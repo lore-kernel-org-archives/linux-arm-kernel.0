@@ -1,227 +1,134 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 21 May 2018 15:17:08 +0100
-Subject: [PATCH v9 07/16] KVM: arm64: Repurpose vcpu_arch.debug_flags for
- general-purpose flags
+Date: Mon, 21 May 2018 15:17:14 +0100
+Subject: [PATCH v9 13/16] KVM: arm64: Remove eager host SVE state saving
 In-Reply-To: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
 References: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1526912237-25308-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1526912237-25308-14-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In struct vcpu_arch, the debug_flags field is used to store
-debug-related flags about the vcpu state.
+Now that the host SVE context can be saved on demand from Hyp,
+there is no longer any need to save this state in advance before
+entering the guest.
 
-Since we are about to add some more flags related to FPSIMD and
-SVE, it makes sense to add them to the existing flags field rather
-than adding new fields.  Since there is only one debug_flags flag
-defined so far, there is plenty of free space for expansion.
+This patch removes the relevant call to
+kvm_fpsimd_flush_cpu_state().
 
-In preparation for adding more flags, this patch renames the
-debug_flags field to simply "flags", and updates comments
-appropriately.
-
-The flag definitions are also moved to <asm/kvm_host.h>, since
-their presence in <asm/kvm_asm.h> was for purely historical
-reasons:  these definitions are not used from asm any more, and not
-very likely to be as more Hyp asm is migrated to C.
-
-KVM_ARM64_DEBUG_DIRTY_SHIFT has not been used since commit
-1ea66d27e7b0 ("arm64: KVM: Move away from the assembly version of
-the world switch"), so this patch gets rid of that too.
-
-No functional change.
+Since the problem that function was intended to solve now no longer
+exists, the function and its dependencies are also deleted.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h  | 3 ---
- arch/arm64/include/asm/kvm_host.h | 7 +++++--
- arch/arm64/kvm/debug.c            | 8 ++++----
- arch/arm64/kvm/hyp/debug-sr.c     | 6 +++---
- arch/arm64/kvm/hyp/sysreg-sr.c    | 4 ++--
- arch/arm64/kvm/sys_regs.c         | 9 ++++-----
- 6 files changed, 18 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  3 ---
+ arch/arm64/include/asm/kvm_host.h | 10 ----------
+ arch/arm64/kernel/fpsimd.c        | 21 ---------------------
+ virt/kvm/arm/arm.c                |  3 ---
+ 4 files changed, 37 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index f6648a3..f62ccbf 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -30,9 +30,6 @@
- /* The hyp-stub will return this for any kvm_call_hyp() call */
- #define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index e627ef8..fa0d9e1 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -312,9 +312,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
  
--#define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
--#define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+-/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+-static inline void kvm_fpsimd_flush_cpu_state(void) {}
 -
- /* Translate a kernel address of @sym into its equivalent linear mapping */
- #define kvm_ksym_ref(sym)						\
- 	({								\
+ static inline void kvm_arm_vhe_guest_enter(void) {}
+ static inline void kvm_arm_vhe_guest_exit(void) {}
+ 
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 469de8a..146c167 100644
+index 80f3985..556067c 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -216,8 +216,8 @@ struct kvm_vcpu_arch {
- 	/* Exception Information */
- 	struct kvm_vcpu_fault_info fault;
+@@ -445,16 +445,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ }
+ #endif
  
--	/* Guest debug state */
--	u64 debug_flags;
-+	/* Miscellaneous vcpu state flags */
-+	u64 flags;
- 
- 	/*
- 	 * We maintain more than a single set of debug registers to support
-@@ -293,6 +293,9 @@ struct kvm_vcpu_arch {
- 	bool sysregs_loaded_on_cpu;
+-/*
+- * All host FP/SIMD state is restored on guest exit, so nothing needs
+- * doing here except in the SVE case:
+-*/
+-static inline void kvm_fpsimd_flush_cpu_state(void)
+-{
+-	if (system_supports_sve())
+-		sve_flush_cpu_state();
+-}
+-
+ static inline void kvm_arm_vhe_guest_enter(void)
+ {
+ 	local_daif_mask();
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index bf7ce9b..b0d29b7 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -120,7 +120,6 @@
+  */
+ struct fpsimd_last_state_struct {
+ 	struct user_fpsimd_state *st;
+-	bool sve_in_use;
  };
  
-+/* vcpu_arch flags field values: */
-+#define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
-+
- #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+ static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+@@ -1013,7 +1012,6 @@ void fpsimd_bind_task_to_cpu(void)
+ 		this_cpu_ptr(&fpsimd_last_state);
+ 
+ 	last->st = &current->thread.uw.fpsimd_state;
+-	last->sve_in_use = test_thread_flag(TIF_SVE);
+ 	current->thread.fpsimd_cpu = smp_processor_id();
+ 
+ 	if (system_supports_sve()) {
+@@ -1035,7 +1033,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	last->st = st;
+-	last->sve_in_use = false;
+ }
  
  /*
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index a1f4ebd..00d4223 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -103,7 +103,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
-  *
-  * Additionally, KVM only traps guest accesses to the debug registers if
-  * the guest is not actively using them (see the KVM_ARM64_DEBUG_DIRTY
-- * flag on vcpu->arch.debug_flags).  Since the guest must not interfere
-+ * flag on vcpu->arch.flags).  Since the guest must not interfere
-  * with the hardware state when debugging the guest, we must ensure that
-  * trapping is enabled whenever we are debugging the guest using the
-  * debug registers.
-@@ -111,7 +111,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
- 
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- {
--	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
-+	bool trap_debug = !(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY);
- 	unsigned long mdscr;
- 
- 	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
-@@ -184,7 +184,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 			vcpu_write_sys_reg(vcpu, mdscr, MDSCR_EL1);
- 
- 			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
--			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+			vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
- 			trap_debug = true;
- 
- 			trace_kvm_arm_set_regset("BKPTS", get_num_brps(),
-@@ -206,7 +206,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 
- 	/* If KDE or MDE are set, perform a full save/restore cycle. */
- 	if (vcpu_read_sys_reg(vcpu, MDSCR_EL1) & (DBG_MDSCR_KDE | DBG_MDSCR_MDE))
--		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
- 
- 	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
- 	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_read_sys_reg(vcpu, MDSCR_EL1));
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 3e717f6..5000976 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -163,7 +163,7 @@ void __hyp_text __debug_switch_to_guest(struct kvm_vcpu *vcpu)
- 	if (!has_vhe())
- 		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
- 
--	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-+	if (!(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY))
- 		return;
- 
- 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-@@ -185,7 +185,7 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
- 	if (!has_vhe())
- 		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
- 
--	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-+	if (!(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY))
- 		return;
- 
- 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-@@ -196,7 +196,7 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
- 	__debug_save_state(vcpu, guest_dbg, guest_ctxt);
- 	__debug_restore_state(vcpu, host_dbg, host_ctxt);
- 
--	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
-+	vcpu->arch.flags &= ~KVM_ARM64_DEBUG_DIRTY;
+@@ -1095,24 +1092,6 @@ void fpsimd_flush_cpu_state(void)
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
  }
  
- u32 __hyp_text __kvm_get_mdcr_el2(void)
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index b3894df..35bc168 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -196,7 +196,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
- 	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
- 	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+-/*
+- * Invalidate any task SVE state currently held in this CPU's regs.
+- *
+- * This is used to prevent the kernel from trying to reuse SVE register data
+- * that is detroyed by KVM guest enter/exit.  This function should go away when
+- * KVM SVE support is implemented.  Don't use it for anything else.
+- */
+-#ifdef CONFIG_ARM64_SVE
+-void sve_flush_cpu_state(void)
+-{
+-	struct fpsimd_last_state_struct const *last =
+-		this_cpu_ptr(&fpsimd_last_state);
+-
+-	if (last->st && last->sve_in_use)
+-		fpsimd_flush_cpu_state();
+-}
+-#endif /* CONFIG_ARM64_SVE */
+-
+ #ifdef CONFIG_KERNEL_MODE_NEON
  
--	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-+	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
- 		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
- }
+ DEFINE_PER_CPU(bool, kernel_neon_busy);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 8518df0..16e852e 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
  
-@@ -218,7 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
- 	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
- 	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
+-		/* Flush FP/SIMD state that can't survive guest entry/exit */
+-		kvm_fpsimd_flush_cpu_state();
+-
+ 		kvm_pmu_flush_hwstate(vcpu);
  
--	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-+	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
- 		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
- }
- 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 6e3b969..a436373 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -31,7 +31,6 @@
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
- #include <asm/kvm_arm.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
-@@ -338,7 +337,7 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
- {
- 	if (p->is_write) {
- 		vcpu_write_sys_reg(vcpu, p->regval, r->reg);
--		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
- 	} else {
- 		p->regval = vcpu_read_sys_reg(vcpu, r->reg);
- 	}
-@@ -369,7 +368,7 @@ static void reg_to_dbg(struct kvm_vcpu *vcpu,
- 	}
- 
- 	*dbg_reg = val;
--	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+	vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
- }
- 
- static void dbg_to_reg(struct kvm_vcpu *vcpu,
-@@ -1441,7 +1440,7 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
- {
- 	if (p->is_write) {
- 		vcpu_cp14(vcpu, r->reg) = p->regval;
--		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
- 	} else {
- 		p->regval = vcpu_cp14(vcpu, r->reg);
- 	}
-@@ -1473,7 +1472,7 @@ static bool trap_xvr(struct kvm_vcpu *vcpu,
- 		val |= p->regval << 32;
- 		*dbg_reg = val;
- 
--		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
- 	} else {
- 		p->regval = *dbg_reg >> 32;
- 	}
+ 		local_irq_disable();
 -- 
 2.1.4
