@@ -1,28 +1,25 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 22 May 2018 10:54:59 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add SMP support
-In-Reply-To: <ec4c6905-23d1-8600-a1cc-4297fbd1ddaa@cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <ec4c6905-23d1-8600-a1cc-4297fbd1ddaa@cogentembedded.com>
-Message-ID: <20180522085459.4khvdbjbg5tw3rf5@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 May 2018 14:35:58 +0530
+Subject: [PATCH v11 03/27] clk: davinci: psc: allow for dev == NULL
+In-Reply-To: <20180518164829.27052-4-david@lechnology.com>
+References: <20180518164829.27052-1-david@lechnology.com>
+ <20180518164829.27052-4-david@lechnology.com>
+Message-ID: <250d94db-c33f-51c9-99c1-3a4ddcd627fa@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 11:19:44PM +0300, Sergei Shtylyov wrote:
-> Add the device nodes for 3 more Cortex-A53 CPU cores; adjust the interrupt
-> delivery masks for the ARM GIC and Architectured Timer.
+On Friday 18 May 2018 10:18 PM, David Lechner wrote:
+> On some davinci SoCs, we need to register the PSC clocks during early
+> boot because they are needed for clocksource/clockevent. These changes
+> allow for dev == NULL because in this case, we won't have a platform
+> device for the clocks.
 > 
-> Based on the original (and large) patch by Vladimir Barinov.
+> Some function declarations are moved to a public header files so that they can
+> be called from mach init code.
 > 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
-> The patch is against the 'renesas-devel-20180516v2-v4.17-rc5' tag of Simon
-> Horman's 'renesas.git' repo. Tested successfully on the V3M Starter Kit board
-> (except offlining CPU0 hangs the kernel).
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-This looks fine but I will wait to see if there are other reviews completed
-before applying.
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Thanks,
+Sekhar
