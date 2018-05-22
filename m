@@ -1,88 +1,77 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 22 May 2018 23:46:07 +0300
-Subject: [PATCH v7 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <19968f96da0c548dd7d96e7520ce899e@codeaurora.org>
-References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
- <1526492623-20527-3-git-send-email-rishabhb@codeaurora.org>
- <CAHp75VdO7+u-PQ+RBH71sxHHG0WkAyEVxv0BNPaycbcRnrZang@mail.gmail.com>
- <f1970a64be17267e0f044242dc0764d6@codeaurora.org>
- <CAHp75Vd8HZU+BT38-OfXHiihv1yZG6YBeMWyfweBA+kAwk6HUw@mail.gmail.com>
- <19968f96da0c548dd7d96e7520ce899e@codeaurora.org>
-Message-ID: <CAHp75VdmUrSo+Vu3CebEWwc=CbsnS95ZzGC3zv1+zd5MsVgdUA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 22 May 2018 13:54:57 -0700
+Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+Message-ID: <20180522205457.GA16363@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 11:40 PM,  <rishabhb@codeaurora.org> wrote:
-> On 2018-05-22 12:38, Andy Shevchenko wrote:
->> On Tue, May 22, 2018 at 9:33 PM,  <rishabhb@codeaurora.org> wrote:
->>> On 2018-05-18 14:01, Andy Shevchenko wrote:
+On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
+> If the watchdog hardware is already enabled during the boot process,
+> when the Linux watchdog driver loads, it should reset the watchdog and
+> tell the watchdog framework. As a result, ping can be generated from
+> the watchdog framework, until the userspace watchdog daemon takes over
+> control
+> 
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
+> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+> index 1484609..408ffbe 100644
+> --- a/drivers/watchdog/sp805_wdt.c
+> +++ b/drivers/watchdog/sp805_wdt.c
+> @@ -42,6 +42,7 @@
+>  	/* control register masks */
+>  	#define	INT_ENABLE	(1 << 0)
+>  	#define	RESET_ENABLE	(1 << 1)
+> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
+>  #define WDTINTCLR		0x00C
+>  #define WDTRIS			0x010
+>  #define WDTMIS			0x014
+> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
+>  MODULE_PARM_DESC(nowayout,
+>  		"Set to 1 to keep watchdog running after device release");
+>  
+> +/* returns true if wdt is running; otherwise returns false */
+> +static bool wdt_is_running(struct watchdog_device *wdd)
+> +{
+> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
+> +	    ENABLE_MASK)
+> +		return true;
+> +	else
+> +		return false;
 
->>>>> +struct llcc_slice_desc *llcc_slice_getd(u32 uid)
->>>>> +{
->>>>> +       const struct llcc_slice_config *cfg;
->>>>> +       struct llcc_slice_desc *desc;
->>>>> +       u32 sz, count = 0;
->>>>> +
->>>>> +       cfg = drv_data->cfg;
->>>>> +       sz = drv_data->cfg_size;
->>>>> +
->>>>
->>>>
->>>>
->>>>> +       while (cfg && count < sz) {
->>>>> +               if (cfg->usecase_id == uid)
->>>>> +                       break;
->>>>> +               cfg++;
->>>>> +               count++;
->>>>> +       }
->>>>> +       if (cfg == NULL || count == sz)
->>>>> +               return ERR_PTR(-ENODEV);
+	return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
 
->>>> if (!cfg)
->>>>           return ERR_PTR(-ENODEV);
->>>>
->>>> while (cfg->... != uid) {
->>>>   cfg++;
->>>>   count++;
->>>> }
->>>>
->>>> if (count == sz)
->>>>  return ...
->>>>
->>>> Though I would rather put it to for () loop.
->>>>
->>> In each while loop iteration the cfg pointer needs to be checked for
->>> NULL. What if the usecase id never matches the uid passed by client
->>> and we keep iterating. At some point it will crash.
-
->> do {
->>   if (!cfg || count == sz)
->>    return ...(-ENODEV);
->>  ...
->> } while (...);
->>
->> Though, as I said for-loop will look slightly better I think.
->
-> Is this fine?
-> for (count = 0; count < sz; count++) {
->    if (!cfg)
->         return ERR_PTR(-ENODEV);
->    if (cfg->usecase_id == uid)
->         break;
->    cfg++;
-> }
-> if (count == sz)
->    return ERR_PTR(-ENODEV);
-
-for (count = 0; cfg && count < sz; count++, cfg++)
- if (_id == uid)
-  break;
-
-if (!cfg || count == sz)
-    return ERR_PTR(-ENODEV);
-
-Simpler ?
-
--- 
-With Best Regards,
-Andy Shevchenko
+> +}
+> +
+>  /* This routine finds load value that will reset system in required timout */
+>  static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
+>  {
+> @@ -239,6 +252,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
+>  	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
+>  	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
+>  
+> +	/*
+> +	 * If HW is already running, enable/reset the wdt and set the running
+> +	 * bit to tell the wdt subsystem
+> +	 */
+> +	if (wdt_is_running(&wdt->wdd)) {
+> +		wdt_enable(&wdt->wdd);
+> +		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
+> +	}
+> +
+>  	ret = watchdog_register_device(&wdt->wdd);
+>  	if (ret) {
+>  		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
+> -- 
+> 2.1.4
+> 
