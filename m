@@ -1,65 +1,94 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 22 May 2018 08:29:24 -0700
-Subject: [PATCH 05/14] arm64: Add 'ssbd' command-line option
-In-Reply-To: <20180522150648.28297-6-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-6-marc.zyngier@arm.com>
-Message-ID: <77a402ab-d119-cc71-518c-a6d4755b7889@infradead.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 22 May 2018 16:09:35 +0100
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <1526952438-22126-1-git-send-email-rokhanna@nvidia.com>
+References: <1526952438-22126-1-git-send-email-rokhanna@nvidia.com>
+Message-ID: <f2db11aa-1a88-0447-6139-435536de2c61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2018 08:06 AM, Marc Zyngier wrote:
-> On a system where the firmware implements ARCH_WORKAROUND_2,
-> it may be useful to either permanently enable or disable the
-> workaround for cases where the user decides that they'd rather
-> not get a trap overhead, and keep the mitigation permanently
-> on or off instead of switching it on exception entry/exit.
+
+
+Rohit,
+
+On 22/05/18 02:27, Rohit Khanna wrote:
+> In the current implementation,  __apply_alternatives patches
+> flush_icache_range and then executes it without invalidating the icache.
+> Thus, icache can contain some of the old instructions for
+> flush_icache_range. This can cause unpredictable behavior as during
+> execution we can get a mix of old and new instructions for
+> flush_icache_range.
 > 
-> In any case, default to the mitigation being enabled.
+> This patch :
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 1. Adds a new function flush_cache_kernel_range for flushing kernel
+> memory range. This function is not patched during boot and can be safely
+> used to flush cache during code patching.
+> 
+> 2. Modifies __apply_alternatives so that it uses
+> flush_cache_kernel_range to flush the cache range after patching code.
+> 
+> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
 > ---
->  Documentation/admin-guide/kernel-parameters.txt |  17 ++++
->  arch/arm64/include/asm/cpufeature.h             |   6 ++
->  arch/arm64/kernel/cpu_errata.c                  | 102 ++++++++++++++++++++----
->  3 files changed, 109 insertions(+), 16 deletions(-)
+>   arch/arm64/include/asm/cacheflush.h |  1 +
+>   arch/arm64/kernel/alternative.c     |  2 +-
+>   arch/arm64/mm/cache.S               | 42 +++++++++++++++++++++++++++++++++++++
+>   3 files changed, 44 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index f2040d46f095..646e112c6f63 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -4092,6 +4092,23 @@
->  			expediting.  Set to zero to disable automatic
->  			expediting.
->  
-> +	ssbd=		[ARM64,HW]
-> +			Speculative Store Bypass Disable control
-> +
-> +			On CPUs that are vulnerable to the Speculative
-> +			Store Bypass vulnerability and offer a
-> +			firmware based mitigation, this parameter
-> +			indicates how the mitigation should be used:
-> +
-> +			force-on:  Unconditionnaly enable mitigation for
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index 0094c6653b06..54692fabdf74 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -73,6 +73,7 @@
+>    */
+>   extern void flush_icache_range(unsigned long start, unsigned long end);
+>   extern int  invalidate_icache_range(unsigned long start, unsigned long end);
+> +extern void flush_cache_kernel_range(unsigned long start, unsigned long end);
+>   extern void __flush_dcache_area(void *addr, size_t len);
+>   extern void __inval_dcache_area(void *addr, size_t len);
+>   extern void __clean_dcache_area_poc(void *addr, size_t len);
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index 5c4bce4ac381..a5408a3c297a 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -155,7 +155,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>   
+>   		alt_cb(alt, origptr, updptr, nr_inst);
+>   
+> -		flush_icache_range((uintptr_t)origptr,
+> +		flush_cache_kernel_range((uintptr_t)origptr,
+>   				   (uintptr_t)(origptr + nr_inst));
+>   	}
+>   }
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index 30334d81b021..4dd09352a044 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -81,6 +81,48 @@ ENDPROC(flush_icache_range)
+>   ENDPROC(__flush_cache_user_range)
+>   
+>   /*
+> + *	flush_cache_kernel_range(start,end)
+> + *
+> + *	Ensure that the I and D caches are coherent within specified kernel
+> + *	region.
+> + *	This is typically used when code has been written to a kernel memory
+> + *	region and will be executed.
+> + *
+> + *	NOTE - This macro cannot have "alternatives" applied to it as its
+> + *	used to update alternatives
+> + *
+> + *	- start   - virtual start address of region
+> + *	- end     - virtual end address of region
+> + */
+> +ENTRY(flush_cache_kernel_range)
+> +	dcache_line_size x2, x3
+...
 
-			           Unconditionally
+> +	icache_line_size x2, x3
 
-> +				   for both kernel and userspace
-> +			force-off: Unconditionnaly disable mitigation for
+You must use raw_{d,i}cache_line_size helpers above to avoid
+using hot-patched code. The above helpers are patched if you
+have mismatched cache line sizes.
 
-			           Unconditionally
-
-> +				   for both kernel and userspace
-> +			kernel:    Always enable mitigation in the
-> +				   kernel, and offer a prctl interface
-> +				   to allow userspace to register its
-> +				   interest in being mitigated too.
-> +
->  	stack_guard_gap=	[MM]
->  			override the default stack gap protection. The value
->  			is in page units and it defines how many pages prior
-
-
-
--- 
-~Randy
+Suzuki
