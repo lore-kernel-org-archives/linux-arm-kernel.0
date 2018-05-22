@@ -1,213 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 May 2018 16:06:39 +0100
-Subject: [PATCH 05/14] arm64: Add 'ssbd' command-line option
+Date: Tue, 22 May 2018 16:06:48 +0100
+Subject: [PATCH 14/14] arm64: KVM: Add ARCH_WORKAROUND_2 discovery through
+ ARCH_FEATURES_FUNC_ID
 In-Reply-To: <20180522150648.28297-1-marc.zyngier@arm.com>
 References: <20180522150648.28297-1-marc.zyngier@arm.com>
-Message-ID: <20180522150648.28297-6-marc.zyngier@arm.com>
+Message-ID: <20180522150648.28297-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a system where the firmware implements ARCH_WORKAROUND_2,
-it may be useful to either permanently enable or disable the
-workaround for cases where the user decides that they'd rather
-not get a trap overhead, and keep the mitigation permanently
-on or off instead of switching it on exception entry/exit.
+Now that all our infrastructure is in place, let's expose the
+availability of ARCH_WORKAROUND_2 to guests. We take this opportunity
+to tidy up a couple of SMCCC constants.
 
-In any case, default to the mitigation being enabled.
-
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  17 ++++
- arch/arm64/include/asm/cpufeature.h             |   6 ++
- arch/arm64/kernel/cpu_errata.c                  | 102 ++++++++++++++++++++----
- 3 files changed, 109 insertions(+), 16 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 12 ++++++++++++
+ arch/arm64/include/asm/kvm_host.h | 23 +++++++++++++++++++++++
+ arch/arm64/kvm/reset.c            |  4 ++++
+ virt/kvm/arm/psci.c               | 18 ++++++++++++++++--
+ 4 files changed, 55 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index f2040d46f095..646e112c6f63 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -4092,6 +4092,23 @@
- 			expediting.  Set to zero to disable automatic
- 			expediting.
- 
-+	ssbd=		[ARM64,HW]
-+			Speculative Store Bypass Disable control
-+
-+			On CPUs that are vulnerable to the Speculative
-+			Store Bypass vulnerability and offer a
-+			firmware based mitigation, this parameter
-+			indicates how the mitigation should be used:
-+
-+			force-on:  Unconditionnaly enable mitigation for
-+				   for both kernel and userspace
-+			force-off: Unconditionnaly disable mitigation for
-+				   for both kernel and userspace
-+			kernel:    Always enable mitigation in the
-+				   kernel, and offer a prctl interface
-+				   to allow userspace to register its
-+				   interest in being mitigated too.
-+
- 	stack_guard_gap=	[MM]
- 			override the default stack gap protection. The value
- 			is in page units and it defines how many pages prior
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 09b0f2a80c8f..9bc548e22784 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -537,6 +537,12 @@ static inline u64 read_zcr_features(void)
- 	return zcr;
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index c7c28c885a19..d478766b56c1 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -315,6 +315,18 @@ static inline bool kvm_arm_harden_branch_predictor(void)
+ 	return false;
  }
  
-+#define ARM64_SSBD_UNKNOWN		-1
-+#define ARM64_SSBD_FORCE_DISABLE	0
-+#define ARM64_SSBD_EL1_ENTRY		1
-+#define ARM64_SSBD_FORCE_ENABLE		2
-+#define ARM64_SSBD_MITIGATED		3
++#define KVM_SSBD_UNKNOWN		-1
++#define KVM_SSBD_FORCE_DISABLE		0
++#define KVM_SSBD_EL1_ENTRY		1
++#define KVM_SSBD_FORCE_ENABLE		2
++#define KVM_SSBD_MITIGATED		3
 +
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 7fd6d5b001f5..f1d4e75b0ddd 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -235,6 +235,38 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- #ifdef CONFIG_ARM64_SSBD
- DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
- 
-+int ssbd_state __read_mostly = ARM64_SSBD_EL1_ENTRY;
-+
-+static const struct ssbd_options {
-+	const char	*str;
-+	int		state;
-+} ssbd_options[] = {
-+	{ "force-on",	ARM64_SSBD_FORCE_ENABLE, },
-+	{ "force-off",	ARM64_SSBD_FORCE_DISABLE, },
-+	{ "kernel",	ARM64_SSBD_EL1_ENTRY, },
-+};
-+
-+static int __init ssbd_cfg(char *buf)
++static inline int kvm_arm_have_ssbd(void)
 +{
-+	int i;
-+
-+	if (!buf || !buf[0])
-+		return -EINVAL;
-+
-+	for (i = 0; i < ARRAY_SIZE(ssbd_options); i++) {
-+		int len = strlen(ssbd_options[i].str);
-+
-+		if (strncmp(buf, ssbd_options[i].str, len))
-+			continue;
-+
-+		ssbd_state = ssbd_options[i].state;
-+		return 0;
-+	}
-+
-+	return -EINVAL;
++	/* No way to detect it yet, pretend it is not there. */
++	return KVM_SSBD_UNKNOWN;
 +}
-+early_param("ssbd", ssbd_cfg);
 +
- void __init arm64_update_smccc_conduit(struct alt_instr *alt,
- 				       __le32 *origptr, __le32 *updptr,
- 				       int nr_inst)
-@@ -272,44 +304,82 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
- 				    int scope)
- {
- 	struct arm_smccc_res res;
--	bool supported = true;
-+	bool required = true;
-+	s32 val;
+ static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
  
- 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
- 
--	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
-+	if (psci_ops.smccc_version == SMCCC_VERSION_1_0) {
-+		ssbd_state = ARM64_SSBD_UNKNOWN;
- 		return false;
-+	}
- 
--	/*
--	 * The probe function return value is either negative
--	 * (unsupported or mitigated), positive (unaffected), or zero
--	 * (requires mitigation). We only need to do anything in the
--	 * last case.
--	 */
- 	switch (psci_ops.conduit) {
- 	case PSCI_CONDUIT_HVC:
- 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
--		if ((int)res.a0 != 0)
--			supported = false;
- 		break;
- 
- 	case PSCI_CONDUIT_SMC:
- 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
--		if ((int)res.a0 != 0)
--			supported = false;
- 		break;
- 
- 	default:
--		supported = false;
-+		ssbd_state = ARM64_SSBD_UNKNOWN;
-+		return false;
- 	}
- 
--	if (supported) {
--		__this_cpu_write(arm64_ssbd_callback_required, 1);
-+	val = (s32)res.a0;
-+
-+	switch (val) {
-+	case SMCCC_RET_NOT_SUPPORTED:
-+		ssbd_state = ARM64_SSBD_UNKNOWN;
-+		return false;
-+
-+	case SMCCC_RET_NOT_REQUIRED:
-+		ssbd_state = ARM64_SSBD_MITIGATED;
-+		return false;
-+
-+	case SMCCC_RET_SUCCESS:
-+		required = true;
-+		break;
-+
-+	case 1:	/* Mitigation not required on this CPU */
-+		required = false;
-+		break;
-+
-+	default:
-+		WARN_ON(1);
-+		return false;
-+	}
-+
-+	switch (ssbd_state) {
-+	case ARM64_SSBD_FORCE_DISABLE:
-+		pr_info_once("%s disabled from command-line\n", entry->desc);
-+		do_ssbd(false);
-+		required = false;
-+		break;
-+
-+	case ARM64_SSBD_EL1_ENTRY:
-+		if (required) {
-+			__this_cpu_write(arm64_ssbd_callback_required, 1);
-+			do_ssbd(true);
-+		}
-+		break;
-+
-+	case ARM64_SSBD_FORCE_ENABLE:
-+		pr_info_once("%s forced from command-line\n", entry->desc);
- 		do_ssbd(true);
-+		required = true;
-+		break;
-+
-+	default:
-+		WARN_ON(1);
-+		break;
- 	}
- 
--	return supported;
-+	return required;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 9bef3f69bdcd..082b0dbb85c6 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -455,6 +455,29 @@ static inline bool kvm_arm_harden_branch_predictor(void)
+ 	return cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
  }
- #endif	/* CONFIG_ARM64_SSBD */
  
++#define KVM_SSBD_UNKNOWN		-1
++#define KVM_SSBD_FORCE_DISABLE		0
++#define KVM_SSBD_EL1_ENTRY		1
++#define KVM_SSBD_FORCE_ENABLE		2
++#define KVM_SSBD_MITIGATED		3
++
++static inline int kvm_arm_have_ssbd(void)
++{
++	switch (arm64_get_ssbd_state()) {
++	case ARM64_SSBD_FORCE_DISABLE:
++		return KVM_SSBD_FORCE_DISABLE;
++	case ARM64_SSBD_EL1_ENTRY:
++		return KVM_SSBD_EL1_ENTRY;
++	case ARM64_SSBD_FORCE_ENABLE:
++		return KVM_SSBD_FORCE_ENABLE;
++	case ARM64_SSBD_MITIGATED:
++		return KVM_SSBD_MITIGATED;
++	case ARM64_SSBD_UNKNOWN:
++	default:
++		return KVM_SSBD_UNKNOWN;
++	}
++}
++
+ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
+ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
+ 
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3256b9228e75..20a7dfee8494 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -122,6 +122,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset PMU */
+ 	kvm_pmu_vcpu_reset(vcpu);
+ 
++	/* Default workaround setup is enabled (if supported) */
++	if (kvm_arm_have_ssbd() == KVM_SSBD_EL1_ENTRY)
++		vcpu->arch.workaround_flags |= VCPU_WORKAROUND_2_FLAG;
++
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu);
+ }
+diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+index c4762bef13c6..4843bfa1f986 100644
+--- a/virt/kvm/arm/psci.c
++++ b/virt/kvm/arm/psci.c
+@@ -405,7 +405,7 @@ static int kvm_psci_call(struct kvm_vcpu *vcpu)
+ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ {
+ 	u32 func_id = smccc_get_function(vcpu);
+-	u32 val = PSCI_RET_NOT_SUPPORTED;
++	u32 val = SMCCC_RET_NOT_SUPPORTED;
+ 	u32 feature;
+ 
+ 	switch (func_id) {
+@@ -417,7 +417,21 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ 		switch(feature) {
+ 		case ARM_SMCCC_ARCH_WORKAROUND_1:
+ 			if (kvm_arm_harden_branch_predictor())
+-				val = 0;
++				val = SMCCC_RET_SUCCESS;
++			break;
++		case ARM_SMCCC_ARCH_WORKAROUND_2:
++			switch (kvm_arm_have_ssbd()) {
++			case KVM_SSBD_FORCE_DISABLE:
++			case KVM_SSBD_UNKNOWN:
++				break;
++			case KVM_SSBD_EL1_ENTRY:
++				val = SMCCC_RET_SUCCESS;
++				break;
++			case KVM_SSBD_FORCE_ENABLE:
++			case KVM_SSBD_MITIGATED:
++				val = SMCCC_RET_NOT_REQUIRED;
++				break;
++			}
+ 			break;
+ 		}
+ 		break;
 -- 
 2.14.2
