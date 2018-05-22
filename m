@@ -1,48 +1,66 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 23 May 2018 00:01:57 +0200
-Subject: [PATCH 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
-In-Reply-To: <CAMuHMdXRnoyhNz=3v_=ZCV=FWX4TwKqx7MpH0g3c7GwtXKP1tg@mail.gmail.com>
-References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
- <CAMuHMdXRnoyhNz=3v_=ZCV=FWX4TwKqx7MpH0g3c7GwtXKP1tg@mail.gmail.com>
-Message-ID: <fc1cfd7e-db27-9277-dbed-cc2274c614a6@gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 22 May 2018 16:24:25 -0700
+Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <20180522205457.GA16363@roeck-us.net>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+ <20180522205457.GA16363@roeck-us.net>
+Message-ID: <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2018 04:43 PM, Geert Uytterhoeven wrote:
-> On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> Drop the MTD partitioning from DT, since it does not describe HW
->> and to give way to a more flexible kernel command line partition
->> passing.
+Hi Guenter,
+
+On 5/22/2018 1:54 PM, Guenter Roeck wrote:
+> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
+>> If the watchdog hardware is already enabled during the boot process,
+>> when the Linux watchdog driver loads, it should reset the watchdog and
+>> tell the watchdog framework. As a result, ping can be generated from
+>> the watchdog framework, until the userspace watchdog daemon takes over
+>> control
 >>
->> To retain the original partitioning, assure you have enabled
->> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
->> following to your kernel command line:
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> ---
+>>   drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
 >>
->>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
+>> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+>> index 1484609..408ffbe 100644
+>> --- a/drivers/watchdog/sp805_wdt.c
+>> +++ b/drivers/watchdog/sp805_wdt.c
+>> @@ -42,6 +42,7 @@
+>>   	/* control register masks */
+>>   	#define	INT_ENABLE	(1 << 0)
+>>   	#define	RESET_ENABLE	(1 << 1)
+>> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
+>>   #define WDTINTCLR		0x00C
+>>   #define WDTRIS			0x010
+>>   #define WDTMIS			0x014
+>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
+>>   MODULE_PARM_DESC(nowayout,
+>>   		"Set to 1 to keep watchdog running after device release");
+>>   
+>> +/* returns true if wdt is running; otherwise returns false */
+>> +static bool wdt_is_running(struct watchdog_device *wdd)
+>> +{
+>> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+>> +
+>> +	if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
+>> +	    ENABLE_MASK)
+>> +		return true;
+>> +	else
+>> +		return false;
 > 
-> I think the "@0" can be dropped, as it's optional?
-> 4m?
-
-My take on this is that the loader is actually at offset 0x0 of the MTD
-device and we explicitly state that in the mtdparts to anchor the first
-partition within the MTD device and all the other partitions are at
-offset +(sum of the sizes of all partitions listed before the current
-one) relative to that first partition.
-
-Removing the @0 feels fragile at best and it seems to depend on the
-current behavior of the code.
-
-> (Gaining more knowledge during reviewing ;-)
-> 
->> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
+> 	return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
 > 
 
+Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
+therefore, a simple !!(expression) would not work? That is, the masked 
+result needs to be compared against the mask again to ensure both bits 
+are set, right?
 
--- 
-Best regards,
-Marek Vasut
+Thanks,
+
+Ray
