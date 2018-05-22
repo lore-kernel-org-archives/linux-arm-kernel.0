@@ -1,127 +1,43 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 22 May 2018 17:11:20 +0100
-Subject: [PATCH v3] arm64: fault: Don't leak data in ESR context for user
- fault on kernel VA
-Message-ID: <20180522161120.12798-1-peter.maydell@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 22 May 2018 17:08:57 +0100
+Subject: [PATCH] drivers/perf: Remove ARM_SPE_PMU explicit PERF_EVENTS
+ dependency
+In-Reply-To: <1527004444-239462-1-git-send-email-john.garry@huawei.com>
+References: <1527004444-239462-1-git-send-email-john.garry@huawei.com>
+Message-ID: <20180522160857.43a4ktp65inpotfr@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If userspace faults on a kernel address, handing them the raw ESR
-value on the sigframe as part of the delivered signal can leak data
-useful to attackers who are using information about the underlying hardware
-fault type (e.g. translation vs permission) as a mechanism to defeat KASLR.
+On Tue, May 22, 2018 at 11:54:04PM +0800, John Garry wrote:
+> Since commit bddb9b68d3fb ("drivers/perf: commonise PERF_EVENTS
+> dependency"), all perf drivers depend on PERF_EVENTS config under a
+> common menu.
+> 
+> Config ARM_SPE_PMU still declares explicitly a dependency on
+> PERF_EVENTS, which is unneeded, so remove it.
+> 
+> Signed-off-by: John Garry <john.garry@huawei.com>
 
-However there are also legitimate uses for the information provided
-in the ESR -- notably the GCC and LLVM sanitizers use this to report
-whether wild pointer accesses by the application are reads or writes
-(since a wild write is a more serious bug than a wild read), so we
-don't want to drop the ESR information entirely.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-For faulting addresses in the kernel, sanitize the ESR. We choose
-to present userspace with the illusion that there is nothing mapped
-in the kernel's part of the address space at all, by reporting all
-faults as level 0 translation faults taken to EL1.
+Will, I assume that you will queue this.
 
-These fields are safe to pass through to userspace as they depend
-only on the instruction that userspace used to provoke the fault:
- EC IL (always)
- ISV CM WNR (for all data aborts)
-All the other fields in ESR except DFSC are architecturally RES0
-for an L0 translation fault taken to EL1, so can be zeroed out
-without confusing userspace.
+Mark.
 
-The illusion is not entirely perfect, as there is a tiny wrinkle
-where we will report an alignment fault that was not due to the memory
-type (for instance a LDREX to an unaligned address) as a translation
-fault, whereas if you do this on real unmapped memory the alignment
-fault takes precedence. This is not likely to trip anybody up in
-practice, as the only users we know of for the ESR information who
-care about the behaviour for kernel addresses only really want to
-know about the WnR bit.
-
-Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
----
-This patch is an alternative proposal to Will's patch
-https://patchwork.kernel.org/patch/10258781/
-which simply removed the ESR record entirely for kernel addresses.
-
-Changes v1->v2:
- * rebased on master
- * commit message tweak
- * DABT_CUR and IABT_CUR moved to "can't happen" default case
- * explicitly clear the bits which are RES0 if ISV == 0
- * comment text tweaks
-Changes v2->v3:
- * remove the support for reporting ESRs with ISV == 1 (this
-   can't happen, and we probably don't want to tell userspace
-   that the exception was taken to EL2 if in some hypothetical
-   future that becomes possible)
- * rebased on 4.17-rc6
----
- arch/arm64/mm/fault.c | 51 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 4165485e8b6e..2af3dd89bcdb 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -293,6 +293,57 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
- static void __do_user_fault(struct siginfo *info, unsigned int esr)
- {
- 	current->thread.fault_address = (unsigned long)info->si_addr;
-+
-+	/*
-+	 * If the faulting address is in the kernel, we must sanitize the ESR.
-+	 * From userspace's point of view, kernel-only mappings don't exist
-+	 * at all, so we report them as level 0 translation faults.
-+	 * (This is not quite the way that "no mapping there at all" behaves:
-+	 * an alignment fault not caused by the memory type would take
-+	 * precedence over translation fault for a real access to empty
-+	 * space. Unfortunately we can't easily distinguish "alignment fault
-+	 * not caused by memory type" from "alignment fault caused by memory
-+	 * type", so we ignore this wrinkle and just return the translation
-+	 * fault.)
-+	 */
-+	if (current->thread.fault_address >= TASK_SIZE) {
-+		switch (ESR_ELx_EC(esr)) {
-+		case ESR_ELx_EC_DABT_LOW:
-+			/*
-+			 * These bits provide only information about the
-+			 * faulting instruction, which userspace knows already.
-+			 * We explicitly clear bits which are architecturally
-+			 * RES0 in case they are given meanings in future.
-+			 * We always report the ESR as if the fault was taken
-+			 * to EL1 and so ISV and the bits in ISS[23:14] are
-+			 * clear. (In fact it always will be a fault to EL1.)
-+			 */
-+			esr &= ESR_ELx_EC_MASK | ESR_ELx_IL |
-+				ESR_ELx_CM | ESR_ELx_WNR;
-+			esr |= ESR_ELx_FSC_FAULT;
-+			break;
-+		case ESR_ELx_EC_IABT_LOW:
-+			/*
-+			 * Claim a level 0 translation fault.
-+			 * All other bits are architecturally RES0 for faults
-+			 * reported with that DFSC value, so we clear them.
-+			 */
-+			esr &= ESR_ELx_EC_MASK | ESR_ELx_IL;
-+			esr |= ESR_ELx_FSC_FAULT;
-+			break;
-+		default:
-+			/*
-+			 * This should never happen (entry.S only brings us
-+			 * into this code for insn and data aborts from a lower
-+			 * exception level). Fail safe by not providing an ESR
-+			 * context record at all.
-+			 */
-+			WARN(1, "ESR 0x%x is not DABT or IABT from EL0\n", esr);
-+			esr = 0;
-+			break;
-+		}
-+	}
-+
- 	current->thread.fault_code = esr;
- 	arm64_force_sig_info(info, esr_to_fault_info(esr)->name, current);
- }
--- 
-2.17.0
+> 
+> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+> index 28bb5a0..90ce4da 100644
+> --- a/drivers/perf/Kconfig
+> +++ b/drivers/perf/Kconfig
+> @@ -94,7 +94,7 @@ config XGENE_PMU
+>  
+>  config ARM_SPE_PMU
+>  	tristate "Enable support for the ARMv8.2 Statistical Profiling Extension"
+> -	depends on PERF_EVENTS && ARM64
+> +	depends on ARM64
+>  	help
+>  	  Enable perf support for the ARMv8.2 Statistical Profiling
+>  	  Extension, which provides periodic sampling of operations in
+> -- 
+> 1.9.1
+> 
