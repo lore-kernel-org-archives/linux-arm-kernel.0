@@ -1,57 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 13:02:38 -0500
-Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
-In-Reply-To: <1526615528-9707-2-git-send-email-djw@t-chip.com.cn>
-References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
- <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
- <1526615528-9707-2-git-send-email-djw@t-chip.com.cn>
-Message-ID: <20180522180238.GA7328@rob-hp-laptop>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 22 May 2018 20:03:41 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+ <20180402142249.7e076a64@bbrezillon>
+ <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
+ <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
+ <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
+ <20180403091813.5fb5c18c@bbrezillon>
+ <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
+ <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+Message-ID: <498f4a40-0f4b-fb32-2d6c-032b5341f2b0@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 11:52:05AM +0800, djw at t-chip.com.cn wrote:
-> From: Levin Du <djw@t-chip.com.cn>
+On 2018-04-11 17:34, Nicolas Ferre wrote:
+> On 11/04/2018 at 16:44, Peter Rosin wrote:
+>> Hi Nicolas,
+>>
+>> Boris asked for your input on this (the datasheet difference appears to
+>> have no bearing on the issue) elsewhere in the tree of messages. It's
+>> now been a week or so and I'm starting to wonder if you missed this
+>> altogether or if you are simply out of office or something?
 > 
-> Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
-> which do not belong to the general pinctrl.
+> Hi Peter,
 > 
-> Adding gpio-syscon support makes controlling regulator or
-> LED using these special pins very easy by reusing existing
-> drivers, such as gpio-regulator and led-gpio.
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
-> 
-> ---
-> 
-> Changes in v2:
-> - Rename gpio_syscon10 to gpio_mute in doc
-> 
-> Changes in v1:
-> - Refactured for general gpio-syscon usage for Rockchip SoCs.
-> - Add doc rockchip,gpio-syscon.txt
-> 
->  .../bindings/gpio/rockchip,gpio-syscon.txt         | 41 ++++++++++++++++++++++
->  drivers/gpio/gpio-syscon.c                         | 30 ++++++++++++++++
->  2 files changed, 71 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
-> new file mode 100644
-> index 0000000..b1b2a67
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
-> @@ -0,0 +1,41 @@
-> +* Rockchip GPIO support for GRF_SOC_CON registers
-> +
-> +Required properties:
-> +- compatible: Should contain "rockchip,gpio-syscon".
-> +- gpio-controller: Marks the device node as a gpio controller.
-> +- #gpio-cells: Should be two. The first cell is the pin number and
-> +  the second cell is used to specify the gpio polarity:
-> +    0 = Active high,
-> +    1 = Active low.
+> I didn't dig into this issue with matrix datasheet reset values and your 
+> findings below. I'll try to move forward with your detailed explanation 
+> and with my contacts within the "product" team internally.
 
-There's no need for this child node. Just make the parent node a gpio 
-controller.
+Hi again, just checking in to see if there is any progress? If not, maybe
+it's time to just take the patch as-is, warts and imperfections included,
+and even if we all hate it. But what to do...
 
-Rob
+Cheers,
+Peter
