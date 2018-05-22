@@ -1,43 +1,45 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 22 May 2018 13:21:47 +0200
-Subject: [PATCH RFC V2 1/6] ARM: bcm2835: Add GET_THROTTLED firmware property
-In-Reply-To: <1526988112-4021-1-git-send-email-stefan.wahren@i2se.com>
-References: <1526988112-4021-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1526988112-4021-2-git-send-email-stefan.wahren@i2se.com>
+Date: Tue, 22 May 2018 13:21:46 +0200
+Subject: [PATCH RFC V2 0/6] hwmon: Add support for Raspberry Pi voltage sensor
+Message-ID: <1526988112-4021-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent Raspberry Pi firmware provides a mailbox property to detect
-under-voltage conditions. Here is the current definition.
+A common issue for the Raspberry Pi is an inadequate power supply. 
+Noralf Tr?nnes started a discussion [1] about writing such undervoltage
+conditions into the kernel log.
 
-The u32 value returned by the firmware is divided into 2 parts:
-  - lower 16-bits are the live value
-  - upper 16-bits are the history or sticky value
+This series is a draft to upstream the resulting kernel patch and is not
+intended for 4.18.
 
-  Bits:
-  0: undervoltage
-  1: arm frequency capped
-  2: currently throttled
-  16: undervoltage has occurred
-  17: arm frequency capped has occurred
-  18: throttling has occurred
+Changes in V2:
+- simplified Kconfig dependency suggested by Robin Murphy
+- replace dt-binding by probing from firmware driver
+- add hwmon documentation
+- minor improvements suggested by Guenter Roeck
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- include/soc/bcm2835/raspberrypi-firmware.h | 1 +
- 1 file changed, 1 insertion(+)
+[1] - https://github.com/raspberrypi/linux/issues/2367
 
-diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
-index 8ee8991..c4a5c9e 100644
---- a/include/soc/bcm2835/raspberrypi-firmware.h
-+++ b/include/soc/bcm2835/raspberrypi-firmware.h
-@@ -75,6 +75,7 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
- 	RPI_FIRMWARE_GET_CUSTOMER_OTP =                       0x00030021,
- 	RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
-+	RPI_FIRMWARE_GET_THROTTLED =                          0x00030046,
- 	RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
- 	RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
- 	RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
+Stefan Wahren (6):
+  ARM: bcm2835: Add GET_THROTTLED firmware property
+  hwmon: Add support for RPi voltage sensor
+  firmware: raspberrypi: Register hwmon driver
+  ARM: bcm2835_defconfig: Enable RPi voltage sensor
+  ARM: multi_v7_defconfig: Enable RPi voltage sensor
+  arm64: defconfig: Enable RPi voltage sensor
+
+ Documentation/hwmon/raspberrypi-hwmon      |  22 ++++
+ arch/arm/configs/bcm2835_defconfig         |   2 +-
+ arch/arm/configs/multi_v7_defconfig        |   1 +
+ arch/arm64/configs/defconfig               |   1 +
+ drivers/firmware/raspberrypi.c             |  19 ++++
+ drivers/hwmon/Kconfig                      |  10 ++
+ drivers/hwmon/Makefile                     |   1 +
+ drivers/hwmon/raspberrypi-hwmon.c          | 168 +++++++++++++++++++++++++++++
+ include/soc/bcm2835/raspberrypi-firmware.h |   1 +
+ 9 files changed, 224 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/hwmon/raspberrypi-hwmon
+ create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
+
 -- 
 2.7.4
