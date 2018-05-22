@@ -1,43 +1,48 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 22 May 2018 22:41:39 +0300
-Subject: v4.17-rc1: regressions on N900, N950
-In-Reply-To: <20180522080250.4fzyvqrgw5oigexn@pali>
-References: <20180422074213.GA12428@amd>
- <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
- <20180521213952.GA11596@amd> <20180522080250.4fzyvqrgw5oigexn@pali>
-Message-ID: <20180522194139.GB2299@darkstar.musicnaut.iki.fi>
+From: daniel@zonque.org (Daniel Mack)
+Date: Tue, 22 May 2018 21:46:26 +0200
+Subject: [PATCH 2/2] ARM: pxa: dts: add pin definitions for extended GPIOs
+In-Reply-To: <87tvqzxz5z.fsf@belgarion.home>
+References: <20180521220044.821-1-daniel@zonque.org>
+ <20180521220044.821-2-daniel@zonque.org> <87tvqzxz5z.fsf@belgarion.home>
+Message-ID: <e97656f6-2bfb-c479-e0c2-cd18a6fd20d9@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday, May 22, 2018 09:34 PM, Robert Jarzmik wrote:
+> Daniel Mack <daniel@zonque.org> writes:
+> 
+>> The PXA3xx series features some extended GPIO banks which are named GPIO0_2,
+>> GPIO1_2 etc. The PXA300, PXA310 and PXA320 have different numbers of such
+>> pins, and they also have variant-specific register offsets.
+>>
+>> Signed-off-by: Daniel Mack <daniel@zonque.org>
+>> ---
+>>   arch/arm/boot/dts/pxa3xx.dtsi | 24 ++++++++++++++++++++++++
+>>   1 file changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
+>> index a13ac52e4fd2..446e612688c0 100644
+>> --- a/arch/arm/boot/dts/pxa3xx.dtsi
+>> +++ b/arch/arm/boot/dts/pxa3xx.dtsi
+>> @@ -8,6 +8,13 @@
+>>   	 (gpio <= 98) ? (0x0400 + 4 * (gpio - 27)) :	\
+>>   	 (gpio <= 127) ? (0x0600 + 4 * (gpio - 99)) :	\
+>>   	 0)
+>> +#define MFP_PIN_PXA300_0_2	0x674
+>> +#define MFP_PIN_PXA300_1_2	0x678
+>> +#define MFP_PIN_PXA300_2_2	0x2dc
+>> +#define MFP_PIN_PXA300_3_2	0x2e0
+>> +#define MFP_PIN_PXA300_4_2	0x2e4
+>> +#define MFP_PIN_PXA300_5_2	0x2e8
+>> +#define MFP_PIN_PXA300_6_2	0x2ec
+> 
+> To be consistent with the previous items, could it be something like :
+> #define MFP_PIN_PXA300_2(gpio) \
+>    ... etc ...
+> 
 
-On Tue, May 22, 2018 at 10:02:50AM +0200, Pali Roh?r wrote:
-> Hi! I remember that in time of migration from platform board code to
-> device tree structures there appeared some bug which caused that
-> sometimes display were not initialized. And somebody figured out that
-> display initialization is failing when some other SPI devices are
-> initialized before or after display... This behavior was observed only
-> on real N900 hardware, not in qemu.
+Ah, yes. Much nicer. Will resend!
 
-Touchscreen needs to be initialized before display. This is documented
-in the DTS, see arch/arm/boot/dts/omap3-n900.dts:
 
-	* For some reason, touchscreen is necessary for screen to work at
-	* all on real hw. It works well without it on emulator.
-	*
-	* Also... order in the device tree actually matters here.
-
-> Real reason was never explained. In old platform board code there was
-> hardcoded order of SPI devices in which initialization happened. And in
-> device tree it is probably in (pseudo)-random order. Enabling/disabling
-> various config option can affect some timings and order in which kernel
-> starts probing and initializing devices...
-
-The issue was also somewhat present with platform/board code, see e.g.
-commit e65f131a14726e5f1b880a528271a52428e5b3a5.
-
-My device worked with v4.17-rc1 (haven't found time to test newer kernels),
-but if you say the probe order is random then we must find some proper way
-to express the dependency.
-
-A.
+Thanks,
+Daniel
