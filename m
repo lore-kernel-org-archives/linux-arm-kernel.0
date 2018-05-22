@@ -1,68 +1,57 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 22 May 2018 19:58:31 +0200
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <86k1rzc4ba.wl-marc.zyngier@arm.com>
-References: <20180518170202.11458-1-samitolvanen@google.com>
- <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
- <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
- <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
- <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
- <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
- <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
- <86k1rzc4ba.wl-marc.zyngier@arm.com>
-Message-ID: <CAAeHK+z2LmMYasYtRTt2U=QF8Pe_i10RA3-SkLzGXXByZqLh1w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 13:02:38 -0500
+Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
+In-Reply-To: <1526615528-9707-2-git-send-email-djw@t-chip.com.cn>
+References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
+ <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
+ <1526615528-9707-2-git-send-email-djw@t-chip.com.cn>
+Message-ID: <20180522180238.GA7328@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 12:44 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> That would definitely be the right thing to do. Make sure you (or
-> Andrey tests with the latest released mainline kernel (4.16 for now)
-> or (even better) the tip of Linus' tree.
+On Fri, May 18, 2018 at 11:52:05AM +0800, djw at t-chip.com.cn wrote:
+> From: Levin Du <djw@t-chip.com.cn>
+> 
+> Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
+> which do not belong to the general pinctrl.
+> 
+> Adding gpio-syscon support makes controlling regulator or
+> LED using these special pins very easy by reusing existing
+> drivers, such as gpio-regulator and led-gpio.
+> 
+> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+> 
+> ---
+> 
+> Changes in v2:
+> - Rename gpio_syscon10 to gpio_mute in doc
+> 
+> Changes in v1:
+> - Refactured for general gpio-syscon usage for Rockchip SoCs.
+> - Add doc rockchip,gpio-syscon.txt
+> 
+>  .../bindings/gpio/rockchip,gpio-syscon.txt         | 41 ++++++++++++++++++++++
+>  drivers/gpio/gpio-syscon.c                         | 30 ++++++++++++++++
+>  2 files changed, 71 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> new file mode 100644
+> index 0000000..b1b2a67
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> @@ -0,0 +1,41 @@
+> +* Rockchip GPIO support for GRF_SOC_CON registers
+> +
+> +Required properties:
+> +- compatible: Should contain "rockchip,gpio-syscon".
+> +- gpio-controller: Marks the device node as a gpio controller.
+> +- #gpio-cells: Should be two. The first cell is the pin number and
+> +  the second cell is used to specify the gpio polarity:
+> +    0 = Active high,
+> +    1 = Active low.
 
-Hi!
+There's no need for this child node. Just make the parent node a gpio 
+controller.
 
-I can confirm that after applying this patch onto 4.17-rc4 kernel the
-Odroid C2 board that I have boots (it doesn't without the patch).
-
-This is the result of running KVM tests that I was able to find [1]:
-
-root at odroid64:/home/odroid/kvm-unit-tests# ./run_tests.sh
-PASS selftest-setup (2 tests)
-PASS selftest-vectors-kernel (2 tests)
-PASS selftest-vectors-user (2 tests)
-PASS selftest-smp (5 tests)
-PASS pci-test (1 tests)
-FAIL pmu (3 tests, 3 unexpected failures)
-PASS gicv2-ipi (3 tests)
-SKIP gicv3-ipi (qemu-system-aarch64: Initialization of device
-kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
-PASS gicv2-active (1 tests)
-SKIP gicv3-active (qemu-system-aarch64: Initialization of device
-kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
-PASS psci (4 tests)
-PASS timer (8 tests)
-
-Here is the result of running the same tests on GCC compiled kernel
-(looks the same):
-
-root at odroid64:/home/odroid/kvm-unit-tests# ./run_tests.sh
-PASS selftest-setup (2 tests)
-PASS selftest-vectors-kernel (2 tests)
-PASS selftest-vectors-user (2 tests)
-PASS selftest-smp (5 tests)
-PASS pci-test (1 tests)
-FAIL pmu (3 tests, 3 unexpected failures)
-PASS gicv2-ipi (3 tests)
-SKIP gicv3-ipi (qemu-system-aarch64: Initialization of device
-kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
-PASS gicv2-active (1 tests)
-SKIP gicv3-active (qemu-system-aarch64: Initialization of device
-kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
-PASS psci (4 tests)
-PASS timer (8 tests)
-
-Tested-by: Andrey Konovalov <andreyknvl@google.com>
-
-Thanks!
-
-[1] https://www.linux-kvm.org/page/KVM-unit-tests
+Rob
