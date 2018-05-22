@@ -1,36 +1,22 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 May 2018 16:29:52 +0200
-Subject: [PATCH 4/9] ARM: dts: koelsch: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-4-marek.vasut+renesas@gmail.com>
-References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-4-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdW_r4D2WyJVJAW6smrg5dipjwB6wV5ZF5O4v3Mq2cXd3g@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 May 2018 15:29:31 +0100
+Subject: [PATCH] arm64: Kconfig: Enable LSE atomics by default
+In-Reply-To: <1526926462-19214-1-git-send-email-will.deacon@arm.com>
+References: <1526926462-19214-1-git-send-email-will.deacon@arm.com>
+Message-ID: <4ace3bc1-4c6e-d6f1-9a62-0dcaeba32b29@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Drop the MTD partitioning from DT, since it does not describe HW
-> and to give way to a more flexible kernel command line partition
-> passing.
->
-> To retain the original partitioning, assure you have enabled
-> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
-> following to your kernel command line:
->
->   mtdparts=spi0.0:512k at 0(loader),5632k(user),-(flash)
->
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+On 21/05/18 19:14, Will Deacon wrote:
+> Now that we're seeing CPUs shipping with LSE atomics, default them to
+> 'on' in Kconfig. CPUs without the instructions will continue to use
+> LDXR/STXR-based sequences, but they will be placed out-of-line by the
+> compiler.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
+	M.
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Jazz is not dead. It just smells funny...
