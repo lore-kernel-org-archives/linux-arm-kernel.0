@@ -1,15 +1,15 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 22 May 2018 10:52:10 +0200
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add GEther support
-In-Reply-To: <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
+Date: Tue, 22 May 2018 10:52:21 +0200
+Subject: [PATCH 2/2] arm64: dts: renesas: v3hsk: add GEther support
+In-Reply-To: <7a853b57-747e-7536-89fe-2e0c847f58f4@cogentembedded.com>
 References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
- <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
-Message-ID: <20180522085209.ehqzfddqknghs6em@verge.net.au>
+ <7a853b57-747e-7536-89fe-2e0c847f58f4@cogentembedded.com>
+Message-ID: <20180522085220.vzffiwiwzixlvpkz@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 10:45:36PM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A77980 part of the GEther device node.
+On Fri, May 18, 2018 at 10:46:19PM +0300, Sergei Shtylyov wrote:
+> Define the V3H Starter Kit board dependent part of the GEther device node.
 > 
 > Based on the original (and large) patch by Vladimir Barinov.
 > 
