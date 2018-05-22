@@ -1,76 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 17:51:40 -0500
-Subject: [RFC PATCH 09/10] arm64: dts: rk3399: Add dfi and dmc nodes.
-In-Reply-To: <20180514211610.26618-10-enric.balletbo@collabora.com>
-References: <20180514211610.26618-1-enric.balletbo@collabora.com>
- <20180514211610.26618-10-enric.balletbo@collabora.com>
-Message-ID: <20180522225140.GA30149@rob-hp-laptop>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 22 May 2018 23:55:27 +0200
+Subject: [PATCH 2/9] ARM: dts: lager: Drop MTD partitioning from DT
+In-Reply-To: <CAMuHMdV1TFH_QwTv4fsOGnUOCNftC9369_1AQmZDK+NBLDmw-Q@mail.gmail.com>
+References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+ <20180522120257.13232-2-marek.vasut+renesas@gmail.com>
+ <CAMuHMdV1TFH_QwTv4fsOGnUOCNftC9369_1AQmZDK+NBLDmw-Q@mail.gmail.com>
+Message-ID: <7f72e09a-3c02-7985-2c42-14e4034ff77e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 11:16:09PM +0200, Enric Balletbo i Serra wrote:
-> From: Lin Huang <hl@rock-chips.com>
+On 05/22/2018 04:32 PM, Geert Uytterhoeven wrote:
+> On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> Drop the MTD partitioning from DT, since it does not describe HW
+>> and to give way to a more flexible kernel command line partition
+>> passing.
+>>
+>> To retain the original partitioning, assure you have enabled
+>> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+>> following to your kernel command line:
+>>
+>>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
 > 
-> These are required to support DDR DVFS on rk3399 platform. The patch also
-> introduces two new files (rk3399-dram.h and rk3399-dram-default-timing)
-> with default DRAM settings.
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
-> 
->  .../rockchip/rk3399-dram-default-timing.dtsi  | 38 ++++++++++
->  arch/arm64/boot/dts/rockchip/rk3399-dram.h    | 73 +++++++++++++++++++
->  .../boot/dts/rockchip/rk3399-op1-opp.dtsi     | 29 ++++++++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 20 +++++
->  4 files changed, 160 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram.h
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
-> new file mode 100644
-> index 000000000000..4dfe3e1d8bdf
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
-> @@ -0,0 +1,38 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR X11)
-> +/*
-> + * Copyright (c) 2016-2018, Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * Author: Lin Huang <hl@rock-chips.com>
-> + */
-> +
-> +#include "rk3399-dram.h"
-> +
-> +rockchip,ddr3_speed_bin = <21>;
-> +rockchip,pd_idle = <0x40>;
-> +rockchip,sr_idle = <0x2>;
+> I guess s/4096k/4m/ works, too?
 
-Don't do includes this way please. These should go under a node.
+Yes, but all the other boards use nnn k, so let's stick with k . I don't
+want one value to stick out like a sore thumb.
 
-> +rockchip,sr_mc_gate_idle = <0x3>;
-> +rockchip,srpd_lite_idle	= <0x4>;
-> +rockchip,standby_idle = <0x2000>;
-> +rockchip,dram_dll_dis_freq = <300000000>;
-> +rockchip,phy_dll_dis_freq = <125000000>;
-> +rockchip,auto_pd_dis_freq = <666000000>;
-> +rockchip,ddr3_odt_dis_freq = <333000000>;
-> +rockchip,ddr3_drv = <DDR3_DS_40ohm>;
-> +rockchip,ddr3_odt = <DDR3_ODT_120ohm>;
-> +rockchip,phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
-> +rockchip,phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
-> +rockchip,phy_ddr3_odt = <PHY_DRV_ODT_240>;
-> +rockchip,lpddr3_odt_dis_freq = <333000000>;
-> +rockchip,lpddr3_drv = <LP3_DS_34ohm>;
-> +rockchip,lpddr3_odt = <LP3_ODT_240ohm>;
-> +rockchip,phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
-> +rockchip,phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
-> +rockchip,phy_lpddr3_odt = <PHY_DRV_ODT_240>;
-> +rockchip,lpddr4_odt_dis_freq = <333000000>;
-> +rockchip,lpddr4_drv = <LP4_PDDS_60ohm>;
-> +rockchip,lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
-> +rockchip,lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
-> +rockchip,phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
-> +rockchip,phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
-> +rockchip,phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
-> +rockchip,phy_lpddr4_odt = <PHY_DRV_ODT_60>;
+>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+
+
+-- 
+Best regards,
+Marek Vasut
