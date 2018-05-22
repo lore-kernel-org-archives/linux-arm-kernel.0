@@ -1,94 +1,88 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 22 May 2018 16:09:35 +0100
-Subject: [PATCH] arm64: alternative:flush cache with unpatched code
-In-Reply-To: <1526952438-22126-1-git-send-email-rokhanna@nvidia.com>
-References: <1526952438-22126-1-git-send-email-rokhanna@nvidia.com>
-Message-ID: <f2db11aa-1a88-0447-6139-435536de2c61@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 May 2018 16:06:47 +0100
+Subject: [PATCH 13/14] arm64: KVM: Handle guest's ARCH_WORKAROUND_2 requests
+In-Reply-To: <20180522150648.28297-1-marc.zyngier@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+Message-ID: <20180522150648.28297-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In order to forward the guest's ARCH_WORKAROUND_2 calls to EL3,
+add a small(-ish) sequence to handle it at EL2. Special care must
+be taken to track the state of the guest itself by updating the
+workaround flags. We also rely on patching to enable calls into
+the firmware.
 
+Note that since we need to execute branches, this always executes
+after the Spectre-v2 mitigation has been applied.
 
-Rohit,
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/asm-offsets.c |  1 +
+ arch/arm64/kvm/hyp/hyp-entry.S  | 38 +++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 38 insertions(+), 1 deletion(-)
 
-On 22/05/18 02:27, Rohit Khanna wrote:
-> In the current implementation,  __apply_alternatives patches
-> flush_icache_range and then executes it without invalidating the icache.
-> Thus, icache can contain some of the old instructions for
-> flush_icache_range. This can cause unpredictable behavior as during
-> execution we can get a mix of old and new instructions for
-> flush_icache_range.
-> 
-> This patch :
-> 
-> 1. Adds a new function flush_cache_kernel_range for flushing kernel
-> memory range. This function is not patched during boot and can be safely
-> used to flush cache during code patching.
-> 
-> 2. Modifies __apply_alternatives so that it uses
-> flush_cache_kernel_range to flush the cache range after patching code.
-> 
-> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
-> ---
->   arch/arm64/include/asm/cacheflush.h |  1 +
->   arch/arm64/kernel/alternative.c     |  2 +-
->   arch/arm64/mm/cache.S               | 42 +++++++++++++++++++++++++++++++++++++
->   3 files changed, 44 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index 0094c6653b06..54692fabdf74 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -73,6 +73,7 @@
->    */
->   extern void flush_icache_range(unsigned long start, unsigned long end);
->   extern int  invalidate_icache_range(unsigned long start, unsigned long end);
-> +extern void flush_cache_kernel_range(unsigned long start, unsigned long end);
->   extern void __flush_dcache_area(void *addr, size_t len);
->   extern void __inval_dcache_area(void *addr, size_t len);
->   extern void __clean_dcache_area_poc(void *addr, size_t len);
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index 5c4bce4ac381..a5408a3c297a 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -155,7 +155,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->   
->   		alt_cb(alt, origptr, updptr, nr_inst);
->   
-> -		flush_icache_range((uintptr_t)origptr,
-> +		flush_cache_kernel_range((uintptr_t)origptr,
->   				   (uintptr_t)(origptr + nr_inst));
->   	}
->   }
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 30334d81b021..4dd09352a044 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -81,6 +81,48 @@ ENDPROC(flush_icache_range)
->   ENDPROC(__flush_cache_user_range)
->   
->   /*
-> + *	flush_cache_kernel_range(start,end)
-> + *
-> + *	Ensure that the I and D caches are coherent within specified kernel
-> + *	region.
-> + *	This is typically used when code has been written to a kernel memory
-> + *	region and will be executed.
-> + *
-> + *	NOTE - This macro cannot have "alternatives" applied to it as its
-> + *	used to update alternatives
-> + *
-> + *	- start   - virtual start address of region
-> + *	- end     - virtual end address of region
-> + */
-> +ENTRY(flush_cache_kernel_range)
-> +	dcache_line_size x2, x3
-...
-
-> +	icache_line_size x2, x3
-
-You must use raw_{d,i}cache_line_size helpers above to avoid
-using hot-patched code. The above helpers are patched if you
-have mismatched cache line sizes.
-
-Suzuki
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 5bdda651bd05..323aeb5f2fe6 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -136,6 +136,7 @@ int main(void)
+ #ifdef CONFIG_KVM_ARM_HOST
+   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
+   DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
++  DEFINE(VCPU_WORKAROUND_FLAGS,	offsetof(struct kvm_vcpu, arch.workaround_flags));
+   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index bffece27b5c1..5b1fa37ca1f4 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -106,8 +106,44 @@ el1_hvc_guest:
+ 	 */
+ 	ldr	x1, [sp]				// Guest's x0
+ 	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
++	cbz	w1, wa_epilogue
++
++	/* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
++	eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
++			  ARM_SMCCC_ARCH_WORKAROUND_2)
+ 	cbnz	w1, el1_trap
+-	mov	x0, x1
++
++#ifdef CONFIG_ARM64_SSBD
++alternative_cb	arm64_enable_wa2_handling
++	b	wa2_end
++alternative_cb_end
++	get_vcpu_ptr	x2, x0
++	ldr	x0, [x2, #VCPU_WORKAROUND_FLAGS]
++
++	/* Sanitize the argument and update the guest flags*/
++	ldr	x1, [sp, #8]			// Guest's x1
++	clz	w1, w1				// Murphy's device:
++	lsr	w1, w1, #5			// w1 = !!w1 without using
++	eor	w1, w1, #1			// the flags...
++	bfi	x0, x1, #VCPU_WORKAROUND_2_FLAG_SHIFT, #1
++	str	x0, [x2, #VCPU_WORKAROUND_FLAGS]
++
++	/* Check that we actually need to perform the call */
++	hyp_ldr_this_cpu x0, arm64_ssbd_callback_required, x2
++	cbz	x0, wa2_end
++
++	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
++	smc	#0
++
++	/* Don't leak data from the SMC call */
++	mov	x3, xzr
++wa2_end:
++	mov	x2, xzr
++	mov	x1, xzr
++#endif
++
++wa_epilogue:
++	mov	x0, xzr
+ 	add	sp, sp, #16
+ 	eret
+ 
+-- 
+2.14.2
