@@ -1,106 +1,98 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 22 May 2018 15:07:13 +0300
-Subject: [PATCH v5 9/9] pwm: atmel: add push-pull mode support
+Date: Tue, 22 May 2018 15:07:09 +0300
+Subject: [PATCH v5 5/9] pwm: add PWM modes
 In-Reply-To: <1526990833-30707-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1526990833-30707-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1526990833-30707-10-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1526990833-30707-6-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for PWM push-pull mode. This is only supported by SAMA5D2 SoCs.
+Add PWM normal and complementary modes.
 
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/pwm/pwm-atmel.c | 40 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 36 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/pwm/pwm.txt |  9 +++++++--
+ Documentation/pwm.txt                         | 26 +++++++++++++++++++++++---
+ include/dt-bindings/pwm/pwm.h                 |  1 +
+ 3 files changed, 31 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 87ef54bd492c..aaafc4dd30f2 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -33,8 +33,11 @@
+diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+index 8556263b8502..7c8aaac43f92 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+@@ -46,11 +46,16 @@ period in nanoseconds.
+ Optionally, the pwm-specifier can encode a number of flags (defined in
+ <dt-bindings/pwm/pwm.h>) in a third cell:
+ - PWM_POLARITY_INVERTED: invert the PWM signal polarity
++- PWM_MODE_COMPLEMENTARY: PWM complementary working mode (for PWM channels
++with two outputs); if not specified, the default for PWM channel will be
++used
  
- #define PWM_CMR			0x0
- /* Bit field in CMR */
--#define PWM_CMR_CPOL		(1 << 9)
--#define PWM_CMR_UPD_CDTY	(1 << 10)
-+#define PWM_CMR_CPOL		BIT(9)
-+#define PWM_CMR_UPD_CDTY	BIT(10)
-+#define PWM_CMR_DTHI		BIT(17)
-+#define PWM_CMR_DTLI		BIT(18)
-+#define PWM_CMR_PPM		BIT(19)
- #define PWM_CMR_CPRE_MSK	0xF
+-Example with optional PWM specifier for inverse polarity
++Example with optional PWM specifier for inverse polarity and complementary
++mode:
  
- /* The following registers for PWM v1 */
-@@ -219,16 +222,19 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- {
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 	struct pwm_state cstate;
-+	struct pwm_caps caps;
- 	unsigned long cprd, cdty;
- 	u32 pres, val;
- 	int ret;
+ 	bl: backlight {
+-		pwms = <&pwm 0 5000000 PWM_POLARITY_INVERTED>;
++		pwms = <&pwm 0 5000000
++			(PWM_MODE_COMPLEMENTARY | PWM_POLARITY_INVERTED)>;
+ 		pwm-names = "backlight";
+ 	};
  
- 	pwm_get_state(pwm, &cstate);
-+	pwm_get_caps(chip, pwm, &caps);
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index 8fbf0aa3ba2d..912c43da8b48 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -61,9 +61,9 @@ In addition to the PWM state, the PWM API also exposes PWM arguments, which
+ are the reference PWM config one should use on this PWM.
+ PWM arguments are usually platform-specific and allows the PWM user to only
+ care about dutycycle relatively to the full period (like, duty = 50% of the
+-period). struct pwm_args contains 2 fields (period and polarity) and should
+-be used to set the initial PWM config (usually done in the probe function
+-of the PWM user). PWM arguments are retrieved with pwm_get_args().
++period). struct pwm_args contains 3 fields (period, polarity and mode) and
++should be used to set the initial PWM config (usually done in the probe
++function of the PWM user). PWM arguments are retrieved with pwm_get_args().
  
- 	if (state->enabled) {
- 		if (cstate.enabled &&
- 		    cstate.polarity == state->polarity &&
--		    cstate.period == state->period) {
-+		    cstate.period == state->period &&
-+		    cstate.mode == state->mode) {
- 			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
- 						  atmel_pwm->data->regs.period);
- 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
-@@ -263,6 +269,18 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			val &= ~PWM_CMR_CPOL;
- 		else
- 			val |= PWM_CMR_CPOL;
+ Using PWMs with the sysfs interface
+ -----------------------------------
+@@ -110,6 +110,26 @@ channel that was exported. The following properties will then be available:
+ 	- 0 - disabled
+ 	- 1 - enabled
+ 
++  mode
++    Get/set PWM channel working mode.
 +
-+		/* PWM mode. */
-+		if (caps.modes & PWMC_MODE(PUSH_PULL)) {
-+			if (state->mode == PWMC_MODE(PUSH_PULL)) {
-+				val |= PWM_CMR_PPM | PWM_CMR_DTLI;
-+				val &= ~PWM_CMR_DTHI;
-+			} else {
-+				val &= ~(PWM_CMR_PPM | PWM_CMR_DTLI |
-+					 PWM_CMR_DTHI);
-+			}
-+		}
++    Normal mode - for PWM channels with one output; this should be the
++        default working mode for every PWM channel; output waveforms looks
++        like this:
++             __    __    __    __
++    PWM   __|  |__|  |__|  |__|  |__
++            <--T-->
 +
- 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
- 		atmel_pwm_set_cprd_cdty(chip, pwm, cprd, cdty);
- 		mutex_lock(&atmel_pwm->isr_lock);
-@@ -315,6 +333,20 @@ static const struct atmel_pwm_data atmel_pwm_data_v2 = {
- 	},
- };
++    Complementary mode - for PWM channels with two outputs; output waveforms
++        looks line this:
++             __    __    __    __
++    PWMH1 __|  |__|  |__|  |__|  |__
++          __    __    __    __    __
++    PWML1   |__|  |__|  |__|  |__|
++            <--T-->
++
++    Where T is the signal period.
++
+ Implementing a PWM driver
+ -------------------------
  
-+static const struct atmel_pwm_data atmel_pwm_data_v3 = {
-+	.regs = {
-+		.period		= PWMV2_CPRD,
-+		.period_upd	= PWMV2_CPRDUPD,
-+		.duty		= PWMV2_CDTY,
-+		.duty_upd	= PWMV2_CDTYUPD,
-+	},
-+	.caps = {
-+		.modes = PWMC_MODE(NORMAL) |
-+			 PWMC_MODE(COMPLEMENTARY) |
-+			 PWMC_MODE(PUSH_PULL),
-+	},
-+};
-+
- static const struct platform_device_id atmel_pwm_devtypes[] = {
- 	{
- 		.name = "at91sam9rl-pwm",
-@@ -337,7 +369,7 @@ static const struct of_device_id atmel_pwm_dt_ids[] = {
- 		.data = &atmel_pwm_data_v2,
- 	}, {
- 		.compatible = "atmel,sama5d2-pwm",
--		.data = &atmel_pwm_data_v2,
-+		.data = &atmel_pwm_data_v3,
- 	}, {
- 		/* sentinel */
- 	},
+diff --git a/include/dt-bindings/pwm/pwm.h b/include/dt-bindings/pwm/pwm.h
+index ab9a077e3c7d..b82279cc1787 100644
+--- a/include/dt-bindings/pwm/pwm.h
++++ b/include/dt-bindings/pwm/pwm.h
+@@ -11,5 +11,6 @@
+ #define _DT_BINDINGS_PWM_PWM_H
+ 
+ #define PWM_POLARITY_INVERTED			(1 << 0)
++#define PWM_MODE_COMPLEMENTARY			(1 << 1)
+ 
+ #endif
 -- 
 2.7.4
