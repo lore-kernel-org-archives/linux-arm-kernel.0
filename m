@@ -1,41 +1,247 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 22 May 2018 11:20:43 -0700
-Subject: [PATCH v2 3/3] ARM: dts: imx28/imx53: enable edt-ft5x06 wakeup
- source
-In-Reply-To: <20180520130528.GC26863@dragon>
-References: <20180517090552.5704-1-daniel@zonque.org>
- <20180517090552.5704-4-daniel@zonque.org>
- <20180520130528.GC26863@dragon>
-Message-ID: <20180522182043.GA123708@dtor-ws>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 22 May 2018 23:51:39 +0530
+Subject: [PATCH v2] ARM: AM43XX: Add functions to save/restore am43xx control
+ registers
+Message-ID: <1527013299-7982-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 20, 2018 at 09:05:30PM +0800, Shawn Guo wrote:
-> On Thu, May 17, 2018 at 11:05:52AM +0200, Daniel Mack wrote:
-> > The touchscreen driver no longer configures the device as wakeup source by
-> > default. A "wakeup-source" property is needed.
-> > 
-> > To avoid regressions, this patch changes the DTS files for the only two
-> > users of this driver that didn't have this property yet.
-> > 
-> > Signed-off-by: Daniel Mack <daniel@zonque.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> 
-> Applied this one, thanks.
+From: Tero Kristo <t-kristo@ti.com>
 
-I think there are few more that need "wakeup-source" added:
+These registers are part of the wkup domain and are lost during RTC only
+suspend and also hibernation, so storing/restoring their state is
+necessary.
 
-arch/arm/boot/dts/am437x-sk-evm.dts
-arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
 
-Thanks.
+Changes in v2:
 
+  * Introduced cpu_pm notifier instead of direct calls from pm33xx code.
+  * Tested on am437x-gp-evm
+
+Probably too late for 4.18!
+
+ arch/arm/mach-omap2/control.c | 112 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/control.h |  61 +++++++++++++++++++++++
+ 2 files changed, 173 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 180da403..0bbfb20 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_address.h>
+ #include <linux/regmap.h>
+ #include <linux/mfd/syscon.h>
++#include <linux/cpu_pm.h>
+ 
+ #include "soc.h"
+ #include "iomap.h"
+@@ -621,6 +622,110 @@ void __init omap3_ctrl_init(void)
+ }
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+ 
++static unsigned long am43xx_control_reg_offsets[] = {
++	AM33XX_CONTROL_SYSCONFIG_OFFSET,
++	AM33XX_CONTROL_STATUS_OFFSET,
++	AM43XX_CONTROL_MPU_L2_CTRL_OFFSET,
++	AM33XX_CONTROL_CORE_SLDO_CTRL_OFFSET,
++	AM33XX_CONTROL_MPU_SLDO_CTRL_OFFSET,
++	AM33XX_CONTROL_CLK32KDIVRATIO_CTRL_OFFSET,
++	AM33XX_CONTROL_BANDGAP_CTRL_OFFSET,
++	AM33XX_CONTROL_BANDGAP_TRIM_OFFSET,
++	AM33XX_CONTROL_PLL_CLKINPULOW_CTRL_OFFSET,
++	AM33XX_CONTROL_MOSC_CTRL_OFFSET,
++	AM33XX_CONTROL_DEEPSLEEP_CTRL_OFFSET,
++	AM43XX_CONTROL_DISPLAY_PLL_SEL_OFFSET,
++	AM33XX_CONTROL_INIT_PRIORITY_0_OFFSET,
++	AM33XX_CONTROL_INIT_PRIORITY_1_OFFSET,
++	AM33XX_CONTROL_TPTC_CFG_OFFSET,
++	AM33XX_CONTROL_USB_CTRL0_OFFSET,
++	AM33XX_CONTROL_USB_CTRL1_OFFSET,
++	AM43XX_CONTROL_USB_CTRL2_OFFSET,
++	AM43XX_CONTROL_GMII_SEL_OFFSET,
++	AM43XX_CONTROL_MPUSS_CTRL_OFFSET,
++	AM43XX_CONTROL_TIMER_CASCADE_CTRL_OFFSET,
++	AM43XX_CONTROL_PWMSS_CTRL_OFFSET,
++	AM33XX_CONTROL_MREQPRIO_0_OFFSET,
++	AM33XX_CONTROL_MREQPRIO_1_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP1_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP2_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP3_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP4_OFFSET,
++	AM33XX_CONTROL_SMRT_CTRL_OFFSET,
++	AM33XX_CONTROL_MPUSS_HW_DEBUG_SEL_OFFSET,
++	AM43XX_CONTROL_CQDETECT_STS_OFFSET,
++	AM43XX_CONTROL_CQDETECT_STS2_OFFSET,
++	AM43XX_CONTROL_VTP_CTRL_OFFSET,
++	AM33XX_CONTROL_VREF_CTRL_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_0_3_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_4_7_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_8_11_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_12_15_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_16_19_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_20_23_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_24_27_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_28_31_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_32_35_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_36_39_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_40_43_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_44_47_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_48_51_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_52_55_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_56_59_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_60_63_OFFSET,
++	AM33XX_CONTROL_TIMER_EVT_CAPT_OFFSET,
++	AM33XX_CONTROL_ECAP_EVT_CAPT_OFFSET,
++	AM33XX_CONTROL_ADC_EVT_CAPT_OFFSET,
++	AM43XX_CONTROL_ADC1_EVT_CAPT_OFFSET,
++	AM33XX_CONTROL_RESET_ISO_OFFSET,
++};
++
++static u32 am33xx_control_vals[ARRAY_SIZE(am43xx_control_reg_offsets)];
++
++/**
++ * am43xx_control_save_context - Save the wakeup domain registers
++ *
++ * Save the wkup domain registers
++ */
++void am43xx_control_save_context(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(am43xx_control_reg_offsets); i++)
++		am33xx_control_vals[i] =
++				omap_ctrl_readl(am43xx_control_reg_offsets[i]);
++}
++
++/**
++ * am43xx_control_restore_context - Restore the wakeup domain registers
++ *
++ * Restore the wkup domain registers
++ */
++void am43xx_control_restore_context(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(am43xx_control_reg_offsets); i++)
++		omap_ctrl_writel(am33xx_control_vals[i],
++				 am43xx_control_reg_offsets[i]);
++}
++
++static int cpu_notifier(struct notifier_block *nb, unsigned long cmd, void *v)
++{
++	switch (cmd) {
++	case CPU_CLUSTER_PM_ENTER:
++		if (enable_off_mode)
++			am43xx_control_save_context();
++		break;
++	case CPU_CLUSTER_PM_EXIT:
++		if (enable_off_mode)
++			am43xx_control_restore_context();
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
+ struct control_init_data {
+ 	int index;
+ 	void __iomem *mem;
+@@ -699,6 +804,7 @@ int __init omap_control_init(void)
+ 	const struct omap_prcm_init_data *data;
+ 	int ret;
+ 	struct regmap *syscon;
++	static struct notifier_block nb;
+ 
+ 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
+ 		data = match->data;
+@@ -731,6 +837,12 @@ int __init omap_control_init(void)
+ 		}
+ 	}
+ 
++	/* Only AM43XX can lose ctrl registers context during rtc-ddr suspend */
++	if (soc_is_am43xx()) {
++		nb.notifier_call = cpu_notifier;
++		cpu_pm_register_notifier(&nb);
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index ec406bc..393b421 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -409,6 +409,67 @@
+ #define AM33XX_DEV_FEATURE		0x604
+ #define AM33XX_SGX_MASK			BIT(29)
+ 
++/* Additional AM33XX/AM43XX CONTROL registers */
++#define AM33XX_CONTROL_SYSCONFIG_OFFSET			0x0010
++#define AM33XX_CONTROL_STATUS_OFFSET			0x0040
++#define AM43XX_CONTROL_MPU_L2_CTRL_OFFSET		0x01e0
++#define AM33XX_CONTROL_CORTEX_VBBLDO_CTRL_OFFSET	0x041c
++#define AM33XX_CONTROL_CORE_SLDO_CTRL_OFFSET		0x0428
++#define AM33XX_CONTROL_MPU_SLDO_CTRL_OFFSET		0x042c
++#define AM33XX_CONTROL_CLK32KDIVRATIO_CTRL_OFFSET	0x0444
++#define AM33XX_CONTROL_BANDGAP_CTRL_OFFSET		0x0448
++#define AM33XX_CONTROL_BANDGAP_TRIM_OFFSET		0x044c
++#define AM33XX_CONTROL_PLL_CLKINPULOW_CTRL_OFFSET	0x0458
++#define AM33XX_CONTROL_MOSC_CTRL_OFFSET			0x0468
++#define AM33XX_CONTROL_RCOSC_CTRL_OFFSET		0x046c
++#define AM33XX_CONTROL_DEEPSLEEP_CTRL_OFFSET		0x0470
++#define AM43XX_CONTROL_DISPLAY_PLL_SEL_OFFSET		0x0534
++#define AM33XX_CONTROL_INIT_PRIORITY_0_OFFSET		0x0608
++#define AM33XX_CONTROL_INIT_PRIORITY_1_OFFSET		0x060c
++#define AM33XX_CONTROL_MMU_CFG_OFFSET			0x0610
++#define AM33XX_CONTROL_TPTC_CFG_OFFSET			0x0614
++#define AM33XX_CONTROL_USB_CTRL0_OFFSET			0x0620
++#define AM33XX_CONTROL_USB_CTRL1_OFFSET			0x0628
++#define AM33XX_CONTROL_USB_WKUP_CTRL_OFFSET		0x0648
++#define AM43XX_CONTROL_USB_CTRL2_OFFSET			0x064c
++#define AM43XX_CONTROL_GMII_SEL_OFFSET			0x0650
++#define AM43XX_CONTROL_MPUSS_CTRL_OFFSET		0x0654
++#define AM43XX_CONTROL_TIMER_CASCADE_CTRL_OFFSET	0x0658
++#define AM43XX_CONTROL_PWMSS_CTRL_OFFSET		0x0664
++#define AM33XX_CONTROL_MREQPRIO_0_OFFSET		0x0670
++#define AM33XX_CONTROL_MREQPRIO_1_OFFSET		0x0674
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP1_OFFSET		0x0690
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP2_OFFSET		0x0694
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP3_OFFSET		0x0698
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP4_OFFSET		0x069c
++#define AM33XX_CONTROL_SMRT_CTRL_OFFSET			0x06a0
++#define AM33XX_CONTROL_MPUSS_HW_DEBUG_SEL_OFFSET	0x06a4
++#define AM43XX_CONTROL_CQDETECT_STS_OFFSET		0x0e00
++#define AM43XX_CONTROL_CQDETECT_STS2_OFFSET		0x0e08
++#define AM43XX_CONTROL_VTP_CTRL_OFFSET			0x0e0c
++#define AM33XX_CONTROL_VREF_CTRL_OFFSET			0x0e14
++#define AM33XX_CONTROL_TPCC_EVT_MUX_0_3_OFFSET		0x0f90
++#define AM33XX_CONTROL_TPCC_EVT_MUX_4_7_OFFSET		0x0f94
++#define AM33XX_CONTROL_TPCC_EVT_MUX_8_11_OFFSET		0x0f98
++#define AM33XX_CONTROL_TPCC_EVT_MUX_12_15_OFFSET	0x0f9c
++#define AM33XX_CONTROL_TPCC_EVT_MUX_16_19_OFFSET	0x0fa0
++#define AM33XX_CONTROL_TPCC_EVT_MUX_20_23_OFFSET	0x0fa4
++#define AM33XX_CONTROL_TPCC_EVT_MUX_24_27_OFFSET	0x0fa8
++#define AM33XX_CONTROL_TPCC_EVT_MUX_28_31_OFFSET	0x0fac
++#define AM33XX_CONTROL_TPCC_EVT_MUX_32_35_OFFSET	0x0fb0
++#define AM33XX_CONTROL_TPCC_EVT_MUX_36_39_OFFSET	0x0fb4
++#define AM33XX_CONTROL_TPCC_EVT_MUX_40_43_OFFSET	0x0fb8
++#define AM33XX_CONTROL_TPCC_EVT_MUX_44_47_OFFSET	0x0fbc
++#define AM33XX_CONTROL_TPCC_EVT_MUX_48_51_OFFSET	0x0fc0
++#define AM33XX_CONTROL_TPCC_EVT_MUX_52_55_OFFSET	0x0fc4
++#define AM33XX_CONTROL_TPCC_EVT_MUX_56_59_OFFSET	0x0fc8
++#define AM33XX_CONTROL_TPCC_EVT_MUX_60_63_OFFSET	0x0fcc
++#define AM33XX_CONTROL_TIMER_EVT_CAPT_OFFSET		0x0fd0
++#define AM33XX_CONTROL_ECAP_EVT_CAPT_OFFSET		0x0fd4
++#define AM33XX_CONTROL_ADC_EVT_CAPT_OFFSET		0x0fd8
++#define AM43XX_CONTROL_ADC1_EVT_CAPT_OFFSET		0x0fdc
++#define AM33XX_CONTROL_RESET_ISO_OFFSET			0x1000
++
+ /* CONTROL OMAP STATUS register to identify OMAP3 features */
+ #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+ 
 -- 
-Dmitry
+1.9.1
