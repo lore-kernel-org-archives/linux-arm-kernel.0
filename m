@@ -1,30 +1,29 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 22 May 2018 13:10:04 -0400
-Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
-Message-ID: <20180522131004.3012953c@gandalf.local.home>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 12:13:45 -0500
+Subject: [PATCH v3 6/6] drm/rockchip: dw_hdmi: add dw-hdmi support for
+ the rk3328
+In-Reply-To: <20180515134736.5824-7-heiko@sntech.de>
+References: <20180515134736.5824-1-heiko@sntech.de>
+ <20180515134736.5824-7-heiko@sntech.de>
+Message-ID: <20180522171345.GA19614@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 May 2018 14:40:06 +0200
-Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+On Tue, May 15, 2018 at 03:47:36PM +0200, Heiko Stuebner wrote:
+> The rk3328 uses a dw-hdmi controller with an external hdmi phy from
+> Innosilicon which uses the generic phy framework for access.
+> Add the necessary data and the compatible for the rk3328 to the
+> rockchip dw-hdmi driver.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> changes in v3:
+> - reword as suggested by Rob to show that it's a dw-hdmi + Inno phy
+> 
+>  .../display/rockchip/dw_hdmi-rockchip.txt     |   1 +
 
-> +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
->  /*
->   * Update current's FPSIMD/SVE registers from thread_struct.
->   *
-> @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
->  	 * non-SVE thread.
->  	 */
->  	if (task == current) {
-> +		local_lock(fpsimd_lock);
->  		local_bh_disable();
+Acked-by: Rob Herring <robh@kernel.org>
 
-I'm surprised that we don't have a "local_lock_bh()"?
-
--- Steve
-
->  
->  		task_fpsimd_save();
+>  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 106 ++++++++++++++++++
+>  2 files changed, 107 insertions(+)
