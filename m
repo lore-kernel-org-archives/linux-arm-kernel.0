@@ -1,115 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 May 2018 18:24:13 +0100
-Subject: [PATCH 09/14] ARM: spectre-v2: add PSCI based hardening
-In-Reply-To: <E1fKjFT-00064F-Bs@rmk-PC.armlinux.org.uk>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <E1fKjFT-00064F-Bs@rmk-PC.armlinux.org.uk>
-Message-ID: <35edb3df-fed4-b6e6-be0c-ee758618c92e@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 22 May 2018 13:24:29 -0400
+Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
+ <20180522131004.3012953c@gandalf.local.home>
+ <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+Message-ID: <20180522132429.6f1dcf92@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/18 12:45, Russell King wrote:
-> Add PSCI based hardening for cores that require more complex handling in
-> firmware.
+On Tue, 22 May 2018 19:21:16 +0200
+Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+
+> On 2018-05-22 13:10:04 [-0400], Steven Rostedt wrote:
+> > On Thu, 17 May 2018 14:40:06 +0200
+> > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+> >   
+> > > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
+> > >  /*
+> > >   * Update current's FPSIMD/SVE registers from thread_struct.
+> > >   *
+> > > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
+> > >  	 * non-SVE thread.
+> > >  	 */
+> > >  	if (task == current) {
+> > > +		local_lock(fpsimd_lock);
+> > >  		local_bh_disable();  
+> > 
+> > I'm surprised that we don't have a "local_lock_bh()"?  
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mm/proc-v7-bugs.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mm/proc-v7.S      | 21 +++++++++++++++++++
->  2 files changed, 71 insertions(+)
+> right. Like the last time when we introduced a global lock with no
+> locking context? 
 > 
-> diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-> index 65a9b8141f86..0c37e6a2830d 100644
-> --- a/arch/arm/mm/proc-v7-bugs.c
-> +++ b/arch/arm/mm/proc-v7-bugs.c
-> @@ -1,9 +1,12 @@
->  // SPDX-License-Identifier: GPL-2.0
-> +#include <linux/arm-smccc.h>
->  #include <linux/kernel.h>
-> +#include <linux/psci.h>
->  #include <linux/smp.h>
->  
->  #include <asm/cp15.h>
->  #include <asm/cputype.h>
-> +#include <asm/proc-fns.h>
->  #include <asm/system_misc.h>
->  
->  void cpu_v7_bugs_init(void);
-> @@ -39,6 +42,9 @@ void cpu_v7_ca15_ibe(void)
->  #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
->  void (*harden_branch_predictor)(void);
->  
-> +extern void cpu_v7_smc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-> +extern void cpu_v7_hvc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-> +
->  static void harden_branch_predictor_bpiall(void)
->  {
->  	write_sysreg(0, BPIALL);
-> @@ -49,6 +55,18 @@ static void harden_branch_predictor_iciallu(void)
->  	write_sysreg(0, ICIALLU);
->  }
->  
-> +#ifdef CONFIG_ARM_PSCI
-> +static void call_smc_arch_workaround_1(void)
-> +{
-> +	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-> +}
-> +
-> +static void call_hvc_arch_workaround_1(void)
-> +{
-> +	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-> +}
-> +#endif
-> +
->  void cpu_v7_bugs_init(void)
->  {
->  	const char *spectre_v2_method = NULL;
-> @@ -73,6 +91,38 @@ void cpu_v7_bugs_init(void)
->  		spectre_v2_method = "ICIALLU";
->  		break;
->  	}
-> +
-> +#ifdef CONFIG_ARM_PSCI
-> +	if (psci_ops.smccc_version != SMCCC_VERSION_1_0) {
-> +		struct arm_smccc_res res;
-> +
-> +		switch (psci_ops.conduit) {
-> +		case PSCI_CONDUIT_HVC:
-> +			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> +					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-> +			if ((int)res.a0 < 0)
-> +				break;
 
-I just realised that there is a small, but significant difference
-between this and the arm64 version: On arm64, we have a table of
-vulnerable implementations, and we try the mitigation on a per-cpu
-basis. Here, you entirely rely on the firmware to discover whether the
-CPU needs mitigation or not. You then need to check for a return value
-of 1, which indicates that although the mitigation is implemented, it is
-not required on this particular CPU.
+I meant, we could have local_lock_bh(fpsimd_lock); that would turn into
+a local_bh_disable() when !PREEMPT_RT.
 
-But that's probably moot if you don't support BL systems.
-
-> +			harden_branch_predictor = call_hvc_arch_workaround_1;
-> +			processor.switch_mm = cpu_v7_hvc_switch_mm;
-> +			spectre_v2_method = "hypervisor";
-> +			break;
-> +
-> +		case PSCI_CONDUIT_SMC:
-> +			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> +					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-> +			if ((int)res.a0 < 0)
-> +				break;
-> +			harden_branch_predictor = call_smc_arch_workaround_1;
-> +			processor.switch_mm = cpu_v7_smc_switch_mm;
-> +			spectre_v2_method = "firmware PSCI";
-
-My previous remark still stands: this is not really PSCI.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
--
+-- Steve
