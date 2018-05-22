@@ -1,167 +1,375 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 22 May 2018 16:47:17 +0200
-Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
- device to genpd
-In-Reply-To: <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
- <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
-Message-ID: <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Tue, 22 May 2018 15:00:17 +0000
+Subject: [patch v21 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
+ families JTAG master driver
+In-Reply-To: <CAHp75Ve7EYiWBiE73i0CmyJhPMOdSKsGzCr0SUvta3Uya=Ov1Q@mail.gmail.com>
+References: <1526394095-5069-1-git-send-email-oleksandrs@mellanox.com>
+ <1526394095-5069-3-git-send-email-oleksandrs@mellanox.com>
+ <CAHp75Ve7EYiWBiE73i0CmyJhPMOdSKsGzCr0SUvta3Uya=Ov1Q@mail.gmail.com>
+Message-ID: <AM5PR0501MB244981D83DD33BD29FD64924B1940@AM5PR0501MB2449.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi Andy. 
+Thanks for review.
 
->>
->> +/**
->> + * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
->> + * @dev: Device to attach.
->> + * @index: The index of the PM domain.
->> + *
->> + * Parse device's OF node to find a PM domain specifier at the provided @index.
->> + * If such is found, allocates a new device and attaches it to retrieved
->> + * pm_domain ops.
->> + *
->> + * Returns the allocated device if successfully attached PM domain, NULL when
->> + * the device don't need a PM domain or have a single PM domain, else PTR_ERR()
->> + * in case of failures. Note that if a power-domain exists for the device, but
->> + * cannot be found or turned on, then return PTR_ERR(-EPROBE_DEFER) to ensure
->> + * that the device is not probed and to re-try again later.
->> + */
->> +struct device *genpd_dev_pm_attach_by_id(struct device *dev,
->> +                                      unsigned int index)
->> +{
->> +     struct device *genpd_dev;
->> +     int num_domains;
->> +     int ret;
->> +
->> +     if (!dev->of_node)
->> +             return NULL;
->> +
->> +     /* Deal only with devices using multiple PM domains. */
->> +     num_domains = of_count_phandle_with_args(dev->of_node, "power-domains",
->> +                                              "#power-domain-cells");
->> +     if (num_domains < 2 || index >= num_domains)
->> +             return NULL;
->> +
->> +     /* Allocate and register device on the genpd bus. */
->> +     genpd_dev = kzalloc(sizeof(*genpd_dev), GFP_KERNEL);
->> +     if (!genpd_dev)
->> +             return ERR_PTR(-ENOMEM);
->> +
->> +     dev_set_name(genpd_dev, "genpd:%u:%s", index, dev_name(dev));
->> +     genpd_dev->bus = &genpd_bus_type;
->> +     genpd_dev->release = genpd_release_dev;
->> +
->> +     ret = device_register(genpd_dev);
->> +     if (ret) {
->> +             kfree(genpd_dev);
->> +             return ERR_PTR(ret);
->> +     }
->> +
->> +     /* Try to attach the device to the PM domain at the specified index. */
->> +     ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
->> +     if (ret < 1) {
->> +             device_unregister(genpd_dev);
->> +             return ret ? ERR_PTR(ret) : NULL;
->> +     }
->> +
->> +     pm_runtime_set_active(genpd_dev);
->> +     pm_runtime_enable(genpd_dev);
->> +
->> +     return genpd_dev;
->> +}
->> +EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
->
-> Thanks for sending this. Believe it or not this has still been on my to-do list
-> and so we definitely need a solution for Tegra.
->
-> Looking at the above it appears that additional power-domains exposed as devices
-> to the client device. So I assume that this means that the drivers for devices
-> with multiple power-domains will need to call RPM APIs for each of these
-> additional power-domains. Is that correct?
+Please read my answers inline.
 
-They can, but should not!
+> -----Original Message-----
+> From: Andy Shevchenko [mailto:andy.shevchenko at gmail.com]
+> Sent: 16 ??? 2018 ?. 0:00
+> To: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>; Arnd Bergmann 
+> <arnd@arndb.de>; Linux Kernel Mailing List 
+> <linux-kernel@vger.kernel.org>; linux-arm Mailing List 
+> <linux-arm-kernel@lists.infradead.org>; devicetree 
+> <devicetree@vger.kernel.org>; openbmc at lists.ozlabs.org; Joel Stanley 
+> <joel@jms.id.au>; Ji?? P?rko <jiri@resnulli.us>; Tobias Klauser 
+> <tklauser@distanz.ch>; open list:SERIAL DRIVERS <linux- 
+> serial at vger.kernel.org>; Vadim Pasternak <vadimp@mellanox.com>; 
+> system-sw-low-level <system-sw-low-level@mellanox.com>; Rob Herring 
+> <robh+dt@kernel.org>; openocd-devel-owner at lists.sourceforge.net; 
+> linux- api at vger.kernel.org; David S. Miller <davem@davemloft.net>; 
+> Mauro Carvalho Chehab <mchehab@kernel.org>; Jiri Pirko 
+> <jiri@mellanox.com>
+> Subject: Re: [patch v21 2/4] drivers: jtag: Add Aspeed SoC 24xx and 
+> 25xx families JTAG master driver
+> 
+> On Tue, May 15, 2018 at 5:21 PM, Oleksandr Shamray 
+> <oleksandrs@mellanox.com> wrote:
+> > Driver adds support of Aspeed 2500/2400 series SOC JTAG master
+> controller.
+> >
+> > Driver implements the following jtag ops:
+> > - freq_get;
+> > - freq_set;
+> > - status_get;
+> > - idle;
+> > - xfer;
+> >
+> > It has been tested on Mellanox system with BMC equipped with Aspeed
+> > 2520 SoC for programming CPLD devices.
+> 
+> > +#define ASPEED_JTAG_DATA               0x00
+> > +#define ASPEED_JTAG_INST               0x04
+> > +#define ASPEED_JTAG_CTRL               0x08
+> > +#define ASPEED_JTAG_ISR                        0x0C
+> > +#define ASPEED_JTAG_SW                 0x10
+> > +#define ASPEED_JTAG_TCK                        0x14
+> > +#define ASPEED_JTAG_EC                 0x18
+> > +
+> > +#define ASPEED_JTAG_DATA_MSB           0x01
+> > +#define ASPEED_JTAG_DATA_CHUNK_SIZE    0x20
+> 
+> 
+> > +#define ASPEED_JTAG_IOUT_LEN(len)      (ASPEED_JTAG_CTL_ENG_EN |\
+> > +                                        ASPEED_JTAG_CTL_ENG_OUT_EN 
+> > +|\
+> > +
+> > +ASPEED_JTAG_CTL_INST_LEN(len))
+> 
+> Better to read
+> 
+> #define MY_COOL_CONST_OR_MACRO(xxx) \
+>  ...
+> 
+> > +#define ASPEED_JTAG_DOUT_LEN(len)      (ASPEED_JTAG_CTL_ENG_EN
+> |\
+> > +                                        ASPEED_JTAG_CTL_ENG_OUT_EN 
+> > + |\
+> > +
+> > +ASPEED_JTAG_CTL_DATA_LEN(len))
+> 
+> Ditto.
 
-Instead, the driver shall use device_link_add() and device_link_del(),
-dynamically, depending on what PM domain that their original device
-needs for the current running use case.
+Ok. Changed to:
+#define ASPEED_JTAG_IOUT_LEN(len) \
+                               (ASPEED_JTAG_CTL_ENG_EN | \
+                               ASPEED_JTAG_CTL_ENG_OUT_EN | \
+                               ASPEED_JTAG_CTL_INST_LEN(len))
 
-In that way, they keep existing runtime PM deployment, operating on
-its original device.
+#define ASPEED_JTAG_DOUT_LEN(len) \
+                               (ASPEED_JTAG_CTL_ENG_EN | \
+                               ASPEED_JTAG_CTL_ENG_OUT_EN | \
+                               ASPEED_JTAG_CTL_DATA_LEN(len))
 
->
-> If so, I can see that that would work, but it does not seem to fit the RPM model
-> where currently for something like device clocks, the RPM callbacks can handle
-> all clocks at once.
->
-> I was wondering why we could not add a list of genpd domains to the
-> dev_pm_domain struct for the device? For example ...
 
-See above answer, hopefully that explains it.
+> 
+> > +static char *end_status_str[] = {"idle", "ir pause", "drpause"};
+> 
+> > +static int aspeed_jtag_freq_set(struct jtag *jtag, u32 freq) {
+> > +       struct aspeed_jtag *aspeed_jtag = jtag_priv(jtag);
+> > +       unsigned long apb_frq;
+> > +       u32 tck_val;
+> > +       u16 div;
+> > +
+> > +       apb_frq = clk_get_rate(aspeed_jtag->pclk);
+> 
+> > +       div = (apb_frq % freq == 0) ? (apb_frq / freq) - 1 : 
+> > + (apb_frq / freq);
+> 
+> Isn't it the same as
+> 
+> div = (apb_frq - 1) / freq;
+> 
+> ?
+> 
 
-FYI, that's why I also discovered the bug around using device links
-with runtime PM during probe.
-https://patchwork.kernel.org/patch/10408825/
+Seems it is same. Thanks.
 
->
-> diff --git a/include/linux/pm.h b/include/linux/pm.h
-> index e723b78d8357..a11d6db3c077 100644
-> --- a/include/linux/pm.h
-> +++ b/include/linux/pm.h
-> @@ -659,6 +659,7 @@ extern void dev_pm_put_subsys_data(struct device *dev);
->   * subsystem-level and driver-level callbacks.
->   */
->  struct dev_pm_domain {
-> +       struct list_head        genpd_list;
->         struct dev_pm_ops       ops;
->         void (*detach)(struct device *dev, bool power_off);
->         int (*activate)(struct device *dev);
-> @@ -666,6 +667,11 @@ struct dev_pm_domain {
->         void (*dismiss)(struct device *dev);
->  };
->
-> +struct dev_pm_domain_link {
-> +       struct generic_pm_domain *genpd;
-> +       struct list_head node;
-> +};
-> +
->  /*
->   * The PM_EVENT_ messages are also used by drivers implementing the legacy
->   * suspend framework, based on the ->suspend() and ->resume() callbacks common
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index e61b5cd79fe2..019593804670 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -51,7 +51,6 @@ struct dev_pm_opp;
->
->  struct generic_pm_domain {
->         struct device dev;
-> -       struct dev_pm_domain domain;    /* PM domain operations */
->         struct list_head gpd_list_node; /* Node in the global PM domains list */
->         struct list_head master_links;  /* Links with PM domain as a master */
->         struct list_head slave_links;   /* Links with PM domain as a slave */
-> @@ -99,11 +98,6 @@ struct generic_pm_domain {
->
->  };
->
-> -static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
-> -{
-> -       return container_of(pd, struct generic_pm_domain, domain);
-> -}
-> -
->
-> Obviously the above will not compile but the intent would be to allocate a
-> dev_pm_domain_link struct per power-domain that the device needs and add
-> to the genpd_list for the device. It would be a much bigger change in
-> having to iterate through all the power-domains when turning devices on
-> and off, however, it would simplify the client driver.
->
-> Cheers
-> Jon
->
+> > +       tck_val = aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_TCK);
+> > +       aspeed_jtag_write(aspeed_jtag,
+> > +                         (tck_val & ASPEED_JTAG_TCK_DIVISOR_MASK) | div,
+> > +                         ASPEED_JTAG_TCK);
+> > +       return 0;
+> > +}
+> 
+> > +static void aspeed_jtag_sw_delay(struct aspeed_jtag *aspeed_jtag, 
+> > +int
+> > +cnt) {
+> > +       int i;
+> > +
+> > +       for (i = 0; i < cnt; i++)
+> > +               aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_SW);
+> 
+> Isn't it readsl() (or how it's called, I don't remember).
+> 
+
+No, readsl reads data into buffer. But in this place read used for make 
+software delay. 
+Aspeed jtag driver supports 2 modes:
+1 - hw mode with the hardware controlled JTAG states
+and pins
+2 - with software controlled pins. 
+This part of code used in sw-mode and generates delay for JTAG bit-bang .
+I will change it to ndelay().
+
+> > +}
+> 
+> > +static void aspeed_jtag_wait_instruction_pause(struct aspeed_jtag
+> > +*aspeed_jtag) {
+> > +       wait_event_interruptible(aspeed_jtag->jtag_wq, aspeed_jtag->flag &
+> > +                                ASPEED_JTAG_ISR_INST_PAUSE);
+> 
+> In such cases I prefer to see a new line with a parameter in full.
+> Check all places.
+> 
+> > +       aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_PAUSE; }
+> 
+> > +static void aspeed_jtag_sm_cycle(struct aspeed_jtag *aspeed_jtag, 
+> > +const
+> u8 *tms,
+> > +                                int len) {
+> > +       int i;
+> > +
+> > +       for (i = 0; i < len; i++)
+> > +               aspeed_jtag_tck_cycle(aspeed_jtag, tms[i], 0); }
+> > +
+> > +static void aspeed_jtag_run_test_idle_sw(struct aspeed_jtag
+> *aspeed_jtag,
+> > +                                        struct jtag_run_test_idle
+> > +*runtest) {
+> > +       static const u8 sm_pause_irpause[] = {1, 1, 1, 1, 0, 1, 0};
+> > +       static const u8 sm_pause_drpause[] = {1, 1, 1, 0, 1, 0};
+> > +       static const u8 sm_idle_irpause[] = {1, 1, 0, 1, 0};
+> > +       static const u8 sm_idle_drpause[] = {1, 0, 1, 0};
+> > +       static const u8 sm_pause_idle[] = {1, 1, 0};
+> > +       int i;
+> > +
+> > +       /* SW mode from idle/pause-> to pause/idle */
+> > +       if (runtest->reset) {
+> > +               for (i = 0; i < ASPEED_JTAG_RESET_CNTR; i++)
+> > +                       aspeed_jtag_tck_cycle(aspeed_jtag, 1, 0);
+> > +       }
+> 
+> I would rather split this big switch to a few helper functions per 
+> each status of surrounding switch.
+> 
+
+Ok.
+Will do it.
+
+
+> > +
+> > +       /* Stay on IDLE for at least  TCK cycle */
+> > +       for (i = 0; i < runtest->tck; i++)
+> > +               aspeed_jtag_tck_cycle(aspeed_jtag, 0, 0); }
+> 
+> 
+> > +/**
+> > + * aspeed_jtag_run_test_idle:
+> > + * JTAG reset: generates at least 9 TMS high and 1 TMS low to force
+> > + * devices into Run-Test/Idle State.
+> > + */
+> 
+> It's rather broken kernel doc.
+
+Deleted.
+
+> 
+> > +               aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_CTL_ENG_EN |
+> > +                                 ASPEED_JTAG_CTL_ENG_OUT_EN |
+> > +                                 ASPEED_JTAG_CTL_FORCE_TMS, 
+> > + ASPEED_JTAG_CTRL);
+> 
+> > +               aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_EC_GO_IDLE,
+> > +                                 ASPEED_JTAG_EC);
+> 
+> > +       aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_SW_MODE_EN |
+> > +                         ASPEED_JTAG_SW_MODE_TDIO, ASPEED_JTAG_SW);
+> 
+> Here you have permutations of flag some of which are repeatetive in 
+> the code. Perhaps make additional definitions instead.
+> Check other similar places.
+> 
+
+Ok. Will add defined for repeated flags
+
+> 
+> > +       char          tdo;
+> 
+> Indentation.
+
+Ok.
+
+> 
+> > +       if (xfer->direction == JTAG_READ_XFER)
+> > +               tdi = UINT_MAX;
+> > +       else
+> > +               tdi = data[index];
+> 
+> > +                       if (xfer->direction == JTAG_READ_XFER)
+> > +                               tdi = UINT_MAX;
+> > +                       else
+> > +                               tdi = data[index];
+> 
+> Take your time to think how the above duplication can be avoided.
+> 
+
+In both cases data[] is different, so I should check it twice, but I will 
+change it to, macro like:
+
+#define ASPEED_JTAG_GET_TDI(direction, data) \
+                              (direction == JTAG_READ_XFER) ? UNIT_MAX : data
+
+> > +               }
+> > +       }
+> > +
+> > +       tdo = aspeed_jtag_tck_cycle(aspeed_jtag, 1, tdi &
+> ASPEED_JTAG_DATA_MSB);
+> > +       data[index] |= tdo << (shift_bits % 
+> > +ASPEED_JTAG_DATA_CHUNK_SIZE); }
+> 
+> 
+> > +       if (endstate != JTAG_STATE_IDLE) {
+> 
+> Why not to use positive check?
+> 
+
+Will restructure to have positive check
+if (endstate == JTAG_STATE_IDLE) {
+...
+} else {
+...
+} 
+
+> > +       int i;
+> > +
+> > +       for (i = 0; i <= xfer->length / BITS_PER_BYTE; i++) {
+> > +               pos += snprintf(&dbg_str[pos], sizeof(dbg_str) - pos,
+> > +                               "0x%02x ", xfer_data[i]);
+> > +       }
+> 
+> Oh, NO! Consider reading printk-formats (for %*ph) and other 
+> documentation about available APIs.
+
+Ok.
+
+> 
+> > +       if (!(aspeed_jtag->mode & JTAG_XFER_HW_MODE)) {
+> > +               /* SW mode */
+> 
+> This is rather too complex to be in one function.
+> 
+
+Will split to separate functions.
+
+> > +       } else {
+> 
+> > +               /* hw mode */
+> > +               aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_SW);
+> > +               aspeed_jtag_xfer_hw(aspeed_jtag, xfer, data);
+> 
+> For symmetry it might be another function.
+> 
+> > +       }
+> 
+> > +       dev_dbg(aspeed_jtag->dev, "status %x\n", status);
+> 
+> Perhaps someone should become familiar with tracepoints?
+> 
+> > +               dev_err(aspeed_jtag->dev, "irq status:%x\n",
+> > +                       status);
+> 
+> 
+> Huh, really?! SPAM.
+
+
+I will review and delete redundant debug messages.
+
+> 
+> (I would drop it completely, though you may use ratelimited variant)
+> 
+> > +               ret = IRQ_NONE;
+> > +       }
+> > +       return ret;
+> > +}
+> 
+> > +       clk_prepare_enable(aspeed_jtag->pclk);
+> 
+> This might fail.
+
+Will add error check
+
+> 
+> > +       dev_dbg(&pdev->dev, "IRQ %d.\n", aspeed_jtag->irq);
+> 
+> Noise even for debug.
+
+Agree.
+
+> 
+> > +       err = jtag_register(jtag);
+> 
+> Perhaps we might have devm_ variant of this. Check how SPI framework 
+> deal with a such.
+> 
+
+Jtag driver uses miscdevice and related  misc_register and misc_deregister 
+calls for creation and destruction. There is no device object prior 
+to call to misc_register, which could be used in devm_jtag_register.
+
+> > +static int aspeed_jtag_remove(struct platform_device *pdev) {
+> 
+> > +       struct jtag *jtag;
+> > +
+> > +       jtag = platform_get_drvdata(pdev);
+> 
+> Usually we put this on one line
+
++
+
+> 
+> > +       aspeed_jtag_deinit(pdev, jtag_priv(jtag));
+> > +       jtag_unregister(jtag);
+> > +       jtag_free(jtag);
+> > +       return 0;
+> > +}
+> 
+> 
 > --
-> nvpublic
+> With Best Regards,
+> Andy Shevchenko
 
-Kind regards
-Uffe
+Best Regards,
+Oleksandr Shamray
