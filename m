@@ -1,110 +1,31 @@
-From: rokhanna@nvidia.com (Rohit Khanna)
-Date: Mon, 21 May 2018 18:27:18 -0700
-Subject: [PATCH] arm64: alternative:flush cache with unpatched code
-Message-ID: <1526952438-22126-1-git-send-email-rokhanna@nvidia.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Mon, 21 May 2018 22:10:13 -0400
+Subject: [PATCH] EDAC, ghes: Make platform-based whitelisting x86-only
+In-Reply-To: <20180521204439.GC14289@pd.tnic>
+References: <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
+ <20180514164720.GH23049@pd.tnic>
+ <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
+ <20180516182958.GB17092@pd.tnic>
+ <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
+ <20180518111132.GC17285@pd.tnic> <20180518112028.GD17285@pd.tnic>
+ <b1d606dc-527c-6a7d-ce80-a11ac852a5f9@codeaurora.org>
+ <20180521171522.GA14289@pd.tnic>
+ <4ee5f5c3-749d-59de-e753-70bd7fd9411e@codeaurora.org>
+ <20180521204439.GC14289@pd.tnic>
+Message-ID: <3c1afc0a-64b5-e43a-4310-1618a2799bae@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current implementation,  __apply_alternatives patches
-flush_icache_range and then executes it without invalidating the icache.
-Thus, icache can contain some of the old instructions for
-flush_icache_range. This can cause unpredictable behavior as during
-execution we can get a mix of old and new instructions for
-flush_icache_range.
+On 5/21/2018 4:44 PM, Borislav Petkov wrote:
+> On Mon, May 21, 2018 at 04:34:11PM -0400, Tyler Baicar wrote:
+>> Agreed. Sounds good to me.
+> Meaning you're sending me a patch soon or ...?
+>
+> :-D
+>
+Yes, I'll put a patch together and send it out tomorrow.
 
-This patch :
-
-1. Adds a new function flush_cache_kernel_range for flushing kernel
-memory range. This function is not patched during boot and can be safely
-used to flush cache during code patching.
-
-2. Modifies __apply_alternatives so that it uses
-flush_cache_kernel_range to flush the cache range after patching code.
-
-Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
----
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/kernel/alternative.c     |  2 +-
- arch/arm64/mm/cache.S               | 42 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 44 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 0094c6653b06..54692fabdf74 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -73,6 +73,7 @@
-  */
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern int  invalidate_icache_range(unsigned long start, unsigned long end);
-+extern void flush_cache_kernel_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
- extern void __inval_dcache_area(void *addr, size_t len);
- extern void __clean_dcache_area_poc(void *addr, size_t len);
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 5c4bce4ac381..a5408a3c297a 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -155,7 +155,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- 
- 		alt_cb(alt, origptr, updptr, nr_inst);
- 
--		flush_icache_range((uintptr_t)origptr,
-+		flush_cache_kernel_range((uintptr_t)origptr,
- 				   (uintptr_t)(origptr + nr_inst));
- 	}
- }
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 30334d81b021..4dd09352a044 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -81,6 +81,48 @@ ENDPROC(flush_icache_range)
- ENDPROC(__flush_cache_user_range)
- 
- /*
-+ *	flush_cache_kernel_range(start,end)
-+ *
-+ *	Ensure that the I and D caches are coherent within specified kernel
-+ *	region.
-+ *	This is typically used when code has been written to a kernel memory
-+ *	region and will be executed.
-+ *
-+ *	NOTE - This macro cannot have "alternatives" applied to it as its
-+ *	used to update alternatives
-+ *
-+ *	- start   - virtual start address of region
-+ *	- end     - virtual end address of region
-+ */
-+ENTRY(flush_cache_kernel_range)
-+	dcache_line_size x2, x3
-+	sub	x3, x2, #1
-+	bic	x4, x0, x3
-+1:
-+	dc	civac, x4	/* Use civac instead of cvau. This is required
-+				 * due to ARM errata 826319, 827319, 824069,
-+				 * 819472 on A53
-+				 */
-+	add	x4, x4, x2
-+	cmp	x4, x1
-+	b.lo	1b
-+	dsb	ish
-+
-+	icache_line_size x2, x3
-+	sub	x3, x2, #1
-+	bic	x4, x0, x3
-+1:
-+	ic	ivau, x4			// invalidate I line PoU
-+	add	x4, x4, x2
-+	cmp	x4, x1
-+	b.lo	1b
-+	dsb	ish
-+	isb
-+	mov	x0, #0
-+	ret
-+ENDPROC(flush_cache_kernel_range)
-+
-+/*
-  *	invalidate_icache_range(start,end)
-  *
-  *	Ensure that the I cache is invalid within specified region.
 -- 
-2.1.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
