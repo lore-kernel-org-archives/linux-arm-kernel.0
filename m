@@ -1,50 +1,44 @@
-From: ryan@finnie.org (Ryan Finnie)
-Date: Tue, 22 May 2018 12:55:53 -0700
-Subject: [PATCH] PCI/portdrv: do not disable device on remove()
-In-Reply-To: <1527011883-21320-1-git-send-email-okaya@codeaurora.org>
-References: <1527011883-21320-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <28781ad3-2105-8127-e385-6d42e3e75ae3@finnie.org>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Tue, 22 May 2018 21:57:57 +0200
+Subject: [PATCH] arm64: dts: fix regulator property name for wlan pcie endpoint
+Message-ID: <20180522195758.24607-1-niklas.cassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2018 10:58 AM, Sinan Kaya wrote:
-> 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-> shutdown")' has been added to kernel to shutdown pending PCIe port
-> service interrupts during reboot so that a newly started kexec kernel
-> wouldn't observe pending interrupts.
-> 
-> pcie_port_device_remove() is disabling the root port and switches by
-> calling pci_disable_device() after all PCIe service drivers are shutdown.
-> 
-> pci_disable_device() has a much wider impact then port service itself and
-> it prevents all inbound transactions to reach to the system and impacts
-> the entire PCI traffic behind the bridge.
-> 
-> Issue is that pcie_port_device_remove() doesn't maintain any coordination
-> with the rest of the PCI device drivers in the system before clearing the
-> bus master bit.
-> 
-> This has been found to cause crashes on HP DL360 Gen9 machines during
-> reboot. Besides, kexec is already clearing the bus master bit in
-> pci_device_shutdown() after all PCI drivers are removed.
+The property name vddpe-supply is not included in
+Documentation/devicetree/bindings/pci/qcom,pcie.txt
+nor in the pcie-qcom PCIe Root Complex driver.
 
-FAOD, this problem has been observed on both DL360 Gen9 and DL380 Gen9,
-in both EFI and legacy modes.  I suspect all Gen9 models with the P89
-firmware base.
+This property name was used in an initial patchset for pcie-qcom,
+but was renamed in a later revision.
 
-> Just remove the extra clear here.
+Therefore, the regulator is currently never enabled, leaving us with
+unoperational wlan.
 
-Thank you!  Fix tested on:
+Fix this by using the correct regulator property name, so that wlan
+comes up correctly.
 
-- DL360 Gen9
-- DL380 Gen9
-- DL380 Gen10 (confirmed no regression)
-- DL380 G7 (confirmed no regression)
+Fixes: 1c8ca74a2ea1 ("arm64: dts: apq8096-db820c: Enable wlan and bt en pins")
+Signed-off-by: Niklas Cassel <niklas.cassel@linaro.org>
+---
+Bluetooth needs a similar patch, but since bluetooth needs some more
+work, submit this right now, so we at least have working wlan.
 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-> Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-> Cc: stable at vger.kernel.org
-> Reported-by: Ryan Finnie <ryan@finnie.org>
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tested-by: Ryan Finnie <ryan@finnie.org>
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 818bf0efd501..804268f54f37 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -203,7 +203,7 @@
+ 			pcie at 600000 {
+ 				status = "okay";
+ 				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
+-				vddpe-supply = <&wlan_en>;
++				vddpe-3v3-supply = <&wlan_en>;
+ 				vddpe1-supply = <&bt_en>;
+ 			};
+ 
+-- 
+2.17.0
