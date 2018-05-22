@@ -1,25 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 22 May 2018 14:49:41 -0300
-Subject: [PATCH] ARM: dts: imx6q: Use correct SDMA script for SPI5 core
-In-Reply-To: <20180522174509.18154-1-sean.nyekjaer@prevas.dk>
-References: <20180522174509.18154-1-sean.nyekjaer@prevas.dk>
-Message-ID: <CAOMZO5AiWtSx8ziA_-GGkU6LxNTUqJOmE+o5_DmFHOQTuMLvjg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 12:37:50 -0500
+Subject: [PATCH v2 08/13] dt-bindings: power: add RK3228 SoCs header for
+ power-domain
+In-Reply-To: <1526268668-20006-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
+ <1526268668-20006-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20180522173750.GA17538@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 2:45 PM, Sean Nyekjaer <sean.nyekjaer@prevas.dk> wrote:
-> According to the reference manual the shp_2_mcu / mcu_2_shp
-> scripts must be used for devices connected through the SPBA.
->
-> This fixes an issue we saw with DMA transfers.
-> Sometimes the SPI controller RX FIFO was not empty after a DMA
-> transfer and the driver got stuck in the next PIO transfer when
-> it read one word more than expected.
->
-> commit dd4b487b32a35 ("ARM: dts: imx6: Use correct SDMA script
-> for SPI cores") is fixing the same issue but only for SPI1 - 4.
->
-> Fixes: 677940258dd8e ("ARM: dts: imx6q: enable dma for ecspi5")
-> Signed-off-by: Sean Nyekjaer <sean.nyekjaer@prevas.dk>
+On Mon, May 14, 2018 at 11:31:08AM +0800, Elaine Zhang wrote:
+> According to a description from TRM, add all the power domains.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  include/dt-bindings/power/rk3228-power.h | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 include/dt-bindings/power/rk3228-power.h
+> 
+> diff --git a/include/dt-bindings/power/rk3228-power.h b/include/dt-bindings/power/rk3228-power.h
+> new file mode 100644
+> index 000000000000..fa1264d5a995
+> --- /dev/null
+> +++ b/include/dt-bindings/power/rk3228-power.h
+> @@ -0,0 +1,26 @@
+> +/*
+> + * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+This goes on the first line. checkpatch.pl will tell you this.
+
+The license here is different than all the others, was that the intent?
+
+> + */
+> +
+> +#ifndef __DT_BINDINGS_POWER_RK3228_POWER_H__
+> +#define __DT_BINDINGS_POWER_RK3228_POWER_H__
+> +
+> +/**
+> + * RK3228 idle id Summary.
+> + */
+> +
+> +#define RK3228_PD_CORE		0
+> +#define RK3228_PD_MSCH		1
+> +#define RK3228_PD_BUS		2
+> +#define RK3228_PD_SYS		3
+> +#define RK3228_PD_VIO		4
+> +#define RK3228_PD_VOP		5
+> +#define RK3228_PD_VPU		6
+> +#define RK3228_PD_RKVDEC	7
+> +#define RK3228_PD_GPU		8
+> +#define RK3228_PD_PERI		9
+> +#define RK3228_PD_GMAC		10
+> +
+> +#endif
+> -- 
+> 1.9.1
+> 
+> 
