@@ -1,63 +1,50 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 22 May 2018 14:02:55 +0200
-Subject: [PATCH 7/9] ARM: dts: gose: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
-References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522120257.13232-7-marek.vasut+renesas@gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 22 May 2018 14:04:07 +0200
+Subject: [PATCH 02/25] hexagon: implement the sync_sg_for_device DMA operation
+In-Reply-To: <20180522120430.28709-1-hch@lst.de>
+References: <20180522120430.28709-1-hch@lst.de>
+Message-ID: <20180522120430.28709-3-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the MTD partitioning from DT, since it does not describe HW
-and to give way to a more flexible kernel command line partition
-passing.
+This methods needs to provide the equivalent of sync_single_for_device
+for each S/G list element, but was missing.
 
-To retain the original partitioning, assure you have enabled
-CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
-following to your kernel command line:
-
-  mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
-
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-renesas-soc at vger.kernel.org
+Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 21 ---------------------
- 1 file changed, 21 deletions(-)
+ arch/hexagon/kernel/dma.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index aa209f6e5d71..b2dd54fbe40c 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -676,27 +676,6 @@
- 		spi-cpol;
- 		spi-cpha;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "user";
--				reg = <0x00040000 0x00400000>;
--				read-only;
--			};
--			partition at 440000 {
--				label = "flash";
--				reg = <0x00440000 0x03bc0000>;
--			};
--		};
- 	};
+diff --git a/arch/hexagon/kernel/dma.c b/arch/hexagon/kernel/dma.c
+index d2b717f352f4..9e46556a227d 100644
+--- a/arch/hexagon/kernel/dma.c
++++ b/arch/hexagon/kernel/dma.c
+@@ -188,6 +188,18 @@ static void hexagon_sync_single_for_device(struct device *dev,
+ 	dma_sync(dma_addr_to_virt(dma_handle), size, dir);
+ }
+ 
++static void hexagon_sync_sg_for_device(struct device *dev,
++		struct scatterlist *sgl, int nents, enum dma_data_direction dir)
++{
++	struct scatterlist *sg;
++	int i;
++
++	for_each_sg(sgl, sg, nents, i)
++		hexagon_sync_single_for_device(dev, sg_dma_address(sg),
++				sg->length, dir);
++}
++
++
+ static int hexagon_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return dma_addr == HEXAGON_MAPPING_ERROR;
+@@ -199,6 +211,7 @@ const struct dma_map_ops hexagon_dma_ops = {
+ 	.map_sg		= hexagon_map_sg,
+ 	.map_page	= hexagon_map_page,
+ 	.sync_single_for_device = hexagon_sync_single_for_device,
++	.sync_sg_for_device = hexagon_sync_sg_for_device,
+ 	.mapping_error	= hexagon_mapping_error,
  };
  
 -- 
-2.16.2
+2.17.0
