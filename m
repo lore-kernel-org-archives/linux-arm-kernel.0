@@ -1,9 +1,9 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 22 May 2018 14:02:51 +0200
-Subject: [PATCH 3/9] ARM: dts: stout: Drop MTD partitioning from DT
+Date: Tue, 22 May 2018 14:02:53 +0200
+Subject: [PATCH 5/9] ARM: dts: porter: Drop MTD partitioning from DT
 In-Reply-To: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522120257.13232-3-marek.vasut+renesas@gmail.com>
+Message-ID: <20180522120257.13232-5-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,7 @@ To retain the original partitioning, assure you have enabled
 CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
 following to your kernel command line:
 
-  mtdparts=spi0.0:512k at 0(loader),256k(uboot),256k(uboot-env),-(flash)
+  mtdparts=spi0.0:256k at 0(loader_prg),4096k(user_prg),-(flash_fs)
 
 Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 Cc: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -24,16 +24,16 @@ Cc: Simon Horman <horms+renesas@verge.net.au>
 Cc: Wolfram Sang <wsa@the-dreams.de>
 Cc: linux-renesas-soc at vger.kernel.org
 ---
- arch/arm/boot/dts/r8a7790-stout.dts | 26 --------------------------
- 1 file changed, 26 deletions(-)
+ arch/arm/boot/dts/r8a7791-porter.dts | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-stout.dts b/arch/arm/boot/dts/r8a7790-stout.dts
-index a13a92c26645..dc65519d53ab 100644
---- a/arch/arm/boot/dts/r8a7790-stout.dts
-+++ b/arch/arm/boot/dts/r8a7790-stout.dts
-@@ -211,32 +211,6 @@
- 		spi-cpha;
- 		spi-cpol;
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index a01101b49d99..45d89e064407 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -344,27 +344,6 @@
+ 		spi-tx-bus-width = <4>;
+ 		spi-rx-bus-width = <4>;
  		m25p,fast-read;
 -
 -		partitions {
@@ -42,23 +42,18 @@ index a13a92c26645..dc65519d53ab 100644
 -			#size-cells = <1>;
 -
 -			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00080000>;
+-				label = "loader_prg";
+-				reg = <0x00000000 0x00040000>;
 -				read-only;
 -			};
--			partition at 80000 {
--				label = "uboot";
--				reg = <0x00080000 0x00040000>;
+-			partition at 40000 {
+-				label = "user_prg";
+-				reg = <0x00040000 0x00400000>;
 -				read-only;
 -			};
--			partition at c0000 {
--				label = "uboot-env";
--				reg = <0x000c0000 0x00040000>;
--				read-only;
--			};
--			partition at 100000 {
--				label = "flash";
--				reg = <0x00100000 0x03f00000>;
+-			partition at 440000 {
+-				label = "flash_fs";
+-				reg = <0x00440000 0x03bc0000>;
 -			};
 -		};
  	};
