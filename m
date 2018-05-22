@@ -1,121 +1,53 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 22 May 2018 17:52:49 +0800
-Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
-In-Reply-To: <20180522083920.GD31075@leoy-ThinkPad-X240s>
-References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
- <1526892748-326-2-git-send-email-leo.yan@linaro.org>
- <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
- <20180522083920.GD31075@leoy-ThinkPad-X240s>
-Message-ID: <20180522095249.GE31075@leoy-ThinkPad-X240s>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 May 2018 10:55:06 +0100
+Subject: [PATCH 06/14] ARM: spectre-v2: harden branch predictor on
+ context switches
+In-Reply-To: <61e24c59-9905-8524-92ba-98cdbadb3011@gmail.com>
+References: <20180521114238.GN17671@n2100.armlinux.org.uk>
+ <E1fKjFD-00063u-Q5@rmk-PC.armlinux.org.uk>
+ <61e24c59-9905-8524-92ba-98cdbadb3011@gmail.com>
+Message-ID: <20180522095506.GQ17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 04:39:20PM +0800, Leo Yan wrote:
+On Mon, May 21, 2018 at 08:21:58PM -0700, Florian Fainelli wrote:
+> 
+> 
+> On 05/21/2018 04:44 AM, Russell King wrote:
+> > Harden the branch predictor against Spectre v2 attacks on context
+> > switches for ARMv7 and later CPUs.  We do this by:
+> > 
+> > Cortex A9, A12, A17, A73, A75: invalidating the BTB.
+> > Cortex A15, Brahma B15: invalidating the instruction cache.
+> > 
+> > Cortex A57 and Cortex A72 are not addressed in this patch.
+> > 
+> > Cortex R7 and Cortex R8 are also not addressed as we do not enforce
+> > memory protection on these cores.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> 
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-[...]
+It does need this additional patch to avoid some build errors - I'm
+surprised that my autobuilder found it before the 0-day builder...
 
-Rather than the patch I posted in my previous email, I think below new
-patch is more reasonable for me.
-
-In the below change, 'etmq->prev_packet' is only used to store the
-previous CS_ETM_RANGE packet, we don't need to save CS_ETM_TRACE_ON
-packet into 'etmq->prev_packet'.
-
-On the other hand, cs_etm__flush() can use 'etmq->period_instructions'
-to indicate if need to generate instruction sample or not.  If it's
-non-zero, then generate instruction sample and
-'etmq->period_instructions' will be cleared; so next time if there
-have more tracing CS_ETM_TRACE_ON packet, it can skip to generate
-instruction sample due 'etmq->period_instructions' is zero.
-
-How about you think for this?
-
-Thanks,
-Leo Yan
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+index 0c37e6a2830d..526d07ab6b7a 100644
+--- a/arch/arm/mm/proc-v7-bugs.c
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -127,4 +127,8 @@ void cpu_v7_bugs_init(void)
+ 		pr_info("CPU: Spectre v2: using %s workaround\n",
+ 			spectre_v2_method);
+ }
++#else
++void cpu_v7_bugs_init(void)
++{
++}
+ #endif
 
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 822ba91..dd354ad 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
- static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
- {
- 	/*
-+	 * The packet is the start tracing packet if the end_addr is zero,
-+	 * returns 0 for this case.
-+	 */
-+	if (!packet->end_addr)
-+		return 0;
-+
-+	/*
- 	 * The packet records the execution range with an exclusive end address
- 	 *
- 	 * A64 instructions are constant size, so the last executed
-@@ -897,13 +904,27 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
- 		etmq->period_instructions = instrs_over;
- 	}
- 
--	if (etm->sample_branches &&
--	    etmq->prev_packet &&
--	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
--	    etmq->prev_packet->last_instr_taken_branch) {
--		ret = cs_etm__synth_branch_sample(etmq);
--		if (ret)
--			return ret;
-+	if (etm->sample_branches && etmq->prev_packet) {
-+		bool generate_sample = false;
-+
-+		/* Generate sample for start tracing packet */
-+		if (etmq->prev_packet->sample_type == 0)
-+			generate_sample = true;
-+
-+		/* Generate sample for exception packet */
-+		if (etmq->prev_packet->exc == true)
-+			generate_sample = true;
-+
-+		/* Generate sample for normal branch packet */
-+		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
-+		    etmq->prev_packet->last_instr_taken_branch)
-+			generate_sample = true;
-+
-+		if (generate_sample) {
-+			ret = cs_etm__synth_branch_sample(etmq);
-+			if (ret)
-+				return ret;
-+		}
- 	}
- 
- 	if (etm->sample_branches || etm->synth_opts.last_branch) {
-@@ -922,11 +943,12 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
- static int cs_etm__flush(struct cs_etm_queue *etmq)
- {
- 	int err = 0;
--	struct cs_etm_packet *tmp;
- 
- 	if (etmq->etm->synth_opts.last_branch &&
- 	    etmq->prev_packet &&
--	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-+	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
-+	    etmq->period_instructions) {
-+
- 		/*
- 		 * Generate a last branch event for the branches left in the
- 		 * circular buffer at the end of the trace.
-@@ -940,14 +962,6 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 			etmq, addr,
- 			etmq->period_instructions);
- 		etmq->period_instructions = 0;
--
--		/*
--		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
--		 * the next incoming packet.
--		 */
--		tmp = etmq->packet;
--		etmq->packet = etmq->prev_packet;
--		etmq->prev_packet = tmp;
- 	}
- 
- 	return err;
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
