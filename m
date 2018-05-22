@@ -1,24 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 12:17:05 -0500
-Subject: [PATCH v3 3/4] dt-bindings: rtc: update stm32-rtc documentation
- for stm32mp1 rtc
-In-Reply-To: <1526558666-24243-4-git-send-email-amelie.delaunay@st.com>
-References: <1526558666-24243-1-git-send-email-amelie.delaunay@st.com>
- <1526558666-24243-4-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20180522171705.GA22550@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 May 2018 18:17:44 +0100
+Subject: [PATCH 2/2] arm64: Unify kernel fault reporting
+In-Reply-To: <20180521131451.41040-3-mark.rutland@arm.com>
+References: <20180521131451.41040-1-mark.rutland@arm.com>
+ <20180521131451.41040-3-mark.rutland@arm.com>
+Message-ID: <20180522171743.GI26955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 02:04:25PM +0200, Amelie Delaunay wrote:
-> RTC embedded in stm32mp1 SoC is slightly different from stm32h7 one, it
-> doesn't require to disable backup domain write protection, and rtc_ck
-> parent clock assignment isn't allowed.
-> To sum up, stm32mp1 RTC requires 2 clocks, pclk and rtc_ck, and an RTC
-> alarm interrupt.
+On Mon, May 21, 2018 at 02:14:51PM +0100, Mark Rutland wrote:
+> In do_page_fault(), we handle some kernel faults early, and simply
+> die() with a message. For faults handled later, we dump the faulting
+> address, decode the ESR, walk the page tables, and perform a number of
+> steps to ensure that this data is reported.
 > 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> Let's unify the handling of fatal kernel faults with a new
+> die_kernel_fault() helper, handling all of these details. This is
+> largely the same as the existing logic in __do_kernel_fault(), except
+> that addresses are consistently padded to 16 hex characters, as would be
+> expected for a 64-bit address.
+> 
+> The messages currently logged in do_page_fault are adjusted to fit into
+> the die_kernel_fault() message template.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 27 ++++++++++++++++------
->  1 file changed, 20 insertions(+), 7 deletions(-)
+>  arch/arm64/mm/fault.c | 37 +++++++++++++++++++++++--------------
+>  1 file changed, 23 insertions(+), 14 deletions(-)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
