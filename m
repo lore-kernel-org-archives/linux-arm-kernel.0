@@ -1,43 +1,121 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 22 May 2018 10:42:21 +0100
-Subject: [PATCH 2/6] arm_pmu: Change API to support 64bit counter values
-In-Reply-To: <201805220546.ySDTMDEX%fengguang.wu@intel.com>
-References: <1526638943-2110-3-git-send-email-suzuki.poulose@arm.com>
- <201805220546.ySDTMDEX%fengguang.wu@intel.com>
-Message-ID: <8b243663-5ea6-b2a4-a57f-4e0f5b130070@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 22 May 2018 17:52:49 +0800
+Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
+In-Reply-To: <20180522083920.GD31075@leoy-ThinkPad-X240s>
+References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+ <1526892748-326-2-git-send-email-leo.yan@linaro.org>
+ <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
+ <20180522083920.GD31075@leoy-ThinkPad-X240s>
+Message-ID: <20180522095249.GE31075@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/18 00:30, kbuild test robot wrote:
-> Hi Suzuki,
-> 
-> Thank you for the patch! Yet something to improve:
-> 
-> [auto build test ERROR on tip/perf/core]
-> [also build test ERROR on v4.17-rc6 next-20180517]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/arm64-perf-Support-for-chaining-event-counters/20180521-102117
-> config: arm-corgi_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-> reproduce:
->          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->          chmod +x ~/bin/make.cross
->          # save the attached .config to linux build tree
->          make.cross ARCH=arm
-> 
-> All errors (new ones prefixed by >>):
-> 
->     arch/arm/kernel/perf_event_xscale.c: In function 'xscale2pmu_init':
->>> arch/arm/kernel/perf_event_xscale.c:741:24: error: assignment from incompatible pointer type [-Werror=incompatible-pointer-types]
->       cpu_pmu->read_counter = xscale2pmu_read_counter;
->                             ^
->     arch/arm/kernel/perf_event_xscale.c:742:25: error: assignment from incompatible pointer type [-Werror=incompatible-pointer-types]
->       cpu_pmu->write_counter = xscale2pmu_write_counter;
->                              ^
->     cc1: some warnings being treated as errors
+On Tue, May 22, 2018 at 04:39:20PM +0800, Leo Yan wrote:
+
+[...]
+
+Rather than the patch I posted in my previous email, I think below new
+patch is more reasonable for me.
+
+In the below change, 'etmq->prev_packet' is only used to store the
+previous CS_ETM_RANGE packet, we don't need to save CS_ETM_TRACE_ON
+packet into 'etmq->prev_packet'.
+
+On the other hand, cs_etm__flush() can use 'etmq->period_instructions'
+to indicate if need to generate instruction sample or not.  If it's
+non-zero, then generate instruction sample and
+'etmq->period_instructions' will be cleared; so next time if there
+have more tracing CS_ETM_TRACE_ON packet, it can skip to generate
+instruction sample due 'etmq->period_instructions' is zero.
+
+How about you think for this?
+
+Thanks,
+Leo Yan
 
 
-Thanks for the report, I have fixed this for the next version.
-
-Suzuki
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 822ba91..dd354ad 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+ static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+ {
+ 	/*
++	 * The packet is the start tracing packet if the end_addr is zero,
++	 * returns 0 for this case.
++	 */
++	if (!packet->end_addr)
++		return 0;
++
++	/*
+ 	 * The packet records the execution range with an exclusive end address
+ 	 *
+ 	 * A64 instructions are constant size, so the last executed
+@@ -897,13 +904,27 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		etmq->period_instructions = instrs_over;
+ 	}
+ 
+-	if (etm->sample_branches &&
+-	    etmq->prev_packet &&
+-	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+-	    etmq->prev_packet->last_instr_taken_branch) {
+-		ret = cs_etm__synth_branch_sample(etmq);
+-		if (ret)
+-			return ret;
++	if (etm->sample_branches && etmq->prev_packet) {
++		bool generate_sample = false;
++
++		/* Generate sample for start tracing packet */
++		if (etmq->prev_packet->sample_type == 0)
++			generate_sample = true;
++
++		/* Generate sample for exception packet */
++		if (etmq->prev_packet->exc == true)
++			generate_sample = true;
++
++		/* Generate sample for normal branch packet */
++		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
++		    etmq->prev_packet->last_instr_taken_branch)
++			generate_sample = true;
++
++		if (generate_sample) {
++			ret = cs_etm__synth_branch_sample(etmq);
++			if (ret)
++				return ret;
++		}
+ 	}
+ 
+ 	if (etm->sample_branches || etm->synth_opts.last_branch) {
+@@ -922,11 +943,12 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ static int cs_etm__flush(struct cs_etm_queue *etmq)
+ {
+ 	int err = 0;
+-	struct cs_etm_packet *tmp;
+ 
+ 	if (etmq->etm->synth_opts.last_branch &&
+ 	    etmq->prev_packet &&
+-	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
++	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
++	    etmq->period_instructions) {
++
+ 		/*
+ 		 * Generate a last branch event for the branches left in the
+ 		 * circular buffer at the end of the trace.
+@@ -940,14 +962,6 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
+ 			etmq, addr,
+ 			etmq->period_instructions);
+ 		etmq->period_instructions = 0;
+-
+-		/*
+-		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
+-		 * the next incoming packet.
+-		 */
+-		tmp = etmq->packet;
+-		etmq->packet = etmq->prev_packet;
+-		etmq->prev_packet = tmp;
+ 	}
+ 
+ 	return err;
+-- 
+2.7.4
