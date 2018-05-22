@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 May 2018 16:32:55 +0200
-Subject: [PATCH 2/9] ARM: dts: lager: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-2-marek.vasut+renesas@gmail.com>
+Date: Tue, 22 May 2018 16:33:37 +0200
+Subject: [PATCH 3/9] ARM: dts: stout: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-3-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-2-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdV1TFH_QwTv4fsOGnUOCNftC9369_1AQmZDK+NBLDmw-Q@mail.gmail.com>
+ <20180522120257.13232-3-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdXw06zb-J7_858+KfRi3aAqQw8d3Js2k0Y69kKwzu2dTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,10 +17,8 @@ On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
 > CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
 > following to your kernel command line:
 >
->   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
-
-I guess s/4096k/4m/ works, too?
-
+>   mtdparts=spi0.0:512k at 0(loader),256k(uboot),256k(uboot-env),-(flash)
+>
 > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
