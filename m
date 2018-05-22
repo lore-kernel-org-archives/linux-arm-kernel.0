@@ -1,92 +1,67 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Tue, 22 May 2018 16:53:42 +0800
-Subject: [PATCH 2/2] ASoC: rockchip: cdn-dp sound output use spdif
-In-Reply-To: <1526979222-32478-1-git-send-email-hl@rock-chips.com>
-References: <1526979222-32478-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1526979222-32478-2-git-send-email-hl@rock-chips.com>
+Date: Tue, 22 May 2018 16:53:41 +0800
+Subject: [PATCH 1/2] drm/rockchip: cnd-dp: adjust spdif register setting
+Message-ID: <1526979222-32478-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-some monitors care about the parity bit in the sub-frame of I2S,
-but the cdn-dp always set this bit to "1", so these monitors
-do not have sound output if use i2s, use spdif can fix this issue.
+We use jitter bypass mode for spdif, so do not need to set jitter mode
+related bit in SPDIF_CTRL_ADDR register. Also, we need to enable
+SPDIF_ENABLE bit.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 Signed-off-by: Lin Huang <hl@rock-chips.com>
 ---
- sound/soc/rockchip/rk3399_gru_sound.c | 46 +----------------------------------
- 1 file changed, 1 insertion(+), 45 deletions(-)
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 9a10181..f184168 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -220,45 +220,6 @@ static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
- 	return 0;
- }
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+index eb3042c..3105965 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+@@ -792,7 +792,6 @@ int cdn_dp_config_video(struct cdn_dp_device *dp)
  
--static int rockchip_sound_cdndp_hw_params(struct snd_pcm_substream *substream,
--					  struct snd_pcm_hw_params *params)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
--	struct snd_soc_dai *codec_dai = rtd->codec_dai;
--	int mclk, ret;
--
--	/* in bypass mode, the mclk has to be one of the frequencies below */
--	switch (params_rate(params)) {
--	case 8000:
--	case 16000:
--	case 24000:
--	case 32000:
--	case 48000:
--	case 64000:
--	case 96000:
--		mclk = 12288000;
--		break;
--	case 11025:
--	case 22050:
--	case 44100:
--	case 88200:
--		mclk = 11289600;
--		break;
--	default:
--		return -EINVAL;
--	}
--
--	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
--				     SND_SOC_CLOCK_OUT);
--	if (ret < 0) {
--		dev_err(codec_dai->dev, "Can't set cpu clock out %d\n", ret);
--		return ret;
--	}
--
--	return 0;
--}
--
- static int rockchip_sound_dmic_hw_params(struct snd_pcm_substream *substream,
- 			     struct snd_pcm_hw_params *params)
+ int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio)
  {
-@@ -293,10 +254,6 @@ static const struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
+-	u32 val;
+ 	int ret;
  
--static const struct snd_soc_ops rockchip_sound_cdndp_ops = {
--	.hw_params = rockchip_sound_cdndp_hw_params,
--};
+ 	ret = cdn_dp_reg_write(dp, AUDIO_PACK_CONTROL, 0);
+@@ -801,11 +800,7 @@ int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio)
+ 		return ret;
+ 	}
+ 
+-	val = SPDIF_AVG_SEL | SPDIF_JITTER_BYPASS;
+-	val |= SPDIF_FIFO_MID_RANGE(0xe0);
+-	val |= SPDIF_JITTER_THRSH(0xe0);
+-	val |= SPDIF_JITTER_AVG_WIN(7);
+-	writel(val, dp->regs + SPDIF_CTRL_ADDR);
++	writel(0, dp->regs + SPDIF_CTRL_ADDR);
+ 
+ 	/* clearn the audio config and reset */
+ 	writel(0, dp->regs + AUDIO_SRC_CNTL);
+@@ -929,12 +924,6 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
+ {
+ 	u32 val;
+ 
+-	val = SPDIF_AVG_SEL | SPDIF_JITTER_BYPASS;
+-	val |= SPDIF_FIFO_MID_RANGE(0xe0);
+-	val |= SPDIF_JITTER_THRSH(0xe0);
+-	val |= SPDIF_JITTER_AVG_WIN(7);
+-	writel(val, dp->regs + SPDIF_CTRL_ADDR);
 -
- static const struct snd_soc_ops rockchip_sound_dmic_ops = {
- 	.hw_params = rockchip_sound_dmic_hw_params,
- };
-@@ -323,8 +280,7 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
- 	[DAILINK_CDNDP] = {
- 		.name = "DP",
- 		.stream_name = "DP PCM",
--		.codec_dai_name = "i2s-hifi",
--		.ops = &rockchip_sound_cdndp_ops,
-+		.codec_dai_name = "spdif-hifi",
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			SND_SOC_DAIFMT_CBS_CFS,
- 	},
+ 	writel(SYNC_WR_TO_CH_ZERO, dp->regs + FIFO_CNTL);
+ 
+ 	val = MAX_NUM_CH(2) | AUDIO_TYPE_LPCM | CFG_SUB_PCKT_NUM(4);
+@@ -942,9 +931,6 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
+ 	writel(SMPL2PKT_EN, dp->regs + SMPL2PKT_CNTL);
+ 
+ 	val = SPDIF_ENABLE | SPDIF_AVG_SEL | SPDIF_JITTER_BYPASS;
+-	val |= SPDIF_FIFO_MID_RANGE(0xe0);
+-	val |= SPDIF_JITTER_THRSH(0xe0);
+-	val |= SPDIF_JITTER_AVG_WIN(7);
+ 	writel(val, dp->regs + SPDIF_CTRL_ADDR);
+ 
+ 	clk_prepare_enable(dp->spdif_clk);
 -- 
 2.7.4
