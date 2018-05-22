@@ -1,145 +1,207 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 May 2018 16:06:38 +0100
-Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
-In-Reply-To: <20180522150648.28297-1-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
-Message-ID: <20180522150648.28297-5-marc.zyngier@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 22 May 2018 16:36:24 +0100
+Subject: [PATCH 4/8] mailbox: tegra-hsp: Refactor in preparation of
+ mailboxes
+In-Reply-To: <20180508114403.14499-5-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-5-mperttunen@nvidia.com>
+Message-ID: <8306b033-e7f5-748c-6e6a-131dfd6a26b8@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
-discovery mechanism for detecting the SSBD mitigation.
 
-A new capability is also allocated for that purpose, and a
-config option.
+On 08/05/18 12:43, Mikko Perttunen wrote:
+> The HSP driver is currently in many places written with the assumption
+> of only supporting doorbells. Prepare for the addition of shared
+> mailbox support by removing these assumptions and cleaning up the code.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>   drivers/mailbox/tegra-hsp.c | 124 +++++++++++++++++++++++++++++---------------
+>   1 file changed, 82 insertions(+), 42 deletions(-)
+> 
+> diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
+> index 0cde356c11ab..16eb970f2c9f 100644
+> --- a/drivers/mailbox/tegra-hsp.c
+> +++ b/drivers/mailbox/tegra-hsp.c
+> @@ -1,5 +1,5 @@
+>   /*
+> - * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+> + * Copyright (c) 2016-2018, NVIDIA CORPORATION.  All rights reserved.
+>    *
+>    * This program is free software; you can redistribute it and/or modify it
+>    * under the terms and conditions of the GNU General Public License,
+> @@ -42,6 +42,7 @@ struct tegra_hsp_channel;
+>   struct tegra_hsp;
+>   
+>   struct tegra_hsp_channel {
+> +	unsigned int type;
+>   	struct tegra_hsp *hsp;
+>   	struct mbox_chan *chan;
+>   	void __iomem *regs;
+> @@ -55,6 +56,12 @@ struct tegra_hsp_doorbell {
+>   	unsigned int index;
+>   };
+>   
+> +static inline struct tegra_hsp_doorbell *
+> +channel_to_doorbell(struct tegra_hsp_channel *channel)
+> +{
+> +	return container_of(channel, struct tegra_hsp_doorbell, channel);
+> +}
+> +
+>   struct tegra_hsp_db_map {
+>   	const char *name;
+>   	unsigned int master;
+> @@ -69,7 +76,7 @@ struct tegra_hsp {
+>   	const struct tegra_hsp_soc *soc;
+>   	struct mbox_controller mbox;
+>   	void __iomem *regs;
+> -	unsigned int irq;
+> +	unsigned int doorbell_irq;
+>   	unsigned int num_sm;
+>   	unsigned int num_as;
+>   	unsigned int num_ss;
+> @@ -194,7 +201,7 @@ tegra_hsp_doorbell_create(struct tegra_hsp *hsp, const char *name,
+>   	if (!db)
+>   		return ERR_PTR(-ENOMEM);
+>   
+> -	offset = (1 + (hsp->num_sm / 2) + hsp->num_ss + hsp->num_as) << 16;
+> +	offset = (1 + (hsp->num_sm / 2) + hsp->num_ss + hsp->num_as) * SZ_64K;
+>   	offset += index * 0x100;
+>   
+>   	db->channel.regs = hsp->regs + offset;
+> @@ -218,18 +225,8 @@ static void __tegra_hsp_doorbell_destroy(struct tegra_hsp_doorbell *db)
+>   	kfree(db);
+>   }
+>   
+> -static int tegra_hsp_doorbell_send_data(struct mbox_chan *chan, void *data)
+> -{
+> -	struct tegra_hsp_doorbell *db = chan->con_priv;
+> -
+> -	tegra_hsp_channel_writel(&db->channel, 1, HSP_DB_TRIGGER);
+> -
+> -	return 0;
+> -}
+> -
+> -static int tegra_hsp_doorbell_startup(struct mbox_chan *chan)
+> +static int tegra_hsp_doorbell_startup(struct tegra_hsp_doorbell *db)
+>   {
+> -	struct tegra_hsp_doorbell *db = chan->con_priv;
+>   	struct tegra_hsp *hsp = db->channel.hsp;
+>   	struct tegra_hsp_doorbell *ccplex;
+>   	unsigned long flags;
+> @@ -260,9 +257,8 @@ static int tegra_hsp_doorbell_startup(struct mbox_chan *chan)
+>   	return 0;
+>   }
+>   
+> -static void tegra_hsp_doorbell_shutdown(struct mbox_chan *chan)
+> +static void tegra_hsp_doorbell_shutdown(struct tegra_hsp_doorbell *db)
+>   {
+> -	struct tegra_hsp_doorbell *db = chan->con_priv;
+>   	struct tegra_hsp *hsp = db->channel.hsp;
+>   	struct tegra_hsp_doorbell *ccplex;
+>   	unsigned long flags;
+> @@ -281,35 +277,61 @@ static void tegra_hsp_doorbell_shutdown(struct mbox_chan *chan)
+>   	spin_unlock_irqrestore(&hsp->lock, flags);
+>   }
+>   
+> -static const struct mbox_chan_ops tegra_hsp_doorbell_ops = {
+> -	.send_data = tegra_hsp_doorbell_send_data,
+> -	.startup = tegra_hsp_doorbell_startup,
+> -	.shutdown = tegra_hsp_doorbell_shutdown,
+> +static int tegra_hsp_send_data(struct mbox_chan *chan, void *data)
+> +{
+> +	struct tegra_hsp_channel *channel = chan->con_priv;
+> +	struct tegra_hsp_doorbell *db;
+> +
+> +	switch (channel->type) {
+> +	case TEGRA_HSP_MBOX_TYPE_DB:
+> +		db = channel_to_doorbell(channel);
+> +		tegra_hsp_channel_writel(&db->channel, 1, HSP_DB_TRIGGER);
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/Kconfig               |  9 ++++++
- arch/arm64/include/asm/cpucaps.h |  3 +-
- arch/arm64/kernel/cpu_errata.c   | 69 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 80 insertions(+), 1 deletion(-)
+The above appears to be redundant. We go from channel to db and then end 
+up passing channels. Do we really need the 'db' struct above?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eb2cf4938f6d..b2103b4df467 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -938,6 +938,15 @@ config HARDEN_EL2_VECTORS
- 
- 	  If unsure, say Y.
- 
-+config ARM64_SSBD
-+	bool "Speculative Store Bypass Disable" if EXPERT
-+	default y
-+	help
-+	  This enables mitigation of the bypassing of previous stores
-+	  by speculative loads.
-+
-+	  If unsure, say Y.
-+
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index bc51b72fafd4..5b2facf786ba 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -48,7 +48,8 @@
- #define ARM64_HAS_CACHE_IDC			27
- #define ARM64_HAS_CACHE_DIC			28
- #define ARM64_HW_DBM				29
-+#define ARM64_SSBD			30
- 
--#define ARM64_NCAPS				30
-+#define ARM64_NCAPS				31
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 0288d6cf560e..7fd6d5b001f5 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -250,6 +250,67 @@ void __init arm64_update_smccc_conduit(struct alt_instr *alt,
- 
- 	*updptr = cpu_to_le32(insn);
- }
-+
-+static void do_ssbd(bool state)
-+{
-+	switch (psci_ops.conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
-+		break;
-+
-+	case PSCI_CONDUIT_SMC:
-+		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
-+		break;
-+
-+	default:
-+		WARN_ON_ONCE(1);
-+		break;
-+	}
-+}
-+
-+static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
-+				    int scope)
-+{
-+	struct arm_smccc_res res;
-+	bool supported = true;
-+
-+	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
-+
-+	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
-+		return false;
-+
-+	/*
-+	 * The probe function return value is either negative
-+	 * (unsupported or mitigated), positive (unaffected), or zero
-+	 * (requires mitigation). We only need to do anything in the
-+	 * last case.
-+	 */
-+	switch (psci_ops.conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
-+		if ((int)res.a0 != 0)
-+			supported = false;
-+		break;
-+
-+	case PSCI_CONDUIT_SMC:
-+		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
-+		if ((int)res.a0 != 0)
-+			supported = false;
-+		break;
-+
-+	default:
-+		supported = false;
-+	}
-+
-+	if (supported) {
-+		__this_cpu_write(arm64_ssbd_callback_required, 1);
-+		do_ssbd(true);
-+	}
-+
-+	return supported;
-+}
- #endif	/* CONFIG_ARM64_SSBD */
- 
- #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
-@@ -506,6 +567,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
- 		ERRATA_MIDR_RANGE_LIST(arm64_harden_el2_vectors),
- 	},
-+#endif
-+#ifdef CONFIG_ARM64_SSBD
-+	{
-+		.desc = "Speculative Store Bypass Disable",
-+		.capability = ARM64_SSBD,
-+		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
-+		.matches = has_ssbd_mitigation,
-+	},
- #endif
- 	{
- 	}
+> +	}
+> +
+> +	return -EINVAL;
+
+Does this function always return -EINVAL?
+
+> +}
+> +
+> +static int tegra_hsp_startup(struct mbox_chan *chan)
+> +{
+> +	struct tegra_hsp_channel *channel = chan->con_priv;
+> +
+> +	switch (channel->type) {
+> +	case TEGRA_HSP_MBOX_TYPE_DB:
+> +		return tegra_hsp_doorbell_startup(channel_to_doorbell(channel));
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static void tegra_hsp_shutdown(struct mbox_chan *chan)
+> +{
+> +	struct tegra_hsp_channel *channel = chan->con_priv;
+> +
+> +	switch (channel->type) {
+> +	case TEGRA_HSP_MBOX_TYPE_DB:
+> +		tegra_hsp_doorbell_shutdown(channel_to_doorbell(channel));
+> +		break;
+> +	}
+> +}
+> +
+> +static const struct mbox_chan_ops tegra_hsp_ops = {
+> +	.send_data = tegra_hsp_send_data,
+> +	.startup = tegra_hsp_startup,
+> +	.shutdown = tegra_hsp_shutdown,
+>   };
+>   
+> -static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
+> -					    const struct of_phandle_args *args)
+> +static struct mbox_chan *tegra_hsp_doorbell_xlate(struct tegra_hsp *hsp,
+> +						  unsigned int master)
+>   {
+>   	struct tegra_hsp_channel *channel = ERR_PTR(-ENODEV);
+> -	struct tegra_hsp *hsp = to_tegra_hsp(mbox);
+> -	unsigned int type = args->args[0];
+> -	unsigned int master = args->args[1];
+>   	struct tegra_hsp_doorbell *db;
+>   	struct mbox_chan *chan;
+>   	unsigned long flags;
+>   	unsigned int i;
+>   
+> -	switch (type) {
+> -	case TEGRA_HSP_MBOX_TYPE_DB:
+> -		db = tegra_hsp_doorbell_get(hsp, master);
+> -		if (db)
+> -			channel = &db->channel;
+> -
+> -		break;
+> -
+> -	default:
+> -		break;
+> -	}
+> +	db = tegra_hsp_doorbell_get(hsp, master);
+> +	if (db)
+> +		channel = &db->channel;
+>   
+>   	if (IS_ERR(channel))
+>   		return ERR_CAST(channel);
+> @@ -321,6 +343,7 @@ static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
+>   		if (!chan->con_priv) {
+>   			chan->con_priv = channel;
+>   			channel->chan = chan;
+> +			channel->type = TEGRA_HSP_MBOX_TYPE_DB;
+>   			break;
+
+I see that you are making the above only used for doorbells, but don't 
+we still need to set the chan->con_priv for shared mailboxes as well?
+
+Cheers
+Jon
+
 -- 
-2.14.2
+nvpublic
