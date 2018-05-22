@@ -1,14 +1,14 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 22 May 2018 14:34:38 +0200
-Subject: [PATCH 5/9] ARM: dts: porter: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-5-marek.vasut+renesas@gmail.com>
+Date: Tue, 22 May 2018 14:34:50 +0200
+Subject: [PATCH 8/9] ARM: dts: alt: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-8-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-5-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522123438.gkfd55suu4g2p6nr@ninjato>
+ <20180522120257.13232-8-marek.vasut+renesas@gmail.com>
+Message-ID: <20180522123450.7elahuoh6rfvbpth@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 02:02:53PM +0200, Marek Vasut wrote:
+On Tue, May 22, 2018 at 02:02:56PM +0200, Marek Vasut wrote:
 > Drop the MTD partitioning from DT, since it does not describe HW
 > and to give way to a more flexible kernel command line partition
 > passing.
@@ -17,7 +17,7 @@ On Tue, May 22, 2018 at 02:02:53PM +0200, Marek Vasut wrote:
 > CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
 > following to your kernel command line:
 > 
->   mtdparts=spi0.0:256k at 0(loader_prg),4096k(user_prg),-(flash_fs)
+>   mtdparts=spi0.0:256k at 0(loader),256k(system),-(user)
 > 
 > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -34,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/71f2c7a2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/4cf6f21e/attachment.sig>
