@@ -1,87 +1,252 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 May 2018 18:18:48 +0100
-Subject: [PATCH v2] iommu/io-pgtable-arm: Make allocations NUMA-aware
-In-Reply-To: <b420b4733b5bc939931c11ee573bbb598f72e7b0.1526989635.git.robin.murphy@arm.com>
-References: <b420b4733b5bc939931c11ee573bbb598f72e7b0.1526989635.git.robin.murphy@arm.com>
-Message-ID: <20180522171848.GJ26955@arm.com>
+Date: Tue, 22 May 2018 18:19:16 +0100
+Subject: [PATCH v3] arm64: signal: Report signal frame size to userspace
+ via auxv
+In-Reply-To: <1526571941-9816-1-git-send-email-Dave.Martin@arm.com>
+References: <1526571941-9816-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180522171916.GL26955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 12:50:09PM +0100, Robin Murphy wrote:
-> We would generally expect pagetables to be read by the IOMMU more than
-> written by the CPU, so in NUMA systems it makes sense to locate them
-> close to the former and avoid cross-node pagetable walks if at all
-> possible. As it turns out, we already have a handle on the IOMMU device
-> for the sake of coherency management, so it's trivial to grab the
-> appropriate NUMA node when allocating new pagetable pages.
+Hi Dave,
+
+On Thu, May 17, 2018 at 04:45:41PM +0100, Dave Martin wrote:
+> Stateful CPU architecture extensions may require the signal frame
+> to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+> However, changing this #define is an ABI break.
+
+[...]
+
+> For arm64 SVE:
 > 
-> Note that we drop the semantics of alloc_pages_exact(), but that's fine
-> since they have never been necessary: the only time we're allocating
-> more than one page is for stage 2 top-level concatenation, but since
-> that is based on the number of IPA bits, the size is always some exact
-> power of two anyway.
+> The SVE context block in the signal frame needs to be considered
+> too when computing the maximum possible signal frame size.
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Because the size of this block depends on the vector length, this
+> patch computes the size based not on the thread's current vector
+> length but instead on the maximum possible vector length: this
+> determines the maximum size of SVE context block that can be
+> observed in any signal frame for the lifetime of the process.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
+> 
 > ---
 > 
-> v2: Retain equivalent highmem check
+> Changes since v2:
 > 
->  drivers/iommu/io-pgtable-arm.c | 13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
+>  * Redefine AT_MINSIGSTKSZ as 51 to avoid clash with values defined by
+>    other architectures.
+> 
+>    This turns out to be a problem for glibc; also random userspace
+>    software does not necessary check the architecture before using
+>    getauxval() or otherwise parsing the aux vector, which can make
+>    aliased tags problematic.
+> 
+>    Really, the headers need cleaning up tree-wide in such away that the
+>    AT_* definitions do not appear to be arch-private.  To be addressed
+>    separately.
+> ---
+>  arch/arm64/include/asm/elf.h         | 11 ++++++++
+>  arch/arm64/include/asm/processor.h   |  5 ++++
+>  arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
+>  arch/arm64/kernel/cpufeature.c       |  1 +
+>  arch/arm64/kernel/signal.c           | 51 +++++++++++++++++++++++++++++++-----
+>  5 files changed, 63 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index fac1c4d..dc32adb 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -24,6 +24,11 @@
+>  #include <asm/ptrace.h>
+>  #include <asm/user.h>
+>  
+> +#ifndef __ASSEMBLY__
+> +#include <linux/bug.h>
+> +#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
+> +#endif
 
-Thanks, Robin.
+Maybe move these inside the pre-existing #ifndef __ASSEMBLY__ block.
 
-Joerg -- please you can pick this up for 4.18? I don't have any other SMMU
-patches pending, so it doesn't seem worth putting together a pull request
-just for this.
+>  /*
+>   * AArch64 static relocation types.
+>   */
+> @@ -146,8 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+>  /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+>  #define ARCH_DLINFO							\
+>  do {									\
+> +	int minsigstksz = signal_minsigstksz;				\
+> +									\
+> +	if (WARN_ON(minsigstksz <= 0))					\
+> +		minsigstksz = MINSIGSTKSZ;				\
+> +									\
 
-Cheers,
+How can this happen?
+
+>  	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+>  		    (elf_addr_t)current->mm->context.vdso);		\
+> +	NEW_AUX_ENT(AT_MINSIGSTKSZ, minsigstksz);			\
+>  } while (0)
+>  
+>  #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 7675989..6f60e92 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -35,6 +35,8 @@
+>  #ifdef __KERNEL__
+>  
+>  #include <linux/build_bug.h>
+> +#include <linux/cache.h>
+> +#include <linux/init.h>
+>  #include <linux/stddef.h>
+>  #include <linux/string.h>
+>  
+> @@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+>  void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+>  void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+>  
+> +extern int __ro_after_init signal_minsigstksz;	/* user signal frame size */
+
+Probably better as unsigned long, to be consistent with the size field
+of the sigframe user layout structure.
+
+> +extern void __init minsigstksz_setup(void);
+> +
+>  /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+>  #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+>  #define SVE_GET_VL()	sve_get_current_vl()
+> diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+> index ec0a86d..743c0b8 100644
+> --- a/arch/arm64/include/uapi/asm/auxvec.h
+> +++ b/arch/arm64/include/uapi/asm/auxvec.h
+> @@ -19,7 +19,8 @@
+>  
+>  /* vDSO location */
+>  #define AT_SYSINFO_EHDR	33
+> +#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
+>  
+> -#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
+> +#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
+>  
+>  #endif
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 9d1b06d..0e0b53d 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
+>  		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+>  
+>  	sve_setup();
+> +	minsigstksz_setup();
+>  
+>  	/* Advertise that we have computed the system capabilities */
+>  	set_sys_caps_initialised();
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index 154b7d3..ae8d4ea 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -17,6 +17,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/cache.h>
+>  #include <linux/compat.h>
+>  #include <linux/errno.h>
+>  #include <linux/kernel.h>
+> @@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+>  	return 0;
+>  }
+>  
+> -/* Determine the layout of optional records in the signal frame */
+> -static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+> +/*
+> + * Determine the layout of optional records in the signal frame
+> + *
+> + * add_all: if true, lays out the biggest possible signal frame for
+> + *	this task; otherwise, generates a layout for the current state
+> + *	of the task.
+> + */
+> +static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
+> +				 bool add_all)
+>  {
+>  	int err;
+>  
+> @@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+>  		return err;
+>  
+>  	/* fault information, if valid */
+> -	if (current->thread.fault_code) {
+> +	if (add_all || current->thread.fault_code) {
+>  		err = sigframe_alloc(user, &user->esr_offset,
+>  				     sizeof(struct esr_context));
+>  		if (err)
+> @@ -591,8 +599,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+>  	if (system_supports_sve()) {
+>  		unsigned int vq = 0;
+>  
+> -		if (test_thread_flag(TIF_SVE))
+> -			vq = sve_vq_from_vl(current->thread.sve_vl);
+> +		if (add_all || test_thread_flag(TIF_SVE)) {
+> +			int vl = sve_max_vl;
+> +
+> +			if (!add_all)
+> +				vl = current->thread.sve_vl;
+> +
+> +			/* Fail safe if something wasn't initialised */
+> +			if (WARN_ON(!sve_vl_valid(vl)))
+> +				vl = SVE_VL_MIN;
+
+How can this happen?
+
+> +
+> +			vq = sve_vq_from_vl(vl);
+> +		}
+>  
+>  		err = sigframe_alloc(user, &user->sve_offset,
+>  				     SVE_SIG_CONTEXT_SIZE(vq));
+> @@ -603,7 +621,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+>  	return sigframe_alloc_end(user);
+>  }
+>  
+> -
+>  static int setup_sigframe(struct rt_sigframe_user_layout *user,
+>  			  struct pt_regs *regs, sigset_t *set)
+>  {
+> @@ -701,7 +718,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
+>  	int err;
+>  
+>  	init_user_layout(user);
+> -	err = setup_sigframe_layout(user);
+> +	err = setup_sigframe_layout(user, false);
+>  	if (err)
+>  		return err;
+>  
+> @@ -936,3 +953,23 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+>  		thread_flags = READ_ONCE(current_thread_info()->flags);
+>  	} while (thread_flags & _TIF_WORK_MASK);
+>  }
+> +
+> +int __ro_after_init signal_minsigstksz;
+> +
+> +/*
+> + * Determine the stack space required for guaranteed signal devliery.
+> + * This function is used to populate AT_MINSIGSTKSZ at process startup.
+> + */
+> +void __init minsigstksz_setup(void)
+> +{
+> +	struct rt_sigframe_user_layout user;
+> +
+> +	init_user_layout(&user);
+> +
+> +	if (WARN_ON(setup_sigframe_layout(&user, true)))
+> +		signal_minsigstksz = SIGSTKSZ;
+
+Why not just omit the aux record in this case? Something has gone badly
+wrong, so it's unlikely we're going to get much further anyway.
 
 Will
-
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index 39c2a056da21..5194755bba29 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -231,12 +231,17 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
->  				    struct io_pgtable_cfg *cfg)
->  {
->  	struct device *dev = cfg->iommu_dev;
-> +	int order = get_order(size);
-> +	struct page *p;
->  	dma_addr_t dma;
-> -	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
-> +	void *pages;
->  
-> -	if (!pages)
-> +	VM_BUG_ON((gfp & __GFP_HIGHMEM));
-> +	p = alloc_pages_node(dev_to_node(dev), gfp | __GFP_ZERO, order);
-> +	if (!p)
->  		return NULL;
->  
-> +	pages = page_address(p);
->  	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
->  		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
->  		if (dma_mapping_error(dev, dma))
-> @@ -256,7 +261,7 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
->  	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
->  	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
->  out_free:
-> -	free_pages_exact(pages, size);
-> +	__free_pages(p, order);
->  	return NULL;
->  }
->  
-> @@ -266,7 +271,7 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
->  	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
->  		dma_unmap_single(cfg->iommu_dev, __arm_lpae_dma_addr(pages),
->  				 size, DMA_TO_DEVICE);
-> -	free_pages_exact(pages, size);
-> +	free_pages((unsigned long)pages, get_order(size));
->  }
->  
->  static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
-> -- 
-> 2.17.0.dirty
-> 
