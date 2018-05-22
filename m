@@ -1,37 +1,43 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 22 May 2018 11:40:42 +0200
-Subject: [PATCH v2 16/16] arm64: dts: marvell: add CP110 ICU SEI subnode
-In-Reply-To: <20180522094042.24770-1-miquel.raynal@bootlin.com>
-References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
-Message-ID: <20180522094042.24770-17-miquel.raynal@bootlin.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 22 May 2018 10:42:21 +0100
+Subject: [PATCH 2/6] arm_pmu: Change API to support 64bit counter values
+In-Reply-To: <201805220546.ySDTMDEX%fengguang.wu@intel.com>
+References: <1526638943-2110-3-git-send-email-suzuki.poulose@arm.com>
+ <201805220546.ySDTMDEX%fengguang.wu@intel.com>
+Message-ID: <8b243663-5ea6-b2a4-a57f-4e0f5b130070@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ICU handles several interrupt groups, each of them being a subpart
-of the ICU node.
+On 22/05/18 00:30, kbuild test robot wrote:
+> Hi Suzuki,
+> 
+> Thank you for the patch! Yet something to improve:
+> 
+> [auto build test ERROR on tip/perf/core]
+> [also build test ERROR on v4.17-rc6 next-20180517]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/arm64-perf-Support-for-chaining-event-counters/20180521-102117
+> config: arm-corgi_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          # save the attached .config to linux build tree
+>          make.cross ARCH=arm
+> 
+> All errors (new ones prefixed by >>):
+> 
+>     arch/arm/kernel/perf_event_xscale.c: In function 'xscale2pmu_init':
+>>> arch/arm/kernel/perf_event_xscale.c:741:24: error: assignment from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       cpu_pmu->read_counter = xscale2pmu_read_counter;
+>                             ^
+>     arch/arm/kernel/perf_event_xscale.c:742:25: error: assignment from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       cpu_pmu->write_counter = xscale2pmu_write_counter;
+>                              ^
+>     cc1: some warnings being treated as errors
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index 5637ff2601c9..0038a922e7db 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -154,6 +154,13 @@
- 				interrupt-controller;
- 				msi-parent = <&gicp>;
- 			};
-+
-+			CP110_LABEL(icu_sei): icu-sei {
-+				compatible = "marvell,cp110-icu-sei";
-+				#interrupt-cells = <2>;
-+				interrupt-controller;
-+				msi-parent = <&sei>;
-+			};
- 		};
- 
- 		CP110_LABEL(rtc): rtc at 284000 {
--- 
-2.14.1
+Thanks for the report, I have fixed this for the next version.
+
+Suzuki
