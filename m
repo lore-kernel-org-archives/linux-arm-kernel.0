@@ -1,32 +1,32 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 22 May 2018 23:54:04 +0800
-Subject: [PATCH] drivers/perf: Remove ARM_SPE_PMU explicit PERF_EVENTS
- dependency
-Message-ID: <1527004444-239462-1-git-send-email-john.garry@huawei.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 10:58:09 -0500
+Subject: [PATCH v6 2/5] Documentation: dt-bindings: phy: add phy_config
+ for Rockchip USB Type-C PHY
+In-Reply-To: <1526895424-22894-2-git-send-email-hl@rock-chips.com>
+References: <1526895424-22894-1-git-send-email-hl@rock-chips.com>
+ <1526895424-22894-2-git-send-email-hl@rock-chips.com>
+Message-ID: <20180522155809.GA3988@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit bddb9b68d3fb ("drivers/perf: commonise PERF_EVENTS
-dependency"), all perf drivers depend on PERF_EVENTS config under a
-common menu.
+On Mon, May 21, 2018 at 05:37:01PM +0800, Lin Huang wrote:
+> If want to do training outside DP Firmware, need phy voltage swing
+> and pre_emphasis value.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - None 
+> Changes in v3:
+> - modify property description and add this property to Example
+> Changes in v4:
+> - None
+> Changes in v5:
+> - None
+> Changes in v6:
+> - change rockchip,phy_config to rockchip,phy-config and descript it in detail.
+>  
+>  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 36 +++++++++++++++++++++-
+>  1 file changed, 35 insertions(+), 1 deletion(-)
 
-Config ARM_SPE_PMU still declares explicitly a dependency on
-PERF_EVENTS, which is unneeded, so remove it.
-
-Signed-off-by: John Garry <john.garry@huawei.com>
-
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index 28bb5a0..90ce4da 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -94,7 +94,7 @@ config XGENE_PMU
- 
- config ARM_SPE_PMU
- 	tristate "Enable support for the ARMv8.2 Statistical Profiling Extension"
--	depends on PERF_EVENTS && ARM64
-+	depends on ARM64
- 	help
- 	  Enable perf support for the ARMv8.2 Statistical Profiling
- 	  Extension, which provides periodic sampling of operations in
--- 
-1.9.1
+Reviewed-by: Rob Herring <robh@kernel.org>
