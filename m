@@ -1,117 +1,43 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 22 May 2018 22:38:36 +0300
-Subject: [PATCH v7 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <f1970a64be17267e0f044242dc0764d6@codeaurora.org>
-References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
- <1526492623-20527-3-git-send-email-rishabhb@codeaurora.org>
- <CAHp75VdO7+u-PQ+RBH71sxHHG0WkAyEVxv0BNPaycbcRnrZang@mail.gmail.com>
- <f1970a64be17267e0f044242dc0764d6@codeaurora.org>
-Message-ID: <CAHp75Vd8HZU+BT38-OfXHiihv1yZG6YBeMWyfweBA+kAwk6HUw@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 22 May 2018 22:41:39 +0300
+Subject: v4.17-rc1: regressions on N900, N950
+In-Reply-To: <20180522080250.4fzyvqrgw5oigexn@pali>
+References: <20180422074213.GA12428@amd>
+ <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
+ <20180521213952.GA11596@amd> <20180522080250.4fzyvqrgw5oigexn@pali>
+Message-ID: <20180522194139.GB2299@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 9:33 PM,  <rishabhb@codeaurora.org> wrote:
-> On 2018-05-18 14:01, Andy Shevchenko wrote:
->> On Wed, May 16, 2018 at 8:43 PM, Rishabh Bhatnagar
->> <rishabhb@codeaurora.org> wrote:
+Hi,
 
->>> +#define ACTIVATE                      0x1
->>> +#define DEACTIVATE                    0x2
->>> +#define ACT_CTRL_OPCODE_ACTIVATE      0x1
->>> +#define ACT_CTRL_OPCODE_DEACTIVATE    0x2
->>> +#define ACT_CTRL_ACT_TRIG             0x1
->>
->>
->> Are these bits? Perhaps BIT() ?
->>
-> isn't it just better to use fixed size as u suggest in the next comment?
+On Tue, May 22, 2018 at 10:02:50AM +0200, Pali Roh?r wrote:
+> Hi! I remember that in time of migration from platform board code to
+> device tree structures there appeared some bug which caused that
+> sometimes display were not initialized. And somebody figured out that
+> display initialization is failing when some other SPI devices are
+> initialized before or after display... This behavior was observed only
+> on real N900 hardware, not in qemu.
 
-If the are bits, use BIT() macro.
+Touchscreen needs to be initialized before display. This is documented
+in the DTS, see arch/arm/boot/dts/omap3-n900.dts:
 
->>> +struct llcc_slice_desc *llcc_slice_getd(u32 uid)
->>> +{
->>> +       const struct llcc_slice_config *cfg;
->>> +       struct llcc_slice_desc *desc;
->>> +       u32 sz, count = 0;
->>> +
->>> +       cfg = drv_data->cfg;
->>> +       sz = drv_data->cfg_size;
->>> +
->>
->>
->>> +       while (cfg && count < sz) {
->>> +               if (cfg->usecase_id == uid)
->>> +                       break;
->>> +               cfg++;
->>> +               count++;
->>> +       }
->>> +       if (cfg == NULL || count == sz)
->>> +               return ERR_PTR(-ENODEV);
->>
->>
->> if (!cfg)
->>           return ERR_PTR(-ENODEV);
->>
->> while (cfg->... != uid) {
->>   cfg++;
->>   count++;
->> }
->>
->> if (count == sz)
->>  return ...
->>
->> Though I would rather put it to for () loop.
->>
-> In each while loop iteration the cfg pointer needs to be checked for
-> NULL. What if the usecase id never matches the uid passed by client
-> and we keep iterating. At some point it will crash.
+	* For some reason, touchscreen is necessary for screen to work at
+	* all on real hw. It works well without it on emulator.
+	*
+	* Also... order in the device tree actually matters here.
 
-do {
-  if (!cfg || count == sz)
-   return ...(-ENODEV);
- ...
-} while (...);
+> Real reason was never explained. In old platform board code there was
+> hardcoded order of SPI devices in which initialization happened. And in
+> device tree it is probably in (pseudo)-random order. Enabling/disabling
+> various config option can affect some timings and order in which kernel
+> starts probing and initializing devices...
 
-Though, as I said for-loop will look slightly better I think.
+The issue was also somewhat present with platform/board code, see e.g.
+commit e65f131a14726e5f1b880a528271a52428e5b3a5.
 
->>> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
->>> +                                 DEACTIVATE);
->>
->>
->> Perhaps one line (~83 characters here is OK) ?
->
-> The checkpatch script complains about such lines.
+My device worked with v4.17-rc1 (haven't found time to test newer kernels),
+but if you say the probe order is random then we must find some proper way
+to express the dependency.
 
-So what if it just 3 characters out?
-
->>> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
->>> +                                 ACTIVATE);
-
->> Ditto.
-
->>> +               attr1_cfg = bcast_off +
->>> +
->>> LLCC_TRP_ATTR1_CFGn(llcc_table[i].slice_id);
->>> +               attr0_cfg = bcast_off +
->>> +
->>> LLCC_TRP_ATTR0_CFGn(llcc_table[i].slice_id);
-
->> Ditto.
-
->>> +               attr1_val |= llcc_table[i].probe_target_ways <<
->>> +                               ATTR1_PROBE_TARGET_WAYS_SHIFT;
->>> +               attr1_val |= llcc_table[i].fixed_size <<
->>> +                               ATTR1_FIXED_SIZE_SHIFT;
->>> +               attr1_val |= llcc_table[i].priority <<
->>> ATTR1_PRIORITY_SHIFT;
-
->> foo |=
->>   bar << SHIFT;
->>
->> would look slightly better.
-
-Did you consider this option ?
-
--- 
-With Best Regards,
-Andy Shevchenko
+A.
