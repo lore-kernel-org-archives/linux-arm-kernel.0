@@ -1,37 +1,36 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 22 May 2018 19:21:16 +0200
-Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180522131004.3012953c@gandalf.local.home>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
- <20180522131004.3012953c@gandalf.local.home>
-Message-ID: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 12:22:38 -0500
+Subject: [PATCH V3 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <1526890046-10565-9-git-send-email-christophe.roullier@st.com>
+References: <1526890046-10565-1-git-send-email-christophe.roullier@st.com>
+ <1526890046-10565-9-git-send-email-christophe.roullier@st.com>
+Message-ID: <20180522172238.GA26145@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-22 13:10:04 [-0400], Steven Rostedt wrote:
-> On Thu, 17 May 2018 14:40:06 +0200
-> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+On Mon, May 21, 2018 at 10:07:26AM +0200, Christophe Roullier wrote:
+> This patch describes syscon DT bindings.
 > 
-> > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
-> >  /*
-> >   * Update current's FPSIMD/SVE registers from thread_struct.
-> >   *
-> > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
-> >  	 * non-SVE thread.
-> >  	 */
-> >  	if (task == current) {
-> > +		local_lock(fpsimd_lock);
-> >  		local_bh_disable();
+> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+> ---
+>  Documentation/devicetree/bindings/arm/stm32.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> I'm surprised that we don't have a "local_lock_bh()"?
+> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
+> index 6808ed9..e46ebad 100644
+> --- a/Documentation/devicetree/bindings/arm/stm32.txt
+> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
+> @@ -8,3 +8,8 @@ using one of the following compatible strings:
+>    st,stm32f746
+>    st,stm32h743
+>    st,stm32mp157
+> +
+> +Required nodes:
+> +- syscon: the soc bus node must have a system controller node pointing to the
+> +  global control registers, with the compatible string
+> +  "st,stm32mp157-syscfg", "syscon";
 
-right. Like the last time when we introduced a global lock with no
-locking context? 
+Please don't mix soc/board bindings with other nodes. So perhaps 
+stm32-syscon.txt.
 
-> -- Steve
-> 
-> >  
-> >  		task_fpsimd_save();
-
-Sebastian
+Rob
