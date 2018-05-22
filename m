@@ -1,41 +1,110 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 22 May 2018 20:03:41 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
-Message-ID: <498f4a40-0f4b-fb32-2d6c-032b5341f2b0@axentia.se>
+From: rokhanna@nvidia.com (Rohit Khanna)
+Date: Tue, 22 May 2018 11:07:31 -0700
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+Message-ID: <1527012451-16117-1-git-send-email-rokhanna@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-11 17:34, Nicolas Ferre wrote:
-> On 11/04/2018 at 16:44, Peter Rosin wrote:
->> Hi Nicolas,
->>
->> Boris asked for your input on this (the datasheet difference appears to
->> have no bearing on the issue) elsewhere in the tree of messages. It's
->> now been a week or so and I'm starting to wonder if you missed this
->> altogether or if you are simply out of office or something?
-> 
-> Hi Peter,
-> 
-> I didn't dig into this issue with matrix datasheet reset values and your 
-> findings below. I'll try to move forward with your detailed explanation 
-> and with my contacts within the "product" team internally.
+In the current implementation,  __apply_alternatives patches
+flush_icache_range and then executes it without invalidating the icache.
+Thus, icache can contain some of the old instructions for
+flush_icache_range. This can cause unpredictable behavior as during
+execution we can get a mix of old and new instructions for
+flush_icache_range.
 
-Hi again, just checking in to see if there is any progress? If not, maybe
-it's time to just take the patch as-is, warts and imperfections included,
-and even if we all hate it. But what to do...
+This patch :
 
-Cheers,
-Peter
+1. Adds a new function flush_cache_kernel_range for flushing kernel
+memory range. This function is not patched during boot and can be safely
+used to flush cache during code patching.
+
+2. Modifies __apply_alternatives so that it uses
+flush_cache_kernel_range to flush the cache range after patching code.
+
+Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
+---
+ arch/arm64/include/asm/cacheflush.h |  1 +
+ arch/arm64/kernel/alternative.c     |  2 +-
+ arch/arm64/mm/cache.S               | 42 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 44 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 0094c6653b06..54692fabdf74 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -73,6 +73,7 @@
+  */
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern int  invalidate_icache_range(unsigned long start, unsigned long end);
++extern void flush_cache_kernel_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
+ extern void __inval_dcache_area(void *addr, size_t len);
+ extern void __clean_dcache_area_poc(void *addr, size_t len);
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 5c4bce4ac381..a5408a3c297a 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -155,7 +155,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 
+ 		alt_cb(alt, origptr, updptr, nr_inst);
+ 
+-		flush_icache_range((uintptr_t)origptr,
++		flush_cache_kernel_range((uintptr_t)origptr,
+ 				   (uintptr_t)(origptr + nr_inst));
+ 	}
+ }
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 30334d81b021..1366f00297c3 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -81,6 +81,48 @@ ENDPROC(flush_icache_range)
+ ENDPROC(__flush_cache_user_range)
+ 
+ /*
++ *	flush_cache_kernel_range(start,end)
++ *
++ *	Ensure that the I and D caches are coherent within specified kernel
++ *	region.
++ *	This is typically used when code has been written to a kernel memory
++ *	region and will be executed.
++ *
++ *	NOTE - This macro cannot have "alternatives" applied to it as its
++ *	used to update alternatives
++ *
++ *	- start   - virtual start address of region
++ *	- end     - virtual end address of region
++ */
++ENTRY(flush_cache_kernel_range)
++	raw_dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x4, x0, x3
++1:
++	dc	civac, x4	/* Use civac instead of cvau. This is required
++				 * due to ARM errata 826319, 827319, 824069,
++				 * 819472 on A53
++				 */
++	add	x4, x4, x2
++	cmp	x4, x1
++	b.lo	1b
++	dsb	ish
++
++	raw_icache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x4, x0, x3
++1:
++	ic	ivau, x4			// invalidate I line PoU
++	add	x4, x4, x2
++	cmp	x4, x1
++	b.lo	1b
++	dsb	ish
++	isb
++	mov	x0, #0
++	ret
++ENDPROC(flush_cache_kernel_range)
++
++/*
+  *	invalidate_icache_range(start,end)
+  *
+  *	Ensure that the I cache is invalid within specified region.
+-- 
+2.1.4
