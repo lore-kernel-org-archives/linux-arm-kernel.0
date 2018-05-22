@@ -1,16 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 22 May 2018 08:25:34 -0300
-Subject: [PATCH 1/2] clk: imx6ul: add GPIO clock gates
-In-Reply-To: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
-References: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5B=-c4erNEBqftyr-aaa17Vhy_bnOTHuvPFSKVP8D6j6w@mail.gmail.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 22 May 2018 15:07:11 +0300
+Subject: [PATCH v5 7/9] pwm: add push-pull mode support
+In-Reply-To: <1526990833-30707-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1526990833-30707-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1526990833-30707-8-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 12:25 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> i.MX6UL has GPIO clock gates in CCM CCGR, add
-> them into clock tree for clock management.
->
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Add push-pull mode support. In push-pull mode the channels' outputs have
+same polarities and the edges are complementary delayed for one period.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ drivers/pwm/core.c  | 1 +
+ include/linux/pwm.h | 3 +++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 59a9df9120de..5fde2e685ca7 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -348,6 +348,7 @@ const char *pwm_mode_desc(struct pwm_device *pwm, unsigned long mode)
+ 		"invalid",
+ 		"normal",
+ 		"complementary",
++		"push-pull",
+ 	};
+ 
+ 	if (!pwm_mode_valid(pwm, mode))
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index a4ce4ad7edf0..eb170e2ab431 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -29,11 +29,14 @@ enum pwm_polarity {
+  * PWM modes capabilities
+  * @PWMC_MODE_NORMAL_BIT: PWM has one output
+  * @PWMC_MODE_COMPLEMENTARY_BIT: PWM has 2 outputs with opposite polarities
++ * @PWMC_MODE_PUSH_PULL_BIT: PWM has 2 outputs with same polarities and the
++ * edges are complementary delayed for one period
+  * @PWMC_MODE_CNT: PWM modes count
+  */
+ enum {
+ 	PWMC_MODE_NORMAL_BIT,
+ 	PWMC_MODE_COMPLEMENTARY_BIT,
++	PWMC_MODE_PUSH_PULL_BIT,
+ 	PWMC_MODE_CNT,
+ };
+ 
+-- 
+2.7.4
