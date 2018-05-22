@@ -1,53 +1,29 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 22 May 2018 15:11:46 +0100
-Subject: [RFC PATCH v2] arm64: fault: Don't leak data in ESR context for
- user fault on kernel VA
-In-Reply-To: <CAFEAcA9i4_neKwaWPm_gV=fAgASL4B9X8Z++c+NvGA+JYSdDZA@mail.gmail.com>
-References: <20180419154833.27727-1-peter.maydell@linaro.org>
- <20180522133826.GE26955@arm.com>
- <CAFEAcA9i4_neKwaWPm_gV=fAgASL4B9X8Z++c+NvGA+JYSdDZA@mail.gmail.com>
-Message-ID: <20180522141146.GF13470@e103592.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 22 May 2018 16:27:00 +0200
+Subject: [PATCH v2] ARM64: dts: sun50i: a64: Add spi flash node for sopine
+In-Reply-To: <20180521115413.92070-1-manu@freebsd.org>
+References: <20180521115413.92070-1-manu@freebsd.org>
+Message-ID: <20180522142700.ugjpcbajxx4n2n7x@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 02:48:29PM +0100, Peter Maydell wrote:
-> On 22 May 2018 at 14:38, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Peter,
-> >
-> > Sorry for the delay in getting to this! Comments inline.
-> >
-> > On Thu, Apr 19, 2018 at 04:48:33PM +0100, Peter Maydell wrote:
+On Mon, May 21, 2018 at 01:54:13PM +0200, Emmanuel Vadot wrote:
+> The Sopine and Pine64-LTS have a winbond w25q128 spi flash on spi0.
+> Add a node for it.
 > 
-> >> +                     /*
-> >> +                      * These bits provide only information about the
-> >> +                      * faulting instruction, which userspace knows already.
-> >> +                      * We explicitly clear bits which are architecturally
-> >> +                      * RES0 in case they are given meanings in future.
-> >> +                      */
-> >> +                     if (esr & ESR_ELx_ISV)
-> >> +                             esr &= ESR_ELx_EC_MASK | ESR_ELx_IL |
-> >> +                                     ESR_ELx_ISV | ESR_ELx_SAS |
-> >> +                                     ESR_ELx_SSE | ESR_ELx_SRT_MASK |
-> >> +                                     ESR_ELx_SF | ESR_ELx_AR | ESR_ELx_CM |
-> >> +                                     ESR_ELx_WNR;
-> >
-> > Reading through the ARM ARM, it seems to say that ISV is always 0 for
-> > faults reported in ESR_EL1, which implies we can drop ISV, SAS, SSE, SRT,
-> > SF and AR from this list and actually drop the conditional altogether.
-> 
-> Mmm, I guess so, if we're guaranteed to only be working with ESRs
-> taken to EL1 (or we want to present userspace with an ESR that
+> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 
-There is no direct interface between EL0 and EL2 with the stage2
-translation enabled, so even if this data is available for a fault at
-EL2, we won't be signalling the fault via delivering a signal to EL0.
+Fixed the prefix and applied, thanks!
+Maxime
 
-> looks like that regardless of what EL we took it to). I'll respin
-> without the conditional.
-
-Sounds fair.  It might have been me that suggested this list of fields
-in the first place: I'd not completely understood the ISV behaviour
-previously, it seems.
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/bf0e2273/attachment.sig>
