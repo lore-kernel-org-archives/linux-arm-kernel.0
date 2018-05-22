@@ -1,49 +1,46 @@
-From: maarten.lankhorst@linux.intel.com (Maarten Lankhorst)
-Date: Tue, 22 May 2018 11:26:12 +0200
-Subject: [PATCH 1/2] drm/fourcc: add a 10bits fully packed variant of NV12
-In-Reply-To: <20180520171705.29690-2-ayaka@soulik.info>
-References: <20180520171705.29690-1-ayaka@soulik.info>
- <20180520171705.29690-2-ayaka@soulik.info>
-Message-ID: <303c89b8-e24f-cacb-c305-65d17c58c597@linux.intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 22 May 2018 15:08:03 +0530
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <001401d3f1a2$c7328850$559798f0$@codeaurora.org>
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+ <153cc316-dcb5-972f-5a2f-c91fe0f6348b@arm.com>
+ <000f01d3f103$3ff78ba0$bfe6a2e0$@codeaurora.org>
+ <2ace10bc-e1c4-2060-94d3-eb71e966ffbe@arm.com>
+ <001401d3f1a2$c7328850$559798f0$@codeaurora.org>
+Message-ID: <20180522093803.kfmfktdskumxyqbx@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 20-05-18 om 19:17 schreef Randy Li:
-> This pixel format is a fully packed and 10bits variant of NV12.
-> A luma pixel would take 10bits in memory, without any
-> filled bits between pixels in a stride. The color gamut
-> follows the BT.2020 standard.
->
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  drivers/gpu/drm/drm_fourcc.c  | 1 +
->  include/uapi/drm/drm_fourcc.h | 3 +++
->  2 files changed, 4 insertions(+)
->
-> diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
-> index 5ca6395cd4d3..1f43967c4013 100644
-> --- a/drivers/gpu/drm/drm_fourcc.c
-> +++ b/drivers/gpu/drm/drm_fourcc.c
-> @@ -173,6 +173,7 @@ const struct drm_format_info *__drm_format_info(u32 format)
->  		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->  		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->  		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> +		{ .format = DRM_FORMAT_NV12_10LE40,	.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
-Hm, the cpp value might give problems because it rounds down, not sure how we should handle that? Set to zero?
->  	};
->  
->  	unsigned int i;
-> diff --git a/include/uapi/drm/drm_fourcc.h b/include/uapi/drm/drm_fourcc.h
-> index e04613d30a13..8eabf01e966f 100644
-> --- a/include/uapi/drm/drm_fourcc.h
-> +++ b/include/uapi/drm/drm_fourcc.h
-> @@ -140,6 +140,9 @@ extern "C" {
->  #define DRM_FORMAT_NV61		fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
->  #define DRM_FORMAT_NV24		fourcc_code('N', 'V', '2', '4') /* non-subsampled Cr:Cb plane */
->  #define DRM_FORMAT_NV42		fourcc_code('N', 'V', '4', '2') /* non-subsampled Cb:Cr plane */
-> +/* A fully packed variant of NV12_10LE32 */
-> +#define DRM_FORMAT_NV12_10LE40	fourcc_code('R', 'K', '2', '0') /* 2x2 subsampled Cr:Cb plane */
-> +
->  
->  /*
->   * 3 plane YCbCr
+On 22-05-18, 10:59, ilialin at codeaurora.org wrote:
+> OK, I think I found out the way. Would this be correct?
+> -----------------------------------------------------------------------------------------------
+> extern struct cpu_topology cpu_topology[NR_CPUS];
+> 
+> static struct device *qcom_cpufreq_kryo_get_cluster_lead(int cluster)
+> {
+> 	unsigned cpu;
+> 
+> 	for_each_possible_cpu(cpu) {
+> 		if ((cluster == cpu_topology[cpu].cluster_id) &&
+> 			(0 == cpu_topology[cpu].core_id))
+> 			return get_cpu_device(cpu);
+> 	}
+> 
+> 	return NULL;
+> }
+
+Okay, this is what you should do IMHO.
+
+for_each_possible_cpu(cpu) {
+        cpu_dev = xxx..
+        ret = dev_pm_opp_set_supported_hw(cpu_dev, xxx, xxx);
+        if (ret && ret != -EBUSY)
+                error-out.
+}
+
+This would require a trivial patch for the OPP core to not throw an
+error message with -EBUSY. I can do that separately.
+
+-- 
+viresh
