@@ -1,64 +1,52 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 May 2018 16:06:41 +0100
-Subject: [PATCH 07/14] arm64: ssbd: Skip apply_ssbd if not using dynamic
+Date: Tue, 22 May 2018 16:06:43 +0100
+Subject: [PATCH 09/14] arm64: ssbd: Introduce thread flag to control userspace
  mitigation
 In-Reply-To: <20180522150648.28297-1-marc.zyngier@arm.com>
 References: <20180522150648.28297-1-marc.zyngier@arm.com>
-Message-ID: <20180522150648.28297-8-marc.zyngier@arm.com>
+Message-ID: <20180522150648.28297-10-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid checking arm64_ssbd_callback_required on each
-kernel entry/exit even if no mitigation is required, let's
-add yet another alternative that by default jumps over the mitigation,
-and that gets nop'ed out if we're doing dynamic mitigation.
+In order to allow userspace to be mitigated on demand, let's
+introduce a new thread flag that prevents the mitigation from
+being turned off when exiting to userspace, and doesn't turn
+it on on entry into the kernel (with the assumtion that the
+mitigation is always enabled in the kernel itself).
 
-Think of it as a poor man's static key...
+This will be used by a prctl interface introduced in a later
+patch.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 14 ++++++++++++++
- arch/arm64/kernel/entry.S      |  3 +++
- 2 files changed, 17 insertions(+)
+ arch/arm64/include/asm/thread_info.h | 1 +
+ arch/arm64/kernel/entry.S            | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index f1d4e75b0ddd..8f686f39b9c1 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -283,6 +283,20 @@ void __init arm64_update_smccc_conduit(struct alt_instr *alt,
- 	*updptr = cpu_to_le32(insn);
- }
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 740aa03c5f0d..cbcf11b5e637 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -94,6 +94,7 @@ void arch_release_task_struct(struct task_struct *tsk);
+ #define TIF_32BIT		22	/* 32bit process */
+ #define TIF_SVE			23	/* Scalable Vector Extension in use */
+ #define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
++#define TIF_SSBD		25	/* Wants SSB mitigation */
  
-+void __init arm64_enable_wa2_handling(struct alt_instr *alt,
-+				      __le32 *origptr, __le32 *updptr,
-+				      int nr_inst)
-+{
-+	BUG_ON(nr_inst != 1);
-+	/*
-+	 * Only allow mitigation on EL1 entry/exit and guest
-+	 * ARCH_WORKAROUND_2 handling if the SSBD state allows it to
-+	 * be flipped.
-+	 */
-+	if (arm64_get_ssbd_state() == ARM64_SSBD_EL1_ENTRY)
-+		*updptr = cpu_to_le32(aarch64_insn_gen_nop());
-+}
-+
- static void do_ssbd(bool state)
- {
- 	switch (psci_ops.conduit) {
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 29ad672a6abd..e6f6e2339b22 100644
+index e6f6e2339b22..28ad8799406f 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -142,6 +142,9 @@ alternative_else_nop_endif
- 	// to save/restore them if required.
- 	.macro	apply_ssbd, state, targ, tmp1, tmp2
- #ifdef CONFIG_ARM64_SSBD
-+alternative_cb	arm64_enable_wa2_handling
-+	b	\targ
-+alternative_cb_end
+@@ -147,6 +147,8 @@ alternative_cb	arm64_enable_wa2_handling
+ alternative_cb_end
  	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
  	cbz	\tmp2, \targ
++	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
++	tbnz	\tmp2, #TIF_SSBD, \targ
  	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+ 	mov	w1, #\state
+ alternative_cb	arm64_update_smccc_conduit
 -- 
 2.14.2
