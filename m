@@ -1,26 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 May 2018 11:27:34 -0700
-Subject: [PATCH 06/14] ARM: spectre-v2: harden branch predictor on
- context switches
-In-Reply-To: <E1fKjFD-00063u-Q5@rmk-PC.armlinux.org.uk>
+Date: Tue, 22 May 2018 11:28:12 -0700
+Subject: [PATCH 07/14] ARM: spectre-v2: add Cortex A8 and A15 validation
+ of the IBE bit
+In-Reply-To: <E1fKjFJ-000641-5N@rmk-PC.armlinux.org.uk>
 References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <E1fKjFD-00063u-Q5@rmk-PC.armlinux.org.uk>
-Message-ID: <20180522182734.GL98604@atomide.com>
+ <E1fKjFJ-000641-5N@rmk-PC.armlinux.org.uk>
+Message-ID: <20180522182811.GM98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King <rmk+kernel@armlinux.org.uk> [180521 12:06]:
-> Harden the branch predictor against Spectre v2 attacks on context
-> switches for ARMv7 and later CPUs.  We do this by:
+* Russell King <rmk+kernel@armlinux.org.uk> [180521 12:09]:
+> When the branch predictor hardening is enabled, firmware must have set
+> the IBE bit in the auxiliary control register.  If this bit has not
+> been set, the Spectre workarounds will not be functional.
 > 
-> Cortex A9, A12, A17, A73, A75: invalidating the BTB.
-> Cortex A15, Brahma B15: invalidating the instruction cache.
+> Add validation that this bit is set, and print a warning at alert level
+> if this is not the case.
 > 
-> Cortex A57 and Cortex A72 are not addressed in this patch.
-> 
-> Cortex R7 and Cortex R8 are also not addressed as we do not enforce
-> memory protection on these cores.
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Not seeing regressions so:
+Yup the alert is working:
 
 Tested-by: Tony Lindgren <tony@atomide.com>
