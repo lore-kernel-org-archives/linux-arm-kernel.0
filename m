@@ -1,65 +1,107 @@
-From: randy.li@rock-chips.com (Randy Li)
-Date: Tue, 22 May 2018 17:49:07 +0800
-Subject: [PATCH 1/2] drm/fourcc: add a 10bits fully packed variant of NV12
-In-Reply-To: <303c89b8-e24f-cacb-c305-65d17c58c597@linux.intel.com>
-References: <20180520171705.29690-1-ayaka@soulik.info>
- <20180520171705.29690-2-ayaka@soulik.info>
- <303c89b8-e24f-cacb-c305-65d17c58c597@linux.intel.com>
-Message-ID: <6288544d-32de-b933-d204-b7026012fb82@rock-chips.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 22 May 2018 10:12:34 +0100
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <001201d3f19a$0130a860$0391f920$@codeaurora.org>
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+ <153cc316-dcb5-972f-5a2f-c91fe0f6348b@arm.com>
+ <000f01d3f103$3ff78ba0$bfe6a2e0$@codeaurora.org>
+ <2ace10bc-e1c4-2060-94d3-eb71e966ffbe@arm.com>
+ <001201d3f19a$0130a860$0391f920$@codeaurora.org>
+Message-ID: <5b2eb27b-b852-97ff-b099-fe4c22b44937@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 05/22/2018 05:26 PM, Maarten Lankhorst wrote:
-> Op 20-05-18 om 19:17 schreef Randy Li:
->> This pixel format is a fully packed and 10bits variant of NV12.
->> A luma pixel would take 10bits in memory, without any
->> filled bits between pixels in a stride. The color gamut
->> follows the BT.2020 standard.
+On 22/05/18 07:56, ilialin at codeaurora.org wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Sudeep Holla <sudeep.holla@arm.com>
+>> Sent: Monday, May 21, 2018 16:05
+
+[...]
+
 >>
->> Signed-off-by: Randy Li <ayaka@soulik.info>
->> ---
->>   drivers/gpu/drm/drm_fourcc.c  | 1 +
->>   include/uapi/drm/drm_fourcc.h | 3 +++
->>   2 files changed, 4 insertions(+)
 >>
->> diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
->> index 5ca6395cd4d3..1f43967c4013 100644
->> --- a/drivers/gpu/drm/drm_fourcc.c
->> +++ b/drivers/gpu/drm/drm_fourcc.c
->> @@ -173,6 +173,7 @@ const struct drm_format_info *__drm_format_info(u32 format)
->>   		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->>   		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->>   		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
->> +		{ .format = DRM_FORMAT_NV12_10LE40,	.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
-> Hm, the cpp value might give problems because it rounds down, not sure how we should handle that? Set to zero?
-It is default behavior that using the filed "cpp"? to calculate the 
-pixel in many drivers. I would suggest use a new filed called bits per 
-pixel (bpp) instead of the old cpp.
-The one used in the Gstreamer is more complex: 
-https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-base-libs/html/gst-plugins-base-libs-GstVideoAlignment.html#GstVideoFormatInfo
-As the struct drm_format_info only a kernel internal data structure, it 
-doesn't need to update the user-space interface like libdrm.
->>   	};
->>   
->>   	unsigned int i;
->> diff --git a/include/uapi/drm/drm_fourcc.h b/include/uapi/drm/drm_fourcc.h
->> index e04613d30a13..8eabf01e966f 100644
->> --- a/include/uapi/drm/drm_fourcc.h
->> +++ b/include/uapi/drm/drm_fourcc.h
->> @@ -140,6 +140,9 @@ extern "C" {
->>   #define DRM_FORMAT_NV61		fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
->>   #define DRM_FORMAT_NV24		fourcc_code('N', 'V', '2', '4') /* non-subsampled Cr:Cb plane */
->>   #define DRM_FORMAT_NV42		fourcc_code('N', 'V', '4', '2') /* non-subsampled Cb:Cr plane */
->> +/* A fully packed variant of NV12_10LE32 */
->> +#define DRM_FORMAT_NV12_10LE40	fourcc_code('R', 'K', '2', '0') /* 2x2 subsampled Cr:Cb plane */
->> +
->>   
->>   /*
->>    * 3 plane YCbCr
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>> That may be true and I am not that bothered about it. But assuming physical
+>> ordering from the logical cpu number is *incorrect* and will break if kernel
+>> decides to change the allocation algorithm. Kernel provides no guarantee on
+>> that, so you need to depend on some physical ID or may be DT to achieve
+>> what your want. But the current code as it stands is wrong.
+> 
+> Got your point. In fact CPUs are numbered 0-3 and ordered into 2 clusters in the DT:
+> 
+> cpus {
+> 	#address-cells = <2>;
+> 	#size-cells = <0>;
+> 
+> 	CPU0: cpu at 0 {
+> 		...
+> 		reg = <0x0 0x0>;
+> 		...
+> 	};
+> 
+> 	CPU1: cpu at 1 {
+> 		...
+> 		reg = <0x0 0x1>;
+> 		...
+> 	};
+> 
+> 	CPU2: cpu at 100 {
+> 		...
+> 		reg = <0x0 0x100>;
+> 		...
+> 	};
+> 
+> 	CPU3: cpu at 101 {
+> 		...
+> 		reg = <0x0 0x101>;
+> 		...
+> 	};
+> 
+> 	cpu-map {
+> 		cluster0 {
+> 			core0 {
+> 				cpu = <&CPU0>;
+> 			};
+> 
+> 			core1 {
+> 				cpu = <&CPU1>;
+> 			};
+> 		};
+> 
+> 		cluster1 {
+> 			core0 {
+> 				cpu = <&CPU2>;
+> 			};
+> 
+> 			core1 {
+> 				cpu = <&CPU3>;
+> 			};
+> 		};
+> 	};
+> };
+> 
+> As far, as I understand, they are probed in the same order. 
+
+Yes that's correct today, will that have to remain same for ever ?
+No it's not user ABI and kernel can decide to change the allocation
+order. What if for some reason one/more CPUs fails to boot or even
+configured not to boot ?
+
+> However, to be certain that the physical CPU is the one I intend to
+> configure, I have to fetch the device structure pointer for the cpu-map ->
+> clusterX -> core0 -> cpu path. Could you suggest a kernel API to do
+> that?
+> 
+
+Let's rewind a bit. Do you supply OPPs only on CPU0 and CPU2 ?
+If yes, that's again wrong. Simple solution is to parse all logical
+CPUs and skip if the share OPPs with some other CPUs. I think that
+logic already exists in OPP library IIRC.
+
+-- 
+Regards,
+Sudeep
