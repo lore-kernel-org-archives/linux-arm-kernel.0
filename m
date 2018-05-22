@@ -1,151 +1,57 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 22 May 2018 11:55:42 -0700
-Subject: [PATCH] arm64: dts: stingray: move common board components to
- stingray-board-base
-Message-ID: <1527015342-9317-1-git-send-email-scott.branden@broadcom.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Tue, 22 May 2018 15:06:21 -0400
+Subject: [PATCHv2 06/12] arm64: add basic pointer authentication support
+In-Reply-To: <20171127163806.31435-7-mark.rutland@arm.com>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+ <20171127163806.31435-7-mark.rutland@arm.com>
+Message-ID: <daefeb1f-9553-c26d-0b35-2c4da328aeff@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move common board components from base bcm958742 dtsi file to new
-stingray-board-base dtsi file so they can be shared between many stingray
-boards following common design.
+On 11/27/2017 11:38 AM, Mark Rutland wrote:
+> This patch adds basic support for pointer authentication, allowing
+> userspace to make use of APIAKey. The kernel maintains an APIAKey value
+> for each process (shared by all threads within), which is initialised to
+> a random value at exec() time.
+> 
+> To describe that address authentication instructions are available, the
+> ID_AA64ISAR0.{APA,API} fields are exposed to userspace. A new hwcap,
+> APIA, is added to describe that the kernel manages APIAKey.
+> 
+> Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
+> and will behave as NOPs. These may be made use of in future patches.
+> 
+> No support is added for the generic key (APGAKey), though this cannot be
+> trapped or made to behave as a NOP. Its presence is not advertised with
+> a hwcap.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/mmu.h          |  5 ++
+>  arch/arm64/include/asm/mmu_context.h  | 25 +++++++++-
+>  arch/arm64/include/asm/pointer_auth.h | 89 +++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/uapi/asm/hwcap.h   |  1 +
+>  arch/arm64/kernel/cpufeature.c        | 17 ++++++-
+>  arch/arm64/kernel/cpuinfo.c           |  1 +
+>  6 files changed, 134 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pointer_auth.h
 
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
----
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 35 +--------------
- .../dts/broadcom/stingray/stingray-board-base.dtsi | 51 ++++++++++++++++++++++
- 2 files changed, 52 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-board-base.dtsi
+Mark, I was able to verify that a buffer overflow exploit results in a segfault
+with these PAC patches. When I compile the same binary without
+"-msign-return-address=none", I am able to successfully overflow the stack and
+execute malicious code.
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-index cacc25e..d74f6df 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-@@ -30,20 +30,9 @@
-  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
--#include "stingray.dtsi"
-+#include "stingray-board-base.dtsi"
- 
- / {
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--
--	aliases {
--		serial0 = &uart1;
--		serial1 = &uart0;
--		serial2 = &uart2;
--		serial3 = &uart3;
--	};
--
- 	sdio0_vddo_ctrl_reg: sdio0_vddo_ctrl {
- 		compatible = "regulator-gpio";
- 		regulator-name = "sdio0_vddo_ctrl_reg";
-@@ -67,23 +56,6 @@
- 	};
- };
- 
--&memory { /* Default DRAM banks */
--	reg = <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
--	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
--};
--
--&mdio_mux_iproc {
--	mdio at 10 {
--		gphy0: eth-phy at 10 {
--			reg = <0x10>;
--		};
--	};
--};
--
--&uart1 {
--	status = "okay";
--};
--
- &pwm {
- 	status = "okay";
- };
-@@ -111,8 +83,6 @@
- };
- 
- &enet {
--	phy-mode = "rgmii-id";
--	phy-handle = <&gphy0>;
- 	status = "okay";
- };
- 
-@@ -133,13 +103,10 @@
- 
- &sdio0 {
- 	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
--	non-removable;
--	full-pwr-cycle;
- 	status = "okay";
- };
- 
- &sdio1 {
- 	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
--	full-pwr-cycle;
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-board-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-board-base.dtsi
-new file mode 100644
-index 0000000..82a2471
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-board-base.dtsi
-@@ -0,0 +1,51 @@
-+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
-+/*
-+ *  Copyright(c) 2016-2018 Broadcom
-+ */
-+
-+#include "stingray.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	aliases {
-+		serial0 = &uart1;
-+		serial1 = &uart0;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&memory { /* Default DRAM banks */
-+	reg = <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
-+	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
-+};
-+
-+&enet {
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&gphy0>;
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&sdio0 {
-+	non-removable;
-+	full-pwr-cycle;
-+};
-+
-+&sdio1 {
-+	full-pwr-cycle;
-+};
-+
-+&mdio_mux_iproc {
-+	mdio at 10 {
-+		gphy0: eth-phy at 10 {
-+			reg = <0x10>;
-+		};
-+	};
-+};
+Thanks
+Adam
+
+Tested-by: Adam Wallis <awallis@codeaurora.org>
+
+
 -- 
-2.5.0
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
