@@ -1,30 +1,47 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 22 May 2018 10:01:39 -0700
-Subject: [PATCH] arm64: dts: specify 1.8V EMMC capabilities for bcm958742t
-Message-ID: <1527008499-4120-1-git-send-email-scott.branden@broadcom.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 22 May 2018 18:31:35 +0200
+Subject: Clang arm64 build is broken
+In-Reply-To: <CAKwvOdkedxmstRytbWeYU8Pj9ahgWOe7rODJJ8BDtRzUroQeXw@mail.gmail.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+ <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+ <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
+ <CAKwvOdkedxmstRytbWeYU8Pj9ahgWOe7rODJJ8BDtRzUroQeXw@mail.gmail.com>
+Message-ID: <CAAeHK+xDpESgjA-Y7JbOAXSzE_yUjz=zcb9carbLxceB3BN=6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify 1.8V EMMC capabilities for bcm958742t board to indicate support
-for UHS mode.
+On Mon, May 14, 2018 at 6:24 PM, Nick Desaulniers
+<ndesaulniers@google.com> wrote:
+> On Fri, Apr 20, 2018 at 7:59 AM Andrey Konovalov <andreyknvl@google.com>
+> wrote:
+>> On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com>
+> wrote:
+>> >> The issue is that
+>> >> clang doesn't know about the "S" asm constraint. I reported this to
+>> >> clang [2], and hopefully this will get fixed. In the meantime, would
+>> >> it possible to work around using the "S" constraint in the kernel?
+>> >
+>> > I have no idea, I've never used clang to build the kernel. Clang isn't
+>> > really supported to build the arm64 kernel anyway (as you mention
+>> > below), and working around clang deficiencies would mean that we leave
+>> > with the workaround forever. I'd rather enable clang once it is at
+>> > feature parity with GCC.
+>
+>> The fact that there are some existing issues with building arm64
+>> kernel with clang doesn't sound like a good justification for adding
+>> new issues :)
+>
+>> However in this case I do believe that this is more of a bug in clang
+>> that should be fixed.
+>
+> Just to follow up with this thread;
+>
+> Support for "S" constraints is being (re-)added to Clang in:
+> https://reviews.llvm.org/D46745
 
-Fixes: d4b4aba6be8a ("arm64: dts: Initial DTS files for Broadcom Stingray SOC")
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi Nick!
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-index 6a4d19e..dd9de6b 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-@@ -44,3 +44,7 @@
- &gphy0 {
- 	enet-phy-lane-swap;
- };
-+
-+&sdio0 {
-+	mmc-ddr-1_8v;
-+};
--- 
-2.5.0
+I can confirm that the latest clang (which includes this patch) is
+able to build the kernel with CONFIG_KVM enabled.
+
+Thanks!
