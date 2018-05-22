@@ -1,111 +1,223 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 22 May 2018 17:05:02 +0100
-Subject: [PATCH v10 01/18] arm64: fpsimd: Fix TIF_FOREIGN_FPSTATE after
- invalidating cpu regs
+Date: Tue, 22 May 2018 17:05:15 +0100
+Subject: [PATCH v10 14/18] KVM: arm64: Save host SVE context as appropriate
 In-Reply-To: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
 References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527005119-6842-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527005119-6842-15-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fpsimd_last_state.st is set to NULL as a way of indicating that
-current's FPSIMD registers are no longer loaded in the cpu.  In
-particular, this is done when the kernel temporarily uses or
-clobbers the FPSIMD registers for its own purposes, as in CPU PM or
-kernel-mode NEON, resulting in them being populated with garbage
-data not belonging to a task.
+This patch adds SVE context saving to the hyp FPSIMD context switch
+path.  This means that it is no longer necessary to save the host
+SVE state in advance of entering the guest, when in use.
 
-Commit 17eed27b02da ("arm64/sve: KVM: Prevent guests from using
-SVE") factors this operation out as a new helper
-fpsimd_flush_cpu_state() to make it clearer what is being done
-here, and on SVE systems this helper is now used, via
-kvm_fpsimd_flush_cpu_state(), to invalidate the registers after KVM
-has run a vcpu.  The reason for this is that KVM does not yet
-understand how to restore the full host SVE registers itself after
-loading the guest FPSIMD context into them.
+In order to avoid adding pointless complexity to the code, VHE is
+assumed if SVE is in use.  VHE is an architectural prerequisite for
+SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+kernels that support both SVE and KVM.
 
-This exposes a particular problem: if fpsimd_last_state.st is set
-to NULL without also setting TIF_FOREIGN_FPSTATE, the kernel may
-continue to think that current's FPSIMD registers are live even
-though they have actually been clobbered.
-
-Prior to the aforementioned commit, the only path where
-fpsimd_last_state.st is set to NULL without setting
-TIF_FOREIGN_FPSTATE is when kernel_neon_begin() is called by a
-kernel thread (where current->mm can be NULL).  This does not
-matter, because the only harm is that at context-switch time
-fpsimd_thread_switch() may unnecessarily save the FPSIMD registers
-back to current's thread_struct (even though kernel threads are not
-considered to have any FPSIMD context of their own and the
-registers will never be reloaded).
-
-Note that although CPU_PM_ENTER lacks the TIF_FOREIGN_FPSTATE
-setting, every CPU passing through that path must subsequently pass
-through CPU_PM_EXIT before it can re-enter the kernel proper.
-CPU_PM_EXIT sets the flag.
-
-The sve_flush_cpu_state() function added by commit 17eed27b02da
-also lacks the proper maintenance of TIF_FOREIGN_FPSTATE.  This may
-cause the bits of a host task's SVE registers that do not alias the
-FPSIMD register file to spontaneously appear zeroed if a KVM vcpu
-runs in the same task in the meantime.  Although this effect is
-hidden by the fact that the non-FPSIMD bits of the SVE registers
-are zeroed by a syscall anyway, it is doubtless a bad idea to rely
-on these different code paths interacting correctly under future
-maintenance.
-
-This patch makes TIF_FOREIGN_FPSTATE an unconditional side-effect
-of fpsimd_flush_cpu_state(), and removes the set_thread_flag()
-calls that become redunant as a result.  This ensures that
-TIF_FOREIGN_FPSTATE cannot remain clear if the FPSIMD state in the
-FPSIMD registers is invalid.
+Historically, software models exist that can expose the
+architecturally invalid configuration of SVE without VHE, so if
+this situation is detected at kvm_init() time then KVM will be
+disabled.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 ---
+
+ * Tags stripped since v8, please reconfirm if possible:
+
+Formerly-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Formerly-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Formerly-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 Changes since v9:
 
- * New patch (bugfix to subsequent commits).
----
- arch/arm64/kernel/fpsimd.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+Requested by Marc Zyngier:
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 87a3536..12e1c96 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -1067,6 +1067,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
- static inline void fpsimd_flush_cpu_state(void)
- {
- 	__this_cpu_write(fpsimd_last_state.st, NULL);
-+	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ * Inline check for VHE if SVE is present into kvm_host.h.
+
+   The check has been renamed to the more specific
+   kvm_arch_check_sve_has_vhe(), and the kvm_pr_unimpl() moved back to
+   arm.c (to avoid circular include issues).
+
+   arm.c is not single-arch code, but it is all Arm-specific, so
+   adding a hook like this doesn't seem too unreasonable.
+
+Changes since v8:
+
+ * Add kvm_arch_check_supported() hook, and move arm64-specific check
+   for SVE-implies-VHE into arch/arm64/.
+
+   Due to circular header dependency problems, it is difficult to get
+   the prototype for kvm_pr_*() functions in <asm/kvm_host.h>, so this
+   patch puts arm64's kvm_arch_check_supported() hook out of line.
+   This is not a hot function.
+---
+ arch/arm/include/asm/kvm_host.h   |  1 +
+ arch/arm64/Kconfig                |  7 +++++++
+ arch/arm64/include/asm/kvm_host.h | 13 +++++++++++++
+ arch/arm64/kvm/fpsimd.c           |  1 -
+ arch/arm64/kvm/hyp/switch.c       | 20 +++++++++++++++++++-
+ virt/kvm/arm/arm.c                |  7 +++++++
+ 6 files changed, 47 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index ac870b2..3b85bbb 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -280,6 +280,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ 
++static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf49..b0d3820 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1130,6 +1130,7 @@ endmenu
+ config ARM64_SVE
+ 	bool "ARM Scalable Vector Extension support"
+ 	default y
++	depends on !KVM || ARM64_VHE
+ 	help
+ 	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+ 	  execution state which complements and extends the SIMD functionality
+@@ -1155,6 +1156,12 @@ config ARM64_SVE
+ 	  booting the kernel.  If unsure and you are not observing these
+ 	  symptoms, you should assume that it is safe to say Y.
+ 
++	  CPUs that support SVE are architecturally required to support the
++	  Virtualization Host Extensions (VHE), so the kernel makes no
++	  provision for supporting SVE alongside KVM without VHE enabled.
++	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
++	  KVM in the same kernel image.
++
+ config ARM64_MODULE_PLTS
+ 	bool
+ 	select HAVE_MOD_ARCH_SPECIFIC
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index b3fe730..06d5a61 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -405,6 +405,19 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	kvm_call_hyp(__kvm_set_tpidr_el2, tpidr_el2);
  }
  
- /*
-@@ -1121,10 +1122,8 @@ void kernel_neon_begin(void)
- 	__this_cpu_write(kernel_neon_busy, true);
++static inline bool kvm_arch_check_sve_has_vhe(void)
++{
++	/*
++	 * The Arm architecture specifies that imlpementation of SVE
++	 * requires VHE also to be implemented.  The KVM code for arm64
++	 * relies on this when SVE is present:
++	 */
++	if (system_supports_sve())
++		return has_vhe();
++	else
++		return true;
++}
++
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index 365933a..dc6ecfa 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+  */
+ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+ {
+-	BUG_ON(system_supports_sve());
+ 	BUG_ON(!current->mm);
  
- 	/* Save unsaved task fpsimd state, if any: */
--	if (current->mm) {
-+	if (current->mm)
- 		task_fpsimd_save();
--		set_thread_flag(TIF_FOREIGN_FPSTATE);
--	}
+ 	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 118f300..a6a8c7d 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,6 +21,7 @@
  
- 	/* Invalidate any task state remaining in the fpsimd regs: */
- 	fpsimd_flush_cpu_state();
-@@ -1251,8 +1250,6 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
- 		fpsimd_flush_cpu_state();
- 		break;
- 	case CPU_PM_EXIT:
--		if (current->mm)
--			set_thread_flag(TIF_FOREIGN_FPSTATE);
- 		break;
- 	case CPU_PM_ENTER_FAILED:
- 	default:
+ #include <kvm/arm_psci.h>
+ 
++#include <asm/cpufeature.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
+@@ -28,6 +29,7 @@
+ #include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
++#include <asm/processor.h>
+ #include <asm/thread_info.h>
+ 
+ /* Check whether the FP regs were dirtied while in the host-side run loop: */
+@@ -329,6 +331,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 				    struct kvm_vcpu *vcpu)
+ {
++	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
++
+ 	if (has_vhe())
+ 		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+ 			     cpacr_el1);
+@@ -339,7 +343,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 	isb();
+ 
+ 	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
+-		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
++		/*
++		 * In the SVE case, VHE is assumed: it is enforced by
++		 * Kconfig and kvm_arch_init().
++		 */
++		if (system_supports_sve() &&
++		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
++			struct thread_struct *thread = container_of(
++				host_fpsimd,
++				struct thread_struct, uw.fpsimd_state);
++
++			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
++		} else {
++			__fpsimd_save_state(host_fpsimd);
++		}
++
+ 		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+ 	}
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index bee226c..ce7c6f3 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
++#include <linux/bug.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -41,6 +42,7 @@
+ #include <asm/mman.h>
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
++#include <asm/cpufeature.h>
+ #include <asm/virt.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -1574,6 +1576,11 @@ int kvm_arch_init(void *opaque)
+ 		return -ENODEV;
+ 	}
+ 
++	if (!kvm_arch_check_sve_has_vhe()) {
++		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
++		return -ENODEV;
++	}
++
+ 	for_each_online_cpu(cpu) {
+ 		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
+ 		if (ret < 0) {
 -- 
 2.1.4
