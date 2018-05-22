@@ -1,43 +1,62 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 22 May 2018 10:52:39 +0300
-Subject: [PATCH v7 9/9] ARM: dts: at91: sama5d2: Add resistive touch device
-In-Reply-To: <1526975559-18966-1-git-send-email-eugen.hristev@microchip.com>
-References: <1526975559-18966-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1526975559-18966-10-git-send-email-eugen.hristev@microchip.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 22 May 2018 13:27:10 +0530
+Subject: [PATCH 12/14] OMAP: CLK: CLKSRC: Add suspend resume hooks
+In-Reply-To: <20180412142714.GX5700@atomide.com>
+References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+ <1523505239-16229-13-git-send-email-j-keerthy@ti.com>
+ <20180412142714.GX5700@atomide.com>
+Message-ID: <038cc2cd-ff72-c9c9-257b-1c1cc09a66a8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic resistive touch device which is connected to ADC block
-inside the SAMA5D2 SoC
 
-Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
----
-Changes in v5:
- - renamed touchscreen-threshold-pressure to touchscreen-min-pressure
 
- arch/arm/boot/dts/sama5d2.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On Thursday 12 April 2018 07:57 PM, Tony Lindgren wrote:
+> * Keerthy <j-keerthy@ti.com> [180412 03:56]:
+>> Add the save and restore for clksrc as part of suspend and resume
+>> so that it saves the counter value and restores. This is needed in
+>> modes like rtc+ddr in self-refresh not doing this stalls the time.
+> 
+> I suspect this too should really happen with cpu_pm.
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index f06ba99..a44f325 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1442,6 +1442,16 @@
- 				status = "disabled";
- 			};
- 
-+			resistive_touch: resistive-touch {
-+				compatible = "resistive-adc-touch";
-+				io-channels = <&adc AT91_SAMA5D2_ADC_X_CHANNEL>,
-+					      <&adc AT91_SAMA5D2_ADC_Y_CHANNEL>,
-+					      <&adc AT91_SAMA5D2_ADC_P_CHANNEL>;
-+				io-channel-names = "x", "y", "pressure";
-+				touchscreen-min-pressure = <50000>;
-+				status = "disabled";
-+			};
-+
- 			pioA: pinctrl at fc038000 {
- 				compatible = "atmel,sama5d2-pinctrl";
- 				reg = <0xfc038000 0x600>;
--- 
-2.7.4
+I believe going by the previous set of patches this fits better with
+suspend/resume?
+
+> 
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -442,6 +442,38 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+>>  	return ret;
+>>  }
+>>  
+>> +static unsigned int omap2_gptimer_clksrc_load;
+>> +
+>> +static void omap2_gptimer_clksrc_suspend(struct clocksource *unused)
+>> +{
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	omap2_gptimer_clksrc_load =
+>> +		__omap_dm_timer_read_counter(&clksrc, OMAP_TIMER_NONPOSTED);
+>> +
+>> +	oh = omap_hwmod_lookup(clocksource_gpt.name);
+>> +	if (!oh)
+>> +		return;
+>> +
+>> +	omap_hwmod_idle(oh);
+>> +}
+> 
+> Probably no need to look up the hwmod every time? Especially if am437x
+> will start supporting deeper idle modes during runtime.
+
+Like clockevent i will store the hwmod pointer for clocksource as well.
+
+> 
+> And probably the cpu_pm notifies should be directly in the hwmod
+> code so we don't need to add more any more dependencies to hwmod
+> functions to timer code. We should have this code move to drivers
+> anyways at some point.
+> 
+> Regards,
+> 
+> Tony
+> 
