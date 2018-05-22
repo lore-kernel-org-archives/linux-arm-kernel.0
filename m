@@ -1,66 +1,41 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 22 May 2018 16:24:25 -0700
-Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-In-Reply-To: <20180522205457.GA16363@roeck-us.net>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
- <20180522205457.GA16363@roeck-us.net>
-Message-ID: <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 May 2018 00:25:20 +0100
+Subject: [PATCH 08/14] ARM: spectre-v2: harden user aborts in kernel space
+In-Reply-To: <e52b3541-7106-a6dc-5851-01b091bec38f@arm.com>
+References: <20180521114238.GN17671@n2100.armlinux.org.uk>
+ <E1fKjFO-000648-8d@rmk-PC.armlinux.org.uk>
+ <e52b3541-7106-a6dc-5851-01b091bec38f@arm.com>
+Message-ID: <20180522232519.GV17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-On 5/22/2018 1:54 PM, Guenter Roeck wrote:
-> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
->> If the watchdog hardware is already enabled during the boot process,
->> when the Linux watchdog driver loads, it should reset the watchdog and
->> tell the watchdog framework. As a result, ping can be generated from
->> the watchdog framework, until the userspace watchdog daemon takes over
->> control
->>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> ---
->>   drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
->>   1 file changed, 22 insertions(+)
->>
->> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
->> index 1484609..408ffbe 100644
->> --- a/drivers/watchdog/sp805_wdt.c
->> +++ b/drivers/watchdog/sp805_wdt.c
->> @@ -42,6 +42,7 @@
->>   	/* control register masks */
->>   	#define	INT_ENABLE	(1 << 0)
->>   	#define	RESET_ENABLE	(1 << 1)
->> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
->>   #define WDTINTCLR		0x00C
->>   #define WDTRIS			0x010
->>   #define WDTMIS			0x014
->> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
->>   MODULE_PARM_DESC(nowayout,
->>   		"Set to 1 to keep watchdog running after device release");
->>   
->> +/* returns true if wdt is running; otherwise returns false */
->> +static bool wdt_is_running(struct watchdog_device *wdd)
->> +{
->> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
->> +
->> +	if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
->> +	    ENABLE_MASK)
->> +		return true;
->> +	else
->> +		return false;
+On Tue, May 22, 2018 at 06:15:02PM +0100, Marc Zyngier wrote:
+> On 21/05/18 12:45, Russell King wrote:
+> > +	switch (read_cpuid_part()) {
+> > +	case ARM_CPU_PART_CORTEX_A8:
+> > +	case ARM_CPU_PART_CORTEX_A9:
+> > +	case ARM_CPU_PART_CORTEX_A12:
+> > +	case ARM_CPU_PART_CORTEX_A17:
+> > +	case ARM_CPU_PART_CORTEX_A73:
+> > +	case ARM_CPU_PART_CORTEX_A75:
+> > +		harden_branch_predictor = harden_branch_predictor_bpiall;
+> > +		spectre_v2_method = "BPIALL";
+> > +		break;
 > 
-> 	return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
-> 
+> You don't seem to take into account the PFR0.CSV2 field which indicates
+> that the CPU has a branch predictor that is immune to Spectre-v2.
 
-Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
-therefore, a simple !!(expression) would not work? That is, the masked 
-result needs to be compared against the mask again to ensure both bits 
-are set, right?
+That information is not covered in the description of the vulnerability
+- the published information on the security-updates site states that
+BPIALL is required without stating any conditions.
 
-Thanks,
+> See for example the Cortex-A75 r3p0 TRM[1].
 
-Ray
+So which cores should such a test be applied to?  As I mention,
+the support site doesn't give this detail.  That brings up the
+obvious question: what else does the web page miss out on?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
