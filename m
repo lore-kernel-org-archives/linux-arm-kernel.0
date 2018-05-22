@@ -1,14 +1,14 @@
 From: awallis@codeaurora.org (Adam Wallis)
-Date: Tue, 22 May 2018 15:06:21 -0400
-Subject: [PATCHv2 06/12] arm64: add basic pointer authentication support
-In-Reply-To: <20171127163806.31435-7-mark.rutland@arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-7-mark.rutland@arm.com>
-Message-ID: <daefeb1f-9553-c26d-0b35-2c4da328aeff@codeaurora.org>
+Date: Tue, 22 May 2018 15:08:42 -0400
+Subject: [PATCHv4 06/10] arm64: add basic pointer authentication support
+In-Reply-To: <20180503132031.25705-7-mark.rutland@arm.com>
+References: <20180503132031.25705-1-mark.rutland@arm.com>
+ <20180503132031.25705-7-mark.rutland@arm.com>
+Message-ID: <4b394038-ffd7-ef28-faaf-00f91febf54a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2017 11:38 AM, Mark Rutland wrote:
+On 5/3/2018 9:20 AM, Mark Rutland wrote:
 > This patch adds basic support for pointer authentication, allowing
 > userspace to make use of APIAKey. The kernel maintains an APIAKey value
 > for each process (shared by all threads within), which is initialised to
@@ -27,17 +27,11 @@ On 11/27/2017 11:38 AM, Mark Rutland wrote:
 > 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
 > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/include/asm/mmu.h          |  5 ++
->  arch/arm64/include/asm/mmu_context.h  | 25 +++++++++-
->  arch/arm64/include/asm/pointer_auth.h | 89 +++++++++++++++++++++++++++++++++++
->  arch/arm64/include/uapi/asm/hwcap.h   |  1 +
->  arch/arm64/kernel/cpufeature.c        | 17 ++++++-
->  arch/arm64/kernel/cpuinfo.c           |  1 +
->  6 files changed, 134 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm64/include/asm/pointer_auth.h
+
 
 Mark, I was able to verify that a buffer overflow exploit results in a segfault
 with these PAC patches. When I compile the same binary without
