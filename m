@@ -1,44 +1,64 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 22 May 2018 13:53:20 +0200
-Subject: [PATCH 04/20] arm-nommu: use generic dma_noncoherent_ops
-In-Reply-To: <20180511091114.GA16141@n2100.armlinux.org.uk>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-5-hch@lst.de>
- <20180511091114.GA16141@n2100.armlinux.org.uk>
-Message-ID: <20180522115320.GA14530@lst.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 22 May 2018 13:48:06 +0200
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add GEther support
+In-Reply-To: <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
+References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
+ <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
+Message-ID: <CAMuHMdW9UzOGV_zh3NxugYrj0j0qszX+NFoZtFvZRD9CNMHt+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 10:11:15AM +0100, Russell King - ARM Linux wrote:
-> > +void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
-> > +		size_t size, enum dma_data_direction dir)
-> 
-> Please no.  There is a lot of history of these (__dma_page_cpu_to_dev etc)
-> functions being abused by out of tree drivers, because they think they
-> know better.  This is stopped by making them static and ensuring that
-> drivers have no access to these functions.
-> 
-> Please do not re-expose these to the global kernel.
-> 
-> While it may make things easier for a cross-architecture point of view,
-> it makes it a lot easier for people to abuse these private APIs.
+Hi Sergei,
 
-The point of this series, which isn't fully archived yet, is to
-consolidate the direct mapping dma code, that is all dma_map_ops
-instances except for iommus.  It is in fact in many ways modelled
-after the ARM code.  For that we need the architectures to supply
-the cache maintainance routines.
+On Fri, May 18, 2018 at 9:45 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the generic R8A77980 part of the GEther device node.
+>
+> Based on the original (and large) patch by Vladimir Barinov.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-However, even if they now appear in dma-noncoherent.h they are NOT
-and will NOT be exported, so using them directly from drivers won't
-easily be possible.
+Thanks for your patch!
 
-I'll drop the arm-nommu patch for now, but I will pester your with this
-again once arm is the last architecture not sharing the common code.
+With the below addressed:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
----end quoted text---
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> @@ -417,6 +417,17 @@
+>                         dma-channels = <16>;
+>                 };
+>
+> +               gether: ethernet at e7400000 {
+> +                       compatible = "renesas,gether-r8a77980";
+> +                       reg = <0 0xe7400000 0 0x1000>;
+> +                       interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 813>;
+> +                       power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+
+resets = <&cpg 813>;
+
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       status = "disabled";
+
+Any default phy-mode needed?
+
+> +               };
+> +
+>                 mmc0: mmc at ee140000 {
+>                         compatible = "renesas,sdhi-r8a77980",
+>                                      "renesas,rcar-gen3-sdhi";
+
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
