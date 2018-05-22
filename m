@@ -1,30 +1,36 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 22 May 2018 16:27:23 +0200
-Subject: [PATCH v2] ARM64: dts: sun50i: h5: Add spi flash node for
- OrangePi PC2
-In-Reply-To: <20180521115426.92115-1-manu@freebsd.org>
-References: <20180521115426.92115-1-manu@freebsd.org>
-Message-ID: <20180522142723.lm4ivndgwr6mzdpp@flea>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 22 May 2018 16:29:01 +0200
+Subject: [PATCH 1/9] ARM: shmobile: defconfig: Enable MTD command line
+ partition parsing
+In-Reply-To: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdWO24GhbmWD=acMBVNxYg35XrcyE71-S4=Zp9=KXKqE4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 01:54:26PM +0200, Emmanuel Vadot wrote:
-> The OrangePi PC2 have an mx25l1606e spi flash.
-> Add a node for it.
-> 
-> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> In preparation for removing MTD partitioning from the DTs and moving
+> it over to kernel command line partition parsing, enable the support
+> for kernel command line MTD partition parsing.
+>
+> The argument for not having MTD partitions in the DT is the same as
+> for not having hard drive partitions in DT, neither describes the
+> hardware itself, so it shouldn't be in the DT. Furthermore, kernel
+> command line MTD partition passing allows greater flexibility in
+> case someone decided to repartition the flash, which is well in the
+> realm of possibility with these systems.
+>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 
-Fixed the prefix and applied, thanks!
-Maxime
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/3426bebf/attachment-0001.sig>
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
