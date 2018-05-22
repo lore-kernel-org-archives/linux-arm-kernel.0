@@ -1,45 +1,69 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 15:09:50 -0500
-Subject: [PATCH 4/5] arm64: allwinner: h6: add USB3 device nodes
-In-Reply-To: <9a25a561-b643-a77b-3287-8082780fce60@cogentembedded.com>
+Date: Tue, 22 May 2018 15:12:00 -0500
+Subject: [PATCH 1/5] phy: allwinner: add phy driver for USB3 PHY on
+ Allwinner H6 SoC
+In-Reply-To: <20180507151817.55663-2-icenowy@aosc.io>
 References: <20180507151817.55663-1-icenowy@aosc.io>
- <20180507151817.55663-5-icenowy@aosc.io>
- <9a25a561-b643-a77b-3287-8082780fce60@cogentembedded.com>
-Message-ID: <20180522200950.GA16392@rob-hp-laptop>
+ <20180507151817.55663-2-icenowy@aosc.io>
+Message-ID: <20180522201200.GA17465@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 11:31:27AM +0300, Sergei Shtylyov wrote:
-> Hello!
+On Mon, May 07, 2018 at 11:18:13PM +0800, Icenowy Zheng wrote:
+> Allwinner H6 SoC contains a USB3 PHY (with USB2 DP/DM lines also
+> controlled).
 > 
-> On 5/7/2018 6:18 PM, Icenowy Zheng wrote:
+> Add a driver for it.
 > 
-> > Allwinner H6 SoC features USB3 functionality, with a DWC3 controller and
-> > a custom PHY.
-> > 
-> > Add device tree nodes for them.
-> > 
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > ---
-> >   arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 38 ++++++++++++++++++++
-> >   1 file changed, 38 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > index c72da8cd9ef5..9564c938717c 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > @@ -174,6 +174,44 @@
-> >   			status = "disabled";
-> >   		};
-> > +		usb3: usb at 5200000 {
+> The register operations in this driver is mainly extracted from the BSP
+> USB3 driver.
 > 
->    I don't think <unit-address> is allowed for a node having no "reg" prop...
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../bindings/phy/sun50i-usb3-phy.txt          |  24 +++
 
-Right. One way to fix is fill out ranges property because the unit 
-address can come from either.
+Please split bindings to separate patch.
 
-However, there's work to deprecate doing DWC3 binding with a child node 
-like this. See the series "usb: dwc3: support clocks and resets for DWC3 
-core". Please follow that.
+>  drivers/phy/allwinner/Kconfig                 |  13 ++
+>  drivers/phy/allwinner/Makefile                |   1 +
+>  drivers/phy/allwinner/phy-sun50i-usb3.c       | 195 ++++++++++++++++++
+>  4 files changed, 233 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+>  create mode 100644 drivers/phy/allwinner/phy-sun50i-usb3.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+> new file mode 100644
+> index 000000000000..912d55f9f69d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+> @@ -0,0 +1,24 @@
+> +Allwinner sun50i USB3 PHY
+> +-----------------------
+> +
+> +Required properties:
+> +- compatible : should be one of
+> +  * allwinner,sun60i-h6-usb3-phy
+> +- reg : a list of offset + length pairs
+> +- #phy-cells : from the generic phy bindings, must be 0
+> +- clocks : phandle + clock specifier for the phy clock
+> +- resets : phandle + reset specifier for the phy reset
+> +
+> +Optional Properties:
+> +- phy-supply : from the generic phy bindings, a phandle to a regulator that
+> +	       provides power to VBUS.
+> +
+> +Example:
+> +	usb3phy: phy at 5210000 {
 
-Rob
+usb-phy at ...
+
+> +		compatible = "allwinner,sun50i-h6-usb3-phy";
+> +		reg = <0x5210000 0x10000>;
+> +		clocks = <&ccu CLK_USB_PHY1>;
+> +		resets = <&ccu RST_USB_PHY1>;
+> +		#phy-cells = <0>;
+> +		status = "disabled";
+
+Don't show status in examples.
+
+> +	};
