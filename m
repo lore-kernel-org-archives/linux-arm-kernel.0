@@ -1,43 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 12:35:34 -0500
-Subject: [PATCH v2 05/13] dt-bindings: power: add RK3128 SoCs header for
- power-domain
-In-Reply-To: <1526268602-9760-1-git-send-email-zhangqing@rock-chips.com>
-References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
- <1526268602-9760-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <20180522173534.GA15794@rob-hp-laptop>
+Date: Tue, 22 May 2018 12:17:05 -0500
+Subject: [PATCH v3 3/4] dt-bindings: rtc: update stm32-rtc documentation
+ for stm32mp1 rtc
+In-Reply-To: <1526558666-24243-4-git-send-email-amelie.delaunay@st.com>
+References: <1526558666-24243-1-git-send-email-amelie.delaunay@st.com>
+ <1526558666-24243-4-git-send-email-amelie.delaunay@st.com>
+Message-ID: <20180522171705.GA22550@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 11:30:02AM +0800, Elaine Zhang wrote:
-> According to a description from TRM, add all the power domains.
+On Thu, May 17, 2018 at 02:04:25PM +0200, Amelie Delaunay wrote:
+> RTC embedded in stm32mp1 SoC is slightly different from stm32h7 one, it
+> doesn't require to disable backup domain write protection, and rtc_ck
+> parent clock assignment isn't allowed.
+> To sum up, stm32mp1 RTC requires 2 clocks, pclk and rtc_ck, and an RTC
+> alarm interrupt.
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
->  include/dt-bindings/power/rk3128-power.h | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 include/dt-bindings/power/rk3128-power.h
-> 
-> diff --git a/include/dt-bindings/power/rk3128-power.h b/include/dt-bindings/power/rk3128-power.h
-> new file mode 100644
-> index 000000000000..26aef519cd94
-> --- /dev/null
-> +++ b/include/dt-bindings/power/rk3128-power.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Copyright (c) 2017 Rockchip Electronics Co. Ltd.
-> + * Author: Elaine Zhang <zhangqing@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-
-Use SPDX tag instead, otherwise:
+>  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 27 ++++++++++++++++------
+>  1 file changed, 20 insertions(+), 7 deletions(-)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
