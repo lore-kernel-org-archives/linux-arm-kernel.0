@@ -1,53 +1,38 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 22 May 2018 15:30:26 +0100
-Subject: [RFC PATCH v2] arm64: fault: Don't leak data in ESR context for
- user fault on kernel VA
-In-Reply-To: <20180522141146.GF13470@e103592.cambridge.arm.com>
-References: <20180419154833.27727-1-peter.maydell@linaro.org>
- <20180522133826.GE26955@arm.com>
- <CAFEAcA9i4_neKwaWPm_gV=fAgASL4B9X8Z++c+NvGA+JYSdDZA@mail.gmail.com>
- <20180522141146.GF13470@e103592.cambridge.arm.com>
-Message-ID: <CAFEAcA9UrUZO8kLRe0fi2NXAZQw9b+bBYgYC4Fr3fg97JnfmEA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 22 May 2018 16:46:09 +0200
+Subject: [PATCH 9/9] ARM: dts: silk: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-9-marek.vasut+renesas@gmail.com>
+References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+ <20180522120257.13232-9-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdWp8P2g5kcP9eeOmfgW+DxPAPfjB82eGCD5M7Jgj155bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2018 at 15:11, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, May 22, 2018 at 02:48:29PM +0100, Peter Maydell wrote:
->> On 22 May 2018 at 14:38, Will Deacon <will.deacon@arm.com> wrote:
->> > Hi Peter,
->> >
->> > Sorry for the delay in getting to this! Comments inline.
->> >
->> > On Thu, Apr 19, 2018 at 04:48:33PM +0100, Peter Maydell wrote:
->>
->> >> +                     /*
->> >> +                      * These bits provide only information about the
->> >> +                      * faulting instruction, which userspace knows already.
->> >> +                      * We explicitly clear bits which are architecturally
->> >> +                      * RES0 in case they are given meanings in future.
->> >> +                      */
->> >> +                     if (esr & ESR_ELx_ISV)
->> >> +                             esr &= ESR_ELx_EC_MASK | ESR_ELx_IL |
->> >> +                                     ESR_ELx_ISV | ESR_ELx_SAS |
->> >> +                                     ESR_ELx_SSE | ESR_ELx_SRT_MASK |
->> >> +                                     ESR_ELx_SF | ESR_ELx_AR | ESR_ELx_CM |
->> >> +                                     ESR_ELx_WNR;
->> >
->> > Reading through the ARM ARM, it seems to say that ISV is always 0 for
->> > faults reported in ESR_EL1, which implies we can drop ISV, SAS, SSE, SRT,
->> > SF and AR from this list and actually drop the conditional altogether.
->>
->> Mmm, I guess so, if we're guaranteed to only be working with ESRs
->> taken to EL1 (or we want to present userspace with an ESR that
+On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Drop the MTD partitioning from DT, since it does not describe HW
+> and to give way to a more flexible kernel command line partition
+> passing.
 >
-> There is no direct interface between EL0 and EL2 with the stage2
-> translation enabled, so even if this data is available for a fault at
-> EL2, we won't be signalling the fault via delivering a signal to EL0.
+> To retain the original partitioning, assure you have enabled
+> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+> following to your kernel command line:
+>
+>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
 
-Right -- and even if we did somehow end up with that, we probably
-wouldn't want to leak to userspace that their access was trapped
-to EL2 rather than EL1, so we should present the illusion that
-it was trapped at EL1 regardless.
+Drop @0?
+4m?
 
-thanks
--- PMM
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
