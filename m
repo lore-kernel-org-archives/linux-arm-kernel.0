@@ -1,54 +1,67 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 May 2018 11:55:03 +0100
-Subject: [PATCH 07/14] ARM: spectre-v2: add Cortex A8 and A15 validation
- of the IBE bit
-In-Reply-To: <CAMuHMdWdfjmdnQVmX7PJsXV8PcHhCCwAeHgxXRSV3CjX4C_amg@mail.gmail.com>
-References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
- <E1fIuBF-0003q0-3d@rmk-PC.armlinux.org.uk>
- <CAMuHMdWdfjmdnQVmX7PJsXV8PcHhCCwAeHgxXRSV3CjX4C_amg@mail.gmail.com>
-Message-ID: <20180522105503.GR17671@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 22 May 2018 11:58:13 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Make allocations NUMA-aware
+In-Reply-To: <20180521184717.GA24025@arm.com>
+References: <b745ecc2acd6aad20b5c3776ecd58022a9019c91.1526926225.git.robin.murphy@arm.com>
+ <20180521184717.GA24025@arm.com>
+Message-ID: <e338ed0f-e25d-73f3-1afd-1da68a8c1f0f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 12:38:05PM +0200, Geert Uytterhoeven wrote:
-> Hi Russell,
+On 21/05/18 19:47, Will Deacon wrote:
+> On Mon, May 21, 2018 at 07:12:40PM +0100, Robin Murphy wrote:
+>> We would generally expect pagetables to be read by the IOMMU more than
+>> written by the CPU, so in NUMA systems it would be preferable to avoid
+>> the IOMMU making cross-node pagetable walks if possible. We already have
+>> a handle on the IOMMU device for the sake of coherency management, so
+>> it's trivial to grab the appropriate NUMA node when allocating new
+>> pagetable pages.
+>>
+>> Note that we drop the semantics of alloc_pages_exact(), but that's fine
+>> since they have never been necessary: the only time we're allocating
+>> more than one page is for stage 2 top-level concatenation, but since
+>> that is based on the number of IPA bits, the size is always some exact
+>> power of two anyway.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/iommu/io-pgtable-arm.c | 12 ++++++++----
+>>   1 file changed, 8 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+>> index 39c2a056da21..e80ca386c5b4 100644
+>> --- a/drivers/iommu/io-pgtable-arm.c
+>> +++ b/drivers/iommu/io-pgtable-arm.c
+>> @@ -231,12 +231,16 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
+>>   				    struct io_pgtable_cfg *cfg)
+>>   {
+>>   	struct device *dev = cfg->iommu_dev;
+>> +	int order = get_order(size);
+>> +	struct page *p;
+>>   	dma_addr_t dma;
+>> -	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+>> +	void *pages;
+>>   
+>> -	if (!pages)
+>> +	p = alloc_pages_node(dev_to_node(dev), gfp | __GFP_ZERO, order);
+>> +	if (!p)
+>>   		return NULL;
+>>   
+>> +	pages = page_address(p);
 > 
-> On Wed, May 16, 2018 at 1:01 PM, Russell King
-> <rmk+kernel@armlinux.org.uk> wrote:
-> > When the branch predictor hardening is enabled, firmware must have set
-> > the IBE bit in the auxiliary control register.  If this bit has not
-> > been set, the Spectre workarounds will not be functional.
-> >
-> > Add validation that this bit is set, and print a warning at alert level
-> > if this is not the case.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> 
-> Thanks for your patch!
-> 
-> > --- /dev/null
-> > +++ b/arch/arm/mm/proc-v7-bugs.c
-> > @@ -0,0 +1,29 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +#include <linux/kernel.h>
-> > +#include <linux/smp.h>
-> > +
-> > +static __maybe_unused void cpu_v7_check_auxcr_set(u32 mask, const char *msg)
-> > +{
-> > +       u32 aux_cr;
-> > +
-> > +       asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (aux_cr));
-> > +
-> > +       if ((aux_cr & mask) != mask)
-> > +               pr_err("CPU%u: %s", smp_processor_id(), msg);
-> 
-> pr_alert(), to match the patch description.
+> Might be worth checking/masking out __GFP_HIGHMEM if we see it, since we
+> could theoretically run into trouble if we got back a highmem mapping here
+> and we're losing the check in __get_free_pages afaict.
 
-It was alert, but I've lowered it because I don't think it warrants
-alert status.  Maybe critical would be better?  Shrug, this stuff is
-rather subjective.
+True - the only callers are internal ones, and anyone trying to make 
+inappropriate changes here should quickly discover why highmem doesn't 
+work without significant surgery all over, but I don't see any harm in 
+keeping an equivalent VM_BUG_ON as clear documentation.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> Other than than, looks good:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks!
+
+Robin.
