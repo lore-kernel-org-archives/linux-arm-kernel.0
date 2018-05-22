@@ -1,73 +1,43 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 22 May 2018 12:50:09 +0100
-Subject: [PATCH v2] iommu/io-pgtable-arm: Make allocations NUMA-aware
-Message-ID: <b420b4733b5bc939931c11ee573bbb598f72e7b0.1526989635.git.robin.murphy@arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 22 May 2018 14:02:49 +0200
+Subject: [PATCH 1/9] ARM: shmobile: defconfig: Enable MTD command line
+ partition parsing
+Message-ID: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We would generally expect pagetables to be read by the IOMMU more than
-written by the CPU, so in NUMA systems it makes sense to locate them
-close to the former and avoid cross-node pagetable walks if at all
-possible. As it turns out, we already have a handle on the IOMMU device
-for the sake of coherency management, so it's trivial to grab the
-appropriate NUMA node when allocating new pagetable pages.
+In preparation for removing MTD partitioning from the DTs and moving
+it over to kernel command line partition parsing, enable the support
+for kernel command line MTD partition parsing.
 
-Note that we drop the semantics of alloc_pages_exact(), but that's fine
-since they have never been necessary: the only time we're allocating
-more than one page is for stage 2 top-level concatenation, but since
-that is based on the number of IPA bits, the size is always some exact
-power of two anyway.
+The argument for not having MTD partitions in the DT is the same as
+for not having hard drive partitions in DT, neither describes the
+hardware itself, so it shouldn't be in the DT. Furthermore, kernel
+command line MTD partition passing allows greater flexibility in
+case someone decided to repartition the flash, which is well in the
+realm of possibility with these systems.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-renesas-soc at vger.kernel.org
 ---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-v2: Retain equivalent highmem check
-
- drivers/iommu/io-pgtable-arm.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 39c2a056da21..5194755bba29 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -231,12 +231,17 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
- 				    struct io_pgtable_cfg *cfg)
- {
- 	struct device *dev = cfg->iommu_dev;
-+	int order = get_order(size);
-+	struct page *p;
- 	dma_addr_t dma;
--	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
-+	void *pages;
- 
--	if (!pages)
-+	VM_BUG_ON((gfp & __GFP_HIGHMEM));
-+	p = alloc_pages_node(dev_to_node(dev), gfp | __GFP_ZERO, order);
-+	if (!p)
- 		return NULL;
- 
-+	pages = page_address(p);
- 	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
- 		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
- 		if (dma_mapping_error(dev, dma))
-@@ -256,7 +261,7 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
- 	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
- 	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
- out_free:
--	free_pages_exact(pages, size);
-+	__free_pages(p, order);
- 	return NULL;
- }
- 
-@@ -266,7 +271,7 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
- 	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
- 		dma_unmap_single(cfg->iommu_dev, __arm_lpae_dma_addr(pages),
- 				 size, DMA_TO_DEVICE);
--	free_pages_exact(pages, size);
-+	free_pages((unsigned long)pages, get_order(size));
- }
- 
- static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index b49887e86a3d..4d0d5a00a188 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -64,6 +64,7 @@ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_SIMPLE_PM_BUS=y
+ CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_SPI_NOR=y
 -- 
-2.17.0.dirty
+2.16.2
