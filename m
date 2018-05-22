@@ -1,88 +1,145 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 May 2018 16:06:47 +0100
-Subject: [PATCH 13/14] arm64: KVM: Handle guest's ARCH_WORKAROUND_2 requests
+Date: Tue, 22 May 2018 16:06:38 +0100
+Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
 In-Reply-To: <20180522150648.28297-1-marc.zyngier@arm.com>
 References: <20180522150648.28297-1-marc.zyngier@arm.com>
-Message-ID: <20180522150648.28297-14-marc.zyngier@arm.com>
+Message-ID: <20180522150648.28297-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to forward the guest's ARCH_WORKAROUND_2 calls to EL3,
-add a small(-ish) sequence to handle it at EL2. Special care must
-be taken to track the state of the guest itself by updating the
-workaround flags. We also rely on patching to enable calls into
-the firmware.
+As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
+discovery mechanism for detecting the SSBD mitigation.
 
-Note that since we need to execute branches, this always executes
-after the Spectre-v2 mitigation has been applied.
+A new capability is also allocated for that purpose, and a
+config option.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kvm/hyp/hyp-entry.S  | 38 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 38 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig               |  9 ++++++
+ arch/arm64/include/asm/cpucaps.h |  3 +-
+ arch/arm64/kernel/cpu_errata.c   | 69 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 5bdda651bd05..323aeb5f2fe6 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -136,6 +136,7 @@ int main(void)
- #ifdef CONFIG_KVM_ARM_HOST
-   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
-   DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
-+  DEFINE(VCPU_WORKAROUND_FLAGS,	offsetof(struct kvm_vcpu, arch.workaround_flags));
-   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
-   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index bffece27b5c1..5b1fa37ca1f4 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -106,8 +106,44 @@ el1_hvc_guest:
- 	 */
- 	ldr	x1, [sp]				// Guest's x0
- 	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	cbz	w1, wa_epilogue
-+
-+	/* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
-+	eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
-+			  ARM_SMCCC_ARCH_WORKAROUND_2)
- 	cbnz	w1, el1_trap
--	mov	x0, x1
-+
-+#ifdef CONFIG_ARM64_SSBD
-+alternative_cb	arm64_enable_wa2_handling
-+	b	wa2_end
-+alternative_cb_end
-+	get_vcpu_ptr	x2, x0
-+	ldr	x0, [x2, #VCPU_WORKAROUND_FLAGS]
-+
-+	/* Sanitize the argument and update the guest flags*/
-+	ldr	x1, [sp, #8]			// Guest's x1
-+	clz	w1, w1				// Murphy's device:
-+	lsr	w1, w1, #5			// w1 = !!w1 without using
-+	eor	w1, w1, #1			// the flags...
-+	bfi	x0, x1, #VCPU_WORKAROUND_2_FLAG_SHIFT, #1
-+	str	x0, [x2, #VCPU_WORKAROUND_FLAGS]
-+
-+	/* Check that we actually need to perform the call */
-+	hyp_ldr_this_cpu x0, arm64_ssbd_callback_required, x2
-+	cbz	x0, wa2_end
-+
-+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
-+	smc	#0
-+
-+	/* Don't leak data from the SMC call */
-+	mov	x3, xzr
-+wa2_end:
-+	mov	x2, xzr
-+	mov	x1, xzr
-+#endif
-+
-+wa_epilogue:
-+	mov	x0, xzr
- 	add	sp, sp, #16
- 	eret
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf4938f6d..b2103b4df467 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -938,6 +938,15 @@ config HARDEN_EL2_VECTORS
  
+ 	  If unsure, say Y.
+ 
++config ARM64_SSBD
++	bool "Speculative Store Bypass Disable" if EXPERT
++	default y
++	help
++	  This enables mitigation of the bypassing of previous stores
++	  by speculative loads.
++
++	  If unsure, say Y.
++
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+ 	depends on COMPAT
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index bc51b72fafd4..5b2facf786ba 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -48,7 +48,8 @@
+ #define ARM64_HAS_CACHE_IDC			27
+ #define ARM64_HAS_CACHE_DIC			28
+ #define ARM64_HW_DBM				29
++#define ARM64_SSBD			30
+ 
+-#define ARM64_NCAPS				30
++#define ARM64_NCAPS				31
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 0288d6cf560e..7fd6d5b001f5 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -250,6 +250,67 @@ void __init arm64_update_smccc_conduit(struct alt_instr *alt,
+ 
+ 	*updptr = cpu_to_le32(insn);
+ }
++
++static void do_ssbd(bool state)
++{
++	switch (psci_ops.conduit) {
++	case PSCI_CONDUIT_HVC:
++		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
++		break;
++
++	case PSCI_CONDUIT_SMC:
++		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
++		break;
++
++	default:
++		WARN_ON_ONCE(1);
++		break;
++	}
++}
++
++static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
++				    int scope)
++{
++	struct arm_smccc_res res;
++	bool supported = true;
++
++	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
++
++	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
++		return false;
++
++	/*
++	 * The probe function return value is either negative
++	 * (unsupported or mitigated), positive (unaffected), or zero
++	 * (requires mitigation). We only need to do anything in the
++	 * last case.
++	 */
++	switch (psci_ops.conduit) {
++	case PSCI_CONDUIT_HVC:
++		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
++		if ((int)res.a0 != 0)
++			supported = false;
++		break;
++
++	case PSCI_CONDUIT_SMC:
++		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
++		if ((int)res.a0 != 0)
++			supported = false;
++		break;
++
++	default:
++		supported = false;
++	}
++
++	if (supported) {
++		__this_cpu_write(arm64_ssbd_callback_required, 1);
++		do_ssbd(true);
++	}
++
++	return supported;
++}
+ #endif	/* CONFIG_ARM64_SSBD */
+ 
+ #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
+@@ -506,6 +567,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+ 		ERRATA_MIDR_RANGE_LIST(arm64_harden_el2_vectors),
+ 	},
++#endif
++#ifdef CONFIG_ARM64_SSBD
++	{
++		.desc = "Speculative Store Bypass Disable",
++		.capability = ARM64_SSBD,
++		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
++		.matches = has_ssbd_mitigation,
++	},
+ #endif
+ 	{
+ 	}
 -- 
 2.14.2
