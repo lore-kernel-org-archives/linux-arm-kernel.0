@@ -1,14 +1,14 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 22 May 2018 14:34:42 +0200
-Subject: [PATCH 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
+Date: Tue, 22 May 2018 14:34:46 +0200
+Subject: [PATCH 7/9] ARM: dts: gose: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-7-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522123442.wd3khrub6jxknvgi@ninjato>
+ <20180522120257.13232-7-marek.vasut+renesas@gmail.com>
+Message-ID: <20180522123446.corqi6446lrq6rxq@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 02:02:54PM +0200, Marek Vasut wrote:
+On Tue, May 22, 2018 at 02:02:55PM +0200, Marek Vasut wrote:
 > Drop the MTD partitioning from DT, since it does not describe HW
 > and to give way to a more flexible kernel command line partition
 > passing.
@@ -34,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/e5476006/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/0d6d680b/attachment.sig>
