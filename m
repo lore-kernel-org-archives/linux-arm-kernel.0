@@ -1,64 +1,73 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 May 2018 13:48:06 +0200
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add GEther support
-In-Reply-To: <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
-References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
- <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
-Message-ID: <CAMuHMdW9UzOGV_zh3NxugYrj0j0qszX+NFoZtFvZRD9CNMHt+w@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 22 May 2018 12:50:09 +0100
+Subject: [PATCH v2] iommu/io-pgtable-arm: Make allocations NUMA-aware
+Message-ID: <b420b4733b5bc939931c11ee573bbb598f72e7b0.1526989635.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+We would generally expect pagetables to be read by the IOMMU more than
+written by the CPU, so in NUMA systems it makes sense to locate them
+close to the former and avoid cross-node pagetable walks if at all
+possible. As it turns out, we already have a handle on the IOMMU device
+for the sake of coherency management, so it's trivial to grab the
+appropriate NUMA node when allocating new pagetable pages.
 
-On Fri, May 18, 2018 at 9:45 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A77980 part of the GEther device node.
->
-> Based on the original (and large) patch by Vladimir Barinov.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Note that we drop the semantics of alloc_pages_exact(), but that's fine
+since they have never been necessary: the only time we're allocating
+more than one page is for stage 2 top-level concatenation, but since
+that is based on the number of IPA bits, the size is always some exact
+power of two anyway.
 
-Thanks for your patch!
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-With the below addressed:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+v2: Retain equivalent highmem check
 
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> @@ -417,6 +417,17 @@
->                         dma-channels = <16>;
->                 };
->
-> +               gether: ethernet at e7400000 {
-> +                       compatible = "renesas,gether-r8a77980";
-> +                       reg = <0 0xe7400000 0 0x1000>;
-> +                       interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&cpg CPG_MOD 813>;
-> +                       power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+ drivers/iommu/io-pgtable-arm.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-resets = <&cpg 813>;
-
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       status = "disabled";
-
-Any default phy-mode needed?
-
-> +               };
-> +
->                 mmc0: mmc at ee140000 {
->                         compatible = "renesas,sdhi-r8a77980",
->                                      "renesas,rcar-gen3-sdhi";
-
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 39c2a056da21..5194755bba29 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -231,12 +231,17 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
+ 				    struct io_pgtable_cfg *cfg)
+ {
+ 	struct device *dev = cfg->iommu_dev;
++	int order = get_order(size);
++	struct page *p;
+ 	dma_addr_t dma;
+-	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
++	void *pages;
+ 
+-	if (!pages)
++	VM_BUG_ON((gfp & __GFP_HIGHMEM));
++	p = alloc_pages_node(dev_to_node(dev), gfp | __GFP_ZERO, order);
++	if (!p)
+ 		return NULL;
+ 
++	pages = page_address(p);
+ 	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
+ 		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+ 		if (dma_mapping_error(dev, dma))
+@@ -256,7 +261,7 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
+ 	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
+ 	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
+ out_free:
+-	free_pages_exact(pages, size);
++	__free_pages(p, order);
+ 	return NULL;
+ }
+ 
+@@ -266,7 +271,7 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
+ 	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
+ 		dma_unmap_single(cfg->iommu_dev, __arm_lpae_dma_addr(pages),
+ 				 size, DMA_TO_DEVICE);
+-	free_pages_exact(pages, size);
++	free_pages((unsigned long)pages, get_order(size));
+ }
+ 
+ static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.17.0.dirty
