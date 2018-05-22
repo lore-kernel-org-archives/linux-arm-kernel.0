@@ -1,9 +1,9 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 22 May 2018 14:02:57 +0200
-Subject: [PATCH 9/9] ARM: dts: silk: Drop MTD partitioning from DT
+Date: Tue, 22 May 2018 14:02:55 +0200
+Subject: [PATCH 7/9] ARM: dts: gose: Drop MTD partitioning from DT
 In-Reply-To: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522120257.13232-9-marek.vasut+renesas@gmail.com>
+Message-ID: <20180522120257.13232-7-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,14 +24,14 @@ Cc: Simon Horman <horms+renesas@verge.net.au>
 Cc: Wolfram Sang <wsa@the-dreams.de>
 Cc: linux-renesas-soc at vger.kernel.org
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 21 ---------------------
+ arch/arm/boot/dts/r8a7793-gose.dts | 21 ---------------------
  1 file changed, 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 7808aaee6644..b8163a0e2190 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -444,27 +444,6 @@
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index aa209f6e5d71..b2dd54fbe40c 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -676,27 +676,6 @@
  		spi-cpol;
  		spi-cpha;
  		m25p,fast-read;
