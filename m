@@ -1,63 +1,46 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 22 May 2018 14:02:52 +0200
-Subject: [PATCH 4/9] ARM: dts: koelsch: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
-References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522120257.13232-4-marek.vasut+renesas@gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 22 May 2018 14:04:05 +0200
+Subject: common non-cache coherent direct dma mapping ops v2
+Message-ID: <20180522120430.28709-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the MTD partitioning from DT, since it does not describe HW
-and to give way to a more flexible kernel command line partition
-passing.
+Hi all,
 
-To retain the original partitioning, assure you have enabled
-CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
-following to your kernel command line:
+this series continues consolidating the dma-mapping code, with a focus
+on architectures that do not (always) provide cache coherence for DMA.
+Three architectures (arm, mips and powerpc) are still left to be
+converted later due to complexity of their dma ops selection.
 
-  mtdparts=spi0.0:512k at 0(loader),5632k(user),-(flash)
+The dma-noncoherent ops calls the dma-direct ops for the actual
+translation of streaming mappins and allow the architecture to provide
+any cache flushing required for cpu to device and/or device to cpu
+ownership transfers.  The dma coherent allocator is for now still left
+entirely to architecture supplied implementations due the amount of
+variations.  Hopefully we can do some consolidation for them later on
+as well.
 
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-renesas-soc at vger.kernel.org
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 21 ---------------------
- 1 file changed, 21 deletions(-)
+A lot of architectures are currently doing very questionable things
+in their dma mapping routines, which are documented in the changelogs
+for each patch.  Please review them very careful and correct me on
+incorrect assumptions.
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 8ab793d8b2fd..406d5d29e29c 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -724,27 +724,6 @@
- 		spi-cpha;
- 		spi-cpol;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00080000>;
--				read-only;
--			};
--			partition at 80000 {
--				label = "user";
--				reg = <0x00080000 0x00580000>;
--				read-only;
--			};
--			partition at 600000 {
--				label = "flash";
--				reg = <0x00600000 0x03a00000>;
--			};
--		};
- 	};
- };
- 
--- 
-2.16.2
+Because this series sits on top of three previously submitted series
+a git tree might be useful to actually test it.  It is provided here:
+
+    git://git.infradead.org/users/hch/misc.git generic-dma-noncoherent.2
+
+Gitweb:
+
+    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/generic-dma-noncoherent.2
+
+Changes since v1:
+ - dropped the already merged generic, arc and c6x patches
+   (with the map_single offset fix from Alexey Brodkin)
+ - split various changes into smaller patches
+ - dropped the arm-nommu changes for now
+ - fixed a typo
+
+Changes since RFC:
+ - fix a typo accidentally disabling the device to cpu transfer sync
+ - fixed a few compile failures
