@@ -1,70 +1,43 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 22 May 2018 13:21:49 +0200
-Subject: [PATCH RFC V2 3/6] firmware: raspberrypi: Register hwmon driver
+Date: Tue, 22 May 2018 13:21:47 +0200
+Subject: [PATCH RFC V2 1/6] ARM: bcm2835: Add GET_THROTTLED firmware property
 In-Reply-To: <1526988112-4021-1-git-send-email-stefan.wahren@i2se.com>
 References: <1526988112-4021-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1526988112-4021-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1526988112-4021-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the raspberrypi-hwmon driver is tied to the VC4 firmware instead of
-particular hardware its registration should be in the firmware driver.
+Recent Raspberry Pi firmware provides a mailbox property to detect
+under-voltage conditions. Here is the current definition.
+
+The u32 value returned by the firmware is divided into 2 parts:
+  - lower 16-bits are the live value
+  - upper 16-bits are the history or sticky value
+
+  Bits:
+  0: undervoltage
+  1: arm frequency capped
+  2: currently throttled
+  16: undervoltage has occurred
+  17: arm frequency capped has occurred
+  18: throttling has occurred
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/firmware/raspberrypi.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ include/soc/bcm2835/raspberrypi-firmware.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/firmware/raspberrypi.c b/drivers/firmware/raspberrypi.c
-index 6692888f..0602626 100644
---- a/drivers/firmware/raspberrypi.c
-+++ b/drivers/firmware/raspberrypi.c
-@@ -21,6 +21,8 @@
- #define MBOX_DATA28(msg)		((msg) & ~0xf)
- #define MBOX_CHAN_PROPERTY		8
- 
-+static struct platform_device *rpi_hwmon;
-+
- struct rpi_firmware {
- 	struct mbox_client cl;
- 	struct mbox_chan *chan; /* The property channel. */
-@@ -183,6 +185,20 @@ rpi_firmware_print_firmware_revision(struct rpi_firmware *fw)
- 	}
- }
- 
-+static void
-+rpi_register_hwmon_driver(struct device *dev, struct rpi_firmware *fw)
-+{
-+	u32 packet;
-+	int ret = rpi_firmware_property(fw, RPI_FIRMWARE_GET_THROTTLED,
-+					&packet, sizeof(packet));
-+
-+	if (ret)
-+		return;
-+
-+	rpi_hwmon = platform_device_register_data(dev, "raspberrypi-hwmon",
-+						  -1, NULL, 0);
-+}
-+
- static int rpi_firmware_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -209,6 +225,7 @@ static int rpi_firmware_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, fw);
- 
- 	rpi_firmware_print_firmware_revision(fw);
-+	rpi_register_hwmon_driver(dev, fw);
- 
- 	return 0;
- }
-@@ -217,6 +234,8 @@ static int rpi_firmware_remove(struct platform_device *pdev)
- {
- 	struct rpi_firmware *fw = platform_get_drvdata(pdev);
- 
-+	platform_device_unregister(rpi_hwmon);
-+	rpi_hwmon = NULL;
- 	mbox_free_channel(fw->chan);
- 
- 	return 0;
+diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+index 8ee8991..c4a5c9e 100644
+--- a/include/soc/bcm2835/raspberrypi-firmware.h
++++ b/include/soc/bcm2835/raspberrypi-firmware.h
+@@ -75,6 +75,7 @@ enum rpi_firmware_property_tag {
+ 	RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
+ 	RPI_FIRMWARE_GET_CUSTOMER_OTP =                       0x00030021,
+ 	RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
++	RPI_FIRMWARE_GET_THROTTLED =                          0x00030046,
+ 	RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
+ 	RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
+ 	RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
 -- 
 2.7.4
