@@ -1,38 +1,22 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 May 2018 14:13:43 +0530
-Subject: [PATCH v11 01/27] clk: davinci: pll: allow dev == NULL
-In-Reply-To: <20180518164829.27052-2-david@lechnology.com>
-References: <20180518164829.27052-1-david@lechnology.com>
- <20180518164829.27052-2-david@lechnology.com>
-Message-ID: <fb68ea47-9d94-143d-0ee1-b7ba7da2c378@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 22 May 2018 10:52:10 +0200
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add GEther support
+In-Reply-To: <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
+References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
+ <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
+Message-ID: <20180522085209.ehqzfddqknghs6em@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 May 2018 10:18 PM, David Lechner wrote:
-> @@ -711,11 +777,11 @@ int of_davinci_pll_init(struct device *dev,
->  		int n_clks =  max_sysclk_id + 1;
->  		int i;
->  
-> -		clk_data = devm_kzalloc(dev, sizeof(*clk_data), GFP_KERNEL);
-> +		clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
->  		if (!clk_data)
->  			return -ENOMEM;
->  
-> -		clks = devm_kmalloc_array(dev, n_clks, sizeof(*clks), GFP_KERNEL);
-> +		clks = kmalloc_array(n_clks, sizeof(*clks), GFP_KERNEL);
->  		if (!clks)
->  			return -ENOMEM;
+On Fri, May 18, 2018 at 10:45:36PM +0300, Sergei Shtylyov wrote:
+> Define the generic R8A77980 part of the GEther device node.
+> 
+> Based on the original (and large) patch by Vladimir Barinov.
+> 
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This should be:
+This looks fine but I will wait to see if there are other reviews before
+applying.
 
-		if (!clks) {
-			kfree(clk_data);
-			return -ENOMEM;
-		}
-
-With that fixed:
-
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
