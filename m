@@ -1,134 +1,122 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 22 May 2018 17:05:16 +0100
-Subject: [PATCH v10 15/18] KVM: arm64: Remove eager host SVE state saving
-In-Reply-To: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527005119-6842-16-git-send-email-Dave.Martin@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 23 May 2018 00:15:08 +0800
+Subject: [rjarzmik:work/dma_slave_map 12/15]
+ drivers/mtd/nand/marvell_nand.c:2621:17: sparse: call with no type!
+Message-ID: <201805230053.f9t1YyL4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the host SVE context can be saved on demand from Hyp,
-there is no longer any need to save this state in advance before
-entering the guest.
+tree:   https://github.com/rjarzmik/linux work/dma_slave_map
+head:   51b9077eb5c5f055bbbc8138b08830ce23ad340e
+commit: 308214fe387eaf6b5547d01e573c41bb309a59fb [12/15] dmaengine: pxa: make the filter function internal
+reproduce:
+        # apt-get install sparse
+        git checkout 308214fe387eaf6b5547d01e573c41bb309a59fb
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-This patch removes the relevant call to
-kvm_fpsimd_flush_cpu_state().
 
-Since the problem that function was intended to solve now no longer
-exists, the function and its dependencies are also deleted.
+sparse warnings: (new ones prefixed by >>)
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+   drivers/mtd/nand/marvell_nand.c:2621:17: sparse: undefined identifier 'pxad_filter_fn'
+>> drivers/mtd/nand/marvell_nand.c:2621:17: sparse: call with no type!
+   In file included from drivers/mtd/nand/marvell_nand.c:21:0:
+   drivers/mtd/nand/marvell_nand.c: In function 'marvell_nfc_init_dma':
+   drivers/mtd/nand/marvell_nand.c:2621:42: error: 'pxad_filter_fn' undeclared (first use in this function); did you mean 'dma_filter_fn'?
+      dma_request_slave_channel_compat(mask, pxad_filter_fn,
+                                             ^
+   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
+     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
+                                                 ^
+   drivers/mtd/nand/marvell_nand.c:2621:42: note: each undeclared identifier is reported only once for each function it appears in
+      dma_request_slave_channel_compat(mask, pxad_filter_fn,
+                                             ^
+   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
+     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
+                                                 ^
+
+vim +2621 drivers/mtd/nand/marvell_nand.c
+
+02f26ecf Miquel Raynal 2018-01-09  2588  
+02f26ecf Miquel Raynal 2018-01-09  2589  static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
+02f26ecf Miquel Raynal 2018-01-09  2590  {
+02f26ecf Miquel Raynal 2018-01-09  2591  	struct platform_device *pdev = container_of(nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2592  						    struct platform_device,
+02f26ecf Miquel Raynal 2018-01-09  2593  						    dev);
+02f26ecf Miquel Raynal 2018-01-09  2594  	struct dma_slave_config config = {};
+02f26ecf Miquel Raynal 2018-01-09  2595  	struct resource *r;
+02f26ecf Miquel Raynal 2018-01-09  2596  	dma_cap_mask_t mask;
+02f26ecf Miquel Raynal 2018-01-09  2597  	struct pxad_param param;
+02f26ecf Miquel Raynal 2018-01-09  2598  	int ret;
+02f26ecf Miquel Raynal 2018-01-09  2599  
+02f26ecf Miquel Raynal 2018-01-09  2600  	if (!IS_ENABLED(CONFIG_PXA_DMA)) {
+02f26ecf Miquel Raynal 2018-01-09  2601  		dev_warn(nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2602  			 "DMA not enabled in configuration\n");
+02f26ecf Miquel Raynal 2018-01-09  2603  		return -ENOTSUPP;
+02f26ecf Miquel Raynal 2018-01-09  2604  	}
+02f26ecf Miquel Raynal 2018-01-09  2605  
+02f26ecf Miquel Raynal 2018-01-09  2606  	ret = dma_set_mask_and_coherent(nfc->dev, DMA_BIT_MASK(32));
+02f26ecf Miquel Raynal 2018-01-09  2607  	if (ret)
+02f26ecf Miquel Raynal 2018-01-09  2608  		return ret;
+02f26ecf Miquel Raynal 2018-01-09  2609  
+02f26ecf Miquel Raynal 2018-01-09  2610  	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+02f26ecf Miquel Raynal 2018-01-09  2611  	if (!r) {
+02f26ecf Miquel Raynal 2018-01-09  2612  		dev_err(nfc->dev, "No resource defined for data DMA\n");
+02f26ecf Miquel Raynal 2018-01-09  2613  		return -ENXIO;
+02f26ecf Miquel Raynal 2018-01-09  2614  	}
+02f26ecf Miquel Raynal 2018-01-09  2615  
+02f26ecf Miquel Raynal 2018-01-09  2616  	param.drcmr = r->start;
+02f26ecf Miquel Raynal 2018-01-09  2617  	param.prio = PXAD_PRIO_LOWEST;
+02f26ecf Miquel Raynal 2018-01-09  2618  	dma_cap_zero(mask);
+02f26ecf Miquel Raynal 2018-01-09  2619  	dma_cap_set(DMA_SLAVE, mask);
+02f26ecf Miquel Raynal 2018-01-09  2620  	nfc->dma_chan =
+02f26ecf Miquel Raynal 2018-01-09 @2621  		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+02f26ecf Miquel Raynal 2018-01-09  2622  						 &param, nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2623  						 "data");
+02f26ecf Miquel Raynal 2018-01-09  2624  	if (!nfc->dma_chan) {
+02f26ecf Miquel Raynal 2018-01-09  2625  		dev_err(nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2626  			"Unable to request data DMA channel\n");
+02f26ecf Miquel Raynal 2018-01-09  2627  		return -ENODEV;
+02f26ecf Miquel Raynal 2018-01-09  2628  	}
+02f26ecf Miquel Raynal 2018-01-09  2629  
+02f26ecf Miquel Raynal 2018-01-09  2630  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+02f26ecf Miquel Raynal 2018-01-09  2631  	if (!r)
+02f26ecf Miquel Raynal 2018-01-09  2632  		return -ENXIO;
+02f26ecf Miquel Raynal 2018-01-09  2633  
+02f26ecf Miquel Raynal 2018-01-09  2634  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+02f26ecf Miquel Raynal 2018-01-09  2635  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+02f26ecf Miquel Raynal 2018-01-09  2636  	config.src_addr = r->start + NDDB;
+02f26ecf Miquel Raynal 2018-01-09  2637  	config.dst_addr = r->start + NDDB;
+02f26ecf Miquel Raynal 2018-01-09  2638  	config.src_maxburst = 32;
+02f26ecf Miquel Raynal 2018-01-09  2639  	config.dst_maxburst = 32;
+02f26ecf Miquel Raynal 2018-01-09  2640  	ret = dmaengine_slave_config(nfc->dma_chan, &config);
+02f26ecf Miquel Raynal 2018-01-09  2641  	if (ret < 0) {
+02f26ecf Miquel Raynal 2018-01-09  2642  		dev_err(nfc->dev, "Failed to configure DMA channel\n");
+02f26ecf Miquel Raynal 2018-01-09  2643  		return ret;
+02f26ecf Miquel Raynal 2018-01-09  2644  	}
+02f26ecf Miquel Raynal 2018-01-09  2645  
+02f26ecf Miquel Raynal 2018-01-09  2646  	/*
+02f26ecf Miquel Raynal 2018-01-09  2647  	 * DMA must act on length multiple of 32 and this length may be
+02f26ecf Miquel Raynal 2018-01-09  2648  	 * bigger than the destination buffer. Use this buffer instead
+02f26ecf Miquel Raynal 2018-01-09  2649  	 * for DMA transfers and then copy the desired amount of data to
+02f26ecf Miquel Raynal 2018-01-09  2650  	 * the provided buffer.
+02f26ecf Miquel Raynal 2018-01-09  2651  	 */
+c495a927 Miquel Raynal 2018-01-19  2652  	nfc->dma_buf = kmalloc(MAX_CHUNK_SIZE, GFP_KERNEL | GFP_DMA);
+02f26ecf Miquel Raynal 2018-01-09  2653  	if (!nfc->dma_buf)
+02f26ecf Miquel Raynal 2018-01-09  2654  		return -ENOMEM;
+02f26ecf Miquel Raynal 2018-01-09  2655  
+02f26ecf Miquel Raynal 2018-01-09  2656  	nfc->use_dma = true;
+02f26ecf Miquel Raynal 2018-01-09  2657  
+02f26ecf Miquel Raynal 2018-01-09  2658  	return 0;
+02f26ecf Miquel Raynal 2018-01-09  2659  }
+02f26ecf Miquel Raynal 2018-01-09  2660  
+
+:::::: The code at line 2621 was first introduced by commit
+:::::: 02f26ecf8c772751d4b24744d487f6b1b20e75d4 mtd: nand: add reworked Marvell NAND controller driver
+
+:::::: TO: Miquel Raynal <miquel.raynal@free-electrons.com>
+:::::: CC: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 ---
- arch/arm/include/asm/kvm_host.h   |  3 ---
- arch/arm64/include/asm/kvm_host.h | 10 ----------
- arch/arm64/kernel/fpsimd.c        | 21 ---------------------
- virt/kvm/arm/arm.c                |  3 ---
- 4 files changed, 37 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3b85bbb..f079a20 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -312,9 +312,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
- 
--/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
--static inline void kvm_fpsimd_flush_cpu_state(void) {}
--
- static inline void kvm_arm_vhe_guest_enter(void) {}
- static inline void kvm_arm_vhe_guest_exit(void) {}
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 06d5a61..ce7ed92 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -457,16 +457,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
- }
- #endif
- 
--/*
-- * All host FP/SIMD state is restored on guest exit, so nothing needs
-- * doing here except in the SVE case:
--*/
--static inline void kvm_fpsimd_flush_cpu_state(void)
--{
--	if (system_supports_sve())
--		sve_flush_cpu_state();
--}
--
- static inline void kvm_arm_vhe_guest_enter(void)
- {
- 	local_daif_mask();
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index f39d3b0..ea5d780 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -120,7 +120,6 @@
-  */
- struct fpsimd_last_state_struct {
- 	struct user_fpsimd_state *st;
--	bool sve_in_use;
- };
- 
- static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
-@@ -1003,7 +1002,6 @@ void fpsimd_bind_task_to_cpu(void)
- 		this_cpu_ptr(&fpsimd_last_state);
- 
- 	last->st = &current->thread.uw.fpsimd_state;
--	last->sve_in_use = test_thread_flag(TIF_SVE);
- 	current->thread.fpsimd_cpu = smp_processor_id();
- 
- 	if (system_supports_sve()) {
-@@ -1025,7 +1023,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	last->st = st;
--	last->sve_in_use = false;
- }
- 
- /*
-@@ -1086,24 +1083,6 @@ void fpsimd_flush_cpu_state(void)
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
- }
- 
--/*
-- * Invalidate any task SVE state currently held in this CPU's regs.
-- *
-- * This is used to prevent the kernel from trying to reuse SVE register data
-- * that is detroyed by KVM guest enter/exit.  This function should go away when
-- * KVM SVE support is implemented.  Don't use it for anything else.
-- */
--#ifdef CONFIG_ARM64_SVE
--void sve_flush_cpu_state(void)
--{
--	struct fpsimd_last_state_struct const *last =
--		this_cpu_ptr(&fpsimd_last_state);
--
--	if (last->st && last->sve_in_use)
--		fpsimd_flush_cpu_state();
--}
--#endif /* CONFIG_ARM64_SVE */
--
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
- DEFINE_PER_CPU(bool, kernel_neon_busy);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index ce7c6f3..39e7771 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 */
- 		preempt_disable();
- 
--		/* Flush FP/SIMD state that can't survive guest entry/exit */
--		kvm_fpsimd_flush_cpu_state();
--
- 		kvm_pmu_flush_hwstate(vcpu);
- 
- 		local_irq_disable();
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
