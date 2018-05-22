@@ -1,52 +1,68 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 22 May 2018 13:58:00 -0400
-Subject: [PATCH] PCI/portdrv: do not disable device on remove()
-Message-ID: <1527011883-21320-1-git-send-email-okaya@codeaurora.org>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 22 May 2018 19:58:31 +0200
+Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
+In-Reply-To: <86k1rzc4ba.wl-marc.zyngier@arm.com>
+References: <20180518170202.11458-1-samitolvanen@google.com>
+ <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
+ <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
+ <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
+ <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
+ <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
+ <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
+ <86k1rzc4ba.wl-marc.zyngier@arm.com>
+Message-ID: <CAAeHK+z2LmMYasYtRTt2U=QF8Pe_i10RA3-SkLzGXXByZqLh1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-shutdown")' has been added to kernel to shutdown pending PCIe port
-service interrupts during reboot so that a newly started kexec kernel
-wouldn't observe pending interrupts.
+On Sat, May 19, 2018 at 12:44 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> That would definitely be the right thing to do. Make sure you (or
+> Andrey tests with the latest released mainline kernel (4.16 for now)
+> or (even better) the tip of Linus' tree.
 
-pcie_port_device_remove() is disabling the root port and switches by
-calling pci_disable_device() after all PCIe service drivers are shutdown.
+Hi!
 
-pci_disable_device() has a much wider impact then port service itself and
-it prevents all inbound transactions to reach to the system and impacts
-the entire PCI traffic behind the bridge.
+I can confirm that after applying this patch onto 4.17-rc4 kernel the
+Odroid C2 board that I have boots (it doesn't without the patch).
 
-Issue is that pcie_port_device_remove() doesn't maintain any coordination
-with the rest of the PCI device drivers in the system before clearing the
-bus master bit.
+This is the result of running KVM tests that I was able to find [1]:
 
-This has been found to cause crashes on HP DL360 Gen9 machines during
-reboot. Besides, kexec is already clearing the bus master bit in
-pci_device_shutdown() after all PCI drivers are removed.
+root at odroid64:/home/odroid/kvm-unit-tests# ./run_tests.sh
+PASS selftest-setup (2 tests)
+PASS selftest-vectors-kernel (2 tests)
+PASS selftest-vectors-user (2 tests)
+PASS selftest-smp (5 tests)
+PASS pci-test (1 tests)
+FAIL pmu (3 tests, 3 unexpected failures)
+PASS gicv2-ipi (3 tests)
+SKIP gicv3-ipi (qemu-system-aarch64: Initialization of device
+kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
+PASS gicv2-active (1 tests)
+SKIP gicv3-active (qemu-system-aarch64: Initialization of device
+kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
+PASS psci (4 tests)
+PASS timer (8 tests)
 
-Just remove the extra clear here.
+Here is the result of running the same tests on GCC compiled kernel
+(looks the same):
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-Cc: stable at vger.kernel.org
-Reported-by: Ryan Finnie <ryan@finnie.org>
----
- drivers/pci/pcie/portdrv_core.c | 1 -
- 1 file changed, 1 deletion(-)
+root at odroid64:/home/odroid/kvm-unit-tests# ./run_tests.sh
+PASS selftest-setup (2 tests)
+PASS selftest-vectors-kernel (2 tests)
+PASS selftest-vectors-user (2 tests)
+PASS selftest-smp (5 tests)
+PASS pci-test (1 tests)
+FAIL pmu (3 tests, 3 unexpected failures)
+PASS gicv2-ipi (3 tests)
+SKIP gicv3-ipi (qemu-system-aarch64: Initialization of device
+kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
+PASS gicv2-active (1 tests)
+SKIP gicv3-active (qemu-system-aarch64: Initialization of device
+kvm-arm-gicv3 failed: error creating in-kernel VGIC: No such device)
+PASS psci (4 tests)
+PASS timer (8 tests)
 
-diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-index c9c0663..d22a95d 100644
---- a/drivers/pci/pcie/portdrv_core.c
-+++ b/drivers/pci/pcie/portdrv_core.c
-@@ -409,7 +409,6 @@ void pcie_port_device_remove(struct pci_dev *dev)
- {
- 	device_for_each_child(&dev->dev, NULL, remove_iter);
- 	pci_free_irq_vectors(dev);
--	pci_disable_device(dev);
- }
- 
- /**
--- 
-2.7.4
+Tested-by: Andrey Konovalov <andreyknvl@google.com>
+
+Thanks!
+
+[1] https://www.linux-kvm.org/page/KVM-unit-tests
