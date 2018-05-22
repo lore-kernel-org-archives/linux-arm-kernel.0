@@ -1,77 +1,103 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 22 May 2018 13:54:57 -0700
-Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-In-Reply-To: <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
-Message-ID: <20180522205457.GA16363@roeck-us.net>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 22 May 2018 21:55:15 +0100
+Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
+ <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
+ <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+Message-ID: <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
-> If the watchdog hardware is already enabled during the boot process,
-> when the Linux watchdog driver loads, it should reset the watchdog and
-> tell the watchdog framework. As a result, ping can be generated from
-> the watchdog framework, until the userspace watchdog daemon takes over
-> control
-> 
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-> index 1484609..408ffbe 100644
-> --- a/drivers/watchdog/sp805_wdt.c
-> +++ b/drivers/watchdog/sp805_wdt.c
-> @@ -42,6 +42,7 @@
->  	/* control register masks */
->  	#define	INT_ENABLE	(1 << 0)
->  	#define	RESET_ENABLE	(1 << 1)
-> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
->  #define WDTINTCLR		0x00C
->  #define WDTRIS			0x010
->  #define WDTMIS			0x014
-> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
->  MODULE_PARM_DESC(nowayout,
->  		"Set to 1 to keep watchdog running after device release");
->  
-> +/* returns true if wdt is running; otherwise returns false */
-> +static bool wdt_is_running(struct watchdog_device *wdd)
-> +{
-> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
-> +	    ENABLE_MASK)
-> +		return true;
-> +	else
-> +		return false;
 
-	return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
-
-> +}
-> +
->  /* This routine finds load value that will reset system in required timout */
->  static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
->  {
-> @@ -239,6 +252,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
->  	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
->  	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
->  
-> +	/*
-> +	 * If HW is already running, enable/reset the wdt and set the running
-> +	 * bit to tell the wdt subsystem
-> +	 */
-> +	if (wdt_is_running(&wdt->wdd)) {
-> +		wdt_enable(&wdt->wdd);
-> +		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
-> +	}
-> +
->  	ret = watchdog_register_device(&wdt->wdd);
->  	if (ret) {
->  		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
-> -- 
-> 2.1.4
+On 22/05/18 15:47, Ulf Hansson wrote:
+> [...]
 > 
+>>>
+>>> +/**
+>>> + * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
+>>> + * @dev: Device to attach.
+>>> + * @index: The index of the PM domain.
+>>> + *
+>>> + * Parse device's OF node to find a PM domain specifier at the provided @index.
+>>> + * If such is found, allocates a new device and attaches it to retrieved
+>>> + * pm_domain ops.
+>>> + *
+>>> + * Returns the allocated device if successfully attached PM domain, NULL when
+>>> + * the device don't need a PM domain or have a single PM domain, else PTR_ERR()
+>>> + * in case of failures. Note that if a power-domain exists for the device, but
+>>> + * cannot be found or turned on, then return PTR_ERR(-EPROBE_DEFER) to ensure
+>>> + * that the device is not probed and to re-try again later.
+>>> + */
+>>> +struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+>>> +                                      unsigned int index)
+>>> +{
+>>> +     struct device *genpd_dev;
+>>> +     int num_domains;
+>>> +     int ret;
+>>> +
+>>> +     if (!dev->of_node)
+>>> +             return NULL;
+>>> +
+>>> +     /* Deal only with devices using multiple PM domains. */
+>>> +     num_domains = of_count_phandle_with_args(dev->of_node, "power-domains",
+>>> +                                              "#power-domain-cells");
+>>> +     if (num_domains < 2 || index >= num_domains)
+>>> +             return NULL;
+>>> +
+>>> +     /* Allocate and register device on the genpd bus. */
+>>> +     genpd_dev = kzalloc(sizeof(*genpd_dev), GFP_KERNEL);
+>>> +     if (!genpd_dev)
+>>> +             return ERR_PTR(-ENOMEM);
+>>> +
+>>> +     dev_set_name(genpd_dev, "genpd:%u:%s", index, dev_name(dev));
+>>> +     genpd_dev->bus = &genpd_bus_type;
+>>> +     genpd_dev->release = genpd_release_dev;
+>>> +
+>>> +     ret = device_register(genpd_dev);
+>>> +     if (ret) {
+>>> +             kfree(genpd_dev);
+>>> +             return ERR_PTR(ret);
+>>> +     }
+>>> +
+>>> +     /* Try to attach the device to the PM domain at the specified index. */
+>>> +     ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
+>>> +     if (ret < 1) {
+>>> +             device_unregister(genpd_dev);
+>>> +             return ret ? ERR_PTR(ret) : NULL;
+>>> +     }
+>>> +
+>>> +     pm_runtime_set_active(genpd_dev);
+>>> +     pm_runtime_enable(genpd_dev);
+>>> +
+>>> +     return genpd_dev;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
+>>
+>> Thanks for sending this. Believe it or not this has still been on my to-do list
+>> and so we definitely need a solution for Tegra.
+>>
+>> Looking at the above it appears that additional power-domains exposed as devices
+>> to the client device. So I assume that this means that the drivers for devices
+>> with multiple power-domains will need to call RPM APIs for each of these
+>> additional power-domains. Is that correct?
+> 
+> They can, but should not!
+> 
+> Instead, the driver shall use device_link_add() and device_link_del(),
+> dynamically, depending on what PM domain that their original device
+> needs for the current running use case.
+> 
+> In that way, they keep existing runtime PM deployment, operating on
+> its original device.
+
+OK, sounds good. Any reason why the linking cannot be handled by the 
+above API? Is there a use-case where you would not want it linked?
+
+Thanks
+Jon
+
+-- 
+nvpublic
