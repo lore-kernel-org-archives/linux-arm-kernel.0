@@ -1,125 +1,112 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 22 May 2018 17:05:07 +0100
-Subject: [PATCH v10 06/18] arm64: fpsimd: Generalise context saving for
- non-task contexts
+Date: Tue, 22 May 2018 17:05:14 +0100
+Subject: [PATCH v10 13/18] arm64/sve: Move sve_pffr() to fpsimd.h and make
+ inline
 In-Reply-To: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
 References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527005119-6842-7-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527005119-6842-14-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
-contexts to be handled by the fpsimd common code, this patch adapts
-task_fpsimd_save() to save back the currently loaded context,
-removing the explicit dependency on current.
+In order to make sve_save_state()/sve_load_state() more easily
+reusable and to get rid of a potential branch on context switch
+critical paths, this patch makes sve_pffr() inline and moves it to
+fpsimd.h.
 
-The relevant storage to write back to in memory is now found by
-examining the fpsimd_last_state percpu struct.
+<asm/processor.h> must be included in fpsimd.h in order to make
+this work, and this creates an #include cycle that is tricky to
+avoid without modifying core code, due to the way the PR_SVE_*()
+prctl helpers are included in the core prctl implementation.
 
-fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
-fpsimd_last_state is updated under local_bh_disable() or
-local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
-thus, fpsimd_save() will write back to the correct storage for the
-loaded context.
+Instead of breaking the cycle, this patch defers inclusion of
+<asm/fpsimd.h> in <asm/processor.h> until the point where it is
+actually needed: i.e., immediately before the prctl definitions.
 
 No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
+ arch/arm64/include/asm/processor.h |  3 ++-
+ arch/arm64/kernel/fpsimd.c         | 12 ------------
+ 3 files changed, 15 insertions(+), 13 deletions(-)
 
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index fb60b22..fa92747 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -18,6 +18,8 @@
+ 
+ #include <asm/ptrace.h>
+ #include <asm/errno.h>
++#include <asm/processor.h>
++#include <asm/sigcontext.h>
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -61,6 +63,17 @@ extern void sve_flush_cpu_state(void);
+ /* Maximum VL that SVE VL-agnostic software can transparently support */
+ #define SVE_VL_ARCH_MAX 0x100
+ 
++/* Offset of FFR in the SVE register dump */
++static inline size_t sve_ffr_offset(int vl)
++{
++	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
++}
++
++static inline void *sve_pffr(struct thread_struct *thread)
++{
++	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
++}
++
+ extern void sve_save_state(void *state, u32 *pfpsr);
+ extern void sve_load_state(void const *state, u32 const *pfpsr,
+ 			   unsigned long vq_minus_1);
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index f902b6d..ebaadb1 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -40,7 +40,6 @@
+ 
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
+-#include <asm/fpsimd.h>
+ #include <asm/hw_breakpoint.h>
+ #include <asm/lse.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -245,6 +244,8 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+ void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+ 
++#include <asm/fpsimd.h>
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 9d85373..3aa100a 100644
+index c4e9762..f39d3b0 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -270,13 +270,15 @@ static void task_fpsimd_load(void)
+@@ -161,18 +161,6 @@ static void sve_free(struct task_struct *task)
+ 	__sve_free(task);
  }
  
- /*
-- * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
-- * with respect to the CPU registers.
-+ * Ensure FPSIMD/SVE storage in memory for the loaded context is up to
-+ * date with respect to the CPU registers.
-  *
-  * Softirqs (and preemption) must be disabled.
-  */
--static void task_fpsimd_save(void)
-+static void fpsimd_save(void)
+-
+-/* Offset of FFR in the SVE register dump */
+-static size_t sve_ffr_offset(int vl)
+-{
+-	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
+-}
+-
+-static void *sve_pffr(struct thread_struct *thread)
+-{
+-	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
+-}
+-
+ static void change_cpacr(u64 val, u64 mask)
  {
-+	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
-+
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
-@@ -291,10 +293,9 @@ static void task_fpsimd_save(void)
- 				return;
- 			}
- 
--			sve_save_state(sve_pffr(current),
--				       &current->thread.uw.fpsimd_state.fpsr);
-+			sve_save_state(sve_pffr(current), &st->fpsr);
- 		} else
--			fpsimd_save_state(&current->thread.uw.fpsimd_state);
-+			fpsimd_save_state(st);
- 	}
- }
- 
-@@ -598,7 +599,7 @@ int sve_set_vector_length(struct task_struct *task,
- 	if (task == current) {
- 		local_bh_disable();
- 
--		task_fpsimd_save();
-+		fpsimd_save();
- 		set_thread_flag(TIF_FOREIGN_FPSTATE);
- 	}
- 
-@@ -837,7 +838,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
- 
- 	local_bh_disable();
- 
--	task_fpsimd_save();
-+	fpsimd_save();
- 	fpsimd_to_sve(current);
- 
- 	/* Force ret_to_user to reload the registers: */
-@@ -898,7 +899,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 	 * 'current'.
- 	 */
- 	if (current->mm)
--		task_fpsimd_save();
-+		fpsimd_save();
- 
- 	if (next->mm) {
- 		/*
-@@ -980,7 +981,7 @@ void fpsimd_preserve_current_state(void)
- 		return;
- 
- 	local_bh_disable();
--	task_fpsimd_save();
-+	fpsimd_save();
- 	local_bh_enable();
- }
- 
-@@ -1121,7 +1122,7 @@ void kernel_neon_begin(void)
- 
- 	/* Save unsaved task fpsimd state, if any: */
- 	if (current->mm)
--		task_fpsimd_save();
-+		fpsimd_save();
- 
- 	/* Invalidate any task state remaining in the fpsimd regs: */
- 	fpsimd_flush_cpu_state();
-@@ -1244,7 +1245,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
- 		if (current->mm)
--			task_fpsimd_save();
-+			fpsimd_save();
- 		fpsimd_flush_cpu_state();
- 		break;
- 	case CPU_PM_EXIT:
+ 	u64 cpacr = read_sysreg(CPACR_EL1);
 -- 
 2.1.4
