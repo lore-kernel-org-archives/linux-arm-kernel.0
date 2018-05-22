@@ -1,37 +1,72 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 22 May 2018 14:34:53 +0200
-Subject: [PATCH 9/9] ARM: dts: silk: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-9-marek.vasut+renesas@gmail.com>
-References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-9-marek.vasut+renesas@gmail.com>
-Message-ID: <20180522123453.64rhv55bbxflvkej@ninjato>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 22 May 2018 15:07:12 +0300
+Subject: [PATCH v5 8/9] pwm: add documentation for pwm push-pull mode
+In-Reply-To: <1526990833-30707-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1526990833-30707-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1526990833-30707-9-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 02:02:57PM +0200, Marek Vasut wrote:
-> Drop the MTD partitioning from DT, since it does not describe HW
-> and to give way to a more flexible kernel command line partition
-> passing.
-> 
-> To retain the original partitioning, assure you have enabled
-> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
-> following to your kernel command line:
-> 
->   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
-> 
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: linux-renesas-soc at vger.kernel.org
+Add documentation for PWM push-pull mode.
 
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/pwm/pwm.txt |  2 ++
+ Documentation/pwm.txt                         | 16 ++++++++++++++++
+ include/dt-bindings/pwm/pwm.h                 |  1 +
+ 3 files changed, 19 insertions(+)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180522/935c754f/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+index 7c8aaac43f92..6a60c0fca112 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+@@ -49,6 +49,8 @@ Optionally, the pwm-specifier can encode a number of flags (defined in
+ - PWM_MODE_COMPLEMENTARY: PWM complementary working mode (for PWM channels
+ with two outputs); if not specified, the default for PWM channel will be
+ used
++- PWM_MODE_PUSH_PULL: PWM push-pull working modes (for PWM channels with
++two outputs); if not specified the default for PWM channel will be used
+ 
+ Example with optional PWM specifier for inverse polarity and complementary
+ mode:
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index 912c43da8b48..675f9351fed1 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -128,6 +128,22 @@ channel that was exported. The following properties will then be available:
+     PWML1   |__|  |__|  |__|  |__|
+             <--T-->
+ 
++    Push-pull mode - for PWM channels with two outputs; output waveforms
++        for a PWM channel in push-pull mode, with normal polarity looks like
++        this:
++            __          __
++    PWMH __|  |________|  |________
++                  __          __
++    PWML ________|  |________|  |__
++           <--T-->
++
++    If polarity is inversed:
++         __    ________    ________
++    PWMH   |__|        |__|
++         ________    ________    __
++    PWML         |__|        |__|
++           <--T-->
++
+     Where T is the signal period.
+ 
+ Implementing a PWM driver
+diff --git a/include/dt-bindings/pwm/pwm.h b/include/dt-bindings/pwm/pwm.h
+index b82279cc1787..cd4265bce968 100644
+--- a/include/dt-bindings/pwm/pwm.h
++++ b/include/dt-bindings/pwm/pwm.h
+@@ -12,5 +12,6 @@
+ 
+ #define PWM_POLARITY_INVERTED			(1 << 0)
+ #define PWM_MODE_COMPLEMENTARY			(1 << 1)
++#define PWM_MODE_PUSH_PULL			(1 << 2)
+ 
+ #endif
+-- 
+2.7.4
