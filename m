@@ -1,43 +1,49 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 22 May 2018 17:29:13 +0100
-Subject: [PATCH 8/8] arm64: tegra: Mark tcu as primary serial port on
- Tegra194 P2888
-In-Reply-To: <20180508114403.14499-9-mperttunen@nvidia.com>
-References: <20180508114403.14499-1-mperttunen@nvidia.com>
- <20180508114403.14499-9-mperttunen@nvidia.com>
-Message-ID: <d7b65d6d-c415-ac49-d729-9c6b44feb8c6@nvidia.com>
+From: jacob.jun.pan@linux.intel.com (Jacob Pan)
+Date: Tue, 22 May 2018 09:43:34 -0700
+Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
+In-Reply-To: <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-4-jean-philippe.brucker@arm.com>
+ <20180516163117.622693ea@jacob-builder>
+ <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
+Message-ID: <20180522094334.71f0e36b@jacob-builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 17 May 2018 11:02:42 +0100
+Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
 
-On 08/05/18 12:44, Mikko Perttunen wrote:
-> The Tegra Combined UART is the proper primary serial port on P2888,
-> so use it.
+> On 17/05/18 00:31, Jacob Pan wrote:
+> > On Fri, 11 May 2018 20:06:04 +0100
+> > I am a little confused about domain vs. pasid relationship. If
+> > each domain represents a address space, should there be a domain for
+> > each pasid?  
 > 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
->   arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> I don't think there is a formal definition, but from previous
+> discussion the consensus seems to be: domains are a collection of
+> devices that have the same virtual address spaces (one or many).
 > 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-> index 859ab5af17c1..95e2433984f7 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-> @@ -10,7 +10,7 @@
->   	aliases {
->   		sdhci0 = "/cbb/sdhci at 3460000";
->   		sdhci1 = "/cbb/sdhci at 3400000";
-> -		serial0 = &uartb;
-> +		serial0 = &tcu;
->   		i2c0 = "/bpmp/i2c";
->   		i2c1 = "/cbb/i2c at 3160000";
->   		i2c2 = "/cbb/i2c at c240000";
+> Keeping that definition makes things easier, in my opinion. Some time
+> ago, I did try to represent PASIDs using "subdomains" (introducing a
+> hierarchy of struct iommu_domain), but it required invasive changes in
+> the IOMMU subsystem and probably all over the tree.
 > 
+> You do need some kind of "root domain" for each device, so that
+> "iommu_get_domain_for_dev()" still makes sense. That root domain
+> doesn't have a single address space but a collection of subdomains.
+> If you need this anyway, representing a PASID with an iommu_domain
+> doesn't seem preferable than using a different structure (io_mm),
+> because they don't have anything in common.
+> 
+My main concern is the PASID table storage. If PASID table storage
+is tied to domain, it is ok to scale up, i.e. multiple devices in a
+domain share a single PASID table. But to scale down, e.g. further
+partition device with VFIO mdev for assignment, each mdev may get its
+own domain via vfio. But there is no IOMMU storage for PASID table at
+mdev device level. Perhaps we do need root domain or some parent-child
+relationship to locate PASID table.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+> Thanks,
+> Jean
 
-Cheers
-Jon
-
--- 
-nvpublic
+[Jacob Pan]
