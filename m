@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 May 2018 16:45:32 +0200
-Subject: [PATCH 8/9] ARM: dts: alt: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-8-marek.vasut+renesas@gmail.com>
+Date: Tue, 22 May 2018 16:44:56 +0200
+Subject: [PATCH 7/9] ARM: dts: gose: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-7-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-8-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdWb1NtxFNPUk1O4+fR+5pZtLXi8Un361Yg2SZZt_J_RFQ@mail.gmail.com>
+ <20180522120257.13232-7-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdVDqq=OX62CJ=iUki1vPE1utu8+_FfxMYpbuy-SjjAQfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,9 +17,9 @@ On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
 > CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
 > following to your kernel command line:
 >
->   mtdparts=spi0.0:256k at 0(loader),256k(system),-(user)
+>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
 
-Drop @0?
+Drop @0? 4m?
 
 > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 
