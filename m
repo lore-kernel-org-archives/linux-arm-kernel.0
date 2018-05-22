@@ -1,28 +1,20 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 May 2018 18:06:32 +0100
-Subject: [PATCH 1/2] arm64: make is_permission_fault() name clearer
-In-Reply-To: <20180521131451.41040-2-mark.rutland@arm.com>
-References: <20180521131451.41040-1-mark.rutland@arm.com>
- <20180521131451.41040-2-mark.rutland@arm.com>
-Message-ID: <20180522170632.GH26955@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 12:36:26 -0500
+Subject: [PATCH v2 06/13] dt-bindings: add binding for rk3128 power domains
+In-Reply-To: <1526268626-11855-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
+ <1526268626-11855-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20180522173626.GA16569@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 02:14:50PM +0100, Mark Rutland wrote:
-> The naming of is_permission_fault() makes it sound like it should return
-> true for permission faults from EL0, but by design, it only does so for
-> faults from EL1.
+On Mon, May 14, 2018 at 11:30:26AM +0800, Elaine Zhang wrote:
+> Add binding documentation for the power domains
+> found on Rockchip RK3128 SoCs.
 > 
-> Let's make this clear by dropping el1 in the name, as we do for
-> is_el1_instruction_abort().
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 > ---
->  arch/arm64/mm/fault.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
+>  Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Acked-by: Rob Herring <robh@kernel.org>
