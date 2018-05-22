@@ -1,29 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 12:13:45 -0500
-Subject: [PATCH v3 6/6] drm/rockchip: dw_hdmi: add dw-hdmi support for
- the rk3328
-In-Reply-To: <20180515134736.5824-7-heiko@sntech.de>
-References: <20180515134736.5824-1-heiko@sntech.de>
- <20180515134736.5824-7-heiko@sntech.de>
-Message-ID: <20180522171345.GA19614@rob-hp-laptop>
+Date: Tue, 22 May 2018 12:14:32 -0500
+Subject: [PATCH v3 1/4] dt-bindings: arm: Add bindings for Mediatek
+ MT8183 SoC Platform
+In-Reply-To: <1526538126-51497-2-git-send-email-erin.lo@mediatek.com>
+References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
+ <1526538126-51497-2-git-send-email-erin.lo@mediatek.com>
+Message-ID: <20180522171432.GA20397@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 03:47:36PM +0200, Heiko Stuebner wrote:
-> The rk3328 uses a dw-hdmi controller with an external hdmi phy from
-> Innosilicon which uses the generic phy framework for access.
-> Add the necessary data and the compatible for the rk3328 to the
-> rockchip dw-hdmi driver.
+On Thu, May 17, 2018 at 02:22:03PM +0800, Erin Lo wrote:
+> This adds dt-binding documentation of cpu for Mediatek MT8183.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 > ---
-> changes in v3:
-> - reword as suggested by Rob to show that it's a dw-hdmi + Inno phy
-> 
->  .../display/rockchip/dw_hdmi-rockchip.txt     |   1 +
+>  Documentation/devicetree/bindings/arm/mediatek.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 106 ++++++++++++++++++
->  2 files changed, 107 insertions(+)
+Reviewed-by: Rob Herring <robh@kernel.org>
