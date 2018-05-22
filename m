@@ -1,133 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 May 2018 16:06:48 +0100
-Subject: [PATCH 14/14] arm64: KVM: Add ARCH_WORKAROUND_2 discovery through
- ARCH_FEATURES_FUNC_ID
-In-Reply-To: <20180522150648.28297-1-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
-Message-ID: <20180522150648.28297-15-marc.zyngier@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 22 May 2018 16:15:09 +0100
+Subject: [PATCH 2/8] dt-bindings: serial: Add bindings for
+ nvidia,tegra194-tcu
+In-Reply-To: <20180508114403.14499-3-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-3-mperttunen@nvidia.com>
+Message-ID: <3ddaafbd-d8cb-3cca-be4e-8c5c53fd9734@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all our infrastructure is in place, let's expose the
-availability of ARCH_WORKAROUND_2 to guests. We take this opportunity
-to tidy up a couple of SMCCC constants.
 
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h   | 12 ++++++++++++
- arch/arm64/include/asm/kvm_host.h | 23 +++++++++++++++++++++++
- arch/arm64/kvm/reset.c            |  4 ++++
- virt/kvm/arm/psci.c               | 18 ++++++++++++++++--
- 4 files changed, 55 insertions(+), 2 deletions(-)
+On 08/05/18 12:43, Mikko Perttunen wrote:
+> Add bindings for the Tegra Combined UART device used to talk to the
+> UART console on Tegra194 systems.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>   .../bindings/serial/nvidia,tegra194-tcu.txt        | 35 ++++++++++++++++++++++
+>   1 file changed, 35 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+> new file mode 100644
+> index 000000000000..86763bc5d74f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+> @@ -0,0 +1,35 @@
+> +NVIDIA Tegra Combined UART (TCU)
+> +
+> +The TCU is a system for sharing a hardware UART instance among multiple
+> +systems withing the Tegra SoC. It is implemented through a mailbox-
+> +based protocol where each "virtual UART" has a pair of mailboxes, one
+> +for transmitting and one for receiving, that is used to communicate
+> +with the hardware implementing the TCU.
+> +
+> +Required properties:
+> +- name : Should be tcu
+> +- compatible
+> +    Array of strings
+> +    One of:
+> +    - "nvidia,tegra194-tcu"
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index c7c28c885a19..d478766b56c1 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -315,6 +315,18 @@ static inline bool kvm_arm_harden_branch_predictor(void)
- 	return false;
- }
- 
-+#define KVM_SSBD_UNKNOWN		-1
-+#define KVM_SSBD_FORCE_DISABLE		0
-+#define KVM_SSBD_EL1_ENTRY		1
-+#define KVM_SSBD_FORCE_ENABLE		2
-+#define KVM_SSBD_MITIGATED		3
-+
-+static inline int kvm_arm_have_ssbd(void)
-+{
-+	/* No way to detect it yet, pretend it is not there. */
-+	return KVM_SSBD_UNKNOWN;
-+}
-+
- static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
- static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 9bef3f69bdcd..082b0dbb85c6 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -455,6 +455,29 @@ static inline bool kvm_arm_harden_branch_predictor(void)
- 	return cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
- }
- 
-+#define KVM_SSBD_UNKNOWN		-1
-+#define KVM_SSBD_FORCE_DISABLE		0
-+#define KVM_SSBD_EL1_ENTRY		1
-+#define KVM_SSBD_FORCE_ENABLE		2
-+#define KVM_SSBD_MITIGATED		3
-+
-+static inline int kvm_arm_have_ssbd(void)
-+{
-+	switch (arm64_get_ssbd_state()) {
-+	case ARM64_SSBD_FORCE_DISABLE:
-+		return KVM_SSBD_FORCE_DISABLE;
-+	case ARM64_SSBD_EL1_ENTRY:
-+		return KVM_SSBD_EL1_ENTRY;
-+	case ARM64_SSBD_FORCE_ENABLE:
-+		return KVM_SSBD_FORCE_ENABLE;
-+	case ARM64_SSBD_MITIGATED:
-+		return KVM_SSBD_MITIGATED;
-+	case ARM64_SSBD_UNKNOWN:
-+	default:
-+		return KVM_SSBD_UNKNOWN;
-+	}
-+}
-+
- void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
- void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
- 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 3256b9228e75..20a7dfee8494 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -122,6 +122,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset PMU */
- 	kvm_pmu_vcpu_reset(vcpu);
- 
-+	/* Default workaround setup is enabled (if supported) */
-+	if (kvm_arm_have_ssbd() == KVM_SSBD_EL1_ENTRY)
-+		vcpu->arch.workaround_flags |= VCPU_WORKAROUND_2_FLAG;
-+
- 	/* Reset timer */
- 	return kvm_timer_vcpu_reset(vcpu);
- }
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index c4762bef13c6..4843bfa1f986 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -405,7 +405,7 @@ static int kvm_psci_call(struct kvm_vcpu *vcpu)
- int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
- {
- 	u32 func_id = smccc_get_function(vcpu);
--	u32 val = PSCI_RET_NOT_SUPPORTED;
-+	u32 val = SMCCC_RET_NOT_SUPPORTED;
- 	u32 feature;
- 
- 	switch (func_id) {
-@@ -417,7 +417,21 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
- 		switch(feature) {
- 		case ARM_SMCCC_ARCH_WORKAROUND_1:
- 			if (kvm_arm_harden_branch_predictor())
--				val = 0;
-+				val = SMCCC_RET_SUCCESS;
-+			break;
-+		case ARM_SMCCC_ARCH_WORKAROUND_2:
-+			switch (kvm_arm_have_ssbd()) {
-+			case KVM_SSBD_FORCE_DISABLE:
-+			case KVM_SSBD_UNKNOWN:
-+				break;
-+			case KVM_SSBD_EL1_ENTRY:
-+				val = SMCCC_RET_SUCCESS;
-+				break;
-+			case KVM_SSBD_FORCE_ENABLE:
-+			case KVM_SSBD_MITIGATED:
-+				val = SMCCC_RET_NOT_REQUIRED;
-+				break;
-+			}
- 			break;
- 		}
- 		break;
+Nit. We should say what device the above compatibility is applicable for ...
+
+     - "nvidia,tegra194-tcu": for Tegra194
+
+Cheers
+Jon
+
 -- 
-2.14.2
+nvpublic
