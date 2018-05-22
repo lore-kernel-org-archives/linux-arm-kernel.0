@@ -1,46 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 22 May 2018 15:08:03 +0530
-Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <001401d3f1a2$c7328850$559798f0$@codeaurora.org>
-References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
- <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
- <153cc316-dcb5-972f-5a2f-c91fe0f6348b@arm.com>
- <000f01d3f103$3ff78ba0$bfe6a2e0$@codeaurora.org>
- <2ace10bc-e1c4-2060-94d3-eb71e966ffbe@arm.com>
- <001401d3f1a2$c7328850$559798f0$@codeaurora.org>
-Message-ID: <20180522093803.kfmfktdskumxyqbx@vireshk-i7>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 May 2018 15:08:04 +0530
+Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <20180518164829.27052-1-david@lechnology.com>
+References: <20180518164829.27052-1-david@lechnology.com>
+Message-ID: <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-05-18, 10:59, ilialin at codeaurora.org wrote:
-> OK, I think I found out the way. Would this be correct?
-> -----------------------------------------------------------------------------------------------
-> extern struct cpu_topology cpu_topology[NR_CPUS];
+Hi David,
+
+On Friday 18 May 2018 10:18 PM, David Lechner wrote:
+> This series converts mach-davinci to use the common clock framework.
 > 
-> static struct device *qcom_cpufreq_kryo_get_cluster_lead(int cluster)
-> {
-> 	unsigned cpu;
+> The series works like this, the first 3 patches fix some issues with the clock
+> drivers that have already been accepted into the mainline kernel.
 > 
-> 	for_each_possible_cpu(cpu) {
-> 		if ((cluster == cpu_topology[cpu].cluster_id) &&
-> 			(0 == cpu_topology[cpu].core_id))
-> 			return get_cpu_device(cpu);
-> 	}
+> Then, starting with "ARM: davinci: pass clock as parameter to
+> davinci_timer_init()", we get the mach code ready for the switch by adding the
+> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+> around the legacy clocks so that we can switch easily between the old and the
+> new.
 > 
-> 	return NULL;
-> }
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
+> 
+> The final four patches add device tree clock support to the one SoC that
+> supports it.
+> 
+> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+> board file).
 
-Okay, this is what you should do IMHO.
+If you do end up sending a v12, you can leave out the mach-davinci
+portions unless there are any changes you need to make. I will pick them
+up from this series once the driver dependencies are merged.
 
-for_each_possible_cpu(cpu) {
-        cpu_dev = xxx..
-        ret = dev_pm_opp_set_supported_hw(cpu_dev, xxx, xxx);
-        if (ret && ret != -EBUSY)
-                error-out.
-}
+I do hope the drivers/clk/* changes can be merged from v4.18.
 
-This would require a trivial patch for the OPP core to not throw an
-error message with -EBUSY. I can do that separately.
-
--- 
-viresh
+Thanks,
+Sekhar
