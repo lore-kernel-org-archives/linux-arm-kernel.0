@@ -1,54 +1,33 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 22 May 2018 11:40:32 +0200
-Subject: [PATCH v2 06/16] irqchip/irq-mvebu-icu: make irq_domain local
+Date: Tue, 22 May 2018 11:40:36 +0200
+Subject: [PATCH v2 10/16] arm64: marvell: enable SEI driver
 In-Reply-To: <20180522094042.24770-1-miquel.raynal@bootlin.com>
 References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
-Message-ID: <20180522094042.24770-7-miquel.raynal@bootlin.com>
+Message-ID: <20180522094042.24770-11-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the current MSI irq_domain local to ease the split between ICU
-platform device code and NSR platform device code.
+Enable the newly introduced Marvell SEI driver for the 64-bit Marvell
+EBU platforms.
 
+Suggested-by: Haim Boot <hayim@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/irqchip/irq-mvebu-icu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-index 3694c0d73c0d..607948870a14 100644
---- a/drivers/irqchip/irq-mvebu-icu.c
-+++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -41,7 +41,6 @@
- struct mvebu_icu {
- 	struct irq_chip irq_chip;
- 	struct regmap *regmap;
--	struct irq_domain *domain;
- 	struct device *dev;
- 	atomic_t initialized;
- };
-@@ -218,6 +217,7 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	struct mvebu_icu *icu;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct device_node *gicp_dn;
-+	struct irq_domain *irq_domain;
- 	struct resource *res;
- 	void __iomem *regs;
- 	int i;
-@@ -282,11 +282,11 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
- 	}
- 
--	icu->domain =
-+	irq_domain =
- 		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
- 						  mvebu_icu_write_msg,
- 						  &mvebu_icu_domain_ops, icu);
--	if (!icu->domain) {
-+	if (!irq_domain) {
- 		dev_err(&pdev->dev, "Failed to create ICU domain\n");
- 		return -ENOMEM;
- 	}
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 2b1535cdeb7c..dc3c42938051 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -121,6 +121,7 @@ config ARCH_MVEBU
+ 	select MVEBU_ICU
+ 	select MVEBU_ODMI
+ 	select MVEBU_PIC
++	select MVEBU_SEI
+ 	select OF_GPIO
+ 	select PINCTRL
+ 	select PINCTRL_ARMADA_37XX
 -- 
 2.14.1
