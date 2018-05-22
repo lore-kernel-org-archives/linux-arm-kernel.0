@@ -1,47 +1,67 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 22 May 2018 19:33:33 +0200
-Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180522132429.6f1dcf92@gandalf.local.home>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
- <20180522131004.3012953c@gandalf.local.home>
- <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
- <20180522132429.6f1dcf92@gandalf.local.home>
-Message-ID: <20180522173333.aawadhkcekzvrswp@linutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 May 2018 12:34:21 -0500
+Subject: [PATCH v2 01/13] dt-bindings: power: add RK3036 SoCs header for
+ power-domain
+In-Reply-To: <1526268501-9200-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
+ <1526268501-9200-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20180522173421.GA12892@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-22 13:24:29 [-0400], Steven Rostedt wrote:
-> On Tue, 22 May 2018 19:21:16 +0200
-> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+On Mon, May 14, 2018 at 11:28:21AM +0800, Elaine Zhang wrote:
+> From: Caesar Wang <wxt@rock-chips.com>
 > 
-> > On 2018-05-22 13:10:04 [-0400], Steven Rostedt wrote:
-> > > On Thu, 17 May 2018 14:40:06 +0200
-> > > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> > >   
-> > > > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
-> > > >  /*
-> > > >   * Update current's FPSIMD/SVE registers from thread_struct.
-> > > >   *
-> > > > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
-> > > >  	 * non-SVE thread.
-> > > >  	 */
-> > > >  	if (task == current) {
-> > > > +		local_lock(fpsimd_lock);
-> > > >  		local_bh_disable();  
-> > > 
-> > > I'm surprised that we don't have a "local_lock_bh()"?  
-> > 
-> > right. Like the last time when we introduced a global lock with no
-> > locking context? 
-> > 
+> According to a description from TRM, add all the power domains.
 > 
-> I meant, we could have local_lock_bh(fpsimd_lock); that would turn into
-> a local_bh_disable() when !PREEMPT_RT.
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  include/dt-bindings/power/rk3036-power.h | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 include/dt-bindings/power/rk3036-power.h
+> 
+> diff --git a/include/dt-bindings/power/rk3036-power.h b/include/dt-bindings/power/rk3036-power.h
+> new file mode 100644
+> index 000000000000..59e09f1c5af7
+> --- /dev/null
+> +++ b/include/dt-bindings/power/rk3036-power.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright (c) 2017 Rockchip Electronics Co. Ltd.
+> + * Author: Caesar Wang <wxt@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 
-Oh that part. That could be possible I guess. I need to look into the
-second part which disables preemption while the FPU is taken.
+Use SPDX tag instead.
 
-> -- Steve
+Otherwise,
 
-Sebastian
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+> + */
+> +
+> +#ifndef __DT_BINDINGS_POWER_RK3036_POWER_H__
+> +#define __DT_BINDINGS_POWER_RK3036_POWER_H__
+> +
+> +#define RK3036_PD_MSCH		0
+> +#define RK3036_PD_CORE		1
+> +#define RK3036_PD_PERI		2
+> +#define RK3036_PD_VIO		3
+> +#define RK3036_PD_VPU		4
+> +#define RK3036_PD_GPU		5
+> +#define RK3036_PD_SYS		6
+> +
+> +#endif
+> -- 
+> 1.9.1
+> 
+> 
