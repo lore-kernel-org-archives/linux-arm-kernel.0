@@ -1,41 +1,36 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 22 May 2018 11:47:17 -0700
-Subject: [PATCH 2/5] watchdog: sp805: add 'timeout-sec' DT property support
+Date: Tue, 22 May 2018 11:47:19 -0700
+Subject: [PATCH 4/5] arm64: dt: set initial SR watchdog timeout to 60 seconds
 In-Reply-To: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
 References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527014840-21236-3-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527014840-21236-5-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for optional devicetree property 'timeout-sec'.
-'timeout-sec' is used in the driver if specified in devicetree.
-Otherwise, fall back to driver default, i.e., 60 seconds
+Set initial Stingray watchdog timeout to 60 seconds
+
+By the time when the userspace watchdog daemon is ready and taking
+control over, the watchdog timeout will then be reset to what's
+configured in the daemon
 
 Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
 Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/watchdog/sp805_wdt.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index 03805bc..1484609 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -230,7 +230,14 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
- 	spin_lock_init(&wdt->lock);
- 	watchdog_set_nowayout(&wdt->wdd, nowayout);
- 	watchdog_set_drvdata(&wdt->wdd, wdt);
--	wdt_setload(&wdt->wdd, DEFAULT_TIMEOUT);
-+
-+	/*
-+	 * If 'timeout-sec' devicetree property is specified, use that.
-+	 * Otherwise, use DEFAULT_TIMEOUT
-+	 */
-+	wdt->wdd.timeout = DEFAULT_TIMEOUT;
-+	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
-+	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 99aaff0..1e1cf49 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -420,6 +420,7 @@
+ 			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&hsls_25m_div2_clk>, <&hsls_div4_clk>;
+ 			clock-names = "wdogclk", "apb_pclk";
++			timeout-sec = <60>;
+ 		};
  
- 	ret = watchdog_register_device(&wdt->wdd);
- 	if (ret) {
+ 		gpio_hsls: gpio at d0000 {
 -- 
 2.1.4
