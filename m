@@ -1,41 +1,21 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Tue, 22 May 2018 07:03:44 +0000
-Subject: [PATCH 6/7 v5] bus: fsl-mc: set coherent dma mask for devices on
- fsl-mc bus
-In-Reply-To: <1526824191-7000-7-git-send-email-nipun.gupta@nxp.com>
-References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
- <1526824191-7000-7-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <5B03C0D0.1090609@nxp.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Tue, 22 May 2018 07:06:48 +0000
+Subject: [PATCH v1] dma: imx-sdma: add virt-dma support
+In-Reply-To: <20180522065534.GD18351@vkoul-mobl>
+References: <1521735499-29138-1-git-send-email-yibin.gong@nxp.com>
+ <DB6PR04MB32230F836E366C6D0AA7A44489940@DB6PR04MB3223.eurprd04.prod.outlook.com>
+ <20180522065534.GD18351@vkoul-mobl>
+Message-ID: <1527001591.3990.1.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Ok, I'll resend it after rebase and test.
 
-
-On 05/20/2018 04:49 PM, Nipun Gupta wrote:
-> of_dma_configure() API expects coherent_dma_mask to be correctly
-> set in the devices. This patch does the needful.
->
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-
-Acked-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-
----
-Best Regards, Laurentiu
-
-> ---
->   drivers/bus/fsl-mc/fsl-mc-bus.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-bus.c
-> index fa43c7d..624828b 100644
-> --- a/drivers/bus/fsl-mc/fsl-mc-bus.c
-> +++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
-> @@ -627,6 +627,7 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
->   		mc_dev->icid = parent_mc_dev->icid;
->   		mc_dev->dma_mask = FSL_MC_DEFAULT_DMA_MASK;
->   		mc_dev->dev.dma_mask = &mc_dev->dma_mask;
-> +		mc_dev->dev.coherent_dma_mask = mc_dev->dma_mask;
->   		dev_set_msi_domain(&mc_dev->dev,
->   				   dev_get_msi_domain(&parent_mc_dev->dev));
->   	}
->
+On ?, 2018-05-22 at 12:25 +0530, Vinod wrote:
+> On 22-05-18, 06:16, Robin Gong wrote:
+> > 
+> > Ping.
+> Looks like I missed this one, can you please rebase and resend.
+> While at it, modify the subject to dmaengine, as thats the subsystem
+> name
+> 
