@@ -1,48 +1,63 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 22 May 2018 14:04:06 +0200
-Subject: [PATCH 01/25] hexagon: remove the sync_single_for_cpu DMA operation
-In-Reply-To: <20180522120430.28709-1-hch@lst.de>
-References: <20180522120430.28709-1-hch@lst.de>
-Message-ID: <20180522120430.28709-2-hch@lst.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 22 May 2018 14:02:57 +0200
+Subject: [PATCH 9/9] ARM: dts: silk: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+Message-ID: <20180522120257.13232-9-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hexagon does all the required cache maintainance at dma map time, and none
-at unmap time.  It thus has to implement sync_single_for_device to match
-the map cace for buffer reuse, but there is no point in doing another
-invalidation in the sync_single_cpu_case, which in terms of cache
-maintainance is equivalent to the unmap case.
+Drop the MTD partitioning from DT, since it does not describe HW
+and to give way to a more flexible kernel command line partition
+passing.
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
+To retain the original partitioning, assure you have enabled
+CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+following to your kernel command line:
+
+  mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
+
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-renesas-soc at vger.kernel.org
 ---
- arch/hexagon/kernel/dma.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/boot/dts/r8a7794-silk.dts | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-diff --git a/arch/hexagon/kernel/dma.c b/arch/hexagon/kernel/dma.c
-index 77459df34e2e..d2b717f352f4 100644
---- a/arch/hexagon/kernel/dma.c
-+++ b/arch/hexagon/kernel/dma.c
-@@ -181,13 +181,6 @@ static dma_addr_t hexagon_map_page(struct device *dev, struct page *page,
- 	return bus;
- }
- 
--static void hexagon_sync_single_for_cpu(struct device *dev,
--					dma_addr_t dma_handle, size_t size,
--					enum dma_data_direction dir)
--{
--	dma_sync(dma_addr_to_virt(dma_handle), size, dir);
--}
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index 7808aaee6644..b8163a0e2190 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -444,27 +444,6 @@
+ 		spi-cpol;
+ 		spi-cpha;
+ 		m25p,fast-read;
 -
- static void hexagon_sync_single_for_device(struct device *dev,
- 					dma_addr_t dma_handle, size_t size,
- 					enum dma_data_direction dir)
-@@ -205,7 +198,6 @@ const struct dma_map_ops hexagon_dma_ops = {
- 	.free		= hexagon_free_coherent,
- 	.map_sg		= hexagon_map_sg,
- 	.map_page	= hexagon_map_page,
--	.sync_single_for_cpu = hexagon_sync_single_for_cpu,
- 	.sync_single_for_device = hexagon_sync_single_for_device,
- 	.mapping_error	= hexagon_mapping_error,
+-		partitions {
+-			compatible = "fixed-partitions";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-
+-			partition at 0 {
+-				label = "loader";
+-				reg = <0x00000000 0x00040000>;
+-				read-only;
+-			};
+-			partition at 40000 {
+-				label = "user";
+-				reg = <0x00040000 0x00400000>;
+-				read-only;
+-			};
+-			partition at 440000 {
+-				label = "flash";
+-				reg = <0x00440000 0x03bc0000>;
+-			};
+-		};
+ 	};
  };
+ 
 -- 
-2.17.0
+2.16.2
