@@ -1,108 +1,50 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Tue, 22 May 2018 17:18:51 +0800
-Subject: [PATCH] perf: hisi: fix uncore PMU index ID
-In-Reply-To: <20180521170554.GE21034@arm.com>
-References: <1526901317-52248-1-git-send-email-zhangshaokun@hisilicon.com>
- <20180521170554.GE21034@arm.com>
-Message-ID: <a301d72f-687c-0c4f-1d44-83e5bbad5e60@hisilicon.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 22 May 2018 11:21:44 +0200
+Subject: [PATCH] Revert "pwm: Set class for exported channels in sysfs"
+Message-ID: <1526980904-11041-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
+regression with multiple pwm chip. It creates a new entry in
+'/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
+- 1st time export will create an entry in /sys/class/pwm/pwmX
+- when another export happens on another pwmchip, it can't be created
+(e.g. -EEXIST)
 
-Hi Will,
+This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
+- pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
 
-On 2018/5/22 1:05, Will Deacon wrote:
-> Hi Shaokun,
-> 
-> [+DT list]
-> 
-> On Mon, May 21, 2018 at 07:15:17PM +0800, Shaokun Zhang wrote:
->> According to ACPI SPEC about _UID (Unique ID), The _UID must be unique
->> across all devices with either a common _HID or _CID. For HiSilion
->> uncore PMU, SCCL_ID and INDEX_ID are used to identify the uncore PMU
->> for the same _HID. Therefore, _UID is not equal to INDEX_ID in
->> multi-sccl scene for the same uncore PMU device.
->>
->> CCL_ID can be used as the INDEX_ID for the L3C PMU and IDX-ID is added
->> in DSDT table for the HHA PMU.
->>
->> Fixes: 2940bc4("perf: hisi: Add support for HiSilicon SoC L3C PMU driver")
->> Fixes: 2bab3cf("perf: hisi: Add support for HiSilicon SoC HHA PMU driver")
->> Reported-by: Huiqiang Wang <wanghuiqiang@huawei.com>
->> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Huiqiang Wang <wanghuiqiang@huawei.com>
->> ---
->>  drivers/perf/hisilicon/hisi_uncore_hha_pmu.c | 18 ++++++++----------
->>  drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c | 11 ++---------
->>  2 files changed, 10 insertions(+), 19 deletions(-)
-> 
-> Whilst I'd normally just accept PMU driver submissions for vendor PMUs,
-> this part rang my alarm bells:
-> 
->> diff --git a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->> index 443906e..dcd8e77 100644
->> --- a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->> +++ b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->> @@ -238,19 +238,10 @@ MODULE_DEVICE_TABLE(acpi, hisi_hha_pmu_acpi_match);
->>  static int hisi_hha_pmu_init_data(struct platform_device *pdev,
->>  				  struct hisi_pmu *hha_pmu)
->>  {
->> -	unsigned long long id;
->>  	struct resource *res;
->> -	acpi_status status;
->> -
->> -	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
->> -				       "_UID", NULL, &id);
->> -	if (ACPI_FAILURE(status))
->> -		return -EINVAL;
->> -
->> -	hha_pmu->index_id = id;
->>  
->>  	/*
->> -	 * Use SCCL_ID and UID to identify the HHA PMU, while
->> +	 * Use SCCL_ID and HHA index ID to identify the HHA PMU, while
->>  	 * SCCL_ID is in MPIDR[aff2].
->>  	 */
->>  	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
->> @@ -258,6 +249,13 @@ static int hisi_hha_pmu_init_data(struct platform_device *pdev,
->>  		dev_err(&pdev->dev, "Can not read hha sccl-id!\n");
->>  		return -EINVAL;
->>  	}
->> +
->> +	if (device_property_read_u32(&pdev->dev, "hisilicon,idx-id",
->> +				     &hha_pmu->index_id)) {
->> +		dev_err(&pdev->dev, "Can not read hha index-id!\n");
->> +		return -EINVAL;
->> +	}
-> 
-> Is this a new DT property? If so, please can you update the binding
-> documentation and get an Ack from a DT maintainer? It's not clear to me
+Example on stm32 (stm32429i-eval) platform:
+$ ls /sys/class/pwm
+pwmchip0 pwmchip4
 
-No, it is not a DT property. We don't support DT mode for this platform and
-only support ACPI mode.
+$ cd /sys/class/pwm/pwmchip0/
+$ echo 0 > export
+$ ls /sys/class/pwm
+pwm0 pwmchip0 pwmchip4
 
-> what a "hisilicon,idx-id" is, nor how I would generate on from firmware.
-> 
+$ cd /sys/class/pwm/pwmchip4/
+$ echo 0 > export
+sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+...Exception stack follows...
 
-For HiSilicon this platform, it supports multi-sccl. each sccl has more than one uncore
-PMUs. Like HHA uncore PMUs, each sccl has 2-HHA PMUs and idx-id is in _DSD package and
-used to distinguish different HHA PMUs with the same sccl, as follow:
-    Name (_DSD, Package () {
-      ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-      Package () {
-        Package () {"hisilicon,scl-id", 0x03},
-        Package () {"hisilicon,idx-id", 0x00},
-      }
-    })
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/pwm/sysfs.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks,
-Shaokun
-
-> Thanks,
-> 
-> Will
-> 
-> .
-> 
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index 7c71cdb..4726d43 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -263,7 +263,6 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+ 	export->pwm = pwm;
+ 	mutex_init(&export->lock);
+ 
+-	export->child.class = parent->class;
+ 	export->child.release = pwm_export_release;
+ 	export->child.parent = parent;
+ 	export->child.devt = MKDEV(0, 0);
+-- 
+1.9.1
