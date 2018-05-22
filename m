@@ -1,74 +1,114 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 22 May 2018 14:23:19 +0200
-Subject: [PATCH v7 7/9] dt-bindings: iio: adc: at91-sama5d2_adc: add
- channel specific consumer info
-In-Reply-To: <1526975559-18966-8-git-send-email-eugen.hristev@microchip.com>
-References: <1526975559-18966-1-git-send-email-eugen.hristev@microchip.com>
- <1526975559-18966-8-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180522122319.GN22971@rfolt0960.corp.atmel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 22 May 2018 14:25:35 +0200 (CEST)
+Subject: [PATCH 1/2] clk: imx6ul: add GPIO clock gates
+In-Reply-To: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1439344955.9677.1526991935718@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 10:52:37AM +0300, Eugen Hristev wrote:
-> Added defines for channel consumer device-tree binding
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Hi Anson,
 
-> ---
->  .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt     |  9 +++++++++
->  include/dt-bindings/iio/adc/at91-sama5d2_adc.h           | 16 ++++++++++++++++
->  2 files changed, 25 insertions(+)
->  create mode 100644 include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+> Anson Huang <Anson.Huang@nxp.com> hat am 22. Mai 2018 um 05:25 geschrieben:
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> index 6469a4c..4a3c1d4 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> @@ -21,6 +21,14 @@ Optional properties:
->    - dmas: Phandle to dma channel for the ADC.
->    - dma-names: Must be "rx" when dmas property is being used.
->    See ../../dma/dma.txt for details.
-> +  - #io-channel-cells: in case consumer drivers are attached, this must be 1.
-> +  See <Documentation/devicetree/bindings/iio/iio-bindings.txt> for details.
-> +
-> +Properties for consumer drivers:
-> +  - Consumer drivers can be connected to this producer device, as specified
-> +  in <Documentation/devicetree/bindings/iio/iio-bindings.txt>
-> +  - Channels exposed are specified in:
-> +  <dt-bindings/iio/adc/at91-sama5d2_adc.txt>
+> 
+> i.MX6UL has GPIO clock gates in CCM CCGR, add
+> them into clock tree for clock management.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  drivers/clk/imx/clk-imx6ul.c             |  5 +++++
+>  include/dt-bindings/clock/imx6ul-clock.h | 31 ++++++++++++++++++-------------
+>  2 files changed, 23 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+> index ba563ba..3ea2d97 100644
+> --- a/drivers/clk/imx/clk-imx6ul.c
+> +++ b/drivers/clk/imx/clk-imx6ul.c
+> @@ -360,6 +360,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+>  	clks[IMX6UL_CLK_UART2_SERIAL]	= imx_clk_gate2("uart2_serial",	"uart_podf",	base + 0x68,	28);
+>  	if (clk_on_imx6ull())
+>  		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		 base + 0x80,	18);
+> +	clks[IMX6UL_CLK_GPIO2]		= imx_clk_gate2("gpio2",	"ipg",		base + 0x68,	30);
 >  
->  Example:
+>  	/* CCGR1 */
+>  	clks[IMX6UL_CLK_ECSPI1]		= imx_clk_gate2("ecspi1",	"ecspi_podf",	base + 0x6c,	0);
+> @@ -376,6 +377,8 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+>  	clks[IMX6UL_CLK_GPT1_SERIAL]	= imx_clk_gate2("gpt1_serial",	"perclk",	base + 0x6c,	22);
+>  	clks[IMX6UL_CLK_UART4_IPG]	= imx_clk_gate2("uart4_ipg",	"ipg",		base + 0x6c,	24);
+>  	clks[IMX6UL_CLK_UART4_SERIAL]	= imx_clk_gate2("uart4_serial",	"uart_podf",	base + 0x6c,	24);
+> +	clks[IMX6UL_CLK_GPIO1]		= imx_clk_gate2("gpio1",	"ipg",		base + 0x6c,	26);
+> +	clks[IMX6UL_CLK_GPIO5]		= imx_clk_gate2("gpio5",	"ipg",		base + 0x6c,	30);
 >  
-> @@ -38,4 +46,5 @@ adc: adc at fc030000 {
->  	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
->  	dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
->  	dma-names = "rx";
-> +	#io-channel-cells = <1>;
->  }
-> diff --git a/include/dt-bindings/iio/adc/at91-sama5d2_adc.h b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
-> new file mode 100644
-> index 0000000..70f99db
-> --- /dev/null
-> +++ b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
-> @@ -0,0 +1,16 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * This header provides constants for configuring the AT91 SAMA5D2 ADC
-> + */
-> +
-> +#ifndef _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
-> +#define _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
-> +
-> +/* X relative position channel index */
-> +#define AT91_SAMA5D2_ADC_X_CHANNEL		24
-> +/* Y relative position channel index */
-> +#define AT91_SAMA5D2_ADC_Y_CHANNEL		25
-> +/* pressure channel index */
-> +#define AT91_SAMA5D2_ADC_P_CHANNEL		26
-> +
-> +#endif
+>  	/* CCGR2 */
+>  	if (clk_on_imx6ull()) {
+> @@ -389,6 +392,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+>  	clks[IMX6UL_CLK_I2C3]		= imx_clk_gate2("i2c3",		"perclk",	base + 0x70,	10);
+>  	clks[IMX6UL_CLK_OCOTP]		= imx_clk_gate2("ocotp",	"ipg",		base + 0x70,	12);
+>  	clks[IMX6UL_CLK_IOMUXC]		= imx_clk_gate2("iomuxc",	"lcdif_podf",	base + 0x70,	14);
+> +	clks[IMX6UL_CLK_GPIO3]		= imx_clk_gate2("gpio3",	"ipg",		base + 0x70,	26);
+>  	clks[IMX6UL_CLK_LCDIF_APB]	= imx_clk_gate2("lcdif_apb",	"axi",		base + 0x70,	28);
+>  	clks[IMX6UL_CLK_PXP]		= imx_clk_gate2("pxp",		"axi",		base + 0x70,	30);
+>  
+> @@ -405,6 +409,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+>  	clks[IMX6UL_CLK_UART6_IPG]	= imx_clk_gate2("uart6_ipg",	"ipg",		base + 0x74,	6);
+>  	clks[IMX6UL_CLK_UART6_SERIAL]	= imx_clk_gate2("uart6_serial",	"uart_podf",	base + 0x74,	6);
+>  	clks[IMX6UL_CLK_LCDIF_PIX]	= imx_clk_gate2("lcdif_pix",	"lcdif_podf",	base + 0x74,	10);
+> +	clks[IMX6UL_CLK_GPIO4]		= imx_clk_gate2("gpio4",	"ipg",		base + 0x74,	12);
+>  	clks[IMX6UL_CLK_QSPI]		= imx_clk_gate2("qspi1",	"qspi1_podf",	base + 0x74,	14);
+>  	clks[IMX6UL_CLK_WDOG1]		= imx_clk_gate2("wdog1",	"ipg",		base + 0x74,	16);
+>  	clks[IMX6UL_CLK_MMDC_P0_FAST]	= imx_clk_gate("mmdc_p0_fast", "mmdc_podf", base + 0x74,	20);
+> diff --git a/include/dt-bindings/clock/imx6ul-clock.h b/include/dt-bindings/clock/imx6ul-clock.h
+> index 9564597..1291328 100644
+> --- a/include/dt-bindings/clock/imx6ul-clock.h
+> +++ b/include/dt-bindings/clock/imx6ul-clock.h
+> @@ -242,20 +242,25 @@
+>  #define IMX6UL_CLK_CKO2_PODF		229
+>  #define IMX6UL_CLK_CKO2			230
+>  #define IMX6UL_CLK_CKO			231
+> +#define IMX6UL_CLK_GPIO1		232
+> +#define IMX6UL_CLK_GPIO2		233
+> +#define IMX6UL_CLK_GPIO3		234
+> +#define IMX6UL_CLK_GPIO4		235
+> +#define IMX6UL_CLK_GPIO5		236
+
+this change looks like a breakage of devicetree ABI. You are changing the mean of the existing clock IDs on i.MX6ULL, which probably regress the combination of older DTBs with newer kernel.
+
+>  
+>  /* For i.MX6ULL */
+> -#define IMX6ULL_CLK_ESAI_PRED		232
+> -#define IMX6ULL_CLK_ESAI_PODF		233
+> -#define IMX6ULL_CLK_ESAI_EXTAL		234
+> -#define IMX6ULL_CLK_ESAI_MEM		235
+> -#define IMX6ULL_CLK_ESAI_IPG		236
+> -#define IMX6ULL_CLK_DCP_CLK		237
+> -#define IMX6ULL_CLK_EPDC_PRE_SEL	238
+> -#define IMX6ULL_CLK_EPDC_SEL		239
+> -#define IMX6ULL_CLK_EPDC_PODF		240
+> -#define IMX6ULL_CLK_EPDC_ACLK		241
+> -#define IMX6ULL_CLK_EPDC_PIX		242
+> -#define IMX6ULL_CLK_ESAI_SEL		243
+> -#define IMX6UL_CLK_END			244
+> +#define IMX6ULL_CLK_ESAI_PRED		237
+> +#define IMX6ULL_CLK_ESAI_PODF		238
+> +#define IMX6ULL_CLK_ESAI_EXTAL		239
+> +#define IMX6ULL_CLK_ESAI_MEM		240
+> +#define IMX6ULL_CLK_ESAI_IPG		241
+> +#define IMX6ULL_CLK_DCP_CLK		242
+> +#define IMX6ULL_CLK_EPDC_PRE_SEL	243
+> +#define IMX6ULL_CLK_EPDC_SEL		244
+> +#define IMX6ULL_CLK_EPDC_PODF		245
+> +#define IMX6ULL_CLK_EPDC_ACLK		246
+> +#define IMX6ULL_CLK_EPDC_PIX		247
+> +#define IMX6ULL_CLK_ESAI_SEL		248
+> +#define IMX6UL_CLK_END			249
+>  
+>  #endif /* __DT_BINDINGS_CLOCK_IMX6UL_H */
 > -- 
 > 2.7.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
