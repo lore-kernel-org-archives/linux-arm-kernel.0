@@ -1,122 +1,399 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 23 May 2018 00:15:08 +0800
-Subject: [rjarzmik:work/dma_slave_map 12/15]
- drivers/mtd/nand/marvell_nand.c:2621:17: sparse: call with no type!
-Message-ID: <201805230053.f9t1YyL4%fengguang.wu@intel.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 22 May 2018 17:20:03 +0100
+Subject: [PATCH 5/8] mailbox: tegra-hsp: Add support for shared mailboxes
+In-Reply-To: <20180508114403.14499-6-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-6-mperttunen@nvidia.com>
+Message-ID: <dc9db3b2-f40b-9422-5dc8-f5d3c186a044@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/rjarzmik/linux work/dma_slave_map
-head:   51b9077eb5c5f055bbbc8138b08830ce23ad340e
-commit: 308214fe387eaf6b5547d01e573c41bb309a59fb [12/15] dmaengine: pxa: make the filter function internal
-reproduce:
-        # apt-get install sparse
-        git checkout 308214fe387eaf6b5547d01e573c41bb309a59fb
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
 
+On 08/05/18 12:44, Mikko Perttunen wrote:
+> The Tegra HSP block supports 'shared mailboxes' that are simple 32-bit
+> registers consisting of a FULL bit in MSB position and 31 bits of data.
+> The hardware can be configured to trigger interrupts when a mailbox
+> is empty or full. Add support for these shared mailboxes to the HSP
+> driver.
+> 
+> The initial use for the mailboxes is the Tegra Combined UART. For this
+> purpose, we use interrupts to receive data, and spinning to wait for
+> the transmit mailbox to be emptied to minimize unnecessary overhead.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>   drivers/mailbox/tegra-hsp.c | 216 +++++++++++++++++++++++++++++++++++++++-----
+>   1 file changed, 193 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
+> index 16eb970f2c9f..77bc8ed7ef15 100644
+> --- a/drivers/mailbox/tegra-hsp.c
+> +++ b/drivers/mailbox/tegra-hsp.c
+> @@ -21,6 +21,11 @@
+>   
+>   #include <dt-bindings/mailbox/tegra186-hsp.h>
+>   
+> +#include "mailbox.h"
+> +
+> +#define HSP_INT0_IE		0x100
+> +#define HSP_INT_IR		0x304
+> +
+>   #define HSP_INT_DIMENSIONING	0x380
+>   #define HSP_nSM_SHIFT		0
+>   #define HSP_nSS_SHIFT		4
+> @@ -34,6 +39,8 @@
+>   #define HSP_DB_RAW	0x8
+>   #define HSP_DB_PENDING	0xc
+>   
+> +#define HSP_SM_SHRD_MBOX	0x0
+> +
+>   #define HSP_DB_CCPLEX		1
+>   #define HSP_DB_BPMP		3
+>   #define HSP_DB_MAX		7
+> @@ -68,6 +75,18 @@ struct tegra_hsp_db_map {
+>   	unsigned int index;
+>   };
+>   
+> +struct tegra_hsp_mailbox {
+> +	struct tegra_hsp_channel channel;
+> +	unsigned int index;
+> +	bool sending;
+> +};
+> +
+> +static inline struct tegra_hsp_mailbox *
+> +channel_to_mailbox(struct tegra_hsp_channel *channel)
+> +{
+> +	return container_of(channel, struct tegra_hsp_mailbox, channel);
+> +}
+> +
+>   struct tegra_hsp_soc {
+>   	const struct tegra_hsp_db_map *map;
+>   };
+> @@ -77,6 +96,7 @@ struct tegra_hsp {
+>   	struct mbox_controller mbox;
+>   	void __iomem *regs;
+>   	unsigned int doorbell_irq;
+> +	unsigned int shared_irq;
+>   	unsigned int num_sm;
+>   	unsigned int num_as;
+>   	unsigned int num_ss;
+> @@ -85,6 +105,7 @@ struct tegra_hsp {
+>   	spinlock_t lock;
+>   
+>   	struct list_head doorbells;
+> +	struct tegra_hsp_mailbox *mailboxes;
+>   };
+>   
+>   static inline struct tegra_hsp *
+> @@ -189,6 +210,35 @@ static irqreturn_t tegra_hsp_doorbell_irq(int irq, void *data)
+>   	return IRQ_HANDLED;
+>   }
+>   
+> +static irqreturn_t tegra_hsp_shared_irq(int irq, void *data)
+> +{
+> +	struct tegra_hsp_mailbox *mb;
+> +	struct tegra_hsp *hsp = data;
+> +	unsigned long bit, mask;
+> +	u32 value;
+> +
+> +	mask = tegra_hsp_readl(hsp, HSP_INT_IR);
+> +	/* Only interested in FULL interrupts */
+> +	mask &= 0xff << 8;
 
-sparse warnings: (new ones prefixed by >>)
+Maybe add some definitions for the above.
 
-   drivers/mtd/nand/marvell_nand.c:2621:17: sparse: undefined identifier 'pxad_filter_fn'
->> drivers/mtd/nand/marvell_nand.c:2621:17: sparse: call with no type!
-   In file included from drivers/mtd/nand/marvell_nand.c:21:0:
-   drivers/mtd/nand/marvell_nand.c: In function 'marvell_nfc_init_dma':
-   drivers/mtd/nand/marvell_nand.c:2621:42: error: 'pxad_filter_fn' undeclared (first use in this function); did you mean 'dma_filter_fn'?
-      dma_request_slave_channel_compat(mask, pxad_filter_fn,
-                                             ^
-   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
-     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-                                                 ^
-   drivers/mtd/nand/marvell_nand.c:2621:42: note: each undeclared identifier is reported only once for each function it appears in
-      dma_request_slave_channel_compat(mask, pxad_filter_fn,
-                                             ^
-   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
-     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-                                                 ^
+Should we qualify 'mask' against the HSP_INT_IE register as well?
 
-vim +2621 drivers/mtd/nand/marvell_nand.c
+> +
+> +	for_each_set_bit(bit, &mask, 16) {
+> +		unsigned int mb_i = bit % 8;
 
-02f26ecf Miquel Raynal 2018-01-09  2588  
-02f26ecf Miquel Raynal 2018-01-09  2589  static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
-02f26ecf Miquel Raynal 2018-01-09  2590  {
-02f26ecf Miquel Raynal 2018-01-09  2591  	struct platform_device *pdev = container_of(nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2592  						    struct platform_device,
-02f26ecf Miquel Raynal 2018-01-09  2593  						    dev);
-02f26ecf Miquel Raynal 2018-01-09  2594  	struct dma_slave_config config = {};
-02f26ecf Miquel Raynal 2018-01-09  2595  	struct resource *r;
-02f26ecf Miquel Raynal 2018-01-09  2596  	dma_cap_mask_t mask;
-02f26ecf Miquel Raynal 2018-01-09  2597  	struct pxad_param param;
-02f26ecf Miquel Raynal 2018-01-09  2598  	int ret;
-02f26ecf Miquel Raynal 2018-01-09  2599  
-02f26ecf Miquel Raynal 2018-01-09  2600  	if (!IS_ENABLED(CONFIG_PXA_DMA)) {
-02f26ecf Miquel Raynal 2018-01-09  2601  		dev_warn(nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2602  			 "DMA not enabled in configuration\n");
-02f26ecf Miquel Raynal 2018-01-09  2603  		return -ENOTSUPP;
-02f26ecf Miquel Raynal 2018-01-09  2604  	}
-02f26ecf Miquel Raynal 2018-01-09  2605  
-02f26ecf Miquel Raynal 2018-01-09  2606  	ret = dma_set_mask_and_coherent(nfc->dev, DMA_BIT_MASK(32));
-02f26ecf Miquel Raynal 2018-01-09  2607  	if (ret)
-02f26ecf Miquel Raynal 2018-01-09  2608  		return ret;
-02f26ecf Miquel Raynal 2018-01-09  2609  
-02f26ecf Miquel Raynal 2018-01-09  2610  	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-02f26ecf Miquel Raynal 2018-01-09  2611  	if (!r) {
-02f26ecf Miquel Raynal 2018-01-09  2612  		dev_err(nfc->dev, "No resource defined for data DMA\n");
-02f26ecf Miquel Raynal 2018-01-09  2613  		return -ENXIO;
-02f26ecf Miquel Raynal 2018-01-09  2614  	}
-02f26ecf Miquel Raynal 2018-01-09  2615  
-02f26ecf Miquel Raynal 2018-01-09  2616  	param.drcmr = r->start;
-02f26ecf Miquel Raynal 2018-01-09  2617  	param.prio = PXAD_PRIO_LOWEST;
-02f26ecf Miquel Raynal 2018-01-09  2618  	dma_cap_zero(mask);
-02f26ecf Miquel Raynal 2018-01-09  2619  	dma_cap_set(DMA_SLAVE, mask);
-02f26ecf Miquel Raynal 2018-01-09  2620  	nfc->dma_chan =
-02f26ecf Miquel Raynal 2018-01-09 @2621  		dma_request_slave_channel_compat(mask, pxad_filter_fn,
-02f26ecf Miquel Raynal 2018-01-09  2622  						 &param, nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2623  						 "data");
-02f26ecf Miquel Raynal 2018-01-09  2624  	if (!nfc->dma_chan) {
-02f26ecf Miquel Raynal 2018-01-09  2625  		dev_err(nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2626  			"Unable to request data DMA channel\n");
-02f26ecf Miquel Raynal 2018-01-09  2627  		return -ENODEV;
-02f26ecf Miquel Raynal 2018-01-09  2628  	}
-02f26ecf Miquel Raynal 2018-01-09  2629  
-02f26ecf Miquel Raynal 2018-01-09  2630  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-02f26ecf Miquel Raynal 2018-01-09  2631  	if (!r)
-02f26ecf Miquel Raynal 2018-01-09  2632  		return -ENXIO;
-02f26ecf Miquel Raynal 2018-01-09  2633  
-02f26ecf Miquel Raynal 2018-01-09  2634  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-02f26ecf Miquel Raynal 2018-01-09  2635  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-02f26ecf Miquel Raynal 2018-01-09  2636  	config.src_addr = r->start + NDDB;
-02f26ecf Miquel Raynal 2018-01-09  2637  	config.dst_addr = r->start + NDDB;
-02f26ecf Miquel Raynal 2018-01-09  2638  	config.src_maxburst = 32;
-02f26ecf Miquel Raynal 2018-01-09  2639  	config.dst_maxburst = 32;
-02f26ecf Miquel Raynal 2018-01-09  2640  	ret = dmaengine_slave_config(nfc->dma_chan, &config);
-02f26ecf Miquel Raynal 2018-01-09  2641  	if (ret < 0) {
-02f26ecf Miquel Raynal 2018-01-09  2642  		dev_err(nfc->dev, "Failed to configure DMA channel\n");
-02f26ecf Miquel Raynal 2018-01-09  2643  		return ret;
-02f26ecf Miquel Raynal 2018-01-09  2644  	}
-02f26ecf Miquel Raynal 2018-01-09  2645  
-02f26ecf Miquel Raynal 2018-01-09  2646  	/*
-02f26ecf Miquel Raynal 2018-01-09  2647  	 * DMA must act on length multiple of 32 and this length may be
-02f26ecf Miquel Raynal 2018-01-09  2648  	 * bigger than the destination buffer. Use this buffer instead
-02f26ecf Miquel Raynal 2018-01-09  2649  	 * for DMA transfers and then copy the desired amount of data to
-02f26ecf Miquel Raynal 2018-01-09  2650  	 * the provided buffer.
-02f26ecf Miquel Raynal 2018-01-09  2651  	 */
-c495a927 Miquel Raynal 2018-01-19  2652  	nfc->dma_buf = kmalloc(MAX_CHUNK_SIZE, GFP_KERNEL | GFP_DMA);
-02f26ecf Miquel Raynal 2018-01-09  2653  	if (!nfc->dma_buf)
-02f26ecf Miquel Raynal 2018-01-09  2654  		return -ENOMEM;
-02f26ecf Miquel Raynal 2018-01-09  2655  
-02f26ecf Miquel Raynal 2018-01-09  2656  	nfc->use_dma = true;
-02f26ecf Miquel Raynal 2018-01-09  2657  
-02f26ecf Miquel Raynal 2018-01-09  2658  	return 0;
-02f26ecf Miquel Raynal 2018-01-09  2659  }
-02f26ecf Miquel Raynal 2018-01-09  2660  
+If you right-shifted the mask above, you could avoid this modulo.
 
-:::::: The code at line 2621 was first introduced by commit
-:::::: 02f26ecf8c772751d4b24744d487f6b1b20e75d4 mtd: nand: add reworked Marvell NAND controller driver
+> +
+> +		mb = &hsp->mailboxes[mb_i];
+> +
+> +		if (!mb->sending) {
+> +			value = tegra_hsp_channel_readl(&mb->channel,
+> +							HSP_SM_SHRD_MBOX);
+> +			value &= ~BIT(31);
 
-:::::: TO: Miquel Raynal <miquel.raynal@free-electrons.com>
-:::::: CC: Boris Brezillon <boris.brezillon@free-electrons.com>
+Similarly a definition for bit 31 may add some clarity.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> +			mbox_chan_received_data(mb->channel.chan, &value);
+> +			tegra_hsp_channel_writel(&mb->channel, value,
+> +						 HSP_SM_SHRD_MBOX);
+> +		}
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+>   static struct tegra_hsp_channel *
+>   tegra_hsp_doorbell_create(struct tegra_hsp *hsp, const char *name,
+>   			  unsigned int master, unsigned int index)
+> @@ -277,15 +327,58 @@ static void tegra_hsp_doorbell_shutdown(struct tegra_hsp_doorbell *db)
+>   	spin_unlock_irqrestore(&hsp->lock, flags);
+>   }
+>   
+> +static int tegra_hsp_mailbox_startup(struct tegra_hsp_mailbox *mb)
+> +{
+> +	struct tegra_hsp *hsp = mb->channel.hsp;
+> +	u32 value;
+> +
+> +	mb->channel.chan->txdone_method = TXDONE_BY_BLOCK;
+> +
+> +	/* Route FULL interrupt to external IRQ 0 */
+> +	value = tegra_hsp_readl(hsp, HSP_INT0_IE);
+> +	value |= BIT(mb->index + 8);
+> +	tegra_hsp_writel(hsp, value, HSP_INT0_IE);
+> +
+> +	return 0;
+> +}
+> +
+> +static int tegra_hsp_mailbox_shutdown(struct tegra_hsp_mailbox *mb)
+> +{
+> +	struct tegra_hsp *hsp = mb->channel.hsp;
+> +	u32 value;
+> +
+> +	value = tegra_hsp_readl(hsp, HSP_INT0_IE);
+> +	value &= ~BIT(mb->index + 8);
+> +	tegra_hsp_writel(hsp, value, HSP_INT0_IE);
+> +
+> +	return 0;
+> +}
+> +
+>   static int tegra_hsp_send_data(struct mbox_chan *chan, void *data)
+>   {
+>   	struct tegra_hsp_channel *channel = chan->con_priv;
+> -	struct tegra_hsp_doorbell *db;
+> +	struct tegra_hsp_mailbox *mailbox;
+> +	uint32_t value;
+>   
+>   	switch (channel->type) {
+>   	case TEGRA_HSP_MBOX_TYPE_DB:
+> -		db = channel_to_doorbell(channel);
+> -		tegra_hsp_channel_writel(&db->channel, 1, HSP_DB_TRIGGER);
+> +		tegra_hsp_channel_writel(channel, 1, HSP_DB_TRIGGER);
+> +		return 0;
+> +	case TEGRA_HSP_MBOX_TYPE_SM:
+> +		mailbox = channel_to_mailbox(channel);
+> +		mailbox->sending = true;
+> +
+> +		value = *(uint32_t *)data;
+> +		/* Mark mailbox full */
+> +		value |= BIT(31);
+> +
+> +		tegra_hsp_channel_writel(channel, value, HSP_SM_SHRD_MBOX);
+> +
+> +		while (tegra_hsp_channel_readl(channel, HSP_SM_SHRD_MBOX)
+> +		               & BIT(31))
+> +			cpu_relax();
+
+Could be nice to use readx_poll_timeout() here.
+
+> +
+> +		return 0;
+>   	}
+>   
+>   	return -EINVAL;
+> @@ -298,6 +391,8 @@ static int tegra_hsp_startup(struct mbox_chan *chan)
+>   	switch (channel->type) {
+>   	case TEGRA_HSP_MBOX_TYPE_DB:
+>   		return tegra_hsp_doorbell_startup(channel_to_doorbell(channel));
+> +	case TEGRA_HSP_MBOX_TYPE_SM:
+> +		return tegra_hsp_mailbox_startup(channel_to_mailbox(channel));
+>   	}
+>   
+>   	return -EINVAL;
+> @@ -311,6 +406,9 @@ static void tegra_hsp_shutdown(struct mbox_chan *chan)
+>   	case TEGRA_HSP_MBOX_TYPE_DB:
+>   		tegra_hsp_doorbell_shutdown(channel_to_doorbell(channel));
+>   		break;
+> +	case TEGRA_HSP_MBOX_TYPE_SM:
+> +		tegra_hsp_mailbox_shutdown(channel_to_mailbox(channel));
+> +		break;
+>   	}
+>   }
+>   
+> @@ -364,7 +462,16 @@ static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
+>   
+>   	switch (type) {
+>   	case TEGRA_HSP_MBOX_TYPE_DB:
+> -		return tegra_hsp_doorbell_xlate(hsp, param);
+> +		if (hsp->doorbell_irq)
+> +			return tegra_hsp_doorbell_xlate(hsp, param);
+> +		else
+> +			return ERR_PTR(-EINVAL);
+> +
+> +	case TEGRA_HSP_MBOX_TYPE_SM:
+> +		if (hsp->shared_irq && param < hsp->num_sm)
+> +			return hsp->mailboxes[param].channel.chan;
+> +		else
+> +			return ERR_PTR(-EINVAL);
+>   
+>   	default:
+>   		return ERR_PTR(-EINVAL);
+> @@ -403,6 +510,31 @@ static int tegra_hsp_add_doorbells(struct tegra_hsp *hsp)
+>   	return 0;
+>   }
+>   
+> +static int tegra_hsp_add_mailboxes(struct tegra_hsp *hsp, struct device *dev)
+> +{
+> +	int i;
+> +
+> +	hsp->mailboxes = devm_kcalloc(dev, hsp->num_sm, sizeof(*hsp->mailboxes),
+> +				      GFP_KERNEL);
+> +	if (!hsp->mailboxes)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < hsp->num_sm; i++) {
+> +		struct tegra_hsp_mailbox *mb = &hsp->mailboxes[i];
+> +
+> +		mb->index = i;
+> +		mb->sending = false;
+> +
+> +		mb->channel.hsp = hsp;
+> +		mb->channel.type = TEGRA_HSP_MBOX_TYPE_SM;
+> +		mb->channel.regs = hsp->regs + SZ_64K + i * SZ_32K;
+> +		mb->channel.chan = &hsp->mbox.chans[i];
+> +		mb->channel.chan->con_priv = &mb->channel;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>   static int tegra_hsp_probe(struct platform_device *pdev)
+>   {
+>   	struct tegra_hsp *hsp;
+> @@ -431,14 +563,19 @@ static int tegra_hsp_probe(struct platform_device *pdev)
+>   	hsp->num_si = (value >> HSP_nSI_SHIFT) & HSP_nINT_MASK;
+>   
+>   	err = platform_get_irq_byname(pdev, "doorbell");
+> -	if (err < 0) {
+> -		dev_err(&pdev->dev, "failed to get doorbell IRQ: %d\n", err);
+> -		return err;
+> -	}
+> +	if (err < 0)
+> +		hsp->doorbell_irq = 0;
+
+It should not be necessary to set to zero as it should already be zero.
+
+> +	else
+> +		hsp->doorbell_irq = err;
+>   
+> -	hsp->doorbell_irq = err;
+> +	err = platform_get_irq_byname(pdev, "shared0");
+> +	if (err < 0)
+> +		hsp->shared_irq = 0;
+
+It should not be necessary to set to zero as it should already be zero.
+
+> +	else
+> +		hsp->shared_irq = err;
+>   
+>   	hsp->mbox.of_xlate = of_tegra_hsp_xlate;
+> +	/* First nSM are reserved for mailboxes */
+>   	hsp->mbox.num_chans = 32;
+>   	hsp->mbox.dev = &pdev->dev;
+>   	hsp->mbox.txdone_irq = false;
+> @@ -451,10 +588,22 @@ static int tegra_hsp_probe(struct platform_device *pdev)
+>   	if (!hsp->mbox.chans)
+>   		return -ENOMEM;
+>   
+> -	err = tegra_hsp_add_doorbells(hsp);
+> -	if (err < 0) {
+> -		dev_err(&pdev->dev, "failed to add doorbells: %d\n", err);
+> -		return err;
+> +	if (hsp->doorbell_irq) {
+> +		err = tegra_hsp_add_doorbells(hsp);
+> +		if (err < 0) {
+> +			dev_err(&pdev->dev, "failed to add doorbells: %d\n",
+> +			        err);
+> +			return err;
+> +		}
+> +	}
+> +
+> +	if (hsp->shared_irq) {
+> +		err = tegra_hsp_add_mailboxes(hsp, &pdev->dev);
+> +		if (err < 0) {
+> +			dev_err(&pdev->dev, "failed to add mailboxes: %d\n",
+> +			        err);
+> +			goto remove_doorbells;
+> +		}
+>   	}
+>   
+>   	platform_set_drvdata(pdev, hsp);
+> @@ -462,20 +611,40 @@ static int tegra_hsp_probe(struct platform_device *pdev)
+>   	err = mbox_controller_register(&hsp->mbox);
+>   	if (err) {
+>   		dev_err(&pdev->dev, "failed to register mailbox: %d\n", err);
+> -		tegra_hsp_remove_doorbells(hsp);
+> -		return err;
+> +		goto remove_doorbells;
+>   	}
+>   
+> -	err = devm_request_irq(&pdev->dev, hsp->doorbell_irq,
+> -			       tegra_hsp_doorbell_irq, IRQF_NO_SUSPEND,
+> -			       dev_name(&pdev->dev), hsp);
+> -	if (err < 0) {
+> -		dev_err(&pdev->dev, "failed to request doorbell IRQ#%u: %d\n",
+> -			hsp->doorbell_irq, err);
+> -		return err;
+> +	if (hsp->doorbell_irq) {
+> +		err = devm_request_irq(&pdev->dev, hsp->doorbell_irq,
+> +				       tegra_hsp_doorbell_irq, IRQF_NO_SUSPEND,
+> +				       dev_name(&pdev->dev), hsp);
+> +		if (err < 0) {
+> +			dev_err(&pdev->dev,
+> +			        "failed to request doorbell IRQ#%u: %d\n",
+> +				hsp->doorbell_irq, err);
+> +			return err;
+
+Clean-up?
+
+> +		}
+> +	}
+> +
+> +	if (hsp->shared_irq) {
+> +		err = devm_request_irq(&pdev->dev, hsp->shared_irq,
+> +				       tegra_hsp_shared_irq, 0,
+> +				       dev_name(&pdev->dev), hsp);
+> +		if (err < 0) {
+> +			dev_err(&pdev->dev,
+> +				"failed to request shared0 IRQ%u: %d\n",
+> +				hsp->shared_irq, err);
+> +			return err;
+
+Clean-up?
+
+> +		}
+>   	}
+>   
+>   	return 0;
+> +
+> +remove_doorbells:
+> +	if (hsp->doorbell_irq)
+> +		tegra_hsp_remove_doorbells(hsp);
+> +
+> +	return err;
+>   }
+>   
+>   static int tegra_hsp_remove(struct platform_device *pdev)
+> @@ -483,7 +652,8 @@ static int tegra_hsp_remove(struct platform_device *pdev)
+>   	struct tegra_hsp *hsp = platform_get_drvdata(pdev);
+>   
+>   	mbox_controller_unregister(&hsp->mbox);
+> -	tegra_hsp_remove_doorbells(hsp);
+> +	if (hsp->doorbell_irq)
+> +		tegra_hsp_remove_doorbells(hsp);
+>   
+	>   	return 0;
+>   }
+> 
+
+Cheers
+Jon
+
+-- 
+nvpublic
