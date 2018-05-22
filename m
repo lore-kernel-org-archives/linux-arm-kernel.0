@@ -1,144 +1,74 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 22 May 2018 17:05:19 +0100
-Subject: [PATCH v10 18/18] KVM: arm64: Invoke FPSIMD context switch trap from C
+Date: Tue, 22 May 2018 17:05:13 +0100
+Subject: [PATCH v10 12/18] arm64/sve: Switch sve_pffr() argument from task to
+ thread
 In-Reply-To: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
 References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527005119-6842-19-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527005119-6842-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion of the FPSIMD context switch trap code to C has added
-some overhead to calling it, due to the need to save registers that
-the procedure call standard defines as caller-saved.
+sve_pffr(), which is used to derive the base address used for
+low-level SVE save/restore routines, currently takes the relevant
+task_struct as an argument.
 
-So, perhaps it is no longer worth invoking this trap handler quite
-so early.
+The only accessed fields are actually part of thread_struct, so
+this patch changes the argument type accordingly.  This is done in
+preparation for moving this function to a header, where we do not
+want to have to include <linux/sched.h> due to the consequent
+circular #include problems.
 
-Instead, we can invoke it from fixup_guest_exit(), with little
-likelihood of increasing the overhead much further.
-
-As a convenience, this patch gives __hyp_switch_fpsimd() the same
-return semantics fixup_guest_exit().  For now there is no
-possibility of a spurious FPSIMD trap, so the function always
-returns true, but this allows it to be tail-called with a single
-return statement.
+No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/entry.S     | 30 ------------------------------
- arch/arm64/kvm/hyp/hyp-entry.S | 19 -------------------
- arch/arm64/kvm/hyp/switch.c    | 15 +++++++++++++--
- 3 files changed, 13 insertions(+), 51 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 40f349b..fad1e16 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -166,33 +166,3 @@ abort_guest_exit_end:
- 	orr	x0, x0, x5
- 1:	ret
- ENDPROC(__guest_exit)
--
--ENTRY(__fpsimd_guest_restore)
--	// x0: esr
--	// x1: vcpu
--	// x2-x29,lr: vcpu regs
--	// vcpu x0-x1 on the stack
--	stp	x2, x3, [sp, #-144]!
--	stp	x4, x5, [sp, #16]
--	stp	x6, x7, [sp, #32]
--	stp	x8, x9, [sp, #48]
--	stp	x10, x11, [sp, #64]
--	stp	x12, x13, [sp, #80]
--	stp	x14, x15, [sp, #96]
--	stp	x16, x17, [sp, #112]
--	stp	x18, lr, [sp, #128]
--
--	bl	__hyp_switch_fpsimd
--
--	ldp	x4, x5, [sp, #16]
--	ldp	x6, x7, [sp, #32]
--	ldp	x8, x9, [sp, #48]
--	ldp	x10, x11, [sp, #64]
--	ldp	x12, x13, [sp, #80]
--	ldp	x14, x15, [sp, #96]
--	ldp	x16, x17, [sp, #112]
--	ldp	x18, lr, [sp, #128]
--	ldp	x0, x1, [sp, #144]
--	ldp	x2, x3, [sp], #160
--	eret
--ENDPROC(__fpsimd_guest_restore)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index bffece2..753b9d2 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -113,25 +113,6 @@ el1_hvc_guest:
- 
- el1_trap:
- 	get_vcpu_ptr	x1, x0
--
--	mrs		x0, esr_el2
--	lsr		x0, x0, #ESR_ELx_EC_SHIFT
--	/*
--	 * x0: ESR_EC
--	 * x1: vcpu pointer
--	 */
--
--	/*
--	 * We trap the first access to the FP/SIMD to save the host context
--	 * and restore the guest context lazily.
--	 * If FP/SIMD is not implemented, handle the trap and inject an
--	 * undefined instruction exception to the guest.
--	 */
--alternative_if_not ARM64_HAS_NO_FPSIMD
--	cmp	x0, #ESR_ELx_EC_FP_ASIMD
--	b.eq	__fpsimd_guest_restore
--alternative_else_nop_endif
--
- 	mov	x0, #ARM_EXCEPTION_TRAP
- 	b	__guest_exit
- 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 4fbee95..2d45bd7 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -328,8 +328,7 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 5152bbc..c4e9762 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -44,6 +44,7 @@
+ #include <asm/fpsimd.h>
+ #include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/processor.h>
+ #include <asm/simd.h>
+ #include <asm/sigcontext.h>
+ #include <asm/sysreg.h>
+@@ -167,10 +168,9 @@ static size_t sve_ffr_offset(int vl)
+ 	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
  }
  
--void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
--				    struct kvm_vcpu *vcpu)
-+static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+-static void *sve_pffr(struct task_struct *task)
++static void *sve_pffr(struct thread_struct *thread)
  {
- 	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
- 
-@@ -369,6 +368,8 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
- 			     fpexc32_el2);
- 
- 	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
-+
-+	return true;
+-	return (char *)task->thread.sve_state +
+-		sve_ffr_offset(task->thread.sve_vl);
++	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
  }
  
- /*
-@@ -390,6 +391,16 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	if (*exit_code != ARM_EXCEPTION_TRAP)
- 		goto exit;
+ static void change_cpacr(u64 val, u64 mask)
+@@ -253,7 +253,7 @@ static void task_fpsimd_load(void)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
  
-+	/*
-+	 * We trap the first access to the FP/SIMD to save the host context
-+	 * and restore the guest context lazily.
-+	 * If FP/SIMD is not implemented, handle the trap and inject an
-+	 * undefined instruction exception to the guest.
-+	 */
-+	if (system_supports_fpsimd() &&
-+	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
-+		return __hyp_switch_fpsimd(vcpu);
-+
- 	if (!__populate_fault_info(vcpu))
- 		return true;
+ 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
+-		sve_load_state(sve_pffr(current),
++		sve_load_state(sve_pffr(&current->thread),
+ 			       &current->thread.uw.fpsimd_state.fpsr,
+ 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
+ 	else
+@@ -284,7 +284,7 @@ void fpsimd_save(void)
+ 				return;
+ 			}
  
+-			sve_save_state(sve_pffr(current), &st->fpsr);
++			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
+ 		} else
+ 			fpsimd_save_state(st);
+ 	}
 -- 
 2.1.4
