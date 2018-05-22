@@ -1,42 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 May 2018 15:08:04 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <20180518164829.27052-1-david@lechnology.com>
-References: <20180518164829.27052-1-david@lechnology.com>
-Message-ID: <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 22 May 2018 11:40:30 +0200
+Subject: [PATCH v2 04/16] irqchip/irq-mvebu-icu: clarify the reset operation
+ of configured interrupts
+In-Reply-To: <20180522094042.24770-1-miquel.raynal@bootlin.com>
+References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
+Message-ID: <20180522094042.24770-5-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Rewrite a small section to clarify the reset operation of interrupts
+already configured by ATF that we want to handle in the driver. This
+will simplify the introduction of System Error Interrupts support.
 
-On Friday 18 May 2018 10:18 PM, David Lechner wrote:
-> This series converts mach-davinci to use the common clock framework.
-> 
-> The series works like this, the first 3 patches fix some issues with the clock
-> drivers that have already been accepted into the mainline kernel.
-> 
-> Then, starting with "ARM: davinci: pass clock as parameter to
-> davinci_timer_init()", we get the mach code ready for the switch by adding the
-> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
-> around the legacy clocks so that we can switch easily between the old and the
-> new.
-> 
-> "ARM: davinci: switch to common clock framework" actually flips the switch
-> to start using the new clock drivers. Then the next 8 patches remove all
-> of the old clock code.
-> 
-> The final four patches add device tree clock support to the one SoC that
-> supports it.
-> 
-> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
-> board file).
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+---
+ drivers/irqchip/irq-mvebu-icu.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-If you do end up sending a v12, you can leave out the mach-davinci
-portions unless there are any changes you need to make. I will pick them
-up from this series once the driver dependencies are merged.
-
-I do hope the drivers/clk/* changes can be merged from v4.18.
-
-Thanks,
-Sekhar
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index a2a3acd74491..0f2655d7f19e 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -258,8 +258,12 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 	 * avoid unpredictable SPI assignments done by firmware.
+ 	 */
+ 	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
+-		u32 icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
+-		if ((icu_int >> ICU_GROUP_SHIFT) == ICU_GRP_NSR)
++		u32 icu_int, icu_grp;
++
++		icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
++		icu_grp = icu_int >> ICU_GROUP_SHIFT;
++
++		if (icu_grp == ICU_GRP_NSR)
+ 			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
+ 	}
+ 
+-- 
+2.14.1
