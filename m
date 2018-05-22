@@ -1,100 +1,74 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 May 2018 11:29:46 -0500
-Subject: [PATCH v5 1/4] dt-bindings: pinctrl: qcom: add gpio-ranges,
- gpio-reserved-ranges
-In-Reply-To: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
-References: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
-Message-ID: <20180522162946.GA25556@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 May 2018 17:30:07 +0100
+Subject: [PATCH 10/14] arm64: ssbd: Add prctl interface for per-thread
+ mitigation
+In-Reply-To: <20180522154842.pjml5lagtpyvwwqo@isilmar-4.linta.de>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-11-marc.zyngier@arm.com>
+ <20180522154842.pjml5lagtpyvwwqo@isilmar-4.linta.de>
+Message-ID: <86h8mzbqls.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 10:57:36PM +0200, Christian Lamparter wrote:
-> This patch adds the gpio-ranges and gpio-reserved-ranges property
-> definitions to the binding text files supported by the pinctrl-msm
-> driver framework.
+On Tue, 22 May 2018 16:48:42 +0100,
+Dominik Brodowski wrote:
 > 
-> gpio-ranges:
-> For DT-based platforms the pinctrl-msm framework currently relies
-> on the deprecated-for-DT gpiochip_add_pin_range() function to add
-> the range of GPIOs to be handled by the pin controller. Due to
-> interactions within gpiolib code, this causes the pinctrl-msm
-> driver to bail out (-517) during boot when a gpio-hog is declared.
-> This can be fatal and cause the system to not boot or reset
-> (for a detailed explanation and call-trace, refer to patch:
-> "pinctrl: msm: fix gpio-hog related boot issues" in this series).
 > 
-> gpio-reserved-ranges:
-> The binding has been added as a precaution since the TrustZone
-> firmware (aka QSEE), which is running as the hypervisor, might
-> have reserved certain, but undisclosed pins. Hence reading or
-> writing to the registers for those pins will cause an
-> XPU violation and this subsequently crashes the kernel.
+> On Tue, May 22, 2018 at 04:06:44PM +0100, Marc Zyngier wrote:
+> > If running on a system that performs dynamic SSBD mitigation, allow
+> > userspace to request the mitigation for itself. This is implemented
+> > as a prctl call, allowing the mitigation to be enabled or disabled at
+> > will for this particular thread.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/kernel/Makefile |   1 +
+> >  arch/arm64/kernel/ssbd.c   | 107 +++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 108 insertions(+)
+> >  create mode 100644 arch/arm64/kernel/ssbd.c
+> > 
+> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> > index bf825f38d206..0025f8691046 100644
+> > --- a/arch/arm64/kernel/Makefile
+> > +++ b/arch/arm64/kernel/Makefile
+> > @@ -54,6 +54,7 @@ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+> >  arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+> >  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+> >  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+> > +arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+> >  
+> >  obj-y					+= $(arm64-obj-y) vdso/ probes/
+> >  obj-m					+= $(arm64-obj-m)
+> > diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
+> > new file mode 100644
+> > index 000000000000..34e3c430176b
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/ssbd.c
+> > @@ -0,0 +1,107 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2018 ARM Ltd, All Rights Reserved.
+> > + */
+> > +
+> > +#include <linux/sched.h>
+> > +#include <linux/thread_info.h>
+> > +
+> > +#include <asm/cpufeature.h>
+> > +
+> > +/*
+> > + * prctl interface for SSBD
+> > + * FIXME: Drop the below ifdefery once the common interface has been merged.
+> > + */
+> > +#ifdef PR_SPEC_STORE_BYPASS
 > 
-> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
-> ---
->  .../bindings/pinctrl/qcom,apq8064-pinctrl.txt         |  6 ++++++
->  .../bindings/pinctrl/qcom,apq8084-pinctrl.txt         | 11 +++++++++++
->  .../bindings/pinctrl/qcom,ipq4019-pinctrl.txt         |  6 ++++++
->  .../bindings/pinctrl/qcom,ipq8064-pinctrl.txt         |  6 ++++++
->  .../bindings/pinctrl/qcom,ipq8074-pinctrl.txt         | 10 ++++++++++
->  .../bindings/pinctrl/qcom,mdm9615-pinctrl.txt         | 11 +++++++++++
->  .../bindings/pinctrl/qcom,msm8660-pinctrl.txt         |  6 ++++++
->  .../bindings/pinctrl/qcom,msm8916-pinctrl.txt         | 11 +++++++++++
->  .../bindings/pinctrl/qcom,msm8960-pinctrl.txt         | 11 +++++++++++
->  .../bindings/pinctrl/qcom,msm8974-pinctrl.txt         |  6 ++++++
->  .../bindings/pinctrl/qcom,msm8994-pinctrl.txt         | 11 +++++++++++
->  .../bindings/pinctrl/qcom,msm8996-pinctrl.txt         | 11 +++++++++++
->  12 files changed, 106 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-> index a752a4716486..7f78c6bb4e35 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-> @@ -10,6 +10,11 @@ Required properties:
->  - #gpio-cells : Should be two.
->                  The first cell is the gpio pin number and the
->                  second cell is used for optional parameters.
-> +- gpio-ranges: Range of pins managed by the GPIO controller.
+> That FIXME wants to be looked at.
 
-Just 'see gpio.txt' is sufficient unless you can say how many entries.
+It is what allowed the series to compile with mainline until last
+night. Once I rebase on top of -rc7, I'll remove it.
 
-> +
-> +Optional properties:
-> +
-> +- gpio-reserved-ranges: Range of pins reserved by the TrustZone TEE.
+Thanks,
 
-ditto.
+	M.
 
->  
->  Please refer to ../gpio/gpio.txt and ../interrupt-controller/interrupts.txt for
->  a general description of GPIO and interrupt bindings.
-> @@ -67,6 +72,7 @@ Example:
->  
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&gsbi5_uart_default>;
-> +		gpio-ranges = <&msmgpio 0 0 90>;
->  
->  		gsbi5_uart_default: gsbi5_uart_default {
->  			mux {
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-> index c4ea61ac56f2..362f32b945af 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-> @@ -40,6 +40,16 @@ MSM8960 platform.
->  	Definition: must be 2. Specifying the pin number and flags, as defined
->  		    in <dt-bindings/gpio/gpio.h>
->  
-> +- gpio-ranges:
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-
-But this is phandle with 3 cells.
-
-Still, you don't need to redefine standard properties here. Just need to 
-know optional vs. required and any constraints you can define (e.g. 
-allowed values, number of values, etc.)
-
-
-Same comments apply to the rest.
-
-Rob
+-- 
+Jazz is not dead, it just smell funny.
