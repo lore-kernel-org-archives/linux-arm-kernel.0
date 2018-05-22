@@ -1,67 +1,177 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Tue, 22 May 2018 16:53:41 +0800
-Subject: [PATCH 1/2] drm/rockchip: cnd-dp: adjust spdif register setting
-Message-ID: <1526979222-32478-1-git-send-email-hl@rock-chips.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Tue, 22 May 2018 10:59:07 +0300
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+ <153cc316-dcb5-972f-5a2f-c91fe0f6348b@arm.com>
+ <000f01d3f103$3ff78ba0$bfe6a2e0$@codeaurora.org>
+ <2ace10bc-e1c4-2060-94d3-eb71e966ffbe@arm.com>
+Message-ID: <001401d3f1a2$c7328850$559798f0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use jitter bypass mode for spdif, so do not need to set jitter mode
-related bit in SPDIF_CTRL_ADDR register. Also, we need to enable
-SPDIF_ENABLE bit.
+OK, I think I found out the way. Would this be correct?
+-----------------------------------------------------------------------------------------------
+extern struct cpu_topology cpu_topology[NR_CPUS];
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Lin Huang <hl@rock-chips.com>
----
- drivers/gpu/drm/rockchip/cdn-dp-reg.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+static struct device *qcom_cpufreq_kryo_get_cluster_lead(int cluster)
+{
+	unsigned cpu;
 
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-index eb3042c..3105965 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-@@ -792,7 +792,6 @@ int cdn_dp_config_video(struct cdn_dp_device *dp)
- 
- int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio)
- {
--	u32 val;
- 	int ret;
- 
- 	ret = cdn_dp_reg_write(dp, AUDIO_PACK_CONTROL, 0);
-@@ -801,11 +800,7 @@ int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio)
- 		return ret;
- 	}
- 
--	val = SPDIF_AVG_SEL | SPDIF_JITTER_BYPASS;
--	val |= SPDIF_FIFO_MID_RANGE(0xe0);
--	val |= SPDIF_JITTER_THRSH(0xe0);
--	val |= SPDIF_JITTER_AVG_WIN(7);
--	writel(val, dp->regs + SPDIF_CTRL_ADDR);
-+	writel(0, dp->regs + SPDIF_CTRL_ADDR);
- 
- 	/* clearn the audio config and reset */
- 	writel(0, dp->regs + AUDIO_SRC_CNTL);
-@@ -929,12 +924,6 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
- {
- 	u32 val;
- 
--	val = SPDIF_AVG_SEL | SPDIF_JITTER_BYPASS;
--	val |= SPDIF_FIFO_MID_RANGE(0xe0);
--	val |= SPDIF_JITTER_THRSH(0xe0);
--	val |= SPDIF_JITTER_AVG_WIN(7);
--	writel(val, dp->regs + SPDIF_CTRL_ADDR);
--
- 	writel(SYNC_WR_TO_CH_ZERO, dp->regs + FIFO_CNTL);
- 
- 	val = MAX_NUM_CH(2) | AUDIO_TYPE_LPCM | CFG_SUB_PCKT_NUM(4);
-@@ -942,9 +931,6 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
- 	writel(SMPL2PKT_EN, dp->regs + SMPL2PKT_CNTL);
- 
- 	val = SPDIF_ENABLE | SPDIF_AVG_SEL | SPDIF_JITTER_BYPASS;
--	val |= SPDIF_FIFO_MID_RANGE(0xe0);
--	val |= SPDIF_JITTER_THRSH(0xe0);
--	val |= SPDIF_JITTER_AVG_WIN(7);
- 	writel(val, dp->regs + SPDIF_CTRL_ADDR);
- 
- 	clk_prepare_enable(dp->spdif_clk);
--- 
-2.7.4
+	for_each_possible_cpu(cpu) {
+		if ((cluster == cpu_topology[cpu].cluster_id) &&
+			(0 == cpu_topology[cpu].core_id))
+			return get_cpu_device(cpu);
+	}
+
+	return NULL;
+}
+-----------------------------------------------------------------------------------------------
+
+> -----Original Message-----
+> From: ilialin at codeaurora.org <ilialin@codeaurora.org>
+> Sent: Tuesday, May 22, 2018 09:56
+> To: 'Sudeep Holla' <sudeep.holla@arm.com>; 'mturquette at baylibre.com'
+> <mturquette@baylibre.com>; 'sboyd at kernel.org' <sboyd@kernel.org>;
+> 'robh at kernel.org' <robh@kernel.org>; 'mark.rutland at arm.com'
+> <mark.rutland@arm.com>; 'viresh.kumar at linaro.org'
+> <viresh.kumar@linaro.org>; 'nm at ti.com' <nm@ti.com>;
+> 'lgirdwood at gmail.com' <lgirdwood@gmail.com>; 'broonie at kernel.org'
+> <broonie@kernel.org>; 'andy.gross at linaro.org' <andy.gross@linaro.org>;
+> 'david.brown at linaro.org' <david.brown@linaro.org>;
+> 'catalin.marinas at arm.com' <catalin.marinas@arm.com>;
+> 'will.deacon at arm.com' <will.deacon@arm.com>; 'rjw at rjwysocki.net'
+> <rjw@rjwysocki.net>; 'linux-clk at vger.kernel.org' <linux-
+> clk at vger.kernel.org>
+> Cc: 'devicetree at vger.kernel.org' <devicetree@vger.kernel.org>; 'linux-
+> kernel at vger.kernel.org' <linux-kernel@vger.kernel.org>; 'linux-
+> pm at vger.kernel.org' <linux-pm@vger.kernel.org>; 'linux-arm-
+> msm at vger.kernel.org' <linux-arm-msm@vger.kernel.org>; 'linux-
+> soc at vger.kernel.org' <linux-soc@vger.kernel.org>; 'linux-arm-
+> kernel at lists.infradead.org' <linux-arm-kernel@lists.infradead.org>;
+> 'rnayak at codeaurora.org' <rnayak@codeaurora.org>;
+> 'amit.kucheria at linaro.org' <amit.kucheria@linaro.org>;
+> 'nicolas.dechesne at linaro.org' <nicolas.dechesne@linaro.org>;
+> 'celster at codeaurora.org' <celster@codeaurora.org>;
+> 'tfinkel at codeaurora.org' <tfinkel@codeaurora.org>
+> Subject: RE: [PATCH] cpufreq: Add Kryo CPU scaling driver
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Sudeep Holla <sudeep.holla@arm.com>
+> > Sent: Monday, May 21, 2018 16:05
+> > To: ilialin at codeaurora.org; mturquette at baylibre.com; sboyd at kernel.org;
+> > robh at kernel.org; mark.rutland at arm.com; viresh.kumar at linaro.org;
+> > nm at ti.com; lgirdwood at gmail.com; broonie at kernel.org;
+> > andy.gross at linaro.org; david.brown at linaro.org;
+> > catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net;
+> > linux-clk at vger.kernel.org
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>; devicetree at vger.kernel.org;
+> > linux-kernel at vger.kernel.org; linux-pm at vger.kernel.org; linux-arm-
+> > msm at vger.kernel.org; linux-soc at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; rnayak at codeaurora.org;
+> > amit.kucheria at linaro.org; nicolas.dechesne at linaro.org;
+> > celster at codeaurora.org; tfinkel at codeaurora.org
+> > Subject: Re: [PATCH] cpufreq: Add Kryo CPU scaling driver
+> >
+> >
+> >
+> > On 21/05/18 13:57, ilialin at codeaurora.org wrote:
+> > >
+> > [...]
+> >
+> > >>> +#include <linux/cpu.h>
+> > >>> +#include <linux/err.h>
+> > >>> +#include <linux/init.h>
+> > >>> +#include <linux/kernel.h>
+> > >>> +#include <linux/module.h>
+> > >>> +#include <linux/nvmem-consumer.h> #include <linux/of.h> #include
+> > >>> +<linux/platform_device.h> #include <linux/pm_opp.h> #include
+> > >>> +<linux/slab.h> #include <linux/soc/qcom/smem.h>
+> > >>> +
+> > >>> +#define MSM_ID_SMEM	137
+> > >>> +#define SILVER_LEAD	0
+> > >>> +#define GOLD_LEAD	2
+> > >>> +
+> > >>
+> > >> So I gather form other emails, that these are physical cpu
+> > >> number(not even unique identifier like MPIDR). Will this work on
+> > >> parts or platforms that need to boot in GOLD LEAD cpus.
+> > >
+> > > The driver is for Kryo CPU, which (and AFAIK all multicore MSMs)
+> > > always boots on the CPU0.
+> >
+> >
+> > That may be true and I am not that bothered about it. But assuming
+> > physical ordering from the logical cpu number is *incorrect* and will
+> > break if kernel decides to change the allocation algorithm. Kernel
+> > provides no guarantee on that, so you need to depend on some physical
+> > ID or may be DT to achieve what your want. But the current code as it
+> stands is wrong.
+> 
+> Got your point. In fact CPUs are numbered 0-3 and ordered into 2 clusters in
+> the DT:
+> 
+> cpus {
+> 	#address-cells = <2>;
+> 	#size-cells = <0>;
+> 
+> 	CPU0: cpu at 0 {
+> 		...
+> 		reg = <0x0 0x0>;
+> 		...
+> 	};
+> 
+> 	CPU1: cpu at 1 {
+> 		...
+> 		reg = <0x0 0x1>;
+> 		...
+> 	};
+> 
+> 	CPU2: cpu at 100 {
+> 		...
+> 		reg = <0x0 0x100>;
+> 		...
+> 	};
+> 
+> 	CPU3: cpu at 101 {
+> 		...
+> 		reg = <0x0 0x101>;
+> 		...
+> 	};
+> 
+> 	cpu-map {
+> 		cluster0 {
+> 			core0 {
+> 				cpu = <&CPU0>;
+> 			};
+> 
+> 			core1 {
+> 				cpu = <&CPU1>;
+> 			};
+> 		};
+> 
+> 		cluster1 {
+> 			core0 {
+> 				cpu = <&CPU2>;
+> 			};
+> 
+> 			core1 {
+> 				cpu = <&CPU3>;
+> 			};
+> 		};
+> 	};
+> };
+> 
+> As far, as I understand, they are probed in the same order. However, to be
+> certain that the physical CPU is the one I intend to configure, I have to fetch
+> the device structure pointer for the cpu-map -> clusterX -> core0 -> cpu path.
+> Could you suggest a kernel API to do that?
+> 
+> 
+> 
+> >
+> > --
+> > Regards,
+> > Sudeep
