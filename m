@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 May 2018 16:43:32 +0200
-Subject: [PATCH 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
-In-Reply-To: <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
+Date: Tue, 22 May 2018 16:34:22 +0200
+Subject: [PATCH 5/9] ARM: dts: porter: Drop MTD partitioning from DT
+In-Reply-To: <20180522120257.13232-5-marek.vasut+renesas@gmail.com>
 References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdXRnoyhNz=3v_=ZCV=FWX4TwKqx7MpH0g3c7GwtXKP1tg@mail.gmail.com>
+ <20180522120257.13232-5-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdUu_DosgA2r1O8FBUpheYQeNJ9uRG=jGE5w0OZw8MTHMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,13 @@ On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
 > CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
 > following to your kernel command line:
 >
->   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
+>   mtdparts=spi0.0:256k at 0(loader_prg),4096k(user_prg),-(flash_fs)
 
-I think the "@0" can be dropped, as it's optional?
 4m?
 
-(Gaining more knowledge during reviewing ;-)
-
 > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
 
