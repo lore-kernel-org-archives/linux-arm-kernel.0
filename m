@@ -1,34 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 May 2018 18:17:22 +0100
-Subject: [PATCH v4 3/3] arm64: Introduce command line parameter to
- disable CNP
-In-Reply-To: <1526638022-4137-4-git-send-email-vladimir.murzin@arm.com>
-References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
- <1526638022-4137-4-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20180523171721.ppazcyf576koimhl@armageddon.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 23 May 2018 11:39:00 -0600
+Subject: [PATCH 07/11] dts: juno: Add scatter-gather support for all
+ revisions
+In-Reply-To: <1526661567-4578-8-git-send-email-suzuki.poulose@arm.com>
+References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
+ <1526661567-4578-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkz8d_RrFojz=ZQwOBB6J3-W9+edaVWC6R7Arg5GvhwcOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 11:07:02AM +0100, Vladimir Murzin wrote:
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 11fc28e..8f59d47 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -2636,6 +2636,10 @@
->  
->  	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
->  
-> +	nocnp		[ARM64]
-> +			Disable CNP (Common not Private translations)
-> +			even if it is supported by processor.
-> +
->  	nodelayacct	[KNL] Disable per-task delay accounting
->  
->  	nodsp		[SH] Disable hardware DSP at boot time.
+On 18 May 2018 at 10:39, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> Advertise that the scatter-gather is properly integrated on
+> all revisions of Juno board.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Do we actually have a use-case for this command line option? I'm not
-considering hardware errata as these are handled separately in the
-kernel.
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
--- 
-Catalin
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index eb749c5..6ce9090 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -198,6 +198,7 @@
+>                 clocks = <&soc_smc50mhz>;
+>                 clock-names = "apb_pclk";
+>                 power-domains = <&scpi_devpd 0>;
+> +               arm,scatter-gather;
+>                 port {
+>                         etr_in_port: endpoint {
+>                                 slave-mode;
+> --
+> 2.7.4
+>
