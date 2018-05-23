@@ -1,29 +1,65 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 23 May 2018 12:26:54 +0200
-Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
-In-Reply-To: <CACRpkdb6pN=XYgWN7rPBGDwgpMjNLhgxVk_=QRTrHb=DZuU-xQ@mail.gmail.com>
-References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
- <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
- <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
- <CACRpkdaxwRc0zoDKogVGisXTPJ0EwLbOQjHzz1pSEjvWCsSCTQ@mail.gmail.com>
- <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
- <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
- <60652f48-2a98-414b-5cff-25890a6da37f@xilinx.com>
- <CACRpkdaNJzW+LO97oxavzYJwfkj0xu7wxTNRaGiaKm98ON5JMA@mail.gmail.com>
- <57e4bbdd-1e30-0352-f758-998b64a6b77f@xilinx.com>
- <8b344d48-592d-8be8-bea0-e29b3e8469a1@xilinx.com>
- <CACRpkdb6pN=XYgWN7rPBGDwgpMjNLhgxVk_=QRTrHb=DZuU-xQ@mail.gmail.com>
-Message-ID: <fa24761b-1025-53bc-7706-9c67c0112cdf@xilinx.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 23 May 2018 15:57:05 +0530
+Subject: [PATCH v3] arm64: allwinner: a64: Add Amarula A64-Relic initial
+ support
+In-Reply-To: <20180523081830.4ly6sj34reabbttn@flea>
+References: <20180522132228.6564-1-jagan@amarulasolutions.com>
+ <20180522143044.pgwawojiwnk2lzxb@flea>
+ <CAMty3ZD3JT-ToGAUHN_uj7uVK-jkyAwfEdTBCmJSj34bACFpYQ@mail.gmail.com>
+ <20180523081830.4ly6sj34reabbttn@flea>
+Message-ID: <CAMty3ZC-N-6WzYg+kYd2+V3wbQdQmvU706Nog_Urd_EUaWnQjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.5.2018 11:44, Linus Walleij wrote:
-> On Tue, May 15, 2018 at 3:26 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-> 
->> Have you done any decision about this patch?
-> 
-> Yeah I applied the patch. It's a bit of "choose the lesser evil" approach
-> but what can I do...
+On Wed, May 23, 2018 at 1:48 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Wed, May 23, 2018 at 11:44:56AM +0530, Jagan Teki wrote:
+>> On Tue, May 22, 2018 at 8:00 PM, Maxime Ripard
+>> <maxime.ripard@bootlin.com> wrote:
+>> > On Tue, May 22, 2018 at 06:52:28PM +0530, Jagan Teki wrote:
+>> >> Amarula A64-Relic is Allwinner A64 based IoT device, which support
+>> >> - Allwinner A64 Cortex-A53
+>> >> - Mali-400MP2 GPU
+>> >> - AXP803 PMIC
+>> >> - 1GB DDR3 RAM
+>> >> - 8GB eMMC
+>> >> - AP6330 Wifi/BLE
+>> >> - MIPI-DSI
+>> >> - CSI: OV5640 sensor
+>> >> - USB OTG
+>> >
+>> > You claim that this is doing OTG...
+>> >
+>> > [..]
+>> >
+>> >> +&usb_otg {
+>> >> +     dr_mode = "peripheral";
+>> >> +     status = "okay";
+>> >> +};
+>> >
+>> > ... and yet you're setting it as peripheral...
+>>
+>> Though it claims OTG, board doesn't have any USB ports to operate(not
+>> even Mini-AB) the only way to use the board as peripheral to transfer
+>> images from host.
+>
+> I'm not sure what you mean here. If there's no USB connector, why do
+> you even enable it?
 
-Thanks,
-Michal
+I'm saying there is no host port on board. Board has connector
+header[1] comes with few pins includes USB D+, D-, ID, VBUS, GROUND,
+UART0 TX, RX etc. we have to connect wires to these pins to make
+pluggable USB to host pc. and here USB pins used for transferring data
+from host pc to target board like in peripheral mode.
+
+Hope you understand.
+
+[1] https://www.digikey.com/product-detail/en/molex-llc/5016451420/WM6074-ND/1787775
+
+Jagan.
+
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
