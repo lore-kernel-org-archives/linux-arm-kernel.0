@@ -1,66 +1,30 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 May 2018 11:50:51 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.18, round 3
-Message-ID: <7hmuwqqk8k.fsf@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 May 2018 11:52:44 -0700
+Subject: [PATCH 3/6] ASoC: ams_delta: use GPIO lookup table
+In-Reply-To: <20180521100503.GA24638@sirena.org.uk>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <20180518210954.29044-3-jmkrzyszt@gmail.com>
+ <20180521100503.GA24638@sirena.org.uk>
+Message-ID: <20180523185244.GT98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof, ARnd,
+* Mark Brown <broonie@kernel.org> [180521 10:07]:
+> On Fri, May 18, 2018 at 11:09:51PM +0200, Janusz Krzysztofik wrote:
+> > Now as the Amstrad Delta board provides GPIO lookup tables, switch from
+> > GPIO numbers to GPIO descriptors and use the table to locate required
+> > GPIO pins.
+> 
+> Acked-by: Mark Brown <broonie@kernel.org>
 
-Here's final round of 64-bit DT updates for v4.18 for Amlogic.
+Thanks applying patches 1 and 3 of this series into omap-for-v4.18/soc.
+It's kind of getting late for v4.18, but let's see if we can still make
+it.
 
-I separated this one from round 2 because I've merged a tag from the
-clock tree where the headers were added that are used by the new clock
-driver nodes.
+Seems the others can be applied to the driver trees after no more
+comments, then once all that is done we can apply the last patch
+in this series.
 
-That clock dependency branch is already queued by the clock maintainers,
-but included here so the arm-soc DT branch will continue to build
-standalone.
+Regards,
 
-Kevin
-
-The following changes since commit ffe2f2a415a5c36c0629c0ac8ea3dda80fbfd4b6:
-
-  ARM64: dts: meson-axg: enable i2c AO on the S400 board (2018-05-23 10:05:41 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
-
-for you to fetch changes up to 9adda3534faad306c3d5351c5b87d26fea9767be:
-
-  ARM64: dts: meson: fix clock source of the pclk for UART_AO (2018-05-23 11:31:54 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT updates, round3
-- AXG: add new clock driver
-
-----------------------------------------------------------------
-Kevin Hilman (1):
-      Merge tag 'for-kevin-meson-clk-bindings-v4.18-1' of https://github.com/BayLibre/clk-meson into v4.18/dt64
-
-Martin Blumenstingl (1):
-      dt-bindings: clock: meson8b: export the NAND clock
-
-Maxime Jourdan (1):
-      clk: meson: gxbb: expose VDEC_1 and VDEC_HEVC clocks
-
-Qiufang Dai (1):
-      ARM64: dts: meson-axg: add AO clock driver
-
-Yixun Lan (3):
-      dt-bindings: clock: axg-aoclkc: New binding for Meson-AXG SoC
-      dt-bindings: clock: reset: Add AXG AO Clock and Reset Bindings
-      ARM64: dts: meson: fix clock source of the pclk for UART_AO
-
- Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt |  1 +
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi                      | 16 ++++++++++++++--
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                     |  4 ++--
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                      |  4 ++--
- include/dt-bindings/clock/axg-aoclkc.h                          | 26 ++++++++++++++++++++++++++
- include/dt-bindings/clock/gxbb-clkc.h                           |  2 ++
- include/dt-bindings/clock/meson8b-clkc.h                        |  1 +
- include/dt-bindings/reset/axg-aoclkc.h                          | 20 ++++++++++++++++++++
- 8 files changed, 68 insertions(+), 6 deletions(-)
- create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
- create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+Tony
