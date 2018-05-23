@@ -1,36 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 May 2018 13:23:11 -0500
-Subject: [PATCH 05/15] drm/sun4i: Add TCON TOP driver
-In-Reply-To: <20180519183127.2718-6-jernej.skrabec@siol.net>
-References: <20180519183127.2718-1-jernej.skrabec@siol.net>
- <20180519183127.2718-6-jernej.skrabec@siol.net>
-Message-ID: <20180523182311.GA8741@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 May 2018 11:37:14 -0700
+Subject: [RFC 12/13] ARM: dts: ti: add dra71-evm FIT description file
+In-Reply-To: <243730d3-e7f3-584d-b5dd-491c2700cf11@ti.com>
+References: <1523956215-28154-1-git-send-email-t-kristo@ti.com>
+ <1523956215-28154-13-git-send-email-t-kristo@ti.com>
+ <20180417092924.GB20335@flint.armlinux.org.uk>
+ <ad5ef67d-d566-0034-a7cd-09a549cbd6d7@ti.com>
+ <20180417144913.GD5669@atomide.com>
+ <43ff3894-a287-1558-687c-40f50712735c@ti.com>
+ <20180522200100.GA23937@rob-hp-laptop>
+ <243730d3-e7f3-584d-b5dd-491c2700cf11@ti.com>
+Message-ID: <20180523183714.GR98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 08:31:17PM +0200, Jernej Skrabec wrote:
-> As already described in DT binding, TCON TOP is responsible for
-> configuring display pipeline. In this initial driver focus is on HDMI
-> pipeline, so TVE and LCD configuration is not implemented.
-> 
-> Implemented features:
-> - HDMI source selection
-> - clock driver (TCON and DSI gating)
-> - connecting mixers and TCONS
-> 
-> Something similar also existed in previous SoCs, except that it was part
-> of first TCON.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/Makefile             |   3 +-
->  drivers/gpu/drm/sun4i/sun8i_tcon_top.c     | 256 +++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun8i_tcon_top.h     |  20 ++
->  include/dt-bindings/clock/sun8i-tcon-top.h |  11 +
+* Tero Kristo <t-kristo@ti.com> [180523 05:58]:
+> On 22/05/18 23:01, Rob Herring wrote:
+> > On Mon, May 21, 2018 at 09:57:54AM +0300, Tero Kristo wrote:
+> > > Ok trying to resurrect this thread a bit. Is there any kind of consensus how
+> > > things like this should be handled? Should we add the DT overlay files to
+> > > kernel tree or not?
+> > 
+> > IMO, yes.
 
-This belongs with the binding doc patch.
+I too agree the overlay files should be in the kernel rather than
+people having to try to figure out where to find them.
 
->  4 files changed, 289 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.c
->  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.h
->  create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
+No idea how we'll verify they'll build though :) Maybe we
+just need randconfig support for DT overlay files too?
+
+Regards,
+
+Tony
