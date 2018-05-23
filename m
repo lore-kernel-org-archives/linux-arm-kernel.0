@@ -1,82 +1,98 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 23 May 2018 14:57:33 +0530
-Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
- device to genpd
-In-Reply-To: <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
- <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
- <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
- <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
- <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
- <CAPDyKFo_69kSS6UzdsJeyeiiED=S=chsdkP+R43qMHDEbZ8n_A@mail.gmail.com>
- <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
-Message-ID: <00ba829d-faf4-168c-db00-531621b9280f@codeaurora.org>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 23 May 2018 11:30:35 +0200
+Subject: [PATCH] ARM: dts: stm32: Add DFSDM support to stm32mp157c
+Message-ID: <1527067835-22303-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+stm32mp157c has DFSDM (Digital Filter For Sigma Delta Modulators) hardware
+with 6 filter instances.
 
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/boot/dts/stm32mp157c.dtsi | 70 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-On 05/23/2018 02:37 PM, Jon Hunter wrote:
-> 
-> On 23/05/18 07:12, Ulf Hansson wrote:
-> 
-> ...
-> 
->>>>>> Thanks for sending this. Believe it or not this has still been on my to-do list
->>>>>> and so we definitely need a solution for Tegra.
->>>>>>
->>>>>> Looking at the above it appears that additional power-domains exposed as devices
->>>>>> to the client device. So I assume that this means that the drivers for devices
->>>>>> with multiple power-domains will need to call RPM APIs for each of these
->>>>>> additional power-domains. Is that correct?
->>>>>
->>>>> They can, but should not!
->>>>>
->>>>> Instead, the driver shall use device_link_add() and device_link_del(),
->>>>> dynamically, depending on what PM domain that their original device
->>>>> needs for the current running use case.
->>>>>
->>>>> In that way, they keep existing runtime PM deployment, operating on
->>>>> its original device.
->>>>
->>>> OK, sounds good. Any reason why the linking cannot be handled by the above API? Is there a use-case where you would not want it linked?
->>>
->>> I am guessing the linking is what would give the driver the ability to decide which subset of powerdomains it actually wants to control
->>> at any point using runtime PM. If we have cases wherein the driver would want to turn on/off _all_ its associated powerdomains _always_
->>> then a default linking of all would help.
->>
->> First, I think we need to decide on *where* the linking should be
->> done, not at both places, as that would just mess up synchronization
->> of who is responsible for calling the device_link_del() at detach.
->>
->> Second, It would in principle be fine to call device_link_add() and
->> device_link_del() as a part of the attach/detach APIs. However, there
->> is a downside to such solution, which would be that the driver then
->> needs call the detach API, just to do device_link_del(). Of course
->> then it would also needs to call the attach API later if/when needed.
->> Doing this adds unnecessary overhead - comparing to just let the
->> driver call device_link_add|del() when needed. On the upside, yes, it
->> would put less burden on the drivers as it then only needs to care
->> about using one set of functions.
->>
->> Which solution do you prefer?
-> 
-> Any reason why we could not add a 'boolean' argument to the API to indicate whether the new device should be linked? I think that I prefer the API handles it, but I can see there could be instances where drivers may wish to handle it themselves.
-> 
-> Rajendra, do you have a use-case right now where the driver would want to handle the linking?
-
-So if I understand this right, any driver which does want to control individual powerdomain state would
-need to do the linking itself right?
-
-What I am saying is, if I have device A, with powerdomains X and Y, and if I want to turn on only X,
-then I would want only X to be linked with A, and at a later point if I want both X and Y to be turned on,
-I would then go ahead and link both X and Y to A? Is that correct or did I get it all wrong?
-
-I know atleast Camera on msm8996 would need to do this since it has 2 vfe powerdoamins, which can be
-turned on one at a time (depending on what resolution needs to be supported) or both together if we
-really need very high resolution using both vfe modules. 
-
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index 66d7496..3d2f4e7 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -556,6 +556,76 @@
+ 			};
+ 		};
+ 
++		dfsdm: dfsdm at 4400d000 {
++			compatible = "st,stm32mp1-dfsdm";
++			reg = <0x4400d000 0x800>;
++			clocks = <&rcc DFSDM_K>;
++			clock-names = "dfsdm";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			dfsdm0: filter at 0 {
++				compatible = "st,stm32-dfsdm-adc";
++				#io-channel-cells = <1>;
++				reg = <0>;
++				interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&dmamux1 101 0x400 0x01>;
++				dma-names = "rx";
++				status = "disabled";
++			};
++
++			dfsdm1: filter at 1 {
++				compatible = "st,stm32-dfsdm-adc";
++				#io-channel-cells = <1>;
++				reg = <1>;
++				interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&dmamux1 102 0x400 0x01>;
++				dma-names = "rx";
++				status = "disabled";
++			};
++
++			dfsdm2: filter at 2 {
++				compatible = "st,stm32-dfsdm-adc";
++				#io-channel-cells = <1>;
++				reg = <2>;
++				interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&dmamux1 103 0x400 0x01>;
++				dma-names = "rx";
++				status = "disabled";
++			};
++
++			dfsdm3: filter at 3 {
++				compatible = "st,stm32-dfsdm-adc";
++				#io-channel-cells = <1>;
++				reg = <3>;
++				interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&dmamux1 104 0x400 0x01>;
++				dma-names = "rx";
++				status = "disabled";
++			};
++
++			dfsdm4: filter at 4 {
++				compatible = "st,stm32-dfsdm-adc";
++				#io-channel-cells = <1>;
++				reg = <4>;
++				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&dmamux1 91 0x400 0x01>;
++				dma-names = "rx";
++				status = "disabled";
++			};
++
++			dfsdm5: filter at 5 {
++				compatible = "st,stm32-dfsdm-adc";
++				#io-channel-cells = <1>;
++				reg = <5>;
++				interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&dmamux1 92 0x400 0x01>;
++				dma-names = "rx";
++				status = "disabled";
++			};
++		};
++
+ 		dma1: dma at 48000000 {
+ 			compatible = "st,stm32-dma";
+ 			reg = <0x48000000 0x400>;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
