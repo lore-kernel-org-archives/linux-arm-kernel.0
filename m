@@ -1,85 +1,76 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 May 2018 18:46:55 +0100
-Subject: [PATCH v4 1/2] arm64/sve: Thin out initialisation sanity-checks for
- sve_max_vl
-In-Reply-To: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
-References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527097616-25214-2-git-send-email-Dave.Martin@arm.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Wed, 23 May 2018 10:47:43 -0700
+Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
+In-Reply-To: <CAAeHK+wk0hSH6iQcsLzrpjvsGocev-UZ6=z95ysecdFnAcHVSQ@mail.gmail.com>
+References: <20180518170202.11458-1-samitolvanen@google.com>
+ <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
+ <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
+ <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
+ <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
+ <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
+ <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
+ <86k1rzc4ba.wl-marc.zyngier@arm.com>
+ <CAAeHK+z2LmMYasYtRTt2U=QF8Pe_i10RA3-SkLzGXXByZqLh1w@mail.gmail.com>
+ <CAKwvOdmWg8o9yoZ+3dCwL8vYB8gzE+AatCbXENN-+Gge9Q6gtA@mail.gmail.com>
+ <CAAeHK+wk0hSH6iQcsLzrpjvsGocev-UZ6=z95ysecdFnAcHVSQ@mail.gmail.com>
+Message-ID: <CAKwvOd=fqk2bQSiPBsUmVSQLGUEGYSUev3iWvico6HOpYs5YJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the kernel SVE support is reasonably mature, it is
-excessive to default sve_max_vl to the invalid value -1 and then
-sprinkle WARN_ON()s around the place to make sure it has been
-initialised before use.  The cpufeatures code already runs pretty
-early, and will ensure sve_max_vl gets initialised.
+On Wed, May 23, 2018 at 4:54 AM Andrey Konovalov <andreyknvl@google.com>
+wrote:
+> On Tue, May 22, 2018 at 8:28 PM, Nick Desaulniers
+> <ndesaulniers@google.com> wrote:
+> > On Fri, May 18, 2018 at 11:13 AM Marc Zyngier <marc.zyngier@arm.com>
+wrote:
+> >> > - you have checked that with a released version of the compiler, you
+> >
+> > On Tue, May 22, 2018 at 10:58 AM Andrey Konovalov <andreyknvl@google.com
 
-This patch initialises sve_max_vl to something sane that will be
-supported by every SVE implementation, and removes most of the
-sanity checks.
+> > wrote:
+> >> Tested-by: Andrey Konovalov <andreyknvl@google.com>
+> >
+> > Hi Andrey,
+> > Thank you very much for this report.  Can you confirm as well the
+version
+> > of Clang that you were using?
 
-The checks in find_supported_vector_length() are retained for now.
-If anything goes horribly wrong, we are likely to trip a check here
-sooner or later.
+> I'm on 86852a40 ("[InstCombine] Calloc-ed strings optimizations").
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 17 ++++-------------
- arch/arm64/kernel/ptrace.c |  3 ---
- 2 files changed, 4 insertions(+), 16 deletions(-)
+> > If it's not a binary release (built from
+> > source), would you be able to re-confirm with a released version?
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 87a3536..f9ec640 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -129,7 +129,7 @@ static int sve_default_vl = -1;
- #ifdef CONFIG_ARM64_SVE
- 
- /* Maximum supported vector length across all CPUs (initially poisoned) */
--int __ro_after_init sve_max_vl = -1;
-+int __ro_after_init sve_max_vl = SVE_VL_MIN;
- /* Set of available vector lengths, as vq_to_bit(vq): */
- static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
- static void __percpu *efi_sve_state;
-@@ -360,22 +360,13 @@ static int sve_proc_do_default_vl(struct ctl_table *table, int write,
- 		return ret;
- 
- 	/* Writing -1 has the special meaning "set to max": */
--	if (vl == -1) {
--		/* Fail safe if sve_max_vl wasn't initialised */
--		if (WARN_ON(!sve_vl_valid(sve_max_vl)))
--			vl = SVE_VL_MIN;
--		else
--			vl = sve_max_vl;
--
--		goto chosen;
--	}
-+	if (vl == -1)
-+		vl = sve_max_vl;
- 
- 	if (!sve_vl_valid(vl))
- 		return -EINVAL;
- 
--	vl = find_supported_vector_length(vl);
--chosen:
--	sve_default_vl = vl;
-+	sve_default_vl = find_supported_vector_length(vl);
- 	return 0;
- }
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 7ff81fe..577deb0 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -766,9 +766,6 @@ static void sve_init_header_from_task(struct user_sve_header *header,
- 	vq = sve_vq_from_vl(header->vl);
- 
- 	header->max_vl = sve_max_vl;
--	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
--		header->max_vl = header->vl;
--
- 	header->size = SVE_PT_SIZE(vq, header->flags);
- 	header->max_size = SVE_PT_SIZE(sve_vq_from_vl(header->max_vl),
- 				      SVE_PT_REGS_SVE);
+> Sure. Which release should I try and how do I get it?
+
+Maybe clang-6.0 as the latest release (though I suspect you may run into
+the recently-fixed-in-clang-7.0 "S" constraint bug that you reported).
+
+I've had luck on debian based distributions installing from:
+http://apt.llvm.org/
+
+(These can be added to your /etc/apt/sources.list, then a `sudo apt update`
+and `sudo apt install clang-6.0`)
+
+If you're not able to add remote repositories (some employers block this ;)
+), then you can find releases for download for a few different platforms:
+https://releases.llvm.org/
+
+For example, a quick:
+$ mkdir llvm-6.0
+$ cd !$
+$ wget
+https://releases.llvm.org/6.0.0/clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz
+$ tar xvf clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz
+$ ./clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin/clang-6.0 -v
+clang version 6.0.0 (tags/RELEASE_600/final)
+Target: x86_64-unknown-linux-gnu
+Thread model: posix
+InstalledDir: .../llvm-6.0/./clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin
+Found candidate GCC installation: ...
+Candidate multilib: .;@m64
+Selected multilib: .;@m64
+
+Seems to work.
 -- 
-2.1.4
+Thanks,
+~Nick Desaulniers
