@@ -1,68 +1,54 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 23 May 2018 14:48:56 +0100
-Subject: [PATCH v10 03/18] arm64: Use update{,_tsk}_thread_flag()
-In-Reply-To: <1527005119-6842-4-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87o9h6trcn.fsf@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 23 May 2018 14:51:29 +0100
+Subject: [PATCH v11 1/8] soc: qcom: Separate kryo l2 accessors from PMU
+ driver
+In-Reply-To: <1527079981-11179-2-git-send-email-ilialin@codeaurora.org>
+References: <1527079981-11179-1-git-send-email-ilialin@codeaurora.org>
+ <1527079981-11179-2-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1cd8b060-9dec-6dce-cb57-4a43bf441f12@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Dave Martin <Dave.Martin@arm.com> writes:
 
-> This patch uses the new update_thread_flag() helpers to simplify a
-> couple of if () set; else clear; constructs.
->
-> No functional change.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
+On 23/05/18 13:52, Ilia Lin wrote:
+> The driver provides kernel level API for other drivers
+> to access the MSM8996 L2 cache registers.
+> Separating the L2 access code from the PMU driver and
+> making it public to allow other drivers use it.
+> The accesses must be separated with a single spinlock,
+> maintained in this driver.
+> 
+> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 > ---
->  arch/arm64/kernel/fpsimd.c | 18 ++++++++----------
->  1 file changed, 8 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 12e1c96..9d85373 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -618,10 +618,8 @@ int sve_set_vector_length(struct task_struct *task,
->  	task->thread.sve_vl = vl;
->
->  out:
-> -	if (flags & PR_SVE_VL_INHERIT)
-> -		set_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
-> -	else
-> -		clear_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
-> +	update_tsk_thread_flag(task, TIF_SVE_VL_INHERIT,
-> +			       flags & PR_SVE_VL_INHERIT);
->
->  	return 0;
->  }
-> @@ -910,12 +908,12 @@ void fpsimd_thread_switch(struct task_struct *next)
->  		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
->  		 * upon the next return to userland.
->  		 */
-> -		if (__this_cpu_read(fpsimd_last_state.st) ==
-> -			&next->thread.uw.fpsimd_state
-> -		    && next->thread.fpsimd_cpu == smp_processor_id())
-> -			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-> -		else
-> -			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-> +		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
-> +					&next->thread.uw.fpsimd_state;
-> +		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
+>  drivers/perf/Kconfig                 |  1 +
+>  drivers/perf/qcom_l2_pmu.c           | 90 ++++++++++--------------------------
+>  drivers/soc/qcom/Kconfig             |  3 ++
+>  drivers/soc/qcom/Makefile            |  1 +
+>  drivers/soc/qcom/kryo-l2-accessors.c | 56 ++++++++++++++++++++++
+>  include/soc/qcom/kryo-l2-accessors.h | 12 +++++
+>  6 files changed, 97 insertions(+), 66 deletions(-)
+>  create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
+>  create mode 100644 include/soc/qcom/kryo-l2-accessors.h
+> 
+
+[..
+> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> index 7093fe7..0567dff 100644
+> --- a/drivers/soc/qcom/Kconfig
+> +++ b/drivers/soc/qcom/Kconfig
+> @@ -39,6 +39,9 @@ config QCOM_GSBI
+>            functions for connecting the underlying serial UART, SPI, and I2C
+>            devices to the output pins.
+>  
+> +config QCOM_KRYO_L2_ACCESSORS
+> +       bool
 > +
-> +		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
-> +				       wrong_task || wrong_cpu);
->  	}
->  }
 
+I think kbuild bot complained about this and you haven't addressed it.
+This can be enabled on ARM and build breaks due to missing sysreg.h
+IIRC. Look at the kbuild report and fix it.
 
---
-Alex Benn?e
+-- 
+Regards,
+Sudeep
