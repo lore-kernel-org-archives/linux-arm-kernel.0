@@ -1,33 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 May 2018 11:37:14 -0700
-Subject: [RFC 12/13] ARM: dts: ti: add dra71-evm FIT description file
-In-Reply-To: <243730d3-e7f3-584d-b5dd-491c2700cf11@ti.com>
-References: <1523956215-28154-1-git-send-email-t-kristo@ti.com>
- <1523956215-28154-13-git-send-email-t-kristo@ti.com>
- <20180417092924.GB20335@flint.armlinux.org.uk>
- <ad5ef67d-d566-0034-a7cd-09a549cbd6d7@ti.com>
- <20180417144913.GD5669@atomide.com>
- <43ff3894-a287-1558-687c-40f50712735c@ti.com>
- <20180522200100.GA23937@rob-hp-laptop>
- <243730d3-e7f3-584d-b5dd-491c2700cf11@ti.com>
-Message-ID: <20180523183714.GR98604@atomide.com>
+Date: Wed, 23 May 2018 11:41:16 -0700
+Subject: [PATCH v2] OMAP: CLK: CLKSRC: Add suspend resume hooks
+In-Reply-To: <1527013340-8036-1-git-send-email-j-keerthy@ti.com>
+References: <1527013340-8036-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180523184116.GS98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [180523 05:58]:
-> On 22/05/18 23:01, Rob Herring wrote:
-> > On Mon, May 21, 2018 at 09:57:54AM +0300, Tero Kristo wrote:
-> > > Ok trying to resurrect this thread a bit. Is there any kind of consensus how
-> > > things like this should be handled? Should we add the DT overlay files to
-> > > kernel tree or not?
-> > 
-> > IMO, yes.
+* Keerthy <j-keerthy@ti.com> [180522 11:24]:
+> Add the save and restore for clksrc as part of suspend and resume
+> so that it saves the counter value and restores. This is needed in
+> modes like rtc+ddr in self-refresh not doing this stalls the time.
 
-I too agree the overlay files should be in the kernel rather than
-people having to try to figure out where to find them.
+Can't we now do this all in drivers/clocksource/timer-ti-*.c?
 
-No idea how we'll verify they'll build though :) Maybe we
-just need randconfig support for DT overlay files too?
+> @@ -490,6 +513,15 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
+>  	res = omap_dm_timer_init_one(&clksrc, fck_source, property,
+>  				     &clocksource_gpt.name,
+>  				     OMAP_TIMER_NONPOSTED);
+> +
+> +	if (soc_is_am43xx()) {
+> +		clocksource_gpt.suspend = omap2_gptimer_clksrc_suspend;
+> +		clocksource_gpt.resume = omap2_gptimer_clksrc_resume;
+> +
+> +		clocksource_gpt_hwmod =
+> +			omap_hwmod_lookup(clocksource_gpt.name);
+> +	}
+> +
+
+Then you can do this based on a quirk flag set by compatible.
 
 Regards,
 
