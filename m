@@ -1,88 +1,68 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 23 May 2018 20:57:32 +0200
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <CAKwvOd=fqk2bQSiPBsUmVSQLGUEGYSUev3iWvico6HOpYs5YJA@mail.gmail.com>
-References: <20180518170202.11458-1-samitolvanen@google.com>
- <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
- <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
- <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
- <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
- <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
- <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
- <86k1rzc4ba.wl-marc.zyngier@arm.com>
- <CAAeHK+z2LmMYasYtRTt2U=QF8Pe_i10RA3-SkLzGXXByZqLh1w@mail.gmail.com>
- <CAKwvOdmWg8o9yoZ+3dCwL8vYB8gzE+AatCbXENN-+Gge9Q6gtA@mail.gmail.com>
- <CAAeHK+wk0hSH6iQcsLzrpjvsGocev-UZ6=z95ysecdFnAcHVSQ@mail.gmail.com>
- <CAKwvOd=fqk2bQSiPBsUmVSQLGUEGYSUev3iWvico6HOpYs5YJA@mail.gmail.com>
-Message-ID: <CAAeHK+xNKhSLSa+w+gWJUosLUvK9P5OJfQDOw7+Emipo199HYg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 May 2018 13:59:44 -0500
+Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
+ property for sp805
+In-Reply-To: <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
+ <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
+ <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
+Message-ID: <20180523185944.GA9989@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 7:47 PM, Nick Desaulniers
-<ndesaulniers@google.com> wrote:
-> On Wed, May 23, 2018 at 4:54 AM Andrey Konovalov <andreyknvl@google.com>
-> wrote:
->> On Tue, May 22, 2018 at 8:28 PM, Nick Desaulniers
->> <ndesaulniers@google.com> wrote:
->> > On Fri, May 18, 2018 at 11:13 AM Marc Zyngier <marc.zyngier@arm.com>
-> wrote:
->> >> > - you have checked that with a released version of the compiler, you
->> >
->> > On Tue, May 22, 2018 at 10:58 AM Andrey Konovalov <andreyknvl@google.com
->
->> > wrote:
->> >> Tested-by: Andrey Konovalov <andreyknvl@google.com>
->> >
->> > Hi Andrey,
->> > Thank you very much for this report.  Can you confirm as well the
-> version
->> > of Clang that you were using?
->
->> I'm on 86852a40 ("[InstCombine] Calloc-ed strings optimizations").
->
->> > If it's not a binary release (built from
->> > source), would you be able to re-confirm with a released version?
->
->> Sure. Which release should I try and how do I get it?
->
-> Maybe clang-6.0 as the latest release (though I suspect you may run into
-> the recently-fixed-in-clang-7.0 "S" constraint bug that you reported).
+On Wed, May 23, 2018 at 09:25:49AM -0700, Ray Jui wrote:
+> 
+> 
+> On 5/23/2018 3:57 AM, Robin Murphy wrote:
+> > On 22/05/18 19:47, Ray Jui wrote:
+> > > Update the SP805 binding document to add optional 'timeout-sec'
+> > > devicetree property
+> > > 
+> > > Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> > > Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> > > ---
+> > > ? Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
+> > > ? 1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> > > b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> > > index edc4f0e..f898a86 100644
+> > > --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> > > +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> > > @@ -19,6 +19,8 @@ Required properties:
+> > > ? Optional properties:
+> > > ? - interrupts : Should specify WDT interrupt number.
+> > > +- timeout-sec : Should specify default WDT timeout in seconds. If
+> > > unset, the
+> > > +??????????????? default timeout is 30 seconds
+> > 
+> > According to the SP805 TRM, the default interval is dependent on the
+> > rate of WDOGCLK, but would typically be a lot longer than that :/
+> > 
+> > On a related note, anyone have any idea why we seem to have two subtly
+> > different SP805 bindings defined?
 
-Yes, and also into the "support for "r" prefixed variables in ARM
-inline assembly" issue.
+Sigh.
 
-Tested on upstream commit ded4c39e (before both issues were
-introduced) with -fno-jump-tables patch applied using clang 6.0.
+> Interesting, I did not even know that until you pointed this out (and it's
+> funny that I found that I actually reviewed arm,sp805.txt internally in
+> Broadcom code review).
+> 
+> It looks like one was done by Bhupesh Sharma (sp805-wdt.txt) and the other
+> was done by Anup Patel (arm,sp805.txt). Both were merged at the same time
+> around March 20, 2016: 915c56bc01d6. I'd assume both were sent out at around
+> the same time.
+> 
+> It sounds like we should definitely remove one of them. Given that
+> sp805-wdt.txt appears to have more detailed descriptions on the use of the
+> clocks, should we remove arm,sp805.txt?
 
-Same result, the patch helps.
+Take whichever text you like, but I prefer filenames using the 
+compatible string and the correct string is 'arm,sp805' because '-wdt' 
+is redundant. You can probably safely just update all the dts files with 
+'arm,sp805' and just remove 'arm,sp805-wdt' because it is not actually 
+used (as the ID registers are).
 
->
-> I've had luck on debian based distributions installing from:
-> http://apt.llvm.org/
->
-> (These can be added to your /etc/apt/sources.list, then a `sudo apt update`
-> and `sudo apt install clang-6.0`)
->
-> If you're not able to add remote repositories (some employers block this ;)
-> ), then you can find releases for download for a few different platforms:
-> https://releases.llvm.org/
->
-> For example, a quick:
-> $ mkdir llvm-6.0
-> $ cd !$
-> $ wget
-> https://releases.llvm.org/6.0.0/clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz
-> $ tar xvf clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz
-> $ ./clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin/clang-6.0 -v
-> clang version 6.0.0 (tags/RELEASE_600/final)
-> Target: x86_64-unknown-linux-gnu
-> Thread model: posix
-> InstalledDir: .../llvm-6.0/./clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin
-> Found candidate GCC installation: ...
-> Candidate multilib: .;@m64
-> Selected multilib: .;@m64
->
-> Seems to work.
-> --
-> Thanks,
-> ~Nick Desaulniers
+Rob
