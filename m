@@ -1,65 +1,81 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 09:25:49 -0700
-Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
- property for sp805
-In-Reply-To: <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
- <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
-Message-ID: <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 May 2018 17:42:20 +0100
+Subject: [PATCH] perf: hisi: fix uncore PMU index ID
+In-Reply-To: <a301d72f-687c-0c4f-1d44-83e5bbad5e60@hisilicon.com>
+References: <1526901317-52248-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20180521170554.GE21034@arm.com>
+ <a301d72f-687c-0c4f-1d44-83e5bbad5e60@hisilicon.com>
+Message-ID: <20180523164219.GG2983@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 5/23/2018 3:57 AM, Robin Murphy wrote:
-> On 22/05/18 19:47, Ray Jui wrote:
->> Update the SP805 binding document to add optional 'timeout-sec'
->> devicetree property
->>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> ---
->> ? Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
->> ? 1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt 
->> b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->> index edc4f0e..f898a86 100644
->> --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->> @@ -19,6 +19,8 @@ Required properties:
->> ? Optional properties:
->> ? - interrupts : Should specify WDT interrupt number.
->> +- timeout-sec : Should specify default WDT timeout in seconds. If 
->> unset, the
->> +??????????????? default timeout is 30 seconds
+On Tue, May 22, 2018 at 05:18:51PM +0800, Zhangshaokun wrote:
+> On 2018/5/22 1:05, Will Deacon wrote:
+> > Whilst I'd normally just accept PMU driver submissions for vendor PMUs,
+> > this part rang my alarm bells:
+> > 
+> >> diff --git a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+> >> index 443906e..dcd8e77 100644
+> >> --- a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+> >> +++ b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+> >> @@ -238,19 +238,10 @@ MODULE_DEVICE_TABLE(acpi, hisi_hha_pmu_acpi_match);
+> >>  static int hisi_hha_pmu_init_data(struct platform_device *pdev,
+> >>  				  struct hisi_pmu *hha_pmu)
+> >>  {
+> >> -	unsigned long long id;
+> >>  	struct resource *res;
+> >> -	acpi_status status;
+> >> -
+> >> -	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
+> >> -				       "_UID", NULL, &id);
+> >> -	if (ACPI_FAILURE(status))
+> >> -		return -EINVAL;
+> >> -
+> >> -	hha_pmu->index_id = id;
+> >>  
+> >>  	/*
+> >> -	 * Use SCCL_ID and UID to identify the HHA PMU, while
+> >> +	 * Use SCCL_ID and HHA index ID to identify the HHA PMU, while
+> >>  	 * SCCL_ID is in MPIDR[aff2].
+> >>  	 */
+> >>  	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
+> >> @@ -258,6 +249,13 @@ static int hisi_hha_pmu_init_data(struct platform_device *pdev,
+> >>  		dev_err(&pdev->dev, "Can not read hha sccl-id!\n");
+> >>  		return -EINVAL;
+> >>  	}
+> >> +
+> >> +	if (device_property_read_u32(&pdev->dev, "hisilicon,idx-id",
+> >> +				     &hha_pmu->index_id)) {
+> >> +		dev_err(&pdev->dev, "Can not read hha index-id!\n");
+> >> +		return -EINVAL;
+> >> +	}
+> > 
+> > Is this a new DT property? If so, please can you update the binding
+> > documentation and get an Ack from a DT maintainer? It's not clear to me
 > 
-> According to the SP805 TRM, the default interval is dependent on the 
-> rate of WDOGCLK, but would typically be a lot longer than that :/
+> No, it is not a DT property. We don't support DT mode for this platform and
+> only support ACPI mode.
+
+Hmm, but by using the firmware-agnostic "device_property_read_u32"
+interface, aren't you implicitly supporting it via DT as well? In fact,
+don't you now fail the probe if this new property isn't present? Isn't
+that a regression?
+
+> > what a "hisilicon,idx-id" is, nor how I would generate on from firmware.
+> > 
 > 
-> On a related note, anyone have any idea why we seem to have two subtly 
-> different SP805 bindings defined?
+> For HiSilicon this platform, it supports multi-sccl. each sccl has more than one uncore
+> PMUs. Like HHA uncore PMUs, each sccl has 2-HHA PMUs and idx-id is in _DSD package and
+> used to distinguish different HHA PMUs with the same sccl, as follow:
+>     Name (_DSD, Package () {
+>       ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>       Package () {
+>         Package () {"hisilicon,scl-id", 0x03},
+>         Package () {"hisilicon,idx-id", 0x00},
+>       }
+>     })
 
-Interesting, I did not even know that until you pointed this out (and 
-it's funny that I found that I actually reviewed arm,sp805.txt 
-internally in Broadcom code review).
+I'm still none the wiser about what this actually is. How is new _DSD crud
+supposed to be documented?
 
-It looks like one was done by Bhupesh Sharma (sp805-wdt.txt) and the 
-other was done by Anup Patel (arm,sp805.txt). Both were merged at the 
-same time around March 20, 2016: 915c56bc01d6. I'd assume both were sent 
-out at around the same time.
-
-It sounds like we should definitely remove one of them. Given that 
-sp805-wdt.txt appears to have more detailed descriptions on the use of 
-the clocks, should we remove arm,sp805.txt?
-
-Thanks,
-
-Ray
-
-> 
-> Robin.
-> 
->> ? Examples:
->>
+Will
