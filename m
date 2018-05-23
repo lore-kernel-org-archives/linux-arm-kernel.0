@@ -1,413 +1,241 @@
-From: ilialin@codeaurora.org (Ilia Lin)
-Date: Wed, 23 May 2018 16:11:30 +0300
-Subject: [PATCH v11 1/2] dt: qcom: Add opp and thermal to the msm8996
-In-Reply-To: <1527081091-13389-1-git-send-email-ilialin@codeaurora.org>
-References: <1527081091-13389-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1527081091-13389-2-git-send-email-ilialin@codeaurora.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 23 May 2018 21:22:03 +0800
+Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
+In-Reply-To: <3c9cdb5c-e1e0-f76d-5367-02aaf668b232@arm.com>
+References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+ <1526892748-326-2-git-send-email-leo.yan@linaro.org>
+ <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
+ <20180522083920.GD31075@leoy-ThinkPad-X240s>
+ <20180522095249.GE31075@leoy-ThinkPad-X240s>
+ <3c9cdb5c-e1e0-f76d-5367-02aaf668b232@arm.com>
+Message-ID: <20180523132203.GA30299@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 269 ++++++++++++++++++++++++++++++++--
- 1 file changed, 260 insertions(+), 9 deletions(-)
+Hi Rob,
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 37b7152c..e6cf290 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/qcom,gcc-msm8996.h>
- #include <dt-bindings/clock/qcom,mmcc-msm8996.h>
- #include <dt-bindings/clock/qcom,rpmcc.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	model = "Qualcomm Technologies, Inc. MSM8996";
-@@ -97,6 +98,9 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 0>;
-+			operating-points-v2 = <&cluster0_opp>;
-+			#cooling-cells = <2>;
- 			next-level-cache = <&L2_0>;
- 			L2_0: l2-cache {
- 			      compatible = "cache";
-@@ -109,6 +113,9 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 0>;
-+			operating-points-v2 = <&cluster0_opp>;
-+			#cooling-cells = <2>;
- 			next-level-cache = <&L2_0>;
- 		};
- 
-@@ -117,6 +124,9 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 1>;
-+			operating-points-v2 = <&cluster1_opp>;
-+			#cooling-cells = <2>;
- 			next-level-cache = <&L2_1>;
- 			L2_1: l2-cache {
- 			      compatible = "cache";
-@@ -129,6 +139,9 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 1>;
-+			operating-points-v2 = <&cluster1_opp>;
-+			#cooling-cells = <2>;
- 			next-level-cache = <&L2_1>;
- 		};
- 
-@@ -155,6 +168,182 @@
- 		};
- 	};
- 
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-307200000 {
-+			opp-hz = /bits/ 64 <307200000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-422400000 {
-+			opp-hz = /bits/ 64 <422400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-480000000 {
-+			opp-hz = /bits/ 64 <480000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-556800000 {
-+			opp-hz = /bits/ 64 <556800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-652800000 {
-+			opp-hz = /bits/ 64 <652800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-729600000 {
-+			opp-hz = /bits/ 64 <729600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-844800000 {
-+			opp-hz = /bits/ 64 <844800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-960000000 {
-+			opp-hz = /bits/ 64 <960000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1036800000 {
-+			opp-hz = /bits/ 64 <1036800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1113600000 {
-+			opp-hz = /bits/ 64 <1113600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1190400000 {
-+			opp-hz = /bits/ 64 <1190400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1228800000 {
-+			opp-hz = /bits/ 64 <1228800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1324800000 {
-+			opp-hz = /bits/ 64 <1324800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1401600000 {
-+			opp-hz = /bits/ 64 <1401600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1478400000 {
-+			opp-hz = /bits/ 64 <1478400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1593600000 {
-+			opp-hz = /bits/ 64 <1593600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+	};
-+
-+	cluster1_opp: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-307200000 {
-+			opp-hz = /bits/ 64 <307200000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-403200000 {
-+			opp-hz = /bits/ 64 <403200000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-480000000 {
-+			opp-hz = /bits/ 64 <480000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-556800000 {
-+			opp-hz = /bits/ 64 <556800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-652800000 {
-+			opp-hz = /bits/ 64 <652800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-729600000 {
-+			opp-hz = /bits/ 64 <729600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-806400000 {
-+			opp-hz = /bits/ 64 <806400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-883200000 {
-+			opp-hz = /bits/ 64 <883200000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-940800000 {
-+			opp-hz = /bits/ 64 <940800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1036800000 {
-+			opp-hz = /bits/ 64 <1036800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1113600000 {
-+			opp-hz = /bits/ 64 <1113600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1190400000 {
-+			opp-hz = /bits/ 64 <1190400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1248000000 {
-+			opp-hz = /bits/ 64 <1248000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1324800000 {
-+			opp-hz = /bits/ 64 <1324800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1401600000 {
-+			opp-hz = /bits/ 64 <1401600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1478400000 {
-+			opp-hz = /bits/ 64 <1478400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1555200000 {
-+			opp-hz = /bits/ 64 <1555200000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1632000000 {
-+			opp-hz = /bits/ 64 <1632000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1708800000 {
-+			opp-hz = /bits/ 64 <1708800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1785600000 {
-+			opp-hz = /bits/ 64 <1785600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1824000000 {
-+			opp-hz = /bits/ 64 <1824000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1920000000 {
-+			opp-hz = /bits/ 64 <1920000000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-1996800000 {
-+			opp-hz = /bits/ 64 <1996800000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-2073600000 {
-+			opp-hz = /bits/ 64 <2073600000>;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp-2150400000 {
-+			opp-hz = /bits/ 64 <2150400000>;
-+			clock-latency-ns = <200000>;
-+		};
-+	};
-+
- 	thermal-zones {
- 		cpu-thermal0 {
- 			polling-delay-passive = <250>;
-@@ -163,18 +352,34 @@
- 			thermal-sensors = <&tsens0 3>;
- 
- 			trips {
--				cpu_alert0: trip0 {
-+				cpu_alert0: cpu_alert0 {
- 					temperature = <75000>;
- 					hysteresis = <2000>;
-+					type = "active";
-+				};
-+				cpu_warn0: cpu_warn0 {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
- 					type = "passive";
- 				};
- 
--				cpu_crit0: trip1 {
-+				cpu_crit0: cpu_crit0 {
- 					temperature = <110000>;
- 					hysteresis = <2000>;
- 					type = "critical";
- 				};
- 			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert0>;
-+					cooling-device = <&CPU0 THERMAL_NO_LIMIT 7>;
-+				};
-+				map1 {
-+					trip = <&cpu_warn0>;
-+					cooling-device = <&CPU0 8 THERMAL_NO_LIMIT>;
-+				};
-+			};
- 		};
- 
- 		cpu-thermal1 {
-@@ -184,18 +389,34 @@
- 			thermal-sensors = <&tsens0 5>;
- 
- 			trips {
--				cpu_alert1: trip0 {
-+				cpu_alert1: cpu_alert1 {
- 					temperature = <75000>;
- 					hysteresis = <2000>;
-+					type = "active";
-+				};
-+				cpu_warn1: cpu_warn1 {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
- 					type = "passive";
- 				};
- 
--				cpu_crit1: trip1 {
-+				cpu_crit1: cpu_crit1 {
- 					temperature = <110000>;
- 					hysteresis = <2000>;
- 					type = "critical";
- 				};
- 			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert1>;
-+					cooling-device = <&CPU0 THERMAL_NO_LIMIT 7>;
-+				};
-+				map1 {
-+					trip = <&cpu_warn1>;
-+					cooling-device = <&CPU0 8 THERMAL_NO_LIMIT>;
-+				};
-+			};
- 		};
- 
- 		cpu-thermal2 {
-@@ -205,18 +426,33 @@
- 			thermal-sensors = <&tsens0 8>;
- 
- 			trips {
--				cpu_alert2: trip0 {
-+				cpu_alert2: cpu_alert2 {
- 					temperature = <75000>;
- 					hysteresis = <2000>;
-+					type = "active";
-+				};
-+				cpu_warn2: cpu_warn2 {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
- 					type = "passive";
- 				};
- 
--				cpu_crit2: trip1 {
-+				cpu_crit2: cpu_crit2 {
- 					temperature = <110000>;
- 					hysteresis = <2000>;
- 					type = "critical";
- 				};
- 			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert2>;
-+					cooling-device = <&CPU2 THERMAL_NO_LIMIT 7>;
-+				};
-+				map1 {
-+					trip = <&cpu_warn2>;
-+					cooling-device = <&CPU2 8 THERMAL_NO_LIMIT>;
-+				};
-+			};
- 		};
- 
- 		cpu-thermal3 {
-@@ -226,9 +462,14 @@
- 			thermal-sensors = <&tsens0 10>;
- 
- 			trips {
--				cpu_alert3: trip0 {
-+				cpu_alert3: cpu_alert3 {
- 					temperature = <75000>;
- 					hysteresis = <2000>;
-+					type = "active";
-+				};
-+				cpu_warn3: cpu_warn3 {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
- 					type = "passive";
- 				};
- 
-@@ -238,6 +479,16 @@
- 					type = "critical";
- 				};
- 			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert3>;
-+					cooling-device = <&CPU2 THERMAL_NO_LIMIT 7>;
-+				};
-+				map1 {
-+					trip = <&cpu_warn3>;
-+					cooling-device = <&CPU2 8 THERMAL_NO_LIMIT>;
-+				};
-+			};
- 		};
- 	};
- 
-@@ -414,7 +665,7 @@
- 		};
- 
- 		kryocc: clock-controller at 6400000 {
--			compatible = "qcom,apcc-msm8996";
-+			compatible = "qcom,msm8996-apcc";
- 			reg = <0x6400000 0x90000>;
- 			#clock-cells = <1>;
- 		};
-@@ -1001,7 +1252,7 @@
- 
- 				pinctrl-names = "default", "sleep";
- 				pinctrl-0 = <&pcie2_clkreq_default &pcie2_perst_default &pcie2_wake_default>;
--				pinctrl-1 = <&pcie2_clkreq_sleep &pcie2_perst_default &pcie2_wake_sleep >;
-+				pinctrl-1 = <&pcie2_clkreq_sleep &pcie2_perst_default &pcie2_wake_sleep>;
- 
- 				vdda-supply = <&pm8994_l28>;
- 
--- 
-1.9.1
+On Wed, May 23, 2018 at 12:21:18PM +0100, Robert Walker wrote:
+> Hi Leo,
+> 
+> On 22/05/18 10:52, Leo Yan wrote:
+> >On Tue, May 22, 2018 at 04:39:20PM +0800, Leo Yan wrote:
+> >
+> >[...]
+> >
+> >Rather than the patch I posted in my previous email, I think below new
+> >patch is more reasonable for me.
+> >
+> >In the below change, 'etmq->prev_packet' is only used to store the
+> >previous CS_ETM_RANGE packet, we don't need to save CS_ETM_TRACE_ON
+> >packet into 'etmq->prev_packet'.
+> >
+> >On the other hand, cs_etm__flush() can use 'etmq->period_instructions'
+> >to indicate if need to generate instruction sample or not.  If it's
+> >non-zero, then generate instruction sample and
+> >'etmq->period_instructions' will be cleared; so next time if there
+> >have more tracing CS_ETM_TRACE_ON packet, it can skip to generate
+> >instruction sample due 'etmq->period_instructions' is zero.
+> >
+> >How about you think for this?
+> >
+> >Thanks,
+> >Leo Yan
+> >
+> 
+> I don't think this covers the cases where CS_ETM_TRACE_ON is used to
+> indicate a discontinuity in the trace.  For example, there is work in
+> progress to configure the ETM so that it only traces a few thousand cycles
+> with a gap of many thousands of cycles between each chunk of trace - this
+> can be used to sample program execution in the form of instruction events
+> with branch stacks for feedback directed optimization (AutoFDO).
+> 
+> In this case, the raw trace is something like:
+> 
+>     ...
+>     I_ADDR_L_64IS0 : Address, Long, 64 bit, IS0.; Addr=0x0000007E7B886908;
+>     I_ATOM_F3 : Atom format 3.; EEN
+>     I_ATOM_F1 : Atom format 1.; E
+> # Trace stops here
+> 
+> # Some time passes, and then trace is turned on again
+>     I_TRACE_ON : Trace On.
+>     I_ADDR_CTXT_L_64IS0 : Address & Context, Long, 64 bit, IS0.;
+> Addr=0x00000057224322F4; Ctxt: AArch64,EL0, NS;
+>     I_ATOM_F3 : Atom format 3.; ENN
+>     I_ATOM_F5 : Atom format 5.; ENENE
+>     ...
+> 
+> This results in the following packets from the decoder:
+> 
+> CS_ETM_RANGE: [0x7e7b886908-0x7e7b886930] br
+> CS_ETM_RANGE: [0x7e7b88699c-0x7e7b8869a4] br
+> CS_ETM_RANGE: [0x7e7b8869d8-0x7e7b8869f0]
+> CS_ETM_RANGE: [0x7e7b8869f0-0x7e7b8869fc] br
+> CS_ETM_TRACE_ON
+> CS_ETM_RANGE: [0x57224322f4-0x5722432304] br
+> CS_ETM_RANGE: [0x57224320e8-0x57224320ec]
+> CS_ETM_RANGE: [0x57224320ec-0x57224320f8]
+> CS_ETM_RANGE: [0x57224320f8-0x572243212c] br
+> CS_ETM_RANGE: [0x5722439b80-0x5722439bec]
+> CS_ETM_RANGE: [0x5722439bec-0x5722439c14] br
+> CS_ETM_RANGE: [0x5722437c30-0x5722437c6c]
+> CS_ETM_RANGE: [0x5722437c6c-0x5722437c7c] br
+> 
+> Without handling the CS_ETM_TRACE_ON, this would be interpreted as a branch
+> from 0x7e7b8869f8 to 0x57224322f4, when there is actually a gap of many
+> thousand instructions between these.
+> 
+> I think this patch will break the branch stacks - by removing the
+> prev_packet swap from cs_etm__flush(), the next time a CS_ETM_RANGE packet
+> is handled, cs_etm__sample() will see prev_packet contains the last
+> CS_ETM_RANGE from the previous block of trace, causing an erroneous call to
+> cs_etm__update_last_branch_rb().  In the example above, the branch stack
+> will contain an erroneous branch from 0x7e7b8869f8 to 0x57224322f4.
+> 
+> I think what you need to do is add a check for the previous packet being a
+> CS_ETM_TRACE_ON when determining the generate_sample value.
+
+I still can see there have hole for packets handling with your
+suggestion, let's focus on below three packets:
+
+CS_ETM_RANGE:    [0x7e7b8869f0-0x7e7b8869fc] br
+CS_ETM_TRACE_ON: [0xdeadbeefdeadbeef-0xdeadbeefdeadbeef]
+CS_ETM_RANGE:    [0x57224322f4-0x5722432304] br
+
+When the CS_ETM_TRACE_ON packet is coming, cs_etm__flush() doesn't
+handle for 'etmq->prev_packet' to generate branch sample, this results
+in we miss the info for 0x7e7b8869fc, and with packet swapping
+'etmq->prev_packet' is assigned to CS_ETM_TRACE_ON packet.
+
+When the last CS_ETM_RANGE packet is coming, cs_etm__sample() will
+combine the values from CS_ETM_TRACE_ON packet and the last
+CS_ETM_RANGE packet to generate branch sample packet; at the end
+we get below sample packets:
+
+  packet(n):   sample::addr=0x7e7b8869f0
+  packet(n+1): sample::ip=0xdeadbeefdeadbeeb sample::addr=0x57224322f4
+
+So I think we also need to generate branch sample, and we can get
+below results:
+
+  packet(n):   sample::addr=0x7e7b8869f0
+  packet(n+1): sample::ip=0x7e7b8869f8 sample::addr=0xdeadbeefdeadbeef
+  packet(n+2): sample::ip=0xdeadbeefdeadbeeb sample::addr=0x57224322f4
+
+So we also can rely on this to get to know there have one address
+range is [0xdeadbeefdeadbeef..0xdeadbeefdeadbeeb] to indicate there
+have a discontinuity in the trace.
+
+> Regards
+> 
+> Rob
+> 
+> >
+> >diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> >index 822ba91..dd354ad 100644
+> >--- a/tools/perf/util/cs-etm.c
+> >+++ b/tools/perf/util/cs-etm.c
+> >@@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+> >  static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+> >  {
+> >  	/*
+> >+	 * The packet is the start tracing packet if the end_addr is zero,
+> >+	 * returns 0 for this case.
+> >+	 */
+> >+	if (!packet->end_addr)
+> >+		return 0;
+> >+
+> >+	/*
+> >  	 * The packet records the execution range with an exclusive end address
+> >  	 *
+> >  	 * A64 instructions are constant size, so the last executed
+> >@@ -897,13 +904,27 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+> >  		etmq->period_instructions = instrs_over;
+> >  	}
+> >-	if (etm->sample_branches &&
+> >-	    etmq->prev_packet &&
+> >-	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+> >-	    etmq->prev_packet->last_instr_taken_branch) {
+> >-		ret = cs_etm__synth_branch_sample(etmq);
+> >-		if (ret)
+> >-			return ret;
+> >+	if (etm->sample_branches && etmq->prev_packet) {
+> >+		bool generate_sample = false;
+> >+
+> >+		/* Generate sample for start tracing packet */
+> >+		if (etmq->prev_packet->sample_type == 0)
+> >+			generate_sample = true;
+> 
+> Also check for etmq->prev_packet->sample_type == CS_ETM_TRACE_ON here and
+> set generate_sample = true.
+
+Agree, will add this.
+
+> >+
+> >+		/* Generate sample for exception packet */
+> >+		if (etmq->prev_packet->exc == true)
+> >+			generate_sample = true;
+> >+
+> >+		/* Generate sample for normal branch packet */
+> >+		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+> >+		    etmq->prev_packet->last_instr_taken_branch)
+> >+			generate_sample = true;
+> >+
+> >+		if (generate_sample) {
+> >+			ret = cs_etm__synth_branch_sample(etmq);
+> >+			if (ret)
+> >+				return ret;
+> >+		}
+> >  	}
+> >  	if (etm->sample_branches || etm->synth_opts.last_branch) {
+> >@@ -922,11 +943,12 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+> >  static int cs_etm__flush(struct cs_etm_queue *etmq)
+> >  {
+> >  	int err = 0;
+> >-	struct cs_etm_packet *tmp;
+> >  	if (etmq->etm->synth_opts.last_branch &&
+> >  	    etmq->prev_packet &&
+> >-	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
+> >+	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+> >+	    etmq->period_instructions) {
+> >+
+> 
+> I don't think this is needed.
+
+Okay, I will keep this.
+
+> >  		/*
+> >  		 * Generate a last branch event for the branches left in the
+> >  		 * circular buffer at the end of the trace.
+> >@@ -940,14 +962,6 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
+> >  			etmq, addr,
+> >  			etmq->period_instructions);
+> >  		etmq->period_instructions = 0;
+> >-
+> >-		/*
+> >-		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
+> >-		 * the next incoming packet.
+> >-		 */
+> >-		tmp = etmq->packet;
+> >-		etmq->packet = etmq->prev_packet;
+> >-		etmq->prev_packet = tmp;
+> 
+> This should not be changed as discussed above.
+
+Okay, will keep this.  But I suggest we add some change like below:
+
++    if (etm->sample_branches) {
++        err = cs_etm__synth_branch_sample(etmq);
++        if (err)
++            return err;
++    }
+
+If so, could you review my posted another patch for this?
+http://archive.armlinux.org.uk/lurker/message/20180522.083920.184f1f78.en.html
+
+Thanks,
+Leo Yan
+
+> >  	}
+> >  	return err;
+> >
