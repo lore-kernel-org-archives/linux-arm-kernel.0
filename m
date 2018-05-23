@@ -1,119 +1,34 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 23 May 2018 10:15:38 -0700
-Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-In-Reply-To: <5a996888-d3d3-9ae6-e438-5de4d5e3ea32@broadcom.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
- <20180522205457.GA16363@roeck-us.net>
- <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
- <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
- <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
- <5a996888-d3d3-9ae6-e438-5de4d5e3ea32@broadcom.com>
-Message-ID: <eb1b8beb-4027-606b-200c-c97f128c9bf1@broadcom.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 May 2018 18:17:22 +0100
+Subject: [PATCH v4 3/3] arm64: Introduce command line parameter to
+ disable CNP
+In-Reply-To: <1526638022-4137-4-git-send-email-vladimir.murzin@arm.com>
+References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
+ <1526638022-4137-4-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20180523171721.ppazcyf576koimhl@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Raym
+On Fri, May 18, 2018 at 11:07:02AM +0100, Vladimir Murzin wrote:
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index 11fc28e..8f59d47 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -2636,6 +2636,10 @@
+>  
+>  	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
+>  
+> +	nocnp		[ARM64]
+> +			Disable CNP (Common not Private translations)
+> +			even if it is supported by processor.
+> +
+>  	nodelayacct	[KNL] Disable per-task delay accounting
+>  
+>  	nodsp		[SH] Disable hardware DSP at boot time.
 
+Do we actually have a use-case for this command line option? I'm not
+considering hardware errata as these are handled separately in the
+kernel.
 
-On 18-05-23 09:29 AM, Ray Jui wrote:
-> Hi Robin,
->
-> On 5/23/2018 4:48 AM, Robin Murphy wrote:
->> On 23/05/18 08:52, Scott Branden wrote:
->>>
->>>
->>> On 18-05-22 04:24 PM, Ray Jui wrote:
->>>> Hi Guenter,
->>>>
->>>> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
->>>>> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
->>>>>> If the watchdog hardware is already enabled during the boot process,
->>>>>> when the Linux watchdog driver loads, it should reset the 
->>>>>> watchdog and
->>>>>> tell the watchdog framework. As a result, ping can be generated from
->>>>>> the watchdog framework, until the userspace watchdog daemon takes 
->>>>>> over
->>>>>> control
->>>>>>
->>>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>>>>> Reviewed-by: Vladimir Olovyannikov 
->>>>>> <vladimir.olovyannikov@broadcom.com>
->>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>>> ---
->>>>>> ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
->>>>>> ? 1 file changed, 22 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/watchdog/sp805_wdt.c 
->>>>>> b/drivers/watchdog/sp805_wdt.c
->>>>>> index 1484609..408ffbe 100644
->>>>>> --- a/drivers/watchdog/sp805_wdt.c
->>>>>> +++ b/drivers/watchdog/sp805_wdt.c
->>>>>> @@ -42,6 +42,7 @@
->>>>>> ????? /* control register masks */
->>>>>> ????? #define??? INT_ENABLE??? (1 << 0)
->>>>>> ????? #define??? RESET_ENABLE??? (1 << 1)
->>>>>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
->>>>>> ? #define WDTINTCLR??????? 0x00C
->>>>>> ? #define WDTRIS??????????? 0x010
->>>>>> ? #define WDTMIS??????????? 0x014
->>>>>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
->>>>>> ? MODULE_PARM_DESC(nowayout,
->>>>>> ????????? "Set to 1 to keep watchdog running after device release");
->>>>>> ? +/* returns true if wdt is running; otherwise returns false */
->>>>>> +static bool wdt_is_running(struct watchdog_device *wdd)
->>>>>> +{
->>>>>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
->>>>>> +
->>>>>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
->>>>>> +??????? ENABLE_MASK)
->>>>>> +??????? return true;
->>>>>> +??? else
->>>>>> +??????? return false;
->>>>>
->>>>> ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
->>>>>
->>>>
->>>> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
->>>> therefore, a simple !!(expression) would not work? That is, the 
->>>> masked result needs to be compared against the mask again to ensure 
->>>> both bits are set, right?
->>> Ray - your original code looks correct to me.? Easier to read and 
->>> less prone to errors as shown in the attempted translation to a 
->>> single statement.
->>
->> ?????if (<boolean condition>)
->> ???????? return true;
->> ?????else
->> ???????? return false;
->>
->> still looks really dumb, though, and IMO is actually harder to read 
->> than just "return <boolean condition>;" because it forces you to stop 
->> and double-check that the logic is, in fact, only doing the obvious 
->> thing.
->
-> If you can propose a way to modify my original code above to make it 
-> more readable, I'm fine to make the change.
->
-> As I mentioned, I don't think the following change proposed by Guenter 
-> will work due to the reason I pointed out:
->
-> return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
-What they are looking for is:
-return ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) == 
-ENABLE_MASK);
-
-or maybe:
-return !!((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) == 
-ENABLE_MASK);
->
->>
->> Robin.
->>
->>
->>
->> p.s. No thanks for making me remember the mind-boggling horror of 
->> briefly maintaining part of this legacy codebase... :P
->>
->> $ grep -r '? true : false' --include=*.cpp . | wc -l
->> 951
+-- 
+Catalin
