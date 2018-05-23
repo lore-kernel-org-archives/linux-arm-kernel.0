@@ -1,31 +1,40 @@
-From: vkoul@kernel.org (Vinod)
-Date: Wed, 23 May 2018 19:04:41 +0530
-Subject: [PATCH v1] dma: imx-sdma: add virt-dma support
-In-Reply-To: <20180523105612.u4wbezh7fzkv4wfh@pengutronix.de>
-References: <1521735499-29138-1-git-send-email-yibin.gong@nxp.com>
- <20180522100948.6xsq3unhyyyd7zz3@pengutronix.de>
- <1527099973.3990.37.camel@nxp.com>
- <20180523105612.u4wbezh7fzkv4wfh@pengutronix.de>
-Message-ID: <20180523133441.GK20991@vkoul-mobl>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 23 May 2018 15:35:31 +0200
+Subject: [PATCH] arm64: defconfig: Enable BD9571MWV regulator
+Message-ID: <1527082531-11640-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-05-18, 12:56, s.hauer at pengutronix.de wrote:
+From: Dien Pham <dien.pham.ry@renesas.com>
 
-> Well, it's somewhat related to virtual dma support, but that's not my
-> point. My point is that this patch is quite big and thus hard to review.
-> If we find ways to make it smaller and to split it up in multiple
-> patches then we should do so, because it makes it easier to review and
-> in case you break something here we raise the chance that a "git bisect"
-> lands on a smaller patch which is easier to understand.
-> 
-> Please try and make that a separate change. I haven't really looked into
-> it and it may not be possible due to reasons I haven't seen, but please
-> at least give it a try.
+The BD9571 PMIC is present on the Renesas Salvator-X(S) and R-Car
+Starter Kit Premier/Pro development boards.
 
-That is something would help me as well. I have reviewed the patch and am not
-sure I fully understand the changes, so breaking up stuff would definitely help
-in the review..
+Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 3a9096bebc74b288..8e430fce8dc97dee 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -363,6 +363,7 @@ CONFIG_MESON_WATCHDOG=m
+ CONFIG_RENESAS_WDT=y
+ CONFIG_UNIPHIER_WATCHDOG=y
+ CONFIG_BCM2835_WDT=y
++CONFIG_MFD_BD9571MWV=y
+ CONFIG_MFD_AXP20X_RSB=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_I2C=y
+@@ -375,6 +376,7 @@ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_MFD_RK808=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_REGULATOR_AXP20X=y
++CONFIG_REGULATOR_BD9571MWV=y
+ CONFIG_REGULATOR_FAN53555=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_GPIO=y
 -- 
-~Vinod
+2.7.4
