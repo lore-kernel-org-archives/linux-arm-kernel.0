@@ -1,108 +1,180 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 23 May 2018 10:21:32 +0530
-Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
- device to genpd
-In-Reply-To: <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
- <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
- <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
- <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
-Message-ID: <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 22 May 2018 22:10:47 -0700
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <b5078a17-4cbb-905e-4cd1-f252a02f97e9@codeaurora.org>
+References: <cover.1526088081.git.collinsd@codeaurora.org>
+ <41d5df73ddac772551d2966e0752bb0c357b1ded.1526088081.git.collinsd@codeaurora.org>
+ <CAD=FV=XegPeFR8pdZM-YiBBJjrbej=C+2biBt4zJKnE90uTYZA@mail.gmail.com>
+ <869aad59-1cc5-28ef-1fb5-4ef846696c40@codeaurora.org>
+ <CAD=FV=U-QOQekUHj=ck57YJbTFdFjCAWr4t2A92x+fCNf+yV9A@mail.gmail.com>
+ <dc1fbe9c-8973-1c4d-0fbd-809c1ec0a6be@codeaurora.org>
+ <CAD=FV=XfSGs14VB464cvMGDNwGS4yvSXjN8itZLffm+Sj-D=ww@mail.gmail.com>
+ <fb390ccb-927a-8449-05c3-8dcac964bfae@codeaurora.org>
+ <CAD=FV=XARtQNo5Cyg78XuT26JUFgn=7BjWRnXPjP566=a-sF1w@mail.gmail.com>
+ <a106c337-0713-e5d6-cb40-13e05f4d361d@codeaurora.org>
+ <CAD=FV=W=BquL5ojORz4HNP889s=-uNJ-QEzUfAxwXj2Oa3cGew@mail.gmail.com>
+ <b5078a17-4cbb-905e-4cd1-f252a02f97e9@codeaurora.org>
+Message-ID: <CAD=FV=Vo3PaHLSA3voEEQ30O+nFFErKfVK9oRo3H2-d17LSQkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 05/23/2018 02:25 AM, Jon Hunter wrote:
-> 
-> On 22/05/18 15:47, Ulf Hansson wrote:
->> [...]
->>
+On Tue, May 22, 2018 at 6:19 PM, David Collins <collinsd@codeaurora.org> wrote:
+>>>> OK, so how's this for a proposal then:
 >>>>
->>>> +/**
->>>> + * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
->>>> + * @dev: Device to attach.
->>>> + * @index: The index of the PM domain.
->>>> + *
->>>> + * Parse device's OF node to find a PM domain specifier at the provided @index.
->>>> + * If such is found, allocates a new device and attaches it to retrieved
->>>> + * pm_domain ops.
->>>> + *
->>>> + * Returns the allocated device if successfully attached PM domain, NULL when
->>>> + * the device don't need a PM domain or have a single PM domain, else PTR_ERR()
->>>> + * in case of failures. Note that if a power-domain exists for the device, but
->>>> + * cannot be found or turned on, then return PTR_ERR(-EPROBE_DEFER) to ensure
->>>> + * that the device is not probed and to re-try again later.
->>>> + */
->>>> +struct device *genpd_dev_pm_attach_by_id(struct device *dev,
->>>> +????????????????????????????????????? unsigned int index)
->>>> +{
->>>> +???? struct device *genpd_dev;
->>>> +???? int num_domains;
->>>> +???? int ret;
->>>> +
->>>> +???? if (!dev->of_node)
->>>> +???????????? return NULL;
->>>> +
->>>> +???? /* Deal only with devices using multiple PM domains. */
->>>> +???? num_domains = of_count_phandle_with_args(dev->of_node, "power-domains",
->>>> +????????????????????????????????????????????? "#power-domain-cells");
->>>> +???? if (num_domains < 2 || index >= num_domains)
->>>> +???????????? return NULL;
->>>> +
->>>> +???? /* Allocate and register device on the genpd bus. */
->>>> +???? genpd_dev = kzalloc(sizeof(*genpd_dev), GFP_KERNEL);
->>>> +???? if (!genpd_dev)
->>>> +???????????? return ERR_PTR(-ENOMEM);
->>>> +
->>>> +???? dev_set_name(genpd_dev, "genpd:%u:%s", index, dev_name(dev));
->>>> +???? genpd_dev->bus = &genpd_bus_type;
->>>> +???? genpd_dev->release = genpd_release_dev;
->>>> +
->>>> +???? ret = device_register(genpd_dev);
->>>> +???? if (ret) {
->>>> +???????????? kfree(genpd_dev);
->>>> +???????????? return ERR_PTR(ret);
->>>> +???? }
->>>> +
->>>> +???? /* Try to attach the device to the PM domain at the specified index. */
->>>> +???? ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
->>>> +???? if (ret < 1) {
->>>> +???????????? device_unregister(genpd_dev);
->>>> +???????????? return ret ? ERR_PTR(ret) : NULL;
->>>> +???? }
->>>> +
->>>> +???? pm_runtime_set_active(genpd_dev);
->>>> +???? pm_runtime_enable(genpd_dev);
->>>> +
->>>> +???? return genpd_dev;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
+>>>> 1. For RPMh-regulator whenever we see a "set voltage" but Linux hasn't
+>>>> specified that the regulator is enabled then we don't send the
+>>>> voltage, we just cache it.
+>>>>
+>>>> 2. When we see the first enable then we first send the cached voltage
+>>>> and then do the enable.
+>>>>
+>>>> 3. We don't need an "initial voltage" because any rails that are
+>>>> expected to be variable voltage the client should be choosing a
+>>>> voltage.
+>>>>
+>>>>
+>>>> ...taking the SD card case as an example: if the regulator framework
+>>>> says "set to the minimum: 1.8V" we'll cache this but not apply it yet
+>>>> because the rail is off as far as Linux is concerned.  Then when the
+>>>> SD card framework starts up it will set the voltage to 3.3V which will
+>>>> overwrite the cache.  Then the SD card framework will enable the
+>>>> regulator and RPMh will set the voltage to 3.3V and enable.
 >>>
->>> Thanks for sending this. Believe it or not this has still been on my to-do list
->>> and so we definitely need a solution for Tegra.
+>>> I am ok with implementing this feature.
 >>>
->>> Looking at the above it appears that additional power-domains exposed as devices
->>> to the client device. So I assume that this means that the drivers for devices
->>> with multiple power-domains will need to call RPM APIs for each of these
->>> additional power-domains. Is that correct?
+>>> However, should the voltage be cached instead of sent immediately any time
+>>> that Linux has not explicitly requested the regulator to be enabled, or
+>>> only before the first time that an enable request is sent?
+>>>
+>>> 1. regulator_set_voltage(reg, 2960000, 2960000)
+>>>    --> cache voltage=2960 mV
+>>> 2. regulator_enable(reg)
+>>>    --> Send voltage=2960 then enable=1
+>>> 3. regulator_disable(reg)
+>>>    --> Send enable=0
+>>> 4. regulator_set_voltage(reg, 1800000, 2960000)
+>>>    --> A. Send voltage=1800 OR B. cache voltage=1800?
+>>>
+>>> Option A is used on the downstream rpmh-regulator driver in order to avoid
+>>> cases where AP votes to disable a regulator that is kept enabled by
+>>> another subsystem but then does not lower the voltage requested thanks to
+>>> regulator_set_voltage() being called after regulator_disable().  I plan to
+>>> go with option A for qcom-rpmh-regulator unless there are objections.
 >>
->> They can, but should not!
+>> So one client's vote for a voltage continues to be in effect even if
+>> that client votes to have the regulator disabled?  That seems
+>> fundamentally broken in RPMh.  I guess my take would be to work around
+>> this RPMh misfeature by saying that whenever Linux votes to disable a
+>> regulator it also votes for a voltage of 0.  Then another client of
+>> RPMh won't be affected.
 >>
->> Instead, the driver shall use device_link_add() and device_link_del(),
->> dynamically, depending on what PM domain that their original device
->> needs for the current running use case.
->>
->> In that way, they keep existing runtime PM deployment, operating on
->> its original device.
-> 
-> OK, sounds good. Any reason why the linking cannot be handled by the above API? Is there a use-case where you would not want it linked?
+>> That seems like it would be beneficial in any case.  If the AP always
+>> asks for 1.3 V and the modem always asks for 1.1 V for the same rail
+>> then the rail should go down to 1.1 V when the AP says to disable the
+>> rail.
+>
+> The VRM in RPMh hardware aggregates enable state, output voltage, mode,
+> and headroom voltage requests independently for each regulator.  This
+> allows for maximum request flexibility and makes no assumptions about
+> consumer use cases.  There is nothing inherently wrong about this approach.
 
-I am guessing the linking is what would give the driver the ability to decide which subset of powerdomains it actually wants to control
-at any point using runtime PM. If we have cases wherein the driver would want to turn on/off _all_ its associated powerdomains _always_
-then a default linking of all would help.
+Just to confirm I'm understanding correctly:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1. AP: request that regulator A be at 1.3 V and enabled
+==> actual output: regulator A is 1.3 V and enabled
+
+2. modem: requests that regulator A be at 1.1 V and enabled
+==> actual output: regulator A is 1.3 V and enabled
+
+3. AP: request that regulator A be disabled
+
+You're saying that here the output of regulator A will be "1.3 V" and
+"enabled".
+
+I just can't see how that can be correct behavior.  A given client's
+vote for the voltage should really only make sense if that client
+wants the regulator enabled.  In the case above the kernel would have
+no idea that someone else might have the regulator enabled.  Why would
+it care if that other user gets it at 1.3 V or at 1.1 V?
+
+You have some use case in mind where the kernel would need to have
+control over the voltage of a regulator that it thinks is disabled?
+
+Now obviously if the kernel re-enables the regulator then its old
+voltage vote should be re-instated right away, but until then its vote
+about the voltage shouldn't count.  If that means that the kernel has
+to "vote" for 0V then I guess that's the way the API works.
+
+
+> I'm concerned about a blanket policy of setting voltage=0 when issuing
+> disable requests.  That seems to violate the semantics of the
+> regulator_set_voltage() API which enforces the requested voltage range
+> until a new range is specified.  There may be workarounds that require a
+> regulator to operate at a specific voltage even when no Linux consumers
+> explicitly need the regulator enabled.
+>
+> Given that not masking the voltage on disable is guaranteed to be safe and
+> does not silently break potential use cases, I plan to stick with this
+> approach.  Therefore, the question about option A or B for voltage caching
+> is still relevant.  I think that option A is safer/more API conforming so
+> I plan to implement that.
+
+I still can't understand how it ever makes sense to vote for a voltage
+for a regulator that you think is disabled.  ...but if there's some
+reason it does then I guess I'm OK with A.
+
+
+>>>> This whole thing makes me worry about another problem, though.  You
+>>>> say that the bootloader left the SD card rail on, right?  ...but as
+>>>> far as Linux is concerned the SD card rail is off (argh, it can't read
+>>>> the state that the bootloader left the rail in!)
+>>>>
+>>>> ...now imagine any of the following:
+>>>>
+>>>> * The user boots up a kernel where the SD card driver is disabled.
+>>>>
+>>>> * The user ejects the SD card right after the bootloader used it but
+>>>> before the kernel driver started.
+>>>>
+>>>> When the kernel comes up it will believe that the SD card rail is
+>>>> disabled so it won't try to disable it.  So the voltage will be left
+>>>> on.
+>>>
+>>> We have not encountered issues with regulators getting left on
+>>> indefinitely because Linux devices failed to take control of them during
+>>> boot.  I don't think that this hypothetical issue needs to be addressed in
+>>> the first qcom-rpmh-regulator driver patch if at all.
+>>
+>> I don't think it hypothetical at all.  Linux takes control of a
+>> regulator and then at bootup it disables all regulators that aren't
+>> currently used/enabled.  In your case you will report that regulators
+>> are already disabled and thus you'll neuter the kernel's attempt to
+>> disable regulators that nobody is using but that might have been left
+>> on by the bootloader.  It seemed like Mark agreed here.
+>
+> I did not consider regulator_late_cleanup().  I'll initialize the enabled
+> value in qcom-rpmh-regulator to -EINVAL to handle this case and also so
+> that _regulator_enable() succeeds without further core modification.
+
+That's weird that the regulator code has a special case for -EINVAL in
+_regulator_enable().  Given how most of the code in the
+regulator/core.c doesn't seem to check for error codes I wonder if
+anyone is using that...  I guess I'd leave it to Mark whether he's
+happy with -EINVAL for this case even though it's asymmetric to using
+-ENOTRECOVERABLE for getting the voltage.
+
+Are we really sure there aren't any places that the regulator code
+needs to handle an error from _regulator_enable()?  An an example, in
+regulator_resolve_supply() are we sure we should be passing a
+regulator_enable() on to our parent supply even if
+_regulator_is_enabled() returns an error?  I haven't looked in depth
+of all use cases, though...
+
+
+I see you posted a new version.  Thanks!  I'll try to find some time
+soon to review it, but I'll be a bit busy over the next few days.
+
+-Doug
