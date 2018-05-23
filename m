@@ -1,52 +1,44 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 May 2018 11:33:43 -0500
-Subject: [PATCH 5/6] ARM: dts: rcar-gen2: Remove unused VIN properties
-In-Reply-To: <20180516221307.GF17948@bigcity.dyn.berto.se>
+Date: Wed, 23 May 2018 11:37:21 -0500
+Subject: [PATCH 2/6] dt-bindings: media: rcar-vin: Document data-active
+In-Reply-To: <1526488352-898-3-git-send-email-jacopo+renesas@jmondi.org>
 References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526488352-898-6-git-send-email-jacopo+renesas@jmondi.org>
- <20180516221307.GF17948@bigcity.dyn.berto.se>
-Message-ID: <20180523163343.GA16505@rob-hp-laptop>
+ <1526488352-898-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180523163721.GB16505@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 12:13:07AM +0200, Niklas S?derlund wrote:
-> Hi Jacopo,
+On Wed, May 16, 2018 at 06:32:28PM +0200, Jacopo Mondi wrote:
+> Document 'data-active' property in R-Car VIN device tree bindings.
+> The property is optional when running with explicit synchronization
+> (eg. BT.601) but mandatory when embedded synchronization is in use (eg.
+> BT.656) as specified by the hardware manual.
 > 
-> Thanks for your work.
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> ---
+>  Documentation/devicetree/bindings/media/rcar_vin.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> On 2018-05-16 18:32:31 +0200, Jacopo Mondi wrote:
-> > The 'bus-width' and 'pclk-sample' properties are not parsed by the VIN
-> > driver and only confuse users. Remove them in all Gen2 SoC that used
-> > them.
-> > 
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > ---
-> >  arch/arm/boot/dts/r8a7790-lager.dts   | 3 ---
-> >  arch/arm/boot/dts/r8a7791-koelsch.dts | 3 ---
-> >  arch/arm/boot/dts/r8a7791-porter.dts  | 1 -
-> >  arch/arm/boot/dts/r8a7793-gose.dts    | 3 ---
-> >  arch/arm/boot/dts/r8a7794-alt.dts     | 1 -
-> >  arch/arm/boot/dts/r8a7794-silk.dts    | 1 -
-> >  6 files changed, 12 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> > index 063fdb6..b56b309 100644
-> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > @@ -873,10 +873,8 @@
-> >  	port {
-> >  		vin0ep2: endpoint {
-> >  			remote-endpoint = <&adv7612_out>;
-> > -			bus-width = <24>;
+> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> index c53ce4e..17eac8a 100644
+> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> @@ -63,6 +63,11 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
+>  	If both HSYNC and VSYNC polarities are not specified, embedded
+>  	synchronization is selected.
 > 
-> I can't really make up my mind if this is a good thing or not. Device 
-> tree describes the hardware and not what the drivers make use of. And 
-> the fact is that this bus is 24 bits wide. So I'm not sure we should 
-> remove these properties. But I would love to hear what others think 
-> about this.
+> +        - data-active: active state of data enable signal (CLOCKENB pin).
+> +          0/1 for LOW/HIGH respectively. If not specified, use HSYNC as
+> +          data enable signal. When using embedded synchronization this
+> +          property is mandatory.
 
-IMO, this property should only be present when all the pins are not 
-connected. And by "all", I mean the minimum of what each end of the 
-graph can support.
+This doesn't match the common property's definition which AIUI is for 
+the data lines' polarity. You need a new property. Perhaps a common one.
 
-Rob
+> +
+>      - port 1 - sub-nodes describing one or more endpoints connected to
+>        the VIN from local SoC CSI-2 receivers. The endpoint numbers must
+>        use the following schema.
+> --
+> 2.7.4
+> 
