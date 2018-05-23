@@ -1,47 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 23 May 2018 16:56:17 +0100
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
-References: <dc1fbe9c-8973-1c4d-0fbd-809c1ec0a6be@codeaurora.org>
- <CAD=FV=XfSGs14VB464cvMGDNwGS4yvSXjN8itZLffm+Sj-D=ww@mail.gmail.com>
- <fb390ccb-927a-8449-05c3-8dcac964bfae@codeaurora.org>
- <CAD=FV=XARtQNo5Cyg78XuT26JUFgn=7BjWRnXPjP566=a-sF1w@mail.gmail.com>
- <a106c337-0713-e5d6-cb40-13e05f4d361d@codeaurora.org>
- <CAD=FV=W=BquL5ojORz4HNP889s=-uNJ-QEzUfAxwXj2Oa3cGew@mail.gmail.com>
- <20180523082908.GB4828@sirena.org.uk>
- <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
- <20180523154057.GL4828@sirena.org.uk>
- <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
-Message-ID: <20180523155617.GN4828@sirena.org.uk>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Wed, 23 May 2018 19:08:48 +0300
+Subject: [PATCH] mtd: atmel-quadspi: add suspend/resume hooks
+Message-ID: <1527091728-19895-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 08:50:22AM -0700, Doug Anderson wrote:
-> On Wed, May 23, 2018 at 8:40 AM, Mark Brown <broonie@kernel.org> wrote:
+Implement suspend/resume hooks.
 
-> > It's got to be valid to think about the voltage of a disabled regulator
-> > since drivers want to be able make sure that the regulator gets enabled
-> > with a sensible config.  With most hardware this is really easy since
-> > you can just look at the status reported by the hardware but the RPM
-> > makes this hard since there's so much write only stuff in there.
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ drivers/mtd/spi-nor/atmel-quadspi.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-> I should be more clear.  Certainly it should be valid to set the
-> voltage before enabling it so, as you said, the regulator turns on at
-> the right voltage.  I'm saying that it's weird (to me) to expect that
-> setting the voltage for a regulator that a client thinks is disabled
-> will affect any real voltages in the system until the regulator is
-> enabled.  In RPMh apparently setting a voltage of a regulator you
-> think is disabled can affect the regulator output if another client
-> (unbeknownst to you) happens to have it enabled.
-
-Yes, that's definitely not what's expected but it's unfortunately what
-the firmware chose to implement so we may well be stuck with it
-unfortunately.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/59d677fb/attachment.sig>
+diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
+index 6c5708bacad8..85d7610fb920 100644
+--- a/drivers/mtd/spi-nor/atmel-quadspi.c
++++ b/drivers/mtd/spi-nor/atmel-quadspi.c
+@@ -737,6 +737,28 @@ static int atmel_qspi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int atmel_qspi_suspend(struct device *dev)
++{
++	struct atmel_qspi *aq = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(aq->clk);
++
++	return 0;
++}
++
++static int atmel_qspi_resume(struct device *dev)
++{
++	struct atmel_qspi *aq = dev_get_drvdata(dev);
++
++	clk_prepare_enable(aq->clk);
++
++	return atmel_qspi_init(aq);
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
++			 atmel_qspi_resume);
+ 
+ static const struct of_device_id atmel_qspi_dt_ids[] = {
+ 	{ .compatible = "atmel,sama5d2-qspi" },
+@@ -749,6 +771,7 @@ static struct platform_driver atmel_qspi_driver = {
+ 	.driver = {
+ 		.name	= "atmel_qspi",
+ 		.of_match_table	= atmel_qspi_dt_ids,
++		.pm	= &atmel_qspi_pm_ops,
+ 	},
+ 	.probe		= atmel_qspi_probe,
+ 	.remove		= atmel_qspi_remove,
+-- 
+2.7.4
