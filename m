@@ -1,40 +1,31 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 23 May 2018 15:35:31 +0200
-Subject: [PATCH] arm64: defconfig: Enable BD9571MWV regulator
-Message-ID: <1527082531-11640-1-git-send-email-geert+renesas@glider.be>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 23 May 2018 14:44:09 +0100
+Subject: [PATCH v10 01/18] arm64: fpsimd: Fix TIF_FOREIGN_FPSTATE after
+ invalidating cpu regs
+In-Reply-To: <1527005119-6842-2-git-send-email-Dave.Martin@arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87r2m2trkm.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dien Pham <dien.pham.ry@renesas.com>
 
-The BD9571 PMIC is present on the Renesas Salvator-X(S) and R-Car
-Starter Kit Premier/Pro development boards.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> fpsimd_last_state.st is set to NULL as a way of indicating that
+> current's FPSIMD registers are no longer loaded in the cpu.  In
+> particular, this is done when the kernel temporarily uses or
+> clobbers the FPSIMD registers for its own purposes, as in CPU PM or
+> kernel-mode NEON, resulting in them being populated with garbage
+> data not belonging to a task.
+<snip>
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 3a9096bebc74b288..8e430fce8dc97dee 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -363,6 +363,7 @@ CONFIG_MESON_WATCHDOG=m
- CONFIG_RENESAS_WDT=y
- CONFIG_UNIPHIER_WATCHDOG=y
- CONFIG_BCM2835_WDT=y
-+CONFIG_MFD_BD9571MWV=y
- CONFIG_MFD_AXP20X_RSB=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
-@@ -375,6 +376,7 @@ CONFIG_MFD_SPMI_PMIC=y
- CONFIG_MFD_RK808=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_REGULATOR_AXP20X=y
-+CONFIG_REGULATOR_BD9571MWV=y
- CONFIG_REGULATOR_FAN53555=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
--- 
-2.7.4
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+--
+Alex Benn?e
