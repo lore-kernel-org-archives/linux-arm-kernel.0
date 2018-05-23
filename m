@@ -1,56 +1,54 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 23 May 2018 14:51:55 -0500
-Subject: [PATCH 1/6] coresight: remove CORESIGHT_LINKS_AND_SINKS
- dependencies and selections
-In-Reply-To: <20180522173140.GA25658@xps15>
-References: <20180517070643.GC13919@kroah.com>
- <20180518012024.22645-1-kim.phillips@arm.com>
- <20180522173140.GA25658@xps15>
-Message-ID: <20180523145155.5929dd09c78a056ef19329be@arm.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Wed, 23 May 2018 21:07:16 +0200
+Subject: [PATCH 5/5] drm/rockchip: lvds: add missing of_node_put
+In-Reply-To: <1527102436-13447-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1527102436-13447-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1527102436-13447-6-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 May 2018 11:31:40 -0600
-Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+The device node iterators perform an of_node_get on each iteration, so a
+jump out of the loop requires an of_node_put.
 
-> On Thu, May 17, 2018 at 08:20:19PM -0500, Kim Phillips wrote:
-> > A coresight topology doesn't need to include links, i.e., a source can
-> > be directly connected to a sink.  As such, selecting and/or depending on
-> > LINKS_AND_SINKS is no longer needed.
-> 
-> I'm good with this patch but now the help text for CORESIGHT_LINKS_AND_SINKS no
-> longer match what the config does.  I see two ways to fix this:
+The semantic patch that fixes this problem is as follows
+(http://coccinelle.lip6.fr):
 
-This patch doesn't change what the config does, it just changes what
-other config options depend on it.
+// <smpl>
+@@
+expression root,e;
+local idexpression child;
+iterator name for_each_child_of_node;
+@@
 
-> 1) Rework the help text.
+ for_each_child_of_node(root, child) {
+   ... when != of_node_put(child)
+       when != e = child
++  of_node_put(child);
+?  break;
+   ...
+}
+... when != child
+// </smpl>
 
-I don't see how, given the above.  Here's the text:
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-config CORESIGHT_LINKS_AND_SINKS
-        bool "CoreSight Link and Sink drivers"
-        help
-          This enables support for CoreSight link and sink drivers that are
-          responsible for transporting and collecting the trace data
-          respectively.  Link and sinks are dynamically aggregated with a trace
-          entity at run time to form a complete trace path.
+---
+ drivers/gpu/drm/rockchip/rockchip_lvds.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-What part of that becomes invalid with this patch?
-
-> 2) Rework CORESIGHT_LINKS_AND_SINKS to be CORESIGHT_FUNNEL and move
-> coresight-replicator.o under CORESIGHT_DYNAMIC_REPLICATOR in the Makefile. I
-> really liked your idea of making the replicator driver intelligent enough to
-> deal with both DT and platform declaration, which merges two driver into one.
-> 
-> I'm obviously favouring the second option but recognise it doesn't have to be
-> part of this patchet.  So for this set please rework the help text for
-> CORESIGHT_LINKS_AND_SINKS.  Once we've dealt with this topic we can refactor the
-> replicator driver.
-
-I'd really like to just focus on getting CoreSight to load as modules,
-something for which this patch isn't technically required...
-
-Thanks,
-
-Kim
+diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+index e67f4ea..051b8be 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
++++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+@@ -363,8 +363,10 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
+ 		of_property_read_u32(endpoint, "reg", &endpoint_id);
+ 		ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
+ 						  &lvds->panel, &lvds->bridge);
+-		if (!ret)
++		if (!ret) {
++			of_node_put(endpoint);
+ 			break;
++		}
+ 	}
+ 	if (!child_count) {
+ 		DRM_DEV_ERROR(dev, "lvds port does not have any children\n");
