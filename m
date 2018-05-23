@@ -1,338 +1,371 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 23 May 2018 11:31:22 +0200
-Subject: [PATCH v5 7/7] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <20180523093122.27859-1-peda@axentia.se>
-References: <20180523093122.27859-1-peda@axentia.se>
-Message-ID: <20180523093122.27859-8-peda@axentia.se>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Wed, 23 May 2018 17:28:16 +0800
+Subject: [PATCH v2 2/4] drm/mediatek: Add support for mediatek SOC MT2712
+In-Reply-To: <1527053036.10410.18.camel@mtksdaap41>
+References: <20180523022517.12103-1-stu.hsieh@mediatek.com>
+ <20180523022517.12103-3-stu.hsieh@mediatek.com>
+ <1527053036.10410.18.camel@mtksdaap41>
+Message-ID: <1527067696.19074.28.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes this driver work with all(?) drivers that are not
-componentized and instead expect to connect to a panel/bridge. That
-said, the only one tested is atmel-hlcdc.
+On Wed, 2018-05-23 at 13:23 +0800, CK Hu wrote:
+> Hi, Stu:
+> 
+> I've some inline comment.
+> 
+> On Wed, 2018-05-23 at 10:25 +0800, Stu Hsieh wrote:
+> > This patch add support for the Mediatek MT2712 DISP subsystem.
+> > There are two OVL engine and three disp output in MT2712.
+> > 
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 50 +++++++++++++++++++++++++++--
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  8 +++--
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  7 ++--
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 47 +++++++++++++++++++++++++--
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |  7 ++--
+> >  5 files changed, 108 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > index 8130f3dab661..e563dedd1999 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > @@ -29,6 +29,8 @@
+> >  #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+> >  #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
+> >  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+> > +#define DISP_REG_CONFIG_DISP_RDMA2_SOUT		0x0b8
+> > +#define DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN	0x0c4
+> 
+> These two definition are useless, so remove it.
+ok
 
-This hooks the relevant work function previously called by the encoder
-and the component also to the bridge, since the encoder goes away when
-connecting to the bridge interface of the driver and the equivalent of
-bind/unbind of the component is handled by bridge attach/detach.
 
-The lifetime requirements of a bridge and a component are slightly
-different, which is the reason for struct tda998x_bridge.
+> 
+> >  #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
+> >  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+> >  
+> > @@ -41,6 +43,7 @@
+> >  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+> > +#define DISP_REG_MUTEX_MOD2(n)	(0x34 + 0x20 * (n))
+> 
+> Move this to the patch 'drm/mediatek: support maximum 64 mutex mod' and
+> that patch should be applied before this patch.
+> 
+> >  
+> >  #define INT_MUTEX				BIT(1)
+> >  
+> > @@ -60,6 +63,25 @@
+> >  #define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
+> >  #define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
+> >  
+> > +#define MT2712_MUTEX_MOD_DISP_OVL0		BIT(11)
+> > +#define MT2712_MUTEX_MOD_DISP_OVL1		BIT(12)
+> > +#define MT2712_MUTEX_MOD_DISP_RDMA0		BIT(13)
+> > +#define MT2712_MUTEX_MOD_DISP_RDMA1		BIT(14)
+> > +#define MT2712_MUTEX_MOD_DISP_RDMA2		BIT(15)
+> > +#define MT2712_MUTEX_MOD_DISP_WDMA0		BIT(16)
+> > +#define MT2712_MUTEX_MOD_DISP_WDMA1		BIT(17)
+> > +#define MT2712_MUTEX_MOD_DISP_COLOR0		BIT(18)
+> > +#define MT2712_MUTEX_MOD_DISP_COLOR1		BIT(19)
+> > +#define MT2712_MUTEX_MOD_DISP_AAL0		BIT(20)
+> > +#define MT2712_MUTEX_MOD_DISP_UFOE		BIT(22)
+> > +#define MT2712_MUTEX_MOD_DISP_PWM0		BIT(23)
+> > +#define MT2712_MUTEX_MOD_DISP_PWM1		BIT(24)
+> > +#define MT2712_MUTEX_MOD_DISP_PWM2		BIT(10)
+> > +#define MT2712_MUTEX_MOD_DISP_OD0		BIT(25)
+> > +/* modules more than 32, add BIT(31) when using DISP_REG_MUTEX_MOD2 bit */
+> > +#define MT2712_MUTEX_MOD2_DISP_AAL1		(BIT(1) | BIT(31))
+> 
+> I think a better definition is
+> 
+> #define MT2712_MUTEX_MOD2_DISP_AAL1		BIT(33)
+> 
+> when you need to access this register,
+> 
+> if (ddp->mutex_mod[id] < BIT(32)) {
+> 	offset = DISP_REG_MUTEX_MOD(mutex->id);
+> 	reg = readl_relaxed(ddp->regs + offset);
+> 	reg |= ddp->mutex_mod[id];
+> 	writel_relaxed(reg, ddp->regs + offset);
+> } else {
+> 	offset = DISP_REG_MUTEX_MOD2(mutex->id);
+> 	reg = readl_relaxed(ddp->regs + offset);
+> 	reg |= (ddp->mutex_mod[id] >> 32);
+> 	writel_relaxed(reg, ddp->regs + offset);
+> }
+> 
+> because DISP_REG_MUTEX_MOD BIT(31) could be used for some module.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 170 ++++++++++++++++++++++++++++++++------
- 1 file changed, 143 insertions(+), 27 deletions(-)
+This modification is workable, but result some build warning like
+following:
+1. #define BIT(nr)   (1UL << (nr)) in include/linux/bitops.h
+2. [DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
+   => we need to modify the definition about "static const unsigned int
+mt2712_mutex_mod"
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index d401b3d0095c..d47e49c2991a 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -36,6 +36,14 @@ struct tda998x_audio_port {
- 	u8 config;		/* AP value */
- };
- 
-+struct tda998x_priv;
-+
-+struct tda998x_bridge {
-+	struct tda998x_priv *priv;
-+	struct device *dev;
-+	struct drm_bridge bridge;
-+};
-+
- struct tda998x_priv {
- 	struct i2c_client *cec;
- 	struct i2c_client *hdmi;
-@@ -63,6 +71,8 @@ struct tda998x_priv {
- 	wait_queue_head_t edid_delay_waitq;
- 	bool edid_delay_active;
- 
-+	struct tda998x_bridge *bridge;
-+	bool local_encoder;
- 	struct drm_encoder encoder;
- 	struct drm_connector connector;
- 
-@@ -75,6 +85,9 @@ struct tda998x_priv {
- #define enc_to_tda998x_priv(x) \
- 	container_of(x, struct tda998x_priv, encoder)
- 
-+#define bridge_to_tda998x_bridge(x) \
-+	container_of(x, struct tda998x_bridge, bridge)
-+
- /* The TDA9988 series of devices use a paged register scheme.. to simplify
-  * things we encode the page # in upper bits of the register #.  To read/
-  * write a given register, we need to make sure CURPAGE register is set
-@@ -842,7 +855,8 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
- 				   struct hdmi_codec_daifmt *daifmt,
- 				   struct hdmi_codec_params *params)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 	int i, ret;
- 	struct tda998x_audio_params audio = {
- 		.sample_width = params->sample_width,
-@@ -899,7 +913,8 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
- 
- static void tda998x_audio_shutdown(struct device *dev, void *data)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
-@@ -912,7 +927,8 @@ static void tda998x_audio_shutdown(struct device *dev, void *data)
- 
- int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
-@@ -925,7 +941,8 @@ int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
- static int tda998x_audio_get_eld(struct device *dev, void *data,
- 				 uint8_t *buf, size_t len)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 	memcpy(buf, priv->connector.eld,
-@@ -1126,7 +1143,10 @@ tda998x_connector_best_encoder(struct drm_connector *connector)
- {
- 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
- 
--	return &priv->encoder;
-+	if (priv->local_encoder)
-+		return &priv->encoder;
-+	else
-+		return priv->bridge->bridge.encoder;
- }
- 
- static
-@@ -1140,6 +1160,7 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- 				  struct drm_device *drm)
- {
- 	struct drm_connector *connector = &priv->connector;
-+	struct drm_encoder *encoder;
- 	int ret;
- 
- 	connector->interlace_allowed = 1;
-@@ -1156,7 +1177,8 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- 	if (ret)
- 		return ret;
- 
--	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
-+	encoder = tda998x_connector_best_encoder(&priv->connector);
-+	drm_mode_connector_attach_encoder(&priv->connector, encoder);
- 
- 	return 0;
- }
-@@ -1671,8 +1693,10 @@ static void tda998x_set_config(struct tda998x_priv *priv,
- 	priv->audio_params = p->audio_params;
- }
- 
--static int tda998x_init(struct device *dev, struct drm_device *drm)
-+static int tda998x_init(struct device *dev, struct drm_device *drm,
-+			bool local_encoder)
- {
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
- 	struct tda998x_encoder_params *params = dev->platform_data;
- 	struct i2c_client *client = to_i2c_client(dev);
- 	struct tda998x_priv *priv;
-@@ -1683,18 +1707,22 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	if (!priv)
- 		return -ENOMEM;
- 
--	dev_set_drvdata(dev, priv);
-+	bridge->priv = priv;
-+	priv->bridge = bridge;
-+	priv->local_encoder = local_encoder;
- 
--	if (dev->of_node)
--		crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
-+	if (local_encoder) {
-+		if (dev->of_node)
-+			crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
- 
--	/* If no CRTCs were found, fall back to our old behaviour */
--	if (crtcs == 0) {
--		dev_warn(dev, "Falling back to first CRTC\n");
--		crtcs = 1 << 0;
--	}
-+		/* If no CRTCs were found, fall back to our old behaviour */
-+		if (crtcs == 0) {
-+			dev_warn(dev, "Falling back to first CRTC\n");
-+			crtcs = 1 << 0;
-+		}
- 
--	priv->encoder.possible_crtcs = crtcs;
-+		priv->encoder.possible_crtcs = crtcs;
-+	}
- 
- 	ret = tda998x_create(client, priv);
- 	if (ret)
-@@ -1703,11 +1731,15 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	if (!dev->of_node && params)
- 		tda998x_set_config(priv, params);
- 
--	drm_encoder_helper_add(&priv->encoder, &tda998x_encoder_helper_funcs);
--	ret = drm_encoder_init(drm, &priv->encoder, &tda998x_encoder_funcs,
--			       DRM_MODE_ENCODER_TMDS, NULL);
--	if (ret)
--		goto err_encoder;
-+	if (local_encoder) {
-+		drm_encoder_helper_add(&priv->encoder,
-+				       &tda998x_encoder_helper_funcs);
-+		ret = drm_encoder_init(drm, &priv->encoder,
-+				       &tda998x_encoder_funcs,
-+				       DRM_MODE_ENCODER_TMDS, NULL);
-+		if (ret)
-+			goto err_encoder;
-+	}
- 
- 	ret = tda998x_connector_init(priv, drm);
- 	if (ret)
-@@ -1716,7 +1748,8 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	return 0;
- 
- err_connector:
--	drm_encoder_cleanup(&priv->encoder);
-+	if (local_encoder)
-+		drm_encoder_cleanup(&priv->encoder);
- err_encoder:
- 	tda998x_destroy(priv);
- 	return ret;
-@@ -1724,10 +1757,12 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 
- static void tda998x_fini(struct device *dev)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	drm_connector_cleanup(&priv->connector);
--	drm_encoder_cleanup(&priv->encoder);
-+	if (priv->local_encoder)
-+		drm_encoder_cleanup(&priv->encoder);
- 	tda998x_destroy(priv);
- }
- 
-@@ -1735,7 +1770,7 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
- {
- 	struct drm_device *drm = data;
- 
--	return tda998x_init(dev, drm);
-+	return tda998x_init(dev, drm, true);
- }
- 
- static void tda998x_unbind(struct device *dev, struct device *master,
-@@ -1749,19 +1784,100 @@ static const struct component_ops tda998x_ops = {
- 	.unbind = tda998x_unbind,
- };
- 
-+/* DRM bridge functions */
-+
-+static int tda998x_bridge_attach(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct device *dev = bridge->dev;
-+	struct drm_device *drm = bridge->bridge.dev;
-+
-+	return tda998x_init(dev, drm, false);
-+}
-+
-+static void tda998x_bridge_detach(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct device *dev = bridge->dev;
-+
-+	tda998x_fini(dev);
-+}
-+
-+static void tda998x_bridge_enable(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_enable(priv);
-+}
-+
-+static void tda998x_bridge_disable(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_disable(priv);
-+}
-+
-+static void tda998x_bridge_mode_set(struct drm_bridge *dbridge,
-+				    struct drm_display_mode *mode,
-+				    struct drm_display_mode *adjusted_mode)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_mode_set(priv, mode, adjusted_mode);
-+}
-+
-+static const struct drm_bridge_funcs tda998x_bridge_funcs = {
-+	.attach = tda998x_bridge_attach,
-+	.detach = tda998x_bridge_detach,
-+	.enable = tda998x_bridge_enable,
-+	.disable = tda998x_bridge_disable,
-+	.mode_set = tda998x_bridge_mode_set,
-+};
-+
- static int
- tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
- {
-+	struct device *dev = &client->dev;
-+	struct tda998x_bridge *bridge;
-+	int ret;
-+
- 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
- 		dev_warn(&client->dev, "adapter does not support I2C\n");
- 		return -EIO;
- 	}
--	return component_add(&client->dev, &tda998x_ops);
-+
-+	bridge = devm_kzalloc(dev, sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge)
-+		return -ENOMEM;
-+
-+	bridge->dev = dev;
-+	dev_set_drvdata(dev, bridge);
-+
-+	bridge->bridge.funcs = &tda998x_bridge_funcs;
-+#ifdef CONFIG_OF
-+	bridge->bridge.of_node = dev->of_node;
-+#endif
-+	drm_bridge_add(&bridge->bridge);
-+
-+	ret = component_add(dev, &tda998x_ops);
-+
-+	if (ret)
-+		drm_bridge_remove(&bridge->bridge);
-+
-+	return ret;
- }
- 
- static int tda998x_remove(struct i2c_client *client)
- {
--	component_del(&client->dev, &tda998x_ops);
-+	struct device *dev = &client->dev;
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+
-+	drm_bridge_remove(&bridge->bridge);
-+	component_del(dev, &tda998x_ops);
-+
- 	return 0;
- }
- 
--- 
-2.11.0
+> > +#define MT2712_MUTEX_MOD2_DISP_OD1		(BIT(2) | BIT(31))
+> > +
+> >  #define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
+> >  #define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
+> >  #define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
+> > @@ -74,6 +96,7 @@
+> >  
+> >  #define OVL0_MOUT_EN_COLOR0		0x1
+> >  #define OD_MOUT_EN_RDMA0		0x1
+> > +#define OD1_MOUT_EN_RDMA1		BIT(16)
+> >  #define UFOE_MOUT_EN_DSI0		0x1
+> >  #define COLOR0_SEL_IN_OVL0		0x1
+> >  #define OVL1_MOUT_EN_COLOR1		0x1
+> > @@ -108,12 +131,32 @@ static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> >  	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
+> >  };
+> >  
+> > +static const unsigned int mt2712_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> > +	[DDP_COMPONENT_AAL0] = MT2712_MUTEX_MOD_DISP_AAL0,
+> > +	[DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
+> > +	[DDP_COMPONENT_COLOR0] = MT2712_MUTEX_MOD_DISP_COLOR0,
+> > +	[DDP_COMPONENT_COLOR1] = MT2712_MUTEX_MOD_DISP_COLOR1,
+> > +	[DDP_COMPONENT_OD0] = MT2712_MUTEX_MOD_DISP_OD0,
+> > +	[DDP_COMPONENT_OD1] = MT2712_MUTEX_MOD2_DISP_OD1,
+> > +	[DDP_COMPONENT_OVL0] = MT2712_MUTEX_MOD_DISP_OVL0,
+> > +	[DDP_COMPONENT_OVL1] = MT2712_MUTEX_MOD_DISP_OVL1,
+> > +	[DDP_COMPONENT_PWM0] = MT2712_MUTEX_MOD_DISP_PWM0,
+> > +	[DDP_COMPONENT_PWM1] = MT2712_MUTEX_MOD_DISP_PWM1,
+> > +	[DDP_COMPONENT_PWM2] = MT2712_MUTEX_MOD_DISP_PWM2,
+> > +	[DDP_COMPONENT_RDMA0] = MT2712_MUTEX_MOD_DISP_RDMA0,
+> > +	[DDP_COMPONENT_RDMA1] = MT2712_MUTEX_MOD_DISP_RDMA1,
+> > +	[DDP_COMPONENT_RDMA2] = MT2712_MUTEX_MOD_DISP_RDMA2,
+> > +	[DDP_COMPONENT_UFOE] = MT2712_MUTEX_MOD_DISP_UFOE,
+> > +	[DDP_COMPONENT_WDMA0] = MT2712_MUTEX_MOD_DISP_WDMA0,
+> > +	[DDP_COMPONENT_WDMA1] = MT2712_MUTEX_MOD_DISP_WDMA1,
+> > +};
+> > +
+> >  static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> > -	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
+> > +	[DDP_COMPONENT_AAL0] = MT8173_MUTEX_MOD_DISP_AAL,
+> >  	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
+> >  	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
+> >  	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
+> > -	[DDP_COMPONENT_OD] = MT8173_MUTEX_MOD_DISP_OD,
+> > +	[DDP_COMPONENT_OD0] = MT8173_MUTEX_MOD_DISP_OD,
+> >  	[DDP_COMPONENT_OVL0] = MT8173_MUTEX_MOD_DISP_OVL0,
+> >  	[DDP_COMPONENT_OVL1] = MT8173_MUTEX_MOD_DISP_OVL1,
+> >  	[DDP_COMPONENT_PWM0] = MT8173_MUTEX_MOD_DISP_PWM0,
+> > @@ -138,7 +181,7 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+> >  	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
+> >  		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
+> >  		value = OVL_MOUT_EN_RDMA;
+> > -	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
+> > +	} else if (cur == DDP_COMPONENT_OD0 && next == DDP_COMPONENT_RDMA0) {
+> >  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+> >  		value = OD_MOUT_EN_RDMA0;
+> >  	} else if (cur == DDP_COMPONENT_UFOE && next == DDP_COMPONENT_DSI0) {
+> > @@ -407,6 +450,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
+> >  
+> >  static const struct of_device_id ddp_driver_dt_match[] = {
+> >  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
+> > +	{ .compatible = "mediatek,mt2712-disp-mutex", .data = mt2712_mutex_mod},
+> >  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
+> >  	{},
+> >  };
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > index 4672317e3ad1..86e8c9e5df41 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > @@ -218,7 +218,8 @@ struct mtk_ddp_comp_match {
+> >  };
+> >  
+> >  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> > -	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
+> > +	[DDP_COMPONENT_AAL0]	= { MTK_DISP_AAL,	0, &ddp_aal },
+> > +	[DDP_COMPONENT_AAL1]	= { MTK_DISP_AAL,	1, &ddp_aal },
+> >  	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
+> >  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
+> >  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+> > @@ -226,10 +227,13 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> >  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+> >  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+> >  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
+> > -	[DDP_COMPONENT_OD]	= { MTK_DISP_OD,	0, &ddp_od },
+> > +	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
+> > +	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
+> >  	[DDP_COMPONENT_OVL0]	= { MTK_DISP_OVL,	0, NULL },
+> >  	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
+> >  	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
+> > +	[DDP_COMPONENT_PWM1]	= { MTK_DISP_PWM,	1, NULL },
+> > +	[DDP_COMPONENT_PWM2]	= { MTK_DISP_PWM,	2, NULL },
+> >  	[DDP_COMPONENT_RDMA0]	= { MTK_DISP_RDMA,	0, NULL },
+> >  	[DDP_COMPONENT_RDMA1]	= { MTK_DISP_RDMA,	1, NULL },
+> >  	[DDP_COMPONENT_RDMA2]	= { MTK_DISP_RDMA,	2, NULL },
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> > index 0828cf8bf85c..e00c2e798abd 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> > @@ -41,7 +41,8 @@ enum mtk_ddp_comp_type {
+> >  };
+> >  
+> >  enum mtk_ddp_comp_id {
+> > -	DDP_COMPONENT_AAL,
+> > +	DDP_COMPONENT_AAL0,
+> > +	DDP_COMPONENT_AAL1,
+> 
+> Move this to a patch 'add ddp component AAL1'.
+ok
+
+> 
+> >  	DDP_COMPONENT_BLS,
+> >  	DDP_COMPONENT_COLOR0,
+> >  	DDP_COMPONENT_COLOR1,
+> > @@ -49,11 +50,13 @@ enum mtk_ddp_comp_id {
+> >  	DDP_COMPONENT_DSI0,
+> >  	DDP_COMPONENT_DSI1,
+> >  	DDP_COMPONENT_GAMMA,
+> > -	DDP_COMPONENT_OD,
+> > +	DDP_COMPONENT_OD0,
+> > +	DDP_COMPONENT_OD1,
+> 
+> Move this to a patch 'add ddp component OD1'.
+ok
+
+> 
+> >  	DDP_COMPONENT_OVL0,
+> >  	DDP_COMPONENT_OVL1,
+> >  	DDP_COMPONENT_PWM0,
+> >  	DDP_COMPONENT_PWM1,
+> > +	DDP_COMPONENT_PWM2,
+> 
+> Move this to a patch 'add ddp component PWM2'.
+ok
+
+> 
+> >  	DDP_COMPONENT_RDMA0,
+> >  	DDP_COMPONENT_RDMA1,
+> >  	DDP_COMPONENT_RDMA2,
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > index a2ca90fc403c..3a866e1d6af4 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > @@ -146,11 +146,37 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
+> >  	DDP_COMPONENT_DPI0,
+> >  };
+> >  
+> > +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_main[] = {
+> > +	DDP_COMPONENT_OVL0,
+> > +	DDP_COMPONENT_COLOR0,
+> > +	DDP_COMPONENT_AAL0,
+> > +	DDP_COMPONENT_OD0,
+> > +	DDP_COMPONENT_RDMA0,
+> > +	DDP_COMPONENT_DPI0,
+> > +	DDP_COMPONENT_PWM0,
+> > +};
+> > +
+> > +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_ext[] = {
+> > +	DDP_COMPONENT_OVL1,
+> > +	DDP_COMPONENT_COLOR1,
+> > +	DDP_COMPONENT_AAL1,
+> > +	DDP_COMPONENT_OD1,
+> > +	DDP_COMPONENT_RDMA1,
+> > +	DDP_COMPONENT_DPI1,
+> > +	DDP_COMPONENT_PWM1,
+> > +};
+> > +
+> > +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
+> > +	DDP_COMPONENT_RDMA2,
+> > +	DDP_COMPONENT_DSI2,
+> > +	DDP_COMPONENT_PWM2,
+> > +};
+> > +
+> >  static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+> >  	DDP_COMPONENT_OVL0,
+> >  	DDP_COMPONENT_COLOR0,
+> > -	DDP_COMPONENT_AAL,
+> > -	DDP_COMPONENT_OD,
+> > +	DDP_COMPONENT_AAL0,
+> > +	DDP_COMPONENT_OD0,
+> >  	DDP_COMPONENT_RDMA0,
+> >  	DDP_COMPONENT_UFOE,
+> >  	DDP_COMPONENT_DSI0,
+> > @@ -173,6 +199,15 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
+> >  	.shadow_register = true,
+> >  };
+> >  
+> > +static const struct mtk_mmsys_driver_data mt2712_mmsys_driver_data = {
+> > +	.main_path = mt2712_mtk_ddp_main,
+> > +	.main_len = ARRAY_SIZE(mt2712_mtk_ddp_main),
+> > +	.ext_path = mt2712_mtk_ddp_ext,
+> > +	.ext_len = ARRAY_SIZE(mt2712_mtk_ddp_ext),
+> > +	.third_path = mt2712_mtk_ddp_third,
+> > +	.third_len = ARRAY_SIZE(mt2712_mtk_ddp_third),
+> > +};
+> > +
+> >  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> >  	.main_path = mt8173_mtk_ddp_main,
+> >  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
+> > @@ -232,6 +267,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+> >  	if (ret < 0)
+> >  		goto err_component_unbind;
+> >  
+> > +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
+> > +				  private->data->third_len);
+> > +	if (ret < 0)
+> > +		goto err_component_unbind;
+> > +
+> 
+> Move this to a patch 'add third ddp path'.
+ok
+
+> 
+> Regards,
+> CK
+> 
+> >  	/* Use OVL device for all DMA memory allocations */
+> >  	np = private->comp_node[private->data->main_path[0]] ?:
+> >  	     private->comp_node[private->data->ext_path[0]];
+> > @@ -374,6 +414,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+> >  	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
+> >  	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
+> >  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> > +	{ .compatible = "mediatek,mt2712-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> >  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> >  	{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void *)MTK_DISP_BLS },
+> >  	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
+> > @@ -552,6 +593,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
+> >  static const struct of_device_id mtk_drm_of_ids[] = {
+> >  	{ .compatible = "mediatek,mt2701-mmsys",
+> >  	  .data = &mt2701_mmsys_driver_data},
+> > +	{ .compatible = "mediatek,mt2712-mmsys",
+> > +	  .data = &mt2712_mmsys_driver_data},
+> >  	{ .compatible = "mediatek,mt8173-mmsys",
+> >  	  .data = &mt8173_mmsys_driver_data},
+> >  	{ }
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > index c3378c452c0a..e821342bc2d3 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > @@ -17,8 +17,8 @@
+> >  #include <linux/io.h>
+> >  #include "mtk_drm_ddp_comp.h"
+> >  
+> > -#define MAX_CRTC	2
+> > -#define MAX_CONNECTOR	2
+> > +#define MAX_CRTC	3
+> > +#define MAX_CONNECTOR	3
+> >  
+> >  struct device;
+> >  struct device_node;
+> > @@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
+> >  	unsigned int main_len;
+> >  	const enum mtk_ddp_comp_id *ext_path;
+> >  	unsigned int ext_len;
+> > +	enum mtk_ddp_comp_id *third_path;
+> > +	unsigned int third_len;
+> > +
+> >  	bool shadow_register;
+> >  };
+> >  
+> 
+> 
