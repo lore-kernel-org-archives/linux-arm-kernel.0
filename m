@@ -1,52 +1,49 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed, 23 May 2018 14:48:36 +0800
-Subject: [PATCH v3 00/13] add power domain support for Rockchip Socs
-Message-ID: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
+Date: Wed, 23 May 2018 14:48:40 +0800
+Subject: [PATCH v3 04/13] soc: rockchip: power-domain: Fix wrong value when
+ power up pd
+In-Reply-To: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
+References: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1527058129-10260-5-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add power domain support for RK3036/RK3128/RK3228/PX30 Soc.
-fix up the wrong value when set power domain up.
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-Change in V2:
-Fix up the commit message description and Assign author.
+Solve the pd could only ever turn off but never turn them on again,
+If the pd registers have the writemask bits.
 
-Change in V3:
-[PATCH 01/13]: The Copyright description use SPDX tag instead.
-[PATCH 05/13]: The Copyright description use SPDX tag instead.
-[PATCH 08/13]: The Copyright description use SPDX tag instead.
-[PATCH 11/13]: The Copyright description use SPDX tag instead.
+Fix up the code error for commit:
+	commit 79bb17ce8edb3141339b5882e372d0ec7346217c
+	Author: Elaine Zhang <zhangqing@rock-chips.com>
+	Date:   Fri Dec 23 11:47:52 2016 +0800
 
-Caesar Wang (3):
-  dt-bindings: power: add RK3036 SoCs header for power-domain
-  dt-bindings: add binding for rk3036 power domains
-  Soc: rockchip: power-domain: add power domain support for rk3036
+	soc: rockchip: power-domain: Support domain control in hiword-registers
 
-Elaine Zhang (6):
-  dt-bindings: power: add RK3128 SoCs header for power-domain
-  dt-bindings: add binding for rk3128 power domains
-  soc: rockchip: power-domain: add power domain support for rk3128
-  dt-bindings: power: add RK3228 SoCs header for power-domain
-  dt-bindings: add binding for rk3228 power domains
-  soc: rockchip: power-domain: add power domain support for rk3228
+	New Rockchips SoCs may have their power-domain control in registers
+	using a writemask-based access scheme (upper 16bit being the write
+	mask). So add a DOMAIN_M type and handle this case accordingly.
+	Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+	Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Finley Xiao (4):
-  soc: rockchip: power-domain: Fix wrong value when power up pd
-  dt-bindings: power: add PX30 SoCs header for power-domain
-  dt-bindings: add binding for px30 power domains
-  soc: rockchip: power-domain: add power domain support for px30
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ drivers/soc/rockchip/pm_domains.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- .../bindings/soc/rockchip/power_domain.txt         |  12 +++
- drivers/soc/rockchip/pm_domains.c                  | 116 ++++++++++++++++++++-
- include/dt-bindings/power/px30-power.h             |  27 +++++
- include/dt-bindings/power/rk3036-power.h           |  13 +++
- include/dt-bindings/power/rk3128-power.h           |  14 +++
- include/dt-bindings/power/rk3228-power.h           |  21 ++++
- 6 files changed, 202 insertions(+), 1 deletion(-)
- create mode 100644 include/dt-bindings/power/px30-power.h
- create mode 100644 include/dt-bindings/power/rk3036-power.h
- create mode 100644 include/dt-bindings/power/rk3128-power.h
- create mode 100644 include/dt-bindings/power/rk3228-power.h
-
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index ebd7c41898c0..01d4ba26a054 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -264,7 +264,7 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
+ 		return;
+ 	else if (pd->info->pwr_w_mask)
+ 		regmap_write(pmu->regmap, pmu->info->pwr_offset,
+-			     on ? pd->info->pwr_mask :
++			     on ? pd->info->pwr_w_mask :
+ 			     (pd->info->pwr_mask | pd->info->pwr_w_mask));
+ 	else
+ 		regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
 -- 
 1.9.1
