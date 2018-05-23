@@ -1,52 +1,67 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 23 May 2018 11:10:58 -0700
-Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
- property for sp805
-In-Reply-To: <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
- <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
-Message-ID: <20180523181058.GC27570@roeck-us.net>
+Date: Wed, 23 May 2018 11:12:21 -0700
+Subject: [PATCH RFC V2 2/6] hwmon: Add support for RPi voltage sensor
+In-Reply-To: <cbbdab47-cde3-7a7c-c797-c00d546e00d5@arm.com>
+References: <1526988112-4021-1-git-send-email-stefan.wahren@i2se.com>
+ <1526988112-4021-3-git-send-email-stefan.wahren@i2se.com>
+ <90a768aa-ee8c-1050-cf15-60637069dbdb@roeck-us.net>
+ <659923372.11518.1526997096662@email.1und1.de>
+ <bea3d6c7-a713-c4aa-8ae8-7fec80c5da5d@roeck-us.net>
+ <723014352.17580.1527017480381@email.1und1.de>
+ <cbbdab47-cde3-7a7c-c797-c00d546e00d5@arm.com>
+Message-ID: <20180523181221.GD27570@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 11:57:25AM +0100, Robin Murphy wrote:
-> On 22/05/18 19:47, Ray Jui wrote:
-> >Update the SP805 binding document to add optional 'timeout-sec'
-> >devicetree property
+On Wed, May 23, 2018 at 01:12:10PM +0100, Robin Murphy wrote:
+> On 22/05/18 20:31, Stefan Wahren wrote:
+> [...]
+> >>>>>+static int rpi_hwmon_probe(struct platform_device *pdev)
+> >>>>>+{
+> >>>>>+	struct device *dev = &pdev->dev;
+> >>>>>+	struct rpi_hwmon_data *data;
+> >>>>>+	int ret;
+> >>>>>+
+> >>>>>+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> >>>>>+	if (!data)
+> >>>>>+		return -ENOMEM;
+> >>>>>+
+> >>>>>+	data->fw = platform_get_drvdata(to_platform_device(dev->parent));
+> >>>>>+	if (!data->fw)
+> >>>>>+		return -EPROBE_DEFER;
+> >>>>>+
+> >>>>
+> >>>>I am a bit at loss here (and sorry I didn't bring this up before).
+> >>>>How would this ever be possible, given that the driver is registered
+> >>>>from the firmware driver ?
+> >>>
+> >>>Do you refer to the (wrong) return code, the assumption that the parent must be a platform driver or a possible race?
+> >>>
+> >>
+> >>The return code is one thing. My question was how the driver would ever be instantiated
+> >>with platform_get_drvdata(to_platform_device(dev->parent)) == NULL (but dev->parent != NULL),
+> >>so I referred to the race. But, sure, a second question would be how that would indicate
+> >>that the parent is not instantiated yet (which by itself seems like an odd question).
 > >
-> >Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> >Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> >---
-> >  Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
-> >  1 file changed, 2 insertions(+)
+> >This shouldn't happen and worth a log error. In patch #3 the registration is called after the complete private data of the firmware driver is initialized. Did i missed something?
 > >
-> >diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> >index edc4f0e..f898a86 100644
-> >--- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> >+++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> >@@ -19,6 +19,8 @@ Required properties:
-> >  Optional properties:
-> >  - interrupts : Should specify WDT interrupt number.
-> >+- timeout-sec : Should specify default WDT timeout in seconds. If unset, the
-> >+                default timeout is 30 seconds
+> >But i must confess that i didn't test all builtin/module combinations.
 > 
-> According to the SP805 TRM, the default interval is dependent on the rate of
-> WDOGCLK, but would typically be a lot longer than that :/
+> The point is that, by construction, a "raspberrypi-hwmon" device will only
+> ever be created for this driver to bind to if the firmware device is both
+> fully initialised and known to support the GET_THROTTLED call already. Thus
+> trying to check those again from the hwmon driver is at best pointless, and
+> at worst misleading. If somebody *does* manage to bind this driver to some
+> random inappropriate device, you've still got no guarantee that dev->parent
+> is valid or that dev_get_drvdata(dev->parent)) won't return something
+> non-NULL that isn't a struct rpi_firmware pointer, at which point you're
+> liable to pass the paranoid check yet still crash anyway.
 > 
-Depends on the definition of "default". In the context of watchdog drivers,
-it is (or should be) a driver default, not a chip default.
+> IOW, you can't reasonably defend against incorrect operation, and under
+> correct operation there's nothing to defend against, so either way it's
+> pretty futile to waste effort trying.
+> 
+
+Well said.
 
 Guenter
-
-> On a related note, anyone have any idea why we seem to have two subtly
-> different SP805 bindings defined?
-> 
-> Robin.
-> 
-> >  Examples:
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
