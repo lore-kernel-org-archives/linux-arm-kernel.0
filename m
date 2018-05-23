@@ -1,55 +1,61 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 23 May 2018 09:58:30 +0200
-Subject: [PATCH V2 3/3] ARM: dts: imx7: correct enet ipg clock
-In-Reply-To: <1526605266-18464-3-git-send-email-Anson.Huang@nxp.com>
-References: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
- <1526605266-18464-3-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <70251e2909cd2f479325a975a4e6302d@agner.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 May 2018 10:02:13 +0200
+Subject: [PATCH] ARM: dts: vexpress: Replace '_' with '-' in node names
+In-Reply-To: <CAL_Jsq+VNuvbxgFTFVouJF-_yMS90u0fd8jaXnYtKwogOP5rww@mail.gmail.com>
+References: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
+ <CAL_Jsq+VNuvbxgFTFVouJF-_yMS90u0fd8jaXnYtKwogOP5rww@mail.gmail.com>
+Message-ID: <CACRpkdYSwLKEchYSOMAUaN_pXBz9VNSf=LX+84Z+mEMozL01Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.05.2018 03:01, Anson Huang wrote:
-> ENET "ipg" clock should be IMX7D_ENETx_IPG_ROOT_CLK
-> rather than IMX7D_ENET_AXI_ROOT_CLK which is for ENET bus
-> clock.
-> 
-> Based on Andy Duan's patch from the NXP kernel tree.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+On Wed, May 9, 2018 at 11:14 PM, Rob Herring <robh+dt@kernel.org> wrote:
+> On Wed, May 9, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> The latest DTC throws warnings for character '_' in the node names.
+>>
+>> Warning (node_name_chars_strict): /sysreg at 10000/sys_led: Character '_' not recommended in node name
+>> Warning (node_name_chars_strict): /sysreg at 10000/sys_mci: Character '_' not recommended in node name
+>> Warning (node_name_chars_strict): /sysreg at 10000/sys_flash: Character '_' not recommended in node name
+>>
+>> The general recommendation is to use character '-' for all the node names.
+>> This patch fixes the warnings following the recommendation.
+>>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>> index 7b8ff5b3b912..58e73131ecef 100644
+>> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>> @@ -77,19 +77,19 @@
+>>                                         compatible = "arm,vexpress-sysreg";
+>>                                         reg = <0x010000 0x1000>;
+>>
+>> -                                       v2m_led_gpios: sys_led {
+>> +                                       v2m_led_gpios: sys-led {
+>
+> Except this is a gpio-controller so it should have 'gpio' for its node
+> name. (I have a dtc check written for that, but there are too many
+> false positives.)
+>
+> But then you have 3 of them and no addressing, so you need to add reg
+> property (with the register's offset and size) and unit-address.
+>
+> I'm surprised Linus W accepted these a GPIO when they are not really
+> general purpose, but then lots of things slip in.
 
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+I guess is was back in this day when we had a finger constantly
+on the fastforward button for DT conversion, and a few not so
+elegant things slipped in.
 
---
-Stefan
+I was annoyed by this thing later, especially since others started
+to use it as a consistency argument "well you allowed this so
+now allow this other crazy thing that looks the same" :D
 
-> ---
->  arch/arm/boot/dts/imx7d.dtsi | 2 +-
->  arch/arm/boot/dts/imx7s.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 200714e..d74dd7f 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -120,7 +120,7 @@
->  			<GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
->  			<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
->  			<GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-> -		clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
-> +		clocks = <&clks IMX7D_ENET2_IPG_ROOT_CLK>,
->  			<&clks IMX7D_ENET_AXI_ROOT_CLK>,
->  			<&clks IMX7D_ENET2_TIME_ROOT_CLK>,
->  			<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 4d42335..b90769d 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -1091,7 +1091,7 @@
->  					<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
->  					<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
->  					<GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
-> +				clocks = <&clks IMX7D_ENET1_IPG_ROOT_CLK>,
->  					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
->  					<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
->  					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
+I suspect I either was not CC:ed or I just sucked at shepherding
+this, I try to do better these days.
+
+Yours,
+Linus Walleij
