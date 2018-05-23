@@ -1,70 +1,108 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 23 May 2018 12:05:30 +0300
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add GEther support
-In-Reply-To: <20180523084100.ynv3zoqrikcxem5f@verge.net.au>
-References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
- <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
- <CAMuHMdW9UzOGV_zh3NxugYrj0j0qszX+NFoZtFvZRD9CNMHt+w@mail.gmail.com>
- <bdbfd13e-cf0c-e19a-b76f-5e8e024dca26@cogentembedded.com>
- <20180523084100.ynv3zoqrikcxem5f@verge.net.au>
-Message-ID: <9f2c6e9b-a6a9-97f1-7899-3635230acd6f@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 May 2018 10:06:50 +0100
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <1527012451-16117-1-git-send-email-rokhanna@nvidia.com>
+References: <1527012451-16117-1-git-send-email-rokhanna@nvidia.com>
+Message-ID: <20180523090638.GA26965@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Hi Rohit,
 
-On 5/23/2018 11:41 AM, Simon Horman wrote:
-
->>>> Define the generic R8A77980 part of the GEther device node.
->>>>
->>>> Based on the original (and large) patch by Vladimir Barinov.
->>>>
->>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>
->>> Thanks for your patch!
->>>
->>> With the below addressed:
->>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->>     Thanks!
->>
->>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->>>> @@ -417,6 +417,17 @@
->>>>                          dma-channels = <16>;
->>>>                  };
->>>>
->>>> +               gether: ethernet at e7400000 {
->>>> +                       compatible = "renesas,gether-r8a77980";
->>>> +                       reg = <0 0xe7400000 0 0x1000>;
->>>> +                       interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
->>>> +                       clocks = <&cpg CPG_MOD 813>;
->>>> +                       power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
->>>
->>> resets = <&cpg 813>;
->>
->>     As usual...
->>
->>>
->>>> +                       #address-cells = <1>;
->>>> +                       #size-cells = <0>;
->>>> +                       status = "disabled";
->>>
->>> Any default phy-mode needed?
->>
->>     A default "phy-mode" IMO make sense when the MAC supports a single
->> PHY interface mode. In this case, both RMII and RGMII are supported, so
->> I coulsn't choose a default...
+On Tue, May 22, 2018 at 11:07:31AM -0700, Rohit Khanna wrote:
+> In the current implementation,  __apply_alternatives patches
+> flush_icache_range and then executes it without invalidating the icache.
+> Thus, icache can contain some of the old instructions for
+> flush_icache_range. This can cause unpredictable behavior as during
+> execution we can get a mix of old and new instructions for
+> flush_icache_range.
 > 
-> I would think making an arbitrary choice is better than no choice.
-> How does the driver behave in the absence of a default?
+> This patch :
+> 
+> 1. Adds a new function flush_cache_kernel_range for flushing kernel
+> memory range. This function is not patched during boot and can be safely
+> used to flush cache during code patching.
+> 
+> 2. Modifies __apply_alternatives so that it uses
+> flush_cache_kernel_range to flush the cache range after patching code.
+> 
+> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
+> ---
+>  arch/arm64/include/asm/cacheflush.h |  1 +
+>  arch/arm64/kernel/alternative.c     |  2 +-
+>  arch/arm64/mm/cache.S               | 42 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 44 insertions(+), 1 deletion(-)
 
-    The board DT *must* assign some "phy-mode" -- it's a required prop.
-    In this particular case, iff the mode is still unspecified, the driver 
-will select the MII mode for the RMII_MII reg (which is a reserved value for 
-this GEther)...
+Thanks for the patch; this is a horrible bug :)
 
-[...]
+Comments below.
 
-MBR, Sergei
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index 30334d81b021..1366f00297c3 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -81,6 +81,48 @@ ENDPROC(flush_icache_range)
+>  ENDPROC(__flush_cache_user_range)
+>  
+>  /*
+> + *	flush_cache_kernel_range(start,end)
+> + *
+> + *	Ensure that the I and D caches are coherent within specified kernel
+> + *	region.
+> + *	This is typically used when code has been written to a kernel memory
+> + *	region and will be executed.
+> + *
+> + *	NOTE - This macro cannot have "alternatives" applied to it as its
+> + *	used to update alternatives
+> + *
+> + *	- start   - virtual start address of region
+> + *	- end     - virtual end address of region
+> + */
+> +ENTRY(flush_cache_kernel_range)
+> +	raw_dcache_line_size x2, x3
+> +	sub	x3, x2, #1
+> +	bic	x4, x0, x3
+> +1:
+> +	dc	civac, x4	/* Use civac instead of cvau. This is required
+> +				 * due to ARM errata 826319, 827319, 824069,
+> +				 * 819472 on A53
+> +				 */
+> +	add	x4, x4, x2
+> +	cmp	x4, x1
+> +	b.lo	1b
+> +	dsb	ish
+> +
+> +	raw_icache_line_size x2, x3
+
+Won't this be broken on systems that misreport the line size in CTR?
+
+> +	sub	x3, x2, #1
+> +	bic	x4, x0, x3
+> +1:
+> +	ic	ivau, x4			// invalidate I line PoU
+> +	add	x4, x4, x2
+> +	cmp	x4, x1
+> +	b.lo	1b
+> +	dsb	ish
+> +	isb
+> +	mov	x0, #0
+> +	ret
+> +ENDPROC(flush_cache_kernel_range)
+
+Generally, I don't think we want to expose this function as it's not going
+to be the right thing to call outside of the alternatives patching. Instead,
+can we:
+
+  1. Code this up in alternative.c, mostly in C code and always using the
+     sanitised feature register value for the CTR
+
+  2. Just call __flush_icache_all once after patching is complete (and
+     add a comment to __flush_icache_all saying that it's used by the
+     patching code)
+
+That way, we're keeping the implementation private and simple so we can
+hopefully avoid running into this problem again.
+
+Cheers,
+
+Will
