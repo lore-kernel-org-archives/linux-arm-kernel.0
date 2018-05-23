@@ -1,300 +1,116 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 May 2018 10:17:16 +0100
-Subject: [PATCH v3] arm64: signal: Report signal frame size to userspace
- via auxv
-In-Reply-To: <20180522171916.GL26955@arm.com>
-References: <1526571941-9816-1-git-send-email-Dave.Martin@arm.com>
- <20180522171916.GL26955@arm.com>
-Message-ID: <20180523091713.GG13470@e103592.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 23 May 2018 11:18:08 +0200
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add GEther support
+In-Reply-To: <9f2c6e9b-a6a9-97f1-7899-3635230acd6f@cogentembedded.com>
+References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
+ <8910c197-cf1b-9ee9-9ddb-5d2f705a4b26@cogentembedded.com>
+ <CAMuHMdW9UzOGV_zh3NxugYrj0j0qszX+NFoZtFvZRD9CNMHt+w@mail.gmail.com>
+ <bdbfd13e-cf0c-e19a-b76f-5e8e024dca26@cogentembedded.com>
+ <20180523084100.ynv3zoqrikcxem5f@verge.net.au>
+ <9f2c6e9b-a6a9-97f1-7899-3635230acd6f@cogentembedded.com>
+Message-ID: <20180523091807.ppxntc75li6frau6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 06:19:16PM +0100, Will Deacon wrote:
-> Hi Dave,
+On Wed, May 23, 2018 at 12:05:30PM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> On Thu, May 17, 2018 at 04:45:41PM +0100, Dave Martin wrote:
-> > Stateful CPU architecture extensions may require the signal frame
-> > to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
-> > However, changing this #define is an ABI break.
+> On 5/23/2018 11:41 AM, Simon Horman wrote:
 > 
-> [...]
-> 
-> > For arm64 SVE:
+> > > > > Define the generic R8A77980 part of the GEther device node.
+> > > > > 
+> > > > > Based on the original (and large) patch by Vladimir Barinov.
+> > > > > 
+> > > > > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > > > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > > > 
+> > > > Thanks for your patch!
+> > > > 
+> > > > With the below addressed:
+> > > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > 
+> > >     Thanks!
+> > > 
+> > > > > --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> > > > > +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> > > > > @@ -417,6 +417,17 @@
+> > > > >                          dma-channels = <16>;
+> > > > >                  };
+> > > > > 
+> > > > > +               gether: ethernet at e7400000 {
+> > > > > +                       compatible = "renesas,gether-r8a77980";
+> > > > > +                       reg = <0 0xe7400000 0 0x1000>;
+> > > > > +                       interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> > > > > +                       clocks = <&cpg CPG_MOD 813>;
+> > > > > +                       power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> > > > 
+> > > > resets = <&cpg 813>;
+> > > 
+> > >     As usual...
+> > > 
+> > > > 
+> > > > > +                       #address-cells = <1>;
+> > > > > +                       #size-cells = <0>;
+> > > > > +                       status = "disabled";
+> > > > 
+> > > > Any default phy-mode needed?
+> > > 
+> > >     A default "phy-mode" IMO make sense when the MAC supports a single
+> > > PHY interface mode. In this case, both RMII and RGMII are supported, so
+> > > I coulsn't choose a default...
 > > 
-> > The SVE context block in the signal frame needs to be considered
-> > too when computing the maximum possible signal frame size.
-> > 
-> > Because the size of this block depends on the vector length, this
-> > patch computes the size based not on the thread's current vector
-> > length but instead on the maximum possible vector length: this
-> > determines the maximum size of SVE context block that can be
-> > observed in any signal frame for the lifetime of the process.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Alex Benn?e <alex.bennee@linaro.org>
-> > 
-> > ---
-> > 
-> > Changes since v2:
-> > 
-> >  * Redefine AT_MINSIGSTKSZ as 51 to avoid clash with values defined by
-> >    other architectures.
-> > 
-> >    This turns out to be a problem for glibc; also random userspace
-> >    software does not necessary check the architecture before using
-> >    getauxval() or otherwise parsing the aux vector, which can make
-> >    aliased tags problematic.
-> > 
-> >    Really, the headers need cleaning up tree-wide in such away that the
-> >    AT_* definitions do not appear to be arch-private.  To be addressed
-> >    separately.
-> > ---
-> >  arch/arm64/include/asm/elf.h         | 11 ++++++++
-> >  arch/arm64/include/asm/processor.h   |  5 ++++
-> >  arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
-> >  arch/arm64/kernel/cpufeature.c       |  1 +
-> >  arch/arm64/kernel/signal.c           | 51 +++++++++++++++++++++++++++++++-----
-> >  5 files changed, 63 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> > index fac1c4d..dc32adb 100644
-> > --- a/arch/arm64/include/asm/elf.h
-> > +++ b/arch/arm64/include/asm/elf.h
-> > @@ -24,6 +24,11 @@
-> >  #include <asm/ptrace.h>
-> >  #include <asm/user.h>
-> >  
-> > +#ifndef __ASSEMBLY__
-> > +#include <linux/bug.h>
-> > +#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-> > +#endif
+> > I would think making an arbitrary choice is better than no choice.
+> > How does the driver behave in the absence of a default?
 > 
-> Maybe move these inside the pre-existing #ifndef __ASSEMBLY__ block.
+>    The board DT *must* assign some "phy-mode" -- it's a required prop.
+>    In this particular case, iff the mode is still unspecified, the driver
+> will select the MII mode for the RMII_MII reg (which is a reserved value for
+> this GEther)...
 
-Mark make the same point.  Can do.
+Thanks, if its required that boards provide this property then
+this makes sense to me.
 
-> >  /*
-> >   * AArch64 static relocation types.
-> >   */
-> > @@ -146,8 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-> >  /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
-> >  #define ARCH_DLINFO							\
-> >  do {									\
-> > +	int minsigstksz = signal_minsigstksz;				\
-> > +									\
-> > +	if (WARN_ON(minsigstksz <= 0))					\
-> > +		minsigstksz = MINSIGSTKSZ;				\
-> > +									\
-> 
-> How can this happen?
+I have applied the patch after adding the resets property.
+The result is as follows:
 
-It can't.  minsigstksz == 0 means that it was not initialised yet.
-This is a sanity-check for something that is currently guaranteed
-by the way the code is structured.
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add GEther support
 
-See the related comment on minsigstksz_setup().
+Define the generic R8A77980 part of the GEther device node.
 
-Perhaps this should be a WARN_ON_ONCE(), with omission of the
-record.
+Based on the original (and large) patch by Vladimir Barinov.
 
-Looking at it again, I don't think we need a WARN both here and in
-minsigstksz_setup().  If minsigstksz_setup() goes wrong, we could
-leave signal_minsigstksz as 0 and then we'd the WARN here anyway.
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[simon: add resets property]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> 
-> >  	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-> >  		    (elf_addr_t)current->mm->context.vdso);		\
-> > +	NEW_AUX_ENT(AT_MINSIGSTKSZ, minsigstksz);			\
-> >  } while (0)
-> >  
-> >  #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
-> > diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> > index 7675989..6f60e92 100644
-> > --- a/arch/arm64/include/asm/processor.h
-> > +++ b/arch/arm64/include/asm/processor.h
-> > @@ -35,6 +35,8 @@
-> >  #ifdef __KERNEL__
-> >  
-> >  #include <linux/build_bug.h>
-> > +#include <linux/cache.h>
-> > +#include <linux/init.h>
-> >  #include <linux/stddef.h>
-> >  #include <linux/string.h>
-> >  
-> > @@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
-> >  void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
-> >  void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
-> >  
-> > +extern int __ro_after_init signal_minsigstksz;	/* user signal frame size */
-> 
-> Probably better as unsigned long, to be consistent with the size field
-> of the sigframe user layout structure.
-
-Yes, that probably makes sense.
-
-I think the "int" dates back to when I had a prctl() call for returning
-this to userspace, since int is the libc return type for prctl.
-
-auxv entries are effectively unsigned long / uint64_t / whatever you
-like to call it, so unsigned long would make sense here now.
-
-> 
-> > +extern void __init minsigstksz_setup(void);
-> > +
-> >  /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
-> >  #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
-> >  #define SVE_GET_VL()	sve_get_current_vl()
-> > diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-> > index ec0a86d..743c0b8 100644
-> > --- a/arch/arm64/include/uapi/asm/auxvec.h
-> > +++ b/arch/arm64/include/uapi/asm/auxvec.h
-> > @@ -19,7 +19,8 @@
-> >  
-> >  /* vDSO location */
-> >  #define AT_SYSINFO_EHDR	33
-> > +#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
-> >  
-> > -#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-> > +#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
-> >  
-> >  #endif
-> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > index 9d1b06d..0e0b53d 100644
-> > --- a/arch/arm64/kernel/cpufeature.c
-> > +++ b/arch/arm64/kernel/cpufeature.c
-> > @@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
-> >  		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
-> >  
-> >  	sve_setup();
-> > +	minsigstksz_setup();
-> >  
-> >  	/* Advertise that we have computed the system capabilities */
-> >  	set_sys_caps_initialised();
-> > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> > index 154b7d3..ae8d4ea 100644
-> > --- a/arch/arm64/kernel/signal.c
-> > +++ b/arch/arm64/kernel/signal.c
-> > @@ -17,6 +17,7 @@
-> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> >  
-> > +#include <linux/cache.h>
-> >  #include <linux/compat.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/kernel.h>
-> > @@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
-> >  	return 0;
-> >  }
-> >  
-> > -/* Determine the layout of optional records in the signal frame */
-> > -static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-> > +/*
-> > + * Determine the layout of optional records in the signal frame
-> > + *
-> > + * add_all: if true, lays out the biggest possible signal frame for
-> > + *	this task; otherwise, generates a layout for the current state
-> > + *	of the task.
-> > + */
-> > +static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
-> > +				 bool add_all)
-> >  {
-> >  	int err;
-> >  
-> > @@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-> >  		return err;
-> >  
-> >  	/* fault information, if valid */
-> > -	if (current->thread.fault_code) {
-> > +	if (add_all || current->thread.fault_code) {
-> >  		err = sigframe_alloc(user, &user->esr_offset,
-> >  				     sizeof(struct esr_context));
-> >  		if (err)
-> > @@ -591,8 +599,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-> >  	if (system_supports_sve()) {
-> >  		unsigned int vq = 0;
-> >  
-> > -		if (test_thread_flag(TIF_SVE))
-> > -			vq = sve_vq_from_vl(current->thread.sve_vl);
-> > +		if (add_all || test_thread_flag(TIF_SVE)) {
-> > +			int vl = sve_max_vl;
-> > +
-> > +			if (!add_all)
-> > +				vl = current->thread.sve_vl;
-> > +
-> > +			/* Fail safe if something wasn't initialised */
-> > +			if (WARN_ON(!sve_vl_valid(vl)))
-> > +				vl = SVE_VL_MIN;
-> 
-> How can this happen?
-
-It can't.  It is a sanity-check that things were set up in the right
-order.  To fall foul of this, the cpufeatures setup would need not to
-have been completed yet.
-
-For now, this is impossible by construction, because this should only
-be called for user tasks, or from the end of cpufeatures setup via
-minsigstksz_setup().
-
-This WARN_ON() is a defence against future refactoring breaking these
-assumptions.  I can elaborate the comment if you like, but I think it's
-a good idea to keep some kind of check.
-
-> 
-> > +
-> > +			vq = sve_vq_from_vl(vl);
-> > +		}
-> >  
-> >  		err = sigframe_alloc(user, &user->sve_offset,
-> >  				     SVE_SIG_CONTEXT_SIZE(vq));
-> > @@ -603,7 +621,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-> >  	return sigframe_alloc_end(user);
-> >  }
-> >  
-> > -
-> >  static int setup_sigframe(struct rt_sigframe_user_layout *user,
-> >  			  struct pt_regs *regs, sigset_t *set)
-> >  {
-> > @@ -701,7 +718,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
-> >  	int err;
-> >  
-> >  	init_user_layout(user);
-> > -	err = setup_sigframe_layout(user);
-> > +	err = setup_sigframe_layout(user, false);
-> >  	if (err)
-> >  		return err;
-> >  
-> > @@ -936,3 +953,23 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
-> >  		thread_flags = READ_ONCE(current_thread_info()->flags);
-> >  	} while (thread_flags & _TIF_WORK_MASK);
-> >  }
-> > +
-> > +int __ro_after_init signal_minsigstksz;
-> > +
-> > +/*
-> > + * Determine the stack space required for guaranteed signal devliery.
-> > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
-> > + */
-> > +void __init minsigstksz_setup(void)
-> > +{
-> > +	struct rt_sigframe_user_layout user;
-> > +
-> > +	init_user_layout(&user);
-> > +
-> > +	if (WARN_ON(setup_sigframe_layout(&user, true)))
-> > +		signal_minsigstksz = SIGSTKSZ;
-> 
-> Why not just omit the aux record in this case? Something has gone badly
-> wrong, so it's unlikely we're going to get much further anyway.
-
-It wasn't clear to me whether arch auxv entries can be optional.  But it
-looks like binfmt_elf.c:create_elf_table() fills any unused tail of the
-aux vector for AT_NULL, which should fix that.
-
-Since my recommendation would be to assume MINSIGSTKSZ if the entry
-isn't there, omitting makes sense if we don't have a better guess.
-
-Cheers
----Dave
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+index 6d2b61d83caf..c797db59ae18 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -417,6 +417,18 @@
+ 			dma-channels = <16>;
+ 		};
+ 
++		gether: ethernet at e7400000 {
++			compatible = "renesas,gether-r8a77980";
++			reg = <0 0xe7400000 0 0x1000>;
++			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 813>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 813>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		mmc0: mmc at ee140000 {
+ 			compatible = "renesas,sdhi-r8a77980",
+ 				     "renesas,rcar-gen3-sdhi";
+-- 
+2.11.0
