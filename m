@@ -1,72 +1,155 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 May 2018 16:03:37 +0100
-Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
-In-Reply-To: <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
- <20180523114812.GH55598@C02W217FHV2R.local>
- <20180523133158.GJ13470@e103592.cambridge.arm.com>
- <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
-Message-ID: <20180523150337.GO13470@e103592.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 23 May 2018 17:12:10 +0200
+Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
+In-Reply-To: <CAL_Jsq+_QEBWdxW=J4oVGWeokc-+nMzxzX_pgCayaxg-ehivfQ@mail.gmail.com>
+References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
+ <6ffb43dc-55a5-14eb-eb18-3a731cdaf424@t-chip.com.cn>
+ <CAL_Jsq+_QEBWdxW=J4oVGWeokc-+nMzxzX_pgCayaxg-ehivfQ@mail.gmail.com>
+Message-ID: <1685755.J6GI985WX3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 03:56:57PM +0100, Catalin Marinas wrote:
-> On Wed, May 23, 2018 at 02:31:59PM +0100, Dave P Martin wrote:
-> > On Wed, May 23, 2018 at 01:48:12PM +0200, Christoffer Dall wrote:
-> > > On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
-> > > > This is true by construction however: TIF_FOREIGN_FPSTATE is never
-> > > > cleared except when returning to userspace or returning from a
-> > > > signal: thus, for a true kernel thread no FPSIMD context is ever
-> > > > loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
-> > > > ever be saved.
-> > > 
-> > > I don't understand this construction proof; from looking at the patch
-> > > below it is not obvious to me why fpsimd_thread_switch() can never have
-> > > !wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
-> > > kernel thread?
+Hi Rob, Levin,
+
+sorry for being late to the party.
+
+Am Mittwoch, 23. Mai 2018, 16:43:07 CEST schrieb Rob Herring:
+> On Tue, May 22, 2018 at 9:02 PM, Levin Du <djw@t-chip.com.cn> wrote:
+> > On 2018-05-23 2:02 AM, Rob Herring wrote:
+> >> On Fri, May 18, 2018 at 11:52:05AM +0800, djw at t-chip.com.cn wrote:
+> >>> From: Levin Du <djw@t-chip.com.cn>
+> >>> 
+> >>> Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
+> >>> which do not belong to the general pinctrl.
+> >>> 
+> >>> Adding gpio-syscon support makes controlling regulator or
+> >>> LED using these special pins very easy by reusing existing
+> >>> drivers, such as gpio-regulator and led-gpio.
+> >>> 
+> >>> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+> >>> 
+> >>> ---
+> >>> 
+> >>> Changes in v2:
+> >>> - Rename gpio_syscon10 to gpio_mute in doc
+> >>> 
+> >>> Changes in v1:
+> >>> - Refactured for general gpio-syscon usage for Rockchip SoCs.
+> >>> - Add doc rockchip,gpio-syscon.txt
+> >>> 
+> >>>   .../bindings/gpio/rockchip,gpio-syscon.txt         | 41
+> >>> 
+> >>> ++++++++++++++++++++++
+> >>> 
+> >>>   drivers/gpio/gpio-syscon.c                         | 30
+> >>> 
+> >>> ++++++++++++++++
+> >>> 
+> >>>   2 files changed, 71 insertions(+)
+> >>>   create mode 100644
+> >>> 
+> >>> Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> >>> 
+> >>> diff --git
+> >>> a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> >>> b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> >>> new file mode 100644
+> >>> index 0000000..b1b2a67
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+> >>> @@ -0,0 +1,41 @@
+> >>> +* Rockchip GPIO support for GRF_SOC_CON registers
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible: Should contain "rockchip,gpio-syscon".
+> >>> +- gpio-controller: Marks the device node as a gpio controller.
+> >>> +- #gpio-cells: Should be two. The first cell is the pin number and
+> >>> +  the second cell is used to specify the gpio polarity:
+> >>> +    0 = Active high,
+> >>> +    1 = Active low.
+> >> 
+> >> There's no need for this child node. Just make the parent node a gpio
+> >> controller.
+> >> 
+> >> Rob
 > > 
-> > Looking at this again, I think it is poorly worded.  This patch aims to
-> > make it true by construction, but it isn't prior to the patch.
+> > Hi Rob, it is not clear to me. Do you suggest that the grf node should be
+> > a
+> > gpio controller,
+> > like below?
 > > 
-> > I'm tempted to delete the paragraph: the assertion of both untrue and
-> > not the best way to justify that this patch works.
-> > 
-> > 
-> > How about:
-> > 
-> > -8<-
-> > 
-> > The context switch logic already isolates user threads from each other.
-> > This, it is sufficient for isolating user threads from the kernel,
-> > since the goal either way is to ensure that code executing in userspace
-> > cannot see any FPSIMD state except its own.  Thus, there is no special
-> > property of kernel threads that we care about except that it is
-> > pointless to save or load FPSIMD register state for them.
-> > 
-> > At worst, the removal of all the kernel thread special cases by this
-> > patch would thus spuriously load and save state for kernel threads when
-> > unnecessary.
-> > 
-> > But the context switch logic is already deliberately optimised to defer
-> > reloads of the regs until ret_to_user (or sigreturn as a special case),
-> > which kernel threads by definition never reach.
-> > 
-> > ->8-
+> > +    grf: syscon at ff100000 {
+> > +        compatible = "rockchip,gpio-syscon", "rockchip,rk3328-grf",
+> > "syscon", "simple-mfd";
 > 
-> The "at worst" paragraph makes it look like it could happen (at least
-> until you reach the last paragraph). Maybe you can just say that
-> wrong_task and wrong_cpu (with the fpsimd_cpu = NR_CPUS addition) are
-> always true for kernel threads. You should probably mention this in a
-> comment in the code as well.
+> Yes, but drop "rockchip,gpio-syscon" and "simple-mfd".
 
-What if I just delete the second paragraph, and remove the "But" from
-the start of the third, and append:
+I would disagree quite a bit here. The grf are the "general register files",
+a bunch of registers used for quite a lot of things, and so it seems
+among other users, also a gpio-controller for some more random pins
+not controlled through the regular gpio controllers.
 
-"As a result, the wrong_task and wrong_cpu tests in
-fpsimd_thread_switch() will always yield false for kernel threads."
+For a more fully stocked grf, please see
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/rk3288.dtsi#n855
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/rockchip/rk3399.dtsi#n1338
 
-...with a similar comment in the code?
+So the gpio controller should definitly also be a subnode.
 
-Cheers
----Dave
+The gpio in question is called "mute", so I'd think the gpio-syscon driver
+should just define a "rockchip,rk3328-gpio-mute" compatible and contain
+all the register voodoo in the driver itself and not define it in the dt.
+
+So it should probably look like
+
+grf: syscon at ff100000 {
+        compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
+
+	[all the other syscon sub-devices]
+
+	gpio_mute: gpio-mute {
+		compatible = "rockchip,rk3328-gpio-mute";
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
+	[more other syscon sub-devices]
+};
+
+
+Heiko	
+	
+
+
+
+> > +        //...
+> > +        gpio-controller;
+> > +        #gpio-cells = <2>;
+> > +        gpio,syscon-dev = <&grf 0x0428 0>;
+> 
+> And drop this. It may be used in the kernel, but it is not a
+> documented property.
+> 
+> > +    };
+> > 
+> > or just reserve the following case in the doc?
+> > 
+> > +    grf: syscon at ff100000 {
+> > +        compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
+> > +        //...
+> > +    };
+> > +
+> > +    gpio_mute: gpio-mute {
+> > +        compatible = "rockchip,gpio-syscon";
+> > +        gpio-controller;
+> > +        #gpio-cells = <2>;
+> > +        gpio,syscon-dev = <&grf 0x0428 0>;
+> > +    };
+> > 
+> > 
+> > Thanks
+> > Levin
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
