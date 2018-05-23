@@ -1,146 +1,94 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 12:35:20 -0700
-Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-In-Reply-To: <20180523180920.GB27570@roeck-us.net>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
- <20180522205457.GA16363@roeck-us.net>
- <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
- <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
- <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
- <5a996888-d3d3-9ae6-e438-5de4d5e3ea32@broadcom.com>
- <ef3539fd-c95c-f364-93c7-680aabd1eea3@arm.com>
- <20180523180920.GB27570@roeck-us.net>
-Message-ID: <4da7f930-2698-3ab5-4fce-50af1eba8af5@broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 23 May 2018 22:38:27 +0300
+Subject: [PATCH 1/6] dt-bindings: media: rcar-vin: Describe optional ep
+ properties
+In-Reply-To: <20180523162947.GA13661@rob-hp-laptop>
+References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526488352-898-2-git-send-email-jacopo+renesas@jmondi.org>
+ <20180523162947.GA13661@rob-hp-laptop>
+Message-ID: <1709653.qERUERh18a@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter/Robin,
+Hi Rob,
 
-On 5/23/2018 11:09 AM, Guenter Roeck wrote:
-> On Wed, May 23, 2018 at 06:15:14PM +0100, Robin Murphy wrote:
->> On 23/05/18 17:29, Ray Jui wrote:
->>> Hi Robin,
->>>
->>> On 5/23/2018 4:48 AM, Robin Murphy wrote:
->>>> On 23/05/18 08:52, Scott Branden wrote:
->>>>>
->>>>>
->>>>> On 18-05-22 04:24 PM, Ray Jui wrote:
->>>>>> Hi Guenter,
->>>>>>
->>>>>> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
->>>>>>> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
->>>>>>>> If the watchdog hardware is already enabled during the boot process,
->>>>>>>> when the Linux watchdog driver loads, it should reset the
->>>>>>>> watchdog and
->>>>>>>> tell the watchdog framework. As a result, ping can be generated from
->>>>>>>> the watchdog framework, until the userspace watchdog daemon
->>>>>>>> takes over
->>>>>>>> control
->>>>>>>>
->>>>>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>>>>>>> Reviewed-by: Vladimir Olovyannikov
->>>>>>>> <vladimir.olovyannikov@broadcom.com>
->>>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>>>>> ---
->>>>>>>>  ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
->>>>>>>>  ? 1 file changed, 22 insertions(+)
->>>>>>>>
->>>>>>>> diff --git a/drivers/watchdog/sp805_wdt.c
->>>>>>>> b/drivers/watchdog/sp805_wdt.c
->>>>>>>> index 1484609..408ffbe 100644
->>>>>>>> --- a/drivers/watchdog/sp805_wdt.c
->>>>>>>> +++ b/drivers/watchdog/sp805_wdt.c
->>>>>>>> @@ -42,6 +42,7 @@
->>>>>>>>  ????? /* control register masks */
->>>>>>>>  ????? #define??? INT_ENABLE??? (1 << 0)
->>>>>>>>  ????? #define??? RESET_ENABLE??? (1 << 1)
->>>>>>>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
->>>>>>>>  ? #define WDTINTCLR??????? 0x00C
->>>>>>>>  ? #define WDTRIS??????????? 0x010
->>>>>>>>  ? #define WDTMIS??????????? 0x014
->>>>>>>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
->>>>>>>>  ? MODULE_PARM_DESC(nowayout,
->>>>>>>>  ????????? "Set to 1 to keep watchdog running after device release");
->>>>>>>>  ? +/* returns true if wdt is running; otherwise returns false */
->>>>>>>> +static bool wdt_is_running(struct watchdog_device *wdd)
->>>>>>>> +{
->>>>>>>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
->>>>>>>> +
->>>>>>>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
->>>>>>>> +??????? ENABLE_MASK)
->>>>>>>> +??????? return true;
->>>>>>>> +??? else
->>>>>>>> +??????? return false;
->>>>>>>
->>>>>>>  ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
->>>>>>>
->>>>>>
->>>>>> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE);
->>>>>> therefore, a simple !!(expression) would not work? That is, the
->>>>>> masked result needs to be compared against the mask again to ensure
->>>>>> both bits are set, right?
->>>>> Ray - your original code looks correct to me.? Easier to read and less
->>>>> prone to errors as shown in the attempted translation to a single
->>>>> statement.
->>>>
->>>>  ?????if (<boolean condition>)
->>>>  ???????? return true;
->>>>  ?????else
->>>>  ???????? return false;
->>>>
->>>> still looks really dumb, though, and IMO is actually harder to read than
->>>> just "return <boolean condition>;" because it forces you to stop and
->>>> double-check that the logic is, in fact, only doing the obvious thing.
->>>
->>> If you can propose a way to modify my original code above to make it more
->>> readable, I'm fine to make the change.
->>
->> Well,
->>
->> 	return readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK == ENABLE_MASK;
->>
->> would probably be reasonable to anyone other than the 80-column zealots, but
->> removing the silly boolean-to-boolean translation idiom really only
->> emphasises the fact that it's fundamentally a big complex statement; for
->> maximum clarity I'd be inclined to separate the two logical operations (read
->> and comparison), e.g.:
->>
->> 	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
->>
->> 	return wdtcontrol & ENABLE_MASK == ENABLE_MASK;
+On Wednesday, 23 May 2018 19:29:47 EEST Rob Herring wrote:
+> On Wed, May 16, 2018 at 06:32:27PM +0200, Jacopo Mondi wrote:
+> > Describe the optional endpoint properties for endpoint nodes of port at 0
+> > and port at 1 of the R-Car VIN driver device tree bindings documentation.
+> > 
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > ---
+> > 
+> >  Documentation/devicetree/bindings/media/rcar_vin.txt | 13 ++++++++++++-
+> >  1 file changed, 12 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> > b/Documentation/devicetree/bindings/media/rcar_vin.txt index
+> > a19517e1..c53ce4e 100644
+> > --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> > +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> > @@ -53,6 +53,16 @@ from local SoC CSI-2 receivers (port1) depending on
+> > SoC.
+> > 
+> >        from external SoC pins described in video-interfaces.txt[1].
+> >        Describing more then one endpoint in port 0 is invalid. Only VIN
+> >        instances that are connected to external pins should have port 0.
+> > 
+> > +
+> > +      - Optional properties for endpoint nodes of port at 0:
+> > +        - hsync-active: active state of the HSYNC signal, 0/1 for
+> > LOW/HIGH
+> > +	  respectively. Default is active high.
+> > +        - vsync-active: active state of the VSYNC signal, 0/1 for
+> > LOW/HIGH
+> > +	  respectively. Default is active high.
+> > +
+> > +	If both HSYNC and VSYNC polarities are not specified, embedded
+> > +	synchronization is selected.
 > 
-> == has higher precendence than bitwise &, so this will need ( ),
-> but otherwise I agree.
-> 
+> No need to copy-n-paste from video-interfaces.txt. Just "see
+> video-interfaces.txt" for the description is fine.
 
-Sure. Let me change the code to the following:
+I would still explicitly list the properties that apply to this binding. I 
+agree that there's no need to copy & paste the description of those properties 
+though.
 
-       u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
+> > +
+> > 
+> >      - port 1 - sub-nodes describing one or more endpoints connected to
+> >      
+> >        the VIN from local SoC CSI-2 receivers. The endpoint numbers must
+> >        use the following schema.
+> > 
+> > @@ -62,6 +72,8 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
+> > 
+> >          - Endpoint 2 - sub-node describing the endpoint connected to
+> >          CSI40
+> >          - Endpoint 3 - sub-node describing the endpoint connected to
+> >          CSI41
+> > 
+> > +      Endpoint nodes of port at 1 do not support any optional endpoint
+> > property. +
+> > 
+> >  Device node example for Gen2 platforms
+> >  --------------------------------------
+> > 
+> > @@ -112,7 +124,6 @@ Board setup example for Gen2 platforms (vin1 composite
+> > video input)> 
+> >                  vin1ep0: endpoint {
+> >                  
+> >                          remote-endpoint = <&adv7180>;
+> > 
+> > -                        bus-width = <8>;
+> > 
+> >                  };
+> >          
+> >          };
+> >  
+> >  };
 
-       return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
+-- 
+Regards,
 
-Thanks.
-
-Ray
-
->>
->> which is still -3 lines vs. the original.
->>
->>> As I mentioned, I don't think the following change proposed by Guenter
->>> will work due to the reason I pointed out:
->>>
->>> return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
->>
->> FWIW, getting the desired result should only need one logical not swapping
->> for a bitwise one there:
->>
->> 	return !(~readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK);
->>
->> but that's well into "too clever for its own good" territory ;)
-> 
-> Yes, that would be confusing.
-> 
->>
->> Robin.
+Laurent Pinchart
