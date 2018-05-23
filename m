@@ -1,40 +1,83 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 May 2018 09:45:05 -0500
-Subject: [PATCH v2 1/3] input: touchscreen: edt-ft5x06: don't make device
- a wakeup source by default
-In-Reply-To: <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
-References: <20180517090552.5704-1-daniel@zonque.org>
- <20180517090552.5704-2-daniel@zonque.org>
- <20180522175413.GA24850@rob-hp-laptop>
- <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
-Message-ID: <CAL_JsqJQt6vFqH-KzNvjW+FZXCgzNAwXj_nSYow2Uz2Vcmi_Cg@mail.gmail.com>
+Date: Wed, 23 May 2018 09:47:42 -0500
+Subject: [PATCH V3 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <4f6941a0-4b41-f2db-52b1-d45aa7287fa2@st.com>
+References: <1526890046-10565-1-git-send-email-christophe.roullier@st.com>
+ <1526890046-10565-9-git-send-email-christophe.roullier@st.com>
+ <20180522172238.GA26145@rob-hp-laptop>
+ <4f6941a0-4b41-f2db-52b1-d45aa7287fa2@st.com>
+Message-ID: <CAL_JsqL1F7frrfbBOVeoaZc-C=iNKzUB0J9ggpoSKO0o4aGOCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 3:27 AM, Daniel Mack <daniel@zonque.org> wrote:
-> On Tuesday, May 22, 2018 07:54 PM, Rob Herring wrote:
->>
->> On Thu, May 17, 2018 at 11:05:50AM +0200, Daniel Mack wrote:
+On Wed, May 23, 2018 at 4:32 AM, Christophe ROULLIER
+<christophe.roullier@st.com> wrote:
+> On 05/22/2018 07:22 PM, Rob Herring wrote:
+>> On Mon, May 21, 2018 at 10:07:26AM +0200, Christophe Roullier wrote:
+>>> This patch describes syscon DT bindings.
 >>>
->>> Allow configuring the device as wakeup source through device properties,
->>> as
->>> not all platforms want to wake up on touch screen activity.
+>>> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/arm/stm32.txt | 5 +++++
+>>>   1 file changed, 5 insertions(+)
 >>>
->>> The I2C core automatically reads the "wakeup-source" DT property to
->>> configure a device's wakeup capability, and board supports files can set
->>> I2C_CLIENT_WAKE in the flags.
+>>> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
+>>> index 6808ed9..e46ebad 100644
+>>> --- a/Documentation/devicetree/bindings/arm/stm32.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
+>>> @@ -8,3 +8,8 @@ using one of the following compatible strings:
+>>>     st,stm32f746
+>>>     st,stm32h743
+>>>     st,stm32mp157
+>>> +
+>>> +Required nodes:
+>>> +- syscon: the soc bus node must have a system controller node pointing to the
+>>> +  global control registers, with the compatible string
+>>> +  "st,stm32mp157-syscfg", "syscon";
 >>
+>> Please don't mix soc/board bindings with other nodes. So perhaps
+>> stm32-syscon.txt.
 >>
->> This will break wake-up on working systems. Looks like mostly i.MX, but
->> there's one AM437x board. If that board doesn't care, then it is up to
->> Shawn.
+>> Rob
+>>
 >
+> Hi Rob,
 >
-> I added the property to the dts files, but as Dmitry pointed out, I missed
-> some. Sorry for that.
+> Is it ok for you with this tree file:
 
-Just adding the property to dts files doesn't fix the compatibility
-problem. If a user uses an existing dtb (before this change) with a
-new kernel (after this change), then wakeup will stop working.
+Yes, one nit below.
 
-Rob
+>
+> Documentation/devicetree/bindings/arm/stm32/stm32.txt
+> Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt
+>         With stm32-syscon.txt:
+>
+> ---------------------------------------------------
+> STMicroelectronics STM32 Platforms System Controller
+>
+> Properties:
+>   - compatible : should contain two values. First value must be :
+>                 - " st,stm32mp157-syscfg " - for stm32mp157 based SoCs,
+>                 second value must be always "syscon".
+>   - reg : offset and length of the register set.
+>
+> Example:
+>         syscfg: system-config at 50020000 {
+
+syscon at ...
+
+>                 compatible = "st,stm32mp157-syscfg", "syscon";
+>                 reg = <0x50020000 0x400>;
+>         };
+> ---------------------------------------------------
+>
+> Do we need to update also all MCU family (stm32f4, stm32h7, stm32f7)
+> property to be coherent ?
+
+Yes, if they all have the same or similar syscfg block.
+
+>
+> Thanks for your feedback.
+>
+> Christophe.
+>
