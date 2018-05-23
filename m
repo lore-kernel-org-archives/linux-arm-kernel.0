@@ -1,72 +1,55 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 23 May 2018 00:52:27 -0700
-Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-In-Reply-To: <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
- <20180522205457.GA16363@roeck-us.net>
- <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
-Message-ID: <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 23 May 2018 09:58:30 +0200
+Subject: [PATCH V2 3/3] ARM: dts: imx7: correct enet ipg clock
+In-Reply-To: <1526605266-18464-3-git-send-email-Anson.Huang@nxp.com>
+References: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
+ <1526605266-18464-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <70251e2909cd2f479325a975a4e6302d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18.05.2018 03:01, Anson Huang wrote:
+> ENET "ipg" clock should be IMX7D_ENETx_IPG_ROOT_CLK
+> rather than IMX7D_ENET_AXI_ROOT_CLK which is for ENET bus
+> clock.
+> 
+> Based on Andy Duan's patch from the NXP kernel tree.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-On 18-05-22 04:24 PM, Ray Jui wrote:
-> Hi Guenter,
->
-> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
->> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
->>> If the watchdog hardware is already enabled during the boot process,
->>> when the Linux watchdog driver loads, it should reset the watchdog and
->>> tell the watchdog framework. As a result, ping can be generated from
->>> the watchdog framework, until the userspace watchdog daemon takes over
->>> control
->>>
->>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
->>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>> ---
->>> ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
->>> ? 1 file changed, 22 insertions(+)
->>>
->>> diff --git a/drivers/watchdog/sp805_wdt.c 
->>> b/drivers/watchdog/sp805_wdt.c
->>> index 1484609..408ffbe 100644
->>> --- a/drivers/watchdog/sp805_wdt.c
->>> +++ b/drivers/watchdog/sp805_wdt.c
->>> @@ -42,6 +42,7 @@
->>> ????? /* control register masks */
->>> ????? #define??? INT_ENABLE??? (1 << 0)
->>> ????? #define??? RESET_ENABLE??? (1 << 1)
->>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
->>> ? #define WDTINTCLR??????? 0x00C
->>> ? #define WDTRIS??????????? 0x010
->>> ? #define WDTMIS??????????? 0x014
->>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
->>> ? MODULE_PARM_DESC(nowayout,
->>> ????????? "Set to 1 to keep watchdog running after device release");
->>> ? +/* returns true if wdt is running; otherwise returns false */
->>> +static bool wdt_is_running(struct watchdog_device *wdd)
->>> +{
->>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
->>> +
->>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
->>> +??????? ENABLE_MASK)
->>> +??????? return true;
->>> +??? else
->>> +??????? return false;
->>
->> ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
->>
->
-> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
-> therefore, a simple !!(expression) would not work? That is, the masked 
-> result needs to be compared against the mask again to ensure both bits 
-> are set, right?
-Ray - your original code looks correct to me.? Easier to read and less 
-prone to errors as shown in the attempted translation to a single statement.
->
-> Thanks,
->
-> Ray
+--
+Stefan
+
+> ---
+>  arch/arm/boot/dts/imx7d.dtsi | 2 +-
+>  arch/arm/boot/dts/imx7s.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 200714e..d74dd7f 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -120,7 +120,7 @@
+>  			<GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+>  			<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+>  			<GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
+> +		clocks = <&clks IMX7D_ENET2_IPG_ROOT_CLK>,
+>  			<&clks IMX7D_ENET_AXI_ROOT_CLK>,
+>  			<&clks IMX7D_ENET2_TIME_ROOT_CLK>,
+>  			<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 4d42335..b90769d 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -1091,7 +1091,7 @@
+>  					<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
+> +				clocks = <&clks IMX7D_ENET1_IPG_ROOT_CLK>,
+>  					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
+>  					<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
+>  					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
