@@ -1,78 +1,142 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 12:29:50 -0700
-Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
- property for sp805
-In-Reply-To: <20180523185944.GA9989@rob-hp-laptop>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
- <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
- <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
- <20180523185944.GA9989@rob-hp-laptop>
-Message-ID: <4b0ec4ab-2d9e-1e4b-e294-c175805f4013@broadcom.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 23 May 2018 20:35:13 +0100
+Subject: [PATCH v10 05/18] KVM: arm64: Convert lazy FPSIMD context switch
+ trap to C
+In-Reply-To: <1527005119-6842-6-git-send-email-Dave.Martin@arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87k1rutbbi.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Dave Martin <Dave.Martin@arm.com> writes:
 
-On 5/23/2018 11:59 AM, Rob Herring wrote:
-> On Wed, May 23, 2018 at 09:25:49AM -0700, Ray Jui wrote:
->>
->>
->> On 5/23/2018 3:57 AM, Robin Murphy wrote:
->>> On 22/05/18 19:47, Ray Jui wrote:
->>>> Update the SP805 binding document to add optional 'timeout-sec'
->>>> devicetree property
->>>>
->>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>> ---
->>>>  ? Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
->>>>  ? 1 file changed, 2 insertions(+)
->>>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>> b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>> index edc4f0e..f898a86 100644
->>>> --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>> @@ -19,6 +19,8 @@ Required properties:
->>>>  ? Optional properties:
->>>>  ? - interrupts : Should specify WDT interrupt number.
->>>> +- timeout-sec : Should specify default WDT timeout in seconds. If
->>>> unset, the
->>>> +??????????????? default timeout is 30 seconds
->>>
->>> According to the SP805 TRM, the default interval is dependent on the
->>> rate of WDOGCLK, but would typically be a lot longer than that :/
->>>
->>> On a related note, anyone have any idea why we seem to have two subtly
->>> different SP805 bindings defined?
-> 
-> Sigh.
-> 
->> Interesting, I did not even know that until you pointed this out (and it's
->> funny that I found that I actually reviewed arm,sp805.txt internally in
->> Broadcom code review).
->>
->> It looks like one was done by Bhupesh Sharma (sp805-wdt.txt) and the other
->> was done by Anup Patel (arm,sp805.txt). Both were merged at the same time
->> around March 20, 2016: 915c56bc01d6. I'd assume both were sent out at around
->> the same time.
->>
->> It sounds like we should definitely remove one of them. Given that
->> sp805-wdt.txt appears to have more detailed descriptions on the use of the
->> clocks, should we remove arm,sp805.txt?
-> 
-> Take whichever text you like, but I prefer filenames using the
-> compatible string and the correct string is 'arm,sp805' because '-wdt'
-> is redundant. You can probably safely just update all the dts files with
-> 'arm,sp805' and just remove 'arm,sp805-wdt' because it is not actually
-> used (as the ID registers are).
+> To make the lazy FPSIMD context switch trap code easier to hack on,
+> this patch converts it to C.
+>
+> This is not amazingly efficient, but the trap should typically only
+> be taken once per host context switch.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
+>  arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
+>  2 files changed, 46 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index e41a161..40f349b 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -172,40 +172,27 @@ ENTRY(__fpsimd_guest_restore)
+>  	// x1: vcpu
+>  	// x2-x29,lr: vcpu regs
+>  	// vcpu x0-x1 on the stack
+> -	stp	x2, x3, [sp, #-16]!
+> -	stp	x4, lr, [sp, #-16]!
+> -
+> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+> -	mrs	x2, cptr_el2
+> -	bic	x2, x2, #CPTR_EL2_TFP
+> -	msr	cptr_el2, x2
+> -alternative_else
+> -	mrs	x2, cpacr_el1
+> -	orr	x2, x2, #CPACR_EL1_FPEN
+> -	msr	cpacr_el1, x2
+> -alternative_endif
+> -	isb
+> -
+> -	mov	x3, x1
+> -
+> -	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
+> -	kern_hyp_va x0
+> -	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+> -	bl	__fpsimd_save_state
+> -
+> -	add	x2, x3, #VCPU_CONTEXT
+> -	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+> -	bl	__fpsimd_restore_state
+> -
+> -	// Skip restoring fpexc32 for AArch64 guests
+> -	mrs	x1, hcr_el2
+> -	tbnz	x1, #HCR_RW_SHIFT, 1f
+> -	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
+> -	msr	fpexc32_el2, x4
+> -1:
+> -	ldp	x4, lr, [sp], #16
+> -	ldp	x2, x3, [sp], #16
+> -	ldp	x0, x1, [sp], #16
+> -
+> +	stp	x2, x3, [sp, #-144]!
+> +	stp	x4, x5, [sp, #16]
+> +	stp	x6, x7, [sp, #32]
+> +	stp	x8, x9, [sp, #48]
+> +	stp	x10, x11, [sp, #64]
+> +	stp	x12, x13, [sp, #80]
+> +	stp	x14, x15, [sp, #96]
+> +	stp	x16, x17, [sp, #112]
+> +	stp	x18, lr, [sp, #128]
+> +
+> +	bl	__hyp_switch_fpsimd
+> +
+> +	ldp	x4, x5, [sp, #16]
+> +	ldp	x6, x7, [sp, #32]
+> +	ldp	x8, x9, [sp, #48]
+> +	ldp	x10, x11, [sp, #64]
+> +	ldp	x12, x13, [sp, #80]
+> +	ldp	x14, x15, [sp, #96]
+> +	ldp	x16, x17, [sp, #112]
+> +	ldp	x18, lr, [sp, #128]
+> +	ldp	x0, x1, [sp, #144]
+> +	ldp	x2, x3, [sp], #160
+>  	eret
+>  ENDPROC(__fpsimd_guest_restore)
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index d964523..c0796c4 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -318,6 +318,30 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  	}
+>  }
+>
+> +void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+> +				    struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_cpu_context_t *host_ctxt;
+> +
+> +	if (has_vhe())
+> +		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> +			     cpacr_el1);
+> +	else
+> +		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
+> +			     cptr_el2);
 
-Okay. I'll consolidate everything into arm,sp805.txt. Will also fix all 
-DTS files to use "arm,sp805". The fix for actual DTS files will be in a 
-different patch series.
+Is there no way to do alternative() in C or does it always come down to
+different inline asms?
 
-> 
-> Rob
-> 
+Anyway:
+
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+
+> +
+> +	isb();
+> +
+> +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> +	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
+> +	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+> +
+> +	/* Skip restoring fpexc32 for AArch64 guests */
+> +	if (!(read_sysreg(hcr_el2) & HCR_RW))
+> +		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
+> +			     fpexc32_el2);
+> +}
+> +
+>  /*
+>   * Return true when we were able to fixup the guest exit and should return to
+>   * the guest, false when we should restore the host state and return to the
+
+
+--
+Alex Benn?e
