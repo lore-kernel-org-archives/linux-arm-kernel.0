@@ -1,26 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 23 May 2018 11:18:55 +0200
-Subject: [PATCH 2/2] arm64: dts: renesas: v3hsk: add GEther support
-In-Reply-To: <20180522085220.vzffiwiwzixlvpkz@verge.net.au>
-References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
- <7a853b57-747e-7536-89fe-2e0c847f58f4@cogentembedded.com>
- <20180522085220.vzffiwiwzixlvpkz@verge.net.au>
-Message-ID: <20180523091854.iybdiv6lyuxcv4cw@verge.net.au>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 23 May 2018 10:23:20 +0100
+Subject: [PATCH 02/14] arm64: Call ARCH_WORKAROUND_2 on transitions
+ between EL0 and EL1
+In-Reply-To: <20180522150648.28297-3-marc.zyngier@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-3-marc.zyngier@arm.com>
+Message-ID: <0b03ce12-510e-464b-63de-cd481d7cb1c5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 10:52:21AM +0200, Simon Horman wrote:
-> On Fri, May 18, 2018 at 10:46:19PM +0300, Sergei Shtylyov wrote:
-> > Define the V3H Starter Kit board dependent part of the GEther device node.
-> > 
-> > Based on the original (and large) patch by Vladimir Barinov.
-> > 
-> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> This looks fine but I will wait to see if there are other reviews before
-> applying.
-> 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Marc,
 
-Applied.
+On 05/22/2018 04:06 PM, Marc Zyngier wrote:
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index ec2ee720e33e..f33e6aed3037 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -18,6 +18,7 @@
+>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>    */
+>   
+> +#include <linux/arm-smccc.h>
+>   #include <linux/init.h>
+>   #include <linux/linkage.h>
+>   
+> @@ -137,6 +138,18 @@ alternative_else_nop_endif
+>   	add	\dst, \dst, #(\sym - .entry.tramp.text)
+>   	.endm
+>   
+> +	// This macro corrupts x0-x3. It is the caller's duty
+> +	// to save/restore them if required.
+
+NIT: Shouldn't you use /* ... */ for multi-line comments?
+
+Regardless that:
+
+Reviewed-by: Julien Grall <julien.grall@arm.com>
+
+Cheers,
+
+-- 
+Julien Grall
