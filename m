@@ -1,62 +1,143 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 23 May 2018 12:17:09 +0200
-Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
-In-Reply-To: <CACRpkdbCsUBMcHg+xGOQCBmhoJsqh9VjK+4pjhG5Hf6Fjzwjww@mail.gmail.com>
-References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
- <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
- <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
- <CACRpkdaxwRc0zoDKogVGisXTPJ0EwLbOQjHzz1pSEjvWCsSCTQ@mail.gmail.com>
- <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
- <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
- <60652f48-2a98-414b-5cff-25890a6da37f@xilinx.com>
- <CACRpkdaNJzW+LO97oxavzYJwfkj0xu7wxTNRaGiaKm98ON5JMA@mail.gmail.com>
- <57e4bbdd-1e30-0352-f758-998b64a6b77f@xilinx.com>
- <CACRpkdbCsUBMcHg+xGOQCBmhoJsqh9VjK+4pjhG5Hf6Fjzwjww@mail.gmail.com>
-Message-ID: <3165bba5-31d4-2dd4-bdb3-851889595e2e@xilinx.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 23 May 2018 11:22:08 +0100
+Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <CAPDyKFoHwujfL4vpB8kq+rxDP4cThW4xB4nwb8Qc6_bZwTPbzA@mail.gmail.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
+ <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
+ <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+ <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
+ <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
+ <CAPDyKFo_69kSS6UzdsJeyeiiED=S=chsdkP+R43qMHDEbZ8n_A@mail.gmail.com>
+ <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
+ <00ba829d-faf4-168c-db00-531621b9280f@codeaurora.org>
+ <CAPDyKFoqLPRwEJ9b+XBpB4Zy79SGEC-a8V8shNhMkYOCQa0=oA@mail.gmail.com>
+ <22068fb1-f6e8-f2ec-d7f4-ab9e93469d7f@nvidia.com>
+ <CAPDyKFoHwujfL4vpB8kq+rxDP4cThW4xB4nwb8Qc6_bZwTPbzA@mail.gmail.com>
+Message-ID: <8a3d0762-7d9c-8960-cdf9-f7f328f53692@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> If you take a look at
->> arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
->> which is Ultra96 board gpio-line-names are filled there for the whole PS
->> part. Definitely take a look and let know if you find out any issue there.
+
+On 23/05/18 10:47, Ulf Hansson wrote:
+> On 23 May 2018 at 11:45, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>
+>> On 23/05/18 10:33, Ulf Hansson wrote:
+>>>
+>>> On 23 May 2018 at 11:27, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>>>>
+>>>>
+>>>>
+>>>> On 05/23/2018 02:37 PM, Jon Hunter wrote:
+>>>>>
+>>>>>
+>>>>> On 23/05/18 07:12, Ulf Hansson wrote:
+>>>>>
+>>>>> ...
+>>>>>
+>>>>>>>>>> Thanks for sending this. Believe it or not this has still been on
+>>>>>>>>>> my to-do list
+>>>>>>>>>> and so we definitely need a solution for Tegra.
+>>>>>>>>>>
+>>>>>>>>>> Looking at the above it appears that additional power-domains
+>>>>>>>>>> exposed as devices
+>>>>>>>>>> to the client device. So I assume that this means that the drivers
+>>>>>>>>>> for devices
+>>>>>>>>>> with multiple power-domains will need to call RPM APIs for each of
+>>>>>>>>>> these
+>>>>>>>>>> additional power-domains. Is that correct?
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> They can, but should not!
+>>>>>>>>>
+>>>>>>>>> Instead, the driver shall use device_link_add() and
+>>>>>>>>> device_link_del(),
+>>>>>>>>> dynamically, depending on what PM domain that their original device
+>>>>>>>>> needs for the current running use case.
+>>>>>>>>>
+>>>>>>>>> In that way, they keep existing runtime PM deployment, operating on
+>>>>>>>>> its original device.
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> OK, sounds good. Any reason why the linking cannot be handled by the
+>>>>>>>> above API? Is there a use-case where you would not want it linked?
+>>>>>>>
+>>>>>>>
+>>>>>>> I am guessing the linking is what would give the driver the ability to
+>>>>>>> decide which subset of powerdomains it actually wants to control
+>>>>>>> at any point using runtime PM. If we have cases wherein the driver
+>>>>>>> would want to turn on/off _all_ its associated powerdomains _always_
+>>>>>>> then a default linking of all would help.
+>>>>>>
+>>>>>>
+>>>>>> First, I think we need to decide on *where* the linking should be
+>>>>>> done, not at both places, as that would just mess up synchronization
+>>>>>> of who is responsible for calling the device_link_del() at detach.
+>>>>>>
+>>>>>> Second, It would in principle be fine to call device_link_add() and
+>>>>>> device_link_del() as a part of the attach/detach APIs. However, there
+>>>>>> is a downside to such solution, which would be that the driver then
+>>>>>> needs call the detach API, just to do device_link_del(). Of course
+>>>>>> then it would also needs to call the attach API later if/when needed.
+>>>>>> Doing this adds unnecessary overhead - comparing to just let the
+>>>>>> driver call device_link_add|del() when needed. On the upside, yes, it
+>>>>>> would put less burden on the drivers as it then only needs to care
+>>>>>> about using one set of functions.
+>>>>>>
+>>>>>> Which solution do you prefer?
+>>>>>
+>>>>>
+>>>>> Any reason why we could not add a 'boolean' argument to the API to
+>>>>> indicate whether the new device should be linked? I think that I prefer the
+>>>>> API handles it, but I can see there could be instances where drivers may
+>>>>> wish to handle it themselves.
+>>>>>
+>>>>> Rajendra, do you have a use-case right now where the driver would want
+>>>>> to handle the linking?
+>>>>
+>>>>
+>>>> So if I understand this right, any driver which does want to control
+>>>> individual powerdomain state would
+>>>> need to do the linking itself right?
+>>>>
+>>>> What I am saying is, if I have device A, with powerdomains X and Y, and
+>>>> if I want to turn on only X,
+>>>> then I would want only X to be linked with A, and at a later point if I
+>>>> want both X and Y to be turned on,
+>>>> I would then go ahead and link both X and Y to A? Is that correct or did
+>>>> I get it all wrong?
+>>>
+>>>
+>>> Correct!
+>>>
+>>>>
+>>>> I know atleast Camera on msm8996 would need to do this since it has 2 vfe
+>>>> powerdoamins, which can be
+>>>> turned on one at a time (depending on what resolution needs to be
+>>>> supported) or both together if we
+>>>> really need very high resolution using both vfe modules.
+>>>
+>>>
+>>> I think this is also the case for the Tegra XUSB subsystem.
+>>>
+>>> The usb device is always attached to one PM domain, but depending on
+>>> if super-speed mode is used, another PM domain for that logic needs to
+>>> be powered on as well.
+>>>
+>>> Jon, please correct me if I am wrong!
+>>
+>>
+>> Yes this is technically correct, however, in reality I think we are always
+>> going to enable the superspeed domain if either the host or device domain is
+>> enabled. So we would probably always link the superspeed with the host and
+>> device devices.
 > 
-> It looks good. I even managed to boot my Ultra96 board which
-> was sent over as price in some competition (great hardware!)
+> Why? Wouldn't that waste power if the superspeed mode isn't used?
 
-Wonderful that you get hw available to be closer to issues.
-Maybe it would be worth to give you some guidance what to do with PL and
-how to add more stuff there especially in connection to GPIO.
-We have pinctrl driver in vendor tree but my colleague needs to upstream
-firmware interface first.
+Simply to reduce complexity.
 
+Jon
 
->> zynq/zynqmp gpio controller contains PS pins (hard part) and PL pins
->> coming to logic.
->>
->> I can't describe PL gpio pins because it can be whatever even I have
->> done that for one fixed hw design.
->>
->> Interesting part on that sha1 you shared is how "NC" pin is described.
->>
->> gpio pin 35 I have on zcu100 as "" but it should be maybe TP_PAD which
->> is really just a pad on real board. And the rest of "" gpio names are
->> connected to PL.
-> 
-> How to handle anything routed to/from programmable logic is
-> in a bit of mess right now, I understand this work isn't the
-> easiest :/
-
-I am happy to discuss this to find out a way how this can be handled.
-There are several things together.
-
-On arm64 how to disable/enable access for NS software.
-
-Maybe also separate pins PS pins from PL pins. Right now all are
-together and not sure if this is ideal in sense of DT overal for
-example. Separate nodes would enable better flexibility. Also if you
-look at partial reconfiguration you can just route just part of pins
-which suggest list of gpios used there.
-
-Thanks,
-Michal
+-- 
+nvpublic
