@@ -1,234 +1,62 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 May 2018 15:55:53 +0100
-Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180523143156.svl7djkm3obrnkvs@linutronix.de>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
- <20180517181932.GW7753@e103592.cambridge.arm.com>
- <20180523143156.svl7djkm3obrnkvs@linutronix.de>
-Message-ID: <20180523145552.GN13470@e103592.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 May 2018 15:56:57 +0100
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180523133158.GJ13470@e103592.cambridge.arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+ <20180523114812.GH55598@C02W217FHV2R.local>
+ <20180523133158.GJ13470@e103592.cambridge.arm.com>
+Message-ID: <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 04:31:56PM +0200, Sebastian Andrzej Siewior wrote:
-> On 2018-05-17 19:19:43 [+0100], Dave Martin wrote:
-> > On Thu, May 17, 2018 at 02:40:06PM +0200, Sebastian Andrzej Siewior wrote:
-> > > In v4.16-RT I noticed a number of warnings from task_fpsimd_load(). The
-> > > code disables BH and expects that it is not preemptible. On -RT the
-> > > task remains preemptible but remains the same CPU. This may corrupt the
+On Wed, May 23, 2018 at 02:31:59PM +0100, Dave P Martin wrote:
+> On Wed, May 23, 2018 at 01:48:12PM +0200, Christoffer Dall wrote:
+> > On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
+> > > This is true by construction however: TIF_FOREIGN_FPSTATE is never
+> > > cleared except when returning to userspace or returning from a
+> > > signal: thus, for a true kernel thread no FPSIMD context is ever
+> > > loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
+> > > ever be saved.
 > > 
-> > Also, watch out for [1] which adds more of this stuff for KVM.  This
-> > not merged yet, but likely to land in v4.18.
+> > I don't understand this construction proof; from looking at the patch
+> > below it is not obvious to me why fpsimd_thread_switch() can never have
+> > !wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
+> > kernel thread?
 > 
-> yay. I will try to keep this in mind while moving forward.
+> Looking at this again, I think it is poorly worded.  This patch aims to
+> make it true by construction, but it isn't prior to the patch.
 > 
-> > Anyway:
-> > 
-> > What we're really trying to achieve with the local_bh_disable/enable
-> > stuff is exclusive access to the CPU FPSIMD registers and associated
-> > metadata that tracks who they belong to.
+> I'm tempted to delete the paragraph: the assertion of both untrue and
+> not the best way to justify that this patch works.
 > 
-> I assumed this.
-
-Yup, it's a common pattern cross-arch.
-
-> > > The preempt_disable() + local_bh_enable() combo in kernel_neon_begin()
-> > > is not working on -RT. We don't use NEON in kernel mode on RT right now
-> > > but this still should be addressed.
-> > 
-> > I think we effectively have two levels of locking here.
-> > 
-> > At the outer level, we want exclusive access to the FPSIMD registers.
-> > This is what is needed between kernel_neon_begin() and
-> > kernel_neon_end(), and maps onto the preempt_disable()/_enable() done
-> > by these functions.
-> > 
-> > In context switch critical code, that's insufficient, and we also
-> > need exclusive access to the metadata that tracks which task or context
-> > owns the FPSIMD registers.  This is what the local_bh_disable()/
-> > _enable() achieves.
-> > 
-> > 
-> > So does it make sense to have two locks (I'm assuming local locks are
-> > implicitly percpu ?)
-> > 
-> > static inline void local_fpsimd_context_lock(void)
-> > {
-> > 	local_bh_disable();
-> > 	local_lock(fpsimd_lock);
-> > 	local_lock(fpsimd_context_lock);
-> > }
-> > 
-> > static inline void local_fpsimd_context_unlock(void)
-> > {
-> > 	local_unlock(fpsimd_context_lock);
-> > 	local_unlock(fpsimd_lock);
-> > 	local_bh_enable();
-> > }
-> > 
-> > 
-> > kernel_neon_begin() could then do
-> > 
-> > 	local_fpsimd_context_lock();
-> > 
-> > 	/* ... */
-> > 
-> > 	preempt_disable();
-> > 	local_unlock(fpsimd_context_lock);
-> > 
-> > ... with the following in kernel_neon_end():
-> > 
-> > 	local_unlock(fpsimd_lock);
-> > 	preempt_enable();
-> > 
-> > 
-> > If kernel-mode NEON was considered harmful to RT due to the context
-> > switch overheads, then the above might be overkill.  SVE will be worse
-> > in that regard, and also needs thinking about at some point -- I've not
-> > looked at if from the RT angle at all.
-> > 
-> > In either case, I think abstracting the lock/unlock sequences out to
-> > make the purpose clearer may be a good idea, even if we just have a
-> > single local lock to manage.
 > 
-> So the two looks you suggested make sense. However I would need to
-> replace this preempt_disable() with one such lock. A local_lock() on -RT
-> is a per-CPU spin_lock. RT's local_lock gets currently transformed into
-> preempt_disable() on !RT configs.
-
-Thinking about this again, I'm guessing it only really makes sense to
-have two local locks if there are two independent reasons to inhibit
-migration.
-
-There is only one such reason here: preempt_disable() for the purpose
-of using the FPSIMD registers, where local_bh_disable() implies this
-and also inhibits local softirqs -- which I'm guessing works just
-the same with RT.
-
-
-So maybe there should really be only one local lock as you suggest.
-
-This gives:
-
-static inline void local_fpsimd_context_lock(void)
-{
-	local_lock(fpsimd_lock);
-	local_bh_disable();
-}
-
-static inline void local_fpsimd_context_unlock(void)
-{
-	local_bh_enable();
-	local_unlock(fpsimd_lock);
-}
-
-kernel_neon_begin(...)
-{
-	local_lock(fpsimd_lock);
-	local_bh_disable();
-
-	/* ... */
-
-	local_bh_enable();
-}
-
-kernel_neon_end(...)
-{
-	/* ... */
-
-	local_unlock(fpsimd_lock);
-}
-
-If the local_{,un}lock() gets transmuted to preempt_{dis,en}enable()
-for !RT, then this seems to map on to what we currently have.
-
-(Still guessing about how RT works here, so a health warning is
-implied.)
-
-
-If you abstract things this way, can you please split the non-RT changes
-into a separate patch and Cc me?  That would be a nice cleanup for
-mainline rather than just having the bare local_bh_ and preempt_ stuff
-everywhere.
-
+> How about:
 > 
-> > There is one place where I mess with the FPSIMD context no lock held
-> > because of a need to copy_from_user() straight into the context backing
-> > store (we can't copy_from_user() with preemption disabled...)
-> > I'm not sure whether RT will have any impact on this, but it probably
-> > needs thinking about.
+> -8<-
 > 
-> if no locks are held and the task can be preempted then it also might
-> happen on PREEMPT config. But copy_from_user() doesn't sounds like
-> something that will go straight to HW.
-
-We're just copying to memory, so I guess so long as program order is
-respected when the task is migrated (which is ensured via heavy barriers
-somewhere in the scheduler and/or arch context switch code IIRC) then I
-think there should be no problem).  This is a prerequisite for
-preemptive migration to work at all, not just on RT.  So I suppose
-there's no new problem here.
-
+> The context switch logic already isolates user threads from each other.
+> This, it is sufficient for isolating user threads from the kernel,
+> since the goal either way is to ensure that code executing in userspace
+> cannot see any FPSIMD state except its own.  Thus, there is no special
+> property of kernel threads that we care about except that it is
+> pointless to save or load FPSIMD register state for them.
 > 
-> > One more comment below...
-> > 
-> > > 
-> > > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> > > ---
-> > >  arch/arm64/kernel/fpsimd.c | 20 ++++++++++++++++++--
-> > >  1 file changed, 18 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > > index e7226c4c7493..3a5cd1908874 100644
-> > > --- a/arch/arm64/kernel/fpsimd.c
-> > > +++ b/arch/arm64/kernel/fpsimd.c
-> > > @@ -38,6 +38,7 @@
-> > >  #include <linux/signal.h>
-> > >  #include <linux/slab.h>
-> > >  #include <linux/sysctl.h>
-> > > +#include <linux/locallock.h>
-> > >  
-> > >  #include <asm/fpsimd.h>
-> > >  #include <asm/cputype.h>
-> > > @@ -235,7 +236,7 @@ static void sve_user_enable(void)
-> > >   *    whether TIF_SVE is clear or set, since these are not vector length
-> > >   *    dependent.
-> > >   */
-> > > -
-> > > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
-> > >  /*
-> > >   * Update current's FPSIMD/SVE registers from thread_struct.
-> > >   *
-> > > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
-> > >  	 * non-SVE thread.
-> > >  	 */
-> > >  	if (task == current) {
-> > > +		local_lock(fpsimd_lock);
-> > >  		local_bh_disable();
-> > >  
-> > >  		task_fpsimd_save();
-> > > @@ -604,8 +606,10 @@ int sve_set_vector_length(struct task_struct *task,
-> > >  	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
-> > >  		sve_to_fpsimd(task);
-> > >  
-> > > -	if (task == current)
-> > > +	if (task == current) {
-> > > +		local_unlock(fpsimd_lock);
-> > 
-> > Is this misordered against local_bh_enable(), or doesn't it matter?
+> At worst, the removal of all the kernel thread special cases by this
+> patch would thus spuriously load and save state for kernel threads when
+> unnecessary.
 > 
-> It actually is but it does not matter. On RT local_bh_disable() is
-> turned into migrate_disable() what in turn disables the migration of the
-> task to another CPU (while it is still preemtible). This
-> migrate_disable() is also part of local_lock(). Maybe I will add a
-> local_lock_bh() and replace this with this local_bh_disable() so it will
-> better :)
-
-Fair enough.
-
-Cheers
----Dave
-
+> But the context switch logic is already deliberately optimised to defer
+> reloads of the regs until ret_to_user (or sigreturn as a special case),
+> which kernel threads by definition never reach.
 > 
-> > >  		local_bh_enable();
-> > > +	}
+> ->8-
+
+The "at worst" paragraph makes it look like it could happen (at least
+until you reach the last paragraph). Maybe you can just say that
+wrong_task and wrong_cpu (with the fpsimd_cpu = NR_CPUS addition) are
+always true for kernel threads. You should probably mention this in a
+comment in the code as well.
+
+-- 
+Catalin
