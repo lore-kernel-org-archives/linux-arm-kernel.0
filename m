@@ -1,111 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 May 2018 09:43:07 -0500
-Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
-In-Reply-To: <6ffb43dc-55a5-14eb-eb18-3a731cdaf424@t-chip.com.cn>
-References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
- <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
- <1526615528-9707-2-git-send-email-djw@t-chip.com.cn>
- <20180522180238.GA7328@rob-hp-laptop>
- <6ffb43dc-55a5-14eb-eb18-3a731cdaf424@t-chip.com.cn>
-Message-ID: <CAL_Jsq+_QEBWdxW=J4oVGWeokc-+nMzxzX_pgCayaxg-ehivfQ@mail.gmail.com>
+Date: Wed, 23 May 2018 09:45:05 -0500
+Subject: [PATCH v2 1/3] input: touchscreen: edt-ft5x06: don't make device
+ a wakeup source by default
+In-Reply-To: <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
+References: <20180517090552.5704-1-daniel@zonque.org>
+ <20180517090552.5704-2-daniel@zonque.org>
+ <20180522175413.GA24850@rob-hp-laptop>
+ <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
+Message-ID: <CAL_JsqJQt6vFqH-KzNvjW+FZXCgzNAwXj_nSYow2Uz2Vcmi_Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 9:02 PM, Levin Du <djw@t-chip.com.cn> wrote:
-> On 2018-05-23 2:02 AM, Rob Herring wrote:
+On Wed, May 23, 2018 at 3:27 AM, Daniel Mack <daniel@zonque.org> wrote:
+> On Tuesday, May 22, 2018 07:54 PM, Rob Herring wrote:
 >>
->> On Fri, May 18, 2018 at 11:52:05AM +0800, djw at t-chip.com.cn wrote:
+>> On Thu, May 17, 2018 at 11:05:50AM +0200, Daniel Mack wrote:
 >>>
->>> From: Levin Du <djw@t-chip.com.cn>
+>>> Allow configuring the device as wakeup source through device properties,
+>>> as
+>>> not all platforms want to wake up on touch screen activity.
 >>>
->>> Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
->>> which do not belong to the general pinctrl.
->>>
->>> Adding gpio-syscon support makes controlling regulator or
->>> LED using these special pins very easy by reusing existing
->>> drivers, such as gpio-regulator and led-gpio.
->>>
->>> Signed-off-by: Levin Du <djw@t-chip.com.cn>
->>>
->>> ---
->>>
->>> Changes in v2:
->>> - Rename gpio_syscon10 to gpio_mute in doc
->>>
->>> Changes in v1:
->>> - Refactured for general gpio-syscon usage for Rockchip SoCs.
->>> - Add doc rockchip,gpio-syscon.txt
->>>
->>>   .../bindings/gpio/rockchip,gpio-syscon.txt         | 41
->>> ++++++++++++++++++++++
->>>   drivers/gpio/gpio-syscon.c                         | 30
->>> ++++++++++++++++
->>>   2 files changed, 71 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>> b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>> new file mode 100644
->>> index 0000000..b1b2a67
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>> @@ -0,0 +1,41 @@
->>> +* Rockchip GPIO support for GRF_SOC_CON registers
->>> +
->>> +Required properties:
->>> +- compatible: Should contain "rockchip,gpio-syscon".
->>> +- gpio-controller: Marks the device node as a gpio controller.
->>> +- #gpio-cells: Should be two. The first cell is the pin number and
->>> +  the second cell is used to specify the gpio polarity:
->>> +    0 = Active high,
->>> +    1 = Active low.
+>>> The I2C core automatically reads the "wakeup-source" DT property to
+>>> configure a device's wakeup capability, and board supports files can set
+>>> I2C_CLIENT_WAKE in the flags.
 >>
->> There's no need for this child node. Just make the parent node a gpio
->> controller.
 >>
->> Rob
+>> This will break wake-up on working systems. Looks like mostly i.MX, but
+>> there's one AM437x board. If that board doesn't care, then it is up to
+>> Shawn.
 >
-> Hi Rob, it is not clear to me. Do you suggest that the grf node should be a
-> gpio controller,
-> like below?
 >
-> +    grf: syscon at ff100000 {
-> +        compatible = "rockchip,gpio-syscon", "rockchip,rk3328-grf",
-> "syscon", "simple-mfd";
+> I added the property to the dts files, but as Dmitry pointed out, I missed
+> some. Sorry for that.
 
-Yes, but drop "rockchip,gpio-syscon" and "simple-mfd".
+Just adding the property to dts files doesn't fix the compatibility
+problem. If a user uses an existing dtb (before this change) with a
+new kernel (after this change), then wakeup will stop working.
 
-> +        //...
-> +        gpio-controller;
-> +        #gpio-cells = <2>;
-> +        gpio,syscon-dev = <&grf 0x0428 0>;
-
-And drop this. It may be used in the kernel, but it is not a
-documented property.
-
-> +    };
->
-> or just reserve the following case in the doc?
->
-> +    grf: syscon at ff100000 {
-> +        compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
-> +        //...
-> +    };
-> +
-> +    gpio_mute: gpio-mute {
-> +        compatible = "rockchip,gpio-syscon";
-> +        gpio-controller;
-> +        #gpio-cells = <2>;
-> +        gpio,syscon-dev = <&grf 0x0428 0>;
-> +    };
->
->
-> Thanks
-> Levin
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Rob
