@@ -1,39 +1,123 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 May 2018 18:11:44 +0100
-Subject: [PATCH v4 2/3] arm64: KVM: Enable Common Not Private translations
-In-Reply-To: <1526638022-4137-3-git-send-email-vladimir.murzin@arm.com>
-References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
- <1526638022-4137-3-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20180523171144.wiijmioqn4zl3ccx@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 23 May 2018 18:15:14 +0100
+Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <5a996888-d3d3-9ae6-e438-5de4d5e3ea32@broadcom.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+ <20180522205457.GA16363@roeck-us.net>
+ <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
+ <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
+ <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
+ <5a996888-d3d3-9ae6-e438-5de4d5e3ea32@broadcom.com>
+Message-ID: <ef3539fd-c95c-f364-93c7-680aabd1eea3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 11:07:01AM +0100, Vladimir Murzin wrote:
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index a4c1b76..9a651a2 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -472,7 +472,7 @@ static bool need_new_vmid_gen(struct kvm *kvm)
->  static void update_vttbr(struct kvm *kvm)
->  {
->  	phys_addr_t pgd_phys;
-> -	u64 vmid;
-> +	u64 vmid, cnp = kvm_cpu_has_cnp() ? 1 : 0;
+On 23/05/18 17:29, Ray Jui wrote:
+> Hi Robin,
+> 
+> On 5/23/2018 4:48 AM, Robin Murphy wrote:
+>> On 23/05/18 08:52, Scott Branden wrote:
+>>>
+>>>
+>>> On 18-05-22 04:24 PM, Ray Jui wrote:
+>>>> Hi Guenter,
+>>>>
+>>>> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
+>>>>> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
+>>>>>> If the watchdog hardware is already enabled during the boot process,
+>>>>>> when the Linux watchdog driver loads, it should reset the watchdog 
+>>>>>> and
+>>>>>> tell the watchdog framework. As a result, ping can be generated from
+>>>>>> the watchdog framework, until the userspace watchdog daemon takes 
+>>>>>> over
+>>>>>> control
+>>>>>>
+>>>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>>>>>> Reviewed-by: Vladimir Olovyannikov 
+>>>>>> <vladimir.olovyannikov@broadcom.com>
+>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>> ---
+>>>>>> ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
+>>>>>> ? 1 file changed, 22 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/watchdog/sp805_wdt.c 
+>>>>>> b/drivers/watchdog/sp805_wdt.c
+>>>>>> index 1484609..408ffbe 100644
+>>>>>> --- a/drivers/watchdog/sp805_wdt.c
+>>>>>> +++ b/drivers/watchdog/sp805_wdt.c
+>>>>>> @@ -42,6 +42,7 @@
+>>>>>> ????? /* control register masks */
+>>>>>> ????? #define??? INT_ENABLE??? (1 << 0)
+>>>>>> ????? #define??? RESET_ENABLE??? (1 << 1)
+>>>>>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
+>>>>>> ? #define WDTINTCLR??????? 0x00C
+>>>>>> ? #define WDTRIS??????????? 0x010
+>>>>>> ? #define WDTMIS??????????? 0x014
+>>>>>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
+>>>>>> ? MODULE_PARM_DESC(nowayout,
+>>>>>> ????????? "Set to 1 to keep watchdog running after device release");
+>>>>>> ? +/* returns true if wdt is running; otherwise returns false */
+>>>>>> +static bool wdt_is_running(struct watchdog_device *wdd)
+>>>>>> +{
+>>>>>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+>>>>>> +
+>>>>>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
+>>>>>> +??????? ENABLE_MASK)
+>>>>>> +??????? return true;
+>>>>>> +??? else
+>>>>>> +??????? return false;
+>>>>>
+>>>>> ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
+>>>>>
+>>>>
+>>>> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
+>>>> therefore, a simple !!(expression) would not work? That is, the 
+>>>> masked result needs to be compared against the mask again to ensure 
+>>>> both bits are set, right?
+>>> Ray - your original code looks correct to me.? Easier to read and 
+>>> less prone to errors as shown in the attempted translation to a 
+>>> single statement.
+>>
+>> ?????if (<boolean condition>)
+>> ???????? return true;
+>> ?????else
+>> ???????? return false;
+>>
+>> still looks really dumb, though, and IMO is actually harder to read 
+>> than just "return <boolean condition>;" because it forces you to stop 
+>> and double-check that the logic is, in fact, only doing the obvious 
+>> thing.
+> 
+> If you can propose a way to modify my original code above to make it 
+> more readable, I'm fine to make the change.
 
-Please define a VTTBR_CNP_BIT here instead of a hard-coded value.
+Well,
 
->  	bool new_gen;
->  
->  	read_lock(&kvm_vmid_lock);
-> @@ -522,7 +522,7 @@ static void update_vttbr(struct kvm *kvm)
->  	pgd_phys = virt_to_phys(kvm->arch.pgd);
->  	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
->  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
-> -	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
-> +	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
->  
->  	write_unlock(&kvm_vmid_lock);
->  }
+	return readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK == ENABLE_MASK;
 
--- 
-Catalin
+would probably be reasonable to anyone other than the 80-column zealots, 
+but removing the silly boolean-to-boolean translation idiom really only 
+emphasises the fact that it's fundamentally a big complex statement; for 
+maximum clarity I'd be inclined to separate the two logical operations 
+(read and comparison), e.g.:
+
+	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
+
+	return wdtcontrol & ENABLE_MASK == ENABLE_MASK;
+
+which is still -3 lines vs. the original.
+
+> As I mentioned, I don't think the following change proposed by Guenter 
+> will work due to the reason I pointed out:
+> 
+> return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
+
+FWIW, getting the desired result should only need one logical not 
+swapping for a bitwise one there:
+
+	return !(~readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK);
+
+but that's well into "too clever for its own good" territory ;)
+
+Robin.
