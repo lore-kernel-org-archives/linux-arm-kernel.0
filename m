@@ -1,48 +1,86 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed, 23 May 2018 14:50:48 +0800
-Subject: [PATCH v3 06/13] dt-bindings: add binding for rk3128 power domains
-In-Reply-To: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
-References: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1527058248-10366-1-git-send-email-zhangqing@rock-chips.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Wed, 23 May 2018 07:19:16 +0000
+Subject: [PATCH 1/2] rtc: st-lpc: fix possible race condition
+In-Reply-To: <20180520123337.14856-1-alexandre.belloni@bootlin.com>
+References: <20180520123337.14856-1-alexandre.belloni@bootlin.com>
+Message-ID: <21f4fd1a-1744-b46f-eb0f-09d6af04247b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the power domains
-found on Rockchip RK3128 SoCs.
+Hi Alexandre
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
- 1 file changed, 3 insertions(+)
+On 05/20/2018 02:33 PM, Alexandre Belloni wrote:
+> The IRQ is requested before the struct rtc is allocated and registered, but
+> this struct is used in the IRQ handler. This may lead to a NULL pointer
+> dereference.
+> 
+> Switch to devm_rtc_allocate_device/rtc_register_device to allocate the rtc
+> before requesting the IRQ.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> ---
+>   drivers/rtc/rtc-st-lpc.c | 24 +++++++++---------------
+>   1 file changed, 9 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
+> index d5222667f892..2f1ef2c28740 100644
+> --- a/drivers/rtc/rtc-st-lpc.c
+> +++ b/drivers/rtc/rtc-st-lpc.c
+> @@ -212,6 +212,10 @@ static int st_rtc_probe(struct platform_device *pdev)
+>   	if (!rtc)
+>   		return -ENOMEM;
+>   
+> +	rtc->rtc_dev = devm_rtc_allocate_device(&pdev->dev);
+> +	if (IS_ERR(rtc->rtc_dev))
+> +		return PTR_ERR(rtc->rtc_dev);
+> +
+>   	spin_lock_init(&rtc->lock);
+>   
+>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -253,26 +257,17 @@ static int st_rtc_probe(struct platform_device *pdev)
+>   
+>   	platform_set_drvdata(pdev, rtc);
+>   
+> -	rtc->rtc_dev = rtc_device_register("st-lpc-rtc", &pdev->dev,
+> -					   &st_rtc_ops, THIS_MODULE);
+> -	if (IS_ERR(rtc->rtc_dev)) {
+> +	rtc->rtc_dev->ops = &st_rtc_ops;
+> +
+> +	ret = rtc_register_device(rtc->rtc_dev);
+> +	if (ret) {
+>   		clk_disable_unprepare(rtc->clk);
+> -		return PTR_ERR(rtc->rtc_dev);
+> +		return ret;
+>   	}
+>   
+>   	return 0;
+>   }
+>   
+> -static int st_rtc_remove(struct platform_device *pdev)
+> -{
+> -	struct st_rtc *rtc = platform_get_drvdata(pdev);
+> -
+> -	if (likely(rtc->rtc_dev))
+> -		rtc_device_unregister(rtc->rtc_dev);
+> -
+> -	return 0;
+> -}
+> -
+>   #ifdef CONFIG_PM_SLEEP
+>   static int st_rtc_suspend(struct device *dev)
+>   {
+> @@ -325,7 +320,6 @@ static struct platform_driver st_rtc_platform_driver = {
+>   		.of_match_table = st_rtc_match,
+>   	},
+>   	.probe = st_rtc_probe,
+> -	.remove = st_rtc_remove,
+>   };
+>   
+>   module_platform_driver(st_rtc_platform_driver);
+> 
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-index 79924ee9ae86..9a3f5fd36a80 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-@@ -6,6 +6,7 @@ powered up/down by software based on different application scenes to save power.
- Required properties for power domain controller:
- - compatible: Should be one of the following.
- 	"rockchip,rk3036-power-controller" - for RK3036 SoCs.
-+	"rockchip,rk3128-power-controller" - for RK3128 SoCs.
- 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
- 	"rockchip,rk3328-power-controller" - for RK3328 SoCs.
- 	"rockchip,rk3366-power-controller" - for RK3366 SoCs.
-@@ -19,6 +20,7 @@ Required properties for power domain controller:
- Required properties for power domain sub nodes:
- - reg: index of the power domain, should use macros in:
- 	"include/dt-bindings/power/rk3036-power.h" - for RK3036 type power domain.
-+	"include/dt-bindings/power/rk3128-power.h" - for RK3128 type power domain.
- 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
- 	"include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
- 	"include/dt-bindings/power/rk3366-power.h" - for RK3366 type power domain.
-@@ -96,6 +98,7 @@ containing a phandle to the power device node and an index specifying which
- power domain to use.
- The index should use macros in:
- 	"include/dt-bindings/power/rk3036-power.h" - for rk3036 type power domain.
-+	"include/dt-bindings/power/rk3128-power.h" - for rk3128 type power domain.
- 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
- 	"include/dt-bindings/power/rk3328-power.h" - for rk3328 type power domain.
- 	"include/dt-bindings/power/rk3366-power.h" - for rk3366 type power domain.
--- 
-1.9.1
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+Thanks
+
+Patrice
