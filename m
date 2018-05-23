@@ -1,96 +1,59 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 23 May 2018 14:17:09 +0530
-Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
- sram code
-In-Reply-To: <d52373eb-1707-17ff-fabb-9f7200cf54c0@ti.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
- <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
- <d52373eb-1707-17ff-fabb-9f7200cf54c0@ti.com>
-Message-ID: <739d9bbf-2acc-9c90-db43-cf78f5b184e3@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 23 May 2018 09:48:28 +0100
+Subject: [PATCHv4 05/10] arm64/cpufeature: detect pointer authentication
+In-Reply-To: <20180503132031.25705-6-mark.rutland@arm.com>
+References: <20180503132031.25705-1-mark.rutland@arm.com>
+ <20180503132031.25705-6-mark.rutland@arm.com>
+Message-ID: <4c057e99-61a9-7f75-664d-1f16f2631766@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Mark,
 
-On Monday 16 April 2018 03:59 PM, Keerthy wrote:
+On 03/05/18 14:20, Mark Rutland wrote:
+> So that we can dynamically handle the presence of pointer authentication
+> functionality, wire up probing code in cpufeature.c.
 > 
+>  From ARMv8.3 onwards, ID_AA64ISAR1 is no longer entirely RES0, and now
+> has four fields describing the presence of pointer authentication
+> functionality:
 > 
-> On Thursday 12 April 2018 10:14 PM, santosh.shilimkar at oracle.com wrote:
->> On 4/11/18 9:53 PM, Keerthy wrote:
->>> From: Dave Gerlach <d-gerlach@ti.com>
->>>
->>> After an RTC+DDR cycle we lose sram context so emif pm functions present
->>> in sram are lost. We can check if the first byte of the original
->>> code in DDR contains the same first byte as the code in sram, and if
->>> they do not match we know we have lost context and must recopy the
->>> functions to the previous address to maintain PM functionality.
->>>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>> ---
->>> ? drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
->>> ? 1 file changed, 24 insertions(+)
->>>
->>> diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
->>> index 632651f..ec4a62c 100644
->>> --- a/drivers/memory/ti-emif-pm.c
->>> +++ b/drivers/memory/ti-emif-pm.c
->>> @@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
->>> ? };
->>> ? MODULE_DEVICE_TABLE(of, ti_emif_of_match);
->>> ? +#ifdef CONFIG_PM_SLEEP
->>> +static int ti_emif_resume(struct device *dev)
->>> +{
->>> +??? unsigned long tmp =
->>> +??????????? __raw_readl((void *)emif_instance->ti_emif_sram_virt);
->>> +
->>> +??? /*
->>> +???? * Check to see if what we are copying is already present in the
->>> +???? * first byte at the destination, only copy if it is not which
->>> +???? * indicates we have lost context and sram no longer contains
->>> +???? * the PM code
->>> +???? */
->>
->>> +??? if (tmp != ti_emif_sram)
->>> +??????? ti_emif_push_sram(dev, emif_instance);
->>> +
->>> +??? return 0;
->>> +}
->>> +#endif /* CONFIG_PM_SLEEP */
->> Instead of this indirect method , why can't just check the previous
->> deep sleep mode and based on that do copy or not. EMIF power status
->> register should have something like that ?
+> * APA - address authentication present, using an architected algorithm
+> * API - address authentication present, using an IMP DEF algorithm
+> * GPA - generic authentication present, using an architected algorithm
+> * GPI - generic authentication present, using an IMP DEF algorithm
 > 
-> I will check if we have a register that tells the previous state of sram.
-
-Unfortunately i do not see any such register for knowing SRAM previous
-state in am43 TRM and hence this indirect way of knowing.
-
-http://www.ti.com/lit/ug/spruhl7h/spruhl7h.pdf
-
+> For the moment we only care about address authentication, so we only
+> need to check APA and API. It is assumed that if all CPUs support an IMP
+> DEF algorithm, the same algorithm is used across all CPUs.
 > 
->>
->> Another minor point is even though there is nothing to do in suspend,
->> might be good to have a callback with comment that nothing to do with
->> some explanation why not. Don't have strong preference but may for
->> better readability.
-
-I can add a blank suspend call with comment
-
-"The contents are already present in DDR hence no need to explicitly save"
-
-The comment in resume function pretty much explains the above. So let me
-know if i need to add the suspend callback.
-
-Regards,
-Keerthy
-
+> Note that when we implement KVM support, we will also need to ensure
+> that CPUs have uniform support for GPA and GPI.
 > 
-> Okay. Thanks a lot for the quick feedback!
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/include/asm/cpucaps.h |  5 ++++-
+>   arch/arm64/kernel/cpufeature.c   | 47 ++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 51 insertions(+), 1 deletion(-)
 > 
->>
->> Regards,
->> Santosh
->>
->>
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index bc51b72fafd4..9dcb4d1b14f5 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -48,7 +48,10 @@
+>   #define ARM64_HAS_CACHE_IDC			27
+>   #define ARM64_HAS_CACHE_DIC			28
+>   #define ARM64_HW_DBM				29
+> +#define ARM64_HAS_ADDRESS_AUTH_ARCH		30
+> +#define ARM64_HAS_ADDRESS_AUTH_IMP_DEF		31
+
+Where are these caps used ? I couldn't find anything in the series
+that uses them. Otherwise looks good to me.
+
+Cheers
+
+Suzuki
