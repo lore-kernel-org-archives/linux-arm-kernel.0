@@ -1,44 +1,65 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 May 2018 11:37:21 -0500
-Subject: [PATCH 2/6] dt-bindings: media: rcar-vin: Document data-active
-In-Reply-To: <1526488352-898-3-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526488352-898-3-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180523163721.GB16505@rob-hp-laptop>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 23 May 2018 09:25:49 -0700
+Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
+ property for sp805
+In-Reply-To: <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
+ <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
+Message-ID: <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 06:32:28PM +0200, Jacopo Mondi wrote:
-> Document 'data-active' property in R-Car VIN device tree bindings.
-> The property is optional when running with explicit synchronization
-> (eg. BT.601) but mandatory when embedded synchronization is in use (eg.
-> BT.656) as specified by the hardware manual.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> index c53ce4e..17eac8a 100644
-> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> @@ -63,6 +63,11 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
->  	If both HSYNC and VSYNC polarities are not specified, embedded
->  	synchronization is selected.
-> 
-> +        - data-active: active state of data enable signal (CLOCKENB pin).
-> +          0/1 for LOW/HIGH respectively. If not specified, use HSYNC as
-> +          data enable signal. When using embedded synchronization this
-> +          property is mandatory.
 
-This doesn't match the common property's definition which AIUI is for 
-the data lines' polarity. You need a new property. Perhaps a common one.
 
-> +
->      - port 1 - sub-nodes describing one or more endpoints connected to
->        the VIN from local SoC CSI-2 receivers. The endpoint numbers must
->        use the following schema.
-> --
-> 2.7.4
+On 5/23/2018 3:57 AM, Robin Murphy wrote:
+> On 22/05/18 19:47, Ray Jui wrote:
+>> Update the SP805 binding document to add optional 'timeout-sec'
+>> devicetree property
+>>
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> ---
+>> ? Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
+>> ? 1 file changed, 2 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt 
+>> b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>> index edc4f0e..f898a86 100644
+>> --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>> @@ -19,6 +19,8 @@ Required properties:
+>> ? Optional properties:
+>> ? - interrupts : Should specify WDT interrupt number.
+>> +- timeout-sec : Should specify default WDT timeout in seconds. If 
+>> unset, the
+>> +??????????????? default timeout is 30 seconds
 > 
+> According to the SP805 TRM, the default interval is dependent on the 
+> rate of WDOGCLK, but would typically be a lot longer than that :/
+> 
+> On a related note, anyone have any idea why we seem to have two subtly 
+> different SP805 bindings defined?
+
+Interesting, I did not even know that until you pointed this out (and 
+it's funny that I found that I actually reviewed arm,sp805.txt 
+internally in Broadcom code review).
+
+It looks like one was done by Bhupesh Sharma (sp805-wdt.txt) and the 
+other was done by Anup Patel (arm,sp805.txt). Both were merged at the 
+same time around March 20, 2016: 915c56bc01d6. I'd assume both were sent 
+out at around the same time.
+
+It sounds like we should definitely remove one of them. Given that 
+sp805-wdt.txt appears to have more detailed descriptions on the use of 
+the clocks, should we remove arm,sp805.txt?
+
+Thanks,
+
+Ray
+
+> 
+> Robin.
+> 
+>> ? Examples:
+>>
