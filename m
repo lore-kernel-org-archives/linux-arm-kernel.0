@@ -1,27 +1,22 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 May 2018 10:06:00 -0700
-Subject: [PATCH v2 0/4] ARM64: dts: meson-axg: i2c updates
-In-Reply-To: <20180517093100.22225-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Thu, 17 May 2018 11:30:56 +0200")
-References: <20180517093100.22225-1-jbrunet@baylibre.com>
-Message-ID: <7hd0xms3nr.fsf@baylibre.com>
+Date: Wed, 23 May 2018 10:07:41 -0700
+Subject: [PATCH 0/2] get rid of Kconfig symbol MACH_MESON8B
+In-Reply-To: <20180520172353.19256-1-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sun, 20 May 2018 19:23:51 +0200")
+References: <20180520172353.19256-1-martin.blumenstingl@googlemail.com>
+Message-ID: <7h603es3ky.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-> This patchset fixes a few problems found in the i2c nodes of
-> amlogic's meson-axg platform. It also adds the missing pins for
-> AO controller so we can use it on the S400
->
-> This series has been tested on the S400 board.
->
-> Jerome Brunet (4):
->   ARM64: dts: meson-axg: clean-up i2c nodes
->   ARM64: dts: meson-axg: correct i2c AO clock
->   ARM64: dts: meson-axg: add i2c AO pins
->   ARM64: dts: meson-axg: enable i2c AO on the S400 board
+> as noted by Kevin [0] there are two Kconfig symbols which only differ
+> in their Kconfig help text and the list of .dtbs that are being built.
+> the goal of this small series is to get rid of the unnecessary
+> MACH_MESON8B Kconfig symbol by merging it into MACH_MESON8.
 
-Applied to v4.18/dt64,
+Thanks for the cleanup.
+
+Applied to v4.18/dt with Jerome's tag,
 
 Kevin
