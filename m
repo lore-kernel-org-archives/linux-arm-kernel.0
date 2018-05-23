@@ -1,51 +1,40 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 23 May 2018 09:42:54 -0700
-Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
- sram code
-In-Reply-To: <739d9bbf-2acc-9c90-db43-cf78f5b184e3@ti.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
- <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
- <d52373eb-1707-17ff-fabb-9f7200cf54c0@ti.com>
- <739d9bbf-2acc-9c90-db43-cf78f5b184e3@ti.com>
-Message-ID: <443e8bb5-91d8-8bd9-ed6a-cf78377eeef4@oracle.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 23 May 2018 09:57:34 -0700
+Subject: [PATCH net] net: phy: broadcom: Fix bcm_write_exp()
+In-Reply-To: <89a1f8d7-5303-f3c0-aa38-43e64488ec5a@gmail.com>
+References: <20180523000450.9384-1-f.fainelli@gmail.com>
+ <20180523001503.GA16062@lunn.ch>
+ <89a1f8d7-5303-f3c0-aa38-43e64488ec5a@gmail.com>
+Message-ID: <f5ba663b-1067-25cf-901b-57e7e85ed9e6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 5/23/2018 1:47 AM, Keerthy wrote:
+On 05/22/2018 06:20 PM, Florian Fainelli wrote:
+> Hi Andrew,
 > 
-> 
-> On Monday 16 April 2018 03:59 PM, Keerthy wrote:
+> On 05/22/2018 05:15 PM, Andrew Lunn wrote:
+>> On Tue, May 22, 2018 at 05:04:49PM -0700, Florian Fainelli wrote:
+>>> On newer PHYs, we need to select the expansion register to write with
+>>> setting bits [11:8] to 0xf. This was done correctly by bcm7xxx.c prior
+>>> to being migrated to generic code under bcm-phy-lib.c which
+>>> unfortunately used the older implementation from the BCM54xx days.
 >>
-[..]
-
->>> Instead of this indirect method , why can't just check the previous
->>> deep sleep mode and based on that do copy or not. EMIF power status
->>> register should have something like that ?
+>> Hi Florian
 >>
->> I will check if we have a register that tells the previous state of sram.
+>> Does selecting the expansion register affect access to the standard
+>> registers? Does this need locking like the Marvell PHY has when
+>> changing pages?
 > 
-> Unfortunately i do not see any such register for knowing SRAM previous
-> state in am43 TRM and hence this indirect way of knowing.
-> 
-OK.
+> We should probably convert this to the page accessors since the
+> expansion, misc and other shadow 0x1c accesses are all indirection
+> layers to poke into a different address space of the PHY. That would be
+> a separate fix though for a number of reasons.
 
-> 
->>
->>>
->>> Another minor point is even though there is nothing to do in suspend,
->>> might be good to have a callback with comment that nothing to do with
->>> some explanation why not. Don't have strong preference but may for
->>> better readability.
-> 
-> I can add a blank suspend call with comment
-> 
-> "The contents are already present in DDR hence no need to explicitly save"
-> 
-> The comment in resume function pretty much explains the above. So let me
-> know if i need to add the suspend callback.
-> Please add the empty suspend callback with comment.
-
-Regards,
-Santosh
+I realize I did not quite answer your question, the answer to your
+question AFAICT is no, setting the expansion register sequence and then
+aborting mid-way is not a problem and does not impact the standard MII
+registers because of how this is implemented. The registers are accessed
+and latched through a specific indirect sequence, but there is no page
+switching unlike the Marvell PHYs
+-- 
+Florian
