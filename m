@@ -1,106 +1,96 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 22 May 2018 16:50:49 -0700
-Subject: [PATCH] arm64: Make sure permission updates happen for pmd/pud
-Message-ID: <20180522235049.23400-1-labbott@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 22 May 2018 17:04:49 -0700
+Subject: [PATCH net] net: phy: broadcom: Fix bcm_write_exp()
+Message-ID: <20180523000450.9384-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-disallowed block mappings for ioremap since that code does not honor
-break-before-make. The same APIs are also used for permission updating
-though and the extra checks prevent the permission updates from happening,
-even though this should be permitted. This results in read-only permissions
-not being fully applied. Visibly, this can occasionaly be seen as a failure
-on the built in rodata test when the test data ends up in a section or
-as an odd RW gap on the page table dump. Fix this by keeping the check
-for the top level p*d_set_huge APIs but using separate functions for the
-update APIs.
+On newer PHYs, we need to select the expansion register to write with
+setting bits [11:8] to 0xf. This was done correctly by bcm7xxx.c prior
+to being migrated to generic code under bcm-phy-lib.c which
+unfortunately used the older implementation from the BCM54xx days.
 
-Reported-by: Peter Robinson <pbrobinson@gmail.com>
-Fixes: 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-Signed-off-by: Laura Abbott <labbott@redhat.com>
+Fix this by creating an inline stub: bcm_write_exp_sel() which adds the
+correct value (MII_BCM54XX_EXP_SEL_ER) and update both the Cygnus PHY
+and BCM7xxx PHY drivers which require setting these bits.
+
+broadcom.c is unchanged because some PHYs even use a different selector
+method, so let them specify it directly (e.g: SerDes secondary selector).
+
+Fixes: a1cba5613edf ("net: phy: Add Broadcom phy library for common interfaces")
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm64/mm/mmu.c | 28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+David, please also queue this one up for -stable, thanks!
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 2dbb2c9f1ec1..57517ad86910 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -66,6 +66,9 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
- static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
- static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+ drivers/net/phy/bcm-cygnus.c  | 6 +++---
+ drivers/net/phy/bcm-phy-lib.h | 7 +++++++
+ drivers/net/phy/bcm7xxx.c     | 4 ++--
+ 3 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/phy/bcm-cygnus.c b/drivers/net/phy/bcm-cygnus.c
+index 6838129839ca..e757b09f1889 100644
+--- a/drivers/net/phy/bcm-cygnus.c
++++ b/drivers/net/phy/bcm-cygnus.c
+@@ -61,17 +61,17 @@ static int bcm_cygnus_afe_config(struct phy_device *phydev)
+ 		return rc;
  
-+static void __pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot);
-+static void __pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot);
-+
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
- {
-@@ -200,7 +203,7 @@ static void init_pmd(pud_t *pudp, unsigned long addr, unsigned long end,
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
- 		    (flags & NO_BLOCK_MAPPINGS) == 0) {
--			pmd_set_huge(pmdp, phys, prot);
-+			__pmd_set_huge(pmdp, phys, prot);
+ 	/* make rcal=100, since rdb default is 000 */
+-	rc = bcm_phy_write_exp(phydev, MII_BRCM_CORE_EXPB1, 0x10);
++	rc = bcm_phy_write_exp_sel(phydev, MII_BRCM_CORE_EXPB1, 0x10);
+ 	if (rc < 0)
+ 		return rc;
  
- 			/*
- 			 * After the PMD entry has been populated once, we
-@@ -299,7 +302,7 @@ static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
- 		 */
- 		if (use_1G_block(addr, next, phys) &&
- 		    (flags & NO_BLOCK_MAPPINGS) == 0) {
--			pud_set_huge(pudp, phys, prot);
-+			__pud_set_huge(pudp, phys, prot);
+ 	/* CORE_EXPB0, Reset R_CAL/RC_CAL Engine */
+-	rc = bcm_phy_write_exp(phydev, MII_BRCM_CORE_EXPB0, 0x10);
++	rc = bcm_phy_write_exp_sel(phydev, MII_BRCM_CORE_EXPB0, 0x10);
+ 	if (rc < 0)
+ 		return rc;
  
- 			/*
- 			 * After the PUD entry has been populated once, we
-@@ -929,31 +932,40 @@ int __init arch_ioremap_pmd_supported(void)
- 	return 1;
+ 	/* CORE_EXPB0, Disable Reset R_CAL/RC_CAL Engine */
+-	rc = bcm_phy_write_exp(phydev, MII_BRCM_CORE_EXPB0, 0x00);
++	rc = bcm_phy_write_exp_sel(phydev, MII_BRCM_CORE_EXPB0, 0x00);
+ 
+ 	return 0;
  }
+diff --git a/drivers/net/phy/bcm-phy-lib.h b/drivers/net/phy/bcm-phy-lib.h
+index 7c73808cbbde..81cceaa412fe 100644
+--- a/drivers/net/phy/bcm-phy-lib.h
++++ b/drivers/net/phy/bcm-phy-lib.h
+@@ -14,11 +14,18 @@
+ #ifndef _LINUX_BCM_PHY_LIB_H
+ #define _LINUX_BCM_PHY_LIB_H
  
--int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
-+void __pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
- {
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
++#include <linux/brcmphy.h>
+ #include <linux/phy.h>
  
-+	BUG_ON(phys & ~PUD_MASK);
-+	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
+ int bcm_phy_write_exp(struct phy_device *phydev, u16 reg, u16 val);
+ int bcm_phy_read_exp(struct phy_device *phydev, u16 reg);
+ 
++static inline int bcm_phy_write_exp_sel(struct phy_device *phydev,
++					u16 reg, u16 val)
++{
++	return bcm_phy_write_exp(phydev, reg | MII_BCM54XX_EXP_SEL_ER, val);
 +}
 +
-+int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
-+{
- 	/* ioremap_page_range doesn't honour BBM */
- 	if (pud_present(READ_ONCE(*pudp)))
- 		return 0;
+ int bcm54xx_auxctl_write(struct phy_device *phydev, u16 regnum, u16 val);
+ int bcm54xx_auxctl_read(struct phy_device *phydev, u16 regnum);
  
--	BUG_ON(phys & ~PUD_MASK);
--	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
-+	__pud_set_huge(pudp, phys, prot);
- 	return 1;
- }
- 
--int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
-+static void __pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
+diff --git a/drivers/net/phy/bcm7xxx.c b/drivers/net/phy/bcm7xxx.c
+index 29b1c88b55cc..01d2ff2f6241 100644
+--- a/drivers/net/phy/bcm7xxx.c
++++ b/drivers/net/phy/bcm7xxx.c
+@@ -65,10 +65,10 @@ struct bcm7xxx_phy_priv {
+ static void r_rc_cal_reset(struct phy_device *phydev)
  {
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
-+	BUG_ON(phys & ~PMD_MASK);
-+	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
-+}
+ 	/* Reset R_CAL/RC_CAL Engine */
+-	bcm_phy_write_exp(phydev, 0x00b0, 0x0010);
++	bcm_phy_write_exp_sel(phydev, 0x00b0, 0x0010);
  
-+int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
-+{
- 	/* ioremap_page_range doesn't honour BBM */
- 	if (pmd_present(READ_ONCE(*pmdp)))
- 		return 0;
- 
--	BUG_ON(phys & ~PMD_MASK);
--	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
-+	__pmd_set_huge(pmdp, phys, prot);
- 	return 1;
+ 	/* Disable Reset R_AL/RC_CAL Engine */
+-	bcm_phy_write_exp(phydev, 0x00b0, 0x0000);
++	bcm_phy_write_exp_sel(phydev, 0x00b0, 0x0000);
  }
  
+ static int bcm7xxx_28nm_b0_afe_config_init(struct phy_device *phydev)
 -- 
-2.17.0
+2.14.1
