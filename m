@@ -1,53 +1,96 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 23 May 2018 16:46:25 +0800
-Subject: [rjarzmik:test/daniel 23/34] sound/arm/pxa2xx-ac97.c:27:10: fatal
- error: mach/regs-ac97.h: No such file or directory
-Message-ID: <201805231623.n3Qx9qdU%fengguang.wu@intel.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 23 May 2018 14:17:09 +0530
+Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
+ sram code
+In-Reply-To: <d52373eb-1707-17ff-fabb-9f7200cf54c0@ti.com>
+References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+ <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
+ <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
+ <d52373eb-1707-17ff-fabb-9f7200cf54c0@ti.com>
+Message-ID: <739d9bbf-2acc-9c90-db43-cf78f5b184e3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/rjarzmik/linux test/daniel
-head:   f495e2dbc482d8f01a1ee20e86284ee9c0c8fa98
-commit: 4cd654b13b9bcc0f206d414497b798ed42df573a [23/34] HACK: select SND_PXA_SOC_SSP for SND_SIMPLE_CARD
-config: x86_64-randconfig-s3-05231547 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        git checkout 4cd654b13b9bcc0f206d414497b798ed42df573a
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
 
-All errors (new ones prefixed by >>):
 
->> sound/arm/pxa2xx-ac97.c:27:10: fatal error: mach/regs-ac97.h: No such file or directory
-    #include <mach/regs-ac97.h>
-             ^~~~~~~~~~~~~~~~~~
-   compilation terminated.
---
->> sound/soc/pxa/pxa2xx-i2s.c:28:10: fatal error: mach/hardware.h: No such file or directory
-    #include <mach/hardware.h>
-             ^~~~~~~~~~~~~~~~~
-   compilation terminated.
+On Monday 16 April 2018 03:59 PM, Keerthy wrote:
+> 
+> 
+> On Thursday 12 April 2018 10:14 PM, santosh.shilimkar at oracle.com wrote:
+>> On 4/11/18 9:53 PM, Keerthy wrote:
+>>> From: Dave Gerlach <d-gerlach@ti.com>
+>>>
+>>> After an RTC+DDR cycle we lose sram context so emif pm functions present
+>>> in sram are lost. We can check if the first byte of the original
+>>> code in DDR contains the same first byte as the code in sram, and if
+>>> they do not match we know we have lost context and must recopy the
+>>> functions to the previous address to maintain PM functionality.
+>>>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> ---
+>>> ? drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
+>>> ? 1 file changed, 24 insertions(+)
+>>>
+>>> diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
+>>> index 632651f..ec4a62c 100644
+>>> --- a/drivers/memory/ti-emif-pm.c
+>>> +++ b/drivers/memory/ti-emif-pm.c
+>>> @@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
+>>> ? };
+>>> ? MODULE_DEVICE_TABLE(of, ti_emif_of_match);
+>>> ? +#ifdef CONFIG_PM_SLEEP
+>>> +static int ti_emif_resume(struct device *dev)
+>>> +{
+>>> +??? unsigned long tmp =
+>>> +??????????? __raw_readl((void *)emif_instance->ti_emif_sram_virt);
+>>> +
+>>> +??? /*
+>>> +???? * Check to see if what we are copying is already present in the
+>>> +???? * first byte at the destination, only copy if it is not which
+>>> +???? * indicates we have lost context and sram no longer contains
+>>> +???? * the PM code
+>>> +???? */
+>>
+>>> +??? if (tmp != ti_emif_sram)
+>>> +??????? ti_emif_push_sram(dev, emif_instance);
+>>> +
+>>> +??? return 0;
+>>> +}
+>>> +#endif /* CONFIG_PM_SLEEP */
+>> Instead of this indirect method , why can't just check the previous
+>> deep sleep mode and based on that do copy or not. EMIF power status
+>> register should have something like that ?
+> 
+> I will check if we have a register that tells the previous state of sram.
 
-vim +27 sound/arm/pxa2xx-ac97.c
+Unfortunately i do not see any such register for knowing SRAM previous
+state in am43 TRM and hence this indirect way of knowing.
 
-2c484df0 Takashi Iwai 2005-06-30  26  
-1f017a99 Eric Miao    2008-11-28 @27  #include <mach/regs-ac97.h>
-a09e64fb Russell King 2008-08-05  28  #include <mach/audio.h>
-2c484df0 Takashi Iwai 2005-06-30  29  
+http://www.ti.com/lit/ug/spruhl7h/spruhl7h.pdf
 
-:::::: The code at line 27 was first introduced by commit
-:::::: 1f017a9964c5b3b9581d3a5732110cb1e0444281 [ARM] pxa: move AC97 register definitions into dedicated regs-ac97.h
+> 
+>>
+>> Another minor point is even though there is nothing to do in suspend,
+>> might be good to have a callback with comment that nothing to do with
+>> some explanation why not. Don't have strong preference but may for
+>> better readability.
 
-:::::: TO: Eric Miao <eric.miao@marvell.com>
-:::::: CC: Eric Miao <eric.miao@marvell.com>
+I can add a blank suspend call with comment
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31184 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/2435dd78/attachment-0001.gz>
+"The contents are already present in DDR hence no need to explicitly save"
+
+The comment in resume function pretty much explains the above. So let me
+know if i need to add the suspend callback.
+
+Regards,
+Keerthy
+
+> 
+> Okay. Thanks a lot for the quick feedback!
+> 
+>>
+>> Regards,
+>> Santosh
+>>
+>>
