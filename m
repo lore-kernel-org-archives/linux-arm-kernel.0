@@ -1,54 +1,117 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 23 May 2018 21:07:12 +0200
-Subject: [PATCH 1/5] pinctrl: at91-pio4: add missing of_node_put
-In-Reply-To: <1527102436-13447-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1527102436-13447-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1527102436-13447-2-git-send-email-Julia.Lawall@lip6.fr>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 24 May 2018 01:33:05 +0530
+Subject: [PATCH 1/2] ti: wkup_m3_ipc: Add rtc_only with ddr in self refresh
+ mode support
+Message-ID: <1527105786-23396-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device node iterators perform an of_node_get on each iteration, so a
-jump out of the loop requires an of_node_put.
+Adds rtc_only support. This needs resume function to shutdown and
+reboot the m3.
 
-The semantic patch that fixes this problem is as follows
-(http://coccinelle.lip6.fr):
-
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-iterator name for_each_child_of_node;
-@@
-
- for_each_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-+  of_node_put(child);
-?  break;
-   ...
-}
-... when != child
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- drivers/pinctrl/pinctrl-at91-pio4.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index 4b57a13..bafb3d4 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -576,8 +576,10 @@ static int atmel_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 		for_each_child_of_node(np_config, np) {
- 			ret = atmel_pctl_dt_subnode_to_map(pctldev, np, map,
- 						    &reserved_maps, num_maps);
--			if (ret < 0)
-+			if (ret < 0) {
-+				of_node_put(np);
- 				break;
-+			}
- 		}
- 	}
+This is tested on am437x-gp-evm and target for 4.19
+
+ drivers/soc/ti/wkup_m3_ipc.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/wkup_m3_ipc.h  |  3 +++
+ 2 files changed, 44 insertions(+)
+
+diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+index 369aef5..b732c39 100644
+--- a/drivers/soc/ti/wkup_m3_ipc.c
++++ b/drivers/soc/ti/wkup_m3_ipc.c
+@@ -329,12 +329,24 @@ static int wkup_m3_finish_low_power(struct wkup_m3_ipc *m3_ipc)
+ 	return 0;
+ }
  
++/**
++ * wkup_m3_set_rtc_only - Set the rtc_only flag
++ * @wkup_m3_wakeup: struct wkup_m3_wakeup_src * gets assigned the
++ *                  wakeup src value
++ */
++static void wkup_m3_set_rtc_only(struct wkup_m3_ipc *m3_ipc)
++{
++	if (m3_ipc_state)
++		m3_ipc_state->is_rtc_only = true;
++}
++
+ static struct wkup_m3_ipc_ops ipc_ops = {
+ 	.set_mem_type = wkup_m3_set_mem_type,
+ 	.set_resume_address = wkup_m3_set_resume_address,
+ 	.prepare_low_power = wkup_m3_prepare_low_power,
+ 	.finish_low_power = wkup_m3_finish_low_power,
+ 	.request_pm_status = wkup_m3_request_pm_status,
++	.set_rtc_only = wkup_m3_set_rtc_only,
+ };
+ 
+ /**
+@@ -484,6 +496,32 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int wkup_m3_ipc_suspend(struct device *dev)
++{
++	/*
++	 * Nothing needs to be done on suspend even with rtc_only flag set
++	 */
++	return 0;
++}
++
++static int wkup_m3_ipc_resume(struct device *dev)
++{
++	if (m3_ipc_state->is_rtc_only) {
++		rproc_shutdown(m3_ipc_state->rproc);
++		rproc_boot(m3_ipc_state->rproc);
++	}
++
++	m3_ipc_state->is_rtc_only = false;
++
++	return 0;
++}
++
++static const struct dev_pm_ops wkup_m3_ipc_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(wkup_m3_ipc_suspend, wkup_m3_ipc_resume)
++};
++#endif
++
+ static const struct of_device_id wkup_m3_ipc_of_match[] = {
+ 	{ .compatible = "ti,am3352-wkup-m3-ipc", },
+ 	{ .compatible = "ti,am4372-wkup-m3-ipc", },
+@@ -497,6 +535,9 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+ 	.driver = {
+ 		.name = "wkup_m3_ipc",
+ 		.of_match_table = wkup_m3_ipc_of_match,
++#ifdef CONFIG_PM
++		.pm = &wkup_m3_ipc_pm_ops,
++#endif
+ 	},
+ };
+ 
+diff --git a/include/linux/wkup_m3_ipc.h b/include/linux/wkup_m3_ipc.h
+index d6ba7d3..d639df1 100644
+--- a/include/linux/wkup_m3_ipc.h
++++ b/include/linux/wkup_m3_ipc.h
+@@ -40,6 +40,7 @@ struct wkup_m3_ipc {
+ 	struct mbox_chan *mbox;
+ 
+ 	struct wkup_m3_ipc_ops *ops;
++	int is_rtc_only;
+ };
+ 
+ struct wkup_m3_ipc_ops {
+@@ -48,8 +49,10 @@ struct wkup_m3_ipc_ops {
+ 	int (*prepare_low_power)(struct wkup_m3_ipc *m3_ipc, int state);
+ 	int (*finish_low_power)(struct wkup_m3_ipc *m3_ipc);
+ 	int (*request_pm_status)(struct wkup_m3_ipc *m3_ipc);
++	void (*set_rtc_only)(struct wkup_m3_ipc *m3_ipc);
+ };
+ 
+ struct wkup_m3_ipc *wkup_m3_ipc_get(void);
+ void wkup_m3_ipc_put(struct wkup_m3_ipc *m3_ipc);
++void wkup_m3_set_rtc_only_mode(void);
+ #endif /* _LINUX_WKUP_M3_IPC_H */
+-- 
+1.9.1
