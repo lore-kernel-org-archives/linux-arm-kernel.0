@@ -1,29 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 23 May 2018 16:08:11 -0400 (EDT)
-Subject: [PATCH V4 0/8] net: ethernet: stmmac: add support for stm32mp1
-In-Reply-To: <1527090479-5263-1-git-send-email-christophe.roullier@st.com>
-References: <1527090479-5263-1-git-send-email-christophe.roullier@st.com>
-Message-ID: <20180523.160811.1425159248399846750.davem@davemloft.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 23 May 2018 22:09:35 +0200
+Subject: [PATCH v3 08/13] dt-bindings: power: add RK3228 SoCs header for
+ power-domain
+In-Reply-To: <1527058286-10503-1-git-send-email-zhangqing@rock-chips.com>
+References: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
+ <1527058286-10503-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <4942955.LTVoZv9MpS@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christophe Roullier <christophe.roullier@st.com>
-Date: Wed, 23 May 2018 17:47:51 +0200
-
-> Patches to have Ethernet support on stm32mp1
-> Changelog:
-> Remark from Rob Herring
-> Move Documentation/devicetree/bindings/arm/stm32.txt in 
-> Documentation/devicetree/bindings/arm/stm32/stm32.txt and create
-> Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt
+Am Mittwoch, 23. Mai 2018, 08:51:26 CEST schrieb Elaine Zhang:
+> According to a description from TRM, add all the power domains.
 > 
-> Replace also in arch/arm/boot/dts/stm32mp157c.dtsi, syscfg: system-config at 50020000 
-> with syscfg: syscon at 50020000syscfg: system-config at 50020000 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-Probably the DTS file updates need to go in via the ARM tree, not
-mine.
+applied for 4.18 (or later)
 
-Can you respin a net-next targetted series that has just the driver
-code and device tree binding updates?
-
-Thank you!
+Thanks
+Heiko
