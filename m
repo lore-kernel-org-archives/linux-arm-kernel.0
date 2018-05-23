@@ -1,70 +1,112 @@
-From: christophe.roullier@st.com (Christophe ROULLIER)
-Date: Wed, 23 May 2018 09:32:04 +0000
-Subject: [PATCH V3 8/8] dt-bindings: stm32: add compatible for syscon
-In-Reply-To: <20180522172238.GA26145@rob-hp-laptop>
-References: <1526890046-10565-1-git-send-email-christophe.roullier@st.com>
- <1526890046-10565-9-git-send-email-christophe.roullier@st.com>
- <20180522172238.GA26145@rob-hp-laptop>
-Message-ID: <4f6941a0-4b41-f2db-52b1-d45aa7287fa2@st.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 23 May 2018 11:31:20 +0200
+Subject: [PATCH v5 5/7] drm/i2c: tda998x: split tda998x_encoder_dpms into
+ enable/disable
+In-Reply-To: <20180523093122.27859-1-peda@axentia.se>
+References: <20180523093122.27859-1-peda@axentia.se>
+Message-ID: <20180523093122.27859-6-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2018 07:22 PM, Rob Herring wrote:
-> On Mon, May 21, 2018 at 10:07:26AM +0200, Christophe Roullier wrote:
->> This patch describes syscon DT bindings.
->>
->> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
->> ---
->>   Documentation/devicetree/bindings/arm/stm32.txt | 5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
->> index 6808ed9..e46ebad 100644
->> --- a/Documentation/devicetree/bindings/arm/stm32.txt
->> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
->> @@ -8,3 +8,8 @@ using one of the following compatible strings:
->>     st,stm32f746
->>     st,stm32h743
->>     st,stm32mp157
->> +
->> +Required nodes:
->> +- syscon: the soc bus node must have a system controller node pointing to the
->> +  global control registers, with the compatible string
->> +  "st,stm32mp157-syscfg", "syscon";
-> 
-> Please don't mix soc/board bindings with other nodes. So perhaps
-> stm32-syscon.txt.
-> 
-> Rob
-> 
+This fits better with the drm_bridge callbacks for when this
+driver becomes a drm_bridge.
 
-Hi Rob,
+Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c | 64 ++++++++++++++++++++++-----------------
+ 1 file changed, 37 insertions(+), 27 deletions(-)
 
-Is it ok for you with this tree file:
-
-Documentation/devicetree/bindings/arm/stm32/stm32.txt
-Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt
-	With stm32-syscon.txt:
-
----------------------------------------------------
-STMicroelectronics STM32 Platforms System Controller
-
-Properties:
-  - compatible : should contain two values. First value must be :
-		- " st,stm32mp157-syscfg " - for stm32mp157 based SoCs,
-		second value must be always "syscon".
-  - reg : offset and length of the register set.
-
-Example:
-	syscfg: system-config at 50020000 {
-		compatible = "st,stm32mp157-syscfg", "syscon";
-		reg = <0x50020000 0x400>;
-	};
----------------------------------------------------
-
-Do we need to update also all MCU family (stm32f4, stm32h7, stm32f7) 
-property to be coherent ?
-
-Thanks for your feedback.
-
-Christophe.
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 933d309d2e0f..3dda07a2fd2f 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1163,36 +1163,42 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
+ 
+ /* DRM encoder functions */
+ 
+-static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
++static void tda998x_enable(struct tda998x_priv *priv)
+ {
+-	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
+-	bool on;
++	if (priv->is_on)
++		return;
+ 
+-	/* we only care about on or off: */
+-	on = mode == DRM_MODE_DPMS_ON;
++	/* enable video ports, audio will be enabled later */
++	reg_write(priv, REG_ENA_VP_0, 0xff);
++	reg_write(priv, REG_ENA_VP_1, 0xff);
++	reg_write(priv, REG_ENA_VP_2, 0xff);
++	/* set muxing after enabling ports: */
++	reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
++	reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
++	reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+ 
+-	if (on == priv->is_on)
+-		return;
++	priv->is_on = true;
++}
+ 
+-	if (on) {
+-		/* enable video ports, audio will be enabled later */
+-		reg_write(priv, REG_ENA_VP_0, 0xff);
+-		reg_write(priv, REG_ENA_VP_1, 0xff);
+-		reg_write(priv, REG_ENA_VP_2, 0xff);
+-		/* set muxing after enabling ports: */
+-		reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
+-		reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
+-		reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+-
+-		priv->is_on = true;
+-	} else {
+-		/* disable video ports */
+-		reg_write(priv, REG_ENA_VP_0, 0x00);
+-		reg_write(priv, REG_ENA_VP_1, 0x00);
+-		reg_write(priv, REG_ENA_VP_2, 0x00);
++static void tda998x_disable(struct tda998x_priv *priv)
++{
++	/* disable video ports */
++	reg_write(priv, REG_ENA_VP_0, 0x00);
++	reg_write(priv, REG_ENA_VP_1, 0x00);
++	reg_write(priv, REG_ENA_VP_2, 0x00);
+ 
+-		priv->is_on = false;
+-	}
++	priv->is_on = false;
++}
++
++static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++
++	/* we only care about on or off: */
++	if (mode == DRM_MODE_DPMS_ON)
++		tda998x_enable(priv);
++	else
++		tda998x_disable(priv);
+ }
+ 
+ static void
+@@ -1606,12 +1612,16 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 
+ static void tda998x_encoder_prepare(struct drm_encoder *encoder)
+ {
+-	tda998x_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
++	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++
++	tda998x_disable(priv);
+ }
+ 
+ static void tda998x_encoder_commit(struct drm_encoder *encoder)
+ {
+-	tda998x_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
++	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++
++	tda998x_enable(priv);
+ }
+ 
+ static const struct drm_encoder_helper_funcs tda998x_encoder_helper_funcs = {
+-- 
+2.11.0
