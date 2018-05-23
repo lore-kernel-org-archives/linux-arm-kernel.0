@@ -1,108 +1,86 @@
 From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 23 May 2018 15:34:20 +0100
-Subject: [PATCH v10 04/18] KVM: arm/arm64: Introduce
- kvm_arch_vcpu_run_pid_change
-In-Reply-To: <1527005119-6842-5-git-send-email-Dave.Martin@arm.com>
+Date: Wed, 23 May 2018 15:35:31 +0100
+Subject: [PATCH v10 02/18] thread_info: Add update_thread_flag() helpers
+In-Reply-To: <20180523135732.GK13470@e103592.cambridge.arm.com>
 References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-5-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87muwqtp8z.fsf@linaro.org>
+ <1527005119-6842-3-git-send-email-Dave.Martin@arm.com>
+ <87po1mtrg3.fsf@linaro.org>
+ <20180523135732.GK13470@e103592.cambridge.arm.com>
+Message-ID: <87lgcatp70.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Dave Martin <Dave.Martin@arm.com> writes:
 
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+> On Wed, May 23, 2018 at 02:46:52PM +0100, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > There are a number of bits of code sprinkled around the kernel to
+>> > set a thread flag if a certain condition is true, and clear it
+>> > otherwise.
+>> >
+>> > To help make those call sites terser and less cumbersome, this
+>> > patch adds a new family of thread flag manipulators
+>> >
+>> > 	update*_thread_flag([...,] flag, cond)
+>> >
+>> > which do the equivalent of:
+>> >
+>> > 	if (cond)
+>> > 		set*_thread_flag([...,] flag);
+>> > 	else
+>> > 		clear*_thread_flag([...,] flag);
+>> >
+>> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> > Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+>> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> > Cc: Ingo Molnar <mingo@redhat.com>
+>> > Cc: Peter Zijlstra <peterz@infradead.org>
+>> > Cc: Oleg Nesterov <oleg@redhat.com>
+>> > ---
+>> >  include/linux/sched.h       |  6 ++++++
+>> >  include/linux/thread_info.h | 11 +++++++++++
+>> >  2 files changed, 17 insertions(+)
+>> >
 >
-> KVM/ARM differs from other architectures in having to maintain an
-> additional virtual address space from that of the host and the
-> guest, because we split the execution of KVM across both EL1 and
-> EL2.
+> [...]
 >
-> This results in a need to explicitly map data structures into EL2
-> (hyp) which are accessed from the hyp code.  As we are about to be
-> more clever with our FPSIMD handling on arm64, which stores data in
-> the task struct and uses thread_info flags, we will have to map
-> parts of the currently executing task struct into the EL2 virtual
-> address space.
+>> > diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+>> > index cf2862b..8d8821b 100644
+>> > --- a/include/linux/thread_info.h
+>> > +++ b/include/linux/thread_info.h
+>> > @@ -60,6 +60,15 @@ static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
+>> >  	clear_bit(flag, (unsigned long *)&ti->flags);
+>> >  }
+>> >
+>> > +static inline void update_ti_thread_flag(struct thread_info *ti, int flag,
+>> > +					 bool value)
+>> > +{
+>> > +	if (value)
+>> > +		set_ti_thread_flag(ti, flag);
+>> > +	else
+>> > +		clear_ti_thread_flag(ti, flag);
+>> > +}
+>> > +
+>>
+>> value does seem a bit of vanilla non-informative name for a condition
+>> flag but whatever:
+>>
+>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 >
-> However, we don't want to do this on every KVM_RUN, because it is a
-> fairly expensive operation to walk the page tables, and the common
-> execution mode is to map a single thread to a VCPU.  By introducing
-> a hook that architectures can select with
-> HAVE_KVM_VCPU_RUN_PID_CHANGE, we do not introduce overhead for
-> other architectures, but have a simple way to only map the data we
-> need when required for arm64.
+> I guess, though I couldn't some up with an obviously better name.
 >
-> This patch introduces the framework only, and wires it up in the
-> arm/arm64 KVM common code.
->
-> No functional change.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/linux/kvm_host.h | 9 +++++++++
->  virt/kvm/Kconfig         | 3 +++
->  virt/kvm/kvm_main.c      | 7 ++++++-
->  3 files changed, 18 insertions(+), 1 deletion(-)
->
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index 6930c63..4268ace 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -1276,4 +1276,13 @@ static inline long kvm_arch_vcpu_async_ioctl(struct file *filp,
->  void kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
->  		unsigned long start, unsigned long end);
->
-> +#ifdef CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE
-> +int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu);
-> +#else
-> +static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
-> +{
-> +	return 0;
-> +}
-> +#endif /* CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE */
-> +
->  #endif
-> diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-> index cca7e06..72143cf 100644
-> --- a/virt/kvm/Kconfig
-> +++ b/virt/kvm/Kconfig
-> @@ -54,3 +54,6 @@ config HAVE_KVM_IRQ_BYPASS
->
->  config HAVE_KVM_VCPU_ASYNC_IOCTL
->         bool
-> +
-> +config HAVE_KVM_VCPU_RUN_PID_CHANGE
-> +       bool
+> I support "condition" would have worked, but it's more verbose.
 
-This almost threw me as I thought you might be able to enable this and
-break the build, but apparently not:
+Well as you use cond in the text I think cond would also work as an
+abbreviated variable name. But its a minor nit ;-)
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index c7b2e92..c32e240 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -2550,8 +2550,13 @@ static long kvm_vcpu_ioctl(struct file *filp,
->  		oldpid = rcu_access_pointer(vcpu->pid);
->  		if (unlikely(oldpid != current->pids[PIDTYPE_PID].pid)) {
->  			/* The thread running this VCPU changed. */
-> -			struct pid *newpid = get_task_pid(current, PIDTYPE_PID);
-> +			struct pid *newpid;
 >
-> +			r = kvm_arch_vcpu_run_pid_change(vcpu);
-> +			if (r)
-> +				break;
-> +
-> +			newpid = get_task_pid(current, PIDTYPE_PID);
->  			rcu_assign_pointer(vcpu->pid, newpid);
->  			if (oldpid)
->  				synchronize_rcu();
+> Thanks for the review
+> ---Dave
 
 
 --
