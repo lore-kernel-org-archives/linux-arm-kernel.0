@@ -1,241 +1,200 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 23 May 2018 21:22:03 +0800
-Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
-In-Reply-To: <3c9cdb5c-e1e0-f76d-5367-02aaf668b232@arm.com>
-References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
- <1526892748-326-2-git-send-email-leo.yan@linaro.org>
- <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
- <20180522083920.GD31075@leoy-ThinkPad-X240s>
- <20180522095249.GE31075@leoy-ThinkPad-X240s>
- <3c9cdb5c-e1e0-f76d-5367-02aaf668b232@arm.com>
-Message-ID: <20180523132203.GA30299@leoy-ThinkPad-X240s>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 23 May 2018 14:31:59 +0100
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180523114812.GH55598@C02W217FHV2R.local>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+ <20180523114812.GH55598@C02W217FHV2R.local>
+Message-ID: <20180523133158.GJ13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, May 23, 2018 at 01:48:12PM +0200, Christoffer Dall wrote:
+> On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
+> > Currently the FPSIMD handling code uses the condition task->mm ==
+> > NULL as a hint that task has no FPSIMD register context.
+> > 
+> > The ->mm check is only there to filter out tasks that cannot
+> > possibly have FPSIMD context loaded, for optimisation purposes.
+> > Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
+> > saving FPSIMD context back to memory.  For these reasons, the ->mm
+> > checks are not useful, providing that that TIF_FOREIGN_FPSTATE is
 
-On Wed, May 23, 2018 at 12:21:18PM +0100, Robert Walker wrote:
-> Hi Leo,
-> 
-> On 22/05/18 10:52, Leo Yan wrote:
-> >On Tue, May 22, 2018 at 04:39:20PM +0800, Leo Yan wrote:
-> >
-> >[...]
-> >
-> >Rather than the patch I posted in my previous email, I think below new
-> >patch is more reasonable for me.
-> >
-> >In the below change, 'etmq->prev_packet' is only used to store the
-> >previous CS_ETM_RANGE packet, we don't need to save CS_ETM_TRACE_ON
-> >packet into 'etmq->prev_packet'.
-> >
-> >On the other hand, cs_etm__flush() can use 'etmq->period_instructions'
-> >to indicate if need to generate instruction sample or not.  If it's
-> >non-zero, then generate instruction sample and
-> >'etmq->period_instructions' will be cleared; so next time if there
-> >have more tracing CS_ETM_TRACE_ON packet, it can skip to generate
-> >instruction sample due 'etmq->period_instructions' is zero.
-> >
-> >How about you think for this?
-> >
-> >Thanks,
-> >Leo Yan
-> >
-> 
-> I don't think this covers the cases where CS_ETM_TRACE_ON is used to
-> indicate a discontinuity in the trace.  For example, there is work in
-> progress to configure the ETM so that it only traces a few thousand cycles
-> with a gap of many thousands of cycles between each chunk of trace - this
-> can be used to sample program execution in the form of instruction events
-> with branch stacks for feedback directed optimization (AutoFDO).
-> 
-> In this case, the raw trace is something like:
-> 
->     ...
->     I_ADDR_L_64IS0 : Address, Long, 64 bit, IS0.; Addr=0x0000007E7B886908;
->     I_ATOM_F3 : Atom format 3.; EEN
->     I_ATOM_F1 : Atom format 1.; E
-> # Trace stops here
-> 
-> # Some time passes, and then trace is turned on again
->     I_TRACE_ON : Trace On.
->     I_ADDR_CTXT_L_64IS0 : Address & Context, Long, 64 bit, IS0.;
-> Addr=0x00000057224322F4; Ctxt: AArch64,EL0, NS;
->     I_ATOM_F3 : Atom format 3.; ENN
->     I_ATOM_F5 : Atom format 5.; ENENE
->     ...
-> 
-> This results in the following packets from the decoder:
-> 
-> CS_ETM_RANGE: [0x7e7b886908-0x7e7b886930] br
-> CS_ETM_RANGE: [0x7e7b88699c-0x7e7b8869a4] br
-> CS_ETM_RANGE: [0x7e7b8869d8-0x7e7b8869f0]
-> CS_ETM_RANGE: [0x7e7b8869f0-0x7e7b8869fc] br
-> CS_ETM_TRACE_ON
-> CS_ETM_RANGE: [0x57224322f4-0x5722432304] br
-> CS_ETM_RANGE: [0x57224320e8-0x57224320ec]
-> CS_ETM_RANGE: [0x57224320ec-0x57224320f8]
-> CS_ETM_RANGE: [0x57224320f8-0x572243212c] br
-> CS_ETM_RANGE: [0x5722439b80-0x5722439bec]
-> CS_ETM_RANGE: [0x5722439bec-0x5722439c14] br
-> CS_ETM_RANGE: [0x5722437c30-0x5722437c6c]
-> CS_ETM_RANGE: [0x5722437c6c-0x5722437c7c] br
-> 
-> Without handling the CS_ETM_TRACE_ON, this would be interpreted as a branch
-> from 0x7e7b8869f8 to 0x57224322f4, when there is actually a gap of many
-> thousand instructions between these.
-> 
-> I think this patch will break the branch stacks - by removing the
-> prev_packet swap from cs_etm__flush(), the next time a CS_ETM_RANGE packet
-> is handled, cs_etm__sample() will see prev_packet contains the last
-> CS_ETM_RANGE from the previous block of trace, causing an erroneous call to
-> cs_etm__update_last_branch_rb().  In the example above, the branch stack
-> will contain an erroneous branch from 0x7e7b8869f8 to 0x57224322f4.
-> 
-> I think what you need to do is add a check for the previous packet being a
-> CS_ETM_TRACE_ON when determining the generate_sample value.
+Hmmm, "that that".  I'll fix that.
 
-I still can see there have hole for packets handling with your
-suggestion, let's focus on below three packets:
-
-CS_ETM_RANGE:    [0x7e7b8869f0-0x7e7b8869fc] br
-CS_ETM_TRACE_ON: [0xdeadbeefdeadbeef-0xdeadbeefdeadbeef]
-CS_ETM_RANGE:    [0x57224322f4-0x5722432304] br
-
-When the CS_ETM_TRACE_ON packet is coming, cs_etm__flush() doesn't
-handle for 'etmq->prev_packet' to generate branch sample, this results
-in we miss the info for 0x7e7b8869fc, and with packet swapping
-'etmq->prev_packet' is assigned to CS_ETM_TRACE_ON packet.
-
-When the last CS_ETM_RANGE packet is coming, cs_etm__sample() will
-combine the values from CS_ETM_TRACE_ON packet and the last
-CS_ETM_RANGE packet to generate branch sample packet; at the end
-we get below sample packets:
-
-  packet(n):   sample::addr=0x7e7b8869f0
-  packet(n+1): sample::ip=0xdeadbeefdeadbeeb sample::addr=0x57224322f4
-
-So I think we also need to generate branch sample, and we can get
-below results:
-
-  packet(n):   sample::addr=0x7e7b8869f0
-  packet(n+1): sample::ip=0x7e7b8869f8 sample::addr=0xdeadbeefdeadbeef
-  packet(n+2): sample::ip=0xdeadbeefdeadbeeb sample::addr=0x57224322f4
-
-So we also can rely on this to get to know there have one address
-range is [0xdeadbeefdeadbeef..0xdeadbeefdeadbeeb] to indicate there
-have a discontinuity in the trace.
-
-> Regards
+> > maintained in a consistent way for kernel threads.
+> > 
+> > This is true by construction however: TIF_FOREIGN_FPSTATE is never
+> > cleared except when returning to userspace or returning from a
+> > signal: thus, for a true kernel thread no FPSIMD context is ever
+> > loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
+> > ever be saved.
 > 
-> Rob
+> I don't understand this construction proof; from looking at the patch
+> below it is not obvious to me why fpsimd_thread_switch() can never have
+> !wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
+> kernel thread?
+
+Looking at this again, I think it is poorly worded.  This patch aims to
+make it true by construction, but it isn't prior to the patch.
+
+I'm tempted to delete the paragraph: the assertion of both untrue and
+not the best way to justify that this patch works.
+
+
+How about:
+
+-8<-
+
+The context switch logic already isolates user threads from each other.
+This, it is sufficient for isolating user threads from the kernel,
+since the goal either way is to ensure that code executing in userspace
+cannot see any FPSIMD state except its own.  Thus, there is no special
+property of kernel threads that we care about except that it is
+pointless to save or load FPSIMD register state for them.
+
+At worst, the removal of all the kernel thread special cases by this
+patch would thus spuriously load and save state for kernel threads when
+unnecessary.
+
+But the context switch logic is already deliberately optimised to defer
+reloads of the regs until ret_to_user (or sigreturn as a special case),
+which kernel threads by definition never reach.
+
+->8-
+
+
+As an aside, I notice that we allow thread.fpsimd_cpu to be initialised
+to 0 for the init task.  This means that the wrong_cpu check may yield
+false for the init task when it shouldn't, because the init task's
+FPSIMD state (which doesn't logically exist) is never loaded anywhere.
+But the wrong_task check will always yield true for the init task for
+the same reason, so this is just an inconsistency in the code rather
+than a bug AFAICT.
+
+copy_thread() calls fpsimd_flush_task_state() to make sure that
+wrong_cpu is initially true for new tasks.  We should do the same for
+the init task by adding
+
+	.fpsimd_cpu = NR_CPUS,
+
+to INIT_THREAD.
+
+
+Cheers
+---Dave
+
 > 
-> >
-> >diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> >index 822ba91..dd354ad 100644
-> >--- a/tools/perf/util/cs-etm.c
-> >+++ b/tools/perf/util/cs-etm.c
-> >@@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
-> >  static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+> 
+> Thanks,
+> -Christoffer
+> 
+> > 
+> > This patch removes the redundant checks and special-case code.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > 
+> > ---
+> > 
+> > Changes since v9:
+> > 
+> >  * New patch.  Introduced during debugging, since the ->mm checks
+> >    appear bogus and/or redundant, so are likely to be hiding or
+> >    causing bugs.
+> > ---
+> >  arch/arm64/include/asm/thread_info.h |  1 +
+> >  arch/arm64/kernel/fpsimd.c           | 38 ++++++++++++------------------------
+> >  2 files changed, 14 insertions(+), 25 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> > index 740aa03c..a2ac914 100644
+> > --- a/arch/arm64/include/asm/thread_info.h
+> > +++ b/arch/arm64/include/asm/thread_info.h
+> > @@ -47,6 +47,7 @@ struct thread_info {
+> >  
+> >  #define INIT_THREAD_INFO(tsk)						\
+> >  {									\
+> > +	.flags		= _TIF_FOREIGN_FPSTATE,				\
+> >  	.preempt_count	= INIT_PREEMPT_COUNT,				\
+> >  	.addr_limit	= KERNEL_DS,					\
+> >  }
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index 3aa100a..1222491 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -891,31 +891,21 @@ asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+> >  
+> >  void fpsimd_thread_switch(struct task_struct *next)
 > >  {
-> >  	/*
-> >+	 * The packet is the start tracing packet if the end_addr is zero,
-> >+	 * returns 0 for this case.
-> >+	 */
-> >+	if (!packet->end_addr)
-> >+		return 0;
-> >+
-> >+	/*
-> >  	 * The packet records the execution range with an exclusive end address
-> >  	 *
-> >  	 * A64 instructions are constant size, so the last executed
-> >@@ -897,13 +904,27 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
-> >  		etmq->period_instructions = instrs_over;
-> >  	}
-> >-	if (etm->sample_branches &&
-> >-	    etmq->prev_packet &&
-> >-	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
-> >-	    etmq->prev_packet->last_instr_taken_branch) {
-> >-		ret = cs_etm__synth_branch_sample(etmq);
-> >-		if (ret)
-> >-			return ret;
-> >+	if (etm->sample_branches && etmq->prev_packet) {
-> >+		bool generate_sample = false;
-> >+
-> >+		/* Generate sample for start tracing packet */
-> >+		if (etmq->prev_packet->sample_type == 0)
-> >+			generate_sample = true;
-> 
-> Also check for etmq->prev_packet->sample_type == CS_ETM_TRACE_ON here and
-> set generate_sample = true.
-
-Agree, will add this.
-
-> >+
-> >+		/* Generate sample for exception packet */
-> >+		if (etmq->prev_packet->exc == true)
-> >+			generate_sample = true;
-> >+
-> >+		/* Generate sample for normal branch packet */
-> >+		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
-> >+		    etmq->prev_packet->last_instr_taken_branch)
-> >+			generate_sample = true;
-> >+
-> >+		if (generate_sample) {
-> >+			ret = cs_etm__synth_branch_sample(etmq);
-> >+			if (ret)
-> >+				return ret;
-> >+		}
-> >  	}
-> >  	if (etm->sample_branches || etm->synth_opts.last_branch) {
-> >@@ -922,11 +943,12 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
-> >  static int cs_etm__flush(struct cs_etm_queue *etmq)
+> > +	bool wrong_task, wrong_cpu;
+> > +
+> >  	if (!system_supports_fpsimd())
+> >  		return;
+> > -	/*
+> > -	 * Save the current FPSIMD state to memory, but only if whatever is in
+> > -	 * the registers is in fact the most recent userland FPSIMD state of
+> > -	 * 'current'.
+> > -	 */
+> > -	if (current->mm)
+> > -		fpsimd_save();
+> >  
+> > -	if (next->mm) {
+> > -		/*
+> > -		 * If we are switching to a task whose most recent userland
+> > -		 * FPSIMD state is already in the registers of *this* cpu,
+> > -		 * we can skip loading the state from memory. Otherwise, set
+> > -		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+> > -		 * upon the next return to userland.
+> > -		 */
+> > -		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
+> > +	/* Save unsaved fpsimd state, if any: */
+> > +	fpsimd_save();
+> > +
+> > +	/* Fix up TIF_FOREIGN_FPSTATE to correctly describe next's state: */
+> > +	wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
+> >  					&next->thread.uw.fpsimd_state;
+> > -		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
+> > +	wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
+> >  
+> > -		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
+> > -				       wrong_task || wrong_cpu);
+> > -	}
+> > +	update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
+> > +			       wrong_task || wrong_cpu);
+> >  }
+> >  
+> >  void fpsimd_flush_thread(void)
+> > @@ -1120,9 +1110,8 @@ void kernel_neon_begin(void)
+> >  
+> >  	__this_cpu_write(kernel_neon_busy, true);
+> >  
+> > -	/* Save unsaved task fpsimd state, if any: */
+> > -	if (current->mm)
+> > -		fpsimd_save();
+> > +	/* Save unsaved fpsimd state, if any: */
+> > +	fpsimd_save();
+> >  
+> >  	/* Invalidate any task state remaining in the fpsimd regs: */
+> >  	fpsimd_flush_cpu_state();
+> > @@ -1244,8 +1233,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
 > >  {
-> >  	int err = 0;
-> >-	struct cs_etm_packet *tmp;
-> >  	if (etmq->etm->synth_opts.last_branch &&
-> >  	    etmq->prev_packet &&
-> >-	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-> >+	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
-> >+	    etmq->period_instructions) {
-> >+
-> 
-> I don't think this is needed.
+> >  	switch (cmd) {
+> >  	case CPU_PM_ENTER:
+> > -		if (current->mm)
+> > -			fpsimd_save();
+> > +		fpsimd_save();
+> >  		fpsimd_flush_cpu_state();
+> >  		break;
+> >  	case CPU_PM_EXIT:
+> > -- 
+> > 2.1.4
 
-Okay, I will keep this.
+[...]
 
-> >  		/*
-> >  		 * Generate a last branch event for the branches left in the
-> >  		 * circular buffer at the end of the trace.
-> >@@ -940,14 +962,6 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
-> >  			etmq, addr,
-> >  			etmq->period_instructions);
-> >  		etmq->period_instructions = 0;
-> >-
-> >-		/*
-> >-		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
-> >-		 * the next incoming packet.
-> >-		 */
-> >-		tmp = etmq->packet;
-> >-		etmq->packet = etmq->prev_packet;
-> >-		etmq->prev_packet = tmp;
-> 
-> This should not be changed as discussed above.
-
-Okay, will keep this.  But I suggest we add some change like below:
-
-+    if (etm->sample_branches) {
-+        err = cs_etm__synth_branch_sample(etmq);
-+        if (err)
-+            return err;
-+    }
-
-If so, could you review my posted another patch for this?
-http://archive.armlinux.org.uk/lurker/message/20180522.083920.184f1f78.en.html
-
-Thanks,
-Leo Yan
-
-> >  	}
-> >  	return err;
-> >
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
