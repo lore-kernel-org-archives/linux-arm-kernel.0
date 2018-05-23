@@ -1,57 +1,70 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 May 2018 15:02:35 +0530
-Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <1527066324-24726-1-git-send-email-ilialin@codeaurora.org>
-References: <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
- <1527066324-24726-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180523093235.k7xugnd7pfisazdx@vireshk-i7>
+From: christophe.roullier@st.com (Christophe ROULLIER)
+Date: Wed, 23 May 2018 09:32:04 +0000
+Subject: [PATCH V3 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <20180522172238.GA26145@rob-hp-laptop>
+References: <1526890046-10565-1-git-send-email-christophe.roullier@st.com>
+ <1526890046-10565-9-git-send-email-christophe.roullier@st.com>
+ <20180522172238.GA26145@rob-hp-laptop>
+Message-ID: <4f6941a0-4b41-f2db-52b1-d45aa7287fa2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-05-18, 12:05, Ilia Lin wrote:
-> In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
-> the CPU frequency subset and voltage value of each OPP varies
-> based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
-> defines the voltage and frequency value based on the msm-id in SMEM
-> and speedbin blown in the efuse combination.
-> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-> to provide the OPP framework with required information.
-> This is used to determine the voltage and frequency value for each OPP of
-> operating-points-v2 table when it is parsed by the OPP framework.
+On 05/22/2018 07:22 PM, Rob Herring wrote:
+> On Mon, May 21, 2018 at 10:07:26AM +0200, Christophe Roullier wrote:
+>> This patch describes syscon DT bindings.
+>>
+>> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/stm32.txt | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
+>> index 6808ed9..e46ebad 100644
+>> --- a/Documentation/devicetree/bindings/arm/stm32.txt
+>> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
+>> @@ -8,3 +8,8 @@ using one of the following compatible strings:
+>>     st,stm32f746
+>>     st,stm32h743
+>>     st,stm32mp157
+>> +
+>> +Required nodes:
+>> +- syscon: the soc bus node must have a system controller node pointing to the
+>> +  global control registers, with the compatible string
+>> +  "st,stm32mp157-syscfg", "syscon";
 > 
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->  drivers/cpufreq/Kconfig.arm          |  10 +++
->  drivers/cpufreq/Makefile             |   1 +
->  drivers/cpufreq/cpufreq-dt-platdev.c |   3 +
->  drivers/cpufreq/qcom-cpufreq-kryo.c  | 163 +++++++++++++++++++++++++++++++++++
->  4 files changed, 177 insertions(+)
->  create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+> Please don't mix soc/board bindings with other nodes. So perhaps
+> stm32-syscon.txt.
+> 
+> Rob
+> 
 
-Hi Ilia,
+Hi Rob,
 
-So the patch looks good now. But I don't see how this series is going
-to get merged. You are touching all parts of the kernel and no single
-maintainer would be able to get these merged easily.
+Is it ok for you with this tree file:
 
-What I would suggest is that you divided the series in at least 3
-parts.
+Documentation/devicetree/bindings/arm/stm32/stm32.txt
+Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt
+	With stm32-syscon.txt:
 
-- Patch 10 and 11, just the cpufreq stuff. So that Rafael can apply
-  those independently. Also mention the dependency on my OPP patches
-  in the cover letter for those two patches.
+---------------------------------------------------
+STMicroelectronics STM32 Platforms System Controller
 
-- All clk patches in another series, so that Stephen can apply them.
+Properties:
+  - compatible : should contain two values. First value must be :
+		- " st,stm32mp157-syscfg " - for stm32mp157 based SoCs,
+		second value must be always "syscon".
+  - reg : offset and length of the register set.
 
-- And finally everything else to go via ARM-Soc.
+Example:
+	syscfg: system-config at 50020000 {
+		compatible = "st,stm32mp157-syscfg", "syscon";
+		reg = <0x50020000 0x400>;
+	};
+---------------------------------------------------
 
-Maybe things wouldn't be that simple, but that's what you would need
-to do to get things merged. And please add all Acked by tags you got
-to the patches.
+Do we need to update also all MCU family (stm32f4, stm32h7, stm32f7) 
+property to be coherent ?
 
-For this patch:
+Thanks for your feedback.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
---
-viresh
+Christophe.
