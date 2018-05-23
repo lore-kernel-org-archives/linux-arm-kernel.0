@@ -1,39 +1,93 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 22 May 2018 22:40:16 -0400
-Subject: [PATCH] PCI/portdrv: do not disable device on remove()
-In-Reply-To: <20180523022431.GA15069@wunner.de>
-References: <1527011883-21320-1-git-send-email-okaya@codeaurora.org>
- <20180523022431.GA15069@wunner.de>
-Message-ID: <8c91a923-1a3a-55fb-e812-62dd69d99975@codeaurora.org>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 22 May 2018 19:43:16 -0700
+Subject: [PATCH v4 0/2] regulator: add QCOM RPMh regulator driver
+Message-ID: <cover.1527040878.git.collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/22/2018 10:24 PM, Lukas Wunner wrote:
-> On Tue, May 22, 2018 at 01:58:00PM -0400, Sinan Kaya wrote:
->> --- a/drivers/pci/pcie/portdrv_core.c
->> +++ b/drivers/pci/pcie/portdrv_core.c
->> @@ -409,7 +409,6 @@ void pcie_port_device_remove(struct pci_dev *dev)
->>  {
->>  	device_for_each_child(&dev->dev, NULL, remove_iter);
->>  	pci_free_irq_vectors(dev);
->> -	pci_disable_device(dev);
->>  }
-> 
-> Shutdown aside, pci_disable_device() is also not called in the ->remove
-> path with this patch, right?  Seems wrong.  E.g. when unbinding the driver
-> from the root port device, or when unplugging a port (happens all the time
-> with Thunderbolt).
+This patch series adds a driver and device tree binding documentation for
+PMIC regulator control via Resource Power Manager-hardened (RPMh) on some
+Qualcomm Technologies, Inc. SoCs such as SDM845.  RPMh is a hardware block
+which contains several accelerators which are used to manage various
+hardware resources that are shared between the processors of the SoC.  The
+final hardware state of a regulator is determined within RPMh by performing
+max aggregation of the requests made by all of the processors.
 
-Agreed. I'll spin another version where I skip disable on shutdown path only.
+The RPMh regulator driver depends upon the RPMh driver [1] and command DB
+driver [2] which are both still undergoing review.  It also depends upon
+three recent regulator changes: [3], [4], and [5].
 
-> 
-> Thanks,
-> 
-> Lukas
-> 
+Changes since v3 [6]:
+ - Removed support for DT properties qcom,regulator-initial-microvolt
+   and qcom,headroom-microvolt
+ - Renamed DT property qcom,allowed-drms-modes to be
+   qcom,regulator-drms-modes
+ - Updated DT binding documentation to mention which common regulator
+   bindings can be used for qcom-rpmh-regulator devices
+ - Added voltage caching so that voltage requests are only sent to RPMh
+   after the regulator has been enabled at least once
+ - Changed 'voltage_selector' default value to be -ENOTRECOVERABLE to
+   interact with [5]
+ - Initialized 'enabled' to -EINVAL so that unused regulators are
+   disabled by regulator_late_cleanup()
+ - Removed rpmh_regulator_load_default_parameters() as it is no longer
+   needed
+ - Updated the mode usage description in qcom,rpmh-regulator.h
 
+Changes since v2 [7]:
+ - Replaced '_' with '-' in device tree supply property names
+ - Renamed qcom_rpmh-regulator.c to be qcom-rpmh-regulator.c
+ - Updated various DT property names to use "microvolt" and "microamp"
+ - Moved allowed modes constraint specification out of the driver [4]
+ - Replaced rpmh_client with device pointer to match new RPMh API [1]
+ - Corrected drms mode threshold checking
+ - Initialized voltage_selector to -EINVAL when not specified in DT
+ - Added constants for PMIC regulator hardware modes
+ - Corrected type sign of mode mapping tables
+ - Made variable names for mode arrays plural
+ - Simplified Kconfig depends on
+ - Removed unnecessary constants and struct fields
+ - Added some descriptive comments
+
+Changes since v1 [8]:
+ - Addressed review feedback from Doug, Mark, and Stephen
+ - Replaced set_voltage()/get_voltage() callbacks with set_voltage_sel()/
+   get_voltage_sel()
+ - Added set_bypass()/get_bypass() callbacks for BOB pass-through mode
+   control
+ - Removed top-level PMIC data structures
+ - Removed initialization variables from structs and passed them as
+   function parameters
+ - Removed various comments and error messages
+ - Simplified mode handling
+ - Refactored per-PMIC rpmh-regulator data specification
+ - Simplified probe function
+ - Moved header into DT patch
+ - Removed redundant property listings from DT binding documentation
+
+[1]: https://lkml.org/lkml/2018/5/9/729
+[2]: https://lkml.org/lkml/2018/4/10/714
+[3]: https://lkml.org/lkml/2018/4/18/556
+[4]: https://lkml.org/lkml/2018/5/11/696
+[5]: https://lkml.org/lkml/2018/5/15/1005
+[6]: https://lkml.org/lkml/2018/5/11/701
+[7]: https://lkml.org/lkml/2018/4/13/687
+[8]: https://lkml.org/lkml/2018/3/16/1431
+
+David Collins (2):
+  regulator: dt-bindings: add QCOM RPMh regulator bindings
+  regulator: add QCOM RPMh regulator driver
+
+ .../bindings/regulator/qcom,rpmh-regulator.txt     | 185 +++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/qcom-rpmh-regulator.c            | 865 +++++++++++++++++++++
+ .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +
+ 5 files changed, 1096 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+ create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
+ create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
