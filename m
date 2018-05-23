@@ -1,57 +1,52 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 23 May 2018 14:37:03 +0800
-Subject: [SPAM]Re: [PATCH v2 4/7] Bluetooth: Add new quirk for
- non-persistent setup settings
-In-Reply-To: <1526976323.18877.47.camel@mtkswgap22>
-References: <cover.1526374087.git.sean.wang@mediatek.com>
- <1d6097f538b3182b2876ad48225ecd6e2d1b128c.1526374087.git.sean.wang@mediatek.com>
- <920B3BE9-3FE8-4AC6-8C5F-63B0E00182AC@holtmann.org>
- <1526976323.18877.47.camel@mtkswgap22>
-Message-ID: <1527057423.4607.3.camel@mtkswgap22>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Wed, 23 May 2018 14:48:36 +0800
+Subject: [PATCH v3 00/13] add power domain support for Rockchip Socs
+Message-ID: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-05-22 at 16:05 +0800, Sean Wang wrote:
-> On Tue, 2018-05-22 at 09:21 +0200, Marcel Holtmann wrote:
-> > Hi Sean,
-> > 
-> 
-> [ ... ]
-> 
-> > > -	if (hci_dev_test_flag(hdev, HCI_SETUP)) {
-> > > +	if (hci_dev_test_flag(hdev, HCI_SETUP) ||
-> > > +	    test_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks)) {
-> > > 		hci_sock_dev_event(hdev, HCI_DEV_SETUP);
-> > 
-> > I am not 100% sure that we want to send the HCI_DEV_SETUP event also multiple times. That is a userspace change that I would need to think about. We need to check create_monitor_event() and see what the btmon trace for this looks like. Can you send me a btmon -w trace.log when this change is active.
-> > 
-> > Regards
-> > 
-> > Marcel
-> > 
-> 
-> Sure, I'll send you the trace.log with the change is active.
-> 
-> 	Sean
-> 
+add power domain support for RK3036/RK3128/RK3228/PX30 Soc.
+fix up the wrong value when set power domain up.
 
-Hi, Marcel
+Change in V2:
+Fix up the commit message description and Assign author.
 
-Attached trace.log was captured when I inputted commands power on and
-then off in bluetoothctl.
+Change in V3:
+[PATCH 01/13]: The Copyright description use SPDX tag instead.
+[PATCH 05/13]: The Copyright description use SPDX tag instead.
+[PATCH 08/13]: The Copyright description use SPDX tag instead.
+[PATCH 11/13]: The Copyright description use SPDX tag instead.
 
-	Sean 
+Caesar Wang (3):
+  dt-bindings: power: add RK3036 SoCs header for power-domain
+  dt-bindings: add binding for rk3036 power domains
+  Soc: rockchip: power-domain: add power domain support for rk3036
 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Elaine Zhang (6):
+  dt-bindings: power: add RK3128 SoCs header for power-domain
+  dt-bindings: add binding for rk3128 power domains
+  soc: rockchip: power-domain: add power domain support for rk3128
+  dt-bindings: power: add RK3228 SoCs header for power-domain
+  dt-bindings: add binding for rk3228 power domains
+  soc: rockchip: power-domain: add power domain support for rk3228
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: trace.log
-Type: text/x-log
-Size: 6573 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/db18fea4/attachment.bin>
+Finley Xiao (4):
+  soc: rockchip: power-domain: Fix wrong value when power up pd
+  dt-bindings: power: add PX30 SoCs header for power-domain
+  dt-bindings: add binding for px30 power domains
+  soc: rockchip: power-domain: add power domain support for px30
+
+ .../bindings/soc/rockchip/power_domain.txt         |  12 +++
+ drivers/soc/rockchip/pm_domains.c                  | 116 ++++++++++++++++++++-
+ include/dt-bindings/power/px30-power.h             |  27 +++++
+ include/dt-bindings/power/rk3036-power.h           |  13 +++
+ include/dt-bindings/power/rk3128-power.h           |  14 +++
+ include/dt-bindings/power/rk3228-power.h           |  21 ++++
+ 6 files changed, 202 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/power/px30-power.h
+ create mode 100644 include/dt-bindings/power/rk3036-power.h
+ create mode 100644 include/dt-bindings/power/rk3128-power.h
+ create mode 100644 include/dt-bindings/power/rk3228-power.h
+
+-- 
+1.9.1
