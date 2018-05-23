@@ -1,79 +1,40 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed, 23 May 2018 14:52:03 +0800
-Subject: [PATCH v3 10/13] soc: rockchip: power-domain: add power domain
- support for rk3228
+Date: Wed, 23 May 2018 14:50:31 +0800
+Subject: [PATCH v3 05/13] dt-bindings: power: add RK3128 SoCs header for
+ power-domain
 In-Reply-To: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
 References: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1527058323-10611-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1527058231-10319-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is modified to support RK3228 SoC.
+According to a description from TRM, add all the power domains.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/soc/rockchip/pm_domains.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ include/dt-bindings/power/rk3128-power.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 include/dt-bindings/power/rk3128-power.h
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 99a2dd8a7801..90dcd5e21ae6 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -20,6 +20,7 @@
- #include <linux/mfd/syscon.h>
- #include <dt-bindings/power/rk3036-power.h>
- #include <dt-bindings/power/rk3128-power.h>
-+#include <dt-bindings/power/rk3228-power.h>
- #include <dt-bindings/power/rk3288-power.h>
- #include <dt-bindings/power/rk3328-power.h>
- #include <dt-bindings/power/rk3366-power.h>
-@@ -729,6 +730,20 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	[RK3128_PD_GPU]		= DOMAIN_RK3288(1, 1, 3, false),
- };
- 
-+static const struct rockchip_domain_info rk3228_pm_domains[] = {
-+	[RK3228_PD_CORE]	= DOMAIN_RK3036(0, 0, 16, true),
-+	[RK3228_PD_MSCH]	= DOMAIN_RK3036(1, 1, 17, true),
-+	[RK3228_PD_BUS]		= DOMAIN_RK3036(2, 2, 18, true),
-+	[RK3228_PD_SYS]		= DOMAIN_RK3036(3, 3, 19, true),
-+	[RK3228_PD_VIO]		= DOMAIN_RK3036(4, 4, 20, false),
-+	[RK3228_PD_VOP]		= DOMAIN_RK3036(5, 5, 21, false),
-+	[RK3228_PD_VPU]		= DOMAIN_RK3036(6, 6, 22, false),
-+	[RK3228_PD_RKVDEC]	= DOMAIN_RK3036(7, 7, 23, false),
-+	[RK3228_PD_GPU]		= DOMAIN_RK3036(8, 8, 24, false),
-+	[RK3228_PD_PERI]	= DOMAIN_RK3036(9, 9, 25, true),
-+	[RK3228_PD_GMAC]	= DOMAIN_RK3036(10, 10, 26, false),
-+};
+diff --git a/include/dt-bindings/power/rk3128-power.h b/include/dt-bindings/power/rk3128-power.h
+new file mode 100644
+index 000000000000..c051dc3108db
+--- /dev/null
++++ b/include/dt-bindings/power/rk3128-power.h
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __DT_BINDINGS_POWER_RK3128_POWER_H__
++#define __DT_BINDINGS_POWER_RK3128_POWER_H__
 +
- static const struct rockchip_domain_info rk3288_pm_domains[] = {
- 	[RK3288_PD_VIO]		= DOMAIN_RK3288(7, 7, 4, false),
- 	[RK3288_PD_HEVC]	= DOMAIN_RK3288(14, 10, 9, false),
-@@ -816,6 +831,15 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	.domain_info = rk3128_pm_domains,
- };
- 
-+static const struct rockchip_pmu_info rk3228_pmu = {
-+	.req_offset = 0x40c,
-+	.idle_offset = 0x488,
-+	.ack_offset = 0x488,
++/* VD_CORE */
++#define RK3128_PD_CORE		0
 +
-+	.num_domains = ARRAY_SIZE(rk3228_pm_domains),
-+	.domain_info = rk3228_pm_domains,
-+};
++/* VD_LOGIC */
++#define RK3128_PD_VIO		1
++#define RK3128_PD_VIDEO		2
++#define RK3128_PD_GPU		3
++#define RK3128_PD_MSCH		4
 +
- static const struct rockchip_pmu_info rk3288_pmu = {
- 	.pwr_offset = 0x08,
- 	.status_offset = 0x0c,
-@@ -899,6 +923,10 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 		.data = (void *)&rk3128_pmu,
- 	},
- 	{
-+		.compatible = "rockchip,rk3228-power-controller",
-+		.data = (void *)&rk3228_pmu,
-+	},
-+	{
- 		.compatible = "rockchip,rk3288-power-controller",
- 		.data = (void *)&rk3288_pmu,
- 	},
++#endif
 -- 
 1.9.1
