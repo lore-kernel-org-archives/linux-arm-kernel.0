@@ -1,26 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 May 2018 14:03:32 -0500
-Subject: [PATCH V4 8/8] dt-bindings: stm32: add compatible for syscon
-In-Reply-To: <1527090479-5263-9-git-send-email-christophe.roullier@st.com>
-References: <1527090479-5263-1-git-send-email-christophe.roullier@st.com>
- <1527090479-5263-9-git-send-email-christophe.roullier@st.com>
-Message-ID: <20180523190332.GA20768@rob-hp-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 23 May 2018 15:27:17 -0400 (EDT)
+Subject: [PATCH net] net: phy: broadcom: Fix bcm_write_exp()
+In-Reply-To: <20180523000450.9384-1-f.fainelli@gmail.com>
+References: <20180523000450.9384-1-f.fainelli@gmail.com>
+Message-ID: <20180523.152717.320840011665325518.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 05:47:59PM +0200, Christophe Roullier wrote:
-> This patch describes syscon DT bindings.
+From: Florian Fainelli <f.fainelli@gmail.com>
+Date: Tue, 22 May 2018 17:04:49 -0700
+
+> On newer PHYs, we need to select the expansion register to write with
+> setting bits [11:8] to 0xf. This was done correctly by bcm7xxx.c prior
+> to being migrated to generic code under bcm-phy-lib.c which
+> unfortunately used the older implementation from the BCM54xx days.
 > 
-> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+> Fix this by creating an inline stub: bcm_write_exp_sel() which adds the
+> correct value (MII_BCM54XX_EXP_SEL_ER) and update both the Cygnus PHY
+> and BCM7xxx PHY drivers which require setting these bits.
+> 
+> broadcom.c is unchanged because some PHYs even use a different selector
+> method, so let them specify it directly (e.g: SerDes secondary selector).
+> 
+> Fixes: a1cba5613edf ("net: phy: Add Broadcom phy library for common interfaces")
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/stm32.txt            | 10 ----------
->  .../devicetree/bindings/arm/stm32/stm32-syscon.txt         | 14 ++++++++++++++
->  Documentation/devicetree/bindings/arm/stm32/stm32.txt      | 10 ++++++++++
->  3 files changed, 24 insertions(+), 10 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/stm32.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/stm32/stm32.txt
+> David, please also queue this one up for -stable, thanks!
 
-In the future, use the -M option so file moves don't show any diff.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+Applied and queued up for -stable, thanks Florian.
