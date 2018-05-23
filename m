@@ -1,120 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 23 May 2018 18:57:18 -0400
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 23 May 2018 16:51:12 -0700
+Subject: [PATCH v2 2/6] Documentation: DT: Add optional 'timeout-sec'
+ property for sp805
+In-Reply-To: <20180523222915.GA16779@roeck-us.net>
+References: <1527107527-8093-1-git-send-email-ray.jui@broadcom.com>
+ <1527107527-8093-3-git-send-email-ray.jui@broadcom.com>
+ <20180523222915.GA16779@roeck-us.net>
+Message-ID: <48dfe138-7bf5-3f91-0108-5b0ce3811ab7@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/23/2018 5:32 PM, Bjorn Helgaas wrote:
-> 
-> The crash seems to indicate that the hpsa device attempted a DMA after
-> we cleared the Root Port's PCI_COMMAND_MASTER, which means
-> hpsa_shutdown() didn't stop DMA from the device (it looks like *most*
-> shutdown methods don't disable device DMA, so it's in good company).
 
-All drivers are expected to shutdown DMA and interrupts in their shutdown()
-routines. They can skip removing threads, data structures etc. but DMA and
-interrupt disabling are required. This is the difference between shutdown()
-and remove() callbacks.
 
-If you see that this is not being done in HPSA, then that is where the
-bugfix should be.
-
-Counter argument is that if shutdown() is not implemented, at least remove()
-should be called. Expecting all drivers to implement shutdown() callbacks
-is just bad by design in my opinion. 
-
-Code should have fallen back to remove() if shutdown() doesn't exist.
-I can propose a patch for this but this is yet another story to chase.
-
-> 
->> This has been found to cause crashes on HP DL360 Gen9 machines during
->> reboot. Besides, kexec is already clearing the bus master bit in
->> pci_device_shutdown() after all PCI drivers are removed.
-> 
-> The original path was:
-> 
->   pci_device_shutdown(hpsa)
->     drv->shutdown
->       hpsa_shutdown                     # hpsa_pci_driver.shutdown
->   ...
->   pci_device_shutdown(RP)               # root port
->     drv->shutdown
->       pcie_portdrv_remove               # pcie_portdriver.shutdown
->         pcie_port_device_remove
->           pci_disable_device
->             do_pci_disable_device
->               # clear RP PCI_COMMAND_MASTER
->     if (kexec)
->       pci_clear_master(RP)
->         # clear RP PCI_COMMAND_MASTER
-> 
-> If I understand correctly, the new path after this patch is:
-> 
->   pci_device_shutdown(hpsa)
->     drv->shutdown
->       hpsa_shutdown                     # hpsa_pci_driver.shutdown
->   ...
->   pci_device_shutdown(RP)               # root port
->     drv->shutdown
->       pcie_portdrv_shutdown             # pcie_portdriver.shutdown
->         __pcie_portdrv_remove(RP, false)
->           pcie_port_device_remove(RP, false)
->             # do NOT clear RP PCI_COMMAND_MASTER
-
-yup
-
->     if (kexec)
->       pci_clear_master(RP)
->         # clear RP PCI_COMMAND_MASTER
-> 
-> I guess this patch avoids the panic during reboot because we're not in
-> the kexec path, so we never clear PCI_COMMAND_MASTER for the Root
-> Port, so the hpsa device can DMA happily until the lights go out.
-> 
-> But DMA continuing for some random amount of time before the reboot or
-> shutdown happens makes me a little queasy.  That doesn't sound safe.
-> The more I think about this, the more confused I get.  What am I
-> missing?  
-
-see above.
-
-> 
->> Just remove the extra clear in shutdown path by seperating the remove and
->> shutdown APIs in the PORTDRV.
+On 5/23/2018 3:29 PM, Guenter Roeck wrote:
+> On Wed, May 23, 2018 at 01:32:03PM -0700, Ray Jui wrote:
+>> Update the SP805 binding document to add optional 'timeout-sec'
+>> devicetree property
 >>
->>  static pci_ers_result_t pcie_portdrv_error_detected(struct pci_dev *dev,
->> @@ -218,7 +228,7 @@ static struct pci_driver pcie_portdriver = {
->>  
->>  	.probe		= pcie_portdrv_probe,
->>  	.remove		= pcie_portdrv_remove,
->> -	.shutdown	= pcie_portdrv_remove,
->> +	.shutdown	= pcie_portdrv_shutdown,
-> 
-> What are the circumstances when we call .remove() vs .shutdown()?
-> 
-> I guess the main (maybe only) way to call .remove() is to hot-remove
-> the port?  And .shutdown() is basically used in the reboot and kexec
-> paths?
-
-Correct. shutdown() is only called during reboot/shutdown calls. If you echo
-1 into the remove file, remove() gets called. Handy for hotplug use cases.
-It needs to be the exact opposite of the probe. It needs to clean up resources
-etc. and have the HW in a state where it can be reinitialized via probe again.
-
-> 
->>  	.err_handler	= &pcie_portdrv_err_handler,
->>  
->> -- 
->> 2.7.4
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>   Documentation/devicetree/bindings/watchdog/arm,sp805.txt | 2 ++
+>>   1 file changed, 2 insertions(+)
 >>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+>> index de93a4d..9cd7470 100644
+>> --- a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+>> +++ b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+>> @@ -18,6 +18,8 @@ Required properties:
+>>   
+>>   Optional properties:
+>>   - interrupts : Should specify WDT interrupt number.
+>> +timeout-sec : Should specify default WDT timeout in seconds. If unset, the
+>> +              default timeout in the driver is 30 seconds
 > 
+> That looks odd, with the changed indentation and the missing '-'
+> in front of 'timeout-sec' >
 
+My bad. Will fix this in v3. Thanks.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Guenter
+> 
