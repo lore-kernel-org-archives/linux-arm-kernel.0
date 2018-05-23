@@ -1,121 +1,72 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 23 May 2018 13:33:38 +0200
-Subject: [PATCH v10 01/18] arm64: fpsimd: Fix TIF_FOREIGN_FPSTATE after
- invalidating cpu regs
-In-Reply-To: <1527005119-6842-2-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180523113338.GG55598@C02W217FHV2R.local>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 23 May 2018 13:43:40 +0200
+Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
+Message-ID: <20180523114340.10216-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 05:05:02PM +0100, Dave Martin wrote:
-> fpsimd_last_state.st is set to NULL as a way of indicating that
-> current's FPSIMD registers are no longer loaded in the cpu.  In
-> particular, this is done when the kernel temporarily uses or
-> clobbers the FPSIMD registers for its own purposes, as in CPU PM or
-> kernel-mode NEON, resulting in them being populated with garbage
-> data not belonging to a task.
-> 
-> Commit 17eed27b02da ("arm64/sve: KVM: Prevent guests from using
-> SVE") factors this operation out as a new helper
-> fpsimd_flush_cpu_state() to make it clearer what is being done
-> here, and on SVE systems this helper is now used, via
-> kvm_fpsimd_flush_cpu_state(), to invalidate the registers after KVM
-> has run a vcpu.  The reason for this is that KVM does not yet
-> understand how to restore the full host SVE registers itself after
-> loading the guest FPSIMD context into them.
-> 
-> This exposes a particular problem: if fpsimd_last_state.st is set
-> to NULL without also setting TIF_FOREIGN_FPSTATE, the kernel may
-> continue to think that current's FPSIMD registers are live even
-> though they have actually been clobbered.
-> 
-> Prior to the aforementioned commit, the only path where
-> fpsimd_last_state.st is set to NULL without setting
-> TIF_FOREIGN_FPSTATE is when kernel_neon_begin() is called by a
-> kernel thread (where current->mm can be NULL).  This does not
-> matter, because the only harm is that at context-switch time
-> fpsimd_thread_switch() may unnecessarily save the FPSIMD registers
-> back to current's thread_struct (even though kernel threads are not
-> considered to have any FPSIMD context of their own and the
-> registers will never be reloaded).
-> 
-> Note that although CPU_PM_ENTER lacks the TIF_FOREIGN_FPSTATE
-> setting, every CPU passing through that path must subsequently pass
-> through CPU_PM_EXIT before it can re-enter the kernel proper.
-> CPU_PM_EXIT sets the flag.
-> 
-> The sve_flush_cpu_state() function added by commit 17eed27b02da
-> also lacks the proper maintenance of TIF_FOREIGN_FPSTATE.  This may
-> cause the bits of a host task's SVE registers that do not alias the
-> FPSIMD register file to spontaneously appear zeroed if a KVM vcpu
-> runs in the same task in the meantime.  Although this effect is
-> hidden by the fact that the non-FPSIMD bits of the SVE registers
-> are zeroed by a syscall anyway, it is doubtless a bad idea to rely
-> on these different code paths interacting correctly under future
-> maintenance.
-> 
-> This patch makes TIF_FOREIGN_FPSTATE an unconditional side-effect
-> of fpsimd_flush_cpu_state(), and removes the set_thread_flag()
-> calls that become redunant as a result.  This ensures that
+Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+one DA9063L and one DA9210 on Porter, the only difference from
+the other boards is that DA9063L is at I2C address 0x5a rather
+than 0x58 .
 
-nit: redundant
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cc: linux-renesas-soc at vger.kernel.org
+---
+ arch/arm/boot/dts/r8a7791-porter.dts | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-> TIF_FOREIGN_FPSTATE cannot remain clear if the FPSIMD state in the
-> FPSIMD registers is invalid.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-
-
-> ---
-> 
-> Changes since v9:
-> 
->  * New patch (bugfix to subsequent commits).
-> ---
->  arch/arm64/kernel/fpsimd.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 87a3536..12e1c96 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -1067,6 +1067,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
->  static inline void fpsimd_flush_cpu_state(void)
->  {
->  	__this_cpu_write(fpsimd_last_state.st, NULL);
-> +	set_thread_flag(TIF_FOREIGN_FPSTATE);
->  }
->  
->  /*
-> @@ -1121,10 +1122,8 @@ void kernel_neon_begin(void)
->  	__this_cpu_write(kernel_neon_busy, true);
->  
->  	/* Save unsaved task fpsimd state, if any: */
-> -	if (current->mm) {
-> +	if (current->mm)
->  		task_fpsimd_save();
-> -		set_thread_flag(TIF_FOREIGN_FPSTATE);
-> -	}
->  
->  	/* Invalidate any task state remaining in the fpsimd regs: */
->  	fpsimd_flush_cpu_state();
-> @@ -1251,8 +1250,6 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
->  		fpsimd_flush_cpu_state();
->  		break;
->  	case CPU_PM_EXIT:
-> -		if (current->mm)
-> -			set_thread_flag(TIF_FOREIGN_FPSTATE);
->  		break;
->  	case CPU_PM_ENTER_FAILED:
->  	default:
-> -- 
-> 2.1.4
-> 
-
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index a01101b49d99..5f77d73d7462 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -375,10 +375,43 @@
+ 	clock-frequency = <400000>;
+ };
+ 
++&i2c6 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	pmic at 5a {
++		compatible = "dlg,da9063l";
++		reg = <0x5a>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++
++		wdt {
++			compatible = "dlg,da9063-watchdog";
++		};
++	};
++
++	vdd_dvfs: regulator at 68 {
++		compatible = "dlg,da9210";
++		reg = <0x68>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
+ &sata0 {
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&vdd_dvfs>;
++};
++
+ /* composite video input */
+ &vin0 {
+ 	status = "okay";
+-- 
+2.16.2
