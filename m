@@ -1,46 +1,55 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed, 23 May 2018 14:51:26 +0800
-Subject: [PATCH v3 08/13] dt-bindings: power: add RK3228 SoCs header for
+Date: Wed, 23 May 2018 14:52:21 +0800
+Subject: [PATCH v3 11/13] dt-bindings: power: add PX30 SoCs header for
  power-domain
 In-Reply-To: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
 References: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1527058286-10503-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1527058341-10658-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Finley Xiao <finley.xiao@rock-chips.com>
+
 According to a description from TRM, add all the power domains.
 
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- include/dt-bindings/power/rk3228-power.h | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 include/dt-bindings/power/rk3228-power.h
+ include/dt-bindings/power/px30-power.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 include/dt-bindings/power/px30-power.h
 
-diff --git a/include/dt-bindings/power/rk3228-power.h b/include/dt-bindings/power/rk3228-power.h
+diff --git a/include/dt-bindings/power/px30-power.h b/include/dt-bindings/power/px30-power.h
 new file mode 100644
-index 000000000000..6a8dc1bf76ce
+index 000000000000..30917a99ad20
 --- /dev/null
-+++ b/include/dt-bindings/power/rk3228-power.h
-@@ -0,0 +1,21 @@
++++ b/include/dt-bindings/power/px30-power.h
+@@ -0,0 +1,27 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __DT_BINDINGS_POWER_RK3228_POWER_H__
-+#define __DT_BINDINGS_POWER_RK3228_POWER_H__
++#ifndef __DT_BINDINGS_POWER_PX30_POWER_H__
++#define __DT_BINDINGS_POWER_PX30_POWER_H__
 +
-+/**
-+ * RK3228 idle id Summary.
-+ */
++/* VD_CORE */
++#define PX30_PD_A35_0		0
++#define PX30_PD_A35_1		1
++#define PX30_PD_A35_2		2
++#define PX30_PD_A35_3		3
++#define PX30_PD_SCU		4
 +
-+#define RK3228_PD_CORE		0
-+#define RK3228_PD_MSCH		1
-+#define RK3228_PD_BUS		2
-+#define RK3228_PD_SYS		3
-+#define RK3228_PD_VIO		4
-+#define RK3228_PD_VOP		5
-+#define RK3228_PD_VPU		6
-+#define RK3228_PD_RKVDEC	7
-+#define RK3228_PD_GPU		8
-+#define RK3228_PD_PERI		9
-+#define RK3228_PD_GMAC		10
++/* VD_LOGIC */
++#define PX30_PD_USB		5
++#define PX30_PD_DDR		6
++#define PX30_PD_SDCARD		7
++#define PX30_PD_CRYPTO		8
++#define PX30_PD_GMAC		9
++#define PX30_PD_MMC_NAND	10
++#define PX30_PD_VPU		11
++#define PX30_PD_VO		12
++#define PX30_PD_VI		13
++#define PX30_PD_GPU		14
++
++/* VD_PMU */
++#define PX30_PD_PMU		15
 +
 +#endif
 -- 
