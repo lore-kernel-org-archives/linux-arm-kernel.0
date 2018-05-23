@@ -1,38 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 23 May 2018 17:29:56 +0100
-Subject: [PATCH 0/3] irqchip: meson-gpio: add support for Meson-AXG SoCs
-In-Reply-To: <0c97c61b-c05b-21cf-c880-80cff04ed6f2@amlogic.com>
-References: <20180408145700.23520-1-yixun.lan@amlogic.com>
- <0c97c61b-c05b-21cf-c880-80cff04ed6f2@amlogic.com>
-Message-ID: <09d70e1f-abba-79d0-4dc3-7130fd0d07a8@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 May 2018 11:33:43 -0500
+Subject: [PATCH 5/6] ARM: dts: rcar-gen2: Remove unused VIN properties
+In-Reply-To: <20180516221307.GF17948@bigcity.dyn.berto.se>
+References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526488352-898-6-git-send-email-jacopo+renesas@jmondi.org>
+ <20180516221307.GF17948@bigcity.dyn.berto.se>
+Message-ID: <20180523163343.GA16505@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/18 03:50, Yixun Lan wrote:
-> Hi Marc (or anyone else)
+On Thu, May 17, 2018 at 12:13:07AM +0200, Niklas S?derlund wrote:
+> Hi Jacopo,
 > 
-> On 04/08/18 22:56, Yixun Lan wrote:
->>   This series try to add GPIO interrupt controller support for Meson-AXG SoCs.
->>   The first patch is a trivial typo fix, I can fold the first two patches
->> together if necessary.
->>
->> Yixun Lan (3):
->>   dt-bindings: interrupt-controller: fix the double quotes
->>   dt-bindings: interrupt-controller: New binding for Meson-AXG SoC
->>   irqchip/meson-gpio: add support for Meson-AXG SoCs
->>
->>  .../bindings/interrupt-controller/amlogic,meson-gpio-intc.txt | 11 ++++++-----
->>  drivers/irqchip/irq-meson-gpio.c                              |  5 +++++
->>  2 files changed, 11 insertions(+), 5 deletions(-)
->>
+> Thanks for your work.
 > 
-> please consider this merely a ping..
-> will you take this series, or is there anything holding this?
+> On 2018-05-16 18:32:31 +0200, Jacopo Mondi wrote:
+> > The 'bus-width' and 'pclk-sample' properties are not parsed by the VIN
+> > driver and only confuse users. Remove them in all Gen2 SoC that used
+> > them.
+> > 
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > ---
+> >  arch/arm/boot/dts/r8a7790-lager.dts   | 3 ---
+> >  arch/arm/boot/dts/r8a7791-koelsch.dts | 3 ---
+> >  arch/arm/boot/dts/r8a7791-porter.dts  | 1 -
+> >  arch/arm/boot/dts/r8a7793-gose.dts    | 3 ---
+> >  arch/arm/boot/dts/r8a7794-alt.dts     | 1 -
+> >  arch/arm/boot/dts/r8a7794-silk.dts    | 1 -
+> >  6 files changed, 12 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> > index 063fdb6..b56b309 100644
+> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> > @@ -873,10 +873,8 @@
+> >  	port {
+> >  		vin0ep2: endpoint {
+> >  			remote-endpoint = <&adv7612_out>;
+> > -			bus-width = <24>;
+> 
+> I can't really make up my mind if this is a good thing or not. Device 
+> tree describes the hardware and not what the drivers make use of. And 
+> the fact is that this bus is 24 bits wide. So I'm not sure we should 
+> remove these properties. But I would love to hear what others think 
+> about this.
 
-Sure, I'll queue that for 4.18.
+IMO, this property should only be present when all the pins are not 
+connected. And by "all", I mean the minimum of what each end of the 
+graph can support.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Rob
