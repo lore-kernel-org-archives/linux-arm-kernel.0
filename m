@@ -1,81 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 May 2018 17:42:20 +0100
-Subject: [PATCH] perf: hisi: fix uncore PMU index ID
-In-Reply-To: <a301d72f-687c-0c4f-1d44-83e5bbad5e60@hisilicon.com>
-References: <1526901317-52248-1-git-send-email-zhangshaokun@hisilicon.com>
- <20180521170554.GE21034@arm.com>
- <a301d72f-687c-0c4f-1d44-83e5bbad5e60@hisilicon.com>
-Message-ID: <20180523164219.GG2983@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 May 2018 17:42:47 +0100
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180523150337.GO13470@e103592.cambridge.arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+ <20180523114812.GH55598@C02W217FHV2R.local>
+ <20180523133158.GJ13470@e103592.cambridge.arm.com>
+ <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
+ <20180523150337.GO13470@e103592.cambridge.arm.com>
+Message-ID: <20180523164246.47c2umln7xq5nf2w@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 05:18:51PM +0800, Zhangshaokun wrote:
-> On 2018/5/22 1:05, Will Deacon wrote:
-> > Whilst I'd normally just accept PMU driver submissions for vendor PMUs,
-> > this part rang my alarm bells:
+On Wed, May 23, 2018 at 04:03:37PM +0100, Dave P Martin wrote:
+> On Wed, May 23, 2018 at 03:56:57PM +0100, Catalin Marinas wrote:
+> > On Wed, May 23, 2018 at 02:31:59PM +0100, Dave P Martin wrote:
+> > > On Wed, May 23, 2018 at 01:48:12PM +0200, Christoffer Dall wrote:
+> > > > On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
+> > > > > This is true by construction however: TIF_FOREIGN_FPSTATE is never
+> > > > > cleared except when returning to userspace or returning from a
+> > > > > signal: thus, for a true kernel thread no FPSIMD context is ever
+> > > > > loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
+> > > > > ever be saved.
+> > > > 
+> > > > I don't understand this construction proof; from looking at the patch
+> > > > below it is not obvious to me why fpsimd_thread_switch() can never have
+> > > > !wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
+> > > > kernel thread?
+> > > 
+> > > Looking at this again, I think it is poorly worded.  This patch aims to
+> > > make it true by construction, but it isn't prior to the patch.
+> > > 
+> > > I'm tempted to delete the paragraph: the assertion of both untrue and
+> > > not the best way to justify that this patch works.
+> > > 
+> > > 
+> > > How about:
+> > > 
+> > > -8<-
+> > > 
+> > > The context switch logic already isolates user threads from each other.
+> > > This, it is sufficient for isolating user threads from the kernel,
+> > > since the goal either way is to ensure that code executing in userspace
+> > > cannot see any FPSIMD state except its own.  Thus, there is no special
+> > > property of kernel threads that we care about except that it is
+> > > pointless to save or load FPSIMD register state for them.
+> > > 
+> > > At worst, the removal of all the kernel thread special cases by this
+> > > patch would thus spuriously load and save state for kernel threads when
+> > > unnecessary.
+> > > 
+> > > But the context switch logic is already deliberately optimised to defer
+> > > reloads of the regs until ret_to_user (or sigreturn as a special case),
+> > > which kernel threads by definition never reach.
+> > > 
+> > > ->8-
 > > 
-> >> diff --git a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
-> >> index 443906e..dcd8e77 100644
-> >> --- a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
-> >> +++ b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
-> >> @@ -238,19 +238,10 @@ MODULE_DEVICE_TABLE(acpi, hisi_hha_pmu_acpi_match);
-> >>  static int hisi_hha_pmu_init_data(struct platform_device *pdev,
-> >>  				  struct hisi_pmu *hha_pmu)
-> >>  {
-> >> -	unsigned long long id;
-> >>  	struct resource *res;
-> >> -	acpi_status status;
-> >> -
-> >> -	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
-> >> -				       "_UID", NULL, &id);
-> >> -	if (ACPI_FAILURE(status))
-> >> -		return -EINVAL;
-> >> -
-> >> -	hha_pmu->index_id = id;
-> >>  
-> >>  	/*
-> >> -	 * Use SCCL_ID and UID to identify the HHA PMU, while
-> >> +	 * Use SCCL_ID and HHA index ID to identify the HHA PMU, while
-> >>  	 * SCCL_ID is in MPIDR[aff2].
-> >>  	 */
-> >>  	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
-> >> @@ -258,6 +249,13 @@ static int hisi_hha_pmu_init_data(struct platform_device *pdev,
-> >>  		dev_err(&pdev->dev, "Can not read hha sccl-id!\n");
-> >>  		return -EINVAL;
-> >>  	}
-> >> +
-> >> +	if (device_property_read_u32(&pdev->dev, "hisilicon,idx-id",
-> >> +				     &hha_pmu->index_id)) {
-> >> +		dev_err(&pdev->dev, "Can not read hha index-id!\n");
-> >> +		return -EINVAL;
-> >> +	}
-> > 
-> > Is this a new DT property? If so, please can you update the binding
-> > documentation and get an Ack from a DT maintainer? It's not clear to me
+> > The "at worst" paragraph makes it look like it could happen (at least
+> > until you reach the last paragraph). Maybe you can just say that
+> > wrong_task and wrong_cpu (with the fpsimd_cpu = NR_CPUS addition) are
+> > always true for kernel threads. You should probably mention this in a
+> > comment in the code as well.
 > 
-> No, it is not a DT property. We don't support DT mode for this platform and
-> only support ACPI mode.
-
-Hmm, but by using the firmware-agnostic "device_property_read_u32"
-interface, aren't you implicitly supporting it via DT as well? In fact,
-don't you now fail the probe if this new property isn't present? Isn't
-that a regression?
-
-> > what a "hisilicon,idx-id" is, nor how I would generate on from firmware.
-> > 
+> What if I just delete the second paragraph, and remove the "But" from
+> the start of the third, and append:
 > 
-> For HiSilicon this platform, it supports multi-sccl. each sccl has more than one uncore
-> PMUs. Like HHA uncore PMUs, each sccl has 2-HHA PMUs and idx-id is in _DSD package and
-> used to distinguish different HHA PMUs with the same sccl, as follow:
->     Name (_DSD, Package () {
->       ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->       Package () {
->         Package () {"hisilicon,scl-id", 0x03},
->         Package () {"hisilicon,idx-id", 0x00},
->       }
->     })
+> "As a result, the wrong_task and wrong_cpu tests in
+> fpsimd_thread_switch() will always yield false for kernel threads."
+> 
+> ...with a similar comment in the code?
 
-I'm still none the wiser about what this actually is. How is new _DSD crud
-supposed to be documented?
+Sounds fine. With that, feel free to add:
 
-Will
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
