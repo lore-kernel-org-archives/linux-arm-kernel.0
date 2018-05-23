@@ -1,72 +1,57 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 23 May 2018 11:31:17 +0200
-Subject: [PATCH v5 2/7] dt-bindings: display: atmel: optional video-interface
- of endpoints
-In-Reply-To: <20180523093122.27859-1-peda@axentia.se>
-References: <20180523093122.27859-1-peda@axentia.se>
-Message-ID: <20180523093122.27859-3-peda@axentia.se>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 23 May 2018 15:02:35 +0530
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <1527066324-24726-1-git-send-email-ilialin@codeaurora.org>
+References: <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+ <1527066324-24726-1-git-send-email-ilialin@codeaurora.org>
+Message-ID: <20180523093235.k7xugnd7pfisazdx@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With bus-type/bus-width properties in the endpoint nodes, the video-
-interface of the connection can be specified for cases where the
-heuristic fails to select the correct output mode. This can happen
-e.g. if not all RGB pins are routed on the PCB; the driver has no
-way of knowing this, and needs to be told explicitly.
+On 23-05-18, 12:05, Ilia Lin wrote:
+> In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
+> the CPU frequency subset and voltage value of each OPP varies
+> based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
+> defines the voltage and frequency value based on the msm-id in SMEM
+> and speedbin blown in the efuse combination.
+> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+> to provide the OPP framework with required information.
+> This is used to determine the voltage and frequency value for each OPP of
+> operating-points-v2 table when it is parsed by the OPP framework.
+> 
+> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm          |  10 +++
+>  drivers/cpufreq/Makefile             |   1 +
+>  drivers/cpufreq/cpufreq-dt-platdev.c |   3 +
+>  drivers/cpufreq/qcom-cpufreq-kryo.c  | 163 +++++++++++++++++++++++++++++++++++
+>  4 files changed, 177 insertions(+)
+>  create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
 
-This is critical for the devices that have the "conflicting output
-formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
-RGB bits move around depending on the selected output mode. For
-devices that do not have the "conflicting output formats" issue
-(SAMA5D2, SAMA5D4), this is completely irrelevant.
+Hi Ilia,
 
-Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+So the patch looks good now. But I don't see how this series is going
+to get merged. You are touching all parts of the kernel and no single
+maintainer would be able to get these merged easily.
 
-diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-index 82f2acb3d374..9de434a8f523 100644
---- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-+++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-@@ -15,6 +15,14 @@ Required children nodes:
-  to external devices using the OF graph reprensentation (see ../graph.txt).
-  At least one port node is required.
- 
-+Optional properties in grandchild nodes:
-+ Any endpoint grandchild node may specify a desired video interface
-+ according to ../../media/video-interfaces.txt, specifically
-+ - bus-type: must be <0>.
-+ - bus-width: recognized values are <12>, <16>, <18> and <24>, and
-+   override any output mode selection heuristic, forcing "rgb444",
-+   "rgb565", "rgb666" and "rgb888" respectively.
-+
- Example:
- 
- 	hlcdc: hlcdc at f0030000 {
-@@ -50,3 +58,21 @@ Example:
- 			#pwm-cells = <3>;
- 		};
- 	};
-+
-+
-+Example 2: With a video interface override to force rgb565; as above
-+but with these changes/additions:
-+
-+	&hlcdc {
-+		hlcdc-display-controller {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
-+
-+			port at 0 {
-+				hlcdc_panel_output: endpoint at 0 {
-+					bus-type = <0>;
-+					bus-width = <16>;
-+				};
-+			};
-+		};
-+	};
--- 
-2.11.0
+What I would suggest is that you divided the series in at least 3
+parts.
+
+- Patch 10 and 11, just the cpufreq stuff. So that Rafael can apply
+  those independently. Also mention the dependency on my OPP patches
+  in the cover letter for those two patches.
+
+- All clk patches in another series, so that Stephen can apply them.
+
+- And finally everything else to go via ARM-Soc.
+
+Maybe things wouldn't be that simple, but that's what you would need
+to do to get things merged. And please add all Acked by tags you got
+to the patches.
+
+For this patch:
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+--
+viresh
