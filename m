@@ -1,64 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 May 2018 08:25:24 +0200
-Subject: [PATCH 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
-In-Reply-To: <fc1cfd7e-db27-9277-dbed-cc2274c614a6@gmail.com>
-References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
- <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
- <CAMuHMdXRnoyhNz=3v_=ZCV=FWX4TwKqx7MpH0g3c7GwtXKP1tg@mail.gmail.com>
- <fc1cfd7e-db27-9277-dbed-cc2274c614a6@gmail.com>
-Message-ID: <CAMuHMdXnNABJSJZ6MLF+aQu8QKpFoMCAvno9Yc-9LOe810NtbA@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 23 May 2018 14:37:03 +0800
+Subject: [SPAM]Re: [PATCH v2 4/7] Bluetooth: Add new quirk for
+ non-persistent setup settings
+In-Reply-To: <1526976323.18877.47.camel@mtkswgap22>
+References: <cover.1526374087.git.sean.wang@mediatek.com>
+ <1d6097f538b3182b2876ad48225ecd6e2d1b128c.1526374087.git.sean.wang@mediatek.com>
+ <920B3BE9-3FE8-4AC6-8C5F-63B0E00182AC@holtmann.org>
+ <1526976323.18877.47.camel@mtkswgap22>
+Message-ID: <1527057423.4607.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Tue, 2018-05-22 at 16:05 +0800, Sean Wang wrote:
+> On Tue, 2018-05-22 at 09:21 +0200, Marcel Holtmann wrote:
+> > Hi Sean,
+> > 
+> 
+> [ ... ]
+> 
+> > > -	if (hci_dev_test_flag(hdev, HCI_SETUP)) {
+> > > +	if (hci_dev_test_flag(hdev, HCI_SETUP) ||
+> > > +	    test_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks)) {
+> > > 		hci_sock_dev_event(hdev, HCI_DEV_SETUP);
+> > 
+> > I am not 100% sure that we want to send the HCI_DEV_SETUP event also multiple times. That is a userspace change that I would need to think about. We need to check create_monitor_event() and see what the btmon trace for this looks like. Can you send me a btmon -w trace.log when this change is active.
+> > 
+> > Regards
+> > 
+> > Marcel
+> > 
+> 
+> Sure, I'll send you the trace.log with the change is active.
+> 
+> 	Sean
+> 
 
-On Wed, May 23, 2018 at 12:01 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 05/22/2018 04:43 PM, Geert Uytterhoeven wrote:
->> On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->>> Drop the MTD partitioning from DT, since it does not describe HW
->>> and to give way to a more flexible kernel command line partition
->>> passing.
->>>
->>> To retain the original partitioning, assure you have enabled
->>> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
->>> following to your kernel command line:
->>>
->>>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
->>
->> I think the "@0" can be dropped, as it's optional?
->> 4m?
->
-> My take on this is that the loader is actually at offset 0x0 of the MTD
-> device and we explicitly state that in the mtdparts to anchor the first
-> partition within the MTD device and all the other partitions are at
-> offset +(sum of the sizes of all partitions listed before the current
-> one) relative to that first partition.
+Hi, Marcel
 
-Where is this explicitly states for the first partition?
+Attached trace.log was captured when I inputted commands power on and
+then off in bluetoothctl.
 
-> Removing the @0 feels fragile at best and it seems to depend on the
-> current behavior of the code.
+	Sean 
 
-Better, it also depends on the documented behavior:
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
 
-Documentation/admin-guide/kernel-parameters.txt refers to
-drivers/mtd/cmdlinepart.c, which states:
-
- * <offset>  := standard linux memsize
- *              if omitted the part will immediately follow the previous part
- *              or 0 if the first part
-
-None of the examples listed there or under the MTD_CMDLINE_PARTS Kconfig
-help text, or in a defconfig bundled with the kernel, use @0 for the first
-partition.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: trace.log
+Type: text/x-log
+Size: 6573 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/db18fea4/attachment.bin>
