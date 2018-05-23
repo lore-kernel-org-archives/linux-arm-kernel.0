@@ -1,44 +1,53 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 23 May 2018 10:44:05 +0200
-Subject: [PATCH] pinctrl: armada-37xx: Fix spurious irq management
-Message-ID: <20180523084405.14410-1-gregory.clement@bootlin.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 23 May 2018 16:46:25 +0800
+Subject: [rjarzmik:test/daniel 23/34] sound/arm/pxa2xx-ac97.c:27:10: fatal
+ error: mach/regs-ac97.h: No such file or directory
+Message-ID: <201805231623.n3Qx9qdU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Terry Zhou <bjzhou@marvell.com>
+tree:   https://github.com/rjarzmik/linux test/daniel
+head:   f495e2dbc482d8f01a1ee20e86284ee9c0c8fa98
+commit: 4cd654b13b9bcc0f206d414497b798ed42df573a [23/34] HACK: select SND_PXA_SOC_SSP for SND_SIMPLE_CARD
+config: x86_64-randconfig-s3-05231547 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        git checkout 4cd654b13b9bcc0f206d414497b798ed42df573a
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Until now, if we found spurious irq in irq_handler, we only updated the
-status in register but not the status in the code. Due to this the system
-will got stuck dues to the infinite loop
+All errors (new ones prefixed by >>):
 
-[gregory.clement at bootlin.com: update comment and add fix and stable tags]
-Fixes: 30ac0d3b0702 ("pinctrl: armada-37xx: Add edge both type gpio irq support")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Terry Zhou <bjzhou@marvell.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>> sound/arm/pxa2xx-ac97.c:27:10: fatal error: mach/regs-ac97.h: No such file or directory
+    #include <mach/regs-ac97.h>
+             ^~~~~~~~~~~~~~~~~~
+   compilation terminated.
+--
+>> sound/soc/pxa/pxa2xx-i2s.c:28:10: fatal error: mach/hardware.h: No such file or directory
+    #include <mach/hardware.h>
+             ^~~~~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +27 sound/arm/pxa2xx-ac97.c
+
+2c484df0 Takashi Iwai 2005-06-30  26  
+1f017a99 Eric Miao    2008-11-28 @27  #include <mach/regs-ac97.h>
+a09e64fb Russell King 2008-08-05  28  #include <mach/audio.h>
+2c484df0 Takashi Iwai 2005-06-30  29  
+
+:::::: The code at line 27 was first introduced by commit
+:::::: 1f017a9964c5b3b9581d3a5732110cb1e0444281 [ARM] pxa: move AC97 register definitions into dedicated regs-ac97.h
+
+:::::: TO: Eric Miao <eric.miao@marvell.com>
+:::::: CC: Eric Miao <eric.miao@marvell.com>
+
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 5b63248c8209..7bef929bd7fe 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -679,12 +679,13 @@ static void armada_37xx_irq_handler(struct irq_desc *desc)
- 					writel(1 << hwirq,
- 					       info->base +
- 					       IRQ_STATUS + 4 * i);
--					continue;
-+					goto update_status;
- 				}
- 			}
- 
- 			generic_handle_irq(virq);
- 
-+update_status:
- 			/* Update status in case a new IRQ appears */
- 			spin_lock_irqsave(&info->irq_lock, flags);
- 			status = readl_relaxed(info->base +
--- 
-2.17.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31184 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/2435dd78/attachment-0001.gz>
