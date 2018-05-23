@@ -1,58 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 23 May 2018 09:42:55 +0100
-Subject: [PATCH] arm64: Kconfig: Enable LSE atomics by default
-In-Reply-To: <1526926462-19214-1-git-send-email-will.deacon@arm.com>
-References: <1526926462-19214-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180523084254.ikpddax5ddbm4ajv@salmiak>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 23 May 2018 09:42:56 +0100
+Subject: [PATCHv4 06/10] arm64: add basic pointer authentication support
+In-Reply-To: <20180503132031.25705-7-mark.rutland@arm.com>
+References: <20180503132031.25705-1-mark.rutland@arm.com>
+ <20180503132031.25705-7-mark.rutland@arm.com>
+Message-ID: <114d65a8-ffa5-7061-864a-a32aa3baa5c5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 07:14:22PM +0100, Will Deacon wrote:
-> Now that we're seeing CPUs shipping with LSE atomics, default them to
-> 'on' in Kconfig. CPUs without the instructions will continue to use
-> LDXR/STXR-based sequences, but they will be placed out-of-line by the
-> compiler.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Mark,
 
-I've been fuzzing v4.17-rc3 with this enabled, and haven't hit anything new
-that appears to be caused by the atomics. FWIW:
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+On 03/05/18 14:20, Mark Rutland wrote:
+> This patch adds basic support for pointer authentication, allowing
+> userspace to make use of APIAKey. The kernel maintains an APIAKey value
+> for each process (shared by all threads within), which is initialised to
+> a random value at exec() time.
+> 
+> To describe that address authentication instructions are available, the
+> ID_AA64ISAR0.{APA,API} fields are exposed to userspace. A new hwcap,
+> APIA, is added to describe that the kernel manages APIAKey.
+> 
+> Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
+> and will behave as NOPs. These may be made use of in future patches.
+> 
+> No support is added for the generic key (APGAKey), though this cannot be
+> trapped or made to behave as a NOP. Its presence is not advertised with
+> a hwcap.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Mark.
 
-> ---
->  arch/arm64/Kconfig | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4d98774cf3c7..3aed13626fd7 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1051,6 +1051,7 @@ config ARM64_PAN
->  
->  config ARM64_LSE_ATOMICS
->  	bool "Atomic instructions"
-> +	default y
->  	help
->  	  As part of the Large System Extensions, ARMv8.1 introduces new
->  	  atomic instructions that are designed specifically to scale in
-> @@ -1059,7 +1060,8 @@ config ARM64_LSE_ATOMICS
->  	  Say Y here to make use of these instructions for the in-kernel
->  	  atomic routines. This incurs a small overhead on CPUs that do
->  	  not support these instructions and requires the kernel to be
-> -	  built with binutils >= 2.25.
-> +	  built with binutils >= 2.25 in order for the new instructions
-> +	  to be used.
->  
->  config ARM64_VHE
->  	bool "Enable support for Virtualization Host Extensions (VHE)"
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+> new file mode 100644
+> index 000000000000..034877ee28bc
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pointer_auth.h
+
+...
+
+> +
+> +#define __ptrauth_key_install(k, v)			\
+> +do {							\
+> +	write_sysreg_s(v.lo, SYS_ ## k ## KEYLO_EL1);	\
+> +	write_sysreg_s(v.hi, SYS_ ## k ## KEYHI_EL1);	\
+> +} while (0)
+
+I think it might be safer to have parentheses around v, to prevent
+something like __ptrauth_key_install(APIA, *key_val) work fine.
+
+> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+> index 17c65c8f33cb..01f02ac500ae 100644
+> --- a/arch/arm64/include/uapi/asm/hwcap.h
+> +++ b/arch/arm64/include/uapi/asm/hwcap.h
+> @@ -48,5 +48,6 @@
+>   #define HWCAP_USCAT		(1 << 25)
+>   #define HWCAP_ILRCPC		(1 << 26)
+>   #define HWCAP_FLAGM		(1 << 27)
+> +#define HWCAP_APIA		(1 << 28)
+>   
+>   #endif /* _UAPI__ASM_HWCAP_H */
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 01b1a7e7d70f..f418d4cb6691 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1030,6 +1030,11 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+>   #endif
+...
+
+> +#ifdef CONFIG_ARM64_PNTR_AUTH
+> +	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_APA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_APIA),
+> +#endif
+
+Did you mean CONFIG_ARM64_PTR_AUTH here ?
+
+Cheers
+
+Suzuki
