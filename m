@@ -1,224 +1,67 @@
-From: ilialin@codeaurora.org (Ilia Lin)
-Date: Wed, 23 May 2018 15:53:01 +0300
-Subject: [PATCH v11 8/8] clk: qcom: Add ACD path to CPU clock driver for
- msm8996
-In-Reply-To: <1527079981-11179-1-git-send-email-ilialin@codeaurora.org>
-References: <1527079981-11179-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1527079981-11179-9-git-send-email-ilialin@codeaurora.org>
+From: philip.li@intel.com (Li, Philip)
+Date: Wed, 23 May 2018 13:05:06 +0000
+Subject: [rjarzmik:test/daniel 23/34] sound/arm/pxa2xx-ac97.c:27:10:
+ fatal error: mach/regs-ac97.h: No such file or directory
+In-Reply-To: <8545409a-475f-1821-fcef-60b2f85101b6@zonque.org>
+References: <201805231623.n3Qx9qdU%fengguang.wu@intel.com>
+ <8545409a-475f-1821-fcef-60b2f85101b6@zonque.org>
+Message-ID: <831EE4E5E37DCC428EB295A351E662494CB31A1D@shsmsx102.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMUX for each duplex allows for selection of ACD clock source.
-The DVM (Dynamic Variation Monitor) will flag an error
-when a voltage droop event is detected. This flagged error
-enables ACD to provide a div-by-2 clock, sourced from the primary PLL.
-The duplex will be provided the divided clock
-until a pre-programmed delay has expired.
+> On Wednesday, May 23, 2018 10:46 AM, kbuild test robot wrote:
+> > tree:   https://github.com/rjarzmik/linux test/daniel
+> > head:   f495e2dbc482d8f01a1ee20e86284ee9c0c8fa98
+> > commit: 4cd654b13b9bcc0f206d414497b798ed42df573a [23/34] HACK: select
+> SND_PXA_SOC_SSP for SND_SIMPLE_CARD
+> 
+> This patch is just a local hack in one of my scratch-pad branches and is
+> not meant for upstream inclusion. Could you remove the branch or make
+> sure it isn't picked up by test robots?
+thanks for info, we will exclude it from testing.
 
-This change configures ACD during the probe and switches
-the PMUXes to the ACD clock source.
-
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
----
- drivers/clk/qcom/clk-cpu-8996.c | 75 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 65 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index ff5c0a5..0a908d8 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -53,9 +53,11 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <soc/qcom/kryo-l2-accessors.h>
- 
- #include "clk-alpha-pll.h"
- #include "clk-regmap.h"
-@@ -69,6 +71,11 @@ enum _pmux_input {
- };
- 
- #define DIV_2_THRESHOLD		600000000
-+#define PWRCL_REG_OFFSET 0x0
-+#define PERFCL_REG_OFFSET 0x80000
-+#define MUX_OFFSET	0x40
-+#define ALT_PLL_OFFSET	0x100
-+#define SSSCTL_OFFSET 0x160
- 
- static const u8 prim_pll_regs[PLL_OFF_MAX_REGS] = {
-        [PLL_OFF_L_VAL] = 0x04,
-@@ -107,7 +114,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll perfcl_pll = {
--	.offset = 0x80000,
-+	.offset = PERFCL_REG_OFFSET,
- 	.regs = prim_pll_regs,
- 	.flags = SUPPORTS_DYNAMIC_UPDATE | SUPPORTS_FSM_MODE,
- 	.clkr.hw.init = &(struct clk_init_data){
-@@ -119,7 +126,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll pwrcl_pll = {
--	.offset = 0x0,
-+	.offset = PWRCL_REG_OFFSET,
- 	.regs = prim_pll_regs,
- 	.flags = SUPPORTS_DYNAMIC_UPDATE | SUPPORTS_FSM_MODE,
- 	.clkr.hw.init = &(struct clk_init_data){
-@@ -149,7 +156,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll perfcl_alt_pll = {
--	.offset = 0x80100,
-+	.offset = PERFCL_REG_OFFSET + ALT_PLL_OFFSET,
- 	.regs = alt_pll_regs,
- 	.vco_table = alt_pll_vco_modes,
- 	.num_vco = ARRAY_SIZE(alt_pll_vco_modes),
-@@ -163,7 +170,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll pwrcl_alt_pll = {
--	.offset = 0x100,
-+	.offset = PWRCL_REG_OFFSET + ALT_PLL_OFFSET,
- 	.regs = alt_pll_regs,
- 	.vco_table = alt_pll_vco_modes,
- 	.num_vco = ARRAY_SIZE(alt_pll_vco_modes),
-@@ -176,6 +183,9 @@ enum _pmux_input {
- 	},
- };
- 
-+void __iomem *base;
-+static void qcom_cpu_clk_msm8996_acd_init(void __iomem *base);
-+
- /* Mux'es */
- 
- struct clk_cpu_8996_mux {
-@@ -253,6 +263,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	switch (event) {
- 	case PRE_RATE_CHANGE:
- 		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
-+		qcom_cpu_clk_msm8996_acd_init(base);
- 		break;
- 	case POST_RATE_CHANGE:
- 		if (cnd->new_rate < DIV_2_THRESHOLD)
-@@ -260,7 +271,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 							  DIV_2_INDEX);
- 		else
- 			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
--							  PLL_INDEX);
-+							  ACD_INDEX);
- 		break;
- 	default:
- 		ret = 0;
-@@ -276,7 +287,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
- 
- static struct clk_cpu_8996_mux pwrcl_smux = {
--	.reg = 0x40,
-+	.reg = PWRCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 2,
- 	.width = 2,
- 	.clkr.hw.init = &(struct clk_init_data) {
-@@ -292,7 +303,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
- 
- static struct clk_cpu_8996_mux perfcl_smux = {
--	.reg = 0x80040,
-+	.reg = PERFCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 2,
- 	.width = 2,
- 	.clkr.hw.init = &(struct clk_init_data) {
-@@ -308,7 +319,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
- 
- static struct clk_cpu_8996_mux pwrcl_pmux = {
--	.reg = 0x40,
-+	.reg = PWRCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &pwrcl_pll.clkr.hw,
-@@ -329,7 +340,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
- 
- static struct clk_cpu_8996_mux perfcl_pmux = {
--	.reg = 0x80040,
-+	.reg = PERFCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &perfcl_pll.clkr.hw,
-@@ -393,6 +404,10 @@ struct clk_regmap *clks[] = {
- 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
- 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
- 
-+	/* Enable alt PLLs */
-+	clk_prepare_enable(pwrcl_alt_pll.clkr.hw.clk);
-+	clk_prepare_enable(perfcl_alt_pll.clkr.hw.clk);
-+
- 	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
- 	if (ret)
- 		return ret;
-@@ -402,10 +417,48 @@ struct clk_regmap *clks[] = {
- 	return ret;
- }
- 
-+#define CPU_AFINITY_MASK 0xFFF
-+#define PWRCL_CPU_REG_MASK 0x3
-+#define PERFCL_CPU_REG_MASK 0x103
-+
-+#define L2ACDCR_REG 0x580ULL
-+#define L2ACDTD_REG 0x581ULL
-+#define L2ACDDVMRC_REG 0x584ULL
-+#define L2ACDSSCR_REG 0x589ULL
-+
-+static DEFINE_SPINLOCK(acd_lock);
-+
-+static void qcom_cpu_clk_msm8996_acd_init(void __iomem *base)
-+{
-+	u64 hwid;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&acd_lock, flags);
-+
-+	hwid = read_cpuid_mpidr() & CPU_AFINITY_MASK;
-+
-+	kryo_l2_set_indirect_reg(L2ACDTD_REG, 0x00006A11);
-+	kryo_l2_set_indirect_reg(L2ACDDVMRC_REG, 0x000E0F0F);
-+	kryo_l2_set_indirect_reg(L2ACDSSCR_REG, 0x00000601);
-+
-+	if (PWRCL_CPU_REG_MASK == (hwid | PWRCL_CPU_REG_MASK)) {
-+		writel(0xF, base + PWRCL_REG_OFFSET + SSSCTL_OFFSET);
-+		wmb();
-+		kryo_l2_set_indirect_reg(L2ACDCR_REG, 0x002C5FFD);
-+	}
-+
-+	if (PERFCL_CPU_REG_MASK == (hwid | PERFCL_CPU_REG_MASK)) {
-+		kryo_l2_set_indirect_reg(L2ACDCR_REG, 0x002C5FFD);
-+		writel(0xF, base + PERFCL_REG_OFFSET + SSSCTL_OFFSET);
-+		wmb();
-+	}
-+
-+	spin_unlock_irqrestore(&acd_lock, flags);
-+}
-+
- static int qcom_cpu_clk_msm8996_driver_probe(struct platform_device *pdev)
- {
- 	int ret;
--	void __iomem *base;
- 	struct resource *res;
- 	struct regmap *regmap;
- 	struct clk_hw_onecell_data *data;
-@@ -429,6 +482,8 @@ static int qcom_cpu_clk_msm8996_driver_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	qcom_cpu_clk_msm8996_acd_init(base);
-+
- 	data->hws[0] = &pwrcl_pmux.clkr.hw;
- 	data->hws[1] = &perfcl_pmux.clkr.hw;
- 	data->num = 2;
--- 
-1.9.1
+> 
+> 
+> Thanks,
+> Daniel
+> 
+> 
+> > config: x86_64-randconfig-s3-05231547 (attached as .config)
+> > compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+> > reproduce:
+> >          git checkout 4cd654b13b9bcc0f206d414497b798ed42df573a
+> >          # save the attached .config to linux build tree
+> >          make ARCH=x86_64
+> >
+> > All errors (new ones prefixed by >>):
+> >
+> >>> sound/arm/pxa2xx-ac97.c:27:10: fatal error: mach/regs-ac97.h: No such file
+> or directory
+> >      #include <mach/regs-ac97.h>
+> >               ^~~~~~~~~~~~~~~~~~
+> >     compilation terminated.
+> > --
+> >>> sound/soc/pxa/pxa2xx-i2s.c:28:10: fatal error: mach/hardware.h: No such file
+> or directory
+> >      #include <mach/hardware.h>
+> >               ^~~~~~~~~~~~~~~~~
+> >     compilation terminated.
+> >
+> > vim +27 sound/arm/pxa2xx-ac97.c
+> >
+> > 2c484df0 Takashi Iwai 2005-06-30  26
+> > 1f017a99 Eric Miao    2008-11-28 @27  #include <mach/regs-ac97.h>
+> > a09e64fb Russell King 2008-08-05  28  #include <mach/audio.h>
+> > 2c484df0 Takashi Iwai 2005-06-30  29
+> >
+> > :::::: The code at line 27 was first introduced by commit
+> > :::::: 1f017a9964c5b3b9581d3a5732110cb1e0444281 [ARM] pxa: move AC97
+> register definitions into dedicated regs-ac97.h
+> >
+> > :::::: TO: Eric Miao <eric.miao@marvell.com>
+> > :::::: CC: Eric Miao <eric.miao@marvell.com>
+> >
+> > ---
+> > 0-DAY kernel test infrastructure                Open Source Technology Center
+> > https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> >
