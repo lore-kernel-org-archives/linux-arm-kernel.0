@@ -1,29 +1,51 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Wed, 23 May 2018 14:34:06 +0000
-Subject: [PATCH v9 3/4] arm64: Implement page table free interfaces
-In-Reply-To: <20180523140157.GG26965@arm.com>
-References: <1525074094-25839-1-git-send-email-cpandya@codeaurora.org>
- <1525074094-25839-4-git-send-email-cpandya@codeaurora.org>
- <20180523140157.GG26965@arm.com>
-Message-ID: <1527085967.14039.10.camel@hpe.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 23 May 2018 16:34:14 +0200
+Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180518124605.GA13470@e103592.cambridge.arm.com>
+References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
+ <20180517181932.GW7753@e103592.cambridge.arm.com>
+ <20180518124605.GA13470@e103592.cambridge.arm.com>
+Message-ID: <20180523143414.3oqpzt7cujvkxxve@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-05-23 at 15:01 +0100, Will Deacon wrote:
-> Hi Chintan,
+On 2018-05-18 13:46:36 [+0100], Dave Martin wrote:
+> On Thu, May 17, 2018 at 07:19:43PM +0100, Dave Martin wrote:
 > 
-> [as a side note: I'm confused on the status of this patch series, as part
->  of it was reposted separately by Toshi. Please can you work together?]
+> [...]
+> 
+> > kernel_neon_begin() could then do
+> > 
+> > 	local_fpsimd_context_lock();
+> > 
+> > 	/* ... */
+> > 
+> > 	preempt_disable();
+> > 	local_unlock(fpsimd_context_lock);
+> > 
+> > ... with the following in kernel_neon_end():
+> > 
+> > 	local_unlock(fpsimd_lock);
+> > 	preempt_enable();
+> > 
+> > 
+> > If kernel-mode NEON was considered harmful to RT due to the context
+> > switch overheads, then the above might be overkill.  SVE will be worse
+> > in that regard, and also needs thinking about at some point -- I've not
+> > looked at if from the RT angle at all.
+> 
+> Hmmm, !KERNEL_MODE_NEON breaks EFI, so this probably does want looking
+> at.  Ard's recent rework to enable voluntary preemption the crypto
+> backends for arm64 [1] should reduce the fpsimd_lock blackouts, but it
+> still depends on the backends playing nice.
 
-I do not know the status of my patch series, either... That being said,
-I made my x86 patches based off from Chintan's 1/4 patch (which changes
-both x86 and arm) so that my series won't conflict with his.
+oh. I've seen the series, I more or less asked for this and I am glad
+for it. I will try to unbreak this EFI problem then?
+I remember the good old days when the boot loader was gone after it
+jumped to the kernel?
 
-Chintan,
-If you need to update your series before mine's accepted, please make
-sure to use the updated 1/4 below. I've updated the descriptions per
-review comment.
-https://patchwork.kernel.org/patch/10407065/
+> Cheers
+> ---Dave
 
-Thanks,
--Toshi 
+Sebastian
