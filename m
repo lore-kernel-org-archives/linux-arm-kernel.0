@@ -1,83 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 23 May 2018 09:42:56 +0100
-Subject: [PATCHv4 06/10] arm64: add basic pointer authentication support
-In-Reply-To: <20180503132031.25705-7-mark.rutland@arm.com>
-References: <20180503132031.25705-1-mark.rutland@arm.com>
- <20180503132031.25705-7-mark.rutland@arm.com>
-Message-ID: <114d65a8-ffa5-7061-864a-a32aa3baa5c5@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 23 May 2018 10:44:05 +0200
+Subject: [PATCH] pinctrl: armada-37xx: Fix spurious irq management
+Message-ID: <20180523084405.14410-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Terry Zhou <bjzhou@marvell.com>
 
+Until now, if we found spurious irq in irq_handler, we only updated the
+status in register but not the status in the code. Due to this the system
+will got stuck dues to the infinite loop
 
-On 03/05/18 14:20, Mark Rutland wrote:
-> This patch adds basic support for pointer authentication, allowing
-> userspace to make use of APIAKey. The kernel maintains an APIAKey value
-> for each process (shared by all threads within), which is initialised to
-> a random value at exec() time.
-> 
-> To describe that address authentication instructions are available, the
-> ID_AA64ISAR0.{APA,API} fields are exposed to userspace. A new hwcap,
-> APIA, is added to describe that the kernel manages APIAKey.
-> 
-> Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
-> and will behave as NOPs. These may be made use of in future patches.
-> 
-> No support is added for the generic key (APGAKey), though this cannot be
-> trapped or made to behave as a NOP. Its presence is not advertised with
-> a hwcap.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+[gregory.clement at bootlin.com: update comment and add fix and stable tags]
+Fixes: 30ac0d3b0702 ("pinctrl: armada-37xx: Add edge both type gpio irq support")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Terry Zhou <bjzhou@marvell.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-> new file mode 100644
-> index 000000000000..034877ee28bc
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pointer_auth.h
-
-...
-
-> +
-> +#define __ptrauth_key_install(k, v)			\
-> +do {							\
-> +	write_sysreg_s(v.lo, SYS_ ## k ## KEYLO_EL1);	\
-> +	write_sysreg_s(v.hi, SYS_ ## k ## KEYHI_EL1);	\
-> +} while (0)
-
-I think it might be safer to have parentheses around v, to prevent
-something like __ptrauth_key_install(APIA, *key_val) work fine.
-
-> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-> index 17c65c8f33cb..01f02ac500ae 100644
-> --- a/arch/arm64/include/uapi/asm/hwcap.h
-> +++ b/arch/arm64/include/uapi/asm/hwcap.h
-> @@ -48,5 +48,6 @@
->   #define HWCAP_USCAT		(1 << 25)
->   #define HWCAP_ILRCPC		(1 << 26)
->   #define HWCAP_FLAGM		(1 << 27)
-> +#define HWCAP_APIA		(1 << 28)
->   
->   #endif /* _UAPI__ASM_HWCAP_H */
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 01b1a7e7d70f..f418d4cb6691 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1030,6 +1030,11 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->   #endif
-...
-
-> +#ifdef CONFIG_ARM64_PNTR_AUTH
-> +	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_APA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_APIA),
-> +#endif
-
-Did you mean CONFIG_ARM64_PTR_AUTH here ?
-
-Cheers
-
-Suzuki
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 5b63248c8209..7bef929bd7fe 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -679,12 +679,13 @@ static void armada_37xx_irq_handler(struct irq_desc *desc)
+ 					writel(1 << hwirq,
+ 					       info->base +
+ 					       IRQ_STATUS + 4 * i);
+-					continue;
++					goto update_status;
+ 				}
+ 			}
+ 
+ 			generic_handle_irq(virq);
+ 
++update_status:
+ 			/* Update status in case a new IRQ appears */
+ 			spin_lock_irqsave(&info->irq_lock, flags);
+ 			status = readl_relaxed(info->base +
+-- 
+2.17.0
