@@ -1,88 +1,67 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 23 May 2018 13:46:59 -0700
-Subject: [PATCHv2] arm64: Make sure permission updates happen for pmd/pud
-In-Reply-To: <20180523184346.487-1-labbott@redhat.com>
-References: <20180523184346.487-1-labbott@redhat.com>
-Message-ID: <CAGXu5jKMsq_UbaNOR1UEE4Q3HfgdTjS6kGk-Ps6+H9_oKKs-4w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 May 2018 15:52:20 -0500
+Subject: [PATCH v2] spi: bcm2835aux: ensure interrupts are enabled for shared
+ handler
+Message-ID: <20180523205220.7394-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 11:43 AM, Laura Abbott <labbott@redhat.com> wrote:
-> Commit 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-> disallowed block mappings for ioremap since that code does not honor
-> break-before-make. The same APIs are also used for permission updating
-> though and the extra checks prevent the permission updates from happening,
-> even though this should be permitted. This results in read-only permissions
-> not being fully applied. Visibly, this can occasionaly be seen as a failure
-> on the built in rodata test when the test data ends up in a section or
-> as an odd RW gap on the page table dump. Fix this by using
-> pgattr_change_is_safe instead of p*d_present for determining if the
-> change is permitted.
->
-> Reported-by: Peter Robinson <pbrobinson@gmail.com>
-> Fixes: 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
+Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
+DT change which breaks compatibility with older kernels. The AUX irqchip
+was already rejected for upstream[1] and the DT change would break
+working systems if the DTB is updated to a newer one. The latter issue
+was brought to my attention by Alex Graf.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+The root cause however is a bug in the shared handler. A shared handler
+must correctly identify it actually handled an interrupt. The handler
+here was processing data whether interrupts were enabled or not.
+It would return IRQ_HANDLED if there was any data and not only when
+there was an actual interrupt pending. The result is that another
+device's IRQ could cause the SPI's IRQ handler to run and process data
+when the the SPI driver working in polled mode. Fix this by adding a
+check in the IRQ handler that the TXEMPTY or IDLE interrupts are enabled
+and always return IRQ_NONE when they are not.
 
-Thanks for fixing this!
+[1] https://patchwork.kernel.org/patch/9781221/
 
--Kees
+Cc: Alexander Graf <agraf@suse.de>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-spi at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+Still hoping someone can test this as I have not.
 
-> ---
-> v2: Switch to using pgattr_change_is_safe per suggestion of Will
-> ---
->  arch/arm64/mm/mmu.c | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 2dbb2c9f1ec1..493ff75670ff 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -933,13 +933,15 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
->  {
->         pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
->                                         pgprot_val(mk_sect_prot(prot)));
-> +       pud_t new_pud = pfn_pud(__phys_to_pfn(phys), sect_prot);
->
-> -       /* ioremap_page_range doesn't honour BBM */
-> -       if (pud_present(READ_ONCE(*pudp)))
-> +       /* Only allow permission changes for now */
-> +       if (!pgattr_change_is_safe(READ_ONCE(pud_val(*pudp)),
-> +                                  pud_val(new_pud)))
->                 return 0;
->
->         BUG_ON(phys & ~PUD_MASK);
-> -       set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
-> +       set_pud(pudp, new_pud);
->         return 1;
->  }
->
-> @@ -947,13 +949,15 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
->  {
->         pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
->                                         pgprot_val(mk_sect_prot(prot)));
-> +       pmd_t new_pmd = pfn_pmd(__phys_to_pfn(phys), sect_prot);
->
-> -       /* ioremap_page_range doesn't honour BBM */
-> -       if (pmd_present(READ_ONCE(*pmdp)))
-> +       /* Only allow permission changes for now */
-> +       if (!pgattr_change_is_safe(READ_ONCE(pmd_val(*pmdp)),
-> +                                  pmd_val(new_pmd)))
->                 return 0;
->
->         BUG_ON(phys & ~PMD_MASK);
-> -       set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
-> +       set_pmd(pmdp, new_pmd);
->         return 1;
->  }
->
-> --
-> 2.17.0
->
+v2:
+- Expand commit message text about shared handler req. and how polled 
+  mode causes the problem.
 
+ drivers/spi/spi-bcm2835aux.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
+diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+index 1431cb98fe40..3094d818cf06 100644
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -184,6 +184,11 @@ static irqreturn_t bcm2835aux_spi_interrupt(int irq, void *dev_id)
+ 	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+ 	irqreturn_t ret = IRQ_NONE;
+ 
++	/* IRQ may be shared, so return if our interrupts are disabled */
++	if (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_CNTL1) &
++	      (BCM2835_AUX_SPI_CNTL1_TXEMPTY | BCM2835_AUX_SPI_CNTL1_IDLE)))
++		return ret;
++
+ 	/* check if we have data to read */
+ 	while (bs->rx_len &&
+ 	       (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_STAT) &
 -- 
-Kees Cook
-Pixel Security
+2.17.0
