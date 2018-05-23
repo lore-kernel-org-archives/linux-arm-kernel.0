@@ -1,30 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 May 2018 10:56:13 -0300
-Subject: [PATCH] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards
- from K+P
-In-Reply-To: <20180519140202.3449e3c1@jawa>
-References: <20180509153428.1440-1-lukma@denx.de>
- <CAOMZO5AexXNEGVoXa9K_GAm+aFLNRQOXOhF_SdKAjV1qmuD2nA@mail.gmail.com>
- <20180519140202.3449e3c1@jawa>
-Message-ID: <CAOMZO5DoLwEmQz5BQHDLk8sBq7mDH_UxBjRA0RGKb+PunMYu-Q@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 23 May 2018 14:57:32 +0100
+Subject: [PATCH v10 02/18] thread_info: Add update_thread_flag() helpers
+In-Reply-To: <87po1mtrg3.fsf@linaro.org>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-3-git-send-email-Dave.Martin@arm.com>
+ <87po1mtrg3.fsf@linaro.org>
+Message-ID: <20180523135732.GK13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+On Wed, May 23, 2018 at 02:46:52PM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > There are a number of bits of code sprinkled around the kernel to
+> > set a thread flag if a certain condition is true, and clear it
+> > otherwise.
+> >
+> > To help make those call sites terser and less cumbersome, this
+> > patch adds a new family of thread flag manipulators
+> >
+> > 	update*_thread_flag([...,] flag, cond)
+> >
+> > which do the equivalent of:
+> >
+> > 	if (cond)
+> > 		set*_thread_flag([...,] flag);
+> > 	else
+> > 		clear*_thread_flag([...,] flag);
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Oleg Nesterov <oleg@redhat.com>
+> > ---
+> >  include/linux/sched.h       |  6 ++++++
+> >  include/linux/thread_info.h | 11 +++++++++++
+> >  2 files changed, 17 insertions(+)
+> >
 
-On Sat, May 19, 2018 at 9:02 AM, Lukasz Majewski <lukma@denx.de> wrote:
+[...]
 
-> After removing imx53-kp-ddc and imx53-kp-common iomux subnodes I do see
-> following errors in the dmesg (v4.17-rc5):
->
-> imx53-pinctrl 53fa8000.iomuxc: function 'iomuxc' not supported
-> imx53-pinctrl 53fa8000.iomuxc: invalid function iomuxc in map table
+> > diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+> > index cf2862b..8d8821b 100644
+> > --- a/include/linux/thread_info.h
+> > +++ b/include/linux/thread_info.h
+> > @@ -60,6 +60,15 @@ static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
+> >  	clear_bit(flag, (unsigned long *)&ti->flags);
+> >  }
+> >
+> > +static inline void update_ti_thread_flag(struct thread_info *ti, int flag,
+> > +					 bool value)
+> > +{
+> > +	if (value)
+> > +		set_ti_thread_flag(ti, flag);
+> > +	else
+> > +		clear_ti_thread_flag(ti, flag);
+> > +}
+> > +
+> 
+> value does seem a bit of vanilla non-informative name for a condition
+> flag but whatever:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
-Could you please investigate this error?
+I guess, though I couldn't some up with an obviously better name.
 
-I have just tried the following change on a imx53-qsb:
-http://code.bulix.org/ik01yu-339697
+I support "condition" would have worked, but it's more verbose.
 
-and it works as expected:
-# dmesg  | grep iomux
-[    0.100046] imx53-pinctrl 53fa8000.iomuxc: initialized IMX pinctrl driver
+Thanks for the review
+---Dave
