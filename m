@@ -1,75 +1,87 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 May 2018 14:57:32 +0100
-Subject: [PATCH v10 02/18] thread_info: Add update_thread_flag() helpers
-In-Reply-To: <87po1mtrg3.fsf@linaro.org>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-3-git-send-email-Dave.Martin@arm.com>
- <87po1mtrg3.fsf@linaro.org>
-Message-ID: <20180523135732.GK13470@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 May 2018 15:01:58 +0100
+Subject: [PATCH v9 3/4] arm64: Implement page table free interfaces
+In-Reply-To: <1525074094-25839-4-git-send-email-cpandya@codeaurora.org>
+References: <1525074094-25839-1-git-send-email-cpandya@codeaurora.org>
+ <1525074094-25839-4-git-send-email-cpandya@codeaurora.org>
+Message-ID: <20180523140157.GG26965@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 02:46:52PM +0100, Alex Benn?e wrote:
+Hi Chintan,
+
+[as a side note: I'm confused on the status of this patch series, as part
+ of it was reposted separately by Toshi. Please can you work together?]
+
+On Mon, Apr 30, 2018 at 01:11:33PM +0530, Chintan Pandya wrote:
+> Implement pud_free_pmd_page() and pmd_free_pte_page().
 > 
-> Dave Martin <Dave.Martin@arm.com> writes:
+> Implementation requires,
+>  1) Clearing off the current pud/pmd entry
+>  2) Invalidate TLB which could have previously
+>     valid but not stale entry
+>  3) Freeing of the un-used next level page tables
 > 
-> > There are a number of bits of code sprinkled around the kernel to
-> > set a thread flag if a certain condition is true, and clear it
-> > otherwise.
-> >
-> > To help make those call sites terser and less cumbersome, this
-> > patch adds a new family of thread flag manipulators
-> >
-> > 	update*_thread_flag([...,] flag, cond)
-> >
-> > which do the equivalent of:
-> >
-> > 	if (cond)
-> > 		set*_thread_flag([...,] flag);
-> > 	else
-> > 		clear*_thread_flag([...,] flag);
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Ingo Molnar <mingo@redhat.com>
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Cc: Oleg Nesterov <oleg@redhat.com>
-> > ---
-> >  include/linux/sched.h       |  6 ++++++
-> >  include/linux/thread_info.h | 11 +++++++++++
-> >  2 files changed, 17 insertions(+)
-> >
-
-[...]
-
-> > diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-> > index cf2862b..8d8821b 100644
-> > --- a/include/linux/thread_info.h
-> > +++ b/include/linux/thread_info.h
-> > @@ -60,6 +60,15 @@ static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
-> >  	clear_bit(flag, (unsigned long *)&ti->flags);
-> >  }
-> >
-> > +static inline void update_ti_thread_flag(struct thread_info *ti, int flag,
-> > +					 bool value)
-> > +{
-> > +	if (value)
-> > +		set_ti_thread_flag(ti, flag);
-> > +	else
-> > +		clear_ti_thread_flag(ti, flag);
-> > +}
-> > +
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+> ---
+>  arch/arm64/mm/mmu.c | 29 +++++++++++++++++++++++++----
+>  1 file changed, 25 insertions(+), 4 deletions(-)
 > 
-> value does seem a bit of vanilla non-informative name for a condition
-> flag but whatever:
-> 
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index da98828..0f651db 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -45,6 +45,7 @@
+>  #include <asm/memblock.h>
+>  #include <asm/mmu_context.h>
+>  #include <asm/ptdump.h>
+> +#include <asm/tlbflush.h>
+>  
+>  #define NO_BLOCK_MAPPINGS	BIT(0)
+>  #define NO_CONT_MAPPINGS	BIT(1)
+> @@ -973,12 +974,32 @@ int pmd_clear_huge(pmd_t *pmdp)
+>  	return 1;
+>  }
+>  
+> -int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+> +int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
+>  {
+> -	return pud_none(*pud);
+> +	pmd_t *table;
+> +
+> +	if (pmd_present(READ_ONCE(*pmdp))) {
 
-I guess, though I couldn't some up with an obviously better name.
+Might also be worth checking pmd_table here, just in case. (same for pud)
 
-I support "condition" would have worked, but it's more verbose.
+> +		table = __va(pmd_val(*pmdp));
 
-Thanks for the review
----Dave
+Can you avoid dereferencing *pmdp twice, and instead READ_ONCE into a local
+variable, please? (same for pud)
+
+> +		pmd_clear(pmdp);
+> +		__flush_tlb_kernel_pgtable(addr);
+> +		free_page((unsigned long) table);
+
+Shouldn't this be pte_free_kernel, to pair with pte_alloc_kernel which
+was used to allocate the page in the first place? (similarly for pud)
+
+> +	}
+> +	return 1;
+>  }
+>  
+> -int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+> +int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+>  {
+> -	return pmd_none(*pmd);
+> +	pmd_t *table;
+> +	int i;
+> +
+> +	if (pud_present(READ_ONCE(*pudp))) {
+> +		table = __va(pud_val(*pudp));
+> +		for (i = 0; i < PTRS_PER_PMD; i++)
+> +			pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE));
+
+I think it would be cleaner to write this as a do { ... } while, for
+consistency with the ioremap and vmalloc code.
+
+Will
