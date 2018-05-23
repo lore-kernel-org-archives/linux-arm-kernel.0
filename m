@@ -1,58 +1,43 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 23 May 2018 10:18:30 +0200
-Subject: [PATCH v3] arm64: allwinner: a64: Add Amarula A64-Relic initial
- support
-In-Reply-To: <CAMty3ZD3JT-ToGAUHN_uj7uVK-jkyAwfEdTBCmJSj34bACFpYQ@mail.gmail.com>
-References: <20180522132228.6564-1-jagan@amarulasolutions.com>
- <20180522143044.pgwawojiwnk2lzxb@flea>
- <CAMty3ZD3JT-ToGAUHN_uj7uVK-jkyAwfEdTBCmJSj34bACFpYQ@mail.gmail.com>
-Message-ID: <20180523081830.4ly6sj34reabbttn@flea>
+From: daniel@zonque.org (Daniel Mack)
+Date: Wed, 23 May 2018 10:26:50 +0200
+Subject: [PATCH v2 3/3] ARM: dts: imx28/imx53: enable edt-ft5x06 wakeup
+ source
+In-Reply-To: <20180522182043.GA123708@dtor-ws>
+References: <20180517090552.5704-1-daniel@zonque.org>
+ <20180517090552.5704-4-daniel@zonque.org> <20180520130528.GC26863@dragon>
+ <20180522182043.GA123708@dtor-ws>
+Message-ID: <6385bf3e-d372-89f4-f3c4-a0a6dca8d8ad@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 11:44:56AM +0530, Jagan Teki wrote:
-> On Tue, May 22, 2018 at 8:00 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Tue, May 22, 2018 at 06:52:28PM +0530, Jagan Teki wrote:
-> >> Amarula A64-Relic is Allwinner A64 based IoT device, which support
-> >> - Allwinner A64 Cortex-A53
-> >> - Mali-400MP2 GPU
-> >> - AXP803 PMIC
-> >> - 1GB DDR3 RAM
-> >> - 8GB eMMC
-> >> - AP6330 Wifi/BLE
-> >> - MIPI-DSI
-> >> - CSI: OV5640 sensor
-> >> - USB OTG
-> >
-> > You claim that this is doing OTG...
-> >
-> > [..]
-> >
-> >> +&usb_otg {
-> >> +     dr_mode = "peripheral";
-> >> +     status = "okay";
-> >> +};
-> >
-> > ... and yet you're setting it as peripheral...
+On Tuesday, May 22, 2018 08:20 PM, Dmitry Torokhov wrote:
+> On Sun, May 20, 2018 at 09:05:30PM +0800, Shawn Guo wrote:
+>> On Thu, May 17, 2018 at 11:05:52AM +0200, Daniel Mack wrote:
+>>> The touchscreen driver no longer configures the device as wakeup source by
+>>> default. A "wakeup-source" property is needed.
+>>>
+>>> To avoid regressions, this patch changes the DTS files for the only two
+>>> users of this driver that didn't have this property yet.
+>>>
+>>> Signed-off-by: Daniel Mack <daniel@zonque.org>
+>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>
+>> Applied this one, thanks.
 > 
-> Though it claims OTG, board doesn't have any USB ports to operate(not
-> even Mini-AB) the only way to use the board as peripheral to transfer
-> images from host.
+> I think there are few more that need "wakeup-source" added:
+> 
+> arch/arm/boot/dts/am437x-sk-evm.dts
+> arch/arm/boot/dts/imx6q-var-dt6customboard.dts
+> arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
+> arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+> arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+> arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
 
-I'm not sure what you mean here. If there's no USB connector, why do
-you even enable it?
+Oh, sorry for having missed them. Will send patches.
 
-maxime
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/aa60090a/attachment.sig>
+Thanks,
+Daniel
