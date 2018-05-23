@@ -1,51 +1,75 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed, 23 May 2018 14:48:38 +0800
-Subject: [PATCH v3 02/13] dt-bindings: add binding for rk3036 power domains
+Date: Wed, 23 May 2018 14:51:10 +0800
+Subject: [PATCH v3 07/13] soc: rockchip: power-domain: add power domain
+ support for rk3128
 In-Reply-To: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
 References: <1527058129-10260-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1527058129-10260-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1527058270-10412-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Caesar Wang <wxt@rock-chips.com>
+This driver is modified to support RK3128 SoC.
 
-Add binding documentation for the power domains
-found on Rockchip RK3036 SoCs.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/soc/rockchip/pm_domains.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-index 301d2a9bc1b8..79924ee9ae86 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-@@ -5,6 +5,7 @@ powered up/down by software based on different application scenes to save power.
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index 01d4ba26a054..99a2dd8a7801 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -19,6 +19,7 @@
+ #include <linux/regmap.h>
+ #include <linux/mfd/syscon.h>
+ #include <dt-bindings/power/rk3036-power.h>
++#include <dt-bindings/power/rk3128-power.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/power/rk3328-power.h>
+ #include <dt-bindings/power/rk3366-power.h>
+@@ -720,6 +721,14 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+ 	[RK3036_PD_SYS]		= DOMAIN_RK3036(8, 22, 29, false),
+ };
  
- Required properties for power domain controller:
- - compatible: Should be one of the following.
-+	"rockchip,rk3036-power-controller" - for RK3036 SoCs.
- 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
- 	"rockchip,rk3328-power-controller" - for RK3328 SoCs.
- 	"rockchip,rk3366-power-controller" - for RK3366 SoCs.
-@@ -17,6 +18,7 @@ Required properties for power domain controller:
++static const struct rockchip_domain_info rk3128_pm_domains[] = {
++	[RK3128_PD_CORE]	= DOMAIN_RK3288(0, 0, 4, false),
++	[RK3128_PD_MSCH]	= DOMAIN_RK3288(-1, -1, 6, true),
++	[RK3128_PD_VIO]		= DOMAIN_RK3288(3, 3, 2, false),
++	[RK3128_PD_VIDEO]	= DOMAIN_RK3288(2, 2, 1, false),
++	[RK3128_PD_GPU]		= DOMAIN_RK3288(1, 1, 3, false),
++};
++
+ static const struct rockchip_domain_info rk3288_pm_domains[] = {
+ 	[RK3288_PD_VIO]		= DOMAIN_RK3288(7, 7, 4, false),
+ 	[RK3288_PD_HEVC]	= DOMAIN_RK3288(14, 10, 9, false),
+@@ -796,6 +805,17 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+ 	.domain_info = rk3036_pm_domains,
+ };
  
- Required properties for power domain sub nodes:
- - reg: index of the power domain, should use macros in:
-+	"include/dt-bindings/power/rk3036-power.h" - for RK3036 type power domain.
- 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
- 	"include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
- 	"include/dt-bindings/power/rk3366-power.h" - for RK3366 type power domain.
-@@ -93,6 +95,7 @@ Node of a device using power domains must have a power-domains property,
- containing a phandle to the power device node and an index specifying which
- power domain to use.
- The index should use macros in:
-+	"include/dt-bindings/power/rk3036-power.h" - for rk3036 type power domain.
- 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
- 	"include/dt-bindings/power/rk3328-power.h" - for rk3328 type power domain.
- 	"include/dt-bindings/power/rk3366-power.h" - for rk3366 type power domain.
++static const struct rockchip_pmu_info rk3128_pmu = {
++	.pwr_offset = 0x04,
++	.status_offset = 0x08,
++	.req_offset = 0x0c,
++	.idle_offset = 0x10,
++	.ack_offset = 0x10,
++
++	.num_domains = ARRAY_SIZE(rk3128_pm_domains),
++	.domain_info = rk3128_pm_domains,
++};
++
+ static const struct rockchip_pmu_info rk3288_pmu = {
+ 	.pwr_offset = 0x08,
+ 	.status_offset = 0x0c,
+@@ -875,6 +895,10 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+ 		.data = (void *)&rk3036_pmu,
+ 	},
+ 	{
++		.compatible = "rockchip,rk3128-power-controller",
++		.data = (void *)&rk3128_pmu,
++	},
++	{
+ 		.compatible = "rockchip,rk3288-power-controller",
+ 		.data = (void *)&rk3288_pmu,
+ 	},
 -- 
 1.9.1
