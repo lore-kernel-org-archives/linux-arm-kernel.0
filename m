@@ -1,122 +1,97 @@
-From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
-Date: Wed, 23 May 2018 10:59:07 -0700
-Subject: [PATCH v7 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <CAHp75Vd8HZU+BT38-OfXHiihv1yZG6YBeMWyfweBA+kAwk6HUw@mail.gmail.com>
-References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
- <1526492623-20527-3-git-send-email-rishabhb@codeaurora.org>
- <CAHp75VdO7+u-PQ+RBH71sxHHG0WkAyEVxv0BNPaycbcRnrZang@mail.gmail.com>
- <f1970a64be17267e0f044242dc0764d6@codeaurora.org>
- <CAHp75Vd8HZU+BT38-OfXHiihv1yZG6YBeMWyfweBA+kAwk6HUw@mail.gmail.com>
-Message-ID: <e2fd7e4b452d955b766401fd871e93c4@codeaurora.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 23 May 2018 11:06:39 -0700
+Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+ <20180522205457.GA16363@roeck-us.net>
+ <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
+ <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
+ <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
+Message-ID: <20180523180639.GA27570@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-22 12:38, Andy Shevchenko wrote:
-> On Tue, May 22, 2018 at 9:33 PM,  <rishabhb@codeaurora.org> wrote:
->> On 2018-05-18 14:01, Andy Shevchenko wrote:
->>> On Wed, May 16, 2018 at 8:43 PM, Rishabh Bhatnagar
->>> <rishabhb@codeaurora.org> wrote:
+On Wed, May 23, 2018 at 12:48:10PM +0100, Robin Murphy wrote:
+> On 23/05/18 08:52, Scott Branden wrote:
+> >
+> >
+> >On 18-05-22 04:24 PM, Ray Jui wrote:
+> >>Hi Guenter,
+> >>
+> >>On 5/22/2018 1:54 PM, Guenter Roeck wrote:
+> >>>On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
+> >>>>If the watchdog hardware is already enabled during the boot process,
+> >>>>when the Linux watchdog driver loads, it should reset the watchdog and
+> >>>>tell the watchdog framework. As a result, ping can be generated from
+> >>>>the watchdog framework, until the userspace watchdog daemon takes over
+> >>>>control
+> >>>>
+> >>>>Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> >>>>Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
+> >>>>Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> >>>>---
+> >>>>? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
+> >>>>? 1 file changed, 22 insertions(+)
+> >>>>
+> >>>>diff --git a/drivers/watchdog/sp805_wdt.c
+> >>>>b/drivers/watchdog/sp805_wdt.c
+> >>>>index 1484609..408ffbe 100644
+> >>>>--- a/drivers/watchdog/sp805_wdt.c
+> >>>>+++ b/drivers/watchdog/sp805_wdt.c
+> >>>>@@ -42,6 +42,7 @@
+> >>>>????? /* control register masks */
+> >>>>????? #define??? INT_ENABLE??? (1 << 0)
+> >>>>????? #define??? RESET_ENABLE??? (1 << 1)
+> >>>>+??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
+> >>>>? #define WDTINTCLR??????? 0x00C
+> >>>>? #define WDTRIS??????????? 0x010
+> >>>>? #define WDTMIS??????????? 0x014
+> >>>>@@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
+> >>>>? MODULE_PARM_DESC(nowayout,
+> >>>>????????? "Set to 1 to keep watchdog running after device release");
+> >>>>? +/* returns true if wdt is running; otherwise returns false */
+> >>>>+static bool wdt_is_running(struct watchdog_device *wdd)
+> >>>>+{
+> >>>>+??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+> >>>>+
+> >>>>+??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
+> >>>>+??????? ENABLE_MASK)
+> >>>>+??????? return true;
+> >>>>+??? else
+> >>>>+??????? return false;
+> >>>
+> >>>????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
+> >>>
+> >>
+> >>Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE);
+> >>therefore, a simple !!(expression) would not work? That is, the masked
+> >>result needs to be compared against the mask again to ensure both bits
+> >>are set, right?
+> >Ray - your original code looks correct to me.? Easier to read and less
+> >prone to errors as shown in the attempted translation to a single
+> >statement.
 > 
->>>> +#define ACTIVATE                      0x1
->>>> +#define DEACTIVATE                    0x2
->>>> +#define ACT_CTRL_OPCODE_ACTIVATE      0x1
->>>> +#define ACT_CTRL_OPCODE_DEACTIVATE    0x2
->>>> +#define ACT_CTRL_ACT_TRIG             0x1
->>> 
->>> 
->>> Are these bits? Perhaps BIT() ?
->>> 
->> isn't it just better to use fixed size as u suggest in the next 
->> comment?
+> 	if (<boolean condition>)
+> 		return true;
+> 	else
+> 		return false;
 > 
-> If the are bits, use BIT() macro.
+> still looks really dumb, though, and IMO is actually harder to read than
+> just "return <boolean condition>;" because it forces you to stop and
+> double-check that the logic is, in fact, only doing the obvious thing.
 > 
->>>> +struct llcc_slice_desc *llcc_slice_getd(u32 uid)
->>>> +{
->>>> +       const struct llcc_slice_config *cfg;
->>>> +       struct llcc_slice_desc *desc;
->>>> +       u32 sz, count = 0;
->>>> +
->>>> +       cfg = drv_data->cfg;
->>>> +       sz = drv_data->cfg_size;
->>>> +
->>> 
->>> 
->>>> +       while (cfg && count < sz) {
->>>> +               if (cfg->usecase_id == uid)
->>>> +                       break;
->>>> +               cfg++;
->>>> +               count++;
->>>> +       }
->>>> +       if (cfg == NULL || count == sz)
->>>> +               return ERR_PTR(-ENODEV);
->>> 
->>> 
->>> if (!cfg)
->>>           return ERR_PTR(-ENODEV);
->>> 
->>> while (cfg->... != uid) {
->>>   cfg++;
->>>   count++;
->>> }
->>> 
->>> if (count == sz)
->>>  return ...
->>> 
->>> Though I would rather put it to for () loop.
->>> 
->> In each while loop iteration the cfg pointer needs to be checked for
->> NULL. What if the usecase id never matches the uid passed by client
->> and we keep iterating. At some point it will crash.
-> 
-> do {
->   if (!cfg || count == sz)
->    return ...(-ENODEV);
->  ...
-> } while (...);
-> 
-> Though, as I said for-loop will look slightly better I think.
-> 
->>>> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
->>>> +                                 DEACTIVATE);
->>> 
->>> 
->>> Perhaps one line (~83 characters here is OK) ?
->> 
->> The checkpatch script complains about such lines.
-> 
-> So what if it just 3 characters out?
-> 
-Many upstream reviewers have objection to lines crossing over 80 
-characters
-I have gotten reviews to reduce the line length even if its like 81~82
-characters. Can we keep this as it is? I have addressed all other
-comments and will send out the next patch by today.
 
->>>> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
->>>> +                                 ACTIVATE);
+Yes, and I won't accept it, sorry.
+
+Guenter
+
+> Robin.
 > 
->>> Ditto.
 > 
->>>> +               attr1_cfg = bcast_off +
->>>> +
->>>> LLCC_TRP_ATTR1_CFGn(llcc_table[i].slice_id);
->>>> +               attr0_cfg = bcast_off +
->>>> +
->>>> LLCC_TRP_ATTR0_CFGn(llcc_table[i].slice_id);
 > 
->>> Ditto.
+> p.s. No thanks for making me remember the mind-boggling horror of briefly
+> maintaining part of this legacy codebase... :P
 > 
->>>> +               attr1_val |= llcc_table[i].probe_target_ways <<
->>>> +                               ATTR1_PROBE_TARGET_WAYS_SHIFT;
->>>> +               attr1_val |= llcc_table[i].fixed_size <<
->>>> +                               ATTR1_FIXED_SIZE_SHIFT;
->>>> +               attr1_val |= llcc_table[i].priority <<
->>>> ATTR1_PRIORITY_SHIFT;
-> 
->>> foo |=
->>>   bar << SHIFT;
->>> 
->>> would look slightly better.
-> 
-> Did you consider this option ?
+> $ grep -r '? true : false' --include=*.cpp . | wc -l
+> 951
