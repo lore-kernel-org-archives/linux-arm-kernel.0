@@ -1,287 +1,122 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 May 2018 18:46:56 +0100
-Subject: [PATCH v4 2/2] arm64: signal: Report signal frame size to userspace
- via auxv
-In-Reply-To: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
-References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527097616-25214-3-git-send-email-Dave.Martin@arm.com>
+From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
+Date: Wed, 23 May 2018 10:59:07 -0700
+Subject: [PATCH v7 2/2] drivers: soc: Add LLCC driver
+In-Reply-To: <CAHp75Vd8HZU+BT38-OfXHiihv1yZG6YBeMWyfweBA+kAwk6HUw@mail.gmail.com>
+References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
+ <1526492623-20527-3-git-send-email-rishabhb@codeaurora.org>
+ <CAHp75VdO7+u-PQ+RBH71sxHHG0WkAyEVxv0BNPaycbcRnrZang@mail.gmail.com>
+ <f1970a64be17267e0f044242dc0764d6@codeaurora.org>
+ <CAHp75Vd8HZU+BT38-OfXHiihv1yZG6YBeMWyfweBA+kAwk6HUw@mail.gmail.com>
+Message-ID: <e2fd7e4b452d955b766401fd871e93c4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stateful CPU architecture extensions may require the signal frame
-to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
-However, changing this #define is an ABI break.
+On 2018-05-22 12:38, Andy Shevchenko wrote:
+> On Tue, May 22, 2018 at 9:33 PM,  <rishabhb@codeaurora.org> wrote:
+>> On 2018-05-18 14:01, Andy Shevchenko wrote:
+>>> On Wed, May 16, 2018 at 8:43 PM, Rishabh Bhatnagar
+>>> <rishabhb@codeaurora.org> wrote:
+> 
+>>>> +#define ACTIVATE                      0x1
+>>>> +#define DEACTIVATE                    0x2
+>>>> +#define ACT_CTRL_OPCODE_ACTIVATE      0x1
+>>>> +#define ACT_CTRL_OPCODE_DEACTIVATE    0x2
+>>>> +#define ACT_CTRL_ACT_TRIG             0x1
+>>> 
+>>> 
+>>> Are these bits? Perhaps BIT() ?
+>>> 
+>> isn't it just better to use fixed size as u suggest in the next 
+>> comment?
+> 
+> If the are bits, use BIT() macro.
+> 
+>>>> +struct llcc_slice_desc *llcc_slice_getd(u32 uid)
+>>>> +{
+>>>> +       const struct llcc_slice_config *cfg;
+>>>> +       struct llcc_slice_desc *desc;
+>>>> +       u32 sz, count = 0;
+>>>> +
+>>>> +       cfg = drv_data->cfg;
+>>>> +       sz = drv_data->cfg_size;
+>>>> +
+>>> 
+>>> 
+>>>> +       while (cfg && count < sz) {
+>>>> +               if (cfg->usecase_id == uid)
+>>>> +                       break;
+>>>> +               cfg++;
+>>>> +               count++;
+>>>> +       }
+>>>> +       if (cfg == NULL || count == sz)
+>>>> +               return ERR_PTR(-ENODEV);
+>>> 
+>>> 
+>>> if (!cfg)
+>>>           return ERR_PTR(-ENODEV);
+>>> 
+>>> while (cfg->... != uid) {
+>>>   cfg++;
+>>>   count++;
+>>> }
+>>> 
+>>> if (count == sz)
+>>>  return ...
+>>> 
+>>> Though I would rather put it to for () loop.
+>>> 
+>> In each while loop iteration the cfg pointer needs to be checked for
+>> NULL. What if the usecase id never matches the uid passed by client
+>> and we keep iterating. At some point it will crash.
+> 
+> do {
+>   if (!cfg || count == sz)
+>    return ...(-ENODEV);
+>  ...
+> } while (...);
+> 
+> Though, as I said for-loop will look slightly better I think.
+> 
+>>>> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
+>>>> +                                 DEACTIVATE);
+>>> 
+>>> 
+>>> Perhaps one line (~83 characters here is OK) ?
+>> 
+>> The checkpatch script complains about such lines.
+> 
+> So what if it just 3 characters out?
+> 
+Many upstream reviewers have objection to lines crossing over 80 
+characters
+I have gotten reviews to reduce the line length even if its like 81~82
+characters. Can we keep this as it is? I have addressed all other
+comments and will send out the next patch by today.
 
-To allow userspace the option of determining the signal frame size
-in a more forwards-compatible way, this patch adds a new auxv entry
-tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
-size that the process can observe during its lifetime.
-
-If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
-assume that the MINSIGSTKSZ #define is sufficient.  This allows for
-a consistent interface with older kernels that do not provide
-AT_MINSIGSTKSZ.
-
-The idea is that libc could expose this via sysconf() or some
-similar mechanism.
-
-There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
-about userspace's own stack overheads and should not pretend to
-know.
-
-For arm64:
-
-The primary motivation for this interface is the Scalable Vector
-Extension, which can require at least 4KB or so of extra space
-in the signal frame for the largest hardware implementations.
-
-To determine the correct value, a "Christmas tree" mode (via the
-add_all argument) is added to setup_sigframe_layout(), to simulate
-addition of all possible records to the signal frame at maximum
-possible size.
-
-If this procedure goes wrong somehow, resulting in a stupidly large
-frame layout and hence failure of sigframe_alloc() to allocate a
-record to the frame, then this is indicative of a kernel bug: the
-kernel's internal SIGFRAME_MAXSZ is supposed to sanity-check
-against generting frames that we consider _impossibly_ large.  If
-we hit this case, SIGFRAME_MAXSZ is used as our best guess, and we
-WARN().
-
-For arm64 SVE:
-
-The SVE context block in the signal frame needs to be considered
-too when computing the maximum possible signal frame size.
-
-Because the size of this block depends on the vector length, this
-patch computes the size based not on the thread's current vector
-length but instead on the maximum possible vector length: this
-determines the maximum size of SVE context block that can be
-observed in any signal frame for the lifetime of the process.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-
----
-
-Changes since v3:
-
- * Fall back to SIGFRAME_MAXSZ, not SIGSTKSZ in case of
-   setup_sigframe_layout() failure, since exceeding SIGFRAME_MAXSZ is
-   the only way this can fail: therefore SIGFRAME_MAXSZ is our best
-   guess at the required size.
-
- * Commit message updated to reflect the above change.
-
-Requested by Will Deacon:
-
- * Remove superfluous WARN()s from ARCH_DL_INFO and
-   setup_sigframe_layout().  If something went wrong and we still have
-   no value for signal_minsigstksz by the time we exec some user
-   process, AT_MINSIGSTKSZ is omitted from the aux vector.  Userspace
-   should fall back to the MINSIGSTKSZ #define anyway in this case
-   (i.e., do things the POSIX way).
-
- * Change the type of signal_minsigstksz to unsigned long, to match the
-   auxv and sigframe_size() types.  (sigframe_size uses size_t, but it's
-   somewhat moot exactly what the types are, providing that
-   SIGFRAME_MAXSZ fits in all of them).
-
-Also requested by Mark Rutland:
-
- * Merge #ifndef __ASSEMBLY__ block introduced in <asm/elf.h> into
-   the existing one.  The only things above are #defines, which
-   shouldn't be affected by this.
----
- arch/arm64/include/asm/elf.h         | 11 ++++++++
- arch/arm64/include/asm/processor.h   |  5 ++++
- arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
- arch/arm64/kernel/cpufeature.c       |  1 +
- arch/arm64/kernel/signal.c           | 52 +++++++++++++++++++++++++++++++-----
- 5 files changed, 64 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index fac1c4d..9c18f0e 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -121,6 +121,9 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/bug.h>
-+#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-+
- typedef unsigned long elf_greg_t;
- 
- #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
-@@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
- 		    (elf_addr_t)current->mm->context.vdso);		\
-+									\
-+	/*								\
-+	 * Should always be nonzero unless there's a kernel bug.  If	\
-+	 * the we haven't determined a sensible value to give to	\
-+	 * userspace, omit the entry:					\
-+	 */								\
-+	if (likely(signal_minsigstksz))					\
-+		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
- } while (0)
- 
- #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 7675989..65ab83e 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -35,6 +35,8 @@
- #ifdef __KERNEL__
- 
- #include <linux/build_bug.h>
-+#include <linux/cache.h>
-+#include <linux/init.h>
- #include <linux/stddef.h>
- #include <linux/string.h>
- 
-@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+extern unsigned long __ro_after_init signal_minsigstksz; /* sigframe size */
-+extern void __init minsigstksz_setup(void);
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
-diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-index ec0a86d..743c0b8 100644
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,7 +19,8 @@
- 
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
-+#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
- 
--#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-+#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
- 
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..0e0b53d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
- 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
- 
- 	sve_setup();
-+	minsigstksz_setup();
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 154b7d3..00b9990 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/cache.h>
- #include <linux/compat.h>
- #include <linux/errno.h>
- #include <linux/kernel.h>
-@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return 0;
- }
- 
--/* Determine the layout of optional records in the signal frame */
--static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-+/*
-+ * Determine the layout of optional records in the signal frame
-+ *
-+ * add_all: if true, lays out the biggest possible signal frame for
-+ *	this task; otherwise, generates a layout for the current state
-+ *	of the task.
-+ */
-+static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
-+				 bool add_all)
- {
- 	int err;
- 
-@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 		return err;
- 
- 	/* fault information, if valid */
--	if (current->thread.fault_code) {
-+	if (add_all || current->thread.fault_code) {
- 		err = sigframe_alloc(user, &user->esr_offset,
- 				     sizeof(struct esr_context));
- 		if (err)
-@@ -591,8 +599,14 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	if (system_supports_sve()) {
- 		unsigned int vq = 0;
- 
--		if (test_thread_flag(TIF_SVE))
--			vq = sve_vq_from_vl(current->thread.sve_vl);
-+		if (add_all || test_thread_flag(TIF_SVE)) {
-+			int vl = sve_max_vl;
-+
-+			if (!add_all)
-+				vl = current->thread.sve_vl;
-+
-+			vq = sve_vq_from_vl(vl);
-+		}
- 
- 		err = sigframe_alloc(user, &user->sve_offset,
- 				     SVE_SIG_CONTEXT_SIZE(vq));
-@@ -603,7 +617,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	return sigframe_alloc_end(user);
- }
- 
--
- static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 			  struct pt_regs *regs, sigset_t *set)
- {
-@@ -701,7 +714,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
- 	int err;
- 
- 	init_user_layout(user);
--	err = setup_sigframe_layout(user);
-+	err = setup_sigframe_layout(user, false);
- 	if (err)
- 		return err;
- 
-@@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		thread_flags = READ_ONCE(current_thread_info()->flags);
- 	} while (thread_flags & _TIF_WORK_MASK);
- }
-+
-+unsigned long __ro_after_init signal_minsigstksz;
-+
-+/*
-+ * Determine the stack space required for guaranteed signal devliery.
-+ * This function is used to populate AT_MINSIGSTKSZ at process startup.
-+ * cpufeatures setup is assumed to be complete.
-+ */
-+void __init minsigstksz_setup(void)
-+{
-+	struct rt_sigframe_user_layout user;
-+
-+	init_user_layout(&user);
-+
-+	/*
-+	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
-+	 * be big enough, but it's our best guess:
-+	 */
-+	if (WARN_ON(setup_sigframe_layout(&user, true)))
-+		signal_minsigstksz = SIGFRAME_MAXSZ;
-+	else
-+		signal_minsigstksz = sigframe_size(&user) +
-+			round_up(sizeof(struct frame_record), 16) +
-+			16; /* max alignment padding */
-+}
--- 
-2.1.4
+>>>> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
+>>>> +                                 ACTIVATE);
+> 
+>>> Ditto.
+> 
+>>>> +               attr1_cfg = bcast_off +
+>>>> +
+>>>> LLCC_TRP_ATTR1_CFGn(llcc_table[i].slice_id);
+>>>> +               attr0_cfg = bcast_off +
+>>>> +
+>>>> LLCC_TRP_ATTR0_CFGn(llcc_table[i].slice_id);
+> 
+>>> Ditto.
+> 
+>>>> +               attr1_val |= llcc_table[i].probe_target_ways <<
+>>>> +                               ATTR1_PROBE_TARGET_WAYS_SHIFT;
+>>>> +               attr1_val |= llcc_table[i].fixed_size <<
+>>>> +                               ATTR1_FIXED_SIZE_SHIFT;
+>>>> +               attr1_val |= llcc_table[i].priority <<
+>>>> ATTR1_PRIORITY_SHIFT;
+> 
+>>> foo |=
+>>>   bar << SHIFT;
+>>> 
+>>> would look slightly better.
+> 
+> Did you consider this option ?
