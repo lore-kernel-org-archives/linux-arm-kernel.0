@@ -1,142 +1,146 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 23 May 2018 20:35:13 +0100
-Subject: [PATCH v10 05/18] KVM: arm64: Convert lazy FPSIMD context switch
- trap to C
-In-Reply-To: <1527005119-6842-6-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-6-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87k1rutbbi.fsf@linaro.org>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 23 May 2018 12:35:20 -0700
+Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <20180523180920.GB27570@roeck-us.net>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+ <20180522205457.GA16363@roeck-us.net>
+ <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
+ <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
+ <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
+ <5a996888-d3d3-9ae6-e438-5de4d5e3ea32@broadcom.com>
+ <ef3539fd-c95c-f364-93c7-680aabd1eea3@arm.com>
+ <20180523180920.GB27570@roeck-us.net>
+Message-ID: <4da7f930-2698-3ab5-4fce-50af1eba8af5@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Guenter/Robin,
 
-Dave Martin <Dave.Martin@arm.com> writes:
+On 5/23/2018 11:09 AM, Guenter Roeck wrote:
+> On Wed, May 23, 2018 at 06:15:14PM +0100, Robin Murphy wrote:
+>> On 23/05/18 17:29, Ray Jui wrote:
+>>> Hi Robin,
+>>>
+>>> On 5/23/2018 4:48 AM, Robin Murphy wrote:
+>>>> On 23/05/18 08:52, Scott Branden wrote:
+>>>>>
+>>>>>
+>>>>> On 18-05-22 04:24 PM, Ray Jui wrote:
+>>>>>> Hi Guenter,
+>>>>>>
+>>>>>> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
+>>>>>>> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
+>>>>>>>> If the watchdog hardware is already enabled during the boot process,
+>>>>>>>> when the Linux watchdog driver loads, it should reset the
+>>>>>>>> watchdog and
+>>>>>>>> tell the watchdog framework. As a result, ping can be generated from
+>>>>>>>> the watchdog framework, until the userspace watchdog daemon
+>>>>>>>> takes over
+>>>>>>>> control
+>>>>>>>>
+>>>>>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>>>>>>>> Reviewed-by: Vladimir Olovyannikov
+>>>>>>>> <vladimir.olovyannikov@broadcom.com>
+>>>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>>>> ---
+>>>>>>>>  ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
+>>>>>>>>  ? 1 file changed, 22 insertions(+)
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/watchdog/sp805_wdt.c
+>>>>>>>> b/drivers/watchdog/sp805_wdt.c
+>>>>>>>> index 1484609..408ffbe 100644
+>>>>>>>> --- a/drivers/watchdog/sp805_wdt.c
+>>>>>>>> +++ b/drivers/watchdog/sp805_wdt.c
+>>>>>>>> @@ -42,6 +42,7 @@
+>>>>>>>>  ????? /* control register masks */
+>>>>>>>>  ????? #define??? INT_ENABLE??? (1 << 0)
+>>>>>>>>  ????? #define??? RESET_ENABLE??? (1 << 1)
+>>>>>>>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
+>>>>>>>>  ? #define WDTINTCLR??????? 0x00C
+>>>>>>>>  ? #define WDTRIS??????????? 0x010
+>>>>>>>>  ? #define WDTMIS??????????? 0x014
+>>>>>>>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
+>>>>>>>>  ? MODULE_PARM_DESC(nowayout,
+>>>>>>>>  ????????? "Set to 1 to keep watchdog running after device release");
+>>>>>>>>  ? +/* returns true if wdt is running; otherwise returns false */
+>>>>>>>> +static bool wdt_is_running(struct watchdog_device *wdd)
+>>>>>>>> +{
+>>>>>>>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+>>>>>>>> +
+>>>>>>>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
+>>>>>>>> +??????? ENABLE_MASK)
+>>>>>>>> +??????? return true;
+>>>>>>>> +??? else
+>>>>>>>> +??????? return false;
+>>>>>>>
+>>>>>>>  ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
+>>>>>>>
+>>>>>>
+>>>>>> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE);
+>>>>>> therefore, a simple !!(expression) would not work? That is, the
+>>>>>> masked result needs to be compared against the mask again to ensure
+>>>>>> both bits are set, right?
+>>>>> Ray - your original code looks correct to me.? Easier to read and less
+>>>>> prone to errors as shown in the attempted translation to a single
+>>>>> statement.
+>>>>
+>>>>  ?????if (<boolean condition>)
+>>>>  ???????? return true;
+>>>>  ?????else
+>>>>  ???????? return false;
+>>>>
+>>>> still looks really dumb, though, and IMO is actually harder to read than
+>>>> just "return <boolean condition>;" because it forces you to stop and
+>>>> double-check that the logic is, in fact, only doing the obvious thing.
+>>>
+>>> If you can propose a way to modify my original code above to make it more
+>>> readable, I'm fine to make the change.
+>>
+>> Well,
+>>
+>> 	return readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK == ENABLE_MASK;
+>>
+>> would probably be reasonable to anyone other than the 80-column zealots, but
+>> removing the silly boolean-to-boolean translation idiom really only
+>> emphasises the fact that it's fundamentally a big complex statement; for
+>> maximum clarity I'd be inclined to separate the two logical operations (read
+>> and comparison), e.g.:
+>>
+>> 	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
+>>
+>> 	return wdtcontrol & ENABLE_MASK == ENABLE_MASK;
+> 
+> == has higher precendence than bitwise &, so this will need ( ),
+> but otherwise I agree.
+> 
 
-> To make the lazy FPSIMD context switch trap code easier to hack on,
-> this patch converts it to C.
->
-> This is not amazingly efficient, but the trap should typically only
-> be taken once per host context switch.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
->  arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
->  2 files changed, 46 insertions(+), 35 deletions(-)
->
-> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> index e41a161..40f349b 100644
-> --- a/arch/arm64/kvm/hyp/entry.S
-> +++ b/arch/arm64/kvm/hyp/entry.S
-> @@ -172,40 +172,27 @@ ENTRY(__fpsimd_guest_restore)
->  	// x1: vcpu
->  	// x2-x29,lr: vcpu regs
->  	// vcpu x0-x1 on the stack
-> -	stp	x2, x3, [sp, #-16]!
-> -	stp	x4, lr, [sp, #-16]!
-> -
-> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-> -	mrs	x2, cptr_el2
-> -	bic	x2, x2, #CPTR_EL2_TFP
-> -	msr	cptr_el2, x2
-> -alternative_else
-> -	mrs	x2, cpacr_el1
-> -	orr	x2, x2, #CPACR_EL1_FPEN
-> -	msr	cpacr_el1, x2
-> -alternative_endif
-> -	isb
-> -
-> -	mov	x3, x1
-> -
-> -	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
-> -	kern_hyp_va x0
-> -	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> -	bl	__fpsimd_save_state
-> -
-> -	add	x2, x3, #VCPU_CONTEXT
-> -	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> -	bl	__fpsimd_restore_state
-> -
-> -	// Skip restoring fpexc32 for AArch64 guests
-> -	mrs	x1, hcr_el2
-> -	tbnz	x1, #HCR_RW_SHIFT, 1f
-> -	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
-> -	msr	fpexc32_el2, x4
-> -1:
-> -	ldp	x4, lr, [sp], #16
-> -	ldp	x2, x3, [sp], #16
-> -	ldp	x0, x1, [sp], #16
-> -
-> +	stp	x2, x3, [sp, #-144]!
-> +	stp	x4, x5, [sp, #16]
-> +	stp	x6, x7, [sp, #32]
-> +	stp	x8, x9, [sp, #48]
-> +	stp	x10, x11, [sp, #64]
-> +	stp	x12, x13, [sp, #80]
-> +	stp	x14, x15, [sp, #96]
-> +	stp	x16, x17, [sp, #112]
-> +	stp	x18, lr, [sp, #128]
-> +
-> +	bl	__hyp_switch_fpsimd
-> +
-> +	ldp	x4, x5, [sp, #16]
-> +	ldp	x6, x7, [sp, #32]
-> +	ldp	x8, x9, [sp, #48]
-> +	ldp	x10, x11, [sp, #64]
-> +	ldp	x12, x13, [sp, #80]
-> +	ldp	x14, x15, [sp, #96]
-> +	ldp	x16, x17, [sp, #112]
-> +	ldp	x18, lr, [sp, #128]
-> +	ldp	x0, x1, [sp, #144]
-> +	ldp	x2, x3, [sp], #160
->  	eret
->  ENDPROC(__fpsimd_guest_restore)
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d964523..c0796c4 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -318,6 +318,30 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  	}
->  }
->
-> +void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
-> +				    struct kvm_vcpu *vcpu)
-> +{
-> +	kvm_cpu_context_t *host_ctxt;
-> +
-> +	if (has_vhe())
-> +		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
-> +			     cpacr_el1);
-> +	else
-> +		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
-> +			     cptr_el2);
+Sure. Let me change the code to the following:
 
-Is there no way to do alternative() in C or does it always come down to
-different inline asms?
+       u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
 
-Anyway:
+       return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Thanks.
 
+Ray
 
-> +
-> +	isb();
-> +
-> +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> +	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-> +	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
-> +
-> +	/* Skip restoring fpexc32 for AArch64 guests */
-> +	if (!(read_sysreg(hcr_el2) & HCR_RW))
-> +		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
-> +			     fpexc32_el2);
-> +}
-> +
->  /*
->   * Return true when we were able to fixup the guest exit and should return to
->   * the guest, false when we should restore the host state and return to the
-
-
---
-Alex Benn?e
+>>
+>> which is still -3 lines vs. the original.
+>>
+>>> As I mentioned, I don't think the following change proposed by Guenter
+>>> will work due to the reason I pointed out:
+>>>
+>>> return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
+>>
+>> FWIW, getting the desired result should only need one logical not swapping
+>> for a bitwise one there:
+>>
+>> 	return !(~readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK);
+>>
+>> but that's well into "too clever for its own good" territory ;)
+> 
+> Yes, that would be confusing.
+> 
+>>
+>> Robin.
