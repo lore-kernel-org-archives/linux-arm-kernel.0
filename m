@@ -1,72 +1,90 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 23 May 2018 13:43:40 +0200
-Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
-Message-ID: <20180523114340.10216-1-marek.vasut+renesas@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 23 May 2018 12:48:10 +0100
+Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
+ <20180522205457.GA16363@roeck-us.net>
+ <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
+ <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
+Message-ID: <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PMIC nodes to Porter and connect CPU DVFS supply. There is
-one DA9063L and one DA9210 on Porter, the only difference from
-the other boards is that DA9063L is at I2C address 0x5a rather
-than 0x58 .
+On 23/05/18 08:52, Scott Branden wrote:
+> 
+> 
+> On 18-05-22 04:24 PM, Ray Jui wrote:
+>> Hi Guenter,
+>>
+>> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
+>>> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
+>>>> If the watchdog hardware is already enabled during the boot process,
+>>>> when the Linux watchdog driver loads, it should reset the watchdog and
+>>>> tell the watchdog framework. As a result, ping can be generated from
+>>>> the watchdog framework, until the userspace watchdog daemon takes over
+>>>> control
+>>>>
+>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>>>> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
+>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>> ---
+>>>> ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
+>>>> ? 1 file changed, 22 insertions(+)
+>>>>
+>>>> diff --git a/drivers/watchdog/sp805_wdt.c 
+>>>> b/drivers/watchdog/sp805_wdt.c
+>>>> index 1484609..408ffbe 100644
+>>>> --- a/drivers/watchdog/sp805_wdt.c
+>>>> +++ b/drivers/watchdog/sp805_wdt.c
+>>>> @@ -42,6 +42,7 @@
+>>>> ????? /* control register masks */
+>>>> ????? #define??? INT_ENABLE??? (1 << 0)
+>>>> ????? #define??? RESET_ENABLE??? (1 << 1)
+>>>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
+>>>> ? #define WDTINTCLR??????? 0x00C
+>>>> ? #define WDTRIS??????????? 0x010
+>>>> ? #define WDTMIS??????????? 0x014
+>>>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
+>>>> ? MODULE_PARM_DESC(nowayout,
+>>>> ????????? "Set to 1 to keep watchdog running after device release");
+>>>> ? +/* returns true if wdt is running; otherwise returns false */
+>>>> +static bool wdt_is_running(struct watchdog_device *wdd)
+>>>> +{
+>>>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+>>>> +
+>>>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
+>>>> +??????? ENABLE_MASK)
+>>>> +??????? return true;
+>>>> +??? else
+>>>> +??????? return false;
+>>>
+>>> ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
+>>>
+>>
+>> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
+>> therefore, a simple !!(expression) would not work? That is, the masked 
+>> result needs to be compared against the mask again to ensure both bits 
+>> are set, right?
+> Ray - your original code looks correct to me.? Easier to read and less 
+> prone to errors as shown in the attempted translation to a single 
+> statement.
 
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Cc: linux-renesas-soc at vger.kernel.org
----
- arch/arm/boot/dts/r8a7791-porter.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+	if (<boolean condition>)
+		return true;
+	else
+		return false;
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index a01101b49d99..5f77d73d7462 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -375,10 +375,43 @@
- 	clock-frequency = <400000>;
- };
- 
-+&i2c6 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	pmic at 5a {
-+		compatible = "dlg,da9063l";
-+		reg = <0x5a>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+
-+		wdt {
-+			compatible = "dlg,da9063-watchdog";
-+		};
-+	};
-+
-+	vdd_dvfs: regulator at 68 {
-+		compatible = "dlg,da9210";
-+		reg = <0x68>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
- &sata0 {
- 	status = "okay";
- };
- 
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+};
-+
- /* composite video input */
- &vin0 {
- 	status = "okay";
--- 
-2.16.2
+still looks really dumb, though, and IMO is actually harder to read than 
+just "return <boolean condition>;" because it forces you to stop and 
+double-check that the logic is, in fact, only doing the obvious thing.
+
+Robin.
+
+
+
+p.s. No thanks for making me remember the mind-boggling horror of 
+briefly maintaining part of this legacy codebase... :P
+
+$ grep -r '? true : false' --include=*.cpp . | wc -l
+951
