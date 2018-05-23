@@ -1,26 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 May 2018 12:01:43 -0700
-Subject: [PATCH] ARM: DTS: dra7: fix DCAN node addresses
-In-Reply-To: <cf431fca-0372-bd50-88e7-d478e4aa52da@ti.com>
-References: <20180521200832.24213-1-khilman@baylibre.com>
- <cf431fca-0372-bd50-88e7-d478e4aa52da@ti.com>
-Message-ID: <20180523190143.GV98604@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 May 2018 14:03:32 -0500
+Subject: [PATCH V4 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <1527090479-5263-9-git-send-email-christophe.roullier@st.com>
+References: <1527090479-5263-1-git-send-email-christophe.roullier@st.com>
+ <1527090479-5263-9-git-send-email-christophe.roullier@st.com>
+Message-ID: <20180523190332.GA20768@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [180521 20:25]:
-> On 21/05/18 15:08, Kevin Hilman wrote:
-> > Fix the DT node addresses to match the reg property addresses,
-> > which were verified to match the TRM:
-> > http://www.ti.com/lit/pdf/sprui30
-> > 
-> > Cc: Roger Quadros <rogerq@ti.com>
-> > Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+On Wed, May 23, 2018 at 05:47:59PM +0200, Christophe Roullier wrote:
+> This patch describes syscon DT bindings.
 > 
-> Thanks Kevin.
-> 
-> Acked-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+> ---
+>  Documentation/devicetree/bindings/arm/stm32.txt            | 10 ----------
+>  .../devicetree/bindings/arm/stm32/stm32-syscon.txt         | 14 ++++++++++++++
+>  Documentation/devicetree/bindings/arm/stm32/stm32.txt      | 10 ++++++++++
+>  3 files changed, 24 insertions(+), 10 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/stm32.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/stm32/stm32.txt
 
-Applying into omap-for-v4.18/dt-fixes thanks.
+In the future, use the -M option so file moves don't show any diff.
 
-Tony
+Reviewed-by: Rob Herring <robh@kernel.org>
