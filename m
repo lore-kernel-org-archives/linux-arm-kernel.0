@@ -1,76 +1,44 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 23 May 2018 22:12:08 +0200
-Subject: v4.17-rc1: regressions on N900, N950
-In-Reply-To: <20180523140615.GA27180@amd>
-References: <20180422074213.GA12428@amd>
- <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
- <20180521213952.GA11596@amd> <20180522080250.4fzyvqrgw5oigexn@pali>
- <20180522194139.GB2299@darkstar.musicnaut.iki.fi>
- <20180522205824.GA24927@amd>
- <20180522215638.GC2299@darkstar.musicnaut.iki.fi>
- <20180523140615.GA27180@amd>
-Message-ID: <20180523201208.GA31731@amd>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Thu, 24 May 2018 02:08:06 +0530
+Subject: [PATCH v2] OMAP: CLK: CLKSRC: Add suspend resume hooks
+In-Reply-To: <20180523184116.GS98604@atomide.com>
+References: <1527013340-8036-1-git-send-email-j-keerthy@ti.com>
+ <20180523184116.GS98604@atomide.com>
+Message-ID: <ea82b336-7e99-bc41-4b51-54fe208c5e55@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-05-23 16:06:15, Pavel Machek wrote:
-> On Wed 2018-05-23 00:56:38, Aaro Koskinen wrote:
-> > Hi,
-> > 
-> > On Tue, May 22, 2018 at 10:58:26PM +0200, Pavel Machek wrote:
-> > > On Tue 2018-05-22 22:41:39, Aaro Koskinen wrote:
-> > > > My device worked with v4.17-rc1 (haven't found time to test newer kernels),
-> > > > but if you say the probe order is random then we must find some proper way
-> > > > to express the dependency.
-> > > 
-> > > I started bisect, but.. that will probably not be useful.
-> > > 
-> > > If your device works ok in v4.17-rc1, it probably works in newer -rcs,
-> > > too.
-> > 
-> > Actually, my statement may be bogus... Now I tried again with -rc1
-> > (and also -rc6) and it fails... But v4.16 works.
-> > 
-> > > Thanks for the ordering hint, I'll try to figure out what is going on
-> > > there.
-> > 
-> > My bisection pointed to 6fa7324ac5489ad43c4b6351355b869bc5458bef which
-> > doesn't seem to make any sense...?! So maybe there really is something
-> > random stuff going on? :-(
-> 
-> So... I did some experiments on v4.16.
-> 
-> Swapping tsc2005 at 0 and lcd: acx565akm at 2 entries in the dts does break
-> stuff.
-> 
-> I thought it might be due to vio regulator, but it does not appear
-> so... screen still works with tsc2005 driver disabled in .config. (so
-> there's noone to enable vio regulator).
 
-Deleting tsc2005 at 0 entry also breaks screen.
 
-Replacing tsc2005 at 0 entry with 
+On 5/24/2018 12:11 AM, Tony Lindgren wrote:
+> * Keerthy <j-keerthy@ti.com> [180522 11:24]:
+>> Add the save and restore for clksrc as part of suspend and resume
+>> so that it saves the counter value and restores. This is needed in
+>> modes like rtc+ddr in self-refresh not doing this stalls the time.
+> Can't we now do this all in drivers/clocksource/timer-ti-*.c?
 
-        foobar at 0 {
-	               compatible = "not really with anything";
- 		       spi-max-frequency = <6000000>;
- 		       reg = <0>;
- };
+arch/arm/boot/dts/am4372.dtsi has compatible ti,omap-counter32k
+which is arch/arm/mach-omap2/timer.c compatible
 
-still results in working touchscreen, removing any of the three fields
-breaks it again.
+IMHO clocksource suspend resume best fits under mach-omap2/timer.c
+just like clockevent has suspend/resume.
 
-Strange.
-
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180523/909e412f/attachment-0001.sig>
+>
+>> @@ -490,6 +513,15 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
+>>   	res = omap_dm_timer_init_one(&clksrc, fck_source, property,
+>>   				     &clocksource_gpt.name,
+>>   				     OMAP_TIMER_NONPOSTED);
+>> +
+>> +	if (soc_is_am43xx()) {
+>> +		clocksource_gpt.suspend = omap2_gptimer_clksrc_suspend;
+>> +		clocksource_gpt.resume = omap2_gptimer_clksrc_resume;
+>> +
+>> +		clocksource_gpt_hwmod =
+>> +			omap_hwmod_lookup(clocksource_gpt.name);
+>> +	}
+>> +
+> Then you can do this based on a quirk flag set by compatible.
+>
+> Regards,
+>
+> Tony
