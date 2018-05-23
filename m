@@ -1,90 +1,143 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 23 May 2018 12:48:10 +0100
-Subject: [PATCH 3/5] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-In-Reply-To: <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-4-git-send-email-ray.jui@broadcom.com>
- <20180522205457.GA16363@roeck-us.net>
- <0d92b9e9-a3d1-6e91-8371-b5ed3a83e399@broadcom.com>
- <00c121ea-d197-93b8-2f56-bcca963f70fb@broadcom.com>
-Message-ID: <76d47e02-7a5f-3fc2-3905-cd4aa03ac69c@arm.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Wed, 23 May 2018 13:48:12 +0200
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180523114812.GH55598@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/18 08:52, Scott Branden wrote:
+On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
+> Currently the FPSIMD handling code uses the condition task->mm ==
+> NULL as a hint that task has no FPSIMD register context.
 > 
+> The ->mm check is only there to filter out tasks that cannot
+> possibly have FPSIMD context loaded, for optimisation purposes.
+> Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
+> saving FPSIMD context back to memory.  For these reasons, the ->mm
+> checks are not useful, providing that that TIF_FOREIGN_FPSTATE is
+> maintained in a consistent way for kernel threads.
 > 
-> On 18-05-22 04:24 PM, Ray Jui wrote:
->> Hi Guenter,
->>
->> On 5/22/2018 1:54 PM, Guenter Roeck wrote:
->>> On Tue, May 22, 2018 at 11:47:18AM -0700, Ray Jui wrote:
->>>> If the watchdog hardware is already enabled during the boot process,
->>>> when the Linux watchdog driver loads, it should reset the watchdog and
->>>> tell the watchdog framework. As a result, ping can be generated from
->>>> the watchdog framework, until the userspace watchdog daemon takes over
->>>> control
->>>>
->>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>>> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
->>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>> ---
->>>> ? drivers/watchdog/sp805_wdt.c | 22 ++++++++++++++++++++++
->>>> ? 1 file changed, 22 insertions(+)
->>>>
->>>> diff --git a/drivers/watchdog/sp805_wdt.c 
->>>> b/drivers/watchdog/sp805_wdt.c
->>>> index 1484609..408ffbe 100644
->>>> --- a/drivers/watchdog/sp805_wdt.c
->>>> +++ b/drivers/watchdog/sp805_wdt.c
->>>> @@ -42,6 +42,7 @@
->>>> ????? /* control register masks */
->>>> ????? #define??? INT_ENABLE??? (1 << 0)
->>>> ????? #define??? RESET_ENABLE??? (1 << 1)
->>>> +??? #define??? ENABLE_MASK??? (INT_ENABLE | RESET_ENABLE)
->>>> ? #define WDTINTCLR??????? 0x00C
->>>> ? #define WDTRIS??????????? 0x010
->>>> ? #define WDTMIS??????????? 0x014
->>>> @@ -74,6 +75,18 @@ module_param(nowayout, bool, 0);
->>>> ? MODULE_PARM_DESC(nowayout,
->>>> ????????? "Set to 1 to keep watchdog running after device release");
->>>> ? +/* returns true if wdt is running; otherwise returns false */
->>>> +static bool wdt_is_running(struct watchdog_device *wdd)
->>>> +{
->>>> +??? struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
->>>> +
->>>> +??? if ((readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK) ==
->>>> +??????? ENABLE_MASK)
->>>> +??????? return true;
->>>> +??? else
->>>> +??????? return false;
->>>
->>> ????return !!(readl_relaxed(wdt->base + WDTCONTROL) & ENABLE_MASK));
->>>
->>
->> Note ENABLE_MASK contains two bits (INT_ENABLE and RESET_ENABLE); 
->> therefore, a simple !!(expression) would not work? That is, the masked 
->> result needs to be compared against the mask again to ensure both bits 
->> are set, right?
-> Ray - your original code looks correct to me.? Easier to read and less 
-> prone to errors as shown in the attempted translation to a single 
-> statement.
+> This is true by construction however: TIF_FOREIGN_FPSTATE is never
+> cleared except when returning to userspace or returning from a
+> signal: thus, for a true kernel thread no FPSIMD context is ever
+> loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
+> ever be saved.
 
-	if (<boolean condition>)
-		return true;
-	else
-		return false;
-
-still looks really dumb, though, and IMO is actually harder to read than 
-just "return <boolean condition>;" because it forces you to stop and 
-double-check that the logic is, in fact, only doing the obvious thing.
-
-Robin.
+I don't understand this construction proof; from looking at the patch
+below it is not obvious to me why fpsimd_thread_switch() can never have
+!wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
+kernel thread?
 
 
+Thanks,
+-Christoffer
 
-p.s. No thanks for making me remember the mind-boggling horror of 
-briefly maintaining part of this legacy codebase... :P
-
-$ grep -r '? true : false' --include=*.cpp . | wc -l
-951
+> 
+> This patch removes the redundant checks and special-case code.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> ---
+> 
+> Changes since v9:
+> 
+>  * New patch.  Introduced during debugging, since the ->mm checks
+>    appear bogus and/or redundant, so are likely to be hiding or
+>    causing bugs.
+> ---
+>  arch/arm64/include/asm/thread_info.h |  1 +
+>  arch/arm64/kernel/fpsimd.c           | 38 ++++++++++++------------------------
+>  2 files changed, 14 insertions(+), 25 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 740aa03c..a2ac914 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -47,6 +47,7 @@ struct thread_info {
+>  
+>  #define INIT_THREAD_INFO(tsk)						\
+>  {									\
+> +	.flags		= _TIF_FOREIGN_FPSTATE,				\
+>  	.preempt_count	= INIT_PREEMPT_COUNT,				\
+>  	.addr_limit	= KERNEL_DS,					\
+>  }
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 3aa100a..1222491 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -891,31 +891,21 @@ asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+>  
+>  void fpsimd_thread_switch(struct task_struct *next)
+>  {
+> +	bool wrong_task, wrong_cpu;
+> +
+>  	if (!system_supports_fpsimd())
+>  		return;
+> -	/*
+> -	 * Save the current FPSIMD state to memory, but only if whatever is in
+> -	 * the registers is in fact the most recent userland FPSIMD state of
+> -	 * 'current'.
+> -	 */
+> -	if (current->mm)
+> -		fpsimd_save();
+>  
+> -	if (next->mm) {
+> -		/*
+> -		 * If we are switching to a task whose most recent userland
+> -		 * FPSIMD state is already in the registers of *this* cpu,
+> -		 * we can skip loading the state from memory. Otherwise, set
+> -		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+> -		 * upon the next return to userland.
+> -		 */
+> -		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
+> +	/* Save unsaved fpsimd state, if any: */
+> +	fpsimd_save();
+> +
+> +	/* Fix up TIF_FOREIGN_FPSTATE to correctly describe next's state: */
+> +	wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
+>  					&next->thread.uw.fpsimd_state;
+> -		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
+> +	wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
+>  
+> -		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
+> -				       wrong_task || wrong_cpu);
+> -	}
+> +	update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
+> +			       wrong_task || wrong_cpu);
+>  }
+>  
+>  void fpsimd_flush_thread(void)
+> @@ -1120,9 +1110,8 @@ void kernel_neon_begin(void)
+>  
+>  	__this_cpu_write(kernel_neon_busy, true);
+>  
+> -	/* Save unsaved task fpsimd state, if any: */
+> -	if (current->mm)
+> -		fpsimd_save();
+> +	/* Save unsaved fpsimd state, if any: */
+> +	fpsimd_save();
+>  
+>  	/* Invalidate any task state remaining in the fpsimd regs: */
+>  	fpsimd_flush_cpu_state();
+> @@ -1244,8 +1233,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+>  {
+>  	switch (cmd) {
+>  	case CPU_PM_ENTER:
+> -		if (current->mm)
+> -			fpsimd_save();
+> +		fpsimd_save();
+>  		fpsimd_flush_cpu_state();
+>  		break;
+>  	case CPU_PM_EXIT:
+> -- 
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
