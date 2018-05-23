@@ -1,320 +1,162 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 23 May 2018 15:23:48 +0100
-Subject: [PATCH v2 11/16] irqchip/irq-mvebu-icu: add support for System
- Error Interrupts (SEI)
-In-Reply-To: <20180522094042.24770-12-miquel.raynal@bootlin.com>
-References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
- <20180522094042.24770-12-miquel.raynal@bootlin.com>
-Message-ID: <cd000f57-e01f-e5b9-77f6-baf4e8f45551@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 23 May 2018 16:31:56 +0200
+Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180517181932.GW7753@e103592.cambridge.arm.com>
+References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
+ <20180517181932.GW7753@e103592.cambridge.arm.com>
+Message-ID: <20180523143156.svl7djkm3obrnkvs@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/18 10:40, Miquel Raynal wrote:
-> An SEI driver provides an MSI domain through which it is possible to
-> raise SEIs.
+On 2018-05-17 19:19:43 [+0100], Dave Martin wrote:
+> On Thu, May 17, 2018 at 02:40:06PM +0200, Sebastian Andrzej Siewior wrote:
+> > In v4.16-RT I noticed a number of warnings from task_fpsimd_load(). The
+> > code disables BH and expects that it is not preemptible. On -RT the
+> > task remains preemptible but remains the same CPU. This may corrupt the
 > 
-> Handle the NSR probe function in a more generic way to support other
-> type of interrupts (ie. the SEIs).
+> Also, watch out for [1] which adds more of this stuff for KVM.  This
+> not merged yet, but likely to land in v4.18.
+
+yay. I will try to keep this in mind while moving forward.
+
+> Anyway:
 > 
-> For clarity we do not use tree IRQ domains for now but linear ones
-> instead, allocating the 207 ICU lines for each interrupt group.
+> What we're really trying to achieve with the local_bh_disable/enable
+> stuff is exclusive access to the CPU FPSIMD registers and associated
+> metadata that tracks who they belong to.
 
-What's the rational for not using trees? Because that's effectively a
-100% overhead...
+I assumed this.
 
-> Reallocating an ICU slot is prevented by the use of an ICU-wide bitmap.
+> > The preempt_disable() + local_bh_enable() combo in kernel_neon_begin()
+> > is not working on -RT. We don't use NEON in kernel mode on RT right now
+> > but this still should be addressed.
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  drivers/irqchip/irq-mvebu-icu.c | 126 ++++++++++++++++++++++++++++++++++------
->  1 file changed, 108 insertions(+), 18 deletions(-)
+> I think we effectively have two levels of locking here.
 > 
-> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> index 977e47b2716f..6ad6236d6ff1 100644
-> --- a/drivers/irqchip/irq-mvebu-icu.c
-> +++ b/drivers/irqchip/irq-mvebu-icu.c
-> @@ -28,6 +28,10 @@
->  #define ICU_SETSPI_NSR_AH	0x14
->  #define ICU_CLRSPI_NSR_AL	0x18
->  #define ICU_CLRSPI_NSR_AH	0x1c
-> +#define ICU_SET_SEI_AL		0x50
-> +#define ICU_SET_SEI_AH		0x54
-> +#define ICU_CLR_SEI_AL		0x58
-> +#define ICU_CLR_SEI_AH		0x5C
->  #define ICU_INT_CFG(x)          (0x100 + 4 * (x))
->  #define   ICU_INT_ENABLE	BIT(24)
->  #define   ICU_IS_EDGE		BIT(28)
-> @@ -38,12 +42,28 @@
->  #define ICU_SATA0_ICU_ID	109
->  #define ICU_SATA1_ICU_ID	107
->  
-> +struct mvebu_icu_subset_data {
-> +	unsigned int icu_group;
-> +	unsigned int offset_set_ah;
-> +	unsigned int offset_set_al;
-> +	unsigned int offset_clr_ah;
-> +	unsigned int offset_clr_al;
-> +};
-> +
->  struct mvebu_icu {
->  	struct irq_chip irq_chip;
->  	struct regmap *regmap;
->  	struct device *dev;
-> -	atomic_t initialized;
->  	bool legacy_bindings;
-> +	/* Lock on interrupt allocations/releases */
-> +	spinlock_t msi_lock;
-> +	DECLARE_BITMAP(msi_bitmap, ICU_MAX_IRQS);
-> +};
-> +
-> +struct mvebu_icu_msi_data {
-> +	struct mvebu_icu *icu;
-> +	atomic_t initialized;
-> +	const struct mvebu_icu_subset_data *subset_data;
->  };
->  
->  struct mvebu_icu_irq_data {
-> @@ -76,16 +96,25 @@ static struct mvebu_icu *mvebu_icu_dev_get_drvdata(struct platform_device *pdev)
->  	return icu;
->  }
->  
-> -static void mvebu_icu_init(struct mvebu_icu *icu, struct msi_msg *msg)
-> +static void mvebu_icu_init(struct mvebu_icu *icu, struct irq_domain *d,
-> +			   struct msi_msg *msg)
->  {
-> -	if (atomic_cmpxchg(&icu->initialized, false, true))
-> +	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(d);
-> +	const struct mvebu_icu_subset_data *subset = msi_data->subset_data;
-> +
-> +	if (atomic_cmpxchg(&msi_data->initialized, false, true))
-> +		return;
-> +
-> +	/* Set 'SET' ICU SPI message address in AP */
-> +	regmap_write(icu->regmap, subset->offset_set_ah, msg[0].address_hi);
-> +	regmap_write(icu->regmap, subset->offset_set_al, msg[0].address_lo);
-> +
-> +	if (subset->icu_group != ICU_GRP_NSR)
->  		return;
->  
-> -	/* Set Clear/Set ICU SPI message address in AP */
-> -	regmap_write(icu->regmap, ICU_SETSPI_NSR_AH, msg[0].address_hi);
-> -	regmap_write(icu->regmap, ICU_SETSPI_NSR_AL, msg[0].address_lo);
-> -	regmap_write(icu->regmap, ICU_CLRSPI_NSR_AH, msg[1].address_hi);
-> -	regmap_write(icu->regmap, ICU_CLRSPI_NSR_AL, msg[1].address_lo);
-> +	/* Set 'CLEAR' ICU SPI message address in AP (level-MSI only) */
-> +	regmap_write(icu->regmap, subset->offset_clr_ah, msg[1].address_hi);
-> +	regmap_write(icu->regmap, subset->offset_clr_al, msg[1].address_lo);
->  }
->  
->  static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-> @@ -96,8 +125,8 @@ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
->  	unsigned int icu_int;
->  
->  	if (msg->address_lo || msg->address_hi) {
-> -		/* One off initialization */
-> -		mvebu_icu_init(icu, msg);
-> +		/* One off initialization per domain */
-> +		mvebu_icu_init(icu, d->domain, msg);
->  		/* Configure the ICU with irq number & type */
->  		icu_int = msg->data | ICU_INT_ENABLE;
->  		if (icu_irqd->type & IRQ_TYPE_EDGE_RISING)
-> @@ -131,7 +160,8 @@ static int
->  mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
->  			       unsigned long *hwirq, unsigned int *type)
->  {
-> -	struct mvebu_icu *icu = platform_msi_get_host_data(d);
-> +	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(d);
-> +	struct mvebu_icu *icu = msi_data->icu;
->  	unsigned int param_count = icu->legacy_bindings ? 3 : 2;
->  
->  	/* Check the count of the parameters in dt */
-> @@ -172,7 +202,9 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  	int err;
->  	unsigned long hwirq;
->  	struct irq_fwspec *fwspec = args;
-> -	struct mvebu_icu *icu = platform_msi_get_host_data(domain);
-> +	struct mvebu_icu_msi_data *msi_data =
-> +		platform_msi_get_host_data(domain);
-> +	struct mvebu_icu *icu = msi_data->icu;
->  	struct mvebu_icu_irq_data *icu_irqd;
->  
->  	icu_irqd = kmalloc(sizeof(*icu_irqd), GFP_KERNEL);
-> @@ -186,16 +218,22 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  		goto free_irqd;
->  	}
->  
-> +	spin_lock(&icu->msi_lock);
-> +	err = bitmap_allocate_region(icu->msi_bitmap, hwirq, 0);
-> +	spin_unlock(&icu->msi_lock);
-
-This (and the freeing counterpart) could deserve a couple of helpers.
-
-> +	if (err < 0)
-> +		goto free_irqd;
-> +
->  	if (icu->legacy_bindings)
->  		icu_irqd->icu_group = fwspec->param[0];
->  	else
-> -		icu_irqd->icu_group = ICU_GRP_NSR;
-> +		icu_irqd->icu_group = msi_data->subset_data->icu_group;
->  	icu_irqd->icu = icu;
->  
->  	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
->  	if (err) {
->  		dev_err(icu->dev, "failed to allocate ICU interrupt in parent domain\n");
-> -		goto free_irqd;
-> +		goto free_bitmap;
->  	}
->  
->  	/* Make sure there is no interrupt left pending by the firmware */
-> @@ -214,6 +252,10 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  
->  free_msi:
->  	platform_msi_domain_free(domain, virq, nr_irqs);
-> +free_bitmap:
-> +	spin_lock(&icu->msi_lock);
-> +	bitmap_release_region(icu->msi_bitmap, hwirq, 0);
-> +	spin_unlock(&icu->msi_lock);
->  free_irqd:
->  	kfree(icu_irqd);
->  	return err;
-> @@ -223,12 +265,19 @@ static void
->  mvebu_icu_irq_domain_free(struct irq_domain *domain, unsigned int virq,
->  			  unsigned int nr_irqs)
->  {
-> +	struct mvebu_icu_msi_data *msi_data =
-> +		platform_msi_get_host_data(domain);
-> +	struct mvebu_icu *icu = msi_data->icu;
->  	struct irq_data *d = irq_get_irq_data(virq);
->  	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
->  
->  	kfree(icu_irqd);
->  
->  	platform_msi_domain_free(domain, virq, nr_irqs);
-> +
-> +	spin_lock(&icu->msi_lock);
-> +	bitmap_release_region(icu->msi_bitmap, d->hwirq, 0);
-> +	spin_unlock(&icu->msi_lock);
->  }
->  
->  static const struct irq_domain_ops mvebu_icu_domain_ops = {
-> @@ -239,14 +288,29 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
->  
->  static int mvebu_icu_subset_probe(struct platform_device *pdev)
->  {
-> +	const struct mvebu_icu_subset_data *subset;
-> +	struct mvebu_icu_msi_data *msi_data;
->  	struct device_node *msi_parent_dn;
->  	struct irq_domain *irq_domain;
->  	struct mvebu_icu *icu;
->  
-> +	msi_data = devm_kzalloc(&pdev->dev, sizeof(*msi_data), GFP_KERNEL);
-> +	if (!msi_data)
-> +		return -ENOMEM;
-> +
->  	icu = mvebu_icu_dev_get_drvdata(pdev);
->  	if (IS_ERR(icu))
->  		return PTR_ERR(icu);
->  
-> +	subset = of_device_get_match_data(&pdev->dev);
-> +	if (!subset) {
-> +		dev_err(&pdev->dev, "Could not retrieve subset data\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	msi_data->icu = icu;
-> +	msi_data->subset_data = subset;
-> +
->  	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, pdev->dev.of_node,
->  						 DOMAIN_BUS_PLATFORM_MSI);
->  	if (!pdev->dev.msi_domain)
-> @@ -259,7 +323,7 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
->  	irq_domain = platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
->  						       mvebu_icu_write_msg,
->  						       &mvebu_icu_domain_ops,
-> -						       icu);
-> +						       msi_data);
->  	if (!irq_domain) {
->  		dev_err(&pdev->dev, "Failed to create ICU MSI domain\n");
->  		return -ENOMEM;
-> @@ -268,9 +332,30 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct mvebu_icu_subset_data mvebu_icu_nsr_subset_data = {
-> +	.icu_group = ICU_GRP_NSR,
-> +	.offset_set_ah = ICU_SETSPI_NSR_AH,
-> +	.offset_set_al = ICU_SETSPI_NSR_AL,
-> +	.offset_clr_ah = ICU_CLRSPI_NSR_AH,
-> +	.offset_clr_al = ICU_CLRSPI_NSR_AL,
-> +};
-> +
-> +static const struct mvebu_icu_subset_data mvebu_icu_sei_subset_data = {
-> +	.icu_group = ICU_GRP_SEI,
-> +	.offset_set_ah = ICU_SET_SEI_AH,
-> +	.offset_set_al = ICU_SET_SEI_AL,
-> +	.offset_clr_ah = ICU_CLR_SEI_AH,
-> +	.offset_clr_al = ICU_CLR_SEI_AL,
-
-I thought SEI was edge only, given what you do in mvebu_icu_init.
-Confused...
-
-> +};
-> +
->  static const struct of_device_id mvebu_icu_subset_of_match[] = {
->  	{
->  		.compatible = "marvell,cp110-icu-nsr",
-> +		.data = &mvebu_icu_nsr_subset_data,
-> +	},
-> +	{
-> +		.compatible = "marvell,cp110-icu-sei",
-> +		.data = &mvebu_icu_sei_subset_data,
->  	},
->  	{},
->  };
-> @@ -317,6 +402,8 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  	if (IS_ERR(icu->regmap))
->  		return PTR_ERR(icu->regmap);
->  
-> +	spin_lock_init(&icu->msi_lock);
-> +
->  	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
->  					    "ICU.%x",
->  					    (unsigned int)res->start);
-> @@ -341,7 +428,7 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  #endif
->  
->  	/*
-> -	 * Clean all ICU interrupts with type SPI_NSR, required to
-> +	 * Clean all ICU interrupts of type NSR and SEI, required to
->  	 * avoid unpredictable SPI assignments done by firmware.
->  	 */
->  	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
-> @@ -350,7 +437,8 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  		regmap_read(icu->regmap, ICU_INT_CFG(i), &icu_int);
->  		icu_grp = icu_int >> ICU_GROUP_SHIFT;
->  
-> -		if (icu_grp == ICU_GRP_NSR)
-> +		if (icu_grp == ICU_GRP_NSR ||
-> +		    (icu_grp == ICU_GRP_SEI && !icu->legacy_bindings))
->  			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
->  	}
->  
-> @@ -363,7 +451,9 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  }
->  
->  static const struct of_device_id mvebu_icu_of_match[] = {
-> -	{ .compatible = "marvell,cp110-icu", },
-> +	{
-> +		.compatible = "marvell,cp110-icu",
-> +	},
->  	{},
->  };
->  
+> At the outer level, we want exclusive access to the FPSIMD registers.
+> This is what is needed between kernel_neon_begin() and
+> kernel_neon_end(), and maps onto the preempt_disable()/_enable() done
+> by these functions.
 > 
+> In context switch critical code, that's insufficient, and we also
+> need exclusive access to the metadata that tracks which task or context
+> owns the FPSIMD registers.  This is what the local_bh_disable()/
+> _enable() achieves.
+> 
+> 
+> So does it make sense to have two locks (I'm assuming local locks are
+> implicitly percpu ?)
+> 
+> static inline void local_fpsimd_context_lock(void)
+> {
+> 	local_bh_disable();
+> 	local_lock(fpsimd_lock);
+> 	local_lock(fpsimd_context_lock);
+> }
+> 
+> static inline void local_fpsimd_context_unlock(void)
+> {
+> 	local_unlock(fpsimd_context_lock);
+> 	local_unlock(fpsimd_lock);
+> 	local_bh_enable();
+> }
+> 
+> 
+> kernel_neon_begin() could then do
+> 
+> 	local_fpsimd_context_lock();
+> 
+> 	/* ... */
+> 
+> 	preempt_disable();
+> 	local_unlock(fpsimd_context_lock);
+> 
+> ... with the following in kernel_neon_end():
+> 
+> 	local_unlock(fpsimd_lock);
+> 	preempt_enable();
+> 
+> 
+> If kernel-mode NEON was considered harmful to RT due to the context
+> switch overheads, then the above might be overkill.  SVE will be worse
+> in that regard, and also needs thinking about at some point -- I've not
+> looked at if from the RT angle at all.
+> 
+> In either case, I think abstracting the lock/unlock sequences out to
+> make the purpose clearer may be a good idea, even if we just have a
+> single local lock to manage.
 
-Thanks,
+So the two looks you suggested make sense. However I would need to
+replace this preempt_disable() with one such lock. A local_lock() on -RT
+is a per-CPU spin_lock. RT's local_lock gets currently transformed into
+preempt_disable() on !RT configs.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> There is one place where I mess with the FPSIMD context no lock held
+> because of a need to copy_from_user() straight into the context backing
+> store (we can't copy_from_user() with preemption disabled...)
+> I'm not sure whether RT will have any impact on this, but it probably
+> needs thinking about.
+
+if no locks are held and the task can be preempted then it also might
+happen on PREEMPT config. But copy_from_user() doesn't sounds like
+something that will go straight to HW.
+
+> One more comment below...
+> 
+> > 
+> > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> > ---
+> >  arch/arm64/kernel/fpsimd.c | 20 ++++++++++++++++++--
+> >  1 file changed, 18 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index e7226c4c7493..3a5cd1908874 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -38,6 +38,7 @@
+> >  #include <linux/signal.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/sysctl.h>
+> > +#include <linux/locallock.h>
+> >  
+> >  #include <asm/fpsimd.h>
+> >  #include <asm/cputype.h>
+> > @@ -235,7 +236,7 @@ static void sve_user_enable(void)
+> >   *    whether TIF_SVE is clear or set, since these are not vector length
+> >   *    dependent.
+> >   */
+> > -
+> > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
+> >  /*
+> >   * Update current's FPSIMD/SVE registers from thread_struct.
+> >   *
+> > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
+> >  	 * non-SVE thread.
+> >  	 */
+> >  	if (task == current) {
+> > +		local_lock(fpsimd_lock);
+> >  		local_bh_disable();
+> >  
+> >  		task_fpsimd_save();
+> > @@ -604,8 +606,10 @@ int sve_set_vector_length(struct task_struct *task,
+> >  	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
+> >  		sve_to_fpsimd(task);
+> >  
+> > -	if (task == current)
+> > +	if (task == current) {
+> > +		local_unlock(fpsimd_lock);
+> 
+> Is this misordered against local_bh_enable(), or doesn't it matter?
+
+It actually is but it does not matter. On RT local_bh_disable() is
+turned into migrate_disable() what in turn disables the migration of the
+task to another CPU (while it is still preemtible). This
+migrate_disable() is also part of local_lock(). Maybe I will add a
+local_lock_bh() and replace this with this local_bh_disable() so it will
+better :)
+
+> >  		local_bh_enable();
+> > +	}
+
+Sebastian
