@@ -1,31 +1,33 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 May 2018 11:17:02 -0700
-Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.18, round 2
-Message-ID: <7h1se2s0dd.fsf@baylibre.com>
+Date: Wed, 23 May 2018 11:17:48 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.18, round 2
+Message-ID: <7hwovuqlrn.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 35ee52bea66c74a7c33cebda8692d61b1ed7c6e9:
+The following changes since commit c51fb2d458a6d62215c1ff6bbca8e5c876370e71:
 
-  ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus (2018-05-10 17:03:28 -0700)
+  dt-bindings: arm: amlogic: add support for the Tronsmart MXIII Plus (2018-05-09 15:25:20 -0700)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
 
-for you to fetch changes up to ae0257da5701b6e44eba9dc4ebab867b56d6ea29:
+for you to fetch changes up to ffe2f2a415a5c36c0629c0ac8ea3dda80fbfd4b6:
 
-  ARM: meson: merge Kconfig symbol MACH_MESON8B into MACH_MESON8 (2018-05-23 10:08:13 -0700)
-
-----------------------------------------------------------------
-Amlogic 32-bit DT changes for v4.18, round 2
-- remove MACH_MESON8B, only used for building DTs
+  ARM64: dts: meson-axg: enable i2c AO on the S400 board (2018-05-23 10:05:41 -0700)
 
 ----------------------------------------------------------------
-Martin Blumenstingl (2):
-      ARM: dts: meson: build the Meson8b .dtbs with MACH_MESON8
-      ARM: meson: merge Kconfig symbol MACH_MESON8B into MACH_MESON8
+Amlogic 64-bit DT updates for v4.18, round 2
+- AXG I2C fixups/cleanups
 
- arch/arm/boot/dts/Makefile  | 5 ++---
- arch/arm/mach-meson/Kconfig | 9 +--------
- 2 files changed, 3 insertions(+), 11 deletions(-)
+----------------------------------------------------------------
+Jerome Brunet (4):
+      ARM64: dts: meson-axg: clean-up i2c nodes
+      ARM64: dts: meson-axg: correct i2c AO clock
+      ARM64: dts: meson-axg: add i2c AO pins
+      ARM64: dts: meson-axg: enable i2c AO on the S400 board
+
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  6 ++++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 79 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------
+ 2 files changed, 62 insertions(+), 23 deletions(-)
