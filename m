@@ -1,42 +1,38 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 23 May 2018 11:39:00 -0600
-Subject: [PATCH 07/11] dts: juno: Add scatter-gather support for all
- revisions
-In-Reply-To: <1526661567-4578-8-git-send-email-suzuki.poulose@arm.com>
-References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
- <1526661567-4578-8-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkz8d_RrFojz=ZQwOBB6J3-W9+edaVWC6R7Arg5GvhwcOA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 23 May 2018 18:46:54 +0100
+Subject: [PATCH v4 0/2] arm64: signal: Report signal frame size to userspace
+ via auxv
+Message-ID: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2018 at 10:39, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> Advertise that the scatter-gather is properly integrated on
-> all revisions of Juno board.
->
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+This series adds support for telling userspace the size of the signal
+frame via a new AT_MINSIGSTKSZ entry in the aux vector.
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+This is an update to a previous v3 standalone patch [1], which is
+presented here as patch 2 with some updates in response to review.
+See the changelog in the patch for details.
 
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index eb749c5..6ce9090 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -198,6 +198,7 @@
->                 clocks = <&soc_smc50mhz>;
->                 clock-names = "apb_pclk";
->                 power-domains = <&scpi_devpd 0>;
-> +               arm,scatter-gather;
->                 port {
->                         etr_in_port: endpoint {
->                                 slave-mode;
-> --
-> 2.7.4
->
+Patch 1 is new, and thins out some WARN_ON() checks for timely
+initialisation of sve_max_vl that now look excessive, to strengthen
+the case for not adding more such checks in patch 2.
+
+[1] [PATCH v3] arm64: signal: Report signal frame size to userspace via auxv
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/578585.html
+
+
+Dave Martin (2):
+  arm64/sve: Thin out initialisation sanity-checks for sve_max_vl
+  arm64: signal: Report signal frame size to userspace via auxv
+
+ arch/arm64/include/asm/elf.h         | 11 ++++++++
+ arch/arm64/include/asm/processor.h   |  5 ++++
+ arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c       |  1 +
+ arch/arm64/kernel/fpsimd.c           | 17 +++---------
+ arch/arm64/kernel/ptrace.c           |  3 ---
+ arch/arm64/kernel/signal.c           | 52 +++++++++++++++++++++++++++++++-----
+ 7 files changed, 68 insertions(+), 24 deletions(-)
+
+-- 
+2.1.4
