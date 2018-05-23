@@ -1,180 +1,349 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 22 May 2018 22:10:47 -0700
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <b5078a17-4cbb-905e-4cd1-f252a02f97e9@codeaurora.org>
-References: <cover.1526088081.git.collinsd@codeaurora.org>
- <41d5df73ddac772551d2966e0752bb0c357b1ded.1526088081.git.collinsd@codeaurora.org>
- <CAD=FV=XegPeFR8pdZM-YiBBJjrbej=C+2biBt4zJKnE90uTYZA@mail.gmail.com>
- <869aad59-1cc5-28ef-1fb5-4ef846696c40@codeaurora.org>
- <CAD=FV=U-QOQekUHj=ck57YJbTFdFjCAWr4t2A92x+fCNf+yV9A@mail.gmail.com>
- <dc1fbe9c-8973-1c4d-0fbd-809c1ec0a6be@codeaurora.org>
- <CAD=FV=XfSGs14VB464cvMGDNwGS4yvSXjN8itZLffm+Sj-D=ww@mail.gmail.com>
- <fb390ccb-927a-8449-05c3-8dcac964bfae@codeaurora.org>
- <CAD=FV=XARtQNo5Cyg78XuT26JUFgn=7BjWRnXPjP566=a-sF1w@mail.gmail.com>
- <a106c337-0713-e5d6-cb40-13e05f4d361d@codeaurora.org>
- <CAD=FV=W=BquL5ojORz4HNP889s=-uNJ-QEzUfAxwXj2Oa3cGew@mail.gmail.com>
- <b5078a17-4cbb-905e-4cd1-f252a02f97e9@codeaurora.org>
-Message-ID: <CAD=FV=Vo3PaHLSA3voEEQ30O+nFFErKfVK9oRo3H2-d17LSQkw@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 23 May 2018 13:23:56 +0800
+Subject: [PATCH v2 2/4] drm/mediatek: Add support for mediatek SOC MT2712
+In-Reply-To: <20180523022517.12103-3-stu.hsieh@mediatek.com>
+References: <20180523022517.12103-1-stu.hsieh@mediatek.com>
+ <20180523022517.12103-3-stu.hsieh@mediatek.com>
+Message-ID: <1527053036.10410.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Stu:
 
-On Tue, May 22, 2018 at 6:19 PM, David Collins <collinsd@codeaurora.org> wrote:
->>>> OK, so how's this for a proposal then:
->>>>
->>>> 1. For RPMh-regulator whenever we see a "set voltage" but Linux hasn't
->>>> specified that the regulator is enabled then we don't send the
->>>> voltage, we just cache it.
->>>>
->>>> 2. When we see the first enable then we first send the cached voltage
->>>> and then do the enable.
->>>>
->>>> 3. We don't need an "initial voltage" because any rails that are
->>>> expected to be variable voltage the client should be choosing a
->>>> voltage.
->>>>
->>>>
->>>> ...taking the SD card case as an example: if the regulator framework
->>>> says "set to the minimum: 1.8V" we'll cache this but not apply it yet
->>>> because the rail is off as far as Linux is concerned.  Then when the
->>>> SD card framework starts up it will set the voltage to 3.3V which will
->>>> overwrite the cache.  Then the SD card framework will enable the
->>>> regulator and RPMh will set the voltage to 3.3V and enable.
->>>
->>> I am ok with implementing this feature.
->>>
->>> However, should the voltage be cached instead of sent immediately any time
->>> that Linux has not explicitly requested the regulator to be enabled, or
->>> only before the first time that an enable request is sent?
->>>
->>> 1. regulator_set_voltage(reg, 2960000, 2960000)
->>>    --> cache voltage=2960 mV
->>> 2. regulator_enable(reg)
->>>    --> Send voltage=2960 then enable=1
->>> 3. regulator_disable(reg)
->>>    --> Send enable=0
->>> 4. regulator_set_voltage(reg, 1800000, 2960000)
->>>    --> A. Send voltage=1800 OR B. cache voltage=1800?
->>>
->>> Option A is used on the downstream rpmh-regulator driver in order to avoid
->>> cases where AP votes to disable a regulator that is kept enabled by
->>> another subsystem but then does not lower the voltage requested thanks to
->>> regulator_set_voltage() being called after regulator_disable().  I plan to
->>> go with option A for qcom-rpmh-regulator unless there are objections.
->>
->> So one client's vote for a voltage continues to be in effect even if
->> that client votes to have the regulator disabled?  That seems
->> fundamentally broken in RPMh.  I guess my take would be to work around
->> this RPMh misfeature by saying that whenever Linux votes to disable a
->> regulator it also votes for a voltage of 0.  Then another client of
->> RPMh won't be affected.
->>
->> That seems like it would be beneficial in any case.  If the AP always
->> asks for 1.3 V and the modem always asks for 1.1 V for the same rail
->> then the rail should go down to 1.1 V when the AP says to disable the
->> rail.
->
-> The VRM in RPMh hardware aggregates enable state, output voltage, mode,
-> and headroom voltage requests independently for each regulator.  This
-> allows for maximum request flexibility and makes no assumptions about
-> consumer use cases.  There is nothing inherently wrong about this approach.
+I've some inline comment.
 
-Just to confirm I'm understanding correctly:
+On Wed, 2018-05-23 at 10:25 +0800, Stu Hsieh wrote:
+> This patch add support for the Mediatek MT2712 DISP subsystem.
+> There are two OVL engine and three disp output in MT2712.
+> 
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 50 +++++++++++++++++++++++++++--
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  8 +++--
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  7 ++--
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 47 +++++++++++++++++++++++++--
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |  7 ++--
+>  5 files changed, 108 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 8130f3dab661..e563dedd1999 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -29,6 +29,8 @@
+>  #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+>  #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
+>  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+> +#define DISP_REG_CONFIG_DISP_RDMA2_SOUT		0x0b8
+> +#define DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN	0x0c4
 
-1. AP: request that regulator A be at 1.3 V and enabled
-==> actual output: regulator A is 1.3 V and enabled
+These two definition are useless, so remove it.
 
-2. modem: requests that regulator A be at 1.1 V and enabled
-==> actual output: regulator A is 1.3 V and enabled
+>  #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
+>  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+>  
+> @@ -41,6 +43,7 @@
+>  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+>  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+>  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+> +#define DISP_REG_MUTEX_MOD2(n)	(0x34 + 0x20 * (n))
 
-3. AP: request that regulator A be disabled
+Move this to the patch 'drm/mediatek: support maximum 64 mutex mod' and
+that patch should be applied before this patch.
 
-You're saying that here the output of regulator A will be "1.3 V" and
-"enabled".
+>  
+>  #define INT_MUTEX				BIT(1)
+>  
+> @@ -60,6 +63,25 @@
+>  #define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
+>  #define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
+>  
+> +#define MT2712_MUTEX_MOD_DISP_OVL0		BIT(11)
+> +#define MT2712_MUTEX_MOD_DISP_OVL1		BIT(12)
+> +#define MT2712_MUTEX_MOD_DISP_RDMA0		BIT(13)
+> +#define MT2712_MUTEX_MOD_DISP_RDMA1		BIT(14)
+> +#define MT2712_MUTEX_MOD_DISP_RDMA2		BIT(15)
+> +#define MT2712_MUTEX_MOD_DISP_WDMA0		BIT(16)
+> +#define MT2712_MUTEX_MOD_DISP_WDMA1		BIT(17)
+> +#define MT2712_MUTEX_MOD_DISP_COLOR0		BIT(18)
+> +#define MT2712_MUTEX_MOD_DISP_COLOR1		BIT(19)
+> +#define MT2712_MUTEX_MOD_DISP_AAL0		BIT(20)
+> +#define MT2712_MUTEX_MOD_DISP_UFOE		BIT(22)
+> +#define MT2712_MUTEX_MOD_DISP_PWM0		BIT(23)
+> +#define MT2712_MUTEX_MOD_DISP_PWM1		BIT(24)
+> +#define MT2712_MUTEX_MOD_DISP_PWM2		BIT(10)
+> +#define MT2712_MUTEX_MOD_DISP_OD0		BIT(25)
+> +/* modules more than 32, add BIT(31) when using DISP_REG_MUTEX_MOD2 bit */
+> +#define MT2712_MUTEX_MOD2_DISP_AAL1		(BIT(1) | BIT(31))
 
-I just can't see how that can be correct behavior.  A given client's
-vote for the voltage should really only make sense if that client
-wants the regulator enabled.  In the case above the kernel would have
-no idea that someone else might have the regulator enabled.  Why would
-it care if that other user gets it at 1.3 V or at 1.1 V?
+I think a better definition is
 
-You have some use case in mind where the kernel would need to have
-control over the voltage of a regulator that it thinks is disabled?
+#define MT2712_MUTEX_MOD2_DISP_AAL1		BIT(33)
 
-Now obviously if the kernel re-enables the regulator then its old
-voltage vote should be re-instated right away, but until then its vote
-about the voltage shouldn't count.  If that means that the kernel has
-to "vote" for 0V then I guess that's the way the API works.
+when you need to access this register,
 
+if (ddp->mutex_mod[id] < BIT(32)) {
+	offset = DISP_REG_MUTEX_MOD(mutex->id);
+	reg = readl_relaxed(ddp->regs + offset);
+	reg |= ddp->mutex_mod[id];
+	writel_relaxed(reg, ddp->regs + offset);
+} else {
+	offset = DISP_REG_MUTEX_MOD2(mutex->id);
+	reg = readl_relaxed(ddp->regs + offset);
+	reg |= (ddp->mutex_mod[id] >> 32);
+	writel_relaxed(reg, ddp->regs + offset);
+}
 
-> I'm concerned about a blanket policy of setting voltage=0 when issuing
-> disable requests.  That seems to violate the semantics of the
-> regulator_set_voltage() API which enforces the requested voltage range
-> until a new range is specified.  There may be workarounds that require a
-> regulator to operate at a specific voltage even when no Linux consumers
-> explicitly need the regulator enabled.
->
-> Given that not masking the voltage on disable is guaranteed to be safe and
-> does not silently break potential use cases, I plan to stick with this
-> approach.  Therefore, the question about option A or B for voltage caching
-> is still relevant.  I think that option A is safer/more API conforming so
-> I plan to implement that.
+because DISP_REG_MUTEX_MOD BIT(31) could be used for some module.
 
-I still can't understand how it ever makes sense to vote for a voltage
-for a regulator that you think is disabled.  ...but if there's some
-reason it does then I guess I'm OK with A.
+> +#define MT2712_MUTEX_MOD2_DISP_OD1		(BIT(2) | BIT(31))
+> +
+>  #define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
+>  #define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
+>  #define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
+> @@ -74,6 +96,7 @@
+>  
+>  #define OVL0_MOUT_EN_COLOR0		0x1
+>  #define OD_MOUT_EN_RDMA0		0x1
+> +#define OD1_MOUT_EN_RDMA1		BIT(16)
+>  #define UFOE_MOUT_EN_DSI0		0x1
+>  #define COLOR0_SEL_IN_OVL0		0x1
+>  #define OVL1_MOUT_EN_COLOR1		0x1
+> @@ -108,12 +131,32 @@ static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+>  	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
+>  };
+>  
+> +static const unsigned int mt2712_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> +	[DDP_COMPONENT_AAL0] = MT2712_MUTEX_MOD_DISP_AAL0,
+> +	[DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
+> +	[DDP_COMPONENT_COLOR0] = MT2712_MUTEX_MOD_DISP_COLOR0,
+> +	[DDP_COMPONENT_COLOR1] = MT2712_MUTEX_MOD_DISP_COLOR1,
+> +	[DDP_COMPONENT_OD0] = MT2712_MUTEX_MOD_DISP_OD0,
+> +	[DDP_COMPONENT_OD1] = MT2712_MUTEX_MOD2_DISP_OD1,
+> +	[DDP_COMPONENT_OVL0] = MT2712_MUTEX_MOD_DISP_OVL0,
+> +	[DDP_COMPONENT_OVL1] = MT2712_MUTEX_MOD_DISP_OVL1,
+> +	[DDP_COMPONENT_PWM0] = MT2712_MUTEX_MOD_DISP_PWM0,
+> +	[DDP_COMPONENT_PWM1] = MT2712_MUTEX_MOD_DISP_PWM1,
+> +	[DDP_COMPONENT_PWM2] = MT2712_MUTEX_MOD_DISP_PWM2,
+> +	[DDP_COMPONENT_RDMA0] = MT2712_MUTEX_MOD_DISP_RDMA0,
+> +	[DDP_COMPONENT_RDMA1] = MT2712_MUTEX_MOD_DISP_RDMA1,
+> +	[DDP_COMPONENT_RDMA2] = MT2712_MUTEX_MOD_DISP_RDMA2,
+> +	[DDP_COMPONENT_UFOE] = MT2712_MUTEX_MOD_DISP_UFOE,
+> +	[DDP_COMPONENT_WDMA0] = MT2712_MUTEX_MOD_DISP_WDMA0,
+> +	[DDP_COMPONENT_WDMA1] = MT2712_MUTEX_MOD_DISP_WDMA1,
+> +};
+> +
+>  static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> -	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
+> +	[DDP_COMPONENT_AAL0] = MT8173_MUTEX_MOD_DISP_AAL,
+>  	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
+>  	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
+>  	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
+> -	[DDP_COMPONENT_OD] = MT8173_MUTEX_MOD_DISP_OD,
+> +	[DDP_COMPONENT_OD0] = MT8173_MUTEX_MOD_DISP_OD,
+>  	[DDP_COMPONENT_OVL0] = MT8173_MUTEX_MOD_DISP_OVL0,
+>  	[DDP_COMPONENT_OVL1] = MT8173_MUTEX_MOD_DISP_OVL1,
+>  	[DDP_COMPONENT_PWM0] = MT8173_MUTEX_MOD_DISP_PWM0,
+> @@ -138,7 +181,7 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
+>  		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
+>  		value = OVL_MOUT_EN_RDMA;
+> -	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
+> +	} else if (cur == DDP_COMPONENT_OD0 && next == DDP_COMPONENT_RDMA0) {
+>  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+>  		value = OD_MOUT_EN_RDMA0;
+>  	} else if (cur == DDP_COMPONENT_UFOE && next == DDP_COMPONENT_DSI0) {
+> @@ -407,6 +450,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
+>  
+>  static const struct of_device_id ddp_driver_dt_match[] = {
+>  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
+> +	{ .compatible = "mediatek,mt2712-disp-mutex", .data = mt2712_mutex_mod},
+>  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
+>  	{},
+>  };
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index 4672317e3ad1..86e8c9e5df41 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -218,7 +218,8 @@ struct mtk_ddp_comp_match {
+>  };
+>  
+>  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> -	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
+> +	[DDP_COMPONENT_AAL0]	= { MTK_DISP_AAL,	0, &ddp_aal },
+> +	[DDP_COMPONENT_AAL1]	= { MTK_DISP_AAL,	1, &ddp_aal },
+>  	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
+>  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
+>  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+> @@ -226,10 +227,13 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+>  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+>  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+>  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
+> -	[DDP_COMPONENT_OD]	= { MTK_DISP_OD,	0, &ddp_od },
+> +	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
+> +	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
+>  	[DDP_COMPONENT_OVL0]	= { MTK_DISP_OVL,	0, NULL },
+>  	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
+>  	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
+> +	[DDP_COMPONENT_PWM1]	= { MTK_DISP_PWM,	1, NULL },
+> +	[DDP_COMPONENT_PWM2]	= { MTK_DISP_PWM,	2, NULL },
+>  	[DDP_COMPONENT_RDMA0]	= { MTK_DISP_RDMA,	0, NULL },
+>  	[DDP_COMPONENT_RDMA1]	= { MTK_DISP_RDMA,	1, NULL },
+>  	[DDP_COMPONENT_RDMA2]	= { MTK_DISP_RDMA,	2, NULL },
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> index 0828cf8bf85c..e00c2e798abd 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> @@ -41,7 +41,8 @@ enum mtk_ddp_comp_type {
+>  };
+>  
+>  enum mtk_ddp_comp_id {
+> -	DDP_COMPONENT_AAL,
+> +	DDP_COMPONENT_AAL0,
+> +	DDP_COMPONENT_AAL1,
 
+Move this to a patch 'add ddp component AAL1'.
 
->>>> This whole thing makes me worry about another problem, though.  You
->>>> say that the bootloader left the SD card rail on, right?  ...but as
->>>> far as Linux is concerned the SD card rail is off (argh, it can't read
->>>> the state that the bootloader left the rail in!)
->>>>
->>>> ...now imagine any of the following:
->>>>
->>>> * The user boots up a kernel where the SD card driver is disabled.
->>>>
->>>> * The user ejects the SD card right after the bootloader used it but
->>>> before the kernel driver started.
->>>>
->>>> When the kernel comes up it will believe that the SD card rail is
->>>> disabled so it won't try to disable it.  So the voltage will be left
->>>> on.
->>>
->>> We have not encountered issues with regulators getting left on
->>> indefinitely because Linux devices failed to take control of them during
->>> boot.  I don't think that this hypothetical issue needs to be addressed in
->>> the first qcom-rpmh-regulator driver patch if at all.
->>
->> I don't think it hypothetical at all.  Linux takes control of a
->> regulator and then at bootup it disables all regulators that aren't
->> currently used/enabled.  In your case you will report that regulators
->> are already disabled and thus you'll neuter the kernel's attempt to
->> disable regulators that nobody is using but that might have been left
->> on by the bootloader.  It seemed like Mark agreed here.
->
-> I did not consider regulator_late_cleanup().  I'll initialize the enabled
-> value in qcom-rpmh-regulator to -EINVAL to handle this case and also so
-> that _regulator_enable() succeeds without further core modification.
+>  	DDP_COMPONENT_BLS,
+>  	DDP_COMPONENT_COLOR0,
+>  	DDP_COMPONENT_COLOR1,
+> @@ -49,11 +50,13 @@ enum mtk_ddp_comp_id {
+>  	DDP_COMPONENT_DSI0,
+>  	DDP_COMPONENT_DSI1,
+>  	DDP_COMPONENT_GAMMA,
+> -	DDP_COMPONENT_OD,
+> +	DDP_COMPONENT_OD0,
+> +	DDP_COMPONENT_OD1,
 
-That's weird that the regulator code has a special case for -EINVAL in
-_regulator_enable().  Given how most of the code in the
-regulator/core.c doesn't seem to check for error codes I wonder if
-anyone is using that...  I guess I'd leave it to Mark whether he's
-happy with -EINVAL for this case even though it's asymmetric to using
--ENOTRECOVERABLE for getting the voltage.
+Move this to a patch 'add ddp component OD1'.
 
-Are we really sure there aren't any places that the regulator code
-needs to handle an error from _regulator_enable()?  An an example, in
-regulator_resolve_supply() are we sure we should be passing a
-regulator_enable() on to our parent supply even if
-_regulator_is_enabled() returns an error?  I haven't looked in depth
-of all use cases, though...
+>  	DDP_COMPONENT_OVL0,
+>  	DDP_COMPONENT_OVL1,
+>  	DDP_COMPONENT_PWM0,
+>  	DDP_COMPONENT_PWM1,
+> +	DDP_COMPONENT_PWM2,
 
+Move this to a patch 'add ddp component PWM2'.
 
-I see you posted a new version.  Thanks!  I'll try to find some time
-soon to review it, but I'll be a bit busy over the next few days.
+>  	DDP_COMPONENT_RDMA0,
+>  	DDP_COMPONENT_RDMA1,
+>  	DDP_COMPONENT_RDMA2,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index a2ca90fc403c..3a866e1d6af4 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -146,11 +146,37 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
+>  	DDP_COMPONENT_DPI0,
+>  };
+>  
+> +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_main[] = {
+> +	DDP_COMPONENT_OVL0,
+> +	DDP_COMPONENT_COLOR0,
+> +	DDP_COMPONENT_AAL0,
+> +	DDP_COMPONENT_OD0,
+> +	DDP_COMPONENT_RDMA0,
+> +	DDP_COMPONENT_DPI0,
+> +	DDP_COMPONENT_PWM0,
+> +};
+> +
+> +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_ext[] = {
+> +	DDP_COMPONENT_OVL1,
+> +	DDP_COMPONENT_COLOR1,
+> +	DDP_COMPONENT_AAL1,
+> +	DDP_COMPONENT_OD1,
+> +	DDP_COMPONENT_RDMA1,
+> +	DDP_COMPONENT_DPI1,
+> +	DDP_COMPONENT_PWM1,
+> +};
+> +
+> +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
+> +	DDP_COMPONENT_RDMA2,
+> +	DDP_COMPONENT_DSI2,
+> +	DDP_COMPONENT_PWM2,
+> +};
+> +
+>  static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+>  	DDP_COMPONENT_OVL0,
+>  	DDP_COMPONENT_COLOR0,
+> -	DDP_COMPONENT_AAL,
+> -	DDP_COMPONENT_OD,
+> +	DDP_COMPONENT_AAL0,
+> +	DDP_COMPONENT_OD0,
+>  	DDP_COMPONENT_RDMA0,
+>  	DDP_COMPONENT_UFOE,
+>  	DDP_COMPONENT_DSI0,
+> @@ -173,6 +199,15 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
+>  	.shadow_register = true,
+>  };
+>  
+> +static const struct mtk_mmsys_driver_data mt2712_mmsys_driver_data = {
+> +	.main_path = mt2712_mtk_ddp_main,
+> +	.main_len = ARRAY_SIZE(mt2712_mtk_ddp_main),
+> +	.ext_path = mt2712_mtk_ddp_ext,
+> +	.ext_len = ARRAY_SIZE(mt2712_mtk_ddp_ext),
+> +	.third_path = mt2712_mtk_ddp_third,
+> +	.third_len = ARRAY_SIZE(mt2712_mtk_ddp_third),
+> +};
+> +
+>  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+>  	.main_path = mt8173_mtk_ddp_main,
+>  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
+> @@ -232,6 +267,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+>  	if (ret < 0)
+>  		goto err_component_unbind;
+>  
+> +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
+> +				  private->data->third_len);
+> +	if (ret < 0)
+> +		goto err_component_unbind;
+> +
 
--Doug
+Move this to a patch 'add third ddp path'.
+
+Regards,
+CK
+
+>  	/* Use OVL device for all DMA memory allocations */
+>  	np = private->comp_node[private->data->main_path[0]] ?:
+>  	     private->comp_node[private->data->ext_path[0]];
+> @@ -374,6 +414,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+>  	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
+>  	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
+>  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> +	{ .compatible = "mediatek,mt2712-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+>  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+>  	{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void *)MTK_DISP_BLS },
+>  	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
+> @@ -552,6 +593,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
+>  static const struct of_device_id mtk_drm_of_ids[] = {
+>  	{ .compatible = "mediatek,mt2701-mmsys",
+>  	  .data = &mt2701_mmsys_driver_data},
+> +	{ .compatible = "mediatek,mt2712-mmsys",
+> +	  .data = &mt2712_mmsys_driver_data},
+>  	{ .compatible = "mediatek,mt8173-mmsys",
+>  	  .data = &mt8173_mmsys_driver_data},
+>  	{ }
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> index c3378c452c0a..e821342bc2d3 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> @@ -17,8 +17,8 @@
+>  #include <linux/io.h>
+>  #include "mtk_drm_ddp_comp.h"
+>  
+> -#define MAX_CRTC	2
+> -#define MAX_CONNECTOR	2
+> +#define MAX_CRTC	3
+> +#define MAX_CONNECTOR	3
+>  
+>  struct device;
+>  struct device_node;
+> @@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
+>  	unsigned int main_len;
+>  	const enum mtk_ddp_comp_id *ext_path;
+>  	unsigned int ext_len;
+> +	enum mtk_ddp_comp_id *third_path;
+> +	unsigned int third_len;
+> +
+>  	bool shadow_register;
+>  };
+>  
