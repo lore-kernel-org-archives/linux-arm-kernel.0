@@ -1,76 +1,287 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Wed, 23 May 2018 10:47:43 -0700
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <CAAeHK+wk0hSH6iQcsLzrpjvsGocev-UZ6=z95ysecdFnAcHVSQ@mail.gmail.com>
-References: <20180518170202.11458-1-samitolvanen@google.com>
- <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
- <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
- <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
- <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
- <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
- <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
- <86k1rzc4ba.wl-marc.zyngier@arm.com>
- <CAAeHK+z2LmMYasYtRTt2U=QF8Pe_i10RA3-SkLzGXXByZqLh1w@mail.gmail.com>
- <CAKwvOdmWg8o9yoZ+3dCwL8vYB8gzE+AatCbXENN-+Gge9Q6gtA@mail.gmail.com>
- <CAAeHK+wk0hSH6iQcsLzrpjvsGocev-UZ6=z95ysecdFnAcHVSQ@mail.gmail.com>
-Message-ID: <CAKwvOd=fqk2bQSiPBsUmVSQLGUEGYSUev3iWvico6HOpYs5YJA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 23 May 2018 18:46:56 +0100
+Subject: [PATCH v4 2/2] arm64: signal: Report signal frame size to userspace
+ via auxv
+In-Reply-To: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
+References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527097616-25214-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 4:54 AM Andrey Konovalov <andreyknvl@google.com>
-wrote:
-> On Tue, May 22, 2018 at 8:28 PM, Nick Desaulniers
-> <ndesaulniers@google.com> wrote:
-> > On Fri, May 18, 2018 at 11:13 AM Marc Zyngier <marc.zyngier@arm.com>
-wrote:
-> >> > - you have checked that with a released version of the compiler, you
-> >
-> > On Tue, May 22, 2018 at 10:58 AM Andrey Konovalov <andreyknvl@google.com
+Stateful CPU architecture extensions may require the signal frame
+to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+However, changing this #define is an ABI break.
 
-> > wrote:
-> >> Tested-by: Andrey Konovalov <andreyknvl@google.com>
-> >
-> > Hi Andrey,
-> > Thank you very much for this report.  Can you confirm as well the
-version
-> > of Clang that you were using?
+To allow userspace the option of determining the signal frame size
+in a more forwards-compatible way, this patch adds a new auxv entry
+tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+size that the process can observe during its lifetime.
 
-> I'm on 86852a40 ("[InstCombine] Calloc-ed strings optimizations").
+If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+a consistent interface with older kernels that do not provide
+AT_MINSIGSTKSZ.
 
-> > If it's not a binary release (built from
-> > source), would you be able to re-confirm with a released version?
+The idea is that libc could expose this via sysconf() or some
+similar mechanism.
 
-> Sure. Which release should I try and how do I get it?
+There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
+about userspace's own stack overheads and should not pretend to
+know.
 
-Maybe clang-6.0 as the latest release (though I suspect you may run into
-the recently-fixed-in-clang-7.0 "S" constraint bug that you reported).
+For arm64:
 
-I've had luck on debian based distributions installing from:
-http://apt.llvm.org/
+The primary motivation for this interface is the Scalable Vector
+Extension, which can require at least 4KB or so of extra space
+in the signal frame for the largest hardware implementations.
 
-(These can be added to your /etc/apt/sources.list, then a `sudo apt update`
-and `sudo apt install clang-6.0`)
+To determine the correct value, a "Christmas tree" mode (via the
+add_all argument) is added to setup_sigframe_layout(), to simulate
+addition of all possible records to the signal frame at maximum
+possible size.
 
-If you're not able to add remote repositories (some employers block this ;)
-), then you can find releases for download for a few different platforms:
-https://releases.llvm.org/
+If this procedure goes wrong somehow, resulting in a stupidly large
+frame layout and hence failure of sigframe_alloc() to allocate a
+record to the frame, then this is indicative of a kernel bug: the
+kernel's internal SIGFRAME_MAXSZ is supposed to sanity-check
+against generting frames that we consider _impossibly_ large.  If
+we hit this case, SIGFRAME_MAXSZ is used as our best guess, and we
+WARN().
 
-For example, a quick:
-$ mkdir llvm-6.0
-$ cd !$
-$ wget
-https://releases.llvm.org/6.0.0/clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz
-$ tar xvf clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz
-$ ./clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin/clang-6.0 -v
-clang version 6.0.0 (tags/RELEASE_600/final)
-Target: x86_64-unknown-linux-gnu
-Thread model: posix
-InstalledDir: .../llvm-6.0/./clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin
-Found candidate GCC installation: ...
-Candidate multilib: .;@m64
-Selected multilib: .;@m64
+For arm64 SVE:
 
-Seems to work.
+The SVE context block in the signal frame needs to be considered
+too when computing the maximum possible signal frame size.
+
+Because the size of this block depends on the vector length, this
+patch computes the size based not on the thread's current vector
+length but instead on the maximum possible vector length: this
+determines the maximum size of SVE context block that can be
+observed in any signal frame for the lifetime of the process.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
+
+---
+
+Changes since v3:
+
+ * Fall back to SIGFRAME_MAXSZ, not SIGSTKSZ in case of
+   setup_sigframe_layout() failure, since exceeding SIGFRAME_MAXSZ is
+   the only way this can fail: therefore SIGFRAME_MAXSZ is our best
+   guess at the required size.
+
+ * Commit message updated to reflect the above change.
+
+Requested by Will Deacon:
+
+ * Remove superfluous WARN()s from ARCH_DL_INFO and
+   setup_sigframe_layout().  If something went wrong and we still have
+   no value for signal_minsigstksz by the time we exec some user
+   process, AT_MINSIGSTKSZ is omitted from the aux vector.  Userspace
+   should fall back to the MINSIGSTKSZ #define anyway in this case
+   (i.e., do things the POSIX way).
+
+ * Change the type of signal_minsigstksz to unsigned long, to match the
+   auxv and sigframe_size() types.  (sigframe_size uses size_t, but it's
+   somewhat moot exactly what the types are, providing that
+   SIGFRAME_MAXSZ fits in all of them).
+
+Also requested by Mark Rutland:
+
+ * Merge #ifndef __ASSEMBLY__ block introduced in <asm/elf.h> into
+   the existing one.  The only things above are #defines, which
+   shouldn't be affected by this.
+---
+ arch/arm64/include/asm/elf.h         | 11 ++++++++
+ arch/arm64/include/asm/processor.h   |  5 ++++
+ arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c       |  1 +
+ arch/arm64/kernel/signal.c           | 52 +++++++++++++++++++++++++++++++-----
+ 5 files changed, 64 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fac1c4d..9c18f0e 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -121,6 +121,9 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <linux/bug.h>
++#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
++
+ typedef unsigned long elf_greg_t;
+ 
+ #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
+@@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+ 		    (elf_addr_t)current->mm->context.vdso);		\
++									\
++	/*								\
++	 * Should always be nonzero unless there's a kernel bug.  If	\
++	 * the we haven't determined a sensible value to give to	\
++	 * userspace, omit the entry:					\
++	 */								\
++	if (likely(signal_minsigstksz))					\
++		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
+ } while (0)
+ 
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 7675989..65ab83e 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -35,6 +35,8 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/build_bug.h>
++#include <linux/cache.h>
++#include <linux/init.h>
+ #include <linux/stddef.h>
+ #include <linux/string.h>
+ 
+@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+ void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+ 
++extern unsigned long __ro_after_init signal_minsigstksz; /* sigframe size */
++extern void __init minsigstksz_setup(void);
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index ec0a86d..743c0b8 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,7 +19,8 @@
+ 
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
++#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
+ 
+-#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9d1b06d..0e0b53d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
+ 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+ 
+ 	sve_setup();
++	minsigstksz_setup();
+ 
+ 	/* Advertise that we have computed the system capabilities */
+ 	set_sys_caps_initialised();
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 154b7d3..00b9990 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/cache.h>
+ #include <linux/compat.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	return 0;
+ }
+ 
+-/* Determine the layout of optional records in the signal frame */
+-static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
++/*
++ * Determine the layout of optional records in the signal frame
++ *
++ * add_all: if true, lays out the biggest possible signal frame for
++ *	this task; otherwise, generates a layout for the current state
++ *	of the task.
++ */
++static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
++				 bool add_all)
+ {
+ 	int err;
+ 
+@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 		return err;
+ 
+ 	/* fault information, if valid */
+-	if (current->thread.fault_code) {
++	if (add_all || current->thread.fault_code) {
+ 		err = sigframe_alloc(user, &user->esr_offset,
+ 				     sizeof(struct esr_context));
+ 		if (err)
+@@ -591,8 +599,14 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	if (system_supports_sve()) {
+ 		unsigned int vq = 0;
+ 
+-		if (test_thread_flag(TIF_SVE))
+-			vq = sve_vq_from_vl(current->thread.sve_vl);
++		if (add_all || test_thread_flag(TIF_SVE)) {
++			int vl = sve_max_vl;
++
++			if (!add_all)
++				vl = current->thread.sve_vl;
++
++			vq = sve_vq_from_vl(vl);
++		}
+ 
+ 		err = sigframe_alloc(user, &user->sve_offset,
+ 				     SVE_SIG_CONTEXT_SIZE(vq));
+@@ -603,7 +617,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	return sigframe_alloc_end(user);
+ }
+ 
+-
+ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+@@ -701,7 +714,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
+ 	int err;
+ 
+ 	init_user_layout(user);
+-	err = setup_sigframe_layout(user);
++	err = setup_sigframe_layout(user, false);
+ 	if (err)
+ 		return err;
+ 
+@@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		thread_flags = READ_ONCE(current_thread_info()->flags);
+ 	} while (thread_flags & _TIF_WORK_MASK);
+ }
++
++unsigned long __ro_after_init signal_minsigstksz;
++
++/*
++ * Determine the stack space required for guaranteed signal devliery.
++ * This function is used to populate AT_MINSIGSTKSZ at process startup.
++ * cpufeatures setup is assumed to be complete.
++ */
++void __init minsigstksz_setup(void)
++{
++	struct rt_sigframe_user_layout user;
++
++	init_user_layout(&user);
++
++	/*
++	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
++	 * be big enough, but it's our best guess:
++	 */
++	if (WARN_ON(setup_sigframe_layout(&user, true)))
++		signal_minsigstksz = SIGFRAME_MAXSZ;
++	else
++		signal_minsigstksz = sigframe_size(&user) +
++			round_up(sizeof(struct frame_record), 16) +
++			16; /* max alignment padding */
++}
 -- 
-Thanks,
-~Nick Desaulniers
+2.1.4
