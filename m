@@ -1,59 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 May 2018 11:51:02 +0100
-Subject: [PATCH] arm64: Make sure permission updates happen for pmd/pud
-In-Reply-To: <20180522235049.23400-1-labbott@redhat.com>
-References: <20180522235049.23400-1-labbott@redhat.com>
-Message-ID: <20180523105102.GB26965@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 23 May 2018 11:50:50 +0100
+Subject: [PATCH 13/14] ARM: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+In-Reply-To: <E1fKjFo-00064i-Hc@rmk-PC.armlinux.org.uk>
+References: <20180521114238.GN17671@n2100.armlinux.org.uk>
+ <E1fKjFo-00064i-Hc@rmk-PC.armlinux.org.uk>
+Message-ID: <4187699a-fe7b-3807-4ffa-809bb918d6a2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
-
-On Tue, May 22, 2018 at 04:50:49PM -0700, Laura Abbott wrote:
-> Commit 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-> disallowed block mappings for ioremap since that code does not honor
-> break-before-make. The same APIs are also used for permission updating
-> though and the extra checks prevent the permission updates from happening,
-> even though this should be permitted. This results in read-only permissions
-> not being fully applied. Visibly, this can occasionaly be seen as a failure
-> on the built in rodata test when the test data ends up in a section or
-> as an odd RW gap on the page table dump. Fix this by keeping the check
-> for the top level p*d_set_huge APIs but using separate functions for the
-> update APIs.
+On 21/05/18 12:45, Russell King wrote:
+> We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+> So let's intercept it as early as we can by testing for the
+> function call number as soon as we've identified a HVC call
+> coming from the guest.
 > 
-> Reported-by: Peter Robinson <pbrobinson@gmail.com>
-> Fixes: 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->  arch/arm64/mm/mmu.c | 28 ++++++++++++++++++++--------
->  1 file changed, 20 insertions(+), 8 deletions(-)
-
-Thanks for sending the fix. One thing below...
-
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 2dbb2c9f1ec1..57517ad86910 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -66,6 +66,9 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
->  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
->  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+>  arch/arm/kvm/hyp/hyp-entry.S | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> index 918a05dd2d63..67de45685e29 100644
+> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -16,6 +16,7 @@
+>   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>   */
 >  
-> +static void __pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot);
-> +static void __pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot);
+> +#include <linux/arm-smccc.h>
+>  #include <linux/linkage.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+> @@ -202,7 +203,7 @@ ENDPROC(__hyp_do_panic)
+>  	lsr     r2, r2, #16
+>  	and     r2, r2, #0xff
+>  	cmp     r2, #0
+> -	bne	guest_trap		@ Guest called HVC
+> +	bne	guest_hvc_trap		@ Guest called HVC
+>  
+>  	/*
+>  	 * Getting here means host called HVC, we shift parameters and branch
+> @@ -253,6 +254,16 @@ THUMB(	orr	lr, #1)
+>  	pop	{r2, lr}
+>  	eret
+>  
+> +guest_hvc_trap:
+> +	movw	ip, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
+> +	movt	ip, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
+
+r12 is a live guest register, and only r0-r2 are saved at that stage.
+You could additionally corrupt r3 though, once you've identified that
+you're in the context of an SMCCC 1.1 call.
+
+You should be able to replace r12 with r2.
+
+> +	ldr	r0, [sp]		@ Guest's r0
+> +	teq	r0, ip
+> +	bne	guest_trap
+> +	pop	{r0, r1, r2}
+
+You could replace this slightly more efficient
+
+	add	sp, sp, #12
+
+since we don't need to restore those registers to the guest. r2 would be
+left containing ARM_SMCCC_ARCH_WORKAROUND_1 (harmless), and r1 has the
+HSR value (perfectly predictable).
+
+> +	mov	r0, #0
+> +	eret
 > +
->  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  			      unsigned long size, pgprot_t vma_prot)
->  {
-> @@ -200,7 +203,7 @@ static void init_pmd(pud_t *pudp, unsigned long addr, unsigned long end,
->  		/* try section mapping first */
->  		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
->  		    (flags & NO_BLOCK_MAPPINGS) == 0) {
-> -			pmd_set_huge(pmdp, phys, prot);
-> +			__pmd_set_huge(pmdp, phys, prot);
+>  guest_trap:
+>  	load_vcpu r0			@ Load VCPU pointer to r0
+>  
+> 
 
-Given that there is ongoing work to fix the core ioremap code, it would
-be nice to avoid adding '__' versions if we can help it. Would it work
-if we replaced the pXd_present check with a call to pgattr_change_is_safe
-instead?
+Thanks,
 
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
