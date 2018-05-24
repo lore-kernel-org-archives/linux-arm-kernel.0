@@ -1,71 +1,45 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 24 May 2018 15:15:24 +0300
-Subject: [PATCH 07/24] arm64: ilp32: add documentation on the ILP32 ABI
- for ARM64
-In-Reply-To: <20180523140620.GA27215@amd>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180516081910.10067-8-ynorov@caviumnetworks.com>
- <20180523140620.GA27215@amd>
-Message-ID: <20180524121524.GA3873@yury-thinkpad>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 24 May 2018 13:16:38 +0100
+Subject: [PATCH 09/14] arm64: ssbd: Introduce thread flag to control
+ userspace mitigation
+In-Reply-To: <20180524120121.pjdw7qaybcsbf4fl@lakrids.cambridge.arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-10-marc.zyngier@arm.com>
+ <20180524120121.pjdw7qaybcsbf4fl@lakrids.cambridge.arm.com>
+Message-ID: <833776ac-2b8c-b0f7-dcff-9c55afd67c65@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Wed, May 23, 2018 at 04:06:20PM +0200, Pavel Machek wrote:
-> On Wed 2018-05-16 11:18:52, Yury Norov wrote:
-> > Based on Andrew Pinski's patch-series.
-> > 
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+On 24/05/18 13:01, Mark Rutland wrote:
+> On Tue, May 22, 2018 at 04:06:43PM +0100, Marc Zyngier wrote:
+>> In order to allow userspace to be mitigated on demand, let's
+>> introduce a new thread flag that prevents the mitigation from
+>> being turned off when exiting to userspace, and doesn't turn
+>> it on on entry into the kernel (with the assumtion that the
 > 
-> So Andrew's signoff should be here?
-
-Yes it should, but it lost since v4. I'll restore it.
- 
-> > ---
-> >  Documentation/arm64/ilp32.txt | 45 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 45 insertions(+)
-> >  create mode 100644 Documentation/arm64/ilp32.txt
-> > 
-> > diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-> > new file mode 100644
-> > index 000000000000..d0fd5109c4b2
-> > --- /dev/null
-> > +++ b/Documentation/arm64/ilp32.txt
-> > @@ -0,0 +1,45 @@
-> > +ILP32 AARCH64 SYSCALL ABI
-> > +=========================
-> > +
-> > +This document describes the ILP32 syscall ABI and where it differs
-> > +from the generic compat linux syscall interface.
+> Nit: s/assumtion/assumption/
 > 
-> I was hoping to learn what ILP32 is / what is it good for, but no,
-> this does not tell me... it would be good to do a short explanation
-> here, and maybe reference it from cover letter of the series...
-> 								Pavel
+>> mitigation is always enabled in the kernel itself).
+>>
+>> This will be used by a prctl interface introduced in a later
+>> patch.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> On the assumption that this flag cannot be flipped while a task is in
+> userspace:
 
-ILP32 is ABI acronym that means "Integers, Longs and Pointers are 32-bit".
-And LP64 means "Longs and Pointers are 64-bit".
+Well, that's the case unless you get into the seccomp thing, which does
+change TIF_SSBD on all threads of the task, without taking it to the
+kernel first. That nicely breaks the state machine, and you end-up
+running non-mitigated in the kernel. Oops.
 
-There's AN490 - "ILP32 for AArch64 Whitepaper" from ARM which covers
-the topic:
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dai0490a/ar01s01.html
+I have a couple of patches fixing that, using a second flag
+(TIF_SSBD_PENDING) that gets turned into the real thing on exit to
+userspace. It's pretty ugly though.
 
-And some talks:
-http://connect.linaro.org/resource/bkk16/bkk16-305b/
+Thanks,
 
-Briefly, ILP32 is 32-bit ABI that works with AARCH64 instruction set. It looks
-better in some performance tests, and is useful for compatibility with 32-bit
-legacy code.
-
-If you're more familiar with x86 terminology, in ARM world LP64 corresponds
-to x86_64, AARCH32_EL0 corresponds to x86_32, and ILP32 corresponds to x32
-ABI.
-
-I'll add link to AN490 in next submission.
-
-Yury
-
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	M.
+-- 
+Jazz is not dead. It just smells funny...
