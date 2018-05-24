@@ -1,153 +1,145 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 24 May 2018 16:09:04 +0100
-Subject: [PATCH v10 18/18] KVM: arm64: Invoke FPSIMD context switch trap
- from C
-In-Reply-To: <1527005119-6842-19-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-19-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87vabdrsz3.fsf@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 24 May 2018 16:55:17 +0100
+Subject: [PATCH v4 2/2] arm64: signal: Report signal frame size to
+ userspace via auxv
+In-Reply-To: <20180524124918.GG8689@arm.com>
+References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
+ <1527097616-25214-3-git-send-email-Dave.Martin@arm.com>
+ <20180524124918.GG8689@arm.com>
+Message-ID: <20180524155516.GW13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 24, 2018 at 01:49:21PM +0100, Will Deacon wrote:
+> On Wed, May 23, 2018 at 06:46:56PM +0100, Dave Martin wrote:
+> > Stateful CPU architecture extensions may require the signal frame
+> > to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+> > However, changing this #define is an ABI break.
+> > 
+> > To allow userspace the option of determining the signal frame size
+> > in a more forwards-compatible way, this patch adds a new auxv entry
+> > tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+> > size that the process can observe during its lifetime.
+> > 
+> > If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+> > assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+> > a consistent interface with older kernels that do not provide
+> > AT_MINSIGSTKSZ.
+> > 
+> > The idea is that libc could expose this via sysconf() or some
+> > similar mechanism.
+> > 
+> > There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
+> > about userspace's own stack overheads and should not pretend to
+> > know.
+> 
+> [...]
+> 
+> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> > index fac1c4d..9c18f0e 100644
+> > --- a/arch/arm64/include/asm/elf.h
+> > +++ b/arch/arm64/include/asm/elf.h
+> > @@ -121,6 +121,9 @@
+> >  
+> >  #ifndef __ASSEMBLY__
+> >  
+> > +#include <linux/bug.h>
+> > +#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
+> > +
+> >  typedef unsigned long elf_greg_t;
+> >  
+> >  #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
+> > @@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+> >  do {									\
+> >  	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+> >  		    (elf_addr_t)current->mm->context.vdso);		\
+> > +									\
+> > +	/*								\
+> > +	 * Should always be nonzero unless there's a kernel bug.  If	\
+> > +	 * the we haven't determined a sensible value to give to	\
+> 
+> "If the we"?
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Dang, fixed locally now.
 
-> The conversion of the FPSIMD context switch trap code to C has added
-> some overhead to calling it, due to the need to save registers that
-> the procedure call standard defines as caller-saved.
->
-> So, perhaps it is no longer worth invoking this trap handler quite
-> so early.
->
-> Instead, we can invoke it from fixup_guest_exit(), with little
-> likelihood of increasing the overhead much further.
->
-> As a convenience, this patch gives __hyp_switch_fpsimd() the same
-> return semantics fixup_guest_exit().  For now there is no
-> possibility of a spurious FPSIMD trap, so the function always
-> returns true, but this allows it to be tail-called with a single
-> return statement.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+[...]
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> > diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+> > index ec0a86d..743c0b8 100644
+> > --- a/arch/arm64/include/uapi/asm/auxvec.h
+> > +++ b/arch/arm64/include/uapi/asm/auxvec.h
+> > @@ -19,7 +19,8 @@
+> >  
+> >  /* vDSO location */
+> >  #define AT_SYSINFO_EHDR	33
+> > +#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
+> 
+> Curious: but how do we avoid/detect conflicts at -rc1? I guess somebody just
+> needs to remember to run grep? (I know you have another series consolidating
+> the ID allocations).
 
-> ---
->  arch/arm64/kvm/hyp/entry.S     | 30 ------------------------------
->  arch/arm64/kvm/hyp/hyp-entry.S | 19 -------------------
->  arch/arm64/kvm/hyp/switch.c    | 15 +++++++++++++--
->  3 files changed, 13 insertions(+), 51 deletions(-)
->
-> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> index 40f349b..fad1e16 100644
-> --- a/arch/arm64/kvm/hyp/entry.S
-> +++ b/arch/arm64/kvm/hyp/entry.S
-> @@ -166,33 +166,3 @@ abort_guest_exit_end:
->  	orr	x0, x0, x5
->  1:	ret
->  ENDPROC(__guest_exit)
-> -
-> -ENTRY(__fpsimd_guest_restore)
-> -	// x0: esr
-> -	// x1: vcpu
-> -	// x2-x29,lr: vcpu regs
-> -	// vcpu x0-x1 on the stack
-> -	stp	x2, x3, [sp, #-144]!
-> -	stp	x4, x5, [sp, #16]
-> -	stp	x6, x7, [sp, #32]
-> -	stp	x8, x9, [sp, #48]
-> -	stp	x10, x11, [sp, #64]
-> -	stp	x12, x13, [sp, #80]
-> -	stp	x14, x15, [sp, #96]
-> -	stp	x16, x17, [sp, #112]
-> -	stp	x18, lr, [sp, #128]
-> -
-> -	bl	__hyp_switch_fpsimd
-> -
-> -	ldp	x4, x5, [sp, #16]
-> -	ldp	x6, x7, [sp, #32]
-> -	ldp	x8, x9, [sp, #48]
-> -	ldp	x10, x11, [sp, #64]
-> -	ldp	x12, x13, [sp, #80]
-> -	ldp	x14, x15, [sp, #96]
-> -	ldp	x16, x17, [sp, #112]
-> -	ldp	x18, lr, [sp, #128]
-> -	ldp	x0, x1, [sp, #144]
-> -	ldp	x2, x3, [sp], #160
-> -	eret
-> -ENDPROC(__fpsimd_guest_restore)
-> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> index bffece2..753b9d2 100644
-> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> @@ -113,25 +113,6 @@ el1_hvc_guest:
->
->  el1_trap:
->  	get_vcpu_ptr	x1, x0
-> -
-> -	mrs		x0, esr_el2
-> -	lsr		x0, x0, #ESR_ELx_EC_SHIFT
-> -	/*
-> -	 * x0: ESR_EC
-> -	 * x1: vcpu pointer
-> -	 */
-> -
-> -	/*
-> -	 * We trap the first access to the FP/SIMD to save the host context
-> -	 * and restore the guest context lazily.
-> -	 * If FP/SIMD is not implemented, handle the trap and inject an
-> -	 * undefined instruction exception to the guest.
-> -	 */
-> -alternative_if_not ARM64_HAS_NO_FPSIMD
-> -	cmp	x0, #ESR_ELx_EC_FP_ASIMD
-> -	b.eq	__fpsimd_guest_restore
-> -alternative_else_nop_endif
-> -
->  	mov	x0, #ARM_EXCEPTION_TRAP
->  	b	__guest_exit
->
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 4fbee95..2d45bd7 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -328,8 +328,7 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  	}
->  }
->
-> -void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
-> -				    struct kvm_vcpu *vcpu)
-> +static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
->  {
->  	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
->
-> @@ -369,6 +368,8 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  			     fpexc32_el2);
->
->  	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
-> +
-> +	return true;
->  }
->
->  /*
-> @@ -390,6 +391,16 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  	if (*exit_code != ARM_EXCEPTION_TRAP)
->  		goto exit;
->
-> +	/*
-> +	 * We trap the first access to the FP/SIMD to save the host context
-> +	 * and restore the guest context lazily.
-> +	 * If FP/SIMD is not implemented, handle the trap and inject an
-> +	 * undefined instruction exception to the guest.
-> +	 */
-> +	if (system_supports_fpsimd() &&
-> +	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
-> +		return __hyp_switch_fpsimd(vcpu);
-> +
->  	if (!__populate_fault_info(vcpu))
->  		return true;
+We basically can't.  These are spread over various arch headers today,
+so the solution is to (a) grep, and (b) know that you needed to do that.
 
+This is the main motivation for collecting the definitions together.
 
---
-Alex Benn?e
+Short of having some script that checks these at build-time, I couldn't
+see another obvious solution.  It's nonetheless a bit ugly because of
+things like AT_VECTOR_SIZE_ARCH which is masquerading a tag but isn't
+one, and obviously does vary across arches...
+
+[...]
+
+> > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> > index 154b7d3..00b9990 100644
+> > --- a/arch/arm64/kernel/signal.c
+> > +++ b/arch/arm64/kernel/signal.c
+
+[...]
+
+> > @@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+> >  		thread_flags = READ_ONCE(current_thread_info()->flags);
+> >  	} while (thread_flags & _TIF_WORK_MASK);
+> >  }
+> > +
+> > +unsigned long __ro_after_init signal_minsigstksz;
+> > +
+> > +/*
+> > + * Determine the stack space required for guaranteed signal devliery.
+> > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
+> > + * cpufeatures setup is assumed to be complete.
+> > + */
+> > +void __init minsigstksz_setup(void)
+> > +{
+> > +	struct rt_sigframe_user_layout user;
+> > +
+> > +	init_user_layout(&user);
+> > +
+> > +	/*
+> > +	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
+> > +	 * be big enough, but it's our best guess:
+> > +	 */
+> > +	if (WARN_ON(setup_sigframe_layout(&user, true)))
+> > +		signal_minsigstksz = SIGFRAME_MAXSZ;
+> 
+> Can we not leave signal_minsigstksz as zero in this case?
+
+I prefer to distinguish the "kernel went wrong" case (where we just omit
+AT_MINSIGSTKSZ for backwards compatibilty) from the "sigframe too
+large" case.
+
+Thanks to the vagueries of C stack sizing is rarely an exact science,
+so there is merit in telling userspace a size that is approimately
+correct even if it's not quite big enough.  So if the frame would be
+larger than SIGFRAME_MAXSZ then it seems preferable to at least steer
+userspace towards allocating bigger stacks rather than just letting
+userspace fall back to MINSIGSTKSZ (which is likely to be much too
+small in this scenario).
+
+These are things that Should Not Happen (tm), so this distinction
+might be viewed as overkill, but that was my rationale anyway.
+
+What do you think?
+
+Cheers
+---Dave
