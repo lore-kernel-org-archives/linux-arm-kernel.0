@@ -1,74 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 May 2018 13:11:35 +0100
-Subject: [PATCH 11/14] arm64: KVM: Add HYP per-cpu accessors
-In-Reply-To: <20180522150648.28297-12-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-12-marc.zyngier@arm.com>
-Message-ID: <20180524121134.qwrbezitjb25afyt@lakrids.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 May 2018 14:17:27 +0200
+Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <1687797a-93f1-7e5c-6060-01c12c070964@nvidia.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
+ <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
+ <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+ <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
+ <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
+ <CAPDyKFo_69kSS6UzdsJeyeiiED=S=chsdkP+R43qMHDEbZ8n_A@mail.gmail.com>
+ <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
+ <CAPDyKFo8e5FMrxF2ggxVZ+HQjw4s1Wtx-tMf5ka67knJpZMQcA@mail.gmail.com>
+ <1687797a-93f1-7e5c-6060-01c12c070964@nvidia.com>
+Message-ID: <CAPDyKFravSx3h6UnsjNGM2ViZtkxvPMULyVQnoVT9jsEP5az+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 04:06:45PM +0100, Marc Zyngier wrote:
-> As we're going to require to access per-cpu variables at EL2,
-> let's craft the minimum set of accessors required to implement
-> reading a per-cpu variable, relying on tpidr_el2 to contain the
-> per-cpu offset.
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 24 May 2018 at 11:36, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+> On 24/05/18 08:04, Ulf Hansson wrote:
+>
+> ...
+>
+>>> Any reason why we could not add a 'boolean' argument to the API to
+>>> indicate
+>>> whether the new device should be linked? I think that I prefer the API
+>>> handles it, but I can see there could be instances where drivers may wish
+>>> to
+>>> handle it themselves.
+>>
+>>
+>> Coming back to this question. Both Tegra XUSB and Qcom Camera use
+>> case, would benefit from doing the linking themselves, as it needs
+>> different PM domains to be powered on depending on the current use
+>> case - as to avoid wasting power.
+>>
+>> However, I can understand that you prefer some simplicity over
+>> optimizations, as you told us. Then, does it mean that you are
+>> insisting on extending the APIs with a boolean for linking, or are you
+>> fine with the driver to call device_link_add()?
+>
+>
+> I am fine with the driver calling device_link_add(), but I just wonder if we
+> will find a several drivers doing this and then we will end up doing this
+> later anyway.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Okay.
 
-Mark.
+>
+> The current API is called ...
+>
+> * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
+> * @dev: Device to attach.
+> * @index: The index of the PM domain.
+>
+> This naming and description is a bit misleading, because really it is not
+> attaching the device that is passed, but creating a new device to attach a
+> PM domain to. So we should consider renaming and changing the description
+> and indicate that users need to link the device.
 
-> ---
->  arch/arm64/include/asm/kvm_asm.h | 27 +++++++++++++++++++++++++--
->  1 file changed, 25 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index f6648a3e4152..fefd8cf42c35 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -71,14 +71,37 @@ extern u32 __kvm_get_mdcr_el2(void);
->  
->  extern u32 __init_stage2_translation(void);
->  
-> +/* Home-grown __this_cpu_{ptr,read} variants that always work at HYP */
-> +#define __hyp_this_cpu_ptr(sym)						\
-> +	({								\
-> +		void *__ptr = hyp_symbol_addr(sym);			\
-> +		__ptr += read_sysreg(tpidr_el2);			\
-> +		(typeof(&sym))__ptr;					\
-> +	 })
-> +
-> +#define __hyp_this_cpu_read(sym)					\
-> +	({								\
-> +		*__hyp_this_cpu_ptr(sym);				\
-> +	 })
-> +
->  #else /* __ASSEMBLY__ */
->  
-> -.macro get_host_ctxt reg, tmp
-> -	adr_l	\reg, kvm_host_cpu_state
-> +.macro hyp_adr_this_cpu reg, sym, tmp
-> +	adr_l	\reg, \sym
->  	mrs	\tmp, tpidr_el2
->  	add	\reg, \reg, \tmp
->  .endm
->  
-> +.macro hyp_ldr_this_cpu reg, sym, tmp
-> +	adr_l	\reg, \sym
-> +	mrs	\tmp, tpidr_el2
-> +	ldr	\reg,  [\reg, \tmp]
-> +.endm
-> +
-> +.macro get_host_ctxt reg, tmp
-> +	hyp_adr_this_cpu \reg, kvm_host_cpu_state, \tmp
-> +.endm
-> +
->  .macro get_vcpu_ptr vcpu, ctxt
->  	get_host_ctxt \ctxt, \vcpu
->  	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
-> -- 
-> 2.14.2
-> 
+I picked the name to be consistent with the existing
+genpd_dev_pm_attach(). Do you have a better suggestion?
+
+I agree, some details is missing to the description, let me try to
+improve it. Actually, I was trying to follow existing descriptions
+from genpd_dev_pm_attach(), so perhaps that also needs a little
+update.
+
+However, do note that, neither genpd_dev_pm_attach() or
+genpd_dev_pm_attach_by_id() is supposed to be called by drivers, but
+rather only by the driver core. So description may not be so
+important.
+
+In regards to good descriptions, for sure the API added in patch9,
+dev_pm_domain_attach_by_id(), needs a good one, as this is what
+drivers should be using.
+
+>
+> Finally, how is a PM domain attached via calling genpd_dev_pm_attach_by_id()
+> detached?
+
+Via the existing genpd_dev_pm_detach(), according to what I have
+described in the change log. I clarify the description in regards to
+this as well.
+
+Kind regards
+Uffe
