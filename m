@@ -1,220 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 May 2018 13:15:07 +0100
-Subject: [PATCH 12/14] arm64: KVM: Add ARCH_WORKAROUND_2 support for guests
-In-Reply-To: <20180522150648.28297-13-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-13-marc.zyngier@arm.com>
-Message-ID: <20180524121507.kocupewjagu7c4lw@lakrids.cambridge.arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 24 May 2018 15:15:24 +0300
+Subject: [PATCH 07/24] arm64: ilp32: add documentation on the ILP32 ABI
+ for ARM64
+In-Reply-To: <20180523140620.GA27215@amd>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180516081910.10067-8-ynorov@caviumnetworks.com>
+ <20180523140620.GA27215@amd>
+Message-ID: <20180524121524.GA3873@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 04:06:46PM +0100, Marc Zyngier wrote:
-> In order to offer ARCH_WORKAROUND_2 support to guests, we need
-> a bit of infrastructure.
-> 
-> Let's add a flag indicating whether or not the guest uses
-> SSBD mitigation. Depending on the state of this flag, allow
-> KVM to disable ARCH_WORKAROUND_2 before entering the guest,
-> and enable it when exiting it.
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi Pavel,
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm/include/asm/kvm_mmu.h    |  5 +++++
->  arch/arm64/include/asm/kvm_asm.h  |  3 +++
->  arch/arm64/include/asm/kvm_host.h |  3 +++
->  arch/arm64/include/asm/kvm_mmu.h  | 24 ++++++++++++++++++++++
->  arch/arm64/kvm/hyp/switch.c       | 42 +++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/arm.c                |  4 ++++
->  6 files changed, 81 insertions(+)
+On Wed, May 23, 2018 at 04:06:20PM +0200, Pavel Machek wrote:
+> On Wed 2018-05-16 11:18:52, Yury Norov wrote:
+> > Based on Andrew Pinski's patch-series.
+> > 
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 707a1f06dc5d..b0c17d88ed40 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -319,6 +319,11 @@ static inline int kvm_map_vectors(void)
->  	return 0;
->  }
->  
-> +static inline int hyp_map_aux_data(void)
-> +{
-> +	return 0;
-> +}
-> +
->  #define kvm_phys_to_vttbr(addr)		(addr)
->  
->  #endif	/* !__ASSEMBLY__ */
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index fefd8cf42c35..d4fbb1356c4c 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -33,6 +33,9 @@
->  #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
->  #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
->  
-> +#define	VCPU_WORKAROUND_2_FLAG_SHIFT	0
-> +#define	VCPU_WORKAROUND_2_FLAG		(_AC(1, UL) << VCPU_WORKAROUND_2_FLAG_SHIFT)
-> +
->  /* Translate a kernel address of @sym into its equivalent linear mapping */
->  #define kvm_ksym_ref(sym)						\
->  	({								\
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 469de8acd06f..9bef3f69bdcd 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -216,6 +216,9 @@ struct kvm_vcpu_arch {
->  	/* Exception Information */
->  	struct kvm_vcpu_fault_info fault;
->  
-> +	/* State of various workarounds, see kvm_asm.h for bit assignment */
-> +	u64 workaround_flags;
-> +
->  	/* Guest debug state */
->  	u64 debug_flags;
->  
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 082110993647..eb7a5c2a2bfb 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -457,6 +457,30 @@ static inline int kvm_map_vectors(void)
->  }
->  #endif
->  
-> +#ifdef CONFIG_ARM64_SSBD
-> +DECLARE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
-> +
-> +static inline int hyp_map_aux_data(void)
-> +{
-> +	int cpu, err;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		u64 *ptr;
-> +
-> +		ptr = per_cpu_ptr(&arm64_ssbd_callback_required, cpu);
-> +		err = create_hyp_mappings(ptr, ptr + 1, PAGE_HYP);
-> +		if (err)
-> +			return err;
-> +	}
-> +	return 0;
-> +}
-> +#else
-> +static inline int hyp_map_aux_data(void)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
->  
->  #endif /* __ASSEMBLY__ */
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d9645236e474..c50cedc447f1 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -15,6 +15,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/arm-smccc.h>
->  #include <linux/types.h>
->  #include <linux/jump_label.h>
->  #include <uapi/linux/psci.h>
-> @@ -389,6 +390,39 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  	return false;
->  }
->  
-> +static inline bool __hyp_text __needs_ssbd_off(struct kvm_vcpu *vcpu)
-> +{
-> +	if (!cpus_have_const_cap(ARM64_SSBD))
-> +		return false;
-> +
-> +	return !(vcpu->arch.workaround_flags & VCPU_WORKAROUND_2_FLAG);
-> +}
-> +
-> +static void __hyp_text __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
-> +{
-> +#ifdef CONFIG_ARM64_SSBD
-> +	/*
-> +	 * The host runs with the workaround always present. If the
-> +	 * guest wants it disabled, so be it...
-> +	 */
-> +	if (__needs_ssbd_off(vcpu) &&
-> +	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
-> +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, 0, NULL);
-> +#endif
-> +}
-> +
-> +static void __hyp_text __set_host_arch_workaround_state(struct kvm_vcpu *vcpu)
-> +{
-> +#ifdef CONFIG_ARM64_SSBD
-> +	/*
-> +	 * If the guest has disabled the workaround, bring it back on.
-> +	 */
-> +	if (__needs_ssbd_off(vcpu) &&
-> +	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
-> +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, 1, NULL);
-> +#endif
-> +}
-> +
->  /* Switch to the guest for VHE systems running in EL2 */
->  int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  {
-> @@ -409,6 +443,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  	sysreg_restore_guest_state_vhe(guest_ctxt);
->  	__debug_switch_to_guest(vcpu);
->  
-> +	__set_guest_arch_workaround_state(vcpu);
-> +
->  	do {
->  		/* Jump in the fire! */
->  		exit_code = __guest_enter(vcpu, host_ctxt);
-> @@ -416,6 +452,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  		/* And we're baaack! */
->  	} while (fixup_guest_exit(vcpu, &exit_code));
->  
-> +	__set_host_arch_workaround_state(vcpu);
-> +
->  	fp_enabled = fpsimd_enabled_vhe();
->  
->  	sysreg_save_guest_state_vhe(guest_ctxt);
-> @@ -465,6 +503,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  	__sysreg_restore_state_nvhe(guest_ctxt);
->  	__debug_switch_to_guest(vcpu);
->  
-> +	__set_guest_arch_workaround_state(vcpu);
-> +
->  	do {
->  		/* Jump in the fire! */
->  		exit_code = __guest_enter(vcpu, host_ctxt);
-> @@ -472,6 +512,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  		/* And we're baaack! */
->  	} while (fixup_guest_exit(vcpu, &exit_code));
->  
-> +	__set_host_arch_workaround_state(vcpu);
-> +
->  	fp_enabled = __fpsimd_enabled_nvhe();
->  
->  	__sysreg_save_state_nvhe(guest_ctxt);
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index a4c1b76240df..2d9b4795edb2 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1490,6 +1490,10 @@ static int init_hyp_mode(void)
->  		}
->  	}
->  
-> +	err = hyp_map_aux_data();
-> +	if (err)
-> +		kvm_err("Cannot map host auxilary data: %d\n", err);
-> +
->  	return 0;
->  
->  out_err:
+> So Andrew's signoff should be here?
+
+Yes it should, but it lost since v4. I'll restore it.
+ 
+> > ---
+> >  Documentation/arm64/ilp32.txt | 45 +++++++++++++++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
+> >  create mode 100644 Documentation/arm64/ilp32.txt
+> > 
+> > diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+> > new file mode 100644
+> > index 000000000000..d0fd5109c4b2
+> > --- /dev/null
+> > +++ b/Documentation/arm64/ilp32.txt
+> > @@ -0,0 +1,45 @@
+> > +ILP32 AARCH64 SYSCALL ABI
+> > +=========================
+> > +
+> > +This document describes the ILP32 syscall ABI and where it differs
+> > +from the generic compat linux syscall interface.
+> 
+> I was hoping to learn what ILP32 is / what is it good for, but no,
+> this does not tell me... it would be good to do a short explanation
+> here, and maybe reference it from cover letter of the series...
+> 								Pavel
+
+ILP32 is ABI acronym that means "Integers, Longs and Pointers are 32-bit".
+And LP64 means "Longs and Pointers are 64-bit".
+
+There's AN490 - "ILP32 for AArch64 Whitepaper" from ARM which covers
+the topic:
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dai0490a/ar01s01.html
+
+And some talks:
+http://connect.linaro.org/resource/bkk16/bkk16-305b/
+
+Briefly, ILP32 is 32-bit ABI that works with AARCH64 instruction set. It looks
+better in some performance tests, and is useful for compatibility with 32-bit
+legacy code.
+
+If you're more familiar with x86 terminology, in ARM world LP64 corresponds
+to x86_64, AARCH32_EL0 corresponds to x86_32, and ILP32 corresponds to x32
+ABI.
+
+I'll add link to AN490 in next submission.
+
+Yury
+
 > -- 
-> 2.14.2
-> 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
