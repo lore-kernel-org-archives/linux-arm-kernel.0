@@ -1,97 +1,188 @@
-From: don.brace@microsemi.com (Don Brace)
-Date: Thu, 24 May 2018 13:37:55 +0000
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
- <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
- <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
- <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <36b790d3fb4c43349cfa560283c03ab5@microsemi.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 24 May 2018 08:38:48 -0500
+Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
+In-Reply-To: <3307687.qJF5Pr3uHG@phil>
+References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
+ <1685755.J6GI985WX3@diego>
+ <CAL_Jsq+VBspzCaLD2Wy=fyC-S+LKGZbVsB+b+Etkx91ioXOCuQ@mail.gmail.com>
+ <3307687.qJF5Pr3uHG@phil>
+Message-ID: <CAL_JsqKO+1KpESJ1E58QcfWoNOpfVw6M_JVkAruZhFF5thEg7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: Thursday, May 24, 2018 8:07 AM
-> To: Sinan Kaya <okaya@codeaurora.org>
-> Cc: linux-pci at vger.kernel.org; timur at codeaurora.org; ryan at finnie.org; linux-
-> arm-msm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> stable at vger.kernel.org; Bjorn Helgaas <bhelgaas@google.com>; Rafael J.
-> Wysocki <rafael.j.wysocki@intel.com>; Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org>; Thomas Gleixner <tglx@linutronix.de>; Kate
-> Stewart <kstewart@linuxfoundation.org>; Frederick Lawler
-> <fred@fredlawl.com>; Dongdong Liu <liudongdong3@huawei.com>; Mika
-> Westerberg <mika.westerberg@linux.intel.com>; open list <linux-
-> kernel at vger.kernel.org>; Don Brace <don.brace@microsemi.com>;
-> esc.storagedev <esc.storagedev@microsemi.com>; linux-scsi at vger.kernel.org
-> Subject: Re: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-> 
-> EXTERNAL EMAIL
-> 
-> 
-> On Thu, May 24, 2018 at 07:43:05AM -0400, Sinan Kaya wrote:
-> > On 5/23/2018 6:57 PM, Sinan Kaya wrote:
-> > >> The crash seems to indicate that the hpsa device attempted a DMA after
-> > >> we cleared the Root Port's PCI_COMMAND_MASTER, which means
-> > >> hpsa_shutdown() didn't stop DMA from the device (it looks like *most*
-> > >> shutdown methods don't disable device DMA, so it's in good company).
-> > > All drivers are expected to shutdown DMA and interrupts in their shutdown()
-> > > routines. They can skip removing threads, data structures etc. but DMA and
-> > > interrupt disabling are required. This is the difference between shutdown()
-> > > and remove() callbacks.
-> >
-> > I found this note yesterday to see why we are not disabling the
-> > devices in the PCI core itself.
-> >
-> > pci_device_remove()
-> >
-> >       /*
-> >        * We would love to complain here if pci_dev->is_enabled is set, that
-> >        * the driver should have called pci_disable_device(), but the
-> >        * unfortunate fact is there are too many odd BIOS and bridge setups
-> >        * that don't like drivers doing that all of the time.
-> >        * Oh well, we can dream of sane hardware when we sleep, no matter how
-> >        * horrible the crap we have to deal with is when we are awake...
-> >        */
-> >
-> > Ryan, can you discard the previous patch and test this one instead?
-> > remove() path in hpsa driver seems to call pci_disable_device() via
-> >
-> > hpsa_remove_one()
-> >       hpsa_free_pci_init()
-> >
-> > but nothing on the shutdown path.
-> >
-> > diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
-> > index 4ed3d26..3823f04 100644
-> > --- a/drivers/scsi/hpsa.c
-> > +++ b/drivers/scsi/hpsa.c
-> > @@ -8651,6 +8651,7 @@ static void hpsa_shutdown(struct pci_dev *pdev)
-> >         h->access.set_intr_mask(h, HPSA_INTR_OFF);
-> >         hpsa_free_irqs(h);                      /* init_one 4 */
-> >         hpsa_disable_interrupt_mode(h);         /* pci_init 2 */
-> > +       pci_disable_device(h->pdev);
-> >  }
-> 
-> I suspect this will make things "work" (if the device can't attempt
-> DMA, no Unsupported Request error will occur).
-> 
-> But I'm concerned that the reason for the DMA might that hpsa is
-> transferring buffers from system memory to the hpsa device, and if we
-> arbitrarily terminate those transfers with pci_disable_device(), we
-> may leave the hpsa device in an inconsistent state, e.g., with a dirty
-> filesystem.
-> 
-> But we really need guidance from an hpsa expert.  I don't know the
-> filesystem/SCSI/hpsa details.
-> 
-> Bjorn
+On Thu, May 24, 2018 at 7:07 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Rob,
+>
+> Am Mittwoch, 23. Mai 2018, 21:53:53 CEST schrieb Rob Herring:
+>> On Wed, May 23, 2018 at 10:12 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>> > Am Mittwoch, 23. Mai 2018, 16:43:07 CEST schrieb Rob Herring:
+>> >> On Tue, May 22, 2018 at 9:02 PM, Levin Du <djw@t-chip.com.cn> wrote:
+>> >> > On 2018-05-23 2:02 AM, Rob Herring wrote:
+>> >> >> On Fri, May 18, 2018 at 11:52:05AM +0800, djw at t-chip.com.cn wrote:
+>> >> >>> From: Levin Du <djw@t-chip.com.cn>
+>> >> >>>
+>> >> >>> Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
+>> >> >>> which do not belong to the general pinctrl.
+>> >> >>>
+>> >> >>> Adding gpio-syscon support makes controlling regulator or
+>> >> >>> LED using these special pins very easy by reusing existing
+>> >> >>> drivers, such as gpio-regulator and led-gpio.
+>> >> >>>
+>> >> >>> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+>> >> >>>
+>> >> >>> ---
+>> >> >>>
+>> >> >>> Changes in v2:
+>> >> >>> - Rename gpio_syscon10 to gpio_mute in doc
+>> >> >>>
+>> >> >>> Changes in v1:
+>> >> >>> - Refactured for general gpio-syscon usage for Rockchip SoCs.
+>> >> >>> - Add doc rockchip,gpio-syscon.txt
+>> >> >>>
+>> >> >>>   .../bindings/gpio/rockchip,gpio-syscon.txt         | 41
+>> >> >>>
+>> >> >>> ++++++++++++++++++++++
+>> >> >>>
+>> >> >>>   drivers/gpio/gpio-syscon.c                         | 30
+>> >> >>>
+>> >> >>> ++++++++++++++++
+>> >> >>>
+>> >> >>>   2 files changed, 71 insertions(+)
+>> >> >>>   create mode 100644
+>> >> >>>
+>> >> >>> Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+>> >> >>>
+>> >> >>> diff --git
+>> >> >>> a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+>> >> >>> b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+>> >> >>> new file mode 100644
+>> >> >>> index 0000000..b1b2a67
+>> >> >>> --- /dev/null
+>> >> >>> +++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+>> >> >>> @@ -0,0 +1,41 @@
+>> >> >>> +* Rockchip GPIO support for GRF_SOC_CON registers
+>> >> >>> +
+>> >> >>> +Required properties:
+>> >> >>> +- compatible: Should contain "rockchip,gpio-syscon".
+>> >> >>> +- gpio-controller: Marks the device node as a gpio controller.
+>> >> >>> +- #gpio-cells: Should be two. The first cell is the pin number and
+>> >> >>> +  the second cell is used to specify the gpio polarity:
+>> >> >>> +    0 = Active high,
+>> >> >>> +    1 = Active low.
+>> >> >>
+>> >> >> There's no need for this child node. Just make the parent node a gpio
+>> >> >> controller.
+>> >> >>
+>> >> >> Rob
+>> >> >
+>> >> > Hi Rob, it is not clear to me. Do you suggest that the grf node should be
+>> >> > a
+>> >> > gpio controller,
+>> >> > like below?
+>> >> >
+>> >> > +    grf: syscon at ff100000 {
+>> >> > +        compatible = "rockchip,gpio-syscon", "rockchip,rk3328-grf",
+>> >> > "syscon", "simple-mfd";
+>> >>
+>> >> Yes, but drop "rockchip,gpio-syscon" and "simple-mfd".
+>> >
+>> > I would disagree quite a bit here. The grf are the "general register files",
+>> > a bunch of registers used for quite a lot of things, and so it seems
+>> > among other users, also a gpio-controller for some more random pins
+>> > not controlled through the regular gpio controllers.
+>> >
+>> > For a more fully stocked grf, please see
+>> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/rk3288.dtsi#n855
+>> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/rockchip/rk3399.dtsi#n1338
+>> >
+>> > So the gpio controller should definitly also be a subnode.
+>>
+>> Sigh, yes, if there are a bunch of functions needing subnodes like the
+>> above, then yes that makes sense. But that's not what has been
+>> presented. Please make some attempt at defining *all* the functions.
+>> An actual binding would be nice, but I'll settle for just a list of
+>> things. The list should have functions that have DT dependencies (like
+>> clocks for phys in the above) because until you do, you don't need
+>> child nodes.
+>
+> That's the problem with the Rockchip-GRF, you only realize its content
+> when implementing specific features.
+>
+> Like on the rk3399 the table of the register-list of the GRF alone is 11
+> pages long with the register details tables taking up another 230 pages.
+> And functional description is often somewhat thin.
 
-It's most likely OCSD traffic that will stop when bus mastering is turned off.
-So, I'll run some tests on my end before ACKing your patch.
+But surely one can scan thru it and have some clue what functions
+there are. For example, does this chip have phy registers in GRF?
 
-Thanks,
-Don Brace
-ESC - Smart Storage
-Microsemi Corporation
+> So I'm not sure I fully understand what you're asking, but in general
+> we define the bindings for sub-devices when tackling these individual
+> components, see for example
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit?id=72580a49a837c2c7da83f698c00592eac41537d8
+
+Yes, and in that case it makes sense. The individual functions
+themselves have resources defined in DT like clocks. What I don't want
+to see are child nodes defining *only* a compatible and any provider
+properties (e.g. #gpio-cells). The only reason to do that is to make
+Linux bind a driver, but DT is not a list of drivers to bind.
+
+This is what I don't want to see:
+
+syscon {
+  compatible = "foo,soc-sysctrl", "syscon", "simple-mfd";
+  reg = <...>;
+  clock-controller {
+    compatible = "foo,soc-sysctrl-clocks";
+    #clock-cells = <1>;
+  };
+  reset-controller {
+    compatible = "foo,soc-sysctrl-resets";
+    #reset-cells = <1>;
+  };
+  gpio {
+    compatible = "foo,soc-sysctrl-gpios";
+    #gpio-cells = <2>;
+    gpio-controller;
+  };
+};
+
+But rather:
+
+syscon {
+  compatible = "foo,soc-sysctrl";
+  reg = <...>;
+  #clock-cells = <1>;
+  #reset-cells = <1>;
+  #gpio-cells = <2>;
+  gpio-controller;
+};
+
+> which also has a real phy-driver behind it and binding against that
+> subnode of the GRF simple-mfd.
+>
+> These are real IP blocks somewhere on the socs, with regular supplies
+> like resets, clocks etc in most cases. Only their controlling registers
+> got dumped into the GRF for some reason.
+
+I can tell that from your examples, but I can't tell that with this
+binding. For this binding, it looks like you are adding a sub-node for
+1 register bit. That wouldn't scale if you have 11 page register list.
+
+> And in retrospect it really looks like we're doing something right,
+> because it seems these bindings seem quite stable over time.
+>
+>
+>> > The gpio in question is called "mute", so I'd think the gpio-syscon driver
+>> > should just define a "rockchip,rk3328-gpio-mute" compatible and contain
+>> > all the register voodoo in the driver itself and not define it in the dt.
+>>
+>> Is there really just one GPIO? If it has a defined function, then is
+>> it really GP? Can you control direction? I know Linus W doesn't like
+>> that kind of abuse of GPIO.
+>
+> looks like I convinced Linus that we're not abusing anything with this :-) .
+
+Okay, but still my question remains: is it really only 1 GPIO?
+Dropping "-mute" would be more future proof if not.
+
+Rob
