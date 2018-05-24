@@ -1,51 +1,111 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 May 2018 10:33:36 +0200
-Subject: [PATCH] PM / runtime: Drop usage count for suppliers at device link
- removal
-Message-ID: <1527150816-8459-1-git-send-email-ulf.hansson@linaro.org>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 24 May 2018 10:33:50 +0200
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180523150337.GO13470@e103592.cambridge.arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+ <20180523114812.GH55598@C02W217FHV2R.local>
+ <20180523133158.GJ13470@e103592.cambridge.arm.com>
+ <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
+ <20180523150337.GO13470@e103592.cambridge.arm.com>
+Message-ID: <20180524083350.GK55598@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case consumer device is runtime resumed, while the link to the
-supplier is removed, the earlier call to pm_runtime_get_sync() made from
-rpm_get_suppliers() does not get properly balanced with a corresponding
-call to pm_runtime_put(). This leads to that suppliers remains to be
-runtime resumed forever, while they don't need to.
+On Wed, May 23, 2018 at 04:03:37PM +0100, Dave Martin wrote:
+> On Wed, May 23, 2018 at 03:56:57PM +0100, Catalin Marinas wrote:
+> > On Wed, May 23, 2018 at 02:31:59PM +0100, Dave P Martin wrote:
+> > > On Wed, May 23, 2018 at 01:48:12PM +0200, Christoffer Dall wrote:
+> > > > On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
+> > > > > This is true by construction however: TIF_FOREIGN_FPSTATE is never
+> > > > > cleared except when returning to userspace or returning from a
+> > > > > signal: thus, for a true kernel thread no FPSIMD context is ever
+> > > > > loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
+> > > > > ever be saved.
+> > > > 
+> > > > I don't understand this construction proof; from looking at the patch
+> > > > below it is not obvious to me why fpsimd_thread_switch() can never have
+> > > > !wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
+> > > > kernel thread?
+> > > 
+> > > Looking at this again, I think it is poorly worded.  This patch aims to
+> > > make it true by construction, but it isn't prior to the patch.
+> > > 
+> > > I'm tempted to delete the paragraph: the assertion of both untrue and
+> > > not the best way to justify that this patch works.
+> > > 
+> > > 
+> > > How about:
+> > > 
+> > > -8<-
+> > > 
+> > > The context switch logic already isolates user threads from each other.
+> > > This, it is sufficient for isolating user threads from the kernel,
 
-Let's fix the behaviour by calling rpm_put_suppliers() when dropping a
-device link. Not that, since rpm_put_suppliers() checks the
-link->rpm_active flag, we can correctly avoid to call pm_runtime_put() in
-cases when we shouldn't.
+s/This/Thus/ ?
 
-Reported-by: Todor Tomov <todor.tomov@linaro.org>
-Fixes: 21d5c57b3726 ("PM / runtime: Use device links")
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+I don't understand what 'it' refers to here?
 
-Rafael, I am not sure if this is safe from locking point of view. The device
-link write lock has been taken when pm_runtime_drop_link() is called, hence I
-assume calling rpm_put_suppliers() should be fine!? If not, can you please
-advise how to change?
+> > > since the goal either way is to ensure that code executing in userspace
+> > > cannot see any FPSIMD state except its own.  Thus, there is no special
+> > > property of kernel threads that we care about except that it is
+> > > pointless to save or load FPSIMD register state for them.
 
-Kind regards
-Uffe
+Actually, I'm not really sure what this paragraph is getting at.
 
----
- drivers/base/power/runtime.c | 2 ++
- 1 file changed, 2 insertions(+)
+> > > 
+> > > At worst, the removal of all the kernel thread special cases by this
+> > > patch would thus spuriously load and save state for kernel threads when
+> > > unnecessary.
+> > > 
+> > > But the context switch logic is already deliberately optimised to defer
+> > > reloads of the regs until ret_to_user (or sigreturn as a special case),
+> > > which kernel threads by definition never reach.
+> > > 
+> > > ->8-
+> > 
+> > The "at worst" paragraph makes it look like it could happen (at least
+> > until you reach the last paragraph). Maybe you can just say that
+> > wrong_task and wrong_cpu (with the fpsimd_cpu = NR_CPUS addition) are
+> > always true for kernel threads. You should probably mention this in a
+> > comment in the code as well.
+> 
+> What if I just delete the second paragraph, and remove the "But" from
+> the start of the third, and append:
+> 
+> "As a result, the wrong_task and wrong_cpu tests in
+> fpsimd_thread_switch() will always yield false for kernel threads."
+> 
+> ...with a similar comment in the code?
 
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 8bef3cb..beb85c3 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -1607,6 +1607,8 @@ void pm_runtime_new_link(struct device *dev)
- 
- void pm_runtime_drop_link(struct device *dev)
- {
-+	rpm_put_suppliers(dev);
-+
- 	spin_lock_irq(&dev->power.lock);
- 	WARN_ON(dev->power.links_count == 0);
- 	dev->power.links_count--;
--- 
-2.7.4
+...with a risk of being a bit over-pedantic and annoying, may I suggest
+the following complete commit text:
+
+------8<------
+Currently the FPSIMD handling code uses the condition task->mm ==
+NULL as a hint that task has no FPSIMD register context.
+
+The ->mm check is only there to filter out tasks that cannot
+possibly have FPSIMD context loaded, for optimisation purposes.
+However, TIF_FOREIGN_FPSTATE must always be checked anyway before
+saving FPSIMD context back to memory.  For this reason, the ->mm
+checks are not useful, providing that that TIF_FOREIGN_FPSTATE is
+maintained properly for kernel threads.
+
+FPSIMD context is never preserved for kernel threads across a context
+switch and therefore TIF_FOREIGN_FPSTATE should always be true for
+kernel threads.  This is indeed the case, as the wrong_task and
+wrong_cpu tests in fpsimd_thread_switch() will always yield false for
+kernel threads.
+
+Further, the context switch logic is already deliberately optimised to
+defer reloads of the FPSIMD context until ret_to_user (or sigreturn as a
+special case), which kernel threads by definition never reach, and
+therefore this change introduces no additional work in the critical
+path.
+
+This patch removes the redundant checks and special-case code.
+------8<------
+
+Thanks,
+-Christoffer
