@@ -1,145 +1,129 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:48 +0100
-Subject: [PATCH v11 19/19] KVM: arm64: Invoke FPSIMD context switch trap from C
+Date: Thu, 24 May 2018 17:56:43 +0100
+Subject: [PATCH v11 14/19] arm64/sve: Move sve_pffr() to fpsimd.h and make
+ inline
 In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
 References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-20-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527181008-13549-15-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion of the FPSIMD context switch trap code to C has added
-some overhead to calling it, due to the need to save registers that
-the procedure call standard defines as caller-saved.
+In order to make sve_save_state()/sve_load_state() more easily
+reusable and to get rid of a potential branch on context switch
+critical paths, this patch makes sve_pffr() inline and moves it to
+fpsimd.h.
 
-So, perhaps it is no longer worth invoking this trap handler quite
-so early.
+<asm/processor.h> must be included in fpsimd.h in order to make
+this work, and this creates an #include cycle that is tricky to
+avoid without modifying core code, due to the way the PR_SVE_*()
+prctl helpers are included in the core prctl implementation.
 
-Instead, we can invoke it from fixup_guest_exit(), with little
-likelihood of increasing the overhead much further.
+Instead of breaking the cycle, this patch defers inclusion of
+<asm/fpsimd.h> in <asm/processor.h> until the point where it is
+actually needed: i.e., immediately before the prctl definitions.
 
-As a convenience, this patch gives __hyp_switch_fpsimd() the same
-return semantics fixup_guest_exit().  For now there is no
-possibility of a spurious FPSIMD trap, so the function always
-returns true, but this allows it to be tail-called with a single
-return statement.
+No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arch/arm64/kvm/hyp/entry.S     | 30 ------------------------------
- arch/arm64/kvm/hyp/hyp-entry.S | 19 -------------------
- arch/arm64/kvm/hyp/switch.c    | 15 +++++++++++++--
- 3 files changed, 13 insertions(+), 51 deletions(-)
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 40f349b..fad1e16 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -166,33 +166,3 @@ abort_guest_exit_end:
- 	orr	x0, x0, x5
- 1:	ret
- ENDPROC(__guest_exit)
--
--ENTRY(__fpsimd_guest_restore)
--	// x0: esr
--	// x1: vcpu
--	// x2-x29,lr: vcpu regs
--	// vcpu x0-x1 on the stack
--	stp	x2, x3, [sp, #-144]!
--	stp	x4, x5, [sp, #16]
--	stp	x6, x7, [sp, #32]
--	stp	x8, x9, [sp, #48]
--	stp	x10, x11, [sp, #64]
--	stp	x12, x13, [sp, #80]
--	stp	x14, x15, [sp, #96]
--	stp	x16, x17, [sp, #112]
--	stp	x18, lr, [sp, #128]
--
--	bl	__hyp_switch_fpsimd
--
--	ldp	x4, x5, [sp, #16]
--	ldp	x6, x7, [sp, #32]
--	ldp	x8, x9, [sp, #48]
--	ldp	x10, x11, [sp, #64]
--	ldp	x12, x13, [sp, #80]
--	ldp	x14, x15, [sp, #96]
--	ldp	x16, x17, [sp, #112]
--	ldp	x18, lr, [sp, #128]
--	ldp	x0, x1, [sp, #144]
--	ldp	x2, x3, [sp], #160
--	eret
--ENDPROC(__fpsimd_guest_restore)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index bffece2..753b9d2 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -113,25 +113,6 @@ el1_hvc_guest:
+---
+
+Changes since v10:
+
+ * Add comment explaining why fpsimd.h is included in a funny place
+   in processor.h.
+---
+ arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
+ arch/arm64/include/asm/processor.h | 12 +++++++++++-
+ arch/arm64/kernel/fpsimd.c         | 12 ------------
+ 3 files changed, 24 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index fb60b22..fa92747 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -18,6 +18,8 @@
  
- el1_trap:
- 	get_vcpu_ptr	x1, x0
--
--	mrs		x0, esr_el2
--	lsr		x0, x0, #ESR_ELx_EC_SHIFT
--	/*
--	 * x0: ESR_EC
--	 * x1: vcpu pointer
--	 */
--
--	/*
--	 * We trap the first access to the FP/SIMD to save the host context
--	 * and restore the guest context lazily.
--	 * If FP/SIMD is not implemented, handle the trap and inject an
--	 * undefined instruction exception to the guest.
--	 */
--alternative_if_not ARM64_HAS_NO_FPSIMD
--	cmp	x0, #ESR_ELx_EC_FP_ASIMD
--	b.eq	__fpsimd_guest_restore
--alternative_else_nop_endif
--
- 	mov	x0, #ARM_EXCEPTION_TRAP
- 	b	__guest_exit
+ #include <asm/ptrace.h>
+ #include <asm/errno.h>
++#include <asm/processor.h>
++#include <asm/sigcontext.h>
  
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 4fbee95..2d45bd7 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -328,8 +328,7 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
+ #ifndef __ASSEMBLY__
+ 
+@@ -61,6 +63,17 @@ extern void sve_flush_cpu_state(void);
+ /* Maximum VL that SVE VL-agnostic software can transparently support */
+ #define SVE_VL_ARCH_MAX 0x100
+ 
++/* Offset of FFR in the SVE register dump */
++static inline size_t sve_ffr_offset(int vl)
++{
++	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
++}
++
++static inline void *sve_pffr(struct thread_struct *thread)
++{
++	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
++}
++
+ extern void sve_save_state(void *state, u32 *pfpsr);
+ extern void sve_load_state(void const *state, u32 const *pfpsr,
+ 			   unsigned long vq_minus_1);
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 9231b87..c99e657 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -40,7 +40,6 @@
+ 
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
+-#include <asm/fpsimd.h>
+ #include <asm/hw_breakpoint.h>
+ #include <asm/lse.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -247,6 +246,17 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+ void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+ 
++/*
++ * Not at the top of the file due to a direct #include cycle between
++ * <asm/fpsimd.h> and <asm/processor.h>.  Deferring this #include
++ * ensures that contents of processor.h are visible to fpsimd.h even if
++ * processor.h is included first.
++ *
++ * These prctl helpers are the only things in this file that require
++ * fpsimd.h.  The core code expects them to be in this header.
++ */
++#include <asm/fpsimd.h>
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 842b2ad..e60c3a2 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -161,18 +161,6 @@ static void sve_free(struct task_struct *task)
+ 	__sve_free(task);
  }
  
--void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
--				    struct kvm_vcpu *vcpu)
-+static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+-
+-/* Offset of FFR in the SVE register dump */
+-static size_t sve_ffr_offset(int vl)
+-{
+-	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
+-}
+-
+-static void *sve_pffr(struct thread_struct *thread)
+-{
+-	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
+-}
+-
+ static void change_cpacr(u64 val, u64 mask)
  {
- 	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
- 
-@@ -369,6 +368,8 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
- 			     fpexc32_el2);
- 
- 	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
-+
-+	return true;
- }
- 
- /*
-@@ -390,6 +391,16 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	if (*exit_code != ARM_EXCEPTION_TRAP)
- 		goto exit;
- 
-+	/*
-+	 * We trap the first access to the FP/SIMD to save the host context
-+	 * and restore the guest context lazily.
-+	 * If FP/SIMD is not implemented, handle the trap and inject an
-+	 * undefined instruction exception to the guest.
-+	 */
-+	if (system_supports_fpsimd() &&
-+	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
-+		return __hyp_switch_fpsimd(vcpu);
-+
- 	if (!__populate_fault_info(vcpu))
- 		return true;
- 
+ 	u64 cpacr = read_sysreg(CPACR_EL1);
 -- 
 2.1.4
