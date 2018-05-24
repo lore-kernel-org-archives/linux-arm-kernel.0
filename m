@@ -1,49 +1,79 @@
 From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Thu, 24 May 2018 19:27:30 +0530
-Subject: [PATCH v10 4/4] Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+Date: Thu, 24 May 2018 19:27:29 +0530
+Subject: [PATCH v10 3/4] arm64: Implement page table free interfaces
 In-Reply-To: <1527170250-5291-1-git-send-email-cpandya@codeaurora.org>
 References: <1527170250-5291-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1527170250-5291-5-git-send-email-cpandya@codeaurora.org>
+Message-ID: <1527170250-5291-4-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit 15122ee2c515a ("arm64: Enforce BBM for huge
-IO/VMAP mappings") is a temporary work-around until the
-issues with CONFIG_HAVE_ARCH_HUGE_VMAP gets fixed.
+Implement pud_free_pmd_page() and pmd_free_pte_page().
 
-Revert this change as we have fixes for the issue.
+Implementation requires,
+ 1) Clearing off the current pud/pmd entry
+ 2) Invalidate TLB which could have previously
+    valid but not stale entry
+ 3) Freeing of the un-used next level page tables
 
 Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
 ---
- arch/arm64/mm/mmu.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm64/mm/mmu.c | 34 ++++++++++++++++++++++++++++++----
+ 1 file changed, 30 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 17d9282..defb3bb 100644
+index da98828..17d9282 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -935,10 +935,6 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
+@@ -45,6 +45,7 @@
+ #include <asm/memblock.h>
+ #include <asm/mmu_context.h>
+ #include <asm/ptdump.h>
++#include <asm/tlbflush.h>
  
--	/* ioremap_page_range doesn't honour BBM */
--	if (pud_present(READ_ONCE(*pudp)))
--		return 0;
--
- 	BUG_ON(phys & ~PUD_MASK);
- 	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
+ #define NO_BLOCK_MAPPINGS	BIT(0)
+ #define NO_CONT_MAPPINGS	BIT(1)
+@@ -973,12 +974,37 @@ int pmd_clear_huge(pmd_t *pmdp)
  	return 1;
-@@ -949,10 +945,6 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
+ }
  
--	/* ioremap_page_range doesn't honour BBM */
--	if (pmd_present(READ_ONCE(*pmdp)))
--		return 0;
--
- 	BUG_ON(phys & ~PMD_MASK);
- 	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
- 	return 1;
+-int pud_free_pmd_page(pud_t *pud, unsigned long addr)
++int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
+ {
+-	return pud_none(*pud);
++	pmd_t *table;
++	pmd_t pmd;
++
++	pmd = READ_ONCE(*pmdp);
++	if (pmd_present(pmd)) {
++		table = __va(pmd_val(pmd));
++		pmd_clear(pmdp);
++		__flush_tlb_kernel_pgtable(addr);
++		pte_free_kernel(NULL, (pte_t *) table);
++	}
++	return 1;
+ }
+ 
+-int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
++int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+ {
+-	return pmd_none(*pmd);
++	pmd_t *table;
++	pud_t pud;
++	int i = 0;
++
++	pud = READ_ONCE(*pudp);
++	if (pud_present(pud)) {
++		table = __va(pud_val(pud));
++		do {
++			pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE));
++		} while (i++, i < PTRS_PER_PMD);
++
++		pud_clear(pudp);
++		__flush_tlb_kernel_pgtable(addr);
++		pmd_free(NULL, table);
++	}
++	return 1;
+ }
 -- 
 Qualcomm India Private Limited, on behalf of Qualcomm Innovation
 Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
