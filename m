@@ -1,64 +1,71 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 24 May 2018 09:06:56 +0200
-Subject: [PATCH v2 06/13] net: smc911x: remove the dmaengine compat need
+Date: Thu, 24 May 2018 09:07:01 +0200
+Subject: [PATCH v2 11/13] dmaengine: pxa: make the filter function internal
 In-Reply-To: <20180524070703.11901-1-robert.jarzmik@free.fr>
 References: <20180524070703.11901-1-robert.jarzmik@free.fr>
-Message-ID: <20180524070703.11901-7-robert.jarzmik@free.fr>
+Message-ID: <20180524070703.11901-12-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the pxa architecture switched towards the dmaengine slave map, the
-old compatibility mechanism to acquire the dma requestor line number and
-priority are not needed anymore.
-
-This patch simplifies the dma resource acquisition, using the more
-generic function dma_request_slave_channel().
+As the pxa architecture and all its related drivers do not rely anymore
+on the filter function, thanks to the slave map conversion, make
+pxad_filter_fn() static, and remove it from the global namespace.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/net/ethernet/smsc/smc911x.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ drivers/dma/pxa_dma.c       |  5 ++---
+ include/linux/dma/pxa-dma.h | 11 -----------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/net/ethernet/smsc/smc911x.c b/drivers/net/ethernet/smsc/smc911x.c
-index 05157442a980..4c3713bd5caa 100644
---- a/drivers/net/ethernet/smsc/smc911x.c
-+++ b/drivers/net/ethernet/smsc/smc911x.c
-@@ -74,7 +74,6 @@ static const char version[] =
- #include <linux/skbuff.h>
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 9505334f9c6e..a332ad1d7dfb 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -179,7 +179,7 @@ static unsigned int pxad_drcmr(unsigned int line)
+ 	return 0x1000 + line * 4;
+ }
  
- #include <linux/dmaengine.h>
--#include <linux/dma/pxa-dma.h>
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
++static bool pxad_filter_fn(struct dma_chan *chan, void *param);
  
- #include <asm/io.h>
+ /*
+  * Debug fs
+@@ -1496,7 +1496,7 @@ static struct platform_driver pxad_driver = {
+ 	.remove		= pxad_remove,
+ };
  
-@@ -1794,8 +1793,6 @@ static int smc911x_probe(struct net_device *dev)
- 	unsigned long irq_flags;
- #ifdef SMC_USE_DMA
- 	struct dma_slave_config	config;
--	dma_cap_mask_t mask;
--	struct pxad_param param;
- #endif
+-bool pxad_filter_fn(struct dma_chan *chan, void *param)
++static bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ {
+ 	struct pxad_chan *c = to_pxad_chan(chan);
+ 	struct pxad_param *p = param;
+@@ -1509,7 +1509,6 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
  
- 	DBG(SMC_DEBUG_FUNC, dev, "--> %s\n", __func__);
-@@ -1969,17 +1966,8 @@ static int smc911x_probe(struct net_device *dev)
+ 	return true;
+ }
+-EXPORT_SYMBOL_GPL(pxad_filter_fn);
  
- #ifdef SMC_USE_DMA
+ module_platform_driver(pxad_driver);
  
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--	param.prio = PXAD_PRIO_LOWEST;
--	param.drcmr = -1UL;
+diff --git a/include/linux/dma/pxa-dma.h b/include/linux/dma/pxa-dma.h
+index 9fc594f69eff..fceb5df07097 100644
+--- a/include/linux/dma/pxa-dma.h
++++ b/include/linux/dma/pxa-dma.h
+@@ -23,15 +23,4 @@ struct pxad_param {
+ 	enum pxad_chan_prio prio;
+ };
+ 
+-struct dma_chan;
 -
--	lp->rxdma =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &param, &dev->dev, "rx");
--	lp->txdma =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &param, &dev->dev, "tx");
-+	lp->rxdma = dma_request_slave_channel(&dev->dev, "rx");
-+	lp->txdma = dma_request_slave_channel(&dev->dev, "tx");
- 	lp->rxdma_active = 0;
- 	lp->txdma_active = 0;
- 
+-#ifdef CONFIG_PXA_DMA
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
+-#else
+-static inline bool pxad_filter_fn(struct dma_chan *chan, void *param)
+-{
+-	return false;
+-}
+-#endif
+-
+ #endif /* _PXA_DMA_H_ */
 -- 
 2.11.0
