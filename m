@@ -1,76 +1,93 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu, 24 May 2018 11:33:20 -0500
-Subject: [PATCHv5 8/8] Documentation: driver-api: add stratix10 service layer
+Date: Thu, 24 May 2018 11:33:13 -0500
+Subject: [PATCHv5 1/8] dt-bindings,
+ firmware: add Intel Stratix10 service layer binding
 In-Reply-To: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
 References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1527179600-26441-9-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1527179600-26441-2-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Gong <richard.gong@intel.com>
 
-Add new file stratix10-svc.rst
-Add stratix10-svc.rst to driver-api/index.rst
+Add a device tree binding for the Intel Stratix10 service layer driver
 
 Signed-off-by: Richard Gong <richard.gong@intel.com>
 Signed-off-by: Alan Tull <atull@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-v5: this patch is added in patch set version 5
+v2: Change to put service layer driver node under the firmware node
+    Change compatible to "intel, stratix10-svc"
+v3: No change
+v4: Add Rob's Reviewed-by
+v5: No change
 ---
- Documentation/driver-api/index.rst         |  1 +
- Documentation/driver-api/stratix10-svc.rst | 32 ++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/driver-api/stratix10-svc.rst
+ .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
 
-diff --git a/Documentation/driver-api/index.rst b/Documentation/driver-api/index.rst
-index 6d8352c..4b31109 100644
---- a/Documentation/driver-api/index.rst
-+++ b/Documentation/driver-api/index.rst
-@@ -49,6 +49,7 @@ available subsections can be seen below.
-    dmaengine/index
-    slimbus
-    soundwire/index
-+   stratix10-svc
- 
- .. only::  subproject and html
- 
-diff --git a/Documentation/driver-api/stratix10-svc.rst b/Documentation/driver-api/stratix10-svc.rst
+diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
 new file mode 100644
-index 0000000..ed361d8
+index 0000000..1fa6606
 --- /dev/null
-+++ b/Documentation/driver-api/stratix10-svc.rst
-@@ -0,0 +1,32 @@
++++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+@@ -0,0 +1,57 @@
++Intel Service Layer Driver for Stratix10 SoC
++============================================
++Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
++processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
++configured from HPS, there needs to be a way for HPS to notify SDM the
++location and size of the configuration data. Then SDM will get the
++configuration data from that location and perform the FPGA configuration.
 +
-+Intel Stratix10 SoC Service Layer
-+=================================
++To meet the whole system security needs and support virtual machine requesting
++communication with SDM, only the secure world of software (EL3, Exception
++Layer 3) can interface with SDM. All software entities running on other
++exception layers must channel through the EL3 software whenever it needs
++service from SDM.
 +
-+Some features of the Intel Stratix10 SoC require a level of privilege
-+higher than the kernel is granted. Such secure features include
-+FPGA programming. In terms of the ARMv8 architecture, the kernel runs
-+at Exception Level 1 (EL1), access to the features requires
-+Exception Level 3 (EL3).
++Intel Stratix10 service layer driver, running at privileged exception level
++(EL1, Exception Layer 1), interfaces with the service providers and provides
++the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
++driver also manages secure monitor call (SMC) to communicate with secure monitor
++code running in EL3.
 +
-+The Intel Stratix10 SoC service layer provides an in kernel API for
-+drivers to request access to the secure features. The requests are queued
-+and processed one by one. ARM?s SMCCC is used to pass the execution
-+of the requests on to a secure monitor (EL3).
++Required properties:
++-------------------
++The svc node has the following mandatory properties, must be located under
++the firmware node.
 +
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_command_code
++- compatible: "intel,stratix10-svc"
++- method: smc or hvc
++        smc - Secure Monitor Call
++        hvc - Hypervisor Call
++- memory-region:
++	phandle to the reserved memory node. See
++	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++	for details
 +
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_client_msg
++Example:
++-------
 +
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_command_reconfig_payload
++	reserved-memory {
++                #address-cells = <2>;
++                #size-cells = <2>;
++                ranges;
 +
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_cb_data
++                service_reserved: svcbuffer at 0 {
++                        compatible = "shared-dma-pool";
++                        reg = <0x0 0x0 0x0 0x1000000>;
++                        alignment = <0x1000>;
++                        no-map;
++                };
++        };
 +
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_client
-+
-+.. kernel-doc:: drivers/misc/stratix10-svc.c
-+   :export:
++	firmware {
++		svc {
++			compatible = "intel,stratix10-svc";
++			method = "smc";
++			memory-region = <&service_reserved>;
++		};
++	};
 -- 
 2.7.4
