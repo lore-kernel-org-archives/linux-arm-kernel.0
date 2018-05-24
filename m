@@ -1,73 +1,71 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 24 May 2018 10:54:27 +0200
-Subject: [PATCH v3] arm64: allwinner: a64: Add Amarula A64-Relic initial
- support
-In-Reply-To: <CAMty3ZC-N-6WzYg+kYd2+V3wbQdQmvU706Nog_Urd_EUaWnQjQ@mail.gmail.com>
-References: <20180522132228.6564-1-jagan@amarulasolutions.com>
- <20180522143044.pgwawojiwnk2lzxb@flea>
- <CAMty3ZD3JT-ToGAUHN_uj7uVK-jkyAwfEdTBCmJSj34bACFpYQ@mail.gmail.com>
- <20180523081830.4ly6sj34reabbttn@flea>
- <CAMty3ZC-N-6WzYg+kYd2+V3wbQdQmvU706Nog_Urd_EUaWnQjQ@mail.gmail.com>
-Message-ID: <20180524085427.xs6yzhpa42zop6e5@flea>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 24 May 2018 09:54:49 +0100
+Subject: [PATCH v10 05/18] KVM: arm64: Convert lazy FPSIMD context switch
+ trap to C
+In-Reply-To: <20180524081220.GJ55598@C02W217FHV2R.local>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-6-git-send-email-Dave.Martin@arm.com>
+ <87k1rutbbi.fsf@linaro.org>
+ <20180524081220.GJ55598@C02W217FHV2R.local>
+Message-ID: <20180524085445.GP13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 03:57:05PM +0530, Jagan Teki wrote:
-> On Wed, May 23, 2018 at 1:48 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Wed, May 23, 2018 at 11:44:56AM +0530, Jagan Teki wrote:
-> >> On Tue, May 22, 2018 at 8:00 PM, Maxime Ripard
-> >> <maxime.ripard@bootlin.com> wrote:
-> >> > On Tue, May 22, 2018 at 06:52:28PM +0530, Jagan Teki wrote:
-> >> >> Amarula A64-Relic is Allwinner A64 based IoT device, which support
-> >> >> - Allwinner A64 Cortex-A53
-> >> >> - Mali-400MP2 GPU
-> >> >> - AXP803 PMIC
-> >> >> - 1GB DDR3 RAM
-> >> >> - 8GB eMMC
-> >> >> - AP6330 Wifi/BLE
-> >> >> - MIPI-DSI
-> >> >> - CSI: OV5640 sensor
-> >> >> - USB OTG
-> >> >
-> >> > You claim that this is doing OTG...
-> >> >
-> >> > [..]
-> >> >
-> >> >> +&usb_otg {
-> >> >> +     dr_mode = "peripheral";
-> >> >> +     status = "okay";
-> >> >> +};
-> >> >
-> >> > ... and yet you're setting it as peripheral...
-> >>
-> >> Though it claims OTG, board doesn't have any USB ports to operate(not
-> >> even Mini-AB) the only way to use the board as peripheral to transfer
-> >> images from host.
-> >
-> > I'm not sure what you mean here. If there's no USB connector, why do
-> > you even enable it?
+On Thu, May 24, 2018 at 10:12:20AM +0200, Christoffer Dall wrote:
+> On Wed, May 23, 2018 at 08:35:13PM +0100, Alex Benn?e wrote:
+> > 
+> > Dave Martin <Dave.Martin@arm.com> writes:
+> > 
+> > > To make the lazy FPSIMD context switch trap code easier to hack on,
+> > > this patch converts it to C.
+> > >
+> > > This is not amazingly efficient, but the trap should typically only
+> > > be taken once per host context switch.
+> > >
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > ---
+> > >  arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
+> > >  arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
+> > >  2 files changed, 46 insertions(+), 35 deletions(-)
+
+[...]
+
+> > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > > index d964523..c0796c4 100644
+> > > --- a/arch/arm64/kvm/hyp/switch.c
+> > > +++ b/arch/arm64/kvm/hyp/switch.c
+> > > @@ -318,6 +318,30 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+> > >  	}
+> > >  }
+> > >
+> > > +void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+> > > +				    struct kvm_vcpu *vcpu)
+> > > +{
+> > > +	kvm_cpu_context_t *host_ctxt;
+> > > +
+> > > +	if (has_vhe())
+> > > +		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> > > +			     cpacr_el1);
+> > > +	else
+> > > +		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
+> > > +			     cptr_el2);
+> > 
+> > Is there no way to do alternative() in C or does it always come down to
+> > different inline asms?
+> > 
 > 
-> I'm saying there is no host port on board. Board has connector
-> header[1] comes with few pins includes USB D+, D-, ID, VBUS, GROUND,
-> UART0 TX, RX etc. we have to connect wires to these pins to make
-> pluggable USB to host pc. and here USB pins used for transferring data
-> from host pc to target board like in peripheral mode.
+> has_vhe() should resolve to a static key, and I prefer this over the
+> previous alternative construct we had for selecting function calls in C,
+> as that resultet in having to follow too many levels of indirection.
 
-I'm still unsure how it's relevant. If the wire is plugged on your
-board's header, is there anything that prevents using it as a host
-assuming you have a proper connector on the other end of your wire?
+I'll defer to Christoffer on that -- I was just following precedent :)
 
-Maxime
+The if (has_vhe()) approach has the benefit of being much more
+readable, and the static branch predictor in many CPUs will succeed in
+folding a short-range unconditional branch out entirely.  There will be
+a small increase in I-cache pressure due to the larger inline code
+size, but probably not much beyond that.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180524/65f20e5f/attachment.sig>
+Cheers
+---Dave
