@@ -1,203 +1,39 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 17:52:57 -0700
-Subject: [PATCH] arm64: dt: Update sp805 compatible string
-Message-ID: <1527123177-23273-1-git-send-email-ray.jui@broadcom.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 24 May 2018 06:40:31 +0530
+Subject: [PATCH] firmware: ti_sci: Switch to SPDX Licensing
+In-Reply-To: <07823efb-e0bb-3c4e-6234-df4b5219fabc@oracle.com>
+References: <20180223114150.9980-1-lokeshvutla@ti.com>
+ <d80df115-d6db-4aff-b201-60fc07f89088@oracle.com>
+ <bbe19392-8902-b2bc-aa78-a99372e756b5@ti.com>
+ <07823efb-e0bb-3c4e-6234-df4b5219fabc@oracle.com>
+Message-ID: <744eadd5-4b28-1a72-ed38-4102717564a2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two sp805 binding documents 'arm,sp805.txt' and 'sp805-wdt.txt' are
-consolidated into 1 ('arm,sp805.txt'), with the compatible string
-consolidated to "arm,sp805", which are already used in all ARM32 dts
-and most ARM64 dts files
+Hi Santosh,
 
-Update the following dtsi to use the consolidated compatible string
-'arm,sp805':
+On 2/26/2018 12:27 PM, santosh.shilimkar at oracle.com wrote:
+> On 2/25/18 10:20 PM, Lokesh Vutla wrote:
+>>
+>>
+>> On Monday 26 February 2018 06:20 AM, Santosh Shilimkar wrote:
+>>> 2/23/2018 3:41 AM, Lokesh Vutla wrote:
+>>>> Switch to SPDX licensing and drop the GPL text which comes redundant.
+>>>>
+>>>> Acked-by: Nishanth Menon <nm@ti.com>
+>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>> ---
+>>> Does this change the original license in any aspect ?
+>>
+>> No, it doesn't change the original license. Just a switch to SPDX format.
+>>
+> Okie..
 
-fsl-ls1088a.dtsi
-fsl-ls208xa.dtsi
-hi3660.dtsi
-hi6220.dtsi
+Gentle ping. Are you planning to take this patch?
 
-Signed-off-by: Ray Jui <ray.jui@broadcom.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 16 ++++++++--------
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 16 ++++++++--------
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi      |  4 ++--
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  2 +-
- 4 files changed, 19 insertions(+), 19 deletions(-)
+Thanks and regards,
+Lokesh
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 1c6556b..473c503 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -614,56 +614,56 @@
- 		};
- 
- 		cluster1_core0_watchdog: wdt at c000000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc000000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster1_core1_watchdog: wdt at c010000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc010000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster1_core2_watchdog: wdt at c020000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc020000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster1_core3_watchdog: wdt at c030000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc030000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster2_core0_watchdog: wdt at c100000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc100000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster2_core1_watchdog: wdt at c110000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc110000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster2_core2_watchdog: wdt at c120000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc120000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster2_core3_watchdog: wdt at c130000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc130000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index 137ef4d..5242ef9 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -258,56 +258,56 @@
- 		};
- 
- 		cluster1_core0_watchdog: wdt at c000000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc000000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster1_core1_watchdog: wdt at c010000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc010000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster2_core0_watchdog: wdt at c100000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc100000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster2_core1_watchdog: wdt at c110000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc110000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster3_core0_watchdog: wdt at c200000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc200000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster3_core1_watchdog: wdt at c210000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc210000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster4_core0_watchdog: wdt at c300000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc300000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
- 		};
- 
- 		cluster4_core1_watchdog: wdt at c310000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xc310000 0x0 0x1000>;
- 			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
- 			clock-names = "apb_pclk", "wdog_clk";
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ec3eb8e..dcfa3fe 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -951,7 +951,7 @@
- 		};
- 
- 		watchdog0: watchdog at e8a06000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xe8a06000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&crg_ctrl HI3660_OSC32K>;
-@@ -959,7 +959,7 @@
- 		};
- 
- 		watchdog1: watchdog at e8a07000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xe8a07000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&crg_ctrl HI3660_OSC32K>;
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 586b281c..beda66b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -816,7 +816,7 @@
- 		};
- 
- 		watchdog0: watchdog at f8005000 {
--			compatible = "arm,sp805-wdt", "arm,primecell";
-+			compatible = "arm,sp805", "arm,primecell";
- 			reg = <0x0 0xf8005000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&ao_ctrl HI6220_WDT0_PCLK>;
--- 
-2.1.4
+> 
+> Regards,
+> Santosh
