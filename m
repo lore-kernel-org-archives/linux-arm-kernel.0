@@ -1,93 +1,78 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 24 May 2018 14:34:25 +0100
-Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
-In-Reply-To: <20180524113933.GA8689@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-5-marc.zyngier@arm.com>
- <6c3e7b31-0bb6-353b-1b82-7ebdf3be1323@arm.com>
- <20180524113933.GA8689@arm.com>
-Message-ID: <ee08702a-f525-7c0a-38b8-50941285df29@arm.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Thu, 24 May 2018 09:35:57 -0400
+Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
+In-Reply-To: <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
+References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
+ <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
+ <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+ <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
+ <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <24846c30ceab15075205b34305b97ba8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/18 12:39, Will Deacon wrote:
-> On Thu, May 24, 2018 at 10:58:43AM +0100, Suzuki K Poulose wrote:
->> On 22/05/18 16:06, Marc Zyngier wrote:
->>> As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
->>> discovery mechanism for detecting the SSBD mitigation.
->>>
->>> A new capability is also allocated for that purpose, and a
->>> config option.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->>
->>> +static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
->>> +				    int scope)
->>> +{
->>> +	struct arm_smccc_res res;
->>> +	bool supported = true;
->>> +
->>> +	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
->>> +
->>> +	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
->>> +		return false;
->>> +
->>> +	/*
->>> +	 * The probe function return value is either negative
->>> +	 * (unsupported or mitigated), positive (unaffected), or zero
->>> +	 * (requires mitigation). We only need to do anything in the
->>> +	 * last case.
->>> +	 */
->>> +	switch (psci_ops.conduit) {
->>> +	case PSCI_CONDUIT_HVC:
->>> +		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
->>> +				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
->>> +		if ((int)res.a0 != 0)
->>> +			supported = false;
->>> +		break;
->>> +
->>> +	case PSCI_CONDUIT_SMC:
->>> +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
->>> +				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
->>> +		if ((int)res.a0 != 0)
->>> +			supported = false;
->>> +		break;
->>> +
->>> +	default:
->>> +		supported = false;
->>> +	}
->>> +
->>> +	if (supported) {
->>> +		__this_cpu_write(arm64_ssbd_callback_required, 1);
->>> +		do_ssbd(true);
->>> +	}
->>
->>
->> Marc,
->>
->> As discussed, we have minor issue with the "corner case". If a CPU
->> is hotplugged in which requires the mitigation, after the system has
->> finalised the cap to "not available", the CPU could go ahead and
->> do the "work around" as above, while not effectively doing anything
->> about it at runtime for KVM guests (as thats the only place where
->> we rely on the CAP being set).
->>
->> But, yes this is real corner case. There is no easy way to solve it
->> other than
->>
->> 1) Allow late modifications to CPU hwcaps
->>
->> OR
->>
->> 2) Penalise the fastpath to always check per-cpu setting.
+On 2018-05-24 09:07, Bjorn Helgaas wrote:
+> On Thu, May 24, 2018 at 07:43:05AM -0400, Sinan Kaya wrote:
+>> On 5/23/2018 6:57 PM, Sinan Kaya wrote:
+>> >> The crash seems to indicate that the hpsa device attempted a DMA after
+>> >> we cleared the Root Port's PCI_COMMAND_MASTER, which means
+>> >> hpsa_shutdown() didn't stop DMA from the device (it looks like *most*
+>> >> shutdown methods don't disable device DMA, so it's in good company).
+>> > All drivers are expected to shutdown DMA and interrupts in their shutdown()
+>> > routines. They can skip removing threads, data structures etc. but DMA and
+>> > interrupt disabling are required. This is the difference between shutdown()
+>> > and remove() callbacks.
+>> 
+>> I found this note yesterday to see why we are not disabling the
+>> devices in the PCI core itself.
+>> 
+>> pci_device_remove()
+>> 
+>> 	/*
+>> 	 * We would love to complain here if pci_dev->is_enabled is set, that
+>> 	 * the driver should have called pci_disable_device(), but the
+>> 	 * unfortunate fact is there are too many odd BIOS and bridge setups
+>> 	 * that don't like drivers doing that all of the time.
+>> 	 * Oh well, we can dream of sane hardware when we sleep, no matter 
+>> how
+>> 	 * horrible the crap we have to deal with is when we are awake...
+>> 	 */
+>> 
+>> Ryan, can you discard the previous patch and test this one instead?
+>> remove() path in hpsa driver seems to call pci_disable_device() via
+>> 
+>> hpsa_remove_one()
+>> 	hpsa_free_pci_init()
+>> 
+>> but nothing on the shutdown path.
+>> 
+>> diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
+>> index 4ed3d26..3823f04 100644
+>> --- a/drivers/scsi/hpsa.c
+>> +++ b/drivers/scsi/hpsa.c
+>> @@ -8651,6 +8651,7 @@ static void hpsa_shutdown(struct pci_dev *pdev)
+>>         h->access.set_intr_mask(h, HPSA_INTR_OFF);
+>>         hpsa_free_irqs(h);                      /* init_one 4 */
+>>         hpsa_disable_interrupt_mode(h);         /* pci_init 2 */
+>> +       pci_disable_device(h->pdev);
+>>  }
 > 
-> Shouldn't we just avoid bring up CPUs that require the mitigation after
-> we've finalised the capability to say that it's not required? Assuming this
-> is just another issue with maxcpus=, then I don't much care for it.
-Ah! Sorry, yes we do kill the CPU. But it is just that it will set the
-ssbd_callback_required flag and issue the do_ssbd(), which is not an issue.
+> I suspect this will make things "work" (if the device can't attempt
+> DMA, no Unsupported Request error will occur).
+> 
+> But I'm concerned that the reason for the DMA might that hpsa is
+> transferring buffers from system memory to the hpsa device, and if we
+> arbitrarily terminate those transfers with pci_disable_device(), we
+> may leave the hpsa device in an inconsistent state, e.g., with a dirty
+> filesystem.
+> 
+> But we really need guidance from an hpsa expert.  I don't know the
+> filesystem/SCSI/hpsa details.
 
-Yes this can only be triggered by maxcpus=.
+Agreed,
 
-Suzuki
+We can drop shutdown and use the remove callback. Remove is supposed to 
+do a safe cleanup.
+
+> 
+> Bjorn
