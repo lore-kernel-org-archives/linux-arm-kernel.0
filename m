@@ -1,143 +1,94 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 24 May 2018 15:54:16 +0100
-Subject: [PATCH v10 15/18] KVM: arm64: Remove eager host SVE state saving
-In-Reply-To: <1527005119-6842-16-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-16-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87zi0prtnr.fsf@linaro.org>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Thu, 24 May 2018 20:29:31 +0530
+Subject: [PATCH v10 3/4] arm64: Implement page table free interfaces
+In-Reply-To: <1527170250-5291-4-git-send-email-cpandya@codeaurora.org>
+References: <1527170250-5291-1-git-send-email-cpandya@codeaurora.org>
+ <1527170250-5291-4-git-send-email-cpandya@codeaurora.org>
+Message-ID: <9cecab0d-3045-39dd-638e-59e4e951d23a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Dave Martin <Dave.Martin@arm.com> writes:
 
-> Now that the host SVE context can be saved on demand from Hyp,
-> there is no longer any need to save this state in advance before
-> entering the guest.
->
-> This patch removes the relevant call to
-> kvm_fpsimd_flush_cpu_state().
->
-> Since the problem that function was intended to solve now no longer
-> exists, the function and its dependencies are also deleted.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
+On 5/24/2018 7:27 PM, Chintan Pandya wrote:
+> Implement pud_free_pmd_page() and pmd_free_pte_page().
+> 
+> Implementation requires,
+>   1) Clearing off the current pud/pmd entry
+>   2) Invalidate TLB which could have previously
+>      valid but not stale entry
+>   3) Freeing of the un-used next level page tables
+> 
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
 > ---
->  arch/arm/include/asm/kvm_host.h   |  3 ---
->  arch/arm64/include/asm/kvm_host.h | 10 ----------
->  arch/arm64/kernel/fpsimd.c        | 21 ---------------------
->  virt/kvm/arm/arm.c                |  3 ---
->  4 files changed, 37 deletions(-)
->
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 3b85bbb..f079a20 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -312,9 +312,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
->
-> -/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
-> -static inline void kvm_fpsimd_flush_cpu_state(void) {}
-> -
->  static inline void kvm_arm_vhe_guest_enter(void) {}
->  static inline void kvm_arm_vhe_guest_exit(void) {}
->
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 06d5a61..ce7ed92 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -457,16 +457,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
->  }
->  #endif
->
-> -/*
-> - * All host FP/SIMD state is restored on guest exit, so nothing needs
-> - * doing here except in the SVE case:
-> -*/
-> -static inline void kvm_fpsimd_flush_cpu_state(void)
-> -{
-> -	if (system_supports_sve())
-> -		sve_flush_cpu_state();
-> -}
-> -
->  static inline void kvm_arm_vhe_guest_enter(void)
->  {
->  	local_daif_mask();
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index f39d3b0..ea5d780 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -120,7 +120,6 @@
->   */
->  struct fpsimd_last_state_struct {
->  	struct user_fpsimd_state *st;
-> -	bool sve_in_use;
->  };
->
->  static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
-> @@ -1003,7 +1002,6 @@ void fpsimd_bind_task_to_cpu(void)
->  		this_cpu_ptr(&fpsimd_last_state);
->
->  	last->st = &current->thread.uw.fpsimd_state;
-> -	last->sve_in_use = test_thread_flag(TIF_SVE);
->  	current->thread.fpsimd_cpu = smp_processor_id();
->
->  	if (system_supports_sve()) {
-> @@ -1025,7 +1023,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
->  	WARN_ON(!in_softirq() && !irqs_disabled());
->
->  	last->st = st;
-> -	last->sve_in_use = false;
->  }
->
->  /*
-> @@ -1086,24 +1083,6 @@ void fpsimd_flush_cpu_state(void)
->  	set_thread_flag(TIF_FOREIGN_FPSTATE);
->  }
->
-> -/*
-> - * Invalidate any task SVE state currently held in this CPU's regs.
-> - *
-> - * This is used to prevent the kernel from trying to reuse SVE register data
-> - * that is detroyed by KVM guest enter/exit.  This function should go away when
-> - * KVM SVE support is implemented.  Don't use it for anything else.
-> - */
-> -#ifdef CONFIG_ARM64_SVE
-> -void sve_flush_cpu_state(void)
-> -{
-> -	struct fpsimd_last_state_struct const *last =
-> -		this_cpu_ptr(&fpsimd_last_state);
-> -
-> -	if (last->st && last->sve_in_use)
-> -		fpsimd_flush_cpu_state();
-> -}
-> -#endif /* CONFIG_ARM64_SVE */
-> -
->  #ifdef CONFIG_KERNEL_MODE_NEON
->
->  DEFINE_PER_CPU(bool, kernel_neon_busy);
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index ce7c6f3..39e7771 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		 */
->  		preempt_disable();
->
-> -		/* Flush FP/SIMD state that can't survive guest entry/exit */
-> -		kvm_fpsimd_flush_cpu_state();
-> -
->  		kvm_pmu_flush_hwstate(vcpu);
->
->  		local_irq_disable();
+>   arch/arm64/mm/mmu.c | 34 ++++++++++++++++++++++++++++++----
+>   1 file changed, 30 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index da98828..17d9282 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -45,6 +45,7 @@
+>   #include <asm/memblock.h>
+>   #include <asm/mmu_context.h>
+>   #include <asm/ptdump.h>
+> +#include <asm/tlbflush.h>
+>   
+>   #define NO_BLOCK_MAPPINGS	BIT(0)
+>   #define NO_CONT_MAPPINGS	BIT(1)
+> @@ -973,12 +974,37 @@ int pmd_clear_huge(pmd_t *pmdp)
+>   	return 1;
+>   }
+>   
+> -int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+> +int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
+>   {
+> -	return pud_none(*pud);
+> +	pmd_t *table;
+> +	pmd_t pmd;
+> +
+> +	pmd = READ_ONCE(*pmdp);
+> +	if (pmd_present(pmd)) {
+> +		table = __va(pmd_val(pmd));
+> +		pmd_clear(pmdp);
+> +		__flush_tlb_kernel_pgtable(addr);
+> +		pte_free_kernel(NULL, (pte_t *) table);
+> +	}
+> +	return 1;
+>   }
+>   
+> -int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+> +int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+>   {
+> -	return pmd_none(*pmd);
+> +	pmd_t *table;
+> +	pud_t pud;
+> +	int i = 0;
+> +
+> +	pud = READ_ONCE(*pudp);
+> +	if (pud_present(pud)) {
+> +		table = __va(pud_val(pud));
+> +		do {
+> +			pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE));
+> +		} while (i++, i < PTRS_PER_PMD);
+Hi Will,
 
+Right after sending these patches, I realized that do-while condition
+can be made to look like what we see in ioremap/vmalloc code. I guess,
+that's what you suggested. So, I'll raise v11 fixing that. Any more
+concerns ?
 
---
-Alex Benn?e
+> +
+> +		pud_clear(pudp);
+> +		__flush_tlb_kernel_pgtable(addr);
+> +		pmd_free(NULL, table);
+> +	}
+> +	return 1;
+>   }
+> 
+
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
