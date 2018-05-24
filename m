@@ -1,53 +1,58 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu, 24 May 2018 11:33:16 -0500
-Subject: [PATCHv5 4/8] dt-bindings: fpga: add Stratix10 SoC FPGA manager
- binding
+Date: Thu, 24 May 2018 11:33:17 -0500
+Subject: [PATCHv5 5/8] arm64: dts: stratix10: add fpga manager and region
 In-Reply-To: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
 References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1527179600-26441-5-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1527179600-26441-6-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alan Tull <atull@kernel.org>
 
-Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
+Add the Stratix10 FPGA manager and a FPGA region to the
+device tree.
 
 Signed-off-by: Alan Tull <atull@kernel.org>
 Signed-off-by: Richard Gong <richard.gong@intel.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 v2: this patch is added in patch set version 2
 v3: change to put fpga_mgr node under firmware/svc node
 v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
     add Richard's signed-off-by
-v5: add Reviewed-by Rob Herring
+v5: no change
 ---
- .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-new file mode 100644
-index 0000000..6e03f79
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-@@ -0,0 +1,17 @@
-+Intel Stratix10 SoC FPGA Manager
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+index c257287..8f8f409 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+@@ -106,6 +106,14 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges = <0 0 0 0xffffffff>;
+ 
++		base_fpga_region {
++			#address-cells = <0x1>;
++			#size-cells = <0x1>;
 +
-+Required properties:
-+The fpga_mgr node has the following mandatory property, must be located under
-+firmware/svc node.
-+
-+- compatible : should contain "intel,stratix10-soc-fpga-mgr"
-+
-+Example:
-+
-+	firmware {
-+		svc {
-+			fpga_mgr: fpga-mgr {
-+				compatible = "intel,stratix10-soc-fpga-mgr";
-+			};
++			compatible = "fpga-region";
++			fpga-mgr = <&fpga_mgr>;
 +		};
-+	};
++
+ 		clkmgr: clock-controller at ffd10000 {
+ 			compatible = "intel,stratix10-clkmgr";
+ 			reg = <0xffd10000 0x1000>;
+@@ -506,6 +514,10 @@
+ 				compatible = "intel,stratix10-svc";
+ 				method = "smc";
+ 				memory-region = <&service_reserved>;
++
++				fpga_mgr: fpga-mgr {
++					compatible = "intel,stratix10-soc-fpga-mgr";
++				};
+ 			};
+ 		};
+ 	};
 -- 
 2.7.4
