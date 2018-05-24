@@ -1,83 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 24 May 2018 11:23:41 +0200
-Subject: v4.17-rc1: regressions on N900, N950
-In-Reply-To: <20180523220456.GY98604@atomide.com>
-References: <20180422074213.GA12428@amd>
- <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
- <20180521213952.GA11596@amd> <20180522080250.4fzyvqrgw5oigexn@pali>
- <20180522194139.GB2299@darkstar.musicnaut.iki.fi>
- <20180522205824.GA24927@amd>
- <20180522215638.GC2299@darkstar.musicnaut.iki.fi>
- <20180523140615.GA27180@amd> <20180523201208.GA31731@amd>
- <20180523220456.GY98604@atomide.com>
-Message-ID: <20180524092341.GA6349@amd>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Thu, 24 May 2018 11:30:06 +0200
+Subject: [PATCH v2 05/13] mtd: rawnand: marvell: remove the dmaengine
+ compat need
+In-Reply-To: <20180524070703.11901-6-robert.jarzmik@free.fr>
+References: <20180524070703.11901-1-robert.jarzmik@free.fr>
+ <20180524070703.11901-6-robert.jarzmik@free.fr>
+Message-ID: <20180524113006.3d5f393e@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-05-23 15:04:56, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [180523 20:14]:
-> > On Wed 2018-05-23 16:06:15, Pavel Machek wrote:
-> > > On Wed 2018-05-23 00:56:38, Aaro Koskinen wrote:
-> > > > Hi,
-> > > > 
-> > > > On Tue, May 22, 2018 at 10:58:26PM +0200, Pavel Machek wrote:
-> > > > > On Tue 2018-05-22 22:41:39, Aaro Koskinen wrote:
-> > > > > > My device worked with v4.17-rc1 (haven't found time to test newer kernels),
-> > > > > > but if you say the probe order is random then we must find some proper way
-> > > > > > to express the dependency.
-> > > > > 
-> > > > > I started bisect, but.. that will probably not be useful.
-> > > > > 
-> > > > > If your device works ok in v4.17-rc1, it probably works in newer -rcs,
-> > > > > too.
-> > > > 
-> > > > Actually, my statement may be bogus... Now I tried again with -rc1
-> > > > (and also -rc6) and it fails... But v4.16 works.
-> > > > 
-> > > > > Thanks for the ordering hint, I'll try to figure out what is going on
-> > > > > there.
-> > > > 
-> > > > My bisection pointed to 6fa7324ac5489ad43c4b6351355b869bc5458bef which
-> > > > doesn't seem to make any sense...?! So maybe there really is something
-> > > > random stuff going on? :-(
-> > > 
-> > > So... I did some experiments on v4.16.
-> > > 
-> > > Swapping tsc2005 at 0 and lcd: acx565akm at 2 entries in the dts does break
-> > > stuff.
-> > > 
-> > > I thought it might be due to vio regulator, but it does not appear
-> > > so... screen still works with tsc2005 driver disabled in .config. (so
-> > > there's noone to enable vio regulator).
-> > 
-> > Deleting tsc2005 at 0 entry also breaks screen.
-> > 
-> > Replacing tsc2005 at 0 entry with 
-> > 
-> >         foobar at 0 {
-> > 	               compatible = "not really with anything";
-> >  		       spi-max-frequency = <6000000>;
-> >  		       reg = <0>;
-> >  };
-> > 
-> > still results in working touchscreen, removing any of the three fields
-> > breaks it again.
+Hi Robert,
+
+On Thu, 24 May 2018 09:06:55 +0200, Robert Jarzmik
+<robert.jarzmik@free.fr> wrote:
+
+> As the pxa architecture switched towards the dmaengine slave map, the
+> old compatibility mechanism to acquire the dma requestor line number and
+> priority are not needed anymore.
 > 
-> I bisected one regression down, see "omapdrm regression in v4.17-rc series"
-> not sure if it covers all the issues being discussed here though.
+> This patch simplifies the dma resource acquisition, using the more
+> generic function dma_request_slave_channel().
+> 
+> Signed-off-by: Signed-off-by: Daniel Mack <daniel@zonque.org>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  drivers/mtd/nand/raw/marvell_nand.c | 17 +----------------
+>  1 file changed, 1 insertion(+), 16 deletions(-)
+> 
 
-This is something else... Video was very sensitive basically to random
-stuff, even in v4.16, and I tried to debug that. If I remove dts
-support for touchscreen, video stops working -- and that's bad.
+Acked-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180524/14759d18/attachment.sig>
+Thanks,
+Miqu?l
