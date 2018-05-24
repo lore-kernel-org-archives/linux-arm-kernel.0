@@ -1,82 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 May 2018 15:57:54 -0500
-Subject: [PATCH v2 1/8] driver core: make deferring probe after init
- optional
-In-Reply-To: <20180524190031.GB31019@kroah.com>
-References: <20180524175024.19874-1-robh@kernel.org>
- <20180524175024.19874-2-robh@kernel.org>
- <20180524190031.GB31019@kroah.com>
-Message-ID: <CAL_JsqJK69A3W=YrSfvPetM95CROOJhU1bW1rMEOGtji=t0ORQ@mail.gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Thu, 24 May 2018 22:35:04 +0200
+Subject: [PATCH 3/6] ASoC: ams_delta: use GPIO lookup table
+In-Reply-To: <20180523185244.GT98604@atomide.com>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <20180521100503.GA24638@sirena.org.uk> <20180523185244.GT98604@atomide.com>
+Message-ID: <1875447.uBIO10iqcO@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 2:00 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
->> Deferred probe will currently wait forever on dependent devices to probe,
->> but sometimes a driver will never exist. It's also not always critical for
->> a driver to exist. Platforms can rely on default configuration from the
->> bootloader or reset defaults for things such as pinctrl and power domains.
->> This is often the case with initial platform support until various drivers
->> get enabled. There's at least 2 scenarios where deferred probe can render
->> a platform broken. Both involve using a DT which has more devices and
->> dependencies than the kernel supports. The 1st case is a driver may be
->> disabled in the kernel config. The 2nd case is the kernel version may
->> simply not have the dependent driver. This can happen if using a newer DT
->> (provided by firmware perhaps) with a stable kernel version.
->>
->> Subsystems or drivers may opt-in to this behavior by calling
->> driver_deferred_probe_check_init_done() instead of just returning
->> -EPROBE_DEFER. They may use additional information from DT or kernel's
->> config to decide whether to continue to defer probe or not.
->>
->> Cc: Alexander Graf <agraf@suse.de>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> ---
->>  drivers/base/dd.c      | 17 +++++++++++++++++
->>  include/linux/device.h |  2 ++
->>  2 files changed, 19 insertions(+)
->>
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index c9f54089429b..d6034718da6f 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -226,6 +226,16 @@ void device_unblock_probing(void)
->>       driver_deferred_probe_trigger();
->>  }
->>
->> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
->> +{
->> +     if (optional && initcalls_done) {
->
-> Wait, what's the "optional" mess here?
+On Wednesday, May 23, 2018 8:52:44 PM CEST Tony Lindgren wrote:
+> * Mark Brown <broonie@kernel.org> [180521 10:07]:
+> > On Fri, May 18, 2018 at 11:09:51PM +0200, Janusz Krzysztofik wrote:
+> > > Now as the Amstrad Delta board provides GPIO lookup tables, switch from
+> > > GPIO numbers to GPIO descriptors and use the table to locate required
+> > > GPIO pins.
+> > 
+> > Acked-by: Mark Brown <broonie@kernel.org>
+> 
 
-My intent was that subsystems just always call this function and never
-return EPROBE_DEFER themselves. Then the driver core can make
-decisions as to what to do (such as the timeout added in the next
-patch). Or it can print common error/debug messages. So optional is a
-hint to allow subsystems per device control.
+Hi Tony,
 
->
-> The caller knows this value, so why do you need to even pass it in here?
+> Thanks applying patches 1 and 3 of this series into omap-for-v4.18/soc.
+> It's kind of getting late for v4.18, but let's see if we can still make
+> it.
 
-Because regardless of the value, we always stop deferring when/if we
-hit the timeout and the caller doesn't know about the timeout. If we
-get rid of it, we'd need functions for both init done and for deferred
-timeout.
+Thank you.
 
-> And bool values that are not obvious are horrid.  I had to go look this
-> up when reading the later patches that just passed "true" in this
-> variable as I had no idea what that meant.
+> Seems the others can be applied to the driver trees after no more
+> comments, then once all that is done we can apply the last patch
+> in this series.
 
-Perhaps inverting it and calling it "keep_deferring" would be better.
-However, the flag is ignored if we have timed out.
+I'll be submitting v2 of 5/6 (nand) very soon. 4/6 (lcd) is still waiting for 
+Tomi to respond. I hope there will be no issues with it. Howevver, regarding 
+2/6 - serio - I have to work more on that to satisfy Dmitry's comments. So 
+let's forget about 6/6 for now and I'll resubmit it again when we are ready 
+for that. Meanwhile, I'm going to submit a few more patches against the board 
+init file to complete migration to GPIO descriptors so dynamic allocation of 
+GPIO numbers to ams-delta latches will be possible.
 
->
-> So as-is, no, this isn't ok, sorry.
->
-> And at the least, this needs some kerneldoc to explain it :)
-
-That part is easy enough to fix.
-
-Rob
+Thanks,
+Janusz
