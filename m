@@ -1,49 +1,62 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Thu, 24 May 2018 09:12:17 -0400
-Subject: [PATCH 2/3] ARM: dts: k2l: add dts node for k2l hw_rng driver
-In-Reply-To: <1527167538-29837-1-git-send-email-vitalya@ti.com>
-References: <1527167538-29837-1-git-send-email-vitalya@ti.com>
-Message-ID: <1527167538-29837-3-git-send-email-vitalya@ti.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Thu, 24 May 2018 16:20:33 +0300
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <CAMuHMdX-t8WfjRKpZ7UxXBbBNojsn-8z7_BM9grmLJcf=9Ks2Q@mail.gmail.com>
+References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
+ <1526387370-17142-4-git-send-email-gilad@benyossef.com>
+ <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
+ <20180516074333.i2672u435ymwffk3@verge.net.au>
+ <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
+ <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
+ <CAOtvUMcf-fHduThORv3cbcN16wEm_Si27OjSjAmSc9g5eK4PJw@mail.gmail.com>
+ <CAMuHMdX-t8WfjRKpZ7UxXBbBNojsn-8z7_BM9grmLJcf=9Ks2Q@mail.gmail.com>
+Message-ID: <CAOtvUMdCSoxYjpyb+fD36EE5+4sV4CjrxwK94RQ7bNKE5rajmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dts node for k2l hw_random generator driver
+On Tue, May 22, 2018 at 10:48 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Gilad,
+>
+> On Mon, May 21, 2018 at 3:43 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+>> On Thu, May 17, 2018 at 1:16 PM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> Indeed. From a quick glance, it looks like drivers/crypto/ccree/cc_driver.c
+>>> does not distinguish between the absence of the clock property, and an
+>>> actual error in getting the clock, and never considers any error a failure
+>>> (incl. -PROBE_DEFER).
+>>>
+>>> As of_clk_get() returns -ENOENT for both a missing clock property and a
+>>> missing clock, you should use (devm_)clk_get() instead, and distinguish
+>>> between NULL (no clock property) and IS_ERR() (actual failure -> abort).
+>>
+>> I was trying to do as you suggested but I didn't quite get what is the
+>> dev_id (2nd) parameter to devm_clk_get parameter is supposed to be.
+>
+> It's the (optional) name of the clock, helpful in case there is more than one.
+> In your case, NULL is fine.
+>
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-[t-kristo at ti.com: added missing addresses from node identifiers]
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- arch/arm/boot/dts/keystone-k2l-netcp.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+I have assumed as much and tried it, it did not work and so I assumed
+I am missing something and asked you.
+It turns out I was missing the fact I was using the wrong device tree
+file... :-(
 
-diff --git a/arch/arm/boot/dts/keystone-k2l-netcp.dtsi b/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
-index 9ec8422..a2e47ba 100644
---- a/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
-@@ -208,3 +208,23 @@ netcp: netcp at 26000000 {
- 		};
- 	};
- };
-+
-+sa_subsys: subsys at 26080000 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible = "simple-bus";
-+	ranges = <0 0x26080000 0x40000>;
-+
-+	sa_config: subsys at 0 {
-+		compatible = "syscon";
-+		reg = <0x0 0x100>;
-+	};
-+
-+	rng at 24000 {
-+		compatible = "ti,keystone-rng";
-+		reg = <0x24000 0x1000>;
-+		ti,syscon-sa-cfg = <&sa_config>;
-+		clocks = <&clksa>;
-+		clock-names = "fck";
-+	};
-+};
+So thanks, it works now :-)
+
+Having said that, while using devm)clk_get() is a better approach, it
+does not seems to distinguish
+between no "clocks" and a failure to clock information - it returns
+ENOENT in both cases as well.
+
+Thanks,
+Gilad
+
+
 -- 
-2.7.4
+Gilad Ben-Yossef
+Chief Coffee Drinker
+
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
