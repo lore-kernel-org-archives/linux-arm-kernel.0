@@ -1,124 +1,37 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Thu, 24 May 2018 11:30:28 +0100
-Subject: [PATCH v3 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <1527157834-7747-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1527157834-7747-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1527157834-7747-3-git-send-email-michel.pollet@bp.renesas.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 May 2018 11:40:55 +0100
+Subject: [PATCH v4 1/2] arm64/sve: Thin out initialisation sanity-checks
+ for sve_max_vl
+In-Reply-To: <1527097616-25214-2-git-send-email-Dave.Martin@arm.com>
+References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
+ <1527097616-25214-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180524104053.GB28425@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time, it
-requires a special enable method to get it started.
+On Wed, May 23, 2018 at 06:46:55PM +0100, Dave Martin wrote:
+> Now that the kernel SVE support is reasonably mature, it is
+> excessive to default sve_max_vl to the invalid value -1 and then
+> sprinkle WARN_ON()s around the place to make sure it has been
+> initialised before use.  The cpufeatures code already runs pretty
+> early, and will ensure sve_max_vl gets initialised.
+> 
+> This patch initialises sve_max_vl to something sane that will be
+> supported by every SVE implementation, and removes most of the
+> sanity checks.
+> 
+> The checks in find_supported_vector_length() are retained for now.
+> If anything goes horribly wrong, we are likely to trip a check here
+> sooner or later.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/kernel/fpsimd.c | 17 ++++-------------
+>  arch/arm64/kernel/ptrace.c |  3 ---
+>  2 files changed, 4 insertions(+), 16 deletions(-)
 
-Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
----
- arch/arm/mach-shmobile/Makefile        |  1 +
- arch/arm/mach-shmobile/smp-r9a06g032.c | 85 ++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+Thanks, this makes the code a bit more readable imo:
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 1939f52..d7fc98f 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
- smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o
-+smp-$(CONFIG_ARCH_R9A06G032)	+= smp-r9a06g032.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
- 
- # PM objects
-diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c b/arch/arm/mach-shmobile/smp-r9a06g032.c
-new file mode 100644
-index 0000000..a536e89
---- /dev/null
-+++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
-@@ -0,0 +1,85 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * RZ/N1D Second CA7 enabler.
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Europe Limited
-+ *
-+ * Michel Pollet <michel.pollet@bp.renesas.com>, <buserror@gmail.com>
-+ * Derived from action,s500-smp
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/smp.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
-+
-+/*
-+ * The second CPU is parked in ROM at boot time. It requires waking it after
-+ * writing an address into the BOOTADDR register of sysctrl.
-+ *
-+ * So the default value of the "cpu-release-addr" corresponds to BOOTADDR...
-+ *
-+ * *However* the BOOTADDR register is not available when the kernel
-+ * starts in NONSEC mode.
-+ *
-+ * So for NONSEC mode, the bootloader re-parks the second CPU into a pen
-+ * in SRAM, and changes the "cpu-release-addr" of linux's DT to a SRAM address,
-+ * which is not restricted.
-+ */
-+
-+static void __iomem *cpu_bootaddr;
-+
-+static DEFINE_SPINLOCK(cpu_lock);
-+
-+static int rzn1_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (!cpu_bootaddr)
-+		return -ENODEV;
-+
-+	spin_lock(&cpu_lock);
-+
-+	writel(__pa_symbol(secondary_startup), cpu_bootaddr);
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
-+	spin_unlock(&cpu_lock);
-+
-+	return 0;
-+}
-+
-+static void __init rzn1_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *dn;
-+	int ret;
-+	u32 bootaddr;
-+
-+	dn = of_get_cpu_node(1, NULL);
-+	if (!dn) {
-+		pr_err("CPU#1: missing device tree node\n");
-+		return;
-+	}
-+	/*
-+	 * Determine the address from which the CPU is polling.
-+	 * The bootloader *does* change this property
-+	 */
-+	ret = of_property_read_u32(dn, "cpu-release-addr", &bootaddr);
-+	of_node_put(dn);
-+	if (ret) {
-+		pr_err("CPU#1: invalid cpu-release-addr property\n");
-+		return;
-+	}
-+	pr_info("CPU#1: cpu-release-addr %08x\n", (u32)bootaddr);
-+
-+	cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr));
-+	if (!cpu_bootaddr)
-+		pr_err("CPU#1: cpu-release-addr map failed\n");
-+}
-+
-+static const struct smp_operations rzn1_smp_ops __initconst = {
-+	.smp_prepare_cpus = rzn1_smp_prepare_cpus,
-+	.smp_boot_secondary = rzn1_smp_boot_secondary,
-+};
-+CPU_METHOD_OF_DECLARE(rzn1_smp, "renesas,r9a06g032-smp", &rzn1_smp_ops);
--- 
-2.7.4
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
