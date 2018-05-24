@@ -1,58 +1,53 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Thu, 24 May 2018 19:04:11 +0300
-Subject: [PATCH v3 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <20180517045437.GE20254@sirena.org.uk>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-6-radu.pirea@microchip.com>
- <CAHp75Ve3Ugnjjm8EZkPQTZSvH1qad1e5SqjOn8zz5syHSQea_g@mail.gmail.com>
- <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
- <CAHp75VdRrL25Jgnbk64Qqc5RY3uJdcntJ3xwRdp3F+rRFeTHBA@mail.gmail.com>
- <c23cdde58b9f724f51787c6c38478df983be6efa.camel@microchip.com>
- <20180517045437.GE20254@sirena.org.uk>
-Message-ID: <0e6e71e2-f8ac-7889-0d81-8d8a4c15223d@microchip.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 24 May 2018 09:07:29 -0700
+Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
+ property for sp805
+In-Reply-To: <91d27df4-29d0-de7f-6805-c3e5f329caf3@arm.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
+ <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
+ <20180523181058.GC27570@roeck-us.net>
+ <91d27df4-29d0-de7f-6805-c3e5f329caf3@arm.com>
+Message-ID: <20180524160729.GA27710@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/17/2018 07:54 AM, Mark Brown wrote:
-> On Tue, May 15, 2018 at 12:22:24PM +0300, Radu Pirea wrote:
->> On Mon, 2018-05-14 at 20:38 +0300, Andy Shevchenko wrote:
+On Thu, May 24, 2018 at 02:25:34PM +0100, Robin Murphy wrote:
+> On 23/05/18 19:10, Guenter Roeck wrote:
+> >On Wed, May 23, 2018 at 11:57:25AM +0100, Robin Murphy wrote:
+> >>On 22/05/18 19:47, Ray Jui wrote:
+> >>>Update the SP805 binding document to add optional 'timeout-sec'
+> >>>devicetree property
+> >>>
+> >>>Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> >>>Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> >>>---
+> >>>  Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
+> >>>  1 file changed, 2 insertions(+)
+> >>>
+> >>>diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> >>>index edc4f0e..f898a86 100644
+> >>>--- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> >>>+++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> >>>@@ -19,6 +19,8 @@ Required properties:
+> >>>  Optional properties:
+> >>>  - interrupts : Should specify WDT interrupt number.
+> >>>+- timeout-sec : Should specify default WDT timeout in seconds. If unset, the
+> >>>+                default timeout is 30 seconds
+> >>
+> >>According to the SP805 TRM, the default interval is dependent on the rate of
+> >>WDOGCLK, but would typically be a lot longer than that :/
+> >>
+> >Depends on the definition of "default". In the context of watchdog drivers,
+> >it is (or should be) a driver default, not a chip default.
 > 
->>> So, what is not going as expected in "SPI core takes care of CSs"
->>> case?
->>> Did you use oscilloscope for that?
-> 
->> Yes, I used and CSs was not asserted. Anyway, I will will try again.
-> 
-> If the core chip select handling is not working properly for some reason
-> then the core chip select handling should be fixed rather than just open
-> coding in your driver - probably it's also broken for other users.
+> DT describes hardware, not driver behaviour.
 > 
 
-Hi Mark,
+In this case it describes expected system behavior. Most definitely
+it does not describe some hardware default.
 
-I found the fix for cs-gpios. If I change spi_add_device function like 
-this(see below) everything is ok.
+Please note that I do not engage in discussions I consider bike-shedding.
+This is one of those. Dropping out.
 
-int spi_add_device(struct spi_device *spi)
-
-...
-
-     if (ctlr->cs_gpios){
-         spi->cs_gpio = ctlr->cs_gpios[spi->chip_select];
-         if(gpio_is_valid(spi->cs_gpio))
-             gpio_direction_output(spi->cs_gpio, !(spi->mode & 
-SPI_CS_HIGH));
-
-     }
-
-...
-
-     return status;
-}
-
-In the subsystem gpio direction of pins is never set and 
-gpio_set_value() don't set the direction.
-In my opinion gpio_direction_output() set direction should be called in 
-spi_add_device. What do you think? Is ok?
+Guenter
