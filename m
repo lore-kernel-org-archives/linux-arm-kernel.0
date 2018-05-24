@@ -1,59 +1,129 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2018 09:29:14 +0200
-Subject: [PATCH v4] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <3016198.WsLn1iDyWJ@debian64>
-References: <20180412190138.12372-1-chunkeey@gmail.com>
- <20180518051826.GO14924@minitux> <3016198.WsLn1iDyWJ@debian64>
-Message-ID: <CACRpkdZtpxe+oDaT+wUG3ONS6fd0YeE5TcDcWt82=NEsc0ti7Q@mail.gmail.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Thu, 24 May 2018 13:04:15 +0530
+Subject: [PATCH v9 3/4] arm64: Implement page table free interfaces
+In-Reply-To: <20180523140157.GG26965@arm.com>
+References: <1525074094-25839-1-git-send-email-cpandya@codeaurora.org>
+ <1525074094-25839-4-git-send-email-cpandya@codeaurora.org>
+ <20180523140157.GG26965@arm.com>
+Message-ID: <9a059bc1-07eb-031b-e561-7e1eaabbf980@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 11:52 AM, Christian Lamparter
-<chunkeey@gmail.com> wrote:
-> On Friday, May 18, 2018 7:18:26 AM CEST Bjorn Andersson wrote:
 
->> > +                   gpio-ranges = <&msmgpio 0 0 150>;
+
+On 5/23/2018 7:31 PM, Will Deacon wrote:
+> Hi Chintan,
+
+Hi Will,
+
+> 
+> [as a side note: I'm confused on the status of this patch series, as part
+>   of it was reposted separately by Toshi. Please can you work together?]
+
+I will share all 4 patches once again as v10 and take latest version of
+1/4 as updated by Toshi.
+
+> 
+> On Mon, Apr 30, 2018 at 01:11:33PM +0530, Chintan Pandya wrote:
+>> Implement pud_free_pmd_page() and pmd_free_pte_page().
 >>
->> I'm still confused to why this information is in DT at all, it feels
->> like an implementation detail, not a system configuration thing.
+>> Implementation requires,
+>>   1) Clearing off the current pud/pmd entry
+>>   2) Invalidate TLB which could have previously
+>>      valid but not stale entry
+>>   3) Freeing of the un-used next level page tables
+>>
+>> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+>> ---
+>>   arch/arm64/mm/mmu.c | 29 +++++++++++++++++++++++++----
+>>   1 file changed, 25 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index da98828..0f651db 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -45,6 +45,7 @@
+>>   #include <asm/memblock.h>
+>>   #include <asm/mmu_context.h>
+>>   #include <asm/ptdump.h>
+>> +#include <asm/tlbflush.h>
+>>   
+>>   #define NO_BLOCK_MAPPINGS	BIT(0)
+>>   #define NO_CONT_MAPPINGS	BIT(1)
+>> @@ -973,12 +974,32 @@ int pmd_clear_huge(pmd_t *pmdp)
+>>   	return 1;
+>>   }
+>>   
+>> -int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+>> +int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
+>>   {
+>> -	return pud_none(*pud);
+>> +	pmd_t *table;
+>> +
+>> +	if (pmd_present(READ_ONCE(*pmdp))) {
+> 
+> Might also be worth checking pmd_table here, just in case. (same for pud)
 
-This reflects especially the layout of systems such as HiSilicon
-that have a standard fit-all pin controller (pinctrl-single.c, shared
-with OMAP) and a standard PL061 GPIO primecell from ARM
-(gpio-pl061.c) shared with many other SoCs.
+I had that check in v2 as below.
 
-These are non-HiSilicon-specific drivers used in other SoCs.
-So the ranges in e.g. arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-define how the pin controller and the GPIO blocks inside the
-SoC are connected using these ranges.
+if (pud_val(*pud) && !pud_huge(*pud))
 
-So "system configuration" is something different for you guys
-than for HiSilicon. They need to configure how the stuff inside
-the SoC are wired up, because they are using standard silicon
-used in other SoCs.
+But removed that in v3 as unmap should change this to NONE if it is
+not table. I still don't see the need of it.
 
-As I understand it, your SoCs are so Qualcomm-specific and
-idiomatic that this situation never happened to you :)
+> 
+>> +		table = __va(pmd_val(*pmdp));
+> 
+> Can you avoid dereferencing *pmdp twice, and instead READ_ONCE into a local
+> variable, please? (same for pud)
 
-> I did look at the commits and code from back in 2013. From what
-> I can gather "this implementation detail" was realized the way
-> it is now, because "devicetree was the new thing" and it seemed
-> like a good idea to make it as extendable/generic as possible.
+Okay.
 
-Many mistakes were made when shoehorning device tree
-into the ARM architecture with one finger constantly on the
-fast-forward button. There were reasons for this. Mea culpa.
+> 
+>> +		pmd_clear(pmdp);
+>> +		__flush_tlb_kernel_pgtable(addr);
+>> +		free_page((unsigned long) table);
+> 
+> Shouldn't this be pte_free_kernel, to pair with pte_alloc_kernel which
+> was used to allocate the page in the first place? (similarly for pud)
 
-I hope to fix them all before I retire.
+Okay.
 
-One use case (which still applied) are pin controllers and GPIO
-chips defined through the use of platform data.
+> 
+>> +	}
+>> +	return 1;
+>>   }
+>>   
+>> -int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+>> +int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+>>   {
+>> -	return pmd_none(*pmd);
+>> +	pmd_t *table;
+>> +	int i;
+>> +
+>> +	if (pud_present(READ_ONCE(*pudp))) {
+>> +		table = __va(pud_val(*pudp));
+>> +		for (i = 0; i < PTRS_PER_PMD; i++)
+>> +			pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE));
+> 
+> I think it would be cleaner to write this as a do { ... } while, for
+> consistency with the ioremap and vmalloc code.
 
-If we have for example a PCI card with a pin controller and
-GPIO block (Alessandro Rubini ran into such a device at
-CERN IIRC) we need to be able to define both components
-and connect them using ranges, even without either
-device tree or ACPI hardware descriptions.
+Okay.
 
-Yours,
-Linus Walleij
+I'll raise v10 fixing above things. Thanks for the review.
+
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
