@@ -1,60 +1,228 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 May 2018 13:30:49 +0100
-Subject: [PATCH 09/14] ARM: spectre-v2: add PSCI based hardening
-In-Reply-To: <ffeddbce-2cf7-c1d9-573b-dc4c38d1cbd7@arm.com>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <E1fKjFT-00064F-Bs@rmk-PC.armlinux.org.uk>
- <35edb3df-fed4-b6e6-be0c-ee758618c92e@arm.com>
- <20180523194503.GX17671@n2100.armlinux.org.uk>
- <ffeddbce-2cf7-c1d9-573b-dc4c38d1cbd7@arm.com>
-Message-ID: <20180524123049.GY17671@n2100.armlinux.org.uk>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 24 May 2018 20:35:31 +0800
+Subject: [PATCH v4] dt-bindings: mediatek: Add binding for mt2712 IOMMU and SMI
+Message-ID: <1527165331-22261-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 01:03:50PM +0100, Marc Zyngier wrote:
-> On 23/05/18 20:45, Russell King - ARM Linux wrote:
-> > On Tue, May 22, 2018 at 06:24:13PM +0100, Marc Zyngier wrote:
-> >> On 21/05/18 12:45, Russell King wrote:
-> >>> +#ifdef CONFIG_ARM_PSCI
-> >>> +	if (psci_ops.smccc_version != SMCCC_VERSION_1_0) {
-> >>> +		struct arm_smccc_res res;
-> >>> +
-> >>> +		switch (psci_ops.conduit) {
-> >>> +		case PSCI_CONDUIT_HVC:
-> >>> +			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> >>> +					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-> >>> +			if ((int)res.a0 < 0)
-> >>> +				break;
-> >>
-> >> I just realised that there is a small, but significant difference
-> >> between this and the arm64 version: On arm64, we have a table of
-> >> vulnerable implementations, and we try the mitigation on a per-cpu
-> >> basis. Here, you entirely rely on the firmware to discover whether the
-> >> CPU needs mitigation or not. You then need to check for a return value
-> >> of 1, which indicates that although the mitigation is implemented, it is
-> >> not required on this particular CPU.
-> > 
-> > Okay, so digging further into the documentation seems to suggest that we
-> > only need to check the firmware for A72 and A57 CPUs, and given this
-> > statement:
-> > 
-> > "Arm recommends that the caller only call this on PEs for which a
-> >  firmware based mitigation of CVE-2017-5715 is required, or where
-> >  a local workaround is infeasible."
-> > 
-> > it seems that the right answer is to ignore the PSCI based methods when
-> > we have anything but these CPUs.  Do you agree?
-> 
-> For CPUs that are produced by ARM, I agree. I don't know about CPUs
-> produced by ARM licensees though, so I'd rather use the opposite logic:
-> Use the firmware unless the CPU is one of those that can be easily
-> mitigated at EL1 (or isn't affected).
+This patch adds decriptions for mt2712 IOMMU and SMI.
 
-The "or isn't affected" is the difficult bit - I guess we could match
-on the CPU vendor field though, and just reject all ARM CPUs that
-aren't explicitly listed as having a problem.
+In order to balance the bandwidth, mt2712 has two M4Us, two
+smi-commons, 10 smi-larbs. and mt2712 is also MTK IOMMU gen2 which
+uses ARM Short-Descriptor translation table format.
 
+The mt2712 M4U-SMI HW diagram is as below:
+
+                            EMI
+                             |
+              ------------------------------------
+              |                                  |
+             M4U0                              M4U1
+              |                                  |
+         smi-common0                        smi-common1
+              |                                  |
+  -------------------------       --------------------------------
+  |     |     |     |     |       |         |        |     |     |
+  |     |     |     |     |       |         |        |     |     |
+larb0 larb1 larb2 larb3 larb6    larb4    larb5    larb7 larb8 larb9
+disp0 vdec  cam   venc   jpg  mdp1/disp1 mdp2/disp2 mdp3 vdo/nr tvd
+
+All the connections are HW fixed, SW can NOT adjust it.
+
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+change notes:
+v4: change the license of the new file in this patch to SPDX.
+
+v3: http://lists.infradead.org/pipermail/linux-mediatek/2018-May/013279.html
+Add a new ECO port(DISP_RDMA2) in larb0/port7.
+
+v2:
+https://lists.linuxfoundation.org/pipermail/iommu/2017-August/023848.html
+
+v1:
+https://lists.linuxfoundation.org/pipermail/iommu/2017-August/023665.html
+---
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  6 +-
+ .../memory-controllers/mediatek,smi-common.txt     |  6 +-
+ .../memory-controllers/mediatek,smi-larb.txt       |  5 +-
+ include/dt-bindings/memory/mt2712-larb-port.h      | 95 ++++++++++++++++++++++
+ 4 files changed, 106 insertions(+), 6 deletions(-)
+ create mode 100644 include/dt-bindings/memory/mt2712-larb-port.h
+
+diff --git a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+index 53c20ca..df5db73 100644
+--- a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
++++ b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+@@ -40,6 +40,7 @@ video decode local arbiter, all these ports are according to the video HW.
+ Required properties:
+ - compatible : must be one of the following string:
+ 	"mediatek,mt2701-m4u" for mt2701 which uses generation one m4u HW.
++	"mediatek,mt2712-m4u" for mt2712 which uses generation two m4u HW.
+ 	"mediatek,mt8173-m4u" for mt8173 which uses generation two m4u HW.
+ - reg : m4u register base and size.
+ - interrupts : the interrupt of m4u.
+@@ -50,8 +51,9 @@ Required properties:
+ 	according to the local arbiter index, like larb0, larb1, larb2...
+ - iommu-cells : must be 1. This is the mtk_m4u_id according to the HW.
+ 	Specifies the mtk_m4u_id as defined in
+-	dt-binding/memory/mt2701-larb-port.h for mt2701 and
+-	dt-binding/memory/mt8173-larb-port.h for mt8173
++	dt-binding/memory/mt2701-larb-port.h for mt2701,
++	dt-binding/memory/mt2712-larb-port.h for mt2712, and
++	dt-binding/memory/mt8173-larb-port.h for mt8173.
+ 
+ Example:
+ 	iommu: iommu at 10205000 {
+diff --git a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
+index aa614b2..615abdd 100644
+--- a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
++++ b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
+@@ -2,8 +2,9 @@ SMI (Smart Multimedia Interface) Common
+ 
+ The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
+ 
+-Mediatek SMI have two generations of HW architecture, mt8173 uses the second
+-generation of SMI HW while mt2701 uses the first generation HW of SMI.
++Mediatek SMI have two generations of HW architecture, mt2712 and mt8173 use
++the second generation of SMI HW while mt2701 uses the first generation HW of
++SMI.
+ 
+ There's slight differences between the two SMI, for generation 2, the
+ register which control the iommu port is at each larb's register base. But
+@@ -15,6 +16,7 @@ not needed for SMI generation 2.
+ Required properties:
+ - compatible : must be one of :
+ 	"mediatek,mt2701-smi-common"
++	"mediatek,mt2712-smi-common"
+ 	"mediatek,mt8173-smi-common"
+ - reg : the register and size of the SMI block.
+ - power-domains : a phandle to the power domain of this local arbiter.
+diff --git a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+index ddf46b8..083155c 100644
+--- a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
++++ b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+@@ -4,8 +4,9 @@ The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
+ 
+ Required properties:
+ - compatible : must be one of :
+-		"mediatek,mt8173-smi-larb"
+ 		"mediatek,mt2701-smi-larb"
++		"mediatek,mt2712-smi-larb"
++		"mediatek,mt8173-smi-larb"
+ - reg : the register and size of this local arbiter.
+ - mediatek,smi : a phandle to the smi_common node.
+ - power-domains : a phandle to the power domain of this local arbiter.
+@@ -15,7 +16,7 @@ Required properties:
+ 	    the register.
+   - "smi" : It's the clock for transfer data and command.
+ 
+-Required property for mt2701:
++Required property for mt2701 and mt2712:
+ - mediatek,larb-id :the hardware id of this larb.
+ 
+ Example:
+diff --git a/include/dt-bindings/memory/mt2712-larb-port.h b/include/dt-bindings/memory/mt2712-larb-port.h
+new file mode 100644
+index 0000000..6f9aa73
+--- /dev/null
++++ b/include/dt-bindings/memory/mt2712-larb-port.h
+@@ -0,0 +1,95 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2017 MediaTek Inc.
++ * Author: Yong Wu <yong.wu@mediatek.com>
++ */
++#ifndef __DTS_IOMMU_PORT_MT2712_H
++#define __DTS_IOMMU_PORT_MT2712_H
++
++#define MTK_M4U_ID(larb, port)		(((larb) << 5) | (port))
++
++#define M4U_LARB0_ID			0
++#define M4U_LARB1_ID			1
++#define M4U_LARB2_ID			2
++#define M4U_LARB3_ID			3
++#define M4U_LARB4_ID			4
++#define M4U_LARB5_ID			5
++#define M4U_LARB6_ID			6
++#define M4U_LARB7_ID			7
++#define M4U_LARB8_ID			8
++#define M4U_LARB9_ID			9
++
++/* larb0 */
++#define M4U_PORT_DISP_OVL0		MTK_M4U_ID(M4U_LARB0_ID, 0)
++#define M4U_PORT_DISP_RDMA0		MTK_M4U_ID(M4U_LARB0_ID, 1)
++#define M4U_PORT_DISP_WDMA0		MTK_M4U_ID(M4U_LARB0_ID, 2)
++#define M4U_PORT_DISP_OD_R		MTK_M4U_ID(M4U_LARB0_ID, 3)
++#define M4U_PORT_DISP_OD_W		MTK_M4U_ID(M4U_LARB0_ID, 4)
++#define M4U_PORT_MDP_RDMA0		MTK_M4U_ID(M4U_LARB0_ID, 5)
++#define M4U_PORT_MDP_WDMA		MTK_M4U_ID(M4U_LARB0_ID, 6)
++#define M4U_PORT_DISP_RDMA2		MTK_M4U_ID(M4U_LARB0_ID, 7)
++
++/* larb1 */
++#define M4U_PORT_HW_VDEC_MC_EXT		MTK_M4U_ID(M4U_LARB1_ID, 0)
++#define M4U_PORT_HW_VDEC_PP_EXT		MTK_M4U_ID(M4U_LARB1_ID, 1)
++#define M4U_PORT_HW_VDEC_UFO_EXT	MTK_M4U_ID(M4U_LARB1_ID, 2)
++#define M4U_PORT_HW_VDEC_VLD_EXT	MTK_M4U_ID(M4U_LARB1_ID, 3)
++#define M4U_PORT_HW_VDEC_VLD2_EXT	MTK_M4U_ID(M4U_LARB1_ID, 4)
++#define M4U_PORT_HW_VDEC_AVC_MV_EXT	MTK_M4U_ID(M4U_LARB1_ID, 5)
++#define M4U_PORT_HW_VDEC_PRED_RD_EXT	MTK_M4U_ID(M4U_LARB1_ID, 6)
++#define M4U_PORT_HW_VDEC_PRED_WR_EXT	MTK_M4U_ID(M4U_LARB1_ID, 7)
++#define M4U_PORT_HW_VDEC_PPWRAP_EXT	MTK_M4U_ID(M4U_LARB1_ID, 8)
++#define M4U_PORT_HW_VDEC_TILE		MTK_M4U_ID(M4U_LARB1_ID, 9)
++#define M4U_PORT_HW_IMG_RESZ_EXT	MTK_M4U_ID(M4U_LARB1_ID, 10)
++
++/* larb2 */
++#define M4U_PORT_CAM_DMA0		MTK_M4U_ID(M4U_LARB2_ID, 0)
++#define M4U_PORT_CAM_DMA1		MTK_M4U_ID(M4U_LARB2_ID, 1)
++#define M4U_PORT_CAM_DMA2		MTK_M4U_ID(M4U_LARB2_ID, 2)
++
++/* larb3 */
++#define M4U_PORT_VENC_RCPU		MTK_M4U_ID(M4U_LARB3_ID, 0)
++#define M4U_PORT_VENC_REC		MTK_M4U_ID(M4U_LARB3_ID, 1)
++#define M4U_PORT_VENC_BSDMA		MTK_M4U_ID(M4U_LARB3_ID, 2)
++#define M4U_PORT_VENC_SV_COMV		MTK_M4U_ID(M4U_LARB3_ID, 3)
++#define M4U_PORT_VENC_RD_COMV		MTK_M4U_ID(M4U_LARB3_ID, 4)
++#define M4U_PORT_VENC_CUR_CHROMA	MTK_M4U_ID(M4U_LARB3_ID, 5)
++#define M4U_PORT_VENC_REF_CHROMA	MTK_M4U_ID(M4U_LARB3_ID, 6)
++#define M4U_PORT_VENC_CUR_LUMA		MTK_M4U_ID(M4U_LARB3_ID, 7)
++#define M4U_PORT_VENC_REF_LUMA		MTK_M4U_ID(M4U_LARB3_ID, 8)
++
++/* larb4 */
++#define M4U_PORT_DISP_OVL1		MTK_M4U_ID(M4U_LARB4_ID, 0)
++#define M4U_PORT_DISP_RDMA1		MTK_M4U_ID(M4U_LARB4_ID, 1)
++#define M4U_PORT_DISP_WDMA1		MTK_M4U_ID(M4U_LARB4_ID, 2)
++#define M4U_PORT_DISP_OD1_R		MTK_M4U_ID(M4U_LARB4_ID, 3)
++#define M4U_PORT_DISP_OD1_W		MTK_M4U_ID(M4U_LARB4_ID, 4)
++#define M4U_PORT_MDP_RDMA1		MTK_M4U_ID(M4U_LARB4_ID, 5)
++#define M4U_PORT_MDP_WROT1		MTK_M4U_ID(M4U_LARB4_ID, 6)
++
++/* larb5 */
++#define M4U_PORT_DISP_OVL2		MTK_M4U_ID(M4U_LARB5_ID, 0)
++#define M4U_PORT_DISP_WDMA2		MTK_M4U_ID(M4U_LARB5_ID, 1)
++#define M4U_PORT_MDP_RDMA2		MTK_M4U_ID(M4U_LARB5_ID, 2)
++#define M4U_PORT_MDP_WROT0		MTK_M4U_ID(M4U_LARB5_ID, 3)
++
++/* larb6 */
++#define M4U_PORT_JPGDEC_WDMA_0		MTK_M4U_ID(M4U_LARB6_ID, 0)
++#define M4U_PORT_JPGDEC_WDMA_1		MTK_M4U_ID(M4U_LARB6_ID, 1)
++#define M4U_PORT_JPGDEC_BSDMA_0		MTK_M4U_ID(M4U_LARB6_ID, 2)
++#define M4U_PORT_JPGDEC_BSDMA_1		MTK_M4U_ID(M4U_LARB6_ID, 3)
++
++/* larb7 */
++#define M4U_PORT_MDP_RDMA3		MTK_M4U_ID(M4U_LARB7_ID, 0)
++#define M4U_PORT_MDP_WROT2		MTK_M4U_ID(M4U_LARB7_ID, 1)
++
++/* larb8 */
++#define M4U_PORT_VDO			MTK_M4U_ID(M4U_LARB8_ID, 0)
++#define M4U_PORT_NR			MTK_M4U_ID(M4U_LARB8_ID, 1)
++#define M4U_PORT_WR_CHANNEL0		MTK_M4U_ID(M4U_LARB8_ID, 2)
++
++/* larb9 */
++#define M4U_PORT_TVD			MTK_M4U_ID(M4U_LARB9_ID, 0)
++#define M4U_PORT_WR_CHANNEL1		MTK_M4U_ID(M4U_LARB9_ID, 1)
++
++#endif
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+1.9.1
