@@ -1,70 +1,53 @@
 From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 24 May 2018 14:09:29 -0500
-Subject: [PATCH 1/4] arm64: capabilities: add nopti command line argument
+Date: Thu, 24 May 2018 14:09:32 -0500
+Subject: [PATCH 4/4] arm64: cpufeature: always log KPTI setting on boot
 In-Reply-To: <20180524190932.32118-1-mlangsdo@redhat.com>
 References: <20180524190932.32118-1-mlangsdo@redhat.com>
-Message-ID: <20180524190932.32118-2-mlangsdo@redhat.com>
+Message-ID: <20180524190932.32118-5-mlangsdo@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The x86 kernel and the documentation use 'nopti' as the kernel command
-line argument to disable kernel page table isolation, so add nopti to
-the arm64 kernel for compatibility.
+Always log KPTI setting at boot time, whether or not KPTI was forced
+by a kernel parameter.
 
 Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  6 +++---
- arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
- 2 files changed, 13 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index f2040d4..a987725 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -3342,8 +3342,8 @@
- 	pt.		[PARIDE]
- 			See Documentation/blockdev/paride.txt.
- 
--	pti=		[X86_64] Control Page Table Isolation of user and
--			kernel address spaces.  Disabling this feature
-+	pti=		[X86_64, ARM64] Control Page Table Isolation of user
-+			and kernel address spaces.  Disabling this feature
- 			removes hardening, but improves performance of
- 			system calls and interrupts.
- 
-@@ -3354,7 +3354,7 @@
- 
- 			Not specifying this option is equivalent to pti=auto.
- 
--	nopti		[X86_64]
-+	nopti		[X86_64, ARM64]
- 			Equivalent to pti=off
- 
- 	pty.legacy_count=
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..7c5d8712 100644
+index 697a6ef..e50bf3c 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -934,10 +934,19 @@ static int __init parse_kpti(char *str)
- 	if (ret)
- 		return ret;
- 
--	__kpti_forced = enabled ? 1 : -1;
-+	if (!__kpti_forced)
-+		__kpti_forced = enabled ? 1 : -1;
- 	return 0;
- }
- __setup("kpti=", parse_kpti);
+@@ -889,16 +889,20 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 		__pti_enabled = __kpti_forced > 0;
+ 		pr_info_once("kernel page table isolation forced %s by %s\n",
+ 			     __pti_enabled ? "ON" : "OFF", str);
++	} else {
++		/* Useful for KASLR robustness */
++		if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
++			__pti_enabled = true;
++		/* Don't force KPTI for CPUs that are not vulnerable */
++		else if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
++			__pti_enabled = false;
++		/* Defer to CPU feature registers */
++		else
++			__pti_enabled = !has_cpuid_feature(entry, scope);
 +
-+/* for compatibility with documentation and x86 nopti command line arg */
-+static int __init force_nokpti(char *arg)
-+{
-+	__kpti_forced = -1;
-+	return 0;
-+}
-+early_param("nopti", force_nokpti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
++		pr_info_once("kernel page table isolation %s by %s\n",
++			    __pti_enabled ? "ON" : "OFF", str);
+ 	}
+-	/* Useful for KASLR robustness */
+-	else if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+-		__pti_enabled = true;
+-	/* Don't force KPTI for CPUs that are not vulnerable */
+-	else if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
+-		__pti_enabled = false;
+-	/* Defer to CPU feature registers */
+-	else
+-		__pti_enabled = !has_cpuid_feature(entry, scope);
  
- #ifdef CONFIG_ARM64_HW_AFDBM
+ 	return __pti_enabled;
+ }
 -- 
 2.9.5
