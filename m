@@ -1,244 +1,100 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 24 May 2018 09:07:02 +0200
-Subject: [PATCH v2 12/13] ARM: pxa: remove the DMA IO resources
-In-Reply-To: <20180524070703.11901-1-robert.jarzmik@free.fr>
-References: <20180524070703.11901-1-robert.jarzmik@free.fr>
-Message-ID: <20180524070703.11901-13-robert.jarzmik@free.fr>
+Date: Thu, 24 May 2018 09:06:50 +0200
+Subject: [PATCH v2 00/13] ARM: pxa: switch to DMA slave maps
+Message-ID: <20180524070703.11901-1-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the last driver using the former mechanism to acquire the DMA
-requestor line has be converted to the dma_slave_map, remove all these
-resources from the PXA devices.
+This v1 cover letter is quoted in [1].
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/devices.c | 136 --------------------------------------------
- 1 file changed, 136 deletions(-)
+For maintainers the table below should help you focus on the patches targetted at you, and ignore the other noise.
 
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index 1e8915fc340d..5a16ea74e28a 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -60,16 +60,6 @@ static struct resource pxamci_resources[] = {
- 		.end	= IRQ_MMC,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		.start	= 21,
--		.end	= 21,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		.start	= 22,
--		.end	= 22,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- static u64 pxamci_dmamask = 0xffffffffUL;
-@@ -407,16 +397,6 @@ static struct resource pxa_ir_resources[] = {
- 		.end	= 0x40700023,
- 		.flags  = IORESOURCE_MEM,
- 	},
--	[5] = {
--		.start  = 17,
--		.end	= 17,
--		.flags  = IORESOURCE_DMA,
--	},
--	[6] = {
--		.start  = 18,
--		.end	= 18,
--		.flags  = IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa_device_ficp = {
-@@ -545,18 +525,6 @@ static struct resource pxa25x_resource_ssp[] = {
- 		.end	= IRQ_SSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 13,
--		.end	= 13,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 14,
--		.end	= 14,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa25x_device_ssp = {
-@@ -583,18 +551,6 @@ static struct resource pxa25x_resource_nssp[] = {
- 		.end	= IRQ_NSSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 15,
--		.end	= 15,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 16,
--		.end	= 16,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa25x_device_nssp = {
-@@ -621,18 +577,6 @@ static struct resource pxa25x_resource_assp[] = {
- 		.end	= IRQ_ASSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 23,
--		.end	= 23,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 24,
--		.end	= 24,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa25x_device_assp = {
-@@ -751,18 +695,6 @@ static struct resource pxa27x_resource_ssp1[] = {
- 		.end	= IRQ_SSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 13,
--		.end	= 13,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 14,
--		.end	= 14,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa27x_device_ssp1 = {
-@@ -789,18 +721,6 @@ static struct resource pxa27x_resource_ssp2[] = {
- 		.end	= IRQ_SSP2,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 15,
--		.end	= 15,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 16,
--		.end	= 16,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa27x_device_ssp2 = {
-@@ -827,18 +747,6 @@ static struct resource pxa27x_resource_ssp3[] = {
- 		.end	= IRQ_SSP3,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 66,
--		.end	= 66,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 67,
--		.end	= 67,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa27x_device_ssp3 = {
-@@ -895,16 +803,6 @@ static struct resource pxa3xx_resources_mci2[] = {
- 		.end	= IRQ_MMC2,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		.start	= 93,
--		.end	= 93,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		.start	= 94,
--		.end	= 94,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa3xx_device_mci2 = {
-@@ -934,16 +832,6 @@ static struct resource pxa3xx_resources_mci3[] = {
- 		.end	= IRQ_MMC3,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		.start	= 100,
--		.end	= 100,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		.start	= 101,
--		.end	= 101,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa3xx_device_mci3 = {
-@@ -1021,18 +909,6 @@ static struct resource pxa3xx_resources_nand[] = {
- 		.end	= IRQ_NAND,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for Data DMA */
--		.start	= 97,
--		.end	= 97,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for Command DMA */
--		.start	= 99,
--		.end	= 99,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- static u64 pxa3xx_nand_dma_mask = DMA_BIT_MASK(32);
-@@ -1066,18 +942,6 @@ static struct resource pxa3xx_resource_ssp4[] = {
- 		.end	= IRQ_SSP4,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 2,
--		.end	= 2,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 3,
--		.end	= 3,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- /*
+The differences since v1 is by maintainers / topic / patch :
+- Arnd and Daniel / PXA topic / 0002
+  devices.c split into pxa25x.c, pxa27x.c and pxa3xx.c
+- Boris and Daniel / MTD topic / 0005
+  Review and ack of this one
+- Arnd and netdev / NET topic / 0006 and 0007
+  Arnd comment taken, review and ack of these one
+- Mark and alsa-devel / ASoC topic / 0008
+  Mark, I couldn't keep your former Ack because :
+    - I changed one line so that the cpu device provides the DMA
+    - I added pxa2xx-i2s which was forgotten
+  Therefore I need a new ack
+- Arnd and Daniel / SSP topic / 0013
+  Review and ack of this one
+
+Happy review.
+
+--
+Robert
+
+Robert Jarzmik (13):
+  dmaengine: pxa: use a dma slave map
+  ARM: pxa: add dma slave map
+  mmc: pxamci: remove the dmaengine compat need
+  media: pxa_camera: remove the dmaengine compat need
+  mtd: rawnand: marvell: remove the dmaengine compat need
+  net: smc911x: remove the dmaengine compat need
+  net: smc91x: remove the dmaengine compat need
+  ASoC: pxa: remove the dmaengine compat need
+  ata: pata_pxa: remove the dmaengine compat need
+  dmaengine: pxa: document pxad_param
+  dmaengine: pxa: make the filter function internal
+  ARM: pxa: remove the DMA IO resources
+  ARM: pxa: change SSP DMA channels allocation
+
+ arch/arm/mach-pxa/devices.c           | 148 +---------------------------------
+ arch/arm/mach-pxa/devices.h           |   6 +-
+ arch/arm/mach-pxa/pxa25x.c            |  41 +++++++++-
+ arch/arm/mach-pxa/pxa27x.c            |  42 +++++++++-
+ arch/arm/mach-pxa/pxa3xx.c            |  44 +++++++++-
+ arch/arm/plat-pxa/ssp.c               |  47 -----------
+ drivers/ata/pata_pxa.c                |  10 +--
+ drivers/dma/pxa_dma.c                 |  13 ++-
+ drivers/media/platform/pxa_camera.c   |  22 +----
+ drivers/mmc/host/pxamci.c             |  29 +------
+ drivers/mtd/nand/raw/marvell_nand.c   |  17 +---
+ drivers/net/ethernet/smsc/smc911x.c   |  16 +---
+ drivers/net/ethernet/smsc/smc91x.c    |  12 +--
+ drivers/net/ethernet/smsc/smc91x.h    |   1 -
+ include/linux/dma/pxa-dma.h           |  20 +++--
+ include/linux/platform_data/mmp_dma.h |   4 +
+ include/linux/pxa2xx_ssp.h            |   2 -
+ sound/arm/pxa2xx-ac97.c               |  14 +---
+ sound/arm/pxa2xx-pcm-lib.c            |   6 +-
+ sound/soc/pxa/pxa-ssp.c               |   5 +-
+ sound/soc/pxa/pxa2xx-ac97.c           |  32 ++------
+ sound/soc/pxa/pxa2xx-i2s.c            |   6 +-
+ 22 files changed, 180 insertions(+), 357 deletions(-)
+
 -- 
 2.11.0
+
+---
+[1] Former v1 cover letter
+This serie is aimed at removing the dmaengine slave compat use, and transfer
+knowledge of the DMA requestors into architecture code.
+
+This was discussed/advised by Arnd a couple of years back, it's almost time.
+
+The serie is divided in 3 phasees :
+ - phase 1 : patch 1/15 and patch 2/15
+   => this is the preparation work
+ - phase 2 : patches 3/15 .. 10/15
+   => this is the switch of all the drivers
+   => this one will require either an Ack of the maintainers or be taken by them
+      once phase 1 is merged
+ - phase 3 : patches 11/15
+   => this is the last part, cleanup and removal of export of the DMA filter
+      function
+
+As this looks like a patch bomb, each maintainer expressing for his tree either
+an Ack or "I want to take through my tree" will be spared in the next iterations
+of this serie.
+
+Several of these changes have been tested on actual hardware, including :
+ - pxamci
+ - pxa_camera
+ - smc*
+ - ASoC and SSP
