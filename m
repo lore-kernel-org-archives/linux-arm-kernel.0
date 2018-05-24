@@ -1,34 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 May 2018 11:27:38 +0100
-Subject: [PATCHv2] arm64: Make sure permission updates happen for pmd/pud
-In-Reply-To: <20180523184346.487-1-labbott@redhat.com>
-References: <20180523184346.487-1-labbott@redhat.com>
-Message-ID: <20180524102735.GA28425@arm.com>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Thu, 24 May 2018 11:30:26 +0100
+Subject: [PATCH v3 0/3] Renesas R9A06G032 SMP enabler
+Message-ID: <1527157834-7747-1-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+*WARNING -- this requires the base R9A06G032 support patches 
+already posted
 
-On Wed, May 23, 2018 at 11:43:46AM -0700, Laura Abbott wrote:
-> Commit 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-> disallowed block mappings for ioremap since that code does not honor
-> break-before-make. The same APIs are also used for permission updating
-> though and the extra checks prevent the permission updates from happening,
-> even though this should be permitted. This results in read-only permissions
-> not being fully applied. Visibly, this can occasionaly be seen as a failure
-> on the built in rodata test when the test data ends up in a section or
-> as an odd RW gap on the page table dump. Fix this by using
-> pgattr_change_is_safe instead of p*d_present for determining if the
-> change is permitted.
-> 
-> Reported-by: Peter Robinson <pbrobinson@gmail.com>
-> Fixes: 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v2: Switch to using pgattr_change_is_safe per suggestion of Will
-> ---
+This patch series is for enabling the second CA7 of the R9A06G032.
+It's based on a spin_table method, and it reuses the same binding
+property as that driver.
 
-Thanks for re-spinning so quickly. I'll queue as a fix with the relevant
-tags.
+v3:
+  + Removed mentions of rz/?n1d?
+  + Rebased on base patch v7 
+v2:
+  + Added suggestions from Florian Fainelli
+  + Use __pa_symbol()
+  + Simplified logic in prepare_cpu()
+  + Reordered the patches
+  + Rebased on RZN1 Base patch v5
 
-Will
+Michel Pollet (3):
+  dt-bindings: cpu: Add Renesas R9A06G032 SMP enable method.
+  arm: shmobile: Add the R9A06G032 SMP enabler driver
+  ARM: dts: Renesas R9A06G032 SMP enable method
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/r9a06g032.dtsi               |  2 +
+ arch/arm/mach-shmobile/Makefile                |  1 +
+ arch/arm/mach-shmobile/smp-r9a06g032.c         | 85 ++++++++++++++++++++++++++
+ 4 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+
+-- 
+2.7.4
