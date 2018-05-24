@@ -1,102 +1,75 @@
-From: amit.kucheria@verdurent.com (Amit Kucheria)
-Date: Thu, 24 May 2018 14:25:10 +0300
-Subject: [PATCH v12 0/8] Clock for CPU scaling support for msm8996
-In-Reply-To: <1527148218-16540-1-git-send-email-ilialin@codeaurora.org>
-References: <1527148218-16540-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <CAHLCerM-F3joG=9YgvqMiGTFvw_CAv82R91ZP7v6mxTjykz9DA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 May 2018 12:27:11 +0100
+Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
+In-Reply-To: <20180522150648.28297-5-marc.zyngier@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-5-marc.zyngier@arm.com>
+Message-ID: <20180524112711.rmjoyifcwbu3xsqz@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 10:50 AM, Ilia Lin <ilialin@codeaurora.org> wrote:
-> [v12]
->  * Addressed the kbuild fail on arm architecture
->
-> [v11]
->  * Split the series into domains
->
-> [v9]
->  * Addressed comments from Viresh and Russel about the error handling
->
-> [v8]
->  * Reordered the patch series into 4 groups
->  * Addressed comments from Amit about the comments and commit messages
->  * Addressed comments from Amit and Viresh about the resourses deallocation
->
-> [v7]
->  * Addressed comments from Viresh about resourses deallocation
->    and DT compatible
->
-> [v6]
->  * Addressed comments from Viresh about:
->  ** Comments style
->  ** Kconfig bool instead of tristate
->  ** DT and documentation style
->  ** Resourses deallocation on an error
->  ** Typos
->
-> [v5]
->  * Rebased
->  * Addressed comments from Bjorn about SPDX style,
->    functions and parameters naming
->  * Addressed comments from Viresh DT properties and style, comments style,
->    resourses deallocation, documentation placement
->  * Addressed comments from Sricharan about unnessesary include
->  * Addressed comments from Nicolas
->  * Addressed comments from Rob about the commit messages and acks
->  * Addressed comments from Mark
->
-> [v4]
->  * Adressed all comments from Stephen
->  * Added CPU regulator support
->  * Added qcom-cpufreq-kryo driver
->
-> [v3]
->  * Rebased on top of the latest PLL driver changes
->  * Addressed comment from Rob Herring for bindings
->
-> [v2]
->  * Addressed comments from Rob Herring for bindings
->  * Addressed comments from Mark Rutland for memory barrier
->  * Addressed comments from Julien Thierry for clock reenabling condition
->  * Tuned the HW configuration for clock frequencies below 600MHz
->
-> SOC (1/15):
-> Extracts the kryo l2 accessors driver from the QCOM PMU driver
->
-> Clocks (2/15-9/15):
-> This series adds support for the CPU clocks on msm8996 devices.
-> The driver uses the existing PLL drivers and is required to control
-> the CPU frequency scaling on the MSM8996.
->
-> Ilia Lin (6):
->   soc: qcom: Separate kryo l2 accessors from PMU driver
->   clk: Use devm_ in the register fixed factor clock
->   clk: qcom: Add CPU clock driver for msm8996
->   dt-bindings: clk: qcom: Add bindings for CPU clock for msm8996
->   clk: qcom: cpu-8996: Add support to switch below 600Mhz
->   clk: qcom: Add ACD path to CPU clock driver for msm8996
->
-> Rajendra Nayak (2):
->   clk: qcom: Make clk_alpha_pll_configure available to modules
->   clk: qcom: cpu-8996: Add support to switch to alternate PLL
->
->  .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
->  drivers/clk/clk-fixed-factor.c                     |   2 +-
->  drivers/clk/qcom/Kconfig                           |  10 +
->  drivers/clk/qcom/Makefile                          |   1 +
->  drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
->  drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
->  drivers/clk/qcom/clk-cpu-8996.c                    | 510 +++++++++++++++++++++
+On Tue, May 22, 2018 at 04:06:38PM +0100, Marc Zyngier wrote:
+> As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
+> discovery mechanism for detecting the SSBD mitigation.
+> 
+> A new capability is also allocated for that purpose, and a
+> config option.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
->  drivers/perf/Kconfig                               |   1 +
->  drivers/perf/qcom_l2_pmu.c                         |  90 +---
->  drivers/soc/qcom/Kconfig                           |   3 +
->  drivers/soc/qcom/Makefile                          |   1 +
->  drivers/soc/qcom/kryo-l2-accessors.c               |  56 +++
->  include/soc/qcom/kryo-l2-accessors.h               |  12 +
+[...]
 
-For the perf/l2-accessors part, Reviewed-by: Amit Kucheria
-<amit.kucheria@linaro.org>
+> +static void do_ssbd(bool state)
+> +{
+> +	switch (psci_ops.conduit) {
+> +	case PSCI_CONDUIT_HVC:
+> +		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+> +		break;
+> +
+> +	case PSCI_CONDUIT_SMC:
+> +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+> +		break;
+> +
+> +	default:
+> +		WARN_ON_ONCE(1);
+> +		break;
+> +	}
+> +}
+> +
+> +static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+> +				    int scope)
+> +{
+> +	struct arm_smccc_res res;
+> +	bool supported = true;
+> +
+> +	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+> +
+> +	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+> +		return false;
+> +
+> +	/*
+> +	 * The probe function return value is either negative
+> +	 * (unsupported or mitigated), positive (unaffected), or zero
+> +	 * (requires mitigation). We only need to do anything in the
+> +	 * last case.
+> +	 */
+> +	switch (psci_ops.conduit) {
+> +	case PSCI_CONDUIT_HVC:
+> +		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+> +				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+> +		if ((int)res.a0 != 0)
+> +			supported = false;
+> +		break;
+> +
+> +	case PSCI_CONDUIT_SMC:
+> +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+> +				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+> +		if ((int)res.a0 != 0)
+> +			supported = false;
+> +		break;
 
-For the entire series, Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
+Once this is merged, I'll rebase my SMCCCC conduit cleanup atop.
+
+Mark.
