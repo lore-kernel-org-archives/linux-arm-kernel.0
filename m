@@ -1,36 +1,39 @@
-From: ramon.fried@gmail.com (Ramon Fried)
-Date: Thu, 24 May 2018 23:17:19 +0300
-Subject: uImage target support on arm64
-In-Reply-To: <20180524193449.jql27apudwaevwpf@tarshish>
-References: <CA+Kvs9=mgW4Z=UcBZZLL82fJ=c--OXF3=B2Zbho+CfMTr8Wk-Q@mail.gmail.com>
- <20180524193449.jql27apudwaevwpf@tarshish>
-Message-ID: <CA+Kvs9=x4kxkj-amni+E_KVjH2qjq_mXU88Dr-x5NNyz64gfuA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 24 May 2018 15:25:06 -0500
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524181834.GF4828@sirena.org.uk>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524181834.GF4828@sirena.org.uk>
+Message-ID: <CAL_Jsq+xHbW8S4ZMsZp8BJ=wq=t6z2gGTacBnYGgkgBG0dVdYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 10:34 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Ramon,
+On Thu, May 24, 2018 at 1:18 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
 >
-> On Thu, May 24, 2018 at 10:05:15PM +0300, Ramon Fried wrote:
->> I've noticed that it's not supported.
->> Is it on purpose ?
+>> Subsystems or drivers may opt-in to this behavior by calling
+>> driver_deferred_probe_check_init_done() instead of just returning
+>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>> config to decide whether to continue to defer probe or not.
 >
-> Yes. The 32bit load address in the uImage header in pretty limited when
-> applied to 64bit ARM64. Even for ARM zImage is the preferred kernel format for
-> quite some time now, since it allows flexible load address, as well as
-> multi-platform kernels.
-Hi Baruch.
-I though that in terms of U-boot, the new FIT image is the preferred
-kernel format.
-Thanks,
-Ramon.
->
->> If not I'll be happy to add support for: make uImage
->> for arm64 targets.
->
-> baruch
->
-> --
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+> Should userspace have some involvement in this decision?  It knows if
+> it's got any intention of loading modules for example.  Kernel config
+> checks might be good enough, though it's going to be a pain to work out
+> if the relevant driver is built as a module for example.
+
+I looked into whether we could hook into uevents in some way. If we
+knew when all the coldplug events had been handled, that would be
+sufficient. But it doesn't look to me like we can tell when that
+happens with the uevent netlink socket. I think about the only thing
+we can tell is if userspace has opened a socket. I'm not all that
+familiar with how the whole sequence works, so other opinions on this
+would be helpful.
+
+Also, for this to work with serial consoles, we have to make the
+decision before we get to userspace. I couldn't get systemd to create
+serial gettys either if we deferred later. There's some dependence on
+/dev/console, but I didn't get to the bottom of it.
+
+Rob
