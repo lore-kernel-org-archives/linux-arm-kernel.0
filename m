@@ -1,133 +1,99 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 24 May 2018 16:18:30 -0700
-Subject: [PATCH v2 00/14] ARM Spectre variant 2 fixes
-In-Reply-To: <20180521114238.GN17671@n2100.armlinux.org.uk>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
-Message-ID: <6845807d-4838-53e4-91ad-a7c6ef081f58@gmail.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 24 May 2018 18:30:27 -0500
+Subject: [PATCH 1/6] coresight: remove CORESIGHT_LINKS_AND_SINKS
+ dependencies and selections
+In-Reply-To: <CANLsYkw-KcEM43pqWgGU1XYOfSTD4cmspNcPM-u+n9x6Xtazbg@mail.gmail.com>
+References: <20180517070643.GC13919@kroah.com>
+ <20180518012024.22645-1-kim.phillips@arm.com>
+ <20180522173140.GA25658@xps15>
+ <20180523145155.5929dd09c78a056ef19329be@arm.com>
+ <CANLsYkw-KcEM43pqWgGU1XYOfSTD4cmspNcPM-u+n9x6Xtazbg@mail.gmail.com>
+Message-ID: <20180524183027.dc498058344604e2d6027eff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2018 04:42 AM, Russell King - ARM Linux wrote:
-> This is the second posting - the original cover note is below.  Comments
-> from previous series addresesd:
-> - Drop R7 and R8 changes.
-> - Remove "PSCI" from the hypervisor version of the workaround.
+On Thu, 24 May 2018 09:32:48 -0600
+Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+
+> On 23 May 2018 at 13:51, Kim Phillips <kim.phillips@arm.com> wrote:
+> > On Tue, 22 May 2018 11:31:40 -0600
+> > Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+> >
+> >> On Thu, May 17, 2018 at 08:20:19PM -0500, Kim Phillips wrote:
+> >> > A coresight topology doesn't need to include links, i.e., a source can
+> >> > be directly connected to a sink.  As such, selecting and/or depending on
+> >> > LINKS_AND_SINKS is no longer needed.
+> >>
+> >> I'm good with this patch but now the help text for CORESIGHT_LINKS_AND_SINKS no
+> >> longer match what the config does.  I see two ways to fix this:
+> >
+> > This patch doesn't change what the config does, it just changes what
+> > other config options depend on it.
+> >
+> >> 1) Rework the help text.
+> >
+> > I don't see how, given the above.  Here's the text:
+> >
+> > config CORESIGHT_LINKS_AND_SINKS
+> >         bool "CoreSight Link and Sink drivers"
+> >         help
+> >           This enables support for CoreSight link and sink drivers that are
+> >           responsible for transporting and collecting the trace data
+> >           respectively.  Link and sinks are dynamically aggregated with a trace
+> >           entity at run time to form a complete trace path.
+> >
+> > What part of that becomes invalid with this patch?
 > 
->  arch/arm/include/asm/bugs.h        |   6 +-
->  arch/arm/include/asm/cp15.h        |   3 +
->  arch/arm/include/asm/cputype.h     |   5 ++
->  arch/arm/include/asm/kvm_asm.h     |   2 -
->  arch/arm/include/asm/kvm_host.h    |  14 +++-
->  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
->  arch/arm/include/asm/proc-fns.h    |   4 +
->  arch/arm/include/asm/system_misc.h |   8 ++
->  arch/arm/kernel/Makefile           |   1 +
->  arch/arm/kernel/bugs.c             |  18 +++++
->  arch/arm/kernel/smp.c              |   4 +
->  arch/arm/kernel/suspend.c          |   2 +
->  arch/arm/kvm/hyp/hyp-entry.S       | 108 +++++++++++++++++++++++++-
->  arch/arm/mm/Kconfig                |  23 ++++++
->  arch/arm/mm/Makefile               |   2 +-
->  arch/arm/mm/fault.c                |   3 +
->  arch/arm/mm/proc-macros.S          |   3 +-
->  arch/arm/mm/proc-v7-2level.S       |   6 --
->  arch/arm/mm/proc-v7-bugs.c         | 130 +++++++++++++++++++++++++++++++
->  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++++++--------
->  20 files changed, 469 insertions(+), 50 deletions(-)
->  create mode 100644 arch/arm/kernel/bugs.c
->  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> Looking at the new Kconfig, what sink component depend on
+> CORESIGHT_LINKS_AND_SINKS?
 
-Since there appears to be more work needed in the PSCI/KVM changes
-(patches 9 through 14), how about we go with the "bare-metal" parts:
-patches 1-8 first and try to get those included ASAP?
+How does that affect the description text?  The description text
+doesn't insinuate any implicit dependencies or non-.
 
-The rationale being that a lot of affected people have Linux running on
-ARMv7-A Cortex-A, typically A9, A15, Brahma-B15, and are in need of
-those patches but do not necessarily require KVM fixes right now, and
-even less so PSCI infrastructure to mitigate ARMv8-A running in AArch32.
+> config CORESIGHT_LINKS
 
-In terms of backporting to -stable, and because the spectre variant 1
-patches have not been submitted yet, it is not like we can lump
-everything in one go anyway, so we are not making the lives of the
--stable maintainers any worse than it currently is?
+Please, not another gratuitous config name change, I've already
+experienced usage regressions from the CORESIGHT_QCOM_REPLICATOR =>
+CORESIGHT_DYNAMIC_REPLICATOR change:
 
-Yay or nay?
+https://patchwork.kernel.org/patch/10206023/
 
+>          bool "CoreSight Link drivers"
+>          help
+>            This enables support for CoreSight link drivers that are responsible
+>            for transporting trace data from source to sink.  Links are
+> dynamically
+>            aggregated with other traces entities at run time to form a
+> complete trace
+>            path.
+
+Oh, I see, so your point is that LINKS_AND_SINKS doesn't technically
+build any sink drivers?  That's completely orthogonal to removing a
+dependency chain:  that just tells me the name was a poor choice in the
+first place maybe?  I don't see where the Makefile may have built a
+sink, but it may be before the move to drivers/hwtracing/coresight, or
+some other reorganization.
+
+> >> 2) Rework CORESIGHT_LINKS_AND_SINKS to be CORESIGHT_FUNNEL and move
+> >> coresight-replicator.o under CORESIGHT_DYNAMIC_REPLICATOR in the Makefile. I
+> >> really liked your idea of making the replicator driver intelligent enough to
+> >> deal with both DT and platform declaration, which merges two driver into one.
+> >>
+> >> I'm obviously favouring the second option but recognise it doesn't have to be
+> >> part of this patchet.  So for this set please rework the help text for
+> >> CORESIGHT_LINKS_AND_SINKS.  Once we've dealt with this topic we can refactor the
+> >> replicator driver.
+> >
+> > I'd really like to just focus on getting CoreSight to load as modules,
+> > something for which this patch isn't technically required...
 > 
-> On Wed, May 16, 2018 at 11:59:49AM +0100, Russell King - ARM Linux wrote:
->> This series addresses the Spectre variant 2 issues on ARM Cortex and
->> Broadcom Brahma B15 CPUs.  Due to the complexity of the bug, it is not
->> possible to verify that this series fixes any of the bugs, since it
->> has not been able to reproduce these exact scenarios using test
->> programs.
->>
->> I believe that this covers the entire extent of the Spectre variant 2
->> issues, with the exception of Cortex A53 and Cortex A72 processors as
->> these require a substantially more complex solution (except where the
->> workaround is implemented in PSCI firmware.)
->>
->> Spectre variant 1 is not covered by this series.
->>
->> The patch series is based partly on Marc Zyngier's work from February -
->> two of the KVM patches are from Marc's work.
->>
->> The main differences are:
->> - Inclusion of more processors as per current ARM Ltd security update
->>   documentation.
->> - Extension of "bugs" infrastructure to detect Cortex A8 and Cortex A15
->>   CPUs missing out on the IBE bit being set on (re-)entry to the kernel
->>   through all paths.
->> - Handle all suspect userspace-touching-kernelspace aborts irrespective
->>   of mapping type.
->>
->> The first patch will trivially conflict with the Broadcom Brahma
->> updates already in arm-soc - it has been necessary to independently
->> add the ID definitions for the B15 CPU.
->>
->> Having worked through this series, I'm of the opinion that the
->> define_processor_functions macro in proc-v7 are probably  more hassle
->> than they're worth - here, we don't need the global equivalent symbols,
->> because we never refer to them from the kernel code for any V7
->> processor (MULTI_CPU is always defined.)
->>
->> This series is currently in my "spectre" branch (along with some
->> Spectre variant 1 patches.)
->>
->> Please carefully review.
->>
->>  arch/arm/include/asm/bugs.h        |   6 +-
->>  arch/arm/include/asm/cp15.h        |   3 +
->>  arch/arm/include/asm/cputype.h     |   5 ++
->>  arch/arm/include/asm/kvm_asm.h     |   2 -
->>  arch/arm/include/asm/kvm_host.h    |  14 +++-
->>  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
->>  arch/arm/include/asm/proc-fns.h    |   4 +
->>  arch/arm/include/asm/system_misc.h |   8 ++
->>  arch/arm/kernel/Makefile           |   1 +
->>  arch/arm/kernel/bugs.c             |  18 +++++
->>  arch/arm/kernel/smp.c              |   4 +
->>  arch/arm/kernel/suspend.c          |   2 +
->>  arch/arm/kvm/hyp/hyp-entry.S       | 108 ++++++++++++++++++++++++-
->>  arch/arm/mm/Kconfig                |  23 ++++++
->>  arch/arm/mm/Makefile               |   2 +-
->>  arch/arm/mm/fault.c                |   3 +
->>  arch/arm/mm/proc-macros.S          |   3 +-
->>  arch/arm/mm/proc-v7-2level.S       |   6 --
->>  arch/arm/mm/proc-v7-bugs.c         | 130 ++++++++++++++++++++++++++++++
->>  arch/arm/mm/proc-v7.S              | 158 +++++++++++++++++++++++++++++--------
->>  20 files changed, 471 insertions(+), 52 deletions(-)
->>
->> -- 
->> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
->> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
->> According to speedtest.net: 8.21Mbps down 510kbps up
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> The only thing I'm asking is that the config description and help text
+> reflect what the Makefile does.
 
+argh, wellll, it's a completely different change, and we're now
+completely off the modularization topic, and I'm uncomfortable doing
+reorgs on things I don't understand, renaming CONFIG_s, esp. when
+others such as the REPLICATOR, since as far as I know, that's also a
+link??
 
--- 
-Florian
+Kim
