@@ -1,9 +1,9 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 24 May 2018 17:07:19 +0200
-Subject: [PATCH v2 7/9] ARM: dts: gose: Drop MTD partitioning from DT
+Date: Thu, 24 May 2018 17:07:18 +0200
+Subject: [PATCH v2 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
 In-Reply-To: <20180524150721.28964-1-marek.vasut+renesas@gmail.com>
 References: <20180524150721.28964-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180524150721.28964-7-marek.vasut+renesas@gmail.com>
+Message-ID: <20180524150721.28964-6-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,7 +19,6 @@ following to your kernel command line:
 
 Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Cc: Simon Horman <horms+renesas@verge.net.au>
@@ -28,14 +27,14 @@ Cc: linux-renesas-soc at vger.kernel.org
 ---
 V2: Drop the @0 anchor from the commit message, use 4m
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 21 ---------------------
+ arch/arm/boot/dts/r8a7792-wheat.dts | 21 ---------------------
  1 file changed, 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index aa209f6e5d71..b2dd54fbe40c 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -676,27 +676,6 @@
+diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
+index db01de7a3811..93f78716225a 100644
+--- a/arch/arm/boot/dts/r8a7792-wheat.dts
++++ b/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -217,27 +217,6 @@
  		spi-cpol;
  		spi-cpha;
  		m25p,fast-read;
