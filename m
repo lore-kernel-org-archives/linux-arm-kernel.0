@@ -1,79 +1,35 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 24 May 2018 16:04:23 +0100
-Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <5B06B17C.1090809@huawei.com>
+Date: Thu, 24 May 2018 16:04:39 +0100
+Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
+In-Reply-To: <20180524115039.GA10260@apalos>
 References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-14-jean-philippe.brucker@arm.com>
- <5B0536A3.1000304@huawei.com> <cd13f60d-b282-3804-4ca7-2d34476c597f@arm.com>
- <5B06B17C.1090809@huawei.com>
-Message-ID: <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
+ <20180511190641.23008-4-jean-philippe.brucker@arm.com>
+ <20180516163117.622693ea@jacob-builder>
+ <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
+ <20180522094334.71f0e36b@jacob-builder>
+ <f73b4a0e-669e-8483-88d7-1b2c8a2b9934@arm.com>
+ <20180524115039.GA10260@apalos>
+Message-ID: <19e82a74-429a-3f86-119e-32b12082d0ff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/18 13:35, Xu Zaibo wrote:
->> Right, sva_init() must be called once for any device that intends to use
->> bind(). For the second process though, group->sva_enabled will be true
->> so we won't call sva_init() again, only bind().
+On 24/05/18 12:50, Ilias Apalodimas wrote:
+>> Interesting, I hadn't thought about this use-case before. At first I
+>> thought you were talking about mdev devices assigned to VMs, but I think
+>> you're referring to mdevs assigned to userspace drivers instead? Out of
+>> curiosity, is it only theoretical or does someone actually need this?
 > 
-> Well, while I create mediated devices based on one parent device to support multiple
-> processes(a new process will create a new 'vfio_group' for the corresponding mediated device,
-> and 'sva_enabled' cannot work any more), in fact, *sva_init and *sva_shutdown are basically
-> working on parent device, so, as a result, I just only need sva initiation and shutdown on the
-> parent device only once. So I change the two as following:
-> 
-> @@ -551,8 +565,18 @@ int iommu_sva_device_init(struct device *dev, unsigned long features,
->       if (features & ~IOMMU_SVA_FEAT_IOPF)
->          return -EINVAL;
-> 
-> +    /* If already exists, do nothing  */
-> +    mutex_lock(&dev->iommu_param->lock);
-> +    if (dev->iommu_param->sva_param) {
-> +        mutex_unlock(&dev->iommu_param->lock);
-> +        return 0;
-> +    }
-> +    mutex_unlock(&dev->iommu_param->lock);
-> 
->      if (features & IOMMU_SVA_FEAT_IOPF) {
->          ret = iommu_register_device_fault_handler(dev, iommu_queue_iopf,
-> 
-> 
-> @@ -621,6 +646,14 @@ int iommu_sva_device_shutdown(struct device *dev)
->      if (!domain)
->          return -ENODEV;
-> 
-> +    /* If any other process is working on the device, shut down does nothing. */
-> +    mutex_lock(&dev->iommu_param->lock);
-> +    if (!list_empty(&dev->iommu_param->sva_param->mm_list)) {
-> +        mutex_unlock(&dev->iommu_param->lock);
-> +        return 0;
-> +    }
-> +    mutex_unlock(&dev->iommu_param->lock);
+> There has been some non upstreamed efforts to have mdev and produce userspace
+> drivers. Huawei is using it on what they call "wrapdrive" for crypto devices and
+> we did a proof of concept for ethernet interfaces. At the time we choose not to
+> involve the IOMMU for the reason you mentioned, but having it there would be
+> good.
 
-I don't think iommu-sva.c is the best place for this, it's probably
-better to implement an intermediate layer (the mediating driver), that
-calls iommu_sva_device_init() and iommu_sva_device_shutdown() once. Then
-vfio-pci would still call these functions itself, but for mdev the
-mediating driver keeps a refcount of groups, and calls device_shutdown()
-only when freeing the last mdev.
-
-A device driver (non mdev in this example) expects to be able to free
-all its resources after sva_device_shutdown() returns. Imagine the
-mm_list isn't empty (mm_exit() is running late), and instead of waiting
-in unbind_dev_all() below, we return 0 immediately. Then the calling
-driver frees its resources, and the mm_exit callback along with private
-data passed to bind() disappear. If a mm_exit() is still running in
-parallel, then it will try to access freed data and corrupt memory. So
-in this function if mm_list isn't empty, the only thing we can do is wait.
+I'm guessing there were good reasons to do it that way but I wonder, is
+it not simpler to just have the kernel driver create a /dev/foo, with a
+standard ioctl/mmap/poll interface? Here VFIO adds a layer of
+indirection, and since the mediating driver has to implement these
+operations already, what is gained?
 
 Thanks,
 Jean
-
-> +
->      __iommu_sva_unbind_dev_all(dev);
-> 
->      mutex_lock(&dev->iommu_param->lock);
-> 
-> I add the above two checkings in both *sva_init and *sva_shutdown, it is working now,
-> but i don't know if it will cause any new problems. What's more, i doubt if it is
-> reasonable to check this to avoid repeating operation in VFIO, maybe it is better to check
-> in IOMMU. :)
