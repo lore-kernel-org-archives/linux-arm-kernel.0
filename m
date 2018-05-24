@@ -1,312 +1,99 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 24 May 2018 09:06:52 +0200
-Subject: [PATCH v2 02/13] ARM: pxa: add dma slave map
-In-Reply-To: <20180524070703.11901-1-robert.jarzmik@free.fr>
-References: <20180524070703.11901-1-robert.jarzmik@free.fr>
-Message-ID: <20180524070703.11901-3-robert.jarzmik@free.fr>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 May 2018 09:13:32 +0200
+Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
+ bindings
+In-Reply-To: <28c374e6-b440-f785-b371-03fe15c8bc4b@st.com>
+References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
+ <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
+ <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
+ <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
+ <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
+ <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+ <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com> <20180517063640.GK5130@dell>
+ <28c374e6-b440-f785-b371-03fe15c8bc4b@st.com>
+Message-ID: <CACRpkdbZ2Hr7cc5+dyPaL0CKYuy2-oosEr=UPo60+3beDCVi9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove the specific knowledge of the dma mapping from PXA
-drivers, add a default slave map for pxa architectures.
+On Fri, May 18, 2018 at 9:29 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+> On 05/17/2018 08:36 AM, Lee Jones wrote:
+>> On Wed, 16 May 2018, Amelie DELAUNAY wrote:
+>>> On 05/16/2018 04:20 PM, Linus Walleij wrote:
+>>>> On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+>>>>
+>>>>> Indeed, stmfx has other functions than GPIO. But, after comments done
+>>>>> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
+>>>>> child drivers into a single PINCTRL/GPIO driver because of the following
+>>>>> reasons:
+>>>>> - Other stmfx functions (IDD measurement and TouchScreen controller) are
+>>>>> not used on any of the boards using an stmfx and supported by Linux, so
+>>>>> no way to test these functions, and no need to maintain them while they
+>>>>> are not being used.
+>>>>> - But, in the case a new board will use more than GPIO function on
+>>>>> stmfx, the actual implementation allow to easily extract common init
+>>>>> part of stmfx and put it in an MFD driver.
+>>>>>
+>>>>> So I could remove gpio sub-node and put its contents in stmfx node and
+>>>>> keep single PINCTRL/GPIO driver for the time being.
+>>>>> Please advise,
+>>>>
+>>>> I would normally advice to use the right modeling from the start, create
+>>>> the MFD driver and spawn the devices from there. It is confusing
+>>>> if the layout of the driver(s) doesn't really match the layout of the
+>>>> hardware.
+>>>>
+>>>> I understand that it is a pain to write new MFD drivers to get your
+>>>> things going and it would be "nice to get this working really quick
+>>>> now" but in my experience it is better to do it right from the start.
+>>>>
+>>>
+>>> Hi Linus,
+>>>
+>>> Thanks for your advice. I understand the point.
+>>> So, the right modeling would be to:
+>>> - create an MFD driver with the common init part of stmfx
+>>> - remove all common init part of stmfx-pinctrl driver and keep only all
+>>> gpio/pinctrl functions.
+>>>
+>>> I will not develop the other stmfx functions (IDD measurement driver and
+>>> TouchScreen controller driver) because, as explained ealier, they are
+>>> not used on any of the boards using an stmfx and supported by Linux, so
+>>> no way to test these functions, and no need to maintain them while they
+>>> are not being used.
+>>>
+>>> Lee, are you OK with that ?
+>>
+>> I missed a lot of this conversation I think, but from what I've read,
+>> it sounds fine.
+>>
+>
+> I summarize the situation:
+> - I still don't have an official datasheet for STMFX device which could
+> justify the use of an MFD driver;
+> - the MFD driver will contain the STMFX chip initialization stuff such
+> as regmap initialization (regmap structure will be shared with the
+> child), chip initialization, global interrupt management;
+> - there will be only one child (GPIO/PINCTRL node) for the time being.
 
-This is the first step, and once all drivers are converted,
-pxad_filter_fn() will be made static, and the DMA resources removed from
-device.c.
+But there will be more devices in it. And they will invariably be put
+to use later, and there will be new versions of the chip as well, and
+then you will be happy about doing the MFD core, which makes it
+easy to add new variants with different subdevices.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
----
-Since v1: revamped the SSP part, split into pxa25.c, pxa27x.c and
-          pxa3xx.c, and add pxa-i2s.
----
- arch/arm/mach-pxa/devices.c | 12 +++---------
- arch/arm/mach-pxa/devices.h |  6 +++++-
- arch/arm/mach-pxa/pxa25x.c  | 41 ++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-pxa/pxa27x.c  | 42 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-pxa/pxa3xx.c  | 44 +++++++++++++++++++++++++++++++++++++++++++-
- 5 files changed, 132 insertions(+), 13 deletions(-)
+> So, is "MFD driver + GPIO/PINCTRL driver" the right modeling, and does
+> it still sound fine after this summary ? :)
 
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index d7c9a8476d57..1e8915fc340d 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -4,6 +4,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- #include <linux/spi/pxa2xx_spi.h>
- #include <linux/platform_data/i2c-pxa.h>
- 
-@@ -1202,11 +1203,6 @@ void __init pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info)
- 	platform_device_add(pd);
- }
- 
--static struct mmp_dma_platdata pxa_dma_pdata = {
--	.dma_channels	= 0,
--	.nb_requestors	= 0,
--};
--
- static struct resource pxa_dma_resource[] = {
- 	[0] = {
- 		.start	= 0x40000000,
-@@ -1233,9 +1229,7 @@ static struct platform_device pxa2xx_pxa_dma = {
- 	.resource	= pxa_dma_resource,
- };
- 
--void __init pxa2xx_set_dmac_info(int nb_channels, int nb_requestors)
-+void __init pxa2xx_set_dmac_info(struct mmp_dma_platdata *dma_pdata)
- {
--	pxa_dma_pdata.dma_channels = nb_channels;
--	pxa_dma_pdata.nb_requestors = nb_requestors;
--	pxa_register_device(&pxa2xx_pxa_dma, &pxa_dma_pdata);
-+	pxa_register_device(&pxa2xx_pxa_dma, dma_pdata);
- }
-diff --git a/arch/arm/mach-pxa/devices.h b/arch/arm/mach-pxa/devices.h
-index 11263f7c455b..498b07bc6a3e 100644
---- a/arch/arm/mach-pxa/devices.h
-+++ b/arch/arm/mach-pxa/devices.h
-@@ -1,4 +1,8 @@
- /* SPDX-License-Identifier: GPL-2.0 */
-+#define PDMA_FILTER_PARAM(_prio, _requestor) (&(struct pxad_param) { \
-+	.prio = PXAD_PRIO_##_prio, .drcmr = _requestor })
-+struct mmp_dma_platdata;
-+
- extern struct platform_device pxa_device_pmu;
- extern struct platform_device pxa_device_mci;
- extern struct platform_device pxa3xx_device_mci2;
-@@ -55,7 +59,7 @@ extern struct platform_device pxa3xx_device_gpio;
- extern struct platform_device pxa93x_device_gpio;
- 
- void __init pxa_register_device(struct platform_device *dev, void *data);
--void __init pxa2xx_set_dmac_info(int nb_channels, int nb_requestors);
-+void __init pxa2xx_set_dmac_info(struct mmp_dma_platdata *dma_pdata);
- 
- struct i2c_pxa_platform_data;
- extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index ba431fad5c47..2d61de41a9d5 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -16,6 +16,8 @@
-  * initialization stuff for PXA machines which can be overridden later if
-  * need be.
-  */
-+#include <linux/dmaengine.h>
-+#include <linux/dma/pxa-dma.h>
- #include <linux/gpio.h>
- #include <linux/gpio-pxa.h>
- #include <linux/module.h>
-@@ -26,6 +28,7 @@
- #include <linux/syscore_ops.h>
- #include <linux/irq.h>
- #include <linux/irqchip.h>
-+#include <linux/platform_data/mmp_dma.h>
- 
- #include <asm/mach/map.h>
- #include <asm/suspend.h>
-@@ -201,6 +204,42 @@ static struct platform_device *pxa25x_devices[] __initdata = {
- 	&pxa_device_asoc_platform,
- };
- 
-+static const struct dma_slave_map pxa25x_slave_map[] = {
-+	/* PXA25x, PXA27x and PXA3xx common entries */
-+	{ "pxa2xx-ac97", "pcm_pcm_mic_mono", PDMA_FILTER_PARAM(LOWEST, 8) },
-+	{ "pxa2xx-ac97", "pcm_pcm_aux_mono_in", PDMA_FILTER_PARAM(LOWEST, 9) },
-+	{ "pxa2xx-ac97", "pcm_pcm_aux_mono_out",
-+	  PDMA_FILTER_PARAM(LOWEST, 10) },
-+	{ "pxa2xx-ac97", "pcm_pcm_stereo_in", PDMA_FILTER_PARAM(LOWEST, 11) },
-+	{ "pxa2xx-ac97", "pcm_pcm_stereo_out", PDMA_FILTER_PARAM(LOWEST, 12) },
-+	{ "pxa-ssp-dai.1", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
-+	{ "pxa-ssp-dai.1", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
-+	{ "pxa-ssp-dai.2", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
-+	{ "pxa-ssp-dai.2", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
-+	{ "pxa2xx-ir", "rx", PDMA_FILTER_PARAM(LOWEST, 17) },
-+	{ "pxa2xx-ir", "tx", PDMA_FILTER_PARAM(LOWEST, 18) },
-+	{ "pxa2xx-mci.0", "rx", PDMA_FILTER_PARAM(LOWEST, 21) },
-+	{ "pxa2xx-mci.0", "tx", PDMA_FILTER_PARAM(LOWEST, 22) },
-+	{ "smc911x.0", "rx", PDMA_FILTER_PARAM(LOWEST, -1) },
-+	{ "smc911x.0", "tx", PDMA_FILTER_PARAM(LOWEST, -1) },
-+	{ "smc91x.0", "data", PDMA_FILTER_PARAM(LOWEST, -1) },
-+
-+	/* PXA25x specific map */
-+	{ "pxa25x-ssp.0", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
-+	{ "pxa25x-ssp.0", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
-+	{ "pxa25x-nssp.1", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
-+	{ "pxa25x-nssp.1", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
-+	{ "pxa25x-nssp.2", "rx", PDMA_FILTER_PARAM(LOWEST, 23) },
-+	{ "pxa25x-nssp.2", "tx", PDMA_FILTER_PARAM(LOWEST, 24) },
-+};
-+
-+static struct mmp_dma_platdata pxa25x_dma_pdata = {
-+	.dma_channels	= 16,
-+	.nb_requestors	= 40,
-+	.slave_map	= pxa25x_slave_map,
-+	.slave_map_cnt	= ARRAY_SIZE(pxa25x_slave_map),
-+};
-+
- static int __init pxa25x_init(void)
- {
- 	int ret = 0;
-@@ -215,7 +254,7 @@ static int __init pxa25x_init(void)
- 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
- 
- 		if (!of_have_populated_dt()) {
--			pxa2xx_set_dmac_info(16, 40);
-+			pxa2xx_set_dmac_info(&pxa25x_dma_pdata);
- 			pxa_register_device(&pxa25x_device_gpio, &pxa25x_gpio_info);
- 			ret = platform_add_devices(pxa25x_devices,
- 						   ARRAY_SIZE(pxa25x_devices));
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 0c06f383ad52..b44e3c4f3013 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -11,6 +11,8 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/dmaengine.h>
-+#include <linux/dma/pxa-dma.h>
- #include <linux/gpio.h>
- #include <linux/gpio-pxa.h>
- #include <linux/module.h>
-@@ -23,6 +25,7 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/platform_data/i2c-pxa.h>
-+#include <linux/platform_data/mmp_dma.h>
- 
- #include <asm/mach/map.h>
- #include <mach/hardware.h>
-@@ -297,6 +300,43 @@ static struct platform_device *devices[] __initdata = {
- 	&pxa27x_device_pwm1,
- };
- 
-+static const struct dma_slave_map pxa27x_slave_map[] = {
-+	/* PXA25x, PXA27x and PXA3xx common entries */
-+	{ "pxa2xx-ac97", "pcm_pcm_mic_mono", PDMA_FILTER_PARAM(LOWEST, 8) },
-+	{ "pxa2xx-ac97", "pcm_pcm_aux_mono_in", PDMA_FILTER_PARAM(LOWEST, 9) },
-+	{ "pxa2xx-ac97", "pcm_pcm_aux_mono_out",
-+	  PDMA_FILTER_PARAM(LOWEST, 10) },
-+	{ "pxa2xx-ac97", "pcm_pcm_stereo_in", PDMA_FILTER_PARAM(LOWEST, 11) },
-+	{ "pxa2xx-ac97", "pcm_pcm_stereo_out", PDMA_FILTER_PARAM(LOWEST, 12) },
-+	{ "pxa-ssp-dai.0", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
-+	{ "pxa-ssp-dai.0", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
-+	{ "pxa-ssp-dai.1", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
-+	{ "pxa-ssp-dai.1", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
-+	{ "pxa2xx-ir", "rx", PDMA_FILTER_PARAM(LOWEST, 17) },
-+	{ "pxa2xx-ir", "tx", PDMA_FILTER_PARAM(LOWEST, 18) },
-+	{ "pxa2xx-mci.0", "rx", PDMA_FILTER_PARAM(LOWEST, 21) },
-+	{ "pxa2xx-mci.0", "tx", PDMA_FILTER_PARAM(LOWEST, 22) },
-+	{ "pxa-ssp-dai.2", "rx", PDMA_FILTER_PARAM(LOWEST, 66) },
-+	{ "pxa-ssp-dai.2", "tx", PDMA_FILTER_PARAM(LOWEST, 67) },
-+	{ "smc911x.0", "rx", PDMA_FILTER_PARAM(LOWEST, -1) },
-+	{ "smc911x.0", "tx", PDMA_FILTER_PARAM(LOWEST, -1) },
-+	{ "smc91x.0", "data", PDMA_FILTER_PARAM(LOWEST, -1) },
-+
-+	/* PXA27x specific map */
-+	{ "pxa2xx-i2s", "rx", PDMA_FILTER_PARAM(LOWEST, 2) },
-+	{ "pxa2xx-i2s", "tx", PDMA_FILTER_PARAM(LOWEST, 3) },
-+	{ "pxa27x-camera.0", "CI_Y", PDMA_FILTER_PARAM(HIGHEST, 68) },
-+	{ "pxa27x-camera.0", "CI_U", PDMA_FILTER_PARAM(HIGHEST, 69) },
-+	{ "pxa27x-camera.0", "CI_V", PDMA_FILTER_PARAM(HIGHEST, 70) },
-+};
-+
-+static struct mmp_dma_platdata pxa27x_dma_pdata = {
-+	.dma_channels	= 32,
-+	.nb_requestors	= 75,
-+	.slave_map	= pxa27x_slave_map,
-+	.slave_map_cnt	= ARRAY_SIZE(pxa27x_slave_map),
-+};
-+
- static int __init pxa27x_init(void)
- {
- 	int ret = 0;
-@@ -313,7 +353,7 @@ static int __init pxa27x_init(void)
- 		if (!of_have_populated_dt()) {
- 			pxa_register_device(&pxa27x_device_gpio,
- 					    &pxa27x_gpio_info);
--			pxa2xx_set_dmac_info(32, 75);
-+			pxa2xx_set_dmac_info(&pxa27x_dma_pdata);
- 			ret = platform_add_devices(devices,
- 						   ARRAY_SIZE(devices));
- 		}
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 4b8a0df8ea57..b5ca4be093ec 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -12,6 +12,8 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/dmaengine.h>
-+#include <linux/dma/pxa-dma.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -24,6 +26,7 @@
- #include <linux/of.h>
- #include <linux/syscore_ops.h>
- #include <linux/platform_data/i2c-pxa.h>
-+#include <linux/platform_data/mmp_dma.h>
- 
- #include <asm/mach/map.h>
- #include <asm/suspend.h>
-@@ -421,6 +424,45 @@ static struct platform_device *devices[] __initdata = {
- 	&pxa27x_device_pwm1,
- };
- 
-+static const struct dma_slave_map pxa3xx_slave_map[] = {
-+	/* PXA25x, PXA27x and PXA3xx common entries */
-+	{ "pxa2xx-ac97", "pcm_pcm_mic_mono", PDMA_FILTER_PARAM(LOWEST, 8) },
-+	{ "pxa2xx-ac97", "pcm_pcm_aux_mono_in", PDMA_FILTER_PARAM(LOWEST, 9) },
-+	{ "pxa2xx-ac97", "pcm_pcm_aux_mono_out",
-+	  PDMA_FILTER_PARAM(LOWEST, 10) },
-+	{ "pxa2xx-ac97", "pcm_pcm_stereo_in", PDMA_FILTER_PARAM(LOWEST, 11) },
-+	{ "pxa2xx-ac97", "pcm_pcm_stereo_out", PDMA_FILTER_PARAM(LOWEST, 12) },
-+	{ "pxa-ssp-dai.0", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
-+	{ "pxa-ssp-dai.0", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
-+	{ "pxa-ssp-dai.1", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
-+	{ "pxa-ssp-dai.1", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
-+	{ "pxa2xx-ir", "rx", PDMA_FILTER_PARAM(LOWEST, 17) },
-+	{ "pxa2xx-ir", "tx", PDMA_FILTER_PARAM(LOWEST, 18) },
-+	{ "pxa2xx-mci.0", "rx", PDMA_FILTER_PARAM(LOWEST, 21) },
-+	{ "pxa2xx-mci.0", "tx", PDMA_FILTER_PARAM(LOWEST, 22) },
-+	{ "pxa-ssp-dai.2", "rx", PDMA_FILTER_PARAM(LOWEST, 66) },
-+	{ "pxa-ssp-dai.2", "tx", PDMA_FILTER_PARAM(LOWEST, 67) },
-+	{ "smc911x.0", "rx", PDMA_FILTER_PARAM(LOWEST, -1) },
-+	{ "smc911x.0", "tx", PDMA_FILTER_PARAM(LOWEST, -1) },
-+	{ "smc91x.0", "data", PDMA_FILTER_PARAM(LOWEST, -1) },
-+
-+	/* PXA3xx specific map */
-+	{ "pxa-ssp-dai.3", "rx", PDMA_FILTER_PARAM(LOWEST, 2) },
-+	{ "pxa-ssp-dai.3", "tx", PDMA_FILTER_PARAM(LOWEST, 3) },
-+	{ "pxa2xx-mci.1", "rx", PDMA_FILTER_PARAM(LOWEST, 93) },
-+	{ "pxa2xx-mci.1", "tx", PDMA_FILTER_PARAM(LOWEST, 94) },
-+	{ "pxa3xx-nand", "data", PDMA_FILTER_PARAM(LOWEST, 97) },
-+	{ "pxa2xx-mci.2", "rx", PDMA_FILTER_PARAM(LOWEST, 100) },
-+	{ "pxa2xx-mci.2", "tx", PDMA_FILTER_PARAM(LOWEST, 101) },
-+};
-+
-+static struct mmp_dma_platdata pxa3xx_dma_pdata = {
-+	.dma_channels	= 32,
-+	.nb_requestors	= 100,
-+	.slave_map	= pxa3xx_slave_map,
-+	.slave_map_cnt	= ARRAY_SIZE(pxa3xx_slave_map),
-+};
-+
- static int __init pxa3xx_init(void)
- {
- 	int ret = 0;
-@@ -452,7 +494,7 @@ static int __init pxa3xx_init(void)
- 		if (of_have_populated_dt())
- 			return 0;
- 
--		pxa2xx_set_dmac_info(32, 100);
-+		pxa2xx_set_dmac_info(&pxa3xx_dma_pdata);
- 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 		if (ret)
- 			return ret;
--- 
-2.11.0
+No I think it should use an MFD core.
+
+Mainly because of device tree concerns.
+
+The main reason is that the device tree bindings will be different if
+you add an MFD core later, the GPIO and pinctrl driver will
+move to a child node, making old device trees incompatible.
+
+We could have a single driver in GPIO+pin control if it is a child
+of an MFD node in the device tree, but it doesn't make much
+sense as the I2C device need to be probing to the MFD core.
+
+Yours,
+Linus Walleij
