@@ -1,53 +1,34 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 24 May 2018 16:04:20 +0800
-Subject: [GIT PULL] berlin dt64 changes for v4.18
-Message-ID: <20180524160420.35da91b5@xhacker.debian>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 May 2018 10:07:02 +0200
+Subject: [PATCH v5 4/4] gpiolib: discourage gpiochip_add_pin[group]_range
+ for DT pinctrls
+In-Reply-To: <2969992a1005d7e7f4ea23d4c684d2f10d4a0aca.1526935804.git.chunkeey@gmail.com>
+References: <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
+ <0ae3376606a89bcdf3fe753a5c967f7103699e09.1526935804.git.chunkeey@gmail.com>
+ <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
+ <2969992a1005d7e7f4ea23d4c684d2f10d4a0aca.1526935804.git.chunkeey@gmail.com>
+Message-ID: <CACRpkdbOTfoj293LO-nyPEbxwXOWRuNyTqwxb_MWoQ2wM3=-Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, May 21, 2018 at 10:57 PM, Christian Lamparter
+<chunkeey@gmail.com> wrote:
 
-Here is the pull request for berlin dt64 changes for v4.18.
+> This patch adds the stern warning to the kerneldoc text of both
+> gpiochip_add_pin[group]_range() functions in hope of detering
+> developers from ever using them in their DeviceTree-supported
+> pinctrl drivers in the future.
+>
+> For anyone affected: Please refer to Section 2.1 of
+> Documentation/devicetree/bindings/gpio/gpio.txt on how to
+> bind pinctrl and gpio drivers via the "gpio-ranges" property.
+>
+> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
 
-Thanks,
-Jisheng
+I'm a big fan of this patch, so applied.
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+I wouldn't mind a pr_info() warning about it at runtime too,
+but this is nice.
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin64-dt-for-v4.18
-
-for you to fetch changes up to 031106ce95a201f6dd4c5ebf35abb900cf34e2ba:
-
-  arm64: dts: move berlin SoC files from marvell dir to synaptics dir (2018-05-24 13:25:45 +0800)
-
-----------------------------------------------------------------
-Berlin64 DT changes for v4.18
-
- - use SPDX-License-Identifier for dts(i) files
- - move berlin SoC dts(i) files from marvell dir to synaptics dir
-
-----------------------------------------------------------------
-Jisheng Zhang (3):
-      arm64: dts: berlin4ct: use SPDX-License-Identifier
-      arm64: dts: berlin4ct-*.dts: use SPDX-License-Identifier
-      arm64: dts: move berlin SoC files from marvell dir to synaptics dir
-
- arch/arm64/boot/dts/Makefile                       |  1 +
- arch/arm64/boot/dts/marvell/Makefile               |  4 --
- arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts      | 66 ----------------------
- arch/arm64/boot/dts/marvell/berlin4ct-stb.dts      | 66 ----------------------
- arch/arm64/boot/dts/synaptics/Makefile             |  4 ++
- arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts    | 29 ++++++++++
- arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts    | 29 ++++++++++
- .../boot/dts/{marvell => synaptics}/berlin4ct.dtsi | 39 +------------
- 8 files changed, 64 insertions(+), 174 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
- delete mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
- create mode 100644 arch/arm64/boot/dts/synaptics/Makefile
- create mode 100644 arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
- create mode 100644 arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi (78%)
+Yours,
+Linus Walleij
