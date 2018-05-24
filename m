@@ -1,60 +1,75 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 24 May 2018 07:43:05 -0400
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
- <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
-Message-ID: <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 May 2018 12:43:30 +0100
+Subject: [PATCH 07/14] arm64: ssbd: Skip apply_ssbd if not using dynamic
+ mitigation
+In-Reply-To: <20180522150648.28297-8-marc.zyngier@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-8-marc.zyngier@arm.com>
+Message-ID: <20180524114330.e2fb3edfqaqi2nvg@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/23/2018 6:57 PM, Sinan Kaya wrote:
->> The crash seems to indicate that the hpsa device attempted a DMA after
->> we cleared the Root Port's PCI_COMMAND_MASTER, which means
->> hpsa_shutdown() didn't stop DMA from the device (it looks like *most*
->> shutdown methods don't disable device DMA, so it's in good company).
-> All drivers are expected to shutdown DMA and interrupts in their shutdown()
-> routines. They can skip removing threads, data structures etc. but DMA and
-> interrupt disabling are required. This is the difference between shutdown()
-> and remove() callbacks.
+On Tue, May 22, 2018 at 04:06:41PM +0100, Marc Zyngier wrote:
+> In order to avoid checking arm64_ssbd_callback_required on each
+> kernel entry/exit even if no mitigation is required, let's
+> add yet another alternative that by default jumps over the mitigation,
+> and that gets nop'ed out if we're doing dynamic mitigation.
+> 
+> Think of it as a poor man's static key...
 
-I found this note yesterday to see why we are not disabling the devices in the
-PCI core itself. 
+I guess in future we can magic up a more general asm static key if we
+need them elsewhere.
 
-pci_device_remove()
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	/*
-	 * We would love to complain here if pci_dev->is_enabled is set, that
-	 * the driver should have called pci_disable_device(), but the
-	 * unfortunate fact is there are too many odd BIOS and bridge setups
-	 * that don't like drivers doing that all of the time.
-	 * Oh well, we can dream of sane hardware when we sleep, no matter how
-	 * horrible the crap we have to deal with is when we are awake...
-	 */ 
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-Ryan, can you discard the previous patch and test this one instead? remove() path
-in hpsa driver seems to call pci_disable_device() via 
+Mark.
 
-hpsa_remove_one()
-	hpsa_free_pci_init()
-
-but nothing on the shutdown path.
-
-diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
-index 4ed3d26..3823f04 100644
---- a/drivers/scsi/hpsa.c
-+++ b/drivers/scsi/hpsa.c
-@@ -8651,6 +8651,7 @@ static void hpsa_shutdown(struct pci_dev *pdev)
-        h->access.set_intr_mask(h, HPSA_INTR_OFF);
-        hpsa_free_irqs(h);                      /* init_one 4 */
-        hpsa_disable_interrupt_mode(h);         /* pci_init 2 */
-+       pci_disable_device(h->pdev);
- }
-
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 14 ++++++++++++++
+>  arch/arm64/kernel/entry.S      |  3 +++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index f1d4e75b0ddd..8f686f39b9c1 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -283,6 +283,20 @@ void __init arm64_update_smccc_conduit(struct alt_instr *alt,
+>  	*updptr = cpu_to_le32(insn);
+>  }
+>  
+> +void __init arm64_enable_wa2_handling(struct alt_instr *alt,
+> +				      __le32 *origptr, __le32 *updptr,
+> +				      int nr_inst)
+> +{
+> +	BUG_ON(nr_inst != 1);
+> +	/*
+> +	 * Only allow mitigation on EL1 entry/exit and guest
+> +	 * ARCH_WORKAROUND_2 handling if the SSBD state allows it to
+> +	 * be flipped.
+> +	 */
+> +	if (arm64_get_ssbd_state() == ARM64_SSBD_EL1_ENTRY)
+> +		*updptr = cpu_to_le32(aarch64_insn_gen_nop());
+> +}
+> +
+>  static void do_ssbd(bool state)
+>  {
+>  	switch (psci_ops.conduit) {
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 29ad672a6abd..e6f6e2339b22 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -142,6 +142,9 @@ alternative_else_nop_endif
+>  	// to save/restore them if required.
+>  	.macro	apply_ssbd, state, targ, tmp1, tmp2
+>  #ifdef CONFIG_ARM64_SSBD
+> +alternative_cb	arm64_enable_wa2_handling
+> +	b	\targ
+> +alternative_cb_end
+>  	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
+>  	cbz	\tmp2, \targ
+>  	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+> -- 
+> 2.14.2
+> 
