@@ -1,61 +1,144 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:32 +0100
-Subject: [PATCH v11 03/19] arm64: Use update{,_tsk}_thread_flag()
-In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-4-git-send-email-Dave.Martin@arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 24 May 2018 10:39:26 -0700
+Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+ <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180524173926.GC14924@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses the new update_thread_flag() helpers to simplify a
-couple of if () set; else clear; constructs.
+On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
 
-No functional change.
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Krait CPUs have a handful of L2 cache controller registers that
+> live behind a cp15 based indirection register. First you program
+> the indirection register (l2cpselr) to point the L2 'window'
+> register (l2cpdr) at what you want to read/write.  Then you
+> read/write the 'window' register to do what you want. The
+> l2cpselr register is not banked per-cpu so we must lock around
+> accesses to it to prevent other CPUs from re-pointing l2cpdr
+> underneath us.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+This should have your signed-off-by here as well.
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 12e1c96..9d85373 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -618,10 +618,8 @@ int sve_set_vector_length(struct task_struct *task,
- 	task->thread.sve_vl = vl;
- 
- out:
--	if (flags & PR_SVE_VL_INHERIT)
--		set_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
--	else
--		clear_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
-+	update_tsk_thread_flag(task, TIF_SVE_VL_INHERIT,
-+			       flags & PR_SVE_VL_INHERIT);
- 
- 	return 0;
- }
-@@ -910,12 +908,12 @@ void fpsimd_thread_switch(struct task_struct *next)
- 		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
- 		 * upon the next return to userland.
- 		 */
--		if (__this_cpu_read(fpsimd_last_state.st) ==
--			&next->thread.uw.fpsimd_state
--		    && next->thread.fpsimd_cpu == smp_processor_id())
--			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
--		else
--			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-+		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
-+					&next->thread.uw.fpsimd_state;
-+		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
-+
-+		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
-+				       wrong_task || wrong_cpu);
- 	}
- }
- 
--- 
-2.1.4
+Apart from that:
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> ---
+>  arch/arm/common/Kconfig                   |  3 ++
+>  arch/arm/common/Makefile                  |  1 +
+>  arch/arm/common/krait-l2-accessors.c      | 48 +++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/krait-l2-accessors.h | 10 +++++++
+>  4 files changed, 62 insertions(+)
+>  create mode 100644 arch/arm/common/krait-l2-accessors.c
+>  create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+> 
+> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+> index e5ad070..c8e1986 100644
+> --- a/arch/arm/common/Kconfig
+> +++ b/arch/arm/common/Kconfig
+> @@ -7,6 +7,9 @@ config DMABOUNCE
+>  	bool
+>  	select ZONE_DMA
+>  
+> +config KRAIT_L2_ACCESSORS
+> +	bool
+> +
+>  config SHARP_LOCOMO
+>  	bool
+>  
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index 70b4a14..eec6cd1 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -7,6 +7,7 @@ obj-y				+= firmware.o
+>  
+>  obj-$(CONFIG_SA1111)		+= sa1111.o
+>  obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+> +obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
+>  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+>  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+>  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+> diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+> new file mode 100644
+> index 0000000..9a97dda
+> --- /dev/null
+> +++ b/arch/arm/common/krait-l2-accessors.c
+> @@ -0,0 +1,48 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> +
+> +#include <linux/spinlock.h>
+> +#include <linux/export.h>
+> +
+> +#include <asm/barrier.h>
+> +#include <asm/krait-l2-accessors.h>
+> +
+> +static DEFINE_RAW_SPINLOCK(krait_l2_lock);
+> +
+> +void krait_set_l2_indirect_reg(u32 addr, u32 val)
+> +{
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&krait_l2_lock, flags);
+> +	/*
+> +	 * Select the L2 window by poking l2cpselr, then write to the window
+> +	 * via l2cpdr.
+> +	 */
+> +	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
+> +	isb();
+> +	asm volatile ("mcr p15, 3, %0, c15, c0, 7 @ l2cpdr" : : "r" (val));
+> +	isb();
+> +
+> +	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
+> +}
+> +EXPORT_SYMBOL(krait_set_l2_indirect_reg);
+> +
+> +u32 krait_get_l2_indirect_reg(u32 addr)
+> +{
+> +	u32 val;
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&krait_l2_lock, flags);
+> +	/*
+> +	 * Select the L2 window by poking l2cpselr, then read from the window
+> +	 * via l2cpdr.
+> +	 */
+> +	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
+> +	isb();
+> +	asm volatile ("mrc p15, 3, %0, c15, c0, 7 @ l2cpdr" : "=r" (val));
+> +
+> +	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
+> +
+> +	return val;
+> +}
+> +EXPORT_SYMBOL(krait_get_l2_indirect_reg);
+> diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
+> new file mode 100644
+> index 0000000..dd7c474
+> --- /dev/null
+> +++ b/arch/arm/include/asm/krait-l2-accessors.h
+> @@ -0,0 +1,10 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> +
+> +#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
+> +#define __ASMARM_KRAIT_L2_ACCESSORS_H
+> +
+> +extern void krait_set_l2_indirect_reg(u32 addr, u32 val);
+> +extern u32 krait_get_l2_indirect_reg(u32 addr);
+> +
+> +#endif
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
