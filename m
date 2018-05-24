@@ -1,11 +1,11 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 24 May 2018 20:56:39 +0200
+Date: Thu, 24 May 2018 21:00:31 +0200
 Subject: [PATCH v2 1/8] driver core: make deferring probe after init
  optional
 In-Reply-To: <20180524175024.19874-2-robh@kernel.org>
 References: <20180524175024.19874-1-robh@kernel.org>
  <20180524175024.19874-2-robh@kernel.org>
-Message-ID: <20180524185639.GA31019@kroah.com>
+Message-ID: <20180524190031.GB31019@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -45,9 +45,18 @@ On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
 > +int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
 > +{
 > +	if (optional && initcalls_done) {
-> +		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
 
-You really only need dev_warn(), here, right?
+Wait, what's the "optional" mess here?
+
+The caller knows this value, so why do you need to even pass it in here?
+
+And bool values that are not obvious are horrid.  I had to go look this
+up when reading the later patches that just passed "true" in this
+variable as I had no idea what that meant.
+
+So as-is, no, this isn't ok, sorry.
+
+And at the least, this needs some kerneldoc to explain it :)
 
 thanks,
 
