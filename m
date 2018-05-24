@@ -1,45 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 May 2018 13:16:38 +0100
-Subject: [PATCH 09/14] arm64: ssbd: Introduce thread flag to control
- userspace mitigation
-In-Reply-To: <20180524120121.pjdw7qaybcsbf4fl@lakrids.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 May 2018 13:11:35 +0100
+Subject: [PATCH 11/14] arm64: KVM: Add HYP per-cpu accessors
+In-Reply-To: <20180522150648.28297-12-marc.zyngier@arm.com>
 References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-10-marc.zyngier@arm.com>
- <20180524120121.pjdw7qaybcsbf4fl@lakrids.cambridge.arm.com>
-Message-ID: <833776ac-2b8c-b0f7-dcff-9c55afd67c65@arm.com>
+ <20180522150648.28297-12-marc.zyngier@arm.com>
+Message-ID: <20180524121134.qwrbezitjb25afyt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/18 13:01, Mark Rutland wrote:
-> On Tue, May 22, 2018 at 04:06:43PM +0100, Marc Zyngier wrote:
->> In order to allow userspace to be mitigated on demand, let's
->> introduce a new thread flag that prevents the mitigation from
->> being turned off when exiting to userspace, and doesn't turn
->> it on on entry into the kernel (with the assumtion that the
+On Tue, May 22, 2018 at 04:06:45PM +0100, Marc Zyngier wrote:
+> As we're going to require to access per-cpu variables at EL2,
+> let's craft the minimum set of accessors required to implement
+> reading a per-cpu variable, relying on tpidr_el2 to contain the
+> per-cpu offset.
 > 
-> Nit: s/assumtion/assumption/
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  arch/arm64/include/asm/kvm_asm.h | 27 +++++++++++++++++++++++++--
+>  1 file changed, 25 insertions(+), 2 deletions(-)
 > 
->> mitigation is always enabled in the kernel itself).
->>
->> This will be used by a prctl interface introduced in a later
->> patch.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index f6648a3e4152..fefd8cf42c35 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -71,14 +71,37 @@ extern u32 __kvm_get_mdcr_el2(void);
+>  
+>  extern u32 __init_stage2_translation(void);
+>  
+> +/* Home-grown __this_cpu_{ptr,read} variants that always work at HYP */
+> +#define __hyp_this_cpu_ptr(sym)						\
+> +	({								\
+> +		void *__ptr = hyp_symbol_addr(sym);			\
+> +		__ptr += read_sysreg(tpidr_el2);			\
+> +		(typeof(&sym))__ptr;					\
+> +	 })
+> +
+> +#define __hyp_this_cpu_read(sym)					\
+> +	({								\
+> +		*__hyp_this_cpu_ptr(sym);				\
+> +	 })
+> +
+>  #else /* __ASSEMBLY__ */
+>  
+> -.macro get_host_ctxt reg, tmp
+> -	adr_l	\reg, kvm_host_cpu_state
+> +.macro hyp_adr_this_cpu reg, sym, tmp
+> +	adr_l	\reg, \sym
+>  	mrs	\tmp, tpidr_el2
+>  	add	\reg, \reg, \tmp
+>  .endm
+>  
+> +.macro hyp_ldr_this_cpu reg, sym, tmp
+> +	adr_l	\reg, \sym
+> +	mrs	\tmp, tpidr_el2
+> +	ldr	\reg,  [\reg, \tmp]
+> +.endm
+> +
+> +.macro get_host_ctxt reg, tmp
+> +	hyp_adr_this_cpu \reg, kvm_host_cpu_state, \tmp
+> +.endm
+> +
+>  .macro get_vcpu_ptr vcpu, ctxt
+>  	get_host_ctxt \ctxt, \vcpu
+>  	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
+> -- 
+> 2.14.2
 > 
-> On the assumption that this flag cannot be flipped while a task is in
-> userspace:
-
-Well, that's the case unless you get into the seccomp thing, which does
-change TIF_SSBD on all threads of the task, without taking it to the
-kernel first. That nicely breaks the state machine, and you end-up
-running non-mitigated in the kernel. Oops.
-
-I have a couple of patches fixing that, using a second flag
-(TIF_SSBD_PENDING) that gets turned into the real thing on exit to
-userspace. It's pretty ugly though.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
