@@ -1,73 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 May 2018 13:24:14 +0100
-Subject: [PATCH 10/14] arm64: ssbd: Add prctl interface for per-thread
- mitigation
-In-Reply-To: <20180522150648.28297-11-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-11-marc.zyngier@arm.com>
-Message-ID: <20180524122413.GD8689@arm.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Thu, 24 May 2018 14:24:19 +0200
+Subject: [PATCH 07/24] arm64: ilp32: add documentation on the ILP32 ABI
+ for ARM64
+In-Reply-To: <20180524121524.GA3873@yury-thinkpad>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180516081910.10067-8-ynorov@caviumnetworks.com>
+ <20180523140620.GA27215@amd> <20180524121524.GA3873@yury-thinkpad>
+Message-ID: <ACC31423-0367-4DB4-B077-B85639FA416C@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 04:06:44PM +0100, Marc Zyngier wrote:
-> If running on a system that performs dynamic SSBD mitigation, allow
-> userspace to request the mitigation for itself. This is implemented
-> as a prctl call, allowing the mitigation to be enabled or disabled at
-> will for this particular thread.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/Makefile |   1 +
->  arch/arm64/kernel/ssbd.c   | 107 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 108 insertions(+)
->  create mode 100644 arch/arm64/kernel/ssbd.c
-> 
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index bf825f38d206..0025f8691046 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -54,6 +54,7 @@ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
->  arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
->  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
->  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
-> +arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/ probes/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
-> new file mode 100644
-> index 000000000000..34e3c430176b
-> --- /dev/null
-> +++ b/arch/arm64/kernel/ssbd.c
-> @@ -0,0 +1,107 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2018 ARM Ltd, All Rights Reserved.
-> + */
-> +
-> +#include <linux/sched.h>
-> +#include <linux/thread_info.h>
-> +
-> +#include <asm/cpufeature.h>
-> +
-> +/*
-> + * prctl interface for SSBD
-> + * FIXME: Drop the below ifdefery once the common interface has been merged.
-> + */
-> +#ifdef PR_SPEC_STORE_BYPASS
-> +static int ssbd_prctl_set(struct task_struct *task, unsigned long ctrl)
-> +{
-> +	int state = arm64_get_ssbd_state();
-> +
-> +	/* Unsupported or already mitigated */
-> +	if (state == ARM64_SSBD_UNKNOWN)
-> +		return -EINVAL;
-> +	if (state == ARM64_SSBD_MITIGATED)
-> +		return -EPERM;
+Yury & Pavel,
 
-I'm not sure this is the best thing to do. If the firmware says that the
-CPU is mitigated, we should probably return 0 for PR_SPEC_DISABLE but
--EPERM for PR_SPEC_ENABLE (i.e. the part that doesn't work is disabling
-the mitigation).
+> On 24 May 2018, at 14:15, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> 
+> Hi Pavel,
+> 
+> On Wed, May 23, 2018 at 04:06:20PM +0200, Pavel Machek wrote:
+>> On Wed 2018-05-16 11:18:52, Yury Norov wrote:
+>>> Based on Andrew Pinski's patch-series.
+>>> 
+>>> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+>> 
+>> So Andrew's signoff should be here?
+> 
+> Yes it should, but it lost since v4. I'll restore it.
+> 
+>>> ---
+>>> Documentation/arm64/ilp32.txt | 45 +++++++++++++++++++++++++++++++++++
+>>> 1 file changed, 45 insertions(+)
+>>> create mode 100644 Documentation/arm64/ilp32.txt
+>>> 
+>>> diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+>>> new file mode 100644
+>>> index 000000000000..d0fd5109c4b2
+>>> --- /dev/null
+>>> +++ b/Documentation/arm64/ilp32.txt
+>>> @@ -0,0 +1,45 @@
+>>> +ILP32 AARCH64 SYSCALL ABI
+>>> +=========================
+>>> +
+>>> +This document describes the ILP32 syscall ABI and where it differs
+>>> +from the generic compat linux syscall interface.
+>> 
+>> I was hoping to learn what ILP32 is / what is it good for, but no,
+>> this does not tell me... it would be good to do a short explanation
+>> here, and maybe reference it from cover letter of the series...
+>> 								Pavel
+> 
+> ILP32 is ABI acronym that means "Integers, Longs and Pointers are 32-bit".
+> And LP64 means "Longs and Pointers are 64-bit?.
 
-Will
+Just a nitpick: ILP32 is in fact just the memory model, but calling from ILP32
+code into the Linux kernel requires modifications to the syscall-ABI due to
+datastructure layout changing (every time a pointer or a ?long? is present in
+a structure). As such structures are passed between the userspace and the
+kernel (and also due to the fact that time_t is an ?unsigned long? in the C
+language standard), modifications to the syscall ABI in Linux are needed to
+support ILP32 processes calling into the kernel.
+
+Things get a bit more involved, as the final consensus was to pass 64bit
+quantities in the lower half of 2 64bit registers instead of as a single register:
+this makes the way (on AArch64) that an ILP32 process calls into the kernel
+more dissimilar from a LP64 process calling the same syscall.
+
+What this rambling boils down to is: ?ILP32" is the memory model, whereas
+this series deals with the ?Linux/AArch64 syscall ABI for ILP32 processes?.
+
+Thanks,
+Phil.
+
+> 
+> There's AN490 - "ILP32 for AArch64 Whitepaper" from ARM which covers
+> the topic:
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dai0490a/ar01s01.html
+> 
+> And some talks:
+> http://connect.linaro.org/resource/bkk16/bkk16-305b/
+> 
+> Briefly, ILP32 is 32-bit ABI that works with AARCH64 instruction set. It looks
+> better in some performance tests, and is useful for compatibility with 32-bit
+> legacy code.
+> 
+> If you're more familiar with x86 terminology, in ARM world LP64 corresponds
+> to x86_64, AARCH32_EL0 corresponds to x86_32, and ILP32 corresponds to x32
+> ABI.
+> 
+> I'll add link to AN490 in next submission.
+> 
+> Yury
+> 
+>> -- 
+>> (english) http://www.livejournal.com/~pavelmachek
+>> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
