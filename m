@@ -1,36 +1,101 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 24 May 2018 09:59:47 -0700
-Subject: [PATCH] firmware: ti_sci: Switch to SPDX Licensing
-In-Reply-To: <744eadd5-4b28-1a72-ed38-4102717564a2@ti.com>
-References: <20180223114150.9980-1-lokeshvutla@ti.com>
- <d80df115-d6db-4aff-b201-60fc07f89088@oracle.com>
- <bbe19392-8902-b2bc-aa78-a99372e756b5@ti.com>
- <07823efb-e0bb-3c4e-6234-df4b5219fabc@oracle.com>
- <744eadd5-4b28-1a72-ed38-4102717564a2@ti.com>
-Message-ID: <2e8ee067-b3a0-da9f-329f-0f3a04246172@oracle.com>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Thu, 24 May 2018 10:04:09 -0700
+Subject: [PATCHv5 1/8] dt-bindings, firmware: add Intel Stratix10 service
+ layer binding
+In-Reply-To: <1527179600-26441-2-git-send-email-richard.gong@linux.intel.com>
+References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
+ <1527179600-26441-2-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <20180524170409.GA4051@archbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/23/2018 6:10 PM, Lokesh Vutla wrote:
-> Hi Santosh,
+On Thu, May 24, 2018 at 11:33:13AM -0500, richard.gong at linux.intel.com wrote:
+> From: Richard Gong <richard.gong@intel.com>
 > 
-> On 2/26/2018 12:27 PM, santosh.shilimkar at oracle.com wrote:
->> On 2/25/18 10:20 PM, Lokesh Vutla wrote:
->>>
->>>
->>> On Monday 26 February 2018 06:20 AM, Santosh Shilimkar wrote:
->>>> 2/23/2018 3:41 AM, Lokesh Vutla wrote:
->>>>> Switch to SPDX licensing and drop the GPL text which comes redundant.
->>>>>
->>>>> Acked-by: Nishanth Menon <nm@ti.com>
->>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>>> ---
->>>> Does this change the original license in any aspect ?
->>>
->>> No, it doesn't change the original license. Just a switch to SPDX format.
->>>
->> Okie..
+> Add a device tree binding for the Intel Stratix10 service layer driver
 > 
-> Gentle ping. Are you planning to take this patch?
+> Signed-off-by: Richard Gong <richard.gong@intel.com>
+> Signed-off-by: Alan Tull <atull@kernel.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Moritz Fischer <mdf@kernel.org>
+> ---
+> v2: Change to put service layer driver node under the firmware node
+>     Change compatible to "intel, stratix10-svc"
+> v3: No change
+> v4: Add Rob's Reviewed-by
+> v5: No change
+> ---
+>  .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
 > 
-https://www.spinics.net/lists/arm-kernel/msg651182.html
+> diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+> new file mode 100644
+> index 0000000..1fa6606
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+> @@ -0,0 +1,57 @@
+> +Intel Service Layer Driver for Stratix10 SoC
+> +============================================
+> +Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
+> +processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
+> +configured from HPS, there needs to be a way for HPS to notify SDM the
+> +location and size of the configuration data. Then SDM will get the
+> +configuration data from that location and perform the FPGA configuration.
+> +
+> +To meet the whole system security needs and support virtual machine requesting
+> +communication with SDM, only the secure world of software (EL3, Exception
+> +Layer 3) can interface with SDM. All software entities running on other
+> +exception layers must channel through the EL3 software whenever it needs
+> +service from SDM.
+> +
+> +Intel Stratix10 service layer driver, running at privileged exception level
+> +(EL1, Exception Layer 1), interfaces with the service providers and provides
+> +the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
+> +driver also manages secure monitor call (SMC) to communicate with secure monitor
+> +code running in EL3.
+> +
+> +Required properties:
+> +-------------------
+> +The svc node has the following mandatory properties, must be located under
+> +the firmware node.
+> +
+> +- compatible: "intel,stratix10-svc"
+> +- method: smc or hvc
+> +        smc - Secure Monitor Call
+> +        hvc - Hypervisor Call
+> +- memory-region:
+> +	phandle to the reserved memory node. See
+> +	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> +	for details
+> +
+> +Example:
+> +-------
+> +
+> +	reserved-memory {
+> +                #address-cells = <2>;
+> +                #size-cells = <2>;
+> +                ranges;
+> +
+> +                service_reserved: svcbuffer at 0 {
+> +                        compatible = "shared-dma-pool";
+> +                        reg = <0x0 0x0 0x0 0x1000000>;
+> +                        alignment = <0x1000>;
+> +                        no-map;
+> +                };
+> +        };
+> +
+> +	firmware {
+> +		svc {
+> +			compatible = "intel,stratix10-svc";
+> +			method = "smc";
+> +			memory-region = <&service_reserved>;
+> +		};
+> +	};
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
