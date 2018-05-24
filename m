@@ -1,52 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 May 2018 14:09:49 +0100
-Subject: [PATCH 6/9] asm-generic/bitops/atomic.h: Rewrite using
- atomic_fetch_*
-In-Reply-To: <20180524124734.GE8689@arm.com>
-References: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
- <1527159586-8578-7-git-send-email-will.deacon@arm.com>
- <20180524124410.GF12198@hirez.programming.kicks-ass.net>
- <20180524124734.GE8689@arm.com>
-Message-ID: <20180524130948.f37eltocl5tnittp@lakrids.cambridge.arm.com>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Thu, 24 May 2018 09:12:16 -0400
+Subject: [PATCH 1/3] ARM: dts: k2hk: add dts node for k2hk hw_rng driver
+In-Reply-To: <1527167538-29837-1-git-send-email-vitalya@ti.com>
+References: <1527167538-29837-1-git-send-email-vitalya@ti.com>
+Message-ID: <1527167538-29837-2-git-send-email-vitalya@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 01:47:39PM +0100, Will Deacon wrote:
-> On Thu, May 24, 2018 at 02:44:10PM +0200, Peter Zijlstra wrote:
-> > On Thu, May 24, 2018 at 11:59:43AM +0100, Will Deacon wrote:
-> > > +static inline void set_bit(unsigned int nr, volatile unsigned long *p)
-> > >  {
-> > > +	p += BIT_WORD(nr);
-> > > +	atomic_long_fetch_or_relaxed(BIT_MASK(nr), (atomic_long_t *)p);
-> > >  }
-> > >  
-> > > +static inline void clear_bit(unsigned int nr, volatile unsigned long *p)
-> > >  {
-> > > +	p += BIT_WORD(nr);
-> > > +	atomic_long_fetch_andnot_relaxed(BIT_MASK(nr), (atomic_long_t *)p);
-> > >  }
-> > >  
-> > > +static inline void change_bit(unsigned int nr, volatile unsigned long *p)
-> > >  {
-> > > +	p += BIT_WORD(nr);
-> > > +	atomic_long_fetch_xor_relaxed(BIT_MASK(nr), (atomic_long_t *)p);
-> > >  }
-> > 
-> > Why use the fetch variants here?
-> 
-> I noticed the same thing just now; I'll drop that and just use the
-> non-value-returning variants. It's shame that I can't do the same for
-> the lock.h unlock code, but we don't have non-returning release variants.
+This patch adds dts node for k2hk hw_random generator driver
 
-As an aside, If I complete the autogeneration stuff, it'll be possible
-to generate those. I split out the necessary barriers in [1], but I
-still have a lot of other preparatory cleanup to do.
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+[t-kristo at ti.com: added missing addresses from node identifiers]
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2hk-netcp.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-IIUC, the void-returning atomic ops are relaxed, so trying to unify that
-with the usual rule that no suffix means fence will slow things down
-unless we want to do a treewide substitition to fixup for that.
-
-Thanks,
-Mark.
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/commit/?h=atomics/api-unification&id=c6b9ff2627d06776e427a7f1a7f83caeff3db536
+diff --git a/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi b/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
+index b88c068..e203145 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
++++ b/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
+@@ -228,3 +228,23 @@ netcp: netcp at 2000000 {
+ 		};
+ 	};
+ };
++
++sa_subsys: subsys at 20c0000 {
++	compatible = "simple-bus";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 0x20c0000 0x40000>;
++
++	sa_config: subsys at 0 {
++		compatible = "syscon";
++		reg = <0x0 0x100>;
++	};
++
++	rng at 24000 {
++		compatible = "ti,keystone-rng";
++		reg = <0x24000 0x1000>;
++		ti,syscon-sa-cfg = <&sa_config>;
++		clocks = <&clksa>;
++		clock-names = "fck";
++	};
++};
+-- 
+2.7.4
