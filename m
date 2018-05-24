@@ -1,106 +1,53 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu, 24 May 2018 11:33:12 -0500
-Subject: [PATCHv5 0/8] Add Intel Stratix10 FPGA manager and service layer 
-Message-ID: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
+Date: Thu, 24 May 2018 11:33:16 -0500
+Subject: [PATCHv5 4/8] dt-bindings: fpga: add Stratix10 SoC FPGA manager
+ binding
+In-Reply-To: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
+References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1527179600-26441-5-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+From: Alan Tull <atull@kernel.org>
 
-This is the 5th submission of Intel stratix10 service layer patches. Intel
-Stratix10 FPGA manager, which is 1st Stratix10 service layer client, is
-included in this submission.
+Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
 
-Stratix10 service layer patches have been reviewed internally by Alan Tull
-and other colleagues at Intel.
-
-Some features of the Intel Stratix10 SoC require a level of privilege
-higher than the kernel is granted. Such secure features include
-FPGA programming. In terms of the ARMv8 architecture, the kernel runs
-at Exception Level 1 (EL1), access to the features requires
-Exception Level 3 (EL3).
-
-The Intel Stratix10 service layer provides an in kernel API for drivers to
-request access to the secure features. The requests are queued and
-processed one by one. ARM?s SMCCC is used to pass the execution of the
-requests on to a secure monitor (EL3).
-
-Later the Intel Stratix10 service layer driver will be extended to provide
-services for QSPI, Crypto and warm reset.
-
-v2: add patches for FPGA manager, FPGA manager binding, dts and defconfig
-    remove intel-service subdirectory and intel-service.h, move intel-smc.h
-    and intel-service.c to driver/misc subdirectory
-    remove global variables
-    change service layer driver be 'default n'
-    correct SPDX markers
-    add timeout for do..while() loop
-    add kernel-doc for the functions and structs, correct multiline comments
-    replace kfifo_in/kfifo_out with kfifo_in_spinlocked/kfifo_out_spinlocked
-    rename struct intel_svc_data (at client header) to intel_svc_client_msg
-    rename struct intel_svc_private_mem to intel_svc_data
-    other corrections/changes from Intel internal code reviews
-v3: change all exported functions with "intel_svc_" as the prefix
-    increase timeout values for claiming back submitted buffer(s)
-    rename struct intel_command_reconfig_payload to
-    struct intel_svc_command_reconfig_payload
-    add pr_err() to provide the error return value
-    change to put fpga_mgr node under firmware/svc node
-    change to FPGA manager to align the update of service client APIs, and the
-    update of fpga_mgr device node
-    Other corrections/changes
-v4: s/intel/stratix10/ on some variables, structs, functions, and file names
-    intel-service.c -> stratix10-svc.c
-    intel-smc.h -> stratix10-smc.h
-    intel-service-client.h -> stratix10-svc-client.h
-    remove non-kernel-doc formatting
-    s/fpga-mgr at 0/fpga-mgr/ to remove unit_address at fpga_mgr node
-    add Rob's Reviewed-by
+Signed-off-by: Alan Tull <atull@kernel.org>
+Signed-off-by: Richard Gong <richard.gong@intel.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+v2: this patch is added in patch set version 2
+v3: change to put fpga_mgr node under firmware/svc node
+v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
     add Richard's signed-off-by
-v5: add a new API statix10_svc_done() which is called by service client
-    when client request is completed or error occurs during request
-    process. Which allows service layer to free its resources.
-    remove dummy client from service layer client header and service layer
-    source file.
-    add Rob's Reviewed-by
-    add a new file stratix10-svc.rst and add that to driver-api/index.rst
-    kernel-doc fixes
-
-Alan Tull (3):
-  dt-bindings: fpga: add Stratix10 SoC FPGA manager binding
-  arm64: dts: stratix10: add fpga manager and region
-  fpga: add intel stratix10 soc fpga manager driver
-
-Richard Gong (5):
-  dt-bindings, firmware: add Intel Stratix10 service layer binding
-  arm64: dts: stratix10: add stratix10 service driver binding to base
-    dtsi
-  driver, misc: add Intel Stratix10 service layer driver
-  defconfig: enable fpga and service layer
-  Documentation: driver-api: add stratix10 service layer
-
- .../bindings/firmware/intel,stratix10-svc.txt      |  57 ++
- .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt |  17 +
- Documentation/driver-api/index.rst                 |   1 +
- Documentation/driver-api/stratix10-svc.rst         |  32 +
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  33 +
- arch/arm64/configs/defconfig                       |   6 +
- drivers/fpga/Kconfig                               |   6 +
- drivers/fpga/Makefile                              |   1 +
- drivers/fpga/stratix10-soc.c                       | 545 ++++++++++++
- drivers/misc/Kconfig                               |  12 +
- drivers/misc/Makefile                              |   1 +
- drivers/misc/stratix10-smc.h                       | 205 +++++
- drivers/misc/stratix10-svc.c                       | 984 +++++++++++++++++++++
- include/linux/stratix10-svc-client.h               | 199 +++++
- 14 files changed, 2099 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+v5: add Reviewed-by Rob Herring
+---
+ .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
- create mode 100644 Documentation/driver-api/stratix10-svc.rst
- create mode 100644 drivers/fpga/stratix10-soc.c
- create mode 100644 drivers/misc/stratix10-smc.h
- create mode 100644 drivers/misc/stratix10-svc.c
- create mode 100644 include/linux/stratix10-svc-client.h
 
+diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+new file mode 100644
+index 0000000..6e03f79
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+@@ -0,0 +1,17 @@
++Intel Stratix10 SoC FPGA Manager
++
++Required properties:
++The fpga_mgr node has the following mandatory property, must be located under
++firmware/svc node.
++
++- compatible : should contain "intel,stratix10-soc-fpga-mgr"
++
++Example:
++
++	firmware {
++		svc {
++			fpga_mgr: fpga-mgr {
++				compatible = "intel,stratix10-soc-fpga-mgr";
++			};
++		};
++	};
 -- 
 2.7.4
