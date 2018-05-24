@@ -1,150 +1,120 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 24 May 2018 16:30:40 -0700
-Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP and
- suspend paths
-In-Reply-To: <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
-Message-ID: <b454e37c-52a8-387f-3649-8ce72c9a5b18@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 24 May 2018 18:47:21 -0500
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524222855.GD14924@minitux>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524222855.GD14924@minitux>
+Message-ID: <CAL_JsqLZFTszxs=t1=R0FQ3vP0scvpUBa6=Fb2S9LrTEvx4d_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2018 04:44 AM, Russell King wrote:
-> Check for CPU bugs when secondary processors are being brought online,
-> and also when CPUs are resuming from a low power mode.  This gives an
-> opportunity to check that processor specific bug workarounds are
-> correctly enabled for all paths that a CPU re-enters the kernel.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+On Thu, May 24, 2018 at 5:28 PM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Thu 24 May 10:50 PDT 2018, Rob Herring wrote:
+>
+>> Deferred probe will currently wait forever on dependent devices to probe,
+>> but sometimes a driver will never exist. It's also not always critical for
+>> a driver to exist. Platforms can rely on default configuration from the
+>> bootloader or reset defaults for things such as pinctrl and power domains.
+>> This is often the case with initial platform support until various drivers
+>> get enabled. There's at least 2 scenarios where deferred probe can render
+>> a platform broken. Both involve using a DT which has more devices and
+>> dependencies than the kernel supports. The 1st case is a driver may be
+>> disabled in the kernel config. The 2nd case is the kernel version may
+>> simply not have the dependent driver. This can happen if using a newer DT
+>> (provided by firmware perhaps) with a stable kernel version.
+>>
+>> Subsystems or drivers may opt-in to this behavior by calling
+>> driver_deferred_probe_check_init_done() instead of just returning
+>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>> config to decide whether to continue to defer probe or not.
+>>
+>
+> For builtin drivers this still looks reasonable.
+>
+> But I would like to have an additional clarification here stating that
+> drivers that might be targeted by this query must not be compiled as
+> modules.
+>
+> And I would prefer to see an ack from e.g. Arnd that arm-soc is okay
+> that we drop "tristate" on drivers affected by this; e.g. if we put this
+> in the pinctrl core then all pinctrl drivers should be "bool" and so
+> should any i2c, ssbi and spmi buses and drivers be.
 
-Something I missed, is that this correctly warns about e.g: missing the
-IBE bit for secondary cores, but it seems to be missing it for the boot CPU:
+For pinctrl, you are not affected now unless you change your DT. I
+made pinctrl opt-in since as you said it could lead to some
+intermittent problems. If iommu or power domains are required, then it
+should fail pretty hard.
 
-[    0.001053] CPU: Testing write buffer coherency: ok
-[    0.001086] CPU: Spectre v2: using ICIALLU workaround
-[    0.001304] CPU0: update cpu_capacity 1024
-[    0.001316] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.001693] Setting up static identity map for 0x200000 - 0x200060
-[    0.001769] Hierarchical SRCU implementation.
-[    0.003951] brcmstb: biuctrl: MCP: Write pairing already disabled
-[    0.004224] smp: Bringing up secondary CPUs ...
-[    0.004874] CPU1: update cpu_capacity 1024
-[    0.004877] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[    0.004881] CPU1: Spectre v2: firmware did not set auxiliary control
-register IBE bit, system vulnerable
-[    0.005604] CPU2: update cpu_capacity 1024
-[    0.005607] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
-[    0.005610] CPU2: Spectre v2: firmware did not set auxiliary control
-register IBE bit, system vulnerable
-[    0.006295] CPU3: update cpu_capacity 1024
-[    0.006299] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
-[    0.006302] CPU3: Spectre v2: firmware did not set auxiliary control
-register IBE bit, system vulnerable
-[    0.006377] smp: Brought up 1 node, 4 CPUs
-[    0.006389] SMP: Total of 4 processors activated (216.00 BogoMIPS).
-[    0.006398] CPU: All CPU(s) started in SVC mode.
+However, good luck getting your serial console to work if it has a
+pinctrl dependency and that's a module. It won't work because the
+console has to be up before userspace. Of course, you can just rely on
+earlycon, but that just proves that pinctrl is not required (at least
+for 1 serial pin). :)
 
-Which could be confusing if you intentionally restricted a SMP system to
-UP with maxcpus=1 or smp=off:
+Rob
 
-[    0.001043] CPU: Testing write buffer coherency: ok
-[    0.001077] CPU: Spectre v2: using ICIALLU workaround
-[    0.001291] CPU0: update cpu_capacity 1024
-[    0.001302] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.001516] Setting up static identity map for 0x200000 - 0x200060
-[    0.001593] Hierarchical SRCU implementation.
-[    0.003829] brcmstb: biuctrl: MCP: Write pairing already disabled
-[    0.004097] smp: Bringing up secondary CPUs ...
-[    0.004108] smp: Brought up 1 node, 1 CPU
-[    0.004117] SMP: Total of 1 processors activated (54.00 BogoMIPS).
-[    0.004126] CPU: All CPU(s) started in SVC mode.
-
-
-
-> ---
->  arch/arm/include/asm/bugs.h | 2 ++
->  arch/arm/kernel/bugs.c      | 5 +++++
->  arch/arm/kernel/smp.c       | 4 ++++
->  arch/arm/kernel/suspend.c   | 2 ++
->  4 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
-> index ed122d294f3f..73a99c72a930 100644
-> --- a/arch/arm/include/asm/bugs.h
-> +++ b/arch/arm/include/asm/bugs.h
-> @@ -14,8 +14,10 @@ extern void check_writebuffer_bugs(void);
->  
->  #ifdef CONFIG_MMU
->  extern void check_bugs(void);
-> +extern void check_other_bugs(void);
->  #else
->  #define check_bugs() do { } while (0)
-> +#define check_other_bugs() do { } while (0)
->  #endif
->  
->  #endif
-> diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-> index 88024028bb70..16e7ba2a9cc4 100644
-> --- a/arch/arm/kernel/bugs.c
-> +++ b/arch/arm/kernel/bugs.c
-> @@ -3,7 +3,12 @@
->  #include <asm/bugs.h>
->  #include <asm/proc-fns.h>
->  
-> +void check_other_bugs(void)
-> +{
-> +}
-> +
->  void __init check_bugs(void)
->  {
->  	check_writebuffer_bugs();
-> +	check_other_bugs();
->  }
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 2da087926ebe..5ad0b67b9e33 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -31,6 +31,7 @@
->  #include <linux/irq_work.h>
->  
->  #include <linux/atomic.h>
-> +#include <asm/bugs.h>
->  #include <asm/smp.h>
->  #include <asm/cacheflush.h>
->  #include <asm/cpu.h>
-> @@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
->  	 * before we continue - which happens after __cpu_up returns.
->  	 */
->  	set_cpu_online(cpu, true);
-> +
-> +	check_other_bugs();
-> +
->  	complete(&cpu_running);
->  
->  	local_irq_enable();
-> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-> index a40ebb7c0896..d08099269e35 100644
-> --- a/arch/arm/kernel/suspend.c
-> +++ b/arch/arm/kernel/suspend.c
-> @@ -3,6 +3,7 @@
->  #include <linux/slab.h>
->  #include <linux/mm_types.h>
->  
-> +#include <asm/bugs.h>
->  #include <asm/cacheflush.h>
->  #include <asm/idmap.h>
->  #include <asm/pgalloc.h>
-> @@ -36,6 +37,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
->  		cpu_switch_mm(mm->pgd, mm);
->  		local_flush_bp_all();
->  		local_flush_tlb_all();
-> +		check_other_bugs();
->  	}
->  
->  	return ret;
-> 
-
-
--- 
-Florian
+>
+> Regards,
+> Bjorn
+>
+>> Cc: Alexander Graf <agraf@suse.de>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  drivers/base/dd.c      | 17 +++++++++++++++++
+>>  include/linux/device.h |  2 ++
+>>  2 files changed, 19 insertions(+)
+>>
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index c9f54089429b..d6034718da6f 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -226,6 +226,16 @@ void device_unblock_probing(void)
+>>       driver_deferred_probe_trigger();
+>>  }
+>>
+>> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+>> +{
+>> +     if (optional && initcalls_done) {
+>> +             dev_WARN(dev, "ignoring dependency for device, assuming no driver");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     return -EPROBE_DEFER;
+>> +}
+>> +
+>>  /**
+>>   * deferred_probe_initcall() - Enable probing of deferred devices
+>>   *
+>> @@ -240,6 +250,13 @@ static int deferred_probe_initcall(void)
+>>       /* Sort as many dependencies as possible before exiting initcalls */
+>>       flush_work(&deferred_probe_work);
+>>       initcalls_done = true;
+>> +
+>> +     /*
+>> +      * Trigger deferred probe again, this time we won't defer anything
+>> +      * that is optional
+>> +      */
+>> +     driver_deferred_probe_trigger();
+>> +     flush_work(&deferred_probe_work);
+>>       return 0;
+>>  }
+>>  late_initcall(deferred_probe_initcall);
+>> diff --git a/include/linux/device.h b/include/linux/device.h
+>> index 477956990f5e..f3dafd44c285 100644
+>> --- a/include/linux/device.h
+>> +++ b/include/linux/device.h
+>> @@ -334,6 +334,8 @@ struct device *driver_find_device(struct device_driver *drv,
+>>                                 struct device *start, void *data,
+>>                                 int (*match)(struct device *dev, void *data));
+>>
+>> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional);
+>> +
+>>  /**
+>>   * struct subsys_interface - interfaces to device functions
+>>   * @name:       name of the device function
+>> --
+>> 2.17.0
+>>
