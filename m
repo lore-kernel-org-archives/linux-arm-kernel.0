@@ -1,54 +1,48 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 May 2018 12:50:21 -0500
-Subject: [PATCH v2 5/8] pinctrl: optionally stop deferring probe at end of
- initcalls
+Date: Thu, 24 May 2018 12:50:24 -0500
+Subject: [PATCH v2 8/8] PM / Domains: Stop deferring probe at the end of
+ initcall
 In-Reply-To: <20180524175024.19874-1-robh@kernel.org>
 References: <20180524175024.19874-1-robh@kernel.org>
-Message-ID: <20180524175024.19874-6-robh@kernel.org>
+Message-ID: <20180524175024.19874-9-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the pinctrl node in DT indicates that pin setup is optional and the
-defaults can be used with the 'pinctrl-use-default', then only defer probe
-until initcalls are done. This gives platforms the option to work without
-their pinctrl driver being enabled.
+All PM domain drivers must be built-in (at least those using DT), so
+there is no point deferring probe after initcalls are done. Continuing
+to defer probe may prevent booting successfully even if managing PM
+domains is not required. This can happen if the user failed to enable
+the driver or if power-domains are added to a platform's DT, but there
+is not yet a driver (e.g. a new DTB with an old kernel).
 
+Call the driver core function driver_deferred_probe_check_init_done()
+instead of just returning -EPROBE_DEFER to stop deferring probe when
+initcalls are done.
+
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Pavel Machek <pavel@ucw.cz>
+Cc: Len Brown <len.brown@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- drivers/pinctrl/devicetree.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ drivers/base/power/domain.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
-index b601039d6c69..74a31074b406 100644
---- a/drivers/pinctrl/devicetree.c
-+++ b/drivers/pinctrl/devicetree.c
-@@ -110,17 +110,23 @@ static int dt_to_map_one_config(struct pinctrl *p,
- 	int ret;
- 	struct pinctrl_map *map;
- 	unsigned num_maps;
-+	bool pctl_optional = false;
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 1ea0e2502e8e..6398cf786e6a 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2218,7 +2218,7 @@ int genpd_dev_pm_attach(struct device *dev)
+ 		mutex_unlock(&gpd_list_lock);
+ 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
+ 			__func__, PTR_ERR(pd));
+-		return -EPROBE_DEFER;
++		return driver_deferred_probe_check_init_done(dev, true);
+ 	}
  
- 	/* Find the pin controller containing np_config */
- 	np_pctldev = of_node_get(np_config);
- 	for (;;) {
-+		if (!pctl_optional)
-+			pctl_optional = of_property_read_bool(np_pctldev, "pinctrl-use-default");
-+
- 		np_pctldev = of_get_next_parent(np_pctldev);
- 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
--			dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
--				np_config);
- 			of_node_put(np_pctldev);
--			/* OK let's just assume this will appear later then */
--			return -EPROBE_DEFER;
-+			ret = driver_deferred_probe_check_init_done(p->dev, pctl_optional);
-+			if (ret == -EPROBE_DEFER)
-+				/* OK let's just assume this will appear later then */
-+				dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
-+					np_config);
-+			return ret;
- 		}
- 		/* If we're creating a hog we can use the passed pctldev */
- 		if (pctldev && (np_pctldev == p->dev->of_node))
+ 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
 -- 
 2.17.0
