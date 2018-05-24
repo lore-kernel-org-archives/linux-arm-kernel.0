@@ -1,37 +1,33 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 17:15:23 -0700
-Subject: [PATCH v3 5/6] arm64: dt: set initial SR watchdog timeout to 60
- seconds
+Date: Wed, 23 May 2018 17:15:20 -0700
+Subject: [PATCH v3 2/6] Documentation: DT: Add optional 'timeout-sec' property
+ for sp805
 In-Reply-To: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
 References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527120924-12131-6-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527120924-12131-3-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set initial Stingray watchdog timeout to 60 seconds
-
-By the time when the userspace watchdog daemon is ready and taking
-control over, the watchdog timeout will then be reset to what's
-configured in the daemon
+Update the SP805 binding document to add optional 'timeout-sec'
+devicetree property
 
 Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/watchdog/arm,sp805.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index 99aaff0..1e1cf49 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -420,6 +420,7 @@
- 			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&hsls_25m_div2_clk>, <&hsls_div4_clk>;
- 			clock-names = "wdogclk", "apb_pclk";
-+			timeout-sec = <60>;
- 		};
+diff --git a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+index 0fa3629..1debea3 100644
+--- a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
++++ b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+@@ -19,6 +19,8 @@ Required properties:
  
- 		gpio_hsls: gpio at d0000 {
+ Optional properties:
+ - interrupts:  Should specify WDT interrupt number
++- timeout-sec: Should specify default WDT timeout in seconds. If unset, the
++               default timeout in the driver is 30 seconds
+ 
+ Example:
+ 	watchdog at 66090000 {
 -- 
 2.1.4
