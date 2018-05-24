@@ -1,41 +1,67 @@
-From: sean@nyekjaer.dk (Sean Nyekjaer)
-Date: Thu, 24 May 2018 21:46:59 +0200
-Subject: [RESEND PATCH] ARM: dts: imx6q: Use correct SDMA script for SPI5 core
-Message-ID: <20180524194659.2546-1-sean.nyekjaer@prevas.dk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 24 May 2018 21:51:07 +0200
+Subject: [PATCH v2 2/8] driver core: add a deferred probe timeout
+In-Reply-To: <CAL_Jsq+wMJ+9JTGFGSsSW2Vww_mvAkzc3ujmftgbpQxDTrLHag@mail.gmail.com>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-3-robh@kernel.org>
+ <20180524190126.GC31019@kroah.com>
+ <CAL_Jsq+wMJ+9JTGFGSsSW2Vww_mvAkzc3ujmftgbpQxDTrLHag@mail.gmail.com>
+Message-ID: <20180524195107.GA4917@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the reference manual the shp_2_mcu / mcu_2_shp
-scripts must be used for devices connected through the SPBA.
+On Thu, May 24, 2018 at 02:45:48PM -0500, Rob Herring wrote:
+> On Thu, May 24, 2018 at 2:01 PM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
+> > On Thu, May 24, 2018 at 12:50:18PM -0500, Rob Herring wrote:
+> >> Deferring probe can wait forever on dependencies that may never appear
+> >> for a variety of reasons. This can be difficult to debug especially if
+> >> the console has dependencies or userspace fails to boot to a shell. Add
+> >> a timeout to retry probing without possibly optional dependencies and to
+> >> dump out the deferred probe pending list after retrying.
+> >>
+> >> This mechanism is intended for debug purposes. It won't work for the
+> >> console which needs to be enabled before userspace starts. However, if
+> >> the console's dependencies are resolved, then the kernel log will be
+> >> printed (as opposed to no output).
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> ---
+> >>  .../admin-guide/kernel-parameters.txt         |  7 +++++
+> >>  drivers/base/dd.c                             | 28 ++++++++++++++++++-
+> >>  2 files changed, 34 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> >> index 11fc28ecdb6d..dd3f40b34a24 100644
+> >> --- a/Documentation/admin-guide/kernel-parameters.txt
+> >> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> >> @@ -809,6 +809,13 @@
+> >>                       Defaults to the default architecture's huge page size
+> >>                       if not specified.
+> >>
+> >> +     deferred_probe_timeout=
+> >> +                     [KNL] Set a timeout in seconds for deferred probe to
+> >> +                     give up waiting on dependencies to probe. Only specific
+> >> +                     dependencies (subsystems or drivers) that have opted in
+> >> +                     will be ignored. This option also dumps out devices
+> >> +                     still on the deferred probe list after retrying.
+> >
+> > Doesn't sound like a debugging-only option.  I can see devices enabling
+> > this when they figure out that's the only way their platform can boot :)
+> 
+> Here's some rope...
+> 
+> No doubt it can be abused. So are you saying don't call it a debug
+> option or hide it behind a config option? And for the latter, what's
+> one that distros don't just turn on?
 
-This fixes an issue we saw with DMA transfers.
-Sometimes the SPI controller RX FIFO was not empty after a DMA
-transfer and the driver got stuck in the next PIO transfer when
-it read one word more than expected.
+If it is a debug option, make it obvious it's only for debugging.  The
+commit log here says it's a debug option, but your documentation does
+not say that at all, and that's what people will read.
 
-commit dd4b487b32a35 ("ARM: dts: imx6: Use correct SDMA script
-for SPI cores") is fixing the same issue but only for SPI1 - 4.
+Well, they might read it, probably not.  But at least give us something
+to point at when they mess things up :)
 
-Fixes: 677940258dd8e ("ARM: dts: imx6q: enable dma for ecspi5")
+thanks,
 
-Signed-off-by: Sean Nyekjaer <sean.nyekjaer@prevas.dk>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6q.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index ae7b3f107893..5185300cc11f 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -96,7 +96,7 @@
- 					clocks = <&clks IMX6Q_CLK_ECSPI5>,
- 						 <&clks IMX6Q_CLK_ECSPI5>;
- 					clock-names = "ipg", "per";
--					dmas = <&sdma 11 7 1>, <&sdma 12 7 2>;
-+					dmas = <&sdma 11 8 1>, <&sdma 12 8 2>;
- 					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
--- 
-2.17.0
+greg k-h
