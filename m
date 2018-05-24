@@ -1,83 +1,101 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 May 2018 12:50:17 -0500
-Subject: [PATCH v2 1/8] driver core: make deferring probe after init optional
+Date: Thu, 24 May 2018 12:50:18 -0500
+Subject: [PATCH v2 2/8] driver core: add a deferred probe timeout
 In-Reply-To: <20180524175024.19874-1-robh@kernel.org>
 References: <20180524175024.19874-1-robh@kernel.org>
-Message-ID: <20180524175024.19874-2-robh@kernel.org>
+Message-ID: <20180524175024.19874-3-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deferred probe will currently wait forever on dependent devices to probe,
-but sometimes a driver will never exist. It's also not always critical for
-a driver to exist. Platforms can rely on default configuration from the
-bootloader or reset defaults for things such as pinctrl and power domains.
-This is often the case with initial platform support until various drivers
-get enabled. There's at least 2 scenarios where deferred probe can render
-a platform broken. Both involve using a DT which has more devices and
-dependencies than the kernel supports. The 1st case is a driver may be
-disabled in the kernel config. The 2nd case is the kernel version may
-simply not have the dependent driver. This can happen if using a newer DT
-(provided by firmware perhaps) with a stable kernel version.
+Deferring probe can wait forever on dependencies that may never appear
+for a variety of reasons. This can be difficult to debug especially if
+the console has dependencies or userspace fails to boot to a shell. Add
+a timeout to retry probing without possibly optional dependencies and to
+dump out the deferred probe pending list after retrying.
 
-Subsystems or drivers may opt-in to this behavior by calling
-driver_deferred_probe_check_init_done() instead of just returning
--EPROBE_DEFER. They may use additional information from DT or kernel's
-config to decide whether to continue to defer probe or not.
+This mechanism is intended for debug purposes. It won't work for the
+console which needs to be enabled before userspace starts. However, if
+the console's dependencies are resolved, then the kernel log will be
+printed (as opposed to no output).
 
-Cc: Alexander Graf <agraf@suse.de>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- drivers/base/dd.c      | 17 +++++++++++++++++
- include/linux/device.h |  2 ++
- 2 files changed, 19 insertions(+)
+ .../admin-guide/kernel-parameters.txt         |  7 +++++
+ drivers/base/dd.c                             | 28 ++++++++++++++++++-
+ 2 files changed, 34 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 11fc28ecdb6d..dd3f40b34a24 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -809,6 +809,13 @@
+ 			Defaults to the default architecture's huge page size
+ 			if not specified.
+ 
++	deferred_probe_timeout=
++			[KNL] Set a timeout in seconds for deferred probe to
++			give up waiting on dependencies to probe. Only specific
++			dependencies (subsystems or drivers) that have opted in
++			will be ignored. This option also dumps out devices
++			still on the deferred probe list after retrying.
++
+ 	dhash_entries=	[KNL]
+ 			Set number of hash buckets for dentry cache.
+ 
 diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index c9f54089429b..d6034718da6f 100644
+index d6034718da6f..4133b240c7e4 100644
 --- a/drivers/base/dd.c
 +++ b/drivers/base/dd.c
-@@ -226,6 +226,16 @@ void device_unblock_probing(void)
+@@ -226,9 +226,17 @@ void device_unblock_probing(void)
  	driver_deferred_probe_trigger();
  }
  
-+int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
++static int deferred_probe_timeout = -1;
++static int __init deferred_probe_timeout_setup(char *str)
 +{
-+	if (optional && initcalls_done) {
-+		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
-+		return -ENODEV;
-+	}
-+
-+	return -EPROBE_DEFER;
++	deferred_probe_timeout = simple_strtol(str, NULL, 0);
++	return 1;
 +}
++__setup("deferred_probe_timeout=", deferred_probe_timeout_setup);
++
+ int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+ {
+-	if (optional && initcalls_done) {
++	if ((optional || !deferred_probe_timeout) && initcalls_done) {
+ 		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
+ 		return -ENODEV;
+ 	}
+@@ -236,6 +244,19 @@ int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+ 	return -EPROBE_DEFER;
+ }
+ 
++static void deferred_probe_timeout_work_func(struct work_struct *work)
++{
++	struct device_private *private, *p;
++
++	deferred_probe_timeout = 0;
++	driver_deferred_probe_trigger();
++	flush_work(&deferred_probe_work);
++
++	list_for_each_entry_safe(private, p, &deferred_probe_pending_list, deferred_probe)
++		dev_info(private->device, "deferred probe pending");
++}
++static DECLARE_DELAYED_WORK(deferred_probe_timeout_work, deferred_probe_timeout_work_func);
 +
  /**
   * deferred_probe_initcall() - Enable probing of deferred devices
   *
-@@ -240,6 +250,13 @@ static int deferred_probe_initcall(void)
- 	/* Sort as many dependencies as possible before exiting initcalls */
+@@ -257,6 +278,11 @@ static int deferred_probe_initcall(void)
+ 	 */
+ 	driver_deferred_probe_trigger();
  	flush_work(&deferred_probe_work);
- 	initcalls_done = true;
 +
-+	/*
-+	 * Trigger deferred probe again, this time we won't defer anything
-+	 * that is optional
-+	 */
-+	driver_deferred_probe_trigger();
-+	flush_work(&deferred_probe_work);
++	if (deferred_probe_timeout > 0) {
++		schedule_delayed_work(&deferred_probe_timeout_work,
++			deferred_probe_timeout * HZ);
++	}
  	return 0;
  }
  late_initcall(deferred_probe_initcall);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 477956990f5e..f3dafd44c285 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -334,6 +334,8 @@ struct device *driver_find_device(struct device_driver *drv,
- 				  struct device *start, void *data,
- 				  int (*match)(struct device *dev, void *data));
- 
-+int driver_deferred_probe_check_init_done(struct device *dev, bool optional);
-+
- /**
-  * struct subsys_interface - interfaces to device functions
-  * @name:       name of the device function
 -- 
 2.17.0
