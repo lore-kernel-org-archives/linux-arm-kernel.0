@@ -1,62 +1,62 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Thu, 24 May 2018 16:20:33 +0300
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <CAMuHMdX-t8WfjRKpZ7UxXBbBNojsn-8z7_BM9grmLJcf=9Ks2Q@mail.gmail.com>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-4-git-send-email-gilad@benyossef.com>
- <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
- <20180516074333.i2672u435ymwffk3@verge.net.au>
- <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
- <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
- <CAOtvUMcf-fHduThORv3cbcN16wEm_Si27OjSjAmSc9g5eK4PJw@mail.gmail.com>
- <CAMuHMdX-t8WfjRKpZ7UxXBbBNojsn-8z7_BM9grmLJcf=9Ks2Q@mail.gmail.com>
-Message-ID: <CAOtvUMdCSoxYjpyb+fD36EE5+4sV4CjrxwK94RQ7bNKE5rajmQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 24 May 2018 15:20:54 +0200
+Subject: [GIT PULL] Rockchip driver updates for 4.18 round 2
+Message-ID: <2574457.1saVLptjF6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 10:48 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Gilad,
->
-> On Mon, May 21, 2018 at 3:43 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->> On Thu, May 17, 2018 at 1:16 PM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> Indeed. From a quick glance, it looks like drivers/crypto/ccree/cc_driver.c
->>> does not distinguish between the absence of the clock property, and an
->>> actual error in getting the clock, and never considers any error a failure
->>> (incl. -PROBE_DEFER).
->>>
->>> As of_clk_get() returns -ENOENT for both a missing clock property and a
->>> missing clock, you should use (devm_)clk_get() instead, and distinguish
->>> between NULL (no clock property) and IS_ERR() (actual failure -> abort).
->>
->> I was trying to do as you suggested but I didn't quite get what is the
->> dev_id (2nd) parameter to devm_clk_get parameter is supposed to be.
->
-> It's the (optional) name of the clock, helpful in case there is more than one.
-> In your case, NULL is fine.
->
+Hi Arnd, Kevin Olof,
 
-I have assumed as much and tried it, it did not work and so I assumed
-I am missing something and asked you.
-It turns out I was missing the fact I was using the wrong device tree
-file... :-(
-
-So thanks, it works now :-)
-
-Having said that, while using devm)clk_get() is a better approach, it
-does not seems to distinguish
-between no "clocks" and a failure to clock information - it returns
-ENOENT in both cases as well.
-
-Thanks,
-Gilad
+please find below a second pull request for Rockchip-specific drivers,
+adding power-domain support for some more socs on top of the
+previous git tag.
 
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+If it looks ok, please pull
+Heiko
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+The following changes since commit 9e59c5f66c624b43c766a9fe3b2430e0e976bf0e:
+
+  soc: rockchip: power-domain: Fix wrong value when power up pd with writemask (2018-05-14 11:53:26 +0200)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-drivers-2
+
+for you to fetch changes up to 9bdf401bf49eddba98ae36f7243b888d43496bd6:
+
+  soc: rockchip: power-domain: add power domain support for px30 (2018-05-23 20:47:57 +0200)
+
+----------------------------------------------------------------
+Power-domain support for Rockchip socs px30, rk3128, rk3228 and rk3036.
+
+----------------------------------------------------------------
+Caesar Wang (3):
+      dt-bindings: power: add RK3036 SoCs header for power-domain
+      dt-bindings: power: add binding for rk3036 power domains
+      soc: rockchip: power-domain: add power domain support for rk3036
+
+Elaine Zhang (6):
+      dt-bindings: power: add RK3128 SoCs header for power-domain
+      dt-bindings: power: add binding for rk3128 power domains
+      soc: rockchip: power-domain: add power domain support for rk3128
+      dt-bindings: power: add RK3228 SoCs header for power-domain
+      dt-bindings: power: add binding for rk3228 power domains
+      soc: rockchip: power-domain: add power domain support for rk3228
+
+Finley Xiao (3):
+      dt-bindings: power: add PX30 SoCs header for power-domain
+      dt-bindings: power: add binding for px30 power domains
+      soc: rockchip: power-domain: add power domain support for px30
+
+ .../bindings/soc/rockchip/power_domain.txt         |  12 +++
+ drivers/soc/rockchip/pm_domains.c                  | 115 +++++++++++++++++++++
+ include/dt-bindings/power/px30-power.h             |  27 +++++
+ include/dt-bindings/power/rk3036-power.h           |  13 +++
+ include/dt-bindings/power/rk3128-power.h           |  14 +++
+ include/dt-bindings/power/rk3228-power.h           |  21 ++++
+ 6 files changed, 202 insertions(+)
+ create mode 100644 include/dt-bindings/power/px30-power.h
+ create mode 100644 include/dt-bindings/power/rk3036-power.h
+ create mode 100644 include/dt-bindings/power/rk3128-power.h
+ create mode 100644 include/dt-bindings/power/rk3228-power.h
