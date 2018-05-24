@@ -1,23 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2018 09:07:22 +0200
-Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.18 (second version)
-In-Reply-To: <20180523192704.25370-1-krzk@kernel.org>
-References: <20180523192704.25370-1-krzk@kernel.org>
-Message-ID: <CACRpkdZ_ZwVdxr-ge1JuN4=7--daXMjR595nR=qCMNsfsEnV_A@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 24 May 2018 09:06:57 +0200
+Subject: [PATCH v2 07/13] net: smc91x: remove the dmaengine compat need
+In-Reply-To: <20180524070703.11901-1-robert.jarzmik@free.fr>
+References: <20180524070703.11901-1-robert.jarzmik@free.fr>
+Message-ID: <20180524070703.11901-8-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 9:27 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+As the pxa architecture switched towards the dmaengine slave map, the
+old compatibility mechanism to acquire the dma requestor line number and
+priority are not needed anymore.
 
-> This is updated pull request with one additional patch from Marek.
-> I saw you did not pull my previous pull request for v4.18 so I hope
-> this update should not be a problem.
+This patch simplifies the dma resource acquisition, using the more
+generic function dma_request_slave_channel().
 
-Thanks Krzysztof, pulled this into "devel" for v4.18.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/net/ethernet/smsc/smc91x.c | 12 +-----------
+ drivers/net/ethernet/smsc/smc91x.h |  1 -
+ 2 files changed, 1 insertion(+), 12 deletions(-)
 
-Sorry for not pulling earlier, was a bit behind on emails.
-
-Thanks for helping out stacking up Samsung patches!
-
-Yours,
-Linus Walleij
+diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
+index 080428762858..4c600f430f6d 100644
+--- a/drivers/net/ethernet/smsc/smc91x.c
++++ b/drivers/net/ethernet/smsc/smc91x.c
+@@ -2018,18 +2018,8 @@ static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
+ 	lp->cfg.flags |= SMC91X_USE_DMA;
+ #  endif
+ 	if (lp->cfg.flags & SMC91X_USE_DMA) {
+-		dma_cap_mask_t mask;
+-		struct pxad_param param;
+-
+-		dma_cap_zero(mask);
+-		dma_cap_set(DMA_SLAVE, mask);
+-		param.prio = PXAD_PRIO_LOWEST;
+-		param.drcmr = -1UL;
+-
+ 		lp->dma_chan =
+-			dma_request_slave_channel_compat(mask, pxad_filter_fn,
+-							 &param, &dev->dev,
+-							 "data");
++			dma_request_slave_channel(lp->device, "data");
+ 	}
+ #endif
+ 
+diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
+index b337ee97e0c0..a27352229fc2 100644
+--- a/drivers/net/ethernet/smsc/smc91x.h
++++ b/drivers/net/ethernet/smsc/smc91x.h
+@@ -301,7 +301,6 @@ struct smc_local {
+  * as RX which can overrun memory and lose packets.
+  */
+ #include <linux/dma-mapping.h>
+-#include <linux/dma/pxa-dma.h>
+ 
+ #ifdef SMC_insl
+ #undef SMC_insl
+-- 
+2.11.0
