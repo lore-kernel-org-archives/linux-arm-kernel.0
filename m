@@ -1,75 +1,93 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 24 May 2018 14:25:34 +0100
-Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
- property for sp805
-In-Reply-To: <20180523181058.GC27570@roeck-us.net>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
- <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
- <20180523181058.GC27570@roeck-us.net>
-Message-ID: <91d27df4-29d0-de7f-6805-c3e5f329caf3@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 24 May 2018 14:34:25 +0100
+Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
+In-Reply-To: <20180524113933.GA8689@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-5-marc.zyngier@arm.com>
+ <6c3e7b31-0bb6-353b-1b82-7ebdf3be1323@arm.com>
+ <20180524113933.GA8689@arm.com>
+Message-ID: <ee08702a-f525-7c0a-38b8-50941285df29@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/18 19:10, Guenter Roeck wrote:
-> On Wed, May 23, 2018 at 11:57:25AM +0100, Robin Murphy wrote:
->> On 22/05/18 19:47, Ray Jui wrote:
->>> Update the SP805 binding document to add optional 'timeout-sec'
->>> devicetree property
+On 24/05/18 12:39, Will Deacon wrote:
+> On Thu, May 24, 2018 at 10:58:43AM +0100, Suzuki K Poulose wrote:
+>> On 22/05/18 16:06, Marc Zyngier wrote:
+>>> As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
+>>> discovery mechanism for detecting the SSBD mitigation.
 >>>
->>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>> ---
->>>   Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
->>>   1 file changed, 2 insertions(+)
+>>> A new capability is also allocated for that purpose, and a
+>>> config option.
 >>>
->>> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>> index edc4f0e..f898a86 100644
->>> --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>> @@ -19,6 +19,8 @@ Required properties:
->>>   Optional properties:
->>>   - interrupts : Should specify WDT interrupt number.
->>> +- timeout-sec : Should specify default WDT timeout in seconds. If unset, the
->>> +                default timeout is 30 seconds
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >>
->> According to the SP805 TRM, the default interval is dependent on the rate of
->> WDOGCLK, but would typically be a lot longer than that :/
 >>
-> Depends on the definition of "default". In the context of watchdog drivers,
-> it is (or should be) a driver default, not a chip default.
+>>> +static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+>>> +				    int scope)
+>>> +{
+>>> +	struct arm_smccc_res res;
+>>> +	bool supported = true;
+>>> +
+>>> +	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+>>> +
+>>> +	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+>>> +		return false;
+>>> +
+>>> +	/*
+>>> +	 * The probe function return value is either negative
+>>> +	 * (unsupported or mitigated), positive (unaffected), or zero
+>>> +	 * (requires mitigation). We only need to do anything in the
+>>> +	 * last case.
+>>> +	 */
+>>> +	switch (psci_ops.conduit) {
+>>> +	case PSCI_CONDUIT_HVC:
+>>> +		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>>> +				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+>>> +		if ((int)res.a0 != 0)
+>>> +			supported = false;
+>>> +		break;
+>>> +
+>>> +	case PSCI_CONDUIT_SMC:
+>>> +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>>> +				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+>>> +		if ((int)res.a0 != 0)
+>>> +			supported = false;
+>>> +		break;
+>>> +
+>>> +	default:
+>>> +		supported = false;
+>>> +	}
+>>> +
+>>> +	if (supported) {
+>>> +		__this_cpu_write(arm64_ssbd_callback_required, 1);
+>>> +		do_ssbd(true);
+>>> +	}
+>>
+>>
+>> Marc,
+>>
+>> As discussed, we have minor issue with the "corner case". If a CPU
+>> is hotplugged in which requires the mitigation, after the system has
+>> finalised the cap to "not available", the CPU could go ahead and
+>> do the "work around" as above, while not effectively doing anything
+>> about it at runtime for KVM guests (as thats the only place where
+>> we rely on the CAP being set).
+>>
+>> But, yes this is real corner case. There is no easy way to solve it
+>> other than
+>>
+>> 1) Allow late modifications to CPU hwcaps
+>>
+>> OR
+>>
+>> 2) Penalise the fastpath to always check per-cpu setting.
+> 
+> Shouldn't we just avoid bring up CPUs that require the mitigation after
+> we've finalised the capability to say that it's not required? Assuming this
+> is just another issue with maxcpus=, then I don't much care for it.
+Ah! Sorry, yes we do kill the CPU. But it is just that it will set the
+ssbd_callback_required flag and issue the do_ssbd(), which is not an issue.
 
-DT describes hardware, not driver behaviour.
+Yes this can only be triggered by maxcpus=.
 
-I appreciate that where a timeout *is* specified, that is effectively a 
-hardware aspect even if it's something an OS consuming the binding still 
-has to voluntarily program into the device. The notion of "this is the 
-longest period of time for which you can reasonably expect to see no 
-activity under normal operation" is indeed a property of the platform as 
-a whole - a system with user-accessible PCIe slots may need to reflect 
-the worst case of one CPU waiting for an ATS invalidation timeout with 
-interrupts disabled, whereas a much shorter period might be appropriate 
-for the same SoC in some closed-down embedded device.
-
-The absence of the property, though, doesn't convey anything other than 
-"I don't know" and/or "it doesn't really matter", and in that situation 
-the default is always going to be "whatever the OS thinks is 
-appropriate". The binding itself can't possibly know, whereas an OS 
-might be configured for some pseudo-real-time application which it knows 
-warrants a maximum of 100ms regardless of what the DT does or doesn't 
-say. In the case of SP805, if the OS doesn't reconfigure it at all, 
-there happens to be an actual hardware default of (2^32 / WDOGCLK), but 
-since that's already implicit in the compatible it doesn't really need 
-saying either.
-
-Optional properties don't need to explicitly state what their absence 
-might infer, especially when it's not directly meaningful (just imagine 
-trying to do that for bindings/regulator/regulator.txt...), so I would 
-suggest following the 93% of existing bindings which simply don't try to 
-claim some default value for this property.
-
-I also think the fact that, within the context of this patch series, the 
-Linux driver doesn't even do what the binding claims only goes to help 
-make my point ;)
-
-Robin.
+Suzuki
