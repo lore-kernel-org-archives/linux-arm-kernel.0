@@ -1,99 +1,150 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Thu, 24 May 2018 18:30:27 -0500
-Subject: [PATCH 1/6] coresight: remove CORESIGHT_LINKS_AND_SINKS
- dependencies and selections
-In-Reply-To: <CANLsYkw-KcEM43pqWgGU1XYOfSTD4cmspNcPM-u+n9x6Xtazbg@mail.gmail.com>
-References: <20180517070643.GC13919@kroah.com>
- <20180518012024.22645-1-kim.phillips@arm.com>
- <20180522173140.GA25658@xps15>
- <20180523145155.5929dd09c78a056ef19329be@arm.com>
- <CANLsYkw-KcEM43pqWgGU1XYOfSTD4cmspNcPM-u+n9x6Xtazbg@mail.gmail.com>
-Message-ID: <20180524183027.dc498058344604e2d6027eff@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 24 May 2018 16:30:40 -0700
+Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP and
+ suspend paths
+In-Reply-To: <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
+References: <20180521114238.GN17671@n2100.armlinux.org.uk>
+ <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
+Message-ID: <b454e37c-52a8-387f-3649-8ce72c9a5b18@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 May 2018 09:32:48 -0600
-Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-
-> On 23 May 2018 at 13:51, Kim Phillips <kim.phillips@arm.com> wrote:
-> > On Tue, 22 May 2018 11:31:40 -0600
-> > Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> >
-> >> On Thu, May 17, 2018 at 08:20:19PM -0500, Kim Phillips wrote:
-> >> > A coresight topology doesn't need to include links, i.e., a source can
-> >> > be directly connected to a sink.  As such, selecting and/or depending on
-> >> > LINKS_AND_SINKS is no longer needed.
-> >>
-> >> I'm good with this patch but now the help text for CORESIGHT_LINKS_AND_SINKS no
-> >> longer match what the config does.  I see two ways to fix this:
-> >
-> > This patch doesn't change what the config does, it just changes what
-> > other config options depend on it.
-> >
-> >> 1) Rework the help text.
-> >
-> > I don't see how, given the above.  Here's the text:
-> >
-> > config CORESIGHT_LINKS_AND_SINKS
-> >         bool "CoreSight Link and Sink drivers"
-> >         help
-> >           This enables support for CoreSight link and sink drivers that are
-> >           responsible for transporting and collecting the trace data
-> >           respectively.  Link and sinks are dynamically aggregated with a trace
-> >           entity at run time to form a complete trace path.
-> >
-> > What part of that becomes invalid with this patch?
+On 05/21/2018 04:44 AM, Russell King wrote:
+> Check for CPU bugs when secondary processors are being brought online,
+> and also when CPUs are resuming from a low power mode.  This gives an
+> opportunity to check that processor specific bug workarounds are
+> correctly enabled for all paths that a CPU re-enters the kernel.
 > 
-> Looking at the new Kconfig, what sink component depend on
-> CORESIGHT_LINKS_AND_SINKS?
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-How does that affect the description text?  The description text
-doesn't insinuate any implicit dependencies or non-.
+Something I missed, is that this correctly warns about e.g: missing the
+IBE bit for secondary cores, but it seems to be missing it for the boot CPU:
 
-> config CORESIGHT_LINKS
+[    0.001053] CPU: Testing write buffer coherency: ok
+[    0.001086] CPU: Spectre v2: using ICIALLU workaround
+[    0.001304] CPU0: update cpu_capacity 1024
+[    0.001316] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.001693] Setting up static identity map for 0x200000 - 0x200060
+[    0.001769] Hierarchical SRCU implementation.
+[    0.003951] brcmstb: biuctrl: MCP: Write pairing already disabled
+[    0.004224] smp: Bringing up secondary CPUs ...
+[    0.004874] CPU1: update cpu_capacity 1024
+[    0.004877] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.004881] CPU1: Spectre v2: firmware did not set auxiliary control
+register IBE bit, system vulnerable
+[    0.005604] CPU2: update cpu_capacity 1024
+[    0.005607] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
+[    0.005610] CPU2: Spectre v2: firmware did not set auxiliary control
+register IBE bit, system vulnerable
+[    0.006295] CPU3: update cpu_capacity 1024
+[    0.006299] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
+[    0.006302] CPU3: Spectre v2: firmware did not set auxiliary control
+register IBE bit, system vulnerable
+[    0.006377] smp: Brought up 1 node, 4 CPUs
+[    0.006389] SMP: Total of 4 processors activated (216.00 BogoMIPS).
+[    0.006398] CPU: All CPU(s) started in SVC mode.
 
-Please, not another gratuitous config name change, I've already
-experienced usage regressions from the CORESIGHT_QCOM_REPLICATOR =>
-CORESIGHT_DYNAMIC_REPLICATOR change:
+Which could be confusing if you intentionally restricted a SMP system to
+UP with maxcpus=1 or smp=off:
 
-https://patchwork.kernel.org/patch/10206023/
+[    0.001043] CPU: Testing write buffer coherency: ok
+[    0.001077] CPU: Spectre v2: using ICIALLU workaround
+[    0.001291] CPU0: update cpu_capacity 1024
+[    0.001302] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.001516] Setting up static identity map for 0x200000 - 0x200060
+[    0.001593] Hierarchical SRCU implementation.
+[    0.003829] brcmstb: biuctrl: MCP: Write pairing already disabled
+[    0.004097] smp: Bringing up secondary CPUs ...
+[    0.004108] smp: Brought up 1 node, 1 CPU
+[    0.004117] SMP: Total of 1 processors activated (54.00 BogoMIPS).
+[    0.004126] CPU: All CPU(s) started in SVC mode.
 
->          bool "CoreSight Link drivers"
->          help
->            This enables support for CoreSight link drivers that are responsible
->            for transporting trace data from source to sink.  Links are
-> dynamically
->            aggregated with other traces entities at run time to form a
-> complete trace
->            path.
 
-Oh, I see, so your point is that LINKS_AND_SINKS doesn't technically
-build any sink drivers?  That's completely orthogonal to removing a
-dependency chain:  that just tells me the name was a poor choice in the
-first place maybe?  I don't see where the Makefile may have built a
-sink, but it may be before the move to drivers/hwtracing/coresight, or
-some other reorganization.
 
-> >> 2) Rework CORESIGHT_LINKS_AND_SINKS to be CORESIGHT_FUNNEL and move
-> >> coresight-replicator.o under CORESIGHT_DYNAMIC_REPLICATOR in the Makefile. I
-> >> really liked your idea of making the replicator driver intelligent enough to
-> >> deal with both DT and platform declaration, which merges two driver into one.
-> >>
-> >> I'm obviously favouring the second option but recognise it doesn't have to be
-> >> part of this patchet.  So for this set please rework the help text for
-> >> CORESIGHT_LINKS_AND_SINKS.  Once we've dealt with this topic we can refactor the
-> >> replicator driver.
-> >
-> > I'd really like to just focus on getting CoreSight to load as modules,
-> > something for which this patch isn't technically required...
+> ---
+>  arch/arm/include/asm/bugs.h | 2 ++
+>  arch/arm/kernel/bugs.c      | 5 +++++
+>  arch/arm/kernel/smp.c       | 4 ++++
+>  arch/arm/kernel/suspend.c   | 2 ++
+>  4 files changed, 13 insertions(+)
 > 
-> The only thing I'm asking is that the config description and help text
-> reflect what the Makefile does.
+> diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
+> index ed122d294f3f..73a99c72a930 100644
+> --- a/arch/arm/include/asm/bugs.h
+> +++ b/arch/arm/include/asm/bugs.h
+> @@ -14,8 +14,10 @@ extern void check_writebuffer_bugs(void);
+>  
+>  #ifdef CONFIG_MMU
+>  extern void check_bugs(void);
+> +extern void check_other_bugs(void);
+>  #else
+>  #define check_bugs() do { } while (0)
+> +#define check_other_bugs() do { } while (0)
+>  #endif
+>  
+>  #endif
+> diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+> index 88024028bb70..16e7ba2a9cc4 100644
+> --- a/arch/arm/kernel/bugs.c
+> +++ b/arch/arm/kernel/bugs.c
+> @@ -3,7 +3,12 @@
+>  #include <asm/bugs.h>
+>  #include <asm/proc-fns.h>
+>  
+> +void check_other_bugs(void)
+> +{
+> +}
+> +
+>  void __init check_bugs(void)
+>  {
+>  	check_writebuffer_bugs();
+> +	check_other_bugs();
+>  }
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 2da087926ebe..5ad0b67b9e33 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/irq_work.h>
+>  
+>  #include <linux/atomic.h>
+> +#include <asm/bugs.h>
+>  #include <asm/smp.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/cpu.h>
+> @@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
+>  	 * before we continue - which happens after __cpu_up returns.
+>  	 */
+>  	set_cpu_online(cpu, true);
+> +
+> +	check_other_bugs();
+> +
+>  	complete(&cpu_running);
+>  
+>  	local_irq_enable();
+> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> index a40ebb7c0896..d08099269e35 100644
+> --- a/arch/arm/kernel/suspend.c
+> +++ b/arch/arm/kernel/suspend.c
+> @@ -3,6 +3,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/mm_types.h>
+>  
+> +#include <asm/bugs.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/idmap.h>
+>  #include <asm/pgalloc.h>
+> @@ -36,6 +37,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  		cpu_switch_mm(mm->pgd, mm);
+>  		local_flush_bp_all();
+>  		local_flush_tlb_all();
+> +		check_other_bugs();
+>  	}
+>  
+>  	return ret;
+> 
 
-argh, wellll, it's a completely different change, and we're now
-completely off the modularization topic, and I'm uncomfortable doing
-reorgs on things I don't understand, renaming CONFIG_s, esp. when
-others such as the REPLICATOR, since as far as I know, that's also a
-link??
 
-Kim
+-- 
+Florian
