@@ -1,51 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 May 2018 12:41:14 +0100
-Subject: [PATCH 06/14] arm64: ssbd: Add global mitigation state accessor
-In-Reply-To: <20180522150648.28297-7-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-7-marc.zyngier@arm.com>
-Message-ID: <20180524114113.omumrknbdmh72j7r@lakrids.cambridge.arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 24 May 2018 07:43:05 -0400
+Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
+In-Reply-To: <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
+ <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
+ <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+Message-ID: <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 04:06:40PM +0100, Marc Zyngier wrote:
-> We're about to need the mitigation state in various parts of the
-> kernel in order to do the right thing for userspace and guests.
-> 
-> Let's expose an accessor that will let other subsystems know
-> about the state.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 5/23/2018 6:57 PM, Sinan Kaya wrote:
+>> The crash seems to indicate that the hpsa device attempted a DMA after
+>> we cleared the Root Port's PCI_COMMAND_MASTER, which means
+>> hpsa_shutdown() didn't stop DMA from the device (it looks like *most*
+>> shutdown methods don't disable device DMA, so it's in good company).
+> All drivers are expected to shutdown DMA and interrupts in their shutdown()
+> routines. They can skip removing threads, data structures etc. but DMA and
+> interrupt disabling are required. This is the difference between shutdown()
+> and remove() callbacks.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+I found this note yesterday to see why we are not disabling the devices in the
+PCI core itself. 
 
-Mark.
+pci_device_remove()
 
-> ---
->  arch/arm64/include/asm/cpufeature.h | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 9bc548e22784..1bacdf57f0af 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -543,6 +543,16 @@ static inline u64 read_zcr_features(void)
->  #define ARM64_SSBD_FORCE_ENABLE		2
->  #define ARM64_SSBD_MITIGATED		3
->  
-> +static inline int arm64_get_ssbd_state(void)
-> +{
-> +#ifdef CONFIG_ARM64_SSBD
-> +	extern int ssbd_state;
-> +	return ssbd_state;
-> +#else
-> +	return ARM64_SSBD_UNKNOWN;
-> +#endif
-> +}
-> +
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
-> -- 
-> 2.14.2
-> 
+	/*
+	 * We would love to complain here if pci_dev->is_enabled is set, that
+	 * the driver should have called pci_disable_device(), but the
+	 * unfortunate fact is there are too many odd BIOS and bridge setups
+	 * that don't like drivers doing that all of the time.
+	 * Oh well, we can dream of sane hardware when we sleep, no matter how
+	 * horrible the crap we have to deal with is when we are awake...
+	 */ 
+
+Ryan, can you discard the previous patch and test this one instead? remove() path
+in hpsa driver seems to call pci_disable_device() via 
+
+hpsa_remove_one()
+	hpsa_free_pci_init()
+
+but nothing on the shutdown path.
+
+diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
+index 4ed3d26..3823f04 100644
+--- a/drivers/scsi/hpsa.c
++++ b/drivers/scsi/hpsa.c
+@@ -8651,6 +8651,7 @@ static void hpsa_shutdown(struct pci_dev *pdev)
+        h->access.set_intr_mask(h, HPSA_INTR_OFF);
+        hpsa_free_irqs(h);                      /* init_one 4 */
+        hpsa_disable_interrupt_mode(h);         /* pci_init 2 */
++       pci_disable_device(h->pdev);
+ }
+
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
