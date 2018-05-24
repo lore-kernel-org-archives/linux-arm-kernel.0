@@ -1,80 +1,87 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 24 May 2018 14:30:12 +0300
-Subject: [PATCH v6 05/17] media: rkisp1: add Rockchip ISP1 subdev driver
-In-Reply-To: <CAAFQd5A7gAK4fXH9YVrobR5_QX_5f8xa272R_56v5YUghV6Sxw@mail.gmail.com>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
- <20180308094807.9443-6-jacob-chen@iotwrt.com>
- <20180503090909.o3dyhukzs2y7em5z@tarshish>
- <CAAFQd5CvBv4hkE=PSHBJTYa9Lj0SyggxpMBEAYD=if0=T0uzHw@mail.gmail.com>
- <20180507063814.vweb4p3nfgnoc3td@tarshish>
- <CAAFQd5A7gAK4fXH9YVrobR5_QX_5f8xa272R_56v5YUghV6Sxw@mail.gmail.com>
-Message-ID: <20180524113012.mt5b2f2vrhfrn3d7@tarshish>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 May 2018 12:39:35 +0100
+Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
+In-Reply-To: <6c3e7b31-0bb6-353b-1b82-7ebdf3be1323@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-5-marc.zyngier@arm.com>
+ <6c3e7b31-0bb6-353b-1b82-7ebdf3be1323@arm.com>
+Message-ID: <20180524113933.GA8689@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Thu, May 24, 2018 at 10:58:43AM +0100, Suzuki K Poulose wrote:
+> On 22/05/18 16:06, Marc Zyngier wrote:
+> >As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
+> >discovery mechanism for detecting the SSBD mitigation.
+> >
+> >A new capability is also allocated for that purpose, and a
+> >config option.
+> >
+> >Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> 
+> >+static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+> >+				    int scope)
+> >+{
+> >+	struct arm_smccc_res res;
+> >+	bool supported = true;
+> >+
+> >+	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+> >+
+> >+	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+> >+		return false;
+> >+
+> >+	/*
+> >+	 * The probe function return value is either negative
+> >+	 * (unsupported or mitigated), positive (unaffected), or zero
+> >+	 * (requires mitigation). We only need to do anything in the
+> >+	 * last case.
+> >+	 */
+> >+	switch (psci_ops.conduit) {
+> >+	case PSCI_CONDUIT_HVC:
+> >+		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+> >+				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+> >+		if ((int)res.a0 != 0)
+> >+			supported = false;
+> >+		break;
+> >+
+> >+	case PSCI_CONDUIT_SMC:
+> >+		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+> >+				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+> >+		if ((int)res.a0 != 0)
+> >+			supported = false;
+> >+		break;
+> >+
+> >+	default:
+> >+		supported = false;
+> >+	}
+> >+
+> >+	if (supported) {
+> >+		__this_cpu_write(arm64_ssbd_callback_required, 1);
+> >+		do_ssbd(true);
+> >+	}
+> 
+> 
+> Marc,
+> 
+> As discussed, we have minor issue with the "corner case". If a CPU
+> is hotplugged in which requires the mitigation, after the system has
+> finalised the cap to "not available", the CPU could go ahead and
+> do the "work around" as above, while not effectively doing anything
+> about it at runtime for KVM guests (as thats the only place where
+> we rely on the CAP being set).
+> 
+> But, yes this is real corner case. There is no easy way to solve it
+> other than
+> 
+> 1) Allow late modifications to CPU hwcaps
+> 
+> OR
+> 
+> 2) Penalise the fastpath to always check per-cpu setting.
 
-On Mon, May 07, 2018 at 06:41:50AM +0000, Tomasz Figa wrote:
-> On Mon, May 7, 2018 at 3:38 PM Baruch Siach <baruch@tkos.co.il> wrote:
-> > On Mon, May 07, 2018 at 06:13:27AM +0000, Tomasz Figa wrote:
-> > > On Thu, May 3, 2018 at 6:09 PM Baruch Siach <baruch@tkos.co.il> wrote:
-> > > > On Thu, Mar 08, 2018 at 05:47:55PM +0800, Jacob Chen wrote:
-> > > > > +static int rkisp1_isp_sd_s_power(struct v4l2_subdev *sd, int on)
-> > > > > +{
-> > > > > +     struct rkisp1_device *isp_dev = sd_to_isp_dev(sd);
-> > > > > +     int ret;
-> > > > > +
-> > > > > +     v4l2_dbg(1, rkisp1_debug, &isp_dev->v4l2_dev, "s_power: %d\n",
-> > > on);
-> > > > > +
-> > > > > +     if (on) {
-> > > > > +             ret = pm_runtime_get_sync(isp_dev->dev);
-> > > > > +             if (ret < 0)
-> > > > > +                     return ret;
-> > > > > +
-> > > > > +             rkisp1_config_clk(isp_dev);
-> > > > > +     } else {
-> > > > > +             ret = pm_runtime_put(isp_dev->dev);
-> > >
-> > > > I commented this line out to make more than one STREAMON work.
-> Otherwise,
-> > > > the second STREAMON hangs. I guess the bug is not this driver.
-> Probably
-> > > > something in drivers/soc/rockchip/pm_domains.c. Just noting that in
-> case
-> > > > you or someone on Cc would like to investigate it further.
-> > > >
-> > > > I tested v4.16-rc4 on the Tinkerboard.
-> > >
-> > > Looks like that version doesn't include the IOMMU PM and clock handling
-> > > rework [1], which should fix a lot of runtime PM issues. FWIW,
-> linux-next
-> > > seems to already include it.
-> > >
-> > > [1] https://lkml.org/lkml/2018/3/23/44
-> 
-> > Thanks for the reference.
-> 
-> > It looks like the iommu driver part is in Linus' tree already. The DT
-> part is
-> > in the v4.18-armsoc/dts32 branch of Heiko's tree. Am I missing anything?
-> 
-> You're right, most of the series made it in time for 4.17. However, the DT
-> part (precisely, the clocks properties added to IOMMU nodes) is crucial for
-> the fixes to be effective.
-> 
-> > Anyway, I'll take a look.
-> 
-> Thanks for testing. :) (Forgot to mention in my previous email...)
+Shouldn't we just avoid bring up CPUs that require the mitigation after
+we've finalised the capability to say that it's not required? Assuming this
+is just another issue with maxcpus=, then I don't much care for it.
 
-I finally got around to testing. Unfortunately, kernel v4.17-rc6 with 
-cherry-pick of commit c78751f91c0b (ARM: dts: rockchip: add clocks in iommu 
-nodes) from Heiko's tree still exhibit the same problem. STREAMON hangs on 
-second try. The same workaround "fixes" it.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Will
