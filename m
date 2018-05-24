@@ -1,86 +1,103 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 25 May 2018 00:06:39 +0200
-Subject: [PATCH] drm/rockchip: vop: fix irq disabled after vop driver probed
-In-Reply-To: <b8eb41e576c4007d40223699eb951db32916b86a.camel@collabora.com>
-References: <b8eb41e576c4007d40223699eb951db32916b86a.camel@collabora.com>
-Message-ID: <25470133.K8n9sLBzRS@diego>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 24 May 2018 15:28:55 -0700
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524175024.19874-2-robh@kernel.org>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+Message-ID: <20180524222855.GD14924@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandy Huang <hjc@rock-chips.com>
+On Thu 24 May 10:50 PDT 2018, Rob Herring wrote:
 
-The vop irq is shared between vop and iommu and irq probing in the
-iommu driver moved to the probe function recently. This can in some
-cases lead to a stall if the irq is triggered while the vop driver
-still has it disabled.
+> Deferred probe will currently wait forever on dependent devices to probe,
+> but sometimes a driver will never exist. It's also not always critical for
+> a driver to exist. Platforms can rely on default configuration from the
+> bootloader or reset defaults for things such as pinctrl and power domains.
+> This is often the case with initial platform support until various drivers
+> get enabled. There's at least 2 scenarios where deferred probe can render
+> a platform broken. Both involve using a DT which has more devices and
+> dependencies than the kernel supports. The 1st case is a driver may be
+> disabled in the kernel config. The 2nd case is the kernel version may
+> simply not have the dependent driver. This can happen if using a newer DT
+> (provided by firmware perhaps) with a stable kernel version.
+> 
+> Subsystems or drivers may opt-in to this behavior by calling
+> driver_deferred_probe_check_init_done() instead of just returning
+> -EPROBE_DEFER. They may use additional information from DT or kernel's
+> config to decide whether to continue to defer probe or not.
+> 
 
-But there is no real need to disable the irq, as the vop can simply
-also track its enabled state and ignore irqs in that case.
+For builtin drivers this still looks reasonable.
 
-So remove the enable/disable handling and add appropriate condition
-to the irq handler.
+But I would like to have an additional clarification here stating that
+drivers that might be targeted by this query must not be compiled as
+modules.
 
-Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-[added an actual commit message]
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-Hi Ezequiel,
+And I would prefer to see an ack from e.g. Arnd that arm-soc is okay
+that we drop "tristate" on drivers affected by this; e.g. if we put this
+in the pinctrl core then all pinctrl drivers should be "bool" and so
+should any i2c, ssbi and spmi buses and drivers be.
 
-this patch came from a discussion I had with Rockchip people over the
-iommu changes and resulting issues back in april, but somehow was
-forgotten and not posted to the lists. Correcting that now.
+Regards,
+Bjorn
 
-So removing the enable/disable voodoo on the shared interrupt is
-the preferred way.
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 510cdf0..61493d4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -549,8 +549,6 @@ static int vop_enable(struct drm_crtc *crtc)
- 
- 	spin_unlock(&vop->reg_lock);
- 
--	enable_irq(vop->irq);
--
- 	drm_crtc_vblank_on(crtc);
- 
- 	return 0;
-@@ -596,8 +594,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
- 
- 	vop_dsp_hold_valid_irq_disable(vop);
- 
--	disable_irq(vop->irq);
--
- 	vop->is_enabled = false;
- 
- 	/*
-@@ -1168,6 +1164,13 @@ static irqreturn_t vop_isr(int irq, void *data)
- 	int ret = IRQ_NONE;
- 
- 	/*
-+	 * since the irq is shared with iommu, iommu irq is enabled before vop
-+	 * enable, so before vop enable we do nothing.
-+	 */
-+	if (!vop->is_enabled)
-+		return IRQ_NONE;
-+
-+	/*
- 	 * interrupt register has interrupt status, enable and clear bits, we
- 	 * must hold irq_lock to avoid a race with enable/disable_vblank().
- 	*/
-@@ -1586,9 +1588,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 	if (ret)
- 		goto err_disable_pm_runtime;
- 
--	/* IRQ is initially disabled; it gets enabled in power_on */
--	disable_irq(vop->irq);
--
- 	return 0;
- 
- err_disable_pm_runtime:
--- 
-2.7.4
+> Cc: Alexander Graf <agraf@suse.de>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/base/dd.c      | 17 +++++++++++++++++
+>  include/linux/device.h |  2 ++
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index c9f54089429b..d6034718da6f 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -226,6 +226,16 @@ void device_unblock_probing(void)
+>  	driver_deferred_probe_trigger();
+>  }
+>  
+> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+> +{
+> +	if (optional && initcalls_done) {
+> +		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
+> +		return -ENODEV;
+> +	}
+> +
+> +	return -EPROBE_DEFER;
+> +}
+> +
+>  /**
+>   * deferred_probe_initcall() - Enable probing of deferred devices
+>   *
+> @@ -240,6 +250,13 @@ static int deferred_probe_initcall(void)
+>  	/* Sort as many dependencies as possible before exiting initcalls */
+>  	flush_work(&deferred_probe_work);
+>  	initcalls_done = true;
+> +
+> +	/*
+> +	 * Trigger deferred probe again, this time we won't defer anything
+> +	 * that is optional
+> +	 */
+> +	driver_deferred_probe_trigger();
+> +	flush_work(&deferred_probe_work);
+>  	return 0;
+>  }
+>  late_initcall(deferred_probe_initcall);
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 477956990f5e..f3dafd44c285 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -334,6 +334,8 @@ struct device *driver_find_device(struct device_driver *drv,
+>  				  struct device *start, void *data,
+>  				  int (*match)(struct device *dev, void *data));
+>  
+> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional);
+> +
+>  /**
+>   * struct subsys_interface - interfaces to device functions
+>   * @name:       name of the device function
+> -- 
+> 2.17.0
+> 
