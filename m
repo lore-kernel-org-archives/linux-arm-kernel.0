@@ -1,48 +1,83 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 May 2018 12:50:24 -0500
-Subject: [PATCH v2 8/8] PM / Domains: Stop deferring probe at the end of
- initcall
+Date: Thu, 24 May 2018 12:50:17 -0500
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init optional
 In-Reply-To: <20180524175024.19874-1-robh@kernel.org>
 References: <20180524175024.19874-1-robh@kernel.org>
-Message-ID: <20180524175024.19874-9-robh@kernel.org>
+Message-ID: <20180524175024.19874-2-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All PM domain drivers must be built-in (at least those using DT), so
-there is no point deferring probe after initcalls are done. Continuing
-to defer probe may prevent booting successfully even if managing PM
-domains is not required. This can happen if the user failed to enable
-the driver or if power-domains are added to a platform's DT, but there
-is not yet a driver (e.g. a new DTB with an old kernel).
+Deferred probe will currently wait forever on dependent devices to probe,
+but sometimes a driver will never exist. It's also not always critical for
+a driver to exist. Platforms can rely on default configuration from the
+bootloader or reset defaults for things such as pinctrl and power domains.
+This is often the case with initial platform support until various drivers
+get enabled. There's at least 2 scenarios where deferred probe can render
+a platform broken. Both involve using a DT which has more devices and
+dependencies than the kernel supports. The 1st case is a driver may be
+disabled in the kernel config. The 2nd case is the kernel version may
+simply not have the dependent driver. This can happen if using a newer DT
+(provided by firmware perhaps) with a stable kernel version.
 
-Call the driver core function driver_deferred_probe_check_init_done()
-instead of just returning -EPROBE_DEFER to stop deferring probe when
-initcalls are done.
+Subsystems or drivers may opt-in to this behavior by calling
+driver_deferred_probe_check_init_done() instead of just returning
+-EPROBE_DEFER. They may use additional information from DT or kernel's
+config to decide whether to continue to defer probe or not.
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-pm at vger.kernel.org
+Cc: Alexander Graf <agraf@suse.de>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- drivers/base/power/domain.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/base/dd.c      | 17 +++++++++++++++++
+ include/linux/device.h |  2 ++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 1ea0e2502e8e..6398cf786e6a 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2218,7 +2218,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 		mutex_unlock(&gpd_list_lock);
- 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
- 			__func__, PTR_ERR(pd));
--		return -EPROBE_DEFER;
-+		return driver_deferred_probe_check_init_done(dev, true);
- 	}
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index c9f54089429b..d6034718da6f 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -226,6 +226,16 @@ void device_unblock_probing(void)
+ 	driver_deferred_probe_trigger();
+ }
  
- 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
++int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
++{
++	if (optional && initcalls_done) {
++		dev_WARN(dev, "ignoring dependency for device, assuming no driver");
++		return -ENODEV;
++	}
++
++	return -EPROBE_DEFER;
++}
++
+ /**
+  * deferred_probe_initcall() - Enable probing of deferred devices
+  *
+@@ -240,6 +250,13 @@ static int deferred_probe_initcall(void)
+ 	/* Sort as many dependencies as possible before exiting initcalls */
+ 	flush_work(&deferred_probe_work);
+ 	initcalls_done = true;
++
++	/*
++	 * Trigger deferred probe again, this time we won't defer anything
++	 * that is optional
++	 */
++	driver_deferred_probe_trigger();
++	flush_work(&deferred_probe_work);
+ 	return 0;
+ }
+ late_initcall(deferred_probe_initcall);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 477956990f5e..f3dafd44c285 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -334,6 +334,8 @@ struct device *driver_find_device(struct device_driver *drv,
+ 				  struct device *start, void *data,
+ 				  int (*match)(struct device *dev, void *data));
+ 
++int driver_deferred_probe_check_init_done(struct device *dev, bool optional);
++
+ /**
+  * struct subsys_interface - interfaces to device functions
+  * @name:       name of the device function
 -- 
 2.17.0
