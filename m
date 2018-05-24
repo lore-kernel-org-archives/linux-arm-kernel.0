@@ -1,86 +1,97 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 24 May 2018 09:19:01 -0700
-Subject: [PATCH v3 4/6] watchdog: sp805: set WDOG_HW_RUNNING when
- appropriate
-In-Reply-To: <1527120924-12131-5-git-send-email-ray.jui@broadcom.com>
-References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
- <1527120924-12131-5-git-send-email-ray.jui@broadcom.com>
-Message-ID: <20180524161901.GB28425@roeck-us.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 24 May 2018 17:19:57 +0100
+Subject: [PATCH v3 3/6] arm64: irqflags: Use ICC sysregs to implement IRQ
+ masking
+In-Reply-To: <1526902515-13769-4-git-send-email-julien.thierry@arm.com>
+References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+ <1526902515-13769-4-git-send-email-julien.thierry@arm.com>
+Message-ID: <6c568926-b70f-ad96-7200-1d427ce148f3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 05:15:22PM -0700, Ray Jui wrote:
-> If the watchdog hardware is already enabled during the boot process,
-> when the Linux watchdog driver loads, it should reset the watchdog and
-> tell the watchdog framework. As a result, ping can be generated from
-> the watchdog framework, until the userspace watchdog daemon takes over
-> control
+Hi Julien,
+
+On 21/05/18 12:35, Julien Thierry wrote:
+> From: Daniel Thompson <daniel.thompson@linaro.org>
 > 
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Currently irqflags is implemented using the PSR's I bit. It is possible
+> to implement irqflags by using the co-processor interface to the GIC.
+> Using the co-processor interface makes it feasible to simulate NMIs
+> using GIC interrupt prioritization.
+> 
+> This patch changes the irqflags macros to modify, save and restore
+> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
+> the kernel. There are four reasons for this:
+> 
+> 1. The state of the PMR becomes part of the interrupt context and must be
+>    saved and restored during exceptions. It is saved on the stack as part
+>    of the saved context when an interrupt/exception is taken.
+> 
+> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
+>    When the I bit is set by hardware we must add code to switch from I
+>    bit masking and PMR masking:
+>        - For IRQs, this is done after the interrupt has been acknowledged
+>        	 avoiding the need to unmask.
+>        - For other exceptions, this is done right after saving the context.
+> 
+> 3. Some instructions, such as wfi, require that the PMR not be used
+>    for interrupt masking. Before calling these instructions we must
+>    switch from PMR masking to I bit masking.
+>    This is also the case when KVM runs a guest, if the CPU receives
+>    an interrupt from the host, interrupts must not be masked in PMR
+>    otherwise the GIC will not signal it to the CPU.
+> 
+> 4. We use the alternatives system to allow a single kernel to boot and
+>    be switched to the alternative masking approach at runtime.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> [julien.thierry at arm.com: changes reflected in commit,
+> 			 message, fixes, renaming]
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/Kconfig                     |  15 ++++
+>  arch/arm64/include/asm/arch_gicv3.h    |  20 ++++++
+>  arch/arm64/include/asm/assembler.h     |  25 ++++++-
+>  arch/arm64/include/asm/daifflags.h     |  36 +++++++---
+>  arch/arm64/include/asm/efi.h           |   5 ++
+>  arch/arm64/include/asm/irqflags.h      | 125 +++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/kvm_host.h      |  14 ++++
+>  arch/arm64/include/asm/processor.h     |   4 ++
+>  arch/arm64/include/asm/ptrace.h        |  14 +++-
+>  arch/arm64/kernel/asm-offsets.c        |   1 +
+>  arch/arm64/kernel/entry.S              |  28 ++++++--
+>  arch/arm64/kernel/head.S               |  37 ++++++++++
+>  arch/arm64/kernel/process.c            |   6 ++
+>  arch/arm64/kernel/smp.c                |   8 +++
+>  arch/arm64/kvm/hyp/switch.c            |  25 +++++++
+>  arch/arm64/mm/fault.c                  |   5 +-
+>  arch/arm64/mm/proc.S                   |  23 ++++++
+>  drivers/irqchip/irq-gic-v3-its.c       |   2 +-
+>  drivers/irqchip/irq-gic-v3.c           |  82 +++++++++++----------
+>  include/linux/irqchip/arm-gic-common.h |   6 ++
+>  include/linux/irqchip/arm-gic.h        |   5 --
+>  21 files changed, 423 insertions(+), 63 deletions(-)
+I've commented about this particular patch offline, but let me state it
+on the list:
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+As it is, this patch is almost impossible to review. It turns the
+interrupt masking upside down, messes with the GIC, hacks KVM... Too
+many things change at once, and I find it very hard to build a mental
+picture of the changes just by staring at it.
 
-I have one question, though: Is it really correct that both
-INT_ENABLE _and_ RESET_ENABLE have to be set to enable the watdog ?
-What if only RESET_ENABLE is set ?
+Can you please try to split it into related chunks, moving the enabling
+of the feature right at the end, so that the reviewers can have a chance
+to understand it? It should make it much easier to review.
 
 Thanks,
-Guenter
 
-> ---
->  drivers/watchdog/sp805_wdt.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-> index 1484609..d662a6f 100644
-> --- a/drivers/watchdog/sp805_wdt.c
-> +++ b/drivers/watchdog/sp805_wdt.c
-> @@ -42,6 +42,7 @@
->  	/* control register masks */
->  	#define	INT_ENABLE	(1 << 0)
->  	#define	RESET_ENABLE	(1 << 1)
-> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
->  #define WDTINTCLR		0x00C
->  #define WDTRIS			0x010
->  #define WDTMIS			0x014
-> @@ -74,6 +75,15 @@ module_param(nowayout, bool, 0);
->  MODULE_PARM_DESC(nowayout,
->  		"Set to 1 to keep watchdog running after device release");
->  
-> +/* returns true if wdt is running; otherwise returns false */
-> +static bool wdt_is_running(struct watchdog_device *wdd)
-> +{
-> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
-> +
-> +	return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
-> +}
-> +
->  /* This routine finds load value that will reset system in required timout */
->  static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
->  {
-> @@ -239,6 +249,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
->  	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
->  	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
->  
-> +	/*
-> +	 * If HW is already running, enable/reset the wdt and set the running
-> +	 * bit to tell the wdt subsystem
-> +	 */
-> +	if (wdt_is_running(&wdt->wdd)) {
-> +		wdt_enable(&wdt->wdd);
-> +		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
-> +	}
-> +
->  	ret = watchdog_register_device(&wdt->wdd);
->  	if (ret) {
->  		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
-> -- 
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	M.
+-- 
+Jazz is not dead. It just smells funny...
