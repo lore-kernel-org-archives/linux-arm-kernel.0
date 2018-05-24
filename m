@@ -1,101 +1,35 @@
-From: mdf@kernel.org (Moritz Fischer)
-Date: Thu, 24 May 2018 10:04:09 -0700
-Subject: [PATCHv5 1/8] dt-bindings, firmware: add Intel Stratix10 service
- layer binding
-In-Reply-To: <1527179600-26441-2-git-send-email-richard.gong@linux.intel.com>
-References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
- <1527179600-26441-2-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <20180524170409.GA4051@archbook>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 24 May 2018 19:02:09 +0200
+Subject: [PATCH v11 02/19] thread_info: Add update_thread_flag() helpers
+In-Reply-To: <1527181008-13549-3-git-send-email-Dave.Martin@arm.com>
+References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
+ <1527181008-13549-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180524170209.GK12198@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 11:33:13AM -0500, richard.gong at linux.intel.com wrote:
-> From: Richard Gong <richard.gong@intel.com>
+On Thu, May 24, 2018 at 05:56:31PM +0100, Dave Martin wrote:
+> There are a number of bits of code sprinkled around the kernel to
+> set a thread flag if a certain condition is true, and clear it
+> otherwise.
 > 
-> Add a device tree binding for the Intel Stratix10 service layer driver
+> To help make those call sites terser and less cumbersome, this
+> patch adds a new family of thread flag manipulators
 > 
-> Signed-off-by: Richard Gong <richard.gong@intel.com>
-> Signed-off-by: Alan Tull <atull@kernel.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Moritz Fischer <mdf@kernel.org>
-> ---
-> v2: Change to put service layer driver node under the firmware node
->     Change compatible to "intel, stratix10-svc"
-> v3: No change
-> v4: Add Rob's Reviewed-by
-> v5: No change
-> ---
->  .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+> 	update*_thread_flag([...,] flag, cond)
 > 
-> diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
-> new file mode 100644
-> index 0000000..1fa6606
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
-> @@ -0,0 +1,57 @@
-> +Intel Service Layer Driver for Stratix10 SoC
-> +============================================
-> +Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
-> +processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
-> +configured from HPS, there needs to be a way for HPS to notify SDM the
-> +location and size of the configuration data. Then SDM will get the
-> +configuration data from that location and perform the FPGA configuration.
-> +
-> +To meet the whole system security needs and support virtual machine requesting
-> +communication with SDM, only the secure world of software (EL3, Exception
-> +Layer 3) can interface with SDM. All software entities running on other
-> +exception layers must channel through the EL3 software whenever it needs
-> +service from SDM.
-> +
-> +Intel Stratix10 service layer driver, running at privileged exception level
-> +(EL1, Exception Layer 1), interfaces with the service providers and provides
-> +the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
-> +driver also manages secure monitor call (SMC) to communicate with secure monitor
-> +code running in EL3.
-> +
-> +Required properties:
-> +-------------------
-> +The svc node has the following mandatory properties, must be located under
-> +the firmware node.
-> +
-> +- compatible: "intel,stratix10-svc"
-> +- method: smc or hvc
-> +        smc - Secure Monitor Call
-> +        hvc - Hypervisor Call
-> +- memory-region:
-> +	phandle to the reserved memory node. See
-> +	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> +	for details
-> +
-> +Example:
-> +-------
-> +
-> +	reserved-memory {
-> +                #address-cells = <2>;
-> +                #size-cells = <2>;
-> +                ranges;
-> +
-> +                service_reserved: svcbuffer at 0 {
-> +                        compatible = "shared-dma-pool";
-> +                        reg = <0x0 0x0 0x0 0x1000000>;
-> +                        alignment = <0x1000>;
-> +                        no-map;
-> +                };
-> +        };
-> +
-> +	firmware {
-> +		svc {
-> +			compatible = "intel,stratix10-svc";
-> +			method = "smc";
-> +			memory-region = <&service_reserved>;
-> +		};
-> +	};
-> -- 
-> 2.7.4
+> which do the equivalent of:
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 	if (cond)
+> 		set*_thread_flag([...,] flag);
+> 	else
+> 		clear*_thread_flag([...,] flag);
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ingo Molnar <mingo@redhat.com>
+
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
