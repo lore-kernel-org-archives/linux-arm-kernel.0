@@ -1,29 +1,61 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 24 May 2018 22:34:49 +0300
-Subject: uImage target support on arm64
-In-Reply-To: <CA+Kvs9=mgW4Z=UcBZZLL82fJ=c--OXF3=B2Zbho+CfMTr8Wk-Q@mail.gmail.com>
-References: <CA+Kvs9=mgW4Z=UcBZZLL82fJ=c--OXF3=B2Zbho+CfMTr8Wk-Q@mail.gmail.com>
-Message-ID: <20180524193449.jql27apudwaevwpf@tarshish>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 24 May 2018 14:42:43 -0500
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524185639.GA31019@kroah.com>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524185639.GA31019@kroah.com>
+Message-ID: <CAL_JsqL86en1UYHA6BMHDW8q=A4kOoo6ro1qXuXHjEwT=KXoMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramon,
+On Thu, May 24, 2018 at 1:56 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
+>> Deferred probe will currently wait forever on dependent devices to probe,
+>> but sometimes a driver will never exist. It's also not always critical for
+>> a driver to exist. Platforms can rely on default configuration from the
+>> bootloader or reset defaults for things such as pinctrl and power domains.
+>> This is often the case with initial platform support until various drivers
+>> get enabled. There's at least 2 scenarios where deferred probe can render
+>> a platform broken. Both involve using a DT which has more devices and
+>> dependencies than the kernel supports. The 1st case is a driver may be
+>> disabled in the kernel config. The 2nd case is the kernel version may
+>> simply not have the dependent driver. This can happen if using a newer DT
+>> (provided by firmware perhaps) with a stable kernel version.
+>>
+>> Subsystems or drivers may opt-in to this behavior by calling
+>> driver_deferred_probe_check_init_done() instead of just returning
+>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>> config to decide whether to continue to defer probe or not.
+>>
+>> Cc: Alexander Graf <agraf@suse.de>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  drivers/base/dd.c      | 17 +++++++++++++++++
+>>  include/linux/device.h |  2 ++
+>>  2 files changed, 19 insertions(+)
+>>
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index c9f54089429b..d6034718da6f 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -226,6 +226,16 @@ void device_unblock_probing(void)
+>>       driver_deferred_probe_trigger();
+>>  }
+>>
+>> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+>> +{
+>> +     if (optional && initcalls_done) {
+>> +             dev_WARN(dev, "ignoring dependency for device, assuming no driver");
+>
+> You really only need dev_warn(), here, right?
 
-On Thu, May 24, 2018 at 10:05:15PM +0300, Ramon Fried wrote:
-> I've noticed that it's not supported.
-> Is it on purpose ?
+No, the screaming is on purpose.
 
-Yes. The 32bit load address in the uImage header in pretty limited when 
-applied to 64bit ARM64. Even for ARM zImage is the preferred kernel format for 
-quite some time now, since it allows flexible load address, as well as 
-multi-platform kernels.
+Bjorn had concerns about debugging/supporting subtle problems that
+could stem from this. Such as electrical settings not quite right that
+cause intermittent errors.
 
-> If not I'll be happy to add support for: make uImage
-> for arm64 targets.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Rob
