@@ -1,239 +1,100 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 24 May 2018 09:50:33 -0700
-Subject: [PATCH v9 02/15] clk: mux: Split out register accessors for reuse
-In-Reply-To: <1520347148-27852-3-git-send-email-sricharan@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
- <1520347148-27852-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20180524165033.GB14924@minitux>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 24 May 2018 17:56:29 +0100
+Subject: [PATCH v11 00/19] KVM: arm64: Optimise FPSIMD context switching
+Message-ID: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
+Note: Most of these patches are Arm-specific.  People not Cc'd on the
+whole series can find it in the linux-arm-kernel archive [2].
 
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> We want to reuse the logic in clk-mux.c for other clock drivers
-> that don't use readl as register accessors. Fortunately, there
-> really isn't much to the mux code besides the table indirection
-> and quirk flags if you assume any bit shifting and masking has
-> been done already. Pull that logic out into reusable functions
-> that operate on an optional table and some flags so that other
-> drivers can use the same logic.
-> 
-> [Sricharan: Rebased for mainline]
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Git: see [3]
 
-This should read as a log, where the first entry is Stephen stating that
-he acquired or wrote the code and can release it according to the
-license requirements. Then you state that you acquired it, changed it
-and are releasing it according to the license requirements.
+This series aims to improve the way FPSIMD context is handled by KVM.
+Changes since the previous v10 [1] are minor, but one patch has been
+split.
 
+** To Catalin Marinas, Alex Benn?e: **
 
-PS. Please expand your last name.
+I have retained your Reviewed-bys on patches 7 and 8: these were split
+from patch 7 of v9.  Although the code is (almost) the same as noted
+below, I advise you to take a look.
 
-Regards,
-Bjorn
+(all) reviewers please note:
 
-> ---
->  drivers/clk/clk-mux.c         | 74 +++++++++++++++++++++++++++----------------
->  drivers/clk/nxp/clk-lpc32xx.c | 21 +++---------
->  include/linux/clk-provider.h  |  6 ++++
->  3 files changed, 57 insertions(+), 44 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 39cabe1..28223fa 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -26,35 +26,25 @@
->   * parent - parent is adjustable through clk_set_parent
->   */
->  
-> -static u8 clk_mux_get_parent(struct clk_hw *hw)
-> +unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
-> +				unsigned int *table,
-> +				unsigned long flags)
->  {
-> -	struct clk_mux *mux = to_clk_mux(hw);
->  	int num_parents = clk_hw_get_num_parents(hw);
-> -	u32 val;
-> -
-> -	/*
-> -	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
-> -	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
-> -	 * to 0x7 (index starts at one)
-> -	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
-> -	 * val = 0x4 really means "bit 2, index starts at bit 0"
-> -	 */
-> -	val = clk_readl(mux->reg) >> mux->shift;
-> -	val &= mux->mask;
->  
-> -	if (mux->table) {
-> +	if (table) {
->  		int i;
->  
->  		for (i = 0; i < num_parents; i++)
-> -			if (mux->table[i] == val)
-> +			if (table[i] == val)
->  				return i;
->  		return -EINVAL;
->  	}
->  
-> -	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
-> +	if (val && (flags & CLK_MUX_INDEX_BIT))
->  		val = ffs(val) - 1;
->  
-> -	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
-> +	if (val && (flags & CLK_MUX_INDEX_ONE))
->  		val--;
->  
->  	if (val >= num_parents)
-> @@ -62,23 +52,53 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
->  
->  	return val;
->  }
-> +EXPORT_SYMBOL_GPL(clk_mux_get_parent);
->  
-> -static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-> +static u8 _clk_mux_get_parent(struct clk_hw *hw)
->  {
->  	struct clk_mux *mux = to_clk_mux(hw);
->  	u32 val;
-> -	unsigned long flags = 0;
->  
-> -	if (mux->table) {
-> -		index = mux->table[index];
-> +	/*
-> +	 * FIXME need a mux-specific flag to determine if val is bitwise or
-> +	 * numeric e.g. sys_clkin_ck's clksel field is 3 bits wide,
-> +	 * but ranges from 0x1 to 0x7 (index starts at one)
-> +	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
-> +	 * val = 0x4 really means "bit 2, index starts at bit 0"
-> +	 */
-> +	val = clk_readl(mux->reg) >> mux->shift;
-> +	val &= mux->mask;
-> +
-> +	return clk_mux_get_parent(hw, val, mux->table, mux->flags);
-> +}
-> +
-> +unsigned int clk_mux_reindex(u8 index, unsigned int *table,
-> +			     unsigned long flags)
-> +{
-> +	unsigned int val = index;
-> +
-> +	if (table) {
-> +		val = table[val];
->  	} else {
-> -		if (mux->flags & CLK_MUX_INDEX_BIT)
-> -			index = 1 << index;
-> +		if (flags & CLK_MUX_INDEX_BIT)
-> +			val = 1 << index;
->  
-> -		if (mux->flags & CLK_MUX_INDEX_ONE)
-> -			index++;
-> +		if (flags & CLK_MUX_INDEX_ONE)
-> +			val++;
->  	}
->  
-> +	return val;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_mux_reindex);
-> +
-> +static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct clk_mux *mux = to_clk_mux(hw);
-> +	u32 val;
-> +	unsigned long flags = 0;
-> +
-> +	index = clk_mux_reindex(index, mux->table, mux->flags);
-> +
->  	if (mux->lock)
->  		spin_lock_irqsave(mux->lock, flags);
->  	else
-> @@ -102,14 +122,14 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
->  }
->  
->  const struct clk_ops clk_mux_ops = {
-> -	.get_parent = clk_mux_get_parent,
-> +	.get_parent = _clk_mux_get_parent,
->  	.set_parent = clk_mux_set_parent,
->  	.determine_rate = __clk_mux_determine_rate,
->  };
->  EXPORT_SYMBOL_GPL(clk_mux_ops);
->  
->  const struct clk_ops clk_mux_ro_ops = {
-> -	.get_parent = clk_mux_get_parent,
-> +	.get_parent = _clk_mux_get_parent,
->  };
->  EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
->  
-> diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-> index f5d815f..9b34150 100644
-> --- a/drivers/clk/nxp/clk-lpc32xx.c
-> +++ b/drivers/clk/nxp/clk-lpc32xx.c
-> @@ -999,29 +999,16 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
->  	.set_rate = clk_divider_set_rate,
->  };
->  
-> -static u8 clk_mux_get_parent(struct clk_hw *hw)
-> +static u8 _clk_mux_get_parent(struct clk_hw *hw)
->  {
->  	struct lpc32xx_clk_mux *mux = to_lpc32xx_mux(hw);
-> -	u32 num_parents = clk_hw_get_num_parents(hw);
->  	u32 val;
->  
->  	regmap_read(clk_regmap, mux->reg, &val);
->  	val >>= mux->shift;
->  	val &= mux->mask;
->  
-> -	if (mux->table) {
-> -		u32 i;
-> -
-> -		for (i = 0; i < num_parents; i++)
-> -			if (mux->table[i] == val)
-> -				return i;
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (val >= num_parents)
-> -		return -EINVAL;
-> -
-> -	return val;
-> +	return clk_mux_get_parent(hw, val, mux->table, 0);
->  }
->  
->  static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-> @@ -1036,11 +1023,11 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
->  }
->  
->  static const struct clk_ops lpc32xx_clk_mux_ro_ops = {
-> -	.get_parent = clk_mux_get_parent,
-> +	.get_parent = _clk_mux_get_parent,
->  };
->  
->  static const struct clk_ops lpc32xx_clk_mux_ops = {
-> -	.get_parent = clk_mux_get_parent,
-> +	.get_parent = _clk_mux_get_parent,
->  	.set_parent = clk_mux_set_parent,
->  	.determine_rate = __clk_mux_determine_rate,
->  };
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index f711be6..344ad92 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -488,6 +488,12 @@ struct clk_mux {
->  extern const struct clk_ops clk_mux_ops;
->  extern const struct clk_ops clk_mux_ro_ops;
->  
-> +unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
-> +				unsigned int *table,
-> +				unsigned long flags);
-> +unsigned int clk_mux_reindex(u8 index, unsigned int *table,
-> +			     unsigned long flags);
-> +
->  struct clk *clk_register_mux(struct device *dev, const char *name,
->  		const char * const *parent_names, u8 num_parents,
->  		unsigned long flags,
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
+ * Patches 7 and 8 have been split from the previous patch 7, since
+   the update to INIT_THREAD_INFO is logically a fix and deserves
+   a Fixes: tag.
+
+   I have also moved the definition of INIT_THREAD_INFO to after the
+   TIF_* definitions that it now depends on (mysteriously this wasn't
+   causing a compile error anyway, but I've not dug into why).
+
+ * Other changes are all additions or rewordings of comments, and
+   amendments commit messages.
+
+Cheers
+---Dave
+
+[1] [PATCH v10 00/18] KVM: arm64: Optimise FPSIMD context switching
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579899.html
+
+[2] linux-arm-kernel archive
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/thread.html
+
+[3] http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/kvm-vhe-fpsimd/v11
+
+Christoffer Dall (1):
+  KVM: arm/arm64: Introduce kvm_arch_vcpu_run_pid_change
+
+Dave Martin (18):
+  arm64: fpsimd: Fix TIF_FOREIGN_FPSTATE after invalidating cpu regs
+  thread_info: Add update_thread_flag() helpers
+  arm64: Use update{,_tsk}_thread_flag()
+  KVM: arm64: Convert lazy FPSIMD context switch trap to C
+  arm64: fpsimd: Generalise context saving for non-task contexts
+  arm64: fpsimd: Avoid FPSIMD context leakage for the init task
+  arm64: fpsimd: Eliminate task->mm checks
+  arm64/sve: Refactor user SVE trap maintenance for external use
+  KVM: arm64: Repurpose vcpu_arch.debug_flags for general-purpose flags
+  KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing
+  arm64/sve: Move read_zcr_features() out of cpufeature.h
+  arm64/sve: Switch sve_pffr() argument from task to thread
+  arm64/sve: Move sve_pffr() to fpsimd.h and make inline
+  KVM: arm64: Save host SVE context as appropriate
+  KVM: arm64: Remove eager host SVE state saving
+  KVM: arm64: Remove redundant *exit_code changes in fpsimd_guest_exit()
+  KVM: arm64: Fold redundant exit code checks out of fixup_guest_exit()
+  KVM: arm64: Invoke FPSIMD context switch trap from C
+
+ arch/arm/include/asm/kvm_host.h      |  10 +-
+ arch/arm64/Kconfig                   |   7 ++
+ arch/arm64/include/asm/cpufeature.h  |  29 ------
+ arch/arm64/include/asm/fpsimd.h      |  21 +++++
+ arch/arm64/include/asm/kvm_asm.h     |   3 -
+ arch/arm64/include/asm/kvm_host.h    |  45 +++++++--
+ arch/arm64/include/asm/processor.h   |  15 ++-
+ arch/arm64/include/asm/thread_info.h |  13 +--
+ arch/arm64/kernel/fpsimd.c           | 177 +++++++++++++++++------------------
+ arch/arm64/kernel/ptrace.c           |   1 +
+ arch/arm64/kvm/Kconfig               |   1 +
+ arch/arm64/kvm/Makefile              |   2 +-
+ arch/arm64/kvm/debug.c               |   8 +-
+ arch/arm64/kvm/fpsimd.c              | 110 ++++++++++++++++++++++
+ arch/arm64/kvm/hyp/debug-sr.c        |   6 +-
+ arch/arm64/kvm/hyp/entry.S           |  43 ---------
+ arch/arm64/kvm/hyp/hyp-entry.S       |  19 ----
+ arch/arm64/kvm/hyp/switch.c          | 124 ++++++++++++++++--------
+ arch/arm64/kvm/hyp/sysreg-sr.c       |   4 +-
+ arch/arm64/kvm/sys_regs.c            |   9 +-
+ include/linux/kvm_host.h             |   9 ++
+ include/linux/sched.h                |   6 ++
+ include/linux/thread_info.h          |  11 +++
+ virt/kvm/Kconfig                     |   3 +
+ virt/kvm/arm/arm.c                   |  14 ++-
+ virt/kvm/kvm_main.c                  |   7 +-
+ 26 files changed, 437 insertions(+), 260 deletions(-)
+ create mode 100644 arch/arm64/kvm/fpsimd.c
+
+-- 
+2.1.4
