@@ -1,53 +1,67 @@
 From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 24 May 2018 14:09:32 -0500
-Subject: [PATCH 4/4] arm64: cpufeature: always log KPTI setting on boot
+Date: Thu, 24 May 2018 14:09:30 -0500
+Subject: [PATCH 2/4] arm64: kdebugfs: create arm64 debugfs directory
 In-Reply-To: <20180524190932.32118-1-mlangsdo@redhat.com>
 References: <20180524190932.32118-1-mlangsdo@redhat.com>
-Message-ID: <20180524190932.32118-5-mlangsdo@redhat.com>
+Message-ID: <20180524190932.32118-3-mlangsdo@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always log KPTI setting at boot time, whether or not KPTI was forced
-by a kernel parameter.
+Create debugfs directory for arm64, like the existing one for x86.
 
 Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
 ---
- arch/arm64/kernel/cpufeature.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ arch/arm64/kernel/Makefile   |  3 ++-
+ arch/arm64/kernel/kdebugfs.c | 27 +++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/kdebugfs.c
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 697a6ef..e50bf3c 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -889,16 +889,20 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 		__pti_enabled = __kpti_forced > 0;
- 		pr_info_once("kernel page table isolation forced %s by %s\n",
- 			     __pti_enabled ? "ON" : "OFF", str);
-+	} else {
-+		/* Useful for KASLR robustness */
-+		if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-+			__pti_enabled = true;
-+		/* Don't force KPTI for CPUs that are not vulnerable */
-+		else if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
-+			__pti_enabled = false;
-+		/* Defer to CPU feature registers */
-+		else
-+			__pti_enabled = !has_cpuid_feature(entry, scope);
-+
-+		pr_info_once("kernel page table isolation %s by %s\n",
-+			    __pti_enabled ? "ON" : "OFF", str);
- 	}
--	/* Useful for KASLR robustness */
--	else if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
--		__pti_enabled = true;
--	/* Don't force KPTI for CPUs that are not vulnerable */
--	else if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
--		__pti_enabled = false;
--	/* Defer to CPU feature registers */
--	else
--		__pti_enabled = !has_cpuid_feature(entry, scope);
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index bf825f3..a48b298 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -18,7 +18,8 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   hyp-stub.o psci.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+-			   smp.o smp_spin_table.o topology.o smccc-call.o
++			   smp.o smp_spin_table.o topology.o smccc-call.o	\
++			   kdebugfs.o
  
- 	return __pti_enabled;
- }
+ extra-$(CONFIG_EFI)			:= efi-entry.o
+ 
+diff --git a/arch/arm64/kernel/kdebugfs.c b/arch/arm64/kernel/kdebugfs.c
+new file mode 100644
+index 0000000..e1e3332
+--- /dev/null
++++ b/arch/arm64/kernel/kdebugfs.c
+@@ -0,0 +1,27 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Architecture specific debugfs files
++ *
++ * Copyright (C) 2018 Red Hat, Inc.
++ */
++
++#include <linux/debugfs.h>
++#include <linux/export.h>
++#include <linux/init.h>
++
++struct dentry *arch_debugfs_dir;
++EXPORT_SYMBOL(arch_debugfs_dir);
++
++static int __init arch_kdebugfs_init(void)
++{
++	int error = 0;
++
++	arch_debugfs_dir = debugfs_create_dir("arm64", NULL);
++	if (IS_ERR(arch_debugfs_dir)) {
++		arch_debugfs_dir = NULL;
++		return -ENOMEM;
++	}
++
++	return error;
++}
++postcore_initcall(arch_kdebugfs_init);
 -- 
 2.9.5
