@@ -1,76 +1,82 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Thu, 24 May 2018 22:33:58 +0200
-Subject: [linux-sunxi] Re: [PATCH 05/15] drm/sun4i: Add TCON TOP driver
-In-Reply-To: <20180524084351.x4ugbbsz3mqv6fh7@flea>
-References: <20180519183127.2718-1-jernej.skrabec@siol.net>
- <5965231.6ucpJrPIQ5@jernej-laptop> <20180524084351.x4ugbbsz3mqv6fh7@flea>
-Message-ID: <2523764.1gMShBa1ZC@jernej-laptop>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 24 May 2018 15:57:54 -0500
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524190031.GB31019@kroah.com>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524190031.GB31019@kroah.com>
+Message-ID: <CAL_JsqJK69A3W=YrSfvPetM95CROOJhU1bW1rMEOGtji=t0ORQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, May 24, 2018 at 2:00 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
+>> Deferred probe will currently wait forever on dependent devices to probe,
+>> but sometimes a driver will never exist. It's also not always critical for
+>> a driver to exist. Platforms can rely on default configuration from the
+>> bootloader or reset defaults for things such as pinctrl and power domains.
+>> This is often the case with initial platform support until various drivers
+>> get enabled. There's at least 2 scenarios where deferred probe can render
+>> a platform broken. Both involve using a DT which has more devices and
+>> dependencies than the kernel supports. The 1st case is a driver may be
+>> disabled in the kernel config. The 2nd case is the kernel version may
+>> simply not have the dependent driver. This can happen if using a newer DT
+>> (provided by firmware perhaps) with a stable kernel version.
+>>
+>> Subsystems or drivers may opt-in to this behavior by calling
+>> driver_deferred_probe_check_init_done() instead of just returning
+>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>> config to decide whether to continue to defer probe or not.
+>>
+>> Cc: Alexander Graf <agraf@suse.de>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  drivers/base/dd.c      | 17 +++++++++++++++++
+>>  include/linux/device.h |  2 ++
+>>  2 files changed, 19 insertions(+)
+>>
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index c9f54089429b..d6034718da6f 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -226,6 +226,16 @@ void device_unblock_probing(void)
+>>       driver_deferred_probe_trigger();
+>>  }
+>>
+>> +int driver_deferred_probe_check_init_done(struct device *dev, bool optional)
+>> +{
+>> +     if (optional && initcalls_done) {
+>
+> Wait, what's the "optional" mess here?
 
-Dne ?etrtek, 24. maj 2018 ob 10:43:51 CEST je Maxime Ripard napisal(a):
-> Hi,
-> 
-> On Mon, May 21, 2018 at 05:15:15PM +0200, Jernej ?krabec wrote:
-> > > > +	/*
-> > > > +	 * Default register values might have some reserved bits set, 
-which
-> > > > +	 * prevents TCON TOP from working properly. Set them to 0 here.
-> > > > +	 */
-> > > > +	writel(0, tcon_top->regs + TCON_TOP_PORT_SEL_REG);
-> > > > +	writel(0, tcon_top->regs + TCON_TOP_GATE_SRC_REG);
-> > > > +
-> > > > +	for (i = 0; i < CLK_NUM; i++) {
-> > > > +		const char *parent_name = "bus-tcon-top";
-> > > 
-> > > I guess retrieving the parent's clock name at runtime would be more
-> > > flexible.
-> > 
-> > It is, but will it ever be anything else?
-> 
-> Probably not, but when the complexity is exactly the same (using
-> __clk_get_name), we'd better use the more appropriate solution. If we
-> ever need to change that clock name, or to use the driver with an SoC
-> that wouldn't have the same clock name for whatever reason, it will
-> just work.
-> 
-> > > > +		struct clk_init_data init;
-> > > > +		struct clk_gate *gate;
-> > > > +
-> > > > +		gate = devm_kzalloc(dev, sizeof(*gate), GFP_KERNEL);
-> > > > +		if (!gate) {
-> > > > +			ret = -ENOMEM;
-> > > > +			goto err_disable_clock;
-> > > > +		}
-> > > > +
-> > > > +		init.name = gates[i].name;
-> > > > +		init.ops = &clk_gate_ops;
-> > > > +		init.flags = CLK_IS_BASIC;
-> > > > +		init.parent_names = &parent_name;
-> > > > +		init.num_parents = 1;
-> > > > +
-> > > > +		gate->reg = tcon_top->regs + TCON_TOP_GATE_SRC_REG;
-> > > > +		gate->bit_idx = gates[i].bit;
-> > > > +		gate->lock = &tcon_top->reg_lock;
-> > > > +		gate->hw.init = &init;
-> > > > +
-> > > > +		ret = devm_clk_hw_register(dev, &gate->hw);
-> > > > +		if (ret)
-> > > > +			goto err_disable_clock;
-> > > 
-> > > Isn't it what clk_hw_register_gate is doing?
-> > 
-> > Almost, but not exactly. My goal was to use devm_* functions, so there is
-> > no need to do any special cleanup.
-> 
-> Is it the only difference? If so, you can just create a
-> devm_clk_hw_register gate.
+My intent was that subsystems just always call this function and never
+return EPROBE_DEFER themselves. Then the driver core can make
+decisions as to what to do (such as the timeout added in the next
+patch). Or it can print common error/debug messages. So optional is a
+hint to allow subsystems per device control.
 
-I checked around and it seems that in clk core there are only non devm_* 
-helpers like clk_hw_register_gate() for some reason. I guess I'll just use 
-that and manually unregister all the clocks in cleanup function.
+>
+> The caller knows this value, so why do you need to even pass it in here?
 
-Best regards,
-Jernej
+Because regardless of the value, we always stop deferring when/if we
+hit the timeout and the caller doesn't know about the timeout. If we
+get rid of it, we'd need functions for both init done and for deferred
+timeout.
+
+> And bool values that are not obvious are horrid.  I had to go look this
+> up when reading the later patches that just passed "true" in this
+> variable as I had no idea what that meant.
+
+Perhaps inverting it and calling it "keep_deferring" would be better.
+However, the flag is ignored if we have timed out.
+
+>
+> So as-is, no, this isn't ok, sorry.
+>
+> And at the least, this needs some kerneldoc to explain it :)
+
+That part is easy enough to fix.
+
+Rob
