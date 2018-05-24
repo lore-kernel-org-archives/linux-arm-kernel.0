@@ -1,15 +1,29 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 24 May 2018 14:09:28 -0500
-Subject: [PATCH 0/4] arm64: align KPTI interface with x86
-Message-ID: <20180524190932.32118-1-mlangsdo@redhat.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 24 May 2018 22:34:49 +0300
+Subject: uImage target support on arm64
+In-Reply-To: <CA+Kvs9=mgW4Z=UcBZZLL82fJ=c--OXF3=B2Zbho+CfMTr8Wk-Q@mail.gmail.com>
+References: <CA+Kvs9=mgW4Z=UcBZZLL82fJ=c--OXF3=B2Zbho+CfMTr8Wk-Q@mail.gmail.com>
+Message-ID: <20180524193449.jql27apudwaevwpf@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 supports KPTI, but is missing some user interface features such as
-a debugfs entry compared to the x86 implementation.
+Hi Ramon,
 
-Add the nopti argument, update the documentation so that ARM64 as well
-as x86 supports nopti and kpti, and add a debugfs entry to check the
-status of the kpti on a running machine.
+On Thu, May 24, 2018 at 10:05:15PM +0300, Ramon Fried wrote:
+> I've noticed that it's not supported.
+> Is it on purpose ?
 
---Mark Langsdorf
+Yes. The 32bit load address in the uImage header in pretty limited when 
+applied to 64bit ARM64. Even for ARM zImage is the preferred kernel format for 
+quite some time now, since it allows flexible load address, as well as 
+multi-platform kernels.
+
+> If not I'll be happy to add support for: make uImage
+> for arm64 targets.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
