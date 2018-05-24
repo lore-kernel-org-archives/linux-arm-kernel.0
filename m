@@ -1,97 +1,73 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 24 May 2018 16:48:53 +0100
-Subject: [PATCH 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
- manage multi PM domains
-In-Reply-To: <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1c21d18e-954a-f3a8-9817-0117b7cb7e4f@nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 May 2018 16:51:18 +0100
+Subject: [PATCH 3/4] KVM: arm/arm64: Remove unnecessary CMOs when
+ creating HYP page tables
+In-Reply-To: <20180517103548.5622-4-marc.zyngier@arm.com>
+References: <20180517103548.5622-1-marc.zyngier@arm.com>
+ <20180517103548.5622-4-marc.zyngier@arm.com>
+Message-ID: <20180524155117.qdi25z33lnmkrsoe@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 18/05/18 11:31, Ulf Hansson wrote:
-> The existing dev_pm_domain_attach() function, allows a single PM domain to
-> be attached per device. To be able to support devices that are partitioned
-> across multiple PM domains, let's introduce a new interface,
-> dev_pm_domain_attach_by_id().
+On Thu, May 17, 2018 at 11:35:47AM +0100, Marc Zyngier wrote:
+> There is no need to perform cache maintenance operations when
+> creating the HYP page tables if we have the multiprocessing
+> extensions. ARMv7 mandates them with the virtualization support,
+> and ARMv8 just mandates them unconditionally.
 > 
-> The dev_pm_domain_attach_by_id() returns a new allocated struct device with
-> the corresponding attached PM domain. This enables for example a driver to
-> operate on the new device from a power management point of view. The driver
-> may then also benefit from using the received device, to set up so called
-> device-links towards its original device. Depending on the situation, these
-> links may then be dynamically changed.
+> Let's remove these operations.
 > 
-> The new interface is typically called by drivers during their probe phase,
-> in case they manages devices which uses multiple PM domains. If that is the
-> case, the driver also becomes responsible of managing the detaching of the
-> PM domains, which typically should be done at the remove phase. Detaching
-> is done by calling the existing dev_pm_domain_detach() function and for
-> each of the received devices from dev_pm_domain_attach_by_id().
-> 
-> Note, currently its only genpd that supports multiple PM domains per
-> device, but dev_pm_domain_attach_by_id() can easily by extended to cover
-> other PM domain types, if/when needed.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->   drivers/base/power/common.c | 33 ++++++++++++++++++++++++++++++++-
->   include/linux/pm_domain.h   |  7 +++++++
->   2 files changed, 39 insertions(+), 1 deletion(-)
+>  virt/kvm/arm/mmu.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
 > 
-> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-> index 7ae62b6..d3db974 100644
-> --- a/drivers/base/power/common.c
-> +++ b/drivers/base/power/common.c
-> @@ -117,13 +117,44 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
->   EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
->   
->   /**
-> + * dev_pm_domain_attach_by_id - Attach a device to one of its PM domains.
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index ba66bf7ae299..acbfea09578c 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -578,7 +578,6 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+>  		pte = pte_offset_kernel(pmd, addr);
+>  		kvm_set_pte(pte, pfn_pte(pfn, prot));
+>  		get_page(virt_to_page(pte));
+> -		kvm_flush_dcache_to_poc(pte, sizeof(*pte));
+>  		pfn++;
+>  	} while (addr += PAGE_SIZE, addr != end);
+>  }
+> @@ -605,7 +604,6 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+>  			}
+>  			pmd_populate_kernel(NULL, pmd, pte);
+>  			get_page(virt_to_page(pmd));
+> -			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
+>  		}
+>  
+>  		next = pmd_addr_end(addr, end);
+> @@ -638,7 +636,6 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+>  			}
+>  			pud_populate(NULL, pud, pmd);
+>  			get_page(virt_to_page(pud));
+> -			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+>  		}
+>  
+>  		next = pud_addr_end(addr, end);
+> @@ -675,7 +672,6 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+>  			}
+>  			pgd_populate(NULL, pgd, pud);
+>  			get_page(virt_to_page(pgd));
+> -			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+>  		}
+>  
+>  		next = pgd_addr_end(addr, end);
+> @@ -685,6 +681,7 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+>  		pfn += (next - addr) >> PAGE_SHIFT;
+>  	} while (addr = next, addr != end);
+>  out:
+> +	dsb(ishst);
+>  	mutex_unlock(&kvm_hyp_pgd_mutex);
 
-Isn't this more of a 'get'?
+Why do we need the DSB here? A comment would help.
 
-> + * @index: The index of the PM domain.
-> + * @dev: Device to attach.
-
-Isn't this just the device associated with the PM domain we are getting?
-
-> + *
-> + * As @dev may only be attached to a single PM domain, the backend PM domain
-> + * provider should create a virtual device to attach instead. As attachment
-> + * succeeds, the ->detach() callback in the struct dev_pm_domain should be
-> + * assigned by the corresponding backend attach function.
-> + *
-> + * This function should typically be invoked from drivers during probe phase.
-> + * Especially for those that manages devices which requires power management
-> + * through more than one PM domain.
-> + *
-> + * Callers must ensure proper synchronization of this function with power
-> + * management callbacks.
-> + *
-> + * Returns the virtual attached device in case successfully attached PM domain,
-> + * NULL in case @dev don't need a PM domain, else a PTR_ERR().
-
-Should this be 'NULL in the case where the @dev already has a power-domain'?
-
-> + */
-> +struct device *dev_pm_domain_attach_by_id(struct device *dev,
-> +					  unsigned int index)
-> +{
-> +	if (dev->pm_domain)
-
-I wonder if this is worthy of a ...
-
-	if (WARN_ON(dev->pm_domain))
-
-> +		return NULL;
-
-Don't we consider this an error case? I wonder why not return PTR_ERR 
-here as well? This would be consistent with dev_pm_domain_attach().
-
-Cheers
-Jon
+If a DMB is sufficient, I think mutex_unlock has release semantics.
 
 -- 
-nvpublic
+Catalin
