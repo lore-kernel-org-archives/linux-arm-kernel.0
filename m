@@ -1,53 +1,99 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 24 May 2018 10:32:46 -0600
-Subject: [PATCH] arm64: dts: msm8916: fix Coresight ETF graph connections
-In-Reply-To: <20180524044853.713.23166@silver>
-References: <20180508150952.24562-1-robh@kernel.org>
- <20180508150952.24562-3-robh@kernel.org>
- <CAL_JsqL8qBiJUMyUEcih07UoFSAghn6Amfo8OfY-pKU-QX2_mw@mail.gmail.com>
- <20180524044853.713.23166@silver>
-Message-ID: <CANLsYkz9tAH7mazz2LNCtoYsdH4f5bKfGWEnJHsgH0mK6vNMEg@mail.gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 24 May 2018 09:36:25 -0700
+Subject: [PATCH v3 4/6] watchdog: sp805: set WDOG_HW_RUNNING when
+ appropriate
+In-Reply-To: <20180524161901.GB28425@roeck-us.net>
+References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
+ <1527120924-12131-5-git-send-email-ray.jui@broadcom.com>
+ <20180524161901.GB28425@roeck-us.net>
+Message-ID: <5e3d05f2-d526-9108-e2fd-13573458be85@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2018 at 22:48, Ivan T. Ivanov <iivanov.xz@gmail.com> wrote:
-> Quoting Rob Herring (2018-05-23 23:29:29)
->> On Tue, May 8, 2018 at 10:09 AM, Rob Herring <robh@kernel.org> wrote:
->> > The ETF input should be connected to the funnel output, and the ETF
->> > output should be connected to the replicator input. The labels are wrong
->> > and these got swapped:
->> >
->> > Warning (graph_endpoint): /soc/funnel at 821000/ports/port at 8/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 1/endpoint' is not bidirectional
->> > Warning (graph_endpoint): /soc/replicator at 824000/ports/port at 2/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 0/endpoint' is not bidirectional
->> >
->> > Fixes: 7c10da373698 ("arm64: dts: qcom: Add msm8916 CoreSight components")
->> > Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
->> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> > Cc: Andy Gross <andy.gross@linaro.org>
->> > Cc: David Brown <david.brown@linaro.org>
->> > Cc: linux-arm-msm at vger.kernel.org
->> > Signed-off-by: Rob Herring <robh@kernel.org>
->> > ---
->> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
->> >  1 file changed, 2 insertions(+), 2 deletions(-)
+
+
+On 5/24/2018 9:19 AM, Guenter Roeck wrote:
+> On Wed, May 23, 2018 at 05:15:22PM -0700, Ray Jui wrote:
+>> If the watchdog hardware is already enabled during the boot process,
+>> when the Linux watchdog driver loads, it should reset the watchdog and
+>> tell the watchdog framework. As a result, ping can be generated from
+>> the watchdog framework, until the userspace watchdog daemon takes over
+>> control
 >>
->> Ping. Still seeing warnings in -next for these.
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> 
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> I have one question, though: Is it really correct that both
+> INT_ENABLE _and_ RESET_ENABLE have to be set to enable the watdog ?
+> What if only RESET_ENABLE is set ?
+
+According to the SP805 TRM, INT_ENABLE needs to be set to high to enable 
+the counter and the interrupt. Counter will be stopped if INT_ENABLE is 
+cleared. So yes, INT_ENABLE needs to be set.
+
+Thanks,
+
+Ray
+
+> 
+> Thanks,
+> Guenter
+> 
+>> ---
+>>   drivers/watchdog/sp805_wdt.c | 19 +++++++++++++++++++
+>>   1 file changed, 19 insertions(+)
 >>
->
->  Hi Rob,
->
->  I no longer have access to this hardware and documentation.
->  I am sure that Mathieu and friends will take care for verification
->  of this patch :-)
-
-The code triggers on the "slave-mode" property rather than the labels,
-so this patch has no effect on how a path is established.  I've tested
-this on a 410c and things look good.
-
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
->
->  Regards,
->  Ivan
->
+>> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+>> index 1484609..d662a6f 100644
+>> --- a/drivers/watchdog/sp805_wdt.c
+>> +++ b/drivers/watchdog/sp805_wdt.c
+>> @@ -42,6 +42,7 @@
+>>   	/* control register masks */
+>>   	#define	INT_ENABLE	(1 << 0)
+>>   	#define	RESET_ENABLE	(1 << 1)
+>> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
+>>   #define WDTINTCLR		0x00C
+>>   #define WDTRIS			0x010
+>>   #define WDTMIS			0x014
+>> @@ -74,6 +75,15 @@ module_param(nowayout, bool, 0);
+>>   MODULE_PARM_DESC(nowayout,
+>>   		"Set to 1 to keep watchdog running after device release");
+>>   
+>> +/* returns true if wdt is running; otherwise returns false */
+>> +static bool wdt_is_running(struct watchdog_device *wdd)
+>> +{
+>> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+>> +	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
+>> +
+>> +	return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
+>> +}
+>> +
+>>   /* This routine finds load value that will reset system in required timout */
+>>   static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
+>>   {
+>> @@ -239,6 +249,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
+>>   	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
+>>   	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
+>>   
+>> +	/*
+>> +	 * If HW is already running, enable/reset the wdt and set the running
+>> +	 * bit to tell the wdt subsystem
+>> +	 */
+>> +	if (wdt_is_running(&wdt->wdd)) {
+>> +		wdt_enable(&wdt->wdd);
+>> +		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
+>> +	}
+>> +
+>>   	ret = watchdog_register_device(&wdt->wdd);
+>>   	if (ret) {
+>>   		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
+>> -- 
+>> 2.1.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
