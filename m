@@ -1,56 +1,121 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 May 2018 11:59:37 +0100
-Subject: [PATCH 0/9] Rewrite asm-generic/bitops/{atomic,
- lock}.h and use on arm64
-Message-ID: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 24 May 2018 11:59:44 +0100
+Subject: [PATCH 7/9] asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*
+In-Reply-To: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
+References: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1527159586-8578-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The lock bitops can be implemented more efficiently using the atomic_fetch_*
+ops, which provide finer-grained control over the memory ordering semantics
+than the bitops.
 
-This patch series has previously been posted in RFC form here:
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ include/asm-generic/bitops/lock.h | 68 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 56 insertions(+), 12 deletions(-)
 
-  RFCv1: https://www.spinics.net/lists/arm-kernel/msg634719.html
-  RFCv2: https://www.spinics.net/lists/arm-kernel/msg636875.html
-
-Changes since RFCv2 include:
-
-  * Rebased onto v4.17-rc4, which allowed me to drop some patches from
-    the series which were merged in 4.16.
-
-  * Moved bit.h to be linux/bit.h instead of asm-generic/bit.h
-
-Thanks,
-
-Will
-
---->8
-
-Will Deacon (9):
-  h8300: Don't include linux/kernel.h in asm/atomic.h
-  m68k: Don't use asm-generic/bitops/lock.h
-  asm-generic: Move some macros from linux/bitops.h to a new bits.h file
-  openrisc: Don't pull in all of linux/bitops.h in asm/cmpxchg.h
-  sh: Don't pull in all of linux/bitops.h in asm/cmpxchg-xchg.h
-  asm-generic/bitops/atomic.h: Rewrite using atomic_fetch_*
-  asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*
-  arm64: Replace our atomic/lock bitop implementations with asm-generic
-  arm64: bitops: Include <asm-generic/bitops/ext2-atomic-setbit.h>
-
- arch/arm64/include/asm/bitops.h     |  21 +---
- arch/arm64/lib/Makefile             |   2 +-
- arch/arm64/lib/bitops.S             |  76 ---------------
- arch/h8300/include/asm/atomic.h     |   4 +-
- arch/m68k/include/asm/bitops.h      |   6 +-
- arch/openrisc/include/asm/cmpxchg.h |   3 +-
- arch/sh/include/asm/cmpxchg-xchg.h  |   3 +-
- include/asm-generic/bitops/atomic.h | 188 +++++++-----------------------------
- include/asm-generic/bitops/lock.h   |  68 ++++++++++---
- include/linux/bitops.h              |  22 +----
- include/linux/bits.h                |  26 +++++
- 11 files changed, 131 insertions(+), 288 deletions(-)
- delete mode 100644 arch/arm64/lib/bitops.S
- create mode 100644 include/linux/bits.h
-
+diff --git a/include/asm-generic/bitops/lock.h b/include/asm-generic/bitops/lock.h
+index 67ab280ad134..3ae021368f48 100644
+--- a/include/asm-generic/bitops/lock.h
++++ b/include/asm-generic/bitops/lock.h
+@@ -2,6 +2,10 @@
+ #ifndef _ASM_GENERIC_BITOPS_LOCK_H_
+ #define _ASM_GENERIC_BITOPS_LOCK_H_
+ 
++#include <linux/atomic.h>
++#include <linux/compiler.h>
++#include <asm/barrier.h>
++
+ /**
+  * test_and_set_bit_lock - Set a bit and return its old value, for lock
+  * @nr: Bit to set
+@@ -11,7 +15,20 @@
+  * the returned value is 0.
+  * It can be used to implement bit locks.
+  */
+-#define test_and_set_bit_lock(nr, addr)	test_and_set_bit(nr, addr)
++static inline int test_and_set_bit_lock(unsigned int nr,
++					volatile unsigned long *p)
++{
++	long old;
++	unsigned long mask = BIT_MASK(nr);
++
++	p += BIT_WORD(nr);
++	if (READ_ONCE(*p) & mask)
++		return 1;
++
++	old = atomic_long_fetch_or_acquire(mask, (atomic_long_t *)p);
++	return !!(old & mask);
++}
++
+ 
+ /**
+  * clear_bit_unlock - Clear a bit in memory, for unlock
+@@ -20,11 +37,11 @@
+  *
+  * This operation is atomic and provides release barrier semantics.
+  */
+-#define clear_bit_unlock(nr, addr)	\
+-do {					\
+-	smp_mb__before_atomic();	\
+-	clear_bit(nr, addr);		\
+-} while (0)
++static inline void clear_bit_unlock(unsigned int nr, volatile unsigned long *p)
++{
++	p += BIT_WORD(nr);
++	atomic_long_fetch_andnot_release(BIT_MASK(nr), (atomic_long_t *)p);
++}
+ 
+ /**
+  * __clear_bit_unlock - Clear a bit in memory, for unlock
+@@ -37,11 +54,38 @@ do {					\
+  *
+  * See for example x86's implementation.
+  */
+-#define __clear_bit_unlock(nr, addr)	\
+-do {					\
+-	smp_mb__before_atomic();	\
+-	clear_bit(nr, addr);		\
+-} while (0)
++static inline void __clear_bit_unlock(unsigned int nr,
++				      volatile unsigned long *p)
++{
++	unsigned long old;
+ 
+-#endif /* _ASM_GENERIC_BITOPS_LOCK_H_ */
++	p += BIT_WORD(nr);
++	old = READ_ONCE(*p);
++	old &= ~BIT_MASK(nr);
++	atomic_long_set_release((atomic_long_t *)p, old);
++}
++
++/**
++ * clear_bit_unlock_is_negative_byte - Clear a bit in memory and test if bottom
++ *                                     byte is negative, for unlock.
++ * @nr: the bit to clear
++ * @addr: the address to start counting from
++ *
++ * This is a bit of a one-trick-pony for the filemap code, which clears
++ * PG_locked and tests PG_waiters,
++ */
++#ifndef clear_bit_unlock_is_negative_byte
++static inline bool clear_bit_unlock_is_negative_byte(unsigned int nr,
++						     volatile unsigned long *p)
++{
++	long old;
++	unsigned long mask = BIT_MASK(nr);
++
++	p += BIT_WORD(nr);
++	old = atomic_long_fetch_andnot_release(mask, (atomic_long_t *)p);
++	return !!(old & BIT(7));
++}
++#define clear_bit_unlock_is_negative_byte clear_bit_unlock_is_negative_byte
++#endif
+ 
++#endif /* _ASM_GENERIC_BITOPS_LOCK_H_ */
 -- 
 2.1.4
