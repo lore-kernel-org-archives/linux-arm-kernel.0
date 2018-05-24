@@ -1,93 +1,53 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu, 24 May 2018 11:33:13 -0500
-Subject: [PATCHv5 1/8] dt-bindings,
- firmware: add Intel Stratix10 service layer binding
-In-Reply-To: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
-References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1527179600-26441-2-git-send-email-richard.gong@linux.intel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 24 May 2018 10:32:46 -0600
+Subject: [PATCH] arm64: dts: msm8916: fix Coresight ETF graph connections
+In-Reply-To: <20180524044853.713.23166@silver>
+References: <20180508150952.24562-1-robh@kernel.org>
+ <20180508150952.24562-3-robh@kernel.org>
+ <CAL_JsqL8qBiJUMyUEcih07UoFSAghn6Amfo8OfY-pKU-QX2_mw@mail.gmail.com>
+ <20180524044853.713.23166@silver>
+Message-ID: <CANLsYkz9tAH7mazz2LNCtoYsdH4f5bKfGWEnJHsgH0mK6vNMEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+On 23 May 2018 at 22:48, Ivan T. Ivanov <iivanov.xz@gmail.com> wrote:
+> Quoting Rob Herring (2018-05-23 23:29:29)
+>> On Tue, May 8, 2018 at 10:09 AM, Rob Herring <robh@kernel.org> wrote:
+>> > The ETF input should be connected to the funnel output, and the ETF
+>> > output should be connected to the replicator input. The labels are wrong
+>> > and these got swapped:
+>> >
+>> > Warning (graph_endpoint): /soc/funnel at 821000/ports/port at 8/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 1/endpoint' is not bidirectional
+>> > Warning (graph_endpoint): /soc/replicator at 824000/ports/port at 2/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 0/endpoint' is not bidirectional
+>> >
+>> > Fixes: 7c10da373698 ("arm64: dts: qcom: Add msm8916 CoreSight components")
+>> > Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+>> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> > Cc: Andy Gross <andy.gross@linaro.org>
+>> > Cc: David Brown <david.brown@linaro.org>
+>> > Cc: linux-arm-msm at vger.kernel.org
+>> > Signed-off-by: Rob Herring <robh@kernel.org>
+>> > ---
+>> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
+>> >  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> Ping. Still seeing warnings in -next for these.
+>>
+>
+>  Hi Rob,
+>
+>  I no longer have access to this hardware and documentation.
+>  I am sure that Mathieu and friends will take care for verification
+>  of this patch :-)
 
-Add a device tree binding for the Intel Stratix10 service layer driver
+The code triggers on the "slave-mode" property rather than the labels,
+so this patch has no effect on how a path is established.  I've tested
+this on a 410c and things look good.
 
-Signed-off-by: Richard Gong <richard.gong@intel.com>
-Signed-off-by: Alan Tull <atull@kernel.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
-v2: Change to put service layer driver node under the firmware node
-    Change compatible to "intel, stratix10-svc"
-v3: No change
-v4: Add Rob's Reviewed-by
-v5: No change
----
- .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
-new file mode 100644
-index 0000000..1fa6606
---- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
-@@ -0,0 +1,57 @@
-+Intel Service Layer Driver for Stratix10 SoC
-+============================================
-+Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
-+processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
-+configured from HPS, there needs to be a way for HPS to notify SDM the
-+location and size of the configuration data. Then SDM will get the
-+configuration data from that location and perform the FPGA configuration.
-+
-+To meet the whole system security needs and support virtual machine requesting
-+communication with SDM, only the secure world of software (EL3, Exception
-+Layer 3) can interface with SDM. All software entities running on other
-+exception layers must channel through the EL3 software whenever it needs
-+service from SDM.
-+
-+Intel Stratix10 service layer driver, running at privileged exception level
-+(EL1, Exception Layer 1), interfaces with the service providers and provides
-+the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
-+driver also manages secure monitor call (SMC) to communicate with secure monitor
-+code running in EL3.
-+
-+Required properties:
-+-------------------
-+The svc node has the following mandatory properties, must be located under
-+the firmware node.
-+
-+- compatible: "intel,stratix10-svc"
-+- method: smc or hvc
-+        smc - Secure Monitor Call
-+        hvc - Hypervisor Call
-+- memory-region:
-+	phandle to the reserved memory node. See
-+	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-+	for details
-+
-+Example:
-+-------
-+
-+	reserved-memory {
-+                #address-cells = <2>;
-+                #size-cells = <2>;
-+                ranges;
-+
-+                service_reserved: svcbuffer at 0 {
-+                        compatible = "shared-dma-pool";
-+                        reg = <0x0 0x0 0x0 0x1000000>;
-+                        alignment = <0x1000>;
-+                        no-map;
-+                };
-+        };
-+
-+	firmware {
-+		svc {
-+			compatible = "intel,stratix10-svc";
-+			method = "smc";
-+			memory-region = <&service_reserved>;
-+		};
-+	};
--- 
-2.7.4
+>
+>  Regards,
+>  Ivan
+>
