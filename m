@@ -1,35 +1,86 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 24 May 2018 16:04:39 +0100
-Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
-In-Reply-To: <20180524115039.GA10260@apalos>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-4-jean-philippe.brucker@arm.com>
- <20180516163117.622693ea@jacob-builder>
- <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
- <20180522094334.71f0e36b@jacob-builder>
- <f73b4a0e-669e-8483-88d7-1b2c8a2b9934@arm.com>
- <20180524115039.GA10260@apalos>
-Message-ID: <19e82a74-429a-3f86-119e-32b12082d0ff@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 24 May 2018 16:06:47 +0100
+Subject: [PATCH v10 17/18] KVM: arm64: Fold redundant exit code checks out
+ of fixup_guest_exit()
+In-Reply-To: <1527005119-6842-18-git-send-email-Dave.Martin@arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-18-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87wovtrt2w.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/18 12:50, Ilias Apalodimas wrote:
->> Interesting, I hadn't thought about this use-case before. At first I
->> thought you were talking about mdev devices assigned to VMs, but I think
->> you're referring to mdevs assigned to userspace drivers instead? Out of
->> curiosity, is it only theoretical or does someone actually need this?
-> 
-> There has been some non upstreamed efforts to have mdev and produce userspace
-> drivers. Huawei is using it on what they call "wrapdrive" for crypto devices and
-> we did a proof of concept for ethernet interfaces. At the time we choose not to
-> involve the IOMMU for the reason you mentioned, but having it there would be
-> good.
 
-I'm guessing there were good reasons to do it that way but I wonder, is
-it not simpler to just have the kernel driver create a /dev/foo, with a
-standard ioctl/mmap/poll interface? Here VFIO adds a layer of
-indirection, and since the mediating driver has to implement these
-operations already, what is gained?
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Thanks,
-Jean
+> The entire tail of fixup_guest_exit() is contained in if statements
+> of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
+> we can check just once and bail out of the function early, allowing
+> the remaining if conditions to be simplified.
+>
+> The only awkward case is where *exit_code is changed to
+> ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
+> interface access: in that case, the GICv3 trap handling code is
+> skipped using a goto.  This avoids pointlessly evaluating the
+> static branch check for the GICv3 case, even though we can't have
+> vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
+> unless we have a GICv3 and GICv2 on the host: that sounds stupid,
+> but I haven't satisfied myself that it can't happen.
+>
+> No functional change.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 18d0faa..4fbee95 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -387,11 +387,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  	 * same PC once the SError has been injected, and replay the
+>  	 * trapping instruction.
+>  	 */
+> -	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+> +	if (*exit_code != ARM_EXCEPTION_TRAP)
+> +		goto exit;
+> +
+> +	if (!__populate_fault_info(vcpu))
+>  		return true;
+>
+> -	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+> -	    *exit_code == ARM_EXCEPTION_TRAP) {
+> +	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
+>  		bool valid;
+>
+>  		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
+> @@ -417,11 +419,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+>  				*exit_code = ARM_EXCEPTION_EL1_SERROR;
+>  			}
+> +
+> +			goto exit;
+>  		}
+>  	}
+>
+>  	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
+> -	    *exit_code == ARM_EXCEPTION_TRAP &&
+>  	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
+>  	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+>  		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+> @@ -430,6 +433,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  			return true;
+>  	}
+>
+> +exit:
+>  	/* Return to the host kernel and handle the exit */
+>  	return false;
+>  }
+
+
+--
+Alex Benn?e
