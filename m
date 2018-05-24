@@ -1,246 +1,121 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 24 May 2018 16:46:31 +0530
-Subject: [PATCH v4] arm64: allwinner: a64: Add Amarula A64-Relic initial
- support
-Message-ID: <20180524111631.11864-1-jagan@amarulasolutions.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 24 May 2018 12:22:42 +0100
+Subject: [PATCH v10 13/18] arm64/sve: Move sve_pffr() to fpsimd.h and
+ make inline
+In-Reply-To: <8736yhtkvo.fsf@linaro.org>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-14-git-send-email-Dave.Martin@arm.com>
+ <8736yhtkvo.fsf@linaro.org>
+Message-ID: <20180524112242.GU13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amarula A64-Relic is Allwinner A64 based IoT device, which support
-- Allwinner A64 Cortex-A53
-- Mali-400MP2 GPU
-- AXP803 PMIC
-- 1GB DDR3 RAM
-- 8GB eMMC
-- AP6330 Wifi/BLE
-- MIPI-DSI
-- CSI: OV5640 sensor
-- USB OTG
-- 12V DC power supply
+On Thu, May 24, 2018 at 11:20:59AM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > In order to make sve_save_state()/sve_load_state() more easily
+> > reusable and to get rid of a potential branch on context switch
+> > critical paths, this patch makes sve_pffr() inline and moves it to
+> > fpsimd.h.
+> >
+> > <asm/processor.h> must be included in fpsimd.h in order to make
+> > this work, and this creates an #include cycle that is tricky to
+> > avoid without modifying core code, due to the way the PR_SVE_*()
+> > prctl helpers are included in the core prctl implementation.
+> >
+> > Instead of breaking the cycle, this patch defers inclusion of
+> > <asm/fpsimd.h> in <asm/processor.h> until the point where it is
+> > actually needed: i.e., immediately before the prctl definitions.
+> >
+> > No functional change.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
+> >  arch/arm64/include/asm/processor.h |  3 ++-
+> >  arch/arm64/kernel/fpsimd.c         | 12 ------------
+> >  3 files changed, 15 insertions(+), 13 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> > index fb60b22..fa92747 100644
+> > --- a/arch/arm64/include/asm/fpsimd.h
+> > +++ b/arch/arm64/include/asm/fpsimd.h
+> > @@ -18,6 +18,8 @@
+> >
+> >  #include <asm/ptrace.h>
+> >  #include <asm/errno.h>
+> > +#include <asm/processor.h>
+> > +#include <asm/sigcontext.h>
+> >
+> >  #ifndef __ASSEMBLY__
+> >
+> > @@ -61,6 +63,17 @@ extern void sve_flush_cpu_state(void);
+> >  /* Maximum VL that SVE VL-agnostic software can transparently support */
+> >  #define SVE_VL_ARCH_MAX 0x100
+> >
+> > +/* Offset of FFR in the SVE register dump */
+> > +static inline size_t sve_ffr_offset(int vl)
+> > +{
+> > +	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
+> > +}
+> > +
+> > +static inline void *sve_pffr(struct thread_struct *thread)
+> > +{
+> > +	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
+> > +}
+> > +
+> >  extern void sve_save_state(void *state, u32 *pfpsr);
+> >  extern void sve_load_state(void const *state, u32 const *pfpsr,
+> >  			   unsigned long vq_minus_1);
+> > diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> > index f902b6d..ebaadb1 100644
+> > --- a/arch/arm64/include/asm/processor.h
+> > +++ b/arch/arm64/include/asm/processor.h
+> > @@ -40,7 +40,6 @@
+> >
+> >  #include <asm/alternative.h>
+> >  #include <asm/cpufeature.h>
+> > -#include <asm/fpsimd.h>
+> >  #include <asm/hw_breakpoint.h>
+> >  #include <asm/lse.h>
+> >  #include <asm/pgtable-hwdef.h>
+> > @@ -245,6 +244,8 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+> >  void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+> >  void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+> >
+> > +#include <asm/fpsimd.h>
+> > +
+> 
+> You really need a one-liner comment to note why the include is in a
+> funny place to save someone just moving it back and then getting really
+> confused. Maybe:
+> 
+>   /* included just in time to avoid circular inclusion issues */
+>   #include <asm/fpsimd.h>
+> 
+> It still seems weird to me though :-/
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v4:
-- update dr_mode as 'otg'
-Changes for v3:
-- Use sun50i-a64-amarula-relic.dts name
-- add eldo3 for dvdd-csi
-- update dldo4 min voltage as 3.3v as per schematics
-- use dldo3 name as dovdd-csi
-- update aldo1, aldo2 voltages as per schematics
-Changes for v2:
-- Rename dts name to sun50i-a64-relic.dts which is simple to use
-- Update dldo4 min voltage as 1.8
-- Use licence year as 2018
+How about
 
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 188 +++++++++++++++++++++
- 2 files changed, 189 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+/*                                                                              
+ * Not at the top of the file due to a direct #include cycle between            
+ * <asm/fpsimd.h> and <asm/processor.h>.  Deferring this #include               
+ * ensures that contents of processor.h are visible to fpsimd.h even if         
+ * processor.h is included first.                                               
+ *                                                                              
+ * These prctl helpers are the only things in this file that require            
+ * fpsimd.h.  The core code expects them to be in this header.                  
+ */
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index c31f90a49481..67ce8c500b2e 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,4 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-amarula-relic.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-new file mode 100644
-index 000000000000..ce4a256ff086
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-@@ -0,0 +1,188 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2018 Amarula Solutions B.V.
-+ * Author: Jagan Teki <jagan@amarulasolutions.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-a64.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Amarula A64-Relic";
-+	compatible = "amarula,a64-relic", "allwinner,sun50i-a64";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&r_rsb {
-+	status = "okay";
-+
-+	axp803: pmic at 3a3 {
-+		compatible = "x-powers,axp803";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&r_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
-+	};
-+};
-+
-+#include "axp803.dtsi"
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "avdd-csi";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pl";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-3v3";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1040000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-cpux";
-+};
-+
-+/* DCDC3 is polyphased with DCDC2 */
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dcdc6 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1100000>;
-+	regulator-max-microvolt = <1100000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-hdmi-dsi-sensor";
-+};
-+
-+&reg_dldo2 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-mipi";
-+};
-+
-+&reg_dldo3 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "dovdd-csi";
-+};
-+
-+&reg_dldo4 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-io";
-+};
-+
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
-+&reg_eldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "cpvdd";
-+};
-+
-+&reg_eldo3 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "dvdd-csi";
-+};
-+
-+&reg_fldo1 {
-+	regulator-min-microvolt = <1200000>;
-+	regulator-max-microvolt = <1200000>;
-+	regulator-name = "vcc-1v2-hsic";
-+};
-+
-+/*
-+ * The A64 chip cannot work without this regulator off, although
-+ * it seems to be only driving the AR100 core.
-+ * Maybe we don't still know well about CPUs domain.
-+ */
-+&reg_fldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1100000>;
-+	regulator-max-microvolt = <1100000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-name = "vcc-rtc";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	usb0_vbus-supply = <&reg_drivevbus>;
-+	status = "okay";
-+};
--- 
-2.14.3
+?
+
+Cheers
+---Dave
+
+> 
+> Otherwise:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
