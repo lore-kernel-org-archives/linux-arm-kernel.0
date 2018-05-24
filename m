@@ -1,236 +1,282 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 24 May 2018 10:21:20 +0100
-Subject: [PATCH v10 09/18] KVM: arm64: Repurpose vcpu_arch.debug_flags for
- general-purpose flags
-In-Reply-To: <1527005119-6842-10-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-10-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87a7sptnn3.fsf@linaro.org>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Thu, 24 May 2018 11:18:47 +0200
+Subject: Patch "staging: bcm2835-audio: Release resources on module_exit()"
+ has been added to the 4.14-stable tree
+Message-ID: <1527153527154254@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Dave Martin <Dave.Martin@arm.com> writes:
+This is a note to let you know that I've just added the patch titled
 
-> In struct vcpu_arch, the debug_flags field is used to store
-> debug-related flags about the vcpu state.
->
-> Since we are about to add some more flags related to FPSIMD and
-> SVE, it makes sense to add them to the existing flags field rather
-> than adding new fields.  Since there is only one debug_flags flag
-> defined so far, there is plenty of free space for expansion.
->
-> In preparation for adding more flags, this patch renames the
-> debug_flags field to simply "flags", and updates comments
-> appropriately.
->
-> The flag definitions are also moved to <asm/kvm_host.h>, since
-> their presence in <asm/kvm_asm.h> was for purely historical
-> reasons:  these definitions are not used from asm any more, and not
-> very likely to be as more Hyp asm is migrated to C.
->
-> KVM_ARM64_DEBUG_DIRTY_SHIFT has not been used since commit
-> 1ea66d27e7b0 ("arm64: KVM: Move away from the assembly version of
-> the world switch"), so this patch gets rid of that too.
->
-> No functional change.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+    staging: bcm2835-audio: Release resources on module_exit()
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+to the 4.14-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
-> ---
->  arch/arm64/include/asm/kvm_asm.h  | 3 ---
->  arch/arm64/include/asm/kvm_host.h | 7 +++++--
->  arch/arm64/kvm/debug.c            | 8 ++++----
->  arch/arm64/kvm/hyp/debug-sr.c     | 6 +++---
->  arch/arm64/kvm/hyp/sysreg-sr.c    | 4 ++--
->  arch/arm64/kvm/sys_regs.c         | 9 ++++-----
->  6 files changed, 18 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index f6648a3..f62ccbf 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -30,9 +30,6 @@
->  /* The hyp-stub will return this for any kvm_call_hyp() call */
->  #define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
->
-> -#define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
-> -#define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
-> -
->  /* Translate a kernel address of @sym into its equivalent linear mapping */
->  #define kvm_ksym_ref(sym)						\
->  	({								\
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 469de8a..146c167 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -216,8 +216,8 @@ struct kvm_vcpu_arch {
->  	/* Exception Information */
->  	struct kvm_vcpu_fault_info fault;
->
-> -	/* Guest debug state */
-> -	u64 debug_flags;
-> +	/* Miscellaneous vcpu state flags */
-> +	u64 flags;
->
->  	/*
->  	 * We maintain more than a single set of debug registers to support
-> @@ -293,6 +293,9 @@ struct kvm_vcpu_arch {
->  	bool sysregs_loaded_on_cpu;
->  };
->
-> +/* vcpu_arch flags field values: */
-> +#define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
-> +
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
->
->  /*
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index a1f4ebd..00d4223 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -103,7 +103,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
->   *
->   * Additionally, KVM only traps guest accesses to the debug registers if
->   * the guest is not actively using them (see the KVM_ARM64_DEBUG_DIRTY
-> - * flag on vcpu->arch.debug_flags).  Since the guest must not interfere
-> + * flag on vcpu->arch.flags).  Since the guest must not interfere
->   * with the hardware state when debugging the guest, we must ensure that
->   * trapping is enabled whenever we are debugging the guest using the
->   * debug registers.
-> @@ -111,7 +111,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
->
->  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->  {
-> -	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
-> +	bool trap_debug = !(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY);
->  	unsigned long mdscr;
->
->  	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
-> @@ -184,7 +184,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->  			vcpu_write_sys_reg(vcpu, mdscr, MDSCR_EL1);
->
->  			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
-> -			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +			vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
->  			trap_debug = true;
->
->  			trace_kvm_arm_set_regset("BKPTS", get_num_brps(),
-> @@ -206,7 +206,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->
->  	/* If KDE or MDE are set, perform a full save/restore cycle. */
->  	if (vcpu_read_sys_reg(vcpu, MDSCR_EL1) & (DBG_MDSCR_KDE | DBG_MDSCR_MDE))
-> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
->
->  	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
->  	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_read_sys_reg(vcpu, MDSCR_EL1));
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index 3e717f6..5000976 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -163,7 +163,7 @@ void __hyp_text __debug_switch_to_guest(struct kvm_vcpu *vcpu)
->  	if (!has_vhe())
->  		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
->
-> -	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-> +	if (!(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY))
->  		return;
->
->  	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> @@ -185,7 +185,7 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
->  	if (!has_vhe())
->  		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
->
-> -	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-> +	if (!(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY))
->  		return;
->
->  	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> @@ -196,7 +196,7 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
->  	__debug_save_state(vcpu, guest_dbg, guest_ctxt);
->  	__debug_restore_state(vcpu, host_dbg, host_ctxt);
->
-> -	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
-> +	vcpu->arch.flags &= ~KVM_ARM64_DEBUG_DIRTY;
->  }
->
->  u32 __hyp_text __kvm_get_mdcr_el2(void)
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index b3894df..35bc168 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -196,7 +196,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
->  	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
->  	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
->
-> -	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-> +	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
->  		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
->  }
->
-> @@ -218,7 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
->  	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
->  	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
->
-> -	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-> +	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
->  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
->  }
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 6e3b969..a436373 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -31,7 +31,6 @@
->  #include <asm/debug-monitors.h>
->  #include <asm/esr.h>
->  #include <asm/kvm_arm.h>
-> -#include <asm/kvm_asm.h>
->  #include <asm/kvm_coproc.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_host.h>
-> @@ -338,7 +337,7 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
->  {
->  	if (p->is_write) {
->  		vcpu_write_sys_reg(vcpu, p->regval, r->reg);
-> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
->  	} else {
->  		p->regval = vcpu_read_sys_reg(vcpu, r->reg);
->  	}
-> @@ -369,7 +368,7 @@ static void reg_to_dbg(struct kvm_vcpu *vcpu,
->  	}
->
->  	*dbg_reg = val;
-> -	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +	vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
->  }
->
->  static void dbg_to_reg(struct kvm_vcpu *vcpu,
-> @@ -1441,7 +1440,7 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
->  {
->  	if (p->is_write) {
->  		vcpu_cp14(vcpu, r->reg) = p->regval;
-> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
->  	} else {
->  		p->regval = vcpu_cp14(vcpu, r->reg);
->  	}
-> @@ -1473,7 +1472,7 @@ static bool trap_xvr(struct kvm_vcpu *vcpu,
->  		val |= p->regval << 32;
->  		*dbg_reg = val;
->
-> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
->  	} else {
->  		p->regval = *dbg_reg >> 32;
->  	}
+The filename of the patch is:
+     staging-bcm2835-audio-release-resources-on-module_exit.patch
+and it can be found in the queue-4.14 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
 
 
---
-Alex Benn?e
+>From foo at baz Thu May 24 11:09:34 CEST 2018
+From: Kirill Marinushkin <k.marinushkin@gmail.com>
+Date: Fri, 23 Mar 2018 20:32:54 +0100
+Subject: staging: bcm2835-audio: Release resources on module_exit()
+
+From: Kirill Marinushkin <k.marinushkin@gmail.com>
+
+[ Upstream commit 626118b472d2eb45f83a0276a18d3e6a01c69f6a ]
+
+In the current implementation, `rmmod snd_bcm2835` does not release
+resources properly. It causes an oops when trying to list sound devices.
+
+This commit fixes it.
+
+The details WRT allocation / free are described below.
+
+Device structure WRT allocation:
+
+pdev
+  \childdev[]
+    \card
+      \chip
+        \pcm
+        \ctl
+
+Allocation / register sequence:
+
+* childdev: devm_kzalloc      - freed during driver detach
+* childdev: device_initialize - freed during device_unregister
+* pdev: devres_alloc          - freed during driver detach
+* childdev: device_add        - removed during device_unregister
+* pdev, childdev: devres_add  - freed during driver detach
+* card: snd_card_new          - freed during snd_card_free
+* chip: kzalloc               - freed during kfree
+* card, chip: snd_device_new  - freed during snd_device_free
+* chip: new_pcm               - TODO: free pcm
+* chip: new_ctl               - TODO: free ctl
+* card: snd_card_register     - unregistered during snd_card_free
+
+Free / unregister sequence:
+
+* card: snd_card_free
+* card, chip: snd_device_free
+* childdev: device_unregister
+* chip: kfree
+
+Steps to reproduce the issue before this commit:
+
+~~~~
+$ rmmod snd_bcm2835
+$ aplay -L
+[  138.648130] Unable to handle kernel paging request at virtual address 7f1343c0
+[  138.660415] pgd = ad8f0000
+[  138.665567] [7f1343c0] *pgd=3864c811, *pte=00000000, *ppte=00000000
+[  138.674887] Internal error: Oops: 7 [#1] SMP ARM
+[  138.683571] Modules linked in: sha256_generic cfg80211 rfkill snd_pcm snd_timer
+ snd fixed uio_pdrv_genirq uio ip_tables x_tables ipv6 [last unloaded: snd_bcm2835
+]
+[  138.706594] CPU: 3 PID: 463 Comm: aplay Tainted: G        WC       4.15.0-rc1-v
+7+ #6
+[  138.719833] Hardware name: BCM2835
+[  138.726016] task: b877ac00 task.stack: aebec000
+[  138.733408] PC is at try_module_get+0x38/0x24c
+[  138.740813] LR is at snd_ctl_open+0x58/0x194 [snd]
+[  138.748485] pc : [<801c4d5c>]    lr : [<7f0e6b2c>]    psr: 20000013
+[  138.757709] sp : aebedd60  ip : aebedd88  fp : aebedd84
+[  138.765884] r10: 00000000  r9 : 00000004  r8 : 7f0ed440
+[  138.774040] r7 : b7e469b0  r6 : 7f0e6b2c  r5 : afd91900  r4 : 7f1343c0
+[  138.783571] r3 : aebec000  r2 : 00000001  r1 : b877ac00  r0 : 7f1343c0
+[  138.793084] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[  138.803300] Control: 10c5387d  Table: 2d8f006a  DAC: 00000055
+[  138.812064] Process aplay (pid: 463, stack limit = 0xaebec210)
+[  138.820868] Stack: (0xaebedd60 to 0xaebee000)
+[  138.828207] dd60: 00000000 b848d000 afd91900 00000000 b7e469b0 7f0ed440 aebedda4 aebedd88
+[  138.842371] dd80: 7f0e6b2c 801c4d30 afd91900 7f0ea4dc 00000000 b7e469b0 aebeddcc aebedda8
+[  138.856611] dda0: 7f0e250c 7f0e6ae0 7f0e2464 b8478ec0 b7e469b0 afd91900 7f0ea388 00000000
+[  138.870864] ddc0: aebeddf4 aebeddd0 802ce590 7f0e2470 8090ab64 afd91900 afd91900 b7e469b0
+[  138.885301] dde0: afd91908 802ce4e4 aebede1c aebeddf8 802c57b4 802ce4f0 afd91900 aebedea8
+[  138.900110] de00: b7fa4c00 00000000 00000000 00000004 aebede3c aebede20 802c6ba8 802c56b4
+[  138.915260] de20: aebedea8 00000000 aebedf5c 00000000 aebedea4 aebede40 802d9a68 802c6b58
+[  138.930661] de40: b874ddd0 00000000 00000000 00000001 00000041 00000000 afd91900 aebede70
+[  138.946402] de60: 00000000 00000000 00000002 b7e469b0 b8a87610 b8d6ab80 801852f8 00080000
+[  138.962314] de80: aebedf5c aebedea8 00000001 80108464 aebec000 00000000 aebedf4c aebedea8
+[  138.978414] dea0: 802dacd4 802d970c b8a87610 b8d6ab80 a7982bc6 00000009 af363019 b9231480
+[  138.994617] dec0: 00000000 b8c038a0 b7e469b0 00000101 00000002 00000238 00000000 00000000
+[  139.010823] dee0: 00000000 aebedee8 00080000 0000000f aebedf3c aebedf00 802ed7e4 80843f94
+[  139.027025] df00: 00000003 00080000 b9231490 b9231480 00000000 00080000 af363000 00000000
+[  139.043229] df20: 00000005 00000002 ffffff9c 00000000 00080000 ffffff9c af363000 00000003
+[  139.059430] df40: aebedf94 aebedf50 802c6f70 802dac70 aebec000 00000000 00000001 00000000
+[  139.075629] df60: 00020000 00000004 00000100 00000001 7ebe577c 0002e038 00000000 00000005
+[  139.091828] df80: 80108464 aebec000 aebedfa4 aebedf98 802c7060 802c6e6c 00000000 aebedfa8
+[  139.108025] dfa0: 801082c0 802c7040 7ebe577c 0002e038 7ebe577c 00080000 00000b98 e81c8400
+[  139.124222] dfc0: 7ebe577c 0002e038 00000000 00000005 7ebe57e4 00a20af8 7ebe57f0 76f87394
+[  139.140419] dfe0: 00000000 7ebe55c4 76ec88e8 76df1d9c 60000010 7ebe577c 00000000 00000000
+[  139.156715] [<801c4d5c>] (try_module_get) from [<7f0e6b2c>] (snd_ctl_open+0x58/0x194 [snd])
+[  139.173222] [<7f0e6b2c>] (snd_ctl_open [snd]) from [<7f0e250c>] (snd_open+0xa8/0x14c [snd])
+[  139.189683] [<7f0e250c>] (snd_open [snd]) from [<802ce590>] (chrdev_open+0xac/0x188)
+[  139.205465] [<802ce590>] (chrdev_open) from [<802c57b4>] (do_dentry_open+0x10c/0x314)
+[  139.221347] [<802c57b4>] (do_dentry_open) from [<802c6ba8>] (vfs_open+0x5c/0x88)
+[  139.236788] [<802c6ba8>] (vfs_open) from [<802d9a68>] (path_openat+0x368/0x944)
+[  139.248270] [<802d9a68>] (path_openat) from [<802dacd4>] (do_filp_open+0x70/0xc4)
+[  139.263731] [<802dacd4>] (do_filp_open) from [<802c6f70>] (do_sys_open+0x110/0x1d4)
+[  139.279378] [<802c6f70>] (do_sys_open) from [<802c7060>] (SyS_open+0x2c/0x30)
+[  139.290647] [<802c7060>] (SyS_open) from [<801082c0>] (ret_fast_syscall+0x0/0x28)
+[  139.306021] Code: e3c3303f e5932004 e2822001 e5832004 (e5943000)
+[  139.316265] ---[ end trace 7f3f7f6193b663ed ]---
+[  139.324956] note: aplay[463] exited with preempt_count 1
+~~~~
+
+Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: Michael Zoran <mzoran@crowfest.net>
+Cc: Andy Shevchenko <andy.shevchenko@gmail.com>
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devel at driverdev.osuosl.org
+Cc: linux-kernel at vger.kernel.org
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/staging/vc04_services/bcm2835-audio/bcm2835.c |   54 ++++++++----------
+ 1 file changed, 25 insertions(+), 29 deletions(-)
+
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+@@ -36,6 +36,10 @@ MODULE_PARM_DESC(enable_compat_alsa,
+ static void snd_devm_unregister_child(struct device *dev, void *res)
+ {
+ 	struct device *childdev = *(struct device **)res;
++	struct bcm2835_chip *chip = dev_get_drvdata(childdev);
++	struct snd_card *card = chip->card;
++
++	snd_card_free(card);
+ 
+ 	device_unregister(childdev);
+ }
+@@ -61,6 +65,13 @@ static int snd_devm_add_child(struct dev
+ 	return 0;
+ }
+ 
++static void snd_bcm2835_release(struct device *dev)
++{
++	struct bcm2835_chip *chip = dev_get_drvdata(dev);
++
++	kfree(chip);
++}
++
+ static struct device *
+ snd_create_device(struct device *parent,
+ 		  struct device_driver *driver,
+@@ -76,6 +87,7 @@ snd_create_device(struct device *parent,
+ 	device_initialize(device);
+ 	device->parent = parent;
+ 	device->driver = driver;
++	device->release = snd_bcm2835_release;
+ 
+ 	dev_set_name(device, "%s", name);
+ 
+@@ -86,18 +98,19 @@ snd_create_device(struct device *parent,
+ 	return device;
+ }
+ 
+-static int snd_bcm2835_free(struct bcm2835_chip *chip)
+-{
+-	kfree(chip);
+-	return 0;
+-}
+-
+ /* component-destructor
+  * (see "Management of Cards and Components")
+  */
+ static int snd_bcm2835_dev_free(struct snd_device *device)
+ {
+-	return snd_bcm2835_free(device->device_data);
++	struct bcm2835_chip *chip = device->device_data;
++	struct snd_card *card = chip->card;
++
++	/* TODO: free pcm, ctl */
++
++	snd_device_free(card, chip);
++
++	return 0;
+ }
+ 
+ /* chip-specific constructor
+@@ -122,7 +135,7 @@ static int snd_bcm2835_create(struct snd
+ 
+ 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
+ 	if (err) {
+-		snd_bcm2835_free(chip);
++		kfree(chip);
+ 		return err;
+ 	}
+ 
+@@ -130,31 +143,14 @@ static int snd_bcm2835_create(struct snd
+ 	return 0;
+ }
+ 
+-static void snd_devm_card_free(struct device *dev, void *res)
++static struct snd_card *snd_bcm2835_card_new(struct device *dev)
+ {
+-	struct snd_card *snd_card = *(struct snd_card **)res;
+-
+-	snd_card_free(snd_card);
+-}
+-
+-static struct snd_card *snd_devm_card_new(struct device *dev)
+-{
+-	struct snd_card **dr;
+ 	struct snd_card *card;
+ 	int ret;
+ 
+-	dr = devres_alloc(snd_devm_card_free, sizeof(*dr), GFP_KERNEL);
+-	if (!dr)
+-		return ERR_PTR(-ENOMEM);
+-
+ 	ret = snd_card_new(dev, -1, NULL, THIS_MODULE, 0, &card);
+-	if (ret) {
+-		devres_free(dr);
++	if (ret)
+ 		return ERR_PTR(ret);
+-	}
+-
+-	*dr = card;
+-	devres_add(dev, dr);
+ 
+ 	return card;
+ }
+@@ -271,7 +267,7 @@ static int snd_add_child_device(struct d
+ 		return PTR_ERR(child);
+ 	}
+ 
+-	card = snd_devm_card_new(child);
++	card = snd_bcm2835_card_new(child);
+ 	if (IS_ERR(card)) {
+ 		dev_err(child, "Failed to create card");
+ 		return PTR_ERR(card);
+@@ -313,7 +309,7 @@ static int snd_add_child_device(struct d
+ 		return err;
+ 	}
+ 
+-	dev_set_drvdata(child, card);
++	dev_set_drvdata(child, chip);
+ 	dev_info(child, "card created with %d channels\n", numchans);
+ 
+ 	return 0;
+
+
+Patches currently in stable-queue which might be from k.marinushkin at gmail.com are
+
+queue-4.14/staging-bcm2835-audio-release-resources-on-module_exit.patch
