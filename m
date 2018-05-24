@@ -1,53 +1,47 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 24 May 2018 09:07:29 -0700
-Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
+Date: Thu, 24 May 2018 09:16:28 -0700
+Subject: [PATCH v3 2/6] Documentation: DT: Add optional 'timeout-sec'
  property for sp805
-In-Reply-To: <91d27df4-29d0-de7f-6805-c3e5f329caf3@arm.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
- <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
- <20180523181058.GC27570@roeck-us.net>
- <91d27df4-29d0-de7f-6805-c3e5f329caf3@arm.com>
-Message-ID: <20180524160729.GA27710@roeck-us.net>
+In-Reply-To: <1527120924-12131-3-git-send-email-ray.jui@broadcom.com>
+References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
+ <1527120924-12131-3-git-send-email-ray.jui@broadcom.com>
+Message-ID: <20180524161628.GA28425@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 02:25:34PM +0100, Robin Murphy wrote:
-> On 23/05/18 19:10, Guenter Roeck wrote:
-> >On Wed, May 23, 2018 at 11:57:25AM +0100, Robin Murphy wrote:
-> >>On 22/05/18 19:47, Ray Jui wrote:
-> >>>Update the SP805 binding document to add optional 'timeout-sec'
-> >>>devicetree property
-> >>>
-> >>>Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> >>>Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> >>>---
-> >>>  Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
-> >>>  1 file changed, 2 insertions(+)
-> >>>
-> >>>diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> >>>index edc4f0e..f898a86 100644
-> >>>--- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> >>>+++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> >>>@@ -19,6 +19,8 @@ Required properties:
-> >>>  Optional properties:
-> >>>  - interrupts : Should specify WDT interrupt number.
-> >>>+- timeout-sec : Should specify default WDT timeout in seconds. If unset, the
-> >>>+                default timeout is 30 seconds
-> >>
-> >>According to the SP805 TRM, the default interval is dependent on the rate of
-> >>WDOGCLK, but would typically be a lot longer than that :/
-> >>
-> >Depends on the definition of "default". In the context of watchdog drivers,
-> >it is (or should be) a driver default, not a chip default.
+On Wed, May 23, 2018 at 05:15:20PM -0700, Ray Jui wrote:
+> Update the SP805 binding document to add optional 'timeout-sec'
+> devicetree property
 > 
-> DT describes hardware, not driver behaviour.
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> ---
+>  Documentation/devicetree/bindings/watchdog/arm,sp805.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
+> diff --git a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> index 0fa3629..1debea3 100644
+> --- a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> @@ -19,6 +19,8 @@ Required properties:
+>  
+>  Optional properties:
+>  - interrupts:  Should specify WDT interrupt number
+> +- timeout-sec: Should specify default WDT timeout in seconds. If unset, the
+> +               default timeout in the driver is 30 seconds
 
-In this case it describes expected system behavior. Most definitely
-it does not describe some hardware default.
-
-Please note that I do not engage in discussions I consider bike-shedding.
-This is one of those. Dropping out.
+"... the default timeout is determined by the driver" might be better.
+If you want to mandate a default here (not sure if that is a good idea),
+I would suggest to use something like "should be 30 seconds".
 
 Guenter
+
+>  
+>  Example:
+>  	watchdog at 66090000 {
+> -- 
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
