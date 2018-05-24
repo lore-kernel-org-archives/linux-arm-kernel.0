@@ -1,36 +1,54 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 May 2018 12:50:22 -0500
-Subject: [PATCH v2 6/8] iommu: Stop deferring probe at end of initcalls
+Date: Thu, 24 May 2018 12:50:21 -0500
+Subject: [PATCH v2 5/8] pinctrl: optionally stop deferring probe at end of
+ initcalls
 In-Reply-To: <20180524175024.19874-1-robh@kernel.org>
 References: <20180524175024.19874-1-robh@kernel.org>
-Message-ID: <20180524175024.19874-7-robh@kernel.org>
+Message-ID: <20180524175024.19874-6-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU subsystem has its own mechanism to not defer probe if driver
-support is missing. Now that the driver core supports stopping deferring
-probe if drivers aren't built-in (and probed), use the driver core
-support so the IOMMU specific support can be removed.
+If the pinctrl node in DT indicates that pin setup is optional and the
+defaults can be used with the 'pinctrl-use-default', then only defer probe
+until initcalls are done. This gives platforms the option to work without
+their pinctrl driver being enabled.
 
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: iommu at lists.linux-foundation.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- drivers/iommu/of_iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/devicetree.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 5c36a8b7656a..2aac8387717c 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -133,7 +133,7 @@ static int of_iommu_xlate(struct device *dev,
- 	 * a proper probe-ordering dependency mechanism in future.
- 	 */
- 	if (!ops)
--		return -EPROBE_DEFER;
-+		return driver_deferred_probe_check_init_done(dev, true);
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index b601039d6c69..74a31074b406 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -110,17 +110,23 @@ static int dt_to_map_one_config(struct pinctrl *p,
+ 	int ret;
+ 	struct pinctrl_map *map;
+ 	unsigned num_maps;
++	bool pctl_optional = false;
  
- 	return ops->of_xlate(dev, iommu_spec);
- }
+ 	/* Find the pin controller containing np_config */
+ 	np_pctldev = of_node_get(np_config);
+ 	for (;;) {
++		if (!pctl_optional)
++			pctl_optional = of_property_read_bool(np_pctldev, "pinctrl-use-default");
++
+ 		np_pctldev = of_get_next_parent(np_pctldev);
+ 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
+-			dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
+-				np_config);
+ 			of_node_put(np_pctldev);
+-			/* OK let's just assume this will appear later then */
+-			return -EPROBE_DEFER;
++			ret = driver_deferred_probe_check_init_done(p->dev, pctl_optional);
++			if (ret == -EPROBE_DEFER)
++				/* OK let's just assume this will appear later then */
++				dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
++					np_config);
++			return ret;
+ 		}
+ 		/* If we're creating a hog we can use the passed pctldev */
+ 		if (pctldev && (np_pctldev == p->dev->of_node))
 -- 
 2.17.0
