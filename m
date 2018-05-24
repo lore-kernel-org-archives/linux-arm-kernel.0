@@ -1,107 +1,40 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 24 May 2018 09:26:37 +0800
-Subject: [PATCH v2 2/4] drm/mediatek: Add support for mediatek SOC MT2712
-In-Reply-To: <1527067696.19074.28.camel@mtksdaap41>
-References: <20180523022517.12103-1-stu.hsieh@mediatek.com>
- <20180523022517.12103-3-stu.hsieh@mediatek.com>
- <1527053036.10410.18.camel@mtksdaap41>
- <1527067696.19074.28.camel@mtksdaap41>
-Message-ID: <1527125197.6406.10.camel@mtksdaap41>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Thu, 24 May 2018 01:42:46 +0000
+Subject: [PATCH v1] dma: imx-sdma: add virt-dma support
+In-Reply-To: <20180523133441.GK20991@vkoul-mobl>
+References: <1521735499-29138-1-git-send-email-yibin.gong@nxp.com>
+ <20180522100948.6xsq3unhyyyd7zz3@pengutronix.de>
+ <1527099973.3990.37.camel@nxp.com>
+ <20180523105612.u4wbezh7fzkv4wfh@pengutronix.de>
+ <20180523133441.GK20991@vkoul-mobl>
+Message-ID: <1527154959.3990.39.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
-
-On Wed, 2018-05-23 at 17:28 +0800, Stu Hsieh wrote:
-> On Wed, 2018-05-23 at 13:23 +0800, CK Hu wrote:
-> > Hi, Stu:
-> > 
-> > I've some inline comment.
-> > 
-> > On Wed, 2018-05-23 at 10:25 +0800, Stu Hsieh wrote:
-> > > This patch add support for the Mediatek MT2712 DISP subsystem.
-> > > There are two OVL engine and three disp output in MT2712.
-> > > 
-> > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > > ---
-> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 50 +++++++++++++++++++++++++++--
-> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  8 +++--
-> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  7 ++--
-> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 47 +++++++++++++++++++++++++--
-> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |  7 ++--
-> > >  5 files changed, 108 insertions(+), 11 deletions(-)
-> > > 
-> > > +#define MT2712_MUTEX_MOD_DISP_AAL0		BIT(20)
-> > > +#define MT2712_MUTEX_MOD_DISP_UFOE		BIT(22)
-> > > +#define MT2712_MUTEX_MOD_DISP_PWM0		BIT(23)
-> > > +#define MT2712_MUTEX_MOD_DISP_PWM1		BIT(24)
-> > > +#define MT2712_MUTEX_MOD_DISP_PWM2		BIT(10)
-> > > +#define MT2712_MUTEX_MOD_DISP_OD0		BIT(25)
-> > > +/* modules more than 32, add BIT(31) when using DISP_REG_MUTEX_MOD2 bit */
-> > > +#define MT2712_MUTEX_MOD2_DISP_AAL1		(BIT(1) | BIT(31))
-> > 
-> > I think a better definition is
-> > 
-> > #define MT2712_MUTEX_MOD2_DISP_AAL1		BIT(33)
-> > 
-> > when you need to access this register,
-> > 
-> > if (ddp->mutex_mod[id] < BIT(32)) {
-> > 	offset = DISP_REG_MUTEX_MOD(mutex->id);
-> > 	reg = readl_relaxed(ddp->regs + offset);
-> > 	reg |= ddp->mutex_mod[id];
-> > 	writel_relaxed(reg, ddp->regs + offset);
-> > } else {
-> > 	offset = DISP_REG_MUTEX_MOD2(mutex->id);
-> > 	reg = readl_relaxed(ddp->regs + offset);
-> > 	reg |= (ddp->mutex_mod[id] >> 32);
-> > 	writel_relaxed(reg, ddp->regs + offset);
-> > }
-> > 
-> > because DISP_REG_MUTEX_MOD BIT(31) could be used for some module.
+Okay, I'll try to split it.
+On ?, 2018-05-23 at 19:04 +0530, Vinod wrote:
+> On 23-05-18, 12:56, s.hauer at pengutronix.de wrote:
 > 
-> This modification is workable, but result some build warning like
-> following:
-> 1. #define BIT(nr)   (1UL << (nr)) in include/linux/bitops.h
-> 2. [DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
->    => we need to modify the definition about "static const unsigned int
-> mt2712_mutex_mod"
-> 
-
-Currently, mutex_mod is a bitwise definition. I think it could be
-changed to index definition such as
-
-
-#define MT2712_MUTEX_MOD_DISP_PWM2		10
-#define MT2712_MUTEX_MOD_DISP_OD0		25
-#define MT2712_MUTEX_MOD2_DISP_AAL1		33
-
-when you need to access this register,
-
-if (ddp->mutex_mod[id] < 32) {
-	offset = DISP_REG_MUTEX_MOD(mutex->id);
-	reg = readl_relaxed(ddp->regs + offset);
-	reg |= 1 << ddp->mutex_mod[id];
-	writel_relaxed(reg, ddp->regs + offset);
-} else {
-	offset = DISP_REG_MUTEX_MOD2(mutex->id);
-	reg = readl_relaxed(ddp->regs + offset);
-	reg |= 1 << (ddp->mutex_mod[id] - 32);
-	writel_relaxed(reg, ddp->regs + offset);
-}
-
-Regards,
-CK
-
-> > > +#define MT2712_MUTEX_MOD2_DISP_OD1		(BIT(2) | BIT(31))
-> > > +
-> > >  #define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
-> > >  #define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
-> > >  #define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
-> > > @@ -74,6 +96,7 @@
-> > >  
-> > >  
 > > 
+> > Well, it's somewhat related to virtual dma support, but that's not
+> > my
+> > point. My point is that this patch is quite big and thus hard to
+> > review.
+> > If we find ways to make it smaller and to split it up in multiple
+> > patches then we should do so, because it makes it easier to review
+> > and
+> > in case you break something here we raise the chance that a "git
+> > bisect"
+> > lands on a smaller patch which is easier to understand.
 > > 
-> 
+> > Please try and make that a separate change. I haven't really looked
+> > into
+> > it and it may not be possible due to reasons I haven't seen, but
+> > please
+> > at least give it a try.
+> That is something would help me as well. I have reviewed the patch
+> and am not
+> sure I fully understand the changes, so breaking up stuff would
+> definitely help
+> in the review..
 > 
