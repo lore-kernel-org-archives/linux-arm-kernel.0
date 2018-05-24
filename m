@@ -1,76 +1,97 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 24 May 2018 09:32:48 -0600
-Subject: [PATCH 1/6] coresight: remove CORESIGHT_LINKS_AND_SINKS
- dependencies and selections
-In-Reply-To: <20180523145155.5929dd09c78a056ef19329be@arm.com>
-References: <20180517070643.GC13919@kroah.com>
- <20180518012024.22645-1-kim.phillips@arm.com>
- <20180522173140.GA25658@xps15>
- <20180523145155.5929dd09c78a056ef19329be@arm.com>
-Message-ID: <CANLsYkw-KcEM43pqWgGU1XYOfSTD4cmspNcPM-u+n9x6Xtazbg@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 24 May 2018 16:48:53 +0100
+Subject: [PATCH 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
+ manage multi PM domains
+In-Reply-To: <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1c21d18e-954a-f3a8-9817-0117b7cb7e4f@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2018 at 13:51, Kim Phillips <kim.phillips@arm.com> wrote:
-> On Tue, 22 May 2018 11:31:40 -0600
-> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->
->> On Thu, May 17, 2018 at 08:20:19PM -0500, Kim Phillips wrote:
->> > A coresight topology doesn't need to include links, i.e., a source can
->> > be directly connected to a sink.  As such, selecting and/or depending on
->> > LINKS_AND_SINKS is no longer needed.
->>
->> I'm good with this patch but now the help text for CORESIGHT_LINKS_AND_SINKS no
->> longer match what the config does.  I see two ways to fix this:
->
-> This patch doesn't change what the config does, it just changes what
-> other config options depend on it.
->
->> 1) Rework the help text.
->
-> I don't see how, given the above.  Here's the text:
->
-> config CORESIGHT_LINKS_AND_SINKS
->         bool "CoreSight Link and Sink drivers"
->         help
->           This enables support for CoreSight link and sink drivers that are
->           responsible for transporting and collecting the trace data
->           respectively.  Link and sinks are dynamically aggregated with a trace
->           entity at run time to form a complete trace path.
->
-> What part of that becomes invalid with this patch?
 
-Looking at the new Kconfig, what sink component depend on
-CORESIGHT_LINKS_AND_SINKS?
+On 18/05/18 11:31, Ulf Hansson wrote:
+> The existing dev_pm_domain_attach() function, allows a single PM domain to
+> be attached per device. To be able to support devices that are partitioned
+> across multiple PM domains, let's introduce a new interface,
+> dev_pm_domain_attach_by_id().
+> 
+> The dev_pm_domain_attach_by_id() returns a new allocated struct device with
+> the corresponding attached PM domain. This enables for example a driver to
+> operate on the new device from a power management point of view. The driver
+> may then also benefit from using the received device, to set up so called
+> device-links towards its original device. Depending on the situation, these
+> links may then be dynamically changed.
+> 
+> The new interface is typically called by drivers during their probe phase,
+> in case they manages devices which uses multiple PM domains. If that is the
+> case, the driver also becomes responsible of managing the detaching of the
+> PM domains, which typically should be done at the remove phase. Detaching
+> is done by calling the existing dev_pm_domain_detach() function and for
+> each of the received devices from dev_pm_domain_attach_by_id().
+> 
+> Note, currently its only genpd that supports multiple PM domains per
+> device, but dev_pm_domain_attach_by_id() can easily by extended to cover
+> other PM domain types, if/when needed.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>   drivers/base/power/common.c | 33 ++++++++++++++++++++++++++++++++-
+>   include/linux/pm_domain.h   |  7 +++++++
+>   2 files changed, 39 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+> index 7ae62b6..d3db974 100644
+> --- a/drivers/base/power/common.c
+> +++ b/drivers/base/power/common.c
+> @@ -117,13 +117,44 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
+>   EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
+>   
+>   /**
+> + * dev_pm_domain_attach_by_id - Attach a device to one of its PM domains.
 
-config CORESIGHT_LINKS
-         bool "CoreSight Link drivers"
-         help
-           This enables support for CoreSight link drivers that are responsible
-           for transporting trace data from source to sink.  Links are
-dynamically
-           aggregated with other traces entities at run time to form a
-complete trace
-           path.
+Isn't this more of a 'get'?
 
->
->> 2) Rework CORESIGHT_LINKS_AND_SINKS to be CORESIGHT_FUNNEL and move
->> coresight-replicator.o under CORESIGHT_DYNAMIC_REPLICATOR in the Makefile. I
->> really liked your idea of making the replicator driver intelligent enough to
->> deal with both DT and platform declaration, which merges two driver into one.
->>
->> I'm obviously favouring the second option but recognise it doesn't have to be
->> part of this patchet.  So for this set please rework the help text for
->> CORESIGHT_LINKS_AND_SINKS.  Once we've dealt with this topic we can refactor the
->> replicator driver.
->
-> I'd really like to just focus on getting CoreSight to load as modules,
-> something for which this patch isn't technically required...
+> + * @index: The index of the PM domain.
+> + * @dev: Device to attach.
 
-The only thing I'm asking is that the config description and help text
-reflect what the Makefile does.
+Isn't this just the device associated with the PM domain we are getting?
 
->
-> Thanks,
->
-> Kim
+> + *
+> + * As @dev may only be attached to a single PM domain, the backend PM domain
+> + * provider should create a virtual device to attach instead. As attachment
+> + * succeeds, the ->detach() callback in the struct dev_pm_domain should be
+> + * assigned by the corresponding backend attach function.
+> + *
+> + * This function should typically be invoked from drivers during probe phase.
+> + * Especially for those that manages devices which requires power management
+> + * through more than one PM domain.
+> + *
+> + * Callers must ensure proper synchronization of this function with power
+> + * management callbacks.
+> + *
+> + * Returns the virtual attached device in case successfully attached PM domain,
+> + * NULL in case @dev don't need a PM domain, else a PTR_ERR().
+
+Should this be 'NULL in the case where the @dev already has a power-domain'?
+
+> + */
+> +struct device *dev_pm_domain_attach_by_id(struct device *dev,
+> +					  unsigned int index)
+> +{
+> +	if (dev->pm_domain)
+
+I wonder if this is worthy of a ...
+
+	if (WARN_ON(dev->pm_domain))
+
+> +		return NULL;
+
+Don't we consider this an error case? I wonder why not return PTR_ERR 
+here as well? This would be consistent with dev_pm_domain_attach().
+
+Cheers
+Jon
+
+-- 
+nvpublic
