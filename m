@@ -1,44 +1,68 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 17:15:18 -0700
-Subject: [PATCH v3 0/6] Enhance support for the SP805 WDT
-Message-ID: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
+Date: Wed, 23 May 2018 17:15:22 -0700
+Subject: [PATCH v3 4/6] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+In-Reply-To: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
+References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527120924-12131-5-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enhances the support for the SP805 watchdog timer.
-First of all, 'timeout-sec' devicetree property is added. In addition,
-support is also added to allow the driver to reset the watchdog if it
-has been detected that watchdot has been started in the bootloader. In
-this case, the driver will initiate the ping service from the kernel
-watchdog subsystem, before a user mode daemon takes over. This series
-also enables SP805 in the default ARM64 defconfig
+If the watchdog hardware is already enabled during the boot process,
+when the Linux watchdog driver loads, it should reset the watchdog and
+tell the watchdog framework. As a result, ping can be generated from
+the watchdog framework, until the userspace watchdog daemon takes over
+control
 
-This patch series is based off v4.17-rc5 and is available on GIHUB:
-repo: https://github.com/Broadcom/arm64-linux.git
-branch: sp805-wdt-v3
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ drivers/watchdog/sp805_wdt.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-Changes since v2:
- - Fix indent and format to make them consistent within arm,sp805.txt
-
-Changes since v1:
- - Consolidate two duplicated SP805 binding documents into one
- - Slight change of the wdt_is_running implementation per discussion
-
-Ray Jui (6):
-  Documentation: DT: Consolidate SP805 binding docs
-  Documentation: DT: Add optional 'timeout-sec' property for sp805
-  watchdog: sp805: add 'timeout-sec' DT property support
-  watchdog: sp805: set WDOG_HW_RUNNING when appropriate
-  arm64: dt: set initial SR watchdog timeout to 60 seconds
-  arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
-
- .../devicetree/bindings/watchdog/arm,sp805.txt     | 29 +++++++++++++++-----
- .../devicetree/bindings/watchdog/sp805-wdt.txt     | 31 ----------------------
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |  1 +
- arch/arm64/configs/defconfig                       |  1 +
- drivers/watchdog/sp805_wdt.c                       | 28 ++++++++++++++++++-
- 5 files changed, 51 insertions(+), 39 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-
+diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+index 1484609..d662a6f 100644
+--- a/drivers/watchdog/sp805_wdt.c
++++ b/drivers/watchdog/sp805_wdt.c
+@@ -42,6 +42,7 @@
+ 	/* control register masks */
+ 	#define	INT_ENABLE	(1 << 0)
+ 	#define	RESET_ENABLE	(1 << 1)
++	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
+ #define WDTINTCLR		0x00C
+ #define WDTRIS			0x010
+ #define WDTMIS			0x014
+@@ -74,6 +75,15 @@ module_param(nowayout, bool, 0);
+ MODULE_PARM_DESC(nowayout,
+ 		"Set to 1 to keep watchdog running after device release");
+ 
++/* returns true if wdt is running; otherwise returns false */
++static bool wdt_is_running(struct watchdog_device *wdd)
++{
++	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
++	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
++
++	return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
++}
++
+ /* This routine finds load value that will reset system in required timout */
+ static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
+ {
+@@ -239,6 +249,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
+ 	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
+ 	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
+ 
++	/*
++	 * If HW is already running, enable/reset the wdt and set the running
++	 * bit to tell the wdt subsystem
++	 */
++	if (wdt_is_running(&wdt->wdd)) {
++		wdt_enable(&wdt->wdd);
++		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
++	}
++
+ 	ret = watchdog_register_device(&wdt->wdd);
+ 	if (ret) {
+ 		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
 -- 
 2.1.4
