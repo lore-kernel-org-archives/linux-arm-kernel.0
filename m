@@ -1,99 +1,103 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Thu, 24 May 2018 09:36:25 -0700
-Subject: [PATCH v3 4/6] watchdog: sp805: set WDOG_HW_RUNNING when
- appropriate
-In-Reply-To: <20180524161901.GB28425@roeck-us.net>
-References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
- <1527120924-12131-5-git-send-email-ray.jui@broadcom.com>
- <20180524161901.GB28425@roeck-us.net>
-Message-ID: <5e3d05f2-d526-9108-e2fd-13573458be85@broadcom.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 24 May 2018 17:36:46 +0100
+Subject: [PATCH 3/4] KVM: arm/arm64: Remove unnecessary CMOs when creating
+ HYP page tables
+In-Reply-To: <20180524155117.qdi25z33lnmkrsoe@armageddon.cambridge.arm.com>
+References: <20180517103548.5622-1-marc.zyngier@arm.com>
+ <20180517103548.5622-4-marc.zyngier@arm.com>
+ <20180524155117.qdi25z33lnmkrsoe@armageddon.cambridge.arm.com>
+Message-ID: <4a60f80f-a2c7-2c97-72fc-72b26f7fff5b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 5/24/2018 9:19 AM, Guenter Roeck wrote:
-> On Wed, May 23, 2018 at 05:15:22PM -0700, Ray Jui wrote:
->> If the watchdog hardware is already enabled during the boot process,
->> when the Linux watchdog driver loads, it should reset the watchdog and
->> tell the watchdog framework. As a result, ping can be generated from
->> the watchdog framework, until the userspace watchdog daemon takes over
->> control
+On 24/05/18 16:51, Catalin Marinas wrote:
+> On Thu, May 17, 2018 at 11:35:47AM +0100, Marc Zyngier wrote:
+>> There is no need to perform cache maintenance operations when
+>> creating the HYP page tables if we have the multiprocessing
+>> extensions. ARMv7 mandates them with the virtualization support,
+>> and ARMv8 just mandates them unconditionally.
 >>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Let's remove these operations.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/mmu.c | 5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index ba66bf7ae299..acbfea09578c 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -578,7 +578,6 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+>>  		pte = pte_offset_kernel(pmd, addr);
+>>  		kvm_set_pte(pte, pfn_pte(pfn, prot));
+>>  		get_page(virt_to_page(pte));
+>> -		kvm_flush_dcache_to_poc(pte, sizeof(*pte));
+>>  		pfn++;
+>>  	} while (addr += PAGE_SIZE, addr != end);
+>>  }
+>> @@ -605,7 +604,6 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+>>  			}
+>>  			pmd_populate_kernel(NULL, pmd, pte);
+>>  			get_page(virt_to_page(pmd));
+>> -			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
+>>  		}
+>>  
+>>  		next = pmd_addr_end(addr, end);
+>> @@ -638,7 +636,6 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+>>  			}
+>>  			pud_populate(NULL, pud, pmd);
+>>  			get_page(virt_to_page(pud));
+>> -			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+>>  		}
+>>  
+>>  		next = pud_addr_end(addr, end);
+>> @@ -675,7 +672,6 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+>>  			}
+>>  			pgd_populate(NULL, pgd, pud);
+>>  			get_page(virt_to_page(pgd));
+>> -			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+>>  		}
+>>  
+>>  		next = pgd_addr_end(addr, end);
+>> @@ -685,6 +681,7 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+>>  		pfn += (next - addr) >> PAGE_SHIFT;
+>>  	} while (addr = next, addr != end);
+>>  out:
+>> +	dsb(ishst);
+>>  	mutex_unlock(&kvm_hyp_pgd_mutex);
 > 
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> 
-> I have one question, though: Is it really correct that both
-> INT_ENABLE _and_ RESET_ENABLE have to be set to enable the watdog ?
-> What if only RESET_ENABLE is set ?
+> Why do we need the DSB here? A comment would help.
 
-According to the SP805 TRM, INT_ENABLE needs to be set to high to enable 
-the counter and the interrupt. Counter will be stopped if INT_ENABLE is 
-cleared. So yes, INT_ENABLE needs to be set.
+That's a combination of me being paranoid (we've just dropped a bunch of
+CMOs that had DSBs there), and prior art (see dcadda146f4f -- adding
+Mark who authored that change).
+
+My understanding is also that we do need this as per K11.5.3 (ARMv8 ARM
+rev C.a), which indicates that a DSB ISH "ensures visibility of the
+update to translation table walks".
+
+There is also this text:
+
+<quote>
+
+A translation table walk is considered to be a separate observer, and:
+-  A write to the translation tables can be observed by that separate
+observer at any time after the execution of the instruction that
+performed that write, but is only guaranteed to be observable after the
+execution of a DSB instruction by the PE that executed the instruction
+that performed that write to the translation tables.
+
+</quote>
+
+I'm happy to add comment though.
+
+> If a DMB is sufficient, I think mutex_unlock has release semantics.
+
+I don't think it is, unfortunately.
 
 Thanks,
 
-Ray
-
-> 
-> Thanks,
-> Guenter
-> 
->> ---
->>   drivers/watchdog/sp805_wdt.c | 19 +++++++++++++++++++
->>   1 file changed, 19 insertions(+)
->>
->> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
->> index 1484609..d662a6f 100644
->> --- a/drivers/watchdog/sp805_wdt.c
->> +++ b/drivers/watchdog/sp805_wdt.c
->> @@ -42,6 +42,7 @@
->>   	/* control register masks */
->>   	#define	INT_ENABLE	(1 << 0)
->>   	#define	RESET_ENABLE	(1 << 1)
->> +	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
->>   #define WDTINTCLR		0x00C
->>   #define WDTRIS			0x010
->>   #define WDTMIS			0x014
->> @@ -74,6 +75,15 @@ module_param(nowayout, bool, 0);
->>   MODULE_PARM_DESC(nowayout,
->>   		"Set to 1 to keep watchdog running after device release");
->>   
->> +/* returns true if wdt is running; otherwise returns false */
->> +static bool wdt_is_running(struct watchdog_device *wdd)
->> +{
->> +	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
->> +	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
->> +
->> +	return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
->> +}
->> +
->>   /* This routine finds load value that will reset system in required timout */
->>   static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
->>   {
->> @@ -239,6 +249,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
->>   	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
->>   	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
->>   
->> +	/*
->> +	 * If HW is already running, enable/reset the wdt and set the running
->> +	 * bit to tell the wdt subsystem
->> +	 */
->> +	if (wdt_is_running(&wdt->wdd)) {
->> +		wdt_enable(&wdt->wdd);
->> +		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
->> +	}
->> +
->>   	ret = watchdog_register_device(&wdt->wdd);
->>   	if (ret) {
->>   		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
->> -- 
->> 2.1.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	M.
+-- 
+Jazz is not dead. It just smells funny...
