@@ -1,10 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2018 09:42:17 +0200
-Subject: [PATCH v1 7/7] arm64: dts: mt7622: add EINT support to pinctrl
-In-Reply-To: <f896f79ebfa9a262c89fdeed89cf086220ca051d.1526835466.git.sean.wang@mediatek.com>
+Date: Thu, 24 May 2018 09:39:47 +0200
+Subject: [PATCH v1 4/7] pinctrl: mediatek: use generic EINT register maps
+ for each SoC
+In-Reply-To: <39738efefe94e3a4fb7668a27dd73ae49695dc3b.1526835466.git.sean.wang@mediatek.com>
 References: <cover.1526835466.git.sean.wang@mediatek.com>
- <f896f79ebfa9a262c89fdeed89cf086220ca051d.1526835466.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdaaTYQvK-enM=voWhLVshjvrTi9hioTH7itWbg6ZEx9ew@mail.gmail.com>
+ <39738efefe94e3a4fb7668a27dd73ae49695dc3b.1526835466.git.sean.wang@mediatek.com>
+Message-ID: <CACRpkdYFZLCMJCZ0csV2cU3zGq4c7R2O0PSLk7XiZsj=cyAK7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,14 +13,14 @@ On Sun, May 20, 2018 at 7:01 PM,  <sean.wang@mediatek.com> wrote:
 
 > From: Sean Wang <sean.wang@mediatek.com>
 >
-> Add EINT support to pinctrl and set those GPIO keys as interrupt-driven
-> keys.
+> So far, EINT on each SoC all used exactly identical register map and thus
+> it's better that we apply generic register map already supported in EINT
+> library and stop copy-n-pasting the same data block and filling into its
+> platform data.
 >
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Please merge this through the ARM SoC tree.
+Patch applied.
 
 Yours,
 Linus Walleij
