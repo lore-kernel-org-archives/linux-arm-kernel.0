@@ -1,39 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 May 2018 15:25:06 -0500
-Subject: [PATCH v2 1/8] driver core: make deferring probe after init
- optional
-In-Reply-To: <20180524181834.GF4828@sirena.org.uk>
-References: <20180524175024.19874-1-robh@kernel.org>
- <20180524175024.19874-2-robh@kernel.org>
- <20180524181834.GF4828@sirena.org.uk>
-Message-ID: <CAL_Jsq+xHbW8S4ZMsZp8BJ=wq=t6z2gGTacBnYGgkgBG0dVdYg@mail.gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Thu, 24 May 2018 22:40:46 +0200
+Subject: [PATCH] ARM: pxa3xx: enable external wakeup pins
+Message-ID: <20180524204046.21494-1-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 1:18 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
->
->> Subsystems or drivers may opt-in to this behavior by calling
->> driver_deferred_probe_check_init_done() instead of just returning
->> -EPROBE_DEFER. They may use additional information from DT or kernel's
->> config to decide whether to continue to defer probe or not.
->
-> Should userspace have some involvement in this decision?  It knows if
-> it's got any intention of loading modules for example.  Kernel config
-> checks might be good enough, though it's going to be a pain to work out
-> if the relevant driver is built as a module for example.
+The PXA3xx SoCs feature dedicated pins for wakeup functionality. These pins
+have no alternate functions, so let's always enable them as wakeup source on
+DT enabled boards. The WAKEUP1 pin is only available on PXA320.
 
-I looked into whether we could hook into uevents in some way. If we
-knew when all the coldplug events had been handled, that would be
-sufficient. But it doesn't look to me like we can tell when that
-happens with the uevent netlink socket. I think about the only thing
-we can tell is if userspace has opened a socket. I'm not all that
-familiar with how the whole sequence works, so other opinions on this
-would be helpful.
+Signed-off-by: Daniel Mack <daniel@zonque.org>
+---
+ arch/arm/mach-pxa/pxa3xx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Also, for this to work with serial consoles, we have to make the
-decision before we get to userspace. I couldn't get systemd to create
-serial gettys either if we deferred later. There's some dependence on
-/dev/console, but I didn't get to the bottom of it.
-
-Rob
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 2a5044dd463e..9e05f92cd97a 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -442,6 +442,10 @@ static int __init pxa3xx_init(void)
+ 
+ 		pxa3xx_init_pm();
+ 
++		enable_irq_wake(IRQ_WAKEUP0);
++		if (cpu_is_pxa320())
++			enable_irq_wake(IRQ_WAKEUP1);
++
+ 		register_syscore_ops(&pxa_irq_syscore_ops);
+ 		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+ 
+-- 
+2.14.3
