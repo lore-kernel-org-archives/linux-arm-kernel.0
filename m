@@ -1,324 +1,238 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 15:37:15 +0100
-Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
-In-Reply-To: <20180524100659.GO55598@C02W217FHV2R.local>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 24 May 2018 15:49:51 +0100
+Subject: [PATCH v10 14/18] KVM: arm64: Save host SVE context as appropriate
+In-Reply-To: <1527005119-6842-15-git-send-email-Dave.Martin@arm.com>
 References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
- <20180523114812.GH55598@C02W217FHV2R.local>
- <20180523133158.GJ13470@e103592.cambridge.arm.com>
- <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
- <20180523150337.GO13470@e103592.cambridge.arm.com>
- <20180524083350.GK55598@C02W217FHV2R.local>
- <20180524095056.GR13470@e103592.cambridge.arm.com>
- <20180524100659.GO55598@C02W217FHV2R.local>
-Message-ID: <20180524143714.GV13470@e103592.cambridge.arm.com>
+ <1527005119-6842-15-git-send-email-Dave.Martin@arm.com>
+Message-ID: <871se1t8fk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 12:06:59PM +0200, Christoffer Dall wrote:
-> On Thu, May 24, 2018 at 10:50:56AM +0100, Dave Martin wrote:
-> > On Thu, May 24, 2018 at 10:33:50AM +0200, Christoffer Dall wrote:
 
-[...]
+Dave Martin <Dave.Martin@arm.com> writes:
 
-> > > ...with a risk of being a bit over-pedantic and annoying, may I suggest
-> > > the following complete commit text:
-> > > 
-> > > ------8<------
-> > > Currently the FPSIMD handling code uses the condition task->mm ==
-> > > NULL as a hint that task has no FPSIMD register context.
-> > > 
-> > > The ->mm check is only there to filter out tasks that cannot
-> > > possibly have FPSIMD context loaded, for optimisation purposes.
-> > > However, TIF_FOREIGN_FPSTATE must always be checked anyway before
-> > > saving FPSIMD context back to memory.  For this reason, the ->mm
-> > > checks are not useful, providing that that TIF_FOREIGN_FPSTATE is
-> > > maintained properly for kernel threads.
-> > > 
-> > > FPSIMD context is never preserved for kernel threads across a context
-> > > switch and therefore TIF_FOREIGN_FPSTATE should always be true for
-> > 
-> > (This refactoring opens up the interesting possibility of making
-> > kernel-mode NEON in task context preemptible for kernel threads so
-> > that we actually do preserve state... but that's a discussion for
-> > another day.  There may be code around that relies on
-> > kernel_neon_begin() disabling preemption for real.)
-> > 
-> > > kernel threads.  This is indeed the case, as the wrong_task and
-> > 
-> > This suggests that TIF_FOREIGN_FPSTATE is always true for kernel
-> > threads today.  This is not quite because use_mm() can make mm non-
-> > NULL.
-> > 
-> 
-> I was suggesting that it's always true after this patch.
+> This patch adds SVE context saving to the hyp FPSIMD context switch
+> path.  This means that it is no longer necessary to save the host
+> SVE state in advance of entering the guest, when in use.
+>
+> In order to avoid adding pointless complexity to the code, VHE is
+> assumed if SVE is in use.  VHE is an architectural prerequisite for
+> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+> kernels that support both SVE and KVM.
+>
+> Historically, software models exist that can expose the
+> architecturally invalid configuration of SVE without VHE, so if
+> this situation is detected at kvm_init() time then KVM will be
+> disabled.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>
+> ---
+>
+>  * Tags stripped since v8, please reconfirm if possible:
+>
+> Formerly-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Formerly-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Formerly-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Changes since v9:
+>
+> Requested by Marc Zyngier:
+>
+>  * Inline check for VHE if SVE is present into kvm_host.h.
+>
+>    The check has been renamed to the more specific
+>    kvm_arch_check_sve_has_vhe(), and the kvm_pr_unimpl() moved back to
+>    arm.c (to avoid circular include issues).
+>
+>    arm.c is not single-arch code, but it is all Arm-specific, so
+>    adding a hook like this doesn't seem too unreasonable.
+>
+> Changes since v8:
+>
+>  * Add kvm_arch_check_supported() hook, and move arm64-specific check
+>    for SVE-implies-VHE into arch/arm64/.
+>
+>    Due to circular header dependency problems, it is difficult to get
+>    the prototype for kvm_pr_*() functions in <asm/kvm_host.h>, so this
+>    patch puts arm64's kvm_arch_check_supported() hook out of line.
+>    This is not a hot function.
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  1 +
+>  arch/arm64/Kconfig                |  7 +++++++
+>  arch/arm64/include/asm/kvm_host.h | 13 +++++++++++++
+>  arch/arm64/kvm/fpsimd.c           |  1 -
+>  arch/arm64/kvm/hyp/switch.c       | 20 +++++++++++++++++++-
+>  virt/kvm/arm/arm.c                |  7 +++++++
+>  6 files changed, 47 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index ac870b2..3b85bbb 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -280,6 +280,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>
+>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>
+> +static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index eb2cf49..b0d3820 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1130,6 +1130,7 @@ endmenu
+>  config ARM64_SVE
+>  	bool "ARM Scalable Vector Extension support"
+>  	default y
+> +	depends on !KVM || ARM64_VHE
+>  	help
+>  	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+>  	  execution state which complements and extends the SIMD functionality
+> @@ -1155,6 +1156,12 @@ config ARM64_SVE
+>  	  booting the kernel.  If unsure and you are not observing these
+>  	  symptoms, you should assume that it is safe to say Y.
+>
+> +	  CPUs that support SVE are architecturally required to support the
+> +	  Virtualization Host Extensions (VHE), so the kernel makes no
+> +	  provision for supporting SVE alongside KVM without VHE enabled.
+> +	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
+> +	  KVM in the same kernel image.
+> +
+>  config ARM64_MODULE_PLTS
+>  	bool
+>  	select HAVE_MOD_ARCH_SPECIFIC
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index b3fe730..06d5a61 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -405,6 +405,19 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  	kvm_call_hyp(__kvm_set_tpidr_el2, tpidr_el2);
+>  }
+>
+> +static inline bool kvm_arch_check_sve_has_vhe(void)
+> +{
+> +	/*
+> +	 * The Arm architecture specifies that imlpementation of SVE
+> +	 * requires VHE also to be implemented.  The KVM code for arm64
+> +	 * relies on this when SVE is present:
+> +	 */
+> +	if (system_supports_sve())
+> +		return has_vhe();
+> +	else
+> +		return true;
+> +}
+> +
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> index 365933a..dc6ecfa 100644
+> --- a/arch/arm64/kvm/fpsimd.c
+> +++ b/arch/arm64/kvm/fpsimd.c
+> @@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+>   */
+>  void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+>  {
+> -	BUG_ON(system_supports_sve());
+>  	BUG_ON(!current->mm);
+>
+>  	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 118f300..a6a8c7d 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -21,6 +21,7 @@
+>
+>  #include <kvm/arm_psci.h>
+>
+> +#include <asm/cpufeature.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_host.h>
+> @@ -28,6 +29,7 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/fpsimd.h>
+>  #include <asm/debug-monitors.h>
+> +#include <asm/processor.h>
+>  #include <asm/thread_info.h>
+>
+>  /* Check whether the FP regs were dirtied while in the host-side run loop: */
+> @@ -329,6 +331,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  				    struct kvm_vcpu *vcpu)
+>  {
+> +	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> +
+>  	if (has_vhe())
+>  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+>  			     cpacr_el1);
+> @@ -339,7 +343,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  	isb();
+>
+>  	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
+> -		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+> +		/*
+> +		 * In the SVE case, VHE is assumed: it is enforced by
+> +		 * Kconfig and kvm_arch_init().
+> +		 */
+> +		if (system_supports_sve() &&
+> +		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
+> +			struct thread_struct *thread = container_of(
+> +				host_fpsimd,
+> +				struct thread_struct, uw.fpsimd_state);
+> +
+> +			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
+> +		} else {
+> +			__fpsimd_save_state(host_fpsimd);
+> +		}
+> +
+>  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+>  	}
+>
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index bee226c..ce7c6f3 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -16,6 +16,7 @@
+>   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>   */
+>
+> +#include <linux/bug.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/errno.h>
+>  #include <linux/err.h>
+> @@ -41,6 +42,7 @@
+>  #include <asm/mman.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/virt.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+> @@ -1574,6 +1576,11 @@ int kvm_arch_init(void *opaque)
+>  		return -ENODEV;
+>  	}
+>
+> +	if (!kvm_arch_check_sve_has_vhe()) {
+> +		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
+> +		return -ENODEV;
+> +	}
+> +
 
-I tend to read the present tense as describing the situation before the
-patch, but this convention isn't followed universally.
+Ahh this is going to be a pain when people want to enable system
+emulation for SVE in QEMU given our patchy feature implementation (i.e.
+we haven't done VHE yet). However that's totally our problem not yours
+;-)
 
-This was part of the problem with my "true by construction" weasel
-words: the described property wasn't true by construction prior to the
-patch, and there wasn't sufficient explanation to convince people it's
-true afterwards.  If people are bring rigorous, it takes a _lot_ of
-explanation...
-
-> 
-> > > wrong_cpu tests in fpsimd_thread_switch() will always yield false for
-> > > kernel threads.
-> > 
-> > ("false" -> "true".  My bad.)
-> > 
-> > > Further, the context switch logic is already deliberately optimised to
-> > > defer reloads of the FPSIMD context until ret_to_user (or sigreturn as a
-> > > special case), which kernel threads by definition never reach, and
-> > > therefore this change introduces no additional work in the critical
-> > > path.
-> > > 
-> > > This patch removes the redundant checks and special-case code.
-> > > ------8<------
-> > 
-> > Looking at my existing text, I rather reworded it like this.
-> > Does this work any better for you?
-> > 
-> > --8<--
-> > 
-> > Currently the FPSIMD handling code uses the condition task->mm ==
-> > NULL as a hint that task has no FPSIMD register context.
-> > 
-> > The ->mm check is only there to filter out tasks that cannot
-> > possibly have FPSIMD context loaded, for optimisation purposes.
-> > Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
-> > saving FPSIMD context back to memory.  For these reasons, the ->mm
-> > checks are not useful, providing that TIF_FOREIGN_FPSTATE is
-> > maintained in a consistent way for kernel threads.
-> 
-> Consistent with what?  Without more context or explanation,
-
-Consistent with the handling of user threads (though I admit it's not
-explicit in the text.)
-
-> I'm not sure what the reader is to make of that.  Do you not mean the
-> TIF_FOREIGN_FPSTATE is always true for kernel threads?
-
-Again, this is probably a red herring.  TIF_FOREIGN_FPSTATE is always
-true for kernel threads prior to the patch, except (randomly) for the
-init task.
-
-This change is not really about TIF_FOREIGN_FPSTATE at all, rather
-that there is nothing to justify handling kernel threads differently,
-or even distinguishing kernel threads from user threads at all in this
-code.
-
-Part of the confusion (and I had confused myself) comes from the fact
-that TIF_FOREIGN_FPSTATE is really a per-cpu property and doesn't make
-sense as a per-task property -- i.e., the flag is meaningless for
-scheduled-out tasks and we must explicitly "repair" it when scheduling
-a task in anyway.  I think it's a thread flag primarily so that it's
-convenient to check alongside other thread flags in the ret_to_user
-work loop.  This is somewhat less of a justification now that loop was
-ported to C.
-
-> > 
-> > The context switch logic is already deliberately optimised to defer
-> > reloads of the regs until ret_to_user (or sigreturn as a special
-> > case), and save them only if they have been previously loaded.
-
-Does it help to insert the following here?
-
-"These paths are the only places where the wrong_task and wrong_cpu
-conditions can be made false, by calling fpsimd_bind_task_to_cpu()."
-
-> > Kernel threads by definition never reach these paths.  As a result,
-> 
-> I'm struggling with the "As a result," here.  Is this because reloads of
-> regs in ret_to_user (or sigreturn) are the only places that can make
-> wrong_cpu or wrong_task be false?
-
-See the proposed clarification above.  Is that sufficient?
-
-> (I'm actually wanting to understand this, not just bikeshedding the
-> commit message, as new corner cases keep coming up on this logic.)
-
-That's a good thing, and I would really like to explain it in a
-concise manner.  See [*] below for the "concise" explanation -- it may
-demonstrate why I've been evasive...
-
-> > the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
-> > always yield true for kernel threads.
-> > 
-> > This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
-> > task.  The fpsimd_flush_task_state() call already present in                    copy_thread() ensures the same for any new task.
-> 
-> nit: funny formatting
-
-Dang, I was repeatedly pasing between Mutt and git commit terminals,
-which doesn't always work as I'd like...
-
-> nit: ensuring that TIF_FOREIGN_FPSTATE *remains* set whenever a kernel
-> thread is scheduled in?
-
-Er, yes.
-
-> > With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
-> > ensures that no extra context save work is added for kernel
-> > threads, and eliminates the redundant context saving that may
-> > currently occur for kernel threads that have acquired an mm via
-> > use_mm().
-> > 
-> > -->8--
-> 
-> If you can slightly connect the dots with the "As a result" above, I'm
-> fine with your version of the text.
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
 
-As an aside, the big wall of text before the definition of struct
-fpsimd_last_state_struct is looking out of date and could use an
-update to cover at least some of what is explained in [*] better.
-
-I'm currently considering that out of scope for this series, but I will
-keep it in mind to refresh it in the not too distant future.
+>  	for_each_online_cpu(cpu) {
+>  		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
+>  		if (ret < 0) {
 
 
-Cheers
----Dave
-
---8<--
-
-[*] The bigger picture:
-
-* Consider a relation (C,T) between cpus C and tasks T, such that
-  (C,T) means "T's FPSIMD regs are loaded on cpu C".
-
-  At a given point of execution of some cpu C, there is at most one task
-  T for which (C,T) holds.
- 
-  At a given point of execution of some task T, there is at most one
-  cpu C for which (C,T) holds.
-
-* (C,T) becomes true whenever T's registers are loaded into cpu C.
-
-* At sched-out, we must ensure that the registers of current are
-  loaded before writing them to current's thread_struct.  Thus, we
-  must save the registers if and only if (smp_processor_id(), current)
-  holds@this time.
-
-* Before entering userspace, we must ensure that current's regs
-  are loaded, and we must only load the regs if they are not loaded
-  already (since if so, they might have been dirtied by current in
-  userspace since last loaded).
-
-  Thus, when entering userspace, we must load the regs from memory
-  if and only if (smp_processor_id(), current) does not hold.
-
-* Checking this relation involves per-CPU access and inspection of
-  current->thread, and was presumably considered too cumbersome for
-  implemenation an entry.S, particluarly in the ret_to_user work
-  pending loop (which is where the FPSIMD regs are finally loaded
-  before entering userspace, if they weren't loaded already).
-
-  To mitigate this, the status of the check is cached in a thread flag
-  TIF_FOREIGN_FPSTATE: with softirqs disabled, (smp_processor_id(),
-  current) holds if and only if TIF_FOREIGN_FPSTATE is false.
-  TIF_FOREIGN_FPSTATE is corrected on sched-in by the code in
-  fpsimd_thread_switch().
-
-[2] Anything that changes the state of the relation for current
-  requires its TIF_FOREIGN_FPSTATE to be changed to match.
-
-* (smp_processor_id(), current) is established in
-  fpsimd_bind_task_to_cpu().  This is the only way the relation can be
-  made to hold between a task and a CPU.
-
-* (C,T) is broken whenever
-
-[1] T is created;
-
-  * T's regs are loaded onto a different cpu C2, so (C2,T) becomes
-    true and (C,T) necessarily becomes false;
-
-  * another task's regs are loaded into C, so (C,T2) becomes true
-    and (C,T) necessarily becomes false;
-
-  * the kernel clobbers the regs on C for its own purposes, so
-    (C,T) becomes false but there is no T2 for which (C,T2) becomes
-    true as a result.  Examples are kernel-mode NEON and loading
-    the regs for a KVM vcpu;
-
-  * T's register context changes via a thread_struct update instead
-    of running instructions in userspace, requiring the contents of
-    the hardware regs to be thrown away.  Examples are exec() (which
-    requires the registers to be zeroed), sigreturn (which populates the
-    regs from the user signal frame) and modification of the registers
-    via PTRACE_SETREGSET;
-
-    As a (probably unnecesary) optimisation, sigreturn immediately
-    loads the registers and reestablishes (smp_processor_id(), current)
-    in anticipation of the return to userspace which is likely to
-    occur soon.  This allows the relation breaking logic to be omitted
-    in fpsimd_update_current_state() which does the work.
-
-* In general, these relation breakings involve an unknown: knowing
-  either C or T but *not* both, we want to break (C,T).  If the
-  relation were recorded in task_struct only, we would need to scan all
-  tasks in the "T unknown" case.  If the relation were recorded in a
-  percpu variable only, we would need to scan all CPUs in the "C
-  unknown" case.  As well as having gnarly synchronisation
-  requirements, these would get expensive in many-tasks or many-cpus
-  situations.
-
-  This is why the relation is recorded in both places, and is only
-  deemed to hold if the two records match up.  This is what
-  fpsimd_thread_switch() is checking for the task being scheduled in.
-
-  The invalidation (breaking) operations are now factored as
-
-  fpsimd_flush_task_state(): falsify (C,current) for every cpu C.
-  This is done by zapping current->thread.fpsimd_cpu with NR_CPUS
-  (chosen because it cannot match smp_processor_id()).
-
-  fpsumd_flush_cpu_state(): falsify (smp_processor_id(),T) for every
-  task T.  This is done by zapping this_cpu(fpsimd_last_state.st)
-  with NULL (chosen because it cannot match &T->thread.uw.fpsimd_state
-  for any task).
-
-  By [2] above, it is necessary to ensure that TIF_FOREIGN_FPSTATE is
-  set after calling either of the above functions.  Of the two,
-  fpsimd_flush_cpu_state() now does this implicitly but
-  fpsimd_flush_task_state() does not: but the caller must do it
-  instead.  I have a vague memory of some refactoring obstacle that
-  dissuaded me from pulling the set_thread_flag in, but I can't
-  remember it now.  I may review this later.
-
-* Because the (C,T) relation may need to be manipulated by
-  kernel_neon_{begin,end}() in softirq context, examining or
-  manipulating for current or the running CPU must be done under
-  local_bh_disable().  The same goes for TIF_FOREIGN_FPSTATE which is
-  supposed to represent the same condition but may spontaneously become
-  stale if softirqs are not masked.  (The rule is not quite as strict
-  as this, but in order to make the code easier to reason about, I skip
-  the local_bh_disable() only where absolutely necessary --
-  restore_sve_fpsimd_context() is the only example today.)
-
-Now, imagine that T is a kernel thread, and consider what needs to
-be done differently.  The observation of this patch is that nothing
-needs to be done differently at all.
-
-There is a single anomaly relating to [1] above, in the form of a task
-that can run without ever being scheduled in: the init task.  Beyond
-that, kernel_neon_begin() before the first reschedule would spuriously
-save the FPSIMD regs into the init_task's thread struct, even though it
-is pointless to do so.  This patch fixes those anomalies by updating
-INIT_THREAD and INIT_THREAD_INFO to set up the init task so that it
-looks the same as some other kernel thread that has been scheduled in.
-
-There is a strong design motivation to avoid unnecessary loads and
-saves of the state, so if removing the special-casing of kernel threads
-were to add cost it would imply that the code were _already_ suboptimal
-for user tasks.  This patch does not attempt to address that at all,
-but by assuming that the code is already well-optimised, "unnecessary"
-save/restore work will not be added.  If this were not the case, it
-could in any case be fixed independently.
-
-The observation of this _series_ is that we don't need to do very
-much in order to be able to generalise the logic to accept KVM vcpus
-in place of T.
+--
+Alex Benn?e
