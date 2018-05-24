@@ -1,110 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 May 2018 12:00:58 +0100
-Subject: [PATCH 02/14] arm64: Call ARCH_WORKAROUND_2 on transitions
- between EL0 and EL1
-In-Reply-To: <20180522150648.28297-3-marc.zyngier@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-3-marc.zyngier@arm.com>
-Message-ID: <20180524110058.mrkwc3rx5l3v6wad@lakrids.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 24 May 2018 13:05:33 +0200
+Subject: Nokia N900: refcount_t underflow, use after free
+In-Reply-To: <5aa1e2de-96d1-0e88-01ca-49df9ae25457@ti.com>
+References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
+ <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com>
+ <20180308185046.GA22796@amd>
+ <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
+ <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com>
+ <20180309221834.GA15476@amd>
+ <c8ee5692-bf71-a9d7-8607-50adc9f0e9f1@ti.com>
+ <20180310112634.GA31614@amd>
+ <5aa1e2de-96d1-0e88-01ca-49df9ae25457@ti.com>
+Message-ID: <20180524110533.GA20599@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 04:06:36PM +0100, Marc Zyngier wrote:
-> In order for the kernel to protect itself, let's call the SSBD mitigation
-> implemented by the higher exception level (either hypervisor or firmware)
-> on each transition between userspace and kernel.
+Hi!
+
+> >>
+> >> OK, see if the following fixes the issue for you, only build tested.
+> > 
+> > Word-wrapped, so I applied by hand. And yes, the oops at boot is
+> > gone. Thanks!
 > 
-> We must take the PSCI conduit into account in order to target the
-> right exception level, hence the introduction of a runtime patching
-> callback.
+> Sorry about that, have to check my mail settings. Anyway will post the
+> patch again, glad that it fixed your issue.
+
+Any news here? AFAICT the bug creeped into v4.17-rcX in the
+meantime...
+
+								Pavel
+
+> regards
+> Suman
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/cpu_errata.c | 18 ++++++++++++++++++
->  arch/arm64/kernel/entry.S      | 22 ++++++++++++++++++++++
->  include/linux/arm-smccc.h      |  5 +++++
->  3 files changed, 45 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index a900befadfe8..46b3aafb631a 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -232,6 +232,24 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
->  }
->  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
->  
-> +#ifdef CONFIG_ARM64_SSBD
-> +void __init arm64_update_smccc_conduit(struct alt_instr *alt,
-> +				       __le32 *origptr, __le32 *updptr,
-> +				       int nr_inst)
-> +{
-> +	u32 insn;
-> +
-> +	BUG_ON(nr_inst != 1);
-> +
-> +	if (psci_ops.conduit == PSCI_CONDUIT_HVC)
-> +		insn = aarch64_insn_get_hvc_value();
-> +	else
-> +		insn = aarch64_insn_get_smc_value();
+> > 
+> > (Camera still does not work in -next... kills system. Oh well. Lets
+> > debug that some other day.)
+> > 
+> >> 8< ---------------------
+> >> >From bac9a48fb646dc51f2030d676a0dbe3298c3b134 Mon Sep 17 00:00:00 2001
+> >> From: Suman Anna <s-anna@ti.com>
+> >> Date: Fri, 9 Mar 2018 16:39:59 -0600
+> >> Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
+> >>
+> >> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+> >> ARM DMA backend. The current code creates a dma_iommu_mapping and
+> >> attaches this to the ISP device, but never detaches the mapping in
+> >> either the probe failure paths or the driver remove path resulting
+> >> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+> >>
+> >> Reported-by: Pavel Machek <pavel@ucw.cz>
+> >> Signed-off-by: Suman Anna <s-anna@ti.com>
+> > 
+> > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > 									Pavel
+> > 
 
-Shouldn't this also handle the case where there is no conduit?
-
-See below comment in apply_ssbd for rationale.
-
-> +
-> +	*updptr = cpu_to_le32(insn);
-> +}
-> +#endif	/* CONFIG_ARM64_SSBD */
-> +
->  #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
->  	.matches = is_affected_midr_range,			\
->  	.midr_range = MIDR_RANGE(model, v_min, r_min, v_max, r_max)
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index ec2ee720e33e..f33e6aed3037 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -18,6 +18,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/arm-smccc.h>
->  #include <linux/init.h>
->  #include <linux/linkage.h>
->  
-> @@ -137,6 +138,18 @@ alternative_else_nop_endif
->  	add	\dst, \dst, #(\sym - .entry.tramp.text)
->  	.endm
->  
-> +	// This macro corrupts x0-x3. It is the caller's duty
-> +	// to save/restore them if required.
-> +	.macro	apply_ssbd, state
-> +#ifdef CONFIG_ARM64_SSBD
-> +	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
-> +	mov	w1, #\state
-> +alternative_cb	arm64_update_smccc_conduit
-> +	nop					// Patched to SMC/HVC #0
-> +alternative_cb_end
-> +#endif
-> +	.endm
-
-If my system doesn't have SMCCC1.1, or the FW doesn't have an
-implementation of ARCH_WORKAROUND_2, does this stay as a NOP?
-
-It looks like this would be patched to an SMC, which would be fatal on
-systems without EL3 FW.
-
-> +
->  	.macro	kernel_entry, el, regsize = 64
->  	.if	\regsize == 32
->  	mov	w0, w0				// zero upper 32 bits of x0
-> @@ -163,6 +176,13 @@ alternative_else_nop_endif
->  	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
->  	disable_step_tsk x19, x20		// exceptions when scheduling.
->  
-> +	apply_ssbd 1
-
-
-... and thus kernel_entry would be fatal.
-
-Thanks,
-Mark.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180524/38b64362/attachment-0001.sig>
