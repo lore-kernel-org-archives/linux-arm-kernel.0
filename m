@@ -1,104 +1,34 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 24 May 2018 11:20:59 +0100
-Subject: [PATCH v10 13/18] arm64/sve: Move sve_pffr() to fpsimd.h and make
- inline
-In-Reply-To: <1527005119-6842-14-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-14-git-send-email-Dave.Martin@arm.com>
-Message-ID: <8736yhtkvo.fsf@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 May 2018 11:27:38 +0100
+Subject: [PATCHv2] arm64: Make sure permission updates happen for pmd/pud
+In-Reply-To: <20180523184346.487-1-labbott@redhat.com>
+References: <20180523184346.487-1-labbott@redhat.com>
+Message-ID: <20180524102735.GA28425@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laura,
 
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> In order to make sve_save_state()/sve_load_state() more easily
-> reusable and to get rid of a potential branch on context switch
-> critical paths, this patch makes sve_pffr() inline and moves it to
-> fpsimd.h.
->
-> <asm/processor.h> must be included in fpsimd.h in order to make
-> this work, and this creates an #include cycle that is tricky to
-> avoid without modifying core code, due to the way the PR_SVE_*()
-> prctl helpers are included in the core prctl implementation.
->
-> Instead of breaking the cycle, this patch defers inclusion of
-> <asm/fpsimd.h> in <asm/processor.h> until the point where it is
-> actually needed: i.e., immediately before the prctl definitions.
->
-> No functional change.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, May 23, 2018 at 11:43:46AM -0700, Laura Abbott wrote:
+> Commit 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
+> disallowed block mappings for ioremap since that code does not honor
+> break-before-make. The same APIs are also used for permission updating
+> though and the extra checks prevent the permission updates from happening,
+> even though this should be permitted. This results in read-only permissions
+> not being fully applied. Visibly, this can occasionaly be seen as a failure
+> on the built in rodata test when the test data ends up in a section or
+> as an odd RW gap on the page table dump. Fix this by using
+> pgattr_change_is_safe instead of p*d_present for determining if the
+> change is permitted.
+> 
+> Reported-by: Peter Robinson <pbrobinson@gmail.com>
+> Fixes: 15122ee2c515 ("arm64: Enforce BBM for huge IO/VMAP mappings")
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 > ---
->  arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
->  arch/arm64/include/asm/processor.h |  3 ++-
->  arch/arm64/kernel/fpsimd.c         | 12 ------------
->  3 files changed, 15 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index fb60b22..fa92747 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -18,6 +18,8 @@
->
->  #include <asm/ptrace.h>
->  #include <asm/errno.h>
-> +#include <asm/processor.h>
-> +#include <asm/sigcontext.h>
->
->  #ifndef __ASSEMBLY__
->
-> @@ -61,6 +63,17 @@ extern void sve_flush_cpu_state(void);
->  /* Maximum VL that SVE VL-agnostic software can transparently support */
->  #define SVE_VL_ARCH_MAX 0x100
->
-> +/* Offset of FFR in the SVE register dump */
-> +static inline size_t sve_ffr_offset(int vl)
-> +{
-> +	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
-> +}
-> +
-> +static inline void *sve_pffr(struct thread_struct *thread)
-> +{
-> +	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
-> +}
-> +
->  extern void sve_save_state(void *state, u32 *pfpsr);
->  extern void sve_load_state(void const *state, u32 const *pfpsr,
->  			   unsigned long vq_minus_1);
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index f902b6d..ebaadb1 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -40,7 +40,6 @@
->
->  #include <asm/alternative.h>
->  #include <asm/cpufeature.h>
-> -#include <asm/fpsimd.h>
->  #include <asm/hw_breakpoint.h>
->  #include <asm/lse.h>
->  #include <asm/pgtable-hwdef.h>
-> @@ -245,6 +244,8 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
->  void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
->  void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
->
-> +#include <asm/fpsimd.h>
-> +
+> v2: Switch to using pgattr_change_is_safe per suggestion of Will
+> ---
 
-You really need a one-liner comment to note why the include is in a
-funny place to save someone just moving it back and then getting really
-confused. Maybe:
+Thanks for re-spinning so quickly. I'll queue as a fix with the relevant
+tags.
 
-  /* included just in time to avoid circular inclusion issues */
-  #include <asm/fpsimd.h>
-
-It still seems weird to me though :-/
-
-Otherwise:
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
---
-Alex Benn?e
+Will
