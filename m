@@ -1,61 +1,85 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 24 May 2018 10:36:34 +0100
-Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
- device to genpd
-In-Reply-To: <CAPDyKFo8e5FMrxF2ggxVZ+HQjw4s1Wtx-tMf5ka67knJpZMQcA@mail.gmail.com>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
- <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
- <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
- <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
- <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
- <CAPDyKFo_69kSS6UzdsJeyeiiED=S=chsdkP+R43qMHDEbZ8n_A@mail.gmail.com>
- <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
- <CAPDyKFo8e5FMrxF2ggxVZ+HQjw4s1Wtx-tMf5ka67knJpZMQcA@mail.gmail.com>
-Message-ID: <1687797a-93f1-7e5c-6060-01c12c070964@nvidia.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 24 May 2018 10:41:40 +0100
+Subject: [PATCH v10 06/18] arm64: fpsimd: Generalise context saving for
+ non-task contexts
+In-Reply-To: <20180524090322.GQ13470@e103592.cambridge.arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-7-git-send-email-Dave.Martin@arm.com>
+ <87in7et9gw.fsf@linaro.org>
+ <20180524090322.GQ13470@e103592.cambridge.arm.com>
+Message-ID: <878t89tmp7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 24/05/18 08:04, Ulf Hansson wrote:
+Dave Martin <Dave.Martin@arm.com> writes:
 
-...
+> On Wed, May 23, 2018 at 09:15:11PM +0100, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
+>> > contexts to be handled by the fpsimd common code, this patch adapts
+>> > task_fpsimd_save() to save back the currently loaded context,
+>> > removing the explicit dependency on current.
+>> >
+>> > The relevant storage to write back to in memory is now found by
+>> > examining the fpsimd_last_state percpu struct.
+>> >
+>> > fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
+>> > fpsimd_last_state is updated under local_bh_disable() or
+>> > local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
+>> > thus, fpsimd_save() will write back to the correct storage for the
+>> > loaded context.
+>> >
+>> > No functional change.
+>> >
+>> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> > ---
+>> >  arch/arm64/kernel/fpsimd.c | 25 +++++++++++++------------
+>> >  1 file changed, 13 insertions(+), 12 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> > index 9d85373..3aa100a 100644
+>> > --- a/arch/arm64/kernel/fpsimd.c
+>> > +++ b/arch/arm64/kernel/fpsimd.c
+>> > @@ -270,13 +270,15 @@ static void task_fpsimd_load(void)
+>> >  }
+>> >
+>> >  /*
+>> > - * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
+>> > - * with respect to the CPU registers.
+>> > + * Ensure FPSIMD/SVE storage in memory for the loaded context is up to
+>> > + * date with respect to the CPU registers.
+>> >   *
+>> >   * Softirqs (and preemption) must be disabled.
+>> >   */
+>> > -static void task_fpsimd_save(void)
+>> > +static void fpsimd_save(void)
+>> >  {
+>> > +	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+>> > +
+>>
+>> I thought I was missing something but the only write I saw of this was:
+>>
+>>   __this_cpu_write(fpsimd_last_state.st, NULL);
+>>
+>> which implied to me it is possible to have an invalid de-reference. I
+>> did figure it out eventually as fpsimd_bind_state_to_cpu uses a more
+>> indirect this_cpu_ptr idiom for tweaking this. I guess a reference to
+>> fpsimd_bind_[task|state]_to_cpu in the comment would have helped my
+>> confusion.
+>
+> How about:
+>
+>  static void fpsimd_save(void)
+>  {
+>  	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+> +	/* set by fpsimd_bind_to_cpu() */
 
->> Any reason why we could not add a 'boolean' argument to the API to indicate
->> whether the new device should be linked? I think that I prefer the API
->> handles it, but I can see there could be instances where drivers may wish to
->> handle it themselves.
-> 
-> Coming back to this question. Both Tegra XUSB and Qcom Camera use
-> case, would benefit from doing the linking themselves, as it needs
-> different PM domains to be powered on depending on the current use
-> case - as to avoid wasting power.
-> 
-> However, I can understand that you prefer some simplicity over
-> optimizations, as you told us. Then, does it mean that you are
-> insisting on extending the APIs with a boolean for linking, or are you
-> fine with the driver to call device_link_add()?
+Great, thanks ;-)
 
-I am fine with the driver calling device_link_add(), but I just wonder 
-if we will find a several drivers doing this and then we will end up 
-doing this later anyway.
-
-The current API is called ...
-
-* genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
-* @dev: Device to attach.
-* @index: The index of the PM domain.
-
-This naming and description is a bit misleading, because really it is 
-not attaching the device that is passed, but creating a new device to 
-attach a PM domain to. So we should consider renaming and changing the 
-description and indicate that users need to link the device.
-
-Finally, how is a PM domain attached via calling 
-genpd_dev_pm_attach_by_id() detached?
-
-Cheers
-Jon
-
--- 
-nvpublic
+--
+Alex Benn?e
