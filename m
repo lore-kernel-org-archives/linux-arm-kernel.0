@@ -1,86 +1,67 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 24 May 2018 16:06:47 +0100
-Subject: [PATCH v10 17/18] KVM: arm64: Fold redundant exit code checks out
- of fixup_guest_exit()
-In-Reply-To: <1527005119-6842-18-git-send-email-Dave.Martin@arm.com>
-References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-18-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87wovtrt2w.fsf@linaro.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 24 May 2018 17:07:21 +0200
+Subject: [PATCH v2 9/9] ARM: dts: silk: Drop MTD partitioning from DT
+In-Reply-To: <20180524150721.28964-1-marek.vasut+renesas@gmail.com>
+References: <20180524150721.28964-1-marek.vasut+renesas@gmail.com>
+Message-ID: <20180524150721.28964-9-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Drop the MTD partitioning from DT, since it does not describe HW
+and to give way to a more flexible kernel command line partition
+passing.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+To retain the original partitioning, assure you have enabled
+CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+following to your kernel command line:
 
-> The entire tail of fixup_guest_exit() is contained in if statements
-> of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
-> we can check just once and bail out of the function early, allowing
-> the remaining if conditions to be simplified.
->
-> The only awkward case is where *exit_code is changed to
-> ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
-> interface access: in that case, the GICv3 trap handling code is
-> skipped using a goto.  This avoids pointlessly evaluating the
-> static branch check for the GICv3 case, even though we can't have
-> vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
-> unless we have a GICv3 and GICv2 on the host: that sounds stupid,
-> but I haven't satisfied myself that it can't happen.
->
-> No functional change.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+  mtdparts=spi0.0:256k(loader),4m(user),-(flash)
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-renesas-soc at vger.kernel.org
+---
+V2: Drop the @0 anchor from the commit message, use 4m
+---
+ arch/arm/boot/dts/r8a7794-silk.dts | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-> ---
->  arch/arm64/kvm/hyp/switch.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 18d0faa..4fbee95 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -387,11 +387,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  	 * same PC once the SError has been injected, and replay the
->  	 * trapping instruction.
->  	 */
-> -	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-> +	if (*exit_code != ARM_EXCEPTION_TRAP)
-> +		goto exit;
-> +
-> +	if (!__populate_fault_info(vcpu))
->  		return true;
->
-> -	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
-> -	    *exit_code == ARM_EXCEPTION_TRAP) {
-> +	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
->  		bool valid;
->
->  		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-> @@ -417,11 +419,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
->  				*exit_code = ARM_EXCEPTION_EL1_SERROR;
->  			}
-> +
-> +			goto exit;
->  		}
->  	}
->
->  	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
-> -	    *exit_code == ARM_EXCEPTION_TRAP &&
->  	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
->  	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
->  		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-> @@ -430,6 +433,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  			return true;
->  	}
->
-> +exit:
->  	/* Return to the host kernel and handle the exit */
->  	return false;
->  }
-
-
---
-Alex Benn?e
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index 7808aaee6644..b8163a0e2190 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -444,27 +444,6 @@
+ 		spi-cpol;
+ 		spi-cpha;
+ 		m25p,fast-read;
+-
+-		partitions {
+-			compatible = "fixed-partitions";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-
+-			partition at 0 {
+-				label = "loader";
+-				reg = <0x00000000 0x00040000>;
+-				read-only;
+-			};
+-			partition at 40000 {
+-				label = "user";
+-				reg = <0x00040000 0x00400000>;
+-				read-only;
+-			};
+-			partition at 440000 {
+-				label = "flash";
+-				reg = <0x00440000 0x03bc0000>;
+-			};
+-		};
+ 	};
+ };
+ 
+-- 
+2.16.2
