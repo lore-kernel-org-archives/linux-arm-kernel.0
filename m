@@ -1,29 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2018 10:17:06 +0200
-Subject: [PATCH] pinctrl: armada-37xx: Fix spurious irq management
-In-Reply-To: <20180523084405.14410-1-gregory.clement@bootlin.com>
-References: <20180523084405.14410-1-gregory.clement@bootlin.com>
-Message-ID: <CACRpkdak2q56BpjrvpGF_FzN=ZTbZ+71r425rFAe=b-kRQDqwA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 24 May 2018 09:20:37 +0100
+Subject: [PATCH v4 3/3] arm64: Introduce command line parameter to disable
+ CNP
+In-Reply-To: <20180523171721.ppazcyf576koimhl@armageddon.cambridge.arm.com>
+References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
+ <1526638022-4137-4-git-send-email-vladimir.murzin@arm.com>
+ <20180523171721.ppazcyf576koimhl@armageddon.cambridge.arm.com>
+Message-ID: <b4771d84-2403-3bd4-9566-4d9b1403d112@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 10:44 AM, Gregory CLEMENT
-<gregory.clement@bootlin.com> wrote:
+On 23/05/18 18:17, Catalin Marinas wrote:
+> On Fri, May 18, 2018 at 11:07:02AM +0100, Vladimir Murzin wrote:
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index 11fc28e..8f59d47 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -2636,6 +2636,10 @@
+>>  
+>>  	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
+>>  
+>> +	nocnp		[ARM64]
+>> +			Disable CNP (Common not Private translations)
+>> +			even if it is supported by processor.
+>> +
+>>  	nodelayacct	[KNL] Disable per-task delay accounting
+>>  
+>>  	nodsp		[SH] Disable hardware DSP at boot time.
+> 
+> Do we actually have a use-case for this command line option? I'm not
+> considering hardware errata as these are handled separately in the
+> kernel.
+> 
 
-> From: Terry Zhou <bjzhou@marvell.com>
->
-> Until now, if we found spurious irq in irq_handler, we only updated the
-> status in register but not the status in the code. Due to this the system
-> will got stuck dues to the infinite loop
->
-> [gregory.clement at bootlin.com: update comment and add fix and stable tags]
-> Fixes: 30ac0d3b0702 ("pinctrl: armada-37xx: Add edge both type gpio irq support")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Terry Zhou <bjzhou@marvell.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Well, I cannot count all cases, yet we might see CnP support advertised
+by CPU via ID register (where CPU meant to be part of bL) but not really
+doing optimisations in hardware.
 
-Patch applied.
+Probably, some userspace (benchmarks) might not benefit of CnP; otoh maybe
+better way for such case would be user-space asking kernel to {dis,en}able
+CnP...
 
-Yours,
-Linus Walleij
+I have no strong opinion on patch, so I'm fine to drop it and come back
+when/if we get results from real hardware.
+
+Cheers
+Vladimir
