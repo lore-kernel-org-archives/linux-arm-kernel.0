@@ -1,42 +1,34 @@
-From: iivanov.xz@gmail.com (Ivan T. Ivanov)
-Date: Thu, 24 May 2018 07:48:53 +0300
-Subject: [PATCH] arm64: dts: msm8916: fix Coresight ETF graph connections
-In-Reply-To: <CAL_JsqL8qBiJUMyUEcih07UoFSAghn6Amfo8OfY-pKU-QX2_mw@mail.gmail.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Thu, 24 May 2018 13:27:13 +0800
+Subject: [PATCH] arm64: dts: sprd: fix typo in 'remote-endpoint'
+In-Reply-To: <CAL_JsqKrsTpgnLfxhcxeucpoh9NkyGwwZq82QUBgJZrdjGYQzg@mail.gmail.com>
 References: <20180508150952.24562-1-robh@kernel.org>
- <20180508150952.24562-3-robh@kernel.org>
- <CAL_JsqL8qBiJUMyUEcih07UoFSAghn6Amfo8OfY-pKU-QX2_mw@mail.gmail.com>
-Message-ID: <20180524044853.713.23166@silver>
+ <20180508150952.24562-4-robh@kernel.org>
+ <CAAfSe-tgKJvzCN6eHCuUR94ECSE8ypAR1eRjhV-VJNztebK9Xw@mail.gmail.com>
+ <CAL_JsqKrsTpgnLfxhcxeucpoh9NkyGwwZq82QUBgJZrdjGYQzg@mail.gmail.com>
+Message-ID: <CAMz4kuKVknMt578MGCnP_wzLB_o-yttHXD9uxbFBDXYq6XiTRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2018-05-23 23:29:29)
-> On Tue, May 8, 2018 at 10:09 AM, Rob Herring <robh@kernel.org> wrote:
-> > The ETF input should be connected to the funnel output, and the ETF
-> > output should be connected to the replicator input. The labels are wrong
-> > and these got swapped:
-> >
-> > Warning (graph_endpoint): /soc/funnel at 821000/ports/port at 8/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 1/endpoint' is not bidirectional
-> > Warning (graph_endpoint): /soc/replicator at 824000/ports/port at 2/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 0/endpoint' is not bidirectional
-> >
-> > Fixes: 7c10da373698 ("arm64: dts: qcom: Add msm8916 CoreSight components")
-> > Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > Cc: Andy Gross <andy.gross@linaro.org>
-> > Cc: David Brown <david.brown@linaro.org>
-> > Cc: linux-arm-msm at vger.kernel.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> Ping. Still seeing warnings in -next for these.
+On 24 May 2018 at 04:30, Rob Herring <robh@kernel.org> wrote:
+> On Tue, May 8, 2018 at 8:58 PM, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
+>> Hi Rob,
+>>
+>> On 8 May 2018 at 23:09, Rob Herring <robh@kernel.org> wrote:
+>>> dtc now warns on incomplete OF graph endpoint connections:
+>>>
+>>> arch/arm64/boot/dts/sprd/sp9860g-1h10.dtb: Warning (graph_endpoint): /soc/stm at 10006000/port/endpoint: graph connection to node '/soc/funnel at 10001000/ports/port at 2/endpoint' is not bidirectional
+>>>
+>>> The cause is a typo in 'remote-endpoint'.
+>>
+>> Thanks for fixing this and,
+>>
+>> Acked-by: Chunyan Zhang <zhang.lyra@gmail.com>
 >
+> Is someone going to apply this? Still seeing warnings in linux-next.
 
- Hi Rob,
+I think Arnd will pick up this patch.
 
- I no longer have access to this hardware and documentation.
- I am sure that Mathieu and friends will take care for verification
- of this patch :-)
-
- Regards,
- Ivan
+-- 
+Baolin.wang
+Best Regards
