@@ -1,34 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2018 10:07:02 +0200
-Subject: [PATCH v5 4/4] gpiolib: discourage gpiochip_add_pin[group]_range
- for DT pinctrls
-In-Reply-To: <2969992a1005d7e7f4ea23d4c684d2f10d4a0aca.1526935804.git.chunkeey@gmail.com>
-References: <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
- <0ae3376606a89bcdf3fe753a5c967f7103699e09.1526935804.git.chunkeey@gmail.com>
- <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
- <2969992a1005d7e7f4ea23d4c684d2f10d4a0aca.1526935804.git.chunkeey@gmail.com>
-Message-ID: <CACRpkdbOTfoj293LO-nyPEbxwXOWRuNyTqwxb_MWoQ2wM3=-Hg@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 24 May 2018 16:06:19 +0800
+Subject: [GIT PULL] berlin dt changes for v4.18
+Message-ID: <20180524160619.45aaead2@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 10:57 PM, Christian Lamparter
-<chunkeey@gmail.com> wrote:
+Hi,
 
-> This patch adds the stern warning to the kerneldoc text of both
-> gpiochip_add_pin[group]_range() functions in hope of detering
-> developers from ever using them in their DeviceTree-supported
-> pinctrl drivers in the future.
->
-> For anyone affected: Please refer to Section 2.1 of
-> Documentation/devicetree/bindings/gpio/gpio.txt on how to
-> bind pinctrl and gpio drivers via the "gpio-ranges" property.
->
-> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
+Here is the pull request for berlin dt changes for v4.18.
 
-I'm a big fan of this patch, so applied.
+Thanks,
+Jisheng
 
-I wouldn't mind a pr_info() warning about it at runtime too,
-but this is nice.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Yours,
-Linus Walleij
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin-dt-for-v4.18
+
+for you to fetch changes up to 15cf848d3c208159410eff2055494163c2542bbb:
+
+  ARM: dts: berlin2q: move PMU node from soc to root (2018-05-24 15:25:44 +0800)
+
+----------------------------------------------------------------
+berlin DT changes for v4.18
+
+ - add Valve Steam Link board support
+ - use PWM for chromecast's LED, override chromecast's bootloader
+   bad ATAG_MEM.
+ - fix twd timer irq type
+ - add interrupt-affinity to BG2Q's pmu
+ - add "cache-unified" to BG2Q's l2 node
+ - use SPDX-License-Identifier
+
+----------------------------------------------------------------
+Alexander Monakov (7):
+      ARM: dts: berlin2cd: fix local timer interrupt flags
+      ARM: dts: berlin2cd: move PMU node from soc to root
+      ARM: dts: berlin2cd: add ADC/thermal sensor node
+      ARM: dts: berlin2cd: add remaining Cortex-A9 nodes
+      ARM: dts: berlin2cd: add remaining nodes to apb subtrees
+      ARM: dts: berlin2cd: add a label for the CPU node
+      ARM: dts: berlin2cd: add Valve Steam Link board
+
+Jisheng Zhang (7):
+      ARM: dts: berlin2q: add interrupt-affinity to pmu node
+      ARM: dts: berlin2q: add "cache-unified" to l2 node
+      ARM: dts: berlin2q: fix irq type for arm twd timer
+      ARM: dts: berlin2: fix irq type for arm twd timer
+      ARM: dts: berlin*.dtsi: use SPDX-License-Identifier for berlin SoCs
+      ARM: dts: berlin*-dts: use SPDX-License-Identifier for berlin based board
+      ARM: dts: berlin2q: move PMU node from soc to root
+
+Thomas Hebb (2):
+      ARM: dts: chromecast: override bad bootloader memory info
+      ARM: dts: chromecast: use PWM for LEDs
+
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        |  33 +----
+ arch/arm/boot/dts/berlin2.dtsi                    |  35 +----
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts |  65 ++++-----
+ arch/arm/boot/dts/berlin2cd-valve-steamlink.dts   |  79 ++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi                  | 167 +++++++++++++++++-----
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts        |  33 +----
+ arch/arm/boot/dts/berlin2q.dtsi                   |  65 +++------
+ 8 files changed, 259 insertions(+), 219 deletions(-)
+ create mode 100644 arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
