@@ -1,40 +1,56 @@
-From: philip.li@intel.com (Li, Philip)
-Date: Thu, 24 May 2018 00:21:39 +0000
-Subject: [rjarzmik:test/daniel 23/34] sound/arm/pxa2xx-ac97.c:27:10:
- fatal error: mach/regs-ac97.h: No such file or directory
-In-Reply-To: <87lgcaxxy4.fsf@belgarion.home>
-References: <201805231623.n3Qx9qdU%fengguang.wu@intel.com>
- <8545409a-475f-1821-fcef-60b2f85101b6@zonque.org>
- <831EE4E5E37DCC428EB295A351E662494CB31A1D@shsmsx102.ccr.corp.intel.com>
- <87lgcaxxy4.fsf@belgarion.home>
-Message-ID: <831EE4E5E37DCC428EB295A351E662494CB32366@shsmsx102.ccr.corp.intel.com>
+From: rishabhb@codeaurora.org (Rishabh Bhatnagar)
+Date: Wed, 23 May 2018 17:35:20 -0700
+Subject: [PATCH v8 1/2] dt-bindings: Documentation for qcom, llcc
+In-Reply-To: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
+References: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <1527122121-31452-2-git-send-email-rishabhb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [rjarzmik:test/daniel 23/34] sound/arm/pxa2xx-ac97.c:27:10: fatal
-> error: mach/regs-ac97.h: No such file or directory
-> 
-> "Li, Philip" <philip.li@intel.com> writes:
-> 
-> >> On Wednesday, May 23, 2018 10:46 AM, kbuild test robot wrote:
-> >> > tree:   https://github.com/rjarzmik/linux test/daniel
-> >> > head:   f495e2dbc482d8f01a1ee20e86284ee9c0c8fa98
-> >> > commit: 4cd654b13b9bcc0f206d414497b798ed42df573a [23/34] HACK:
-> select
-> >> SND_PXA_SOC_SSP for SND_SIMPLE_CARD
-> >>
-> >> This patch is just a local hack in one of my scratch-pad branches and is
-> >> not meant for upstream inclusion. Could you remove the branch or make
-> >> sure it isn't picked up by test robots?
-> > thanks for info, we will exclude it from testing.
-> Hi Li, Philip,
-> 
-> Is it possible to exclude a pattern instead ?
-> I mean would it be possible to exclude each branch of the form "test/*" ?
-sure, we will use test/.* to match the branch to exclude.
+Documentation for last level cache controller device tree bindings,
+client bindings usage examples.
 
-> 
-> Cheers.
-> 
-> --
-> Robert
+Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+Reviewed-by: Evan Green <evgreen@chromium.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+new file mode 100644
+index 0000000..5e85749
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+@@ -0,0 +1,26 @@
++== Introduction==
++
++LLCC (Last Level Cache Controller) provides last level of cache memory in SOC,
++that can be shared by multiple clients. Clients here are different cores in the
++SOC, the idea is to minimize the local caches at the clients and migrate to
++common pool of memory. Cache memory is divided into partitions called slices
++which are assigned to clients. Clients can query the slice details, activate
++and deactivate them.
++
++Properties:
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be "qcom,sdm845-llcc"
++
++- reg:
++	Usage: required
++	Value Type: <prop-encoded-array>
++	Definition: Start address and the the size of the register region.
++
++Example:
++
++	cache-controller at 1100000 {
++		compatible = "qcom,sdm845-llcc";
++		reg = <0x1100000 0x250000>;
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
