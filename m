@@ -1,248 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 May 2018 11:59:43 +0100
-Subject: [PATCH 6/9] asm-generic/bitops/atomic.h: Rewrite using atomic_fetch_*
-In-Reply-To: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
-References: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1527159586-8578-7-git-send-email-will.deacon@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 May 2018 12:00:58 +0100
+Subject: [PATCH 02/14] arm64: Call ARCH_WORKAROUND_2 on transitions
+ between EL0 and EL1
+In-Reply-To: <20180522150648.28297-3-marc.zyngier@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-3-marc.zyngier@arm.com>
+Message-ID: <20180524110058.mrkwc3rx5l3v6wad@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atomic bitops can actually be implemented pretty efficiently using
-the atomic_fetch_* ops, rather than explicit use of spinlocks.
+On Tue, May 22, 2018 at 04:06:36PM +0100, Marc Zyngier wrote:
+> In order for the kernel to protect itself, let's call the SSBD mitigation
+> implemented by the higher exception level (either hypervisor or firmware)
+> on each transition between userspace and kernel.
+> 
+> We must take the PSCI conduit into account in order to target the
+> right exception level, hence the introduction of a runtime patching
+> callback.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 18 ++++++++++++++++++
+>  arch/arm64/kernel/entry.S      | 22 ++++++++++++++++++++++
+>  include/linux/arm-smccc.h      |  5 +++++
+>  3 files changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index a900befadfe8..46b3aafb631a 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -232,6 +232,24 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+>  }
+>  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+>  
+> +#ifdef CONFIG_ARM64_SSBD
+> +void __init arm64_update_smccc_conduit(struct alt_instr *alt,
+> +				       __le32 *origptr, __le32 *updptr,
+> +				       int nr_inst)
+> +{
+> +	u32 insn;
+> +
+> +	BUG_ON(nr_inst != 1);
+> +
+> +	if (psci_ops.conduit == PSCI_CONDUIT_HVC)
+> +		insn = aarch64_insn_get_hvc_value();
+> +	else
+> +		insn = aarch64_insn_get_smc_value();
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/asm-generic/bitops/atomic.h | 188 +++++++-----------------------------
- 1 file changed, 33 insertions(+), 155 deletions(-)
+Shouldn't this also handle the case where there is no conduit?
 
-diff --git a/include/asm-generic/bitops/atomic.h b/include/asm-generic/bitops/atomic.h
-index 04deffaf5f7d..bca92586c2f6 100644
---- a/include/asm-generic/bitops/atomic.h
-+++ b/include/asm-generic/bitops/atomic.h
-@@ -2,189 +2,67 @@
- #ifndef _ASM_GENERIC_BITOPS_ATOMIC_H_
- #define _ASM_GENERIC_BITOPS_ATOMIC_H_
- 
--#include <asm/types.h>
--#include <linux/irqflags.h>
--
--#ifdef CONFIG_SMP
--#include <asm/spinlock.h>
--#include <asm/cache.h>		/* we use L1_CACHE_BYTES */
--
--/* Use an array of spinlocks for our atomic_ts.
-- * Hash function to index into a different SPINLOCK.
-- * Since "a" is usually an address, use one spinlock per cacheline.
-- */
--#  define ATOMIC_HASH_SIZE 4
--#  define ATOMIC_HASH(a) (&(__atomic_hash[ (((unsigned long) a)/L1_CACHE_BYTES) & (ATOMIC_HASH_SIZE-1) ]))
--
--extern arch_spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned;
--
--/* Can't use raw_spin_lock_irq because of #include problems, so
-- * this is the substitute */
--#define _atomic_spin_lock_irqsave(l,f) do {	\
--	arch_spinlock_t *s = ATOMIC_HASH(l);	\
--	local_irq_save(f);			\
--	arch_spin_lock(s);			\
--} while(0)
--
--#define _atomic_spin_unlock_irqrestore(l,f) do {	\
--	arch_spinlock_t *s = ATOMIC_HASH(l);		\
--	arch_spin_unlock(s);				\
--	local_irq_restore(f);				\
--} while(0)
--
--
--#else
--#  define _atomic_spin_lock_irqsave(l,f) do { local_irq_save(f); } while (0)
--#  define _atomic_spin_unlock_irqrestore(l,f) do { local_irq_restore(f); } while (0)
--#endif
-+#include <linux/atomic.h>
-+#include <linux/compiler.h>
-+#include <asm/barrier.h>
- 
- /*
-- * NMI events can occur at any time, including when interrupts have been
-- * disabled by *_irqsave().  So you can get NMI events occurring while a
-- * *_bit function is holding a spin lock.  If the NMI handler also wants
-- * to do bit manipulation (and they do) then you can get a deadlock
-- * between the original caller of *_bit() and the NMI handler.
-- *
-- * by Keith Owens
-+ * Implementation of atomic bitops using atomic-fetch ops.
-+ * See Documentation/atomic_bitops.txt for details.
-  */
- 
--/**
-- * set_bit - Atomically set a bit in memory
-- * @nr: the bit to set
-- * @addr: the address to start counting from
-- *
-- * This function is atomic and may not be reordered.  See __set_bit()
-- * if you do not require the atomic guarantees.
-- *
-- * Note: there are no guarantees that this function will not be reordered
-- * on non x86 architectures, so if you are writing portable code,
-- * make sure not to rely on its reordering guarantees.
-- *
-- * Note that @nr may be almost arbitrarily large; this function is not
-- * restricted to acting on a single-word quantity.
-- */
--static inline void set_bit(int nr, volatile unsigned long *addr)
-+static inline void set_bit(unsigned int nr, volatile unsigned long *p)
- {
--	unsigned long mask = BIT_MASK(nr);
--	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
--	unsigned long flags;
--
--	_atomic_spin_lock_irqsave(p, flags);
--	*p  |= mask;
--	_atomic_spin_unlock_irqrestore(p, flags);
-+	p += BIT_WORD(nr);
-+	atomic_long_fetch_or_relaxed(BIT_MASK(nr), (atomic_long_t *)p);
- }
- 
--/**
-- * clear_bit - Clears a bit in memory
-- * @nr: Bit to clear
-- * @addr: Address to start counting from
-- *
-- * clear_bit() is atomic and may not be reordered.  However, it does
-- * not contain a memory barrier, so if it is used for locking purposes,
-- * you should call smp_mb__before_atomic() and/or smp_mb__after_atomic()
-- * in order to ensure changes are visible on other processors.
-- */
--static inline void clear_bit(int nr, volatile unsigned long *addr)
-+static inline void clear_bit(unsigned int nr, volatile unsigned long *p)
- {
--	unsigned long mask = BIT_MASK(nr);
--	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
--	unsigned long flags;
--
--	_atomic_spin_lock_irqsave(p, flags);
--	*p &= ~mask;
--	_atomic_spin_unlock_irqrestore(p, flags);
-+	p += BIT_WORD(nr);
-+	atomic_long_fetch_andnot_relaxed(BIT_MASK(nr), (atomic_long_t *)p);
- }
- 
--/**
-- * change_bit - Toggle a bit in memory
-- * @nr: Bit to change
-- * @addr: Address to start counting from
-- *
-- * change_bit() is atomic and may not be reordered. It may be
-- * reordered on other architectures than x86.
-- * Note that @nr may be almost arbitrarily large; this function is not
-- * restricted to acting on a single-word quantity.
-- */
--static inline void change_bit(int nr, volatile unsigned long *addr)
-+static inline void change_bit(unsigned int nr, volatile unsigned long *p)
- {
--	unsigned long mask = BIT_MASK(nr);
--	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
--	unsigned long flags;
--
--	_atomic_spin_lock_irqsave(p, flags);
--	*p ^= mask;
--	_atomic_spin_unlock_irqrestore(p, flags);
-+	p += BIT_WORD(nr);
-+	atomic_long_fetch_xor_relaxed(BIT_MASK(nr), (atomic_long_t *)p);
- }
- 
--/**
-- * test_and_set_bit - Set a bit and return its old value
-- * @nr: Bit to set
-- * @addr: Address to count from
-- *
-- * This operation is atomic and cannot be reordered.
-- * It may be reordered on other architectures than x86.
-- * It also implies a memory barrier.
-- */
--static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
-+static inline int test_and_set_bit(unsigned int nr, volatile unsigned long *p)
- {
-+	long old;
- 	unsigned long mask = BIT_MASK(nr);
--	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
--	unsigned long old;
--	unsigned long flags;
- 
--	_atomic_spin_lock_irqsave(p, flags);
--	old = *p;
--	*p = old | mask;
--	_atomic_spin_unlock_irqrestore(p, flags);
-+	p += BIT_WORD(nr);
-+	if (READ_ONCE(*p) & mask)
-+		return 1;
- 
--	return (old & mask) != 0;
-+	old = atomic_long_fetch_or(mask, (atomic_long_t *)p);
-+	return !!(old & mask);
- }
- 
--/**
-- * test_and_clear_bit - Clear a bit and return its old value
-- * @nr: Bit to clear
-- * @addr: Address to count from
-- *
-- * This operation is atomic and cannot be reordered.
-- * It can be reorderdered on other architectures other than x86.
-- * It also implies a memory barrier.
-- */
--static inline int test_and_clear_bit(int nr, volatile unsigned long *addr)
-+static inline int test_and_clear_bit(unsigned int nr, volatile unsigned long *p)
- {
-+	long old;
- 	unsigned long mask = BIT_MASK(nr);
--	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
--	unsigned long old;
--	unsigned long flags;
- 
--	_atomic_spin_lock_irqsave(p, flags);
--	old = *p;
--	*p = old & ~mask;
--	_atomic_spin_unlock_irqrestore(p, flags);
-+	p += BIT_WORD(nr);
-+	if (!(READ_ONCE(*p) & mask))
-+		return 0;
- 
--	return (old & mask) != 0;
-+	old = atomic_long_fetch_andnot(mask, (atomic_long_t *)p);
-+	return !!(old & mask);
- }
- 
--/**
-- * test_and_change_bit - Change a bit and return its old value
-- * @nr: Bit to change
-- * @addr: Address to count from
-- *
-- * This operation is atomic and cannot be reordered.
-- * It also implies a memory barrier.
-- */
--static inline int test_and_change_bit(int nr, volatile unsigned long *addr)
-+static inline int test_and_change_bit(unsigned int nr, volatile unsigned long *p)
- {
-+	long old;
- 	unsigned long mask = BIT_MASK(nr);
--	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
--	unsigned long old;
--	unsigned long flags;
--
--	_atomic_spin_lock_irqsave(p, flags);
--	old = *p;
--	*p = old ^ mask;
--	_atomic_spin_unlock_irqrestore(p, flags);
- 
--	return (old & mask) != 0;
-+	p += BIT_WORD(nr);
-+	old = atomic_long_fetch_xor(mask, (atomic_long_t *)p);
-+	return !!(old & mask);
- }
- 
- #endif /* _ASM_GENERIC_BITOPS_ATOMIC_H */
--- 
-2.1.4
+See below comment in apply_ssbd for rationale.
+
+> +
+> +	*updptr = cpu_to_le32(insn);
+> +}
+> +#endif	/* CONFIG_ARM64_SSBD */
+> +
+>  #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
+>  	.matches = is_affected_midr_range,			\
+>  	.midr_range = MIDR_RANGE(model, v_min, r_min, v_max, r_max)
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index ec2ee720e33e..f33e6aed3037 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -18,6 +18,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/arm-smccc.h>
+>  #include <linux/init.h>
+>  #include <linux/linkage.h>
+>  
+> @@ -137,6 +138,18 @@ alternative_else_nop_endif
+>  	add	\dst, \dst, #(\sym - .entry.tramp.text)
+>  	.endm
+>  
+> +	// This macro corrupts x0-x3. It is the caller's duty
+> +	// to save/restore them if required.
+> +	.macro	apply_ssbd, state
+> +#ifdef CONFIG_ARM64_SSBD
+> +	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+> +	mov	w1, #\state
+> +alternative_cb	arm64_update_smccc_conduit
+> +	nop					// Patched to SMC/HVC #0
+> +alternative_cb_end
+> +#endif
+> +	.endm
+
+If my system doesn't have SMCCC1.1, or the FW doesn't have an
+implementation of ARCH_WORKAROUND_2, does this stay as a NOP?
+
+It looks like this would be patched to an SMC, which would be fatal on
+systems without EL3 FW.
+
+> +
+>  	.macro	kernel_entry, el, regsize = 64
+>  	.if	\regsize == 32
+>  	mov	w0, w0				// zero upper 32 bits of x0
+> @@ -163,6 +176,13 @@ alternative_else_nop_endif
+>  	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
+>  	disable_step_tsk x19, x20		// exceptions when scheduling.
+>  
+> +	apply_ssbd 1
+
+
+... and thus kernel_entry would be fatal.
+
+Thanks,
+Mark.
