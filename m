@@ -1,45 +1,94 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Thu, 24 May 2018 12:33:13 +0530
-Subject: [PATCH v9 3/4] arm64: Implement page table free interfaces
-In-Reply-To: <1527085967.14039.10.camel@hpe.com>
-References: <1525074094-25839-1-git-send-email-cpandya@codeaurora.org>
- <1525074094-25839-4-git-send-email-cpandya@codeaurora.org>
- <20180523140157.GG26965@arm.com> <1527085967.14039.10.camel@hpe.com>
-Message-ID: <5a0481d4-4ac0-e65a-e00e-4ac63c4306c9@codeaurora.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 May 2018 09:04:54 +0200
+Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
+ <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
+ <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+ <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
+ <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
+ <CAPDyKFo_69kSS6UzdsJeyeiiED=S=chsdkP+R43qMHDEbZ8n_A@mail.gmail.com>
+ <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
+Message-ID: <CAPDyKFo8e5FMrxF2ggxVZ+HQjw4s1Wtx-tMf5ka67knJpZMQcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 5/23/2018 8:04 PM, Kani, Toshi wrote:
-> On Wed, 2018-05-23 at 15:01 +0100, Will Deacon wrote:
->> Hi Chintan,
+On 23 May 2018 at 11:07, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+> On 23/05/18 07:12, Ulf Hansson wrote:
+>
+> ...
+>
+>
+>>>>>> Thanks for sending this. Believe it or not this has still been on my
+>>>>>> to-do list
+>>>>>> and so we definitely need a solution for Tegra.
+>>>>>>
+>>>>>> Looking at the above it appears that additional power-domains exposed
+>>>>>> as devices
+>>>>>> to the client device. So I assume that this means that the drivers for
+>>>>>> devices
+>>>>>> with multiple power-domains will need to call RPM APIs for each of
+>>>>>> these
+>>>>>> additional power-domains. Is that correct?
+>>>>>
+>>>>>
+>>>>> They can, but should not!
+>>>>>
+>>>>> Instead, the driver shall use device_link_add() and device_link_del(),
+>>>>> dynamically, depending on what PM domain that their original device
+>>>>> needs for the current running use case.
+>>>>>
+>>>>> In that way, they keep existing runtime PM deployment, operating on
+>>>>> its original device.
+>>>>
+>>>>
+>>>> OK, sounds good. Any reason why the linking cannot be handled by the
+>>>> above API? Is there a use-case where you would not want it linked?
+>>>
+>>>
+>>> I am guessing the linking is what would give the driver the ability to
+>>> decide which subset of powerdomains it actually wants to control
+>>> at any point using runtime PM. If we have cases wherein the driver would
+>>> want to turn on/off _all_ its associated powerdomains _always_
+>>> then a default linking of all would help.
 >>
->> [as a side note: I'm confused on the status of this patch series, as part
->>   of it was reposted separately by Toshi. Please can you work together?]
-> 
-> I do not know the status of my patch series, either... That being said,
-> I made my x86 patches based off from Chintan's 1/4 patch (which changes
-> both x86 and arm) so that my series won't conflict with his.
-> 
-> Chintan,
-Hi Toshi,
+>>
+>> First, I think we need to decide on *where* the linking should be
+>> done, not at both places, as that would just mess up synchronization
+>> of who is responsible for calling the device_link_del() at detach.
+>>
+>> Second, It would in principle be fine to call device_link_add() and
+>> device_link_del() as a part of the attach/detach APIs. However, there
+>> is a downside to such solution, which would be that the driver then
+>> needs call the detach API, just to do device_link_del(). Of course
+>> then it would also needs to call the attach API later if/when needed.
+>> Doing this adds unnecessary overhead - comparing to just let the
+>> driver call device_link_add|del() when needed. On the upside, yes, it
+>> would put less burden on the drivers as it then only needs to care
+>> about using one set of functions.
+>>
+>> Which solution do you prefer?
+>
+>
+> Any reason why we could not add a 'boolean' argument to the API to indicate
+> whether the new device should be linked? I think that I prefer the API
+> handles it, but I can see there could be instances where drivers may wish to
+> handle it themselves.
 
-> If you need to update your series before mine's accepted, please make
-> sure to use the updated 1/4 below. I've updated the descriptions per
-> review comment.
-> https://patchwork.kernel.org/patch/10407065/
-For the sake of completeness, I will re-push my previous 1/4 but will
-take your version of change log. I've seen this and your change log
-describes the change better.
+Coming back to this question. Both Tegra XUSB and Qcom Camera use
+case, would benefit from doing the linking themselves, as it needs
+different PM domains to be powered on depending on the current use
+case - as to avoid wasting power.
 
-> 
-> Thanks,
-> -Toshi
-> 
+However, I can understand that you prefer some simplicity over
+optimizations, as you told us. Then, does it mean that you are
+insisting on extending the APIs with a boolean for linking, or are you
+fine with the driver to call device_link_add()?
 
-Chintan
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+[...]
+
+Kind regards
+Uffe
