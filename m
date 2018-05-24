@@ -1,123 +1,60 @@
-From: ilialin@codeaurora.org (Ilia Lin)
-Date: Thu, 24 May 2018 10:50:17 +0300
-Subject: [PATCH v12 7/8] clk: qcom: cpu-8996: Add support to switch below
- 600Mhz
-In-Reply-To: <1527148218-16540-1-git-send-email-ilialin@codeaurora.org>
-References: <1527148218-16540-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1527148218-16540-8-git-send-email-ilialin@codeaurora.org>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 24 May 2018 09:59:29 +0200
+Subject: [PATCH 1/5] pinctrl: at91-pio4: add missing of_node_put
+In-Reply-To: <1527102436-13447-2-git-send-email-Julia.Lawall@lip6.fr>
+References: <1527102436-13447-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1527102436-13447-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20180524075929.GA3750@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU clock controller's primary PLL operates on a single VCO range,
-between 600MHz and 3GHz. However the CPUs do support OPPs with
-frequencies between 300MHz and 600MHz. In order to support running the
-CPUs at those frequencies we end up having to lock the PLL at twice the
-rate and drive the CPU clk via the PLL/2 output and SMUX.
+On Wed, May 23, 2018 at 09:07:12PM +0200, Julia Lawall wrote:
+> The device node iterators perform an of_node_get on each iteration, so a
+> jump out of the loop requires an of_node_put.
+> 
+> The semantic patch that fixes this problem is as follows
+> (http://coccinelle.lip6.fr):
+> 
+> // <smpl>
+> @@
+> expression root,e;
+> local idexpression child;
+> iterator name for_each_child_of_node;
+> @@
+> 
+>  for_each_child_of_node(root, child) {
+>    ... when != of_node_put(child)
+>        when != e = child
+> +  of_node_put(child);
+> ?  break;
+>    ...
+> }
+> ... when != child
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-So for frequencies above 600MHz we follow the following path
- Primary PLL --> PLL_EARLY --> PMUX(1) --> CPU clk
-and for frequencies between 300MHz and 600MHz we follow
- Primary PLL --> PLL/2 --> SMUX(1) --> PMUX(0) --> CPU clk
-
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
----
- drivers/clk/qcom/clk-cpu-8996.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index 620fdc2..ff5c0a5 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -68,6 +68,8 @@ enum _pmux_input {
- 	NUM_OF_PMUX_INPUTS
- };
- 
-+#define DIV_2_THRESHOLD		600000000
-+
- static const u8 prim_pll_regs[PLL_OFF_MAX_REGS] = {
-        [PLL_OFF_L_VAL] = 0x04,
-        [PLL_OFF_ALPHA_VAL] = 0x08,
-@@ -95,10 +97,11 @@ enum _pmux_input {
- 
- static const struct alpha_pll_config hfpll_config = {
- 	.l = 60,
--	.config_ctl_val = 0x200d4828,
-+	.config_ctl_val = 0x200d4aa8,
- 	.config_ctl_hi_val = 0x006,
- 	.pre_div_mask = BIT(12),
- 	.post_div_mask = 0x3 << 8,
-+	.post_div_val = 0x1 << 8,
- 	.main_output_mask = BIT(0),
- 	.early_output_mask = BIT(3),
- };
-@@ -140,7 +143,7 @@ enum _pmux_input {
- 	.vco_mask = 0x3 << 20,
- 	.config_ctl_val = 0x4001051b,
- 	.post_div_mask = 0x3 << 8,
--	.post_div_val = 0x1,
-+	.post_div_val = 0x1 << 8,
- 	.main_output_mask = BIT(0),
- 	.early_output_mask = BIT(3),
- };
-@@ -181,6 +184,7 @@ struct clk_cpu_8996_mux {
- 	u8	width;
- 	struct notifier_block nb;
- 	struct clk_hw	*pll;
-+	struct clk_hw	*pll_div_2;
- 	struct clk_regmap clkr;
- };
- 
-@@ -226,6 +230,13 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
- 	struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_hw(hw);
- 	struct clk_hw *parent = cpuclk->pll;
- 
-+	if (cpuclk->pll_div_2 && req->rate < DIV_2_THRESHOLD) {
-+		if (req->rate < (DIV_2_THRESHOLD / 2))
-+			return -EINVAL;
-+
-+		parent = cpuclk->pll_div_2;
-+	}
-+
- 	req->best_parent_rate = clk_hw_round_rate(parent, req->rate);
- 	req->best_parent_hw = parent;
- 
-@@ -237,13 +248,19 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- {
- 	int ret;
- 	struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_nb(nb);
-+	struct clk_notifier_data *cnd = data;
- 
- 	switch (event) {
- 	case PRE_RATE_CHANGE:
- 		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
- 		break;
- 	case POST_RATE_CHANGE:
--		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, PLL_INDEX);
-+		if (cnd->new_rate < DIV_2_THRESHOLD)
-+			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
-+							  DIV_2_INDEX);
-+		else
-+			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
-+							  PLL_INDEX);
- 		break;
- 	default:
- 		ret = 0;
-@@ -295,6 +312,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &pwrcl_pll.clkr.hw,
-+	.pll_div_2 = &pwrcl_smux.clkr.hw,
- 	.nb.notifier_call = cpu_clk_notifier_cb,
- 	.clkr.hw.init = &(struct clk_init_data) {
- 		.name = "pwrcl_pmux",
-@@ -315,6 +333,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &perfcl_pll.clkr.hw,
-+	.pll_div_2 = &perfcl_smux.clkr.hw,
- 	.nb.notifier_call = cpu_clk_notifier_cb,
- 	.clkr.hw.init = &(struct clk_init_data) {
- 		.name = "perfcl_pmux",
--- 
-1.9.1
+Thanks
+> 
+> ---
+>  drivers/pinctrl/pinctrl-at91-pio4.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+> index 4b57a13..bafb3d4 100644
+> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
+> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+> @@ -576,8 +576,10 @@ static int atmel_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>  		for_each_child_of_node(np_config, np) {
+>  			ret = atmel_pctl_dt_subnode_to_map(pctldev, np, map,
+>  						    &reserved_maps, num_maps);
+> -			if (ret < 0)
+> +			if (ret < 0) {
+> +				of_node_put(np);
+>  				break;
+> +			}
+>  		}
+>  	}
+>  
+> 
