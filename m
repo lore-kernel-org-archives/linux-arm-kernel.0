@@ -1,135 +1,173 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:45 +0100
-Subject: [PATCH v11 16/19] KVM: arm64: Remove eager host SVE state saving
+Date: Thu, 24 May 2018 17:56:41 +0100
+Subject: [PATCH v11 12/19] arm64/sve: Move read_zcr_features() out of
+ cpufeature.h
 In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
 References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527181008-13549-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the host SVE context can be saved on demand from Hyp,
-there is no longer any need to save this state in advance before
-entering the guest.
+Having read_zcr_features() inline in cpufeature.h results in that
+header requiring #includes which make it hard to include
+<asm/fpsimd.h> elsewhere without triggering header inclusion
+cycles.
 
-This patch removes the relevant call to
-kvm_fpsimd_flush_cpu_state().
+This is not a hot-path function and arguably should not be in
+cpufeature.h in the first place, so this patch moves it to
+fpsimd.c, compiled conditionally if CONFIG_ARM64_SVE=y.
 
-Since the problem that function was intended to solve now no longer
-exists, the function and its dependencies are also deleted.
+This allows some SVE-related #includes to be dropped from
+cpufeature.h, which will ease future maintenance.
+
+A couple of missing #includes of <asm/fpsimd.h> are exposed by this
+change under arch/arm64/.  This patch adds the missing #includes as
+necessary.
+
+No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  3 ---
- arch/arm64/include/asm/kvm_host.h | 10 ----------
- arch/arm64/kernel/fpsimd.c        | 21 ---------------------
- virt/kvm/arm/arm.c                |  3 ---
- 4 files changed, 37 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 29 -----------------------------
+ arch/arm64/include/asm/fpsimd.h     |  2 ++
+ arch/arm64/include/asm/processor.h  |  1 +
+ arch/arm64/kernel/fpsimd.c          | 28 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/ptrace.c          |  1 +
+ 5 files changed, 32 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3b85bbb..f079a20 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -312,9 +312,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 09b0f2a..0a6b713 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -11,9 +11,7 @@
  
--/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
--static inline void kvm_fpsimd_flush_cpu_state(void) {}
--
- static inline void kvm_arm_vhe_guest_enter(void) {}
- static inline void kvm_arm_vhe_guest_exit(void) {}
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index fda9289..a4ca202 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -457,16 +457,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
- }
- #endif
- 
--/*
-- * All host FP/SIMD state is restored on guest exit, so nothing needs
-- * doing here except in the SVE case:
--*/
--static inline void kvm_fpsimd_flush_cpu_state(void)
--{
--	if (system_supports_sve())
--		sve_flush_cpu_state();
--}
--
- static inline void kvm_arm_vhe_guest_enter(void)
- {
- 	local_daif_mask();
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e60c3a2..7074c4c 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -120,7 +120,6 @@
-  */
- struct fpsimd_last_state_struct {
- 	struct user_fpsimd_state *st;
--	bool sve_in_use;
- };
- 
- static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
-@@ -1008,7 +1007,6 @@ void fpsimd_bind_task_to_cpu(void)
- 		this_cpu_ptr(&fpsimd_last_state);
- 
- 	last->st = &current->thread.uw.fpsimd_state;
--	last->sve_in_use = test_thread_flag(TIF_SVE);
- 	current->thread.fpsimd_cpu = smp_processor_id();
- 
- 	if (system_supports_sve()) {
-@@ -1030,7 +1028,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	last->st = st;
--	last->sve_in_use = false;
- }
+ #include <asm/cpucaps.h>
+ #include <asm/cputype.h>
+-#include <asm/fpsimd.h>
+ #include <asm/hwcap.h>
+-#include <asm/sigcontext.h>
+ #include <asm/sysreg.h>
  
  /*
-@@ -1091,24 +1088,6 @@ void fpsimd_flush_cpu_state(void)
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+@@ -510,33 +508,6 @@ static inline bool system_supports_sve(void)
+ 		cpus_have_const_cap(ARM64_SVE);
  }
  
 -/*
-- * Invalidate any task SVE state currently held in this CPU's regs.
+- * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
+- * vector length.
 - *
-- * This is used to prevent the kernel from trying to reuse SVE register data
-- * that is detroyed by KVM guest enter/exit.  This function should go away when
-- * KVM SVE support is implemented.  Don't use it for anything else.
+- * Use only if SVE is present.
+- * This function clobbers the SVE vector length.
 - */
--#ifdef CONFIG_ARM64_SVE
--void sve_flush_cpu_state(void)
+-static inline u64 read_zcr_features(void)
 -{
--	struct fpsimd_last_state_struct const *last =
--		this_cpu_ptr(&fpsimd_last_state);
+-	u64 zcr;
+-	unsigned int vq_max;
 -
--	if (last->st && last->sve_in_use)
--		fpsimd_flush_cpu_state();
+-	/*
+-	 * Set the maximum possible VL, and write zeroes to all other
+-	 * bits to see if they stick.
+-	 */
+-	sve_kernel_enable(NULL);
+-	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
+-
+-	zcr = read_sysreg_s(SYS_ZCR_EL1);
+-	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
+-	vq_max = sve_vq_from_vl(sve_get_vl());
+-	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
+-
+-	return zcr;
 -}
--#endif /* CONFIG_ARM64_SVE */
 -
- #ifdef CONFIG_KERNEL_MODE_NEON
+ #endif /* __ASSEMBLY__ */
  
- DEFINE_PER_CPU(bool, kernel_neon_busy);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index ce7c6f3..39e7771 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 */
- 		preempt_disable();
+ #endif
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 3e00f70..fb60b22 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -69,6 +69,8 @@ extern unsigned int sve_get_vl(void);
+ struct arm64_cpu_capabilities;
+ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
  
--		/* Flush FP/SIMD state that can't survive guest entry/exit */
--		kvm_fpsimd_flush_cpu_state();
--
- 		kvm_pmu_flush_hwstate(vcpu);
++extern u64 read_zcr_features(void);
++
+ extern int __ro_after_init sve_max_vl;
  
- 		local_irq_disable();
+ #ifdef CONFIG_ARM64_SVE
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 36d64f8..9231b87 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -40,6 +40,7 @@
+ 
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
++#include <asm/fpsimd.h>
+ #include <asm/hw_breakpoint.h>
+ #include <asm/lse.h>
+ #include <asm/pgtable-hwdef.h>
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 794dd99..6c01ee2 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -37,6 +37,7 @@
+ #include <linux/sched/task_stack.h>
+ #include <linux/signal.h>
+ #include <linux/slab.h>
++#include <linux/stddef.h>
+ #include <linux/sysctl.h>
+ 
+ #include <asm/esr.h>
+@@ -755,6 +756,33 @@ void sve_kernel_enable(const struct arm64_cpu_capabilities *__always_unused p)
+ 	isb();
+ }
+ 
++/*
++ * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
++ * vector length.
++ *
++ * Use only if SVE is present.
++ * This function clobbers the SVE vector length.
++ */
++u64 read_zcr_features(void)
++{
++	u64 zcr;
++	unsigned int vq_max;
++
++	/*
++	 * Set the maximum possible VL, and write zeroes to all other
++	 * bits to see if they stick.
++	 */
++	sve_kernel_enable(NULL);
++	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
++
++	zcr = read_sysreg_s(SYS_ZCR_EL1);
++	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
++	vq_max = sve_vq_from_vl(sve_get_vl());
++	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
++
++	return zcr;
++}
++
+ void __init sve_setup(void)
+ {
+ 	u64 zcr;
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 7ff81fe..78889c4 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -44,6 +44,7 @@
+ #include <asm/compat.h>
+ #include <asm/cpufeature.h>
+ #include <asm/debug-monitors.h>
++#include <asm/fpsimd.h>
+ #include <asm/pgtable.h>
+ #include <asm/stacktrace.h>
+ #include <asm/syscall.h>
 -- 
 2.1.4
