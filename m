@@ -1,68 +1,37 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 17:15:22 -0700
-Subject: [PATCH v3 4/6] watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+Date: Wed, 23 May 2018 17:15:23 -0700
+Subject: [PATCH v3 5/6] arm64: dt: set initial SR watchdog timeout to 60
+ seconds
 In-Reply-To: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
 References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527120924-12131-5-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527120924-12131-6-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the watchdog hardware is already enabled during the boot process,
-when the Linux watchdog driver loads, it should reset the watchdog and
-tell the watchdog framework. As a result, ping can be generated from
-the watchdog framework, until the userspace watchdog daemon takes over
-control
+Set initial Stingray watchdog timeout to 60 seconds
+
+By the time when the userspace watchdog daemon is ready and taking
+control over, the watchdog timeout will then be reset to what's
+configured in the daemon
 
 Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 Reviewed-by: Vladimir Olovyannikov <vladimir.olovyannikov@broadcom.com>
 Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/watchdog/sp805_wdt.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index 1484609..d662a6f 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -42,6 +42,7 @@
- 	/* control register masks */
- 	#define	INT_ENABLE	(1 << 0)
- 	#define	RESET_ENABLE	(1 << 1)
-+	#define	ENABLE_MASK	(INT_ENABLE | RESET_ENABLE)
- #define WDTINTCLR		0x00C
- #define WDTRIS			0x010
- #define WDTMIS			0x014
-@@ -74,6 +75,15 @@ module_param(nowayout, bool, 0);
- MODULE_PARM_DESC(nowayout,
- 		"Set to 1 to keep watchdog running after device release");
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 99aaff0..1e1cf49 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -420,6 +420,7 @@
+ 			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&hsls_25m_div2_clk>, <&hsls_div4_clk>;
+ 			clock-names = "wdogclk", "apb_pclk";
++			timeout-sec = <60>;
+ 		};
  
-+/* returns true if wdt is running; otherwise returns false */
-+static bool wdt_is_running(struct watchdog_device *wdd)
-+{
-+	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
-+	u32 wdtcontrol = readl_relaxed(wdt->base + WDTCONTROL);
-+
-+	return (wdtcontrol & ENABLE_MASK) == ENABLE_MASK;
-+}
-+
- /* This routine finds load value that will reset system in required timout */
- static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
- {
-@@ -239,6 +249,15 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
- 	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
- 	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
- 
-+	/*
-+	 * If HW is already running, enable/reset the wdt and set the running
-+	 * bit to tell the wdt subsystem
-+	 */
-+	if (wdt_is_running(&wdt->wdd)) {
-+		wdt_enable(&wdt->wdd);
-+		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
-+	}
-+
- 	ret = watchdog_register_device(&wdt->wdd);
- 	if (ret) {
- 		dev_err(&adev->dev, "watchdog_register_device() failed: %d\n",
+ 		gpio_hsls: gpio at d0000 {
 -- 
 2.1.4
