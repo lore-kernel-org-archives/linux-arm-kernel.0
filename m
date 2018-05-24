@@ -1,102 +1,70 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 24 May 2018 16:02:36 +0800
-Subject: [rjarzmik:work/dma_slave_map 5/13]
- drivers/mtd/nand/raw/marvell_nand.c:2628:44: error: passing argument 1 of
- 'dma_request_slave_channel' from incompatible pointer type
-Message-ID: <201805241634.YdKNPCfn%fengguang.wu@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 May 2018 10:04:14 +0200
+Subject: [PATCH v5 2/4] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
+References: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
+ <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
+Message-ID: <CACRpkdZ_HODTLc65kpE011=VWRkC9g5W04=NXWczozenobUcGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/rjarzmik/linux work/dma_slave_map
-head:   d18138ed977685f67fb18efcb5b5ef7084e3f1ae
-commit: 38686a4ca1306465bae33d821a1128288f68ec6b [5/13] mtd: rawnand: marvell: remove the dmaengine compat need
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        git checkout 38686a4ca1306465bae33d821a1128288f68ec6b
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Mon, May 21, 2018 at 10:57 PM, Christian Lamparter
+<chunkeey@gmail.com> wrote:
 
-All errors (new ones prefixed by >>):
+> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
+> Setting up any gpio-hog in the device-tree for his device would
+> "kill the bootup completely":
+>
+> | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+> | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
+> | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
+> | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
+> | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
+> | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+> | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
+>
+> This was also verified on a RT-AC58U (IPQ4018) which would
+> no longer boot, if a gpio-hog was specified. (Tried forcing
+> the USB LED PIN (GPIO0) to high.).
+>
+> The problem is that Pinctrl+GPIO registration is currently
+> peformed in the following order in pinctrl-msm.c:
+>         1. pinctrl_register()
+>         2. gpiochip_add()
+>         3. gpiochip_add_pin_range()
+>
+> The actual error code -517 == -EPROBE_DEFER is coming from
+> pinctrl_get_device_gpio_range(), which is called through:
+>         gpiochip_add
+>             of_gpiochip_add
+>                 of_gpiochip_scan_gpios
+>                     gpiod_hog
+>                         gpiochip_request_own_desc
+>                             __gpiod_request
+>                                 chip->request
+>                                     gpiochip_generic_request
+>                                        pinctrl_gpio_request
+>                                           pinctrl_get_device_gpio_range
+>
+> pinctrl_get_device_gpio_range() is unable to find any valid
+> pin ranges, since nothing has been added to the pinctrldev_list yet.
+> so the range can't be found, and the operation fails with -EPROBE_DEFER.
+>
+> This patch fixes the issue by adding the "gpio-ranges" property to
+> the pinctrl device node of all upstream Qcom SoC. The pin ranges are
+> then added by the gpio core.
+>
+> In order to remain compatible with older, existing DTs (and ACPI)
+> a check for the "gpio-ranges" property has been added to
+> msm_gpio_init(). This prevents the driver of adding the same entry
+> to the pinctrldev_list twice.
+>
+> Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
+> Tested-by: Sven Eckelmann <sven.eckelmann@openmesh.com> [ipq4019]
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
 
-   drivers/mtd/nand/raw/marvell_nand.c: In function 'marvell_nfc_init_dma':
->> drivers/mtd/nand/raw/marvell_nand.c:2628:44: error: passing argument 1 of 'dma_request_slave_channel' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     nfc->dma_chan = dma_request_slave_channel(&nfc->dev, "data");
-                                               ^
-   In file included from drivers/mtd/nand/raw/marvell_nand.c:21:0:
-   include/linux/dmaengine.h:1315:18: note: expected 'struct device *' but argument is of type 'struct device **'
-    struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
-                     ^~~~~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+Patch applied.
 
-vim +/dma_request_slave_channel +2628 drivers/mtd/nand/raw/marvell_nand.c
-
-  2608	
-  2609	static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
-  2610	{
-  2611		struct platform_device *pdev = container_of(nfc->dev,
-  2612							    struct platform_device,
-  2613							    dev);
-  2614		struct dma_slave_config config = {};
-  2615		struct resource *r;
-  2616		int ret;
-  2617	
-  2618		if (!IS_ENABLED(CONFIG_PXA_DMA)) {
-  2619			dev_warn(nfc->dev,
-  2620				 "DMA not enabled in configuration\n");
-  2621			return -ENOTSUPP;
-  2622		}
-  2623	
-  2624		ret = dma_set_mask_and_coherent(nfc->dev, DMA_BIT_MASK(32));
-  2625		if (ret)
-  2626			return ret;
-  2627	
-> 2628		nfc->dma_chan =	dma_request_slave_channel(&nfc->dev, "data");
-  2629		if (!nfc->dma_chan) {
-  2630			dev_err(nfc->dev,
-  2631				"Unable to request data DMA channel\n");
-  2632			return -ENODEV;
-  2633		}
-  2634	
-  2635		r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-  2636		if (!r)
-  2637			return -ENXIO;
-  2638	
-  2639		config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-  2640		config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-  2641		config.src_addr = r->start + NDDB;
-  2642		config.dst_addr = r->start + NDDB;
-  2643		config.src_maxburst = 32;
-  2644		config.dst_maxburst = 32;
-  2645		ret = dmaengine_slave_config(nfc->dma_chan, &config);
-  2646		if (ret < 0) {
-  2647			dev_err(nfc->dev, "Failed to configure DMA channel\n");
-  2648			return ret;
-  2649		}
-  2650	
-  2651		/*
-  2652		 * DMA must act on length multiple of 32 and this length may be
-  2653		 * bigger than the destination buffer. Use this buffer instead
-  2654		 * for DMA transfers and then copy the desired amount of data to
-  2655		 * the provided buffer.
-  2656		 */
-  2657		nfc->dma_buf = kmalloc(MAX_CHUNK_SIZE, GFP_KERNEL | GFP_DMA);
-  2658		if (!nfc->dma_buf)
-  2659			return -ENOMEM;
-  2660	
-  2661		nfc->use_dma = true;
-  2662	
-  2663		return 0;
-  2664	}
-  2665	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62929 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180524/bd7a5ffc/attachment-0001.gz>
+Yours,
+Linus Walleij
