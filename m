@@ -1,79 +1,72 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:47 +0100
-Subject: [PATCH v11 18/19] KVM: arm64: Fold redundant exit code checks out of
- fixup_guest_exit()
-In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-19-git-send-email-Dave.Martin@arm.com>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Thu, 24 May 2018 10:04:59 -0700
+Subject: [PATCHv5 2/8] arm64: dts: stratix10: add stratix10 service
+ driver binding to base dtsi
+In-Reply-To: <1527179600-26441-3-git-send-email-richard.gong@linux.intel.com>
+References: <1527179600-26441-1-git-send-email-richard.gong@linux.intel.com>
+ <1527179600-26441-3-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <20180524170459.GB4051@archbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The entire tail of fixup_guest_exit() is contained in if statements
-of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
-we can check just once and bail out of the function early, allowing
-the remaining if conditions to be simplified.
+Hi Richard,
 
-The only awkward case is where *exit_code is changed to
-ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
-interface access: in that case, the GICv3 trap handling code is
-skipped using a goto.  This avoids pointlessly evaluating the
-static branch check for the GICv3 case, even though we can't have
-vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
-unless we have a GICv3 and GICv2 on the host: that sounds stupid,
-but I haven't satisfied myself that it can't happen.
-
-No functional change.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
----
- arch/arm64/kvm/hyp/switch.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 18d0faa..4fbee95 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -387,11 +387,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	 * same PC once the SError has been injected, and replay the
- 	 * trapping instruction.
- 	 */
--	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-+	if (*exit_code != ARM_EXCEPTION_TRAP)
-+		goto exit;
-+
-+	if (!__populate_fault_info(vcpu))
- 		return true;
- 
--	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
--	    *exit_code == ARM_EXCEPTION_TRAP) {
-+	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
- 		bool valid;
- 
- 		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-@@ -417,11 +419,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
- 				*exit_code = ARM_EXCEPTION_EL1_SERROR;
- 			}
-+
-+			goto exit;
- 		}
- 	}
- 
- 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
--	    *exit_code == ARM_EXCEPTION_TRAP &&
- 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
- 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-@@ -430,6 +433,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 			return true;
- 	}
- 
-+exit:
- 	/* Return to the host kernel and handle the exit */
- 	return false;
- }
--- 
-2.1.4
+On Thu, May 24, 2018 at 11:33:14AM -0500, richard.gong at linux.intel.com wrote:
+> From: Richard Gong <richard.gong@intel.com>
+> 
+> Add Intel Stratix10 service layer to the device tree
+> 
+> Signed-off-by: Richard Gong <richard.gong@intel.com>
+> Signed-off-by: Alan Tull <atull@kernel.org>
+Acked-by: Moritz Fischer <mdf@kernel.org>
+> ---
+> v2: Change to put service layer driver node under the firmware node
+>     Change compatible to "intel, stratix10-svc"
+> v3: No change
+> v4: s/service driver/stratix10 service driver/ in subject line
+> v5: No change
+> ---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index d8c94d5..c257287 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -24,6 +24,19 @@
+>  	#address-cells = <2>;
+>  	#size-cells = <2>;
+>  
+> +	reserved-memory {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		service_reserved: svcbuffer at 0 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x0 0x0 0x0 0x1000000>;
+> +			alignment = <0x1000>;
+> +			no-map;
+> +		};
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -487,5 +500,13 @@
+>  
+>  			status = "disabled";
+>  		};
+> +
+> +		firmware {
+> +			svc {
+> +				compatible = "intel,stratix10-svc";
+> +				method = "smc";
+> +				memory-region = <&service_reserved>;
+> +			};
+> +		};
+>  	};
+>  };
+> -- 
+> 2.7.4
+> 
