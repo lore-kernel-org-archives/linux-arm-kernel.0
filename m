@@ -1,42 +1,30 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 23 May 2018 17:15:21 -0700
-Subject: [PATCH v3 3/6] watchdog: sp805: add 'timeout-sec' DT property support
+Date: Wed, 23 May 2018 17:15:24 -0700
+Subject: [PATCH v3 6/6] arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
 In-Reply-To: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
 References: <1527120924-12131-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527120924-12131-4-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527120924-12131-7-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for optional devicetree property 'timeout-sec'.
-'timeout-sec' is used in the driver if specified in devicetree.
-Otherwise, fall back to driver default, i.e., 60 seconds
+Enable the SP805 watchdog timer
 
 Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/watchdog/sp805_wdt.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index 03805bc..1484609 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -230,7 +230,14 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
- 	spin_lock_init(&wdt->lock);
- 	watchdog_set_nowayout(&wdt->wdd, nowayout);
- 	watchdog_set_drvdata(&wdt->wdd, wdt);
--	wdt_setload(&wdt->wdd, DEFAULT_TIMEOUT);
-+
-+	/*
-+	 * If 'timeout-sec' devicetree property is specified, use that.
-+	 * Otherwise, use DEFAULT_TIMEOUT
-+	 */
-+	wdt->wdd.timeout = DEFAULT_TIMEOUT;
-+	watchdog_init_timeout(&wdt->wdd, 0, &adev->dev);
-+	wdt_setload(&wdt->wdd, wdt->wdd.timeout);
- 
- 	ret = watchdog_register_device(&wdt->wdd);
- 	if (ret) {
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ecf6137..3fe5eb5 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -351,6 +351,7 @@ CONFIG_ROCKCHIP_THERMAL=m
+ CONFIG_TEGRA_BPMP_THERMAL=m
+ CONFIG_UNIPHIER_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=m
 -- 
 2.1.4
