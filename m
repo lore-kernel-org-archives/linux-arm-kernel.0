@@ -1,87 +1,88 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 24 May 2018 14:52:21 +0100
-Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
- property for sp805
-In-Reply-To: <4b0ec4ab-2d9e-1e4b-e294-c175805f4013@broadcom.com>
-References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
- <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
- <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
- <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
- <20180523185944.GA9989@rob-hp-laptop>
- <4b0ec4ab-2d9e-1e4b-e294-c175805f4013@broadcom.com>
-Message-ID: <16e0b756-d455-77f3-0560-75cacf7e3afa@arm.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Thu, 24 May 2018 19:27:26 +0530
+Subject: [PATCH v10 0/4] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1527170250-5291-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/18 20:29, Ray Jui wrote:
-> 
-> 
-> On 5/23/2018 11:59 AM, Rob Herring wrote:
->> On Wed, May 23, 2018 at 09:25:49AM -0700, Ray Jui wrote:
->>>
->>>
->>> On 5/23/2018 3:57 AM, Robin Murphy wrote:
->>>> On 22/05/18 19:47, Ray Jui wrote:
->>>>> Update the SP805 binding document to add optional 'timeout-sec'
->>>>> devicetree property
->>>>>
->>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>> ---
->>>>> ?? Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
->>>>> ?? 1 file changed, 2 insertions(+)
->>>>>
->>>>> diff --git
->>>>> a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>>> b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>>> index edc4f0e..f898a86 100644
->>>>> --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>>> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>>>> @@ -19,6 +19,8 @@ Required properties:
->>>>> ?? Optional properties:
->>>>> ?? - interrupts : Should specify WDT interrupt number.
->>>>> +- timeout-sec : Should specify default WDT timeout in seconds. If
->>>>> unset, the
->>>>> +??????????????? default timeout is 30 seconds
->>>>
->>>> According to the SP805 TRM, the default interval is dependent on the
->>>> rate of WDOGCLK, but would typically be a lot longer than that :/
->>>>
->>>> On a related note, anyone have any idea why we seem to have two subtly
->>>> different SP805 bindings defined?
->>
->> Sigh.
->>
->>> Interesting, I did not even know that until you pointed this out (and 
->>> it's
->>> funny that I found that I actually reviewed arm,sp805.txt internally in
->>> Broadcom code review).
->>>
->>> It looks like one was done by Bhupesh Sharma (sp805-wdt.txt) and the 
->>> other
->>> was done by Anup Patel (arm,sp805.txt). Both were merged at the same 
->>> time
->>> around March 20, 2016: 915c56bc01d6. I'd assume both were sent out at 
->>> around
->>> the same time.
->>>
->>> It sounds like we should definitely remove one of them. Given that
->>> sp805-wdt.txt appears to have more detailed descriptions on the use 
->>> of the
->>> clocks, should we remove arm,sp805.txt?
->>
->> Take whichever text you like, but I prefer filenames using the
->> compatible string and the correct string is 'arm,sp805' because '-wdt'
->> is redundant. You can probably safely just update all the dts files with
->> 'arm,sp805' and just remove 'arm,sp805-wdt' because it is not actually
->> used (as the ID registers are).
-> 
-> Okay. I'll consolidate everything into arm,sp805.txt. Will also fix all 
-> DTS files to use "arm,sp805". The fix for actual DTS files will be in a 
-> different patch series.
+This series of patches re-bring huge vmap back for arm64.
 
-Looking at the current in-tree DTs, for extra fun try to figure out 
-which binding each instance was following for the clocks. The most 
-common answer seems to be "neither"... :(
+Patch 1/4 has been taken by Toshi in his series of patches
+by name "[PATCH v3 0/3] fix free pmd/pte page handlings on x86"
+to avoid merge conflict with this series.
 
-Robin.
+Patch 4/4 may conflict with Laura's patch "[PATCHv2] arm64: Make
+sure permission updates happen for pmd/pud". It looks to me that,
+problem addressed by this patch will also get resolved by below
+series of patches. There could be multiple ways to resolve this.
+I would let maintainer suggest the best approach, and I will do
+the needful.
+
+This patches are tested on 4.16 kernel with Cortex-A75 based SoC.
+
+The test used for verifying these patches is a stress test on
+ioremap/unmap which tries to re-use same io-address but changes
+size of mapping randomly i.e. 4K to 2M to 16K etc. The same test
+used to reproduce 3rd level translation fault without these fixes
+(and also of course with Revert "arm64: Enforce BBM for huge IO/VMAP
+mappings" being part of the tree).
+
+These patches can also go into '-stable' branch (if accepted)
+for 4.6 onwards.
+
+>From V9->V10:
+ - Updated commit log for patch 1/4 by Toshi
+ - Addressed review comments by Will on patch 3/4
+
+>From V8->V9:
+ - Used __TLBI_VADDR macros in new TLB flush API
+
+>From V7->V8:
+ - Properly fixed compilation issue in x86 file
+
+>From V6->V7:
+ - Fixed compilation issue in x86 case
+ - V6 patches were not properly enumarated
+
+>From V5->V6:
+ - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+   "bool tlb_inv" based variance as it is not need now
+ - Re-naming for consistency
+
+>From V4->V5:
+ - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+   for kernel addresses
+
+>From V3->V4:
+ - Add header for 'addr' in x86 implementation
+ - Re-order pmd/pud clear and table free
+ - Avoid redundant TLB invalidatation in one perticular case
+
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
+
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
+
+
+
+Chintan Pandya (4):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+  arm64: Implement page table free interfaces
+  Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+
+ arch/arm64/include/asm/tlbflush.h |  7 +++++++
+ arch/arm64/mm/mmu.c               | 42 ++++++++++++++++++++++++++++-----------
+ arch/x86/mm/pgtable.c             |  8 +++++---
+ include/asm-generic/pgtable.h     |  8 ++++----
+ lib/ioremap.c                     |  4 ++--
+ 5 files changed, 48 insertions(+), 21 deletions(-)
+
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
