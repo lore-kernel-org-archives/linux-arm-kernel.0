@@ -1,68 +1,136 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:36 +0100
-Subject: [PATCH v11 07/19] arm64: fpsimd: Avoid FPSIMD context leakage for the
- init task
+Date: Thu, 24 May 2018 17:56:35 +0100
+Subject: [PATCH v11 06/19] arm64: fpsimd: Generalise context saving for
+ non-task contexts
 In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
 References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527181008-13549-7-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The init task is started with thread_flags equal to 0, which means
-that TIF_FOREIGN_FPSTATE is initially clear.
+In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
+contexts to be handled by the fpsimd common code, this patch adapts
+task_fpsimd_save() to save back the currently loaded context,
+removing the explicit dependency on current.
 
-It is theoretically possible (if unlikely) that the init task could
-reach userspace without ever being scheduled out.  If this occurs,
-data left in the FPSIMD registers by the kernel could be exposed.
+The relevant storage to write back to in memory is now found by
+examining the fpsimd_last_state percpu struct.
 
-This patch fixes this anomaly by ensuring that the init task's
-initial TIF_FOREIGN_FPSTATE is set.
+fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
+fpsimd_last_state is updated under local_bh_disable() or
+local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
+thus, fpsimd_save() will write back to the correct storage for the
+loaded context.
+
+No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Fixes: 005f78cd8849 ("arm64: defer reloading a task's FPSIMD state to userland resume")
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 ---
 
 Changes since v10:
 
- * New patch.
----
- arch/arm64/include/asm/thread_info.h | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+Requested by Alex Benn?e:
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 740aa03c..af271f9 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -45,12 +45,6 @@ struct thread_info {
- 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
- };
+ * Add a brief comment in fpsimd_save() giving a clue about where the
+   value of fpsimd_last_state.st comes from.
+---
+ arch/arm64/kernel/fpsimd.c | 26 ++++++++++++++------------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 9d85373..2d9a9e8 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -270,13 +270,16 @@ static void task_fpsimd_load(void)
+ }
  
--#define INIT_THREAD_INFO(tsk)						\
--{									\
--	.preempt_count	= INIT_PREEMPT_COUNT,				\
--	.addr_limit	= KERNEL_DS,					\
--}
--
- #define thread_saved_pc(tsk)	\
- 	((unsigned long)(tsk->thread.cpu_context.pc))
- #define thread_saved_sp(tsk)	\
-@@ -117,5 +111,12 @@ void arch_release_task_struct(struct task_struct *tsk);
- 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
- 				 _TIF_NOHZ)
- 
-+#define INIT_THREAD_INFO(tsk)						\
-+{									\
-+	.flags		= _TIF_FOREIGN_FPSTATE,				\
-+	.preempt_count	= INIT_PREEMPT_COUNT,				\
-+	.addr_limit	= KERNEL_DS,					\
-+}
+ /*
+- * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
+- * with respect to the CPU registers.
++ * Ensure FPSIMD/SVE storage in memory for the loaded context is up to
++ * date with respect to the CPU registers.
+  *
+  * Softirqs (and preemption) must be disabled.
+  */
+-static void task_fpsimd_save(void)
++static void fpsimd_save(void)
+ {
++	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
++	/* set by fpsimd_bind_to_cpu() */
 +
- #endif /* __KERNEL__ */
- #endif /* __ASM_THREAD_INFO_H */
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+@@ -291,10 +294,9 @@ static void task_fpsimd_save(void)
+ 				return;
+ 			}
+ 
+-			sve_save_state(sve_pffr(current),
+-				       &current->thread.uw.fpsimd_state.fpsr);
++			sve_save_state(sve_pffr(current), &st->fpsr);
+ 		} else
+-			fpsimd_save_state(&current->thread.uw.fpsimd_state);
++			fpsimd_save_state(st);
+ 	}
+ }
+ 
+@@ -598,7 +600,7 @@ int sve_set_vector_length(struct task_struct *task,
+ 	if (task == current) {
+ 		local_bh_disable();
+ 
+-		task_fpsimd_save();
++		fpsimd_save();
+ 		set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 	}
+ 
+@@ -837,7 +839,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ 
+ 	local_bh_disable();
+ 
+-	task_fpsimd_save();
++	fpsimd_save();
+ 	fpsimd_to_sve(current);
+ 
+ 	/* Force ret_to_user to reload the registers: */
+@@ -898,7 +900,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 	 * 'current'.
+ 	 */
+ 	if (current->mm)
+-		task_fpsimd_save();
++		fpsimd_save();
+ 
+ 	if (next->mm) {
+ 		/*
+@@ -980,7 +982,7 @@ void fpsimd_preserve_current_state(void)
+ 		return;
+ 
+ 	local_bh_disable();
+-	task_fpsimd_save();
++	fpsimd_save();
+ 	local_bh_enable();
+ }
+ 
+@@ -1121,7 +1123,7 @@ void kernel_neon_begin(void)
+ 
+ 	/* Save unsaved task fpsimd state, if any: */
+ 	if (current->mm)
+-		task_fpsimd_save();
++		fpsimd_save();
+ 
+ 	/* Invalidate any task state remaining in the fpsimd regs: */
+ 	fpsimd_flush_cpu_state();
+@@ -1244,7 +1246,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ 	switch (cmd) {
+ 	case CPU_PM_ENTER:
+ 		if (current->mm)
+-			task_fpsimd_save();
++			fpsimd_save();
+ 		fpsimd_flush_cpu_state();
+ 		break;
+ 	case CPU_PM_EXIT:
 -- 
 2.1.4
