@@ -1,166 +1,76 @@
-From: djw@t-chip.com.cn (Levin Du)
-Date: Thu, 24 May 2018 09:59:36 +0800
-Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
-In-Reply-To: <CAL_Jsq+VBspzCaLD2Wy=fyC-S+LKGZbVsB+b+Etkx91ioXOCuQ@mail.gmail.com>
-References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
- <6ffb43dc-55a5-14eb-eb18-3a731cdaf424@t-chip.com.cn>
- <CAL_Jsq+_QEBWdxW=J4oVGWeokc-+nMzxzX_pgCayaxg-ehivfQ@mail.gmail.com>
- <1685755.J6GI985WX3@diego>
- <CAL_Jsq+VBspzCaLD2Wy=fyC-S+LKGZbVsB+b+Etkx91ioXOCuQ@mail.gmail.com>
-Message-ID: <860b225a-94e0-c3cb-94c2-5e354e0ccb1f@t-chip.com.cn>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 24 May 2018 10:52:22 +0800
+Subject: [v3 03/10] mfd: mtk-mmsys: Add mmsys driver
+In-Reply-To: <20180430101826.GC5147@dell>
+References: <cover.1524820923.git.mbrugger@suse.com>
+ <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
+ <20180430101826.GC5147@dell>
+Message-ID: <1527130342.4607.27.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all, I'd like to quote reply of Robin Murphy at
- ?http://lists.infradead.org/pipermail/linux-rockchip/2018-May/020619.html
+On Mon, 2018-04-30 at 11:18 +0100, Lee Jones wrote:
+> On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
+> 
+> > From: Matthias Brugger <mbrugger@suse.com>
+> > 
+> > The MMSYS subsystem includes clocks and drm components.
+> > This patch adds a MFD device to probe both drivers from the same
+> > device tree compatible.
+> > 
+> > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> > ---
+> >  drivers/mfd/Kconfig     |  9 ++++++
+> >  drivers/mfd/Makefile    |  2 ++
+> >  drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
 
->
-> I would suggest s/pin number/bit number in the associated GRF register/
-> here. At least in this RK3328 case there's only one pin, which isn't
-> numbered, and if you naively considered it pin 0 of this 'bank' you'd
-> already have the wrong number. Since we're dealing with the "random
-> SoC-specific controls" region of the GRF as opposed to the
-> relatively-consistent and organised pinmux parts, I don't think we
-> should rely on any assumptions about how things are laid out.
->
-> I was initially going to suggest a more specific compatible string as
-> well, but on reflection I think the generic "rockchip,gpio-syscon" for
-> basic "flip this single GRF bit" functionality actually is the right way
-> to go. In the specific RK3328 GPIO_MUTE case, there look to be 4 bits in
-> total related to this pin - the enable, value, and some pull controls
-> (which I assume apply when the output is disabled) - if at some point in
-> future we *did* want to start explicitly controlling the rest of them
-> too, then would be a good time to define a separate
-> "rockchip,rk3328-gpio-mute" binding (and probably a dedicated driver)
-> for that specialised functionality, independently of this basic one.
+[ ... ]
 
-
-Shall we go the generic "rockchip,gpio-syscon" way, or the specific
- ?"rockchip,rk3328-gpio-mute" way? I prefer the former one.
-
-The property of "gpio,syscon-dev" in gpio-syscon driver should be 
-documented.
-Since the gpio controller is defined in the dtsi file, which inevitably 
-contains voodoo
-register addresses. But at the board level dts file, there won't be more 
-register
-addresses.
-
-On 2018-05-24 3:53 AM, Rob Herring wrote:
-> On Wed, May 23, 2018 at 10:12 AM, Heiko St?bner <heiko@sntech.de> wrote:
->> Hi Rob, Levin,
->>
->> sorry for being late to the party.
->>
->> Am Mittwoch, 23. Mai 2018, 16:43:07 CEST schrieb Rob Herring:
->>> On Tue, May 22, 2018 at 9:02 PM, Levin Du <djw@t-chip.com.cn> wrote:
->>>> On 2018-05-23 2:02 AM, Rob Herring wrote:
->>>>> On Fri, May 18, 2018 at 11:52:05AM +0800, djw at t-chip.com.cn wrote:
->>>>>> From: Levin Du <djw@t-chip.com.cn>
->>>>>>
->>>>>> Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
->>>>>> which do not belong to the general pinctrl.
->>>>>>
->>>>>> Adding gpio-syscon support makes controlling regulator or
->>>>>> LED using these special pins very easy by reusing existing
->>>>>> drivers, such as gpio-regulator and led-gpio.
->>>>>>
->>>>>> Signed-off-by: Levin Du <djw@t-chip.com.cn>
->>>>>>
->>>>>> ---
->>>>>>
->>>>>> Changes in v2:
->>>>>> - Rename gpio_syscon10 to gpio_mute in doc
->>>>>>
->>>>>> Changes in v1:
->>>>>> - Refactured for general gpio-syscon usage for Rockchip SoCs.
->>>>>> - Add doc rockchip,gpio-syscon.txt
->>>>>>
->>>>>>    .../bindings/gpio/rockchip,gpio-syscon.txt         | 41
->>>>>>
->>>>>> ++++++++++++++++++++++
->>>>>>
->>>>>>    drivers/gpio/gpio-syscon.c                         | 30
->>>>>>
->>>>>> ++++++++++++++++
->>>>>>
->>>>>>    2 files changed, 71 insertions(+)
->>>>>>    create mode 100644
->>>>>>
->>>>>> Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>>>>>
->>>>>> diff --git
->>>>>> a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>>>>> b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..b1b2a67
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
->>>>>> @@ -0,0 +1,41 @@
->>>>>> +* Rockchip GPIO support for GRF_SOC_CON registers
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible: Should contain "rockchip,gpio-syscon".
->>>>>> +- gpio-controller: Marks the device node as a gpio controller.
->>>>>> +- #gpio-cells: Should be two. The first cell is the pin number and
->>>>>> +  the second cell is used to specify the gpio polarity:
->>>>>> +    0 = Active high,
->>>>>> +    1 = Active low.
->>>>> There's no need for this child node. Just make the parent node a gpio
->>>>> controller.
->>>>>
->>>>> Rob
->>>> Hi Rob, it is not clear to me. Do you suggest that the grf node should be
->>>> a
->>>> gpio controller,
->>>> like below?
->>>>
->>>> +    grf: syscon at ff100000 {
->>>> +        compatible = "rockchip,gpio-syscon", "rockchip,rk3328-grf",
->>>> "syscon", "simple-mfd";
->>> Yes, but drop "rockchip,gpio-syscon" and "simple-mfd".
->> I would disagree quite a bit here. The grf are the "general register files",
->> a bunch of registers used for quite a lot of things, and so it seems
->> among other users, also a gpio-controller for some more random pins
->> not controlled through the regular gpio controllers.
->>
->> For a more fully stocked grf, please see
->> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/rk3288.dtsi#n855
->> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/rockchip/rk3399.dtsi#n1338
->>
->> So the gpio controller should definitly also be a subnode.
-> Sigh, yes, if there are a bunch of functions needing subnodes like the
-> above, then yes that makes sense. But that's not what has been
-> presented. Please make some attempt at defining *all* the functions.
-> An actual binding would be nice, but I'll settle for just a list of
-> things. The list should have functions that have DT dependencies (like
-> clocks for phys in the above) because until you do, you don't need
-> child nodes.
-
-In rk3328.dtsi file, there are lots of line "rockchip,grf = <&grf>;" in 
-various nodes,
-such as tsadc,? cru, gmac2io, gmac2phy, and also pinctrl, which are not 
-sub nodes of
-`grf`, but for reference only. The gpio-syscon node should also have 
-similar behavior.
- ?They are not strongly coupled. The gpio-syscon node should be defined 
-outside of the
-`grf` node.
+> > +};
+> 
+> This driver is pretty pointless.  It doesn't actually do anything.
+> 
+> I think you just want to use "simple-mfd" instead.
+> 
 
 
->
->> The gpio in question is called "mute", so I'd think the gpio-syscon driver
->> should just define a "rockchip,rk3328-gpio-mute" compatible and contain
->> all the register voodoo in the driver itself and not define it in the dt.
-> Is there really just one GPIO? If it has a defined function, then is
-> it really GP? Can you control direction? I know Linus W doesn't like
-> that kind of abuse of GPIO.
+Hi, Matthias
 
-The "mute" pin is a output only GPIO, which is already supported by 
-setting flags in the gpio-syscon
- ?driver. And yes, this pin has a defined function, but can also be used 
-for general purpose operation.
+Why not embedded a platform_device_register_data call into existent
+MMSYS driver ?
+
+It looks elegant and makes sense that mmsys device is being as parent
+device for all its DRM components device and no need to create an
+additional node representing the same device with mmsys simply in order
+to probe its DRM components.
+
+I'm planing to send a bunch of HDMI, MIPI related to MMSYS nodes for
+MT7623 SoC when 4.18 rc1 comes out, so we should want to solve the
+dt-binding violation issue first.
+
+Though there are two same mmsys-compatible strings involving in dts
+though, it seems that hdmi still can work fine in my setup.
+
+	Sean
 
 
-Thanks
-Levin
+> > +static const struct of_device_id of_match_mmsys[] = {
+> > +	{ .compatible = "mediatek,mt2701-mmsys",
+> > +	  .data = (void *) MMSYS_MT2701,
+> > +	},
+> > +	{ /* sentinel */ },
+> > +};
+> > +
+> > +static struct platform_driver mmsys_drv = {
+> > +	.probe = mmsys_probe,
+> > +	.driver = {
+> > +		.name = "mediatek-mmysys",
+> > +		.of_match_table = of_match_ptr(of_match_mmsys),
+> > +	},
+> > +};
+> > +
+> > +builtin_platform_driver(mmsys_drv);
+> > +
+> > +MODULE_DESCRIPTION("Mediatek MMSYS multi-function driver");
+> > +MODULE_LICENSE("GPL");
+> 
