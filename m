@@ -1,49 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 May 2018 13:19:45 +0100
-Subject: [PATCH 09/14] arm64: ssbd: Introduce thread flag to control
- userspace mitigation
-In-Reply-To: <833776ac-2b8c-b0f7-dcff-9c55afd67c65@arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-10-marc.zyngier@arm.com>
- <20180524120121.pjdw7qaybcsbf4fl@lakrids.cambridge.arm.com>
- <833776ac-2b8c-b0f7-dcff-9c55afd67c65@arm.com>
-Message-ID: <20180524121944.GC8689@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 24 May 2018 08:07:27 -0500
+Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
+In-Reply-To: <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
+References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
+ <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
+ <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+ <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
+Message-ID: <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 01:16:38PM +0100, Marc Zyngier wrote:
-> On 24/05/18 13:01, Mark Rutland wrote:
-> > On Tue, May 22, 2018 at 04:06:43PM +0100, Marc Zyngier wrote:
-> >> In order to allow userspace to be mitigated on demand, let's
-> >> introduce a new thread flag that prevents the mitigation from
-> >> being turned off when exiting to userspace, and doesn't turn
-> >> it on on entry into the kernel (with the assumtion that the
-> > 
-> > Nit: s/assumtion/assumption/
-> > 
-> >> mitigation is always enabled in the kernel itself).
-> >>
-> >> This will be used by a prctl interface introduced in a later
-> >> patch.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > On the assumption that this flag cannot be flipped while a task is in
-> > userspace:
+On Thu, May 24, 2018 at 07:43:05AM -0400, Sinan Kaya wrote:
+> On 5/23/2018 6:57 PM, Sinan Kaya wrote:
+> >> The crash seems to indicate that the hpsa device attempted a DMA after
+> >> we cleared the Root Port's PCI_COMMAND_MASTER, which means
+> >> hpsa_shutdown() didn't stop DMA from the device (it looks like *most*
+> >> shutdown methods don't disable device DMA, so it's in good company).
+> > All drivers are expected to shutdown DMA and interrupts in their shutdown()
+> > routines. They can skip removing threads, data structures etc. but DMA and
+> > interrupt disabling are required. This is the difference between shutdown()
+> > and remove() callbacks.
 > 
-> Well, that's the case unless you get into the seccomp thing, which does
-> change TIF_SSBD on all threads of the task, without taking it to the
-> kernel first. That nicely breaks the state machine, and you end-up
-> running non-mitigated in the kernel. Oops.
+> I found this note yesterday to see why we are not disabling the
+> devices in the PCI core itself. 
 > 
-> I have a couple of patches fixing that, using a second flag
-> (TIF_SSBD_PENDING) that gets turned into the real thing on exit to
-> userspace. It's pretty ugly though.
+> pci_device_remove()
+> 
+> 	/*
+> 	 * We would love to complain here if pci_dev->is_enabled is set, that
+> 	 * the driver should have called pci_disable_device(), but the
+> 	 * unfortunate fact is there are too many odd BIOS and bridge setups
+> 	 * that don't like drivers doing that all of the time.
+> 	 * Oh well, we can dream of sane hardware when we sleep, no matter how
+> 	 * horrible the crap we have to deal with is when we are awake...
+> 	 */ 
+> 
+> Ryan, can you discard the previous patch and test this one instead?
+> remove() path in hpsa driver seems to call pci_disable_device() via 
+> 
+> hpsa_remove_one()
+> 	hpsa_free_pci_init()
+> 
+> but nothing on the shutdown path.
+> 
+> diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
+> index 4ed3d26..3823f04 100644
+> --- a/drivers/scsi/hpsa.c
+> +++ b/drivers/scsi/hpsa.c
+> @@ -8651,6 +8651,7 @@ static void hpsa_shutdown(struct pci_dev *pdev)
+>         h->access.set_intr_mask(h, HPSA_INTR_OFF);
+>         hpsa_free_irqs(h);                      /* init_one 4 */
+>         hpsa_disable_interrupt_mode(h);         /* pci_init 2 */
+> +       pci_disable_device(h->pdev);
+>  }
 
-... which introduces the need for atomics on the entry path too :(
+I suspect this will make things "work" (if the device can't attempt
+DMA, no Unsupported Request error will occur).
 
-I would /much/ rather kill the seccomp implicit enabling of the mitigation,
-or at least have a way to opt-out per arch since it doesn't seem to be
-technically justified imo.
+But I'm concerned that the reason for the DMA might that hpsa is
+transferring buffers from system memory to the hpsa device, and if we
+arbitrarily terminate those transfers with pci_disable_device(), we
+may leave the hpsa device in an inconsistent state, e.g., with a dirty
+filesystem.
 
-Will
+But we really need guidance from an hpsa expert.  I don't know the
+filesystem/SCSI/hpsa details.
+
+Bjorn
