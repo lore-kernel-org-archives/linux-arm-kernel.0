@@ -1,27 +1,89 @@
-From: ilias.apalodimas@linaro.org (Ilias Apalodimas)
-Date: Thu, 24 May 2018 14:50:39 +0300
-Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
-In-Reply-To: <f73b4a0e-669e-8483-88d7-1b2c8a2b9934@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-4-jean-philippe.brucker@arm.com>
- <20180516163117.622693ea@jacob-builder>
- <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
- <20180522094334.71f0e36b@jacob-builder>
- <f73b4a0e-669e-8483-88d7-1b2c8a2b9934@arm.com>
-Message-ID: <20180524115039.GA10260@apalos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 24 May 2018 12:52:48 +0100
+Subject: [PATCH 05/14] arm64: Add 'ssbd' command-line option
+In-Reply-To: <20180524114031.ehtumruiyuu4z2oo@lakrids.cambridge.arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-6-marc.zyngier@arm.com>
+ <20180524114031.ehtumruiyuu4z2oo@lakrids.cambridge.arm.com>
+Message-ID: <c5d4566b-d1de-d16b-a21a-d20ff8224620@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Interesting, I hadn't thought about this use-case before. At first I
-> thought you were talking about mdev devices assigned to VMs, but I think
-> you're referring to mdevs assigned to userspace drivers instead? Out of
-> curiosity, is it only theoretical or does someone actually need this?
+On 24/05/18 12:40, Mark Rutland wrote:
+> On Tue, May 22, 2018 at 04:06:39PM +0100, Marc Zyngier wrote:
+>> On a system where the firmware implements ARCH_WORKAROUND_2,
+>> it may be useful to either permanently enable or disable the
+>> workaround for cases where the user decides that they'd rather
+>> not get a trap overhead, and keep the mitigation permanently
+>> on or off instead of switching it on exception entry/exit.
+>>
+>> In any case, default to the mitigation being enabled.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  Documentation/admin-guide/kernel-parameters.txt |  17 ++++
+>>  arch/arm64/include/asm/cpufeature.h             |   6 ++
+>>  arch/arm64/kernel/cpu_errata.c                  | 102 ++++++++++++++++++++----
+>>  3 files changed, 109 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index f2040d46f095..646e112c6f63 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -4092,6 +4092,23 @@
+>>  			expediting.  Set to zero to disable automatic
+>>  			expediting.
+>>  
+>> +	ssbd=		[ARM64,HW]
+>> +			Speculative Store Bypass Disable control
+>> +
+>> +			On CPUs that are vulnerable to the Speculative
+>> +			Store Bypass vulnerability and offer a
+>> +			firmware based mitigation, this parameter
+>> +			indicates how the mitigation should be used:
+>> +
+>> +			force-on:  Unconditionnaly enable mitigation for
+>> +				   for both kernel and userspace
+>> +			force-off: Unconditionnaly disable mitigation for
+>> +				   for both kernel and userspace
+>> +			kernel:    Always enable mitigation in the
+>> +				   kernel, and offer a prctl interface
+>> +				   to allow userspace to register its
+>> +				   interest in being mitigated too.
+>> +
+>>  	stack_guard_gap=	[MM]
+>>  			override the default stack gap protection. The value
+>>  			is in page units and it defines how many pages prior
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index 09b0f2a80c8f..9bc548e22784 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -537,6 +537,12 @@ static inline u64 read_zcr_features(void)
+>>  	return zcr;
+>>  }
+>>  
+>> +#define ARM64_SSBD_UNKNOWN		-1
+>> +#define ARM64_SSBD_FORCE_DISABLE	0
+>> +#define ARM64_SSBD_EL1_ENTRY		1
+> 
+> The EL1_ENTRY part of the name is a bit misleading, since this doesn't
+> apply to EL1->EL1 exceptions (and as with many other bits of the arm64
+> code, it's arguably misleading in the VHE case).
+> 
+> Perhaps ARM64_SSBD_KERNEL, which would align with the parameter name?
 
-There has been some non upstreamed efforts to have mdev and produce userspace
-drivers. Huawei is using it on what they call "wrapdrive" for crypto devices and
-we did a proof of concept for ethernet interfaces. At the time we choose not to
-involve the IOMMU for the reason you mentioned, but having it there would be
-good.
+I was just waiting for someone to sort out the naming for me, thanks for
+falling into that trap! ;-)
 
-Thanks
-Ilias
+I'll update that.
+
+> Not a big deal either way, and otherwise this looks good to me.
+> Regardless:
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
