@@ -1,30 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 May 2018 15:16:51 +0100
-Subject: linux-next: build failure after merge of the pm tree
-Message-ID: <20180524141651.GV4828@sirena.org.uk>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Thu, 24 May 2018 15:19:05 +0100
+Subject: [PATCH v2 0/5] crypto: ccree: cleanup, fixes and R-Car enabling
+Message-ID: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+The patch set enables the use of CryptoCell found in some Renesas R-Car
+Salvator-X boards and fixes some driver issues uncovered that prevented
+to work properly.
 
-After merging the pm tree, today's linux-next build (arm64 defconfig)
-failed like this:
+Changes from v1:
+- Properly fix the bug that caused us to read a bad signature register
+  rather than dropping the check
+- Proper DT fields as indicated by Geert Uytterhoeven.
+- Better clock enabling as suggested by Geert Uytterhoeven.
 
-drivers/acpi/ec.o: In function `acpi_ec_dispatch_gpe':
-/home/broonie/next/next/drivers/acpi/ec.c:1040: undefined reference to `acpi_dispatch_gpe'
-/home/broonie/next/next/drivers/acpi/ec.c:1040:(.text+0x228c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `acpi_dispatch_gpe'
+Note! the last two patches in the set depend on the
+"clk: renesas: r8a7795: Add CR clock" patch from Geert Uytterhoeven.
 
-Probably caused by commit
+Gilad Ben-Yossef (5):
+  crypto: ccree: correct host regs offset
+  crypto: ccree: better clock handling
+  crypto: ccree: silence debug prints
+  clk: renesas: r8a7795: add ccree clock bindings
+  arm64: dts: renesas: r8a7795: add ccree binding
 
-  8f81c457105b5d4 ("ACPI: EC: Dispatch the EC GPE directly on s2idle wake")
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi |  9 +++++++++
+ drivers/clk/renesas/r8a7795-cpg-mssr.c   |  1 +
+ drivers/crypto/ccree/cc_debugfs.c        |  7 +++++--
+ drivers/crypto/ccree/cc_driver.c         | 34 ++++++++++++++++++++++++++------
+ drivers/crypto/ccree/cc_driver.h         |  2 ++
+ drivers/crypto/ccree/cc_host_regs.h      |  6 ++++--
+ 6 files changed, 49 insertions(+), 10 deletions(-)
 
-(though the symbol appears to be there and like it should be built and
-the relocation warning looks funky...).  I've used the PM tree from the
-last -next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180524/fcc5a5bf/attachment.sig>
+-- 
+2.7.4
