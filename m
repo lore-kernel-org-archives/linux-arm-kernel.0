@@ -1,76 +1,42 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 24 May 2018 10:52:22 +0800
-Subject: [v3 03/10] mfd: mtk-mmsys: Add mmsys driver
-In-Reply-To: <20180430101826.GC5147@dell>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
- <20180430101826.GC5147@dell>
-Message-ID: <1527130342.4607.27.camel@mtkswgap22>
+From: iivanov.xz@gmail.com (Ivan T. Ivanov)
+Date: Thu, 24 May 2018 07:48:53 +0300
+Subject: [PATCH] arm64: dts: msm8916: fix Coresight ETF graph connections
+In-Reply-To: <CAL_JsqL8qBiJUMyUEcih07UoFSAghn6Amfo8OfY-pKU-QX2_mw@mail.gmail.com>
+References: <20180508150952.24562-1-robh@kernel.org>
+ <20180508150952.24562-3-robh@kernel.org>
+ <CAL_JsqL8qBiJUMyUEcih07UoFSAghn6Amfo8OfY-pKU-QX2_mw@mail.gmail.com>
+Message-ID: <20180524044853.713.23166@silver>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-30 at 11:18 +0100, Lee Jones wrote:
-> On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
-> 
-> > From: Matthias Brugger <mbrugger@suse.com>
-> > 
-> > The MMSYS subsystem includes clocks and drm components.
-> > This patch adds a MFD device to probe both drivers from the same
-> > device tree compatible.
-> > 
-> > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Quoting Rob Herring (2018-05-23 23:29:29)
+> On Tue, May 8, 2018 at 10:09 AM, Rob Herring <robh@kernel.org> wrote:
+> > The ETF input should be connected to the funnel output, and the ETF
+> > output should be connected to the replicator input. The labels are wrong
+> > and these got swapped:
+> >
+> > Warning (graph_endpoint): /soc/funnel at 821000/ports/port at 8/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 1/endpoint' is not bidirectional
+> > Warning (graph_endpoint): /soc/replicator at 824000/ports/port at 2/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 0/endpoint' is not bidirectional
+> >
+> > Fixes: 7c10da373698 ("arm64: dts: qcom: Add msm8916 CoreSight components")
+> > Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > Cc: Andy Gross <andy.gross@linaro.org>
+> > Cc: David Brown <david.brown@linaro.org>
+> > Cc: linux-arm-msm at vger.kernel.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
 > > ---
-> >  drivers/mfd/Kconfig     |  9 ++++++
-> >  drivers/mfd/Makefile    |  2 ++
-> >  drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
-
-[ ... ]
-
-> > +};
+> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> This driver is pretty pointless.  It doesn't actually do anything.
-> 
-> I think you just want to use "simple-mfd" instead.
-> 
+> Ping. Still seeing warnings in -next for these.
+>
 
+ Hi Rob,
 
-Hi, Matthias
+ I no longer have access to this hardware and documentation.
+ I am sure that Mathieu and friends will take care for verification
+ of this patch :-)
 
-Why not embedded a platform_device_register_data call into existent
-MMSYS driver ?
-
-It looks elegant and makes sense that mmsys device is being as parent
-device for all its DRM components device and no need to create an
-additional node representing the same device with mmsys simply in order
-to probe its DRM components.
-
-I'm planing to send a bunch of HDMI, MIPI related to MMSYS nodes for
-MT7623 SoC when 4.18 rc1 comes out, so we should want to solve the
-dt-binding violation issue first.
-
-Though there are two same mmsys-compatible strings involving in dts
-though, it seems that hdmi still can work fine in my setup.
-
-	Sean
-
-
-> > +static const struct of_device_id of_match_mmsys[] = {
-> > +	{ .compatible = "mediatek,mt2701-mmsys",
-> > +	  .data = (void *) MMSYS_MT2701,
-> > +	},
-> > +	{ /* sentinel */ },
-> > +};
-> > +
-> > +static struct platform_driver mmsys_drv = {
-> > +	.probe = mmsys_probe,
-> > +	.driver = {
-> > +		.name = "mediatek-mmysys",
-> > +		.of_match_table = of_match_ptr(of_match_mmsys),
-> > +	},
-> > +};
-> > +
-> > +builtin_platform_driver(mmsys_drv);
-> > +
-> > +MODULE_DESCRIPTION("Mediatek MMSYS multi-function driver");
-> > +MODULE_LICENSE("GPL");
-> 
+ Regards,
+ Ivan
