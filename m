@@ -1,128 +1,107 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:34 +0100
-Subject: [PATCH v11 05/19] KVM: arm64: Convert lazy FPSIMD context switch trap
- to C
+Date: Thu, 24 May 2018 17:56:30 +0100
+Subject: [PATCH v11 01/19] arm64: fpsimd: Fix TIF_FOREIGN_FPSTATE after
+ invalidating cpu regs
 In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
 References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527181008-13549-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the lazy FPSIMD context switch trap code easier to hack on,
-this patch converts it to C.
+fpsimd_last_state.st is set to NULL as a way of indicating that
+current's FPSIMD registers are no longer loaded in the cpu.  In
+particular, this is done when the kernel temporarily uses or
+clobbers the FPSIMD registers for its own purposes, as in CPU PM or
+kernel-mode NEON, resulting in them being populated with garbage
+data not belonging to a task.
 
-This is not amazingly efficient, but the trap should typically only
-be taken once per host context switch.
+Commit 17eed27b02da ("arm64/sve: KVM: Prevent guests from using
+SVE") factors this operation out as a new helper
+fpsimd_flush_cpu_state() to make it clearer what is being done
+here, and on SVE systems this helper is now used, via
+kvm_fpsimd_flush_cpu_state(), to invalidate the registers after KVM
+has run a vcpu.  The reason for this is that KVM does not yet
+understand how to restore the full host SVE registers itself after
+loading the guest FPSIMD context into them.
+
+This exposes a particular problem: if fpsimd_last_state.st is set
+to NULL without also setting TIF_FOREIGN_FPSTATE, the kernel may
+continue to think that current's FPSIMD registers are live even
+though they have actually been clobbered.
+
+Prior to the aforementioned commit, the only path where
+fpsimd_last_state.st is set to NULL without setting
+TIF_FOREIGN_FPSTATE is when kernel_neon_begin() is called by a
+kernel thread (where current->mm can be NULL).  This does not
+matter, because the only harm is that at context-switch time
+fpsimd_thread_switch() may unnecessarily save the FPSIMD registers
+back to current's thread_struct (even though kernel threads are not
+considered to have any FPSIMD context of their own and the
+registers will never be reloaded).
+
+Note that although CPU_PM_ENTER lacks the TIF_FOREIGN_FPSTATE
+setting, every CPU passing through that path must subsequently pass
+through CPU_PM_EXIT before it can re-enter the kernel proper.
+CPU_PM_EXIT sets the flag.
+
+The sve_flush_cpu_state() function added by commit 17eed27b02da
+also lacks the proper maintenance of TIF_FOREIGN_FPSTATE.  This may
+cause the bits of a host task's SVE registers that do not alias the
+FPSIMD register file to spontaneously appear zeroed if a KVM vcpu
+runs in the same task in the meantime.  Although this effect is
+hidden by the fact that the non-FPSIMD bits of the SVE registers
+are zeroed by a syscall anyway, it is doubtless a bad idea to rely
+on these different code paths interacting correctly under future
+maintenance.
+
+This patch makes TIF_FOREIGN_FPSTATE an unconditional side-effect
+of fpsimd_flush_cpu_state(), and removes the set_thread_flag()
+calls that become redundant as a result.  This ensures that
+TIF_FOREIGN_FPSTATE cannot remain clear if the FPSIMD state in the
+FPSIMD registers is invalid.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
- arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
- 2 files changed, 46 insertions(+), 35 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index e41a161..40f349b 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -172,40 +172,27 @@ ENTRY(__fpsimd_guest_restore)
- 	// x1: vcpu
- 	// x2-x29,lr: vcpu regs
- 	// vcpu x0-x1 on the stack
--	stp	x2, x3, [sp, #-16]!
--	stp	x4, lr, [sp, #-16]!
--
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	mrs	x2, cptr_el2
--	bic	x2, x2, #CPTR_EL2_TFP
--	msr	cptr_el2, x2
--alternative_else
--	mrs	x2, cpacr_el1
--	orr	x2, x2, #CPACR_EL1_FPEN
--	msr	cpacr_el1, x2
--alternative_endif
--	isb
--
--	mov	x3, x1
--
--	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
--	kern_hyp_va x0
--	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
--	bl	__fpsimd_save_state
--
--	add	x2, x3, #VCPU_CONTEXT
--	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
--	bl	__fpsimd_restore_state
--
--	// Skip restoring fpexc32 for AArch64 guests
--	mrs	x1, hcr_el2
--	tbnz	x1, #HCR_RW_SHIFT, 1f
--	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
--	msr	fpexc32_el2, x4
--1:
--	ldp	x4, lr, [sp], #16
--	ldp	x2, x3, [sp], #16
--	ldp	x0, x1, [sp], #16
--
-+	stp	x2, x3, [sp, #-144]!
-+	stp	x4, x5, [sp, #16]
-+	stp	x6, x7, [sp, #32]
-+	stp	x8, x9, [sp, #48]
-+	stp	x10, x11, [sp, #64]
-+	stp	x12, x13, [sp, #80]
-+	stp	x14, x15, [sp, #96]
-+	stp	x16, x17, [sp, #112]
-+	stp	x18, lr, [sp, #128]
-+
-+	bl	__hyp_switch_fpsimd
-+
-+	ldp	x4, x5, [sp, #16]
-+	ldp	x6, x7, [sp, #32]
-+	ldp	x8, x9, [sp, #48]
-+	ldp	x10, x11, [sp, #64]
-+	ldp	x12, x13, [sp, #80]
-+	ldp	x14, x15, [sp, #96]
-+	ldp	x16, x17, [sp, #112]
-+	ldp	x18, lr, [sp, #128]
-+	ldp	x0, x1, [sp, #144]
-+	ldp	x2, x3, [sp], #160
- 	eret
- ENDPROC(__fpsimd_guest_restore)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index d964523..c0796c4 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -318,6 +318,30 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 87a3536..12e1c96 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -1067,6 +1067,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
+ static inline void fpsimd_flush_cpu_state(void)
+ {
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
++	set_thread_flag(TIF_FOREIGN_FPSTATE);
  }
  
-+void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
-+				    struct kvm_vcpu *vcpu)
-+{
-+	kvm_cpu_context_t *host_ctxt;
-+
-+	if (has_vhe())
-+		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
-+			     cpacr_el1);
-+	else
-+		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
-+			     cptr_el2);
-+
-+	isb();
-+
-+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-+	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
-+
-+	/* Skip restoring fpexc32 for AArch64 guests */
-+	if (!(read_sysreg(hcr_el2) & HCR_RW))
-+		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
-+			     fpexc32_el2);
-+}
-+
  /*
-  * Return true when we were able to fixup the guest exit and should return to
-  * the guest, false when we should restore the host state and return to the
+@@ -1121,10 +1122,8 @@ void kernel_neon_begin(void)
+ 	__this_cpu_write(kernel_neon_busy, true);
+ 
+ 	/* Save unsaved task fpsimd state, if any: */
+-	if (current->mm) {
++	if (current->mm)
+ 		task_fpsimd_save();
+-		set_thread_flag(TIF_FOREIGN_FPSTATE);
+-	}
+ 
+ 	/* Invalidate any task state remaining in the fpsimd regs: */
+ 	fpsimd_flush_cpu_state();
+@@ -1251,8 +1250,6 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ 		fpsimd_flush_cpu_state();
+ 		break;
+ 	case CPU_PM_EXIT:
+-		if (current->mm)
+-			set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 		break;
+ 	case CPU_PM_ENTER_FAILED:
+ 	default:
 -- 
 2.1.4
