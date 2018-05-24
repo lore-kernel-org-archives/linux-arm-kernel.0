@@ -1,69 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 24 May 2018 13:05:33 +0200
-Subject: Nokia N900: refcount_t underflow, use after free
-In-Reply-To: <5aa1e2de-96d1-0e88-01ca-49df9ae25457@ti.com>
-References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
- <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com>
- <20180308185046.GA22796@amd>
- <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
- <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com>
- <20180309221834.GA15476@amd>
- <c8ee5692-bf71-a9d7-8607-50adc9f0e9f1@ti.com>
- <20180310112634.GA31614@amd>
- <5aa1e2de-96d1-0e88-01ca-49df9ae25457@ti.com>
-Message-ID: <20180524110533.GA20599@amd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 May 2018 12:14:05 +0100
+Subject: [PATCH 03/14] arm64: Add per-cpu infrastructure to call
+ ARCH_WORKAROUND_2
+In-Reply-To: <20180522150648.28297-4-marc.zyngier@arm.com>
+References: <20180522150648.28297-1-marc.zyngier@arm.com>
+ <20180522150648.28297-4-marc.zyngier@arm.com>
+Message-ID: <20180524111405.won7dozpt7gq5xda@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >>
-> >> OK, see if the following fixes the issue for you, only build tested.
-> > 
-> > Word-wrapped, so I applied by hand. And yes, the oops at boot is
-> > gone. Thanks!
+On Tue, May 22, 2018 at 04:06:37PM +0100, Marc Zyngier wrote:
+> In a heterogeneous system, we can end up with both affected and
+> unaffected CPUs. Let's check their status before calling into the
+> firmware.
 > 
-> Sorry about that, have to check my mail settings. Anyway will post the
-> patch again, glad that it fixed your issue.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Any news here? AFAICT the bug creeped into v4.17-rcX in the
-meantime...
+Ah, I guess this may fix the issue I noted with the prior patch,
+assuming we only set arm64_ssbd_callback_required for a CPU when the FW
+supports the mitigation.
 
-								Pavel
+If so, if you fold this together with the prior patch:
 
-> regards
-> Suman
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/kernel/cpu_errata.c |  2 ++
+>  arch/arm64/kernel/entry.S      | 11 +++++++----
+>  2 files changed, 9 insertions(+), 4 deletions(-)
 > 
-> > 
-> > (Camera still does not work in -next... kills system. Oh well. Lets
-> > debug that some other day.)
-> > 
-> >> 8< ---------------------
-> >> >From bac9a48fb646dc51f2030d676a0dbe3298c3b134 Mon Sep 17 00:00:00 2001
-> >> From: Suman Anna <s-anna@ti.com>
-> >> Date: Fri, 9 Mar 2018 16:39:59 -0600
-> >> Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
-> >>
-> >> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
-> >> ARM DMA backend. The current code creates a dma_iommu_mapping and
-> >> attaches this to the ISP device, but never detaches the mapping in
-> >> either the probe failure paths or the driver remove path resulting
-> >> in an unbalanced mapping refcount and a memory leak. Fix this properly.
-> >>
-> >> Reported-by: Pavel Machek <pavel@ucw.cz>
-> >> Signed-off-by: Suman Anna <s-anna@ti.com>
-> > 
-> > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > 									Pavel
-> > 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180524/38b64362/attachment-0001.sig>
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 46b3aafb631a..0288d6cf560e 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -233,6 +233,8 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+>  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+>  
+>  #ifdef CONFIG_ARM64_SSBD
+> +DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
+> +
+>  void __init arm64_update_smccc_conduit(struct alt_instr *alt,
+>  				       __le32 *origptr, __le32 *updptr,
+>  				       int nr_inst)
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index f33e6aed3037..29ad672a6abd 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -140,8 +140,10 @@ alternative_else_nop_endif
+>  
+>  	// This macro corrupts x0-x3. It is the caller's duty
+>  	// to save/restore them if required.
+> -	.macro	apply_ssbd, state
+> +	.macro	apply_ssbd, state, targ, tmp1, tmp2
+>  #ifdef CONFIG_ARM64_SSBD
+> +	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
+> +	cbz	\tmp2, \targ
+>  	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+>  	mov	w1, #\state
+>  alternative_cb	arm64_update_smccc_conduit
+> @@ -176,12 +178,13 @@ alternative_cb_end
+>  	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
+>  	disable_step_tsk x19, x20		// exceptions when scheduling.
+>  
+> -	apply_ssbd 1
+> +	apply_ssbd 1, 1f, x22, x23
+>  
+>  #ifdef CONFIG_ARM64_SSBD
+>  	ldp	x0, x1, [sp, #16 * 0]
+>  	ldp	x2, x3, [sp, #16 * 1]
+>  #endif
+> +1:
+>  
+>  	mov	x29, xzr			// fp pointed to user-space
+>  	.else
+> @@ -323,8 +326,8 @@ alternative_if ARM64_WORKAROUND_845719
+>  alternative_else_nop_endif
+>  #endif
+>  3:
+> -	apply_ssbd 0
+> -
+> +	apply_ssbd 0, 5f, x0, x1
+> +5:
+>  	.endif
+>  
+>  	msr	elr_el1, x21			// set up the return data
+> -- 
+> 2.14.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
