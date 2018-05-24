@@ -1,139 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 May 2018 12:23:06 +0100
-Subject: [PATCH 02/14] arm64: Call ARCH_WORKAROUND_2 on transitions
- between EL0 and EL1
-In-Reply-To: <20180524110058.mrkwc3rx5l3v6wad@lakrids.cambridge.arm.com>
-References: <20180522150648.28297-1-marc.zyngier@arm.com>
- <20180522150648.28297-3-marc.zyngier@arm.com>
- <20180524110058.mrkwc3rx5l3v6wad@lakrids.cambridge.arm.com>
-Message-ID: <20180524112305.ld3jghzmb6a35h73@lakrids.cambridge.arm.com>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Thu, 24 May 2018 14:25:10 +0300
+Subject: [PATCH v12 0/8] Clock for CPU scaling support for msm8996
+In-Reply-To: <1527148218-16540-1-git-send-email-ilialin@codeaurora.org>
+References: <1527148218-16540-1-git-send-email-ilialin@codeaurora.org>
+Message-ID: <CAHLCerM-F3joG=9YgvqMiGTFvw_CAv82R91ZP7v6mxTjykz9DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 12:00:58PM +0100, Mark Rutland wrote:
-> On Tue, May 22, 2018 at 04:06:36PM +0100, Marc Zyngier wrote:
-> > In order for the kernel to protect itself, let's call the SSBD mitigation
-> > implemented by the higher exception level (either hypervisor or firmware)
-> > on each transition between userspace and kernel.
-> > 
-> > We must take the PSCI conduit into account in order to target the
-> > right exception level, hence the introduction of a runtime patching
-> > callback.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kernel/cpu_errata.c | 18 ++++++++++++++++++
-> >  arch/arm64/kernel/entry.S      | 22 ++++++++++++++++++++++
-> >  include/linux/arm-smccc.h      |  5 +++++
-> >  3 files changed, 45 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > index a900befadfe8..46b3aafb631a 100644
-> > --- a/arch/arm64/kernel/cpu_errata.c
-> > +++ b/arch/arm64/kernel/cpu_errata.c
-> > @@ -232,6 +232,24 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-> >  }
-> >  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
-> >  
-> > +#ifdef CONFIG_ARM64_SSBD
-> > +void __init arm64_update_smccc_conduit(struct alt_instr *alt,
-> > +				       __le32 *origptr, __le32 *updptr,
-> > +				       int nr_inst)
-> > +{
-> > +	u32 insn;
-> > +
-> > +	BUG_ON(nr_inst != 1);
-> > +
-> > +	if (psci_ops.conduit == PSCI_CONDUIT_HVC)
-> > +		insn = aarch64_insn_get_hvc_value();
-> > +	else
-> > +		insn = aarch64_insn_get_smc_value();
-> 
-> Shouldn't this also handle the case where there is no conduit?
+On Thu, May 24, 2018 at 10:50 AM, Ilia Lin <ilialin@codeaurora.org> wrote:
+> [v12]
+>  * Addressed the kbuild fail on arm architecture
+>
+> [v11]
+>  * Split the series into domains
+>
+> [v9]
+>  * Addressed comments from Viresh and Russel about the error handling
+>
+> [v8]
+>  * Reordered the patch series into 4 groups
+>  * Addressed comments from Amit about the comments and commit messages
+>  * Addressed comments from Amit and Viresh about the resourses deallocation
+>
+> [v7]
+>  * Addressed comments from Viresh about resourses deallocation
+>    and DT compatible
+>
+> [v6]
+>  * Addressed comments from Viresh about:
+>  ** Comments style
+>  ** Kconfig bool instead of tristate
+>  ** DT and documentation style
+>  ** Resourses deallocation on an error
+>  ** Typos
+>
+> [v5]
+>  * Rebased
+>  * Addressed comments from Bjorn about SPDX style,
+>    functions and parameters naming
+>  * Addressed comments from Viresh DT properties and style, comments style,
+>    resourses deallocation, documentation placement
+>  * Addressed comments from Sricharan about unnessesary include
+>  * Addressed comments from Nicolas
+>  * Addressed comments from Rob about the commit messages and acks
+>  * Addressed comments from Mark
+>
+> [v4]
+>  * Adressed all comments from Stephen
+>  * Added CPU regulator support
+>  * Added qcom-cpufreq-kryo driver
+>
+> [v3]
+>  * Rebased on top of the latest PLL driver changes
+>  * Addressed comment from Rob Herring for bindings
+>
+> [v2]
+>  * Addressed comments from Rob Herring for bindings
+>  * Addressed comments from Mark Rutland for memory barrier
+>  * Addressed comments from Julien Thierry for clock reenabling condition
+>  * Tuned the HW configuration for clock frequencies below 600MHz
+>
+> SOC (1/15):
+> Extracts the kryo l2 accessors driver from the QCOM PMU driver
+>
+> Clocks (2/15-9/15):
+> This series adds support for the CPU clocks on msm8996 devices.
+> The driver uses the existing PLL drivers and is required to control
+> the CPU frequency scaling on the MSM8996.
+>
+> Ilia Lin (6):
+>   soc: qcom: Separate kryo l2 accessors from PMU driver
+>   clk: Use devm_ in the register fixed factor clock
+>   clk: qcom: Add CPU clock driver for msm8996
+>   dt-bindings: clk: qcom: Add bindings for CPU clock for msm8996
+>   clk: qcom: cpu-8996: Add support to switch below 600Mhz
+>   clk: qcom: Add ACD path to CPU clock driver for msm8996
+>
+> Rajendra Nayak (2):
+>   clk: qcom: Make clk_alpha_pll_configure available to modules
+>   clk: qcom: cpu-8996: Add support to switch to alternate PLL
+>
+>  .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
+>  drivers/clk/clk-fixed-factor.c                     |   2 +-
+>  drivers/clk/qcom/Kconfig                           |  10 +
+>  drivers/clk/qcom/Makefile                          |   1 +
+>  drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
+>  drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
+>  drivers/clk/qcom/clk-cpu-8996.c                    | 510 +++++++++++++++++++++
 
-Due to the config symbol not being defined yet, and various other fixups
-in later patches, this is actually benign.
 
-However, if you make this:
+>  drivers/perf/Kconfig                               |   1 +
+>  drivers/perf/qcom_l2_pmu.c                         |  90 +---
+>  drivers/soc/qcom/Kconfig                           |   3 +
+>  drivers/soc/qcom/Makefile                          |   1 +
+>  drivers/soc/qcom/kryo-l2-accessors.c               |  56 +++
+>  include/soc/qcom/kryo-l2-accessors.h               |  12 +
 
-	switch (psci_ops.conduit) {
-	case PSCI_CONDUIT_NONE:
-		return;
-	case PSCI_CONDUIT_HVC:
-		insn = aarch64_insn_get_hvc_value();
-		break;
-	case PSCI_CONDUIT_SMC:
-		insn = aarch64_insn_get_smc_value();
-		break;
-	}
+For the perf/l2-accessors part, Reviewed-by: Amit Kucheria
+<amit.kucheria@linaro.org>
 
-... then we won't even bother patching the nop in the default case
-regardless, which is nicer, IMO.
-
-With that:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> 
-> See below comment in apply_ssbd for rationale.
-> 
-> > +
-> > +	*updptr = cpu_to_le32(insn);
-> > +}
-> > +#endif	/* CONFIG_ARM64_SSBD */
-> > +
-> >  #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
-> >  	.matches = is_affected_midr_range,			\
-> >  	.midr_range = MIDR_RANGE(model, v_min, r_min, v_max, r_max)
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index ec2ee720e33e..f33e6aed3037 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -18,6 +18,7 @@
-> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> >  
-> > +#include <linux/arm-smccc.h>
-> >  #include <linux/init.h>
-> >  #include <linux/linkage.h>
-> >  
-> > @@ -137,6 +138,18 @@ alternative_else_nop_endif
-> >  	add	\dst, \dst, #(\sym - .entry.tramp.text)
-> >  	.endm
-> >  
-> > +	// This macro corrupts x0-x3. It is the caller's duty
-> > +	// to save/restore them if required.
-> > +	.macro	apply_ssbd, state
-> > +#ifdef CONFIG_ARM64_SSBD
-> > +	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
-> > +	mov	w1, #\state
-> > +alternative_cb	arm64_update_smccc_conduit
-> > +	nop					// Patched to SMC/HVC #0
-> > +alternative_cb_end
-> > +#endif
-> > +	.endm
-> 
-> If my system doesn't have SMCCC1.1, or the FW doesn't have an
-> implementation of ARCH_WORKAROUND_2, does this stay as a NOP?
-> 
-> It looks like this would be patched to an SMC, which would be fatal on
-> systems without EL3 FW.
-> 
-> > +
-> >  	.macro	kernel_entry, el, regsize = 64
-> >  	.if	\regsize == 32
-> >  	mov	w0, w0				// zero upper 32 bits of x0
-> > @@ -163,6 +176,13 @@ alternative_else_nop_endif
-> >  	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-> >  	disable_step_tsk x19, x20		// exceptions when scheduling.
-> >  
-> > +	apply_ssbd 1
-> 
-> 
-> ... and thus kernel_entry would be fatal.
-> 
-> Thanks,
-> Mark.
+For the entire series, Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
