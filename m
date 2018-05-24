@@ -1,83 +1,204 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 24 May 2018 11:12:52 +0100
-Subject: [PATCH v10 12/18] arm64/sve: Switch sve_pffr() argument from task
- to thread
-In-Reply-To: <1527005119-6842-13-git-send-email-Dave.Martin@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 24 May 2018 11:18:39 +0100
+Subject: [PATCH v10 10/18] KVM: arm64: Optimise FPSIMD handling to reduce
+ guest/host thrashing
+In-Reply-To: <877enttlfl.fsf@linaro.org>
 References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
- <1527005119-6842-13-git-send-email-Dave.Martin@arm.com>
-Message-ID: <874lixtl97.fsf@linaro.org>
+ <1527005119-6842-11-git-send-email-Dave.Martin@arm.com>
+ <877enttlfl.fsf@linaro.org>
+Message-ID: <20180524101838.GT13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 24, 2018 at 11:09:02AM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > This patch refactors KVM to align the host and guest FPSIMD
+> > save/restore logic with each other for arm64.  This reduces the
+> > number of redundant save/restore operations that must occur, and
+> > reduces the common-case IRQ blackout time during guest exit storms
+> > by saving the host state lazily and optimising away the need to
+> > restore the host state before returning to the run loop.
+> >
+> > Four hooks are defined in order to enable this:
+> >
+> >  * kvm_arch_vcpu_run_map_fp():
+> >    Called on PID change to map necessary bits of current to Hyp.
+> >
+> >  * kvm_arch_vcpu_load_fp():
+> >    Set up FP/SIMD for entering the KVM run loop (parse as
+> >    "vcpu_load fp").
+> >
+> >  * kvm_arch_vcpu_ctxsync_fp():
+> >    Get FP/SIMD into a safe state for re-enabling interrupts after a
+> >    guest exit back to the run loop.
+> >
+> >    For arm64 specifically, this involves updating the host kernel's
+> >    FPSIMD context tracking metadata so that kernel-mode NEON use
+> >    will cause the vcpu's FPSIMD state to be saved back correctly
+> >    into the vcpu struct.  This must be done before re-enabling
+> >    interrupts because kernel-mode NEON may be used by softirqs.
+> >
+> >  * kvm_arch_vcpu_put_fp():
+> >    Save guest FP/SIMD state back to memory and dissociate from the
+> >    CPU ("vcpu_put fp").
+> >
+> > Also, the arm64 FPSIMD context switch code is updated to enable it
+> > to save back FPSIMD state for a vcpu, not just current.  A few
+> > helpers drive this:
+> >
+> >  * fpsimd_bind_state_to_cpu(struct user_fpsimd_state *fp):
+> >    mark this CPU as having context fp (which may belong to a vcpu)
+> >    currently loaded in its registers.  This is the non-task
+> >    equivalent of the static function fpsimd_bind_to_cpu() in
+> >    fpsimd.c.
+> >
+> >  * task_fpsimd_save():
+> >    exported to allow KVM to save the guest's FPSIMD state back to
+> >    memory on exit from the run loop.
+> >
+> >  * fpsimd_flush_state():
+> >    invalidate any context's FPSIMD state that is currently loaded.
+> >    Used to disassociate the vcpu from the CPU regs on run loop exit.
+> >
+> > These changes allow the run loop to enable interrupts (and thus
+> > softirqs that may use kernel-mode NEON) without having to save the
+> > guest's FPSIMD state eagerly.
+> >
+> > Some new vcpu_arch fields are added to make all this work.  Because
+> > host FPSIMD state can now be saved back directly into current's
+> > thread_struct as appropriate, host_cpu_context is no longer used
+> > for preserving the FPSIMD state.  However, it is still needed for
+> > preserving other things such as the host's system registers.  To
+> > avoid ABI churn, the redundant storage space in host_cpu_context is
+> > not removed for now.
+> >
+> > arch/arm is not addressed by this patch and continues to use its
+> > current save/restore logic.  It could provide implementations of
+> > the helpers later if desired.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> > ---
+> >
+> > Reviewers note: tags retained because this delta is straightforward by
+> > itself.  Please shout if you're not happy!
+> >
+> > Changes since v9:
+> >
+> >  * Remove redundant set_thread_flag(TIF_FOREIGN_FPSTATE) that is now
+> >    implicit in fpsimd_flush_cpu_state().
+> > ---
+> >  arch/arm/include/asm/kvm_host.h   |   8 +++
+> >  arch/arm64/include/asm/fpsimd.h   |   6 +++
+> >  arch/arm64/include/asm/kvm_host.h |  21 ++++++++
+> >  arch/arm64/kernel/fpsimd.c        |  17 ++++--
+> >  arch/arm64/kvm/Kconfig            |   1 +
+> >  arch/arm64/kvm/Makefile           |   2 +-
+> >  arch/arm64/kvm/fpsimd.c           | 111 ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/kvm/hyp/switch.c       |  51 +++++++++---------
+> >  virt/kvm/arm/arm.c                |   4 ++
+> >  9 files changed, 191 insertions(+), 30 deletions(-)
+> >  create mode 100644 arch/arm64/kvm/fpsimd.c
+> >
+> > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> > index c7c28c8..ac870b2 100644
+> > --- a/arch/arm/include/asm/kvm_host.h
+> > +++ b/arch/arm/include/asm/kvm_host.h
+> > @@ -303,6 +303,14 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+> >  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+> >  			       struct kvm_device_attr *attr);
+> >
+> > +/*
+> > + * VFP/NEON switching is all done by the hyp switch code, so no need to
+> > + * coordinate with host context handling for this state:
+> > + */
+> > +static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+> > +static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
+> > +static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
+> > +
+> >  /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+> >  static inline void kvm_fpsimd_flush_cpu_state(void) {}
+> >
+> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> > index aa7162a..3e00f70 100644
+> > --- a/arch/arm64/include/asm/fpsimd.h
+> > +++ b/arch/arm64/include/asm/fpsimd.h
+> > @@ -41,6 +41,8 @@ struct task_struct;
+> >  extern void fpsimd_save_state(struct user_fpsimd_state *state);
+> >  extern void fpsimd_load_state(struct user_fpsimd_state *state);
+> >
+> > +extern void fpsimd_save(void);
+> > +
+> >  extern void fpsimd_thread_switch(struct task_struct *next);
+> >  extern void fpsimd_flush_thread(void);
+> >
+> > @@ -49,7 +51,11 @@ extern void fpsimd_preserve_current_state(void);
+> >  extern void fpsimd_restore_current_state(void);
+> >  extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
+> >
+> > +extern void fpsimd_bind_task_to_cpu(void);
+> > +extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state);
+> > +
+> >  extern void fpsimd_flush_task_state(struct task_struct *target);
+> > +extern void fpsimd_flush_cpu_state(void);
+> >  extern void sve_flush_cpu_state(void);
+> >
+> >  /* Maximum VL that SVE VL-agnostic software can transparently support */
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index 146c167..b3fe730 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -30,6 +30,7 @@
+> >  #include <asm/kvm.h>
+> >  #include <asm/kvm_asm.h>
+> >  #include <asm/kvm_mmio.h>
+> > +#include <asm/thread_info.h>
+> >
+> >  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+> >
+> > @@ -238,6 +239,10 @@ struct kvm_vcpu_arch {
+> >
+> >  	/* Pointer to host CPU context */
+> >  	kvm_cpu_context_t *host_cpu_context;
+> > +
+> > +	struct thread_info *host_thread_info;	/* hyp VA */
+> > +	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+> > +
+> >  	struct {
+> >  		/* {Break,watch}point registers */
+> >  		struct kvm_guest_debug_arch regs;
+> > @@ -295,6 +300,9 @@ struct kvm_vcpu_arch {
+> >
+> >  /* vcpu_arch flags field values: */
+> >  #define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
+> > +#define KVM_ARM64_FP_ENABLED		(1 << 1) /* guest FP regs loaded */
+> > +#define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded
+> >  */
+> 
+> I may be descending into bike-shedding territory here but it seems a
+> little incongruous to have _ENABLED = guest FP state when we have _HOST
+> for host FP state. Why not KVM_ARM64_FP_GUEST?
 
-Dave Martin <Dave.Martin@arm.com> writes:
+I thought about this, but wanted to retain the clear relationship
+between the _ENABLED flag and the state of the FPSIMD trap controls.
 
-> sve_pffr(), which is used to derive the base address used for
-> low-level SVE save/restore routines, currently takes the relevant
-> task_struct as an argument.
->
-> The only accessed fields are actually part of thread_struct, so
-> this patch changes the argument type accordingly.  This is done in
-> preparation for moving this function to a header, where we do not
-> want to have to include <linux/sched.h> due to the consequent
-> circular #include problems.
->
-> No functional change.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The HOST flag has no direct relationship with trap controls, so these
+seemed different enough things to justify different names, though the
+inconsistency was a bit annoying.
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+[...]
 
-> ---
->  arch/arm64/kernel/fpsimd.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 5152bbc..c4e9762 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -44,6 +44,7 @@
->  #include <asm/fpsimd.h>
->  #include <asm/cpufeature.h>
->  #include <asm/cputype.h>
-> +#include <asm/processor.h>
->  #include <asm/simd.h>
->  #include <asm/sigcontext.h>
->  #include <asm/sysreg.h>
-> @@ -167,10 +168,9 @@ static size_t sve_ffr_offset(int vl)
->  	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
->  }
->
-> -static void *sve_pffr(struct task_struct *task)
-> +static void *sve_pffr(struct thread_struct *thread)
->  {
-> -	return (char *)task->thread.sve_state +
-> -		sve_ffr_offset(task->thread.sve_vl);
-> +	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
->  }
->
->  static void change_cpacr(u64 val, u64 mask)
-> @@ -253,7 +253,7 @@ static void task_fpsimd_load(void)
->  	WARN_ON(!in_softirq() && !irqs_disabled());
->
->  	if (system_supports_sve() && test_thread_flag(TIF_SVE))
-> -		sve_load_state(sve_pffr(current),
-> +		sve_load_state(sve_pffr(&current->thread),
->  			       &current->thread.uw.fpsimd_state.fpsr,
->  			       sve_vq_from_vl(current->thread.sve_vl) - 1);
->  	else
-> @@ -284,7 +284,7 @@ void fpsimd_save(void)
->  				return;
->  			}
->
-> -			sve_save_state(sve_pffr(current), &st->fpsr);
-> +			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
->  		} else
->  			fpsimd_save_state(st);
->  	}
+> Minor bike-shedding aside:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
+Thanks.  I'll probably leave it as is, but shout if you're unhappy with
+this.
 
---
-Alex Benn?e
+Cheers
+---Dave
