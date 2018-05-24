@@ -1,70 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2018 10:04:14 +0200
-Subject: [PATCH v5 2/4] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
-References: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
- <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
-Message-ID: <CACRpkdZ_HODTLc65kpE011=VWRkC9g5W04=NXWczozenobUcGA@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 24 May 2018 16:04:20 +0800
+Subject: [GIT PULL] berlin dt64 changes for v4.18
+Message-ID: <20180524160420.35da91b5@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 10:57 PM, Christian Lamparter
-<chunkeey@gmail.com> wrote:
+Hi,
 
-> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
-> Setting up any gpio-hog in the device-tree for his device would
-> "kill the bootup completely":
->
-> | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
-> | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
-> | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
-> | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
-> | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
->
-> This was also verified on a RT-AC58U (IPQ4018) which would
-> no longer boot, if a gpio-hog was specified. (Tried forcing
-> the USB LED PIN (GPIO0) to high.).
->
-> The problem is that Pinctrl+GPIO registration is currently
-> peformed in the following order in pinctrl-msm.c:
->         1. pinctrl_register()
->         2. gpiochip_add()
->         3. gpiochip_add_pin_range()
->
-> The actual error code -517 == -EPROBE_DEFER is coming from
-> pinctrl_get_device_gpio_range(), which is called through:
->         gpiochip_add
->             of_gpiochip_add
->                 of_gpiochip_scan_gpios
->                     gpiod_hog
->                         gpiochip_request_own_desc
->                             __gpiod_request
->                                 chip->request
->                                     gpiochip_generic_request
->                                        pinctrl_gpio_request
->                                           pinctrl_get_device_gpio_range
->
-> pinctrl_get_device_gpio_range() is unable to find any valid
-> pin ranges, since nothing has been added to the pinctrldev_list yet.
-> so the range can't be found, and the operation fails with -EPROBE_DEFER.
->
-> This patch fixes the issue by adding the "gpio-ranges" property to
-> the pinctrl device node of all upstream Qcom SoC. The pin ranges are
-> then added by the gpio core.
->
-> In order to remain compatible with older, existing DTs (and ACPI)
-> a check for the "gpio-ranges" property has been added to
-> msm_gpio_init(). This prevents the driver of adding the same entry
-> to the pinctrldev_list twice.
->
-> Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
-> Tested-by: Sven Eckelmann <sven.eckelmann@openmesh.com> [ipq4019]
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
+Here is the pull request for berlin dt64 changes for v4.18.
 
-Patch applied.
+Thanks,
+Jisheng
 
-Yours,
-Linus Walleij
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin64-dt-for-v4.18
+
+for you to fetch changes up to 031106ce95a201f6dd4c5ebf35abb900cf34e2ba:
+
+  arm64: dts: move berlin SoC files from marvell dir to synaptics dir (2018-05-24 13:25:45 +0800)
+
+----------------------------------------------------------------
+Berlin64 DT changes for v4.18
+
+ - use SPDX-License-Identifier for dts(i) files
+ - move berlin SoC dts(i) files from marvell dir to synaptics dir
+
+----------------------------------------------------------------
+Jisheng Zhang (3):
+      arm64: dts: berlin4ct: use SPDX-License-Identifier
+      arm64: dts: berlin4ct-*.dts: use SPDX-License-Identifier
+      arm64: dts: move berlin SoC files from marvell dir to synaptics dir
+
+ arch/arm64/boot/dts/Makefile                       |  1 +
+ arch/arm64/boot/dts/marvell/Makefile               |  4 --
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts      | 66 ----------------------
+ arch/arm64/boot/dts/marvell/berlin4ct-stb.dts      | 66 ----------------------
+ arch/arm64/boot/dts/synaptics/Makefile             |  4 ++
+ arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts    | 29 ++++++++++
+ arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts    | 29 ++++++++++
+ .../boot/dts/{marvell => synaptics}/berlin4ct.dtsi | 39 +------------
+ 8 files changed, 64 insertions(+), 174 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+ delete mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
+ create mode 100644 arch/arm64/boot/dts/synaptics/Makefile
+ create mode 100644 arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
+ create mode 100644 arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
+ rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi (78%)
