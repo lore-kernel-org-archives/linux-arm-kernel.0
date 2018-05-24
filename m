@@ -1,97 +1,61 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 24 May 2018 17:56:33 +0100
-Subject: [PATCH v11 04/19] KVM: arm/arm64: Introduce
- kvm_arch_vcpu_run_pid_change
+Date: Thu, 24 May 2018 17:56:32 +0100
+Subject: [PATCH v11 03/19] arm64: Use update{,_tsk}_thread_flag()
 In-Reply-To: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
 References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527181008-13549-5-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527181008-13549-4-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
-
-KVM/ARM differs from other architectures in having to maintain an
-additional virtual address space from that of the host and the
-guest, because we split the execution of KVM across both EL1 and
-EL2.
-
-This results in a need to explicitly map data structures into EL2
-(hyp) which are accessed from the hyp code.  As we are about to be
-more clever with our FPSIMD handling on arm64, which stores data in
-the task struct and uses thread_info flags, we will have to map
-parts of the currently executing task struct into the EL2 virtual
-address space.
-
-However, we don't want to do this on every KVM_RUN, because it is a
-fairly expensive operation to walk the page tables, and the common
-execution mode is to map a single thread to a VCPU.  By introducing
-a hook that architectures can select with
-HAVE_KVM_VCPU_RUN_PID_CHANGE, we do not introduce overhead for
-other architectures, but have a simple way to only map the data we
-need when required for arm64.
-
-This patch introduces the framework only, and wires it up in the
-arm/arm64 KVM common code.
+This patch uses the new update_thread_flag() helpers to simplify a
+couple of if () set; else clear; constructs.
 
 No functional change.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/linux/kvm_host.h | 9 +++++++++
- virt/kvm/Kconfig         | 3 +++
- virt/kvm/kvm_main.c      | 7 ++++++-
- 3 files changed, 18 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/fpsimd.c | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 6930c63..4268ace 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1276,4 +1276,13 @@ static inline long kvm_arch_vcpu_async_ioctl(struct file *filp,
- void kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
- 		unsigned long start, unsigned long end);
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 12e1c96..9d85373 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -618,10 +618,8 @@ int sve_set_vector_length(struct task_struct *task,
+ 	task->thread.sve_vl = vl;
  
-+#ifdef CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE
-+int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu);
-+#else
-+static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE */
-+
- #endif
-diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-index cca7e06..72143cf 100644
---- a/virt/kvm/Kconfig
-+++ b/virt/kvm/Kconfig
-@@ -54,3 +54,6 @@ config HAVE_KVM_IRQ_BYPASS
+ out:
+-	if (flags & PR_SVE_VL_INHERIT)
+-		set_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
+-	else
+-		clear_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
++	update_tsk_thread_flag(task, TIF_SVE_VL_INHERIT,
++			       flags & PR_SVE_VL_INHERIT);
  
- config HAVE_KVM_VCPU_ASYNC_IOCTL
-        bool
+ 	return 0;
+ }
+@@ -910,12 +908,12 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+ 		 * upon the next return to userland.
+ 		 */
+-		if (__this_cpu_read(fpsimd_last_state.st) ==
+-			&next->thread.uw.fpsimd_state
+-		    && next->thread.fpsimd_cpu == smp_processor_id())
+-			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+-		else
+-			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
++		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
++					&next->thread.uw.fpsimd_state;
++		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
 +
-+config HAVE_KVM_VCPU_RUN_PID_CHANGE
-+       bool
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index c7b2e92..c32e240 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -2550,8 +2550,13 @@ static long kvm_vcpu_ioctl(struct file *filp,
- 		oldpid = rcu_access_pointer(vcpu->pid);
- 		if (unlikely(oldpid != current->pids[PIDTYPE_PID].pid)) {
- 			/* The thread running this VCPU changed. */
--			struct pid *newpid = get_task_pid(current, PIDTYPE_PID);
-+			struct pid *newpid;
++		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
++				       wrong_task || wrong_cpu);
+ 	}
+ }
  
-+			r = kvm_arch_vcpu_run_pid_change(vcpu);
-+			if (r)
-+				break;
-+
-+			newpid = get_task_pid(current, PIDTYPE_PID);
- 			rcu_assign_pointer(vcpu->pid, newpid);
- 			if (oldpid)
- 				synchronize_rcu();
 -- 
 2.1.4
