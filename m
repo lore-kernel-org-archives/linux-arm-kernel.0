@@ -1,40 +1,46 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 25 May 2018 00:32:44 +0200
-Subject: [PATCH 6/9] asm-generic/bitops/atomic.h: Rewrite using
- atomic_fetch_*
-In-Reply-To: <20180524220610.GA7607@andrea>
-References: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
- <1527159586-8578-7-git-send-email-will.deacon@arm.com>
- <20180524124410.GF12198@hirez.programming.kicks-ass.net>
- <20180524124734.GE8689@arm.com>
- <20180524130948.f37eltocl5tnittp@lakrids.cambridge.arm.com>
- <20180524220610.GA7607@andrea>
-Message-ID: <20180524223244.GO12198@hirez.programming.kicks-ass.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 24 May 2018 16:17:32 -0700
+Subject: [PATCH v2 1/3] input: touchscreen: edt-ft5x06: don't make device
+ a wakeup source by default
+In-Reply-To: <CAL_JsqJQt6vFqH-KzNvjW+FZXCgzNAwXj_nSYow2Uz2Vcmi_Cg@mail.gmail.com>
+References: <20180517090552.5704-1-daniel@zonque.org>
+ <20180517090552.5704-2-daniel@zonque.org>
+ <20180522175413.GA24850@rob-hp-laptop>
+ <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
+ <CAL_JsqJQt6vFqH-KzNvjW+FZXCgzNAwXj_nSYow2Uz2Vcmi_Cg@mail.gmail.com>
+Message-ID: <20180524231732.GC177107@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 12:06:10AM +0200, Andrea Parri wrote:
-> Hi Mark,
+On Wed, May 23, 2018 at 09:45:05AM -0500, Rob Herring wrote:
+> On Wed, May 23, 2018 at 3:27 AM, Daniel Mack <daniel@zonque.org> wrote:
+> > On Tuesday, May 22, 2018 07:54 PM, Rob Herring wrote:
+> >>
+> >> On Thu, May 17, 2018 at 11:05:50AM +0200, Daniel Mack wrote:
+> >>>
+> >>> Allow configuring the device as wakeup source through device properties,
+> >>> as
+> >>> not all platforms want to wake up on touch screen activity.
+> >>>
+> >>> The I2C core automatically reads the "wakeup-source" DT property to
+> >>> configure a device's wakeup capability, and board supports files can set
+> >>> I2C_CLIENT_WAKE in the flags.
+> >>
+> >>
+> >> This will break wake-up on working systems. Looks like mostly i.MX, but
+> >> there's one AM437x board. If that board doesn't care, then it is up to
+> >> Shawn.
+> >
+> >
+> > I added the property to the dts files, but as Dmitry pointed out, I missed
+> > some. Sorry for that.
 > 
-> > As an aside, If I complete the autogeneration stuff, it'll be possible
-> > to generate those. I split out the necessary barriers in [1], but I
-> > still have a lot of other preparatory cleanup to do.
-> 
-> I do grasp the rationale behind that naming:
-> 
->   __atomic_mb_{before,after}_{acquire,release,fence}()
-> 
-> and yet I remain puzzled by it:
-> 
-> For example, can you imagine (using):
-> 
->   __atomic_mb_before_acquire() ?
-> 
-> (as your __atomic_mb_after_acquire() is whispering me "acquire-fences"...)
+> Just adding the property to dts files doesn't fix the compatibility
+> problem. If a user uses an existing dtb (before this change) with a
+> new kernel (after this change), then wakeup will stop working.
 
-Yes, I really do think he means acquire-fence. It is however something I
-have vague memories of not being liked much because it is the memop
-itself that carries the ordering.
+Is this a practical problem though? Do we know of any products with
+this touch panel that use DTS not distributed with the kernel?
 
-That said, this is only an implementation detail and not a public
-interface, so maybe we can get away with it.
+-- 
+Dmitry
