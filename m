@@ -1,67 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 24 May 2018 15:44:18 +0200
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <CAOtvUMdCSoxYjpyb+fD36EE5+4sV4CjrxwK94RQ7bNKE5rajmQ@mail.gmail.com>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-4-git-send-email-gilad@benyossef.com>
- <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
- <20180516074333.i2672u435ymwffk3@verge.net.au>
- <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
- <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
- <CAOtvUMcf-fHduThORv3cbcN16wEm_Si27OjSjAmSc9g5eK4PJw@mail.gmail.com>
- <CAMuHMdX-t8WfjRKpZ7UxXBbBNojsn-8z7_BM9grmLJcf=9Ks2Q@mail.gmail.com>
- <CAOtvUMdCSoxYjpyb+fD36EE5+4sV4CjrxwK94RQ7bNKE5rajmQ@mail.gmail.com>
-Message-ID: <CAMuHMdXcGDVOdf52JcJD-nawJ6-0tTJp8e5Ok8_0P51uPRnthQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 24 May 2018 14:52:21 +0100
+Subject: [PATCH 1/5] Documentation: DT: Add optional 'timeout-sec'
+ property for sp805
+In-Reply-To: <4b0ec4ab-2d9e-1e4b-e294-c175805f4013@broadcom.com>
+References: <1527014840-21236-1-git-send-email-ray.jui@broadcom.com>
+ <1527014840-21236-2-git-send-email-ray.jui@broadcom.com>
+ <af81ea74-fb80-11e2-7bdc-d3607bdbd46b@arm.com>
+ <c542388f-e417-f624-ade1-95f9a2fc8a3b@broadcom.com>
+ <20180523185944.GA9989@rob-hp-laptop>
+ <4b0ec4ab-2d9e-1e4b-e294-c175805f4013@broadcom.com>
+Message-ID: <16e0b756-d455-77f3-0560-75cacf7e3afa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gilad,
-
-On Thu, May 24, 2018 at 3:20 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
-> On Tue, May 22, 2018 at 10:48 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Mon, May 21, 2018 at 3:43 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->>> On Thu, May 17, 2018 at 1:16 PM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>>> Indeed. From a quick glance, it looks like drivers/crypto/ccree/cc_driver.c
->>>> does not distinguish between the absence of the clock property, and an
->>>> actual error in getting the clock, and never considers any error a failure
->>>> (incl. -PROBE_DEFER).
->>>>
->>>> As of_clk_get() returns -ENOENT for both a missing clock property and a
->>>> missing clock, you should use (devm_)clk_get() instead, and distinguish
->>>> between NULL (no clock property) and IS_ERR() (actual failure -> abort).
+On 23/05/18 20:29, Ray Jui wrote:
+> 
+> 
+> On 5/23/2018 11:59 AM, Rob Herring wrote:
+>> On Wed, May 23, 2018 at 09:25:49AM -0700, Ray Jui wrote:
 >>>
->>> I was trying to do as you suggested but I didn't quite get what is the
->>> dev_id (2nd) parameter to devm_clk_get parameter is supposed to be.
+>>>
+>>> On 5/23/2018 3:57 AM, Robin Murphy wrote:
+>>>> On 22/05/18 19:47, Ray Jui wrote:
+>>>>> Update the SP805 binding document to add optional 'timeout-sec'
+>>>>> devicetree property
+>>>>>
+>>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>> ---
+>>>>> ?? Documentation/devicetree/bindings/watchdog/sp805-wdt.txt | 2 ++
+>>>>> ?? 1 file changed, 2 insertions(+)
+>>>>>
+>>>>> diff --git
+>>>>> a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>>>>> b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>>>>> index edc4f0e..f898a86 100644
+>>>>> --- a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>>>>> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>>>>> @@ -19,6 +19,8 @@ Required properties:
+>>>>> ?? Optional properties:
+>>>>> ?? - interrupts : Should specify WDT interrupt number.
+>>>>> +- timeout-sec : Should specify default WDT timeout in seconds. If
+>>>>> unset, the
+>>>>> +??????????????? default timeout is 30 seconds
+>>>>
+>>>> According to the SP805 TRM, the default interval is dependent on the
+>>>> rate of WDOGCLK, but would typically be a lot longer than that :/
+>>>>
+>>>> On a related note, anyone have any idea why we seem to have two subtly
+>>>> different SP805 bindings defined?
 >>
->> It's the (optional) name of the clock, helpful in case there is more than one.
->> In your case, NULL is fine.
->
-> I have assumed as much and tried it, it did not work and so I assumed
-> I am missing something and asked you.
-> It turns out I was missing the fact I was using the wrong device tree
-> file... :-(
->
-> So thanks, it works now :-)
+>> Sigh.
+>>
+>>> Interesting, I did not even know that until you pointed this out (and 
+>>> it's
+>>> funny that I found that I actually reviewed arm,sp805.txt internally in
+>>> Broadcom code review).
+>>>
+>>> It looks like one was done by Bhupesh Sharma (sp805-wdt.txt) and the 
+>>> other
+>>> was done by Anup Patel (arm,sp805.txt). Both were merged at the same 
+>>> time
+>>> around March 20, 2016: 915c56bc01d6. I'd assume both were sent out at 
+>>> around
+>>> the same time.
+>>>
+>>> It sounds like we should definitely remove one of them. Given that
+>>> sp805-wdt.txt appears to have more detailed descriptions on the use 
+>>> of the
+>>> clocks, should we remove arm,sp805.txt?
+>>
+>> Take whichever text you like, but I prefer filenames using the
+>> compatible string and the correct string is 'arm,sp805' because '-wdt'
+>> is redundant. You can probably safely just update all the dts files with
+>> 'arm,sp805' and just remove 'arm,sp805-wdt' because it is not actually
+>> used (as the ID registers are).
+> 
+> Okay. I'll consolidate everything into arm,sp805.txt. Will also fix all 
+> DTS files to use "arm,sp805". The fix for actual DTS files will be in a 
+> different patch series.
 
-Glad to hear that!
+Looking at the current in-tree DTs, for extra fun try to figure out 
+which binding each instance was following for the clocks. The most 
+common answer seems to be "neither"... :(
 
-> Having said that, while using devm)clk_get() is a better approach, it
-> does not seems to distinguish
-> between no "clocks" and a failure to clock information - it returns
-> ENOENT in both cases as well.
-
-Oh right, I guess I'm too used to not even getting that far due to the PM
-Domain code failing to obtain the clock...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Robin.
