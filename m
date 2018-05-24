@@ -1,117 +1,191 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Thu, 24 May 2018 15:50:30 +0800
-Subject: [PATCH v2 2/4] drm/mediatek: Add support for mediatek SOC MT2712
-In-Reply-To: <1527125197.6406.10.camel@mtksdaap41>
-References: <20180523022517.12103-1-stu.hsieh@mediatek.com>
- <20180523022517.12103-3-stu.hsieh@mediatek.com>
- <1527053036.10410.18.camel@mtksdaap41>
- <1527067696.19074.28.camel@mtksdaap41>
- <1527125197.6406.10.camel@mtksdaap41>
-Message-ID: <1527148230.11810.3.camel@mtksdaap41>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 24 May 2018 12:06:59 +0200
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180524095056.GR13470@e103592.cambridge.arm.com>
+References: <1527005119-6842-1-git-send-email-Dave.Martin@arm.com>
+ <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+ <20180523114812.GH55598@C02W217FHV2R.local>
+ <20180523133158.GJ13470@e103592.cambridge.arm.com>
+ <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
+ <20180523150337.GO13470@e103592.cambridge.arm.com>
+ <20180524083350.GK55598@C02W217FHV2R.local>
+ <20180524095056.GR13470@e103592.cambridge.arm.com>
+Message-ID: <20180524100659.GO55598@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
-
-On Thu, 2018-05-24 at 09:26 +0800, CK Hu wrote:
-> Hi, Stu:
+On Thu, May 24, 2018 at 10:50:56AM +0100, Dave Martin wrote:
+> On Thu, May 24, 2018 at 10:33:50AM +0200, Christoffer Dall wrote:
+> > On Wed, May 23, 2018 at 04:03:37PM +0100, Dave Martin wrote:
+> > > On Wed, May 23, 2018 at 03:56:57PM +0100, Catalin Marinas wrote:
+> > > > On Wed, May 23, 2018 at 02:31:59PM +0100, Dave P Martin wrote:
+> > > > > On Wed, May 23, 2018 at 01:48:12PM +0200, Christoffer Dall wrote:
+> > > > > > On Tue, May 22, 2018 at 05:05:08PM +0100, Dave Martin wrote:
+> > > > > > > This is true by construction however: TIF_FOREIGN_FPSTATE is never
+> > > > > > > cleared except when returning to userspace or returning from a
+> > > > > > > signal: thus, for a true kernel thread no FPSIMD context is ever
+> > > > > > > loaded, TIF_FOREIGN_FPSTATE will remain set and no context will
+> > > > > > > ever be saved.
+> > > > > > 
+> > > > > > I don't understand this construction proof; from looking at the patch
+> > > > > > below it is not obvious to me why fpsimd_thread_switch() can never have
+> > > > > > !wrong_task && !wrong_cpu and therefore clear TIF_FOREIGN_FPSTATE for a
+> > > > > > kernel thread?
+> > > > > 
+> > > > > Looking at this again, I think it is poorly worded.  This patch aims to
+> > > > > make it true by construction, but it isn't prior to the patch.
+> > > > > 
+> > > > > I'm tempted to delete the paragraph: the assertion of both untrue and
+> > > > > not the best way to justify that this patch works.
+> > > > > 
+> > > > > 
+> > > > > How about:
+> > > > > 
+> > > > > -8<-
+> > > > > 
+> > > > > The context switch logic already isolates user threads from each other.
+> > > > > This, it is sufficient for isolating user threads from the kernel,
+> > 
+> > s/This/Thus/ ?
+> > 
+> > I don't understand what 'it' refers to here?
+> > 
+> > > > > since the goal either way is to ensure that code executing in userspace
+> > > > > cannot see any FPSIMD state except its own.  Thus, there is no special
+> > > > > property of kernel threads that we care about except that it is
+> > > > > pointless to save or load FPSIMD register state for them.
+> > 
+> > Actually, I'm not really sure what this paragraph is getting at.
 > 
-> On Wed, 2018-05-23 at 17:28 +0800, Stu Hsieh wrote:
-> > On Wed, 2018-05-23 at 13:23 +0800, CK Hu wrote:
-> > > Hi, Stu:
-> > > 
-> > > I've some inline comment.
-> > > 
-> > > On Wed, 2018-05-23 at 10:25 +0800, Stu Hsieh wrote:
-> > > > This patch add support for the Mediatek MT2712 DISP subsystem.
-> > > > There are two OVL engine and three disp output in MT2712.
+> Reading this again, I don't think the paragraph adds much useful.
+> 
+> So I propose deleting that too.
+> 
+> > > > > 
+> > > > > At worst, the removal of all the kernel thread special cases by this
+> > > > > patch would thus spuriously load and save state for kernel threads when
+> > > > > unnecessary.
+> > > > > 
+> > > > > But the context switch logic is already deliberately optimised to defer
+> > > > > reloads of the regs until ret_to_user (or sigreturn as a special case),
+> > > > > which kernel threads by definition never reach.
+> > > > > 
+> > > > > ->8-
 > > > > 
-> > > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > > > ---
-> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 50 +++++++++++++++++++++++++++--
-> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  8 +++--
-> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  7 ++--
-> > > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 47 +++++++++++++++++++++++++--
-> > > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |  7 ++--
-> > > >  5 files changed, 108 insertions(+), 11 deletions(-)
-> > > > 
-> > > > +#define MT2712_MUTEX_MOD_DISP_AAL0		BIT(20)
-> > > > +#define MT2712_MUTEX_MOD_DISP_UFOE		BIT(22)
-> > > > +#define MT2712_MUTEX_MOD_DISP_PWM0		BIT(23)
-> > > > +#define MT2712_MUTEX_MOD_DISP_PWM1		BIT(24)
-> > > > +#define MT2712_MUTEX_MOD_DISP_PWM2		BIT(10)
-> > > > +#define MT2712_MUTEX_MOD_DISP_OD0		BIT(25)
-> > > > +/* modules more than 32, add BIT(31) when using DISP_REG_MUTEX_MOD2 bit */
-> > > > +#define MT2712_MUTEX_MOD2_DISP_AAL1		(BIT(1) | BIT(31))
+> > > > The "at worst" paragraph makes it look like it could happen (at least
+> > > > until you reach the last paragraph). Maybe you can just say that
+> > > > wrong_task and wrong_cpu (with the fpsimd_cpu = NR_CPUS addition) are
+> > > > always true for kernel threads. You should probably mention this in a
+> > > > comment in the code as well.
 > > > 
-> > > I think a better definition is
+> > > What if I just delete the second paragraph, and remove the "But" from
+> > > the start of the third, and append:
 > > > 
-> > > #define MT2712_MUTEX_MOD2_DISP_AAL1		BIT(33)
+> > > "As a result, the wrong_task and wrong_cpu tests in
+> > > fpsimd_thread_switch() will always yield false for kernel threads."
 > > > 
-> > > when you need to access this register,
-> > > 
-> > > if (ddp->mutex_mod[id] < BIT(32)) {
-> > > 	offset = DISP_REG_MUTEX_MOD(mutex->id);
-> > > 	reg = readl_relaxed(ddp->regs + offset);
-> > > 	reg |= ddp->mutex_mod[id];
-> > > 	writel_relaxed(reg, ddp->regs + offset);
-> > > } else {
-> > > 	offset = DISP_REG_MUTEX_MOD2(mutex->id);
-> > > 	reg = readl_relaxed(ddp->regs + offset);
-> > > 	reg |= (ddp->mutex_mod[id] >> 32);
-> > > 	writel_relaxed(reg, ddp->regs + offset);
-> > > }
-> > > 
-> > > because DISP_REG_MUTEX_MOD BIT(31) could be used for some module.
+> > > ...with a similar comment in the code?
 > > 
-> > This modification is workable, but result some build warning like
-> > following:
-> > 1. #define BIT(nr)   (1UL << (nr)) in include/linux/bitops.h
-> > 2. [DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
-> >    => we need to modify the definition about "static const unsigned int
-> > mt2712_mutex_mod"
+> > ...with a risk of being a bit over-pedantic and annoying, may I suggest
+> > the following complete commit text:
 > > 
+> > ------8<------
+> > Currently the FPSIMD handling code uses the condition task->mm ==
+> > NULL as a hint that task has no FPSIMD register context.
+> > 
+> > The ->mm check is only there to filter out tasks that cannot
+> > possibly have FPSIMD context loaded, for optimisation purposes.
+> > However, TIF_FOREIGN_FPSTATE must always be checked anyway before
+> > saving FPSIMD context back to memory.  For this reason, the ->mm
+> > checks are not useful, providing that that TIF_FOREIGN_FPSTATE is
+> > maintained properly for kernel threads.
+> > 
+> > FPSIMD context is never preserved for kernel threads across a context
+> > switch and therefore TIF_FOREIGN_FPSTATE should always be true for
 > 
-> Currently, mutex_mod is a bitwise definition. I think it could be
-> changed to index definition such as
+> (This refactoring opens up the interesting possibility of making
+> kernel-mode NEON in task context preemptible for kernel threads so
+> that we actually do preserve state... but that's a discussion for
+> another day.  There may be code around that relies on
+> kernel_neon_begin() disabling preemption for real.)
 > 
+> > kernel threads.  This is indeed the case, as the wrong_task and
 > 
-> #define MT2712_MUTEX_MOD_DISP_PWM2		10
-> #define MT2712_MUTEX_MOD_DISP_OD0		25
-> #define MT2712_MUTEX_MOD2_DISP_AAL1		33
+> This suggests that TIF_FOREIGN_FPSTATE is always true for kernel
+> threads today.  This is not quite because use_mm() can make mm non-
+> NULL.
 > 
-> when you need to access this register,
+
+I was suggesting that it's always true after this patch.
+
+> > wrong_cpu tests in fpsimd_thread_switch() will always yield false for
+> > kernel threads.
 > 
-> if (ddp->mutex_mod[id] < 32) {
-> 	offset = DISP_REG_MUTEX_MOD(mutex->id);
-> 	reg = readl_relaxed(ddp->regs + offset);
-> 	reg |= 1 << ddp->mutex_mod[id];
-> 	writel_relaxed(reg, ddp->regs + offset);
-> } else {
-> 	offset = DISP_REG_MUTEX_MOD2(mutex->id);
-> 	reg = readl_relaxed(ddp->regs + offset);
-> 	reg |= 1 << (ddp->mutex_mod[id] - 32);
-> 	writel_relaxed(reg, ddp->regs + offset);
-> }
+> ("false" -> "true".  My bad.)
 > 
-> Regards,
-> CK
-ok, these modification has no build warning.
-I would also change the definition about 2701 and 8173 from bitwise to
-index.
+> > Further, the context switch logic is already deliberately optimised to
+> > defer reloads of the FPSIMD context until ret_to_user (or sigreturn as a
+> > special case), which kernel threads by definition never reach, and
+> > therefore this change introduces no additional work in the critical
+> > path.
+> > 
+> > This patch removes the redundant checks and special-case code.
+> > ------8<------
+> 
+> Looking at my existing text, I rather reworded it like this.
+> Does this work any better for you?
+> 
+> --8<--
+> 
+> Currently the FPSIMD handling code uses the condition task->mm ==
+> NULL as a hint that task has no FPSIMD register context.
+> 
+> The ->mm check is only there to filter out tasks that cannot
+> possibly have FPSIMD context loaded, for optimisation purposes.
+> Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
+> saving FPSIMD context back to memory.  For these reasons, the ->mm
+> checks are not useful, providing that TIF_FOREIGN_FPSTATE is
+> maintained in a consistent way for kernel threads.
+
+Consistent with what?  Without more context or explanation,
+I'm not sure what the reader is to make of that.  Do you not mean the
+TIF_FOREIGN_FPSTATE is always true for kernel threads?
 
 > 
-> > > > +#define MT2712_MUTEX_MOD2_DISP_OD1		(BIT(2) | BIT(31))
-> > > > +
-> > > >  #define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
-> > > >  #define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
-> > > >  #define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
-> > > > @@ -74,6 +96,7 @@
-> > > >  
-> > > >  
-> > > 
-> > > 
-> > 
-> > 
+> The context switch logic is already deliberately optimised to defer
+> reloads of the regs until ret_to_user (or sigreturn as a special
+> case), and save them only if they have been previously loaded.
+> Kernel threads by definition never reach these paths.  As a result,
+
+I'm struggling with the "As a result," here.  Is this because reloads of
+regs in ret_to_user (or sigreturn) are the only places that can make
+wrong_cpu or wrong_task be false?
+
+(I'm actually wanting to understand this, not just bikeshedding the
+commit message, as new corner cases keep coming up on this logic.)
+
+> the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
+> always yield true for kernel threads.
 > 
+> This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
+> task.  The fpsimd_flush_task_state() call already present in                    copy_thread() ensures the same for any new task.
+
+nit: funny formatting
+
+nit: ensuring that TIF_FOREIGN_FPSTATE *remains* set whenever a kernel
+thread is scheduled in?
+
 > 
+> With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
+> ensures that no extra context save work is added for kernel
+> threads, and eliminates the redundant context saving that may
+> currently occur for kernel threads that have acquired an mm via
+> use_mm().
+> 
+> -->8--
+
+If you can slightly connect the dots with the "As a result" above, I'm
+fine with your version of the text.
+
+Thanks,
+-Christoffer
