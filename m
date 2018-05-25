@@ -1,48 +1,107 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:27 +0100
-Subject: [PATCH v4 21/26] arm64: Add build option for IRQ masking via priority
+Date: Fri, 25 May 2018 10:49:19 +0100
+Subject: [PATCH v4 13/26] arm/arm64: gic-v3: Add helper functions to manage
+ IRQ priorities
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-22-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-14-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a build option to enable using  GICv3 priorities to enable/disable
-interrupts.
+Add a function to check if priority masking is supported and accessors
+for PMR/RPR.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/Kconfig | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/include/asm/arch_gicv3.h   | 21 +++++++++++++++++++++
+ arch/arm64/include/asm/arch_gicv3.h | 20 ++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eb2cf49..ab214b9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -938,6 +938,21 @@ config HARDEN_EL2_VECTORS
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 0bd5307..58d5d3e 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -34,6 +34,7 @@
+ #define ICC_SRE				__ACCESS_CP15(c12, 0, c12, 5)
+ #define ICC_IGRPEN1			__ACCESS_CP15(c12, 0, c12, 7)
+ #define ICC_BPR1			__ACCESS_CP15(c12, 0, c12, 3)
++#define ICC_RPR				__ACCESS_CP15(c12, 0, c11, 3)
  
- 	  If unsure, say Y.
+ #define __ICC_AP0Rx(x)			__ACCESS_CP15(c12, 0, c8, 4 | x)
+ #define ICC_AP0R0			__ICC_AP0Rx(0)
+@@ -245,6 +246,21 @@ static inline void gic_write_bpr1(u32 val)
+ 	write_sysreg(val, ICC_BPR1);
+ }
  
-+config USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	bool "Use ICC system registers for IRQ masking"
-+	select CONFIG_ARM_GIC_V3
-+	help
-+	  Using the ICC system registers for IRQ masking makes it possible
-+	  to simulate NMI on ARM64 systems. This allows several interesting
-+	  features (especially debug features) to be used on these systems.
++static inline u32 gic_read_pmr(void)
++{
++	return read_sysreg(ICC_PMR);
++}
 +
-+	  Say Y here to implement IRQ masking using ICC system
-+	  registers when the GIC System Registers are available. The changes
-+	  are applied dynamically using the alternatives system so it is safe
-+	  to enable this option on systems with older interrupt controllers.
++static inline void gic_write_pmr(u32 val)
++{
++	write_sysreg(val, ICC_PMR);
++}
 +
-+	  If unsure, say N
++static inline u32 gic_read_rpr(void)
++{
++	return read_sysreg(ICC_RPR);
++}
 +
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
+ /*
+  * Even in 32bit systems that use LPAE, there is no guarantee that the I/O
+  * interface provides true 64bit atomic accesses, so using strd/ldrd doesn't
+@@ -347,5 +363,10 @@ static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
+ 
+ #define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
+ 
++static inline bool gic_prio_masking_enabled(void)
++{
++	return false;
++}
++
+ #endif /* !__ASSEMBLY__ */
+ #endif /* !__ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index e278f94..98b09db 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -114,6 +114,21 @@ static inline void gic_write_bpr1(u32 val)
+ 	write_sysreg_s(val, SYS_ICC_BPR1_EL1);
+ }
+ 
++static inline u32 gic_read_pmr(void)
++{
++	return read_sysreg_s(SYS_ICC_PMR_EL1);
++}
++
++static inline void gic_write_pmr(u32 val)
++{
++	write_sysreg_s(val, SYS_ICC_PMR_EL1);
++}
++
++static inline u32 gic_read_rpr(void)
++{
++	return read_sysreg_s(SYS_ICC_RPR_EL1);
++}
++
+ #define gic_read_typer(c)		readq_relaxed(c)
+ #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
+ #define gic_read_lpir(c)		readq_relaxed(c)
+@@ -140,5 +155,10 @@ static inline void gic_write_bpr1(u32 val)
+ #define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
+ #define gits_read_vpendbaser(c)		readq_relaxed(c)
+ 
++static inline bool gic_prio_masking_enabled(void)
++{
++	return cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
++}
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
 -- 
 1.9.1
