@@ -1,94 +1,22 @@
-From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Fri, 25 May 2018 09:00:04 -0400
-Subject: [PATCH v6 3/9] docs: Add Generic Counter interface documentation
-In-Reply-To: <cd045792-8ed2-8d83-231a-661975ffc7c5@st.com>
-References: <cover.1526487615.git.vilhelm.gray@gmail.com>
- <aa4d62315bb11ddc66d0e1a685c81b1721ffe624.1526487615.git.vilhelm.gray@gmail.com>
- <20180520163109.22b11af8@archlinux> <20180521134729.GB5723@sophia>
- <20180522180805.2b61f0ed@archlinux>
- <cd045792-8ed2-8d83-231a-661975ffc7c5@st.com>
-Message-ID: <20180525130004.GA3751@sophia>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 25 May 2018 09:30:59 -0400
+Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
+In-Reply-To: <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
+References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
+ <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
+ <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+ <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <984b9734-244d-04e9-946f-7524f148ff7c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:26:11AM +0200, Fabrice Gasnier wrote:
->On 05/22/2018 07:08 PM, Jonathan Cameron wrote:
->>>>> +* Quadrature x2 Rising:
->>>>> +  Rising edges on either quadrature pair signals updates the respective
->>>>> +  count. Quadrature encoding determines the direction.  
->>>> This one I've never met.  Really? There are devices who do this form
->>>> of crazy? It gives really uneven counting and I'm failing to see when
->>>> it would ever make sense...  References for these odd corner cases
->>>> would be good.
->>>>
->>>>
->>>> __|---|____|-----|____
->>>> ____|----|____|-----|____
->>>>
->>>> 001122222223334444444  
->>> That's the same reaction I had when I discovered this -- in fact the
->>> STM32 LP Timer is the first time I've come across such a quadrature
->>> mode. I'm not sure of the use case for this mode, because positioning
->>> wouldn't be precise as you've pointed out. Perhaps Fabrice or Benjamin
->>> can probe the ST guys responsible for this design choice to figure out
->>> the rationale.
->> Hmm.  My inclination would be to not support it unless someone can up
->> with a meaningful use.  We are adding ABI (be it not much) for a case
->> that to us makes no sense.
->
->Hi Jonathan, William,
->
->Sorry for the late reply. To follow your advise, we can probably drop
->this for now. I think simple counter, or quadrature x4 will be mostly
->used for now. As you pointed out, there's not much ABI for x2
->rising/falling cases. It will not be a big deal to add it later if needed.
->
->I can help to update (remove & test) this in LP-Timer counter driver if
->you wish.
->
->Please let me know,
->
->Thanks,
->Fabrice
+On 5/24/2018 2:35 PM, Bjorn Helgaas wrote:
+> That sounds like a reasonable idea, and it is definitely another can
+> of worms.  I looked briefly at some of the .shutdown() cases:
 
-All right, let's postpone the COUNT_FUNCTION_QUADRATURE_X2_RISING and
-COUNT_FUNCTION_QUADRATURE_X2_FALLING modes for now. Fabrice, send me
-over an update patch removing these modes from the LP-Timer counter
-driver and I'll squash it in with the next patchset revision.
+should we throw it into 4.18 and see what happens?
 
-I'll keep the rest of the quadrature modes the same as they are used in
-the other counter drivers as well (with the remaining "Quadrature x1 B"
-staying to complete the pattern) and I've seen real world use cases for
-each:
-
-    * COUNT_FUNCTION_QUADRATURE_X1_A
-    * COUNT_FUNCTION_QUADRATURE_X1_B
-    * COUNT_FUNCTION_QUADRATURE_X2_A
-    * COUNT_FUNCTION_QUADRATURE_X2_B
-
-Adding support in the future for "Quadrature x2 Rising" and "Quadrature
-x2 Falling" will be trivial, so really the main requirement in order to
-bring these modes back is to provide reasonable use cases for them. My
-suspicion is that there was some rationale for these Quadrature x2 modes
-in the STM32 LP-Timer -- afterall, why else would the engineers go
-through the trouble of designing and implementing it -- but until that
-use case is clear, it's best to wait on changing the Generic Counter ABI
-lest we end up with an interface that is never used in the real world.
-
-William Breathitt Gray
-
->
->> 
->> Looks rather like the sort of thing that is a side effect of the
->> implementation rather than deliberate.
->> 
->>> I'm leaving in these modes for now, as they do exist in the STM32 LP
->>> Timer, but it does make me curious what the intentions for them were
->>> (perhaps use cases outside of traditional quadrature encoder
->>> positioning).
->>>
->> Sure if there is a usecase then fair enough.
->> 
->> Jonathan
->> 
->> 
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
