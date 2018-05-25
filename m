@@ -1,32 +1,63 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 25 May 2018 15:01:29 +0100
-Subject: [PATCH v3 13/15] ARM: spectre-v2: KVM: invalidate icache on guest
- exit for Brahma B15
+Date: Fri, 25 May 2018 15:01:34 +0100
+Subject: [PATCH v3 14/15] ARM: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
 In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
 References: <20180525135938.GE17671@n2100.armlinux.org.uk>
-Message-ID: <E1fMDHd-00073z-Bg@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fMDHi-000746-Fu@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include Brahma B15 in the Spectre v2 KVM workarounds.
+We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+So let's intercept it as early as we can by testing for the
+function call number as soon as we've identified a HVC call
+coming from the guest.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/include/asm/kvm_mmu.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/kvm/hyp/hyp-entry.S | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 48edb1f4ced4..fea770f78144 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -306,6 +306,7 @@ static inline void *kvm_get_hyp_vector(void)
- 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
- 	}
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 918a05dd2d63..aa3f9a9837ac 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
  
-+	case ARM_CPU_PART_BRAHMA_B15:
- 	case ARM_CPU_PART_CORTEX_A15:
- 	{
- 		extern char __kvm_hyp_vector_ic_inv[];
++#include <linux/arm-smccc.h>
+ #include <linux/linkage.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -202,7 +203,7 @@ ENDPROC(__hyp_do_panic)
+ 	lsr     r2, r2, #16
+ 	and     r2, r2, #0xff
+ 	cmp     r2, #0
+-	bne	guest_trap		@ Guest called HVC
++	bne	guest_hvc_trap		@ Guest called HVC
+ 
+ 	/*
+ 	 * Getting here means host called HVC, we shift parameters and branch
+@@ -253,6 +254,20 @@ THUMB(	orr	lr, #1)
+ 	pop	{r2, lr}
+ 	eret
+ 
++guest_hvc_trap:
++	movw	r2, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
++	movt	r2, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
++	ldr	r0, [sp]		@ Guest's r0
++	teq	r0, r2
++	bne	guest_trap
++	add	sp, sp, #12
++	@ Returns:
++	@ r0 = 0
++	@ r1 = HSR value (perfectly predictable)
++	@ r2 = ARM_SMCCC_ARCH_WORKAROUND_1
++	mov	r0, #0
++	eret
++
+ guest_trap:
+ 	load_vcpu r0			@ Load VCPU pointer to r0
+ 
 -- 
 2.7.4
