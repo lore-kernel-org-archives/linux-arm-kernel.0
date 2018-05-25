@@ -1,67 +1,56 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 May 2018 16:52:08 +0100
-Subject: [PATCH v3 08/15] ARM: spectre-v2: harden user aborts in kernel
- space
-In-Reply-To: <20180525154742.GA77025@atomide.com>
-References: <20180525135938.GE17671@n2100.armlinux.org.uk>
- <E1fMDHD-00073Q-Ob@rmk-PC.armlinux.org.uk>
- <20180525154742.GA77025@atomide.com>
-Message-ID: <20180525155207.GF17671@n2100.armlinux.org.uk>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 25 May 2018 23:54:18 +0800
+Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
+In-Reply-To: <20180525152713.GD4091@kernel.org>
+References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+ <1526892748-326-2-git-send-email-leo.yan@linaro.org>
+ <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
+ <20180522083920.GD31075@leoy-ThinkPad-X240s>
+ <03a53a72-8af5-02de-21a8-fd02a0974ed6@arm.com>
+ <20180525152713.GD4091@kernel.org>
+Message-ID: <20180525155418.GA27273@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 08:47:42AM -0700, Tony Lindgren wrote:
-> * Russell King <rmk+kernel@armlinux.org.uk> [180525 15:10]:
-> > +static void cpu_v7_spectre_init(void)
-> > +{
-> > +	const char *spectre_v2_method = NULL;
-> > +	int cpu = smp_processor_id();
-> > +
-> > +	if (per_cpu(harden_branch_predictor_fn, cpu))
-> > +		return;
-> > +
-> > +	switch (read_cpuid_part()) {
-> > +	case ARM_CPU_PART_CORTEX_A8:
-> > +	case ARM_CPU_PART_CORTEX_A9:
-> > +	case ARM_CPU_PART_CORTEX_A12:
-> > +	case ARM_CPU_PART_CORTEX_A17:
-> > +	case ARM_CPU_PART_CORTEX_A73:
-> > +	case ARM_CPU_PART_CORTEX_A75:
-> > +		per_cpu(harden_branch_predictor_fn, cpu) =
-> > +			harden_branch_predictor_bpiall;
-> > +		spectre_v2_method = "BPIALL";
-> > +		break;
-> > +
-> > +	case ARM_CPU_PART_CORTEX_A15:
-> > +	case ARM_CPU_PART_BRAHMA_B15:
-> > +		per_cpu(harden_branch_predictor_fn, cpu) =
-> > +			harden_branch_predictor_iciallu;
-> > +		spectre_v2_method = "ICIALLU";
-> > +		break;
-> > +	}
-> > +	if (spectre_v2_method)
-> > +		pr_info("CPU%u: Spectre v2: using %s workaround\n",
-> > +			smp_processor_id(), spectre_v2_method);
-> > +}
-> 
-> We can now get this with the whole series applied:
-> 
-> CPU0: Spectre v2: firmware did not set auxiliary control register
-> IBE bit, system vulnerable
-> CPU: Spectre v2: using ICIALLU workaround
-> 
-> So maybe change the wording from "using %s workaround" to
-> "chosen workaround %s"?
-> 
-> Or I guess disabling the pr_info when not functional can
-> be done in the later patches based on some variable set
-> by check_spectre_auxcr() would be doable too.
+Hi Arnaldo, Rob,
 
-You should not be getting both messages.  It looks like you're using
-an older series - I assumed you pulled my git tree rather than the
-patches?  The public git tree isn't up to date with these changes.
+On Fri, May 25, 2018 at 12:27:13PM -0300, Arnaldo Carvalho de Melo wrote:
+> Em Fri, May 25, 2018 at 03:03:47PM +0100, Robert Walker escreveu:
+> > Hi Leo,
+> > 
+> > Following the discussions from your reply to this with a simplified patch,
+> > this version of the patch works better as you also need to emit a branch
+> > sample when handling a CS_ETM_TRACE_ON packet to indicate the end of a block
+> > of trace.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+I also will follow the suggestion as Rob mentioned in another email:
+"The deadbeefdeadbeef addresses are a bit ugly - these are just dummy
+values emitted in the decoder layer - maybe these should be changed
+to 0."
+
+> > This patch does not break the output from perf inject to generate
+> > instruction samples for AutoFDO, so I am happy with that.
+
+Thanks for confirmation.
+
+> > Regards
+> > 
+> > Rob
+> > 
+> > Reviewed-by: Robert Walker <robert.walker@arm.com>
+> 
+> So, Leo, can you please resubmit, bumping the v2 to v3 (or the latest
+> one, I haven't fully reread this thread) add this "Reviewed-by: Robert"
+> tag and any other that people may have provided, so that I can merge it?
+
+Sure!  I will respin the v3 patch series by following up Rob's
+suggestion and add Rob's review tag.
+
+BTW, I'd like to get ack from Mathieu as well.  Mathieu is working on
+CPU wide tracing, so I talked with Mathieu he will review the patch
+series if has conflict with CPU wide tracing.
+
+[...]
+
+Thanks,
+Leo Yan
