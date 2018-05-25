@@ -1,103 +1,47 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 25 May 2018 14:14:20 +0200
-Subject: [PATCH] drm/rockchip: vop: fix irq disabled after vop driver
- probed
-In-Reply-To: <8495bffd-2a52-ca85-1bc9-afc3ea0af8e4@arm.com>
-References: <b8eb41e576c4007d40223699eb951db32916b86a.camel@collabora.com>
- <25470133.K8n9sLBzRS@diego> <8495bffd-2a52-ca85-1bc9-afc3ea0af8e4@arm.com>
-Message-ID: <4318500.8KycslRrNH@phil>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Fri, 25 May 2018 15:17:39 +0300
+Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
+ under at91-usart mfd
+In-Reply-To: <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-7-radu.pirea@microchip.com>
+ <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
+ <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
+ <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
+Message-ID: <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-Am Freitag, 25. Mai 2018, 13:07:02 CEST schrieb Marc Zyngier:
-> [Thanks Robin for pointing me to that patch.]
+
+On 05/15/2018 04:14 PM, Richard Genoud wrote:
+> On 15/05/2018 14:47, Radu Pirea wrote:
+>> On Mon, 2018-05-14 at 12:57 +0200, Richard Genoud wrote:
+>>> After your patch, the DMA is not selected anymore:
+>>> atmel_usart_serial atmel_usart_serial.0.auto: TX channel not
+>>> available, switch to pio
+>>> instead of:
+>>> atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
+>>>
+>> Fixed.
+>>> And the kernel doesn't log anymore on the serial console, despite the
+>>> loglevel=8
+>>> (after reverting this series, the kernel logs reappears on the serial
+>>> console)
+>>>
+>> Which serial are you using as console?
+> fffff200.serial (sam9g35-cm)
+> ( stdout-path = "serial0:115200n8"; in the DTS )
 > 
-> Hi Heiko,
+> With this series applied, all the kernel log goes on the screen.
+> Without, it goes on the serial debug.
 > 
-> On 24/05/18 23:06, Heiko St?bner wrote:
-> > From: Sandy Huang <hjc@rock-chips.com>
-> > 
-> > The vop irq is shared between vop and iommu and irq probing in the
-> > iommu driver moved to the probe function recently. This can in some
-> > cases lead to a stall if the irq is triggered while the vop driver
-> > still has it disabled.
-> > 
-> > But there is no real need to disable the irq, as the vop can simply
-> > also track its enabled state and ignore irqs in that case.
-> > 
-> > So remove the enable/disable handling and add appropriate condition
-> > to the irq handler.
-> > 
-> > Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> > [added an actual commit message]
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Hi Ezequiel,
-> > 
-> > this patch came from a discussion I had with Rockchip people over the
-> > iommu changes and resulting issues back in april, but somehow was
-> > forgotten and not posted to the lists. Correcting that now.
-> > 
-> > So removing the enable/disable voodoo on the shared interrupt is
-> > the preferred way.
-> > 
-> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++-------
-> >  1 file changed, 7 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > index 510cdf0..61493d4 100644
-> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > @@ -549,8 +549,6 @@ static int vop_enable(struct drm_crtc *crtc)
-> >  
-> >  	spin_unlock(&vop->reg_lock);
-> >  
-> > -	enable_irq(vop->irq);
-> > -
-> >  	drm_crtc_vblank_on(crtc);
-> >  
-> >  	return 0;
-> > @@ -596,8 +594,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
-> >  
-> >  	vop_dsp_hold_valid_irq_disable(vop);
-> >  
-> > -	disable_irq(vop->irq);
-> > -
-> >  	vop->is_enabled = false;
-> >  
-> >  	/*
-> > @@ -1168,6 +1164,13 @@ static irqreturn_t vop_isr(int irq, void *data)
-> >  	int ret = IRQ_NONE;
-> >  
-> >  	/*
-> > +	 * since the irq is shared with iommu, iommu irq is enabled before vop
-> > +	 * enable, so before vop enable we do nothing.
-> > +	 */
-> > +	if (!vop->is_enabled)
-> > +		return IRQ_NONE;
-> > +
+I tested again with archlinux arm and poky-linux4sam release as distros 
+and kernel log goes on the serial debug. Can you give me more details 
+like cmdline?
+>>> (tests done on sam9g35)
+>>>
+>> I will consider the rest of suggestions.
+>>> regards,
+>>> Richard
 > 
-> What guarantee do we have that the IOMMU will actually service that
-> interrupt? Can't we get into a situation where the interrupt gets
-> ignored by both drivers and subsequently disabled by the core irq code
-> as being spurious?
-> 
-> From what I understood of the way things are plugged together on the
-> rockchip platforms, each individual VOP is behind a single IOMMU, hence
-> there there is hardly any point in handling IOMMU interrupts if the VOP
-> is off.
-
-Yeah, which is probably the reason that patch fell through the cracks
-initially. I resurrected it from the internal discussion because of the issue
-described below.
-
-> But I'm missing the actual reason behind this patch. Could you enlighten me?
-
-Recently the iommu driver moved the irq request from the iommu enablement
-to its probe function. With that change Ezequiel got various stalls, see
-	https://lkml.org/lkml/2018/5/24/1347
-
-
-Heiko
