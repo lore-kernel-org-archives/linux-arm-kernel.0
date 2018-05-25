@@ -1,11 +1,11 @@
 From: vgarodia@codeaurora.org (Vikash Garodia)
-Date: Fri, 25 May 2018 16:33:28 +0530
-Subject: qcom: add firmware file for Venus on SDM845 
-Message-ID: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
+Date: Fri, 25 May 2018 16:33:29 +0530
+Subject: qcom: add firmware file for Venus on SDM845
+In-Reply-To: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
+References: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
+Message-ID: <1527246209-26685-2-git-send-email-vgarodia@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-hi,
 
 This pull request adds firmware files for Venus h/w codec found on the Qualcomm SDM845 chipset.
 
