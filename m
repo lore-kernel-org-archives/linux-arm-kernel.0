@@ -1,36 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 04:47:33 -0700
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.18
-In-Reply-To: <5AFAF15A.20500@hisilicon.com>
-References: <5AFAF15A.20500@hisilicon.com>
-Message-ID: <20180525114733.a2gvjslv2bdfs64z@localhost>
+Date: Fri, 25 May 2018 04:49:18 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.18
+In-Reply-To: <7hh8n8tuw5.fsf@baylibre.com>
+References: <7hh8n8tuw5.fsf@baylibre.com>
+Message-ID: <20180525114918.6rhmoanzd5izbpdu@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 03:40:26PM +0100, Wei Xu wrote:
-> Hi Olof, Hi Arnd,
+On Tue, May 15, 2018 at 03:29:46PM -0700, Kevin Hilman wrote:
+> Hi Arnd, Olof,
 > 
-> Please help to pull the following changes.
-> Thanks!
+> This is mostly DT, but contains also contains the mach-meson change to
+> build the new DT, which might be more appropriate for the 'soc' branch,
+> but I left it here because it's just about enabling the new DT.  Let me
+> know if you prefer it split out.
 > 
-> Best Regards,
-> Wei
+> Kevin
 > 
-> ---
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.18v2
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
 > 
-> for you to fetch changes up to bb61c53601b4af0f33f99ec0a8c9315246a0b6d4:
+> for you to fetch changes up to 35ee52bea66c74a7c33cebda8692d61b1ed7c6e9:
 > 
->   arm64: dts: hi3798cv200: enable emmc support for poplar board (2018-05-15 14:54:03 +0100)
+>   ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus (2018-05-10 17:03:28 -0700)
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
