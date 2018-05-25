@@ -1,88 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 May 2018 12:32:51 +0100
-Subject: [PATCH v4 2/2] arm64: signal: Report signal frame size to
- userspace via auxv
-In-Reply-To: <20180524170713.GY13470@e103592.cambridge.arm.com>
-References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
- <1527097616-25214-3-git-send-email-Dave.Martin@arm.com>
- <20180524124918.GG8689@arm.com>
- <20180524155516.GW13470@e103592.cambridge.arm.com>
- <20180524165045.GP8689@arm.com>
- <20180524170713.GY13470@e103592.cambridge.arm.com>
-Message-ID: <20180525113251.GB3255@arm.com>
+From: haiyue.wang@linux.intel.com (Wang, Haiyue)
+Date: Fri, 25 May 2018 19:33:42 +0800
+Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS
+ node
+In-Reply-To: <CACPK8Xdhmrwfj6tGZ_o_JeoxdOii_5OD5oz80FJFRasvGd1L9w@mail.gmail.com>
+References: <1520399090-2455-1-git-send-email-haiyue.wang@linux.intel.com>
+ <9231baaf-e77c-c517-bca2-083070a53342@linux.intel.com>
+ <CACPK8Xdhmrwfj6tGZ_o_JeoxdOii_5OD5oz80FJFRasvGd1L9w@mail.gmail.com>
+Message-ID: <d9f9bd48-7b2c-9f48-0515-50e0a5e55259@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 06:07:13PM +0100, Dave Martin wrote:
-> On Thu, May 24, 2018 at 05:50:48PM +0100, Will Deacon wrote:
-> > On Thu, May 24, 2018 at 04:55:17PM +0100, Dave Martin wrote:
-> > > On Thu, May 24, 2018 at 01:49:21PM +0100, Will Deacon wrote:
-> > > > On Wed, May 23, 2018 at 06:46:56PM +0100, Dave Martin wrote:
-> > > > > @@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
-> > > > >  		thread_flags = READ_ONCE(current_thread_info()->flags);
-> > > > >  	} while (thread_flags & _TIF_WORK_MASK);
-> > > > >  }
-> > > > > +
-> > > > > +unsigned long __ro_after_init signal_minsigstksz;
-> > > > > +
-> > > > > +/*
-> > > > > + * Determine the stack space required for guaranteed signal devliery.
-> > > > > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
-> > > > > + * cpufeatures setup is assumed to be complete.
-> > > > > + */
-> > > > > +void __init minsigstksz_setup(void)
-> > > > > +{
-> > > > > +	struct rt_sigframe_user_layout user;
-> > > > > +
-> > > > > +	init_user_layout(&user);
-> > > > > +
-> > > > > +	/*
-> > > > > +	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
-> > > > > +	 * be big enough, but it's our best guess:
-> > > > > +	 */
-> > > > > +	if (WARN_ON(setup_sigframe_layout(&user, true)))
-> > > > > +		signal_minsigstksz = SIGFRAME_MAXSZ;
-> > > > 
-> > > > Can we not leave signal_minsigstksz as zero in this case?
-> > > 
-> > > I prefer to distinguish the "kernel went wrong" case (where we just omit
-> > > AT_MINSIGSTKSZ for backwards compatibilty) from the "sigframe too
-> > > large" case.
-> > 
-> > Hmm, so I'm confused as to the distinction here. Wouldn't an allocation
-> > failure in setup_sigframe_layout be indicative of "kernel went wrong"?
-> > 
-> > To put it another way, if we could determine the maximum sigframe size
-> > at build time, surely we'd fail the build if SIGFRAME_MAXSZ wasn't big
-> > enough? In that case, detecting this at runtime is also pretty bad (hence
-> 
-> Yup
+Hi Joel & Andrew
 
-Good, I was starting to worry I was missing something!
+This patch is out of date. ;-)
 
-> > the WARN_ON) and I think we should drop the aux entry rather than provide
-> > a value that is known to be incorrect.
-> 
-> Telling userspace the signal frame size is not optional: by omitting
-> AT_MINSIGSTKSZ we implicitly tell userspace than MINSIGSTKSZ
-> is sufficient.  But in this case we not only know that this is false, we
-> know that SIGFRAME_MAXSZ is not sufficient either.  But we also know
-> that SIGFRAME_MAXSZ is a closer estimate to the true requirement, because
-> it's the larger value.
-> 
-> This falls under the heading of "being no more wrong than necessary".
+New: https://patchwork.ozlabs.org/patch/893720/
 
-I think I just prefer distinguishing between "AT_MINSIGSTKSZ isn't
-present, I'll assume MINSIGSTKSZ is sufficient but it might not be" and
-"AT_MINSIGSTKSZ is present, I know that it's sufficient".
 
-> Either way, this is trying to paper over a kernel bug, by telling
-> userspace something "sensible".  This may not be a sensible course
-> of action...
-> 
-> So if you feel strongly I'm happy to not distinguish the two cases and
-> just WARN() in minsigstksz_setup() as at present.
-
-Yes, please.
-
-Will
+On 2018-05-25 12:34, Joel Stanley wrote:
+> Hello Andrew,
+>
+> On 16 March 2018 at 11:17, Wang, Haiyue <haiyue.wang@linux.intel.com> wrote:
+>> Hi Joel and Andrew,
+>>
+>> Have time to review this patch ? Hope for your comments. :-)
+>>
+>> BR,
+>> Haiyue
+>>
+>>
+>> On 2018-03-07 13:04, Haiyue Wang wrote:
+>>> The IPMI KCS device part of the LPC interface and is used for
+>>> communication with the host processor.
+>>>
+>>> Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
+> Do you have time to take a look at these? The device tree doesn't make
+> sense to me.
+>
+> Cheers,
+>
+> Joel
+>
+>>> ---
+>>>    arch/arm/boot/dts/aspeed-g5.dtsi | 43
+>>> +++++++++++++++++++++++++++++++++++++++-
+>>>    1 file changed, 42 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi
+>>> b/arch/arm/boot/dts/aspeed-g5.dtsi
+>>> index 8eac57c..f443169 100644
+>>> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+>>> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+>>> @@ -267,8 +267,40 @@
+>>>                                  ranges = <0x0 0x1e789000 0x1000>;
+>>>                                  lpc_bmc: lpc-bmc at 0 {
+>>> -                                       compatible =
+>>> "aspeed,ast2500-lpc-bmc";
+>>> +                                       compatible =
+>>> "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
+>>>                                          reg = <0x0 0x80>;
+>>> +                                       reg-io-width = <4>;
+>>> +
+>>> +                                       #address-cells = <1>;
+>>> +                                       #size-cells = <1>;
+>>> +                                       ranges = <0x0 0x0 0x80>;
+>>> +
+>>> +                                       kcs1: kcs1 at 0 {
+>>> +                                               compatible =
+>>> "aspeed,ast2500-kcs-bmc";
+>>> +                                               reg = <0x0 0x80>;
+>>> +                                               interrupts = <8>;
+>>> +                                               kcs_chan = <1>;
+>>> +                                               kcs_addr = <0x0>;
+>>> +                                               status = "disabled";
+>>> +                                       };
+>>> +
+>>> +                                       kcs2: kcs2 at 0 {
+>>> +                                               compatible =
+>>> "aspeed,ast2500-kcs-bmc";
+>>> +                                               reg = <0x0 0x80>;
+>>> +                                               interrupts = <8>;
+>>> +                                               kcs_chan = <2>;
+>>> +                                               kcs_addr = <0x0>;
+>>> +                                               status = "disabled";
+>>> +                                       };
+>>> +
+>>> +                                       kcs3: kcs3 at 0 {
+>>> +                                               compatible =
+>>> "aspeed,ast2500-kcs-bmc";
+>>> +                                               reg = <0x0 0x80>;
+>>> +                                               interrupts = <8>;
+>>> +                                               kcs_chan = <3>;
+>>> +                                               kcs_addr = <0x0>;
+>>> +                                               status = "disabled";
+>>> +                                       };
+>>>                                  };
+>>>                                  lpc_host: lpc-host at 80 {
+>>> @@ -294,6 +326,15 @@
+>>>                                                  status = "disabled";
+>>>                                          };
+>>>    +                                     kcs4: kcs4 at 0 {
+>>> +                                               compatible =
+>>> "aspeed,ast2500-kcs-bmc";
+>>> +                                               reg = <0x0 0xa0>;
+>>> +                                               interrupts = <8>;
+>>> +                                               kcs_chan = <4>;
+>>> +                                               kcs_addr = <0x0>;
+>>> +                                               status = "disabled";
+>>> +                                       };
+>>> +
+>>>                                          lhc: lhc at 20 {
+>>>                                                  compatible =
+>>> "aspeed,ast2500-lhc";
+>>>                                                  reg = <0x20 0x24 0x48
+>>> 0x8>;
+>>
