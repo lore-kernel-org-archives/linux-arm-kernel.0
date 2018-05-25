@@ -1,34 +1,41 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 25 May 2018 07:56:14 +0000
-Subject: [PATCH v7 2/2] ARM: dts: imx: Add basic dts support for imx6sll
- EVK board
-In-Reply-To: <1527234127-11991-2-git-send-email-ping.bai@nxp.com>
-References: <1527234127-11991-1-git-send-email-ping.bai@nxp.com>
- <1527234127-11991-2-git-send-email-ping.bai@nxp.com>
-Message-ID: <AM0PR04MB42110126E2FA536C0EFE0E2F80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 25 May 2018 09:22:47 +0100
+Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <CAPDyKFp3nMoUoM0LfxcSvJKthwrAKK7yCLAkZMGW-oapUsK7GA@mail.gmail.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
+ <f5589b88-acf8-b491-df79-e359e596c8d0@nvidia.com>
+ <CAPDyKFr_7hbs-MC1jQn5uAgSnb1UGufXZdEmUqNTM63KemTe1g@mail.gmail.com>
+ <5a79d3a2-d090-645b-da69-524b7e7a4d90@nvidia.com>
+ <51f7de26-579a-8b9e-4e79-f4eee923ab38@codeaurora.org>
+ <CAPDyKFo_69kSS6UzdsJeyeiiED=S=chsdkP+R43qMHDEbZ8n_A@mail.gmail.com>
+ <3838f17a-2ac8-bf3f-f0b1-f69bbe17629c@nvidia.com>
+ <CAPDyKFo8e5FMrxF2ggxVZ+HQjw4s1Wtx-tMf5ka67knJpZMQcA@mail.gmail.com>
+ <1687797a-93f1-7e5c-6060-01c12c070964@nvidia.com>
+ <CAPDyKFravSx3h6UnsjNGM2ViZtkxvPMULyVQnoVT9jsEP5az+A@mail.gmail.com>
+ <96169281-49b2-121f-0b7e-f54aae66db91@nvidia.com>
+ <CAPDyKFp3nMoUoM0LfxcSvJKthwrAKK7yCLAkZMGW-oapUsK7GA@mail.gmail.com>
+Message-ID: <a8064cdb-d11d-ef85-1da3-28113b86af3b@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
 
-> -----Original Message-----
-> From: Jacky Bai
-> Sent: Friday, May 25, 2018 3:42 PM
-> To: shawnguo at kernel.org; robh+dt at kernel.org; kernel at pengutronix.de
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-
-> linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> jacky.baip at gmail.com
-> Subject: [PATCH v7 2/2] ARM: dts: imx: Add basic dts support for imx6sll EVK
-> board
+On 24/05/18 22:21, Ulf Hansson wrote:
+
+...
+
+>> OK, so this bit is a to-do as that is not yet exposed AFAICT. I see that you
+>> said 'although we need to extend it to cover cleanup of the earlier
+>> registered device, via calling device_unregister().' So if we do this then
+>> that would be fine.
 > 
-> Add dts file support for imx6sll EVK board.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Acked-by: Dong Aisheng <Aisheng.dong@nxp.com>
+> Let me clarify the changelog. It's not a to-do, as it's already done
+> as part of $subject patch.
 
-Would you help pick this patch series?
-It seems there's only DTS part left for MX6SLL support.
+Yes I see it now. OK, then that's fine.
 
-Regards
-Dong Aisheng
+Jon
+
+-- 
+nvpublic
