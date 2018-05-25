@@ -1,58 +1,46 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 25 May 2018 12:25:41 -0700
-Subject: [PATCH] arm64: defconfig: Enable PCIe on msm8996 and db820c
-Message-ID: <20180525192541.12223-1-bjorn.andersson@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 25 May 2018 21:24:33 +0200
+Subject: [PATCH V3 0/6] hwmon: Add support for Raspberry Pi voltage sensor
+Message-ID: <1527276279-23876-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msm8996 PCIe sits behind the "agnoc0", which is represented as a
-simple-pm-bus, so enable support for this. Then enable the QMP phy
-driver.
+A common issue for the Raspberry Pi is an inadequate power supply. 
+Noralf Tr?nnes started a discussion [1] about writing such undervoltage
+conditions into the kernel log.
 
-Also enable the atl1c ethernet driver and ath10k wlan driver to support
-these components on the DragonBoard820c.
+Changes in V3:
+- rebase
+- simplify probing
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/configs/defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+Changes in V2:
+- simplified Kconfig dependency suggested by Robin Murphy
+- replace dt-binding by probing from firmware driver
+- add hwmon documentation
+- minor improvements suggested by Guenter Roeck
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 895b2d92124d..e3687afdd64c 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -173,6 +173,7 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=32
-+CONFIG_SIMPLE_PM_BUS=y
- CONFIG_MTD=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-@@ -213,6 +214,7 @@ CONFIG_VETH=m
- CONFIG_VIRTIO_NET=y
- CONFIG_AMD_XGBE=y
- CONFIG_NET_XGENE=y
-+CONFIG_ATL1C=m
- CONFIG_MACB=y
- CONFIG_THUNDER_NIC_PF=y
- CONFIG_HNS_DSAF=y
-@@ -254,6 +256,8 @@ CONFIG_USB_NET_SMSC75XX=m
- CONFIG_USB_NET_SMSC95XX=m
- CONFIG_USB_NET_PLUSB=m
- CONFIG_USB_NET_MCS7830=m
-+CONFIG_ATH10K=m
-+CONFIG_ATH10K_PCI=m
- CONFIG_BRCMFMAC=m
- CONFIG_MWIFIEX=m
- CONFIG_MWIFIEX_PCIE=m
-@@ -615,6 +619,7 @@ CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_QCOM_USB_HS=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_MVEBU_CP110_COMPHY=y
-+CONFIG_PHY_QCOM_QMP=m
- CONFIG_PHY_ROCKCHIP_INNO_USB2=y
- CONFIG_PHY_ROCKCHIP_EMMC=y
- CONFIG_PHY_ROCKCHIP_PCIE=m
+[1] - https://github.com/raspberrypi/linux/issues/2367
+
+Stefan Wahren (6):
+  ARM: bcm2835: Add GET_THROTTLED firmware property
+  hwmon: Add support for RPi voltage sensor
+  firmware: raspberrypi: Register hwmon driver
+  ARM: bcm2835_defconfig: Enable RPi voltage sensor
+  ARM: multi_v7_defconfig: Enable RPi voltage sensor
+  arm64: defconfig: Enable RPi voltage sensor
+
+ Documentation/hwmon/raspberrypi-hwmon      |  22 ++++
+ arch/arm/configs/bcm2835_defconfig         |   2 +-
+ arch/arm/configs/multi_v7_defconfig        |   1 +
+ arch/arm64/configs/defconfig               |   1 +
+ drivers/firmware/raspberrypi.c             |  19 ++++
+ drivers/hwmon/Kconfig                      |  10 ++
+ drivers/hwmon/Makefile                     |   1 +
+ drivers/hwmon/raspberrypi-hwmon.c          | 166 +++++++++++++++++++++++++++++
+ include/soc/bcm2835/raspberrypi-firmware.h |   1 +
+ 9 files changed, 222 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/hwmon/raspberrypi-hwmon
+ create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
+
 -- 
-2.17.0
+2.7.4
