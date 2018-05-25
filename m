@@ -1,65 +1,100 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:14 +0100
-Subject: [PATCH v4 08/26] arm64: daifflags: Use irqflags functions for
- daifflags
+Date: Fri, 25 May 2018 10:49:20 +0100
+Subject: [PATCH v4 14/26] arm64: kvm: Unmask PMR before entering guest
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-9-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-15-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the work done in daifflags save/restore is already provided
-by irqflags functions. Daifflags should always be a superset of irqflags
-(it handles irq status + status of other flags). Modifying behaviour of
-irqflags should alter the behaviour of daifflags.
+Interrupts masked by ICC_PMR_EL1 will not be signaled to the CPU. This
+means that hypervisor will not receive masked interrupts while running a
+guest.
 
-Use irqflags_save/restore functions for the corresponding daifflags
-operation.
+Avoid this by making sure ICC_PMR_EL1 is unmasked when we enter a guest.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/include/asm/daifflags.h | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/kvm_host.h | 12 ++++++++++++
+ arch/arm64/kvm/hyp/switch.c       | 17 +++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-Note:
-A latter patch changes the behaviour of arch_local_flags but the daif
-flag still need to follow the semantics of arch_local_flags.
-
-diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-index 22e4c83..8d91f22 100644
---- a/arch/arm64/include/asm/daifflags.h
-+++ b/arch/arm64/include/asm/daifflags.h
-@@ -36,11 +36,8 @@ static inline unsigned long local_daif_save(void)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 469de8a..bfd9e5b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -24,6 +24,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
++#include <asm/arch_gicv3.h>
+ #include <asm/cpufeature.h>
+ #include <asm/daifflags.h>
+ #include <asm/fpsimd.h>
+@@ -433,6 +434,17 @@ static inline void kvm_fpsimd_flush_cpu_state(void)
+ static inline void kvm_arm_vhe_guest_enter(void)
  {
- 	unsigned long flags;
-
--	asm volatile(
--		"mrs	%0, daif		// local_daif_save\n"
--		: "=r" (flags)
--		:
--		: "memory");
-+	flags = arch_local_save_flags();
-+
  	local_daif_mask();
-
- 	return flags;
-@@ -60,11 +57,9 @@ static inline void local_daif_restore(unsigned long flags)
- {
- 	if (!arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_on();
--	asm volatile(
--		"msr	daif, %0		// local_daif_restore"
--		:
--		: "r" (flags)
--		: "memory");
 +
-+	arch_local_irq_restore(flags);
-+
- 	if (arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_off();
++	/*
++	 * Having IRQs masked via PMR when entering the guest means the GIC
++	 * will not signal the CPU of interrupts of lower priority, and the
++	 * only way to get out will be via guest exceptions.
++	 * Naturally, we want to avoid this.
++	 */
++	if (gic_prio_masking_enabled()) {
++		gic_write_pmr(ICC_PMR_EL1_UNMASKED);
++		dsb(sy);
++	}
  }
---
+ 
+ static inline void kvm_arm_vhe_guest_exit(void)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d964523..f00a04c 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,6 +21,7 @@
+ 
+ #include <kvm/arm_psci.h>
+ 
++#include <asm/arch_gicv3.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+@@ -442,6 +443,19 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	struct kvm_cpu_context *guest_ctxt;
+ 	bool fp_enabled;
+ 	u64 exit_code;
++	u32 host_pmr = ICC_PMR_EL1_UNMASKED;
++
++	/*
++	 * Having IRQs masked via PMR when entering the guest means the GIC
++	 * will not signal the CPU of interrupts of lower priority, and the
++	 * only way to get out will be via guest exceptions.
++	 * Naturally, we want to avoid this.
++	 */
++	if (gic_prio_masking_enabled()) {
++		host_pmr = gic_read_pmr();
++		gic_write_pmr(ICC_PMR_EL1_UNMASKED);
++		dsb(sy);
++	}
+ 
+ 	vcpu = kern_hyp_va(vcpu);
+ 
+@@ -496,6 +510,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	 */
+ 	__debug_switch_to_host(vcpu);
+ 
++	if (gic_prio_masking_enabled())
++		gic_write_pmr(host_pmr);
++
+ 	return exit_code;
+ }
+ 
+-- 
 1.9.1
