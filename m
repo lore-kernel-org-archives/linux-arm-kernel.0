@@ -1,34 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 14:57:24 -0700
-Subject: [GIT PULL] Rockchip driver updates for 4.18 round 2
-In-Reply-To: <2574457.1saVLptjF6@phil>
-References: <2574457.1saVLptjF6@phil>
-Message-ID: <20180525215724.if43mgylfrdseatr@localhost>
+Date: Fri, 25 May 2018 14:49:49 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.18, round 3
+In-Reply-To: <7hmuwqqk8k.fsf@baylibre.com>
+References: <7hmuwqqk8k.fsf@baylibre.com>
+Message-ID: <20180525214949.cwokqbzvl4f4jqdk@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 03:20:54PM +0200, Heiko Stuebner wrote:
-> Hi Arnd, Kevin Olof,
+On Wed, May 23, 2018 at 11:50:51AM -0700, Kevin Hilman wrote:
+> Olof, ARnd,
 > 
-> please find below a second pull request for Rockchip-specific drivers,
-> adding power-domain support for some more socs on top of the
-> previous git tag.
+> Here's final round of 64-bit DT updates for v4.18 for Amlogic.
 > 
+> I separated this one from round 2 because I've merged a tag from the
+> clock tree where the headers were added that are used by the new clock
+> driver nodes.
 > 
-> If it looks ok, please pull
-> Heiko
+> That clock dependency branch is already queued by the clock maintainers,
+> but included here so the arm-soc DT branch will continue to build
+> standalone.
 > 
-> The following changes since commit 9e59c5f66c624b43c766a9fe3b2430e0e976bf0e:
+> Kevin
 > 
->   soc: rockchip: power-domain: Fix wrong value when power up pd with writemask (2018-05-14 11:53:26 +0200)
+> The following changes since commit ffe2f2a415a5c36c0629c0ac8ea3dda80fbfd4b6:
 > 
-> are available in the Git repository at:
+>   ARM64: dts: meson-axg: enable i2c AO on the S400 board (2018-05-23 10:05:41 -0700)
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-drivers-2
+> are available in the git repository at:
 > 
-> for you to fetch changes up to 9bdf401bf49eddba98ae36f7243b888d43496bd6:
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
 > 
->   soc: rockchip: power-domain: add power domain support for px30 (2018-05-23 20:47:57 +0200)
+> for you to fetch changes up to 9adda3534faad306c3d5351c5b87d26fea9767be:
+> 
+>   ARM64: dts: meson: fix clock source of the pclk for UART_AO (2018-05-23 11:31:54 -0700)
+> 
+> ----------------------------------------------------------------
+> Amlogic 64-bit DT updates, round3
+> - AXG: add new clock driver
 
 Merged, thanks!
 
