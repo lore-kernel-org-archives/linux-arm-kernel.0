@@ -1,65 +1,67 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:18 +0100
-Subject: [PATCH v4 12/26] arm64: Unmask PMR before going idle
+Date: Fri, 25 May 2018 10:49:24 +0100
+Subject: [PATCH v4 18/26] irqchip/gic-v3: Do not overwrite PMR value
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-13-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-19-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU does not received signals for interrupts with a priority masked by
-ICC_PMR_EL1. This means the CPU might not come back from a WFI
-instruction.
-
-Make sure ICC_PMR_EL1 does not mask interrupts when doing a WFI.
+If the architecture is using ICC_PMR_EL1 to mask IRQs, do not overwrite
+that value.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/mm/proc.S | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/irqchip/irq-gic-v3.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5f9a73a..e7cafbf 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -20,6 +20,7 @@
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 13d283d..fc477e2 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -226,6 +226,11 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GICD_ISENABLER);
+ }
  
- #include <linux/init.h>
- #include <linux/linkage.h>
-+#include <linux/irqchip/arm-gic-v3.h>
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/hwcap.h>
-@@ -53,10 +54,27 @@
-  *	cpu_do_idle()
-  *
-  *	Idle the processor (wait for interrupt).
-+ *
-+ *	If the CPU supports priority masking we must do additional work to
-+ *	ensure that interrupts are not masked at the PMR (because the core will
-+ *	not wake up if we block the wake up signal in the interrupt controller).
-  */
- ENTRY(cpu_do_idle)
-+alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
-+	dsb	sy				// WFI may enter a low-power mode
-+	wfi
-+	ret
-+alternative_else
-+	mrs	x0, daif			// save I bit
-+	msr	daifset, #2			// set I bit
-+	mrs_s	x1, SYS_ICC_PMR_EL1		// save PMR
-+alternative_endif
-+	mov	x2, #ICC_PMR_EL1_UNMASKED
-+	msr_s	SYS_ICC_PMR_EL1, x2		// unmask at PMR
- 	dsb	sy				// WFI may enter a low-power mode
- 	wfi
-+	msr_s	SYS_ICC_PMR_EL1, x1		// restore PMR
-+	msr	daif, x0			// restore I bit
- 	ret
- ENDPROC(cpu_do_idle)
++static inline bool arch_uses_gic_prios(void)
++{
++	return IS_ENABLED(CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS);
++}
++
+ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 				     enum irqchip_irq_state which, bool val)
+ {
+@@ -404,6 +409,9 @@ static u32 gic_get_pribits(void)
+ static bool gic_has_group0(void)
+ {
+ 	u32 val;
++	u32 old_pmr;
++
++	old_pmr = gic_read_pmr();
  
+ 	/*
+ 	 * Let's find out if Group0 is under control of EL3 or not by
+@@ -419,6 +427,8 @@ static bool gic_has_group0(void)
+ 	gic_write_pmr(BIT(8 - gic_get_pribits()));
+ 	val = gic_read_pmr();
+ 
++	gic_write_pmr(old_pmr);
++
+ 	return val != 0;
+ }
+ 
+@@ -580,7 +590,8 @@ static void gic_cpu_sys_reg_init(void)
+ 	group0 = gic_has_group0();
+ 
+ 	/* Set priority mask register */
+-	write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
++	if (!arch_uses_gic_prios())
++		write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
+ 
+ 	/*
+ 	 * Some firmwares hand over to the kernel with the BPR changed from
 -- 
 1.9.1
