@@ -1,44 +1,62 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 14:49:49 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.18, round 3
-In-Reply-To: <7hmuwqqk8k.fsf@baylibre.com>
-References: <7hmuwqqk8k.fsf@baylibre.com>
-Message-ID: <20180525214949.cwokqbzvl4f4jqdk@localhost>
+Date: Fri, 25 May 2018 14:51:59 -0700
+Subject: [GIT PULL] berlin core changes for 4.18
+In-Reply-To: <20180524155944.1de22147@xhacker.debian>
+References: <20180524155944.1de22147@xhacker.debian>
+Message-ID: <20180525215159.xo7tgssmoep73oct@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 11:50:51AM -0700, Kevin Hilman wrote:
-> Olof, ARnd,
+Hi,
+
+On Thu, May 24, 2018 at 03:59:44PM +0800, Jisheng Zhang wrote:
+> Hi
 > 
-> Here's final round of 64-bit DT updates for v4.18 for Amlogic.
+> Here is our mach-berlin changes for v4.18.
 > 
-> I separated this one from round 2 because I've merged a tag from the
-> clock tree where the headers were added that are used by the new clock
-> driver nodes.
+> Thanks,
+> Jisheng
 > 
-> That clock dependency branch is already queued by the clock maintainers,
-> but included here so the arm-soc DT branch will continue to build
-> standalone.
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
-> Kevin
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> The following changes since commit ffe2f2a415a5c36c0629c0ac8ea3dda80fbfd4b6:
+> are available in the Git repository at:
 > 
->   ARM64: dts: meson-axg: enable i2c AO on the S400 board (2018-05-23 10:05:41 -0700)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin-core-for-v4.18
 > 
-> are available in the git repository at:
+> for you to fetch changes up to eb14767c8a9117fdd84fc79e6263c85a4d8ec934:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
-> 
-> for you to fetch changes up to 9adda3534faad306c3d5351c5b87d26fea9767be:
-> 
->   ARM64: dts: meson: fix clock source of the pclk for UART_AO (2018-05-23 11:31:54 -0700)
+>   ARM: berlin: switch to SPDX license identifier (2018-05-24 14:49:09 +0800)
 > 
 > ----------------------------------------------------------------
-> Amlogic 64-bit DT updates, round3
-> - AXG: add new clock driver
+> berlin core changes for v4.18
+> 
+> BG2CD SoC uses r3p0 Cortex-A9 MPCore single-CPU cluster. Autoselect
+> pertinent errata, the SCU and the global timer, and allow use of the
+> local timer on uniprocessor kernels.
+> 
+> remove non-necessary flush_cache_all() after scu_enable().
+> 
+> switch to SPDX license identifier for all files under mach-berlin/
+> 
+> ----------------------------------------------------------------
+> Alexander Monakov (1):
+>       ARM: berlin: extend BG2CD Kconfig entry
+> 
+> Jisheng Zhang (2):
+>       arm: berlin: remove non-necessary flush_cache_all()
+>       ARM: berlin: switch to SPDX license identifier
 
 Merged, thanks!
+
+Watch out for consistency on the patch subjects, please.
+
+Also, you're cutting it a bit close w.r.t. merge window opening. If you can get
+your pull requests in before -rc6 you run less risk of missing it if there's
+a problem with it that needs a respin.
+
+
 
 
 -Olof
