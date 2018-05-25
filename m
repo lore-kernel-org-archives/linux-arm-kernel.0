@@ -1,52 +1,72 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 25 May 2018 12:07:04 +0100
-Subject: [PATCH 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
- manage multi PM domains
-In-Reply-To: <CAPDyKFrTtvhxOhf9BPY1=cJ9VQyx9D=P3O0vCV+WXSVR82FozQ@mail.gmail.com>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
- <1c21d18e-954a-f3a8-9817-0117b7cb7e4f@nvidia.com>
- <CAPDyKFozm88OM8cDFXXwvgdMirrt2=HhZtBdyhNjo2bgjHV2Mg@mail.gmail.com>
- <2c63af8c-4745-a751-8d3d-f7122e921e6f@nvidia.com>
- <CAPDyKFrTtvhxOhf9BPY1=cJ9VQyx9D=P3O0vCV+WXSVR82FozQ@mail.gmail.com>
-Message-ID: <b3a94d63-678c-eab6-47a8-43eca95da979@nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 25 May 2018 12:52:21 +0200
+Subject: REGRESSION: iommu fails to take address limit into account
+In-Reply-To: <6d95cd70-70bd-9e63-c148-d535fbedb0d0@arm.com>
+References: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
+ <CAKv+Gu_0ECwLhoA2ywp3nntFX=RxfpM+MWFwTain1WN1sMrW9g@mail.gmail.com>
+ <6d95cd70-70bd-9e63-c148-d535fbedb0d0@arm.com>
+Message-ID: <CAKv+Gu83Ro=2oCtfvBipw8yDCaQZoF5TCtH3-kYesiBYACoxXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25 May 2018 at 12:49, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 25/05/18 11:35, Ard Biesheuvel wrote:
+>>
+>> On 25 May 2018 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>
+>>> Hello all,
+>>>
+>>> I am looking into an issue where a platform device is wired to a
+>>> MMU-500, and for some reason (which is under investigation) the
+>>> platform device can not drive all address bits. I can work around this
+>>> by limiting the DMA mask to 40 bits in the driver. However, the IORT
+>>> table allows me to set the address limit as well, and so I was
+>>> expecting this to be taken into account by the SMMU driver.
+>>>
+>>> When the iort/iommu layer sets up the DMA operations,
+>>> iommu_dma_init_domain() is entered with the expected values:
+>>>
+>>> base == 0
+>>> size == 0x100_0000_0000
+>>>
+>>> However, the iommu layer ends up generating IOVA addresses that have
+>>> bits [47:40] set (which is what the MMU-500 supports). Looking closer,
+>>> this is not surprising, given that the end_pfn variable that is
+>>> calculated in iommu_dma_init_domain() is no longer used after Zhen's
+>>> patch aa3ac9469c185 ("iommu/iova: Make dma_32bit_pfn implicit") was
+>>> applied.
+>>>
+>>> So effectively, this is a regression, and I would like your help
+>>> figuring out how to go about fixing this.
+>>>
+>>
+>> I have narrowed it down a bit further: even though the IOVA range
+>> ignores the IORT address limit, the device's DMA mask is set
+>> correctly. The only problem is that the driver (like all drivers
+>> afaict) does not take into account the fact that its DMA mask has
+>> already been set by the bus layer before its probe function is called.
+>>
+>> I could add something like this
+>>
+>> -       if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
+>> +       if (dma_get_mask(&pdev->dev) == DMA_BIT_MASK(32) &&
+>> +           dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
+>>                  dev_warn(&pdev->dev, "Failed to enable 64-bit DMA\n");
+>>
+>> to only override the mask if it is not at its default value, but it
+>> feels like papering over the problem given that most drivers appear to
+>> ignore the preset mask as well.
+>
+>
+> Yup, that's the crux of it - if, say, the firmware describes an explicit
+> restriction to 32 bits, then drivers have no way to tell the difference
+> between that and the default mask initialised by the bus code (which they
+> *should* be able to widen), and at the moment neither does arch code or
+> anyone else (and the current interface between arch code and firmware code
+> does not help matters).
+>
 
-
-On 25/05/18 11:45, Ulf Hansson wrote:
-
-...
-
->> Right, but this case still seems like an error. My understanding is that
->> only drivers will use this API directly and it will not be used by the
->> device driver core (unlike dev_pm_domain_attach), so if anyone calls this
->> attempting to attach another PM domain when one is already attached, they
->> are doing something wrong.
-> 
-> [...]
-> 
-> You may be right!
-> 
-> What I was thinking of is whether multiple PM domains may be optional
-> in some cases, but instead a PM domain have already been attached by
-> dev_pm_domain_attach(), prior the driver starts to probe.
-> 
-> Then, assuming we return an error for this case, that means the caller
-> then need to check the dev->pm_domain pointer, prior calling
-> dev_pm_domain_attach_by_id(). Wouldn't it? Perhaps that is more clear
-> though?
-
-IMO the driver should know whether is needs multiple power-domains or 
-not and if it needs multiple then it should just call 
-dev_pm_domain_attach_by_id() N times without needing to checking 
-dev->pm_domain first. If it fails then either the PM domain core did 
-something wrong or power-domains are missing from DT, but either way 
-there is an error, so let it fail.
-
-Cheers
-Jon
-
--- 
-nvpublic
+OK, so I guess we need an additional bus limit field that is
+initialized to ~0 and can only be narrowed, and take that into account
+when dma_set_mask_and_coherent() is called. Not pretty, but at least
+we won't have to fix all the drivers.
