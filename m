@@ -1,89 +1,94 @@
-From: xuzaibo@huawei.com (Xu Zaibo)
-Date: Fri, 25 May 2018 10:39:33 +0800
-Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-14-jean-philippe.brucker@arm.com>
- <5B0536A3.1000304@huawei.com> <cd13f60d-b282-3804-4ca7-2d34476c597f@arm.com>
- <5B06B17C.1090809@huawei.com> <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
-Message-ID: <5B077765.30703@huawei.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 25 May 2018 11:57:37 +0900
+Subject: [PATCH] drm/rockchip: vop: fix irq disabled after vop driver
+ probed
+In-Reply-To: <25470133.K8n9sLBzRS@diego>
+References: <b8eb41e576c4007d40223699eb951db32916b86a.camel@collabora.com>
+ <25470133.K8n9sLBzRS@diego>
+Message-ID: <CAAFQd5DwFiKJ-JyFkFqC-XzTyBeanbQWazw8OqT4XQRmwrNJrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Heiko, Sandy,
 
-On 2018/5/24 23:04, Jean-Philippe Brucker wrote:
-> On 24/05/18 13:35, Xu Zaibo wrote:
->>> Right, sva_init() must be called once for any device that intends to use
->>> bind(). For the second process though, group->sva_enabled will be true
->>> so we won't call sva_init() again, only bind().
->> Well, while I create mediated devices based on one parent device to support multiple
->> processes(a new process will create a new 'vfio_group' for the corresponding mediated device,
->> and 'sva_enabled' cannot work any more), in fact, *sva_init and *sva_shutdown are basically
->> working on parent device, so, as a result, I just only need sva initiation and shutdown on the
->> parent device only once. So I change the two as following:
->>
->> @@ -551,8 +565,18 @@ int iommu_sva_device_init(struct device *dev, unsigned long features,
->>        if (features & ~IOMMU_SVA_FEAT_IOPF)
->>           return -EINVAL;
->>
->> +    /* If already exists, do nothing  */
->> +    mutex_lock(&dev->iommu_param->lock);
->> +    if (dev->iommu_param->sva_param) {
->> +        mutex_unlock(&dev->iommu_param->lock);
->> +        return 0;
->> +    }
->> +    mutex_unlock(&dev->iommu_param->lock);
->>
->>       if (features & IOMMU_SVA_FEAT_IOPF) {
->>           ret = iommu_register_device_fault_handler(dev, iommu_queue_iopf,
->>
->>
->> @@ -621,6 +646,14 @@ int iommu_sva_device_shutdown(struct device *dev)
->>       if (!domain)
->>           return -ENODEV;
->>
->> +    /* If any other process is working on the device, shut down does nothing. */
->> +    mutex_lock(&dev->iommu_param->lock);
->> +    if (!list_empty(&dev->iommu_param->sva_param->mm_list)) {
->> +        mutex_unlock(&dev->iommu_param->lock);
->> +        return 0;
->> +    }
->> +    mutex_unlock(&dev->iommu_param->lock);
-> I don't think iommu-sva.c is the best place for this, it's probably
-> better to implement an intermediate layer (the mediating driver), that
-> calls iommu_sva_device_init() and iommu_sva_device_shutdown() once. Then
-> vfio-pci would still call these functions itself, but for mdev the
-> mediating driver keeps a refcount of groups, and calls device_shutdown()
-> only when freeing the last mdev.
->
-> A device driver (non mdev in this example) expects to be able to free
-> all its resources after sva_device_shutdown() returns. Imagine the
-> mm_list isn't empty (mm_exit() is running late), and instead of waiting
-> in unbind_dev_all() below, we return 0 immediately. Then the calling
-> driver frees its resources, and the mm_exit callback along with private
-> data passed to bind() disappear. If a mm_exit() is still running in
-> parallel, then it will try to access freed data and corrupt memory. So
-> in this function if mm_list isn't empty, the only thing we can do is wait.
->
-I still don't understand why we should 'unbind_dev_all', is it possible 
-to do a 'unbind_dev_pasid'?
-Then we can do other things instead of waiting that user may not like. :)
+On Fri, May 25, 2018 at 7:07 AM Heiko St?bner <heiko@sntech.de> wrote:
 
-Thanks
-Zaibo
->
->> +
->>       __iommu_sva_unbind_dev_all(dev);
->>
->>       mutex_lock(&dev->iommu_param->lock);
->>
->> I add the above two checkings in both *sva_init and *sva_shutdown, it is working now,
->> but i don't know if it will cause any new problems. What's more, i doubt if it is
->> reasonable to check this to avoid repeating operation in VFIO, maybe it is better to check
->> in IOMMU. :)
->
->
->
-> .
->
+> From: Sandy Huang <hjc@rock-chips.com>
+
+> The vop irq is shared between vop and iommu and irq probing in the
+> iommu driver moved to the probe function recently. This can in some
+> cases lead to a stall if the irq is triggered while the vop driver
+> still has it disabled.
+
+> But there is no real need to disable the irq, as the vop can simply
+> also track its enabled state and ignore irqs in that case.
+
+> So remove the enable/disable handling and add appropriate condition
+> to the irq handler.
+
+> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+> [added an actual commit message]
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Hi Ezequiel,
+
+> this patch came from a discussion I had with Rockchip people over the
+> iommu changes and resulting issues back in april, but somehow was
+> forgotten and not posted to the lists. Correcting that now.
+
+> So removing the enable/disable voodoo on the shared interrupt is
+> the preferred way.
+
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++-------
+>   1 file changed, 7 insertions(+), 7 deletions(-)
+
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 510cdf0..61493d4 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -549,8 +549,6 @@ static int vop_enable(struct drm_crtc *crtc)
+
+>          spin_unlock(&vop->reg_lock);
+
+> -       enable_irq(vop->irq);
+> -
+
+While this one should be okay (+/- my comment for vop_isr()), because the
+hardware is already powered on and clocked at this point...
+
+>          drm_crtc_vblank_on(crtc);
+
+>          return 0;
+> @@ -596,8 +594,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc
+*crtc,
+
+>          vop_dsp_hold_valid_irq_disable(vop);
+
+> -       disable_irq(vop->irq);
+> -
+>          vop->is_enabled = false;
+
+...this one is more tricky. There might be an interrupt handler still
+running at this point. disable_irq() waits for any running handler to
+complete before disabling, so we might want to call synchronize_irq() after
+setting is_enabled to false.
+
+
+>          /*
+> @@ -1168,6 +1164,13 @@ static irqreturn_t vop_isr(int irq, void *data)
+>          int ret = IRQ_NONE;
+
+>          /*
+> +        * since the irq is shared with iommu, iommu irq is enabled
+before vop
+> +        * enable, so before vop enable we do nothing.
+> +        */
+> +       if (!vop->is_enabled)
+> +               return IRQ_NONE;
+
+This doesn't seem to be properly synchronized. We don't even call it under
+a spinlock, so no barriers are issued. Perhaps we should make this atomic_t?
+
+Best regards,
+Tomasz
