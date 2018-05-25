@@ -1,58 +1,63 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 May 2018 11:48:04 +0100
-Subject: [PATCH v11 08/19] arm64: fpsimd: Eliminate task->mm checks
-In-Reply-To: <87r2m0rqzw.fsf@linaro.org>
-References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
- <1527181008-13549-9-git-send-email-Dave.Martin@arm.com>
- <87r2m0rqzw.fsf@linaro.org>
-Message-ID: <20180525104803.GC13470@e103592.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 25 May 2018 11:49:01 +0100
+Subject: REGRESSION: iommu fails to take address limit into account
+In-Reply-To: <CAKv+Gu_0ECwLhoA2ywp3nntFX=RxfpM+MWFwTain1WN1sMrW9g@mail.gmail.com>
+References: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
+ <CAKv+Gu_0ECwLhoA2ywp3nntFX=RxfpM+MWFwTain1WN1sMrW9g@mail.gmail.com>
+Message-ID: <6d95cd70-70bd-9e63-c148-d535fbedb0d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:04:03AM +0100, Alex Benn?e wrote:
+On 25/05/18 11:35, Ard Biesheuvel wrote:
+> On 25 May 2018 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> Hello all,
+>>
+>> I am looking into an issue where a platform device is wired to a
+>> MMU-500, and for some reason (which is under investigation) the
+>> platform device can not drive all address bits. I can work around this
+>> by limiting the DMA mask to 40 bits in the driver. However, the IORT
+>> table allows me to set the address limit as well, and so I was
+>> expecting this to be taken into account by the SMMU driver.
+>>
+>> When the iort/iommu layer sets up the DMA operations,
+>> iommu_dma_init_domain() is entered with the expected values:
+>>
+>> base == 0
+>> size == 0x100_0000_0000
+>>
+>> However, the iommu layer ends up generating IOVA addresses that have
+>> bits [47:40] set (which is what the MMU-500 supports). Looking closer,
+>> this is not surprising, given that the end_pfn variable that is
+>> calculated in iommu_dma_init_domain() is no longer used after Zhen's
+>> patch aa3ac9469c185 ("iommu/iova: Make dma_32bit_pfn implicit") was
+>> applied.
+>>
+>> So effectively, this is a regression, and I would like your help
+>> figuring out how to go about fixing this.
+>>
 > 
-> Dave Martin <Dave.Martin@arm.com> writes:
+> I have narrowed it down a bit further: even though the IOVA range
+> ignores the IORT address limit, the device's DMA mask is set
+> correctly. The only problem is that the driver (like all drivers
+> afaict) does not take into account the fact that its DMA mask has
+> already been set by the bus layer before its probe function is called.
 > 
-> > Currently the FPSIMD handling code uses the condition task->mm ==
-> > NULL as a hint that task has no FPSIMD register context.
-> >
-> > The ->mm check is only there to filter out tasks that cannot
-> > possibly have FPSIMD context loaded, for optimisation purposes.
-> > Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
-> > saving FPSIMD context back to memory.  For these reasons, the ->mm
-> > checks are not useful, providing that TIF_FOREIGN_FPSTATE is
-> > maintained in a consistent way for all threads.
-> >
-> > The context switch logic is already deliberately optimised to defer
-> > reloads of the regs until ret_to_user (or sigreturn as a special
-> > case), and save them only if they have been previously loaded.
-> > These paths are the only places where the wrong_task and wrong_cpu
-> > conditions can be made false, by calling fpsimd_bind_task_to_cpu().
-> > Kernel threads by definition never reach these paths.  As a result,
-> > the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
-> > always yield true for kernel threads.
-> >
-> > This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
-> > task.  The fpsimd_flush_task_state() call already present in
-> > copy_thread() ensures the same for any new task.
-> >
-> > With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
-> > ensures that no extra context save work is added for kernel
-> > threads, and eliminates the redundant context saving that may
-> > currently occur for kernel threads that have acquired an mm via
-> > use_mm().
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> I could add something like this
 > 
-> Still good (although obviously without the ws damage in the commit).
+> -       if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
+> +       if (dma_get_mask(&pdev->dev) == DMA_BIT_MASK(32) &&
+> +           dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
+>                  dev_warn(&pdev->dev, "Failed to enable 64-bit DMA\n");
+> 
+> to only override the mask if it is not at its default value, but it
+> feels like papering over the problem given that most drivers appear to
+> ignore the preset mask as well.
 
-Agreed -- I'll coordinate with Marc to make sure that gets fixed.
+Yup, that's the crux of it - if, say, the firmware describes an explicit 
+restriction to 32 bits, then drivers have no way to tell the difference 
+between that and the default mask initialised by the bus code (which 
+they *should* be able to widen), and at the moment neither does arch 
+code or anyone else (and the current interface between arch code and 
+firmware code does not help matters).
 
-Thanks for the review.
-
-[...]
-
-Cheers
----Dave
+Robin.
