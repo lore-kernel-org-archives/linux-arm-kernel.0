@@ -1,90 +1,151 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 25 May 2018 11:41:22 +0530
-Subject: [PATCH v8 12/12] ARM: dts: ipq8074: Enable few peripherals for hk01
- board
+Date: Fri, 25 May 2018 11:41:14 +0530
+Subject: [PATCH v8 04/12] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
 In-Reply-To: <1527228682-12285-1-git-send-email-sricharan@codeaurora.org>
 References: <1527228682-12285-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1527228682-12285-13-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1527228682-12285-5-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the common parts for the dk04 boards.
+
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 54 +++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi | 111 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-ipq4019.dtsi           |   2 +-
+ 2 files changed, 112 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-index 72c5b4a3..c13ddee 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-+++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-@@ -21,6 +21,7 @@
- 
- 	aliases {
- 		serial0 = &blsp1_uart5;
-+		serial1 = &blsp1_uart3;
- 	};
- 
- 	chosen {
-@@ -36,5 +37,58 @@
- 		serial at 78b3000 {
- 			status = "ok";
- 		};
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+new file mode 100644
+index 0000000..7c1eb19
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+@@ -0,0 +1,111 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
 +
-+		spi at 78b5000 {
++#include "qcom-ipq4019.dtsi"
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1";
++
++	aliases {
++		serial0 = &blsp1_uart1;
++		serial1 = &blsp1_uart2;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256MB */
++	};
++
++	soc {
++		pinctrl at 1000000 {
++			serial_0_pins: serial0-pinmux {
++				pins = "gpio16", "gpio17";
++				function = "blsp_uart0";
++				bias-disable;
++			};
++
++			serial_1_pins: serial1-pinmux {
++				pins = "gpio8", "gpio9",
++					"gpio10", "gpio11";
++				function = "blsp_uart1";
++				bias-disable;
++			};
++
++			spi_0_pins: spi-0-pinmux {
++				pinmux {
++					function = "blsp_spi0";
++					pins = "gpio13", "gpio14", "gpio15";
++					bias-disable;
++				};
++				pinmux_cs {
++					function = "gpio";
++					pins = "gpio12";
++					bias-disable;
++					output-high;
++				};
++			};
++
++			i2c_0_pins: i2c-0-pinmux {
++				pins = "gpio20", "gpio21";
++				function = "blsp_i2c0";
++				bias-disable;
++			};
++
++			nand_pins: nand-pins {
++				pins = "gpio53", "gpio55", "gpio56",
++					"gpio57", "gpio58", "gpio59",
++					"gpio60", "gpio62", "gpio63",
++					"gpio64", "gpio65", "gpio66",
++					"gpio67", "gpio68", "gpio69";
++				function = "qpic";
++			};
++		};
++
++		serial at 78af000 {
++			pinctrl-0 = <&serial_0_pins>;
++			pinctrl-names = "default";
 +			status = "ok";
++		};
++
++		serial at 78b0000 {
++			pinctrl-0 = <&serial_1_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++
++		dma at 7884000 {
++			status = "ok";
++		};
++
++		spi at 78b5000 { /* BLSP1 QUP1 */
++			pinctrl-0 = <&spi_0_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++			cs-gpios = <&tlmm 12 0>;
 +
 +			m25p80 at 0 {
-+				  #address-cells = <1>;
-+				  #size-cells = <1>;
-+				  compatible = "jedec,spi-nor";
-+				  reg = <0>;
-+				  spi-max-frequency = <50000000>;
-+			};
-+		};
-+
-+		serial at 78b1000 {
-+			 status = "ok";
-+		};
-+
-+		i2c at 78b6000 {
-+			 status = "ok";
-+		};
-+
-+		dma at 7984000 {
-+			 status = "ok";
-+		};
-+
-+		nand at 79b0000 {
-+			status = "ok";
-+
-+			nand at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
 +				reg = <0>;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+				nand-bus-width = <8>;
++				compatible = "n25q128a11";
++				spi-max-frequency = <24000000>;
 +			};
 +		};
 +
-+		phy at 86000 {
++		pci at 40000000 {
 +			status = "ok";
++			perst-gpio = <&tlmm 38 0x1>;
 +		};
 +
-+		phy at 8e000 {
-+			status = "ok";
++		qpic-nand at 79b0000 {
++			pinctrl-0 = <&nand_pins>;
++			pinctrl-names = "default";
 +		};
-+
-+		pci at 20000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 58 0x1>;
-+		};
-+
-+		pci at 10000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 61 0x1>;
-+		};
- 	};
- };
++	};
++};
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index ad61a55..7bcd763 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -323,7 +323,7 @@
+ 			dma-names = "rx", "tx";
+ 		};
+ 
+-		serial at 78b0000 {
++		blsp1_uart2: serial at 78b0000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x78b0000 0x200>;
+ 			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
