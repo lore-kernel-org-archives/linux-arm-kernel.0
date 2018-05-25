@@ -1,160 +1,127 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 25 May 2018 11:21:59 -0600
+Date: Fri, 25 May 2018 11:27:46 -0600
 Subject: [PATCH 6/6] coresight: allow to build as modules
-In-Reply-To: <20180524184908.3648cf67456510261a1afe16@arm.com>
+In-Reply-To: <4986a636-d5a5-387c-abf1-d68afe063f06@arm.com>
 References: <20180517070643.GC13919@kroah.com>
  <20180518012024.22645-1-kim.phillips@arm.com>
- <20180518012024.22645-6-kim.phillips@arm.com> <20180522213906.GC25658@xps15>
- <20180524184908.3648cf67456510261a1afe16@arm.com>
-Message-ID: <CANLsYkw7rpSz-mJoUa6n-98ko+5X4xc6zF6TpkJ1pjV9cnMEwg@mail.gmail.com>
+ <20180518012024.22645-6-kim.phillips@arm.com>
+ <4986a636-d5a5-387c-abf1-d68afe063f06@arm.com>
+Message-ID: <CANLsYkzD9Ot1noY7QpTu76fUcGsTu4V8y6Dep9Haffw-0uPM9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2018 at 17:49, Kim Phillips <kim.phillips@arm.com> wrote:
-> On Tue, 22 May 2018 15:39:06 -0600
-> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->
->> On Thu, May 17, 2018 at 08:20:24PM -0500, Kim Phillips wrote:
->> > Allow to build coresight as modules.  This greatly enhances developer
->> > efficiency by allowing the development to take place exclusively on the
->> > target, and without needing to reboot in between changes.
->> >
->> > - Kconfig bools become tristates, to allow =m
->> >
->> > - use -objs to denote merge object directives in Makefile, adds a
->> >   coresight-core nomenclature for the base module.
->> >
->> > - Export core functions so as to be able to be used by
->> >   non-core modules.
->> >
->> > - add a coresight_exit() that unregisters the coresight bus, add
->> >   remove fns for most others.
->> >
->> > - fix up modules with ID tables for autoloading on boot
->> >
->> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> > Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
->> > Cc: Randy Dunlap <rdunlap@infradead.org>
->> > Signed-off-by: Kim Phillips <kim.phillips@arm.com>
->> > ---
->> >  drivers/hwtracing/coresight/Kconfig           | 48 +++++++++++++++----
->> >  drivers/hwtracing/coresight/Makefile          | 28 +++++++----
->> >  .../hwtracing/coresight/coresight-cpu-debug.c |  2 +
->> >  .../coresight/coresight-dynamic-replicator.c  | 26 ++++++++--
->> >  drivers/hwtracing/coresight/coresight-etb10.c | 27 +++++++++--
->> >  .../hwtracing/coresight/coresight-etm-perf.c  |  9 +++-
->> >  .../coresight/coresight-etm3x-sysfs.c         |  1 +
->> >  drivers/hwtracing/coresight/coresight-etm3x.c | 32 +++++++++++--
->> >  .../coresight/coresight-etm4x-sysfs.c         |  1 +
->> >  drivers/hwtracing/coresight/coresight-etm4x.c | 33 +++++++++++--
->> >  .../hwtracing/coresight/coresight-funnel.c    | 26 ++++++++--
->> >  drivers/hwtracing/coresight/coresight-priv.h  |  1 -
->> >  .../coresight/coresight-replicator.c          | 28 +++++++++--
->> >  drivers/hwtracing/coresight/coresight-stm.c   | 23 ++++++++-
->> >  drivers/hwtracing/coresight/coresight-tmc.c   | 18 ++++++-
->> >  drivers/hwtracing/coresight/coresight-tpiu.c  | 26 ++++++++--
->> >  drivers/hwtracing/coresight/coresight.c       | 14 ++++++
->> >  17 files changed, 299 insertions(+), 44 deletions(-)
+On 25 May 2018 at 11:12, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 18/05/18 02:20, Kim Phillips wrote:
 >>
->> For the next revision please split the work based on files.
->
-> If I read that literally, one file-by-one would break build
-> bisectability.  Do you mean split by source files depending on the
-> logical modules they belong to, e.g., etm3x, etm4x, etb10, etc.?  If
-
-I meant to introduce all the needed changes - including the module
-author, description and licences - per module.  That will break up
-this patch considerably and allow us to concentrate on individual
-component.  As a final step do the changes to Kconfig and the
-Makefile.
-
-
-> so, I think it would look like the coresight-core would be first,
-> followed by the rest, but I also think there are cross-dependencies.
-> Hmm, OK, I'll have a look, but there's also one more thing:  I think
-> the Makefile  obj '-core' nomenclature was to change the name of the
-> module to not be the same as the core source file, so what do you think
-> about renaming the core source file instead of the module name?  e.g.:
->
-> Instead of this:
->
-> obj-$(CONFIG_CORESIGHT) += coresight-core.o
-> coresight-core-objs := coresight.o \
->                        of_coresight.o
->
-> we have this:
->
-> obj-$(CONFIG_CORESIGHT) += coresight.o
-> coresight-objs := coresight-core.o \
->                   of_coresight.o
->
-> and e.g., instead of this:
->
-> obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x-core.o
-> coresight-etm3x-core-objs := coresight-etm3x.o \
->                              coresight-etm-cp14.o \
->                              coresight-etm3x-sysfs.o
->
-> we have this:
->
-> obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o
-> coresight-etm3x-objs := coresight-etm3x-core.o \
->                         coresight-etm-cp14.o \
->                         coresight-etm3x-sysfs.o
->
-> ?
-
-I think that is much better and avoid carrying the heave "-core"
-appendage.  Renaming needs to be a patch on its own (but still part of
-this set).
-
->
->> > +static int __exit tmc_remove(struct amba_device *adev)
->> > +{
->> > +   struct tmc_drvdata *drvdata = dev_get_drvdata(&adev->dev);
->> > +
->> > +   /* free ETB/ETF or ETR memory */
->> > +   tmc_read_unprepare(drvdata);
->> > +
->> > +   misc_deregister(&drvdata->miscdev);
->> > +   coresight_unregister(drvdata->csdev);
->> > +
->> > +   return 0;
->> > +}
->> > +
+>> Allow to build coresight as modules.  This greatly enhances developer
+>> efficiency by allowing the development to take place exclusively on the
+>> target, and without needing to reboot in between changes.
 >>
->> Right now I can remove the module for a TMC link or sink when part of an active
->> session, something I pointed out during an earlier revision.
+>> - Kconfig bools become tristates, to allow =m
+>>
+>> - use -objs to denote merge object directives in Makefile, adds a
+>>    coresight-core nomenclature for the base module.
+>>
+>> - Export core functions so as to be able to be used by
+>>    non-core modules.
+>>
+>> - add a coresight_exit() that unregisters the coresight bus, add
+>>    remove fns for most others.
+>>
+>> - fix up modules with ID tables for autoloading on boot
+>>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+>> Cc: Randy Dunlap <rdunlap@infradead.org>
+>> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 >
-> Right, I missed that :(
 >
-> So would the first thing tmc_remove does is this:
+> Kim,
 >
-> if (drvdata->reading)
->         return -EBUSY;
+> I see that you have addressed my comments on a previous version
+> of this series posted in April. But I don't see the version number
+> increased for this new version. Please add versioning to make it
+> easier to make it more obvious.
 >
-> work, or would we need to introduce a new sentinel?
+> Also, generally it is a good idea to keep the people who reviewed
+> and commented on your previous versions in the newer versions.
+>
+> Some comments below :
+>
+>> diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> index fc742215ab05..bc42b8022556 100644
+>> --- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> +++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> @@ -37,7 +37,12 @@ struct replicator_state {
+>>   static int replicator_enable(struct coresight_device *csdev, int inport,
+>>                               int outport)
+>>   {
+>> -       struct replicator_state *drvdata =
+>> dev_get_drvdata(csdev->dev.parent);
+>> +       struct device *parent_dev = csdev->dev.parent;
+>> +       struct replicator_state *drvdata = dev_get_drvdata(parent_dev);
+>> +       struct module *module = parent_dev->driver->owner;
+>> +
+>> +       if (!try_module_get(module))
+>> +               return -ENODEV;
+>>         CS_UNLOCK(drvdata->base);
+>
+>
+> What is the guarantee that the "csdev" is still available when we reach
+> here ?
+>
+> A module could be unloaded "after the component was added to the path"
+> (via coresight_build_path) and before we invoke the "enable" on each
+> component in the path ?
 
-The ->reading flag is to prevent concurrent access to the buffer from
-sysFS and to avoid clobbering said buffer with new trace data.  The
-TMC driver shouldn't be different from the other ones with regards to
-the usage of the try_module_get()/module_put() functions.
+Very good point - this is invariably racy.
 
 >
->> I also think we need to deal with driver removal cases when the TMC buffer
->> (ETR or ETF) is being read from sysFS.
+> Also, it  is tedious to do module_get in "enable" and module_put in the
+> disable call backs for each component.
 >
-> OK, I thought the:
->
-> struct file_operations tmc_fops = {
->         .owner = THIS_MODULE,
->
-> would prevent module unload whilst sysfs access was being performed,
-> but I'll double check.
+> Instead, if we do a module_get() in build_path and module_put() in
+> release path, we could solve all these problems and keep it the module
+> refcount in a central place.
 
-Right, just check that it works as advertised.
+Good idea, it does streamline things a lot.
 
 >
-> Thanks,
+>> +MODULE_DEVICE_TABLE(amba, replicator_ids);
+>> +
+>>   static struct amba_driver replicator_driver = {
+>>         .drv = {
+>>                 .name   = "coresight-dynamic-replicator",
+>> @@ -207,9 +226,10 @@ static struct amba_driver replicator_driver = {
+>>                 .suppress_bind_attrs = true,
+>>         },
+>>         .probe          = replicator_probe,
+>> +       .remove         = replicator_remove,
+>>         .id_table       = replicator_ids,
+>>   };
 >
-> Kim
+>
+> Do we have the owner field set here for this driver ? I see that you
+> added it for some components and not others. e.g, you have added it for
+> etm4x, while not for replicator and others.
+>
+>
+>> +MODULE_DEVICE_TABLE(amba, etm4_ids);
+>> +
+>>   static struct amba_driver etm4x_driver = {
+>>         .drv = {
+>>                 .name   = "coresight-etm4x",
+>> +               .owner  = THIS_MODULE,
+>>                 .suppress_bind_attrs = true,
+>>         },
+>>         .probe          = etm4_probe,
+>> +       .remove         = etm4_remove,
+>>         .id_table       = etm4_ids,
+>>   };
+>> -builtin_amba_driver(etm4x_driver);
+>> +module_amba_driver(etm4x_driver);
+>
+>
+>
+> Suzuki
