@@ -1,45 +1,67 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 25 May 2018 10:04:23 -0400
-Subject: [PATCH] PCI: Try to clean up resources via remove if shutdown doesn't
- exist
-Message-ID: <1527257063-15843-1-git-send-email-okaya@codeaurora.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 25 May 2018 15:00:33 +0100
+Subject: [PATCH v3 02/15] ARM: bugs: prepare processor bug infrastructure
+In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
+References: <20180525135938.GE17671@n2100.armlinux.org.uk>
+Message-ID: <E1fMDGj-0006yR-0n@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is up to a driver to implement shutdown() callback. If shutdown()
-callback is not implemented, PCI device can have pending interrupt and
-even do DMA transactions while the system is going down.
+Prepare the processor bug infrastructure so that it can be expanded to
+check for per-processor bugs.
 
-If kexec is in use, this can damage the newly booting kexec kernel
-or even prevent it from booting altogether. Fallback to calling the
-remove() callback if shutdown() isn't implemented for a given driver.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/pci/pci-driver.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/include/asm/bugs.h | 4 ++--
+ arch/arm/kernel/Makefile    | 1 +
+ arch/arm/kernel/bugs.c      | 9 +++++++++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/kernel/bugs.c
 
-diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
-index 6ace470..4ac72e3 100644
---- a/drivers/pci/pci-driver.c
-+++ b/drivers/pci/pci-driver.c
-@@ -475,8 +475,17 @@ static void pci_device_shutdown(struct device *dev)
+diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
+index a97f1ea708d1..ed122d294f3f 100644
+--- a/arch/arm/include/asm/bugs.h
++++ b/arch/arm/include/asm/bugs.h
+@@ -10,10 +10,10 @@
+ #ifndef __ASM_BUGS_H
+ #define __ASM_BUGS_H
  
- 	pm_runtime_resume(dev);
+-#ifdef CONFIG_MMU
+ extern void check_writebuffer_bugs(void);
  
-+	/*
-+	 * Try shutdown callback if it exists, otherwise fallback to remove
-+	 * callback. PCI drivers can do DMA and have pending interrupts.
-+	 * Leaving the DMA and interrupts pending could damage the newly
-+	 * booting kexec kernel as well as prevent it from booting altogether
-+	 * if the pending interrupt is level.
-+	 */
- 	if (drv && drv->shutdown)
- 		drv->shutdown(pci_dev);
-+	else if (drv && drv->remove)
-+		drv->remove(pci_dev);
+-#define check_bugs() check_writebuffer_bugs()
++#ifdef CONFIG_MMU
++extern void check_bugs(void);
+ #else
+ #define check_bugs() do { } while (0)
+ #endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index b59ac4bf82b8..8cad59465af3 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -31,6 +31,7 @@ else
+ obj-y		+= entry-armv.o
+ endif
  
- 	/*
- 	 * If this is a kexec reboot, turn off Bus Master bit on the
++obj-$(CONFIG_MMU)		+= bugs.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+ obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+new file mode 100644
+index 000000000000..88024028bb70
+--- /dev/null
++++ b/arch/arm/kernel/bugs.c
+@@ -0,0 +1,9 @@
++// SPDX-Identifier: GPL-2.0
++#include <linux/init.h>
++#include <asm/bugs.h>
++#include <asm/proc-fns.h>
++
++void __init check_bugs(void)
++{
++	check_writebuffer_bugs();
++}
 -- 
 2.7.4
