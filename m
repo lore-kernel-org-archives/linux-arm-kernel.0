@@ -1,72 +1,180 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:11 +0100
-Subject: [PATCH v4 05/26] irqchip/gic: Unify GIC priority definitions
+Date: Fri, 25 May 2018 10:49:10 +0100
+Subject: [PATCH v4 04/26] arm64: alternative: Apply alternatives early in boot
+ process
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-6-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-5-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPIs use the same priority value as other GIC interrupts.
+From: Daniel Thompson <daniel.thompson@linaro.org>
 
-Make the GIC default priority definition visible to ITS implementation
-and use this same definition for LPI priorities.
+Currently alternatives are applied very late in the boot process (and
+a long time after we enable scheduling). Some alternative sequences,
+such as those that alter the way CPU context is stored, must be applied
+much earlier in the boot sequence.
 
+Introduce apply_boot_alternatives() to allow some alternatives to be
+applied immediately after we detect the CPU features of the boot CPU.
+
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+[julien.thierry at arm.com: rename to fit new cpufeature framework better,
+			 apply BOOT_SCOPE feature early in boot]
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c       | 2 +-
- include/linux/irqchip/arm-gic-common.h | 6 ++++++
- include/linux/irqchip/arm-gic.h        | 5 -----
- 3 files changed, 7 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/alternative.h |  3 +--
+ arch/arm64/include/asm/cpufeature.h  |  2 ++
+ arch/arm64/kernel/alternative.c      | 30 +++++++++++++++++++++++++++---
+ arch/arm64/kernel/cpufeature.c       |  5 +++++
+ arch/arm64/kernel/smp.c              |  7 +++++++
+ 5 files changed, 42 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5416f2b..9ac146c 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -62,7 +62,7 @@
- #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
- #define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index a91933b..9fc938f 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -14,8 +14,6 @@
+ #include <linux/stddef.h>
+ #include <linux/stringify.h>
  
--#define LPI_PROP_DEFAULT_PRIO	0xa0
-+#define LPI_PROP_DEFAULT_PRIO	GICD_INT_DEF_PRI
+-extern int alternatives_applied;
+-
+ struct alt_instr {
+ 	s32 orig_offset;	/* offset to original instruction */
+ 	s32 alt_offset;		/* offset to replacement instruction */
+@@ -27,6 +25,7 @@ struct alt_instr {
+ typedef void (*alternative_cb_t)(struct alt_instr *alt,
+ 				 __le32 *origptr, __le32 *updptr, int nr_inst);
  
- /*
-  * Collection structure - just an ID, and a redistributor address to
-diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
-index 0a83b43..9a1a479 100644
---- a/include/linux/irqchip/arm-gic-common.h
-+++ b/include/linux/irqchip/arm-gic-common.h
-@@ -13,6 +13,12 @@
- #include <linux/types.h>
- #include <linux/ioport.h>
++void __init apply_boot_alternatives(void);
+ void __init apply_alternatives_all(void);
+ void apply_alternatives(void *start, size_t length);
  
-+#define GICD_INT_DEF_PRI		0xa0
-+#define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
-+					(GICD_INT_DEF_PRI << 16) |\
-+					(GICD_INT_DEF_PRI << 8) |\
-+					GICD_INT_DEF_PRI)
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 09b0f2a..19efe4e 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -359,6 +359,8 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
+ extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
+ extern struct static_key_false arm64_const_caps_ready;
+ 
++extern unsigned long boot_capabilities;
 +
- enum gic_type {
- 	GIC_V2,
- 	GIC_V3,
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 68d8b1f..5f2129b 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -65,11 +65,6 @@
- #define GICD_INT_EN_CLR_X32		0xffffffff
- #define GICD_INT_EN_SET_SGI		0x0000ffff
- #define GICD_INT_EN_CLR_PPI		0xffff0000
--#define GICD_INT_DEF_PRI		0xa0
--#define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
--					(GICD_INT_DEF_PRI << 16) |\
--					(GICD_INT_DEF_PRI << 8) |\
--					GICD_INT_DEF_PRI)
+ bool this_cpu_has_cap(unsigned int cap);
  
- #define GICH_HCR			0x0
- #define GICH_VTR			0x4
+ static inline bool cpu_have_feature(unsigned int num)
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 5c4bce4..3f540ff 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -122,7 +122,8 @@ static void patch_alternative(struct alt_instr *alt,
+ 	}
+ }
+ 
+-static void __apply_alternatives(void *alt_region, bool use_linear_alias)
++static void __apply_alternatives(void *alt_region,  bool use_linear_alias,
++				 unsigned long feature_mask)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+@@ -132,6 +133,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 	for (alt = region->begin; alt < region->end; alt++) {
+ 		int nr_inst;
+ 
++		if ((BIT(alt->cpufeature) & feature_mask) == 0)
++			continue;
++
+ 		/* Use ARM64_CB_PATCH as an unconditional patch */
+ 		if (alt->cpufeature < ARM64_CB_PATCH &&
+ 		    !cpus_have_cap(alt->cpufeature))
+@@ -178,7 +182,9 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 		isb();
+ 	} else {
+ 		BUG_ON(alternatives_applied);
+-		__apply_alternatives(&region, true);
++
++		__apply_alternatives(&region, true, ~boot_capabilities);
++
+ 		/* Barriers provided by the cache flushing */
+ 		WRITE_ONCE(alternatives_applied, 1);
+ 	}
+@@ -192,6 +198,24 @@ void __init apply_alternatives_all(void)
+ 	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
+ }
+ 
++/*
++ * This is called very early in the boot process (directly after we run
++ * a feature detect on the boot CPU). No need to worry about other CPUs
++ * here.
++ */
++void __init apply_boot_alternatives(void)
++{
++	struct alt_region region = {
++		.begin	= (struct alt_instr *)__alt_instructions,
++		.end	= (struct alt_instr *)__alt_instructions_end,
++	};
++
++	/* If called on non-boot cpu things could go wrong */
++	WARN_ON(smp_processor_id() != 0);
++
++	__apply_alternatives(&region, true, boot_capabilities);
++}
++
+ void apply_alternatives(void *start, size_t length)
+ {
+ 	struct alt_region region = {
+@@ -199,5 +223,5 @@ void apply_alternatives(void *start, size_t length)
+ 		.end	= start + length,
+ 	};
+ 
+-	__apply_alternatives(&region, false);
++	__apply_alternatives(&region, false, -1);
+ }
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a3a5585d..7a4f602 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -52,6 +52,8 @@
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ EXPORT_SYMBOL(cpu_hwcaps);
+ 
++unsigned long boot_capabilities;
++
+ /*
+  * Flag to indicate if we have computed the system wide
+  * capabilities based on the boot time active CPUs. This
+@@ -1370,6 +1372,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 		if (!cpus_have_cap(caps->capability) && caps->desc)
+ 			pr_info("%s %s\n", info, caps->desc);
+ 		cpus_set_cap(caps->capability);
++
++		if (scope_mask & SCOPE_BOOT_CPU)
++			__set_bit(caps->capability, &boot_capabilities);
+ 	}
+ }
+ 
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index f3e2e3a..b7fb909 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -410,6 +410,13 @@ void __init smp_prepare_boot_cpu(void)
+ 	 */
+ 	jump_label_init();
+ 	cpuinfo_store_boot_cpu();
++
++	/*
++	 * We now know enough about the boot CPU to apply the
++	 * alternatives that cannot wait until interrupt handling
++	 * and/or scheduling is enabled.
++	 */
++	apply_boot_alternatives();
+ }
+ 
+ static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 -- 
 1.9.1
