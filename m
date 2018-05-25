@@ -1,72 +1,67 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 14:42:29 +0100
-Subject: [PATCH v4 00/26] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <02afa8bb-5d27-f229-6085-8f61a626bc63@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <20180525101632.cfcfnmnt2u7rz3lt@holly.lan>
- <02afa8bb-5d27-f229-6085-8f61a626bc63@arm.com>
-Message-ID: <8703b3e0-b5f8-e607-2d8f-3d0b71a5ec3c@arm.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Fri, 25 May 2018 15:47:59 +0200
+Subject: [PATCH v2] bpf, arm32: Correct check_imm24
+In-Reply-To: <20180511030634.GB7621@udknight>
+References: <20180511030634.GB7621@udknight>
+Message-ID: <206ea320-7f9e-6e3b-9808-f040f474839e@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 25/05/18 11:40, Julien Thierry wrote:
+On 05/11/2018 05:06 AM, Wang YanQing wrote:
+> imm24 is signed, so the right range is:
+> [-(1<<(24 - 1)), (1<<(24 - 1)) - 1]
 > 
+> Note:this patch also fix a typo.
 > 
-> On 25/05/18 11:16, Daniel Thompson wrote:
->> On Fri, May 25, 2018 at 10:49:06AM +0100, Julien Thierry wrote:
->>> This series is a continuation of the work started by Daniel [1]. The 
->>> goal
->>> is to use GICv3 interrupt priorities to simulate an NMI.
->>>
->>> To achieve this, set two priorities, one for standard interrupts and
->>> another, higher priority, for NMIs. Whenever we want to disable 
->>> interrupts,
->>> we mask the standard priority instead so NMIs can still be raised. Some
->>> corner cases though still require to actually mask all interrupts
->>> effectively disabling the NMI.
->>>
->>> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
->>> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as 
->>> NMI
->>> for now. I don't think there is any reason LPIs should be allowed to 
->>> be set
->>> as NMI as they do not have an active state.
->>> When an NMI is active on a CPU, no other NMI can be triggered on the 
->>> CPU.
->>>
->>> After the big refactoring I get performances similar to the ones I had
->>> in v3[2], reposting old results here:
->>>
->>> - "hackbench 200 process 1000" (average over 20 runs)
->>> +-----------+----------+------------+------------------+
->>> |?????????? | native?? | PMR guest? | v4.17-rc6 guest? |
->>> +-----------+----------+------------+------------------+
->>> | PMR host? | 40.0336s |?? 39.3039s |???????? 39.2044s |
->>> | v4.17-rc6 | 40.4040s |?? 39.6011s |???????? 39.1147s |
->>> +-----------+----------+------------+------------------+
->>>
->>> - Kernel build from defconfig:
->>> PMR host:? 13m45.743s
->>> v4.17-rc6: 13m40.400s
->>>
->>> I'll try to post more detailed benchmarks later if I find notable
->>> differences with the previous version.
->>
->> Do you have a public git tree anywhere... I *can* apply 26 patches from
->> e-mail but I'd rather pull them!
->>
+> Signed-off-by: Wang YanQing <udknight@gmail.com>
+
+Through which tree will this fix be routed? (And the cleanup in "[PATCH v2]
+bpf, arm32: Fix inconsistent naming about emit_a32_lsr_r64|emit_a32_lsr_i64"?)
+Wasn't fully clear from the subject in the patch whether target are bpf trees.
+
+If this one here should go as a fix via bpf tree, would be great to get an
+ACK from Russell.
+
+Just asking since I haven't seen it in Linus' tree and it's been two weeks
+by now, so making sure it's not getting lost in the archives. ;-)
+
+> ---
+>  Changes
+>  v1-v2:
+>  1:Rewrite the patch, I make a mistake, the v1 is wrong totally,
+>    reported by Russell King.
 > 
-> Yes that makes sense, I'll try to get one set up.
+>    I use the fix suggested by Russell King instead of myself which
+>    use the exact number range [-8388608, 8388607].
+>  2:Fix the error in changelog.
 > 
-> I'll let you know once I have done so.
-
-My public git is up. You can pull the patches from:
-
-git://linux-arm.org/linux-jt.git v4.17-pseudo-nmi
-
-Cheers,
-
--- 
-Julien Thierry
+>  Thanks!
+> 
+>  arch/arm/net/bpf_jit_32.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index caccc78..316bc08 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -84,7 +84,7 @@
+>   *
+>   * 1. First argument is passed using the arm 32bit registers and rest of the
+>   * arguments are passed on stack scratch space.
+> - * 2. First callee-saved arugument is mapped to arm 32 bit registers and rest
+> + * 2. First callee-saved argument is mapped to arm 32 bit registers and rest
+>   * arguments are mapped to scratch space on stack.
+>   * 3. We need two 64 bit temp registers to do complex operations on eBPF
+>   * registers.
+> @@ -1199,8 +1199,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+>  	s32 jmp_offset;
+>  
+>  #define check_imm(bits, imm) do {				\
+> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+> +	if ((imm) >= (1 << ((bits) - 1)) ||			\
+> +	    (imm) < -(1 << ((bits) - 1))) {			\
+>  		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+>  			i, imm, imm);				\
+>  		return -EINVAL;					\
+> 
