@@ -1,28 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 14:48:54 -0700
-Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.18, round 2
-In-Reply-To: <7h1se2s0dd.fsf@baylibre.com>
-References: <7h1se2s0dd.fsf@baylibre.com>
-Message-ID: <20180525214854.bu5tiktatywwsmi5@localhost>
+Date: Fri, 25 May 2018 14:56:47 -0700
+Subject: [GIT PULL] berlin dt changes for v4.18
+In-Reply-To: <20180524160619.45aaead2@xhacker.debian>
+References: <20180524160619.45aaead2@xhacker.debian>
+Message-ID: <20180525215647.xez6iukpgslbphru@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 11:17:02AM -0700, Kevin Hilman wrote:
-> The following changes since commit 35ee52bea66c74a7c33cebda8692d61b1ed7c6e9:
+On Thu, May 24, 2018 at 04:06:19PM +0800, Jisheng Zhang wrote:
+> Hi,
 > 
->   ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus (2018-05-10 17:03:28 -0700)
+> Here is the pull request for berlin dt changes for v4.18.
 > 
-> are available in the git repository at:
+> Thanks,
+> Jisheng
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
-> for you to fetch changes up to ae0257da5701b6e44eba9dc4ebab867b56d6ea29:
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
->   ARM: meson: merge Kconfig symbol MACH_MESON8B into MACH_MESON8 (2018-05-23 10:08:13 -0700)
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin-dt-for-v4.18
+> 
+> for you to fetch changes up to 15cf848d3c208159410eff2055494163c2542bbb:
+> 
+>   ARM: dts: berlin2q: move PMU node from soc to root (2018-05-24 15:25:44 +0800)
 > 
 > ----------------------------------------------------------------
-> Amlogic 32-bit DT changes for v4.18, round 2
-> - remove MACH_MESON8B, only used for building DTs
+> berlin DT changes for v4.18
+> 
+>  - add Valve Steam Link board support
+>  - use PWM for chromecast's LED, override chromecast's bootloader
+>    bad ATAG_MEM.
+>  - fix twd timer irq type
+>  - add interrupt-affinity to BG2Q's pmu
+>  - add "cache-unified" to BG2Q's l2 node
+>  - use SPDX-License-Identifier
 
 Merged, thanks!
 
