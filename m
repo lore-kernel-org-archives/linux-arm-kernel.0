@@ -1,76 +1,291 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri, 25 May 2018 09:45:15 -0700
-Subject: [PATCH 1/3] dt-bindings: clk: Update Stingray binding doc
+Date: Fri, 25 May 2018 09:45:16 -0700
+Subject: [PATCH 2/3] clk: bcm: Update and add tingray clock entries
 In-Reply-To: <1527266717-8406-1-git-send-email-ray.jui@broadcom.com>
 References: <1527266717-8406-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527266717-8406-2-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527266717-8406-3-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Stingray clock binding document to add additional clock entries
-with names matching the latest ASIC datasheet. Also modify a few existing
-entries to make their naming more consistent with the rest of the entries
+Update and add Stingray clock definitions and tables so they match the
+binding document and the latest ASIC datasheet
 
 Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
 Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 ---
- .../bindings/clock/brcm,iproc-clocks.txt           | 26 ++++++++++++----------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+ drivers/clk/bcm/clk-sr.c           | 135 ++++++++++++++++++++++++++++++++-----
+ include/dt-bindings/clock/bcm-sr.h |  24 +++++--
+ 2 files changed, 137 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-index f8e4a93..ab730ea 100644
---- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-@@ -276,36 +276,38 @@ These clock IDs are defined in:
-     clk_ts_500_ref	genpll2		2	BCM_SR_GENPLL2_TS_500_REF_CLK
-     clk_125_nitro	genpll2		3	BCM_SR_GENPLL2_125_NITRO_CLK
-     clk_chimp		genpll2		4	BCM_SR_GENPLL2_CHIMP_CLK
--    clk_nic_flash	genpll2		5	BCM_SR_GENPLL2_NIC_FLASH
-+    clk_nic_flash	genpll2		5	BCM_SR_GENPLL2_NIC_FLASH_CLK
-+    clk_fs		genpll2		6	BCM_SR_GENPLL2_FS_CLK
+diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
+index adc74f4..7b9efc0 100644
+--- a/drivers/clk/bcm/clk-sr.c
++++ b/drivers/clk/bcm/clk-sr.c
+@@ -56,8 +56,8 @@ static const struct iproc_pll_ctrl sr_genpll0 = {
+ };
  
-     genpll3		crystal		0	BCM_SR_GENPLL3
-     clk_hsls		genpll3		1	BCM_SR_GENPLL3_HSLS_CLK
-     clk_sdio		genpll3		2	BCM_SR_GENPLL3_SDIO_CLK
+ static const struct iproc_clk_ctrl sr_genpll0_clk[] = {
+-	[BCM_SR_GENPLL0_SATA_CLK] = {
+-		.channel = BCM_SR_GENPLL0_SATA_CLK,
++	[BCM_SR_GENPLL0_125M_CLK] = {
++		.channel = BCM_SR_GENPLL0_125M_CLK,
+ 		.flags = IPROC_CLK_AON,
+ 		.enable = ENABLE_VAL(0x4, 6, 0, 12),
+ 		.mdiv = REG_VAL(0x18, 0, 9),
+@@ -102,6 +102,65 @@ static int sr_genpll0_clk_init(struct platform_device *pdev)
+ 	return 0;
+ }
  
-     genpll4		crystal		0	BCM_SR_GENPLL4
--    ccn			genpll4		1	BCM_SR_GENPLL4_CCN_CLK
-+    clk_ccn		genpll4		1	BCM_SR_GENPLL4_CCN_CLK
-     clk_tpiu_pll	genpll4		2	BCM_SR_GENPLL4_TPIU_PLL_CLK
--    noc_clk		genpll4		3	BCM_SR_GENPLL4_NOC_CLK
-+    clk_noc		genpll4		3	BCM_SR_GENPLL4_NOC_CLK
-     clk_chclk_fs4	genpll4		4	BCM_SR_GENPLL4_CHCLK_FS4_CLK
-     clk_bridge_fscpu	genpll4		5	BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK
++static const struct iproc_pll_ctrl sr_genpll2 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
++		IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 1, 13, 12),
++	.reset = RESET_VAL(0x0, 12, 11),
++	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
++	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
++	.ndiv_int = REG_VAL(0x10, 20, 10),
++	.ndiv_frac = REG_VAL(0x10, 0, 20),
++	.pdiv = REG_VAL(0x14, 0, 4),
++	.status = REG_VAL(0x30, 12, 1),
++};
++
++static const struct iproc_clk_ctrl sr_genpll2_clk[] = {
++	[BCM_SR_GENPLL2_NIC_CLK] = {
++		.channel = BCM_SR_GENPLL2_NIC_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++		.mdiv = REG_VAL(0x18, 0, 9),
++	},
++	[BCM_SR_GENPLL2_TS_500_CLK] = {
++		.channel = BCM_SR_GENPLL2_TS_500_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 7, 1, 13),
++		.mdiv = REG_VAL(0x18, 10, 9),
++	},
++	[BCM_SR_GENPLL2_125_NITRO_CLK] = {
++		.channel = BCM_SR_GENPLL2_125_NITRO_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 8, 2, 14),
++		.mdiv = REG_VAL(0x18, 20, 9),
++	},
++	[BCM_SR_GENPLL2_CHIMP_CLK] = {
++		.channel = BCM_SR_GENPLL2_CHIMP_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 9, 3, 15),
++		.mdiv = REG_VAL(0x1c, 0, 9),
++	},
++	[BCM_SR_GENPLL2_NIC_FLASH_CLK] = {
++		.channel = BCM_SR_GENPLL2_NIC_FLASH_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 10, 4, 16),
++		.mdiv = REG_VAL(0x1c, 10, 9),
++	},
++	[BCM_SR_GENPLL2_FS4_CLK] = {
++		.channel = BCM_SR_GENPLL2_FS4_CLK,
++		.enable = ENABLE_VAL(0x4, 11, 5, 17),
++		.mdiv = REG_VAL(0x1c, 20, 9),
++	},
++};
++
++static int sr_genpll2_clk_init(struct platform_device *pdev)
++{
++	iproc_pll_clk_setup(pdev->dev.of_node,
++			    &sr_genpll2, NULL, 0, sr_genpll2_clk,
++			    ARRAY_SIZE(sr_genpll2_clk));
++	return 0;
++}
++
+ static const struct iproc_pll_ctrl sr_genpll3 = {
+ 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
+ 		IPROC_CLK_PLL_NEEDS_SW_CFG,
+@@ -157,6 +216,30 @@ static const struct iproc_clk_ctrl sr_genpll4_clk[] = {
+ 		.enable = ENABLE_VAL(0x4, 6, 0, 12),
+ 		.mdiv = REG_VAL(0x18, 0, 9),
+ 	},
++	[BCM_SR_GENPLL4_TPIU_PLL_CLK] = {
++		.channel = BCM_SR_GENPLL4_TPIU_PLL_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 7, 1, 13),
++		.mdiv = REG_VAL(0x18, 10, 9),
++	},
++	[BCM_SR_GENPLL4_NOC_CLK] = {
++		.channel = BCM_SR_GENPLL4_NOC_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 8, 2, 14),
++		.mdiv = REG_VAL(0x18, 20, 9),
++	},
++	[BCM_SR_GENPLL4_CHCLK_FS4_CLK] = {
++		.channel = BCM_SR_GENPLL4_CHCLK_FS4_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 9, 3, 15),
++		.mdiv = REG_VAL(0x1c, 0, 9),
++	},
++	[BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK] = {
++		.channel = BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 10, 4, 16),
++		.mdiv = REG_VAL(0x1c, 10, 9),
++	},
+ };
  
--
-     genpll5		crystal		0	BCM_SR_GENPLL5
--    fs4_hf_clk		genpll5		1	BCM_SR_GENPLL5_FS4_HF_CLK
--    crypto_ae_clk	genpll5		2	BCM_SR_GENPLL5_CRYPTO_AE_CLK
--    raid_ae_clk		genpll5		3	BCM_SR_GENPLL5_RAID_AE_CLK
-+    clk_fs4_hf		genpll5		1	BCM_SR_GENPLL5_FS4_HF_CLK
-+    clk_crypto_ae	genpll5		2	BCM_SR_GENPLL5_CRYPTO_AE_CLK
-+    clk_raid_ae		genpll5		3	BCM_SR_GENPLL5_RAID_AE_CLK
+ static int sr_genpll4_clk_init(struct platform_device *pdev)
+@@ -181,18 +264,21 @@ static const struct iproc_pll_ctrl sr_genpll5 = {
+ };
  
-     genpll6		crystal		0	BCM_SR_GENPLL6
--    48_usb		genpll6		1	BCM_SR_GENPLL6_48_USB_CLK
-+    clk_48_usb		genpll6		1	BCM_SR_GENPLL6_48_USB_CLK
+ static const struct iproc_clk_ctrl sr_genpll5_clk[] = {
+-	[BCM_SR_GENPLL5_FS_CLK] = {
+-		.channel = BCM_SR_GENPLL5_FS_CLK,
+-		.flags = IPROC_CLK_AON,
++	[BCM_SR_GENPLL5_FS4_HF_CLK] = {
++		.channel = BCM_SR_GENPLL5_FS4_HF_CLK,
+ 		.enable = ENABLE_VAL(0x4, 6, 0, 12),
+ 		.mdiv = REG_VAL(0x18, 0, 9),
+ 	},
+-	[BCM_SR_GENPLL5_SPU_CLK] = {
+-		.channel = BCM_SR_GENPLL5_SPU_CLK,
+-		.flags = IPROC_CLK_AON,
+-		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++	[BCM_SR_GENPLL5_CRYPTO_AE_CLK] = {
++		.channel = BCM_SR_GENPLL5_CRYPTO_AE_CLK,
++		.enable = ENABLE_VAL(0x4, 7, 1, 12),
+ 		.mdiv = REG_VAL(0x18, 10, 9),
+ 	},
++	[BCM_SR_GENPLL5_RAID_AE_CLK] = {
++		.channel = BCM_SR_GENPLL5_RAID_AE_CLK,
++		.enable = ENABLE_VAL(0x4, 8, 2, 14),
++		.mdiv = REG_VAL(0x18, 20, 9),
++	},
+ };
  
-     lcpll0		crystal		0	BCM_SR_LCPLL0
-     clk_sata_refp 	lcpll0		1	BCM_SR_LCPLL0_SATA_REFP_CLK
-     clk_sata_refn	lcpll0		2	BCM_SR_LCPLL0_SATA_REFN_CLK
--    clk_usb_ref		lcpll0		3	BCM_SR_LCPLL0_USB_REF_CLK
--    sata_refpn		lcpll0		3	BCM_SR_LCPLL0_SATA_REFPN_CLK
-+    clk_sata_350	lcpll0		3	BCM_SR_LCPLL0_SATA_350_CLK
-+    clk_sata_500	lcpll0		4	BCM_SR_LCPLL0_SATA_500_CLK
+ static int sr_genpll5_clk_init(struct platform_device *pdev)
+@@ -214,24 +300,30 @@ static const struct iproc_pll_ctrl sr_lcpll0 = {
+ };
  
-     lcpll1		crystal		0	BCM_SR_LCPLL1
--    wan 		lcpll1		1	BCM_SR_LCPLL0_WAN_CLK
-+    clk_wan		lcpll1		1	BCM_SR_LCPLL1_WAN_CLK
-+    clk_usb_ref		lcpll1		2	BCM_SR_LCPLL1_USB_REF_CLK
-+    clk_crmu_ts		lcpll1		3	BCM_SR_LCPLL1_CRMU_TS_CLK
+ static const struct iproc_clk_ctrl sr_lcpll0_clk[] = {
+-	[BCM_SR_LCPLL0_SATA_REF_CLK] = {
+-		.channel = BCM_SR_LCPLL0_SATA_REF_CLK,
++	[BCM_SR_LCPLL0_SATA_REFP_CLK] = {
++		.channel = BCM_SR_LCPLL0_SATA_REFP_CLK,
+ 		.flags = IPROC_CLK_AON,
+ 		.enable = ENABLE_VAL(0x0, 7, 1, 13),
+ 		.mdiv = REG_VAL(0x14, 0, 9),
+ 	},
+-	[BCM_SR_LCPLL0_USB_REF_CLK] = {
+-		.channel = BCM_SR_LCPLL0_USB_REF_CLK,
++	[BCM_SR_LCPLL0_SATA_REFN_CLK] = {
++		.channel = BCM_SR_LCPLL0_SATA_REFN_CLK,
+ 		.flags = IPROC_CLK_AON,
+ 		.enable = ENABLE_VAL(0x0, 8, 2, 14),
+ 		.mdiv = REG_VAL(0x14, 10, 9),
+ 	},
+-	[BCM_SR_LCPLL0_SATA_REFPN_CLK] = {
+-		.channel = BCM_SR_LCPLL0_SATA_REFPN_CLK,
++	[BCM_SR_LCPLL0_SATA_350_CLK] = {
++		.channel = BCM_SR_LCPLL0_SATA_350_CLK,
+ 		.flags = IPROC_CLK_AON,
+ 		.enable = ENABLE_VAL(0x0, 9, 3, 15),
+ 		.mdiv = REG_VAL(0x14, 20, 9),
+ 	},
++	[BCM_SR_LCPLL0_SATA_500_CLK] = {
++		.channel = BCM_SR_LCPLL0_SATA_500_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 10, 4, 16),
++		.mdiv = REG_VAL(0x18, 0, 9),
++	},
+ };
  
-     lcpll_pcie		crystal		0	BCM_SR_LCPLL_PCIE
--    pcie_phy_ref 	lcpll1		1	BCM_SR_LCPLL_PCIE_PHY_REF_CLK
-+    clk_pcie_phy_ref	lcpll1		1	BCM_SR_LCPLL_PCIE_PHY_REF_CLK
+ static int sr_lcpll0_clk_init(struct platform_device *pdev)
+@@ -259,6 +351,18 @@ static const struct iproc_clk_ctrl sr_lcpll1_clk[] = {
+ 		.enable = ENABLE_VAL(0x0, 7, 1, 13),
+ 		.mdiv = REG_VAL(0x14, 0, 9),
+ 	},
++	[BCM_SR_LCPLL1_USB_REF_CLK] = {
++		.channel = BCM_SR_LCPLL1_USB_REF_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 8, 2, 14),
++		.mdiv = REG_VAL(0x14, 10, 9),
++	},
++	[BCM_SR_LCPLL1_CRMU_TS_CLK] = {
++		.channel = BCM_SR_LCPLL1_CRMU_TS_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 9, 3, 15),
++		.mdiv = REG_VAL(0x14, 20, 9),
++	},
+ };
+ 
+ static int sr_lcpll1_clk_init(struct platform_device *pdev)
+@@ -298,6 +402,7 @@ static int sr_lcpll_pcie_clk_init(struct platform_device *pdev)
+ 
+ static const struct of_device_id sr_clk_dt_ids[] = {
+ 	{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init },
++	{ .compatible = "brcm,sr-genpll2", .data = sr_genpll2_clk_init },
+ 	{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init },
+ 	{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init },
+ 	{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init },
+diff --git a/include/dt-bindings/clock/bcm-sr.h b/include/dt-bindings/clock/bcm-sr.h
+index cff6c6f..419011b 100644
+--- a/include/dt-bindings/clock/bcm-sr.h
++++ b/include/dt-bindings/clock/bcm-sr.h
+@@ -35,7 +35,7 @@
+ 
+ /* GENPLL 0 clock channel ID SCR HSLS FS PCIE */
+ #define BCM_SR_GENPLL0			0
+-#define BCM_SR_GENPLL0_SATA_CLK		1
++#define BCM_SR_GENPLL0_125M_CLK		1
+ #define BCM_SR_GENPLL0_SCR_CLK		2
+ #define BCM_SR_GENPLL0_250M_CLK		3
+ #define BCM_SR_GENPLL0_PCIE_AXI_CLK	4
+@@ -50,9 +50,11 @@
+ /* GENPLL 2 clock channel ID NITRO MHB*/
+ #define BCM_SR_GENPLL2			0
+ #define BCM_SR_GENPLL2_NIC_CLK		1
+-#define BCM_SR_GENPLL2_250_NITRO_CLK	2
++#define BCM_SR_GENPLL2_TS_500_CLK	2
+ #define BCM_SR_GENPLL2_125_NITRO_CLK	3
+ #define BCM_SR_GENPLL2_CHIMP_CLK	4
++#define BCM_SR_GENPLL2_NIC_FLASH_CLK	5
++#define BCM_SR_GENPLL2_FS4_CLK		6
+ 
+ /* GENPLL 3 HSLS clock channel ID */
+ #define BCM_SR_GENPLL3			0
+@@ -62,11 +64,16 @@
+ /* GENPLL 4 SCR clock channel ID */
+ #define BCM_SR_GENPLL4			0
+ #define BCM_SR_GENPLL4_CCN_CLK		1
++#define BCM_SR_GENPLL4_TPIU_PLL_CLK	2
++#define BCM_SR_GENPLL4_NOC_CLK		3
++#define BCM_SR_GENPLL4_CHCLK_FS4_CLK	4
++#define BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK	5
+ 
+ /* GENPLL 5 FS4 clock channel ID */
+ #define BCM_SR_GENPLL5			0
+-#define BCM_SR_GENPLL5_FS_CLK		1
+-#define BCM_SR_GENPLL5_SPU_CLK		2
++#define BCM_SR_GENPLL5_FS4_HF_CLK	1
++#define BCM_SR_GENPLL5_CRYPTO_AE_CLK	2
++#define BCM_SR_GENPLL5_RAID_AE_CLK	3
+ 
+ /* GENPLL 6 NITRO clock channel ID */
+ #define BCM_SR_GENPLL6			0
+@@ -74,13 +81,16 @@
+ 
+ /* LCPLL0  clock channel ID */
+ #define BCM_SR_LCPLL0			0
+-#define BCM_SR_LCPLL0_SATA_REF_CLK	1
+-#define BCM_SR_LCPLL0_USB_REF_CLK	2
+-#define BCM_SR_LCPLL0_SATA_REFPN_CLK	3
++#define BCM_SR_LCPLL0_SATA_REFP_CLK	1
++#define BCM_SR_LCPLL0_SATA_REFN_CLK	2
++#define BCM_SR_LCPLL0_SATA_350_CLK	3
++#define BCM_SR_LCPLL0_SATA_500_CLK	4
+ 
+ /* LCPLL1  clock channel ID */
+ #define BCM_SR_LCPLL1			0
+ #define BCM_SR_LCPLL1_WAN_CLK		1
++#define BCM_SR_LCPLL1_USB_REF_CLK	2
++#define BCM_SR_LCPLL1_CRMU_TS_CLK	3
+ 
+ /* LCPLL PCIE  clock channel ID */
+ #define BCM_SR_LCPLL_PCIE		0
 -- 
 2.1.4
