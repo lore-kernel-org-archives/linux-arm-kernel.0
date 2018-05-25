@@ -1,107 +1,178 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 May 2018 16:01:57 +0530
-Subject: [PATCH 11/15] arm: dts: berlin: Add missing OPP properties for CPUs
+Date: Fri, 25 May 2018 16:01:52 +0530
+Subject: [PATCH 06/15] arm: dts: sun: Add missing cooling device properties
+ for CPUs
 In-Reply-To: <cover.1527244200.git.viresh.kumar@linaro.org>
 References: <cover.1527244200.git.viresh.kumar@linaro.org>
-Message-ID: <a15b79cdd46efe5d1b35aa6c7a31ca4eb24c0b0d.1527244201.git.viresh.kumar@linaro.org>
+Message-ID: <eded393f4b508a1f377f9af6859a3b82a6787e1c.1527244201.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OPP properties, like "operating-points", should either be present
-for all the CPUs of a cluster or none. If these are present only for a
-subset of CPUs of a cluster then things will start falling apart as soon
-as the CPUs are brought online in a different order. For example, this
-will happen because the operating system looks for such properties in
-the CPU node it is trying to bring up, so that it can create an OPP
-table.
+The cooling device properties, like "#cooling-cells" and
+"dynamic-power-coefficient", should either be present for all the CPUs
+of a cluster or none. If these are present only for a subset of CPUs of
+a cluster then things will start falling apart as soon as the CPUs are
+brought online in a different order. For example, this will happen
+because the operating system looks for such properties in the CPU node
+it is trying to bring up, so that it can register a cooling device.
 
 Add such missing properties.
 
-Fix other missing properties (clocks, clock latency) as well to
+Fix other missing properties (clocks, OPP, clock latency) as well to
 make it all work.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/berlin2.dtsi  | 10 ++++++++++
- arch/arm/boot/dts/berlin2q.dtsi | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 30 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/sun8i-a33.dtsi |  9 +++++++++
+ arch/arm/boot/dts/sun8i-h3.dtsi  |  9 +++++++++
+ 4 files changed, 61 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index d575823c5750..487e9de53244 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -81,6 +81,16 @@
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index c72992556a86..debc0bf22ea3 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -119,18 +119,48 @@
+ 			compatible = "arm,cortex-a7";
  			device_type = "cpu";
- 			next-level-cache = <&l2>;
  			reg = <1>;
-+
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
++			clocks = <&ccu CLK_CPU>;
++			clock-latency = <244144>; /* 8 32k periods */
 +			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index bf3a6c9a1d34..9cd00ab53f2d 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -76,6 +76,17 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <1>;
-+
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
++				/* kHz	  uV */
++				1008000	1200000
++				864000	1200000
++				720000	1100000
++				480000	1000000
++				>;
++			#cooling-cells = <2>;
  		};
  
  		cpu at 2 {
-@@ -83,6 +94,17 @@
+ 			compatible = "arm,cortex-a7";
  			device_type = "cpu";
- 			next-level-cache = <&l2>;
  			reg = <2>;
-+
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
++			clocks = <&ccu CLK_CPU>;
++			clock-latency = <244144>; /* 8 32k periods */
 +			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
++				/* kHz	  uV */
++				1008000	1200000
++				864000	1200000
++				720000	1100000
++				480000	1000000
++				>;
++			#cooling-cells = <2>;
  		};
  
  		cpu at 3 {
-@@ -90,6 +112,17 @@
+ 			compatible = "arm,cortex-a7";
  			device_type = "cpu";
- 			next-level-cache = <&l2>;
  			reg = <3>;
-+
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
++			clocks = <&ccu CLK_CPU>;
++			clock-latency = <244144>; /* 8 32k periods */
 +			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
++				/* kHz	  uV */
++				1008000	1200000
++				864000	1200000
++				720000	1100000
++				480000	1000000
++				>;
++			#cooling-cells = <2>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index e529e4ff2174..35372a0cfc8d 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -122,6 +122,19 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <1>;
++			clocks = <&ccu CLK_CPU>;
++			clock-latency = <244144>; /* 8 32k periods */
++			operating-points = <
++				/* kHz	  uV */
++				960000	1400000
++				912000	1400000
++				864000	1300000
++				720000	1200000
++				528000	1100000
++				312000	1000000
++				144000	1000000
++				>;
++			#cooling-cells = <2>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index 8d278ee001e9..4e92741b24a7 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -132,21 +132,30 @@
+ 		};
+ 
+ 		cpu at 1 {
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <2>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <3>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 41d57c76f290..9dff6887923c 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -84,21 +84,30 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <1>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <2>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <3>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
  		};
  	};
  
