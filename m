@@ -1,8 +1,8 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 May 2018 18:09:13 +0200
+Date: Fri, 25 May 2018 18:10:20 +0200
 Subject: [PATCH 1/2] ARM: stm32: Don't select DMA unconditionally on
  STM32MP157C
-Message-ID: <20180525160926.150713-1-arnd@arndb.de>
+Message-ID: <20180525161051.187324-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
