@@ -1,177 +1,154 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 25 May 2018 11:02:57 +0200
-Subject: [PATCH v11 08/19] arm64: fpsimd: Eliminate task->mm checks
-In-Reply-To: <1527181008-13549-9-git-send-email-Dave.Martin@arm.com>
-References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
- <1527181008-13549-9-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180525090257.GB54529@C02W217FHV2R.local>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 25 May 2018 12:05:58 +0300
+Subject: [PATCH] mmc: sdhci-*: Don't emit error msg if sdhci_add_host()
+ fails
+In-Reply-To: <20180525151509.0270dbe1@xhacker.debian>
+References: <20180525151509.0270dbe1@xhacker.debian>
+Message-ID: <48df3724-b9ff-ef9c-0583-961fd40f1978@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 05:56:37PM +0100, Dave Martin wrote:
-> Currently the FPSIMD handling code uses the condition task->mm ==
-> NULL as a hint that task has no FPSIMD register context.
+On 25/05/18 10:15, Jisheng Zhang wrote:
+> I noticed below error msg with sdhci-pxav3 on some berlin platforms:
 > 
-> The ->mm check is only there to filter out tasks that cannot
-> possibly have FPSIMD context loaded, for optimisation purposes.
-> Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
-> saving FPSIMD context back to memory.  For these reasons, the ->mm
-> checks are not useful, providing that TIF_FOREIGN_FPSTATE is
-> maintained in a consistent way for all threads.
+> [.....] sdhci-pxav3 f7ab0000.sdhci failed to add host
 > 
-> The context switch logic is already deliberately optimised to defer
-> reloads of the regs until ret_to_user (or sigreturn as a special
-> case), and save them only if they have been previously loaded.
-> These paths are the only places where the wrong_task and wrong_cpu
-> conditions can be made false, by calling fpsimd_bind_task_to_cpu().
-> Kernel threads by definition never reach these paths.  As a result,
-> the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
-> always yield true for kernel threads.
+> It is due to getting related vmmc or vqmmc regulator returns
+> -EPROBE_DEFER. It doesn't matter at all but it's confusing.
 > 
-> This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
-> task.  The fpsimd_flush_task_state() call already present in
-> copy_thread() ensures the same for any new task.
+>>From another side, if driver probing fails and the error number isn't
+> -EPROBE_DEFER, the core will tell us something as below:
+> 
+> [.....] sdhci-pxav3: probe of f7ab0000.sdhci failed with error -EXX
+> 
+> So it's not necessary to emit error msg if sdhci_add_host() fails. And
+> some other sdhci host drivers also have this issue, let's fix them
+> together.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 
-nit: formatting still funny, but you shouldn't respin just for that.
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-> 
-> With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
-> ensures that no extra context save work is added for kernel
-> threads, and eliminates the redundant context saving that may
-> currently occur for kernel threads that have acquired an mm via
-> use_mm().
-
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
 > ---
+>  drivers/mmc/host/sdhci-bcm-kona.c | 4 +---
+>  drivers/mmc/host/sdhci-pic32.c    | 4 +---
+>  drivers/mmc/host/sdhci-pxav2.c    | 4 +---
+>  drivers/mmc/host/sdhci-pxav3.c    | 4 +---
+>  drivers/mmc/host/sdhci-s3c.c      | 4 +---
+>  drivers/mmc/host/sdhci-spear.c    | 4 +---
+>  drivers/mmc/host/sdhci-st.c       | 4 +---
+>  7 files changed, 7 insertions(+), 21 deletions(-)
 > 
-> Changes since v10:
-> 
->  * The INIT_THREAD flag change is split out into the prior
->    patch, since it is in principle a fix rather than simply a
->    tidy-up.
-> 
-> Requested by Christoffer Dall / Catalin Marinas:
-> 
->  * Reworded commit message to explain the change more clearly,
->    and remove confusing claims about things being true by
->    construction.
-> 
->  * Added a comment to the code explaining that wrong_cpu and
->    wrong_task will always be true for kernel threads.
-> 
->  * Ensure .fpsimd_cpu = NR_CPUS for the init task.
-> 
->    This does not seem to be a bug, because the wrong_task check in
->    fpsimd_thread_switch() should still always be true for the init
->    task; but it is nonetheless an inconsistency compared with what
->    copy_thread() does.
-> 
->    So fix it to avoid future surprises.
-> ---
->  arch/arm64/include/asm/processor.h |  4 +++-
->  arch/arm64/kernel/fpsimd.c         | 40 +++++++++++++++-----------------------
->  2 files changed, 19 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 7675989..36d64f8 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -156,7 +156,9 @@ static inline void arch_thread_struct_whitelist(unsigned long *offset,
->  /* Sync TPIDR_EL0 back to thread_struct for current */
->  void tls_preserve_current_state(void);
+> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
+> index 11ca95c60bcf..bdbd4897c0f7 100644
+> --- a/drivers/mmc/host/sdhci-bcm-kona.c
+> +++ b/drivers/mmc/host/sdhci-bcm-kona.c
+> @@ -284,10 +284,8 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
+>  	sdhci_bcm_kona_sd_init(host);
 >  
-> -#define INIT_THREAD  {	}
-> +#define INIT_THREAD {				\
-> +	.fpsimd_cpu = NR_CPUS,			\
-> +}
->  
->  static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
->  {
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 2d9a9e8..d736b6c 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -892,31 +892,25 @@ asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
->  
->  void fpsimd_thread_switch(struct task_struct *next)
->  {
-> +	bool wrong_task, wrong_cpu;
-> +
->  	if (!system_supports_fpsimd())
->  		return;
-> +
-> +	/* Save unsaved fpsimd state, if any: */
-> +	fpsimd_save();
-> +
->  	/*
-> -	 * Save the current FPSIMD state to memory, but only if whatever is in
-> -	 * the registers is in fact the most recent userland FPSIMD state of
-> -	 * 'current'.
-> +	 * Fix up TIF_FOREIGN_FPSTATE to correctly describe next's
-> +	 * state.  For kernel threads, FPSIMD registers are never loaded
-> +	 * and wrong_task and wrong_cpu will always be true.
->  	 */
-> -	if (current->mm)
-> -		fpsimd_save();
-> -
-> -	if (next->mm) {
-> -		/*
-> -		 * If we are switching to a task whose most recent userland
-> -		 * FPSIMD state is already in the registers of *this* cpu,
-> -		 * we can skip loading the state from memory. Otherwise, set
-> -		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
-> -		 * upon the next return to userland.
-> -		 */
-> -		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
-> +	wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
->  					&next->thread.uw.fpsimd_state;
-> -		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
-> +	wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
->  
-> -		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
-> -				       wrong_task || wrong_cpu);
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(dev, "Failed sdhci_add_host\n");
+> +	if (ret)
+>  		goto err_reset;
 > -	}
-> +	update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
-> +			       wrong_task || wrong_cpu);
->  }
 >  
->  void fpsimd_flush_thread(void)
-> @@ -1121,9 +1115,8 @@ void kernel_neon_begin(void)
+>  	/* if device is eMMC, emulate card insert right here */
+>  	if (!mmc_card_is_removable(host->mmc)) {
+> diff --git a/drivers/mmc/host/sdhci-pic32.c b/drivers/mmc/host/sdhci-pic32.c
+> index a6caa49ca25a..a11e6397d4ff 100644
+> --- a/drivers/mmc/host/sdhci-pic32.c
+> +++ b/drivers/mmc/host/sdhci-pic32.c
+> @@ -200,10 +200,8 @@ static int pic32_sdhci_probe(struct platform_device *pdev)
+>  	}
 >  
->  	__this_cpu_write(kernel_neon_busy, true);
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "error adding host\n");
+> +	if (ret)
+>  		goto err_base_clk;
+> -	}
 >  
-> -	/* Save unsaved task fpsimd state, if any: */
-> -	if (current->mm)
-> -		fpsimd_save();
-> +	/* Save unsaved fpsimd state, if any: */
-> +	fpsimd_save();
+>  	dev_info(&pdev->dev, "Successfully added sdhci host\n");
+>  	return 0;
+> diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
+> index 8986f9d9cf98..2c3827f54927 100644
+> --- a/drivers/mmc/host/sdhci-pxav2.c
+> +++ b/drivers/mmc/host/sdhci-pxav2.c
+> @@ -221,10 +221,8 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
+>  	host->ops = &pxav2_sdhci_ops;
 >  
->  	/* Invalidate any task state remaining in the fpsimd regs: */
->  	fpsimd_flush_cpu_state();
-> @@ -1245,8 +1238,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
->  {
->  	switch (cmd) {
->  	case CPU_PM_ENTER:
-> -		if (current->mm)
-> -			fpsimd_save();
-> +		fpsimd_save();
->  		fpsimd_flush_cpu_state();
->  		break;
->  	case CPU_PM_EXIT:
-> -- 
-> 2.1.4
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "failed to add host\n");
+> +	if (ret)
+>  		goto disable_clk;
+> -	}
+>  
+>  	return 0;
+>  
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index a34434166ca7..b8e96f392428 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -472,10 +472,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>  	pm_suspend_ignore_children(&pdev->dev, 1);
+>  
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "failed to add host\n");
+> +	if (ret)
+>  		goto err_add_host;
+> -	}
+>  
+>  	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
+>  		device_init_wakeup(&pdev->dev, 1);
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index cda83ccb2702..9ef89d00970e 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -655,10 +655,8 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
+>  		goto err_req_regs;
+>  
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(dev, "sdhci_add_host() failed\n");
+> +	if (ret)
+>  		goto err_req_regs;
+> -	}
+>  
+>  #ifdef CONFIG_PM
+>  	if (pdata->cd_type != S3C_SDHCI_CD_INTERNAL)
+> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+> index 14511526a3a8..9247d51f2eed 100644
+> --- a/drivers/mmc/host/sdhci-spear.c
+> +++ b/drivers/mmc/host/sdhci-spear.c
+> @@ -126,10 +126,8 @@ static int sdhci_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_dbg(&pdev->dev, "error adding host\n");
+> +	if (ret)
+>  		goto disable_clk;
+> -	}
+>  
+>  	platform_set_drvdata(pdev, host);
+>  
+> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+> index c32daed0d418..8f95647195d9 100644
+> --- a/drivers/mmc/host/sdhci-st.c
+> +++ b/drivers/mmc/host/sdhci-st.c
+> @@ -422,10 +422,8 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>  	st_mmcss_cconfig(np, host);
+>  
+>  	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+> +	if (ret)
+>  		goto err_out;
+> -	}
+>  
+>  	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+>  
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
