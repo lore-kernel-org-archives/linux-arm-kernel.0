@@ -1,55 +1,50 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 25 May 2018 10:36:49 -0700
-Subject: [PATCH] PCI: Try to clean up resources via remove if shutdown
- doesn't exist
-In-Reply-To: <1527257063-15843-1-git-send-email-okaya@codeaurora.org>
-References: <1527257063-15843-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <d0970733-d56b-9a96-26cd-4c911c127579@codeaurora.org>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 25 May 2018 19:21:15 +0200
+Subject: [PATCH v3 5/6] lib,
+ arm64: untag addrs passed to strncpy_from_user and strnlen_user
+In-Reply-To: <cover.1527268727.git.andreyknvl@google.com>
+References: <cover.1527268727.git.andreyknvl@google.com>
+Message-ID: <011bbed9ae9404e2f8939e2bcda459387038089f.1527268727.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc kexec]
+strncpy_from_user and strnlen_user accept user addresses as arguments, and
+do not go through the same path as copy_from_user and others, so here we
+need to handle the case of tagged user addresses separately.
 
-On 5/25/2018 7:04 AM, Sinan Kaya wrote:
-> It is up to a driver to implement shutdown() callback. If shutdown()
-> callback is not implemented, PCI device can have pending interrupt and
-> even do DMA transactions while the system is going down.
-> 
-> If kexec is in use, this can damage the newly booting kexec kernel
-> or even prevent it from booting altogether. Fallback to calling the
-> remove() callback if shutdown() isn't implemented for a given driver.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci-driver.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
-> index 6ace470..4ac72e3 100644
-> --- a/drivers/pci/pci-driver.c
-> +++ b/drivers/pci/pci-driver.c
-> @@ -475,8 +475,17 @@ static void pci_device_shutdown(struct device *dev)
->  
->  	pm_runtime_resume(dev);
->  
-> +	/*
-> +	 * Try shutdown callback if it exists, otherwise fallback to remove
-> +	 * callback. PCI drivers can do DMA and have pending interrupts.
-> +	 * Leaving the DMA and interrupts pending could damage the newly
-> +	 * booting kexec kernel as well as prevent it from booting altogether
-> +	 * if the pending interrupt is level.
-> +	 */
->  	if (drv && drv->shutdown)
->  		drv->shutdown(pci_dev);
-> +	else if (drv && drv->remove)
-> +		drv->remove(pci_dev);
->  
->  	/*
->  	 * If this is a kexec reboot, turn off Bus Master bit on the
-> 
+Untag user pointers passed to these functions.
 
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ lib/strncpy_from_user.c | 2 ++
+ lib/strnlen_user.c      | 2 ++
+ 2 files changed, 4 insertions(+)
 
+diff --git a/lib/strncpy_from_user.c b/lib/strncpy_from_user.c
+index b53e1b5d80f4..97467cd2bc59 100644
+--- a/lib/strncpy_from_user.c
++++ b/lib/strncpy_from_user.c
+@@ -106,6 +106,8 @@ long strncpy_from_user(char *dst, const char __user *src, long count)
+ 	if (unlikely(count <= 0))
+ 		return 0;
+ 
++	src = untagged_addr(src);
++
+ 	max_addr = user_addr_max();
+ 	src_addr = (unsigned long)src;
+ 	if (likely(src_addr < max_addr)) {
+diff --git a/lib/strnlen_user.c b/lib/strnlen_user.c
+index 60d0bbda8f5e..8b5f56466e00 100644
+--- a/lib/strnlen_user.c
++++ b/lib/strnlen_user.c
+@@ -108,6 +108,8 @@ long strnlen_user(const char __user *str, long count)
+ 	if (unlikely(count <= 0))
+ 		return 0;
+ 
++	str = untagged_addr(str);
++
+ 	max_addr = user_addr_max();
+ 	src_addr = (unsigned long)str;
+ 	if (likely(src_addr < max_addr)) {
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.17.0.921.gf22659ad46-goog
