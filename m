@@ -1,68 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 May 2018 11:01:37 +0100
-Subject: [PATCHv4 05/10] arm64/cpufeature: detect pointer authentication
-In-Reply-To: <4c057e99-61a9-7f75-664d-1f16f2631766@arm.com>
-References: <20180503132031.25705-1-mark.rutland@arm.com>
- <20180503132031.25705-6-mark.rutland@arm.com>
- <4c057e99-61a9-7f75-664d-1f16f2631766@arm.com>
-Message-ID: <20180525100137.mte5z2sonob3vffq@lakrids.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 25 May 2018 11:00:58 +0100
+Subject: [PATCH v4 04/26] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <1527241772-48007-5-git-send-email-julien.thierry@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+ <1527241772-48007-5-git-send-email-julien.thierry@arm.com>
+Message-ID: <89769f8d-2ed0-1eb7-0373-09fc25f8071a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 09:48:28AM +0100, Suzuki K Poulose wrote:
+On 25/05/18 10:49, Julien Thierry wrote:
+> From: Daniel Thompson <daniel.thompson@linaro.org>
 > 
-> Mark,
+> Currently alternatives are applied very late in the boot process (and
+> a long time after we enable scheduling). Some alternative sequences,
+> such as those that alter the way CPU context is stored, must be applied
+> much earlier in the boot sequence.
 > 
-> On 03/05/18 14:20, Mark Rutland wrote:
-> > So that we can dynamically handle the presence of pointer authentication
-> > functionality, wire up probing code in cpufeature.c.
-> > 
-> >  From ARMv8.3 onwards, ID_AA64ISAR1 is no longer entirely RES0, and now
-> > has four fields describing the presence of pointer authentication
-> > functionality:
-> > 
-> > * APA - address authentication present, using an architected algorithm
-> > * API - address authentication present, using an IMP DEF algorithm
-> > * GPA - generic authentication present, using an architected algorithm
-> > * GPI - generic authentication present, using an IMP DEF algorithm
-> > 
-> > For the moment we only care about address authentication, so we only
-> > need to check APA and API. It is assumed that if all CPUs support an IMP
-> > DEF algorithm, the same algorithm is used across all CPUs.
-> > 
-> > Note that when we implement KVM support, we will also need to ensure
-> > that CPUs have uniform support for GPA and GPI.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >   arch/arm64/include/asm/cpucaps.h |  5 ++++-
-> >   arch/arm64/kernel/cpufeature.c   | 47 ++++++++++++++++++++++++++++++++++++++++
-> >   2 files changed, 51 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> > index bc51b72fafd4..9dcb4d1b14f5 100644
-> > --- a/arch/arm64/include/asm/cpucaps.h
-> > +++ b/arch/arm64/include/asm/cpucaps.h
-> > @@ -48,7 +48,10 @@
-> >   #define ARM64_HAS_CACHE_IDC			27
-> >   #define ARM64_HAS_CACHE_DIC			28
-> >   #define ARM64_HW_DBM				29
-> > +#define ARM64_HAS_ADDRESS_AUTH_ARCH		30
-> > +#define ARM64_HAS_ADDRESS_AUTH_IMP_DEF		31
+> Introduce apply_boot_alternatives() to allow some alternatives to be
+> applied immediately after we detect the CPU features of the boot CPU.
 > 
-> Where are these caps used ? I couldn't find anything in the series
-> that uses them. Otherwise looks good to me.
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> [julien.thierry at arm.com: rename to fit new cpufeature framework better,
+> 			 apply BOOT_SCOPE feature early in boot]
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   arch/arm64/include/asm/alternative.h |  3 +--
+>   arch/arm64/include/asm/cpufeature.h  |  2 ++
+>   arch/arm64/kernel/alternative.c      | 30 +++++++++++++++++++++++++++---
+>   arch/arm64/kernel/cpufeature.c       |  5 +++++
+>   arch/arm64/kernel/smp.c              |  7 +++++++
+>   5 files changed, 42 insertions(+), 5 deletions(-)
+> 
 
-Those were consumed by KVM support, which needed to detect if CPUs had
-mismatched support. Currently they're just placeholders as I need a
-cpucap value for the separate IMP-DEF / architected probing cases.
+...
 
-I *could* get rid of those and just have the ARM64_HAS_ADDRESS_AUTH case
-log "Address authentication", but I wanted to have separate messages for
-IMP-DEF vs architected.
+>   
+> +unsigned long boot_capabilities;
+> +
+>   /*
+>    * Flag to indicate if we have computed the system wide
+>    * capabilities based on the boot time active CPUs. This
+> @@ -1370,6 +1372,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>   		if (!cpus_have_cap(caps->capability) && caps->desc)
+>   			pr_info("%s %s\n", info, caps->desc);
+>   		cpus_set_cap(caps->capability);
+> +
+> +		if (scope_mask & SCOPE_BOOT_CPU)
+> +			__set_bit(caps->capability, &boot_capabilities);
 
-Thanks,
-Mark.
+Julien
+
+I think this check is problematic. The scope_mask passed on by the boot CPU
+is (SCOPE_BOOT_CPU | SCOPE_LOCAL_CPU) to cover both BOOT CPU capabilities *and*
+CPU local capabilites on the boot CPU. So, you might apply the alternatives for
+a "local" CPU erratum, which is not intended. You may change the above check to :
+
+	if (caps->type & SCOPE_BOOT_CPU)
+
+to make sure you check the "capability" has the SCOPE_BOOT_CPU set.
+
+Suzuki
