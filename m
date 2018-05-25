@@ -1,35 +1,82 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:07 +0100
-Subject: [PATCH v4 01/26] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot
- system feature
-In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-2-git-send-email-julien.thierry@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 25 May 2018 09:48:48 +0000
+Subject: [PATCH V2 1/4] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <152182399342.178046.13139513462419815903@swboyd.mtv.corp.google.com>
+References: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
+ <1521602391-30356-2-git-send-email-aisheng.dong@nxp.com>
+ <152182399342.178046.13139513462419815903@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB421192DFF5F41078B54FCC1A80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Stephen,
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..e03e897 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
- 	{
- 		.desc = "GIC system register CPU interface",
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
--		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
- 		.matches = has_useable_gicv3_cpuif,
- 		.sys_reg = SYS_ID_AA64PFR0_EL1,
- 		.field_pos = ID_AA64PFR0_GIC_SHIFT,
--- 
-1.9.1
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at kernel.org]
+> Sent: Saturday, March 24, 2018 12:53 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> mturquette at baylibre.com; hdegoede at redhat.com;
+> b.zolnierkie at samsung.com; linux at armlinux.org.uk; linux-
+> fbdev at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>; A.s. Dong
+> <aisheng.dong@nxp.com>; Stephen Boyd <sboyd@codeaurora.org>; Russell
+> King <linux@arm.linux.org.uk>
+> Subject: Re: [PATCH V2 1/4] clk: bulk: add of_clk_bulk_get()
+> 
+> Quoting Dong Aisheng (2018-03-20 20:19:48)
+> > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c index
+> > 4c10456..4b357b2 100644
+> > --- a/drivers/clk/clk-bulk.c
+> > +++ b/drivers/clk/clk-bulk.c
+> > @@ -19,6 +19,38 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/device.h>
+> >  #include <linux/export.h>
+> > +#include <linux/of.h>
+> > +
+> > +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> 
+> Do we need these defines? of_clk_get() is a stub function when these
+> configs are false.
+> 
+
+You're right. Will drop it.
+
+> > +static int __must_check of_clk_bulk_get(struct device_node *np, int
+> num_clks,
+> > +                                       struct clk_bulk_data *clks) {
+> > +       int ret;
+> > +       int i;
+> > +
+> > +       for (i = 0; i < num_clks; i++)
+> > +               clks[i].clk = NULL;
+> > +
+> > +       for (i = 0; i < num_clks; i++) {
+> > +               clks[i].clk = of_clk_get(np, i);
+> > +               if (IS_ERR(clks[i].clk)) {
+> > +                       ret = PTR_ERR(clks[i].clk);
+> > +                       pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
+> > +                              np, i, ret);
+> > +                       clks[i].clk = NULL;
+> > +                       goto err;
+> > +               }
+> > +       }
+> > +
+> > +       return 0;
+> > +
+> > +err:
+> > +       clk_bulk_put(i, clks);
+> > +
+> > +       return ret;
+> > +}
+> > +EXPORT_SYMBOL(of_clk_bulk_get);
+> 
+> It's static, so don't export it.
+
+Got it.
+Sorry for such mistake.
+
+Will fix and sent V3.
+
+Regards
+Dong Aisheng
