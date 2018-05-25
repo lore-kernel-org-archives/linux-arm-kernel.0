@@ -1,47 +1,91 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Fri, 25 May 2018 17:51:36 +0300
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
-Message-ID: <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Fri, 25 May 2018 17:07:56 +0300
+Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
+ under at91-usart mfd
+In-Reply-To: <f817c82a-95b6-afb3-e662-c481a877cf01@sorico.fr>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-7-radu.pirea@microchip.com>
+ <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
+ <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
+ <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
+ <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
+ <f817c82a-95b6-afb3-e662-c481a877cf01@sorico.fr>
+Message-ID: <df164579-1d6c-0f0b-4f2f-c0a29aa63d8f@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Peter,
 
-On 04/11/2018 06:34 PM, Nicolas Ferre wrote:
-> I'll try to move forward with your detailed explanation and with my 
-> contacts within the "product" team internally.
 
-We have talked with the hardware team, looks like there is an error in
-the description of the Master to Slave Access matrix. CPU accesses DDR2
-port0 through AXI matrix and not AHB. There is no conflict between CPU
-and LCDC DMA when accessing DDR2 ports. This explains why using CPU
-helps.
-
-The slave numbers from "Table 14-3 Master to Slave Access" are wrong.
-The 7th row  should be removed and all the other rows from below it,
-shifted up with one level (DDR2 Port 1 is Slave no 7, DDR2 port 2 is
-Slave no 8, ... , APB1 is slave no 11).
-
-We think the best way is to keep LCD on DDR Ports 2 and 3 (8th and 9th
-slaves), to have maximum bandwidth and to use DMA on DDR port 1 for NAND
-(7th slave).
-
-Also, some information about your configuration is useful. Can you
-please tell us what NAND DMA configuration did you use?  Are you using
-NAND storage for the videos that you are playing on the LCD screen?
-
-Thanks,
-ta
+On 05/25/2018 04:35 PM, Richard Genoud wrote:
+> On 25/05/2018 14:17, Radu Pirea wrote:
+>>
+>>
+>> On 05/15/2018 04:14 PM, Richard Genoud wrote:
+>>> On 15/05/2018 14:47, Radu Pirea wrote:
+>>>> On Mon, 2018-05-14 at 12:57 +0200, Richard Genoud wrote:
+>>>>> After your patch, the DMA is not selected anymore:
+>>>>> atmel_usart_serial atmel_usart_serial.0.auto: TX channel not
+>>>>> available, switch to pio
+>>>>> instead of:
+>>>>> atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
+>>>>>
+>>>> Fixed.
+>>>>> And the kernel doesn't log anymore on the serial console, despite the
+>>>>> loglevel=8
+>>>>> (after reverting this series, the kernel logs reappears on the serial
+>>>>> console)
+>>>>>
+>>>> Which serial are you using as console?
+>>> fffff200.serial (sam9g35-cm)
+>>> ( stdout-path = "serial0:115200n8"; in the DTS )
+>>>
+>>> With this series applied, all the kernel log goes on the screen.
+>>> Without, it goes on the serial debug.
+>>>
+>> I tested again with archlinux arm and poky-linux4sam release as distros
+>> and kernel log goes on the serial debug. Can you give me more details
+>> like cmdline?
+> I used kernel 4.17-rc6
+> at91_dt_defconfig
+> at91sam9g35ek.dtb
+> 
+> Kernel command line: root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs
+I reproduced your issue.
+If in cmdline console is not set like this "console=ttyS0,115200", the 
+console goes to the lcd.
+> ( the one from the DTS )
+> 
+> Detailed instructions:
+> 
+> git checkout v4.17-rc6
+> ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 at91_dt_defconfig
+> ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
+> cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
+> 
+>  From uboot:
+> tftpboot 0x20007FC0 uImage
+> tftpboot 0x26400000 at91sam9g35ek.dtb
+> bootm 0x20007FC0 - 0x26400000
+> 
+> [ I see the logs on the serial debug ]
+> 
+> git am \[PATCH\ v3\ [1-6]*
+> 
+> ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
+> cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
+> 
+>  From uboot:
+> tftpboot 0x20007FC0 uImage
+> tftpboot 0x26400000 at91sam9g35ek.dtb
+> bootm 0x20007FC0 - 0x26400000
+> 
+> [ I don't see the logs on the serial debug anymore ]
+> 
+> 
+>>>>> (tests done on sam9g35)
+>>>>>
+>>>> I will consider the rest of suggestions.
+>>>>> regards,
+>>>>> Richard
+>>>
+> 
