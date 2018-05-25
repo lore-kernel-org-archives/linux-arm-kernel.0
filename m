@@ -1,105 +1,85 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 25 May 2018 10:43:06 -0600
-Subject: [PATCH 08/11] coresight: Add generic TMC sg table framework
-In-Reply-To: <21fef51b-2afe-1a2c-6006-5cf3de4e74e8@arm.com>
-References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
- <1526661567-4578-9-git-send-email-suzuki.poulose@arm.com>
- <20180523202552.GA4609@xps15>
- <21fef51b-2afe-1a2c-6006-5cf3de4e74e8@arm.com>
-Message-ID: <20180525164306.GA13430@xps15>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Fri, 25 May 2018 09:45:17 -0700
+Subject: [PATCH 3/3] arm64: dts: Update Stingray clock DT nodes
+In-Reply-To: <1527266717-8406-1-git-send-email-ray.jui@broadcom.com>
+References: <1527266717-8406-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527266717-8406-4-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 05:07:07PM +0100, Suzuki K Poulose wrote:
-> On 23/05/18 21:25, Mathieu Poirier wrote:
-> >On Fri, May 18, 2018 at 05:39:24PM +0100, Suzuki K Poulose wrote:
-> >>This patch introduces a generic sg table data structure and
-> >>associated operations. An SG table can be used to map a set
-> >>of Data pages where the trace data could be stored by the TMC
-> >>ETR. The information about the data pages could be stored in
-> >>different formats, depending on the type of the underlying
-> >>SG mechanism (e.g, TMC ETR SG vs Coresight CATU). The generic
-> >>structure provides book keeping of the pages used for the data
-> >>as well as the table contents. The table should be filled by
-> >>the user of the infrastructure.
-> >>
-> >>A table can be created by specifying the number of data pages
-> >>as well as the number of table pages required to hold the
-> >>pointers, where the latter could be different for different
-> >>types of tables. The pages are mapped in the appropriate dma
-> >>data direction mode (i.e, DMA_TO_DEVICE for table pages
-> >>and DMA_FROM_DEVICE for data pages).  The framework can optionally
-> >>accept a set of allocated data pages (e.g, perf ring buffer) and
-> >>map them accordingly. The table and data pages are vmap'ed to allow
-> >>easier access by the drivers. The framework also provides helpers to
-> >>sync the data written to the pages with appropriate directions.
-> >>
-> >>This will be later used by the TMC ETR SG unit and CATU.
-> >>
-> >>Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> >>Changes since v1:
-> >>  - Address code style issues, more comments
-> >>---
-> >>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 290 ++++++++++++++++++++++++
-> >>  drivers/hwtracing/coresight/coresight-tmc.h     |  50 ++++
-> >>  2 files changed, 340 insertions(+)
-> >>
-> >>diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> >>index 9780798..1e844f8 100644
-> >>--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> >>+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> >>@@ -17,9 +17,299 @@
-> 
-> 
-> >>+static inline dma_addr_t tmc_sg_table_base_paddr(struct tmc_sg_table *sg_table)
-> >>+{
-> >>+	if (WARN_ON(!sg_table->data_pages.pages[0]))
-> >>+		return 0;
-> >>+	return sg_table->table_daddr;
-> >>+}
-> >>+
-> >>+static inline void *tmc_sg_table_base_vaddr(struct tmc_sg_table *sg_table)
-> >>+{
-> >>+	if (WARN_ON(!sg_table->data_pages.pages[0]))
-> >>+		return NULL;
-> >>+	return sg_table->table_vaddr;
-> >>+}
-> >
-> >The above two functions deal with DMA'able and virtual addresses for the table
-> >page buffer.  Yet the test in the WARN_ON is done on the data page array.
-> >Shouldn't this be sg_table->table_pages.pages[0] instead?
-> 
-> The table is as good as empty if there are no data pages associated with
-> the table. Hence the data_pages check.
+Update clock output names in the Stingray clock DT nodes so they match
+the binding document and the latest ASIC datasheet. Also add entries
+for LCPLL2
 
-That is correct.  On the flip side you can't have data_pages without table_pages
-and vice versa, hence my comment.
+Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 26 ++++++++++++++++------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-> 
-> >
-> >If not please add a comment justifying your position so that someone else
-> >looking at the code does't end up thinking the same in a year from now.
-> 
-> I will add a comment to reflect the above.
-> 
-> >
-> >>+
-> >>+static inline void *
-> >>+tmc_sg_table_data_vaddr(struct tmc_sg_table *sg_table)
-> >>+{
-> >>+	if (WARN_ON(!sg_table->data_pages.nr_pages))
-> >>+		return 0;
-> >>+	return sg_table->data_vaddr;
-> >>+}
-> >
-> >I see that tmc_sg_table_base_vaddr() and tmc_sg_table_data_vaddr() are both
-> >returning the virtual address of the contiguous buffer for table and data
-> >respectively.  Yet there is a discrepency in the naming convention.  I would
-> >have expected tmc_sg_table_base_vaddr() and tmc_sg_data_base_vaddr() so that
-> >there is a little symmetry between them.
-> 
-> Agree. I will fix it.
-> 
-> Suzuki
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+index 3a4d452..10a106a 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+@@ -52,12 +52,24 @@
+ 			reg = <0x0001d104 0x32>,
+ 			      <0x0001c854 0x4>;
+ 			clocks = <&osc>;
+-			clock-output-names = "genpll0", "clk_125", "clk_scr",
++			clock-output-names = "genpll0", "clk_125m", "clk_scr",
+ 					     "clk_250", "clk_pcie_axi",
+ 					     "clk_paxc_axi_x2",
+ 					     "clk_paxc_axi";
+ 		};
+ 
++		genpll2: genpll2 at 1d1ac {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-genpll2";
++			reg = <0x0001d1ac 0x32>,
++			      <0x0001c854 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "genpll2", "clk_nic",
++					     "clk_ts_500_ref", "clk_125_nitro",
++					     "clk_chimp", "clk_nic_flash",
++					     "clk_fs";
++		};
++
+ 		genpll3: genpll3 at 1d1e0 {
+ 			#clock-cells = <1>;
+ 			compatible = "brcm,sr-genpll3";
+@@ -75,8 +87,8 @@
+ 			      <0x0001c854 0x4>;
+ 			clocks = <&osc>;
+ 			clock-output-names = "genpll4", "clk_ccn",
+-					     "clk_tpiu_pll", "noc_clk",
+-					     "pll_chclk_fs4",
++					     "clk_tpiu_pll", "clk_noc",
++					     "clk_chclk_fs4",
+ 					     "clk_bridge_fscpu";
+ 		};
+ 
+@@ -86,8 +98,8 @@
+ 			reg = <0x0001d248 0x32>,
+ 			      <0x0001c870 0x4>;
+ 			clocks = <&osc>;
+-			clock-output-names = "genpll5", "fs4_hf_clk",
+-					     "crypto_ae_clk", "raid_ae_clk";
++			clock-output-names = "genpll5", "clk_fs4_hf",
++					     "clk_crypto_ae", "clk_raid_ae";
+ 		};
+ 
+ 		lcpll0: lcpll0 at 1d0c4 {
+@@ -107,9 +119,9 @@
+ 			reg = <0x0001d138 0x3c>,
+ 			      <0x0001c870 0x4>;
+ 			clocks = <&osc>;
+-			clock-output-names = "lcpll1", "clk_wanpn",
++			clock-output-names = "lcpll1", "clk_wan",
+ 					     "clk_usb_ref",
+-					     "timesync_evt_clk";
++					     "clk_crmu_ts";
+ 		};
+ 
+ 		hsls_clk: hsls_clk {
+-- 
+2.1.4
