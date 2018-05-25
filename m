@@ -1,63 +1,31 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 May 2018 16:01:46 +0530
-Subject: [PATCH 00/15] arm: dts: Fix OPP and cooling device properties
-Message-ID: <cover.1527244200.git.viresh.kumar@linaro.org>
+Date: Fri, 25 May 2018 16:01:47 +0530
+Subject: [PATCH 01/15] arm: dts: armada: Fix "#cooling-cells" property's name
+In-Reply-To: <cover.1527244200.git.viresh.kumar@linaro.org>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+Message-ID: <26a0666368694db610414a85a08843435ea070a7.1527244201.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes missing OPP and cooling device properties for CPUs for the
-ARM 32 bit platforms. This is build tested by the zero day testing
-infrastructure as well.
+It should be "#cooling-cells" instead of "cooling-cells". Fix it.
 
-Individual maintainers can pick the patches to their SoC trees or I will
-ask ARM SoC maintainers to pick them up later.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/boot/dts/armada-385-synology-ds116.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---
-viresh
-
-Viresh Kumar (15):
-  arm: dts: armada: Fix "#cooling-cells" property's name
-  arm: dts: ls1021a: Add missing cooling device properties for CPUs
-  arm: dts: mediatek: Add missing cooling device properties for CPUs
-  arm: dts: rk322x: Add missing cooling device properties for CPUs
-  arm: dts: uniphier: Add missing cooling device properties for CPUs
-  arm: dts: sun: Add missing cooling device properties for CPUs
-  arm: dts: exynos: Add missing cooling device properties for CPUs
-  arm: dts: dra74x: Add missing cooling device properties for CPUs
-  arm: dts: omap: Add missing cooling device properties for CPUs
-  arm: dts: rk3288: Add missing cooling device properties for CPUs
-  arm: dts: berlin: Add missing OPP properties for CPUs
-  arm: dts: highbank: Add missing OPP properties for CPUs
-  arm: dts: r8a7743: Add missing OPP properties for CPUs
-  arm: dts: qcom: Add missing OPP properties for CPUs
-  arm: dts: imx: Add missing OPP properties for CPUs
-
- arch/arm/boot/dts/armada-385-synology-ds116.dts |  2 +-
- arch/arm/boot/dts/berlin2.dtsi                  | 10 +++
- arch/arm/boot/dts/berlin2q.dtsi                 | 33 ++++++++++
- arch/arm/boot/dts/dra74x.dtsi                   | 10 +++
- arch/arm/boot/dts/exynos3250.dtsi               | 16 +++++
- arch/arm/boot/dts/exynos4210.dtsi               | 13 ++++
- arch/arm/boot/dts/exynos4412.dtsi               |  9 +++
- arch/arm/boot/dts/exynos5250.dtsi               | 23 +++++++
- arch/arm/boot/dts/highbank.dts                  | 30 +++++++++
- arch/arm/boot/dts/imx6dl.dtsi                   | 23 +++++++
- arch/arm/boot/dts/imx6q-cm-fx6.dts              | 66 +++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi                    | 87 ++++++++++++++++++++++++-
- arch/arm/boot/dts/imx7d.dtsi                    |  5 ++
- arch/arm/boot/dts/ls1021a.dtsi                  |  1 +
- arch/arm/boot/dts/mt7623.dtsi                   |  3 +
- arch/arm/boot/dts/omap5.dtsi                    | 14 ++++
- arch/arm/boot/dts/qcom-ipq4019.dtsi             | 24 +++++++
- arch/arm/boot/dts/r8a7743.dtsi                  |  9 +++
- arch/arm/boot/dts/rk322x.dtsi                   |  3 +
- arch/arm/boot/dts/rk3288.dtsi                   | 54 +++++++++++++++
- arch/arm/boot/dts/sun6i-a31.dtsi                | 30 +++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                | 13 ++++
- arch/arm/boot/dts/sun8i-a33.dtsi                |  9 +++
- arch/arm/boot/dts/sun8i-h3.dtsi                 |  9 +++
- arch/arm/boot/dts/uniphier-pxs2.dtsi            |  3 +
- 25 files changed, 495 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-385-synology-ds116.dts b/arch/arm/boot/dts/armada-385-synology-ds116.dts
+index 6782ce481ac9..d8769956cbfc 100644
+--- a/arch/arm/boot/dts/armada-385-synology-ds116.dts
++++ b/arch/arm/boot/dts/armada-385-synology-ds116.dts
+@@ -139,7 +139,7 @@
+ 					      3700 5
+ 					      3900 6
+ 					      4000 7>;
+-			cooling-cells = <2>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		gpio-leds {
 -- 
 2.15.0.194.g9af6a3dea062
