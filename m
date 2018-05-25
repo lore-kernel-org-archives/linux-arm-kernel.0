@@ -1,60 +1,108 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:09 +0100
-Subject: [PATCH v4 03/26] arm64: cpufeature: Use alternatives for VHE
- cpu_enable
-In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-4-git-send-email-julien.thierry@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 25 May 2018 09:49:45 +0000
+Subject: [PATCH V2 2/4] clk: add new APIs to operate on all available
+ clocks
+In-Reply-To: <152182421754.178046.7553203878044979411@swboyd.mtv.corp.google.com>
+References: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
+ <1521602391-30356-3-git-send-email-aisheng.dong@nxp.com>
+ <152182421754.178046.7553203878044979411@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB42110066C43E037F2E0501CB80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu_enable callback for VHE feature requires all alternatives to have
-been applied. This prevents applying VHE alternative separately from the
-rest.
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at kernel.org]
+> Sent: Saturday, March 24, 2018 12:57 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> mturquette at baylibre.com; hdegoede at redhat.com;
+> b.zolnierkie at samsung.com; linux at armlinux.org.uk; linux-
+> fbdev at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>; A.s. Dong
+> <aisheng.dong@nxp.com>; Stephen Boyd <sboyd@codeaurora.org>;
+> Masahiro Yamada <yamada.masahiro@socionext.com>
+> Subject: Re: [PATCH V2 2/4] clk: add new APIs to operate on all available
+> clocks
+> 
+> Quoting Dong Aisheng (2018-03-20 20:19:49)
+> > @@ -50,6 +52,38 @@ static int __must_check of_clk_bulk_get(struct
+> device_node *np, int num_clks,
+> >         return ret;
+> >  }
+> >  EXPORT_SYMBOL(of_clk_bulk_get);
+> > +
+> > +static int __must_check of_clk_bulk_get_all(struct device_node *np,
+> > +                                           struct clk_bulk_data
+> > +**clks) {
+> > +       struct clk_bulk_data *clk_bulk;
+> > +       int num_clks;
+> > +       int ret;
+> > +
+> > +       num_clks = of_clk_get_parent_count(np);
+> > +       if (!num_clks)
+> > +               return 0;
+> > +
+> > +       clk_bulk = kcalloc(num_clks, sizeof(*clk_bulk), GFP_KERNEL);
+> 
+> Can be kmalloc_array? of_clk_bulk_get() already clears things out
+> appropriately.
 
-Use an alternative depending on VHE feature to know whether VHE
-alternatives have already been applied.
+Yes, indeed. Will use kmalloc_array instead.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-Cc: Christoffer Dall <Christoffer.Dall@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+> 
+> > +       if (!clk_bulk)
+> > +               return -ENOMEM;
+> > +
+> > +       ret = of_clk_bulk_get(np, num_clks, clk_bulk);
+> > +       if (ret) {
+> > +               kfree(clk_bulk);
+> > +               return ret;
+> > +       }
+> > +
+> > +       *clks = clk_bulk;
+> > +
+> > +       return num_clks;
+> > +}
+> > +#else
+> > +static int __must_check of_clk_bulk_get_all(struct device_node *np,
+> > +                                           struct clk_bulk_data
+> > +**clks) {
+> > +       return -ENOENT;
+> > +}
+> >  #endif
+> 
+> This else can probably be dropped too.
+> 
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a177104..a3a5585d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1013,6 +1013,8 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
- 
- static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
- {
-+	u64 tmp = 0;
-+
- 	/*
- 	 * Copy register values that aren't redirected by hardware.
- 	 *
-@@ -1021,8 +1023,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
- 	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
- 	 * do anything here.
- 	 */
--	if (!alternatives_applied)
--		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
-+	asm volatile(ALTERNATIVE(
-+		"mrs	%0, tpidr_el1\n"
-+		"msr	tpidr_el2, %0",
-+		"nop\n"
-+		"nop",
-+		ARM64_HAS_VIRT_HOST_EXTN)
-+		: "+r" (tmp)
-+		:
-+		: "memory");
- }
- #endif
- 
--- 
-1.9.1
+Right.
+
+> >
+> >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks) @@ -90,6
+> > +124,29 @@ int __must_check clk_bulk_get(struct device *dev, int
+> > num_clks,  }  EXPORT_SYMBOL(clk_bulk_get);
+> >
+> > +void clk_bulk_put_all(int num_clks, struct clk_bulk_data *clks) {
+> > +       if (IS_ERR_OR_NULL(clks))
+> > +               return;
+> > +
+> > +       clk_bulk_put(num_clks, clks);
+> > +
+> > +       kfree(clks);
+> > +}
+> > +EXPORT_SYMBOL(clk_bulk_put_all);
+> > +
+> > +int __must_check clk_bulk_get_all(struct device *dev,
+> > +                                 struct clk_bulk_data **clks) {
+> > +       struct device_node *np = dev_of_node(dev);
+> > +
+> > +       if (!np)
+> > +               return 0;
+> > +
+> > +       return of_clk_bulk_get_all(np, clks); }
+> > +EXPORT_SYMBOL(clk_bulk_get_all);
+> 
+> Looks better!
+
+Thanks
+
+Regards
+Dong Aisheng
