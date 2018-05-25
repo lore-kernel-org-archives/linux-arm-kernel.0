@@ -1,64 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 25 May 2018 21:12:57 +0200
-Subject: [PATCH 2/2] ARM: shmobile: only call secure_cntvoff_init on SMP
- builds
-In-Reply-To: <20180525161051.187324-2-arnd@arndb.de>
-References: <20180525161051.187324-1-arnd@arndb.de>
- <20180525161051.187324-2-arnd@arndb.de>
-Message-ID: <CAMuHMdVsEH31x60p4wfqZsM-b1WNt39=ko8vKtYLfk2db6u5TQ@mail.gmail.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Fri, 25 May 2018 19:23:49 +0000
+Subject: [PATCH v6 09/11] firmware: xilinx: Add debugfs for clock control
+ APIs
+In-Reply-To: <6579fdce-6845-70d5-1dc1-64d52debef19@arm.com>
+References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+ <1523389127-14243-10-git-send-email-jollys@xilinx.com>
+ <5bcc47f7-3352-f0e6-29c5-78d5be96c1d1@arm.com>
+ <SN1PR02MB3758191654612CFC261A38BEB89C0@SN1PR02MB3758.namprd02.prod.outlook.com>
+ <6579fdce-6845-70d5-1dc1-64d52debef19@arm.com>
+Message-ID: <SN1PR02MB3758876A011FFF46C71C8F6CB8690@SN1PR02MB3758.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Sudeep,
 
-On Fri, May 25, 2018 at 6:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The secure_cntvoff_init() function is not available without CONFIG_SMP,
-> leading to a link error on shmobile:
->
-> arch/arm/mach-shmobile/setup-rcar-gen2.o: In function `rcar_gen2_timer_init':
-> setup-rcar-gen2.c:(.init.text+0x18): undefined reference to `secure_cntvoff_init'
->
-> From the description in commit 3fd45a136ff6 ("ARM: shmobile: rcar-gen2:
-> Make sure CNTVOFF is initialized on CA7/15"), I understand that we
-> don't need to call it on non-SMP builds because the boot CPU is always
-> initialized by common code, so we can simply avoid the reference by
-> checking for CONFIG_SMP.
->
-> Fixes: cad160ed0a94 ("ARM: shmobile: Convert file to use cntvoff")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Tuesday, May 15, 2018 1:58 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>; ard.biesheuvel at linaro.org;
+> mingo at kernel.org; gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> hkallweit1 at gmail.com; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; mturquette at baylibre.com;
+> sboyd at codeaurora.org; michal.simek at xilinx.com; robh+dt at kernel.org;
+> mark.rutland at arm.com; linux-clk at vger.kernel.org
+> Cc: Sudeep Holla <sudeep.holla@arm.com>; Rajan Vaja <RAJANV@xilinx.com>;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH v6 09/11] firmware: xilinx: Add debugfs for clock control
+> APIs
+> 
+> 
+> 
+> On 14/05/18 20:18, Jolly Shah wrote:
+> > Hi Sudeep,
+> 
+> [..]
+> 
+> >>
+> >> As I mentioned in earlier patch, I don't see the need for this
+> >> debugfs interface. Clock lay has read-only interface in debugfs
+> >> already. Also if you want to debug clocks, you can do so using the
+> >> driver which uses these clocks. Do you really want to manage clocks
+> >> in user-space ? The whole idea of EEMI kind of interface is to
+> >> abstract and hide the fine details even from non-trusted rich OS like
+> >> Linux kernel, but by providing this you are doing exactly opposite.
+> >
+> > No we don't want to manage clocks in user-space. This debugfs is meant
+> > for developer who wants to debug APIs behavior in case something
+> > doesn't work as expected. Debugfs should be off by default in
+> > production images.
+> >
+> 
+> Good that it's not used in production image. The clock layer has
+> *sufficient* debugfs support that will *help in debugging*. So please drop this
+> Xilinx specific clock debugfs.
+> 
+> --
+> Regards,
+> Sudeep
 
-NAKed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Ok. Will remove them in next version. Let me know if rest changes look ok and I can submit final version with suggested minor changes.
 
-> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> @@ -71,7 +71,8 @@ void __init rcar_gen2_timer_init(void)
->         void __iomem *base;
->         u32 freq;
->
-> -       secure_cntvoff_init();
-> +       if (IS_ENABLED(CONFIG_SMP))
-> +               secure_cntvoff_init();
-
-The call here is for the boot CPU, since commit 9ce3fa6816c2fb59 ("ARM:
-shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794"), and
-modified and consolidated in commit 3fd45a136ff6 mentioned above.
-
-The call for secondary CPUs is in arch/arm/mach-shmobile/headsmp-apmu.S.
-
->
->         if (of_machine_is_compatible("renesas,r8a7745") ||
->             of_machine_is_compatible("renesas,r8a77470") ||
-
-So the proper fix is to build arch/arm/common/secure_cntvoff.o
-unconditionally.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Jolly Shah
