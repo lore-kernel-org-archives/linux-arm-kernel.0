@@ -1,63 +1,102 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 25 May 2018 11:49:01 +0100
-Subject: REGRESSION: iommu fails to take address limit into account
-In-Reply-To: <CAKv+Gu_0ECwLhoA2ywp3nntFX=RxfpM+MWFwTain1WN1sMrW9g@mail.gmail.com>
-References: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
- <CAKv+Gu_0ECwLhoA2ywp3nntFX=RxfpM+MWFwTain1WN1sMrW9g@mail.gmail.com>
-Message-ID: <6d95cd70-70bd-9e63-c148-d535fbedb0d0@arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Fri, 25 May 2018 18:37:22 +0800
+Subject: [PATCH V3 3/4] clk: add managed version of clk_bulk_get_all
+In-Reply-To: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
+References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1527244643-10736-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/18 11:35, Ard Biesheuvel wrote:
-> On 25 May 2018 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Hello all,
->>
->> I am looking into an issue where a platform device is wired to a
->> MMU-500, and for some reason (which is under investigation) the
->> platform device can not drive all address bits. I can work around this
->> by limiting the DMA mask to 40 bits in the driver. However, the IORT
->> table allows me to set the address limit as well, and so I was
->> expecting this to be taken into account by the SMMU driver.
->>
->> When the iort/iommu layer sets up the DMA operations,
->> iommu_dma_init_domain() is entered with the expected values:
->>
->> base == 0
->> size == 0x100_0000_0000
->>
->> However, the iommu layer ends up generating IOVA addresses that have
->> bits [47:40] set (which is what the MMU-500 supports). Looking closer,
->> this is not surprising, given that the end_pfn variable that is
->> calculated in iommu_dma_init_domain() is no longer used after Zhen's
->> patch aa3ac9469c185 ("iommu/iova: Make dma_32bit_pfn implicit") was
->> applied.
->>
->> So effectively, this is a regression, and I would like your help
->> figuring out how to go about fixing this.
->>
-> 
-> I have narrowed it down a bit further: even though the IOVA range
-> ignores the IORT address limit, the device's DMA mask is set
-> correctly. The only problem is that the driver (like all drivers
-> afaict) does not take into account the fact that its DMA mask has
-> already been set by the bus layer before its probe function is called.
-> 
-> I could add something like this
-> 
-> -       if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
-> +       if (dma_get_mask(&pdev->dev) == DMA_BIT_MASK(32) &&
-> +           dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
->                  dev_warn(&pdev->dev, "Failed to enable 64-bit DMA\n");
-> 
-> to only override the mask if it is not at its default value, but it
-> feels like papering over the problem given that most drivers appear to
-> ignore the preset mask as well.
+This patch introduces the managed version of clk_bulk_get_all.
 
-Yup, that's the crux of it - if, say, the firmware describes an explicit 
-restriction to 32 bits, then drivers have no way to tell the difference 
-between that and the default mask initialised by the bus code (which 
-they *should* be able to widen), and at the moment neither does arch 
-code or anyone else (and the current interface between arch code and 
-firmware code does not help matters).
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+v2->v3:
+ * a minor fix of build warning on PowerPC platform.
+v1->v2:
+ * new patch
+---
+ drivers/clk/clk-devres.c | 24 ++++++++++++++++++++++++
+ include/linux/clk.h      | 23 +++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
 
-Robin.
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index d854e26..6d3ca5e 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -70,6 +70,30 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ }
+ EXPORT_SYMBOL_GPL(devm_clk_bulk_get);
+ 
++int __must_check devm_clk_bulk_get_all(struct device *dev,
++				       struct clk_bulk_data **clks)
++{
++	struct clk_bulk_devres *devres;
++	int ret;
++
++	devres = devres_alloc(devm_clk_bulk_release,
++			      sizeof(*devres), GFP_KERNEL);
++	if (!devres)
++		return -ENOMEM;
++
++	ret = clk_bulk_get_all(dev, clks);
++	if (ret > 0) {
++		devres->clks = *clks;
++		devres->num_clks = ret;
++		devres_add(dev, devres);
++	} else {
++		devres_free(devres);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(devm_clk_bulk_get_all);
++
+ static int devm_clk_match(struct device *dev, void *res, void *data)
+ {
+ 	struct clk **c = res;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index a76fdff..ef20217 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -313,6 +313,22 @@ int __must_check clk_bulk_get_all(struct device *dev,
+  */
+ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ 				   struct clk_bulk_data *clks);
++/**
++ * devm_clk_bulk_get_all - managed get multiple clk consumers
++ * @dev: device for clock "consumer"
++ * @clks: pointer to the clk_bulk_data table of consumer
++ *
++ * Returns a positive value for the number of clocks obtained while the
++ * clock references are stored in the clk_bulk_data table in @clks field.
++ * Returns 0 if there're none and a negative value if something failed.
++ *
++ * This helper function allows drivers to get several clk
++ * consumers in one operation with management, the clks will
++ * automatically be freed when the device is unbound.
++ */
++
++int __must_check devm_clk_bulk_get_all(struct device *dev,
++				       struct clk_bulk_data **clks);
+ 
+ /**
+  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
+@@ -658,6 +674,13 @@ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clk
+ 	return 0;
+ }
+ 
++static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
++						     struct clk_bulk_data **clks)
++{
++
++	return 0;
++}
++
+ static inline struct clk *devm_get_clk_from_child(struct device *dev,
+ 				struct device_node *np, const char *con_id)
+ {
+-- 
+2.7.4
