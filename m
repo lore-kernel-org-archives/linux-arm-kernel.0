@@ -1,51 +1,36 @@
 From: david@lechnology.com (David Lechner)
-Date: Fri, 25 May 2018 13:11:41 -0500
-Subject: [PATCH 0/9] clk: davinci: outstanding fixes
-Message-ID: <20180525181150.17873-1-david@lechnology.com>
+Date: Fri, 25 May 2018 13:11:45 -0500
+Subject: [PATCH 4/9] clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always enabled
+In-Reply-To: <20180525181150.17873-1-david@lechnology.com>
+References: <20180525181150.17873-1-david@lechnology.com>
+Message-ID: <20180525181150.17873-5-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a resend of all of the outstanding DaVinci clock patches plus one new
-patch. All of the patches (except the new one) have been reviewed and tested
-by someone other than me.
+From: Sekhar Nori <nsekhar@ti.com>
 
-The new patch ("clk: davinci: Fix link errors when not all SoCs are enabled")
-should be fairly trivial.
+PLL2 SYSCLK1 on DM646x is connected to DDR2 PHY and cannot
+be disabled. Mark it so to prevent unused clock disable
+infrastructure from disabling it.
 
-I am resending them all in one series to hopefully make it easier to get them
-picked up by having them in the correct order to avoid merge conflicts. This
-series is based on the clk/clk-davinci-psc-da830 branch.
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Reviewed-by: David Lechner <david@lechnology.com>
+---
+ drivers/clk/davinci/pll-dm646x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-David Lechner (7):
-  clk: davinci: pll-dm355: drop pll2_sysclk2
-  clk: davinci: pll-dm355: fix SYSCLKn parent names
-  clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups
-  clk: davinci: pll: allow dev == NULL
-  clk: davinci: da850-pll: change PLL0 to CLK_OF_DECLARE
-  clk: davinci: psc: allow for dev == NULL
-  clk: davinci: Fix link errors when not all SoCs are enabled
-
-Sekhar Nori (2):
-  clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always enabled
-  clk: davinci: psc-dm365: fix few clocks
-
- drivers/clk/davinci/pll-da830.c  |   5 +-
- drivers/clk/davinci/pll-da850.c  |  37 ++--
- drivers/clk/davinci/pll-dm355.c  |  22 ++-
- drivers/clk/davinci/pll-dm365.c  |   9 +-
- drivers/clk/davinci/pll-dm644x.c |   9 +-
- drivers/clk/davinci/pll-dm646x.c |  11 +-
- drivers/clk/davinci/pll.c        | 299 +++++++++++++++++++++----------
- drivers/clk/davinci/pll.h        |  41 +++--
- drivers/clk/davinci/psc-dm355.c  |   7 +-
- drivers/clk/davinci/psc-dm365.c  |  22 ++-
- drivers/clk/davinci/psc-dm644x.c |   3 +-
- drivers/clk/davinci/psc-dm646x.c |   3 +-
- drivers/clk/davinci/psc.c        |  72 ++++++--
- drivers/clk/davinci/psc.h        |  12 ++
- include/linux/clk/davinci.h      |  40 +++++
- 15 files changed, 418 insertions(+), 174 deletions(-)
- create mode 100644 include/linux/clk/davinci.h
-
+diff --git a/drivers/clk/davinci/pll-dm646x.c b/drivers/clk/davinci/pll-dm646x.c
+index a61cc3256418..0ae827e3ce80 100644
+--- a/drivers/clk/davinci/pll-dm646x.c
++++ b/drivers/clk/davinci/pll-dm646x.c
+@@ -72,7 +72,7 @@ static const struct davinci_pll_clk_info dm646x_pll2_info = {
+ 	.flags = 0,
+ };
+ 
+-SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, 0);
++SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, SYSCLK_ALWAYS_ENABLED);
+ 
+ int dm646x_pll2_init(struct device *dev, void __iomem *base)
+ {
 -- 
 2.17.0
