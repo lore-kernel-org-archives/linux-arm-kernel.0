@@ -1,76 +1,91 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri, 25 May 2018 19:53:22 +0530
-Subject: [PATCH v2 5/5] MAINTAINERS: Add Actions Semi S900 pinctrl entries
-In-Reply-To: <CACRpkdaTQOWA_5nyasxTwE=cGRis+uaLhw66pmkd+qPxMC6FFQ@mail.gmail.com>
-References: <20180520051736.4842-1-manivannan.sadhasivam@linaro.org>
- <20180520051736.4842-6-manivannan.sadhasivam@linaro.org>
- <CACRpkdYF7a-uwye0uwn-pT9Bprj74q1-Pcbq4WLyiE+kYY4j7w@mail.gmail.com>
- <25d1c303-71d7-8c38-880f-7bb0e133a876@suse.de>
- <20180525050103.3hg3u2v5mvftqhht@linaro.org>
- <CACRpkdaTQOWA_5nyasxTwE=cGRis+uaLhw66pmkd+qPxMC6FFQ@mail.gmail.com>
-Message-ID: <20180525142322.GA25453@linaro.org>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Fri, 25 May 2018 19:58:05 +0530
+Subject: [PATCH v11 0/4] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1527258489-30473-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 02:12:06PM +0200, Linus Walleij wrote:
-> On Fri, May 25, 2018 at 7:01 AM, Manivannan Sadhasivam
-> <manivannan.sadhasivam@linaro.org> wrote:
-> 
-> > FYI, I have ordered S700 based Cubieboard and will work on adding support for
-> > that first. I still don't have access to S500 board yet since it is not
-> > available on my region. Will find a way to get this asap.
-> 
-> Awesome, then we can count on some actions action here.
->
+This series of patches re-bring huge vmap back for arm64.
 
-Oops... Small correction here, I have ordered S500 based board.
+Patch 1/4 has been taken by Toshi in his series of patches
+by name "[PATCH v3 0/3] fix free pmd/pte page handlings on x86"
+to avoid merge conflict with this series.
 
-> >> Also I had been investing efforts in explaining the upstreaming process
-> >> to Actions, last in November. I see Thomas Liau and Jeff Chen missing in
-> >> CC and I have not seen any Reviewed-by or Acked-by from anyone at
-> >> Actions on this and the preceding series. There are more chips than the
-> >> one on Linaro's 96board, so I would prefer to assure that the design
-> >> works for all. Thus I am very critical of you applying the patches
-> >> without waiting for review by Actions.
-> >
-> > I don't think Actions would be interested in any upstreaming efforts. It
-> > is our (comunity) responsibility to add support for that in order to
-> > have our boards running mainline kernel and that's what we both have been
-> > doing. Moreover I only saw once David Liau responded to your patchset and
-> > there isn't much further. So how can you expect the subsystem maintainer's
-> > to hold the patch series waiting for a so far silent SoC manufacturer's
-> > response?
-> 
-> They are certainly informed now! :D
-> 
-> Actions semi folks, please familiarize yourself with the following:
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/tree/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt?h=devel
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/tree/drivers/pinctrl/actions?h=devel
-> 
-> If you have any concerns with this, now is a good time to share them.
-> 
-> > I
-> > did ask you to add me as Co-Maintainer but you didn't responded to that.
-> > I know that I can't send any pull requests to Arnd, but we should sort
-> > it out IMO. Also, if you are completely swamped, then I take take up the
-> > maintainership role now inorder to keep the things moving. TBH I don't
-> > want my patches to be floating for months without any reason.
-> 
-> Doing some comainatinership can very well include doing pull
-> requests as long as you agree on who does what.
-> 
-> I think it may be a bit late for the next merge window right now,
-> but if you simply queue up stuff in some git tree and ask
-> Srothwell to include it in linux-next then Andreas can very well
-> pull it to his tree from there and then to ARM SoC or you can
-> queue patches as well.
->
+Patch 4/4 may conflict with Laura's patch "[PATCHv2] arm64: Make
+sure permission updates happen for pmd/pud". It looks to me that,
+problem addressed by this patch will also get resolved by below
+series of patches. There could be multiple ways to resolve this.
+I would let maintainer suggest the best approach, and I will do
+the needful.
 
-Cool. Will queue up all approved dts patches in a git tree and share it with
-andreas.
+These patches are tested on 4.16 kernel with Cortex-A75 based SoC.
 
-Thanks,
-Mani
+The test used for verifying these patches is a stress test on
+ioremap/unmap which tries to re-use same io-address but changes
+size of mapping randomly i.e. 4K to 2M to 16K etc. The same test
+used to reproduce 3rd level translation fault without these fixes
+(and also of course with Revert "arm64: Enforce BBM for huge IO/VMAP
+mappings" being part of the tree).
 
-> Yours,
-> Linus Walleij
+These patches can also go into '-stable' branch (if accepted)
+for 4.6 onwards.
+
+>From V10->V11:
+ - Updated pud_free_pmd_page & pmd_free_pte_page to use consistent
+   conding style
+ - Fixed few bugs by using pmd_page_paddr & pud_page_paddr
+
+>From V9->V10:
+ - Updated commit log for patch 1/4 by Toshi
+ - Addressed review comments by Will on patch 3/4
+
+>From V8->V9:
+ - Used __TLBI_VADDR macros in new TLB flush API
+
+>From V7->V8:
+ - Properly fixed compilation issue in x86 file
+
+>From V6->V7:
+ - Fixed compilation issue in x86 case
+ - V6 patches were not properly enumarated
+
+>From V5->V6:
+ - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+   "bool tlb_inv" based variance as it is not need now
+ - Re-naming for consistency
+
+>From V4->V5:
+ - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+   for kernel addresses
+
+>From V3->V4:
+ - Add header for 'addr' in x86 implementation
+ - Re-order pmd/pud clear and table free
+ - Avoid redundant TLB invalidatation in one perticular case
+
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
+
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
+
+Chintan Pandya (4):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+  arm64: Implement page table free interfaces
+  Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+
+ arch/arm64/include/asm/tlbflush.h |  7 ++++++
+ arch/arm64/mm/mmu.c               | 46 +++++++++++++++++++++++++++++----------
+ arch/x86/mm/pgtable.c             |  8 ++++---
+ include/asm-generic/pgtable.h     |  8 +++----
+ lib/ioremap.c                     |  4 ++--
+ 5 files changed, 52 insertions(+), 21 deletions(-)
+
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
