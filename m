@@ -1,55 +1,35 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 25 May 2018 02:14:07 +0000
-Subject: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
- maillist as reviewer
-In-Reply-To: <1524855977-15719-6-git-send-email-aisheng.dong@nxp.com>
-References: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
- <1524855977-15719-6-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <AM0PR04MB4211D5AE2B22FFB8BA532ADD80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: stu.hsieh@mediatek.com (stu.hsieh at mediatek.com)
+Date: Fri, 25 May 2018 10:34:21 +0800
+Subject: [PATCH v3 4/8] drm/mediatek: add ddp component AAL1
+In-Reply-To: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527215665-11937-5-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+From: Stu Hsieh <stu.hsieh@mediatek.com>
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Saturday, April 28, 2018 3:06 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: dongas86 at gmail.com; kernel at pengutronix.de; shawnguo at kernel.org;
-> Fabio Estevam <fabio.estevam@nxp.com>; robh+dt at kernel.org;
-> catalin.marinas at arm.com; will.deacon at arm.com; dl-linux-imx <linux-
-> imx at nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> Subject: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
-> maillist as reviewer
-> 
-> Add NXP linux team upstream maillist as reviewer
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+This patch add component AAL1 and
+rename AAL to AAL0
 
-Would you pick this one first?
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Regards
-Dong Aisheng
-
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 0a1410d..1defbc8 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1403,6 +1403,7 @@ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
->  M:	Shawn Guo <shawnguo@kernel.org>
->  M:	Sascha Hauer <kernel@pengutronix.de>
->  R:	Fabio Estevam <fabio.estevam@nxp.com>
-> +R:	NXP Linux Team <linux-imx@nxp.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-
-> subscribers)
->  S:	Maintained
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-> --
-> 2.7.4
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index 0828cf8bf85c..eee3c0cc2632 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -41,7 +41,8 @@ enum mtk_ddp_comp_type {
+ };
+ 
+ enum mtk_ddp_comp_id {
+-	DDP_COMPONENT_AAL,
++	DDP_COMPONENT_AAL0,
++	DDP_COMPONENT_AAL1,
+ 	DDP_COMPONENT_BLS,
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_COLOR1,
+-- 
+2.12.5
