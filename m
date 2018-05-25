@@ -1,42 +1,56 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 25 May 2018 17:24:57 +0800
-Subject: [PATCH] usb: gadget: composite: fix delayed_status race condition
- when set_interface
-Message-ID: <75dc545f259a68d36d49c0c663d5cac19bb61a24.1527240183.git.chunfeng.yun@mediatek.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 25 May 2018 10:52:12 +0100
+Subject: [PATCH v11 08/19] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180525090257.GB54529@C02W217FHV2R.local>
+References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
+ <1527181008-13549-9-git-send-email-Dave.Martin@arm.com>
+ <20180525090257.GB54529@C02W217FHV2R.local>
+Message-ID: <20180525095211.GB13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It happens when enable debug log, if set_alt() returns
-USB_GADGET_DELAYED_STATUS and usb_composite_setup_continue()
-is called before increasing count of @delayed_status,
-so fix it by using spinlock of @cdev->lock.
+On Fri, May 25, 2018 at 11:02:57AM +0200, Christoffer Dall wrote:
+> On Thu, May 24, 2018 at 05:56:37PM +0100, Dave Martin wrote:
+> > Currently the FPSIMD handling code uses the condition task->mm ==
+> > NULL as a hint that task has no FPSIMD register context.
+> > 
+> > The ->mm check is only there to filter out tasks that cannot
+> > possibly have FPSIMD context loaded, for optimisation purposes.
+> > Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
+> > saving FPSIMD context back to memory.  For these reasons, the ->mm
+> > checks are not useful, providing that TIF_FOREIGN_FPSTATE is
+> > maintained in a consistent way for all threads.
+> > 
+> > The context switch logic is already deliberately optimised to defer
+> > reloads of the regs until ret_to_user (or sigreturn as a special
+> > case), and save them only if they have been previously loaded.
+> > These paths are the only places where the wrong_task and wrong_cpu
+> > conditions can be made false, by calling fpsimd_bind_task_to_cpu().
+> > Kernel threads by definition never reach these paths.  As a result,
+> > the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
+> > always yield true for kernel threads.
+> > 
+> > This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
+> > task.  The fpsimd_flush_task_state() call already present in
+> > copy_thread() ensures the same for any new task.
+> 
+> nit: formatting still funny, but you shouldn't respin just for that.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Tested-by: Jay Hsu <shih-chieh.hsu@mediatek.com>
----
- drivers/usb/gadget/composite.c | 3 +++
- 1 file changed, 3 insertions(+)
+Ah jeez... it was a long day.
 
-diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
-index f242c2b..d2fa071 100644
---- a/drivers/usb/gadget/composite.c
-+++ b/drivers/usb/gadget/composite.c
-@@ -1719,6 +1719,8 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
- 		 */
- 		if (w_value && !f->get_alt)
- 			break;
-+
-+		spin_lock(&cdev->lock);
- 		value = f->set_alt(f, w_index, w_value);
- 		if (value == USB_GADGET_DELAYED_STATUS) {
- 			DBG(cdev,
-@@ -1728,6 +1730,7 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
- 			DBG(cdev, "delayed_status count %d\n",
- 					cdev->delayed_status);
- 		}
-+		spin_unlock(&cdev->lock);
- 		break;
- 	case USB_REQ_GET_INTERFACE:
- 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
--- 
-1.9.1
+I guess this isn't the end of the world, but I'll fix this in my branch
+and point Marc at it.
+
+> > 
+> > With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
+> > ensures that no extra context save work is added for kernel
+> > threads, and eliminates the redundant context saving that may
+> > currently occur for kernel threads that have acquired an mm via
+> > use_mm().
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+
+[...]
+
+Thanks
+---Dave
