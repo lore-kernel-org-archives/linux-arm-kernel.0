@@ -1,56 +1,34 @@
 From: stu.hsieh@mediatek.com (stu.hsieh at mediatek.com)
-Date: Fri, 25 May 2018 10:34:17 +0800
-Subject: [PATCH v3 0/8] Add support for mediatek SOC MT2712
-Message-ID: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
+Date: Fri, 25 May 2018 10:34:20 +0800
+Subject: [PATCH v3 3/8] drm/mediatek: add connection from OD1 to RDMA1
+In-Reply-To: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527215665-11937-4-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stu Hsieh <stu.hsieh@mediatek.com>
 
-This patch add support for the Mediatek MT2712 DISP subsystem.
-MT2712 is base on MT8173, there are some difference as following:
-MT2712 support three disp output(two ovl and one rdma)
+This patch add the connection from OD1 to RDMA1 for ext path.
 
-Change in v3:
-- Added patch for ddp component AAL1
-- Added patch for ddp component OD1
-- Added patch for ddp component PWM2
-- Added patch to create third ddp path
-- Rebase patch "support maximum 64 mutex mod" before
-  "Add support for mediatek SOC MT2712"
-- Rebase patch "add connection from OD1 to RDMA1" before
-  "Add support for mediatek SOC MT2712"
-- Remove two definition about RDMA0 and RDMA2
-- Change the definition about mutex module from
-  bitwise to index
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Changes in v2:
-- update dt-bindings for mt2712
-- Added patch to connection from OD1 to RDMA1
-- Added patch to support maximum 64 mutex mod
-- rewrite mutex mod condition for reducing one byte
-- Change the component name AAL/OD to AAL0/OD0 for naming consistency
-- Move the compatible infomation about dpi to other patch which modify
-  the dpi driver for mt2712
-
-
-Stu Hsieh (8):
-  drm/mediatek: update dt-bindings for mt2712
-  drm/mediatek: support maximum 64 mutex mod
-  drm/mediatek: add connection from OD1 to RDMA1
-  drm/mediatek: add ddp component AAL1
-  drm/mediatek: add ddp component OD1
-  drm/mediatek: add ddp component PWM2
-  drm/mediatek: Add support for mediatek SOC MT2712
-  drm/mediatek: add third ddp path
-
- .../bindings/display/mediatek/mediatek,disp.txt    |   2 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 124 +++++++++++++++------
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |   8 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |   7 +-
- drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  47 +++++++-
- drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   7 +-
- 6 files changed, 155 insertions(+), 40 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 47ffa240bd25..0f568dd853d8 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -151,6 +151,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_GAMMA && next == DDP_COMPONENT_RDMA1) {
+ 		*addr = DISP_REG_CONFIG_DISP_GAMMA_MOUT_EN;
+ 		value = GAMMA_MOUT_EN_RDMA1;
++	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
++		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
++		value = OD1_MOUT_EN_RDMA1;
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+ 		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+ 		value = RDMA1_MOUT_DPI0;
 -- 
 2.12.5
