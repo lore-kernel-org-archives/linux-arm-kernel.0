@@ -1,39 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 May 2018 09:01:19 -0700
-Subject: [PATCH v3 08/15] ARM: spectre-v2: harden user aborts in kernel
- space
-In-Reply-To: <20180525155207.GF17671@n2100.armlinux.org.uk>
-References: <20180525135938.GE17671@n2100.armlinux.org.uk>
- <E1fMDHD-00073Q-Ob@rmk-PC.armlinux.org.uk>
- <20180525154742.GA77025@atomide.com>
- <20180525155207.GF17671@n2100.armlinux.org.uk>
-Message-ID: <20180525160119.GC98604@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 May 2018 17:04:49 +0100
+Subject: [GIT PULL] arm64: fixes for -rc7
+Message-ID: <20180525160448.GF3255@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [180525 15:54]:
-> On Fri, May 25, 2018 at 08:47:42AM -0700, Tony Lindgren wrote:
-> > We can now get this with the whole series applied:
-> > 
-> > CPU0: Spectre v2: firmware did not set auxiliary control register
-> > IBE bit, system vulnerable
-> > CPU: Spectre v2: using ICIALLU workaround
-> > 
-> > So maybe change the wording from "using %s workaround" to
-> > "chosen workaround %s"?
-> > 
-> > Or I guess disabling the pr_info when not functional can
-> > be done in the later patches based on some variable set
-> > by check_spectre_auxcr() would be doable too.
-> 
-> You should not be getting both messages.  It looks like you're using
-> an older series - I assumed you pulled my git tree rather than the
-> patches?  The public git tree isn't up to date with these changes.
+Hi Linus,
 
-Yes I just fetched your git tree because it allows using
-git mergetool because of the conflicts with next. I'll apply
-manually and test again.
+Here are a few arm64 fixes for -rc7. The two main fixes are for the asm
+constraints in our LSE atomics and for our pmd/pud setters when changing
+permissions for kernel mappings. Summary in the tag.
 
-Thanks,
+Please pull,
 
-Tony
+Will
+
+--->8
+
+The following changes since commit 771c577c23bac90597c685971d7297ea00f99d11:
+
+  Linux 4.17-rc6 (2018-05-20 15:31:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 82034c23fcbc2389c73d97737f61fa2dd6526413:
+
+  arm64: Make sure permission updates happen for pmd/pud (2018-05-24 11:19:31 +0100)
+
+----------------------------------------------------------------
+More arm64 fixes:
+
+- Fix application of read-only permissions to kernel section mappings
+
+- Sanitise reported ESR values for signals delivered on a kernel address
+
+- Ensure tishift GCC helpers are exported to modules
+
+- Fix inline asm constraints for some LSE atomics
+
+----------------------------------------------------------------
+Jason A. Donenfeld (1):
+      arm64: export tishift functions to modules
+
+Laura Abbott (1):
+      arm64: Make sure permission updates happen for pmd/pud
+
+Peter Maydell (1):
+      arm64: fault: Don't leak data in ESR context for user fault on kernel VA
+
+Will Deacon (1):
+      arm64: lse: Add early clobbers to some input/output asm operands
+
+ arch/arm64/include/asm/atomic_lse.h | 24 ++++++++---------
+ arch/arm64/kernel/arm64ksyms.c      |  8 ++++++
+ arch/arm64/lib/tishift.S            | 15 ++---------
+ arch/arm64/mm/fault.c               | 51 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/mmu.c                 | 16 +++++++-----
+ 5 files changed, 83 insertions(+), 31 deletions(-)
