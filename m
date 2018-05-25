@@ -1,22 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 25 May 2018 22:10:12 +0200
-Subject: [PATCH] ARM: dts: pxa3xx: fix MMC clocks
-In-Reply-To: <20180524174339.12236-1-daniel@zonque.org> (Daniel Mack's message
- of "Thu, 24 May 2018 19:43:39 +0200")
-References: <20180524174339.12236-1-daniel@zonque.org>
-Message-ID: <87o9h3wl7f.fsf@belgarion.home>
+From: lsun@mellanox.com (Liming Sun)
+Date: Fri, 25 May 2018 16:17:14 -0400
+Subject: [PATCH v2 2/4] arm64: Add Mellanox BlueField SoC config option
+In-Reply-To: <1527279436-14773-1-git-send-email-lsun@mellanox.com>
+References: <1527279436-14773-1-git-send-email-lsun@mellanox.com>
+Message-ID: <1527279436-14773-2-git-send-email-lsun@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+This commit introduces config option for Mellanox BlueField SoC,
+which can be used to build the SoC specific drivers, and enables
+it by default in configs/defconfig.
 
-> The clocks for the 3 MMC controllers on pxa3xx platforms are CLK_MMC1,
-> CLK_MMC2 and CLK_MMC3. CLK_MMC is only for pxa2xx.
->
-> Signed-off-by: Daniel Mack <daniel@zonque.org>
-Very true.
+Reviewed-by: David Woods <dwoods@mellanox.com>
+Signed-off-by: Liming Sun <lsun@mellanox.com>
+---
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 7 insertions(+)
 
-Queued to pxa/dt.
-
---
-Cheers.
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 2b1535c..74ad03f 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -110,6 +110,12 @@ config ARCH_MESON
+ 	help
+ 	  This enables support for the Amlogic S905 SoCs.
+ 
++config ARCH_MLNX_BLUEFIELD
++	bool "Mellanox BlueField SoC Family"
++	select SOC_MLNX
++	help
++	  This enables support for the Mellanox BlueField SoC.
++
+ config ARCH_MVEBU
+ 	bool "Marvell EBU SoC Family"
+ 	select ARMADA_AP806_SYSCON
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 1c98939..842f607 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -43,6 +43,7 @@ CONFIG_ARCH_LG1K=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_MESON=y
++CONFIG_ARCH_MLNX_BLUEFIELD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_ROCKCHIP=y
+-- 
+1.8.3.1
