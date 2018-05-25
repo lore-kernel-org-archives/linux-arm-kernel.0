@@ -1,32 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 05:17:31 -0700
-Subject: [GIT PULL] ARM: mvebu: arm64 for v4.18 (#1)
-In-Reply-To: <874lj429kq.fsf@bootlin.com>
-References: <874lj429kq.fsf@bootlin.com>
-Message-ID: <20180525121731.2xudzndd6gq6hcrx@localhost>
+Date: Fri, 25 May 2018 05:22:15 -0700
+Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates for v4.18
+In-Reply-To: <CAK7LNASUq_9osPdzbiMCbYzeqc=W3Yv7tB63V+5gXqcZ9QBtYA@mail.gmail.com>
+References: <CAK7LNASUq_9osPdzbiMCbYzeqc=W3Yv7tB63V+5gXqcZ9QBtYA@mail.gmail.com>
+Message-ID: <20180525122215.ylx35lkdcbr5qmkw@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 06:49:09PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Sun, May 20, 2018 at 11:38:39AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-> Here is the first pull request for arm64 for mvebu for v4.18.
+> Here are UniPhier DT (64bit) updates for the v4.18 merge window.
+> Please pull!
 > 
-> Gregory
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.18-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-dt64-v4.18
 > 
-> for you to fetch changes up to 3eb0a48af488b5e83d2986943a1b6905ca753571:
+> for you to fetch changes up to b076ff8bddfba793d49bca14feb49a0e84f41843:
 > 
->   arm64: defconfig: enable the Armada thermal driver (2018-05-16 20:08:31 +0200)
+>   arm64: dts: uniphier: add syscon-phy-mode property to each ethernet
+> node (2018-04-25 00:21:14 +0900)
+> 
+> ----------------------------------------------------------------
+> UniPhier ARM64 SoC DT updates for v4.18
+> 
+> - add more properties to ethernet nodes
+> 
+> ----------------------------------------------------------------
+> Kunihiko Hayashi (2):
+>       arm64: dts: uniphier: add clock-names and reset-names to ethernet node
+>       arm64: dts: uniphier: add syscon-phy-mode property to each ethernet node
 
-Merged, thanks!
+Merged, same comment as for the 32-bit pull request. Thanks!
 
 
 -Olof
