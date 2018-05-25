@@ -1,273 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 May 2018 16:02:01 +0530
-Subject: [PATCH 15/15] arm: dts: imx: Add missing OPP properties for CPUs
-In-Reply-To: <cover.1527244200.git.viresh.kumar@linaro.org>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
-Message-ID: <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 25 May 2018 11:34:35 +0100
+Subject: REGRESSION: iommu fails to take address limit into account
+In-Reply-To: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
+References: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
+Message-ID: <31cd3850-fb61-2d5d-7394-66d84d46b63e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OPP properties, like "operating-points", should either be present
-for all the CPUs of a cluster or none. If these are present only for a
-subset of CPUs of a cluster then things will start falling apart as soon
-as the CPUs are brought online in a different order. For example, this
-will happen because the operating system looks for such properties in
-the CPU node it is trying to bring up, so that it can create an OPP
-table.
+Hi Ard,
 
-Add such missing properties.
+On 25/05/18 10:48, Ard Biesheuvel wrote:
+> Hello all,
+> 
+> I am looking into an issue where a platform device is wired to a
+> MMU-500, and for some reason (which is under investigation) the
+> platform device can not drive all address bits. I can work around this
+> by limiting the DMA mask to 40 bits in the driver. However, the IORT
+> table allows me to set the address limit as well, and so I was
+> expecting this to be taken into account by the SMMU driver.
+> 
+> When the iort/iommu layer sets up the DMA operations,
+> iommu_dma_init_domain() is entered with the expected values:
+> 
+> base == 0
+> size == 0x100_0000_0000
+> 
+> However, the iommu layer ends up generating IOVA addresses that have
+> bits [47:40] set (which is what the MMU-500 supports). Looking closer,
+> this is not surprising, given that the end_pfn variable that is
+> calculated in iommu_dma_init_domain() is no longer used after Zhen's
+> patch aa3ac9469c185 ("iommu/iova: Make dma_32bit_pfn implicit") was
+> applied.
+> 
+> So effectively, this is a regression, and I would like your help
+> figuring out how to go about fixing this.
 
-Fix other missing properties (like clocks, supply, clock latency) as
-well to make it all work.
+Note that the size passed to iommu_dma_init_domain() has *never* been 
+any kind of enforced limit, so nothing is actually regressing here. If 
+the device master interface is natively >40 bits wide (such that the 
+driver would expect to set a larger DMA mask) and the restriction is 
+purely in the interconnect between device and SMMU, then that's the case 
+which has always been broken.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/boot/dts/imx6dl.dtsi      | 23 ++++++++++
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 66 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi       | 87 ++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/imx7d.dtsi       |  5 +++
- 4 files changed, 178 insertions(+), 3 deletions(-)
+I do have a long-standing plan of attack for fixing the underlying issue 
+(of actually enforcing any dma mask restriction described by IORT or DT 
+"dma-ranges"), but it's one of those things that's tied to a whole bunch 
+of other rework and fixes in order to be viable. I'm about to go off on 
+holiday for a while but I should hopefully have the bandwidth to start 
+looking at this seriously once I get back (frankly it's been getting 
+bumped down my to-do list for far too long now...)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index b384913c34dd..cc8ffc42d128 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -50,6 +50,29 @@
- 			device_type = "cpu";
- 			reg = <1>;
- 			next-level-cache = <&L2>;
-+			operating-points = <
-+				/* kHz    uV */
-+				996000  1250000
-+				792000  1175000
-+				396000  1150000
-+			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz  SOC-PU uV */
-+				996000	1175000
-+				792000	1175000
-+				396000	1175000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX6QDL_CLK_ARM>,
-+				 <&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-+				 <&clks IMX6QDL_CLK_STEP>,
-+				 <&clks IMX6QDL_CLK_PLL1_SW>,
-+				 <&clks IMX6QDL_CLK_PLL1_SYS>;
-+			clock-names = "arm", "pll2_pfd2_396m", "step",
-+				      "pll1_sw", "pll1_sys";
-+			arm-supply = <&reg_arm>;
-+			pu-supply = <&reg_pu>;
-+			soc-supply = <&reg_soc>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 65ef4cacbc71..18ae4f3be6e3 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -187,6 +187,72 @@
- 	>;
- };
- 
-+&cpu1 {
-+	/*
-+	 * Although the imx6q fuse indicates that 1.2GHz operation is possible,
-+	 * the module behaves unstable at this frequency. Hence, remove the
-+	 * 1.2GHz operation point here.
-+	 */
-+	operating-points = <
-+		/* kHz	uV */
-+		996000	1250000
-+		852000	1250000
-+		792000	1175000
-+		396000	975000
-+	>;
-+	fsl,soc-operating-points = <
-+		/* ARM kHz	SOC-PU uV */
-+		996000		1250000
-+		852000		1250000
-+		792000		1175000
-+		396000		1175000
-+	>;
-+};
-+
-+&cpu2 {
-+	/*
-+	 * Although the imx6q fuse indicates that 1.2GHz operation is possible,
-+	 * the module behaves unstable at this frequency. Hence, remove the
-+	 * 1.2GHz operation point here.
-+	 */
-+	operating-points = <
-+		/* kHz	uV */
-+		996000	1250000
-+		852000	1250000
-+		792000	1175000
-+		396000	975000
-+	>;
-+	fsl,soc-operating-points = <
-+		/* ARM kHz	SOC-PU uV */
-+		996000		1250000
-+		852000		1250000
-+		792000		1175000
-+		396000		1175000
-+	>;
-+};
-+
-+&cpu3 {
-+	/*
-+	 * Although the imx6q fuse indicates that 1.2GHz operation is possible,
-+	 * the module behaves unstable at this frequency. Hence, remove the
-+	 * 1.2GHz operation point here.
-+	 */
-+	operating-points = <
-+		/* kHz	uV */
-+		996000	1250000
-+		852000	1250000
-+		792000	1175000
-+		396000	975000
-+	>;
-+	fsl,soc-operating-points = <
-+		/* ARM kHz	SOC-PU uV */
-+		996000		1250000
-+		852000		1250000
-+		792000		1175000
-+		396000		1175000
-+	>;
-+};
-+
- &ecspi1 {
- 	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 70483ce72ba6..78b89bb1bfed 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -50,25 +50,106 @@
- 			soc-supply = <&reg_soc>;
- 		};
- 
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
- 			reg = <1>;
- 			next-level-cache = <&L2>;
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1275000
-+				996000  1250000
-+				852000  1250000
-+				792000  1175000
-+				396000  975000
-+			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz  SOC-PU uV */
-+				1200000 1275000
-+				996000	1250000
-+				852000	1250000
-+				792000	1175000
-+				396000	1175000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX6QDL_CLK_ARM>,
-+				 <&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-+				 <&clks IMX6QDL_CLK_STEP>,
-+				 <&clks IMX6QDL_CLK_PLL1_SW>,
-+				 <&clks IMX6QDL_CLK_PLL1_SYS>;
-+			clock-names = "arm", "pll2_pfd2_396m", "step",
-+				      "pll1_sw", "pll1_sys";
-+			arm-supply = <&reg_arm>;
-+			pu-supply = <&reg_pu>;
-+			soc-supply = <&reg_soc>;
- 		};
- 
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
- 			reg = <2>;
- 			next-level-cache = <&L2>;
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1275000
-+				996000  1250000
-+				852000  1250000
-+				792000  1175000
-+				396000  975000
-+			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz  SOC-PU uV */
-+				1200000 1275000
-+				996000	1250000
-+				852000	1250000
-+				792000	1175000
-+				396000	1175000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX6QDL_CLK_ARM>,
-+				 <&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-+				 <&clks IMX6QDL_CLK_STEP>,
-+				 <&clks IMX6QDL_CLK_PLL1_SW>,
-+				 <&clks IMX6QDL_CLK_PLL1_SYS>;
-+			clock-names = "arm", "pll2_pfd2_396m", "step",
-+				      "pll1_sw", "pll1_sys";
-+			arm-supply = <&reg_arm>;
-+			pu-supply = <&reg_pu>;
-+			soc-supply = <&reg_soc>;
- 		};
- 
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
- 			reg = <3>;
- 			next-level-cache = <&L2>;
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1275000
-+				996000  1250000
-+				852000  1250000
-+				792000  1175000
-+				396000  975000
-+			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz  SOC-PU uV */
-+				1200000 1275000
-+				996000	1250000
-+				852000	1250000
-+				792000	1175000
-+				396000	1175000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX6QDL_CLK_ARM>,
-+				 <&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-+				 <&clks IMX6QDL_CLK_STEP>,
-+				 <&clks IMX6QDL_CLK_PLL1_SW>,
-+				 <&clks IMX6QDL_CLK_PLL1_SYS>;
-+			clock-names = "arm", "pll2_pfd2_396m", "step",
-+				      "pll1_sw", "pll1_sys";
-+			arm-supply = <&reg_arm>;
-+			pu-supply = <&reg_pu>;
-+			soc-supply = <&reg_soc>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 4c9877ec29f2..5434a8aa5602 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -21,6 +21,11 @@
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <1>;
-+			operating-points = <
-+				/* KHz	uV */
-+				996000	1075000
-+				792000	975000
-+			>;
- 			clock-frequency = <996000000>;
- 		};
- 	};
--- 
-2.15.0.194.g9af6a3dea062
+Robin.
