@@ -1,46 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 May 2018 11:18:55 +0100
-Subject: [PATCHv4 06/10] arm64: add basic pointer authentication support
-In-Reply-To: <114d65a8-ffa5-7061-864a-a32aa3baa5c5@arm.com>
-References: <20180503132031.25705-1-mark.rutland@arm.com>
- <20180503132031.25705-7-mark.rutland@arm.com>
- <114d65a8-ffa5-7061-864a-a32aa3baa5c5@arm.com>
-Message-ID: <20180525101855.szjk4zfavi4omm55@lakrids.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 25 May 2018 11:25:34 +0100
+Subject: [PATCH v4 04/26] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <89769f8d-2ed0-1eb7-0373-09fc25f8071a@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+ <1527241772-48007-5-git-send-email-julien.thierry@arm.com>
+ <89769f8d-2ed0-1eb7-0373-09fc25f8071a@arm.com>
+Message-ID: <7e579de3-cab2-0677-a3d0-d150ee72f839@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2018 at 09:42:56AM +0100, Suzuki K Poulose wrote:
-> On 03/05/18 14:20, Mark Rutland wrote:
-> > +#define __ptrauth_key_install(k, v)			\
-> > +do {							\
-> > +	write_sysreg_s(v.lo, SYS_ ## k ## KEYLO_EL1);	\
-> > +	write_sysreg_s(v.hi, SYS_ ## k ## KEYHI_EL1);	\
-> > +} while (0)
+
+
+On 25/05/18 11:00, Suzuki K Poulose wrote:
+> On 25/05/18 10:49, Julien Thierry wrote:
+>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>
+>> Currently alternatives are applied very late in the boot process (and
+>> a long time after we enable scheduling). Some alternative sequences,
+>> such as those that alter the way CPU context is stored, must be applied
+>> much earlier in the boot sequence.
+>>
+>> Introduce apply_boot_alternatives() to allow some alternatives to be
+>> applied immediately after we detect the CPU features of the boot CPU.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> [julien.thierry at arm.com: rename to fit new cpufeature framework better,
+>> ???????????? apply BOOT_SCOPE feature early in boot]
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> ? arch/arm64/include/asm/alternative.h |? 3 +--
+>> ? arch/arm64/include/asm/cpufeature.h? |? 2 ++
+>> ? arch/arm64/kernel/alternative.c????? | 30 
+>> +++++++++++++++++++++++++++---
+>> ? arch/arm64/kernel/cpufeature.c?????? |? 5 +++++
+>> ? arch/arm64/kernel/smp.c????????????? |? 7 +++++++
+>> ? 5 files changed, 42 insertions(+), 5 deletions(-)
+>>
 > 
-> I think it might be safer to have parentheses around v, to prevent
-> something like __ptrauth_key_install(APIA, *key_val) work fine.
-
-In case v is ever an expression with side-effects, I've made this:
-
-#define __ptrauth_key_install(k, v)				\
-do {								\
-	struct ptrauth_key __pki_v = (v);			\
-	write_sysreg_s(__pki_v.lo, SYS_ ## k ## KEYLO_EL1);	\
-	write_sysreg_s(__pki_v.hi, SYS_ ## k ## KEYHI_EL1);	\
-} while (0)
-
-... though I could just move the raw sysreg accesses into
-ptrauth_keys_switch() for now.
-
-[...]
-
-> > +#ifdef CONFIG_ARM64_PNTR_AUTH
-> > +	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_APA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_APIA),
-> > +#endif
+> ...
 > 
-> Did you mean CONFIG_ARM64_PTR_AUTH here ?
+>> +unsigned long boot_capabilities;
+>> +
+>> ? /*
+>> ?? * Flag to indicate if we have computed the system wide
+>> ?? * capabilities based on the boot time active CPUs. This
+>> @@ -1370,6 +1372,9 @@ static void __update_cpu_capabilities(const 
+>> struct arm64_cpu_capabilities *caps,
+>> ????????? if (!cpus_have_cap(caps->capability) && caps->desc)
+>> ????????????? pr_info("%s %s\n", info, caps->desc);
+>> ????????? cpus_set_cap(caps->capability);
+>> +
+>> +??????? if (scope_mask & SCOPE_BOOT_CPU)
+>> +??????????? __set_bit(caps->capability, &boot_capabilities);
+> 
+> Julien
+> 
+> I think this check is problematic. The scope_mask passed on by the boot CPU
+> is (SCOPE_BOOT_CPU | SCOPE_LOCAL_CPU) to cover both BOOT CPU 
+> capabilities *and*
+> CPU local capabilites on the boot CPU. So, you might apply the 
+> alternatives for
+> a "local" CPU erratum, which is not intended. You may change the above 
+> check to :
+> 
+>  ????if (caps->type & SCOPE_BOOT_CPU)
+> 
+> to make sure you check the "capability" has the SCOPE_BOOT_CPU set.
+> 
 
-Yes; fixed now.
+Makes sense, I'll do that.
 
 Thanks,
-Mark.
+
+-- 
+Julien Thierry
