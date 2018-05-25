@@ -1,67 +1,65 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:16 +0100
-Subject: [PATCH v4 10/26] arm64: Delay daif masking for user return
+Date: Fri, 25 May 2018 10:49:14 +0100
+Subject: [PATCH v4 08/26] arm64: daifflags: Use irqflags functions for
+ daifflags
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-11-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-9-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Masking daif flags is done very early before returning to EL0.
+Some of the work done in daifflags save/restore is already provided
+by irqflags functions. Daifflags should always be a superset of irqflags
+(it handles irq status + status of other flags). Modifying behaviour of
+irqflags should alter the behaviour of daifflags.
 
-Only toggle the interrupt masking while in the vector entry and mask daif
-once in kernel_exit.
+Use irqflags_save/restore functions for the corresponding daifflags
+operation.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: James Morse <james.morse@arm.com>
 ---
- arch/arm64/kernel/entry.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/daifflags.h | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index ec2ee72..20252d5 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -240,9 +240,9 @@ alternative_else_nop_endif
- 	.endm
- 
- 	.macro	kernel_exit, el
--	.if	\el != 0
- 	disable_daif
- 
-+	.if	\el != 0
- 	/* Restore the task's original addr_limit. */
- 	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
- 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
-@@ -872,7 +872,7 @@ ENDPROC(el0_error)
-  * and this includes saving x0 back into the kernel stack.
-  */
- ret_fast_syscall:
--	disable_daif
-+	disable_irq				// disable interrupts
- 	str	x0, [sp, #S_X0]			// returned x0
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
- 	and	x2, x1, #_TIF_SYSCALL_WORK
-@@ -882,7 +882,7 @@ ret_fast_syscall:
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
- ret_fast_syscall_trace:
--	enable_daif
-+	enable_irq				// enable interrupts
- 	b	__sys_trace_return_skipped	// we already saved x0
- 
- /*
-@@ -900,7 +900,7 @@ work_pending:
-  * "slow" syscall return path.
-  */
- ret_to_user:
--	disable_daif
-+	disable_irq				// disable interrupts
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
--- 
+Note:
+A latter patch changes the behaviour of arch_local_flags but the daif
+flag still need to follow the semantics of arch_local_flags.
+
+diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
+index 22e4c83..8d91f22 100644
+--- a/arch/arm64/include/asm/daifflags.h
++++ b/arch/arm64/include/asm/daifflags.h
+@@ -36,11 +36,8 @@ static inline unsigned long local_daif_save(void)
+ {
+ 	unsigned long flags;
+
+-	asm volatile(
+-		"mrs	%0, daif		// local_daif_save\n"
+-		: "=r" (flags)
+-		:
+-		: "memory");
++	flags = arch_local_save_flags();
++
+ 	local_daif_mask();
+
+ 	return flags;
+@@ -60,11 +57,9 @@ static inline void local_daif_restore(unsigned long flags)
+ {
+ 	if (!arch_irqs_disabled_flags(flags))
+ 		trace_hardirqs_on();
+-	asm volatile(
+-		"msr	daif, %0		// local_daif_restore"
+-		:
+-		: "r" (flags)
+-		: "memory");
++
++	arch_local_irq_restore(flags);
++
+ 	if (arch_irqs_disabled_flags(flags))
+ 		trace_hardirqs_off();
+ }
+--
 1.9.1
