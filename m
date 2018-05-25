@@ -1,232 +1,115 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:30 +0100
-Subject: [PATCH v4 24/26] irqchip/gic-v3: Add base support for pseudo-NMI
+Date: Fri, 25 May 2018 10:49:32 +0100
+Subject: [PATCH v4 26/26] irqchip/gic-v3: Allow interrupts to be set as
+ pseudo-NMI
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-25-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-27-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a higher priority to be used for pseudo-NMIs. When such an
-interrupt is received, enter the NMI state and prevent other NMIs to
-be raised.
-
-When returning from a pseudo-NMI, skip preemption and tracing if the
-interrupted context has interrupts disabled.
+Provide a way to set a GICv3 interrupt as pseudo-NMI. The interrupt
+must not be enabled when setting/clearing the NMI status of the interrupt.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h   |  6 ++++++
- arch/arm64/include/asm/arch_gicv3.h |  6 ++++++
- arch/arm64/kernel/entry.S           | 43 +++++++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic-v3.c        | 41 +++++++++++++++++++++++++++++++++++
- 4 files changed, 96 insertions(+)
+ drivers/irqchip/irq-gic-v3.c | 54 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/interrupt.h    |  1 +
+ 2 files changed, 55 insertions(+)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index b39d620..1ed0476 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -374,5 +374,11 @@ static inline void gic_start_pmr_masking(void)
- 	WARN_ON(true);
- }
- 
-+static inline void gic_set_nmi_active(void)
-+{
-+	/* Should not get called */
-+	WARN_ON(true);
-+}
-+
- #endif /* !__ASSEMBLY__ */
- #endif /* !__ASM_ARCH_GICV3_H */
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 23c88ac0..3196cf1 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -166,5 +166,11 @@ static inline void gic_start_pmr_masking(void)
- 	asm volatile ("msr daifclr, #2" : : : "memory");
- }
- 
-+/* Notify an NMI is active, blocking other NMIs */
-+static inline void gic_set_nmi_active(void)
-+{
-+	asm volatile ("msr daifset, #2" : : : "memory");
-+}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f56f27e..0d0c829 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -391,6 +391,16 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
- 	mov	sp, x19
- 	.endm
- 
-+	/* Should be checked on return from irq handlers */
-+	.macro	branch_if_was_nmi, tmp, target
-+	alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	mrs	\tmp, daif
-+	alternative_else
-+	mov	\tmp, #0
-+	alternative_endif
-+	tbnz	\tmp, #7, \target // Exiting an NMI
-+	.endm
-+
- /*
-  * These are the registers used in the syscall handler, and allow us to
-  * have in theory up to 7 arguments to a function - x0 to x6.
-@@ -611,12 +621,30 @@ ENDPROC(el1_sync)
- el1_irq:
- 	kernel_entry 1
- 	enable_da_f
-+
- #ifdef CONFIG_TRACE_IRQFLAGS
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	ldr	x20, [sp, #S_PMR_SAVE]
-+	/* Irqs were disabled, don't trace */
-+	tbz	x20, ICC_PMR_EL1_EN_SHIFT, 1f
-+#endif
- 	bl	trace_hardirqs_off
-+1:
- #endif
- 
- 	irq_handler
- 
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/*
-+	 * Irqs were disabled, we have an nmi.
-+	 * We might have interrupted a context with interrupt disabled that set
-+	 * NEED_RESCHED flag.
-+	 * Skip preemption and irq tracing if needed.
-+	 */
-+	tbz	x20, ICC_PMR_EL1_EN_SHIFT, untraced_irq_exit
-+	branch_if_was_nmi x0, skip_preempt
-+#endif
-+
- #ifdef CONFIG_PREEMPT
- 	ldr	w24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
- 	cbnz	w24, 1f				// preempt count != 0
-@@ -625,9 +653,13 @@ el1_irq:
- 	bl	el1_preempt
- 1:
- #endif
-+
-+skip_preempt:
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_on
- #endif
-+
-+untraced_irq_exit:
- 	kernel_exit 1
- ENDPROC(el1_irq)
- 
-@@ -858,6 +890,9 @@ el0_irq_naked:
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_on
- #endif
-+
-+	branch_if_was_nmi x2, nmi_ret_to_user
-+
- 	b	ret_to_user
- ENDPROC(el0_irq)
- 
-@@ -1353,3 +1388,11 @@ alternative_else_nop_endif
- ENDPROC(__sdei_asm_handler)
- NOKPROBE(__sdei_asm_handler)
- #endif /* CONFIG_ARM_SDE_INTERFACE */
-+
-+/*
-+ * NMI return path to EL0
-+ */
-+nmi_ret_to_user:
-+	ldr	x1, [tsk, #TSK_TI_FLAGS]
-+	b	finish_ret_to_user
-+ENDPROC(nmi_ret_to_user)
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b144f73..4be5996 100644
+index fa23d12..cea1000 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
-@@ -41,6 +41,8 @@
- 
- #include "irq-gic-common.h"
- 
-+#define GICD_INT_NMI_PRI		0xa0
-+
- struct redist_region {
- 	void __iomem		*redist_base;
- 	phys_addr_t		phys_base;
-@@ -253,6 +255,12 @@ static inline bool arch_uses_gic_prios(void)
- 	return IS_ENABLED(CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS);
+@@ -305,6 +305,43 @@ static void handle_percpu_devid_nmi(struct irq_desc *desc)
+ 		chip->irq_eoi(&desc->irq_data);
  }
  
-+static inline bool gic_supports_nmi(void)
++static int gic_irq_set_irqchip_prio(struct irq_data *d, bool val)
 +{
-+	return arch_uses_gic_prios()
-+	       && static_branch_likely(&have_non_secure_prio_view);
++	u8 prio;
++	irq_flow_handler_t handler;
++
++	if (gic_peek_irq(d, GICD_ISENABLER)) {
++		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
++		return -EPERM;
++	}
++
++	if (val) {
++		prio = GICD_INT_NMI_PRI;
++
++		if (gic_irq(d) < 32)
++			handler = handle_percpu_devid_nmi;
++		else
++			handler = handle_fasteoi_nmi;
++	} else {
++		prio = GICD_INT_DEF_PRI;
++
++		if (gic_irq(d) < 32)
++			handler = handle_percpu_devid_irq;
++		else
++			handler = handle_fasteoi_irq;
++	}
++
++	/*
++	 * Already in a locked context for the desc from calling
++	 * irq_set_irq_chip_state.
++	 * It should be safe to simply modify the handler.
++	 */
++	irq_to_desc(d->irq)->handle_irq = handler;
++	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), prio);
++
++	return 0;
 +}
 +
  static int gic_irq_set_irqchip_state(struct irq_data *d,
  				     enum irqchip_irq_state which, bool val)
  {
-@@ -371,6 +379,20 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
- 	return aff;
- }
+@@ -326,6 +363,16 @@ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
+ 		break;
  
-+static void do_handle_nmi(unsigned int hwirq, struct pt_regs *regs)
-+{
-+	struct pt_regs *old_regs = set_irq_regs(regs);
-+	unsigned int irq;
-+
-+	nmi_enter();
-+
-+	irq = irq_find_mapping(gic_data.domain, hwirq);
-+	generic_handle_irq(irq);
-+
-+	nmi_exit();
-+	set_irq_regs(old_regs);
-+}
-+
- static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqnr;
-@@ -386,6 +408,23 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
- 		int err;
- 
-+		if (gic_supports_nmi()
-+		    && unlikely(gic_read_rpr() == GICD_INT_NMI_PRI)) {
-+			/*
-+			 * We need to prevent other NMIs to occur even after a
-+			 * priority drop.
-+			 * We keep I flag set until cpsr is restored from
-+			 * kernel_exit.
-+			 */
-+			gic_set_nmi_active();
-+
-+			if (static_branch_likely(&supports_deactivate_key))
-+				gic_write_eoir(irqnr);
-+
-+			do_handle_nmi(irqnr, regs);
-+			return;
++	case IRQCHIP_STATE_NMI:
++		if (gic_supports_nmi()) {
++			return gic_irq_set_irqchip_prio(d, val);
++		} else if (val) {
++			pr_warn("Failed to set IRQ %u as NMI, NMIs are unsupported\n",
++				gic_irq(d));
++			return -EINVAL;
 +		}
++		return 0;
 +
- 		if (static_branch_likely(&supports_deactivate_key))
- 			gic_write_eoir(irqnr);
- 		else if (!arch_uses_gic_prios())
-@@ -1183,6 +1222,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 	if (arch_uses_gic_prios()) {
- 		if (!gic_has_group0() || gic_dist_security_disabled())
- 			static_branch_enable(&have_non_secure_prio_view);
-+		else
-+			pr_warn("SCR_EL3.FIQ set, cannot enable use of pseudo-NMIs\n");
+ 	default:
+ 		return -EINVAL;
  	}
+@@ -353,6 +400,13 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+ 		*val = !gic_peek_irq(d, GICD_ISENABLER);
+ 		break;
  
- 	return 0;
++	case IRQCHIP_STATE_NMI:
++		if (!gic_supports_nmi())
++			return -EINVAL;
++		*val = (gic_get_irq_prio(gic_irq(d), gic_dist_base(d)) ==
++			GICD_INT_NMI_PRI);
++		break;
++
+ 	default:
+ 		return -EINVAL;
+ 	}
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index 5426627..02c794f 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -419,6 +419,7 @@ enum irqchip_irq_state {
+ 	IRQCHIP_STATE_ACTIVE,		/* Is interrupt in progress? */
+ 	IRQCHIP_STATE_MASKED,		/* Is interrupt masked? */
+ 	IRQCHIP_STATE_LINE_LEVEL,	/* Is IRQ line high? */
++	IRQCHIP_STATE_NMI,		/* Is IRQ an NMI? */
+ };
+ 
+ extern int irq_get_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
 -- 
 1.9.1
