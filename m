@@ -1,285 +1,34 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 25 May 2018 13:46:00 +0200
-Subject: [PATCH 15/15] arm: dts: imx: Add missing OPP properties for CPUs
-In-Reply-To: <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
-Message-ID: <1527248760.3472.6.camel@pengutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 25 May 2018 12:47:46 +0100
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524181834.GF4828@sirena.org.uk>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524181834.GF4828@sirena.org.uk>
+Message-ID: <5c0831eb-dcdc-af27-fc4f-5c5018297287@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-Am Freitag, den 25.05.2018, 16:02 +0530 schrieb Viresh Kumar:
-> The OPP properties, like "operating-points", should either be present
-> for all the CPUs of a cluster or none. If these are present only for a
-> subset of CPUs of a cluster then things will start falling apart as soon
-> as the CPUs are brought online in a different order. For example, this
-> will happen because the operating system looks for such properties in
-> the CPU node it is trying to bring up, so that it can create an OPP
-> table.
+On 24/05/18 19:18, Mark Brown wrote:
+> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
 > 
-> Add such missing properties.
+>> Subsystems or drivers may opt-in to this behavior by calling
+>> driver_deferred_probe_check_init_done() instead of just returning
+>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>> config to decide whether to continue to defer probe or not.
 > 
-> Fix other missing properties (like clocks, supply, clock latency) as
-> well to make it all work.
+> Should userspace have some involvement in this decision?  It knows if
+> it's got any intention of loading modules for example.  Kernel config
+> checks might be good enough, though it's going to be a pain to work out
+> if the relevant driver is built as a module for example.
 
-This is a lot of duplicate information for what is effectively a shared
- cluster wide thing. This does absolutely not _feel_ right.
+Arguably userspace has some control over that already, as in many cases 
+it can just unbind and reprobe the consumer driver after loading the 
+provider driver (in my silly IOMMU-drivers-as-modules PoC a while ago I 
+was delighted to find that it can really be that simple). It's a bit 
+harder when the device is the primary console or root filesystem, but I 
+think that's effectively just another variant of the "defer until a 
+module is loaded" chicken-and-egg problem.
 
-What problem are you solving here? Why do we need all this duplicate
-information? Why can't we fix it by falling back to looking at cpu0 if
-needed?
-
-Regards,
-Lucas
-
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> ?arch/arm/boot/dts/imx6dl.dtsi??????| 23 ++++++++++
-> ?arch/arm/boot/dts/imx6q-cm-fx6.dts | 66 +++++++++++++++++++++++++++++
-> ?arch/arm/boot/dts/imx6q.dtsi???????| 87 ++++++++++++++++++++++++++++++++++++--
-> ?arch/arm/boot/dts/imx7d.dtsi???????|??5 +++
-> ?4 files changed, 178 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> index b384913c34dd..cc8ffc42d128 100644
-> --- a/arch/arm/boot/dts/imx6dl.dtsi
-> +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> @@ -50,6 +50,29 @@
-> > ?			device_type = "cpu";
-> > ?			reg = <1>;
-> > ?			next-level-cache = <&L2>;
-> > +			operating-points = <
-> > +				/* kHz????uV */
-> > +				996000??1250000
-> > +				792000??1175000
-> > +				396000??1150000
-> > +			>;
-> > +			fsl,soc-operating-points = <
-> > +				/* ARM kHz??SOC-PU uV */
-> > > +				996000	1175000
-> > > +				792000	1175000
-> > > +				396000	1175000
-> > +			>;
-> > +			clock-latency = <61036>; /* two CLK32 periods */
-> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
-> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-> > +				?<&clks IMX6QDL_CLK_STEP>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
-> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
-> > +				??????"pll1_sw", "pll1_sys";
-> > +			arm-supply = <&reg_arm>;
-> > +			pu-supply = <&reg_pu>;
-> > +			soc-supply = <&reg_soc>;
-> > ?		};
-> > ?	};
-> ?
-> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-> index 65ef4cacbc71..18ae4f3be6e3 100644
-> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-> @@ -187,6 +187,72 @@
-> > ?	>;
-> ?};
-> ?
-> +&cpu1 {
-> > +	/*
-> > +	?* Although the imx6q fuse indicates that 1.2GHz operation is possible,
-> > +	?* the module behaves unstable at this frequency. Hence, remove the
-> > +	?* 1.2GHz operation point here.
-> > +	?*/
-> > +	operating-points = <
-> > > +		/* kHz	uV */
-> > > +		996000	1250000
-> > > +		852000	1250000
-> > > +		792000	1175000
-> > > +		396000	975000
-> > +	>;
-> > +	fsl,soc-operating-points = <
-> > > +		/* ARM kHz	SOC-PU uV */
-> > > +		996000		1250000
-> > > +		852000		1250000
-> > > +		792000		1175000
-> > > +		396000		1175000
-> > +	>;
-> +};
-> +
-> +&cpu2 {
-> > +	/*
-> > +	?* Although the imx6q fuse indicates that 1.2GHz operation is possible,
-> > +	?* the module behaves unstable at this frequency. Hence, remove the
-> > +	?* 1.2GHz operation point here.
-> > +	?*/
-> > +	operating-points = <
-> > > +		/* kHz	uV */
-> > > +		996000	1250000
-> > > +		852000	1250000
-> > > +		792000	1175000
-> > > +		396000	975000
-> > +	>;
-> > +	fsl,soc-operating-points = <
-> > > +		/* ARM kHz	SOC-PU uV */
-> > > +		996000		1250000
-> > > +		852000		1250000
-> > > +		792000		1175000
-> > > +		396000		1175000
-> > +	>;
-> +};
-> +
-> +&cpu3 {
-> > +	/*
-> > +	?* Although the imx6q fuse indicates that 1.2GHz operation is possible,
-> > +	?* the module behaves unstable at this frequency. Hence, remove the
-> > +	?* 1.2GHz operation point here.
-> > +	?*/
-> > +	operating-points = <
-> > > +		/* kHz	uV */
-> > > +		996000	1250000
-> > > +		852000	1250000
-> > > +		792000	1175000
-> > > +		396000	975000
-> > +	>;
-> > +	fsl,soc-operating-points = <
-> > > +		/* ARM kHz	SOC-PU uV */
-> > > +		996000		1250000
-> > > +		852000		1250000
-> > > +		792000		1175000
-> > > +		396000		1175000
-> > +	>;
-> +};
-> +
-> ?&ecspi1 {
-> > ?	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
-> > ?	pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 70483ce72ba6..78b89bb1bfed 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -50,25 +50,106 @@
-> > ?			soc-supply = <&reg_soc>;
-> > ?		};
-> ?
-> > -		cpu at 1 {
-> > > +		cpu1: cpu at 1 {
-> > ?			compatible = "arm,cortex-a9";
-> > ?			device_type = "cpu";
-> > ?			reg = <1>;
-> > ?			next-level-cache = <&L2>;
-> > +			operating-points = <
-> > +				/* kHz????uV */
-> > +				1200000 1275000
-> > +				996000??1250000
-> > +				852000??1250000
-> > +				792000??1175000
-> > +				396000??975000
-> > +			>;
-> > +			fsl,soc-operating-points = <
-> > +				/* ARM kHz??SOC-PU uV */
-> > +				1200000 1275000
-> > > +				996000	1250000
-> > > +				852000	1250000
-> > > +				792000	1175000
-> > > +				396000	1175000
-> > +			>;
-> > +			clock-latency = <61036>; /* two CLK32 periods */
-> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
-> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-> > +				?<&clks IMX6QDL_CLK_STEP>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
-> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
-> > +				??????"pll1_sw", "pll1_sys";
-> > +			arm-supply = <&reg_arm>;
-> > +			pu-supply = <&reg_pu>;
-> > +			soc-supply = <&reg_soc>;
-> > ?		};
-> ?
-> > -		cpu at 2 {
-> > > +		cpu2: cpu at 2 {
-> > ?			compatible = "arm,cortex-a9";
-> > ?			device_type = "cpu";
-> > ?			reg = <2>;
-> > ?			next-level-cache = <&L2>;
-> > +			operating-points = <
-> > +				/* kHz????uV */
-> > +				1200000 1275000
-> > +				996000??1250000
-> > +				852000??1250000
-> > +				792000??1175000
-> > +				396000??975000
-> > +			>;
-> > +			fsl,soc-operating-points = <
-> > +				/* ARM kHz??SOC-PU uV */
-> > +				1200000 1275000
-> > > +				996000	1250000
-> > > +				852000	1250000
-> > > +				792000	1175000
-> > > +				396000	1175000
-> > +			>;
-> > +			clock-latency = <61036>; /* two CLK32 periods */
-> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
-> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-> > +				?<&clks IMX6QDL_CLK_STEP>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
-> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
-> > +				??????"pll1_sw", "pll1_sys";
-> > +			arm-supply = <&reg_arm>;
-> > +			pu-supply = <&reg_pu>;
-> > +			soc-supply = <&reg_soc>;
-> > ?		};
-> ?
-> > -		cpu at 3 {
-> > > +		cpu3: cpu at 3 {
-> > ?			compatible = "arm,cortex-a9";
-> > ?			device_type = "cpu";
-> > ?			reg = <3>;
-> > ?			next-level-cache = <&L2>;
-> > +			operating-points = <
-> > +				/* kHz????uV */
-> > +				1200000 1275000
-> > +				996000??1250000
-> > +				852000??1250000
-> > +				792000??1175000
-> > +				396000??975000
-> > +			>;
-> > +			fsl,soc-operating-points = <
-> > +				/* ARM kHz??SOC-PU uV */
-> > +				1200000 1275000
-> > > +				996000	1250000
-> > > +				852000	1250000
-> > > +				792000	1175000
-> > > +				396000	1175000
-> > +			>;
-> > +			clock-latency = <61036>; /* two CLK32 periods */
-> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
-> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
-> > +				?<&clks IMX6QDL_CLK_STEP>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
-> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
-> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
-> > +				??????"pll1_sw", "pll1_sys";
-> > +			arm-supply = <&reg_arm>;
-> > +			pu-supply = <&reg_pu>;
-> > +			soc-supply = <&reg_soc>;
-> > ?		};
-> > ?	};
-> ?
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 4c9877ec29f2..5434a8aa5602 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -21,6 +21,11 @@
-> > ?			compatible = "arm,cortex-a7";
-> > ?			device_type = "cpu";
-> > ?			reg = <1>;
-> > +			operating-points = <
-> > > +				/* KHz	uV */
-> > > +				996000	1075000
-> > > +				792000	975000
-> > +			>;
-> > ?			clock-frequency = <996000000>;
-> > ?		};
-> > ?	};
+Robin.
