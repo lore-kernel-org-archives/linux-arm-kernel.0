@@ -1,56 +1,65 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 May 2018 10:52:12 +0100
-Subject: [PATCH v11 08/19] arm64: fpsimd: Eliminate task->mm checks
-In-Reply-To: <20180525090257.GB54529@C02W217FHV2R.local>
-References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
- <1527181008-13549-9-git-send-email-Dave.Martin@arm.com>
- <20180525090257.GB54529@C02W217FHV2R.local>
-Message-ID: <20180525095211.GB13470@e103592.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 25 May 2018 10:49:08 +0100
+Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ priority
+ masking
+In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:02:57AM +0200, Christoffer Dall wrote:
-> On Thu, May 24, 2018 at 05:56:37PM +0100, Dave Martin wrote:
-> > Currently the FPSIMD handling code uses the condition task->mm ==
-> > NULL as a hint that task has no FPSIMD register context.
-> > 
-> > The ->mm check is only there to filter out tasks that cannot
-> > possibly have FPSIMD context loaded, for optimisation purposes.
-> > Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
-> > saving FPSIMD context back to memory.  For these reasons, the ->mm
-> > checks are not useful, providing that TIF_FOREIGN_FPSTATE is
-> > maintained in a consistent way for all threads.
-> > 
-> > The context switch logic is already deliberately optimised to defer
-> > reloads of the regs until ret_to_user (or sigreturn as a special
-> > case), and save them only if they have been previously loaded.
-> > These paths are the only places where the wrong_task and wrong_cpu
-> > conditions can be made false, by calling fpsimd_bind_task_to_cpu().
-> > Kernel threads by definition never reach these paths.  As a result,
-> > the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
-> > always yield true for kernel threads.
-> > 
-> > This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
-> > task.  The fpsimd_flush_task_state() call already present in
-> > copy_thread() ensures the same for any new task.
-> 
-> nit: formatting still funny, but you shouldn't respin just for that.
+Add a cpufeature indicating whether a cpu supports masking interrupts
+by priority.
 
-Ah jeez... it was a long day.
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpucaps.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c   | 15 +++++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-I guess this isn't the end of the world, but I'll fix this in my branch
-and point Marc at it.
-
-> > 
-> > With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
-> > ensures that no extra context save work is added for kernel
-> > threads, and eliminates the redundant context saving that may
-> > currently occur for kernel threads that have acquired an mm via
-> > use_mm().
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-
-[...]
-
-Thanks
----Dave
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index bc51b72..cd8f9ed 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -48,7 +48,8 @@
+ #define ARM64_HAS_CACHE_IDC			27
+ #define ARM64_HAS_CACHE_DIC			28
+ #define ARM64_HW_DBM				29
++#define ARM64_HAS_IRQ_PRIO_MASKING		30
+ 
+-#define ARM64_NCAPS				30
++#define ARM64_NCAPS				31
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e03e897..a177104 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1202,6 +1202,21 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ 		.cpu_enable = cpu_enable_hw_dbm,
+ 	},
+ #endif
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	{
++		/*
++		 * Depends on having GICv3
++		 */
++		.desc = "IRQ priority masking",
++		.capability = ARM64_HAS_IRQ_PRIO_MASKING,
++		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
++		.matches = has_useable_gicv3_cpuif,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.field_pos = ID_AA64PFR0_GIC_SHIFT,
++		.sign = FTR_UNSIGNED,
++		.min_field_value = 1,
++	},
++#endif
+ 	{},
+ };
+ 
+-- 
+1.9.1
