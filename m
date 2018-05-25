@@ -1,93 +1,53 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 May 2018 15:39:03 +0100
-Subject: [PATCH v4 2/2] arm64: signal: Report signal frame size to
- userspace via auxv
-In-Reply-To: <20180525113251.GB3255@arm.com>
-References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
- <1527097616-25214-3-git-send-email-Dave.Martin@arm.com>
- <20180524124918.GG8689@arm.com>
- <20180524155516.GW13470@e103592.cambridge.arm.com>
- <20180524165045.GP8689@arm.com>
- <20180524170713.GY13470@e103592.cambridge.arm.com>
- <20180525113251.GB3255@arm.com>
-Message-ID: <20180525142050.GA22983@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 May 2018 07:51:20 -0700
+Subject: [GIT PULL] late omap soc changes for v4.18 merge window
+Message-ID: <pull-1527259829-686604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 12:32:51PM +0100, Will Deacon wrote:
-> On Thu, May 24, 2018 at 06:07:13PM +0100, Dave Martin wrote:
-> > On Thu, May 24, 2018 at 05:50:48PM +0100, Will Deacon wrote:
-> > > On Thu, May 24, 2018 at 04:55:17PM +0100, Dave Martin wrote:
-> > > > On Thu, May 24, 2018 at 01:49:21PM +0100, Will Deacon wrote:
-> > > > > On Wed, May 23, 2018 at 06:46:56PM +0100, Dave Martin wrote:
-> > > > > > @@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
-> > > > > >  		thread_flags = READ_ONCE(current_thread_info()->flags);
-> > > > > >  	} while (thread_flags & _TIF_WORK_MASK);
-> > > > > >  }
-> > > > > > +
-> > > > > > +unsigned long __ro_after_init signal_minsigstksz;
-> > > > > > +
-> > > > > > +/*
-> > > > > > + * Determine the stack space required for guaranteed signal devliery.
-> > > > > > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
-> > > > > > + * cpufeatures setup is assumed to be complete.
-> > > > > > + */
-> > > > > > +void __init minsigstksz_setup(void)
-> > > > > > +{
-> > > > > > +	struct rt_sigframe_user_layout user;
-> > > > > > +
-> > > > > > +	init_user_layout(&user);
-> > > > > > +
-> > > > > > +	/*
-> > > > > > +	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
-> > > > > > +	 * be big enough, but it's our best guess:
-> > > > > > +	 */
-> > > > > > +	if (WARN_ON(setup_sigframe_layout(&user, true)))
-> > > > > > +		signal_minsigstksz = SIGFRAME_MAXSZ;
-> > > > > 
-> > > > > Can we not leave signal_minsigstksz as zero in this case?
-> > > > 
-> > > > I prefer to distinguish the "kernel went wrong" case (where we just omit
-> > > > AT_MINSIGSTKSZ for backwards compatibilty) from the "sigframe too
-> > > > large" case.
-> > > 
-> > > Hmm, so I'm confused as to the distinction here. Wouldn't an allocation
-> > > failure in setup_sigframe_layout be indicative of "kernel went wrong"?
-> > > 
-> > > To put it another way, if we could determine the maximum sigframe size
-> > > at build time, surely we'd fail the build if SIGFRAME_MAXSZ wasn't big
-> > > enough? In that case, detecting this at runtime is also pretty bad (hence
-> > 
-> > Yup
-> 
-> Good, I was starting to worry I was missing something!
-> 
-> > > the WARN_ON) and I think we should drop the aux entry rather than provide
-> > > a value that is known to be incorrect.
-> > 
-> > Telling userspace the signal frame size is not optional: by omitting
-> > AT_MINSIGSTKSZ we implicitly tell userspace than MINSIGSTKSZ
-> > is sufficient.  But in this case we not only know that this is false, we
-> > know that SIGFRAME_MAXSZ is not sufficient either.  But we also know
-> > that SIGFRAME_MAXSZ is a closer estimate to the true requirement, because
-> > it's the larger value.
-> > 
-> > This falls under the heading of "being no more wrong than necessary".
-> 
-> I think I just prefer distinguishing between "AT_MINSIGSTKSZ isn't
-> present, I'll assume MINSIGSTKSZ is sufficient but it might not be" and
-> "AT_MINSIGSTKSZ is present, I know that it's sufficient".
-> 
-> > Either way, this is trying to paper over a kernel bug, by telling
-> > userspace something "sensible".  This may not be a sensible course
-> > of action...
-> > 
-> > So if you feel strongly I'm happy to not distinguish the two cases and
-> > just WARN() in minsigstksz_setup() as at present.
-> 
-> Yes, please.
+From: "Tony Lindgren" <tony@atomide.com>
 
-OK, will do.  This saves on explanations at least.
+The following changes since commit 3bb3799cd4233b7c24622ae8c41455fb27a55c0f:
 
-Cheers
----Dave
+  Merge branch 'omap-for-v4.18/soc-fixes' into omap-for-v4.18/soc (2018-05-21 10:34:17 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/soc-late-signed
+
+for you to fetch changes up to 759c27bdc77577aaecb6f31768e5951a858f97a9:
+
+  OMAP: CLK: CLKSRC: Add suspend resume hooks (2018-05-23 14:16:26 -0700)
+
+----------------------------------------------------------------
+Late omap soc changes for v4.18 merge window
+
+This series contains two omap1 ams-delta GPIO clean-up patches to get
+started with removal of hard-coded GPIO numbers from drivers. And then
+the removal of board mach includes from drivers. The second patch mostly
+touches the ams-delta audio driver but is included here because of the
+removal of the latch gpios and is acked by Mark Brown.
+
+And there are two more am437x related PM patches to save and restore
+control module and timer registers for RTC only suspend mode. Looks like
+the patch title for the timer changes is a bit misleading, not all the
+timer code is yet living under drivers/clocksource. But I had already
+pushed out the branch before I noticed this.
+
+----------------------------------------------------------------
+Janusz Krzysztofik (2):
+      ARM: OMAP1: ams-delta: add GPIO lookup tables
+      ASoC: ams_delta: use GPIO lookup table
+
+Keerthy (1):
+      OMAP: CLK: CLKSRC: Add suspend resume hooks
+
+Tero Kristo (1):
+      ARM: AM43XX: Add functions to save/restore am43xx control registers
+
+ arch/arm/mach-omap1/board-ams-delta.c | 107 ++++++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/control.c         | 112 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/control.h         |  61 ++++++++++++++++++
+ arch/arm/mach-omap2/timer.c           |  32 ++++++++++
+ sound/soc/omap/ams-delta.c            |  38 ++++++------
+ 5 files changed, 328 insertions(+), 22 deletions(-)
