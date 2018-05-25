@@ -1,22 +1,83 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 25 May 2018 09:30:59 -0400
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
- <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
- <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <984b9734-244d-04e9-946f-7524f148ff7c@codeaurora.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 25 May 2018 15:35:40 +0200
+Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
+ under at91-usart mfd
+In-Reply-To: <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-7-radu.pirea@microchip.com>
+ <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
+ <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
+ <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
+ <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
+Message-ID: <f817c82a-95b6-afb3-e662-c481a877cf01@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/24/2018 2:35 PM, Bjorn Helgaas wrote:
-> That sounds like a reasonable idea, and it is definitely another can
-> of worms.  I looked briefly at some of the .shutdown() cases:
+On 25/05/2018 14:17, Radu Pirea wrote:
+> 
+> 
+> On 05/15/2018 04:14 PM, Richard Genoud wrote:
+>> On 15/05/2018 14:47, Radu Pirea wrote:
+>>> On Mon, 2018-05-14 at 12:57 +0200, Richard Genoud wrote:
+>>>> After your patch, the DMA is not selected anymore:
+>>>> atmel_usart_serial atmel_usart_serial.0.auto: TX channel not
+>>>> available, switch to pio
+>>>> instead of:
+>>>> atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
+>>>>
+>>> Fixed.
+>>>> And the kernel doesn't log anymore on the serial console, despite the
+>>>> loglevel=8
+>>>> (after reverting this series, the kernel logs reappears on the serial
+>>>> console)
+>>>>
+>>> Which serial are you using as console?
+>> fffff200.serial (sam9g35-cm)
+>> ( stdout-path = "serial0:115200n8"; in the DTS )
+>>
+>> With this series applied, all the kernel log goes on the screen.
+>> Without, it goes on the serial debug.
+>>
+> I tested again with archlinux arm and poky-linux4sam release as distros
+> and kernel log goes on the serial debug. Can you give me more details
+> like cmdline?
+I used kernel 4.17-rc6
+at91_dt_defconfig
+at91sam9g35ek.dtb
 
-should we throw it into 4.18 and see what happens?
+Kernel command line: root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs
+( the one from the DTS )
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Detailed instructions:
+
+git checkout v4.17-rc6 
+ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 at91_dt_defconfig
+ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
+cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
+
+>From uboot:
+tftpboot 0x20007FC0 uImage
+tftpboot 0x26400000 at91sam9g35ek.dtb
+bootm 0x20007FC0 - 0x26400000
+
+[ I see the logs on the serial debug ]
+
+git am \[PATCH\ v3\ [1-6]*
+
+ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
+cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
+
+>From uboot:
+tftpboot 0x20007FC0 uImage
+tftpboot 0x26400000 at91sam9g35ek.dtb
+bootm 0x20007FC0 - 0x26400000
+
+[ I don't see the logs on the serial debug anymore ]
+
+
+>>>> (tests done on sam9g35)
+>>>>
+>>> I will consider the rest of suggestions.
+>>>> regards,
+>>>> Richard
+>>
