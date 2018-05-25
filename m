@@ -1,43 +1,78 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 25 May 2018 15:00:48 +0100
-Subject: [PATCH v3 05/15] ARM: spectre: add Kconfig symbol for CPUs vulnerable
- to Spectre
+Date: Fri, 25 May 2018 15:00:43 +0100
+Subject: [PATCH v3 04/15] ARM: bugs: add support for per-processor bug checking
 In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
 References: <20180525135938.GE17671@n2100.armlinux.org.uk>
-Message-ID: <E1fMDGy-0006ym-CZ@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fMDGt-0006yf-8k@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Kconfig symbol for CPUs which are vulnerable to the Spectre
-attacks.
+Add support for per-processor bug checking - each processor function
+descriptor gains a function pointer for this check, which must not be
+an __init function.  If non-NULL, this will be called whenever a CPU
+enters the kernel via which ever path (boot CPU, secondary CPU startup,
+CPU resuming, etc.)
+
+This allows processor specific bug checks to validate that workaround
+bits are properly enabled by firmware via all entry paths to the kernel.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mm/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/include/asm/proc-fns.h | 4 ++++
+ arch/arm/kernel/bugs.c          | 4 ++++
+ arch/arm/mm/proc-macros.S       | 3 ++-
+ 3 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 7f14acf67caf..6f3ef86b4cb7 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -415,6 +415,7 @@ config CPU_V7
- 	select CPU_CP15_MPU if !MMU
- 	select CPU_HAS_ASID if MMU
- 	select CPU_PABRT_V7
-+	select CPU_SPECTRE if MMU
- 	select CPU_THUMB_CAPABLE
- 	select CPU_TLB_V7 if MMU
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index f2e1af45bd6f..e25f4392e1b2 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -37,6 +37,10 @@ extern struct processor {
+ 	 */
+ 	void (*_proc_init)(void);
+ 	/*
++	 * Check for processor bugs
++	 */
++	void (*check_bugs)(void);
++	/*
+ 	 * Disable any processor specifics
+ 	 */
+ 	void (*_proc_fin)(void);
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+index 16e7ba2a9cc4..7be511310191 100644
+--- a/arch/arm/kernel/bugs.c
++++ b/arch/arm/kernel/bugs.c
+@@ -5,6 +5,10 @@
  
-@@ -826,6 +827,9 @@ config CPU_BPREDICT_DISABLE
- 	help
- 	  Say Y here to disable branch prediction.  If unsure, say N.
+ void check_other_bugs(void)
+ {
++#ifdef MULTI_CPU
++	if (processor.check_bugs)
++		processor.check_bugs();
++#endif
+ }
  
-+config CPU_SPECTRE
-+	bool
-+
- config TLS_REG_EMUL
- 	bool
- 	select NEED_KUSER_HELPERS
+ void __init check_bugs(void)
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index f10e31d0730a..81d0efb055c6 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -273,13 +273,14 @@
+ 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
+ 	.endm
+ 
+-.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
++.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
+ 	.type	\name\()_processor_functions, #object
+ 	.align 2
+ ENTRY(\name\()_processor_functions)
+ 	.word	\dabort
+ 	.word	\pabort
+ 	.word	cpu_\name\()_proc_init
++	.word	\bugs
+ 	.word	cpu_\name\()_proc_fin
+ 	.word	cpu_\name\()_reset
+ 	.word	cpu_\name\()_do_idle
 -- 
 2.7.4
