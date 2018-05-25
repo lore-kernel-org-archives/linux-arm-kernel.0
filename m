@@ -1,20 +1,16 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:15 +0100
-Subject: [PATCH v4 09/26] arm64: Use daifflag_restore after bp_hardening
+Date: Fri, 25 May 2018 10:49:16 +0100
+Subject: [PATCH v4 10/26] arm64: Delay daif masking for user return
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-10-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-11-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For EL0 entries requiring bp_hardening, daif status is kept at
-DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
-are enabled through local_irq_enable().
+Masking daif flags is done very early before returning to EL0.
 
-Before using local_irq_* functions, daifflags should be properly restored
-to a state where IRQs are enabled.
-
-Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
+Only toggle the interrupt masking while in the vector entry and mask daif
+once in kernel_exit.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -22,43 +18,50 @@ Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: James Morse <james.morse@arm.com>
 ---
- arch/arm64/mm/fault.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/entry.S | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Note:
-This doesn't introduce a real change in behaviour, but once PMR
-is used for interrupt masking, PSR.I bit needs to be cleared and
-local_irq_enable won't do that anymore.
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 4165485..7a18634 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -37,6 +37,7 @@
- #include <asm/cmpxchg.h>
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
-+#include <asm/daifflags.h>
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
- #include <asm/sysreg.h>
-@@ -712,7 +713,7 @@ asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
- 	if (addr > TASK_SIZE)
- 		arm64_apply_bp_hardening();
-
--	local_irq_enable();
-+	local_daif_restore(DAIF_PROCCTX);
- 	do_mem_abort(addr, esr, regs);
- }
-
-@@ -726,7 +727,7 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
- 	if (user_mode(regs)) {
- 		if (instruction_pointer(regs) > TASK_SIZE)
- 			arm64_apply_bp_hardening();
--		local_irq_enable();
-+		local_daif_restore(DAIF_PROCCTX);
- 	}
-
- 	info.si_signo = SIGBUS;
---
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index ec2ee72..20252d5 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -240,9 +240,9 @@ alternative_else_nop_endif
+ 	.endm
+ 
+ 	.macro	kernel_exit, el
+-	.if	\el != 0
+ 	disable_daif
+ 
++	.if	\el != 0
+ 	/* Restore the task's original addr_limit. */
+ 	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
+ 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
+@@ -872,7 +872,7 @@ ENDPROC(el0_error)
+  * and this includes saving x0 back into the kernel stack.
+  */
+ ret_fast_syscall:
+-	disable_daif
++	disable_irq				// disable interrupts
+ 	str	x0, [sp, #S_X0]			// returned x0
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+@@ -882,7 +882,7 @@ ret_fast_syscall:
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ret_fast_syscall_trace:
+-	enable_daif
++	enable_irq				// enable interrupts
+ 	b	__sys_trace_return_skipped	// we already saved x0
+ 
+ /*
+@@ -900,7 +900,7 @@ work_pending:
+  * "slow" syscall return path.
+  */
+ ret_to_user:
+-	disable_daif
++	disable_irq				// disable interrupts
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+-- 
 1.9.1
