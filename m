@@ -1,142 +1,102 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 May 2018 10:45:17 +0100
-Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
-In-Reply-To: <20180525090020.GA54529@C02W217FHV2R.local>
-References: <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
- <20180523114812.GH55598@C02W217FHV2R.local>
- <20180523133158.GJ13470@e103592.cambridge.arm.com>
- <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
- <20180523150337.GO13470@e103592.cambridge.arm.com>
- <20180524083350.GK55598@C02W217FHV2R.local>
- <20180524095056.GR13470@e103592.cambridge.arm.com>
- <20180524100659.GO55598@C02W217FHV2R.local>
- <20180524143714.GV13470@e103592.cambridge.arm.com>
- <20180525090020.GA54529@C02W217FHV2R.local>
-Message-ID: <20180525094515.GA13470@e103592.cambridge.arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 25 May 2018 10:47:43 +0100
+Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
+In-Reply-To: <5B077765.30703@huawei.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-14-jean-philippe.brucker@arm.com>
+ <5B0536A3.1000304@huawei.com> <cd13f60d-b282-3804-4ca7-2d34476c597f@arm.com>
+ <5B06B17C.1090809@huawei.com> <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
+ <5B077765.30703@huawei.com>
+Message-ID: <fea420ff-e738-e2ed-ab1e-a3f4dde4b6ef@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:00:20AM +0200, Christoffer Dall wrote:
-> On Thu, May 24, 2018 at 03:37:15PM +0100, Dave Martin wrote:
-> > On Thu, May 24, 2018 at 12:06:59PM +0200, Christoffer Dall wrote:
-> > > On Thu, May 24, 2018 at 10:50:56AM +0100, Dave Martin wrote:
-
-[...]
-
-> > > I'm not sure what the reader is to make of that.  Do you not mean the
-> > > TIF_FOREIGN_FPSTATE is always true for kernel threads?
-> > 
-> > Again, this is probably a red herring.  TIF_FOREIGN_FPSTATE is always
-> > true for kernel threads prior to the patch, except (randomly) for the
-> > init task.
+On 25/05/18 03:39, Xu Zaibo wrote:
+> Hi,
 > 
-> That was really what my initial question was about, and what I thought
-> the commit message should make abundantly clear, because that ties the
-> message together with the code.
-> 
-> > 
-> > This change is not really about TIF_FOREIGN_FPSTATE at all, rather
-> > that there is nothing to justify handling kernel threads differently,
-> > or even distinguishing kernel threads from user threads at all in this
-> > code.
-> 
-> Understood.
+> On 2018/5/24 23:04, Jean-Philippe Brucker wrote:
+>> On 24/05/18 13:35, Xu Zaibo wrote:
+>>>> Right, sva_init() must be called once for any device that intends to use
+>>>> bind(). For the second process though, group->sva_enabled will be true
+>>>> so we won't call sva_init() again, only bind().
+>>> Well, while I create mediated devices based on one parent device to support multiple
+>>> processes(a new process will create a new 'vfio_group' for the corresponding mediated device,
+>>> and 'sva_enabled' cannot work any more), in fact, *sva_init and *sva_shutdown are basically
+>>> working on parent device, so, as a result, I just only need sva initiation and shutdown on the
+>>> parent device only once. So I change the two as following:
+>>>
+>>> @@ -551,8 +565,18 @@ int iommu_sva_device_init(struct device *dev, unsigned long features,
+>>>        if (features & ~IOMMU_SVA_FEAT_IOPF)
+>>>           return -EINVAL;
+>>>
+>>> +    /* If already exists, do nothing  */
+>>> +    mutex_lock(&dev->iommu_param->lock);
+>>> +    if (dev->iommu_param->sva_param) {
+>>> +        mutex_unlock(&dev->iommu_param->lock);
+>>> +        return 0;
+>>> +    }
+>>> +    mutex_unlock(&dev->iommu_param->lock);
+>>>
+>>>       if (features & IOMMU_SVA_FEAT_IOPF) {
+>>>           ret = iommu_register_device_fault_handler(dev, iommu_queue_iopf,
+>>>
+>>>
+>>> @@ -621,6 +646,14 @@ int iommu_sva_device_shutdown(struct device *dev)
+>>>       if (!domain)
+>>>           return -ENODEV;
+>>>
+>>> +    /* If any other process is working on the device, shut down does nothing. */
+>>> +    mutex_lock(&dev->iommu_param->lock);
+>>> +    if (!list_empty(&dev->iommu_param->sva_param->mm_list)) {
+>>> +        mutex_unlock(&dev->iommu_param->lock);
+>>> +        return 0;
+>>> +    }
+>>> +    mutex_unlock(&dev->iommu_param->lock);
+>> I don't think iommu-sva.c is the best place for this, it's probably
+>> better to implement an intermediate layer (the mediating driver), that
+>> calls iommu_sva_device_init() and iommu_sva_device_shutdown() once. Then
+>> vfio-pci would still call these functions itself, but for mdev the
+>> mediating driver keeps a refcount of groups, and calls device_shutdown()
+>> only when freeing the last mdev.
+>>
+>> A device driver (non mdev in this example) expects to be able to free
+>> all its resources after sva_device_shutdown() returns. Imagine the
+>> mm_list isn't empty (mm_exit() is running late), and instead of waiting
+>> in unbind_dev_all() below, we return 0 immediately. Then the calling
+>> driver frees its resources, and the mm_exit callback along with private
+>> data passed to bind() disappear. If a mm_exit() is still running in
+>> parallel, then it will try to access freed data and corrupt memory. So
+>> in this function if mm_list isn't empty, the only thing we can do is wait.
+>>
+> I still don't understand why we should 'unbind_dev_all', is it possible 
+> to do a 'unbind_dev_pasid'?
 
-And my bad was that I hadn't gone to the effort of understanding my own
-argument -- I'd glad to be called out on that.
+Not in sva_device_shutdown(), it needs to clean up everything. For
+example you want to physically unplug the device, or assign it to a VM.
+To prevent any leak sva_device_shutdown() needs to remove all bonds. In
+theory there shouldn't be any, since either the driver did unbind_dev(),
+or all process exited. This is a safety net.
 
-> > Part of the confusion (and I had confused myself) comes from the fact
-> > that TIF_FOREIGN_FPSTATE is really a per-cpu property and doesn't make
-> > sense as a per-task property -- i.e., the flag is meaningless for
-> > scheduled-out tasks and we must explicitly "repair" it when scheduling
-> > a task in anyway.  I think it's a thread flag primarily so that it's
-> > convenient to check alongside other thread flags in the ret_to_user
-> > work loop.  This is somewhat less of a justification now that loop was
-> > ported to C.
-> > 
-> > > > 
-> > > > The context switch logic is already deliberately optimised to defer
-> > > > reloads of the regs until ret_to_user (or sigreturn as a special
-> > > > case), and save them only if they have been previously loaded.
-> > 
-> > Does it help to insert the following here?
-> > 
-> > "These paths are the only places where the wrong_task and wrong_cpu
-> > conditions can be made false, by calling fpsimd_bind_task_to_cpu()."
-> > 
-> 
-> yes it does.
-> 
-> > > > Kernel threads by definition never reach these paths.  As a result,
-> > > 
-> > > I'm struggling with the "As a result," here.  Is this because reloads of
-> > > regs in ret_to_user (or sigreturn) are the only places that can make
-> > > wrong_cpu or wrong_task be false?
-> > 
-> > See the proposed clarification above.  Is that sufficient?
-> > 
-> 
-> yes.
-> 
-> > > (I'm actually wanting to understand this, not just bikeshedding the
-> > > commit message, as new corner cases keep coming up on this logic.)
-> > 
-> > That's a good thing, and I would really like to explain it in a
-> > concise manner.  See [*] below for the "concise" explanation -- it may
-> > demonstrate why I've been evasive...
-> > 
-> 
-> I don't think you've been evasive at all, I just think we reason about
-> this in slightly different ways, and I was trying to convince myself why
-> this change is safe and summarize that concisely.  I think we've
-> accomplished both :)
+> Then we can do other things instead of waiting that user may not like. :)
 
-OK, good.  I reposted speculatively on this basis :)
+They may not like it, but it's for their own good :) At the moment we're
+waiting that:
 
-The commit message is in better shape now, and I very much appreciate
-you kicking the tyres on my reasoning!
+* All exit_mm() callback for this device have finished. If we don't wait
+  then the caller will free the private data passed to bind and the
+  mm_exit() callback while they are still being used.
 
-[...]
+* All page requests targeting this device are dealt with. If we don't
+  wait then some requests, that are lingering in the IOMMU PRI queue,
+  may hit the next contexts bound to this device, possibly in a
+  different VM. It may not be too risky (though probably exploitable in
+  some way), but is incredibly messy.
 
-> > As an aside, the big wall of text before the definition of struct
-> > fpsimd_last_state_struct is looking out of date and could use an
-> > update to cover at least some of what is explained in [*] better.
-> > 
-> > I'm currently considering that out of scope for this series, but I will
-> > keep it in mind to refresh it in the not too distant future.
-> > 
-> 
-> Fine with me.
+All of this is bounded in time, and normally should be over pretty fast
+unless the device driver's exit_mm() does something strange. If the
+driver did the right thing, there shouldn't be any wait here (although
+there may be one in unbind_dev() for the same reasons - prevent use
+after free).
 
-OK, good.
-
-[...]
-
-> > [*] The bigger picture:
-> > 
-> > * Consider a relation (C,T) between cpus C and tasks T, such that
-
-[...]
-
-> > but by assuming that the code is already well-optimised, "unnecessary"
-> > save/restore work will not be added.  If this were not the case, it
-> > could in any case be fixed independently.
-> > 
-> > The observation of this _series_ is that we don't need to do very
-> > much in order to be able to generalise the logic to accept KVM vcpus
-> > in place of T.
-> > 
-> 
-> Thanks for the explanation.
-> -Christoffer
-
-Was this reasonably understandable?  If so I could use it as a basis for
-improving the comment block in fpsimd.c, but I'd want to squash it down
-to the essentials.  It's pretty verbose as it stands.
-
-(What I'd really like to do it take an axe to the logic so that we
-end up with something that doesn't require anything like this amount
-of explanation ... but that's more of an aspiration right now.)
-
-Cheers
----Dave
+Thanks,
+Jean
