@@ -1,31 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 15:01:24 -0700
-Subject: [GIT PULL] Qualcomm Driver Fixes for 4.17-rc7
-In-Reply-To: <1527220509-23245-1-git-send-email-andy.gross@linaro.org>
-References: <1527220509-23245-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20180525220124.f3tv2bpkb54rga53@localhost>
+Date: Fri, 25 May 2018 15:26:49 -0700
+Subject: [PATCH 1/2] ARM: stm32: Don't select DMA unconditionally on
+ STM32MP157C
+In-Reply-To: <20180525160926.150713-1-arnd@arndb.de>
+References: <20180525160926.150713-1-arnd@arndb.de>
+Message-ID: <20180525222649.adxut6t7w53ugykx@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 10:55:09PM -0500, Andy Gross wrote:
-> The following changes since commit 771c577c23bac90597c685971d7297ea00f99d11:
+On Fri, May 25, 2018 at 06:09:13PM +0200, Arnd Bergmann wrote:
+> The patch that enabled these had no useful changelog that explains
+> why it is done, and it causes a build warning:
 > 
->   Linux 4.17-rc6 (2018-05-20 15:31:38 -0700)
+> WARNING: unmet direct dependencies detected for STM32_DMA
+>   Depends on [n]: DMADEVICES [=n] && (ARCH_STM32 [=y] || COMPILE_TEST [=y])
+>   Selected by [y]:
+>   - MACH_STM32MP157 [=y] && ARCH_STM32 [=y] && ARCH_MULTI_V7 [=y]
+> 
+> Generally, platforms should not select arbitrary drivers, so let's
+> just revert that change.
+> 
+> Fixes: de6037fa207f ("ARM: stm32: Select DMA, DMAMUX and MDMA support on STM32MP157C")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-This is a newer -rc than I had for fixes, so I had to move forward. Feel
-free to use as old an rc as you can on these branches too.
-
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.17-rc7
-> 
-> for you to fetch changes up to 5ec3444c8346c922316f4effafa8afc17defda0e:
-> 
->   firmware: qcom: scm: Fix crash in qcom_scm_call_atomic1() (2018-05-24 22:36:45 -0500)
-
-
-Merged, thanks!
+Applied to next/soc now.
 
 
 -Olof
