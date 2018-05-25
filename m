@@ -1,31 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 14:10:25 -0700
-Subject: [PATCH 1/6] arm64: dts: amlogic: Add missing cooling device
- properties for CPUs
-In-Reply-To: <2a2eb28da9fecf129f6bc0ab3d3748d9f4d25a29.1527225682.git.viresh.kumar@linaro.org>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <2a2eb28da9fecf129f6bc0ab3d3748d9f4d25a29.1527225682.git.viresh.kumar@linaro.org>
-Message-ID: <20180525211025.c73zdcdtyuvlewng@localhost>
+Date: Fri, 25 May 2018 14:14:52 -0700
+Subject: [GIT PULL 3/3] more omap dts changes for v4.18 merge window
+In-Reply-To: <pull-1526925630-789198@atomide.com-3>
+References: <pull-1526925630-789198@atomide.com>
+ <pull-1526925630-789198@atomide.com-3>
+Message-ID: <20180525211452.bxeda6d77x5psxaz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:10:01AM +0530, Viresh Kumar wrote:
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
+On Mon, May 21, 2018 at 12:41:32PM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
-> Add such missing properties.
+> The following changes since commit 8dfa75524a0e0e2b4eaf2a3dc178f6b4d8db85d9:
+> 
+>   ARM: dts: correct invalid I/O definition for MMC/SD card detect on T410 (2018-05-03 10:03:01 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-part2-signed
+> 
+> for you to fetch changes up to 0dbf99542caf8a767ea0ac286ca8077cc5e8bd32:
+> 
+>   ARM: dts: am3517-evm: Add User LEDs and Pushbutton (2018-05-18 14:07:38 -0700)
+> 
+> ----------------------------------------------------------------
+> Second set of dts changes for omap variants for v4.18 merge window
+> 
+> This series of changes contains fixes for already queued tps65218
+> IRQ_TYPE, and fixes for omap3 and am335x use of IRQ_TYPE. There are
+> also addition of oscillator clock for logicpd omap3 boards and a series
+> of changes to improve support for am3517-evm board. And there is also
+> a change to configure WLAN for am437x-sk-evm.
 
-This seems awkward compared to just having one cooling-cells in the /cpus node
-instead.
-
-What's it used for? I don't see any properties in the device nodes on meson-gxm
-that have any cooling-foo cells in them? So why should #cooling-cells be
-needed?
+Merged, thanks!
 
 
 -Olof
