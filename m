@@ -1,117 +1,285 @@
-From: haiyue.wang@linux.intel.com (Wang, Haiyue)
-Date: Fri, 25 May 2018 19:33:42 +0800
-Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS
- node
-In-Reply-To: <CACPK8Xdhmrwfj6tGZ_o_JeoxdOii_5OD5oz80FJFRasvGd1L9w@mail.gmail.com>
-References: <1520399090-2455-1-git-send-email-haiyue.wang@linux.intel.com>
- <9231baaf-e77c-c517-bca2-083070a53342@linux.intel.com>
- <CACPK8Xdhmrwfj6tGZ_o_JeoxdOii_5OD5oz80FJFRasvGd1L9w@mail.gmail.com>
-Message-ID: <d9f9bd48-7b2c-9f48-0515-50e0a5e55259@linux.intel.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 25 May 2018 13:46:00 +0200
+Subject: [PATCH 15/15] arm: dts: imx: Add missing OPP properties for CPUs
+In-Reply-To: <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
+Message-ID: <1527248760.3472.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel & Andrew
+Hi Viresh,
 
-This patch is out of date. ;-)
+Am Freitag, den 25.05.2018, 16:02 +0530 schrieb Viresh Kumar:
+> The OPP properties, like "operating-points", should either be present
+> for all the CPUs of a cluster or none. If these are present only for a
+> subset of CPUs of a cluster then things will start falling apart as soon
+> as the CPUs are brought online in a different order. For example, this
+> will happen because the operating system looks for such properties in
+> the CPU node it is trying to bring up, so that it can create an OPP
+> table.
+> 
+> Add such missing properties.
+> 
+> Fix other missing properties (like clocks, supply, clock latency) as
+> well to make it all work.
 
-New: https://patchwork.ozlabs.org/patch/893720/
+This is a lot of duplicate information for what is effectively a shared
+ cluster wide thing. This does absolutely not _feel_ right.
 
+What problem are you solving here? Why do we need all this duplicate
+information? Why can't we fix it by falling back to looking at cpu0 if
+needed?
 
-On 2018-05-25 12:34, Joel Stanley wrote:
-> Hello Andrew,
->
-> On 16 March 2018 at 11:17, Wang, Haiyue <haiyue.wang@linux.intel.com> wrote:
->> Hi Joel and Andrew,
->>
->> Have time to review this patch ? Hope for your comments. :-)
->>
->> BR,
->> Haiyue
->>
->>
->> On 2018-03-07 13:04, Haiyue Wang wrote:
->>> The IPMI KCS device part of the LPC interface and is used for
->>> communication with the host processor.
->>>
->>> Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
-> Do you have time to take a look at these? The device tree doesn't make
-> sense to me.
->
-> Cheers,
->
-> Joel
->
->>> ---
->>>    arch/arm/boot/dts/aspeed-g5.dtsi | 43
->>> +++++++++++++++++++++++++++++++++++++++-
->>>    1 file changed, 42 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi
->>> b/arch/arm/boot/dts/aspeed-g5.dtsi
->>> index 8eac57c..f443169 100644
->>> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
->>> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
->>> @@ -267,8 +267,40 @@
->>>                                  ranges = <0x0 0x1e789000 0x1000>;
->>>                                  lpc_bmc: lpc-bmc at 0 {
->>> -                                       compatible =
->>> "aspeed,ast2500-lpc-bmc";
->>> +                                       compatible =
->>> "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
->>>                                          reg = <0x0 0x80>;
->>> +                                       reg-io-width = <4>;
->>> +
->>> +                                       #address-cells = <1>;
->>> +                                       #size-cells = <1>;
->>> +                                       ranges = <0x0 0x0 0x80>;
->>> +
->>> +                                       kcs1: kcs1 at 0 {
->>> +                                               compatible =
->>> "aspeed,ast2500-kcs-bmc";
->>> +                                               reg = <0x0 0x80>;
->>> +                                               interrupts = <8>;
->>> +                                               kcs_chan = <1>;
->>> +                                               kcs_addr = <0x0>;
->>> +                                               status = "disabled";
->>> +                                       };
->>> +
->>> +                                       kcs2: kcs2 at 0 {
->>> +                                               compatible =
->>> "aspeed,ast2500-kcs-bmc";
->>> +                                               reg = <0x0 0x80>;
->>> +                                               interrupts = <8>;
->>> +                                               kcs_chan = <2>;
->>> +                                               kcs_addr = <0x0>;
->>> +                                               status = "disabled";
->>> +                                       };
->>> +
->>> +                                       kcs3: kcs3 at 0 {
->>> +                                               compatible =
->>> "aspeed,ast2500-kcs-bmc";
->>> +                                               reg = <0x0 0x80>;
->>> +                                               interrupts = <8>;
->>> +                                               kcs_chan = <3>;
->>> +                                               kcs_addr = <0x0>;
->>> +                                               status = "disabled";
->>> +                                       };
->>>                                  };
->>>                                  lpc_host: lpc-host at 80 {
->>> @@ -294,6 +326,15 @@
->>>                                                  status = "disabled";
->>>                                          };
->>>    +                                     kcs4: kcs4 at 0 {
->>> +                                               compatible =
->>> "aspeed,ast2500-kcs-bmc";
->>> +                                               reg = <0x0 0xa0>;
->>> +                                               interrupts = <8>;
->>> +                                               kcs_chan = <4>;
->>> +                                               kcs_addr = <0x0>;
->>> +                                               status = "disabled";
->>> +                                       };
->>> +
->>>                                          lhc: lhc at 20 {
->>>                                                  compatible =
->>> "aspeed,ast2500-lhc";
->>>                                                  reg = <0x20 0x24 0x48
->>> 0x8>;
->>
+Regards,
+Lucas
+
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> ?arch/arm/boot/dts/imx6dl.dtsi??????| 23 ++++++++++
+> ?arch/arm/boot/dts/imx6q-cm-fx6.dts | 66 +++++++++++++++++++++++++++++
+> ?arch/arm/boot/dts/imx6q.dtsi???????| 87 ++++++++++++++++++++++++++++++++++++--
+> ?arch/arm/boot/dts/imx7d.dtsi???????|??5 +++
+> ?4 files changed, 178 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index b384913c34dd..cc8ffc42d128 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -50,6 +50,29 @@
+> > ?			device_type = "cpu";
+> > ?			reg = <1>;
+> > ?			next-level-cache = <&L2>;
+> > +			operating-points = <
+> > +				/* kHz????uV */
+> > +				996000??1250000
+> > +				792000??1175000
+> > +				396000??1150000
+> > +			>;
+> > +			fsl,soc-operating-points = <
+> > +				/* ARM kHz??SOC-PU uV */
+> > > +				996000	1175000
+> > > +				792000	1175000
+> > > +				396000	1175000
+> > +			>;
+> > +			clock-latency = <61036>; /* two CLK32 periods */
+> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
+> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
+> > +				?<&clks IMX6QDL_CLK_STEP>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
+> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
+> > +				??????"pll1_sw", "pll1_sys";
+> > +			arm-supply = <&reg_arm>;
+> > +			pu-supply = <&reg_pu>;
+> > +			soc-supply = <&reg_soc>;
+> > ?		};
+> > ?	};
+> ?
+> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> index 65ef4cacbc71..18ae4f3be6e3 100644
+> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> @@ -187,6 +187,72 @@
+> > ?	>;
+> ?};
+> ?
+> +&cpu1 {
+> > +	/*
+> > +	?* Although the imx6q fuse indicates that 1.2GHz operation is possible,
+> > +	?* the module behaves unstable at this frequency. Hence, remove the
+> > +	?* 1.2GHz operation point here.
+> > +	?*/
+> > +	operating-points = <
+> > > +		/* kHz	uV */
+> > > +		996000	1250000
+> > > +		852000	1250000
+> > > +		792000	1175000
+> > > +		396000	975000
+> > +	>;
+> > +	fsl,soc-operating-points = <
+> > > +		/* ARM kHz	SOC-PU uV */
+> > > +		996000		1250000
+> > > +		852000		1250000
+> > > +		792000		1175000
+> > > +		396000		1175000
+> > +	>;
+> +};
+> +
+> +&cpu2 {
+> > +	/*
+> > +	?* Although the imx6q fuse indicates that 1.2GHz operation is possible,
+> > +	?* the module behaves unstable at this frequency. Hence, remove the
+> > +	?* 1.2GHz operation point here.
+> > +	?*/
+> > +	operating-points = <
+> > > +		/* kHz	uV */
+> > > +		996000	1250000
+> > > +		852000	1250000
+> > > +		792000	1175000
+> > > +		396000	975000
+> > +	>;
+> > +	fsl,soc-operating-points = <
+> > > +		/* ARM kHz	SOC-PU uV */
+> > > +		996000		1250000
+> > > +		852000		1250000
+> > > +		792000		1175000
+> > > +		396000		1175000
+> > +	>;
+> +};
+> +
+> +&cpu3 {
+> > +	/*
+> > +	?* Although the imx6q fuse indicates that 1.2GHz operation is possible,
+> > +	?* the module behaves unstable at this frequency. Hence, remove the
+> > +	?* 1.2GHz operation point here.
+> > +	?*/
+> > +	operating-points = <
+> > > +		/* kHz	uV */
+> > > +		996000	1250000
+> > > +		852000	1250000
+> > > +		792000	1175000
+> > > +		396000	975000
+> > +	>;
+> > +	fsl,soc-operating-points = <
+> > > +		/* ARM kHz	SOC-PU uV */
+> > > +		996000		1250000
+> > > +		852000		1250000
+> > > +		792000		1175000
+> > > +		396000		1175000
+> > +	>;
+> +};
+> +
+> ?&ecspi1 {
+> > ?	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
+> > ?	pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 70483ce72ba6..78b89bb1bfed 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -50,25 +50,106 @@
+> > ?			soc-supply = <&reg_soc>;
+> > ?		};
+> ?
+> > -		cpu at 1 {
+> > > +		cpu1: cpu at 1 {
+> > ?			compatible = "arm,cortex-a9";
+> > ?			device_type = "cpu";
+> > ?			reg = <1>;
+> > ?			next-level-cache = <&L2>;
+> > +			operating-points = <
+> > +				/* kHz????uV */
+> > +				1200000 1275000
+> > +				996000??1250000
+> > +				852000??1250000
+> > +				792000??1175000
+> > +				396000??975000
+> > +			>;
+> > +			fsl,soc-operating-points = <
+> > +				/* ARM kHz??SOC-PU uV */
+> > +				1200000 1275000
+> > > +				996000	1250000
+> > > +				852000	1250000
+> > > +				792000	1175000
+> > > +				396000	1175000
+> > +			>;
+> > +			clock-latency = <61036>; /* two CLK32 periods */
+> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
+> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
+> > +				?<&clks IMX6QDL_CLK_STEP>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
+> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
+> > +				??????"pll1_sw", "pll1_sys";
+> > +			arm-supply = <&reg_arm>;
+> > +			pu-supply = <&reg_pu>;
+> > +			soc-supply = <&reg_soc>;
+> > ?		};
+> ?
+> > -		cpu at 2 {
+> > > +		cpu2: cpu at 2 {
+> > ?			compatible = "arm,cortex-a9";
+> > ?			device_type = "cpu";
+> > ?			reg = <2>;
+> > ?			next-level-cache = <&L2>;
+> > +			operating-points = <
+> > +				/* kHz????uV */
+> > +				1200000 1275000
+> > +				996000??1250000
+> > +				852000??1250000
+> > +				792000??1175000
+> > +				396000??975000
+> > +			>;
+> > +			fsl,soc-operating-points = <
+> > +				/* ARM kHz??SOC-PU uV */
+> > +				1200000 1275000
+> > > +				996000	1250000
+> > > +				852000	1250000
+> > > +				792000	1175000
+> > > +				396000	1175000
+> > +			>;
+> > +			clock-latency = <61036>; /* two CLK32 periods */
+> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
+> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
+> > +				?<&clks IMX6QDL_CLK_STEP>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
+> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
+> > +				??????"pll1_sw", "pll1_sys";
+> > +			arm-supply = <&reg_arm>;
+> > +			pu-supply = <&reg_pu>;
+> > +			soc-supply = <&reg_soc>;
+> > ?		};
+> ?
+> > -		cpu at 3 {
+> > > +		cpu3: cpu at 3 {
+> > ?			compatible = "arm,cortex-a9";
+> > ?			device_type = "cpu";
+> > ?			reg = <3>;
+> > ?			next-level-cache = <&L2>;
+> > +			operating-points = <
+> > +				/* kHz????uV */
+> > +				1200000 1275000
+> > +				996000??1250000
+> > +				852000??1250000
+> > +				792000??1175000
+> > +				396000??975000
+> > +			>;
+> > +			fsl,soc-operating-points = <
+> > +				/* ARM kHz??SOC-PU uV */
+> > +				1200000 1275000
+> > > +				996000	1250000
+> > > +				852000	1250000
+> > > +				792000	1175000
+> > > +				396000	1175000
+> > +			>;
+> > +			clock-latency = <61036>; /* two CLK32 periods */
+> > +			clocks = <&clks IMX6QDL_CLK_ARM>,
+> > +				?<&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
+> > +				?<&clks IMX6QDL_CLK_STEP>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SW>,
+> > +				?<&clks IMX6QDL_CLK_PLL1_SYS>;
+> > +			clock-names = "arm", "pll2_pfd2_396m", "step",
+> > +				??????"pll1_sw", "pll1_sys";
+> > +			arm-supply = <&reg_arm>;
+> > +			pu-supply = <&reg_pu>;
+> > +			soc-supply = <&reg_soc>;
+> > ?		};
+> > ?	};
+> ?
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 4c9877ec29f2..5434a8aa5602 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -21,6 +21,11 @@
+> > ?			compatible = "arm,cortex-a7";
+> > ?			device_type = "cpu";
+> > ?			reg = <1>;
+> > +			operating-points = <
+> > > +				/* KHz	uV */
+> > > +				996000	1075000
+> > > +				792000	975000
+> > +			>;
+> > ?			clock-frequency = <996000000>;
+> > ?		};
+> > ?	};
