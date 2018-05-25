@@ -1,78 +1,63 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 24 May 2018 20:01:53 -0700
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: Make sure SD1_WP is low
-Message-ID: <20180525030153.15986-1-andrew.smirnov@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 24 May 2018 21:37:41 -0500
+Subject: Nokia N900: refcount_t underflow, use after free
+In-Reply-To: <20180524110533.GA20599@amd>
+References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
+ <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com> <20180308185046.GA22796@amd>
+ <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
+ <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com> <20180309221834.GA15476@amd>
+ <c8ee5692-bf71-a9d7-8607-50adc9f0e9f1@ti.com> <20180310112634.GA31614@amd>
+ <5aa1e2de-96d1-0e88-01ca-49df9ae25457@ti.com> <20180524110533.GA20599@amd>
+Message-ID: <09e30e44-4904-3bb3-c977-19ccd8d76a08@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that MX51_PAD_GPIO1_1 does not remain configure as
-ALT0/SD1_WP (it is out of reset). This is needed because of external
-pull-up resistor attached to that pad that, when left unchanged, will
-drive SD1_WP high preventing eSDHC1/eMMC from working correctly.
+On 05/24/2018 06:05 AM, Pavel Machek wrote:
+> Hi!
+> 
+>>>>
+>>>> OK, see if the following fixes the issue for you, only build tested.
+>>>
+>>> Word-wrapped, so I applied by hand. And yes, the oops at boot is
+>>> gone. Thanks!
+>>
+>> Sorry about that, have to check my mail settings. Anyway will post the
+>> patch again, glad that it fixed your issue.
+> 
+> Any news here? AFAICT the bug creeped into v4.17-rcX in the
+> meantime...
+>
 
-To fix that add a pinmux configuration line configureing the pad to
-function as a GPIO. While we are at it, add a corresponding input GPIO
-hog in an effort to minimize current consumption.
+The patch has been on linux-next for sometime now.
 
-Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Chris Healy <cphealy@gmail.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+regards
+Suman
 
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index df9eca94d812..d484e7e46b27 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -476,6 +476,17 @@
- 	status = "okay";
- };
- 
-+&gpio1 {
-+	unused-sd3-wp-gpio {
-+		/*
-+		 * See pinctrl_esdhc1 below for more details on this
-+		 */
-+		gpio-hog;
-+		gpios = <1 GPIO_ACTIVE_HIGH>;
-+		input;
-+	};
-+};
-+
- &i2c2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c2>;
-@@ -660,6 +671,23 @@
- 			MX51_PAD_SD1_DATA1__SD1_DATA1		0x20d5
- 			MX51_PAD_SD1_DATA2__SD1_DATA2		0x20d5
- 			MX51_PAD_SD1_DATA3__SD1_DATA3		0x20d5
-+			/*
-+			 * GPIO1_1 is not directly used by eSDHC1 in
-+			 * any capacity, but earlier versions of RDU1
-+			 * used that pin as WP GPIO for eSDHC3 and
-+			 * because of that that pad has an external
-+			 * pull-up resistor. This is problematic
-+			 * because out of reset the pad is configured
-+			 * as ALT0 which serves as SD1_WP, which, when
-+			 * pulled high by and external pull-up, will
-+			 * inhibit execution of any write request to
-+			 * attached eMMC device.
-+			 *
-+			 * To avoid this problem we configure the pad
-+                	 * to ALT1/GPIO and avoid driving SD1_WP
-+                	 * signal high.
-+			 */
-+			MX51_PAD_GPIO1_1__GPIO1_1		0x0000
- 		>;
- 	};
- 
--- 
-2.17.0
+> 								Pavel
+> 
+>> regards
+>> Suman
+>>
+>>>
+>>> (Camera still does not work in -next... kills system. Oh well. Lets
+>>> debug that some other day.)
+>>>
+>>>> 8< ---------------------
+>>>> >From bac9a48fb646dc51f2030d676a0dbe3298c3b134 Mon Sep 17 00:00:00 2001
+>>>> From: Suman Anna <s-anna@ti.com>
+>>>> Date: Fri, 9 Mar 2018 16:39:59 -0600
+>>>> Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
+>>>>
+>>>> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+>>>> ARM DMA backend. The current code creates a dma_iommu_mapping and
+>>>> attaches this to the ISP device, but never detaches the mapping in
+>>>> either the probe failure paths or the driver remove path resulting
+>>>> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+>>>>
+>>>> Reported-by: Pavel Machek <pavel@ucw.cz>
+>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>
+>>> Tested-by: Pavel Machek <pavel@ucw.cz>
+>>> 									Pavel
+>>>
+> 
