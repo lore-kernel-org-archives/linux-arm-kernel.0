@@ -1,38 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 May 2018 23:08:30 +0200
-Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE disabled
-Message-ID: <20180525210843.1821071-1-arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 25 May 2018 13:53:34 -0700
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.18
+In-Reply-To: <1526828281-14664-4-git-send-email-shawnguo@kernel.org>
+References: <1526828281-14664-1-git-send-email-shawnguo@kernel.org>
+ <1526828281-14664-4-git-send-email-shawnguo@kernel.org>
+Message-ID: <20180525205334.iqag5yn6pnuuyy77@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without dmaengine support, we get a harmless warning about an
-unused function:
+On Sun, May 20, 2018 at 10:58:00PM +0800, Shawn Guo wrote:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> 
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.18
+> 
+> for you to fetch changes up to 70ce60431e45ace2a1198d4cf339beaef1de9f8b:
+> 
+>   arm64: dts: fsl-ls1012a: Fix DTC aliases warnings (2018-05-15 14:43:58 +0800)
 
-drivers/pwm/pwm-stm32.c:166:12: error: 'stm32_pwm_capture' defined but not used [-Werror=unused-function]
+Merged, thanks!
 
-Changing the #ifdef to an IS_ENABLED() check shuts up that warning
-and is slightly nicer to read.
 
-Fixes: 53e38fe73f94 ("pwm: stm32: Add capture support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pwm/pwm-stm32.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
-index 60bfc07c4912..97bbc1f18fd6 100644
---- a/drivers/pwm/pwm-stm32.c
-+++ b/drivers/pwm/pwm-stm32.c
-@@ -484,9 +484,7 @@ static int stm32_pwm_apply_locked(struct pwm_chip *chip, struct pwm_device *pwm,
- static const struct pwm_ops stm32pwm_ops = {
- 	.owner = THIS_MODULE,
- 	.apply = stm32_pwm_apply_locked,
--#if IS_ENABLED(CONFIG_DMA_ENGINE)
--	.capture = stm32_pwm_capture,
--#endif
-+	.capture = IS_ENABLED(CONFIG_DMA_ENGINE) ? stm32_pwm_capture : NULL,
- };
- 
- static int stm32_pwm_set_breakinput(struct stm32_pwm *priv,
--- 
-2.9.0
+-Olof
