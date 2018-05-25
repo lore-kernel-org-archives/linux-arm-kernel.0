@@ -1,113 +1,140 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 25 May 2018 18:12:30 +0100
-Subject: [PATCH 6/6] coresight: allow to build as modules
-In-Reply-To: <20180518012024.22645-6-kim.phillips@arm.com>
-References: <20180517070643.GC13919@kroah.com>
- <20180518012024.22645-1-kim.phillips@arm.com>
- <20180518012024.22645-6-kim.phillips@arm.com>
-Message-ID: <4986a636-d5a5-387c-abf1-d68afe063f06@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 25 May 2018 18:14:38 +0100
+Subject: [PATCH v1 1/4] soc: Add TmFifo driver for Mellanox BlueField Soc
+In-Reply-To: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+Message-ID: <8c2bfde9-5dd2-c1f9-a7f1-503c6eb8b0fe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/18 02:20, Kim Phillips wrote:
-> Allow to build coresight as modules.  This greatly enhances developer
-> efficiency by allowing the development to take place exclusively on the
-> target, and without needing to reboot in between changes.
-> 
-> - Kconfig bools become tristates, to allow =m
-> 
-> - use -objs to denote merge object directives in Makefile, adds a
->    coresight-core nomenclature for the base module.
-> 
-> - Export core functions so as to be able to be used by
->    non-core modules.
-> 
-> - add a coresight_exit() that unregisters the coresight bus, add
->    remove fns for most others.
-> 
-> - fix up modules with ID tables for autoloading on boot
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+On 25/05/18 17:06, Liming Sun wrote:
+[...]
+> diff --git a/drivers/soc/mellanox/tmfifo.c b/drivers/soc/mellanox/tmfifo.c
+> new file mode 100644
+> index 0000000..a3303d1
+> --- /dev/null
+> +++ b/drivers/soc/mellanox/tmfifo.c
+> @@ -0,0 +1,1265 @@
+> +// SPDX-License-Identifier: GPL-2.0
 
-Kim,
+This tag doesn't match the included license text...
 
-I see that you have addressed my comments on a previous version
-of this series posted in April. But I don't see the version number
-increased for this new version. Please add versioning to make it
-easier to make it more obvious.
+> +/*
+> + * Copyright (c) 2018, Mellanox Technologies. All rights reserved.
+> + *
+> + * This software is available to you under a choice of one of two
+> + * licenses.  You may choose to be licensed under the terms of the GNU
+> + * General Public License (GPL) Version 2, available from the file
+> + * COPYING in the main directory of this source tree, or the
+> + * OpenIB.org BSD license below:
+> + *
+> + *     Redistribution and use in source and binary forms, with or
+> + *     without modification, are permitted provided that the following
+> + *     conditions are met:
+> + *
+> + *      - Redistributions of source code must retain the above
+> + *        copyright notice, this list of conditions and the following
+> + *        disclaimer.
+> + *
+> + *      - Redistributions in binary form must reproduce the above
+> + *        copyright notice, this list of conditions and the following
+> + *        disclaimer in the documentation and/or other materials
+> + *        provided with the distribution.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+> + * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+> + * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+> + * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> + * SOFTWARE.
+> + */
 
-Also, generally it is a good idea to keep the people who reviewed
-and commented on your previous versions in the newer versions.
-
-Some comments below :
-
-> diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-> index fc742215ab05..bc42b8022556 100644
-> --- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-> +++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-> @@ -37,7 +37,12 @@ struct replicator_state {
->   static int replicator_enable(struct coresight_device *csdev, int inport,
->   			      int outport)
->   {
-> -	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +	struct device *parent_dev = csdev->dev.parent;
-> +	struct replicator_state *drvdata = dev_get_drvdata(parent_dev);
-> +	struct module *module = parent_dev->driver->owner;
+[...]
+> +/* Several utility macros to get/set the register fields. */
+> +#define TMFIFO_GET_FIELD(reg, field) \
+> +	(((reg) >> field##_SHIFT) & ((1UL << field##_WIDTH) - 1))
 > +
-> +	if (!try_module_get(module))
-> +		return -ENODEV;
->   
->   	CS_UNLOCK(drvdata->base);
+> +#define TMFIFO_SET_FIELD(reg, field, value) ({ \
+> +	u64 _mask = ((1UL << field##_WIDTH) - 1) << field##_SHIFT; \
+> +	((reg) & ~_mask) | (((value) << field##_SHIFT) & _mask); \
+> +})
 
-What is the guarantee that the "csdev" is still available when we reach
-here ?
+There's no need to reinvent <linux/bitfield.h>
 
-A module could be unloaded "after the component was added to the path"
-(via coresight_build_path) and before we invoke the "enable" on each
-component in the path ?
+[...]
+> +MODULE_DESCRIPTION("Mellanox BlueField SoC TMFIFO Driver");
+> +MODULE_AUTHOR("Mellanox Technologies, Ltd");
+> +MODULE_LICENSE("GPL");
 
-Also, it  is tedious to do module_get in "enable" and module_put in the
-disable call backs for each component.
+...and this implies yet another different license (since it indicates 
+"GPLv2 or later")
 
-Instead, if we do a module_get() in build_path and module_put() in
-release path, we could solve all these problems and keep it the module
-refcount in a central place.
+> +MODULE_VERSION("0.7");
+> diff --git a/drivers/soc/mellanox/tmfifo_regs.h b/drivers/soc/mellanox/tmfifo_regs.h
+> new file mode 100644
+> index 0000000..b07f353
+> --- /dev/null
+> +++ b/drivers/soc/mellanox/tmfifo_regs.h
+> @@ -0,0 +1,112 @@
+> +// SPDX-License-Identifier: GPL-2.0
 
-> +MODULE_DEVICE_TABLE(amba, replicator_ids);
+Again, this doesn't match the included text. Also, the SPDX comment 
+style is /* */ for headers.
+
+> +/*
+> + * Copyright (c) 2018, Mellanox Technologies. All rights reserved.
+> + *
+> + * This software is available to you under a choice of one of two
+> + * licenses.  You may choose to be licensed under the terms of the GNU
+> + * General Public License (GPL) Version 2, available from the file
+> + * COPYING in the main directory of this source tree, or the
+> + * OpenIB.org BSD license below:
+> + *
+> + *     Redistribution and use in source and binary forms, with or
+> + *     without modification, are permitted provided that the following
+> + *     conditions are met:
+> + *
+> + *      - Redistributions of source code must retain the above
+> + *        copyright notice, this list of conditions and the following
+> + *        disclaimer.
+> + *
+> + *      - Redistributions in binary form must reproduce the above
+> + *        copyright notice, this list of conditions and the following
+> + *        disclaimer in the documentation and/or other materials
+> + *        provided with the distribution.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+> + * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+> + * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+> + * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> + * SOFTWARE.
+> + */
+
+[...]
+> +#ifdef __ASSEMBLER__
+> +#define _64bit(x) x
+> +#else /* __ASSEMBLER__ */
+> +#ifdef __tile__
+> +#define _64bit(x) x ## UL
+> +#else /* __tile__ */
+> +#define _64bit(x) x ## ULL
+> +#endif /* __tile__ */
+> +#endif /* __ASSEMBLER */
 > +
->   static struct amba_driver replicator_driver = {
->   	.drv = {
->   		.name	= "coresight-dynamic-replicator",
-> @@ -207,9 +226,10 @@ static struct amba_driver replicator_driver = {
->   		.suppress_bind_attrs = true,
->   	},
->   	.probe		= replicator_probe,
-> +	.remove		= replicator_remove,
->   	.id_table	= replicator_ids,
->   };
-
-Do we have the owner field set here for this driver ? I see that you
-added it for some components and not others. e.g, you have added it for
-etm4x, while not for replicator and others.
-
-
-> +MODULE_DEVICE_TABLE(amba, etm4_ids);
+> +#ifdef __KERNEL__
+> +#include <linux/types.h>
+> +#else
+> +#include <stdint.h>
+> +#endif
 > +
->   static struct amba_driver etm4x_driver = {
->   	.drv = {
->   		.name   = "coresight-etm4x",
-> +		.owner  = THIS_MODULE,
->   		.suppress_bind_attrs = true,
->   	},
->   	.probe		= etm4_probe,
-> +	.remove		= etm4_remove,
->   	.id_table	= etm4_ids,
->   };
-> -builtin_amba_driver(etm4x_driver);
-> +module_amba_driver(etm4x_driver);
+> +#ifndef __DOXYGEN__
 
+Given that this is a private header under drivers/, is any of that lot 
+necessary?
 
-Suzuki
+Robin.
