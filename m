@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 May 2018 11:10:04 +0530
-Subject: [PATCH 4/6] arm64: dts: mediatek: Add missing cooling device
+Date: Fri, 25 May 2018 11:10:03 +0530
+Subject: [PATCH 3/6] arm64: dts: hisilicon: Add missing cooling device
  properties for CPUs
 In-Reply-To: <cover.1527225682.git.viresh.kumar@linaro.org>
 References: <cover.1527225682.git.viresh.kumar@linaro.org>
-Message-ID: <49b1086c104b0ee22f6e992a0abb380de9320c09.1527225682.git.viresh.kumar@linaro.org>
+Message-ID: <0754957a2c3842cf4e36fa27231d327fd8d6d499.1527225682.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,43 +18,89 @@ it is trying to bring up, so that it can register a cooling device.
 
 Add such missing properties.
 
+Do minor rearrangement as well to keep ordering consistent.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/boot/dts/mediatek/mt7622.dtsi | 1 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 2 ++
- 2 files changed, 3 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index 9213c966c224..d49fe125e770 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -89,6 +89,7 @@
- 				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
- 			clock-names = "cpu", "intermediate";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 586b281cd531..247024df714f 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -88,8 +88,8 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
+ 			clocks = <&stub_clock 0>;
  			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 			enable-method = "psci";
- 			clock-frequency = <1300000000>;
+-			#cooling-cells = <2>; /* min followed by max */
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
+ 			dynamic-power-coefficient = <311>;
  		};
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 94597e33c806..abd2f15a544b 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -168,6 +168,7 @@
- 			reg = <0x001>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SLEEP_0>;
-+			#cooling-cells = <2>;
- 			clocks = <&infracfg CLK_INFRA_CA53SEL>,
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
-@@ -193,6 +194,7 @@
- 			reg = <0x101>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SLEEP_0>;
-+			#cooling-cells = <2>;
- 			clocks = <&infracfg CLK_INFRA_CA57SEL>,
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
+ 
+@@ -101,6 +101,8 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -111,6 +113,8 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -121,6 +125,8 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -131,6 +137,8 @@
+ 			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -141,6 +149,8 @@
+ 			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -151,6 +161,8 @@
+ 			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -161,6 +173,8 @@
+ 			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
++			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <311>;
+ 		};
+ 
+ 		CLUSTER0_L2: l2-cache0 {
 -- 
 2.15.0.194.g9af6a3dea062
