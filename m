@@ -1,56 +1,99 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 May 2018 10:52:36 -0500
-Subject: [PATCH v2 1/3] input: touchscreen: edt-ft5x06: don't make device
- a wakeup source by default
-In-Reply-To: <20180524231732.GC177107@dtor-ws>
-References: <20180517090552.5704-1-daniel@zonque.org>
- <20180517090552.5704-2-daniel@zonque.org>
- <20180522175413.GA24850@rob-hp-laptop>
- <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
- <CAL_JsqJQt6vFqH-KzNvjW+FZXCgzNAwXj_nSYow2Uz2Vcmi_Cg@mail.gmail.com>
- <20180524231732.GC177107@dtor-ws>
-Message-ID: <CAL_JsqKnmrMUqFq=fL0ZM5XCaRFpVaFcdHfd7jzUVkroymvCCA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 25 May 2018 17:07:07 +0100
+Subject: [PATCH 08/11] coresight: Add generic TMC sg table framework
+In-Reply-To: <20180523202552.GA4609@xps15>
+References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
+ <1526661567-4578-9-git-send-email-suzuki.poulose@arm.com>
+ <20180523202552.GA4609@xps15>
+Message-ID: <21fef51b-2afe-1a2c-6006-5cf3de4e74e8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 6:17 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Wed, May 23, 2018 at 09:45:05AM -0500, Rob Herring wrote:
->> On Wed, May 23, 2018 at 3:27 AM, Daniel Mack <daniel@zonque.org> wrote:
->> > On Tuesday, May 22, 2018 07:54 PM, Rob Herring wrote:
->> >>
->> >> On Thu, May 17, 2018 at 11:05:50AM +0200, Daniel Mack wrote:
->> >>>
->> >>> Allow configuring the device as wakeup source through device properties,
->> >>> as
->> >>> not all platforms want to wake up on touch screen activity.
->> >>>
->> >>> The I2C core automatically reads the "wakeup-source" DT property to
->> >>> configure a device's wakeup capability, and board supports files can set
->> >>> I2C_CLIENT_WAKE in the flags.
->> >>
->> >>
->> >> This will break wake-up on working systems. Looks like mostly i.MX, but
->> >> there's one AM437x board. If that board doesn't care, then it is up to
->> >> Shawn.
->> >
->> >
->> > I added the property to the dts files, but as Dmitry pointed out, I missed
->> > some. Sorry for that.
+On 23/05/18 21:25, Mathieu Poirier wrote:
+> On Fri, May 18, 2018 at 05:39:24PM +0100, Suzuki K Poulose wrote:
+>> This patch introduces a generic sg table data structure and
+>> associated operations. An SG table can be used to map a set
+>> of Data pages where the trace data could be stored by the TMC
+>> ETR. The information about the data pages could be stored in
+>> different formats, depending on the type of the underlying
+>> SG mechanism (e.g, TMC ETR SG vs Coresight CATU). The generic
+>> structure provides book keeping of the pages used for the data
+>> as well as the table contents. The table should be filled by
+>> the user of the infrastructure.
 >>
->> Just adding the property to dts files doesn't fix the compatibility
->> problem. If a user uses an existing dtb (before this change) with a
->> new kernel (after this change), then wakeup will stop working.
->
-> Is this a practical problem though? Do we know of any products with
-> this touch panel that use DTS not distributed with the kernel?
+>> A table can be created by specifying the number of data pages
+>> as well as the number of table pages required to hold the
+>> pointers, where the latter could be different for different
+>> types of tables. The pages are mapped in the appropriate dma
+>> data direction mode (i.e, DMA_TO_DEVICE for table pages
+>> and DMA_FROM_DEVICE for data pages).  The framework can optionally
+>> accept a set of allocated data pages (e.g, perf ring buffer) and
+>> map them accordingly. The table and data pages are vmap'ed to allow
+>> easier access by the drivers. The framework also provides helpers to
+>> sync the data written to the pages with appropriate directions.
+>>
+>> This will be later used by the TMC ETR SG unit and CATU.
+>>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since v1:
+>>   - Address code style issues, more comments
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 290 ++++++++++++++++++++++++
+>>   drivers/hwtracing/coresight/coresight-tmc.h     |  50 ++++
+>>   2 files changed, 340 insertions(+)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> index 9780798..1e844f8 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> @@ -17,9 +17,299 @@
 
-Distribution of dts with kernel is irrelevant. It is how the dtb's are
-handled that matters. You still need to ask in tree users.
 
-I can't have any way of knowing what DTs may exist as there is only
-one upstream repository of dts files. There's not really a good
-solution on this to avoid breaking users, so we'll just have to see if
-anyone (besides the known users) complains.
+>> +static inline dma_addr_t tmc_sg_table_base_paddr(struct tmc_sg_table *sg_table)
+>> +{
+>> +	if (WARN_ON(!sg_table->data_pages.pages[0]))
+>> +		return 0;
+>> +	return sg_table->table_daddr;
+>> +}
+>> +
+>> +static inline void *tmc_sg_table_base_vaddr(struct tmc_sg_table *sg_table)
+>> +{
+>> +	if (WARN_ON(!sg_table->data_pages.pages[0]))
+>> +		return NULL;
+>> +	return sg_table->table_vaddr;
+>> +}
+> 
+> The above two functions deal with DMA'able and virtual addresses for the table
+> page buffer.  Yet the test in the WARN_ON is done on the data page array.
+> Shouldn't this be sg_table->table_pages.pages[0] instead?
 
-Rob
+The table is as good as empty if there are no data pages associated with
+the table. Hence the data_pages check.
+
+> 
+> If not please add a comment justifying your position so that someone else
+> looking at the code does't end up thinking the same in a year from now.
+
+I will add a comment to reflect the above.
+
+> 
+>> +
+>> +static inline void *
+>> +tmc_sg_table_data_vaddr(struct tmc_sg_table *sg_table)
+>> +{
+>> +	if (WARN_ON(!sg_table->data_pages.nr_pages))
+>> +		return 0;
+>> +	return sg_table->data_vaddr;
+>> +}
+> 
+> I see that tmc_sg_table_base_vaddr() and tmc_sg_table_data_vaddr() are both
+> returning the virtual address of the contiguous buffer for table and data
+> respectively.  Yet there is a discrepency in the naming convention.  I would
+> have expected tmc_sg_table_base_vaddr() and tmc_sg_data_base_vaddr() so that
+> there is a little symmetry between them.
+
+Agree. I will fix it.
+
+Suzuki
