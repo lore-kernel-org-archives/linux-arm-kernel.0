@@ -1,47 +1,54 @@
 From: liwei213@huawei.com (Li Wei)
-Date: Fri, 25 May 2018 17:17:10 +0800
-Subject: [PATCH v10 3/5] arm64: dts: add ufs dts node
-In-Reply-To: <20180525091712.37227-1-liwei213@huawei.com>
-References: <20180525091712.37227-1-liwei213@huawei.com>
-Message-ID: <20180525091712.37227-4-liwei213@huawei.com>
+Date: Fri, 25 May 2018 17:17:07 +0800
+Subject: [PATCH v10 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660
+ SoC
+Message-ID: <20180525091712.37227-1-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64: dts: add ufs node for Hisilicon.
+This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
 
-Signed-off-by: Li Wei <liwei213@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Li Wei (5):
+  scsi: ufs: add Hisilicon ufs driver code
+  dt-bindings: scsi: ufs: add document for hisi-ufs
+  arm64: dts: add ufs dts node
+  arm64: defconfig: enable configs for Hisilicon ufs
+  arm64: defconfig: enable f2fs and squashfs
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ec3eb8e33a3a..04438621c6c3 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -892,6 +892,24 @@
- 			reset-gpios = <&gpio11 1 0 >;
- 		};
- 
-+		/* UFS */
-+		ufs: ufs at ff3b0000 {
-+			compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-+			/* 0: HCI standard */
-+			/* 1: UFS SYS CTRL */
-+			reg = <0x0 0xff3b0000 0x0 0x1000>,
-+				<0x0 0xff3b1000 0x0 0x1000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-+				<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-+			clock-names = "ref_clk", "phy_clk";
-+			freq-table-hz = <0 0>, <0 0>;
-+			/* offset: 0x84; bit: 12 */
-+			resets = <&crg_rst 0x84 12>;
-+			reset-names = "rst";
-+		};
-+
- 		/* SD */
- 		dwmmc1: dwmmc1 at ff37f000 {
- 			#address-cells = <1>;
+ Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
+ .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
+ arch/arm64/configs/defconfig                       |  11 +
+ drivers/scsi/ufs/Kconfig                           |   9 +
+ drivers/scsi/ufs/Makefile                          |   1 +
+ drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
+ drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
+ 8 files changed, 821 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.h
+
+Major changes in v10:
+ - solve review comments from Rob Herring.
+   *Modify the "reset-names" describe in ufs-hisi.txt binding file.
+   *List clocks in ufs-hisi.txt binding file.
+   *remove the "arst" and keep only "rst" in the binging files.
+   *remove the "arst" member from both dts and c code. 
+Major changes in v9:
+ - solve review comments from Rob Herring.
+   *remove freq-table-hz in ufs-hisi.txt binding file.
+   *Move the rst to the ufshcd_pltfm.txt common binding file.
+   *Modify the member "assert" of UFS host structure to "arst".
+Major changes in v8:
+ - solve review comments from zhangfei.
+   *Add Version history.
+ - solve review comments from Rob Herring.
+   *remove freq-table-hz.
+ -  solve review comments from Riku Voipio.
+   *Add MODULE_DEVICE_TABLE for ufs driver.
+-- 
+Major changes in v7:
+ - solve review comments from Philippe Ombredanne.
+   *use the new SPDX license ids instead of the GNU General Public License.
 -- 
 2.15.0
