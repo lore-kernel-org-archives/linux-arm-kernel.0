@@ -1,31 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 May 2018 11:03:59 +0100
-Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP
- and suspend paths
-In-Reply-To: <b454e37c-52a8-387f-3649-8ce72c9a5b18@gmail.com>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
- <b454e37c-52a8-387f-3649-8ce72c9a5b18@gmail.com>
-Message-ID: <20180525100359.GC17671@n2100.armlinux.org.uk>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 25 May 2018 10:49:07 +0100
+Subject: [PATCH v4 01/26] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot
+ system feature
+In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 04:30:40PM -0700, Florian Fainelli wrote:
-> On 05/21/2018 04:44 AM, Russell King wrote:
-> > Check for CPU bugs when secondary processors are being brought online,
-> > and also when CPUs are resuming from a low power mode.  This gives an
-> > opportunity to check that processor specific bug workarounds are
-> > correctly enabled for all paths that a CPU re-enters the kernel.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Something I missed, is that this correctly warns about e.g: missing the
-> IBE bit for secondary cores, but it seems to be missing it for the boot CPU:
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Are you sure that the boot CPU has the IBE bit clear?
-
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9d1b06d..e03e897 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ 	{
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+-		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+ 		.matches = has_useable_gicv3_cpuif,
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
+ 		.field_pos = ID_AA64PFR0_GIC_SHIFT,
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+1.9.1
