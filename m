@@ -1,60 +1,43 @@
 From: david@lechnology.com (David Lechner)
-Date: Fri, 25 May 2018 13:11:46 -0500
-Subject: [PATCH 5/9] clk: davinci: psc-dm365: fix few clocks
+Date: Fri, 25 May 2018 13:11:44 -0500
+Subject: [PATCH 3/9] clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups
 In-Reply-To: <20180525181150.17873-1-david@lechnology.com>
 References: <20180525181150.17873-1-david@lechnology.com>
-Message-ID: <20180525181150.17873-6-david@lechnology.com>
+Message-ID: <20180525181150.17873-4-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
+The clkdev lookups for the ASP0/1 devices on TI DM355 were declared, but
+not assigned to any LPSC. This assigns the clkdev lookups to the
+correct LPSCs.
 
-Fix parent of EMAC and voice codec PSC clocks. Documentation is clear
-on EMAC clock parent, but its not fully clear on parent of voice codec
-clock. The implementation chosen is matches arch/arm/mach-davinci/dm365.c.
-Add a comment explaining this for posterity.
-
-There is only one power domain on DM365. Fix the power domain of voice
-codec and vpss dac modules.
-
-While at it, add a comment explaining how the parent of vpss dac clock was
-derived. Note that this patch does not touch the parent of vpss dac clock.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Reviewed-by: David Lechner <david@lechnology.com>
+Reported-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: David Lechner <david@lechnology.com>
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 ---
- drivers/clk/davinci/psc-dm365.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ drivers/clk/davinci/psc-dm355.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/davinci/psc-dm365.c b/drivers/clk/davinci/psc-dm365.c
-index 3ad915f37376..289af3913fb0 100644
---- a/drivers/clk/davinci/psc-dm365.c
-+++ b/drivers/clk/davinci/psc-dm365.c
-@@ -65,9 +65,22 @@ static const struct davinci_lpsc_clk_info dm365_psc_info[] = {
- 	LPSC(31, 0, arm,         pll2_sysclk2, NULL,               LPSC_ALWAYS_ENABLED),
- 	LPSC(38, 0, spi3,        pll1_sysclk4, spi3_clkdev,        0),
- 	LPSC(39, 0, spi4,        pll1_auxclk,  spi4_clkdev,        0),
--	LPSC(40, 0, emac,        pll2_sysclk4, emac_clkdev,        0),
--	LPSC(44, 1, voice_codec, pll1_sysclk3, voice_codec_clkdev, 0),
--	LPSC(46, 1, vpss_dac,    pll1_sysclk3, vpss_dac_clkdev,    0),
-+	LPSC(40, 0, emac,        pll1_sysclk4, emac_clkdev,        0),
-+	/*
-+	 * The TRM (ARM Subsystem User's Guide) shows two clocks input into
-+	 * voice codec module (PLL2 SYSCLK4 with a DIV2 and PLL1 SYSCLK4). Its
-+	 * not fully clear from documentation which clock should be considered
-+	 * as parent for PSC. The clock chosen here is to maintain
-+	 * compatibility with existing code in arch/arm/mach-davinci/dm365.c
-+	 */
-+	LPSC(44, 0, voice_codec, pll2_sysclk4, voice_codec_clkdev, 0),
-+	/*
-+	 * Its not fully clear from TRM (ARM Subsystem User's Guide) as to what
-+	 * the parent of VPSS DAC LPSC should actually be. PLL1 SYSCLK3 feeds
-+	 * into HDVICP and MJCP. The clock chosen here is to remain compatible
-+	 * with code existing in arch/arm/mach-davinci/dm365.c
-+	 */
-+	LPSC(46, 0, vpss_dac,    pll1_sysclk3, vpss_dac_clkdev,    0),
- 	LPSC(47, 0, vpss_master, pll1_sysclk5, vpss_master_clkdev, 0),
- 	LPSC(50, 0, mjcp,        pll1_sysclk3, NULL,               0),
- 	{ }
+diff --git a/drivers/clk/davinci/psc-dm355.c b/drivers/clk/davinci/psc-dm355.c
+index 6995ecea2677..128e7345b20c 100644
+--- a/drivers/clk/davinci/psc-dm355.c
++++ b/drivers/clk/davinci/psc-dm355.c
+@@ -41,14 +41,14 @@ static const struct davinci_lpsc_clk_info dm355_psc_info[] = {
+ 	LPSC(5,  0, timer3,      pll1_auxclk,  NULL,               0),
+ 	LPSC(6,  0, spi1,        pll1_sysclk2, spi1_clkdev,        0),
+ 	LPSC(7,  0, mmcsd1,      pll1_sysclk2, mmcsd1_clkdev,      0),
+-	LPSC(8,  0, asp1,        pll1_sysclk2, NULL,               0),
++	LPSC(8,  0, asp1,        pll1_sysclk2, mcbsp1_clkdev,      0),
+ 	LPSC(9,  0, usb,         pll1_sysclk2, usb_clkdev,         0),
+ 	LPSC(10, 0, pwm3,        pll1_auxclk,  NULL,               0),
+ 	LPSC(11, 0, spi2,        pll1_sysclk2, spi2_clkdev,        0),
+ 	LPSC(12, 0, rto,         pll1_auxclk,  NULL,               0),
+ 	LPSC(14, 0, aemif,       pll1_sysclk2, aemif_clkdev,       0),
+ 	LPSC(15, 0, mmcsd0,      pll1_sysclk2, mmcsd0_clkdev,      0),
+-	LPSC(17, 0, asp0,        pll1_sysclk2, NULL,               0),
++	LPSC(17, 0, asp0,        pll1_sysclk2, mcbsp0_clkdev,      0),
+ 	LPSC(18, 0, i2c,         pll1_auxclk,  i2c_clkdev,         0),
+ 	LPSC(19, 0, uart0,       pll1_auxclk,  uart0_clkdev,       0),
+ 	LPSC(20, 0, uart1,       pll1_auxclk,  uart1_clkdev,       0),
 -- 
 2.17.0
