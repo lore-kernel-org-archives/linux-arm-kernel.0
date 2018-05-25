@@ -1,85 +1,98 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 25 May 2018 15:01:24 +0100
-Subject: [PATCH v3 12/15] ARM: KVM: invalidate icache on guest exit for
- Cortex-A15
+Date: Fri, 25 May 2018 15:00:58 +0100
+Subject: [PATCH v3 07/15] ARM: spectre-v2: add Cortex A8 and A15 validation of
+ the IBE bit
 In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
 References: <20180525135938.GE17671@n2100.armlinux.org.uk>
-Message-ID: <E1fMDHY-00073s-7i@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fMDH8-0006z0-K8@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+When the branch predictor hardening is enabled, firmware must have set
+the IBE bit in the auxiliary control register.  If this bit has not
+been set, the Spectre workarounds will not be functional.
 
-In order to avoid aliasing attacks against the branch predictor
-on Cortex-A15, let's invalidate the BTB on guest exit, which can
-only be done by invalidating the icache (with ACTLR[0] being set).
+Add validation that this bit is set, and print a warning at alert level
+if this is not the case.
 
-We use the same hack as for A12/A17 to perform the vector decoding.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/include/asm/kvm_mmu.h |  5 +++++
- arch/arm/kvm/hyp/hyp-entry.S   | 24 ++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ arch/arm/mm/Makefile       |  2 +-
+ arch/arm/mm/proc-v7-bugs.c | 29 +++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S      |  4 ++--
+ 3 files changed, 32 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mm/proc-v7-bugs.c
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index d08ce9c41df4..48edb1f4ced4 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -306,6 +306,11 @@ static inline void *kvm_get_hyp_vector(void)
- 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
- 	}
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 9dbb84923e12..a0c40610210c 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -97,7 +97,7 @@ obj-$(CONFIG_CPU_MOHAWK)	+= proc-mohawk.o
+ obj-$(CONFIG_CPU_FEROCEON)	+= proc-feroceon.o
+ obj-$(CONFIG_CPU_V6)		+= proc-v6.o
+ obj-$(CONFIG_CPU_V6K)		+= proc-v6.o
+-obj-$(CONFIG_CPU_V7)		+= proc-v7.o
++obj-$(CONFIG_CPU_V7)		+= proc-v7.o proc-v7-bugs.o
+ obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
  
-+	case ARM_CPU_PART_CORTEX_A15:
-+	{
-+		extern char __kvm_hyp_vector_ic_inv[];
-+		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
-+	}
+ AFLAGS_proc-v6.o	:=-Wa,-march=armv6
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+new file mode 100644
+index 000000000000..a32ce13479d9
+--- /dev/null
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -0,0 +1,29 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/kernel.h>
++#include <linux/smp.h>
++
++static __maybe_unused void cpu_v7_check_auxcr_set(u32 mask, const char *msg)
++{
++	u32 aux_cr;
++
++	asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (aux_cr));
++
++	if ((aux_cr & mask) != mask)
++		pr_err("CPU%u: %s", smp_processor_id(), msg);
++}
++
++static void check_spectre_auxcr(u32 bit)
++{
++	if (IS_ENABLED(CONFIG_HARDEN_BRANCH_PREDICTOR))
++		cpu_v7_check_auxcr_set(bit, "Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable\n");
++}
++
++void cpu_v7_ca8_ibe(void)
++{
++	check_spectre_auxcr(BIT(6));
++}
++
++void cpu_v7_ca15_ibe(void)
++{
++	check_spectre_auxcr(BIT(0));
++}
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index a2d433d59848..fa9214036fb3 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -569,7 +569,7 @@ ENDPROC(__v7_setup)
+ 	globl_equ	cpu_ca8_do_suspend,	cpu_v7_do_suspend
+ 	globl_equ	cpu_ca8_do_resume,	cpu_v7_do_resume
  #endif
- 	default:
- 	{
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index e789f52a5129..918a05dd2d63 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -73,6 +73,28 @@
+-	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_ca8_ibe
  
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- 	.align 5
-+__kvm_hyp_vector_ic_inv:
-+	.global __kvm_hyp_vector_ic_inv
-+
-+	/*
-+	 * We encode the exception entry in the bottom 3 bits of
-+	 * SP, and we have to guarantee to be 8 bytes aligned.
-+	 */
-+	W(add)	sp, sp, #1	/* Reset 	  7 */
-+	W(add)	sp, sp, #1	/* Undef	  6 */
-+	W(add)	sp, sp, #1	/* Syscall	  5 */
-+	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-+	W(add)	sp, sp, #1	/* Data abort	  3 */
-+	W(add)	sp, sp, #1	/* HVC		  2 */
-+	W(add)	sp, sp, #1	/* IRQ		  1 */
-+	W(nop)			/* FIQ		  0 */
-+
-+	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
-+	isb
-+
-+	b	decode_vectors
-+
-+	.align 5
- __kvm_hyp_vector_bp_inv:
- 	.global __kvm_hyp_vector_bp_inv
- 
-@@ -92,6 +114,8 @@
- 	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
- 	isb
- 
-+decode_vectors:
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 	/*
- 	 * Yet another silly hack: Use VPIDR as a temp register.
+ 	@ Cortex-A9 - needs more registers preserved across suspend/resume
+ 	@ and bpiall switch_mm for hardening
+@@ -602,7 +602,7 @@ ENDPROC(__v7_setup)
+ 	globl_equ	cpu_ca15_suspend_size,	cpu_v7_suspend_size
+ 	globl_equ	cpu_ca15_do_suspend,	cpu_v7_do_suspend
+ 	globl_equ	cpu_ca15_do_resume,	cpu_v7_do_resume
+-	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_ca15_ibe
+ #ifdef CONFIG_CPU_PJ4B
+ 	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #endif
 -- 
 2.7.4
