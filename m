@@ -1,91 +1,51 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 25 May 2018 17:07:56 +0300
-Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
- under at91-usart mfd
-In-Reply-To: <f817c82a-95b6-afb3-e662-c481a877cf01@sorico.fr>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-7-radu.pirea@microchip.com>
- <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
- <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
- <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
- <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
- <f817c82a-95b6-afb3-e662-c481a877cf01@sorico.fr>
-Message-ID: <df164579-1d6c-0f0b-4f2f-c0a29aa63d8f@microchip.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 25 May 2018 15:01:39 +0100
+Subject: [PATCH v3 15/15] ARM: KVM: report support for SMCCC_ARCH_WORKAROUND_1
+In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
+References: <20180525135938.GE17671@n2100.armlinux.org.uk>
+Message-ID: <E1fMDHn-00074D-Iw@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Report support for SMCCC_ARCH_WORKAROUND_1 to KVM guests for affected
+CPUs.
 
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/include/asm/kvm_host.h | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-On 05/25/2018 04:35 PM, Richard Genoud wrote:
-> On 25/05/2018 14:17, Radu Pirea wrote:
->>
->>
->> On 05/15/2018 04:14 PM, Richard Genoud wrote:
->>> On 15/05/2018 14:47, Radu Pirea wrote:
->>>> On Mon, 2018-05-14 at 12:57 +0200, Richard Genoud wrote:
->>>>> After your patch, the DMA is not selected anymore:
->>>>> atmel_usart_serial atmel_usart_serial.0.auto: TX channel not
->>>>> available, switch to pio
->>>>> instead of:
->>>>> atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
->>>>>
->>>> Fixed.
->>>>> And the kernel doesn't log anymore on the serial console, despite the
->>>>> loglevel=8
->>>>> (after reverting this series, the kernel logs reappears on the serial
->>>>> console)
->>>>>
->>>> Which serial are you using as console?
->>> fffff200.serial (sam9g35-cm)
->>> ( stdout-path = "serial0:115200n8"; in the DTS )
->>>
->>> With this series applied, all the kernel log goes on the screen.
->>> Without, it goes on the serial debug.
->>>
->> I tested again with archlinux arm and poky-linux4sam release as distros
->> and kernel log goes on the serial debug. Can you give me more details
->> like cmdline?
-> I used kernel 4.17-rc6
-> at91_dt_defconfig
-> at91sam9g35ek.dtb
-> 
-> Kernel command line: root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs
-I reproduced your issue.
-If in cmdline console is not set like this "console=ttyS0,115200", the 
-console goes to the lcd.
-> ( the one from the DTS )
-> 
-> Detailed instructions:
-> 
-> git checkout v4.17-rc6
-> ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 at91_dt_defconfig
-> ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
-> cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
-> 
->  From uboot:
-> tftpboot 0x20007FC0 uImage
-> tftpboot 0x26400000 at91sam9g35ek.dtb
-> bootm 0x20007FC0 - 0x26400000
-> 
-> [ I see the logs on the serial debug ]
-> 
-> git am \[PATCH\ v3\ [1-6]*
-> 
-> ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
-> cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
-> 
->  From uboot:
-> tftpboot 0x20007FC0 uImage
-> tftpboot 0x26400000 at91sam9g35ek.dtb
-> bootm 0x20007FC0 - 0x26400000
-> 
-> [ I don't see the logs on the serial debug anymore ]
-> 
-> 
->>>>> (tests done on sam9g35)
->>>>>
->>>> I will consider the rest of suggestions.
->>>>> regards,
->>>>> Richard
->>>
-> 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 248b930563e5..11f91744ffb0 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
++#include <asm/cputype.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
+@@ -311,8 +312,17 @@ static inline void kvm_arm_vhe_guest_exit(void) {}
+ 
+ static inline bool kvm_arm_harden_branch_predictor(void)
+ {
+-	/* No way to detect it yet, pretend it is not there. */
+-	return false;
++	switch(read_cpuid_part()) {
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	case ARM_CPU_PART_BRAHMA_B15:
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A15:
++	case ARM_CPU_PART_CORTEX_A17:
++		return true;
++#endif
++	default:
++		return false;
++	}
+ }
+ 
+ #endif /* __ARM_KVM_HOST_H__ */
+-- 
+2.7.4
