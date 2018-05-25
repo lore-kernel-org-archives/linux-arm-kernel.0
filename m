@@ -1,161 +1,44 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 25 May 2018 11:10:11 +0530
-Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <20180524173926.GC14924@minitux>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
- <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
- <20180524173926.GC14924@minitux>
-Message-ID: <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 25 May 2018 11:10:00 +0530
+Subject: [PATCH 0/6] arm64: dts: Add missing cooling device properties for CPUs
+Message-ID: <cover.1527225682.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hello,
 
-On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
-> On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
-> 
->> From: Stephen Boyd <sboyd@codeaurora.org>
->>
->> Krait CPUs have a handful of L2 cache controller registers that
->> live behind a cp15 based indirection register. First you program
->> the indirection register (l2cpselr) to point the L2 'window'
->> register (l2cpdr) at what you want to read/write.  Then you
->> read/write the 'window' register to do what you want. The
->> l2cpselr register is not banked per-cpu so we must lock around
->> accesses to it to prevent other CPUs from re-pointing l2cpdr
->> underneath us.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> This should have your signed-off-by here as well.
-> 
+This fixes missing cooling device properties for CPUs for the ARM64
+platforms. This is build tested by the zero day testing infrastructure
+as well.
 
- ok.
+Individual maintainers can pick the patches to their SoC trees or I will
+ask ARM SoC maintainers to pick them up later.
 
-> Apart from that:
-> 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> 
+--
+viresh
 
- Thanks.
+Viresh Kumar (6):
+  arm64: dts: amlogic: Add missing cooling device properties for CPUs
+  arm64: dts: freescale: Add missing cooling device properties for CPUs
+  arm64: dts: hisilicon: Add missing cooling device properties for CPUs
+  arm64: dts: mediatek: Add missing cooling device properties for CPUs
+  arm64: dts: rockchip: Add missing cooling device properties for CPUs
+  arm64: dts: socionext: Add missing cooling device properties for CPUs
 
-Regards,
- Sricharan
-
-
-> Regards,
-> Bjorn
-> 
->> ---
->>  arch/arm/common/Kconfig                   |  3 ++
->>  arch/arm/common/Makefile                  |  1 +
->>  arch/arm/common/krait-l2-accessors.c      | 48 +++++++++++++++++++++++++++++++
->>  arch/arm/include/asm/krait-l2-accessors.h | 10 +++++++
->>  4 files changed, 62 insertions(+)
->>  create mode 100644 arch/arm/common/krait-l2-accessors.c
->>  create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
->>
->> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
->> index e5ad070..c8e1986 100644
->> --- a/arch/arm/common/Kconfig
->> +++ b/arch/arm/common/Kconfig
->> @@ -7,6 +7,9 @@ config DMABOUNCE
->>  	bool
->>  	select ZONE_DMA
->>  
->> +config KRAIT_L2_ACCESSORS
->> +	bool
->> +
->>  config SHARP_LOCOMO
->>  	bool
->>  
->> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
->> index 70b4a14..eec6cd1 100644
->> --- a/arch/arm/common/Makefile
->> +++ b/arch/arm/common/Makefile
->> @@ -7,6 +7,7 @@ obj-y				+= firmware.o
->>  
->>  obj-$(CONFIG_SA1111)		+= sa1111.o
->>  obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
->> +obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
->>  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
->>  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
->>  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
->> diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
->> new file mode 100644
->> index 0000000..9a97dda
->> --- /dev/null
->> +++ b/arch/arm/common/krait-l2-accessors.c
->> @@ -0,0 +1,48 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
->> +
->> +#include <linux/spinlock.h>
->> +#include <linux/export.h>
->> +
->> +#include <asm/barrier.h>
->> +#include <asm/krait-l2-accessors.h>
->> +
->> +static DEFINE_RAW_SPINLOCK(krait_l2_lock);
->> +
->> +void krait_set_l2_indirect_reg(u32 addr, u32 val)
->> +{
->> +	unsigned long flags;
->> +
->> +	raw_spin_lock_irqsave(&krait_l2_lock, flags);
->> +	/*
->> +	 * Select the L2 window by poking l2cpselr, then write to the window
->> +	 * via l2cpdr.
->> +	 */
->> +	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
->> +	isb();
->> +	asm volatile ("mcr p15, 3, %0, c15, c0, 7 @ l2cpdr" : : "r" (val));
->> +	isb();
->> +
->> +	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
->> +}
->> +EXPORT_SYMBOL(krait_set_l2_indirect_reg);
->> +
->> +u32 krait_get_l2_indirect_reg(u32 addr)
->> +{
->> +	u32 val;
->> +	unsigned long flags;
->> +
->> +	raw_spin_lock_irqsave(&krait_l2_lock, flags);
->> +	/*
->> +	 * Select the L2 window by poking l2cpselr, then read from the window
->> +	 * via l2cpdr.
->> +	 */
->> +	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
->> +	isb();
->> +	asm volatile ("mrc p15, 3, %0, c15, c0, 7 @ l2cpdr" : "=r" (val));
->> +
->> +	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
->> +
->> +	return val;
->> +}
->> +EXPORT_SYMBOL(krait_get_l2_indirect_reg);
->> diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
->> new file mode 100644
->> index 0000000..dd7c474
->> --- /dev/null
->> +++ b/arch/arm/include/asm/krait-l2-accessors.h
->> @@ -0,0 +1,10 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
->> +
->> +#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
->> +#define __ASMARM_KRAIT_L2_ACCESSORS_H
->> +
->> +extern void krait_set_l2_indirect_reg(u32 addr, u32 val);
->> +extern u32 krait_get_l2_indirect_reg(u32 addr);
->> +
->> +#endif
->> -- 
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->>
+ .../boot/dts/amlogic/meson-gxm-khadas-vim2.dts     | 24 ++++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  5 ++++-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |  3 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     |  6 ++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  4 ++++
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     |  4 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 16 ++++++++++++++-
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           |  1 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  2 ++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  3 +++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 12 +++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  8 ++++++--
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |  2 ++
+ 13 files changed, 86 insertions(+), 4 deletions(-)
 
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.15.0.194.g9af6a3dea062
