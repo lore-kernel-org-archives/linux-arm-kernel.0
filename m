@@ -1,23 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 15:29:09 -0700
-Subject: [PATCH 1/2] arm64: dts: Add GPIO and GPIO keys device nodes
-In-Reply-To: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
-References: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
-Message-ID: <20180525222909.sedcwcakptjoetma@localhost>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 25 May 2018 17:41:05 -0500
+Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.18 - Part 2
+Message-ID: <1527288065-27438-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 10:40:03AM +0800, Baolin Wang wrote:
-> This patch adds device nodes to enable one GPIO controller located on
-> digital chip, 2 EIC (external interrupt controller) controllers loacted
-> on PMIC and digital chip for Spreadtrum SC9860 platform.
-> 
-> Moreover this patch adds 3 GPIO keys relied on EIC controller to support
-> power key and volume up/down keys.
-> 
-> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+The following changes since commit 57fc67ef0d35af11fbb1b928e359b370889994ae:
 
-Applied with "sprd:" added to the subject.
+  arm64: dts: qcom: msm8996: Add ufs related nodes (2018-05-22 23:29:03 -0500)
 
+are available in the git repository at:
 
--Olof
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.18-2
+
+for you to fetch changes up to d8f8d467f53a192041193fc17176ceb013f4d041:
+
+  arm64: dts: apq8096-db820c: Removed bt-en-1-8v regulator (2018-05-25 16:21:05 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Updates for v4.18 Part 2
+
+* Fix UFS GDSC on msm8996
+* Remove unused BT node regulator
+* Correct WLAN PCIe regulator endpoint name
+
+----------------------------------------------------------------
+Bjorn Andersson (1):
+      arm64: dts: qcom: msm8996: Use UFS_GDSC for UFS
+
+Niklas Cassel (1):
+      arm64: dts: fix regulator property name for wlan pcie endpoint
+
+Thierry Escande (1):
+      arm64: dts: apq8096-db820c: Removed bt-en-1-8v regulator
+
+ arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi |  2 +-
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi           | 16 +---------------
+ arch/arm64/boot/dts/qcom/msm8996.dtsi                  |  4 ++--
+ 3 files changed, 4 insertions(+), 18 deletions(-)
