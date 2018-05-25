@@ -1,55 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 25 May 2018 14:34:02 +0200
-Subject: [PATCH 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
- manage multi PM domains
-In-Reply-To: <b3a94d63-678c-eab6-47a8-43eca95da979@nvidia.com>
-References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
- <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
- <1c21d18e-954a-f3a8-9817-0117b7cb7e4f@nvidia.com>
- <CAPDyKFozm88OM8cDFXXwvgdMirrt2=HhZtBdyhNjo2bgjHV2Mg@mail.gmail.com>
- <2c63af8c-4745-a751-8d3d-f7122e921e6f@nvidia.com>
- <CAPDyKFrTtvhxOhf9BPY1=cJ9VQyx9D=P3O0vCV+WXSVR82FozQ@mail.gmail.com>
- <b3a94d63-678c-eab6-47a8-43eca95da979@nvidia.com>
-Message-ID: <CAPDyKFphA8iEpRv2RipqDygt6i4W7VOE65JWCxOH=R_xzLCJzg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 25 May 2018 05:21:34 -0700
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.18
+In-Reply-To: <CAK7LNATphrRyYvMXMMJz--UtfNk2BZLWHAp3XXpQLob5=5w2Qg@mail.gmail.com>
+References: <CAK7LNATphrRyYvMXMMJz--UtfNk2BZLWHAp3XXpQLob5=5w2Qg@mail.gmail.com>
+Message-ID: <20180525122134.zigckjuxovguyc7a@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2018 at 13:07, Jon Hunter <jonathanh@nvidia.com> wrote:
->
->
-> On 25/05/18 11:45, Ulf Hansson wrote:
->
-> ...
->
->>> Right, but this case still seems like an error. My understanding is that
->>> only drivers will use this API directly and it will not be used by the
->>> device driver core (unlike dev_pm_domain_attach), so if anyone calls this
->>> attempting to attach another PM domain when one is already attached, they
->>> are doing something wrong.
->>
->>
->> [...]
->>
->> You may be right!
->>
->> What I was thinking of is whether multiple PM domains may be optional
->> in some cases, but instead a PM domain have already been attached by
->> dev_pm_domain_attach(), prior the driver starts to probe.
->>
->> Then, assuming we return an error for this case, that means the caller
->> then need to check the dev->pm_domain pointer, prior calling
->> dev_pm_domain_attach_by_id(). Wouldn't it? Perhaps that is more clear
->> though?
->
->
-> IMO the driver should know whether is needs multiple power-domains or not
-> and if it needs multiple then it should just call
-> dev_pm_domain_attach_by_id() N times without needing to checking
-> dev->pm_domain first. If it fails then either the PM domain core did
-> something wrong or power-domains are missing from DT, but either way there
-> is an error, so let it fail.
+On Sun, May 20, 2018 at 11:34:08AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
+> 
+> Here are UniPhier DT (32bit) updates for the v4.18 merge window.
+> Please pull!
+> 
+> 
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> 
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-dt-v4.18
+> 
+> for you to fetch changes up to 526f872b8492fbfb1a0f342e601bdc5ba322f16b:
+> 
+>   ARM: dts: uniphier: add syscon-phy-mode property to each ethernet
+> node (2018-04-25 00:21:51 +0900)
+> 
+> ----------------------------------------------------------------
+> UniPhier ARM SoC DT updates for v4.18
+> 
+> - add more properties to ethernet nodes
+> 
+> ----------------------------------------------------------------
+> Kunihiko Hayashi (2):
+>       ARM: dts: uniphier: add required clocks and resets to Pro4 ethernet node
+>       ARM: dts: uniphier: add syscon-phy-mode property to each ethernet node
 
-Right, sounds reasonable!
+Hi,
 
-Kind regards
-Uffe
+Merged, but please spend a little more effort on the tag description (what are
+these new properties giving you in functionality?)
+
+
+-Olof
