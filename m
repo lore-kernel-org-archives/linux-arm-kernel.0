@@ -1,271 +1,156 @@
-From: robert.walker@arm.com (Robert Walker)
-Date: Fri, 25 May 2018 14:56:42 +0100
-Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
-In-Reply-To: <20180523132203.GA30299@leoy-ThinkPad-X240s>
-References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
- <1526892748-326-2-git-send-email-leo.yan@linaro.org>
- <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
- <20180522083920.GD31075@leoy-ThinkPad-X240s>
- <20180522095249.GE31075@leoy-ThinkPad-X240s>
- <3c9cdb5c-e1e0-f76d-5367-02aaf668b232@arm.com>
- <20180523132203.GA30299@leoy-ThinkPad-X240s>
-Message-ID: <78ccb81d-3055-ae2a-a058-a6cfe7fa1ce4@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 May 2018 14:59:39 +0100
+Subject: [PATCH v3 00/15] ARM Spectre variant 2 fixes
+Message-ID: <20180525135938.GE17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Third version:
+- Remove "PSCI" from the SMC version of the workaround as well.
+- Avoid reporting active workaround if the IBE bit is not set.
+- Only probe for workaround_1 on Cortex A57 and A72, or non-ARM CPUs.
+- Require features probe for workaround_1 to return zero.
+- Validation that all CPUs in the system have the same workaround status.
+- Avoid corrupting r12 in workaround_1 KVM hypervisor implementation.
 
+ arch/arm/include/asm/bugs.h        |   6 +-
+ arch/arm/include/asm/cp15.h        |   3 +
+ arch/arm/include/asm/cputype.h     |   8 ++
+ arch/arm/include/asm/kvm_asm.h     |   2 -
+ arch/arm/include/asm/kvm_host.h    |  14 ++-
+ arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
+ arch/arm/include/asm/proc-fns.h    |   4 +
+ arch/arm/include/asm/system_misc.h |  15 ++++
+ arch/arm/kernel/Makefile           |   1 +
+ arch/arm/kernel/bugs.c             |  18 ++++
+ arch/arm/kernel/smp.c              |   4 +
+ arch/arm/kernel/suspend.c          |   2 +
+ arch/arm/kvm/hyp/hyp-entry.S       | 112 +++++++++++++++++++++++-
+ arch/arm/mm/Kconfig                |  23 +++++
+ arch/arm/mm/Makefile               |   2 +-
+ arch/arm/mm/fault.c                |   3 +
+ arch/arm/mm/proc-macros.S          |   3 +-
+ arch/arm/mm/proc-v7-2level.S       |   6 --
+ arch/arm/mm/proc-v7-bugs.c         | 170 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S              | 154 ++++++++++++++++++++++++++-------
+ 20 files changed, 523 insertions(+), 50 deletions(-)
+ create mode 100644 arch/arm/kernel/bugs.c
+ create mode 100644 arch/arm/mm/proc-v7-bugs.c
 
-On 23/05/18 14:22, Leo Yan wrote:
-> Hi Rob,
->
-> On Wed, May 23, 2018 at 12:21:18PM +0100, Robert Walker wrote:
->> Hi Leo,
->>
->> On 22/05/18 10:52, Leo Yan wrote:
->>> On Tue, May 22, 2018 at 04:39:20PM +0800, Leo Yan wrote:
->>>
->>> [...]
->>>
->>> Rather than the patch I posted in my previous email, I think below new
->>> patch is more reasonable for me.
->>>
->>> In the below change, 'etmq->prev_packet' is only used to store the
->>> previous CS_ETM_RANGE packet, we don't need to save CS_ETM_TRACE_ON
->>> packet into 'etmq->prev_packet'.
->>>
->>> On the other hand, cs_etm__flush() can use 'etmq->period_instructions'
->>> to indicate if need to generate instruction sample or not.  If it's
->>> non-zero, then generate instruction sample and
->>> 'etmq->period_instructions' will be cleared; so next time if there
->>> have more tracing CS_ETM_TRACE_ON packet, it can skip to generate
->>> instruction sample due 'etmq->period_instructions' is zero.
->>>
->>> How about you think for this?
->>>
->>> Thanks,
->>> Leo Yan
->>>
->> I don't think this covers the cases where CS_ETM_TRACE_ON is used to
->> indicate a discontinuity in the trace.  For example, there is work in
->> progress to configure the ETM so that it only traces a few thousand cycles
->> with a gap of many thousands of cycles between each chunk of trace - this
->> can be used to sample program execution in the form of instruction events
->> with branch stacks for feedback directed optimization (AutoFDO).
->>
->> In this case, the raw trace is something like:
->>
->>      ...
->>      I_ADDR_L_64IS0 : Address, Long, 64 bit, IS0.; Addr=0x0000007E7B886908;
->>      I_ATOM_F3 : Atom format 3.; EEN
->>      I_ATOM_F1 : Atom format 1.; E
->> # Trace stops here
->>
->> # Some time passes, and then trace is turned on again
->>      I_TRACE_ON : Trace On.
->>      I_ADDR_CTXT_L_64IS0 : Address & Context, Long, 64 bit, IS0.;
->> Addr=0x00000057224322F4; Ctxt: AArch64,EL0, NS;
->>      I_ATOM_F3 : Atom format 3.; ENN
->>      I_ATOM_F5 : Atom format 5.; ENENE
->>      ...
->>
->> This results in the following packets from the decoder:
->>
->> CS_ETM_RANGE: [0x7e7b886908-0x7e7b886930] br
->> CS_ETM_RANGE: [0x7e7b88699c-0x7e7b8869a4] br
->> CS_ETM_RANGE: [0x7e7b8869d8-0x7e7b8869f0]
->> CS_ETM_RANGE: [0x7e7b8869f0-0x7e7b8869fc] br
->> CS_ETM_TRACE_ON
->> CS_ETM_RANGE: [0x57224322f4-0x5722432304] br
->> CS_ETM_RANGE: [0x57224320e8-0x57224320ec]
->> CS_ETM_RANGE: [0x57224320ec-0x57224320f8]
->> CS_ETM_RANGE: [0x57224320f8-0x572243212c] br
->> CS_ETM_RANGE: [0x5722439b80-0x5722439bec]
->> CS_ETM_RANGE: [0x5722439bec-0x5722439c14] br
->> CS_ETM_RANGE: [0x5722437c30-0x5722437c6c]
->> CS_ETM_RANGE: [0x5722437c6c-0x5722437c7c] br
->>
->> Without handling the CS_ETM_TRACE_ON, this would be interpreted as a branch
->> from 0x7e7b8869f8 to 0x57224322f4, when there is actually a gap of many
->> thousand instructions between these.
->>
->> I think this patch will break the branch stacks - by removing the
->> prev_packet swap from cs_etm__flush(), the next time a CS_ETM_RANGE packet
->> is handled, cs_etm__sample() will see prev_packet contains the last
->> CS_ETM_RANGE from the previous block of trace, causing an erroneous call to
->> cs_etm__update_last_branch_rb().  In the example above, the branch stack
->> will contain an erroneous branch from 0x7e7b8869f8 to 0x57224322f4.
->>
->> I think what you need to do is add a check for the previous packet being a
->> CS_ETM_TRACE_ON when determining the generate_sample value.
-> I still can see there have hole for packets handling with your
-> suggestion, let's focus on below three packets:
->
-> CS_ETM_RANGE:    [0x7e7b8869f0-0x7e7b8869fc] br
-> CS_ETM_TRACE_ON: [0xdeadbeefdeadbeef-0xdeadbeefdeadbeef]
-> CS_ETM_RANGE:    [0x57224322f4-0x5722432304] br
->
-> When the CS_ETM_TRACE_ON packet is coming, cs_etm__flush() doesn't
-> handle for 'etmq->prev_packet' to generate branch sample, this results
-> in we miss the info for 0x7e7b8869fc, and with packet swapping
-> 'etmq->prev_packet' is assigned to CS_ETM_TRACE_ON packet.
->
-> When the last CS_ETM_RANGE packet is coming, cs_etm__sample() will
-> combine the values from CS_ETM_TRACE_ON packet and the last
-> CS_ETM_RANGE packet to generate branch sample packet; at the end
-> we get below sample packets:
->
->    packet(n):   sample::addr=0x7e7b8869f0
->    packet(n+1): sample::ip=0xdeadbeefdeadbeeb sample::addr=0x57224322f4
->
-> So I think we also need to generate branch sample, and we can get
-> below results:
->
->    packet(n):   sample::addr=0x7e7b8869f0
->    packet(n+1): sample::ip=0x7e7b8869f8 sample::addr=0xdeadbeefdeadbeef
->    packet(n+2): sample::ip=0xdeadbeefdeadbeeb sample::addr=0x57224322f4
->
-> So we also can rely on this to get to know there have one address
-> range is [0xdeadbeefdeadbeef..0xdeadbeefdeadbeeb] to indicate there
-> have a discontinuity in the trace.
-Yes, I agree you need the extra branch sample from cs_etm__flush().
+On Mon, May 21, 2018 at 12:42:38PM +0100, Russell King - ARM Linux wrote:
+> This is the second posting - the original cover note is below.  Comments
+> from previous series addresesd:
+> - Drop R7 and R8 changes.
+> - Remove "PSCI" from the hypervisor version of the workaround.
+> 
+>  arch/arm/include/asm/bugs.h        |   6 +-
+>  arch/arm/include/asm/cp15.h        |   3 +
+>  arch/arm/include/asm/cputype.h     |   5 ++
+>  arch/arm/include/asm/kvm_asm.h     |   2 -
+>  arch/arm/include/asm/kvm_host.h    |  14 +++-
+>  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
+>  arch/arm/include/asm/proc-fns.h    |   4 +
+>  arch/arm/include/asm/system_misc.h |   8 ++
+>  arch/arm/kernel/Makefile           |   1 +
+>  arch/arm/kernel/bugs.c             |  18 +++++
+>  arch/arm/kernel/smp.c              |   4 +
+>  arch/arm/kernel/suspend.c          |   2 +
+>  arch/arm/kvm/hyp/hyp-entry.S       | 108 +++++++++++++++++++++++++-
+>  arch/arm/mm/Kconfig                |  23 ++++++
+>  arch/arm/mm/Makefile               |   2 +-
+>  arch/arm/mm/fault.c                |   3 +
+>  arch/arm/mm/proc-macros.S          |   3 +-
+>  arch/arm/mm/proc-v7-2level.S       |   6 --
+>  arch/arm/mm/proc-v7-bugs.c         | 130 +++++++++++++++++++++++++++++++
+>  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++++++--------
+>  20 files changed, 469 insertions(+), 50 deletions(-)
+>  create mode 100644 arch/arm/kernel/bugs.c
+>  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> 
+> On Wed, May 16, 2018 at 11:59:49AM +0100, Russell King - ARM Linux wrote:
+> > This series addresses the Spectre variant 2 issues on ARM Cortex and
+> > Broadcom Brahma B15 CPUs.  Due to the complexity of the bug, it is not
+> > possible to verify that this series fixes any of the bugs, since it
+> > has not been able to reproduce these exact scenarios using test
+> > programs.
+> > 
+> > I believe that this covers the entire extent of the Spectre variant 2
+> > issues, with the exception of Cortex A53 and Cortex A72 processors as
+> > these require a substantially more complex solution (except where the
+> > workaround is implemented in PSCI firmware.)
+> > 
+> > Spectre variant 1 is not covered by this series.
+> > 
+> > The patch series is based partly on Marc Zyngier's work from February -
+> > two of the KVM patches are from Marc's work.
+> > 
+> > The main differences are:
+> > - Inclusion of more processors as per current ARM Ltd security update
+> >   documentation.
+> > - Extension of "bugs" infrastructure to detect Cortex A8 and Cortex A15
+> >   CPUs missing out on the IBE bit being set on (re-)entry to the kernel
+> >   through all paths.
+> > - Handle all suspect userspace-touching-kernelspace aborts irrespective
+> >   of mapping type.
+> > 
+> > The first patch will trivially conflict with the Broadcom Brahma
+> > updates already in arm-soc - it has been necessary to independently
+> > add the ID definitions for the B15 CPU.
+> > 
+> > Having worked through this series, I'm of the opinion that the
+> > define_processor_functions macro in proc-v7 are probably  more hassle
+> > than they're worth - here, we don't need the global equivalent symbols,
+> > because we never refer to them from the kernel code for any V7
+> > processor (MULTI_CPU is always defined.)
+> > 
+> > This series is currently in my "spectre" branch (along with some
+> > Spectre variant 1 patches.)
+> > 
+> > Please carefully review.
+> > 
+> >  arch/arm/include/asm/bugs.h        |   6 +-
+> >  arch/arm/include/asm/cp15.h        |   3 +
+> >  arch/arm/include/asm/cputype.h     |   5 ++
+> >  arch/arm/include/asm/kvm_asm.h     |   2 -
+> >  arch/arm/include/asm/kvm_host.h    |  14 +++-
+> >  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
+> >  arch/arm/include/asm/proc-fns.h    |   4 +
+> >  arch/arm/include/asm/system_misc.h |   8 ++
+> >  arch/arm/kernel/Makefile           |   1 +
+> >  arch/arm/kernel/bugs.c             |  18 +++++
+> >  arch/arm/kernel/smp.c              |   4 +
+> >  arch/arm/kernel/suspend.c          |   2 +
+> >  arch/arm/kvm/hyp/hyp-entry.S       | 108 ++++++++++++++++++++++++-
+> >  arch/arm/mm/Kconfig                |  23 ++++++
+> >  arch/arm/mm/Makefile               |   2 +-
+> >  arch/arm/mm/fault.c                |   3 +
+> >  arch/arm/mm/proc-macros.S          |   3 +-
+> >  arch/arm/mm/proc-v7-2level.S       |   6 --
+> >  arch/arm/mm/proc-v7-bugs.c         | 130 ++++++++++++++++++++++++++++++
+> >  arch/arm/mm/proc-v7.S              | 158 +++++++++++++++++++++++++++++--------
+> >  20 files changed, 471 insertions(+), 52 deletions(-)
+> > 
+> > -- 
+> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> > According to speedtest.net: 8.21Mbps down 510kbps up
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-With a discontinuity in trace, I get output from perf script like this:
-
-branches:u:??????? 59ee6e2e08 sqlite3VdbeExec (speedtest1) =>?????? 
-59ee6e2e64 sqlite3VdbeExec (spe
-branches:u:??????? 59ee6e2e7c sqlite3VdbeExec (speedtest1) =>?????? 
-59ee6e2eec sqlite3VdbeExec (spe
-branches:u:??????? 59ee6e2efc sqlite3VdbeExec (speedtest1) =>?????? 
-59ee6e2f14 sqlite3VdbeExec (spe
-branches:u:??????? 59ee6e2f3c sqlite3VdbeExec (speedtest1) => 
-deadbeefdeadbeef [unknown] ([unknown])
-branches:u:? deadbeefdeadbeeb [unknown] ([unknown]) => 769949daa0 memcpy 
-(/system/lib64/libc.so)
-branches:u:??????? 769949dacc memcpy (/system/lib64/libc.so) =>?????? 
-59ee6f0664 insertCell (speedtest1)
-branches:u:??????? 59ee6f0664 insertCell (speedtest1) => 59ee6f0684 
-insertCell (speedtest1)
-branches:u:??????? 59ee6f06a4 insertCell (speedtest1) => 59ee6a4d50 
-memmove at plt (speedtest1)
-branches:u:??????? 59ee6a4d5c memmove at plt (speedtest1) => 769949ebf8 
-memmove (/system/lib64/libc.so)
-
-Showing there is a break in trace between 59ee6e2f3c and 769949daa0.? 
-The deadbeefdeadbeef addresses are a bit ugly - these are just dummy 
-values emitted in the decoder layer - maybe these should be changed to 
-0.? Or you could add a new sample type (i.e. not branch) to indicate the 
-start / end of trace, with only the valid address.
-
-With this change, it becomes the same as the patch from your previous mail.
-
-Regards
-
-Rob
-
->> Regards
->>
->> Rob
->>
->>> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
->>> index 822ba91..dd354ad 100644
->>> --- a/tools/perf/util/cs-etm.c
->>> +++ b/tools/perf/util/cs-etm.c
->>> @@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
->>>   static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
->>>   {
->>>   	/*
->>> +	 * The packet is the start tracing packet if the end_addr is zero,
->>> +	 * returns 0 for this case.
->>> +	 */
->>> +	if (!packet->end_addr)
->>> +		return 0;
->>> +
->>> +	/*
->>>   	 * The packet records the execution range with an exclusive end address
->>>   	 *
->>>   	 * A64 instructions are constant size, so the last executed
->>> @@ -897,13 +904,27 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
->>>   		etmq->period_instructions = instrs_over;
->>>   	}
->>> -	if (etm->sample_branches &&
->>> -	    etmq->prev_packet &&
->>> -	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
->>> -	    etmq->prev_packet->last_instr_taken_branch) {
->>> -		ret = cs_etm__synth_branch_sample(etmq);
->>> -		if (ret)
->>> -			return ret;
->>> +	if (etm->sample_branches && etmq->prev_packet) {
->>> +		bool generate_sample = false;
->>> +
->>> +		/* Generate sample for start tracing packet */
->>> +		if (etmq->prev_packet->sample_type == 0)
->>> +			generate_sample = true;
->> Also check for etmq->prev_packet->sample_type == CS_ETM_TRACE_ON here and
->> set generate_sample = true.
-> Agree, will add this.
->
->>> +
->>> +		/* Generate sample for exception packet */
->>> +		if (etmq->prev_packet->exc == true)
->>> +			generate_sample = true;
->>> +
->>> +		/* Generate sample for normal branch packet */
->>> +		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
->>> +		    etmq->prev_packet->last_instr_taken_branch)
->>> +			generate_sample = true;
->>> +
->>> +		if (generate_sample) {
->>> +			ret = cs_etm__synth_branch_sample(etmq);
->>> +			if (ret)
->>> +				return ret;
->>> +		}
->>>   	}
->>>   	if (etm->sample_branches || etm->synth_opts.last_branch) {
->>> @@ -922,11 +943,12 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
->>>   static int cs_etm__flush(struct cs_etm_queue *etmq)
->>>   {
->>>   	int err = 0;
->>> -	struct cs_etm_packet *tmp;
->>>   	if (etmq->etm->synth_opts.last_branch &&
->>>   	    etmq->prev_packet &&
->>> -	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
->>> +	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
->>> +	    etmq->period_instructions) {
->>> +
->> I don't think this is needed.
-> Okay, I will keep this.
->
->>>   		/*
->>>   		 * Generate a last branch event for the branches left in the
->>>   		 * circular buffer at the end of the trace.
->>> @@ -940,14 +962,6 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
->>>   			etmq, addr,
->>>   			etmq->period_instructions);
->>>   		etmq->period_instructions = 0;
->>> -
->>> -		/*
->>> -		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
->>> -		 * the next incoming packet.
->>> -		 */
->>> -		tmp = etmq->packet;
->>> -		etmq->packet = etmq->prev_packet;
->>> -		etmq->prev_packet = tmp;
->> This should not be changed as discussed above.
-> Okay, will keep this.  But I suggest we add some change like below:
->
-> +    if (etm->sample_branches) {
-> +        err = cs_etm__synth_branch_sample(etmq);
-> +        if (err)
-> +            return err;
-> +    }
->
-> If so, could you review my posted another patch for this?
-> http://archive.armlinux.org.uk/lurker/message/20180522.083920.184f1f78.en.html
-WIll do - with these changes, it is the same as your original patch.
-> Thanks,
-> Leo Yan
->
->>>   	}
->>>   	return err;
->>>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
