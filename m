@@ -1,52 +1,142 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Fri, 25 May 2018 17:36:53 +0800
-Subject: [PATCH v3 3/8] drm/mediatek: add connection from OD1 to RDMA1
-In-Reply-To: <1527218776.27165.5.camel@mtksdaap41>
-References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
- <1527215665-11937-4-git-send-email-stu.hsieh@mediatek.com>
- <1527218776.27165.5.camel@mtksdaap41>
-Message-ID: <1527241013.11190.11.camel@mtksdccf07>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 25 May 2018 10:45:17 +0100
+Subject: [PATCH v10 07/18] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <20180525090020.GA54529@C02W217FHV2R.local>
+References: <1527005119-6842-8-git-send-email-Dave.Martin@arm.com>
+ <20180523114812.GH55598@C02W217FHV2R.local>
+ <20180523133158.GJ13470@e103592.cambridge.arm.com>
+ <20180523145657.g7b6v2q2vxfqpoc4@armageddon.cambridge.arm.com>
+ <20180523150337.GO13470@e103592.cambridge.arm.com>
+ <20180524083350.GK55598@C02W217FHV2R.local>
+ <20180524095056.GR13470@e103592.cambridge.arm.com>
+ <20180524100659.GO55598@C02W217FHV2R.local>
+ <20180524143714.GV13470@e103592.cambridge.arm.com>
+ <20180525090020.GA54529@C02W217FHV2R.local>
+Message-ID: <20180525094515.GA13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, CK:
+On Fri, May 25, 2018 at 11:00:20AM +0200, Christoffer Dall wrote:
+> On Thu, May 24, 2018 at 03:37:15PM +0100, Dave Martin wrote:
+> > On Thu, May 24, 2018 at 12:06:59PM +0200, Christoffer Dall wrote:
+> > > On Thu, May 24, 2018 at 10:50:56AM +0100, Dave Martin wrote:
 
-For this patch, I would move it after "add ddp component OD1"
-And add this line "#define OD1_MOUT_EN_RDMA1              BIT(16)" from
-the path "Add support for mediatek SOC MT2712" to this patch
+[...]
 
-Regards,
-Stu
+> > > I'm not sure what the reader is to make of that.  Do you not mean the
+> > > TIF_FOREIGN_FPSTATE is always true for kernel threads?
+> > 
+> > Again, this is probably a red herring.  TIF_FOREIGN_FPSTATE is always
+> > true for kernel threads prior to the patch, except (randomly) for the
+> > init task.
+> 
+> That was really what my initial question was about, and what I thought
+> the commit message should make abundantly clear, because that ties the
+> message together with the code.
+> 
+> > 
+> > This change is not really about TIF_FOREIGN_FPSTATE at all, rather
+> > that there is nothing to justify handling kernel threads differently,
+> > or even distinguishing kernel threads from user threads at all in this
+> > code.
+> 
+> Understood.
 
-On Fri, 2018-05-25 at 11:26 +0800, CK Hu wrote:
-> Hi, Stu:
-> 
-> On Fri, 2018-05-25 at 10:34 +0800, stu.hsieh at mediatek.com wrote:
-> > From: Stu Hsieh <stu.hsieh@mediatek.com>
+And my bad was that I hadn't gone to the effort of understanding my own
+argument -- I'd glad to be called out on that.
+
+> > Part of the confusion (and I had confused myself) comes from the fact
+> > that TIF_FOREIGN_FPSTATE is really a per-cpu property and doesn't make
+> > sense as a per-task property -- i.e., the flag is meaningless for
+> > scheduled-out tasks and we must explicitly "repair" it when scheduling
+> > a task in anyway.  I think it's a thread flag primarily so that it's
+> > convenient to check alongside other thread flags in the ret_to_user
+> > work loop.  This is somewhat less of a justification now that loop was
+> > ported to C.
 > > 
-> > This patch add the connection from OD1 to RDMA1 for ext path.
+> > > > 
+> > > > The context switch logic is already deliberately optimised to defer
+> > > > reloads of the regs until ret_to_user (or sigreturn as a special
+> > > > case), and save them only if they have been previously loaded.
+> > 
+> > Does it help to insert the following here?
+> > 
+> > "These paths are the only places where the wrong_task and wrong_cpu
+> > conditions can be made false, by calling fpsimd_bind_task_to_cpu()."
 > > 
 > 
-> Reviewed-by: CK Hu <ck.hu@mediatek.com>
+> yes it does.
 > 
-> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 +++
-> >  1 file changed, 3 insertions(+)
+> > > > Kernel threads by definition never reach these paths.  As a result,
+> > > 
+> > > I'm struggling with the "As a result," here.  Is this because reloads of
+> > > regs in ret_to_user (or sigreturn) are the only places that can make
+> > > wrong_cpu or wrong_task be false?
 > > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > index 47ffa240bd25..0f568dd853d8 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > @@ -151,6 +151,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
-> >  	} else if (cur == DDP_COMPONENT_GAMMA && next == DDP_COMPONENT_RDMA1) {
-> >  		*addr = DISP_REG_CONFIG_DISP_GAMMA_MOUT_EN;
-> >  		value = GAMMA_MOUT_EN_RDMA1;
-> > +	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
-> > +		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
-> > +		value = OD1_MOUT_EN_RDMA1;
-> >  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
-> >  		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
-> >  		value = RDMA1_MOUT_DPI0;
+> > See the proposed clarification above.  Is that sufficient?
+> > 
 > 
+> yes.
 > 
+> > > (I'm actually wanting to understand this, not just bikeshedding the
+> > > commit message, as new corner cases keep coming up on this logic.)
+> > 
+> > That's a good thing, and I would really like to explain it in a
+> > concise manner.  See [*] below for the "concise" explanation -- it may
+> > demonstrate why I've been evasive...
+> > 
+> 
+> I don't think you've been evasive at all, I just think we reason about
+> this in slightly different ways, and I was trying to convince myself why
+> this change is safe and summarize that concisely.  I think we've
+> accomplished both :)
+
+OK, good.  I reposted speculatively on this basis :)
+
+The commit message is in better shape now, and I very much appreciate
+you kicking the tyres on my reasoning!
+
+[...]
+
+> > As an aside, the big wall of text before the definition of struct
+> > fpsimd_last_state_struct is looking out of date and could use an
+> > update to cover at least some of what is explained in [*] better.
+> > 
+> > I'm currently considering that out of scope for this series, but I will
+> > keep it in mind to refresh it in the not too distant future.
+> > 
+> 
+> Fine with me.
+
+OK, good.
+
+[...]
+
+> > [*] The bigger picture:
+> > 
+> > * Consider a relation (C,T) between cpus C and tasks T, such that
+
+[...]
+
+> > but by assuming that the code is already well-optimised, "unnecessary"
+> > save/restore work will not be added.  If this were not the case, it
+> > could in any case be fixed independently.
+> > 
+> > The observation of this _series_ is that we don't need to do very
+> > much in order to be able to generalise the logic to accept KVM vcpus
+> > in place of T.
+> > 
+> 
+> Thanks for the explanation.
+> -Christoffer
+
+Was this reasonably understandable?  If so I could use it as a basis for
+improving the comment block in fpsimd.c, but I'd want to squash it down
+to the essentials.  It's pretty verbose as it stands.
+
+(What I'd really like to do it take an axe to the logic so that we
+end up with something that doesn't require anything like this amount
+of explanation ... but that's more of an aspiration right now.)
+
+Cheers
+---Dave
