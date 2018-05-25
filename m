@@ -1,83 +1,72 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 25 May 2018 15:35:40 +0200
-Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
- under at91-usart mfd
-In-Reply-To: <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-7-radu.pirea@microchip.com>
- <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
- <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
- <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
- <391de5c1-45d7-4773-fe57-7f2bc747214b@microchip.com>
-Message-ID: <f817c82a-95b6-afb3-e662-c481a877cf01@sorico.fr>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 25 May 2018 14:42:29 +0100
+Subject: [PATCH v4 00/26] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <02afa8bb-5d27-f229-6085-8f61a626bc63@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+ <20180525101632.cfcfnmnt2u7rz3lt@holly.lan>
+ <02afa8bb-5d27-f229-6085-8f61a626bc63@arm.com>
+Message-ID: <8703b3e0-b5f8-e607-2d8f-3d0b71a5ec3c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/2018 14:17, Radu Pirea wrote:
+
+
+On 25/05/18 11:40, Julien Thierry wrote:
 > 
 > 
-> On 05/15/2018 04:14 PM, Richard Genoud wrote:
->> On 15/05/2018 14:47, Radu Pirea wrote:
->>> On Mon, 2018-05-14 at 12:57 +0200, Richard Genoud wrote:
->>>> After your patch, the DMA is not selected anymore:
->>>> atmel_usart_serial atmel_usart_serial.0.auto: TX channel not
->>>> available, switch to pio
->>>> instead of:
->>>> atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
->>>>
->>> Fixed.
->>>> And the kernel doesn't log anymore on the serial console, despite the
->>>> loglevel=8
->>>> (after reverting this series, the kernel logs reappears on the serial
->>>> console)
->>>>
->>> Which serial are you using as console?
->> fffff200.serial (sam9g35-cm)
->> ( stdout-path = "serial0:115200n8"; in the DTS )
+> On 25/05/18 11:16, Daniel Thompson wrote:
+>> On Fri, May 25, 2018 at 10:49:06AM +0100, Julien Thierry wrote:
+>>> This series is a continuation of the work started by Daniel [1]. The 
+>>> goal
+>>> is to use GICv3 interrupt priorities to simulate an NMI.
+>>>
+>>> To achieve this, set two priorities, one for standard interrupts and
+>>> another, higher priority, for NMIs. Whenever we want to disable 
+>>> interrupts,
+>>> we mask the standard priority instead so NMIs can still be raised. Some
+>>> corner cases though still require to actually mask all interrupts
+>>> effectively disabling the NMI.
+>>>
+>>> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+>>> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as 
+>>> NMI
+>>> for now. I don't think there is any reason LPIs should be allowed to 
+>>> be set
+>>> as NMI as they do not have an active state.
+>>> When an NMI is active on a CPU, no other NMI can be triggered on the 
+>>> CPU.
+>>>
+>>> After the big refactoring I get performances similar to the ones I had
+>>> in v3[2], reposting old results here:
+>>>
+>>> - "hackbench 200 process 1000" (average over 20 runs)
+>>> +-----------+----------+------------+------------------+
+>>> |?????????? | native?? | PMR guest? | v4.17-rc6 guest? |
+>>> +-----------+----------+------------+------------------+
+>>> | PMR host? | 40.0336s |?? 39.3039s |???????? 39.2044s |
+>>> | v4.17-rc6 | 40.4040s |?? 39.6011s |???????? 39.1147s |
+>>> +-----------+----------+------------+------------------+
+>>>
+>>> - Kernel build from defconfig:
+>>> PMR host:? 13m45.743s
+>>> v4.17-rc6: 13m40.400s
+>>>
+>>> I'll try to post more detailed benchmarks later if I find notable
+>>> differences with the previous version.
 >>
->> With this series applied, all the kernel log goes on the screen.
->> Without, it goes on the serial debug.
+>> Do you have a public git tree anywhere... I *can* apply 26 patches from
+>> e-mail but I'd rather pull them!
 >>
-> I tested again with archlinux arm and poky-linux4sam release as distros
-> and kernel log goes on the serial debug. Can you give me more details
-> like cmdline?
-I used kernel 4.17-rc6
-at91_dt_defconfig
-at91sam9g35ek.dtb
+> 
+> Yes that makes sense, I'll try to get one set up.
+> 
+> I'll let you know once I have done so.
 
-Kernel command line: root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs
-( the one from the DTS )
+My public git is up. You can pull the patches from:
 
-Detailed instructions:
+git://linux-arm.org/linux-jt.git v4.17-pseudo-nmi
 
-git checkout v4.17-rc6 
-ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 at91_dt_defconfig
-ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
-cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
+Cheers,
 
->From uboot:
-tftpboot 0x20007FC0 uImage
-tftpboot 0x26400000 at91sam9g35ek.dtb
-bootm 0x20007FC0 - 0x26400000
-
-[ I see the logs on the serial debug ]
-
-git am \[PATCH\ v3\ [1-6]*
-
-ARCH=arm CROSS_COMPILE=path_to_my_Xchain/arm-linux- LOADADDR=0x20008000 make -j 12 uImage at91sam9g35ek.dtb
-cp arch/arm/boot/uImage arch/arm/boot/dts/at91sam9g35ek.dtb /tftpboot/
-
->From uboot:
-tftpboot 0x20007FC0 uImage
-tftpboot 0x26400000 at91sam9g35ek.dtb
-bootm 0x20007FC0 - 0x26400000
-
-[ I don't see the logs on the serial debug anymore ]
-
-
->>>> (tests done on sam9g35)
->>>>
->>> I will consider the rest of suggestions.
->>>> regards,
->>>> Richard
->>
+-- 
+Julien Thierry
