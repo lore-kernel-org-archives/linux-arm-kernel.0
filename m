@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 May 2018 16:01:49 +0530
-Subject: [PATCH 03/15] arm: dts: mediatek: Add missing cooling device
- properties for CPUs
+Date: Fri, 25 May 2018 16:01:50 +0530
+Subject: [PATCH 04/15] arm: dts: rk322x: Add missing cooling device properties
+ for CPUs
 In-Reply-To: <cover.1527244200.git.viresh.kumar@linaro.org>
 References: <cover.1527244200.git.viresh.kumar@linaro.org>
-Message-ID: <b687bb6035fbb010383f4511a206abb4006679fa.1527244201.git.viresh.kumar@linaro.org>
+Message-ID: <406021e33d541ca0318a6b15687084ca19fdd943.1527244201.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,35 +20,35 @@ Add such missing properties.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 3 +++
+ arch/arm/boot/dts/rk322x.dtsi | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index d1eb123bc73b..1cdc346a05e8 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -92,6 +92,7 @@
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 			clock-frequency = <1300000000>;
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index be80e9a2c9af..ef414e39bf3a 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -80,6 +80,7 @@
+ 			reg = <0xf01>;
+ 			resets = <&cru SRST_CORE1>;
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>; /* min followed by max */
+ 			enable-method = "psci";
  		};
  
-@@ -103,6 +104,7 @@
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 			clock-frequency = <1300000000>;
+@@ -89,6 +90,7 @@
+ 			reg = <0xf02>;
+ 			resets = <&cru SRST_CORE2>;
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>; /* min followed by max */
+ 			enable-method = "psci";
  		};
  
-@@ -114,6 +116,7 @@
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 			clock-frequency = <1300000000>;
+@@ -98,6 +100,7 @@
+ 			reg = <0xf03>;
+ 			resets = <&cru SRST_CORE3>;
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>; /* min followed by max */
+ 			enable-method = "psci";
  		};
  	};
 -- 
