@@ -1,102 +1,67 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 25 May 2018 18:37:22 +0800
-Subject: [PATCH V3 3/4] clk: add managed version of clk_bulk_get_all
-In-Reply-To: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
-References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1527244643-10736-4-git-send-email-aisheng.dong@nxp.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 May 2018 11:50:10 +0100
+Subject: [PATCHv2] ARM64: KVM: use lm_alias() for kvm_ksym_ref()
+In-Reply-To: <20180510111347.32253-1-mark.rutland@arm.com>
+References: <20180510111347.32253-1-mark.rutland@arm.com>
+Message-ID: <20180525105010.qswcppfkybznmzka@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the managed version of clk_bulk_get_all.
+On Thu, May 10, 2018 at 12:13:47PM +0100, Mark Rutland wrote:
+> For historical reasons, we open-code lm_alias() in kvm_ksym_ref().
+> 
+> Let's use lm_alias() to avoid duplication and make things clearer.
+> 
+> As we have to pull this from <linux/mm.h> (which is not safe for
+> inclusion in assembly), we may as well move the kvm_ksym_ref()
+> definition into the existing !__ASSEMBLY__ block.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> ---
+>  arch/arm64/include/asm/kvm_asm.h | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v2->v3:
- * a minor fix of build warning on PowerPC platform.
-v1->v2:
- * new patch
----
- drivers/clk/clk-devres.c | 24 ++++++++++++++++++++++++
- include/linux/clk.h      | 23 +++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
+Marc, Christoffer, are you happy to pick this up?
 
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index d854e26..6d3ca5e 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -70,6 +70,30 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
- }
- EXPORT_SYMBOL_GPL(devm_clk_bulk_get);
- 
-+int __must_check devm_clk_bulk_get_all(struct device *dev,
-+				       struct clk_bulk_data **clks)
-+{
-+	struct clk_bulk_devres *devres;
-+	int ret;
-+
-+	devres = devres_alloc(devm_clk_bulk_release,
-+			      sizeof(*devres), GFP_KERNEL);
-+	if (!devres)
-+		return -ENOMEM;
-+
-+	ret = clk_bulk_get_all(dev, clks);
-+	if (ret > 0) {
-+		devres->clks = *clks;
-+		devres->num_clks = ret;
-+		devres_add(dev, devres);
-+	} else {
-+		devres_free(devres);
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(devm_clk_bulk_get_all);
-+
- static int devm_clk_match(struct device *dev, void *res, void *data)
- {
- 	struct clk **c = res;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index a76fdff..ef20217 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -313,6 +313,22 @@ int __must_check clk_bulk_get_all(struct device *dev,
-  */
- int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
- 				   struct clk_bulk_data *clks);
-+/**
-+ * devm_clk_bulk_get_all - managed get multiple clk consumers
-+ * @dev: device for clock "consumer"
-+ * @clks: pointer to the clk_bulk_data table of consumer
-+ *
-+ * Returns a positive value for the number of clocks obtained while the
-+ * clock references are stored in the clk_bulk_data table in @clks field.
-+ * Returns 0 if there're none and a negative value if something failed.
-+ *
-+ * This helper function allows drivers to get several clk
-+ * consumers in one operation with management, the clks will
-+ * automatically be freed when the device is unbound.
-+ */
-+
-+int __must_check devm_clk_bulk_get_all(struct device *dev,
-+				       struct clk_bulk_data **clks);
- 
- /**
-  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
-@@ -658,6 +674,13 @@ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clk
- 	return 0;
- }
- 
-+static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
-+						     struct clk_bulk_data **clks)
-+{
-+
-+	return 0;
-+}
-+
- static inline struct clk *devm_get_clk_from_child(struct device *dev,
- 				struct device_node *np, const char *con_id)
- {
--- 
-2.7.4
+Mark.
+
+> Since v1 [1]:
+> * Rebase to v4.17-rc4
+> * Fix typo in commit message
+> 
+> Mark.
+> 
+> [1] https://lkml.kernel.org/r/20180406151909.57197-1-mark.rutland at arm.com
+> 
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index f6648a3e4152..a9ceeec5a76f 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -33,16 +33,19 @@
+>  #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+>  #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+>  
+> +#ifndef __ASSEMBLY__
+> +
+> +#include <linux/mm.h>
+> +
+>  /* Translate a kernel address of @sym into its equivalent linear mapping */
+>  #define kvm_ksym_ref(sym)						\
+>  	({								\
+>  		void *val = &sym;					\
+>  		if (!is_kernel_in_hyp_mode())				\
+> -			val = phys_to_virt((u64)&sym - kimage_voffset);	\
+> +			val = lm_alias(&sym);				\
+>  		val;							\
+>  	 })
+>  
+> -#ifndef __ASSEMBLY__
+>  struct kvm;
+>  struct kvm_vcpu;
+>  
+> -- 
+> 2.11.0
+> 
