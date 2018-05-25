@@ -1,102 +1,47 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 25 May 2018 11:41:18 +0530
-Subject: [PATCH v8 08/12] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c1
+Date: Fri, 25 May 2018 11:41:16 +0530
+Subject: [PATCH v8 06/12] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk04.1-c3
  board file
 In-Reply-To: <1527228682-12285-1-git-send-email-sricharan@codeaurora.org>
 References: <1527228682-12285-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1527228682-12285-9-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1527228682-12285-7-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts | 64 +++++++++++++++++++++++++
- 2 files changed, 65 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts
+ arch/arm/boot/dts/Makefile                      | 1 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts | 9 +++++++++
+ 2 files changed, 10 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c6cabec..596cce3 100644
+index 4e15d0d..c6cabec 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -762,6 +762,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+@@ -761,6 +761,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8084-mtp.dtb \
  	qcom-ipq4019-ap.dk01.1-c1.dtb \
  	qcom-ipq4019-ap.dk04.1-c1.dtb \
- 	qcom-ipq4019-ap.dk04.1-c3.dtb \
-+	qcom-ipq4019-ap.dk07.1-c1.dtb \
++	qcom-ipq4019-ap.dk04.1-c3.dtb \
  	qcom-ipq8064-ap148.dtb \
  	qcom-msm8660-surf.dtb \
  	qcom-msm8960-cdp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
 new file mode 100644
-index 0000000..8c7ef65
+index 0000000..2d1c4c6
 --- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts
-@@ -0,0 +1,64 @@
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+@@ -0,0 +1,9 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
 +
-+#include "qcom-ipq4019-ap.dk07.1.dtsi"
++#include "qcom-ipq4019-ap.dk04.1.dtsi"
 +
 +/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1-C1";
-+	compatible = "qcom,ipq4019-ap-dk07.1-c1";
-+
-+	soc {
-+		pci at 40000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 38 0x1>;
-+		};
-+
-+		spi at 78b6000 {
-+			status = "ok";
-+		};
-+
-+		pinctrl at 1000000 {
-+			serial_1_pins: serial1-pinmux {
-+				pins = "gpio8", "gpio9",
-+					"gpio10", "gpio11";
-+				function = "blsp_uart1";
-+				bias-disable;
-+			};
-+
-+			spi_0_pins: spi-0-pinmux {
-+				pinmux {
-+					function = "blsp_spi0";
-+					pins = "gpio13", "gpio14", "gpio15";
-+					bias-disable;
-+				};
-+				pinmux_cs {
-+					function = "gpio";
-+					pins = "gpio12";
-+					bias-disable;
-+					output-high;
-+				};
-+			};
-+		};
-+
-+		serial at 78b0000 {
-+			pinctrl-0 = <&serial_1_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		spi at 78b5000 {
-+			pinctrl-0 = <&spi_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+			cs-gpios = <&tlmm 12 0>;
-+
-+			m25p80 at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0>;
-+				compatible = "n25q128a11";
-+				spi-max-frequency = <24000000>;
-+			};
-+		};
-+	};
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C3";
++	compatible = "qcom,ipq4019-ap-dk04.1-c3";
 +};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
