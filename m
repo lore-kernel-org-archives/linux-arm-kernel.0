@@ -1,95 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 25 May 2018 12:07:02 +0100
-Subject: [PATCH] drm/rockchip: vop: fix irq disabled after vop driver
- probed
-In-Reply-To: <25470133.K8n9sLBzRS@diego>
-References: <b8eb41e576c4007d40223699eb951db32916b86a.camel@collabora.com>
- <25470133.K8n9sLBzRS@diego>
-Message-ID: <8495bffd-2a52-ca85-1bc9-afc3ea0af8e4@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 25 May 2018 12:07:04 +0100
+Subject: [PATCH 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
+ manage multi PM domains
+In-Reply-To: <CAPDyKFrTtvhxOhf9BPY1=cJ9VQyx9D=P3O0vCV+WXSVR82FozQ@mail.gmail.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
+ <1c21d18e-954a-f3a8-9817-0117b7cb7e4f@nvidia.com>
+ <CAPDyKFozm88OM8cDFXXwvgdMirrt2=HhZtBdyhNjo2bgjHV2Mg@mail.gmail.com>
+ <2c63af8c-4745-a751-8d3d-f7122e921e6f@nvidia.com>
+ <CAPDyKFrTtvhxOhf9BPY1=cJ9VQyx9D=P3O0vCV+WXSVR82FozQ@mail.gmail.com>
+Message-ID: <b3a94d63-678c-eab6-47a8-43eca95da979@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Thanks Robin for pointing me to that patch.]
 
-Hi Heiko,
 
-On 24/05/18 23:06, Heiko St?bner wrote:
-> From: Sandy Huang <hjc@rock-chips.com>
-> 
-> The vop irq is shared between vop and iommu and irq probing in the
-> iommu driver moved to the probe function recently. This can in some
-> cases lead to a stall if the irq is triggered while the vop driver
-> still has it disabled.
-> 
-> But there is no real need to disable the irq, as the vop can simply
-> also track its enabled state and ignore irqs in that case.
-> 
-> So remove the enable/disable handling and add appropriate condition
-> to the irq handler.
-> 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> [added an actual commit message]
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Hi Ezequiel,
-> 
-> this patch came from a discussion I had with Rockchip people over the
-> iommu changes and resulting issues back in april, but somehow was
-> forgotten and not posted to the lists. Correcting that now.
-> 
-> So removing the enable/disable voodoo on the shared interrupt is
-> the preferred way.
-> 
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 510cdf0..61493d4 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -549,8 +549,6 @@ static int vop_enable(struct drm_crtc *crtc)
->  
->  	spin_unlock(&vop->reg_lock);
->  
-> -	enable_irq(vop->irq);
-> -
->  	drm_crtc_vblank_on(crtc);
->  
->  	return 0;
-> @@ -596,8 +594,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
->  
->  	vop_dsp_hold_valid_irq_disable(vop);
->  
-> -	disable_irq(vop->irq);
-> -
->  	vop->is_enabled = false;
->  
->  	/*
-> @@ -1168,6 +1164,13 @@ static irqreturn_t vop_isr(int irq, void *data)
->  	int ret = IRQ_NONE;
->  
->  	/*
-> +	 * since the irq is shared with iommu, iommu irq is enabled before vop
-> +	 * enable, so before vop enable we do nothing.
-> +	 */
-> +	if (!vop->is_enabled)
-> +		return IRQ_NONE;
-> +
+On 25/05/18 11:45, Ulf Hansson wrote:
 
-What guarantee do we have that the IOMMU will actually service that
-interrupt? Can't we get into a situation where the interrupt gets
-ignored by both drivers and subsequently disabled by the core irq code
-as being spurious?
+...
 
->From what I understood of the way things are plugged together on the
-rockchip platforms, each individual VOP is behind a single IOMMU, hence
-there there is hardly any point in handling IOMMU interrupts if the VOP
-is off.
+>> Right, but this case still seems like an error. My understanding is that
+>> only drivers will use this API directly and it will not be used by the
+>> device driver core (unlike dev_pm_domain_attach), so if anyone calls this
+>> attempting to attach another PM domain when one is already attached, they
+>> are doing something wrong.
+> 
+> [...]
+> 
+> You may be right!
+> 
+> What I was thinking of is whether multiple PM domains may be optional
+> in some cases, but instead a PM domain have already been attached by
+> dev_pm_domain_attach(), prior the driver starts to probe.
+> 
+> Then, assuming we return an error for this case, that means the caller
+> then need to check the dev->pm_domain pointer, prior calling
+> dev_pm_domain_attach_by_id(). Wouldn't it? Perhaps that is more clear
+> though?
 
-But I'm missing the actual reason behind this patch. Could you enlighten me?
+IMO the driver should know whether is needs multiple power-domains or 
+not and if it needs multiple then it should just call 
+dev_pm_domain_attach_by_id() N times without needing to checking 
+dev->pm_domain first. If it fails then either the PM domain core did 
+something wrong or power-domains are missing from DT, but either way 
+there is an error, so let it fail.
 
-Thanks,
+Cheers
+Jon
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+nvpublic
