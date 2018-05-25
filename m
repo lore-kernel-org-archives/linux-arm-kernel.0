@@ -1,51 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 25 May 2018 13:21:12 -0500
-Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
-References: <20180518164829.27052-1-david@lechnology.com>
- <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
-Message-ID: <9ca9d240-f556-cb4f-1a58-4a55c379a02f@lechnology.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 25 May 2018 11:35:38 -0700
+Subject: [PATCH] arm64: dts: qcom: msm8996: Use UFS_GDSC for UFS
+In-Reply-To: <CAFp+6iH5bS5rmqZ1oy09COb2Rzuz6zbN7pFwxz0WTJNOYTTbkg@mail.gmail.com>
+References: <20180524223122.12601-1-bjorn.andersson@linaro.org>
+ <CAFp+6iH5bS5rmqZ1oy09COb2Rzuz6zbN7pFwxz0WTJNOYTTbkg@mail.gmail.com>
+Message-ID: <20180525183538.GH14924@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2018 04:38 AM, Sekhar Nori wrote:
-> Hi David,
-> 
-> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
->> This series converts mach-davinci to use the common clock framework.
->>
->> The series works like this, the first 3 patches fix some issues with the clock
->> drivers that have already been accepted into the mainline kernel.
->>
->> Then, starting with "ARM: davinci: pass clock as parameter to
->> davinci_timer_init()", we get the mach code ready for the switch by adding the
->> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
->> around the legacy clocks so that we can switch easily between the old and the
->> new.
->>
->> "ARM: davinci: switch to common clock framework" actually flips the switch
->> to start using the new clock drivers. Then the next 8 patches remove all
->> of the old clock code.
->>
->> The final four patches add device tree clock support to the one SoC that
->> supports it.
->>
->> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
->> board file).
-> 
-> If you do end up sending a v12, you can leave out the mach-davinci
-> portions unless there are any changes you need to make. I will pick them
-> up from this series once the driver dependencies are merged.
-> 
-> I do hope the drivers/clk/* changes can be merged from v4.18.
-> 
+On Fri 25 May 05:51 PDT 2018, Vivek Gautam wrote:
 
-I have resent all of the clk patches (including all of the ones I listed as
-dependencies in addition to the three remaining in this series) under the
-cover "clk: davinci: outstanding fixes?".
+> Hi Bjorn,
+> 
+> On Fri, May 25, 2018 at 4:01 AM, Bjorn Andersson
+> <bjorn.andersson@linaro.org> wrote:
+> > The UFS host controller occationally (20%) fails to enable
+> > gcc_ufs_axi_clk because the UFS GDSC is not enabled. In most cases it's
+> > enabled through the UFS phy driver, but to make sure it's enabled let's
+> > enable it directly from the UFS host controller directly as well.
+> >
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> > index 380e14591686..03c7904bda14 100644
+> > --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> > @@ -674,6 +674,8 @@
+> >                         vccq-max-microamp = <450000>;
+> >                         vccq2-max-microamp = <450000>;
+> >
+> > +                       power-domains = <&gcc UFS_GDSC>;
+> > +
+> 
+> We shouldn't need power-domain with the phy. UFS_GDSC should
+> be attached to the controller, as the phy is powered up only after
+> the controller is power-up, and during collapse too, we turn off
+> the phy first.
 
-I also found that we need to add power-domains properties to the PWM nodes
-in "ARM: dts: da850: Add clocks". I probably should just take your advice
-and just globally added them even if they are not documented for some types
-ofnodes.
+Afaict you're right, it should only be needed by the resources for the
+HCD.
+
+> Can you try testing keeping UFS_GDSC only with ufs controller and
+> remove it from the ufs-phy node? We are doing same on the 4.14 release
+> branch too for db820.
+
+I test booted this 10 times, with 100% success :)
+
+> I apologize to have missed this in your patch for ufs-related dt nodes.
+> Can we please fix this now?
+
+I'll send a v2, that moves the power-domain to the HCD, rather than just
+adding it there too. Thanks for the quick review!
+
+Regards,
+Bjorn
