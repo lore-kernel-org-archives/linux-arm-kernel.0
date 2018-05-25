@@ -1,45 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 May 2018 17:50:13 +0200
-Subject: [PATCH 6/8] drm/exynos: fix scaler_task_done return type
-In-Reply-To: <20180525155030.3667352-1-arnd@arndb.de>
-References: <20180525155030.3667352-1-arnd@arndb.de>
-Message-ID: <20180525155030.3667352-6-arnd@arndb.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 May 2018 16:52:08 +0100
+Subject: [PATCH v3 08/15] ARM: spectre-v2: harden user aborts in kernel
+ space
+In-Reply-To: <20180525154742.GA77025@atomide.com>
+References: <20180525135938.GE17671@n2100.armlinux.org.uk>
+ <E1fMDHD-00073Q-Ob@rmk-PC.armlinux.org.uk>
+ <20180525154742.GA77025@atomide.com>
+Message-ID: <20180525155207.GF17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern gcc versions warn about returning a ternary operator with an 'int'
-type in a function returning type 'bool':
+On Fri, May 25, 2018 at 08:47:42AM -0700, Tony Lindgren wrote:
+> * Russell King <rmk+kernel@armlinux.org.uk> [180525 15:10]:
+> > +static void cpu_v7_spectre_init(void)
+> > +{
+> > +	const char *spectre_v2_method = NULL;
+> > +	int cpu = smp_processor_id();
+> > +
+> > +	if (per_cpu(harden_branch_predictor_fn, cpu))
+> > +		return;
+> > +
+> > +	switch (read_cpuid_part()) {
+> > +	case ARM_CPU_PART_CORTEX_A8:
+> > +	case ARM_CPU_PART_CORTEX_A9:
+> > +	case ARM_CPU_PART_CORTEX_A12:
+> > +	case ARM_CPU_PART_CORTEX_A17:
+> > +	case ARM_CPU_PART_CORTEX_A73:
+> > +	case ARM_CPU_PART_CORTEX_A75:
+> > +		per_cpu(harden_branch_predictor_fn, cpu) =
+> > +			harden_branch_predictor_bpiall;
+> > +		spectre_v2_method = "BPIALL";
+> > +		break;
+> > +
+> > +	case ARM_CPU_PART_CORTEX_A15:
+> > +	case ARM_CPU_PART_BRAHMA_B15:
+> > +		per_cpu(harden_branch_predictor_fn, cpu) =
+> > +			harden_branch_predictor_iciallu;
+> > +		spectre_v2_method = "ICIALLU";
+> > +		break;
+> > +	}
+> > +	if (spectre_v2_method)
+> > +		pr_info("CPU%u: Spectre v2: using %s workaround\n",
+> > +			smp_processor_id(), spectre_v2_method);
+> > +}
+> 
+> We can now get this with the whole series applied:
+> 
+> CPU0: Spectre v2: firmware did not set auxiliary control register
+> IBE bit, system vulnerable
+> CPU: Spectre v2: using ICIALLU workaround
+> 
+> So maybe change the wording from "using %s workaround" to
+> "chosen workaround %s"?
+> 
+> Or I guess disabling the pr_info when not functional can
+> be done in the later patches based on some variable set
+> by check_spectre_auxcr() would be doable too.
 
-drivers/gpu/drm/exynos/exynos_drm_scaler.c: In function 'scaler_task_done':
-drivers/gpu/drm/exynos/exynos_drm_scaler.c:402:47: error: ?: using integer constants in boolean context [-Werror=int-in-bool-context]
-  return val & SCALER_INT_STATUS_FRAME_END ? 0 : -EINVAL;
+You should not be getting both messages.  It looks like you're using
+an older series - I assumed you pulled my git tree rather than the
+patches?  The public git tree isn't up to date with these changes.
 
->From context, it becomes clear that this should have been 'int',
-so I'm fixing it, along with parenthesizing the expression to make
-it clearer what is meant here (I got confused at first, after seeing
-the warning).
-
-Fixes: 01fb9185dc18 ("drm/exynos: Add driver for Exynos Scaler module")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/exynos/exynos_drm_scaler.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_scaler.c b/drivers/gpu/drm/exynos/exynos_drm_scaler.c
-index 63b05b7c846a..4ad49d7782cd 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_scaler.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_scaler.c
-@@ -397,9 +397,9 @@ static inline u32 scaler_get_int_status(struct scaler_context *scaler)
- 	return scaler_read(SCALER_INT_STATUS);
- }
- 
--static inline bool scaler_task_done(u32 val)
-+static inline int scaler_task_done(u32 val)
- {
--	return val & SCALER_INT_STATUS_FRAME_END ? 0 : -EINVAL;
-+	return (val & SCALER_INT_STATUS_FRAME_END) ? 0 : -EINVAL;
- }
- 
- static irqreturn_t scaler_irq_handler(int irq, void *arg)
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
