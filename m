@@ -1,67 +1,42 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 25 May 2018 11:00:58 +0100
-Subject: [PATCH v4 04/26] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <1527241772-48007-5-git-send-email-julien.thierry@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <1527241772-48007-5-git-send-email-julien.thierry@arm.com>
-Message-ID: <89769f8d-2ed0-1eb7-0373-09fc25f8071a@arm.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 25 May 2018 17:24:57 +0800
+Subject: [PATCH] usb: gadget: composite: fix delayed_status race condition
+ when set_interface
+Message-ID: <75dc545f259a68d36d49c0c663d5cac19bb61a24.1527240183.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/18 10:49, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
-> 
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
-> 
-> Introduce apply_boot_alternatives() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> [julien.thierry at arm.com: rename to fit new cpufeature framework better,
-> 			 apply BOOT_SCOPE feature early in boot]
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm64/include/asm/alternative.h |  3 +--
->   arch/arm64/include/asm/cpufeature.h  |  2 ++
->   arch/arm64/kernel/alternative.c      | 30 +++++++++++++++++++++++++++---
->   arch/arm64/kernel/cpufeature.c       |  5 +++++
->   arch/arm64/kernel/smp.c              |  7 +++++++
->   5 files changed, 42 insertions(+), 5 deletions(-)
-> 
+It happens when enable debug log, if set_alt() returns
+USB_GADGET_DELAYED_STATUS and usb_composite_setup_continue()
+is called before increasing count of @delayed_status,
+so fix it by using spinlock of @cdev->lock.
 
-...
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Tested-by: Jay Hsu <shih-chieh.hsu@mediatek.com>
+---
+ drivers/usb/gadget/composite.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
->   
-> +unsigned long boot_capabilities;
-> +
->   /*
->    * Flag to indicate if we have computed the system wide
->    * capabilities based on the boot time active CPUs. This
-> @@ -1370,6 +1372,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->   		if (!cpus_have_cap(caps->capability) && caps->desc)
->   			pr_info("%s %s\n", info, caps->desc);
->   		cpus_set_cap(caps->capability);
-> +
-> +		if (scope_mask & SCOPE_BOOT_CPU)
-> +			__set_bit(caps->capability, &boot_capabilities);
-
-Julien
-
-I think this check is problematic. The scope_mask passed on by the boot CPU
-is (SCOPE_BOOT_CPU | SCOPE_LOCAL_CPU) to cover both BOOT CPU capabilities *and*
-CPU local capabilites on the boot CPU. So, you might apply the alternatives for
-a "local" CPU erratum, which is not intended. You may change the above check to :
-
-	if (caps->type & SCOPE_BOOT_CPU)
-
-to make sure you check the "capability" has the SCOPE_BOOT_CPU set.
-
-Suzuki
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index f242c2b..d2fa071 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -1719,6 +1719,8 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
+ 		 */
+ 		if (w_value && !f->get_alt)
+ 			break;
++
++		spin_lock(&cdev->lock);
+ 		value = f->set_alt(f, w_index, w_value);
+ 		if (value == USB_GADGET_DELAYED_STATUS) {
+ 			DBG(cdev,
+@@ -1728,6 +1730,7 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
+ 			DBG(cdev, "delayed_status count %d\n",
+ 					cdev->delayed_status);
+ 		}
++		spin_unlock(&cdev->lock);
+ 		break;
+ 	case USB_REQ_GET_INTERFACE:
+ 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
+-- 
+1.9.1
