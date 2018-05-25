@@ -1,41 +1,48 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 15:25:53 -0700
-Subject: [GIT PULL] late omap soc changes for v4.18 merge window
-In-Reply-To: <pull-1527259829-686604@atomide.com>
-References: <pull-1527259829-686604@atomide.com>
-Message-ID: <20180525222553.tjewwse3mipiroic@localhost>
+Date: Fri, 25 May 2018 15:28:00 -0700
+Subject: [GIT PULL v3] arm64: defconfig: hisilicon config updates for v4.18
+In-Reply-To: <5B083857.6040401@hisilicon.com>
+References: <5B083857.6040401@hisilicon.com>
+Message-ID: <20180525222800.ttzgplfali24wzaf@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 07:51:20AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Fri, May 25, 2018 at 05:22:47PM +0100, Wei Xu wrote:
+> Hi Olof, Hi Arnd,
 > 
-> The following changes since commit 3bb3799cd4233b7c24622ae8c41455fb27a55c0f:
+> Please help to pull the following changes.
+> Thanks!
 > 
->   Merge branch 'omap-for-v4.18/soc-fixes' into omap-for-v4.18/soc (2018-05-21 10:34:17 -0700)
+> Best Regards,
+> Wei
+> 
+> ---
+> 
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> 
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/soc-late-signed
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.18v3
 > 
-> for you to fetch changes up to 759c27bdc77577aaecb6f31768e5951a858f97a9:
+> for you to fetch changes up to 30480a849820d728c409e90bd6715d11f4071416:
 > 
->   OMAP: CLK: CLKSRC: Add suspend resume hooks (2018-05-23 14:16:26 -0700)
+>   arm64: defconfig: Enable HISILICON_LPC (2018-05-25 16:58:51 +0100)
 > 
 > ----------------------------------------------------------------
-> Late omap soc changes for v4.18 merge window
+> ARM64: hisilicon: defconfig updates for 4.18
 > 
-> This series contains two omap1 ams-delta GPIO clean-up patches to get
-> started with removal of hard-coded GPIO numbers from drivers. And then
-> the removal of board mach includes from drivers. The second patch mostly
-> touches the ams-delta audio driver but is included here because of the
-> removal of the latch gpios and is acked by Mark Brown.
+> - Enable the support of ethernet, eMMC, Combo/INNO phy
+>   and PCIe for Hi3798CV200
+> - Enable the LPC for hip06 and hip07
 > 
-> And there are two more am437x related PM patches to save and restore
-> control module and timer registers for RTC only suspend mode. Looks like
-> the patch title for the timer changes is a bit misleading, not all the
-> timer code is yet living under drivers/clocksource. But I had already
-> pushed out the branch before I noticed this.
+> ----------------------------------------------------------------
+> John Garry (1):
+>       arm64: defconfig: Enable HISILICON_LPC
+> 
+> Shawn Guo (1):
+>       arm64: defconfig: enable drivers for Poplar support
 
 Merged, thanks!
 
