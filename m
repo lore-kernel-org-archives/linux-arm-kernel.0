@@ -1,135 +1,72 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 25 May 2018 09:27:09 -0600
-Subject: [PATCH 1/6] coresight: remove CORESIGHT_LINKS_AND_SINKS
- dependencies and selections
-In-Reply-To: <20180524183027.dc498058344604e2d6027eff@arm.com>
-References: <20180517070643.GC13919@kroah.com>
- <20180518012024.22645-1-kim.phillips@arm.com>
- <20180522173140.GA25658@xps15>
- <20180523145155.5929dd09c78a056ef19329be@arm.com>
- <CANLsYkw-KcEM43pqWgGU1XYOfSTD4cmspNcPM-u+n9x6Xtazbg@mail.gmail.com>
- <20180524183027.dc498058344604e2d6027eff@arm.com>
-Message-ID: <CANLsYkwZtAptXtLK0HaDwmXbdAx24X+PEFVggakxe31nkH111g@mail.gmail.com>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Fri, 25 May 2018 17:45:49 +0200
+Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
+In-Reply-To: <20180227101712.3zwobvs4ox4jchcj@earth.universe>
+References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
+ <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
+ <20180224074543.GF3217@dragon>
+ <20180226134741.neqkpge33zo3pfzt@earth.universe>
+ <20180227011033.GV3217@dragon>
+ <20180227101712.3zwobvs4ox4jchcj@earth.universe>
+Message-ID: <20180525154549.r7gwxegcu4colhvs@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2018 at 17:30, Kim Phillips <kim.phillips@arm.com> wrote:
-> On Thu, 24 May 2018 09:32:48 -0600
-> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->
->> On 23 May 2018 at 13:51, Kim Phillips <kim.phillips@arm.com> wrote:
->> > On Tue, 22 May 2018 11:31:40 -0600
->> > Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->> >
->> >> On Thu, May 17, 2018 at 08:20:19PM -0500, Kim Phillips wrote:
->> >> > A coresight topology doesn't need to include links, i.e., a source can
->> >> > be directly connected to a sink.  As such, selecting and/or depending on
->> >> > LINKS_AND_SINKS is no longer needed.
->> >>
->> >> I'm good with this patch but now the help text for CORESIGHT_LINKS_AND_SINKS no
->> >> longer match what the config does.  I see two ways to fix this:
->> >
->> > This patch doesn't change what the config does, it just changes what
->> > other config options depend on it.
->> >
->> >> 1) Rework the help text.
->> >
->> > I don't see how, given the above.  Here's the text:
->> >
->> > config CORESIGHT_LINKS_AND_SINKS
->> >         bool "CoreSight Link and Sink drivers"
->> >         help
->> >           This enables support for CoreSight link and sink drivers that are
->> >           responsible for transporting and collecting the trace data
->> >           respectively.  Link and sinks are dynamically aggregated with a trace
->> >           entity at run time to form a complete trace path.
->> >
->> > What part of that becomes invalid with this patch?
->>
->> Looking at the new Kconfig, what sink component depend on
->> CORESIGHT_LINKS_AND_SINKS?
->
-> How does that affect the description text?  The description text
-> doesn't insinuate any implicit dependencies or non-.
+Hi Shawn,
 
-Now that the depends are gone there is no correlation between this
-config and sinks.
+On Tue, Feb 27, 2018 at 11:17:12AM +0100, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Tue, Feb 27, 2018 at 09:10:34AM +0800, Shawn Guo wrote:
+> > On Mon, Feb 26, 2018 at 02:47:41PM +0100, Sebastian Reichel wrote:
+> > > On Sat, Feb 24, 2018 at 03:45:44PM +0800, Shawn Guo wrote:
+> > > > On Mon, Feb 12, 2018 at 01:39:44PM +0100, Sebastian Reichel wrote:
+> > > > > On i.MX53 it is necessary to set the DBG_EN bit in the
+> > > > > platform GPC register to enable access to PMU counters
+> > > > > other than the cycle counter.
+> > > > > 
+> > > > > Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> > > > > ---
+> > > > >  arch/arm/mach-imx/mach-imx53.c | 39 ++++++++++++++++++++++++++++++++++++++-
+> > > > >  1 file changed, 38 insertions(+), 1 deletion(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> > > > > index 07c2e8dca494..658e28604dca 100644
+> > > > > --- a/arch/arm/mach-imx/mach-imx53.c
+> > > > > +++ b/arch/arm/mach-imx/mach-imx53.c
+> > > > > @@ -28,10 +28,47 @@ static void __init imx53_init_early(void)
+> > > > >  	mxc_set_cpu_type(MXC_CPU_MX53);
+> > > > >  }
+> > > > >  
+> > > > > +#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
+> > > > 
+> > > > The base address should be retrieved from device tree.
+> > > 
+> > > DT has no entry for 0x63fa0000-0x63fa3fff. iMX53 TRM lists it as "ARM Platform"
+> > > with 8 platform specific 32 bit registers. Do you think it's worth the trouble
+> > > adding a new binding? Do you have a suggestion for a compatible value?
+> > 
+> > Looking at it more closely, I feel that patching every single platform
+> > which needs to set up additional register for secure-reg-access support
+> > doesn't really scale.  Can we have pmu driver do it with a phandle in
+> > DT pointing to the register and bit that need to be configured?
+> 
+> The PMU driver used to have a feature for initialising platform
+> specific bits, but it is currently being removed to make the PMU
+> code more maintainable. My understanding is, that it's very uncommon
+> to require platform specific setup to get secure-reg-access working.
+> E.g. it is not needed for newer iMX platforms.
 
->
->> config CORESIGHT_LINKS
->
-> Please, not another gratuitous config name change, I've already
-> experienced usage regressions from the CORESIGHT_QCOM_REPLICATOR =>
-> CORESIGHT_DYNAMIC_REPLICATOR change:
+You never replied to this one. Are you fine with adding the
+function? This is kind of a deadlock situation with neither
+you wanting to enable the platform bit, nor the generic PMU
+driver.
 
-Defines within subsystems are bound to change as they evolves.  Most
-of the CoreSight subsystem was developed on the OMAP3 based
-beagleboard.  Since then new topologies have emerged and new IP blocks
-came along.  It is only normal that we adjust configuration options to
-reflect the reality of the HW the subsystem is managing.  I can guide
-you through the history of the replicator config name change if you
-want - it is quite logical.  Other than that and until this patchset,
-we haven't modified a single configuration in the 5 years the
-subsystem has existed.  Not bad for all the churn and new IP blocks
-that came in.
-
->
-> https://patchwork.kernel.org/patch/10206023/
->
->>          bool "CoreSight Link drivers"
->>          help
->>            This enables support for CoreSight link drivers that are responsible
->>            for transporting trace data from source to sink.  Links are
->> dynamically
->>            aggregated with other traces entities at run time to form a
->> complete trace
->>            path.
->
-> Oh, I see, so your point is that LINKS_AND_SINKS doesn't technically
-> build any sink drivers?  That's completely orthogonal to removing a
-> dependency chain:  that just tells me the name was a poor choice in the
-> first place maybe?  I don't see where the Makefile may have built a
-> sink, but it may be before the move to drivers/hwtracing/coresight, or
-> some other reorganization.
-
-Because of the depends property carried by the sink drivers (which we
-are now removing), defining CORESIGHT_LINKS_AND_SINKS was mandatory to
-build sink drivers.  That was accurate 5 years ago with the topologies
-that were available at that time.  Now there is no point in having the
-define, which is why I'm asking you to make this modification.
-
->
->> >> 2) Rework CORESIGHT_LINKS_AND_SINKS to be CORESIGHT_FUNNEL and move
->> >> coresight-replicator.o under CORESIGHT_DYNAMIC_REPLICATOR in the Makefile. I
->> >> really liked your idea of making the replicator driver intelligent enough to
->> >> deal with both DT and platform declaration, which merges two driver into one.
->> >>
->> >> I'm obviously favouring the second option but recognise it doesn't have to be
->> >> part of this patchet.  So for this set please rework the help text for
->> >> CORESIGHT_LINKS_AND_SINKS.  Once we've dealt with this topic we can refactor the
->> >> replicator driver.
->> >
->> > I'd really like to just focus on getting CoreSight to load as modules,
->> > something for which this patch isn't technically required...
->>
->> The only thing I'm asking is that the config description and help text
->> reflect what the Makefile does.
->
-> argh, wellll, it's a completely different change, and we're now
-> completely off the modularization topic, and I'm uncomfortable doing
-
-I don't agree with you.  This is a very simple change and I even wrote
-down what needed to be modified.
-
-> reorgs on things I don't understand, renaming CONFIG_s, esp. when
-> others such as the REPLICATOR, since as far as I know, that's also a
-> link??
-
-Correct, a replicator is a link and completely removed from this conversation.
-
-If this is so hard for you then simply don't make the modification - I
-will do it myself, something that will take me about 10 minutes
-(including writing the changelog).
-
->
-> Kim
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180525/431c48ca/attachment.sig>
