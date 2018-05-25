@@ -1,81 +1,77 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 May 2018 11:00:20 +0100
-Subject: [PATCH v2 00/14] ARM Spectre variant 2 fixes
-In-Reply-To: <6845807d-4838-53e4-91ad-a7c6ef081f58@gmail.com>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <6845807d-4838-53e4-91ad-a7c6ef081f58@gmail.com>
-Message-ID: <20180525100020.GB17671@n2100.armlinux.org.uk>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 25 May 2018 11:01:11 +0100
+Subject: [PATCH v11 07/19] arm64: fpsimd: Avoid FPSIMD context leakage for
+ the init task
+In-Reply-To: <1527181008-13549-8-git-send-email-Dave.Martin@arm.com>
+References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
+ <1527181008-13549-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87sh6grr4o.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 04:18:30PM -0700, Florian Fainelli wrote:
-> On 05/21/2018 04:42 AM, Russell King - ARM Linux wrote:
-> > This is the second posting - the original cover note is below.  Comments
-> > from previous series addresesd:
-> > - Drop R7 and R8 changes.
-> > - Remove "PSCI" from the hypervisor version of the workaround.
-> > 
-> >  arch/arm/include/asm/bugs.h        |   6 +-
-> >  arch/arm/include/asm/cp15.h        |   3 +
-> >  arch/arm/include/asm/cputype.h     |   5 ++
-> >  arch/arm/include/asm/kvm_asm.h     |   2 -
-> >  arch/arm/include/asm/kvm_host.h    |  14 +++-
-> >  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
-> >  arch/arm/include/asm/proc-fns.h    |   4 +
-> >  arch/arm/include/asm/system_misc.h |   8 ++
-> >  arch/arm/kernel/Makefile           |   1 +
-> >  arch/arm/kernel/bugs.c             |  18 +++++
-> >  arch/arm/kernel/smp.c              |   4 +
-> >  arch/arm/kernel/suspend.c          |   2 +
-> >  arch/arm/kvm/hyp/hyp-entry.S       | 108 +++++++++++++++++++++++++-
-> >  arch/arm/mm/Kconfig                |  23 ++++++
-> >  arch/arm/mm/Makefile               |   2 +-
-> >  arch/arm/mm/fault.c                |   3 +
-> >  arch/arm/mm/proc-macros.S          |   3 +-
-> >  arch/arm/mm/proc-v7-2level.S       |   6 --
-> >  arch/arm/mm/proc-v7-bugs.c         | 130 +++++++++++++++++++++++++++++++
-> >  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++++++--------
-> >  20 files changed, 469 insertions(+), 50 deletions(-)
-> >  create mode 100644 arch/arm/kernel/bugs.c
-> >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
-> 
-> Since there appears to be more work needed in the PSCI/KVM changes
-> (patches 9 through 14), how about we go with the "bare-metal" parts:
-> patches 1-8 first and try to get those included ASAP?
-> 
-> The rationale being that a lot of affected people have Linux running on
-> ARMv7-A Cortex-A, typically A9, A15, Brahma-B15, and are in need of
-> those patches but do not necessarily require KVM fixes right now, and
-> even less so PSCI infrastructure to mitigate ARMv8-A running in AArch32.
-> 
-> In terms of backporting to -stable, and because the spectre variant 1
-> patches have not been submitted yet, it is not like we can lump
-> everything in one go anyway, so we are not making the lives of the
-> -stable maintainers any worse than it currently is?
 
-Patch 6 is implicated in the rework - it will cause big.Little systems
-to either have the workaround applied when it isn't required or not
-applied when it is required.  It depends which CPU is the boot CPU.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-For example, a big.Little A7/A15 cluster - if the boot CPU is an A15,
-then we will use the ICIALLI switch_mm method for both the A15 and A7.
-If the boot CPU is an A7, then we will use the standard switch_mm
-method that does not contain the workaround even for the A15, and the
-A15 will then be vulnerable.
+> The init task is started with thread_flags equal to 0, which means
+> that TIF_FOREIGN_FPSTATE is initially clear.
+>
+> It is theoretically possible (if unlikely) that the init task could
+> reach userspace without ever being scheduled out.  If this occurs,
+> data left in the FPSIMD registers by the kernel could be exposed.
+>
+> This patch fixes this anomaly by ensuring that the init task's
+> initial TIF_FOREIGN_FPSTATE is set.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Fixes: 005f78cd8849 ("arm64: defer reloading a task's FPSIMD state to userland resume")
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
-I don't think we have a way to identify if we boot on a big.Little
-system, so the kernel messages could claim to have the workarounds,
-but they won't be effective.
+Still good ;-)
 
-This is the hardest one to solve, because it means more invasive
-changes to deal with the MM switching paths, which need to become
-per-cpu.  The problem is, there are times that we call into that
-path but the per-cpu variables are not accessible (because the CPU
-isn't initialised sufficiently for them to work.)
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> ---
+>
+> Changes since v10:
+>
+>  * New patch.
+> ---
+>  arch/arm64/include/asm/thread_info.h | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 740aa03c..af271f9 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -45,12 +45,6 @@ struct thread_info {
+>  	int			preempt_count;	/* 0 => preemptable, <0 => bug */
+>  };
+>
+> -#define INIT_THREAD_INFO(tsk)						\
+> -{									\
+> -	.preempt_count	= INIT_PREEMPT_COUNT,				\
+> -	.addr_limit	= KERNEL_DS,					\
+> -}
+> -
+>  #define thread_saved_pc(tsk)	\
+>  	((unsigned long)(tsk->thread.cpu_context.pc))
+>  #define thread_saved_sp(tsk)	\
+> @@ -117,5 +111,12 @@ void arch_release_task_struct(struct task_struct *tsk);
+>  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+>  				 _TIF_NOHZ)
+>
+> +#define INIT_THREAD_INFO(tsk)						\
+> +{									\
+> +	.flags		= _TIF_FOREIGN_FPSTATE,				\
+> +	.preempt_count	= INIT_PREEMPT_COUNT,				\
+> +	.addr_limit	= KERNEL_DS,					\
+> +}
+> +
+>  #endif /* __KERNEL__ */
+>  #endif /* __ASM_THREAD_INFO_H */
 
-It's trivial to solve the issues in the later patches by comparison.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+--
+Alex Benn?e
