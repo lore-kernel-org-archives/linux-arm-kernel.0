@@ -1,83 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 25 May 2018 11:49:13 +0200
-Subject: [PATCH v3 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <1527157834-7747-3-git-send-email-michel.pollet@bp.renesas.com>
-References: <1527157834-7747-1-git-send-email-michel.pollet@bp.renesas.com>
- <1527157834-7747-3-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdWv2ZRbX=k5+H_WfAeoQ4QsyQLU9iQ9TJ9OQ0fmwg0GOQ@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 25 May 2018 10:49:09 +0100
+Subject: [PATCH v4 03/26] arm64: cpufeature: Use alternatives for VHE
+ cpu_enable
+In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-4-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+The cpu_enable callback for VHE feature requires all alternatives to have
+been applied. This prevents applying VHE alternative separately from the
+rest.
 
-On Thu, May 24, 2018 at 12:30 PM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time, it
-> requires a special enable method to get it started.
->
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+Use an alternative depending on VHE feature to know whether VHE
+alternatives have already been applied.
 
-Thanks for your patch!
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Cc: Christoffer Dall <Christoffer.Dall@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
->  arch/arm/mach-shmobile/smp-r9a06g032.c | 85 ++++++++++++++++++++++++++++++++++
-
-I think you can safely call this driver smp-rzn1d.c, or smp-rzn1.c.
-Source files are not covered by the stable DT ABI, and can be reordered
-later at will.
-
-I expect you will just add more CPU_METHOD_OF_DECLARE() lines later
-(perhaps with a little bit of extra code to handle deviations).
-
-> --- /dev/null
-> +++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
-> @@ -0,0 +1,85 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * RZ/N1D Second CA7 enabler.
-> + *
-> + * Copyright (C) 2018 Renesas Electronics Europe Limited
-> + *
-> + * Michel Pollet <michel.pollet@bp.renesas.com>, <buserror@gmail.com>
-> + * Derived from action,s500-smp
-> + */
-> +
-> +#include <linux/delay.h>
-
-Do you need this?
-
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/smp_scu.h>
-
-Do you need these?
-
-> +static void __init rzn1_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +       struct device_node *dn;
-> +       int ret;
-> +       u32 bootaddr;
-
-> +       pr_info("CPU#1: cpu-release-addr %08x\n", (u32)bootaddr);
-
-The cast is not needed.
-
-> +
-> +       cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr));
-> +       if (!cpu_bootaddr)
-> +               pr_err("CPU#1: cpu-release-addr map failed\n");
-
-If this fails, that is basically an OOM condition, which will scream anyway.
-So I think you should drop the error message.
-
-> +}
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a177104..a3a5585d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1013,6 +1013,8 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
+ 
+ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ {
++	u64 tmp = 0;
++
+ 	/*
+ 	 * Copy register values that aren't redirected by hardware.
+ 	 *
+@@ -1021,8 +1023,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ 	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+ 	 * do anything here.
+ 	 */
+-	if (!alternatives_applied)
+-		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
++	asm volatile(ALTERNATIVE(
++		"mrs	%0, tpidr_el1\n"
++		"msr	tpidr_el2, %0",
++		"nop\n"
++		"nop",
++		ARM64_HAS_VIRT_HOST_EXTN)
++		: "+r" (tmp)
++		:
++		: "memory");
+ }
+ #endif
+ 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+1.9.1
