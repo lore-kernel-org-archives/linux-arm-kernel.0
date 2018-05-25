@@ -1,69 +1,88 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 May 2018 12:31:39 +0100
-Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP
- and suspend paths
-In-Reply-To: <20180525100359.GC17671@n2100.armlinux.org.uk>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
- <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
- <b454e37c-52a8-387f-3649-8ce72c9a5b18@gmail.com>
- <20180525100359.GC17671@n2100.armlinux.org.uk>
-Message-ID: <20180525113139.GD17671@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 May 2018 12:32:51 +0100
+Subject: [PATCH v4 2/2] arm64: signal: Report signal frame size to
+ userspace via auxv
+In-Reply-To: <20180524170713.GY13470@e103592.cambridge.arm.com>
+References: <1527097616-25214-1-git-send-email-Dave.Martin@arm.com>
+ <1527097616-25214-3-git-send-email-Dave.Martin@arm.com>
+ <20180524124918.GG8689@arm.com>
+ <20180524155516.GW13470@e103592.cambridge.arm.com>
+ <20180524165045.GP8689@arm.com>
+ <20180524170713.GY13470@e103592.cambridge.arm.com>
+Message-ID: <20180525113251.GB3255@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:03:59AM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 24, 2018 at 04:30:40PM -0700, Florian Fainelli wrote:
-> > On 05/21/2018 04:44 AM, Russell King wrote:
-> > > Check for CPU bugs when secondary processors are being brought online,
-> > > and also when CPUs are resuming from a low power mode.  This gives an
-> > > opportunity to check that processor specific bug workarounds are
-> > > correctly enabled for all paths that a CPU re-enters the kernel.
+On Thu, May 24, 2018 at 06:07:13PM +0100, Dave Martin wrote:
+> On Thu, May 24, 2018 at 05:50:48PM +0100, Will Deacon wrote:
+> > On Thu, May 24, 2018 at 04:55:17PM +0100, Dave Martin wrote:
+> > > On Thu, May 24, 2018 at 01:49:21PM +0100, Will Deacon wrote:
+> > > > On Wed, May 23, 2018 at 06:46:56PM +0100, Dave Martin wrote:
+> > > > > @@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+> > > > >  		thread_flags = READ_ONCE(current_thread_info()->flags);
+> > > > >  	} while (thread_flags & _TIF_WORK_MASK);
+> > > > >  }
+> > > > > +
+> > > > > +unsigned long __ro_after_init signal_minsigstksz;
+> > > > > +
+> > > > > +/*
+> > > > > + * Determine the stack space required for guaranteed signal devliery.
+> > > > > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
+> > > > > + * cpufeatures setup is assumed to be complete.
+> > > > > + */
+> > > > > +void __init minsigstksz_setup(void)
+> > > > > +{
+> > > > > +	struct rt_sigframe_user_layout user;
+> > > > > +
+> > > > > +	init_user_layout(&user);
+> > > > > +
+> > > > > +	/*
+> > > > > +	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
+> > > > > +	 * be big enough, but it's our best guess:
+> > > > > +	 */
+> > > > > +	if (WARN_ON(setup_sigframe_layout(&user, true)))
+> > > > > +		signal_minsigstksz = SIGFRAME_MAXSZ;
+> > > > 
+> > > > Can we not leave signal_minsigstksz as zero in this case?
 > > > 
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> > > I prefer to distinguish the "kernel went wrong" case (where we just omit
+> > > AT_MINSIGSTKSZ for backwards compatibilty) from the "sigframe too
+> > > large" case.
 > > 
-> > Something I missed, is that this correctly warns about e.g: missing the
-> > IBE bit for secondary cores, but it seems to be missing it for the boot CPU:
+> > Hmm, so I'm confused as to the distinction here. Wouldn't an allocation
+> > failure in setup_sigframe_layout be indicative of "kernel went wrong"?
+> > 
+> > To put it another way, if we could determine the maximum sigframe size
+> > at build time, surely we'd fail the build if SIGFRAME_MAXSZ wasn't big
+> > enough? In that case, detecting this at runtime is also pretty bad (hence
 > 
-> Are you sure that the boot CPU has the IBE bit clear?
+> Yup
 
-Here's what I get on TI Keystone 2, which doesn't set the IBE bit for
-any CPU:
+Good, I was starting to worry I was missing something!
 
-CPU: Testing write buffer coherency: ok
-CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-CPU0: Spectre v2: using ICIALLU workaround
-/cpus/cpu at 0 missing clock-frequency property
-/cpus/cpu at 1 missing clock-frequency property
-/cpus/cpu at 2 missing clock-frequency property
-/cpus/cpu at 3 missing clock-frequency property
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-Setting up static identity map for 0x80008300 - 0x80008438
-Hierarchical SRCU implementation.
-smp: Bringing up secondary CPUs ...
-CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-CPU1: Spectre v2: using ICIALLU workaround
-CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
-CPU2: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-CPU2: Spectre v2: using ICIALLU workaround
-CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
-CPU3: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-CPU3: Spectre v2: using ICIALLU workaround
+> > the WARN_ON) and I think we should drop the aux entry rather than provide
+> > a value that is known to be incorrect.
+> 
+> Telling userspace the signal frame size is not optional: by omitting
+> AT_MINSIGSTKSZ we implicitly tell userspace than MINSIGSTKSZ
+> is sufficient.  But in this case we not only know that this is false, we
+> know that SIGFRAME_MAXSZ is not sufficient either.  But we also know
+> that SIGFRAME_MAXSZ is a closer estimate to the true requirement, because
+> it's the larger value.
+> 
+> This falls under the heading of "being no more wrong than necessary".
 
-It should be noted that, if we implement a "bugs" bit exported to
-userspace (as I think someone requested) that booting on a system
-where only the boot CPU initially comes up (which has the IBE bit
-set) and then bringing the secondary CPUs online after userspace
-has started (where those CPUs don't have the IBE bit set) will
-result in the system initially not being vulnerable, but then
-becoming vulnerable when running on those other CPUs.
+I think I just prefer distinguishing between "AT_MINSIGSTKSZ isn't
+present, I'll assume MINSIGSTKSZ is sufficient but it might not be" and
+"AT_MINSIGSTKSZ is present, I know that it's sufficient".
 
-If the bugs bit had already been checked by userspace, then it would
-think that there's no system level vulnerability.  Userspace would
-need to check the status each time a CPU comes online.
+> Either way, this is trying to paper over a kernel bug, by telling
+> userspace something "sensible".  This may not be a sensible course
+> of action...
+> 
+> So if you feel strongly I'm happy to not distinguish the two cases and
+> just WARN() in minsigstksz_setup() as at present.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Yes, please.
+
+Will
