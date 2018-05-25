@@ -1,85 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 May 2018 12:31:05 +0100
-Subject: [PATCH v2 7/8] iommu: Remove IOMMU_OF_DECLARE
-In-Reply-To: <20180524175024.19874-8-robh@kernel.org>
-References: <20180524175024.19874-1-robh@kernel.org>
- <20180524175024.19874-8-robh@kernel.org>
-Message-ID: <20180525113104.GA3255@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 May 2018 12:31:39 +0100
+Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP
+ and suspend paths
+In-Reply-To: <20180525100359.GC17671@n2100.armlinux.org.uk>
+References: <20180521114238.GN17671@n2100.armlinux.org.uk>
+ <E1fKjEx-00063Y-N5@rmk-PC.armlinux.org.uk>
+ <b454e37c-52a8-387f-3649-8ce72c9a5b18@gmail.com>
+ <20180525100359.GC17671@n2100.armlinux.org.uk>
+Message-ID: <20180525113139.GD17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 12:50:23PM -0500, Rob Herring wrote:
-> Now that we use the driver core to stop deferred probe for missing
-> drivers, IOMMU_OF_DECLARE can be removed.
+On Fri, May 25, 2018 at 11:03:59AM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 24, 2018 at 04:30:40PM -0700, Florian Fainelli wrote:
+> > On 05/21/2018 04:44 AM, Russell King wrote:
+> > > Check for CPU bugs when secondary processors are being brought online,
+> > > and also when CPUs are resuming from a low power mode.  This gives an
+> > > opportunity to check that processor specific bug workarounds are
+> > > correctly enabled for all paths that a CPU re-enters the kernel.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> > 
+> > Something I missed, is that this correctly warns about e.g: missing the
+> > IBE bit for secondary cores, but it seems to be missing it for the boot CPU:
 > 
-> This is slightly less optimal than having a list of built-in drivers in
-> that we'll now defer probe twice before giving up. This shouldn't have a
-> significant impact on boot times as past discussions about deferred
-> probe have given no evidence of deferred probe having a substantial
-> impact.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Rob Clark <robdclark@gmail.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: iommu at lists.linux-foundation.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/iommu/arm-smmu-v3.c    |  2 --
->  drivers/iommu/arm-smmu.c       |  7 -------
->  drivers/iommu/exynos-iommu.c   |  2 --
->  drivers/iommu/ipmmu-vmsa.c     |  3 ---
->  drivers/iommu/msm_iommu.c      |  2 --
->  drivers/iommu/of_iommu.c       | 19 +------------------
->  drivers/iommu/qcom_iommu.c     |  2 --
->  drivers/iommu/rockchip-iommu.c |  2 --
->  include/linux/of_iommu.h       |  4 ----
->  9 files changed, 1 insertion(+), 42 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 1d647104bccc..22bdabd3d8e0 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -2915,8 +2915,6 @@ static struct platform_driver arm_smmu_driver = {
->  };
->  module_platform_driver(arm_smmu_driver);
->  
-> -IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3");
-> -
->  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
->  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
->  MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 69e7c60792a8..9dd7cbaa3b0c 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2211,13 +2211,6 @@ static struct platform_driver arm_smmu_driver = {
->  };
->  module_platform_driver(arm_smmu_driver);
->  
-> -IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1");
-> -IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2");
-> -IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400");
-> -IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401");
-> -IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500");
-> -IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2");
-> -
->  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
->  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
->  MODULE_LICENSE("GPL v2");
+> Are you sure that the boot CPU has the IBE bit clear?
 
-For the SMMU drivers:
+Here's what I get on TI Keystone 2, which doesn't set the IBE bit for
+any CPU:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+CPU: Testing write buffer coherency: ok
+CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+CPU0: Spectre v2: using ICIALLU workaround
+/cpus/cpu at 0 missing clock-frequency property
+/cpus/cpu at 1 missing clock-frequency property
+/cpus/cpu at 2 missing clock-frequency property
+/cpus/cpu at 3 missing clock-frequency property
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x80008300 - 0x80008438
+Hierarchical SRCU implementation.
+smp: Bringing up secondary CPUs ...
+CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+CPU1: Spectre v2: using ICIALLU workaround
+CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
+CPU2: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+CPU2: Spectre v2: using ICIALLU workaround
+CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
+CPU3: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+CPU3: Spectre v2: using ICIALLU workaround
 
-Will
+It should be noted that, if we implement a "bugs" bit exported to
+userspace (as I think someone requested) that booting on a system
+where only the boot CPU initially comes up (which has the IBE bit
+set) and then bringing the secondary CPUs online after userspace
+has started (where those CPUs don't have the IBE bit set) will
+result in the system initially not being vulnerable, but then
+becoming vulnerable when running on those other CPUs.
+
+If the bugs bit had already been checked by userspace, then it would
+think that there's no system level vulnerability.  Userspace would
+need to check the status each time a CPU comes online.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
