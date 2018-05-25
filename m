@@ -1,282 +1,63 @@
-From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
-Date: Fri, 25 May 2018 12:45:24 +0000
-Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-Message-ID: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 25 May 2018 18:21:50 +0530
+Subject: [PATCH] arm64: dts: qcom: msm8996: Use UFS_GDSC for UFS
+In-Reply-To: <20180524223122.12601-1-bjorn.andersson@linaro.org>
+References: <20180524223122.12601-1-bjorn.andersson@linaro.org>
+Message-ID: <CAFp+6iH5bS5rmqZ1oy09COb2Rzuz6zbN7pFwxz0WTJNOYTTbkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of irq-gic-v3-its driver allocates at least 32 LPIs (interrupt numbers) 
-for each Device ID even if the number of requested LPIs is only one.
-I think it is a waste for LPI resource.
-And if we use many devices over ITS, this implementation may cause a shortage of LPI .
+Hi Bjorn,
 
-I have a patch to avoid this problem by changing method of lpis management.
-For detail, I use free list instead of chunk method to manage lpis.
+On Fri, May 25, 2018 at 4:01 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> The UFS host controller occationally (20%) fails to enable
+> gcc_ufs_axi_clk because the UFS GDSC is not enabled. In most cases it's
+> enabled through the UFS phy driver, but to make sure it's enabled let's
+> enable it directly from the UFS host controller directly as well.
+>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
+>  arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> index 380e14591686..03c7904bda14 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> @@ -674,6 +674,8 @@
+>                         vccq-max-microamp = <450000>;
+>                         vccq2-max-microamp = <450000>;
+>
+> +                       power-domains = <&gcc UFS_GDSC>;
+> +
 
-The points of this patch are as follows.
-Point1:Not always allocates at least 32 LPIs.
-Round numbers of lpi requested up to nearest power of two.
-Point2: Guarantee base lpi number is aligned a power of two.
-For example if you want 2 lpis, you will get 2 lpis, and base lpi number will be aligned by 2.
-If you want 15 lpis, you will get 16 lpis, and base lpi number will be aligned by 16.
-Point3: Lpis be allocated as a contiguous range,
+We shouldn't need power-domain with the phy. UFS_GDSC should
+be attached to the controller, as the phy is powered up only after
+the controller is power-up, and during collapse too, we turn off
+the phy first.
+Can you try testing keeping UFS_GDSC only with ufs controller and
+remove it from the ufs-phy node? We are doing same on the 4.14 release
+branch too for db820.
+I apologize to have missed this in your patch for ufs-related dt nodes.
+Can we please fix this now?
 
-Signed-off-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
-------------------------------------------------
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5416f2b..e68fca6 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1405,82 +1405,122 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
- 	.irq_set_vcpu_affinity	= its_irq_set_vcpu_affinity,
- };
- 
--/*
-- * How we allocate LPIs:
-- *
-- * The GIC has id_bits bits for interrupt identifiers. From there, we
-- * must subtract 8192 which are reserved for SGIs/PPIs/SPIs. Then, as
-- * we allocate LPIs by chunks of 32, we can shift the whole thing by 5
-- * bits to the right.
-- *
-- * This gives us (((1UL << id_bits) - 8192) >> 5) possible allocations.
-- */
--#define IRQS_PER_CHUNK_SHIFT	5
--#define IRQS_PER_CHUNK		(1UL << IRQS_PER_CHUNK_SHIFT)
--#define ITS_MAX_LPI_NRBITS	16 /* 64K LPIs */
-+static struct list_head lpi_free_list;
-+static struct list_head lpi_alloc_list; struct lpi_mng {
-+	struct list_head lpi_list;
-+	int base;
-+	int len;
-+};
- 
--static unsigned long *lpi_bitmap;
--static u32 lpi_chunks;
-+#define ITS_MAX_LPI_NRBITS	16 /* 64K LPIs */
- static DEFINE_SPINLOCK(lpi_lock);
- 
--static int its_lpi_to_chunk(int lpi)
--{
--	return (lpi - 8192) >> IRQS_PER_CHUNK_SHIFT;
--}
--
--static int its_chunk_to_lpi(int chunk)
--{
--	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
--}
- 
- static int __init its_lpi_init(u32 id_bits)  {
--	lpi_chunks = its_lpi_to_chunk(1UL << id_bits);
-+	u32 nr_irq = 1UL << id_bits;
-+	struct lpi_mng *lpi_free_mng = NULL;
-+	struct lpi_mng *lpi_new = NULL;
-+
-+	INIT_LIST_HEAD(&lpi_free_list);
-+	INIT_LIST_HEAD(&lpi_alloc_list);
- 
--	lpi_bitmap = kzalloc(BITS_TO_LONGS(lpi_chunks) * sizeof(long),
--			     GFP_KERNEL);
--	if (!lpi_bitmap) {
--		lpi_chunks = 0;
-+	lpi_free_mng = kzalloc(sizeof(struct lpi_mng), GFP_KERNEL);
-+	if (!lpi_free_mng)
- 		return -ENOMEM;
--	}
- 
--	pr_info("ITS: Allocated %d chunks for LPIs\n", (int)lpi_chunks);
-+	lpi_free_mng->base = 0;
-+	lpi_free_mng->len = nr_irq;
-+	list_add(&lpi_free_mng->lpi_list, &lpi_free_list);
-+
-+	do {
-+		lpi_free_mng = list_first_entry(&lpi_free_list, struct lpi_mng,
-+			lpi_list);
-+		if (lpi_free_mng->len == 8192) {
-+			/*It is not lpi, so we delete */
-+			if (lpi_free_mng->base == 0) {
-+				list_del_init(&lpi_free_mng->lpi_list);
-+				kfree(lpi_free_mng);
-+				continue;
-+			}
-+			if (lpi_free_mng->base == 8192)
-+				goto out;
-+		}
-+		if (lpi_free_mng->len > 8192) {
-+			lpi_new  = kzalloc(sizeof(struct lpi_mng),
-+					 GFP_ATOMIC);
-+			if (!lpi_new)
-+				return -ENOMEM;
-+			lpi_free_mng->len /= 2;
-+			lpi_new->base = lpi_free_mng->base + lpi_free_mng->len;
-+			lpi_new->len = lpi_free_mng->len;
-+			list_add(&lpi_new->lpi_list, &lpi_free_mng->lpi_list);
-+		}
-+	} while (1);
-+
-+out:
-+	pr_info("ITS: Allocated %d  LPIs\n", nr_irq - 8192);
- 	return 0;
- }
- 
-+static struct lpi_mng *its_alloc_lpi(int nr_irqs) {
-+	struct lpi_mng *lpi_alloc_mng = NULL;
-+	struct lpi_mng *lpi_split = NULL;
-+	struct lpi_mng *lpi_new = NULL;
-+	int base;
-+
-+	base = INT_MAX;
-+	do {
-+		list_for_each_entry(lpi_alloc_mng, &lpi_free_list, lpi_list) {
-+			if (nr_irqs > lpi_alloc_mng->len)
-+				continue;
-+			if (nr_irqs == lpi_alloc_mng->len) {
-+				list_del_init(&lpi_alloc_mng->lpi_list);
-+				list_add(&lpi_alloc_mng->lpi_list,
-+					&lpi_alloc_list);
-+				return lpi_alloc_mng;
-+			}
-+			if ((nr_irqs < lpi_alloc_mng->len)
-+				&& (lpi_alloc_mng->base < base)) {
-+				base = lpi_alloc_mng->base;
-+				lpi_split = lpi_alloc_mng;
-+			}
-+		}
-+		lpi_new  = kzalloc(sizeof(struct lpi_mng),
-+				 GFP_ATOMIC);
-+		if (!lpi_new || !lpi_split)
-+			return NULL;
-+
-+		lpi_split->len /= 2;
-+		lpi_new->base = lpi_split->base + lpi_split->len;
-+		lpi_new->len = lpi_split->len;
-+		list_add(&lpi_new->lpi_list, &lpi_split->lpi_list);
-+
-+	} while (1);
-+}
-+
- static unsigned long *its_lpi_alloc_chunks(int nr_irqs, int *base, int *nr_ids)  {
- 	unsigned long *bitmap = NULL;
--	int chunk_id;
--	int nr_chunks;
--	int i;
--
--	nr_chunks = DIV_ROUND_UP(nr_irqs, IRQS_PER_CHUNK);
-+	struct lpi_mng *lpi_alloc_mng = NULL;
- 
- 	spin_lock(&lpi_lock);
- 
--	do {
--		chunk_id = bitmap_find_next_zero_area(lpi_bitmap, lpi_chunks,
--						      0, nr_chunks, 0);
--		if (chunk_id < lpi_chunks)
--			break;
--
--		nr_chunks--;
--	} while (nr_chunks > 0);
-+	lpi_alloc_mng = its_alloc_lpi(nr_irqs);
- 
--	if (!nr_chunks)
-+	if (!lpi_alloc_mng)
- 		goto out;
- 
--	bitmap = kzalloc(BITS_TO_LONGS(nr_chunks * IRQS_PER_CHUNK) * sizeof (long),
--			 GFP_ATOMIC);
-+	bitmap = kzalloc(BITS_TO_LONGS(nr_irqs) * sizeof(long),
-+		 GFP_ATOMIC);
- 	if (!bitmap)
- 		goto out;
- 
--	for (i = 0; i < nr_chunks; i++)
--		set_bit(chunk_id + i, lpi_bitmap);
- 
--	*base = its_chunk_to_lpi(chunk_id);
--	*nr_ids = nr_chunks * IRQS_PER_CHUNK;
-+	*base = lpi_alloc_mng->base;
-+	*nr_ids = lpi_alloc_mng->len;
- 
- out:
- 	spin_unlock(&lpi_lock);
-@@ -1491,23 +1531,53 @@ static unsigned long *its_lpi_alloc_chunks(int nr_irqs, int *base, int *nr_ids)
- 	return bitmap;
- }
- 
-+static void its_joint_free_list(struct lpi_mng *free, struct lpi_mng 
-+*alloc) {
-+	free->len = free->len * 2;
-+	if (free->base > alloc->base)
-+		free->base = alloc->base;
-+}
-+
- static void its_lpi_free_chunks(unsigned long *bitmap, int base, int nr_ids)  {
--	int lpi;
-+	struct lpi_mng *lpi_alloc_mng = NULL;
-+	struct lpi_mng *lpi_free_mng = NULL;
-+	bool first_half;
-+	int pair_base;
- 
- 	spin_lock(&lpi_lock);
- 
--	for (lpi = base; lpi < (base + nr_ids); lpi += IRQS_PER_CHUNK) {
--		int chunk = its_lpi_to_chunk(lpi);
--
--		BUG_ON(chunk > lpi_chunks);
--		if (test_bit(chunk, lpi_bitmap)) {
--			clear_bit(chunk, lpi_bitmap);
--		} else {
--			pr_err("Bad LPI chunk %d\n", chunk);
-+	list_for_each_entry(lpi_alloc_mng, &lpi_alloc_list, lpi_list) {
-+		if (lpi_alloc_mng->base == base) {
-+			list_del_init(&lpi_alloc_mng->lpi_list);
-+			break;
- 		}
- 	}
- 
-+	first_half = (lpi_alloc_mng->base % (lpi_alloc_mng->len * 2))
-+			 ? false : true;
-+	if (first_half)
-+		pair_base = lpi_alloc_mng->base + lpi_alloc_mng->len;
-+	else
-+		pair_base = lpi_alloc_mng->base - lpi_alloc_mng->len;
-+
-+	// found the other half
-+	list_for_each_entry(lpi_free_mng, &lpi_free_list, lpi_list) {
-+		if (lpi_free_mng->base == pair_base) {
-+			its_joint_free_list(lpi_free_mng, lpi_alloc_mng);
-+			kfree(lpi_alloc_mng);
-+			goto out;
-+		}
-+	}
-+	// Not found the other half
-+	list_for_each_entry(lpi_free_mng, &lpi_free_list, lpi_list) {
-+		if (lpi_alloc_mng->base  < lpi_free_mng->base) {
-+			list_add_tail(&lpi_alloc_mng->lpi_list,
-+				&lpi_free_mng->lpi_list);
-+			break;
-+		}
-+	}
-+out:
- 	spin_unlock(&lpi_lock);
- 
- 	kfree(bitmap);
-@@ -2117,12 +2187,13 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	 * We allocate at least one chunk worth of LPIs bet device,
- 	 * and thus that many ITEs. The device may require less though.
- 	 */
--	nr_ites = max(IRQS_PER_CHUNK, roundup_pow_of_two(nvecs));
-+	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
- 	sz = nr_ites * its->ite_size;
- 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
- 	itt = kzalloc(sz, GFP_KERNEL);
- 	if (alloc_lpis) {
--		lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
-+		lpi_map = its_lpi_alloc_chunks(roundup_pow_of_two(nvecs),
-+			&lpi_base, &nr_lpis);
- 		if (lpi_map)
- 			col_map = kzalloc(sizeof(*col_map) * nr_lpis,
- 					  GFP_KERNEL);
-----------------------------------------------------
-Regards,
-Lei Zhang
---
-Lei Zhang  e-mail: zhang.lei at jp.fujitsu.com FUJITSU LIMITED
+Best regards
+Vivek
+
+>                         clock-names =
+>                                 "core_clk_src",
+>                                 "core_clk",
+> --
+> 2.17.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
