@@ -1,15 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 05:11:58 -0700
-Subject: [GIT PULL 2/5] memory: tegra: Changes for v4.18-rc1
-In-Reply-To: <20180518142245.20242-2-thierry.reding@gmail.com>
-References: <20180518142245.20242-1-thierry.reding@gmail.com>
- <20180518142245.20242-2-thierry.reding@gmail.com>
-Message-ID: <20180525121158.dk5hv525ilakmshz@localhost>
+Date: Fri, 25 May 2018 05:01:40 -0700
+Subject: [GIT PULL v2] arm64: defconfig: hisilicon config updates for v4.18
+In-Reply-To: <5AFEB1E0.9030200@hisilicon.com>
+References: <5AFEB1E0.9030200@hisilicon.com>
+Message-ID: <20180525120140.d5gtksg62xlr6cz3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 04:22:42PM +0200, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Fri, May 18, 2018 at 11:58:40AM +0100, Wei Xu wrote:
+> Hi Olof, Hi Arnd,
+> 
+> Please help to pull the following changes.
+> Thanks!
+> 
+> Best Regards,
+> Wei
+> 
+> ---
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
@@ -17,47 +24,36 @@ On Fri, May 18, 2018 at 04:22:42PM +0200, Thierry Reding wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-memory
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.18v2
 > 
-> for you to fetch changes up to bef89a8d81ca97aca864778746b110cf52847868:
+> for you to fetch changes up to 9ab1c973324566baa314f8dd4e3827e4076a8675:
 > 
->   memory: tegra: Remove Tegra114 SATA and AFI reset definitions (2018-05-18 12:33:02 +0200)
-> 
-> Thanks,
-> Thierry
+>   arm64: defconfig: Enable HISILICON_LPC (2018-05-11 11:39:01 +0100)
 > 
 > ----------------------------------------------------------------
-> memory: tegra: Changes for v4.18-rc1
+> ARM64: hisilicon: defconfig updates for 4.18
 > 
-> This contains some cleanup of the memory controller driver as well as
-> unification work to share more code between Tegra20 and later SoC
-> generations. Also included are an implementation for the hot resets
-> functionality by the memory controller which is required to properly
-> reset busy hardware.
+> - Sync the arm64 defconfig with savedefconfig
+> - Enable the support of ethernet, eMMC, Combo/INNO phy
+>   and PCIe for Hi3798CV200
+> - Enable the LPC for hip06 and hip07
 > 
 > ----------------------------------------------------------------
-> Dmitry Osipenko (14):
->       dt-bindings: memory: tegra: Add hot resets definitions
->       memory: tegra: Do not handle spurious interrupts
->       memory: tegra: Setup interrupts mask before requesting IRQ
->       memory: tegra: Apply interrupts mask per SoC
->       memory: tegra: Remove unused headers inclusions
->       memory: tegra: Squash tegra20-mc into common tegra-mc driver
->       memory: tegra: Introduce memory client hot reset
->       memory: tegra: Add Tegra20 memory controller hot resets
->       memory: tegra: Add Tegra30 memory controller hot resets
->       memory: tegra: Add Tegra114 memory controller hot resets
->       memory: tegra: Add Tegra124 memory controller hot resets
->       memory: tegra: Register SMMU after MC driver became ready
->       dt-bindings: memory: tegra: Remove Tegra114 SATA and AFI reset definitions
->       memory: tegra: Remove Tegra114 SATA and AFI reset definitions
+> John Garry (1):
+>       arm64: defconfig: Enable HISILICON_LPC
 > 
-> Thierry Reding (1):
->       memory: tegra: Add Tegra210 memory controller hot resets
+> Shawn Guo (2):
+>       arm64: defconfig: sync it with savedefconfig
 
-Looks like this is just additional/proper resets, are there any backwards
-compatibility concerns with older device trees or new assumptions of properties
-that should be handled?
+Same feedback here as for  Gregory on his Marvell pull request -- please don't
+run savedefconfig since it messes up and adds a lot of conflicts for everybody.
+We'll do it in our tree right around the end of the merge window instead.
+
+It's probably easiest to send the patches as patches so we can fix them up if
+needed, so please resend separately and we'll apply. (Or send a new pull
+request with just the two new config changes).
+
+Thanks!
 
 
 -Olof
