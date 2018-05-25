@@ -1,18 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 13:58:33 -0700
-Subject: [GIT PULL] Allwinner DT changes for 4.18
-In-Reply-To: <20180521094839.j7aq43ljqw4k4mvw@flea>
-References: <20180521094839.j7aq43ljqw4k4mvw@flea>
-Message-ID: <20180525205833.xideppsfp4iriywp@localhost>
+Date: Fri, 25 May 2018 13:59:13 -0700
+Subject: [GIT PULL] Allwinner H3/H5 changes for 4.18
+In-Reply-To: <20180521095517.liyqgj32d3xd7ejq@flea>
+References: <20180521095517.liyqgj32d3xd7ejq@flea>
+Message-ID: <20180525205913.yuntcqsm56z3xz7d@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 11:48:39AM +0200, Maxime Ripard wrote:
+On Mon, May 21, 2018 at 11:55:17AM +0200, Maxime Ripard wrote:
 > Hi Arnd, Olof,
 > 
-> Here is our usual bunch of arm32 DT changes for the next release.
+> Here is our usual PR with the changes that apply to the H3 and H5,
+> shared between arm and arm64.
 > 
-> Thanks!
 > Maxime
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
@@ -21,27 +21,21 @@ On Mon, May 21, 2018 at 11:48:39AM +0200, Maxime Ripard wrote:
 > 
 > are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.18
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-h3-h5-for-4.18
 > 
-> for you to fetch changes up to 5d9ef839f874f4e3923c8a9ae7b136c6c3912cd5:
+> for you to fetch changes up to 06139c822c5011ff79341000f44eca96151aac92:
 > 
->   ARM: dts: sun7i: Add Olimex A20-SOM-EVB-eMMC board (2018-05-21 11:41:03 +0200)
+>   ARM: dts: sun8i: h3: Add SY8106A regulator to Orange Pi PC (2018-05-11 10:00:28 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner DT additions for 4.18
+> Allwinner H3/H5 support for 4.18
 > 
-> Here is our usual bunch of DT changes for our arm SoCs, with most
-> significantly:
->   - MIPI-DSI support for the A33
->   - NAND support for the A33
->   - SMP support for the A83t
->   - GMAC support for the R40
->   - And some new boards: Olimex A20-SOM-EVB-eMMC, Nintendo NES and SuperNES
->     Classic
-
-Neat to see the Nintendo Classic systems support!
+> Here is our usual bunch of changes for the H3 and H5 SoCs that share the
+> same SoC design but with different CPUs.
+> 
+> This time, most of the changes are about supporting CPUFreq on these SoCs,
+> with voltage scaling being enabled for a number of boards.
 
 Merged, thanks!
-
 
 -Olof
