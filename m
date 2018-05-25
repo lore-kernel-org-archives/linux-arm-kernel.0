@@ -1,47 +1,63 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 05:21:34 -0700
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.18
-In-Reply-To: <CAK7LNATphrRyYvMXMMJz--UtfNk2BZLWHAp3XXpQLob5=5w2Qg@mail.gmail.com>
-References: <CAK7LNATphrRyYvMXMMJz--UtfNk2BZLWHAp3XXpQLob5=5w2Qg@mail.gmail.com>
-Message-ID: <20180525122134.zigckjuxovguyc7a@localhost>
+Date: Fri, 25 May 2018 05:11:58 -0700
+Subject: [GIT PULL 2/5] memory: tegra: Changes for v4.18-rc1
+In-Reply-To: <20180518142245.20242-2-thierry.reding@gmail.com>
+References: <20180518142245.20242-1-thierry.reding@gmail.com>
+ <20180518142245.20242-2-thierry.reding@gmail.com>
+Message-ID: <20180525121158.dk5hv525ilakmshz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 20, 2018 at 11:34:08AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
-> 
-> Here are UniPhier DT (32bit) updates for the v4.18 merge window.
-> Please pull!
-> 
+On Fri, May 18, 2018 at 04:22:42PM +0200, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-dt-v4.18
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-memory
 > 
-> for you to fetch changes up to 526f872b8492fbfb1a0f342e601bdc5ba322f16b:
+> for you to fetch changes up to bef89a8d81ca97aca864778746b110cf52847868:
 > 
->   ARM: dts: uniphier: add syscon-phy-mode property to each ethernet
-> node (2018-04-25 00:21:51 +0900)
+>   memory: tegra: Remove Tegra114 SATA and AFI reset definitions (2018-05-18 12:33:02 +0200)
 > 
-> ----------------------------------------------------------------
-> UniPhier ARM SoC DT updates for v4.18
-> 
-> - add more properties to ethernet nodes
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> Kunihiko Hayashi (2):
->       ARM: dts: uniphier: add required clocks and resets to Pro4 ethernet node
->       ARM: dts: uniphier: add syscon-phy-mode property to each ethernet node
+> memory: tegra: Changes for v4.18-rc1
+> 
+> This contains some cleanup of the memory controller driver as well as
+> unification work to share more code between Tegra20 and later SoC
+> generations. Also included are an implementation for the hot resets
+> functionality by the memory controller which is required to properly
+> reset busy hardware.
+> 
+> ----------------------------------------------------------------
+> Dmitry Osipenko (14):
+>       dt-bindings: memory: tegra: Add hot resets definitions
+>       memory: tegra: Do not handle spurious interrupts
+>       memory: tegra: Setup interrupts mask before requesting IRQ
+>       memory: tegra: Apply interrupts mask per SoC
+>       memory: tegra: Remove unused headers inclusions
+>       memory: tegra: Squash tegra20-mc into common tegra-mc driver
+>       memory: tegra: Introduce memory client hot reset
+>       memory: tegra: Add Tegra20 memory controller hot resets
+>       memory: tegra: Add Tegra30 memory controller hot resets
+>       memory: tegra: Add Tegra114 memory controller hot resets
+>       memory: tegra: Add Tegra124 memory controller hot resets
+>       memory: tegra: Register SMMU after MC driver became ready
+>       dt-bindings: memory: tegra: Remove Tegra114 SATA and AFI reset definitions
+>       memory: tegra: Remove Tegra114 SATA and AFI reset definitions
+> 
+> Thierry Reding (1):
+>       memory: tegra: Add Tegra210 memory controller hot resets
 
-Hi,
-
-Merged, but please spend a little more effort on the tag description (what are
-these new properties giving you in functionality?)
+Looks like this is just additional/proper resets, are there any backwards
+compatibility concerns with older device trees or new assumptions of properties
+that should be handled?
 
 
 -Olof
