@@ -1,114 +1,64 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:13 +0100
-Subject: [PATCH v4 07/26] irqchip/gic-v3: Remove acknowledge loop
+Date: Fri, 25 May 2018 10:49:15 +0100
+Subject: [PATCH v4 09/26] arm64: Use daifflag_restore after bp_hardening
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-8-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-10-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple interrupts pending for a CPU is actually rare. Doing an
-acknowledge loop does not give much better performance or even can
-deteriorate them.
+For EL0 entries requiring bp_hardening, daif status is kept at
+DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
+are enabled through local_irq_enable().
 
-Do not loop when an interrupt has been acknowledged, just return
-from interrupt and wait for another one to be raised.
+Before using local_irq_* functions, daifflags should be properly restored
+to a state where IRQs are enabled.
+
+Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: James Morse <james.morse@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 65 +++++++++++++++++++++-----------------------
- 1 file changed, 31 insertions(+), 34 deletions(-)
+ arch/arm64/mm/fault.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 Note:
-The loop pattern also discourages from using PMR for IRQ masking because
-PMR needs to be unmasked to acknowledge interrupts.
+This doesn't introduce a real change in behaviour, but once PMR
+is used for interrupt masking, PSR.I bit needs to be cleared and
+local_irq_enable won't do that anymore.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index e5d1014..0c58db3 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -348,48 +348,45 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- {
- 	u32 irqnr;
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 4165485..7a18634 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -37,6 +37,7 @@
+ #include <asm/cmpxchg.h>
+ #include <asm/cpufeature.h>
+ #include <asm/exception.h>
++#include <asm/daifflags.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/esr.h>
+ #include <asm/sysreg.h>
+@@ -712,7 +713,7 @@ asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
+ 	if (addr > TASK_SIZE)
+ 		arm64_apply_bp_hardening();
 
--	do {
--		irqnr = gic_read_iar();
-+	irqnr = gic_read_iar();
-
--		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
--			int err;
-+	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
-+		int err;
-
--			if (static_branch_likely(&supports_deactivate_key))
-+		if (static_branch_likely(&supports_deactivate_key))
-+			gic_write_eoir(irqnr);
-+		else
-+			isb();
-+
-+		err = handle_domain_irq(gic_data.domain, irqnr, regs);
-+		if (err) {
-+			WARN_ONCE(true, "Unexpected interrupt received!\n");
-+			if (static_branch_likely(&supports_deactivate_key)) {
-+				if (irqnr < 8192)
-+					gic_write_dir(irqnr);
-+			} else {
- 				gic_write_eoir(irqnr);
--			else
--				isb();
--
--			err = handle_domain_irq(gic_data.domain, irqnr, regs);
--			if (err) {
--				WARN_ONCE(true, "Unexpected interrupt received!\n");
--				if (static_branch_likely(&supports_deactivate_key)) {
--					if (irqnr < 8192)
--						gic_write_dir(irqnr);
--				} else {
--					gic_write_eoir(irqnr);
--				}
- 			}
--			continue;
- 		}
--		if (irqnr < 16) {
--			gic_write_eoir(irqnr);
--			if (static_branch_likely(&supports_deactivate_key))
--				gic_write_dir(irqnr);
-+		return;
-+	}
-+	if (irqnr < 16) {
-+		gic_write_eoir(irqnr);
-+		if (static_branch_likely(&supports_deactivate_key))
-+			gic_write_dir(irqnr);
- #ifdef CONFIG_SMP
--			/*
--			 * Unlike GICv2, we don't need an smp_rmb() here.
--			 * The control dependency from gic_read_iar to
--			 * the ISB in gic_write_eoir is enough to ensure
--			 * that any shared data read by handle_IPI will
--			 * be read after the ACK.
--			 */
--			handle_IPI(irqnr, regs);
-+		/*
-+		 * Unlike GICv2, we don't need an smp_rmb() here.
-+		 * The control dependency from gic_read_iar to
-+		 * the ISB in gic_write_eoir is enough to ensure
-+		 * that any shared data read by handle_IPI will
-+		 * be read after the ACK.
-+		 */
-+		handle_IPI(irqnr, regs);
- #else
--			WARN_ONCE(true, "Unexpected SGI received!\n");
-+		WARN_ONCE(true, "Unexpected SGI received!\n");
- #endif
--			continue;
--		}
--	} while (irqnr != ICC_IAR1_EL1_SPURIOUS);
-+	}
+-	local_irq_enable();
++	local_daif_restore(DAIF_PROCCTX);
+ 	do_mem_abort(addr, esr, regs);
  }
 
- static void __init gic_dist_init(void)
+@@ -726,7 +727,7 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
+ 	if (user_mode(regs)) {
+ 		if (instruction_pointer(regs) > TASK_SIZE)
+ 			arm64_apply_bp_hardening();
+-		local_irq_enable();
++		local_daif_restore(DAIF_PROCCTX);
+ 	}
+
+ 	info.si_signo = SIGBUS;
 --
 1.9.1
