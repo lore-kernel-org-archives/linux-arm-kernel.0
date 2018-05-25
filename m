@@ -1,48 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 May 2018 23:07:42 +0200
-Subject: [PATCH] mmc: sunxi: mark PM functions as __maybe_unused
-Message-ID: <20180525210752.1794502-1-arnd@arndb.de>
+Date: Fri, 25 May 2018 23:08:30 +0200
+Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE disabled
+Message-ID: <20180525210843.1821071-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added runtime-pm functions cause a harmless warning
-when CONFIG_PM is disabled:
+Without dmaengine support, we get a harmless warning about an
+unused function:
 
-drivers/mmc/host/sunxi-mmc.c:1452:12: error: 'sunxi_mmc_runtime_suspend' defined but not used [-Werror=unused-function]
- static int sunxi_mmc_runtime_suspend(struct device *dev)
-            ^~~~~~~~~~~~~~~~~~~~~~~~~
-drivers/mmc/host/sunxi-mmc.c:1435:12: error: 'sunxi_mmc_runtime_resume' defined but not used [-Werror=unused-function]
- static int sunxi_mmc_runtime_resume(struct device *dev)
+drivers/pwm/pwm-stm32.c:166:12: error: 'stm32_pwm_capture' defined but not used [-Werror=unused-function]
 
-This marks them as __maybe_unused to shut up the warning.
+Changing the #ifdef to an IS_ENABLED() check shuts up that warning
+and is slightly nicer to read.
 
-Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+Fixes: 53e38fe73f94 ("pwm: stm32: Add capture support")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/mmc/host/sunxi-mmc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pwm/pwm-stm32.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 97c6b79b7d6f..837888b96bd3 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1432,7 +1432,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index 60bfc07c4912..97bbc1f18fd6 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -484,9 +484,7 @@ static int stm32_pwm_apply_locked(struct pwm_chip *chip, struct pwm_device *pwm,
+ static const struct pwm_ops stm32pwm_ops = {
+ 	.owner = THIS_MODULE,
+ 	.apply = stm32_pwm_apply_locked,
+-#if IS_ENABLED(CONFIG_DMA_ENGINE)
+-	.capture = stm32_pwm_capture,
+-#endif
++	.capture = IS_ENABLED(CONFIG_DMA_ENGINE) ? stm32_pwm_capture : NULL,
+ };
  
--static int sunxi_mmc_runtime_resume(struct device *dev)
-+static int __maybe_unused sunxi_mmc_runtime_resume(struct device *dev)
- {
- 	struct mmc_host	*mmc = dev_get_drvdata(dev);
- 	struct sunxi_mmc_host *host = mmc_priv(mmc);
-@@ -1449,7 +1449,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
- 	return 0;
- }
- 
--static int sunxi_mmc_runtime_suspend(struct device *dev)
-+static int __maybe_unused sunxi_mmc_runtime_suspend(struct device *dev)
- {
- 	struct mmc_host	*mmc = dev_get_drvdata(dev);
- 	struct sunxi_mmc_host *host = mmc_priv(mmc);
+ static int stm32_pwm_set_breakinput(struct stm32_pwm *priv,
 -- 
 2.9.0
