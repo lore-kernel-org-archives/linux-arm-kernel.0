@@ -1,65 +1,54 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 25 May 2018 11:26:11 +0200
-Subject: [PATCH v6 3/9] docs: Add Generic Counter interface documentation
-In-Reply-To: <20180522180805.2b61f0ed@archlinux>
-References: <cover.1526487615.git.vilhelm.gray@gmail.com>
- <aa4d62315bb11ddc66d0e1a685c81b1721ffe624.1526487615.git.vilhelm.gray@gmail.com>
- <20180520163109.22b11af8@archlinux> <20180521134729.GB5723@sophia>
- <20180522180805.2b61f0ed@archlinux>
-Message-ID: <cd045792-8ed2-8d83-231a-661975ffc7c5@st.com>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Fri, 25 May 2018 17:20:58 +0800
+Subject: [PATCH v3 1/8] drm/mediatek: update dt-bindings for mt2712
+In-Reply-To: <1527218292.27165.2.camel@mtksdaap41>
+References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
+ <1527215665-11937-2-git-send-email-stu.hsieh@mediatek.com>
+ <1527218292.27165.2.camel@mtksdaap41>
+Message-ID: <1527240058.11190.0.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2018 07:08 PM, Jonathan Cameron wrote:
->>>> +* Quadrature x2 Rising:
->>>> +  Rising edges on either quadrature pair signals updates the respective
->>>> +  count. Quadrature encoding determines the direction.  
->>> This one I've never met.  Really? There are devices who do this form
->>> of crazy? It gives really uneven counting and I'm failing to see when
->>> it would ever make sense...  References for these odd corner cases
->>> would be good.
->>>
->>>
->>> __|---|____|-----|____
->>> ____|----|____|-----|____
->>>
->>> 001122222223334444444  
->> That's the same reaction I had when I discovered this -- in fact the
->> STM32 LP Timer is the first time I've come across such a quadrature
->> mode. I'm not sure of the use case for this mode, because positioning
->> wouldn't be precise as you've pointed out. Perhaps Fabrice or Benjamin
->> can probe the ST guys responsible for this design choice to figure out
->> the rationale.
-> Hmm.  My inclination would be to not support it unless someone can up
-> with a meaningful use.  We are adding ABI (be it not much) for a case
-> that to us makes no sense.
+Hi, CK:
 
-Hi Jonathan, William,
+On Fri, 2018-05-25 at 11:18 +0800, CK Hu wrote:
+> Hi, Stu:
+> 
+> On Fri, 2018-05-25 at 10:34 +0800, stu.hsieh at mediatek.com wrote:
+> > From: Stu Hsieh <stu.hsieh@mediatek.com>
+> > 
+> > Update device tree binding documentation for the display subsystem for
+> > Mediatek MT2712 SoCs.
+> > 
+> 
+> I've acked v2 of this patch and v3 is the same as v2, so you should keep
+> my ack in commit message.
+> 
+> Regards,
+> CK
+OK
 
-Sorry for the late reply. To follow your advise, we can probably drop
-this for now. I think simple counter, or quadrature x4 will be mostly
-used for now. As you pointed out, there's not much ABI for x2
-rising/falling cases. It will not be a big deal to add it later if needed.
-
-I can help to update (remove & test) this in LP-Timer counter driver if
-you wish.
-
-Please let me know,
-
-Thanks,
-Fabrice
+Regards,
+Stu
 
 > 
-> Looks rather like the sort of thing that is a side effect of the
-> implementation rather than deliberate.
-> 
->> I'm leaving in these modes for now, as they do exist in the STM32 LP
->> Timer, but it does make me curious what the intentions for them were
->> (perhaps use cases outside of traditional quadrature encoder
->> positioning).
->>
-> Sure if there is a usecase then fair enough.
-> 
-> Jonathan
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> > index 383183a89164..8469de510001 100644
+> > --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> > +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> > @@ -40,7 +40,7 @@ Required properties (all function blocks):
+> >  	"mediatek,<chip>-dpi"        - DPI controller, see mediatek,dpi.txt
+> >  	"mediatek,<chip>-disp-mutex" - display mutex
+> >  	"mediatek,<chip>-disp-od"    - overdrive
+> > -  the supported chips are mt2701 and mt8173.
+> > +  the supported chips are mt2701, mt2712 and mt8173.
+> >  - reg: Physical base address and length of the function block register space
+> >  - interrupts: The interrupt signal from the function block (required, except for
+> >    merge and split function blocks).
 > 
 > 
