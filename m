@@ -1,44 +1,52 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 25 May 2018 18:37:19 +0800
-Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-Message-ID: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 25 May 2018 12:35:42 +0200
+Subject: REGRESSION: iommu fails to take address limit into account
+In-Reply-To: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
+References: <CAKv+Gu9HoV-V4nj3j6VPzwGz3Z-G4G7zUQcUHufQ6Rdkk8-VNQ@mail.gmail.com>
+Message-ID: <CAKv+Gu_0ECwLhoA2ywp3nntFX=RxfpM+MWFwTain1WN1sMrW9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a continue of discussion from here,
-https://patchwork.kernel.org/patch/9986293/
-that some users may want to handle all available clocks from device
-tree without need to know the detailed clock information likes clock
-numbers and names. This is useful in writing some generic drivers to
-handle clock part.
+On 25 May 2018 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Hello all,
+>
+> I am looking into an issue where a platform device is wired to a
+> MMU-500, and for some reason (which is under investigation) the
+> platform device can not drive all address bits. I can work around this
+> by limiting the DMA mask to 40 bits in the driver. However, the IORT
+> table allows me to set the address limit as well, and so I was
+> expecting this to be taken into account by the SMMU driver.
+>
+> When the iort/iommu layer sets up the DMA operations,
+> iommu_dma_init_domain() is entered with the expected values:
+>
+> base == 0
+> size == 0x100_0000_0000
+>
+> However, the iommu layer ends up generating IOVA addresses that have
+> bits [47:40] set (which is what the MMU-500 supports). Looking closer,
+> this is not surprising, given that the end_pfn variable that is
+> calculated in iommu_dma_init_domain() is no longer used after Zhen's
+> patch aa3ac9469c185 ("iommu/iova: Make dma_32bit_pfn implicit") was
+> applied.
+>
+> So effectively, this is a regression, and I would like your help
+> figuring out how to go about fixing this.
+>
 
-Note:
-This patch series is tested on MX6Q SDB cpufreq driver with a minor change
-to switch to use clk_bulk_get_all.
-But patch 4 only test compiling. Hopefully someone could help test
-the function.
+I have narrowed it down a bit further: even though the IOVA range
+ignores the IORT address limit, the device's DMA mask is set
+correctly. The only problem is that the driver (like all drivers
+afaict) does not take into account the fact that its DMA mask has
+already been set by the bus layer before its probe function is called.
 
-v2->v3:
- * address all comments from Stephen
- * fix build warnings on other architectures.
-v1->v2:
- * add clk_bulk_{get|put}_all() which only supports DT platform currently
- * remove _all variants and the wrapper struct clk_bulk
- * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
-   proves they need it because they don't have a struct device pointer.
+I could add something like this
 
-Dong Aisheng (4):
-  clk: bulk: add of_clk_bulk_get()
-  clk: add new APIs to operate on all available clocks
-  clk: add managed version of clk_bulk_get_all
-  video: simplefb: switch to use clk_bulk API to simplify clock
-    operations
+-       if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
++       if (dma_get_mask(&pdev->dev) == DMA_BIT_MASK(32) &&
++           dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)))
+                dev_warn(&pdev->dev, "Failed to enable 64-bit DMA\n");
 
- drivers/clk/clk-bulk.c         | 80 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-devres.c       | 24 +++++++++++++
- drivers/video/fbdev/simplefb.c | 66 +++++++---------------------------
- include/linux/clk.h            | 65 +++++++++++++++++++++++++++++++++-
- 4 files changed, 180 insertions(+), 55 deletions(-)
-
--- 
-2.7.4
+to only override the mask if it is not at its default value, but it
+feels like papering over the problem given that most drivers appear to
+ignore the preset mask as well.
