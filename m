@@ -1,63 +1,94 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Fri, 25 May 2018 18:21:50 +0530
-Subject: [PATCH] arm64: dts: qcom: msm8996: Use UFS_GDSC for UFS
-In-Reply-To: <20180524223122.12601-1-bjorn.andersson@linaro.org>
-References: <20180524223122.12601-1-bjorn.andersson@linaro.org>
-Message-ID: <CAFp+6iH5bS5rmqZ1oy09COb2Rzuz6zbN7pFwxz0WTJNOYTTbkg@mail.gmail.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Fri, 25 May 2018 09:00:04 -0400
+Subject: [PATCH v6 3/9] docs: Add Generic Counter interface documentation
+In-Reply-To: <cd045792-8ed2-8d83-231a-661975ffc7c5@st.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <aa4d62315bb11ddc66d0e1a685c81b1721ffe624.1526487615.git.vilhelm.gray@gmail.com>
+ <20180520163109.22b11af8@archlinux> <20180521134729.GB5723@sophia>
+ <20180522180805.2b61f0ed@archlinux>
+ <cd045792-8ed2-8d83-231a-661975ffc7c5@st.com>
+Message-ID: <20180525130004.GA3751@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On Fri, May 25, 2018 at 4:01 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> The UFS host controller occationally (20%) fails to enable
-> gcc_ufs_axi_clk because the UFS GDSC is not enabled. In most cases it's
-> enabled through the UFS phy driver, but to make sure it's enabled let's
-> enable it directly from the UFS host controller directly as well.
+On Fri, May 25, 2018 at 11:26:11AM +0200, Fabrice Gasnier wrote:
+>On 05/22/2018 07:08 PM, Jonathan Cameron wrote:
+>>>>> +* Quadrature x2 Rising:
+>>>>> +  Rising edges on either quadrature pair signals updates the respective
+>>>>> +  count. Quadrature encoding determines the direction.  
+>>>> This one I've never met.  Really? There are devices who do this form
+>>>> of crazy? It gives really uneven counting and I'm failing to see when
+>>>> it would ever make sense...  References for these odd corner cases
+>>>> would be good.
+>>>>
+>>>>
+>>>> __|---|____|-----|____
+>>>> ____|----|____|-----|____
+>>>>
+>>>> 001122222223334444444  
+>>> That's the same reaction I had when I discovered this -- in fact the
+>>> STM32 LP Timer is the first time I've come across such a quadrature
+>>> mode. I'm not sure of the use case for this mode, because positioning
+>>> wouldn't be precise as you've pointed out. Perhaps Fabrice or Benjamin
+>>> can probe the ST guys responsible for this design choice to figure out
+>>> the rationale.
+>> Hmm.  My inclination would be to not support it unless someone can up
+>> with a meaningful use.  We are adding ABI (be it not much) for a case
+>> that to us makes no sense.
 >
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
+>Hi Jonathan, William,
 >
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index 380e14591686..03c7904bda14 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -674,6 +674,8 @@
->                         vccq-max-microamp = <450000>;
->                         vccq2-max-microamp = <450000>;
+>Sorry for the late reply. To follow your advise, we can probably drop
+>this for now. I think simple counter, or quadrature x4 will be mostly
+>used for now. As you pointed out, there's not much ABI for x2
+>rising/falling cases. It will not be a big deal to add it later if needed.
 >
-> +                       power-domains = <&gcc UFS_GDSC>;
-> +
-
-We shouldn't need power-domain with the phy. UFS_GDSC should
-be attached to the controller, as the phy is powered up only after
-the controller is power-up, and during collapse too, we turn off
-the phy first.
-Can you try testing keeping UFS_GDSC only with ufs controller and
-remove it from the ufs-phy node? We are doing same on the 4.14 release
-branch too for db820.
-I apologize to have missed this in your patch for ufs-related dt nodes.
-Can we please fix this now?
-
-Best regards
-Vivek
-
->                         clock-names =
->                                 "core_clk_src",
->                                 "core_clk",
-> --
-> 2.17.0
+>I can help to update (remove & test) this in LP-Timer counter driver if
+>you wish.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>Please let me know,
+>
+>Thanks,
+>Fabrice
 
+All right, let's postpone the COUNT_FUNCTION_QUADRATURE_X2_RISING and
+COUNT_FUNCTION_QUADRATURE_X2_FALLING modes for now. Fabrice, send me
+over an update patch removing these modes from the LP-Timer counter
+driver and I'll squash it in with the next patchset revision.
 
+I'll keep the rest of the quadrature modes the same as they are used in
+the other counter drivers as well (with the remaining "Quadrature x1 B"
+staying to complete the pattern) and I've seen real world use cases for
+each:
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+    * COUNT_FUNCTION_QUADRATURE_X1_A
+    * COUNT_FUNCTION_QUADRATURE_X1_B
+    * COUNT_FUNCTION_QUADRATURE_X2_A
+    * COUNT_FUNCTION_QUADRATURE_X2_B
+
+Adding support in the future for "Quadrature x2 Rising" and "Quadrature
+x2 Falling" will be trivial, so really the main requirement in order to
+bring these modes back is to provide reasonable use cases for them. My
+suspicion is that there was some rationale for these Quadrature x2 modes
+in the STM32 LP-Timer -- afterall, why else would the engineers go
+through the trouble of designing and implementing it -- but until that
+use case is clear, it's best to wait on changing the Generic Counter ABI
+lest we end up with an interface that is never used in the real world.
+
+William Breathitt Gray
+
+>
+>> 
+>> Looks rather like the sort of thing that is a side effect of the
+>> implementation rather than deliberate.
+>> 
+>>> I'm leaving in these modes for now, as they do exist in the STM32 LP
+>>> Timer, but it does make me curious what the intentions for them were
+>>> (perhaps use cases outside of traditional quadrature encoder
+>>> positioning).
+>>>
+>> Sure if there is a usecase then fair enough.
+>> 
+>> Jonathan
+>> 
+>> 
