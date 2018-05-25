@@ -1,36 +1,35 @@
 From: stu.hsieh@mediatek.com (stu.hsieh at mediatek.com)
-Date: Fri, 25 May 2018 10:34:25 +0800
-Subject: [PATCH v3 8/8] drm/mediatek: add third ddp path
+Date: Fri, 25 May 2018 10:34:22 +0800
+Subject: [PATCH v3 5/8] drm/mediatek: add ddp component OD1
 In-Reply-To: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527215665-11937-9-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527215665-11937-6-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stu Hsieh <stu.hsieh@mediatek.com>
 
-This patch create third crtc by third ddp path
+This patch add the component OD1 and
+rename the OD to OD1
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_drv.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index b32c4cc8d051..3a866e1d6af4 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -267,6 +267,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 	if (ret < 0)
- 		goto err_component_unbind;
- 
-+	ret = mtk_drm_crtc_create(drm, private->data->third_path,
-+				  private->data->third_len);
-+	if (ret < 0)
-+		goto err_component_unbind;
-+
- 	/* Use OVL device for all DMA memory allocations */
- 	np = private->comp_node[private->data->main_path[0]] ?:
- 	     private->comp_node[private->data->ext_path[0]];
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index eee3c0cc2632..9b19fc4423f1 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -50,7 +50,8 @@ enum mtk_ddp_comp_id {
+ 	DDP_COMPONENT_DSI0,
+ 	DDP_COMPONENT_DSI1,
+ 	DDP_COMPONENT_GAMMA,
+-	DDP_COMPONENT_OD,
++	DDP_COMPONENT_OD0,
++	DDP_COMPONENT_OD1,
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_OVL1,
+ 	DDP_COMPONENT_PWM0,
 -- 
 2.12.5
