@@ -1,127 +1,141 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 25 May 2018 11:27:46 -0600
-Subject: [PATCH 6/6] coresight: allow to build as modules
-In-Reply-To: <4986a636-d5a5-387c-abf1-d68afe063f06@arm.com>
-References: <20180517070643.GC13919@kroah.com>
- <20180518012024.22645-1-kim.phillips@arm.com>
- <20180518012024.22645-6-kim.phillips@arm.com>
- <4986a636-d5a5-387c-abf1-d68afe063f06@arm.com>
-Message-ID: <CANLsYkzD9Ot1noY7QpTu76fUcGsTu4V8y6Dep9Haffw-0uPM9w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 May 2018 12:35:00 -0500
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <92e3be10-e65a-99e9-6ef7-f11ded6a35f9@arm.com>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524190031.GB31019@kroah.com>
+ <CAL_JsqJK69A3W=YrSfvPetM95CROOJhU1bW1rMEOGtji=t0ORQ@mail.gmail.com>
+ <92e3be10-e65a-99e9-6ef7-f11ded6a35f9@arm.com>
+Message-ID: <CAL_JsqKXyBZjpz3dvR+7Hign7Z3iwnvKWrAUdoPDWWBgjWmQLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2018 at 11:12, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 18/05/18 02:20, Kim Phillips wrote:
+On Fri, May 25, 2018 at 7:20 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 24/05/18 21:57, Rob Herring wrote:
 >>
->> Allow to build coresight as modules.  This greatly enhances developer
->> efficiency by allowing the development to take place exclusively on the
->> target, and without needing to reboot in between changes.
+>> On Thu, May 24, 2018 at 2:00 PM, Greg Kroah-Hartman
+>> <gregkh@linuxfoundation.org> wrote:
+>>>
+>>> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
+>>>>
+>>>> Deferred probe will currently wait forever on dependent devices to
+>>>> probe,
+>>>> but sometimes a driver will never exist. It's also not always critical
+>>>> for
+>>>> a driver to exist. Platforms can rely on default configuration from the
+>>>> bootloader or reset defaults for things such as pinctrl and power
+>>>> domains.
+>>>> This is often the case with initial platform support until various
+>>>> drivers
+>>>> get enabled. There's at least 2 scenarios where deferred probe can
+>>>> render
+>>>> a platform broken. Both involve using a DT which has more devices and
+>>>> dependencies than the kernel supports. The 1st case is a driver may be
+>>>> disabled in the kernel config. The 2nd case is the kernel version may
+>>>> simply not have the dependent driver. This can happen if using a newer
+>>>> DT
+>>>> (provided by firmware perhaps) with a stable kernel version.
+>>>>
+>>>> Subsystems or drivers may opt-in to this behavior by calling
+>>>> driver_deferred_probe_check_init_done() instead of just returning
+>>>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>>>> config to decide whether to continue to defer probe or not.
+>>>>
+>>>> Cc: Alexander Graf <agraf@suse.de>
+>>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>>> ---
+>>>>   drivers/base/dd.c      | 17 +++++++++++++++++
+>>>>   include/linux/device.h |  2 ++
+>>>>   2 files changed, 19 insertions(+)
+>>>>
+>>>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>>>> index c9f54089429b..d6034718da6f 100644
+>>>> --- a/drivers/base/dd.c
+>>>> +++ b/drivers/base/dd.c
+>>>> @@ -226,6 +226,16 @@ void device_unblock_probing(void)
+>>>>        driver_deferred_probe_trigger();
+>>>>   }
+>>>>
+>>>> +int driver_deferred_probe_check_init_done(struct device *dev, bool
+>>>> optional)
+>>>> +{
+>>>> +     if (optional && initcalls_done) {
+>>>
+>>>
+>>> Wait, what's the "optional" mess here?
 >>
->> - Kconfig bools become tristates, to allow =m
 >>
->> - use -objs to denote merge object directives in Makefile, adds a
->>    coresight-core nomenclature for the base module.
->>
->> - Export core functions so as to be able to be used by
->>    non-core modules.
->>
->> - add a coresight_exit() that unregisters the coresight bus, add
->>    remove fns for most others.
->>
->> - fix up modules with ID tables for autoloading on boot
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
->> Cc: Randy Dunlap <rdunlap@infradead.org>
->> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+>> My intent was that subsystems just always call this function and never
+>> return EPROBE_DEFER themselves. Then the driver core can make
+>> decisions as to what to do (such as the timeout added in the next
+>> patch). Or it can print common error/debug messages. So optional is a
+>> hint to allow subsystems per device control.
 >
 >
-> Kim,
->
-> I see that you have addressed my comments on a previous version
-> of this series posted in April. But I don't see the version number
-> increased for this new version. Please add versioning to make it
-> easier to make it more obvious.
->
-> Also, generally it is a good idea to keep the people who reviewed
-> and commented on your previous versions in the newer versions.
->
-> Some comments below :
->
->> diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
->> b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
->> index fc742215ab05..bc42b8022556 100644
->> --- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
->> +++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
->> @@ -37,7 +37,12 @@ struct replicator_state {
->>   static int replicator_enable(struct coresight_device *csdev, int inport,
->>                               int outport)
->>   {
->> -       struct replicator_state *drvdata =
->> dev_get_drvdata(csdev->dev.parent);
->> +       struct device *parent_dev = csdev->dev.parent;
->> +       struct replicator_state *drvdata = dev_get_drvdata(parent_dev);
->> +       struct module *module = parent_dev->driver->owner;
->> +
->> +       if (!try_module_get(module))
->> +               return -ENODEV;
->>         CS_UNLOCK(drvdata->base);
->
->
-> What is the guarantee that the "csdev" is still available when we reach
-> here ?
->
-> A module could be unloaded "after the component was added to the path"
-> (via coresight_build_path) and before we invoke the "enable" on each
-> component in the path ?
+> Maybe just driver_defer_probe() might be a more descriptive name? To me,
+> calling "foo_check_x()" with a parameter that says "I don't actually care
+> about x" is the really unintuitive bit.
 
-Very good point - this is invariably racy.
+All the other (though static or internal to driver core) functions are
+prefixed driver_deferred_probe_* so I was trying to remain consistent
+there. You're right though, with the timeout it's not just whether
+initcalls are done. It's really "get the return value depending on the
+core's deferred probe state". So perhaps one of these:
 
->
-> Also, it  is tedious to do module_get in "enable" and module_put in the
-> disable call backs for each component.
->
-> Instead, if we do a module_get() in build_path and module_put() in
-> release path, we could solve all these problems and keep it the module
-> refcount in a central place.
+driver_deferred_probe_get_return_val()
+driver_deferred_probe_handle_return()
 
-Good idea, it does streamline things a lot.
+The other option would be a more straight-forward functions that just
+returns a bool on whether to continue deferring and leave the return
+code handling to the caller:
 
+if (driver_deferred_probe_enabled_for_builtin(dev))
+  return -EPROBE_DEFER;
+else
+  return -ENODEV;
+
+The pinctrl case would look like this:
+
+builtin_only = of_property_read_bool(np_pctldev, "pinctrl-use-default");
+if (builtin_only && driver_deferred_probe_enabled_for_builtin(dev))
+  return -EPROBE_DEFER;
+else if (!builtin_only && driver_deferred_probe_enabled(dev))
+  return -EPROBE_DEFER;
+else
+  return -ENODEV;
+
+I still prefer the former, picking the bike shed color is easier with
+the latter.
+
+>>>
+>>> The caller knows this value, so why do you need to even pass it in here?
+>>
+>>
+>> Because regardless of the value, we always stop deferring when/if we
+>> hit the timeout and the caller doesn't know about the timeout. If we
+>> get rid of it, we'd need functions for both init done and for deferred
+>> timeout.
+>>
+>>> And bool values that are not obvious are horrid.  I had to go look this
+>>> up when reading the later patches that just passed "true" in this
+>>> variable as I had no idea what that meant.
+>>
+>>
+>> Perhaps inverting it and calling it "keep_deferring" would be better.
+>> However, the flag is ignored if we have timed out.
 >
->> +MODULE_DEVICE_TABLE(amba, replicator_ids);
->> +
->>   static struct amba_driver replicator_driver = {
->>         .drv = {
->>                 .name   = "coresight-dynamic-replicator",
->> @@ -207,9 +226,10 @@ static struct amba_driver replicator_driver = {
->>                 .suppress_bind_attrs = true,
->>         },
->>         .probe          = replicator_probe,
->> +       .remove         = replicator_remove,
->>         .id_table       = replicator_ids,
->>   };
 >
->
-> Do we have the owner field set here for this driver ? I see that you
-> added it for some components and not others. e.g, you have added it for
-> etm4x, while not for replicator and others.
->
->
->> +MODULE_DEVICE_TABLE(amba, etm4_ids);
->> +
->>   static struct amba_driver etm4x_driver = {
->>         .drv = {
->>                 .name   = "coresight-etm4x",
->> +               .owner  = THIS_MODULE,
->>                 .suppress_bind_attrs = true,
->>         },
->>         .probe          = etm4_probe,
->> +       .remove         = etm4_remove,
->>         .id_table       = etm4_ids,
->>   };
->> -builtin_amba_driver(etm4x_driver);
->> +module_amba_driver(etm4x_driver);
->
->
->
-> Suzuki
+> Perhaps an enum (or bitmask of named flags) then? That would allow the most
+> readability at callsites, plus it seems quite likely that we may want
+> intermediate degrees of "deferral strictness" eventually.
+
+A bitmask is just 32 booleans stuffed into one parameter which I can
+guess Greg's opinion on.
+
+I can't really think of other flags we might need here. If we added
+some userspace trigger saying module loading is done, I don't think
+we'd need that to be per caller.
+
+Rob
