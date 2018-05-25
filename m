@@ -1,44 +1,95 @@
-From: vgarodia@codeaurora.org (Vikash Garodia)
-Date: Fri, 25 May 2018 16:33:29 +0530
-Subject: qcom: add firmware file for Venus on SDM845
-In-Reply-To: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
-References: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
-Message-ID: <1527246209-26685-2-git-send-email-vgarodia@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 25 May 2018 12:07:02 +0100
+Subject: [PATCH] drm/rockchip: vop: fix irq disabled after vop driver
+ probed
+In-Reply-To: <25470133.K8n9sLBzRS@diego>
+References: <b8eb41e576c4007d40223699eb951db32916b86a.camel@collabora.com>
+ <25470133.K8n9sLBzRS@diego>
+Message-ID: <8495bffd-2a52-ca85-1bc9-afc3ea0af8e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pull request adds firmware files for Venus h/w codec found on the Qualcomm SDM845 chipset.
+[Thanks Robin for pointing me to that patch.]
 
-The following changes since commit 2a9b2cf50fb32e36e4fc1586c2f6f1421913b553:
+Hi Heiko,
 
-  Merge branch 'for-upstreaming-v1.7.2' of https://github.com/felix-cavium/linux-firmware (2018-05-18 08:35:22 -0400)
+On 24/05/18 23:06, Heiko St?bner wrote:
+> From: Sandy Huang <hjc@rock-chips.com>
+> 
+> The vop irq is shared between vop and iommu and irq probing in the
+> iommu driver moved to the probe function recently. This can in some
+> cases lead to a stall if the irq is triggered while the vop driver
+> still has it disabled.
+> 
+> But there is no real need to disable the irq, as the vop can simply
+> also track its enabled state and ignore irqs in that case.
+> 
+> So remove the enable/disable handling and add appropriate condition
+> to the irq handler.
+> 
+> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+> [added an actual commit message]
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Hi Ezequiel,
+> 
+> this patch came from a discussion I had with Rockchip people over the
+> iommu changes and resulting issues back in april, but somehow was
+> forgotten and not posted to the lists. Correcting that now.
+> 
+> So removing the enable/disable voodoo on the shared interrupt is
+> the preferred way.
+> 
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 510cdf0..61493d4 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -549,8 +549,6 @@ static int vop_enable(struct drm_crtc *crtc)
+>  
+>  	spin_unlock(&vop->reg_lock);
+>  
+> -	enable_irq(vop->irq);
+> -
+>  	drm_crtc_vblank_on(crtc);
+>  
+>  	return 0;
+> @@ -596,8 +594,6 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
+>  
+>  	vop_dsp_hold_valid_irq_disable(vop);
+>  
+> -	disable_irq(vop->irq);
+> -
+>  	vop->is_enabled = false;
+>  
+>  	/*
+> @@ -1168,6 +1164,13 @@ static irqreturn_t vop_isr(int irq, void *data)
+>  	int ret = IRQ_NONE;
+>  
+>  	/*
+> +	 * since the irq is shared with iommu, iommu irq is enabled before vop
+> +	 * enable, so before vop enable we do nothing.
+> +	 */
+> +	if (!vop->is_enabled)
+> +		return IRQ_NONE;
+> +
 
-are available in the git repository at:
+What guarantee do we have that the IOMMU will actually service that
+interrupt? Can't we get into a situation where the interrupt gets
+ignored by both drivers and subsequently disabled by the core irq code
+as being spurious?
 
+>From what I understood of the way things are plugged together on the
+rockchip platforms, each individual VOP is behind a single IOMMU, hence
+there there is hardly any point in handling IOMMU interrupts if the VOP
+is off.
 
-  https://github.com/vgarodia/linux-firmware master
+But I'm missing the actual reason behind this patch. Could you enlighten me?
 
-for you to fetch changes up to d6088b9c9d7f49d3c6c43681190889eca0abdcce:
+Thanks,
 
-  qcom: add venus firmware files for v5.2 (2018-05-25 15:16:43 +0530)
-
-----------------------------------------------------------------
-Vikash Garodia (1):
-      qcom: add venus firmware files for v5.2
-
- WHENCE                   |   9 +++++++++
- qcom/venus-5.2/venus.b00 | Bin 0 -> 212 bytes
- qcom/venus-5.2/venus.b01 | Bin 0 -> 6600 bytes
- qcom/venus-5.2/venus.b02 | Bin 0 -> 819552 bytes
- qcom/venus-5.2/venus.b03 | Bin 0 -> 33536 bytes
- qcom/venus-5.2/venus.b04 |   1 +
- qcom/venus-5.2/venus.mbn | Bin 0 -> 865408 bytes
- qcom/venus-5.2/venus.mdt | Bin 0 -> 6812 bytes
- 8 files changed, 10 insertions(+)
- create mode 100644 qcom/venus-5.2/venus.b00
- create mode 100644 qcom/venus-5.2/venus.b01
- create mode 100644 qcom/venus-5.2/venus.b02
- create mode 100644 qcom/venus-5.2/venus.b03
- create mode 100644 qcom/venus-5.2/venus.b04
- create mode 100644 qcom/venus-5.2/venus.mbn
- create mode 100644 qcom/venus-5.2/venus.mdt
+	M.
+-- 
+Jazz is not dead. It just smells funny...
