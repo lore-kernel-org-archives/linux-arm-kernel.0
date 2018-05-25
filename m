@@ -1,33 +1,55 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Fri, 25 May 2018 19:30:12 +0200
-Subject: i2c-gpio and boards conversions to GPIO descriptors
-In-Reply-To: <20180525154144.GC19100@kw.sim.vm.gnt>
-References: <20180525154144.GC19100@kw.sim.vm.gnt>
-Message-ID: <20180525173012.GD19100@kw.sim.vm.gnt>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 25 May 2018 10:36:49 -0700
+Subject: [PATCH] PCI: Try to clean up resources via remove if shutdown
+ doesn't exist
+In-Reply-To: <1527257063-15843-1-git-send-email-okaya@codeaurora.org>
+References: <1527257063-15843-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <d0970733-d56b-9a96-26cd-4c911c127579@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 05:41:44PM +0200, Simon Guinot wrote:
-> Hi Linus,
+[+cc kexec]
 
-Forwarding to some mailing lists I missed in a first place.
+On 5/25/2018 7:04 AM, Sinan Kaya wrote:
+> It is up to a driver to implement shutdown() callback. If shutdown()
+> callback is not implemented, PCI device can have pending interrupt and
+> even do DMA transactions while the system is going down.
+> 
+> If kexec is in use, this can damage the newly booting kexec kernel
+> or even prevent it from booting altogether. Fallback to calling the
+> remove() callback if shutdown() isn't implemented for a given driver.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci-driver.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
+> index 6ace470..4ac72e3 100644
+> --- a/drivers/pci/pci-driver.c
+> +++ b/drivers/pci/pci-driver.c
+> @@ -475,8 +475,17 @@ static void pci_device_shutdown(struct device *dev)
+>  
+>  	pm_runtime_resume(dev);
+>  
+> +	/*
+> +	 * Try shutdown callback if it exists, otherwise fallback to remove
+> +	 * callback. PCI drivers can do DMA and have pending interrupts.
+> +	 * Leaving the DMA and interrupts pending could damage the newly
+> +	 * booting kexec kernel as well as prevent it from booting altogether
+> +	 * if the pending interrupt is level.
+> +	 */
+>  	if (drv && drv->shutdown)
+>  		drv->shutdown(pci_dev);
+> +	else if (drv && drv->remove)
+> +		drv->remove(pci_dev);
+>  
+>  	/*
+>  	 * If this is a kexec reboot, turn off Bus Master bit on the
+> 
 
-> 
-> I think your patch b2e63555592f "i2c: gpio: Convert to use descriptors"
-> may have broken i2c-gpio support for some boards using old fashion
-> platform_device declarations.
-> 
-> Indeed when an "i2c-gpio" platform_device is registered with a fixed id
-> e.g. 0, then I think the device name becomes "i2c-gpio.0". And then this
-> won't match a lookup table registered with an "i2c-gpio" dev_id.
-> 
-> Please double check this :)
-> 
-> Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180525/4bcae35d/attachment.sig>
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
