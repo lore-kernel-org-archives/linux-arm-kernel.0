@@ -1,25 +1,30 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 25 May 2018 17:10:24 -0500
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <984b9734-244d-04e9-946f-7524f148ff7c@codeaurora.org>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
- <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
- <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
- <984b9734-244d-04e9-946f-7524f148ff7c@codeaurora.org>
-Message-ID: <20180525221024.GC92995@bhelgaas-glaptop.roam.corp.google.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 25 May 2018 14:48:54 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.18, round 2
+In-Reply-To: <7h1se2s0dd.fsf@baylibre.com>
+References: <7h1se2s0dd.fsf@baylibre.com>
+Message-ID: <20180525214854.bu5tiktatywwsmi5@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 09:30:59AM -0400, Sinan Kaya wrote:
-> On 5/24/2018 2:35 PM, Bjorn Helgaas wrote:
-> > That sounds like a reasonable idea, and it is definitely another can
-> > of worms.  I looked briefly at some of the .shutdown() cases:
+On Wed, May 23, 2018 at 11:17:02AM -0700, Kevin Hilman wrote:
+> The following changes since commit 35ee52bea66c74a7c33cebda8692d61b1ed7c6e9:
 > 
-> should we throw it into 4.18 and see what happens?
+>   ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus (2018-05-10 17:03:28 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
+> 
+> for you to fetch changes up to ae0257da5701b6e44eba9dc4ebab867b56d6ea29:
+> 
+>   ARM: meson: merge Kconfig symbol MACH_MESON8B into MACH_MESON8 (2018-05-23 10:08:13 -0700)
+> 
+> ----------------------------------------------------------------
+> Amlogic 32-bit DT changes for v4.18, round 2
+> - remove MACH_MESON8B, only used for building DTs
 
-It wouldn't solve this particular problem because hpsa *does* have a
-.shutdown() method.  The problem is that it doesn't work -- it's
-supposed to stop DMA and interrupts but it apparently doesn't.
+Merged, thanks!
 
-I think we need to fix hpsa first.
+
+-Olof
