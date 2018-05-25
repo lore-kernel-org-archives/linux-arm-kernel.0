@@ -1,45 +1,51 @@
 From: lsun@mellanox.com (Liming Sun)
-Date: Fri, 25 May 2018 12:06:57 -0400
-Subject: [PATCH v1 3/4] dt-bindings: soc: Add TmFifo binding for Mellanox
- BlueField SoC
+Date: Fri, 25 May 2018 12:06:56 -0400
+Subject: [PATCH v1 2/4] arm64: Add Mellanox BlueField SoC config option
 In-Reply-To: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
 References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
-Message-ID: <7df0814868fd1b260d2336f9a76fc26d51496c33.1527264077.git.lsun@mellanox.com>
+Message-ID: <24ceba8a62a9ac89349661823001e3cc5a0d9318.1527264077.git.lsun@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This commit introduces config option for Mellanox BlueField SoC,
+which can be used to build the SoC specific drivers, and enables
+it by default in configs/defconfig.
 
 Reviewed-by: David Woods <dwoods@mellanox.com>
 Signed-off-by: Liming Sun <lsun@mellanox.com>
 ---
- .../devicetree/bindings/soc/mellanox/tmfifo.txt      | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
-new file mode 100644
-index 0000000..0a362f5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
-@@ -0,0 +1,20 @@
-+* Mellanox BlueField SoC TmFifo
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 2b1535c..74ad03f 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -110,6 +110,12 @@ config ARCH_MESON
+ 	help
+ 	  This enables support for the Amlogic S905 SoCs.
+ 
++config ARCH_MLNX_BLUEFIELD
++	bool "Mellanox BlueField SoC Family"
++	select SOC_MLNX
++	help
++	  This enables support for the Mellanox BlueField SoC.
 +
-+BlueField TmFifo provides a shared FIFO between the target and the
-+external host machine, which can be accessed via USB or PCIe.
-+
-+Required properties:
-+
-+- compatible:	Should be "mellanox,bf-tmfifo"
-+- reg:		Physical base address and length of Rx/Tx block
-+- interrupts:	The interrupt number of Rx low water mark, Rx high water mark
-+		Tx low water mark, Tx high water mark respectively.
-+
-+Example:
-+
-+tmfifo at 800a20 {
-+	compatible = "mellanox,bf-tmfifo";
-+	reg = <0x00800a20 0x00000018
-+	       0x00800a40 0x00000018>;
-+	interrupts = <41, 42, 43, 44>;
-+};
+ config ARCH_MVEBU
+ 	bool "Marvell EBU SoC Family"
+ 	select ARMADA_AP806_SYSCON
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 1c98939..842f607 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -43,6 +43,7 @@ CONFIG_ARCH_LG1K=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_MESON=y
++CONFIG_ARCH_MLNX_BLUEFIELD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_ROCKCHIP=y
 -- 
 1.8.3.1
