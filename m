@@ -1,53 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 May 2018 07:51:20 -0700
-Subject: [GIT PULL] late omap soc changes for v4.18 merge window
-Message-ID: <pull-1527259829-686604@atomide.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Fri, 25 May 2018 17:51:36 +0300
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+ <20180402142249.7e076a64@bbrezillon>
+ <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
+ <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
+ <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
+ <20180403091813.5fb5c18c@bbrezillon>
+ <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
+ <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+Message-ID: <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Hi, Peter,
 
-The following changes since commit 3bb3799cd4233b7c24622ae8c41455fb27a55c0f:
+On 04/11/2018 06:34 PM, Nicolas Ferre wrote:
+> I'll try to move forward with your detailed explanation and with my 
+> contacts within the "product" team internally.
 
-  Merge branch 'omap-for-v4.18/soc-fixes' into omap-for-v4.18/soc (2018-05-21 10:34:17 -0700)
+We have talked with the hardware team, looks like there is an error in
+the description of the Master to Slave Access matrix. CPU accesses DDR2
+port0 through AXI matrix and not AHB. There is no conflict between CPU
+and LCDC DMA when accessing DDR2 ports. This explains why using CPU
+helps.
 
-are available in the Git repository at:
+The slave numbers from "Table 14-3 Master to Slave Access" are wrong.
+The 7th row  should be removed and all the other rows from below it,
+shifted up with one level (DDR2 Port 1 is Slave no 7, DDR2 port 2 is
+Slave no 8, ... , APB1 is slave no 11).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/soc-late-signed
+We think the best way is to keep LCD on DDR Ports 2 and 3 (8th and 9th
+slaves), to have maximum bandwidth and to use DMA on DDR port 1 for NAND
+(7th slave).
 
-for you to fetch changes up to 759c27bdc77577aaecb6f31768e5951a858f97a9:
+Also, some information about your configuration is useful. Can you
+please tell us what NAND DMA configuration did you use?  Are you using
+NAND storage for the videos that you are playing on the LCD screen?
 
-  OMAP: CLK: CLKSRC: Add suspend resume hooks (2018-05-23 14:16:26 -0700)
-
-----------------------------------------------------------------
-Late omap soc changes for v4.18 merge window
-
-This series contains two omap1 ams-delta GPIO clean-up patches to get
-started with removal of hard-coded GPIO numbers from drivers. And then
-the removal of board mach includes from drivers. The second patch mostly
-touches the ams-delta audio driver but is included here because of the
-removal of the latch gpios and is acked by Mark Brown.
-
-And there are two more am437x related PM patches to save and restore
-control module and timer registers for RTC only suspend mode. Looks like
-the patch title for the timer changes is a bit misleading, not all the
-timer code is yet living under drivers/clocksource. But I had already
-pushed out the branch before I noticed this.
-
-----------------------------------------------------------------
-Janusz Krzysztofik (2):
-      ARM: OMAP1: ams-delta: add GPIO lookup tables
-      ASoC: ams_delta: use GPIO lookup table
-
-Keerthy (1):
-      OMAP: CLK: CLKSRC: Add suspend resume hooks
-
-Tero Kristo (1):
-      ARM: AM43XX: Add functions to save/restore am43xx control registers
-
- arch/arm/mach-omap1/board-ams-delta.c | 107 ++++++++++++++++++++++++++++++--
- arch/arm/mach-omap2/control.c         | 112 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/control.h         |  61 ++++++++++++++++++
- arch/arm/mach-omap2/timer.c           |  32 ++++++++++
- sound/soc/omap/ams-delta.c            |  38 ++++++------
- 5 files changed, 328 insertions(+), 22 deletions(-)
+Thanks,
+ta
