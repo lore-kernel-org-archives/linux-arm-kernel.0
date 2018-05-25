@@ -1,67 +1,159 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Fri, 25 May 2018 15:47:59 +0200
-Subject: [PATCH v2] bpf, arm32: Correct check_imm24
-In-Reply-To: <20180511030634.GB7621@udknight>
-References: <20180511030634.GB7621@udknight>
-Message-ID: <206ea320-7f9e-6e3b-9808-f040f474839e@iogearbox.net>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Fri, 25 May 2018 12:42:49 +0000
+Subject: [PATCH] mmc: sdhci-*: Don't emit error msg if sdhci_add_host()
+ fails
+In-Reply-To: <20180525151509.0270dbe1@xhacker.debian>
+References: <20180525151509.0270dbe1@xhacker.debian>
+Message-ID: <340a9aca-e4d1-84ef-6149-9e83141ce6a1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2018 05:06 AM, Wang YanQing wrote:
-> imm24 is signed, so the right range is:
-> [-(1<<(24 - 1)), (1<<(24 - 1)) - 1]
+Hi Jisheng
+
+On 05/25/2018 09:15 AM, Jisheng Zhang wrote:
+> I noticed below error msg with sdhci-pxav3 on some berlin platforms:
 > 
-> Note:this patch also fix a typo.
+> [.....] sdhci-pxav3 f7ab0000.sdhci failed to add host
 > 
-> Signed-off-by: Wang YanQing <udknight@gmail.com>
-
-Through which tree will this fix be routed? (And the cleanup in "[PATCH v2]
-bpf, arm32: Fix inconsistent naming about emit_a32_lsr_r64|emit_a32_lsr_i64"?)
-Wasn't fully clear from the subject in the patch whether target are bpf trees.
-
-If this one here should go as a fix via bpf tree, would be great to get an
-ACK from Russell.
-
-Just asking since I haven't seen it in Linus' tree and it's been two weeks
-by now, so making sure it's not getting lost in the archives. ;-)
-
+> It is due to getting related vmmc or vqmmc regulator returns
+> -EPROBE_DEFER. It doesn't matter at all but it's confusing.
+> 
+>  From another side, if driver probing fails and the error number isn't
+> -EPROBE_DEFER, the core will tell us something as below:
+> 
+> [.....] sdhci-pxav3: probe of f7ab0000.sdhci failed with error -EXX
+> 
+> So it's not necessary to emit error msg if sdhci_add_host() fails. And
+> some other sdhci host drivers also have this issue, let's fix them
+> together.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 > ---
->  Changes
->  v1-v2:
->  1:Rewrite the patch, I make a mistake, the v1 is wrong totally,
->    reported by Russell King.
+>   drivers/mmc/host/sdhci-bcm-kona.c | 4 +---
+>   drivers/mmc/host/sdhci-pic32.c    | 4 +---
+>   drivers/mmc/host/sdhci-pxav2.c    | 4 +---
+>   drivers/mmc/host/sdhci-pxav3.c    | 4 +---
+>   drivers/mmc/host/sdhci-s3c.c      | 4 +---
+>   drivers/mmc/host/sdhci-spear.c    | 4 +---
+>   drivers/mmc/host/sdhci-st.c       | 4 +---
+>   7 files changed, 7 insertions(+), 21 deletions(-)
 > 
->    I use the fix suggested by Russell King instead of myself which
->    use the exact number range [-8388608, 8388607].
->  2:Fix the error in changelog.
+> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
+> index 11ca95c60bcf..bdbd4897c0f7 100644
+> --- a/drivers/mmc/host/sdhci-bcm-kona.c
+> +++ b/drivers/mmc/host/sdhci-bcm-kona.c
+> @@ -284,10 +284,8 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
+>   	sdhci_bcm_kona_sd_init(host);
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(dev, "Failed sdhci_add_host\n");
+> +	if (ret)
+>   		goto err_reset;
+> -	}
+>   
+>   	/* if device is eMMC, emulate card insert right here */
+>   	if (!mmc_card_is_removable(host->mmc)) {
+> diff --git a/drivers/mmc/host/sdhci-pic32.c b/drivers/mmc/host/sdhci-pic32.c
+> index a6caa49ca25a..a11e6397d4ff 100644
+> --- a/drivers/mmc/host/sdhci-pic32.c
+> +++ b/drivers/mmc/host/sdhci-pic32.c
+> @@ -200,10 +200,8 @@ static int pic32_sdhci_probe(struct platform_device *pdev)
+>   	}
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "error adding host\n");
+> +	if (ret)
+>   		goto err_base_clk;
+> -	}
+>   
+>   	dev_info(&pdev->dev, "Successfully added sdhci host\n");
+>   	return 0;
+> diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
+> index 8986f9d9cf98..2c3827f54927 100644
+> --- a/drivers/mmc/host/sdhci-pxav2.c
+> +++ b/drivers/mmc/host/sdhci-pxav2.c
+> @@ -221,10 +221,8 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
+>   	host->ops = &pxav2_sdhci_ops;
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "failed to add host\n");
+> +	if (ret)
+>   		goto disable_clk;
+> -	}
+>   
+>   	return 0;
+>   
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index a34434166ca7..b8e96f392428 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -472,10 +472,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>   	pm_suspend_ignore_children(&pdev->dev, 1);
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "failed to add host\n");
+> +	if (ret)
+>   		goto err_add_host;
+> -	}
+>   
+>   	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
+>   		device_init_wakeup(&pdev->dev, 1);
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index cda83ccb2702..9ef89d00970e 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -655,10 +655,8 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
+>   		goto err_req_regs;
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(dev, "sdhci_add_host() failed\n");
+> +	if (ret)
+>   		goto err_req_regs;
+> -	}
+>   
+>   #ifdef CONFIG_PM
+>   	if (pdata->cd_type != S3C_SDHCI_CD_INTERNAL)
+> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+> index 14511526a3a8..9247d51f2eed 100644
+> --- a/drivers/mmc/host/sdhci-spear.c
+> +++ b/drivers/mmc/host/sdhci-spear.c
+> @@ -126,10 +126,8 @@ static int sdhci_probe(struct platform_device *pdev)
+>   	}
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_dbg(&pdev->dev, "error adding host\n");
+> +	if (ret)
+>   		goto disable_clk;
+> -	}
+>   
+>   	platform_set_drvdata(pdev, host);
+>   
+> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+> index c32daed0d418..8f95647195d9 100644
+> --- a/drivers/mmc/host/sdhci-st.c
+> +++ b/drivers/mmc/host/sdhci-st.c
+> @@ -422,10 +422,8 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>   	st_mmcss_cconfig(np, host);
+>   
+>   	ret = sdhci_add_host(host);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+> +	if (ret)
+>   		goto err_out;
+> -	}
+>   
+>   	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+>   
 > 
->  Thanks!
-> 
->  arch/arm/net/bpf_jit_32.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-> index caccc78..316bc08 100644
-> --- a/arch/arm/net/bpf_jit_32.c
-> +++ b/arch/arm/net/bpf_jit_32.c
-> @@ -84,7 +84,7 @@
->   *
->   * 1. First argument is passed using the arm 32bit registers and rest of the
->   * arguments are passed on stack scratch space.
-> - * 2. First callee-saved arugument is mapped to arm 32 bit registers and rest
-> + * 2. First callee-saved argument is mapped to arm 32 bit registers and rest
->   * arguments are mapped to scratch space on stack.
->   * 3. We need two 64 bit temp registers to do complex operations on eBPF
->   * registers.
-> @@ -1199,8 +1199,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
->  	s32 jmp_offset;
->  
->  #define check_imm(bits, imm) do {				\
-> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> +	if ((imm) >= (1 << ((bits) - 1)) ||			\
-> +	    (imm) < -(1 << ((bits) - 1))) {			\
->  		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
->  			i, imm, imm);				\
->  		return -EINVAL;					\
-> 
+
+For drivers/mmc/host/sdhci-st.c:
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+Thanks
