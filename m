@@ -1,85 +1,297 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:25 +0100
-Subject: [PATCH v4 19/26] irqchip/gic-v3: Switch to PMR masking after IRQ
- acknowledge
+Date: Fri, 25 May 2018 10:49:21 +0100
+Subject: [PATCH v4 15/26] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-20-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-16-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After an interrupt has been acknowledged, mask the IRQ priority through
-PMR and clear PSR.I bit, allowing higher priority interrupts to be
-received during interrupt handling.
+Instead disabling interrupts by setting the PSR.I bit, use a priority
+higher than the one used for interrupts to mask them via PMR.
+
+The value chosen for PMR to enable/disable interrupts encodes the status
+of interrupts on a single bit. This information is stored in the irqflags
+values used when saving/restoring IRQ status.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Oleg Nesterov <oleg@redhat.com>
 ---
- arch/arm/include/asm/arch_gicv3.h   | 6 ++++++
- arch/arm64/include/asm/arch_gicv3.h | 6 ++++++
- drivers/irqchip/irq-gic-v3.c        | 8 +++++++-
- 3 files changed, 19 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/assembler.h | 17 ++++++-
+ arch/arm64/include/asm/efi.h       |  3 +-
+ arch/arm64/include/asm/irqflags.h  | 97 ++++++++++++++++++++++++++++++--------
+ arch/arm64/include/asm/ptrace.h    | 10 ++--
+ arch/arm64/kernel/entry.S          |  6 +--
+ 5 files changed, 104 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index 58d5d3e..b39d620 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -368,5 +368,11 @@ static inline bool gic_prio_masking_enabled(void)
- 	return false;
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 0bcc98d..0b2dcfd 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -23,6 +23,7 @@
+ #ifndef __ASM_ASSEMBLER_H
+ #define __ASM_ASSEMBLER_H
+ 
++#include <asm/alternative.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
+ #include <asm/debug-monitors.h>
+@@ -62,12 +63,24 @@
+ /*
+  * Enable and disable interrupts.
+  */
+-	.macro	disable_irq
++	.macro	disable_irq, tmp
++	mov	\tmp, #ICC_PMR_EL1_MASKED
++alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
+ 	msr	daifset, #2
++alternative_else
++	msr_s	SYS_ICC_PMR_EL1, \tmp
++alternative_endif
+ 	.endm
+ 
+-	.macro	enable_irq
++	.macro	enable_irq, tmp
++	mov     \tmp, #ICC_PMR_EL1_UNMASKED
++alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
+ 	msr	daifclr, #2
++	nop
++alternative_else
++	msr_s	SYS_ICC_PMR_EL1, \tmp
++	dsb	sy
++alternative_endif
+ 	.endm
+ 
+ 	.macro	save_and_disable_irq, flags
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 192d791..a4e0730 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -42,7 +42,8 @@
+ 
+ efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
+ 
+-#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
++#define ARCH_EFI_IRQ_FLAGS_MASK \
++	(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | ARCH_FLAG_PMR_EN)
+ 
+ /* arch specific definitions used by the stub code */
+ 
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 24692ed..193cfd0 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -18,7 +18,27 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <asm/alternative.h>
++#include <asm/cpufeature.h>
+ #include <asm/ptrace.h>
++#include <asm/sysreg.h>
++
++
++/*
++ * When ICC_PMR_EL1 is used for interrupt masking, only the bit indicating
++ * whether the normal interrupts are masked is kept along with the daif
++ * flags.
++ */
++#define ARCH_FLAG_PMR_EN 0x1
++
++#define MAKE_ARCH_FLAGS(daif, pmr)					\
++	((daif) | (((pmr) >> ICC_PMR_EL1_EN_SHIFT) & ARCH_FLAG_PMR_EN))
++
++#define ARCH_FLAGS_GET_PMR(flags)				\
++	((((flags) & ARCH_FLAG_PMR_EN) << ICC_PMR_EL1_EN_SHIFT) \
++		| ICC_PMR_EL1_MASKED)
++
++#define ARCH_FLAGS_GET_DAIF(flags) ((flags) & ~ARCH_FLAG_PMR_EN)
+ 
+ /*
+  * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
+@@ -38,31 +58,50 @@
+  */
+ static inline unsigned long arch_local_irq_save(void)
+ {
+-	unsigned long flags;
+-	asm volatile(
++	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
++	unsigned long pmr = 0;
++
++	asm volatile(ALTERNATIVE(
+ 		"mrs	%0, daif		// arch_local_irq_save\n"
+-		"msr	daifset, #2"
+-		: "=r" (flags)
+-		:
++		"msr	daifset, #2\n"
++		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
++		/* --- */
++		"mrs	%0, daif\n"
++		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1) "\n"
++		"msr_s	" __stringify(SYS_ICC_PMR_EL1) ", %2",
++		ARM64_HAS_IRQ_PRIO_MASKING)
++		: "=&r" (flags), "=&r" (pmr)
++		: "r" (masked)
+ 		: "memory");
+-	return flags;
++
++	return MAKE_ARCH_FLAGS(flags, pmr);
  }
  
-+static inline void gic_start_pmr_masking(void)
-+{
-+	/* Should not get called */
-+	WARN_ON(true);
-+}
+ static inline void arch_local_irq_enable(void)
+ {
+-	asm volatile(
+-		"msr	daifclr, #2		// arch_local_irq_enable"
+-		:
++	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
 +
- #endif /* !__ASSEMBLY__ */
- #endif /* !__ASM_ARCH_GICV3_H */
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 98b09db..23c88ac0 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -160,5 +160,11 @@ static inline bool gic_prio_masking_enabled(void)
- 	return cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
++	asm volatile(ALTERNATIVE(
++		"msr	daifclr, #2		// arch_local_irq_enable\n"
++		"nop",
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
++		"dsb	sy",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
++		: "r" (unmasked)
+ 		: "memory");
  }
  
-+static inline void gic_start_pmr_masking(void)
-+{
-+	gic_write_pmr(ICC_PMR_EL1_MASKED);
-+	asm volatile ("msr daifclr, #2" : : : "memory");
-+}
+ static inline void arch_local_irq_disable(void)
+ {
+-	asm volatile(
+-		"msr	daifset, #2		// arch_local_irq_disable"
+-		:
++	unsigned long masked = ICC_PMR_EL1_MASKED;
 +
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index fc477e2..2fd0440 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -355,12 +355,18 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
++	asm volatile(ALTERNATIVE(
++		"msr	daifset, #2		// arch_local_irq_disable",
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
++		: "r" (masked)
+ 		: "memory");
+ }
  
- 	irqnr = gic_read_iar();
- 
-+	if (arch_uses_gic_prios()) {
-+		isb();
-+		/* Masking IRQs earlier would prevent to ack the current interrupt */
-+		gic_start_pmr_masking();
-+	}
+@@ -72,12 +111,19 @@ static inline void arch_local_irq_disable(void)
+ static inline unsigned long arch_local_save_flags(void)
+ {
+ 	unsigned long flags;
+-	asm volatile(
+-		"mrs	%0, daif		// arch_local_save_flags"
+-		: "=r" (flags)
++	unsigned long pmr = 0;
 +
- 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
- 		int err;
++	asm volatile(ALTERNATIVE(
++		"mrs	%0, daif		// arch_local_save_flags\n"
++		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
++		"mrs	%0, daif\n"
++		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1),
++		ARM64_HAS_IRQ_PRIO_MASKING)
++		: "=r" (flags), "=r" (pmr)
+ 		:
+ 		: "memory");
+-	return flags;
++
++	return MAKE_ARCH_FLAGS(flags, pmr);
+ }
  
- 		if (static_branch_likely(&supports_deactivate_key))
- 			gic_write_eoir(irqnr);
--		else
-+		else if (!arch_uses_gic_prios())
- 			isb();
+ /*
+@@ -85,16 +131,27 @@ static inline unsigned long arch_local_save_flags(void)
+  */
+ static inline void arch_local_irq_restore(unsigned long flags)
+ {
+-	asm volatile(
+-		"msr	daif, %0		// arch_local_irq_restore"
++	unsigned long pmr = ARCH_FLAGS_GET_PMR(flags);
++
++	flags = ARCH_FLAGS_GET_DAIF(flags);
++
++	asm volatile(ALTERNATIVE(
++		"msr	daif, %0		// arch_local_irq_restore\n"
++		"nop\n"
++		"nop",
++		"msr	daif, %0\n"
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%1\n"
++		"dsb	sy",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 	:
+-	: "r" (flags)
++	: "r" (flags), "r" (pmr)
+ 	: "memory");
+ }
  
- 		err = handle_domain_irq(gic_data.domain, irqnr, regs);
+ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ {
+-	return flags & PSR_I_BIT;
++	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
++		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
+ }
+ #endif
+ #endif
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index e87aef7..3ec58a4 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -25,8 +25,11 @@
+ #define CurrentEL_EL1		(1 << 2)
+ #define CurrentEL_EL2		(2 << 2)
+ 
+-/* PMR value use to unmask interrupts */
++/* PMR values used to mask/unmask interrupts */
+ #define ICC_PMR_EL1_UNMASKED    0xf0
++#define ICC_PMR_EL1_EN_SHIFT	6
++#define ICC_PMR_EL1_EN_BIT	(1 << ICC_PMR_EL1_EN_SHIFT) // PMR IRQ enable
++#define ICC_PMR_EL1_MASKED      (ICC_PMR_EL1_UNMASKED ^ ICC_PMR_EL1_EN_BIT)
+ 
+ /* AArch32-specific ptrace requests */
+ #define COMPAT_PTRACE_GETREGS		12
+@@ -174,8 +177,9 @@ static inline void forget_syscall(struct pt_regs *regs)
+ #define processor_mode(regs) \
+ 	((regs)->pstate & PSR_MODE_MASK)
+ 
+-#define interrupts_enabled(regs) \
+-	(!((regs)->pstate & PSR_I_BIT))
++#define interrupts_enabled(regs)			\
++	((!((regs)->pstate & PSR_I_BIT)) &&		\
++	 ((regs)->pmr_save & ICC_PMR_EL1_EN_BIT))
+ 
+ #define fast_interrupts_enabled(regs) \
+ 	(!((regs)->pstate & PSR_F_BIT))
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 78e4ff4..f56f27e 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -888,7 +888,7 @@ ENDPROC(el0_error)
+  * and this includes saving x0 back into the kernel stack.
+  */
+ ret_fast_syscall:
+-	disable_irq				// disable interrupts
++	disable_irq x21				// disable interrupts
+ 	str	x0, [sp, #S_X0]			// returned x0
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+@@ -898,7 +898,7 @@ ret_fast_syscall:
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ret_fast_syscall_trace:
+-	enable_irq				// enable interrupts
++	enable_irq x0				// enable interrupts
+ 	b	__sys_trace_return_skipped	// we already saved x0
+ 
+ /*
+@@ -916,7 +916,7 @@ work_pending:
+  * "slow" syscall return path.
+  */
+ ret_to_user:
+-	disable_irq				// disable interrupts
++	disable_irq x21				// disable interrupts
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
 -- 
 1.9.1
