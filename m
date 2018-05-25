@@ -1,107 +1,132 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 10:49:19 +0100
-Subject: [PATCH v4 13/26] arm/arm64: gic-v3: Add helper functions to manage
- IRQ priorities
+Date: Fri, 25 May 2018 10:49:28 +0100
+Subject: [PATCH v4 22/26] arm64: Detect current view of GIC priorities
 In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
 References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1527241772-48007-14-git-send-email-julien.thierry@arm.com>
+Message-ID: <1527241772-48007-23-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to check if priority masking is supported and accessors
-for PMR/RPR.
+The values non secure EL1 needs to use for PMR and RPR registers depends on
+the value of SCR_EL3.FIQ.
+
+The values non secure EL1 sees from the distributor and redistributor
+depend on whether security is enabled for the GIC or not.
+
+Figure out what values we are dealing with to know if the values we use for
+PMR and RPR match the priority values that have been configured in the
+distributor and redistributors.
+
+Also, add firmware requirements related to SCR_EL3.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h   | 21 +++++++++++++++++++++
- arch/arm64/include/asm/arch_gicv3.h | 20 ++++++++++++++++++++
- 2 files changed, 41 insertions(+)
+ Documentation/arm64/booting.txt |  5 +++++
+ drivers/irqchip/irq-gic-v3.c    | 42 +++++++++++++++++++++++++++++++++++------
+ 2 files changed, 41 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index 0bd5307..58d5d3e 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -34,6 +34,7 @@
- #define ICC_SRE				__ACCESS_CP15(c12, 0, c12, 5)
- #define ICC_IGRPEN1			__ACCESS_CP15(c12, 0, c12, 7)
- #define ICC_BPR1			__ACCESS_CP15(c12, 0, c12, 3)
-+#define ICC_RPR				__ACCESS_CP15(c12, 0, c11, 3)
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 8d0df62..e387938 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
+   the kernel image will be entered must be initialised by software at a
+   higher exception level to prevent execution in an UNKNOWN state.
  
- #define __ICC_AP0Rx(x)			__ACCESS_CP15(c12, 0, c8, 4 | x)
- #define ICC_AP0R0			__ICC_AP0Rx(0)
-@@ -245,6 +246,21 @@ static inline void gic_write_bpr1(u32 val)
- 	write_sysreg(val, ICC_BPR1);
++  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
++    executing on.
++  - The value of SCR_EL3.FIQ must be the same as the one present at boot
++    time whenever the kernel is executing.
++
+   For systems with a GICv3 interrupt controller to be used in v3 mode:
+   - If EL3 is present:
+     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 2fd0440..b144f73 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -63,6 +63,28 @@ struct gic_chip_data {
+ static struct gic_chip_data gic_data __read_mostly;
+ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
+ 
++/*
++ * The behaviours of RPR and PMR registers differ depending on the value of
++ * SCR_EL3.FIQ, and the behaviour of non-secure priority registers of the
++ * distributor and redistributors depends on whether security is enabled in the
++ * GIC.
++ *
++ * When security is enabled, non-secure priority values from the (re)distributor
++ * are presented to the GIC CPUIF as follow:
++ *     (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
++ *
++ * If SCR_EL3.FIQ == 1, the values writen to/read from PMR and RPR at non-secure
++ * EL1 are subject to a similar operation thus matching the priorities presented
++ * from the (re)distributor when security is enabled.
++ *
++ * see GICv3/GICv4 Architecture Specification (IHI0069D):
++ * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
++ *   priorities.
++ * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
++ *   interrupt.
++ */
++DEFINE_STATIC_KEY_FALSE(have_non_secure_prio_view);
++
+ static struct gic_kvm_info gic_v3_kvm_info;
+ static DEFINE_PER_CPU(bool, has_rss);
+ 
+@@ -573,6 +595,12 @@ static void gic_update_vlpi_properties(void)
+ 		!gic_data.rdists.has_direct_lpi ? "no " : "");
  }
  
-+static inline u32 gic_read_pmr(void)
++/* Check whether it's single security state view */
++static inline bool gic_dist_security_disabled(void)
 +{
-+	return read_sysreg(ICC_PMR);
++	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
 +}
 +
-+static inline void gic_write_pmr(u32 val)
-+{
-+	write_sysreg(val, ICC_PMR);
-+}
-+
-+static inline u32 gic_read_rpr(void)
-+{
-+	return read_sysreg(ICC_RPR);
-+}
-+
- /*
-  * Even in 32bit systems that use LPAE, there is no guarantee that the I/O
-  * interface provides true 64bit atomic accesses, so using strd/ldrd doesn't
-@@ -347,5 +363,10 @@ static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
+ static void gic_cpu_sys_reg_init(void)
+ {
+ 	int i, cpu = smp_processor_id();
+@@ -598,6 +626,9 @@ static void gic_cpu_sys_reg_init(void)
+ 	/* Set priority mask register */
+ 	if (!arch_uses_gic_prios())
+ 		write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
++	else if (static_branch_likely(&have_non_secure_prio_view) && group0)
++		/* Mismatch configuration with boot CPU */
++		WARN_ON(group0 && !gic_dist_security_disabled());
  
- #define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
+ 	/*
+ 	 * Some firmwares hand over to the kernel with the BPR changed from
+@@ -850,12 +881,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ #endif
  
-+static inline bool gic_prio_masking_enabled(void)
-+{
-+	return false;
-+}
-+
- #endif /* !__ASSEMBLY__ */
- #endif /* !__ASM_ARCH_GICV3_H */
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index e278f94..98b09db 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -114,6 +114,21 @@ static inline void gic_write_bpr1(u32 val)
- 	write_sysreg_s(val, SYS_ICC_BPR1_EL1);
- }
+ #ifdef CONFIG_CPU_PM
+-/* Check whether it's single security state view */
+-static bool gic_dist_security_disabled(void)
+-{
+-	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
+-}
+-
+ static int gic_cpu_pm_notifier(struct notifier_block *self,
+ 			       unsigned long cmd, void *v)
+ {
+@@ -1155,6 +1180,11 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 	gic_cpu_init();
+ 	gic_cpu_pm_init();
  
-+static inline u32 gic_read_pmr(void)
-+{
-+	return read_sysreg_s(SYS_ICC_PMR_EL1);
-+}
++	if (arch_uses_gic_prios()) {
++		if (!gic_has_group0() || gic_dist_security_disabled())
++			static_branch_enable(&have_non_secure_prio_view);
++	}
 +
-+static inline void gic_write_pmr(u32 val)
-+{
-+	write_sysreg_s(val, SYS_ICC_PMR_EL1);
-+}
-+
-+static inline u32 gic_read_rpr(void)
-+{
-+	return read_sysreg_s(SYS_ICC_RPR_EL1);
-+}
-+
- #define gic_read_typer(c)		readq_relaxed(c)
- #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
- #define gic_read_lpir(c)		readq_relaxed(c)
-@@ -140,5 +155,10 @@ static inline void gic_write_bpr1(u32 val)
- #define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
- #define gits_read_vpendbaser(c)		readq_relaxed(c)
+ 	return 0;
  
-+static inline bool gic_prio_masking_enabled(void)
-+{
-+	return cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
-+}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
+ out_free:
 -- 
 1.9.1
