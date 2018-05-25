@@ -1,39 +1,30 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 25 May 2018 11:26:16 +0800
-Subject: [PATCH v3 3/8] drm/mediatek: add connection from OD1 to RDMA1
-In-Reply-To: <1527215665-11937-4-git-send-email-stu.hsieh@mediatek.com>
-References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
- <1527215665-11937-4-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527218776.27165.5.camel@mtksdaap41>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 24 May 2018 22:55:09 -0500
+Subject: [GIT PULL] Qualcomm Driver Fixes for 4.17-rc7
+Message-ID: <1527220509-23245-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+The following changes since commit 771c577c23bac90597c685971d7297ea00f99d11:
 
-On Fri, 2018-05-25 at 10:34 +0800, stu.hsieh at mediatek.com wrote:
-> From: Stu Hsieh <stu.hsieh@mediatek.com>
-> 
-> This patch add the connection from OD1 to RDMA1 for ext path.
-> 
+  Linux 4.17-rc6 (2018-05-20 15:31:38 -0700)
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+are available in the git repository at:
 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 47ffa240bd25..0f568dd853d8 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -151,6 +151,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_GAMMA && next == DDP_COMPONENT_RDMA1) {
->  		*addr = DISP_REG_CONFIG_DISP_GAMMA_MOUT_EN;
->  		value = GAMMA_MOUT_EN_RDMA1;
-> +	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
-> +		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
-> +		value = OD1_MOUT_EN_RDMA1;
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
->  		value = RDMA1_MOUT_DPI0;
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.17-rc7
+
+for you to fetch changes up to 5ec3444c8346c922316f4effafa8afc17defda0e:
+
+  firmware: qcom: scm: Fix crash in qcom_scm_call_atomic1() (2018-05-24 22:36:45 -0500)
+
+----------------------------------------------------------------
+Qualcomm Fixes for 4.17-rc7
+
+* Fix crash in qcom_scm_call_atomic1()
+
+----------------------------------------------------------------
+Niklas Cassel (1):
+      firmware: qcom: scm: Fix crash in qcom_scm_call_atomic1()
+
+ drivers/firmware/qcom_scm-32.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
