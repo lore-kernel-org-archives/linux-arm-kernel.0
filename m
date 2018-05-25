@@ -1,67 +1,76 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 25 May 2018 15:00:33 +0100
-Subject: [PATCH v3 02/15] ARM: bugs: prepare processor bug infrastructure
-In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
-References: <20180525135938.GE17671@n2100.armlinux.org.uk>
-Message-ID: <E1fMDGj-0006yR-0n@rmk-PC.armlinux.org.uk>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri, 25 May 2018 19:53:22 +0530
+Subject: [PATCH v2 5/5] MAINTAINERS: Add Actions Semi S900 pinctrl entries
+In-Reply-To: <CACRpkdaTQOWA_5nyasxTwE=cGRis+uaLhw66pmkd+qPxMC6FFQ@mail.gmail.com>
+References: <20180520051736.4842-1-manivannan.sadhasivam@linaro.org>
+ <20180520051736.4842-6-manivannan.sadhasivam@linaro.org>
+ <CACRpkdYF7a-uwye0uwn-pT9Bprj74q1-Pcbq4WLyiE+kYY4j7w@mail.gmail.com>
+ <25d1c303-71d7-8c38-880f-7bb0e133a876@suse.de>
+ <20180525050103.3hg3u2v5mvftqhht@linaro.org>
+ <CACRpkdaTQOWA_5nyasxTwE=cGRis+uaLhw66pmkd+qPxMC6FFQ@mail.gmail.com>
+Message-ID: <20180525142322.GA25453@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the processor bug infrastructure so that it can be expanded to
-check for per-processor bugs.
+On Fri, May 25, 2018 at 02:12:06PM +0200, Linus Walleij wrote:
+> On Fri, May 25, 2018 at 7:01 AM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> 
+> > FYI, I have ordered S700 based Cubieboard and will work on adding support for
+> > that first. I still don't have access to S500 board yet since it is not
+> > available on my region. Will find a way to get this asap.
+> 
+> Awesome, then we can count on some actions action here.
+>
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/include/asm/bugs.h | 4 ++--
- arch/arm/kernel/Makefile    | 1 +
- arch/arm/kernel/bugs.c      | 9 +++++++++
- 3 files changed, 12 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/kernel/bugs.c
+Oops... Small correction here, I have ordered S500 based board.
 
-diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
-index a97f1ea708d1..ed122d294f3f 100644
---- a/arch/arm/include/asm/bugs.h
-+++ b/arch/arm/include/asm/bugs.h
-@@ -10,10 +10,10 @@
- #ifndef __ASM_BUGS_H
- #define __ASM_BUGS_H
- 
--#ifdef CONFIG_MMU
- extern void check_writebuffer_bugs(void);
- 
--#define check_bugs() check_writebuffer_bugs()
-+#ifdef CONFIG_MMU
-+extern void check_bugs(void);
- #else
- #define check_bugs() do { } while (0)
- #endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index b59ac4bf82b8..8cad59465af3 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -31,6 +31,7 @@ else
- obj-y		+= entry-armv.o
- endif
- 
-+obj-$(CONFIG_MMU)		+= bugs.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ISA_DMA_API)	+= dma.o
- obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
-diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-new file mode 100644
-index 000000000000..88024028bb70
---- /dev/null
-+++ b/arch/arm/kernel/bugs.c
-@@ -0,0 +1,9 @@
-+// SPDX-Identifier: GPL-2.0
-+#include <linux/init.h>
-+#include <asm/bugs.h>
-+#include <asm/proc-fns.h>
-+
-+void __init check_bugs(void)
-+{
-+	check_writebuffer_bugs();
-+}
--- 
-2.7.4
+> >> Also I had been investing efforts in explaining the upstreaming process
+> >> to Actions, last in November. I see Thomas Liau and Jeff Chen missing in
+> >> CC and I have not seen any Reviewed-by or Acked-by from anyone at
+> >> Actions on this and the preceding series. There are more chips than the
+> >> one on Linaro's 96board, so I would prefer to assure that the design
+> >> works for all. Thus I am very critical of you applying the patches
+> >> without waiting for review by Actions.
+> >
+> > I don't think Actions would be interested in any upstreaming efforts. It
+> > is our (comunity) responsibility to add support for that in order to
+> > have our boards running mainline kernel and that's what we both have been
+> > doing. Moreover I only saw once David Liau responded to your patchset and
+> > there isn't much further. So how can you expect the subsystem maintainer's
+> > to hold the patch series waiting for a so far silent SoC manufacturer's
+> > response?
+> 
+> They are certainly informed now! :D
+> 
+> Actions semi folks, please familiarize yourself with the following:
+> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/tree/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt?h=devel
+> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/tree/drivers/pinctrl/actions?h=devel
+> 
+> If you have any concerns with this, now is a good time to share them.
+> 
+> > I
+> > did ask you to add me as Co-Maintainer but you didn't responded to that.
+> > I know that I can't send any pull requests to Arnd, but we should sort
+> > it out IMO. Also, if you are completely swamped, then I take take up the
+> > maintainership role now inorder to keep the things moving. TBH I don't
+> > want my patches to be floating for months without any reason.
+> 
+> Doing some comainatinership can very well include doing pull
+> requests as long as you agree on who does what.
+> 
+> I think it may be a bit late for the next merge window right now,
+> but if you simply queue up stuff in some git tree and ask
+> Srothwell to include it in linux-next then Andreas can very well
+> pull it to his tree from there and then to ARM SoC or you can
+> queue patches as well.
+>
+
+Cool. Will queue up all approved dts patches in a git tree and share it with
+andreas.
+
+Thanks,
+Mani
+
+> Yours,
+> Linus Walleij
