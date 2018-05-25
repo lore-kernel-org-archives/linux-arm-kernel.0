@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 May 2018 11:10:02 +0530
-Subject: [PATCH 2/6] arm64: dts: freescale: Add missing cooling device
+Date: Fri, 25 May 2018 11:10:06 +0530
+Subject: [PATCH 6/6] arm64: dts: socionext: Add missing cooling device
  properties for CPUs
 In-Reply-To: <cover.1527225682.git.viresh.kumar@linaro.org>
 References: <cover.1527225682.git.viresh.kumar@linaro.org>
-Message-ID: <e4504945d2b684fae2850bbcf03a6d02917a8c8a.1527225682.git.viresh.kumar@linaro.org>
+Message-ID: <744f4c0a9a6f0d3acfc36e49ef62f17f53831b3b.1527225682.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,206 +18,30 @@ it is trying to bring up, so that it can register a cooling device.
 
 Add such missing properties.
 
-Do minor rearrangement as well to keep ordering consistent.
-
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 5 ++++-
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 3 +++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 6 ++++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 4 ++++
- 5 files changed, 21 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 1109f22bda5e..630ee47441f2 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -80,8 +80,8 @@
- 			reg = <0x0>;
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
--			#cooling-cells = <2>;
- 			cpu-idle-states = <&CPU_PH20>;
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 3a5ed789c056..10ffb5019013 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -58,6 +58,7 @@
+ 			clocks = <&sys_clk 32>;
+ 			enable-method = "psci";
+ 			operating-points-v2 = <&cluster0_opp>;
 +			#cooling-cells = <2>;
  		};
  
- 		cpu1: cpu at 1 {
-@@ -91,6 +91,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
+ 		cpu2: cpu at 100 {
+@@ -77,6 +78,7 @@
+ 			clocks = <&sys_clk 33>;
+ 			enable-method = "psci";
+ 			operating-points-v2 = <&cluster1_opp>;
 +			#cooling-cells = <2>;
  		};
- 
- 		cpu2: cpu at 2 {
-@@ -100,6 +101,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -109,6 +111,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		l2: l2-cache {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 136ebfa9b333..ee7beab8bfae 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -87,6 +87,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -96,6 +97,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -105,6 +107,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		l2: l2-cache {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 1c6556bcfddf..e64823a25158 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -76,6 +76,7 @@
- 			reg = <0x1>;
- 			clocks = <&clockgen 1 0>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -84,6 +85,7 @@
- 			reg = <0x2>;
- 			clocks = <&clockgen 1 0>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -92,6 +94,7 @@
- 			reg = <0x3>;
- 			clocks = <&clockgen 1 0>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu4: cpu at 100 {
-@@ -109,6 +112,7 @@
- 			reg = <0x101>;
- 			clocks = <&clockgen 1 1>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -117,6 +121,7 @@
- 			reg = <0x102>;
- 			clocks = <&clockgen 1 1>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -125,6 +130,7 @@
- 			reg = <0x103>;
- 			clocks = <&clockgen 1 1>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		CPU_PH20: cpu-ph20 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index 8d739301e7b8..c264b6d1bd7f 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -65,6 +65,7 @@
- 		clocks = <&clockgen 1 0>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster0_l2>;
-+		#cooling-cells = <2>;
  	};
  
- 	cpu2: cpu at 100 {
-@@ -84,6 +85,7 @@
- 		clocks = <&clockgen 1 1>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster1_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cpu4: cpu at 200 {
-@@ -103,6 +105,7 @@
- 		clocks = <&clockgen 1 2>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster2_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cpu6: cpu at 300 {
-@@ -122,6 +125,7 @@
- 		clocks = <&clockgen 1 3>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster3_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cluster0_l2: l2-cache0 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-index 0884e1a77901..b6ea9e96c866 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-@@ -65,6 +65,7 @@
- 		clocks = <&clockgen 1 0>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster0_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cpu2: cpu at 100 {
-@@ -84,6 +85,7 @@
- 		clocks = <&clockgen 1 1>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster1_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cpu4: cpu at 200 {
-@@ -103,6 +105,7 @@
- 		clocks = <&clockgen 1 2>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster2_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cpu6: cpu at 300 {
-@@ -122,6 +125,7 @@
- 		clocks = <&clockgen 1 3>;
- 		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster3_l2>;
-+		#cooling-cells = <2>;
- 	};
- 
- 	cluster0_l2: l2-cache0 {
 -- 
 2.15.0.194.g9af6a3dea062
