@@ -1,61 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 May 2018 17:04:49 +0100
-Subject: [GIT PULL] arm64: fixes for -rc7
-Message-ID: <20180525160448.GF3255@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 May 2018 10:52:36 -0500
+Subject: [PATCH v2 1/3] input: touchscreen: edt-ft5x06: don't make device
+ a wakeup source by default
+In-Reply-To: <20180524231732.GC177107@dtor-ws>
+References: <20180517090552.5704-1-daniel@zonque.org>
+ <20180517090552.5704-2-daniel@zonque.org>
+ <20180522175413.GA24850@rob-hp-laptop>
+ <52c1cd13-3386-8f70-aaf2-e5f4b19fd1e6@zonque.org>
+ <CAL_JsqJQt6vFqH-KzNvjW+FZXCgzNAwXj_nSYow2Uz2Vcmi_Cg@mail.gmail.com>
+ <20180524231732.GC177107@dtor-ws>
+Message-ID: <CAL_JsqKnmrMUqFq=fL0ZM5XCaRFpVaFcdHfd7jzUVkroymvCCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, May 24, 2018 at 6:17 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Wed, May 23, 2018 at 09:45:05AM -0500, Rob Herring wrote:
+>> On Wed, May 23, 2018 at 3:27 AM, Daniel Mack <daniel@zonque.org> wrote:
+>> > On Tuesday, May 22, 2018 07:54 PM, Rob Herring wrote:
+>> >>
+>> >> On Thu, May 17, 2018 at 11:05:50AM +0200, Daniel Mack wrote:
+>> >>>
+>> >>> Allow configuring the device as wakeup source through device properties,
+>> >>> as
+>> >>> not all platforms want to wake up on touch screen activity.
+>> >>>
+>> >>> The I2C core automatically reads the "wakeup-source" DT property to
+>> >>> configure a device's wakeup capability, and board supports files can set
+>> >>> I2C_CLIENT_WAKE in the flags.
+>> >>
+>> >>
+>> >> This will break wake-up on working systems. Looks like mostly i.MX, but
+>> >> there's one AM437x board. If that board doesn't care, then it is up to
+>> >> Shawn.
+>> >
+>> >
+>> > I added the property to the dts files, but as Dmitry pointed out, I missed
+>> > some. Sorry for that.
+>>
+>> Just adding the property to dts files doesn't fix the compatibility
+>> problem. If a user uses an existing dtb (before this change) with a
+>> new kernel (after this change), then wakeup will stop working.
+>
+> Is this a practical problem though? Do we know of any products with
+> this touch panel that use DTS not distributed with the kernel?
 
-Here are a few arm64 fixes for -rc7. The two main fixes are for the asm
-constraints in our LSE atomics and for our pmd/pud setters when changing
-permissions for kernel mappings. Summary in the tag.
+Distribution of dts with kernel is irrelevant. It is how the dtb's are
+handled that matters. You still need to ask in tree users.
 
-Please pull,
+I can't have any way of knowing what DTs may exist as there is only
+one upstream repository of dts files. There's not really a good
+solution on this to avoid breaking users, so we'll just have to see if
+anyone (besides the known users) complains.
 
-Will
-
---->8
-
-The following changes since commit 771c577c23bac90597c685971d7297ea00f99d11:
-
-  Linux 4.17-rc6 (2018-05-20 15:31:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 82034c23fcbc2389c73d97737f61fa2dd6526413:
-
-  arm64: Make sure permission updates happen for pmd/pud (2018-05-24 11:19:31 +0100)
-
-----------------------------------------------------------------
-More arm64 fixes:
-
-- Fix application of read-only permissions to kernel section mappings
-
-- Sanitise reported ESR values for signals delivered on a kernel address
-
-- Ensure tishift GCC helpers are exported to modules
-
-- Fix inline asm constraints for some LSE atomics
-
-----------------------------------------------------------------
-Jason A. Donenfeld (1):
-      arm64: export tishift functions to modules
-
-Laura Abbott (1):
-      arm64: Make sure permission updates happen for pmd/pud
-
-Peter Maydell (1):
-      arm64: fault: Don't leak data in ESR context for user fault on kernel VA
-
-Will Deacon (1):
-      arm64: lse: Add early clobbers to some input/output asm operands
-
- arch/arm64/include/asm/atomic_lse.h | 24 ++++++++---------
- arch/arm64/kernel/arm64ksyms.c      |  8 ++++++
- arch/arm64/lib/tishift.S            | 15 ++---------
- arch/arm64/mm/fault.c               | 51 +++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/mmu.c                 | 16 +++++++-----
- 5 files changed, 83 insertions(+), 31 deletions(-)
+Rob
