@@ -1,47 +1,111 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 25 May 2018 12:23:58 +0800
-Subject: [PATCH v3 4/8] drm/mediatek: add ddp component AAL1
-In-Reply-To: <1527215665-11937-5-git-send-email-stu.hsieh@mediatek.com>
-References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
- <1527215665-11937-5-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527222238.27165.12.camel@mtksdaap41>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 25 May 2018 14:04:11 +0930
+Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS
+ node
+In-Reply-To: <9231baaf-e77c-c517-bca2-083070a53342@linux.intel.com>
+References: <1520399090-2455-1-git-send-email-haiyue.wang@linux.intel.com>
+ <9231baaf-e77c-c517-bca2-083070a53342@linux.intel.com>
+Message-ID: <CACPK8Xdhmrwfj6tGZ_o_JeoxdOii_5OD5oz80FJFRasvGd1L9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+Hello Andrew,
 
-On Fri, 2018-05-25 at 10:34 +0800, stu.hsieh at mediatek.com wrote:
-> From: Stu Hsieh <stu.hsieh@mediatek.com>
-> 
-> This patch add component AAL1 and
-> rename AAL to AAL0
-> 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index 0828cf8bf85c..eee3c0cc2632 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -41,7 +41,8 @@ enum mtk_ddp_comp_type {
->  };
->  
->  enum mtk_ddp_comp_id {
-> -	DDP_COMPONENT_AAL,
-> +	DDP_COMPONENT_AAL0,
-> +	DDP_COMPONENT_AAL1,
+On 16 March 2018 at 11:17, Wang, Haiyue <haiyue.wang@linux.intel.com> wrote:
+> Hi Joel and Andrew,
+>
+> Have time to review this patch ? Hope for your comments. :-)
+>
+> BR,
+> Haiyue
+>
+>
+> On 2018-03-07 13:04, Haiyue Wang wrote:
+>>
+>> The IPMI KCS device part of the LPC interface and is used for
+>> communication with the host processor.
+>>
+>> Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
 
-Be sure compiling is success when you apply each patch of a series. I
-think when you apply to this patch, it would cause compiling error
-because some related modification is in the patch 'Add support for
-mediatek SOC MT2712'. So move the modification from that patch to this
-patch.
+Do you have time to take a look at these? The device tree doesn't make
+sense to me.
 
-Regards,
-CK
+Cheers,
 
->  	DDP_COMPONENT_BLS,
->  	DDP_COMPONENT_COLOR0,
->  	DDP_COMPONENT_COLOR1,
+Joel
+
+>> ---
+>>   arch/arm/boot/dts/aspeed-g5.dtsi | 43
+>> +++++++++++++++++++++++++++++++++++++++-
+>>   1 file changed, 42 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi
+>> b/arch/arm/boot/dts/aspeed-g5.dtsi
+>> index 8eac57c..f443169 100644
+>> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+>> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+>> @@ -267,8 +267,40 @@
+>>                                 ranges = <0x0 0x1e789000 0x1000>;
+>>                                 lpc_bmc: lpc-bmc at 0 {
+>> -                                       compatible =
+>> "aspeed,ast2500-lpc-bmc";
+>> +                                       compatible =
+>> "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
+>>                                         reg = <0x0 0x80>;
+>> +                                       reg-io-width = <4>;
+>> +
+>> +                                       #address-cells = <1>;
+>> +                                       #size-cells = <1>;
+>> +                                       ranges = <0x0 0x0 0x80>;
+>> +
+>> +                                       kcs1: kcs1 at 0 {
+>> +                                               compatible =
+>> "aspeed,ast2500-kcs-bmc";
+>> +                                               reg = <0x0 0x80>;
+>> +                                               interrupts = <8>;
+>> +                                               kcs_chan = <1>;
+>> +                                               kcs_addr = <0x0>;
+>> +                                               status = "disabled";
+>> +                                       };
+>> +
+>> +                                       kcs2: kcs2 at 0 {
+>> +                                               compatible =
+>> "aspeed,ast2500-kcs-bmc";
+>> +                                               reg = <0x0 0x80>;
+>> +                                               interrupts = <8>;
+>> +                                               kcs_chan = <2>;
+>> +                                               kcs_addr = <0x0>;
+>> +                                               status = "disabled";
+>> +                                       };
+>> +
+>> +                                       kcs3: kcs3 at 0 {
+>> +                                               compatible =
+>> "aspeed,ast2500-kcs-bmc";
+>> +                                               reg = <0x0 0x80>;
+>> +                                               interrupts = <8>;
+>> +                                               kcs_chan = <3>;
+>> +                                               kcs_addr = <0x0>;
+>> +                                               status = "disabled";
+>> +                                       };
+>>                                 };
+>>                                 lpc_host: lpc-host at 80 {
+>> @@ -294,6 +326,15 @@
+>>                                                 status = "disabled";
+>>                                         };
+>>   +                                     kcs4: kcs4 at 0 {
+>> +                                               compatible =
+>> "aspeed,ast2500-kcs-bmc";
+>> +                                               reg = <0x0 0xa0>;
+>> +                                               interrupts = <8>;
+>> +                                               kcs_chan = <4>;
+>> +                                               kcs_addr = <0x0>;
+>> +                                               status = "disabled";
+>> +                                       };
+>> +
+>>                                         lhc: lhc at 20 {
+>>                                                 compatible =
+>> "aspeed,ast2500-lhc";
+>>                                                 reg = <0x20 0x24 0x48
+>> 0x8>;
+>
+>
