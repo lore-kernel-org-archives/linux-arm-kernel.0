@@ -1,100 +1,165 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 25 May 2018 15:00:38 +0100
-Subject: [PATCH v3 03/15] ARM: bugs: hook processor bug checking into SMP and
- suspend paths
+Date: Fri, 25 May 2018 15:01:08 +0100
+Subject: [PATCH v3 09/15] ARM: spectre-v2: add firmware based hardening
 In-Reply-To: <20180525135938.GE17671@n2100.armlinux.org.uk>
 References: <20180525135938.GE17671@n2100.armlinux.org.uk>
-Message-ID: <E1fMDGo-0006yY-4l@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fMDHI-00073X-Sa@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for CPU bugs when secondary processors are being brought online,
-and also when CPUs are resuming from a low power mode.  This gives an
-opportunity to check that processor specific bug workarounds are
-correctly enabled for all paths that a CPU re-enters the kernel.
+Add firmware based hardening for cores that require more complex
+handling in firmware.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/include/asm/bugs.h | 2 ++
- arch/arm/kernel/bugs.c      | 5 +++++
- arch/arm/kernel/smp.c       | 4 ++++
- arch/arm/kernel/suspend.c   | 2 ++
- 4 files changed, 13 insertions(+)
+ arch/arm/mm/proc-v7-bugs.c | 64 +++++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mm/proc-v7.S      | 21 +++++++++++++++
+ 2 files changed, 84 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
-index ed122d294f3f..73a99c72a930 100644
---- a/arch/arm/include/asm/bugs.h
-+++ b/arch/arm/include/asm/bugs.h
-@@ -14,8 +14,10 @@ extern void check_writebuffer_bugs(void);
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+index 585b2b61d7d3..5e50b0d9354c 100644
+--- a/arch/arm/mm/proc-v7-bugs.c
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -1,14 +1,20 @@
+ // SPDX-License-Identifier: GPL-2.0
++#include <linux/arm-smccc.h>
+ #include <linux/kernel.h>
++#include <linux/psci.h>
+ #include <linux/smp.h>
  
- #ifdef CONFIG_MMU
- extern void check_bugs(void);
-+extern void check_other_bugs(void);
- #else
- #define check_bugs() do { } while (0)
-+#define check_other_bugs() do { } while (0)
- #endif
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
++#include <asm/proc-fns.h>
+ #include <asm/system_misc.h>
  
- #endif
-diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-index 88024028bb70..16e7ba2a9cc4 100644
---- a/arch/arm/kernel/bugs.c
-+++ b/arch/arm/kernel/bugs.c
-@@ -3,7 +3,12 @@
- #include <asm/bugs.h>
- #include <asm/proc-fns.h>
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ DEFINE_PER_CPU(harden_branch_predictor_fn_t, harden_branch_predictor_fn);
  
-+void check_other_bugs(void)
++extern void cpu_v7_smc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
++extern void cpu_v7_hvc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
++
+ static void harden_branch_predictor_bpiall(void)
+ {
+ 	write_sysreg(0, BPIALL);
+@@ -19,15 +25,27 @@ static void harden_branch_predictor_iciallu(void)
+ 	write_sysreg(0, ICIALLU);
+ }
+ 
++static void __maybe_unused call_smc_arch_workaround_1(void)
 +{
++	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
 +}
 +
- void __init check_bugs(void)
++static void __maybe_unused call_hvc_arch_workaround_1(void)
++{
++	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
++}
++
+ static void cpu_v7_spectre_init(void)
  {
- 	check_writebuffer_bugs();
-+	check_other_bugs();
- }
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2da087926ebe..5ad0b67b9e33 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -31,6 +31,7 @@
- #include <linux/irq_work.h>
+ 	const char *spectre_v2_method = NULL;
+ 	int cpu = smp_processor_id();
++	u32 cpuid;
  
- #include <linux/atomic.h>
-+#include <asm/bugs.h>
- #include <asm/smp.h>
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
-@@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
- 	 * before we continue - which happens after __cpu_up returns.
- 	 */
- 	set_cpu_online(cpu, true);
+ 	if (per_cpu(harden_branch_predictor_fn, cpu))
+ 		return;
+ 
+-	switch (read_cpuid_part()) {
++	cpuid = read_cpuid_part();
++	switch (cpuid) {
+ 	case ARM_CPU_PART_CORTEX_A8:
+ 	case ARM_CPU_PART_CORTEX_A9:
+ 	case ARM_CPU_PART_CORTEX_A12:
+@@ -45,7 +63,51 @@ static void cpu_v7_spectre_init(void)
+ 			harden_branch_predictor_iciallu;
+ 		spectre_v2_method = "ICIALLU";
+ 		break;
 +
-+	check_other_bugs();
++#ifdef CONFIG_ARM_PSCI
++	default:
++		/* Other ARM CPUs require no workaround */
++		if (cpuid >> 24 == ARM_CPU_IMP_ARM)
++			break;
++		/* fallthrough */
++		/* Cortex A57/A72 require firmware workaround */
++	case ARM_CPU_PART_CORTEX_A57:
++	case ARM_CPU_PART_CORTEX_A72: {
++		struct arm_smccc_res res;
 +
- 	complete(&cpu_running);
- 
- 	local_irq_enable();
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index a40ebb7c0896..d08099269e35 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -3,6 +3,7 @@
- #include <linux/slab.h>
- #include <linux/mm_types.h>
- 
-+#include <asm/bugs.h>
- #include <asm/cacheflush.h>
- #include <asm/idmap.h>
- #include <asm/pgalloc.h>
-@@ -36,6 +37,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 		cpu_switch_mm(mm->pgd, mm);
- 		local_flush_bp_all();
- 		local_flush_tlb_all();
-+		check_other_bugs();
++		if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
++			break;
++
++		switch (psci_ops.conduit) {
++		case PSCI_CONDUIT_HVC:
++			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++			if ((int)res.a0 != 0)
++				break;
++			per_cpu(harden_branch_predictor_fn, cpu) =
++				call_hvc_arch_workaround_1;
++			processor.switch_mm = cpu_v7_hvc_switch_mm;
++			spectre_v2_method = "hypervisor";
++			break;
++
++		case PSCI_CONDUIT_SMC:
++			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++			if ((int)res.a0 != 0)
++				break;
++			per_cpu(harden_branch_predictor_fn, cpu) =
++				call_smc_arch_workaround_1;
++			processor.switch_mm = cpu_v7_smc_switch_mm;
++			spectre_v2_method = "firmware";
++			break;
++
++		default:
++			break;
++		}
  	}
++#endif
++	}
++
+ 	if (spectre_v2_method)
+ 		pr_info("CPU%u: Spectre v2: using %s workaround\n",
+ 			smp_processor_id(), spectre_v2_method);
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 79510011e7eb..b78d59a1cc05 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -9,6 +9,7 @@
+  *
+  *  This is the "shell" of the ARMv7 processor support.
+  */
++#include <linux/arm-smccc.h>
+ #include <linux/init.h>
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+@@ -93,6 +94,26 @@ ENTRY(cpu_v7_dcache_clean_area)
+ 	ret	lr
+ ENDPROC(cpu_v7_dcache_clean_area)
  
- 	return ret;
++#ifdef CONFIG_ARM_PSCI
++	.arch_extension sec
++ENTRY(cpu_v7_smc_switch_mm)
++	stmfd	sp!, {r0 - r3}
++	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
++	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
++	smc	#0
++	ldmfd	sp!, {r0 - r3}
++	b	cpu_v7_switch_mm
++ENDPROC(cpu_v7_smc_switch_mm)
++	.arch_extension virt
++ENTRY(cpu_v7_hvc_switch_mm)
++	stmfd	sp!, {r0 - r3}
++	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
++	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
++	hvc	#0
++	ldmfd	sp!, {r0 - r3}
++	b	cpu_v7_switch_mm
++ENDPROC(cpu_v7_smc_switch_mm)
++#endif
+ ENTRY(cpu_v7_iciallu_switch_mm)
+ 	mov	r3, #0
+ 	mcr	p15, 0, r3, c7, c5, 0		@ ICIALLU
 -- 
 2.7.4
