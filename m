@@ -1,16 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 14:02:18 -0700
-Subject: [GIT PULL] Allwinner core changes for 4.18
-In-Reply-To: <20180521114156.6nppm5vomksxpeqv@flea>
-References: <20180521114156.6nppm5vomksxpeqv@flea>
-Message-ID: <20180525210218.orjdivwnkm6j4d4q@localhost>
+Date: Fri, 25 May 2018 13:58:33 -0700
+Subject: [GIT PULL] Allwinner DT changes for 4.18
+In-Reply-To: <20180521094839.j7aq43ljqw4k4mvw@flea>
+References: <20180521094839.j7aq43ljqw4k4mvw@flea>
+Message-ID: <20180525205833.xideppsfp4iriywp@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 01:41:56PM +0200, Maxime Ripard wrote:
-> Hi,
+On Mon, May 21, 2018 at 11:48:39AM +0200, Maxime Ripard wrote:
+> Hi Arnd, Olof,
 > 
-> Here is our mach-sunxi changes for the next merge window, thanks!
+> Here is our usual bunch of arm32 DT changes for the next release.
+> 
+> Thanks!
 > Maxime
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
@@ -19,22 +21,27 @@ On Mon, May 21, 2018 at 01:41:56PM +0200, Maxime Ripard wrote:
 > 
 > are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-core-for-4.18
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.18
 > 
-> for you to fetch changes up to 6961275e72a8c15cc4ebf108a81eee758480a6a2:
+> for you to fetch changes up to 5d9ef839f874f4e3923c8a9ae7b136c6c3912cd5:
 > 
->   ARM: sun8i: smp: Add support for A83T (2018-05-08 15:00:20 +0200)
+>   ARM: dts: sun7i: Add Olimex A20-SOM-EVB-eMMC board (2018-05-21 11:41:03 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner core changes for 4.18
+> Allwinner DT additions for 4.18
 > 
-> The A83t, unlike the other Allwinner SoCs, cannot use PSCI because of a
-> silicon bug. As such, we needed to have some smp_ops in order to bringup
-> the various cores (and clusters) found on this SoC.
+> Here is our usual bunch of DT changes for our arm SoCs, with most
+> significantly:
+>   - MIPI-DSI support for the A33
+>   - NAND support for the A33
+>   - SMP support for the A83t
+>   - GMAC support for the R40
+>   - And some new boards: Olimex A20-SOM-EVB-eMMC, Nintendo NES and SuperNES
+>     Classic
 
-Hrm. that's unfortunate. Is there any public documentation of what the bug is?
+Neat to see the Nintendo Classic systems support!
 
-(Merged).
+Merged, thanks!
 
 
 -Olof
