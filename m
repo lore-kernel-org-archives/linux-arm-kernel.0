@@ -1,154 +1,140 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 25 May 2018 12:05:58 +0300
-Subject: [PATCH] mmc: sdhci-*: Don't emit error msg if sdhci_add_host()
- fails
-In-Reply-To: <20180525151509.0270dbe1@xhacker.debian>
-References: <20180525151509.0270dbe1@xhacker.debian>
-Message-ID: <48df3724-b9ff-ef9c-0583-961fd40f1978@intel.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 25 May 2018 11:09:02 +0200
+Subject: [PATCH] media: v4l2-ctrl: Add control for VP9 profile
+In-Reply-To: <20180517095349.203865-1-keiichiw@chromium.org>
+References: <20180517095349.203865-1-keiichiw@chromium.org>
+Message-ID: <a618b1b5-48ac-f725-39a6-50ba81b167f0@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/18 10:15, Jisheng Zhang wrote:
-> I noticed below error msg with sdhci-pxav3 on some berlin platforms:
+On 17/05/18 11:53, Keiichi Watanabe wrote:
+> Add a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE for selecting desired
+> profile for VP9 encoder and querying for supported profiles by VP9 encoder
+> or decoder.
 > 
-> [.....] sdhci-pxav3 f7ab0000.sdhci failed to add host
+> An existing control V4L2_CID_MPEG_VIDEO_VPX_PROFILE cannot be
+> used for querying since it is not a menu control but an integer
+> control, which cannot return an arbitrary set of supported profiles.
 > 
-> It is due to getting related vmmc or vqmmc regulator returns
-> -EPROBE_DEFER. It doesn't matter at all but it's confusing.
-> 
->>From another side, if driver probing fails and the error number isn't
-> -EPROBE_DEFER, the core will tell us something as below:
-> 
-> [.....] sdhci-pxav3: probe of f7ab0000.sdhci failed with error -EXX
-> 
-> So it's not necessary to emit error msg if sdhci_add_host() fails. And
-> some other sdhci host drivers also have this issue, let's fix them
-> together.
-> 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> The new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE is a menu control as
+> with controls for other codec profiles. (e.g. H264)
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+I don't mind adding this control (although I would like to have an Ack from
+Sylwester), but we also need this to be used in an actual kernel driver.
 
+Otherwise we're adding a control that nobody uses.
+
+Regards,
+
+	Hans
+
+> 
+> Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
 > ---
->  drivers/mmc/host/sdhci-bcm-kona.c | 4 +---
->  drivers/mmc/host/sdhci-pic32.c    | 4 +---
->  drivers/mmc/host/sdhci-pxav2.c    | 4 +---
->  drivers/mmc/host/sdhci-pxav3.c    | 4 +---
->  drivers/mmc/host/sdhci-s3c.c      | 4 +---
->  drivers/mmc/host/sdhci-spear.c    | 4 +---
->  drivers/mmc/host/sdhci-st.c       | 4 +---
->  7 files changed, 7 insertions(+), 21 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-> index 11ca95c60bcf..bdbd4897c0f7 100644
-> --- a/drivers/mmc/host/sdhci-bcm-kona.c
-> +++ b/drivers/mmc/host/sdhci-bcm-kona.c
-> @@ -284,10 +284,8 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
->  	sdhci_bcm_kona_sd_init(host);
+>  .../media/uapi/v4l/extended-controls.rst      | 26 +++++++++++++++++++
+>  drivers/media/v4l2-core/v4l2-ctrls.c          | 12 +++++++++
+>  include/uapi/linux/v4l2-controls.h            |  8 ++++++
+>  3 files changed, 46 insertions(+)
+> 
+> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+> index 03931f9b1285..4f7f128a4998 100644
+> --- a/Documentation/media/uapi/v4l/extended-controls.rst
+> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+> @@ -1959,6 +1959,32 @@ enum v4l2_vp8_golden_frame_sel -
+>      Select the desired profile for VPx encoder. Acceptable values are 0,
+>      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
 >  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_err(dev, "Failed sdhci_add_host\n");
-> +	if (ret)
->  		goto err_reset;
-> -	}
+> +.. _v4l2-mpeg-video-vp9-profile:
+> +
+> +``V4L2_CID_MPEG_VIDEO_VP9_PROFILE``
+> +    (enum)
+> +
+> +enum v4l2_mpeg_video_vp9_profile -
+> +    This control allows to select the profile for VP9 encoder.
+> +    This is also used to enumerate supported profiles by VP9 encoder or decoder.
+> +    Possible values are:
+> +
+> +
+> +
+> +.. flat-table::
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +
+> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_0``
+> +      - Profile 0
+> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_1``
+> +      - Profile 1
+> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_2``
+> +      - Profile 2
+> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_3``
+> +      - Profile 3
+> +
+> +
 >  
->  	/* if device is eMMC, emulate card insert right here */
->  	if (!mmc_card_is_removable(host->mmc)) {
-> diff --git a/drivers/mmc/host/sdhci-pic32.c b/drivers/mmc/host/sdhci-pic32.c
-> index a6caa49ca25a..a11e6397d4ff 100644
-> --- a/drivers/mmc/host/sdhci-pic32.c
-> +++ b/drivers/mmc/host/sdhci-pic32.c
-> @@ -200,10 +200,8 @@ static int pic32_sdhci_probe(struct platform_device *pdev)
->  	}
+>  High Efficiency Video Coding (HEVC/H.265) Control Reference
+>  -----------------------------------------------------------
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index d29e45516eb7..401ce21c2e63 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -431,6 +431,13 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+>  		"Use Previous Specific Frame",
+>  		NULL,
+>  	};
+> +	static const char * const vp9_profile[] = {
+> +		"0",
+> +		"1",
+> +		"2",
+> +		"3",
+> +		NULL,
+> +	};
 >  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "error adding host\n");
-> +	if (ret)
->  		goto err_base_clk;
-> -	}
+>  	static const char * const flash_led_mode[] = {
+>  		"Off",
+> @@ -614,6 +621,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+>  		return mpeg4_profile;
+>  	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
+>  		return vpx_golden_frame_sel;
+> +	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
+> +		return vp9_profile;
+>  	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
+>  		return jpeg_chroma_subsampling;
+>  	case V4L2_CID_DV_TX_MODE:
+> @@ -841,6 +850,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+>  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
 >  
->  	dev_info(&pdev->dev, "Successfully added sdhci host\n");
->  	return 0;
-> diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
-> index 8986f9d9cf98..2c3827f54927 100644
-> --- a/drivers/mmc/host/sdhci-pxav2.c
-> +++ b/drivers/mmc/host/sdhci-pxav2.c
-> @@ -221,10 +221,8 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
->  	host->ops = &pxav2_sdhci_ops;
+> +	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:			return "VP9 Profile";
+> +
+>  	/* HEVC controls */
+>  	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I-Frame QP Value";
+>  	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P-Frame QP Value";
+> @@ -1180,6 +1191,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+>  	case V4L2_CID_DEINTERLACING_MODE:
+>  	case V4L2_CID_TUNE_DEEMPHASIS:
+>  	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
+> +	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
+>  	case V4L2_CID_DETECT_MD_MODE:
+>  	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+>  	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index 8d473c979b61..56203b7b715c 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -589,6 +589,14 @@ enum v4l2_vp8_golden_frame_sel {
+>  #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP		(V4L2_CID_MPEG_BASE+510)
+>  #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE			(V4L2_CID_MPEG_BASE+511)
 >  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "failed to add host\n");
-> +	if (ret)
->  		goto disable_clk;
-> -	}
+> +#define V4L2_CID_MPEG_VIDEO_VP9_PROFILE			(V4L2_CID_MPEG_BASE+512)
+> +enum v4l2_mpeg_video_vp9_profile {
+> +	V4L2_MPEG_VIDEO_VP9_PROFILE_0				= 0,
+> +	V4L2_MPEG_VIDEO_VP9_PROFILE_1				= 1,
+> +	V4L2_MPEG_VIDEO_VP9_PROFILE_2				= 2,
+> +	V4L2_MPEG_VIDEO_VP9_PROFILE_3				= 3,
+> +};
+> +
+>  /* CIDs for HEVC encoding. */
 >  
->  	return 0;
->  
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index a34434166ca7..b8e96f392428 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -472,10 +472,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->  	pm_suspend_ignore_children(&pdev->dev, 1);
->  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "failed to add host\n");
-> +	if (ret)
->  		goto err_add_host;
-> -	}
->  
->  	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
->  		device_init_wakeup(&pdev->dev, 1);
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index cda83ccb2702..9ef89d00970e 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -655,10 +655,8 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
->  		goto err_req_regs;
->  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_err(dev, "sdhci_add_host() failed\n");
-> +	if (ret)
->  		goto err_req_regs;
-> -	}
->  
->  #ifdef CONFIG_PM
->  	if (pdata->cd_type != S3C_SDHCI_CD_INTERNAL)
-> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
-> index 14511526a3a8..9247d51f2eed 100644
-> --- a/drivers/mmc/host/sdhci-spear.c
-> +++ b/drivers/mmc/host/sdhci-spear.c
-> @@ -126,10 +126,8 @@ static int sdhci_probe(struct platform_device *pdev)
->  	}
->  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_dbg(&pdev->dev, "error adding host\n");
-> +	if (ret)
->  		goto disable_clk;
-> -	}
->  
->  	platform_set_drvdata(pdev, host);
->  
-> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-> index c32daed0d418..8f95647195d9 100644
-> --- a/drivers/mmc/host/sdhci-st.c
-> +++ b/drivers/mmc/host/sdhci-st.c
-> @@ -422,10 +422,8 @@ static int sdhci_st_probe(struct platform_device *pdev)
->  	st_mmcss_cconfig(np, host);
->  
->  	ret = sdhci_add_host(host);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
-> +	if (ret)
->  		goto err_out;
-> -	}
->  
->  	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
->  
+>  #define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP		(V4L2_CID_MPEG_BASE + 600)
 > 
