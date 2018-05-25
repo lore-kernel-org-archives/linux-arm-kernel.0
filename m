@@ -1,35 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 04:57:18 -0700
-Subject: [GIT PULL] ARM: mvebu: arm for v4.18 (#1)
-In-Reply-To: <87603m1lq9.fsf@bootlin.com>
-References: <87603m1lq9.fsf@bootlin.com>
-Message-ID: <20180525115718.o426ixt6bilonjnx@localhost>
+Date: Fri, 25 May 2018 04:58:30 -0700
+Subject: [GIT PULL 1/3] DaVinci SoC updates for v4.18
+In-Reply-To: <20180517130845.863-1-nsekhar@ti.com>
+References: <20180517130845.863-1-nsekhar@ti.com>
+Message-ID: <20180525115830.ltodmaldiwkxqna5@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 02:59:42PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Thu, May 17, 2018 at 06:38:43PM +0530, Sekhar Nori wrote:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
-> Here is the first pull request for arm for mvebu for v4.18.
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> As I feared, there were (trivial) merge issues due to the defconfig
-> update in linux-next. The best place to solve them is in your tree, so
-> as soon as you will pull this, I will remove from my mvebu/for-next
-> branch.
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.18/soc
+> 
+> for you to fetch changes up to ccfadbb759bed3cc40336e2c486e619e3bf8590b:
+> 
+>   Merge branch 'v4.18/nand-cs-simplification' into v4.18/soc (2018-05-02 15:04:15 +0530)
+> 
+> ----------------------------------------------------------------
+> DaVinci SoC support updates for v4.18
+> 
+> Mainly contains patches to move NAND chipselect to platform data
+> (currently platform device id is being used). These patches have
+> been acked by NAND maintainer and because of the driver dependency
+> an immutable branch has been provided to Boris.
+> 
+> The other patch is to remove an unnecessary postcore_initcall() on
+> DM644x which is needed for common clock framework conversion.
 
-Hmm. Yeah, this is because you took upon yourself to run 'make savedefconfig'
-for all platforms on this shared defconfig. This will of course conflict with
-everything everywhere, and it doesn't seem like a good idea to do this way.
-
-What you're really doing here is turning on one single option? Just do that.
-
-We can run savedefconfig at the end of a merge window here instead of having
-one of the platform maintainers do it.
-
-So, feel free to send just the NAND patch, and I can fix it up when I apply it
-if needed.
-
-Thanks!
+Merged, thanks.
 
 
 -Olof
