@@ -1,26 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 14:12:07 -0700
-Subject: [GIT PULL 1/3] ti-sysc array access fix for v4.18 merge window
-In-Reply-To: <pull-1526925630-789198@atomide.com>
-References: <pull-1526925630-789198@atomide.com>
-Message-ID: <20180525211207.lf62njx6lnkwkfay@localhost>
+Date: Fri, 25 May 2018 13:47:56 -0700
+Subject: [GIT PULL 2/5] i.MX SoC changes for 4.18
+In-Reply-To: <1526828281-14664-2-git-send-email-shawnguo@kernel.org>
+References: <1526828281-14664-1-git-send-email-shawnguo@kernel.org>
+ <1526828281-14664-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <20180525204756.2x2xec4azdp5362r@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 12:41:30PM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Sun, May 20, 2018 at 10:57:58PM +0800, Shawn Guo wrote:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
-> The following changes since commit dc4c85eac6bc8cfe25144936c5636aa1415bbc12:
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
->   bus: ti-sysc: Show module information for suspend if DEBUG is enabled (2018-05-01 06:54:17 -0700)
+> are available in the git repository at:
 > 
-> are available in the Git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.18
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/ti-sysc-fix-signed
+> for you to fetch changes up to 0e8d1c4b7613399494720e315f99d21793cacb8c:
 > 
-> for you to fetch changes up to c97c8620833e4a55ddb7a43961d3205184a487f0:
+>   ARM: imx: select imx6sll pinctrl when imx6sll enabled (2018-05-02 15:01:32 +0800)
 > 
->   bus: ti-sysc: Fix optional clocks array access (2018-05-18 07:54:44 -0700)
+> ----------------------------------------------------------------
+> i.MX SoC update for 4.18:
+>  - A series from Bartosz to convert all i.MX plaform code using
+>    at24_platform_data to use at24 eeprom generic device properties.
+>  - Enable pinctrl driver support for i.MX6SLL SoC.
+>  - Clean up i.MX platform code using spi_imx platform data on outdated
+>    documentation and chip select array usage.
 
 Merged, thanks!
 
