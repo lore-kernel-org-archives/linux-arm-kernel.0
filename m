@@ -1,50 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 May 2018 15:28:00 -0700
-Subject: [GIT PULL v3] arm64: defconfig: hisilicon config updates for v4.18
-In-Reply-To: <5B083857.6040401@hisilicon.com>
-References: <5B083857.6040401@hisilicon.com>
-Message-ID: <20180525222800.ttzgplfali24wzaf@localhost>
+Date: Fri, 25 May 2018 15:29:09 -0700
+Subject: [PATCH 1/2] arm64: dts: Add GPIO and GPIO keys device nodes
+In-Reply-To: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
+References: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
+Message-ID: <20180525222909.sedcwcakptjoetma@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 05:22:47PM +0100, Wei Xu wrote:
-> Hi Olof, Hi Arnd,
+On Mon, Apr 16, 2018 at 10:40:03AM +0800, Baolin Wang wrote:
+> This patch adds device nodes to enable one GPIO controller located on
+> digital chip, 2 EIC (external interrupt controller) controllers loacted
+> on PMIC and digital chip for Spreadtrum SC9860 platform.
 > 
-> Please help to pull the following changes.
-> Thanks!
+> Moreover this patch adds 3 GPIO keys relied on EIC controller to support
+> power key and volume up/down keys.
 > 
-> Best Regards,
-> Wei
-> 
-> ---
-> 
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the Git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.18v3
-> 
-> for you to fetch changes up to 30480a849820d728c409e90bd6715d11f4071416:
-> 
->   arm64: defconfig: Enable HISILICON_LPC (2018-05-25 16:58:51 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM64: hisilicon: defconfig updates for 4.18
-> 
-> - Enable the support of ethernet, eMMC, Combo/INNO phy
->   and PCIe for Hi3798CV200
-> - Enable the LPC for hip06 and hip07
-> 
-> ----------------------------------------------------------------
-> John Garry (1):
->       arm64: defconfig: Enable HISILICON_LPC
-> 
-> Shawn Guo (1):
->       arm64: defconfig: enable drivers for Poplar support
+> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 
-Merged, thanks!
+Applied with "sprd:" added to the subject.
 
 
 -Olof
