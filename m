@@ -1,57 +1,145 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 25 May 2018 11:41:51 +0100
-Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
- priority masking
-In-Reply-To: <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
- <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
- <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
- <c4e5f8ff-ecde-7b88-8a37-39e47ef22917@arm.com>
- <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
-Message-ID: <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 25 May 2018 12:45:51 +0200
+Subject: [PATCH 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
+ manage multi PM domains
+In-Reply-To: <2c63af8c-4745-a751-8d3d-f7122e921e6f@nvidia.com>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-10-git-send-email-ulf.hansson@linaro.org>
+ <1c21d18e-954a-f3a8-9817-0117b7cb7e4f@nvidia.com>
+ <CAPDyKFozm88OM8cDFXXwvgdMirrt2=HhZtBdyhNjo2bgjHV2Mg@mail.gmail.com>
+ <2c63af8c-4745-a751-8d3d-f7122e921e6f@nvidia.com>
+Message-ID: <CAPDyKFrTtvhxOhf9BPY1=cJ9VQyx9D=P3O0vCV+WXSVR82FozQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/18 11:39, Julien Thierry wrote:
-> 
-> 
-> On 25/05/18 11:36, Suzuki K Poulose wrote:
->> On 25/05/18 11:17, Julien Thierry wrote:
+On 25 May 2018 at 10:31, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+> On 24/05/18 22:11, Ulf Hansson wrote:
+>>
+>> On 24 May 2018 at 17:48, Jon Hunter <jonathanh@nvidia.com> wrote:
 >>>
 >>>
->>> On 25/05/18 11:04, Suzuki K Poulose wrote:
->>>> On 25/05/18 10:49, Julien Thierry wrote:
->>>>> Add a cpufeature indicating whether a cpu supports masking interrupts
->>>>> by priority.
+>>> On 18/05/18 11:31, Ulf Hansson wrote:
 >>>>
->>>> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
->>>> the description ?
+>>>>
+>>>> The existing dev_pm_domain_attach() function, allows a single PM domain
+>>>> to
+>>>> be attached per device. To be able to support devices that are
+>>>> partitioned
+>>>> across multiple PM domains, let's introduce a new interface,
+>>>> dev_pm_domain_attach_by_id().
+>>>>
+>>>> The dev_pm_domain_attach_by_id() returns a new allocated struct device
+>>>> with
+>>>> the corresponding attached PM domain. This enables for example a driver
+>>>> to
+>>>> operate on the new device from a power management point of view. The
+>>>> driver
+>>>> may then also benefit from using the received device, to set up so
+>>>> called
+>>>> device-links towards its original device. Depending on the situation,
+>>>> these
+>>>> links may then be dynamically changed.
+>>>>
+>>>> The new interface is typically called by drivers during their probe
+>>>> phase,
+>>>> in case they manages devices which uses multiple PM domains. If that is
+>>>> the
+>>>> case, the driver also becomes responsible of managing the detaching of
+>>>> the
+>>>> PM domains, which typically should be done at the remove phase.
+>>>> Detaching
+>>>> is done by calling the existing dev_pm_domain_detach() function and for
+>>>> each of the received devices from dev_pm_domain_attach_by_id().
+>>>>
+>>>> Note, currently its only genpd that supports multiple PM domains per
+>>>> device, but dev_pm_domain_attach_by_id() can easily by extended to cover
+>>>> other PM domain types, if/when needed.
+>>>>
+>>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>>> ---
+>>>>    drivers/base/power/common.c | 33 ++++++++++++++++++++++++++++++++-
+>>>>    include/linux/pm_domain.h   |  7 +++++++
+>>>>    2 files changed, 39 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+>>>> index 7ae62b6..d3db974 100644
+>>>> --- a/drivers/base/power/common.c
+>>>> +++ b/drivers/base/power/common.c
+>>>> @@ -117,13 +117,44 @@ int dev_pm_domain_attach(struct device *dev, bool
+>>>> power_on)
+>>>>    EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
+>>>>      /**
+>>>> + * dev_pm_domain_attach_by_id - Attach a device to one of its PM
+>>>> domains.
 >>>
->>> More or less.
->>>
->>> It is just to have an easier condition in the rest of the series. Basically the PRIO masking feature is enabled if we have a GICv3 CPUIF working *and* the option was selected at build time. Before this meant that I was checking for the GIC_CPUIF cap inside #ifdefs (and putting alternatives depending on that inside #ifdefs as well).
->>>
->>> Having this as a separate feature feels easier to manage in the code. It also makes it clearer at boot time that the kernel will be using irq priorities (although I admit it was not the initial intention):
->>>
->>> [??? 0.000000] CPU features: detected: IRQ priority masking
 >>>
 >>>
->>> But yes that new feature will be detected only if SYSREG_GIC_CPUIF gets detected as well.
+>>> Isn't this more of a 'get'?
 >>
->> Well, you could always wrap the check like :
 >>
->> static inline bool system_has_irq_priority_masking(void)
->> {
->> ?????return (IS_ENABLED(CONFIG_YOUR_CONFIG) && cpus_have_const_cap(HWCAP_SYSREG_GIC_CPUIF));
->> }
+>> I don't think so, at least according to the common understanding of
+>> how we use get and put APIs.
 >>
->> and use it everywhere.
+>> For example, clk_get() returns a cookie to a clk, which you then can
+>> do a hole bunch of different clk specific operations on.
 >>
-> 
-> Yes, but I can't use that in the asm parts that use alternatives and would need to surround them in #ifdef... :\
+>> This is different, there are no specific PM domain operations the
+>> caller can or should do. Instead the idea is to keep drivers more or
+>> less transparent, still using runtime PM as before. The only care the
+>> caller need to take is to use device links, which BTW isn't a PM
+>> domain specific thing.
+>
+>
+> Yes, but a user can still call pm_runtime_get/put with the device returned
+> if they wish to, right?
 
-I thought there is _ALTERNATIVE_CFG() to base the alternative depend on a CONFIG_xxx ?
-Doesn't that solve the problem ?
+Correct.
 
-Suzuki
+[...]
+
+>>>> + */
+>>>> +struct device *dev_pm_domain_attach_by_id(struct device *dev,
+>>>> +                                         unsigned int index)
+>>>> +{
+>>>> +       if (dev->pm_domain)
+>>>
+>>>
+>>>
+>>> I wonder if this is worthy of a ...
+>>>
+>>>          if (WARN_ON(dev->pm_domain))
+>>>
+>>>> +               return NULL;
+>>>
+>>>
+>>>
+>>> Don't we consider this an error case? I wonder why not return PTR_ERR
+>>> here
+>>> as well? This would be consistent with dev_pm_domain_attach().
+>>
+>>
+>> Please see above comment.
+>
+>
+> Right, but this case still seems like an error. My understanding is that
+> only drivers will use this API directly and it will not be used by the
+> device driver core (unlike dev_pm_domain_attach), so if anyone calls this
+> attempting to attach another PM domain when one is already attached, they
+> are doing something wrong.
+
+[...]
+
+You may be right!
+
+What I was thinking of is whether multiple PM domains may be optional
+in some cases, but instead a PM domain have already been attached by
+dev_pm_domain_attach(), prior the driver starts to probe.
+
+Then, assuming we return an error for this case, that means the caller
+then need to check the dev->pm_domain pointer, prior calling
+dev_pm_domain_attach_by_id(). Wouldn't it? Perhaps that is more clear
+though?
+
+Kind regards
+Uffe
