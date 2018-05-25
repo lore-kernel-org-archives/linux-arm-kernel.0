@@ -1,267 +1,245 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 May 2018 16:17:08 +0100
-Subject: [PATCH v5 2/2] arm64: signal: Report signal frame size to userspace
- via auxv
-In-Reply-To: <1527261428-6662-1-git-send-email-Dave.Martin@arm.com>
-References: <1527261428-6662-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527261428-6662-3-git-send-email-Dave.Martin@arm.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Fri, 25 May 2018 12:27:13 -0300
+Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
+In-Reply-To: <03a53a72-8af5-02de-21a8-fd02a0974ed6@arm.com>
+References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+ <1526892748-326-2-git-send-email-leo.yan@linaro.org>
+ <bc320d6d-a21d-b5a4-e30d-511bb69aba32@arm.com>
+ <20180522083920.GD31075@leoy-ThinkPad-X240s>
+ <03a53a72-8af5-02de-21a8-fd02a0974ed6@arm.com>
+Message-ID: <20180525152713.GD4091@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stateful CPU architecture extensions may require the signal frame
-to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
-However, changing this #define is an ABI break.
+Em Fri, May 25, 2018 at 03:03:47PM +0100, Robert Walker escreveu:
+> Hi Leo,
+> 
+> Following the discussions from your reply to this with a simplified patch,
+> this version of the patch works better as you also need to emit a branch
+> sample when handling a CS_ETM_TRACE_ON packet to indicate the end of a block
+> of trace.
+> 
+> This patch does not break the output from perf inject to generate
+> instruction samples for AutoFDO, so I am happy with that.
+> 
+> Regards
+> 
+> Rob
+> 
+> Reviewed-by: Robert Walker <robert.walker@arm.com>
 
-To allow userspace the option of determining the signal frame size
-in a more forwards-compatible way, this patch adds a new auxv entry
-tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
-size that the process can observe during its lifetime.
+So, Leo, can you please resubmit, bumping the v2 to v3 (or the latest
+one, I haven't fully reread this thread) add this "Reviewed-by: Robert"
+tag and any other that people may have provided, so that I can merge it?
 
-If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
-assume that the MINSIGSTKSZ #define is sufficient.  This allows for
-a consistent interface with older kernels that do not provide
-AT_MINSIGSTKSZ.
+Thanks,
 
-The idea is that libc could expose this via sysconf() or some
-similar mechanism.
-
-There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
-about userspace's own stack overheads and should not pretend to
-know.
-
-For arm64:
-
-The primary motivation for this interface is the Scalable Vector
-Extension, which can require at least 4KB or so of extra space
-in the signal frame for the largest hardware implementations.
-
-To determine the correct value, a "Christmas tree" mode (via the
-add_all argument) is added to setup_sigframe_layout(), to simulate
-addition of all possible records to the signal frame at maximum
-possible size.
-
-If this procedure goes wrong somehow, resulting in a stupidly large
-frame layout and hence failure of sigframe_alloc() to allocate a
-record to the frame, then this is indicative of a kernel bug.  In
-this case, we WARN() and no attempt is made to populate
-AT_MINSIGSTKSZ for userspace.
-
-For arm64 SVE:
-
-The SVE context block in the signal frame needs to be considered
-too when computing the maximum possible signal frame size.
-
-Because the size of this block depends on the vector length, this
-patch computes the size based not on the thread's current vector
-length but instead on the maximum possible vector length: this
-determines the maximum size of SVE context block that can be
-observed in any signal frame for the lifetime of the process.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-
----
-
-Changes since v4:
-
-Requested by Will Deacon:
-
- * Fix typo in ARCH_INFO comment.
-
- * Remove special-casing of minsigstksz_setup() failure.  Just
-   WARN() and don't populate AT_MINSIGSTKSZ for userspace in this
-   case, rather than trying to make an intelligent guess about
-   how to populate it when the kernel is obviously broken.
----
- arch/arm64/include/asm/elf.h         | 11 ++++++++
- arch/arm64/include/asm/processor.h   |  5 ++++
- arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
- arch/arm64/kernel/cpufeature.c       |  1 +
- arch/arm64/kernel/signal.c           | 52 +++++++++++++++++++++++++++++++-----
- 5 files changed, 64 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index fac1c4d..8cf112b 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -121,6 +121,9 @@
+- Arnaldo
  
- #ifndef __ASSEMBLY__
- 
-+#include <linux/bug.h>
-+#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-+
- typedef unsigned long elf_greg_t;
- 
- #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
-@@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
- 		    (elf_addr_t)current->mm->context.vdso);		\
-+									\
-+	/*								\
-+	 * Should always be nonzero unless there's a kernel bug.	\
-+	 * If we haven't determined a sensible value to give to		\
-+	 * userspace, omit the entry:					\
-+	 */								\
-+	if (likely(signal_minsigstksz))					\
-+		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
- } while (0)
- 
- #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 7675989..65ab83e 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -35,6 +35,8 @@
- #ifdef __KERNEL__
- 
- #include <linux/build_bug.h>
-+#include <linux/cache.h>
-+#include <linux/init.h>
- #include <linux/stddef.h>
- #include <linux/string.h>
- 
-@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+extern unsigned long __ro_after_init signal_minsigstksz; /* sigframe size */
-+extern void __init minsigstksz_setup(void);
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
-diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-index ec0a86d..743c0b8 100644
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,7 +19,8 @@
- 
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
-+#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
- 
--#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-+#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
- 
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..0e0b53d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
- 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
- 
- 	sve_setup();
-+	minsigstksz_setup();
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 154b7d3..e7da5db 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/cache.h>
- #include <linux/compat.h>
- #include <linux/errno.h>
- #include <linux/kernel.h>
-@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return 0;
- }
- 
--/* Determine the layout of optional records in the signal frame */
--static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-+/*
-+ * Determine the layout of optional records in the signal frame
-+ *
-+ * add_all: if true, lays out the biggest possible signal frame for
-+ *	this task; otherwise, generates a layout for the current state
-+ *	of the task.
-+ */
-+static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
-+				 bool add_all)
- {
- 	int err;
- 
-@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 		return err;
- 
- 	/* fault information, if valid */
--	if (current->thread.fault_code) {
-+	if (add_all || current->thread.fault_code) {
- 		err = sigframe_alloc(user, &user->esr_offset,
- 				     sizeof(struct esr_context));
- 		if (err)
-@@ -591,8 +599,14 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	if (system_supports_sve()) {
- 		unsigned int vq = 0;
- 
--		if (test_thread_flag(TIF_SVE))
--			vq = sve_vq_from_vl(current->thread.sve_vl);
-+		if (add_all || test_thread_flag(TIF_SVE)) {
-+			int vl = sve_max_vl;
-+
-+			if (!add_all)
-+				vl = current->thread.sve_vl;
-+
-+			vq = sve_vq_from_vl(vl);
-+		}
- 
- 		err = sigframe_alloc(user, &user->sve_offset,
- 				     SVE_SIG_CONTEXT_SIZE(vq));
-@@ -603,7 +617,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	return sigframe_alloc_end(user);
- }
- 
--
- static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 			  struct pt_regs *regs, sigset_t *set)
- {
-@@ -701,7 +714,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
- 	int err;
- 
- 	init_user_layout(user);
--	err = setup_sigframe_layout(user);
-+	err = setup_sigframe_layout(user, false);
- 	if (err)
- 		return err;
- 
-@@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		thread_flags = READ_ONCE(current_thread_info()->flags);
- 	} while (thread_flags & _TIF_WORK_MASK);
- }
-+
-+unsigned long __ro_after_init signal_minsigstksz;
-+
-+/*
-+ * Determine the stack space required for guaranteed signal devliery.
-+ * This function is used to populate AT_MINSIGSTKSZ at process startup.
-+ * cpufeatures setup is assumed to be complete.
-+ */
-+void __init minsigstksz_setup(void)
-+{
-+	struct rt_sigframe_user_layout user;
-+
-+	init_user_layout(&user);
-+
-+	/*
-+	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
-+	 * be big enough, but it's our best guess:
-+	 */
-+	if (WARN_ON(setup_sigframe_layout(&user, true)))
-+		return;
-+
-+	signal_minsigstksz = sigframe_size(&user) +
-+		round_up(sizeof(struct frame_record), 16) +
-+		16; /* max alignment padding */
-+}
--- 
-2.1.4
+> 
+> On 22/05/18 09:39, Leo Yan wrote:
+> > Hi Rob,
+> > 
+> > On Mon, May 21, 2018 at 12:27:42PM +0100, Robert Walker wrote:
+> > > Hi Leo,
+> > > 
+> > > On 21/05/18 09:52, Leo Yan wrote:
+> > > > Commit e573e978fb12 ("perf cs-etm: Inject capabilitity for CoreSight
+> > > > traces") reworks the samples generation flow from CoreSight trace to
+> > > > match the correct format so Perf report tool can display the samples
+> > > > properly.  But the change has side effect for packet handling, it only
+> > > > generate samples when 'prev_packet->last_instr_taken_branch' is true,
+> > > > this results in the start tracing packet and exception packets are
+> > > > dropped.
+> > > > 
+> > > > This patch checks extra two conditions for complete samples:
+> > > > 
+> > > > - If 'prev_packet->sample_type' is zero we can use this condition to
+> > > >    get to know this is the start tracing packet; for this case, the start
+> > > >    packet's end_addr is zero as well so we need to handle it in the
+> > > >    function cs_etm__last_executed_instr();
+> > > > 
+> > > I think you also need to add something in to handle discontinuities in
+> > > trace - for example it is possible to configure the ETM to only trace
+> > > execution in specific code regions or to trace a few cycles every so
+> > > often. In these cases, prev_packet->sample_type will not be zero, but
+> > > whatever the previous packet was.  You will get a CS_ETM_TRACE_ON packet in
+> > > such cases, generated by an I_TRACE_ON element in the trace stream.
+> > > You also get this on exception return.
+> > > 
+> > > However, you should also keep the test for prev_packet->sample_type == 0
+> > > as you may not see a CS_ETM_TRACE_ON when decoding a buffer that has
+> > > wrapped.
+> > Thanks for reviewing.  Let's dig more detailed into this issue,
+> > especially for handling packet CS_ETM_TRACE_ON, I'd like divide into two
+> > sub cases.
+> > 
+> > - The first case is for using python script:
+> > 
+> >    I use python script to analyze packets with below command:
+> >    ./perf script --itrace=ril128 -s arm-cs-trace-disasm.py -F cpu,event,ip,addr,sym -- -v -d objdump -k ./vmlinux
+> > 
+> >    What I observe is after we pass python script with parameter '-s
+> >    arm-cs-trace-disasm.py', then instruction tracing options
+> >    '--itrace=ril128' isn't really used;  the perf tool creates another
+> >    new process for launch python script and re-enter cmd_script()
+> >    function, but at the second time when invoke cmd_script() for python
+> >    script execution the option '--itrace=ril128' is dropped and all
+> >    parameters are only valid defined by the python script.
+> > 
+> >    As result, I can the variable 'etmq->etm->synth_opts.last_branch' is
+> >    always FALSE for running python script.  So all CS_ETM_TRACE_ON
+> >    packets will be ignored in the function cs_etm__flush().
+> > 
+> >    Even the CS_ETM_TRACE_ON packets are missed to handle, the program
+> >    flow still can work well.  The reason is without the interference by
+> >    CS_ETM_TRACE_ON, the CS_ETM_RANGE packets can smoothly create
+> >    instruction range by ignore the middle CS_ETM_TRACE_ON packet.
+> > 
+> >    Please see below example, in this example there have 3 packets, the
+> >    first one packet is CS_ETM_RANGE packet which is labelled with
+> >    'PACKET_1', the first one packet can properly generate branch sample
+> >    data with previous packet as expected;  the second packet is
+> >    PACKET_2 which is CS_ETM_TRACE_ON, but
+> >    'etmq->etm->synth_opts.last_branch' is false so function
+> >    cs_etm__flush() doesn't handle it and skip the swap operation
+> >    "etmq->prev_packet = tmp"; the third packet is PACKET_3, which is
+> >    CS_ETM_RANGE packet and we can see it's smoontly to create
+> >    continous instruction range between PACKET_1 and PACKET_3.
+> > 
+> >    cs_etm__sample: prev_packet: sample_type=1 exc=0 exc_ret=0 cpu=1 start_addr=0xffff000008a5f79c end_addr=0xffff000008a5f7bc last_instr_taken_branch=1
+> >    PACKET_1: cs_etm__sample: packet: sample_type=1 exc=0 exc_ret=0 cpu=1 start_addr=0xffff000008a5f858 end_addr=0xffff000008a5f864 last_instr_taken_branch=1
+> >    cs_etm__synth_branch_sample: ip=0xffff000008a5f7b8 addr=0xffff000008a5f858 pid=2290 tid=2290 id=1000000021 stream_id=1000000021 period=1 cpu=1 flags=0 cpumode=2
+> > 
+> >    cs_etm__flush: prev_packet: sample_type=1 exc=0 exc_ret=0 cpu=1 start_addr=0xffff000008a5f858 end_addr=0xffff000008a5f864 last_instr_taken_branch=1
+> >    PACKET_2: cs_etm__flush: packet: sample_type=2 exc=0 exc_ret=0 cpu=2 start_addr=0xdeadbeefdeadbeef end_addr=0xdeadbeefdeadbeef last_instr_taken_branch=1
+> > 
+> >    cs_etm__sample: prev_packet: sample_type=1 exc=0 exc_ret=0 cpu=1 start_addr=0xffff000008a5f858 end_addr=0xffff000008a5f864 last_instr_taken_branch=1
+> >    PACKET_3: cs_etm__sample: packet: sample_type=1 exc=0 exc_ret=0 cpu=2 start_addr=0xffff000008be7528 end_addr=0xffff000008be7538 last_instr_taken_branch=1
+> >    cs_etm__synth_branch_sample: ip=0xffff000008a5f860 addr=0xffff000008be7528 pid=2290 tid=2290 id=1000000021 stream_id=1000000021 period=1 cpu=2 flags=0 cpumode=2
+> > 
+> >    So seems to me, the CS_ETM_TRACE_ON packet doesn't introduce trouble
+> >    for the program flow analysis if we can handle all CS_ETM_RANGE
+> >    packets and without handling CS_ETM_TRACE_ON packet for branch
+> >    samples.
+> > 
+> > - The second case is for --itrace option without python script:
+> >    ./perf script --itrace=ril -F cpu,event,ip,addr,sym -k ./vmlinux
+> > 
+> >    In this case, the flag 'etmq->etm->synth_opts.last_branch' is true
+> >    so CS_ETM_TRACE_ON packet will be handled; but I can observe the
+> >    CS_ETM_RANGE packet in etmq->prev_packet isn't handled in the
+> >    function cs_etm__flush() for branch sample, so actually we miss some
+> >    branch sample for this case.
+> > 
+> >    So I think we also need handle CS_ETM_RANGE packet in function
+> >    cs_etm__flush() to generate branch samples.  But this has side
+> >    effect, we introduce the extra track for CS_ETM_TRACE_ON packet for
+> >    branch samples, so we will see one branch range like:
+> >    [ 0xdeadbeefdeadbeef .. 0xdeadbeefdeadbeef ].
+> > 
+> > Please reivew below change is okay for you?  Thanks a lot for
+> > suggestions.
+> > 
+> > diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> > index 822ba91..37d3722 100644
+> > --- a/tools/perf/util/cs-etm.c
+> > +++ b/tools/perf/util/cs-etm.c
+> > @@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+> >   static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+> >   {
+> >   	/*
+> > +	 * The packet is the start tracing packet if the end_addr is zero,
+> > +	 * returns 0 for this case.
+> > +	 */
+> > +	if (!packet->end_addr)
+> > +		return 0;
+> > +
+> > +	/*
+> >   	 * The packet records the execution range with an exclusive end address
+> >   	 *
+> >   	 * A64 instructions are constant size, so the last executed
+> > @@ -897,13 +904,28 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+> >   		etmq->period_instructions = instrs_over;
+> >   	}
+> > -	if (etm->sample_branches &&
+> > -	    etmq->prev_packet &&
+> > -	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+> > -	    etmq->prev_packet->last_instr_taken_branch) {
+> > -		ret = cs_etm__synth_branch_sample(etmq);
+> > -		if (ret)
+> > -			return ret;
+> > +	if (etm->sample_branches && etmq->prev_packet) {
+> > +		bool generate_sample = false;
+> > +
+> > +		/* Generate sample for start tracing packet */
+> > +		if (etmq->prev_packet->sample_type == 0 ||
+> > +		    etmq->prev_packet->sample_type == CS_ETM_TRACE_ON)
+> > +			generate_sample = true;
+> > +
+> > +		/* Generate sample for exception packet */
+> > +		if (etmq->prev_packet->exc == true)
+> > +			generate_sample = true;
+> > +
+> > +		/* Generate sample for normal branch packet */
+> > +		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+> > +		    etmq->prev_packet->last_instr_taken_branch)
+> > +			generate_sample = true;
+> > +
+> > +		if (generate_sample) {
+> > +			ret = cs_etm__synth_branch_sample(etmq);
+> > +			if (ret)
+> > +				return ret;
+> > +		}
+> >   	}
+> >   	if (etm->sample_branches || etm->synth_opts.last_branch) {
+> > @@ -921,12 +943,17 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+> >   static int cs_etm__flush(struct cs_etm_queue *etmq)
+> >   {
+> > +	struct cs_etm_auxtrace *etm = etmq->etm;
+> >   	int err = 0;
+> >   	struct cs_etm_packet *tmp;
+> > -	if (etmq->etm->synth_opts.last_branch &&
+> > -	    etmq->prev_packet &&
+> > -	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
+> > +	if (!etmq->prev_packet)
+> > +		return 0;
+> > +
+> > +	if (etmq->prev_packet->sample_type != CS_ETM_RANGE)
+> > +		return 0;
+> > +
+> > +	if (etmq->etm->synth_opts.last_branch) {
+> >   		/*
+> >   		 * Generate a last branch event for the branches left in the
+> >   		 * circular buffer at the end of the trace.
+> > @@ -939,18 +966,25 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
+> >   		err = cs_etm__synth_instruction_sample(
+> >   			etmq, addr,
+> >   			etmq->period_instructions);
+> > +		if (err)
+> > +			return err;
+> >   		etmq->period_instructions = 0;
+> > +	}
+> > -		/*
+> > -		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
+> > -		 * the next incoming packet.
+> > -		 */
+> > -		tmp = etmq->packet;
+> > -		etmq->packet = etmq->prev_packet;
+> > -		etmq->prev_packet = tmp;
+> > +	if (etm->sample_branches) {
+> > +		err = cs_etm__synth_branch_sample(etmq);
+> > +		if (err)
+> > +			return err;
+> >   	}
+> > -	return err;
+> > +	/*
+> > +	 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
+> > +	 * the next incoming packet.
+> > +	 */
+> > +	tmp = etmq->packet;
+> > +	etmq->packet = etmq->prev_packet;
+> > +	etmq->prev_packet = tmp;
+> > +	return 0;
+> >   }
+> >   static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
