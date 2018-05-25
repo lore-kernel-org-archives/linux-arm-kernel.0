@@ -1,79 +1,58 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 11:48:10 +0100
-Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
- priority masking
-In-Reply-To: <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
- <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
- <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
- <c4e5f8ff-ecde-7b88-8a37-39e47ef22917@arm.com>
- <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
- <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
-Message-ID: <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 25 May 2018 11:48:04 +0100
+Subject: [PATCH v11 08/19] arm64: fpsimd: Eliminate task->mm checks
+In-Reply-To: <87r2m0rqzw.fsf@linaro.org>
+References: <1527181008-13549-1-git-send-email-Dave.Martin@arm.com>
+ <1527181008-13549-9-git-send-email-Dave.Martin@arm.com>
+ <87r2m0rqzw.fsf@linaro.org>
+Message-ID: <20180525104803.GC13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 25/05/18 11:41, Suzuki K Poulose wrote:
-> On 25/05/18 11:39, Julien Thierry wrote:
->>
->>
->> On 25/05/18 11:36, Suzuki K Poulose wrote:
->>> On 25/05/18 11:17, Julien Thierry wrote:
->>>>
->>>>
->>>> On 25/05/18 11:04, Suzuki K Poulose wrote:
->>>>> On 25/05/18 10:49, Julien Thierry wrote:
->>>>>> Add a cpufeature indicating whether a cpu supports masking interrupts
->>>>>> by priority.
->>>>>
->>>>> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
->>>>> the description ?
->>>>
->>>> More or less.
->>>>
->>>> It is just to have an easier condition in the rest of the series. 
->>>> Basically the PRIO masking feature is enabled if we have a GICv3 
->>>> CPUIF working *and* the option was selected at build time. Before 
->>>> this meant that I was checking for the GIC_CPUIF cap inside #ifdefs 
->>>> (and putting alternatives depending on that inside #ifdefs as well).
->>>>
->>>> Having this as a separate feature feels easier to manage in the 
->>>> code. It also makes it clearer at boot time that the kernel will be 
->>>> using irq priorities (although I admit it was not the initial 
->>>> intention):
->>>>
->>>> [??? 0.000000] CPU features: detected: IRQ priority masking
->>>>
->>>>
->>>> But yes that new feature will be detected only if SYSREG_GIC_CPUIF 
->>>> gets detected as well.
->>>
->>> Well, you could always wrap the check like :
->>>
->>> static inline bool system_has_irq_priority_masking(void)
->>> {
->>> ?????return (IS_ENABLED(CONFIG_YOUR_CONFIG) && 
->>> cpus_have_const_cap(HWCAP_SYSREG_GIC_CPUIF));
->>> }
->>>
->>> and use it everywhere.
->>>
->>
->> Yes, but I can't use that in the asm parts that use alternatives and 
->> would need to surround them in #ifdef... :\
+On Fri, May 25, 2018 at 11:04:03AM +0100, Alex Benn?e wrote:
 > 
-> I thought there is _ALTERNATIVE_CFG() to base the alternative depend on 
-> a CONFIG_xxx ?
-> Doesn't that solve the problem ?
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > Currently the FPSIMD handling code uses the condition task->mm ==
+> > NULL as a hint that task has no FPSIMD register context.
+> >
+> > The ->mm check is only there to filter out tasks that cannot
+> > possibly have FPSIMD context loaded, for optimisation purposes.
+> > Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
+> > saving FPSIMD context back to memory.  For these reasons, the ->mm
+> > checks are not useful, providing that TIF_FOREIGN_FPSTATE is
+> > maintained in a consistent way for all threads.
+> >
+> > The context switch logic is already deliberately optimised to defer
+> > reloads of the regs until ret_to_user (or sigreturn as a special
+> > case), and save them only if they have been previously loaded.
+> > These paths are the only places where the wrong_task and wrong_cpu
+> > conditions can be made false, by calling fpsimd_bind_task_to_cpu().
+> > Kernel threads by definition never reach these paths.  As a result,
+> > the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
+> > always yield true for kernel threads.
+> >
+> > This patch removes the redundant checks and special-case code,                  ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread               is scheduled in, and ensures that this flag is set for the init
+> > task.  The fpsimd_flush_task_state() call already present in
+> > copy_thread() ensures the same for any new task.
+> >
+> > With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
+> > ensures that no extra context save work is added for kernel
+> > threads, and eliminates the redundant context saving that may
+> > currently occur for kernel threads that have acquired an mm via
+> > use_mm().
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> Still good (although obviously without the ws damage in the commit).
 
-Right, I didn't see that one. It should work yes.
+Agreed -- I'll coordinate with Marc to make sure that gets fixed.
 
-I'll try that when working on the next version.
+Thanks for the review.
 
-Thanks,
+[...]
 
--- 
-Julien Thierry
+Cheers
+---Dave
