@@ -1,85 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 25 May 2018 16:16:37 +0200
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: Make sure SD1_WP is low
-In-Reply-To: <20180525030153.15986-1-andrew.smirnov@gmail.com>
-References: <20180525030153.15986-1-andrew.smirnov@gmail.com>
-Message-ID: <1527257797.3472.8.camel@pengutronix.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 25 May 2018 10:04:23 -0400
+Subject: [PATCH] PCI: Try to clean up resources via remove if shutdown doesn't
+ exist
+Message-ID: <1527257063-15843-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 24.05.2018, 20:01 -0700 schrieb Andrey Smirnov:
-> Make sure that MX51_PAD_GPIO1_1 does not remain configure as
-> ALT0/SD1_WP (it is out of reset). This is needed because of external
-> pull-up resistor attached to that pad that, when left unchanged, will
-> drive SD1_WP high preventing eSDHC1/eMMC from working correctly.
-> 
-> To fix that add a pinmux configuration line configureing the pad to
-> function as a GPIO. While we are at it, add a corresponding input GPIO
-> hog in an effort to minimize current consumption.
+It is up to a driver to implement shutdown() callback. If shutdown()
+callback is not implemented, PCI device can have pending interrupt and
+even do DMA transactions while the system is going down.
 
-Enabling the input part of the pad also consumes (a small amount of)
-power, if you are after minimizing power consumption, better configure
-the pin as output and drive it in the pull direction.
+If kexec is in use, this can damage the newly booting kexec kernel
+or even prevent it from booting altogether. Fallback to calling the
+remove() callback if shutdown() isn't implemented for a given driver.
 
-> 
-> > Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: Chris Healy <cphealy@gmail.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
-> ?arch/arm/boot/dts/imx51-zii-rdu1.dts | 28 ++++++++++++++++++++++++++++
-> ?1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> index df9eca94d812..d484e7e46b27 100644
-> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> @@ -476,6 +476,17 @@
-> > ?	status = "okay";
-> ?};
-> ?
-> +&gpio1 {
-> > +	unused-sd3-wp-gpio {
-> > +		/*
-> > +		?* See pinctrl_esdhc1 below for more details on this
-> > +		?*/
-> > +		gpio-hog;
-> > +		gpios = <1 GPIO_ACTIVE_HIGH>;
-> > +		input;
-> > +	};
-> +};
-> +
-> ?&i2c2 {
-> > ?	pinctrl-names = "default";
-> > ?	pinctrl-0 = <&pinctrl_i2c2>;
-> @@ -660,6 +671,23 @@
-> > > ?			MX51_PAD_SD1_DATA1__SD1_DATA1		0x20d5
-> > > ?			MX51_PAD_SD1_DATA2__SD1_DATA2		0x20d5
-> > > ?			MX51_PAD_SD1_DATA3__SD1_DATA3		0x20d5
-> > +			/*
-> > +			?* GPIO1_1 is not directly used by eSDHC1 in
-> > +			?* any capacity, but earlier versions of RDU1
-> > +			?* used that pin as WP GPIO for eSDHC3 and
-> > +			?* because of that that pad has an external
-> > +			?* pull-up resistor. This is problematic
-> > +			?* because out of reset the pad is configured
-> > +			?* as ALT0 which serves as SD1_WP, which, when
-> > +			?* pulled high by and external pull-up, will
-> > +			?* inhibit execution of any write request to
-> > +			?* attached eMMC device.
-> > +			?*
-> > +			?* To avoid this problem we configure the pad
-> > +????????????????	?* to ALT1/GPIO and avoid driving SD1_WP
-> +????????????????	?* signal high.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci-driver.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Applying the patch complains about whitespace damage in the above 2
-lines.
-
-Regards,
-Lucas
+diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
+index 6ace470..4ac72e3 100644
+--- a/drivers/pci/pci-driver.c
++++ b/drivers/pci/pci-driver.c
+@@ -475,8 +475,17 @@ static void pci_device_shutdown(struct device *dev)
+ 
+ 	pm_runtime_resume(dev);
+ 
++	/*
++	 * Try shutdown callback if it exists, otherwise fallback to remove
++	 * callback. PCI drivers can do DMA and have pending interrupts.
++	 * Leaving the DMA and interrupts pending could damage the newly
++	 * booting kexec kernel as well as prevent it from booting altogether
++	 * if the pending interrupt is level.
++	 */
+ 	if (drv && drv->shutdown)
+ 		drv->shutdown(pci_dev);
++	else if (drv && drv->remove)
++		drv->remove(pci_dev);
+ 
+ 	/*
+ 	 * If this is a kexec reboot, turn off Bus Master bit on the
+-- 
+2.7.4
