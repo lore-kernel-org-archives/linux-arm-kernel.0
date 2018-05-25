@@ -1,61 +1,64 @@
-From: jwboyer@kernel.org (Josh Boyer)
-Date: Fri, 25 May 2018 08:04:28 -0400
-Subject: qcom: add firmware file for Venus on SDM845
-In-Reply-To: <1527246209-26685-2-git-send-email-vgarodia@codeaurora.org>
-References: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
- <1527246209-26685-2-git-send-email-vgarodia@codeaurora.org>
-Message-ID: <CA+5PVA67tow+prVC55XF4=CbRGXJvPi2SuCMyhRyuw5qt8T6_Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 May 2018 14:12:06 +0200
+Subject: [PATCH v2 5/5] MAINTAINERS: Add Actions Semi S900 pinctrl entries
+In-Reply-To: <20180525050103.3hg3u2v5mvftqhht@linaro.org>
+References: <20180520051736.4842-1-manivannan.sadhasivam@linaro.org>
+ <20180520051736.4842-6-manivannan.sadhasivam@linaro.org>
+ <CACRpkdYF7a-uwye0uwn-pT9Bprj74q1-Pcbq4WLyiE+kYY4j7w@mail.gmail.com>
+ <25d1c303-71d7-8c38-880f-7bb0e133a876@suse.de>
+ <20180525050103.3hg3u2v5mvftqhht@linaro.org>
+Message-ID: <CACRpkdaTQOWA_5nyasxTwE=cGRis+uaLhw66pmkd+qPxMC6FFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 7:03 AM Vikash Garodia <vgarodia@codeaurora.org>
-wrote:
+On Fri, May 25, 2018 at 7:01 AM, Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
 
-> This pull request adds firmware files for Venus h/w codec found on the
-Qualcomm SDM845 chipset.
+> FYI, I have ordered S700 based Cubieboard and will work on adding support for
+> that first. I still don't have access to S500 board yet since it is not
+> available on my region. Will find a way to get this asap.
 
-> The following changes since commit
-2a9b2cf50fb32e36e4fc1586c2f6f1421913b553:
+Awesome, then we can count on some actions action here.
 
->    Merge branch 'for-upstreaming-v1.7.2' of
-https://github.com/felix-cavium/linux-firmware (2018-05-18 08:35:22 -0400)
+>> Also I had been investing efforts in explaining the upstreaming process
+>> to Actions, last in November. I see Thomas Liau and Jeff Chen missing in
+>> CC and I have not seen any Reviewed-by or Acked-by from anyone at
+>> Actions on this and the preceding series. There are more chips than the
+>> one on Linaro's 96board, so I would prefer to assure that the design
+>> works for all. Thus I am very critical of you applying the patches
+>> without waiting for review by Actions.
+>
+> I don't think Actions would be interested in any upstreaming efforts. It
+> is our (comunity) responsibility to add support for that in order to
+> have our boards running mainline kernel and that's what we both have been
+> doing. Moreover I only saw once David Liau responded to your patchset and
+> there isn't much further. So how can you expect the subsystem maintainer's
+> to hold the patch series waiting for a so far silent SoC manufacturer's
+> response?
 
-> are available in the git repository at:
+They are certainly informed now! :D
 
+Actions semi folks, please familiarize yourself with the following:
+https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/tree/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt?h=devel
+https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/tree/drivers/pinctrl/actions?h=devel
 
->    https://github.com/vgarodia/linux-firmware master
+If you have any concerns with this, now is a good time to share them.
 
-> for you to fetch changes up to d6088b9c9d7f49d3c6c43681190889eca0abdcce:
+> I
+> did ask you to add me as Co-Maintainer but you didn't responded to that.
+> I know that I can't send any pull requests to Arnd, but we should sort
+> it out IMO. Also, if you are completely swamped, then I take take up the
+> maintainership role now inorder to keep the things moving. TBH I don't
+> want my patches to be floating for months without any reason.
 
->    qcom: add venus firmware files for v5.2 (2018-05-25 15:16:43 +0530)
+Doing some comainatinership can very well include doing pull
+requests as long as you agree on who does what.
 
-> ----------------------------------------------------------------
-> Vikash Garodia (1):
->        qcom: add venus firmware files for v5.2
+I think it may be a bit late for the next merge window right now,
+but if you simply queue up stuff in some git tree and ask
+Srothwell to include it in linux-next then Andreas can very well
+pull it to his tree from there and then to ARM SoC or you can
+queue patches as well.
 
->   WHENCE                   |   9 +++++++++
->   qcom/venus-5.2/venus.b00 | Bin 0 -> 212 bytes
->   qcom/venus-5.2/venus.b01 | Bin 0 -> 6600 bytes
->   qcom/venus-5.2/venus.b02 | Bin 0 -> 819552 bytes
->   qcom/venus-5.2/venus.b03 | Bin 0 -> 33536 bytes
->   qcom/venus-5.2/venus.b04 |   1 +
->   qcom/venus-5.2/venus.mbn | Bin 0 -> 865408 bytes
->   qcom/venus-5.2/venus.mdt | Bin 0 -> 6812 bytes
->   8 files changed, 10 insertions(+)
->   create mode 100644 qcom/venus-5.2/venus.b00
->   create mode 100644 qcom/venus-5.2/venus.b01
->   create mode 100644 qcom/venus-5.2/venus.b02
->   create mode 100644 qcom/venus-5.2/venus.b03
->   create mode 100644 qcom/venus-5.2/venus.b04
->   create mode 100644 qcom/venus-5.2/venus.mbn
->   create mode 100644 qcom/venus-5.2/venus.mdt
-
-The venus.mbn file isn't mentioned in WHENCE:
-
-[jwboyer at vader linux-firmware]$ ./check_whence.py
-E: qcom/venus-5.2/venus.mbn not listed in WHENCE
-[jwboyer at vader linux-firmware]$
-
-Can you fix that up and let me know when to re-pull?
-
-josh
+Yours,
+Linus Walleij
