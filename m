@@ -1,44 +1,35 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 25 May 2018 11:17:45 +0100
-Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
- priority masking
-In-Reply-To: <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
- <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
-Message-ID: <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 25 May 2018 15:48:39 +0530
+Subject: [PATCH] mmc: sdhci-*: Don't emit error msg if sdhci_add_host()
+ fails
+In-Reply-To: <20180525151509.0270dbe1@xhacker.debian>
+References: <20180525151509.0270dbe1@xhacker.debian>
+Message-ID: <20180525101839.vfzyhyt5uwduhdcc@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 25/05/18 11:04, Suzuki K Poulose wrote:
-> On 25/05/18 10:49, Julien Thierry wrote:
->> Add a cpufeature indicating whether a cpu supports masking interrupts
->> by priority.
+On 25-05-18, 15:15, Jisheng Zhang wrote:
+> I noticed below error msg with sdhci-pxav3 on some berlin platforms:
 > 
-> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
-> the description ?
+> [.....] sdhci-pxav3 f7ab0000.sdhci failed to add host
+> 
+> It is due to getting related vmmc or vqmmc regulator returns
+> -EPROBE_DEFER. It doesn't matter at all but it's confusing.
+> 
+> From another side, if driver probing fails and the error number isn't
+> -EPROBE_DEFER, the core will tell us something as below:
+> 
+> [.....] sdhci-pxav3: probe of f7ab0000.sdhci failed with error -EXX
+> 
+> So it's not necessary to emit error msg if sdhci_add_host() fails. And
+> some other sdhci host drivers also have this issue, let's fix them
+> together.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/mmc/host/sdhci-spear.c    | 4 +---
 
-More or less.
-
-It is just to have an easier condition in the rest of the series. 
-Basically the PRIO masking feature is enabled if we have a GICv3 CPUIF 
-working *and* the option was selected at build time. Before this meant 
-that I was checking for the GIC_CPUIF cap inside #ifdefs (and putting 
-alternatives depending on that inside #ifdefs as well).
-
-Having this as a separate feature feels easier to manage in the code. It 
-also makes it clearer at boot time that the kernel will be using irq 
-priorities (although I admit it was not the initial intention):
-
-[    0.000000] CPU features: detected: IRQ priority masking
-
-
-But yes that new feature will be detected only if SYSREG_GIC_CPUIF gets 
-detected as well.
-
-Cheers,
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-Julien Thierry
+viresh
