@@ -1,157 +1,220 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 25 May 2018 15:51:07 +0800
-Subject: [PATCH RESEND V4 5/9] clk: imx: add composite clk support
+Date: Fri, 25 May 2018 15:51:08 +0800
+Subject: [PATCH RESEND V4 6/9] dt-bindings: clock: add imx7ulp clock binding
+ doc
 In-Reply-To: <1527234671-31755-1-git-send-email-aisheng.dong@nxp.com>
 References: <1527234671-31755-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1527234671-31755-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1527234671-31755-7-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx composite clk is designed for Peripheral Clock Control (PCC)
-module observed in IMX ULP SoC series. e.g. i.MX7ULP.
+i.MX7ULP Clock functions are under joint control of the System
+Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+modules, and Core Mode Controller (CMC)1 blocks
 
-NOTE pcc can only be operated when clk is gated.
+Note IMX7ULP has two clock domains: M4 and A7. This binding doc
+is only for A7 clock domain.
 
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Anson Huang <Anson.Huang@nxp.com>
 Cc: Bai Ping <ping.bai@nxp.com>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
 ChangeLog:
 v2->v3:
  * no changes
-v1->v2:
- * remove an unneeded blank line change
- * use clk_hw_register
+v1->v2: no changes
 ---
- drivers/clk/imx/Makefile        |  1 +
- drivers/clk/imx/clk-composite.c | 85 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk.h           |  6 +++
- 3 files changed, 92 insertions(+)
- create mode 100644 drivers/clk/imx/clk-composite.c
+ .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++++++++
+ include/dt-bindings/clock/imx7ulp-clock.h          | 105 +++++++++++++++++++++
+ 2 files changed, 167 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+ create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
 
-diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index e5b0d42..f4da12c 100644
---- a/drivers/clk/imx/Makefile
-+++ b/drivers/clk/imx/Makefile
-@@ -4,6 +4,7 @@ obj-y += \
- 	clk.o \
- 	clk-busy.o \
- 	clk-cpu.o \
-+	clk-composite.o \
- 	clk-fixup-div.o \
- 	clk-fixup-mux.o \
- 	clk-gate-exclusive.o \
-diff --git a/drivers/clk/imx/clk-composite.c b/drivers/clk/imx/clk-composite.c
+diff --git a/Documentation/devicetree/bindings/clock/imx7ulp-clock.txt b/Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
 new file mode 100644
-index 0000000..297974b
+index 0000000..76ea3c7
 --- /dev/null
-+++ b/drivers/clk/imx/clk-composite.c
-@@ -0,0 +1,85 @@
-+// SPDX-License-Identifier: GPL-2.0+
++++ b/Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+@@ -0,0 +1,62 @@
++* Clock bindings for Freescale i.MX7ULP
++
++i.MX7ULP Clock functions are under joint control of the System
++Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
++modules, and Core Mode Controller (CMC)1 blocks
++
++The clocking scheme provides clear separation between M4 domain
++and A7 domain. Except for a few clock sources shared between two
++domains, such as the System Oscillator clock, the Slow IRC (SIRC),
++and and the Fast IRC clock (FIRCLK), clock sources and clock
++management are separated and contained within each domain.
++
++M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
++A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
++
++Note: this binding doc is only for A7 clock domain.
++
++Required properties:
++
++- compatible:	Should be "fsl,imx7ulp-clock".
++- reg : 	Should contain registers location and length for scg1,
++		pcc2 and pcc3.
++- reg-names:	Should contain the according reg names "scg1", "pcc2"
++		and "pcc3".
++- #clock-cells:	Should be <1>.
++- clocks:	Should contain the fixed input clocks.
++- clock-name:   Should contain the following clock names:"rsoc", "sosc",
++		"sirc", "firc", "upll", "mpll".
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.
++See include/dt-bindings/clock/imx7ulp-clock.h
++for the full list of i.MX7ULP clock IDs.
++
++Examples:
++
++#include <dt-bindings/clock/imx7ulp-clock.h>
++
++clks: scg1 at 403e0000 {
++	compatible = "fsl,imx7ulp-clock";
++	reg = <0x403e0000 0x10000>
++	      <0x403f0000 0x10000>
++	      <0x40b30000 0x10000>;
++	reg-names = "scg1", "pcc2", "pcc3";
++	clocks = <&rsoc>, <&sosc>, <&sirc>,
++		 <&firc>, <&upll>, <&mpll>;
++	clock-names = "rsoc", "sosc", "sirc",
++		      "firc", "upll", "mpll";
++	#clock-cells = <1>;
++};
++
++usdhc1: usdhc at 40380000 {
++	compatible = "fsl,imx7ulp-usdhc";
++	reg = <0x40380000 0x10000>;
++	interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
++		 <&clks IMX7ULP_CLK_NIC1_DIV>,
++		 <&clks IMX7ULP_CLK_USDHC1>;
++	clock-names ="ipg", "ahb", "per";
++	bus-width = <4>;
++	status = "disabled";
++};
+diff --git a/include/dt-bindings/clock/imx7ulp-clock.h b/include/dt-bindings/clock/imx7ulp-clock.h
+new file mode 100644
+index 0000000..2b6a29d
+--- /dev/null
++++ b/include/dt-bindings/clock/imx7ulp-clock.h
+@@ -0,0 +1,105 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017~2018 NXP
 + *
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
++#ifndef __DT_BINDINGS_CLOCK_IMX7ULP_H
++#define __DT_BINDINGS_CLOCK_IMX7ULP_H
 +
-+#define PCG_PCS_SHIFT	24
-+#define PCG_PCS_MASK	0x7
-+#define PCG_CGC_SHIFT	30
-+#define PCG_FRAC_SHIFT	3
-+#define PCG_FRAC_WIDTH	1
-+#define PCG_FRAC_MASK	BIT(3)
-+#define PCG_PCD_SHIFT	0
-+#define PCG_PCD_WIDTH	3
-+#define PCG_PCD_MASK	0x7
++#define IMX7ULP_CLK_DUMMY		0
++#define IMX7ULP_CLK_ROSC		1
++#define IMX7ULP_CLK_SOSC		2
++#define IMX7ULP_CLK_FIRC		3
 +
-+struct clk_hw *imx_clk_composite(const char *name,
-+			      const char * const *parent_names,
-+			      int num_parents, bool mux_present,
-+			      bool rate_present, bool gate_present,
-+			      void __iomem *reg)
-+{
-+	struct clk_hw *mux_hw = NULL, *fd_hw = NULL, *gate_hw = NULL;
-+	struct clk_fractional_divider *fd = NULL;
-+	struct clk_gate *gate = NULL;
-+	struct clk_mux *mux = NULL;
-+	struct clk_hw *hw;
++/* SCG1 */
++#define IMX7ULP_CLK_SPLL_PRE_SEL	4
++#define IMX7ULP_CLK_SPLL_PRE_DIV	5
++#define IMX7ULP_CLK_SPLL		6
++#define IMX7ULP_CLK_SPLL_POST_DIV1	7
++#define IMX7ULP_CLK_SPLL_POST_DIV2	8
++#define IMX7ULP_CLK_SPLL_PFD0		9
++#define IMX7ULP_CLK_SPLL_PFD1		10
++#define IMX7ULP_CLK_SPLL_PFD2		11
++#define IMX7ULP_CLK_SPLL_PFD3		12
++#define IMX7ULP_CLK_SPLL_PFD_SEL	13
++#define IMX7ULP_CLK_SPLL_SEL		14
++#define IMX7ULP_CLK_APLL_PRE_SEL	15
++#define IMX7ULP_CLK_APLL_PRE_DIV	16
++#define IMX7ULP_CLK_APLL		17
++#define IMX7ULP_CLK_APLL_POST_DIV1	18
++#define IMX7ULP_CLK_APLL_POST_DIV2	19
++#define IMX7ULP_CLK_APLL_PFD0		20
++#define IMX7ULP_CLK_APLL_PFD1		21
++#define IMX7ULP_CLK_APLL_PFD2		22
++#define IMX7ULP_CLK_APLL_PFD3		23
++#define IMX7ULP_CLK_APLL_PFD_SEL	24
++#define IMX7ULP_CLK_APLL_SEL		25
++#define IMX7ULP_CLK_UPLL		26
++#define IMX7ULP_CLK_SYS_SEL		27
++#define IMX7ULP_CLK_CORE_DIV		28
++#define IMX7ULP_CLK_BUS_DIV		29
++#define IMX7ULP_CLK_PLAT_DIV		30
++#define IMX7ULP_CLK_DDR_SEL		31
++#define IMX7ULP_CLK_DDR_DIV		32
++#define IMX7ULP_CLK_NIC_SEL		33
++#define IMX7ULP_CLK_NIC0_DIV		34
++#define IMX7ULP_CLK_GPU_DIV		35
++#define IMX7ULP_CLK_NIC1_DIV		36
++#define IMX7ULP_CLK_NIC1_BUS_DIV	37
++#define IMX7ULP_CLK_NIC1_EXT_DIV	38
 +
-+	if (mux_present) {
-+		mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+		if (!mux)
-+			return ERR_PTR(-ENOMEM);
-+		mux_hw = &mux->hw;
-+		mux->reg = reg;
-+		mux->shift = PCG_PCS_SHIFT;
-+		mux->mask = PCG_PCS_MASK;
-+	}
++/* PCG2 */
++#define IMX7ULP_CLK_DMA1		39
++#define IMX7ULP_CLK_RGPIO2P1		40
++#define IMX7ULP_CLK_FLEXBUS		41
++#define IMX7ULP_CLK_SEMA42_1		42
++#define IMX7ULP_CLK_DMA_MUX1		43
++#define IMX7ULP_CLK_SNVS		44
++#define IMX7ULP_CLK_CAAM		45
++#define IMX7ULP_CLK_LPTPM4		46
++#define IMX7ULP_CLK_LPTPM5		47
++#define IMX7ULP_CLK_LPIT1		48
++#define IMX7ULP_CLK_LPSPI2		49
++#define IMX7ULP_CLK_LPSPI3		50
++#define IMX7ULP_CLK_LPI2C4		51
++#define IMX7ULP_CLK_LPI2C5		52
++#define IMX7ULP_CLK_LPUART4		53
++#define IMX7ULP_CLK_LPUART5		54
++#define IMX7ULP_CLK_FLEXIO1		55
++#define IMX7ULP_CLK_USB0		56
++#define IMX7ULP_CLK_USB1		57
++#define IMX7ULP_CLK_USB_PHY		58
++#define IMX7ULP_CLK_USB_PL301		59
++#define IMX7ULP_CLK_USDHC0		60
++#define IMX7ULP_CLK_USDHC1		61
++#define IMX7ULP_CLK_WDG1		62
++#define IMX7ULP_CLK_WDG2		63
 +
-+	if (rate_present) {
-+		fd = kzalloc(sizeof(*fd), GFP_KERNEL);
-+		if (!fd) {
-+			kfree(mux);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+		fd_hw = &fd->hw;
-+		fd->reg = reg;
-+		fd->mshift = PCG_FRAC_SHIFT;
-+		fd->mwidth = PCG_FRAC_WIDTH;
-+		fd->mmask  = PCG_FRAC_MASK;
-+		fd->nshift = PCG_PCD_SHIFT;
-+		fd->nwidth = PCG_PCD_WIDTH;
-+		fd->nmask = PCG_PCD_MASK;
-+		fd->flags = CLK_FRAC_DIVIDER_ZERO_BASED;
-+	}
++/* PCG3 */
++#define IMX7ULP_CLK_LPTPM6		64
++#define IMX7ULP_CLK_LPTPM7		65
++#define IMX7ULP_CLK_LPI2C6		66
++#define IMX7ULP_CLK_LPI2C7		67
++#define IMX7ULP_CLK_LPUART6		68
++#define IMX7ULP_CLK_LPUART7		69
++#define IMX7ULP_CLK_VIU			70
++#define IMX7ULP_CLK_DSI			71
++#define IMX7ULP_CLK_LCDIF		72
++#define IMX7ULP_CLK_MMDC		73
++#define IMX7ULP_CLK_PCTLC		74
++#define IMX7ULP_CLK_PCTLD		75
++#define IMX7ULP_CLK_PCTLE		76
++#define IMX7ULP_CLK_PCTLF		77
++#define IMX7ULP_CLK_GPU3D		78
++#define IMX7ULP_CLK_GPU2D		79
++#define IMX7ULP_CLK_MIPI_PLL		80
++#define IMX7ULP_CLK_SIRC		81
++#define IMX7ULP_CLK_SOSC_BUS_CLK	82
++#define IMX7ULP_CLK_FIRC_BUS_CLK	83
++#define IMX7ULP_CLK_SPLL_BUS_CLK	84
 +
-+	if (gate_present) {
-+		gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+		if (!gate) {
-+			kfree(mux);
-+			kfree(fd);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+		gate_hw = &gate->hw;
-+		gate->reg = reg;
-+		gate->bit_idx = PCG_CGC_SHIFT;
-+	}
++#define IMX7ULP_CLK_END			85
 +
-+	hw = clk_hw_register_composite(NULL, name, parent_names, num_parents,
-+				       mux_hw, &clk_mux_ops, fd_hw,
-+				       &clk_fractional_divider_ops, gate_hw,
-+				       &clk_gate_ops, CLK_SET_RATE_GATE |
-+				       CLK_SET_PARENT_GATE);
-+	if (IS_ERR(hw)) {
-+		kfree(mux);
-+		kfree(fd);
-+		kfree(gate);
-+	}
-+
-+	return hw;
-+}
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index a5a9374..bc43f68 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -71,6 +71,12 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
- 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
- 			     const char **parent_names, int num_parents);
- 
-+struct clk_hw *imx_clk_composite(const char *name,
-+				 const char * const *parent_names,
-+				 int num_parents, bool mux_present,
-+				 bool rate_present, bool gate_present,
-+				 void __iomem *reg);
-+
- struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
- 				  void __iomem *reg, u8 shift, u8 width,
- 				  void (*fixup)(u32 *val));
++#endif /* __DT_BINDINGS_CLOCK_IMX7ULP_H */
 -- 
 2.7.4
