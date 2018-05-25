@@ -1,32 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 May 2018 18:07:15 +0200
-Subject: [PATCH] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE dependency
-Message-ID: <20180525160729.92026-1-arnd@arndb.de>
+Date: Fri, 25 May 2018 18:09:13 +0200
+Subject: [PATCH 1/2] ARM: stm32: Don't select DMA unconditionally on
+ STM32MP157C
+Message-ID: <20180525160926.150713-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that option, we run into a link failure:
+The patch that enabled these had no useful changelog that explains
+why it is done, and it causes a build warning:
 
-drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
-hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
+WARNING: unmet direct dependencies detected for STM32_DMA
+  Depends on [n]: DMADEVICES [=n] && (ARCH_STM32 [=y] || COMPILE_TEST [=y])
+  Selected by [y]:
+  - MACH_STM32MP157 [=y] && ARCH_STM32 [=y] && ARCH_MULTI_V7 [=y]
 
-Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
+Generally, platforms should not select arbitrary drivers, so let's
+just revert that change.
+
+Fixes: de6037fa207f ("ARM: stm32: Select DMA, DMAMUX and MDMA support on STM32MP157C")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/usb/gadget/udc/aspeed-vhub/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-stm32/Kconfig | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/aspeed-vhub/Kconfig b/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
-index f0cdf89b8503..83ba8a2eb6af 100644
---- a/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
-+++ b/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
-@@ -2,6 +2,7 @@
- config USB_ASPEED_VHUB
- 	tristate "Aspeed vHub UDC driver"
- 	depends on ARCH_ASPEED || COMPILE_TEST
-+	depends on USB_LIBCOMPOSITE
- 	help
- 	  USB peripheral controller for the Aspeed AST2500 family
- 	  SoCs supporting the "vHub" functionality and USB2.0
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index 82a93b8d9ae6..713c068b953f 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -46,9 +46,6 @@ if ARCH_MULTI_V7
+ 
+ config MACH_STM32MP157
+ 	bool "STMicroelectronics STM32MP157"
+-	select STM32_DMA
+-	select STM32_DMAMUX
+-	select STM32_MDMA
+ 	default y
+ 
+ endif # ARMv7-A
 -- 
 2.9.0
