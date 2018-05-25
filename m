@@ -1,107 +1,180 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Fri, 25 May 2018 16:34:06 +0800
-Subject: [PATCH] perf: hisi: fix uncore PMU index ID
-In-Reply-To: <20180523164219.GG2983@arm.com>
-References: <1526901317-52248-1-git-send-email-zhangshaokun@hisilicon.com>
- <20180521170554.GE21034@arm.com>
- <a301d72f-687c-0c4f-1d44-83e5bbad5e60@hisilicon.com>
- <20180523164219.GG2983@arm.com>
-Message-ID: <3c5215c8-8ad6-8e6d-7878-7fcd3a0cfad5@hisilicon.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Fri, 25 May 2018 10:35:37 +0200
+Subject: [PATCH v2 08/13] ASoC: pxa: remove the dmaengine compat need
+In-Reply-To: <20180524070703.11901-9-robert.jarzmik@free.fr>
+References: <20180524070703.11901-1-robert.jarzmik@free.fr>
+ <20180524070703.11901-9-robert.jarzmik@free.fr>
+Message-ID: <5bc2aa06-7939-1ca4-6704-30f307edcda4@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 2018/5/24 0:42, Will Deacon wrote:
-> On Tue, May 22, 2018 at 05:18:51PM +0800, Zhangshaokun wrote:
->> On 2018/5/22 1:05, Will Deacon wrote:
->>> Whilst I'd normally just accept PMU driver submissions for vendor PMUs,
->>> this part rang my alarm bells:
->>>
->>>> diff --git a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->>>> index 443906e..dcd8e77 100644
->>>> --- a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->>>> +++ b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->>>> @@ -238,19 +238,10 @@ MODULE_DEVICE_TABLE(acpi, hisi_hha_pmu_acpi_match);
->>>>  static int hisi_hha_pmu_init_data(struct platform_device *pdev,
->>>>  				  struct hisi_pmu *hha_pmu)
->>>>  {
->>>> -	unsigned long long id;
->>>>  	struct resource *res;
->>>> -	acpi_status status;
->>>> -
->>>> -	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
->>>> -				       "_UID", NULL, &id);
->>>> -	if (ACPI_FAILURE(status))
->>>> -		return -EINVAL;
->>>> -
->>>> -	hha_pmu->index_id = id;
->>>>  
->>>>  	/*
->>>> -	 * Use SCCL_ID and UID to identify the HHA PMU, while
->>>> +	 * Use SCCL_ID and HHA index ID to identify the HHA PMU, while
->>>>  	 * SCCL_ID is in MPIDR[aff2].
->>>>  	 */
->>>>  	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
->>>> @@ -258,6 +249,13 @@ static int hisi_hha_pmu_init_data(struct platform_device *pdev,
->>>>  		dev_err(&pdev->dev, "Can not read hha sccl-id!\n");
->>>>  		return -EINVAL;
->>>>  	}
->>>> +
->>>> +	if (device_property_read_u32(&pdev->dev, "hisilicon,idx-id",
->>>> +				     &hha_pmu->index_id)) {
->>>> +		dev_err(&pdev->dev, "Can not read hha index-id!\n");
->>>> +		return -EINVAL;
->>>> +	}
->>>
->>> Is this a new DT property? If so, please can you update the binding
->>> documentation and get an Ack from a DT maintainer? It's not clear to me
->>
->> No, it is not a DT property. We don't support DT mode for this platform and
->> only support ACPI mode.
+On Thursday, May 24, 2018 09:06 AM, Robert Jarzmik wrote:
+> As the pxa architecture switched towards the dmaengine slave map, the
+> old compatibility mechanism to acquire the dma requestor line number and
+> priority are not needed anymore.
 > 
-> Hmm, but by using the firmware-agnostic "device_property_read_u32"
-> interface, aren't you implicitly supporting it via DT as well? In fact,
-> don't you now fail the probe if this new property isn't present? Isn't
-> that a regression?
+> This patch simplifies the dma resource acquisition, using the more
+> generic function dma_request_slave_channel().
 > 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Even though we don't support DT, using unified device interface seems a better practice
-in general. We could use acpi_dev_get_property(), but not much gain.
-As for regression, this never worked anyway, right? And this is for a new platform with
-little distribution, so not much pain to upgrade the FW.
+Reviewed-by: Daniel Mack <daniel@zonque.org>
 
->>> what a "hisilicon,idx-id" is, nor how I would generate on from firmware.
->>>
->>
->> For HiSilicon this platform, it supports multi-sccl. each sccl has more than one uncore
->> PMUs. Like HHA uncore PMUs, each sccl has 2-HHA PMUs and idx-id is in _DSD package and
->> used to distinguish different HHA PMUs with the same sccl, as follow:
->>     Name (_DSD, Package () {
->>       ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->>       Package () {
->>         Package () {"hisilicon,scl-id", 0x03},
->>         Package () {"hisilicon,idx-id", 0x00},
->>       }
->>     })
+> ---
+>   sound/arm/pxa2xx-ac97.c     | 14 ++------------
+>   sound/arm/pxa2xx-pcm-lib.c  |  6 +++---
+>   sound/soc/pxa/pxa2xx-ac97.c | 32 +++++---------------------------
+>   sound/soc/pxa/pxa2xx-i2s.c  |  6 ++----
+>   4 files changed, 12 insertions(+), 46 deletions(-)
 > 
-> I'm still none the wiser about what this actually is. How is new _DSD crud
-> supposed to be documented?
-> 
-
-For instance:
-when run perf list | grep hisi_sccl3_hha
-hisi_sccl3_hha0/rx_outer/ [kernel PMU event]
-------------------------------------------
-hisi_sccl3_hha1/rx_outer/ [kernel PMU event]
-0 and 1 are the hha index in the same sccl that sccl-id is 3.
-We document as hisi_sccl{X}_<l3c{Y}/hha{Y}/ddrc{Y}> in
-Documentation/perf/hisi-pmu.txt
-
-Thanks,
-Shaokun
-
-> Will
-> 
-> .
+> diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
+> index 4bc244c40f80..236a63cdaf9f 100644
+> --- a/sound/arm/pxa2xx-ac97.c
+> +++ b/sound/arm/pxa2xx-ac97.c
+> @@ -63,28 +63,18 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+>   	.reset	= pxa2xx_ac97_legacy_reset,
+>   };
+>   
+> -static struct pxad_param pxa2xx_ac97_pcm_out_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 12,
+> -};
+> -
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_out = {
+>   	.addr		= __PREG(PCDR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +	.chan_name	= "pcm_pcm_stereo_out",
+>   	.maxburst	= 32,
+> -	.filter_data	= &pxa2xx_ac97_pcm_out_req,
+> -};
+> -
+> -static struct pxad_param pxa2xx_ac97_pcm_in_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 11,
+>   };
+>   
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_in = {
+>   	.addr		= __PREG(PCDR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +	.chan_name	= "pcm_pcm_stereo_in",
+>   	.maxburst	= 32,
+> -	.filter_data	= &pxa2xx_ac97_pcm_in_req,
+>   };
+>   
+>   static struct snd_pcm *pxa2xx_ac97_pcm;
+> diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
+> index e8da3b8ee721..dcbe7ecc1835 100644
+> --- a/sound/arm/pxa2xx-pcm-lib.c
+> +++ b/sound/arm/pxa2xx-pcm-lib.c
+> @@ -125,9 +125,9 @@ int __pxa2xx_pcm_open(struct snd_pcm_substream *substream)
+>   	if (ret < 0)
+>   		return ret;
+>   
+> -	return snd_dmaengine_pcm_open_request_chan(substream,
+> -					pxad_filter_fn,
+> -					dma_params->filter_data);
+> +	return snd_dmaengine_pcm_open(
+> +		substream, dma_request_slave_channel(rtd->cpu_dai->dev,
+> +						     dma_params->chan_name));
+>   }
+>   EXPORT_SYMBOL(__pxa2xx_pcm_open);
+>   
+> diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+> index 803818aabee9..1b41c0f2a8fb 100644
+> --- a/sound/soc/pxa/pxa2xx-ac97.c
+> +++ b/sound/soc/pxa/pxa2xx-ac97.c
+> @@ -68,61 +68,39 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+>   	.reset	= pxa2xx_ac97_cold_reset,
+>   };
+>   
+> -static struct pxad_param pxa2xx_ac97_pcm_stereo_in_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 11,
+> -};
+> -
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_in = {
+>   	.addr		= __PREG(PCDR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +	.chan_name	= "pcm_pcm_stereo_in",
+>   	.maxburst	= 32,
+> -	.filter_data	= &pxa2xx_ac97_pcm_stereo_in_req,
+> -};
+> -
+> -static struct pxad_param pxa2xx_ac97_pcm_stereo_out_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 12,
+>   };
+>   
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_out = {
+>   	.addr		= __PREG(PCDR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +	.chan_name	= "pcm_pcm_stereo_out",
+>   	.maxburst	= 32,
+> -	.filter_data	= &pxa2xx_ac97_pcm_stereo_out_req,
+>   };
+>   
+> -static struct pxad_param pxa2xx_ac97_pcm_aux_mono_out_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 10,
+> -};
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_out = {
+>   	.addr		= __PREG(MODR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
+> +	.chan_name	= "pcm_aux_mono_out",
+>   	.maxburst	= 16,
+> -	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_out_req,
+>   };
+>   
+> -static struct pxad_param pxa2xx_ac97_pcm_aux_mono_in_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 9,
+> -};
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_in = {
+>   	.addr		= __PREG(MODR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
+> +	.chan_name	= "pcm_aux_mono_in",
+>   	.maxburst	= 16,
+> -	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_in_req,
+>   };
+>   
+> -static struct pxad_param pxa2xx_ac97_pcm_aux_mic_mono_req = {
+> -	.prio = PXAD_PRIO_LOWEST,
+> -	.drcmr = 8,
+> -};
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_mic_mono_in = {
+>   	.addr		= __PREG(MCDR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
+> +	.chan_name	= "pcm_aux_mic_mono",
+>   	.maxburst	= 16,
+> -	.filter_data	= &pxa2xx_ac97_pcm_aux_mic_mono_req,
+>   };
+>   
+>   static int pxa2xx_ac97_hifi_startup(struct snd_pcm_substream *substream,
+> diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
+> index 3fb60baf6eab..e7184de0de04 100644
+> --- a/sound/soc/pxa/pxa2xx-i2s.c
+> +++ b/sound/soc/pxa/pxa2xx-i2s.c
+> @@ -82,20 +82,18 @@ static struct pxa_i2s_port pxa_i2s;
+>   static struct clk *clk_i2s;
+>   static int clk_ena = 0;
+>   
+> -static unsigned long pxa2xx_i2s_pcm_stereo_out_req = 3;
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_out = {
+>   	.addr		= __PREG(SADR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +	.chan_name	= "tx",
+>   	.maxburst	= 32,
+> -	.filter_data	= &pxa2xx_i2s_pcm_stereo_out_req,
+>   };
+>   
+> -static unsigned long pxa2xx_i2s_pcm_stereo_in_req = 2;
+>   static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_in = {
+>   	.addr		= __PREG(SADR),
+>   	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +	.chan_name	= "rx",
+>   	.maxburst	= 32,
+> -	.filter_data	= &pxa2xx_i2s_pcm_stereo_in_req,
+>   };
+>   
+>   static int pxa2xx_i2s_startup(struct snd_pcm_substream *substream,
 > 
