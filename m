@@ -1,66 +1,79 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2018 12:38:04 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.18
-In-Reply-To: <cover.1526549153.git.horms+renesas@verge.net.au>
-References: <cover.1526549153.git.horms+renesas@verge.net.au>
-Message-ID: <20180526193804.hkfekw5dwspkm4dg@localhost>
+Date: Sat, 26 May 2018 14:01:37 -0700
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20180526210137.wbjji6vfi63k7c3a@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 01:16:44PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC DT bindings updates for v4.18.
-> 
-> 
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.18
-> 
-> for you to fetch changes up to c92db4a4a4c6c176c34604e456d6d355803d9ada:
-> 
->   dt-bindings: arm: document Renesas V3HSK board bindings (2018-05-15 09:17:45 +0200)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Bindings Updates for v4.18
-> 
-> Document bindings for:
-> 
-> * V3H Starter Kit, a board used with the R-Car V3H (r8a77980) SoC
-> * R-Car E3 (R8A77990) SoC and its Ebisu board
-> * iWave Systems RZ/G1C Single Board Computer (iW-RainboW-G23S)
->   which uses an RZ/G1C (R8A77470) SoC
-> * RZ/G1M (R8A7743) and RZ/G1N (R8A7744) CMT support
-> 
-> Cleanup:
-> * Consistently name r8a77965 as R-Car M3-N
-> 
-> ----------------------------------------------------------------
-> Biju Das (1):
->       dt-bindings: arm: Document iW-RainboW-G23S single board computer
-> 
-> Fabrizio Castro (1):
->       dt-bindings: timer: renesas, cmt: Document r8a774[35] CMT support
-> 
-> Sergei Shtylyov (1):
->       dt-bindings: arm: document Renesas V3HSK board bindings
-> 
-> Simon Horman (1):
->       dt-bindings: arm: consistently name r8a77965 as M3-N
-> 
-> Yoshihiro Shimoda (2):
->       dt-bindings: arm: Document R-Car E3 SoC DT bindings
->       dt-bindings: arm: Document Renesas Ebisu board DT bindings
-> 
->  Documentation/devicetree/bindings/arm/shmobile.txt      | 10 +++++++++-
->  Documentation/devicetree/bindings/timer/renesas,cmt.txt | 14 ++++++++++----
->  2 files changed, 19 insertions(+), 5 deletions(-)
+Hi Linus,
 
-Merged, thanks.
+
+Please merge. Thanks!
 
 
 -Olof
+
+
+The following changes since commit 771c577c23bac90597c685971d7297ea00f99d11:
+
+  Linux 4.17-rc6 (2018-05-20 15:31:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to e5dd61546a777d19d4fe35e2d0a2b664ca49f6b2:
+
+  Merge tag 'hisi-fixes-for-4.17v2' of git://github.com/hisilicon/linux-hisi into fixes (2018-05-26 12:12:44 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.17-rc
+
+A few more fixes for v4.17:
+ - A fix for a crash in scm_call_atomic on qcom platforms
+ - Display fix for Allwinner A10
+ - A fix that re-enables ethernet on Allwinner H3 (C.H.I.P et al)
+ - A fix for eMMC corruption on hikey
+ - i2c-gpio descriptor tables for ixp4xx
+ + a small typo fix
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      ARM: dts: sun8i: h3: Re-enable EMAC on Orange Pi One
+
+Colin Ian King (1):
+      ARM: sun8i: v3s: fix spelling mistake: "disbaled" -> "disabled"
+
+John Stultz (1):
+      arm64: dts: hikey: Fix eMMC corruption regression
+
+Linus Walleij (1):
+      ARM: Fix i2c-gpio GPIO descriptor tables
+
+Niklas Cassel (1):
+      firmware: qcom: scm: Fix crash in qcom_scm_call_atomic1()
+
+Olof Johansson (3):
+      Merge tag 'sunxi-fixes-for-4.17' of https://git.kernel.org/.../sunxi/linux into fixes
+      Merge tag 'qcom-fixes-for-4.17-rc7' of git://git.kernel.org/.../agross/linux into fixes
+      Merge tag 'hisi-fixes-for-4.17v2' of git://github.com/hisilicon/linux-hisi into fixes
+
+Pascal Roeleven (1):
+      ARM: dts: sun4i: Fix incorrect clocks for displays
+
+ arch/arm/boot/dts/sun4i-a10.dtsi                   | 6 +++---
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 1 +
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 2 +-
+ arch/arm/mach-ep93xx/core.c                        | 2 +-
+ arch/arm/mach-ixp4xx/avila-setup.c                 | 2 +-
+ arch/arm/mach-ixp4xx/dsmg600-setup.c               | 2 +-
+ arch/arm/mach-ixp4xx/fsg-setup.c                   | 2 +-
+ arch/arm/mach-ixp4xx/ixdp425-setup.c               | 2 +-
+ arch/arm/mach-ixp4xx/nas100d-setup.c               | 2 +-
+ arch/arm/mach-ixp4xx/nslu2-setup.c                 | 2 +-
+ arch/arm/mach-pxa/palmz72.c                        | 2 +-
+ arch/arm/mach-pxa/viper.c                          | 4 ++--
+ arch/arm/mach-sa1100/simpad.c                      | 2 +-
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     | 1 -
+ drivers/firmware/qcom_scm-32.c                     | 8 ++++----
+ 15 files changed, 20 insertions(+), 20 deletions(-)
