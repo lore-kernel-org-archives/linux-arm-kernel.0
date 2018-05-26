@@ -1,38 +1,21 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sat, 26 May 2018 14:34:16 +1000
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <80df07c8-b89c-503e-ad25-9f235cb08038@st.com>
-References: <20180515072217.0a2ffe25@canb.auug.org.au>
- <80df07c8-b89c-503e-ad25-9f235cb08038@st.com>
-Message-ID: <20180526143416.5eeea2d8@canb.auug.org.au>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 25 May 2018 21:43:32 -0700
+Subject: [PATCH 0/3] Dts nodes for Keystone2 hw_rng driver
+In-Reply-To: <1527167538-29837-1-git-send-email-vitalya@ti.com>
+References: <1527167538-29837-1-git-send-email-vitalya@ti.com>
+Message-ID: <45e0a1c8-739e-0a38-bd86-047c37551f62@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On Tue, 15 May 2018 09:15:23 +0200 Alexandre Torgue <alexandre.torgue@st.com> wrote:
->
-> On 05/14/2018 11:22 PM, Stephen Rothwell wrote:
-> > 
-> > Commit
-> > 
-> >    949a0c0dec85 ("ARM: dts: stm32: add USB Host (USBH) support to stm32mp157c")
-> > 
-> > is missing a Signed-off-by from its committer.
+On 5/24/18 6:12 AM, Vitaly Andrianov wrote:
+> This series adds dts nodes for Keystone2 hw_rng driver
 > 
-> My fault, I forgot it when I applied patch on my branch. Do we need an 
-> update or it is just a reminder?
+> Vitaly Andrianov (3):
+>    ARM: dts: k2hk: add dts node for k2hk hw_rng driver
+>    ARM: dts: k2l: add dts node for k2l hw_rng driver
+>    ARM: dts: k2e: add dts node for k2e hw_rng driver
+> 
+Looks good. Will queue this up for 4.19. Thanks !!
 
-Some people rebase their tree to fix these up, some just take it as a
-learning experience :-)
-
--- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180526/6bd6efa8/attachment.sig>
+Regards,
+Santosh
