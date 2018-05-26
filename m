@@ -1,108 +1,52 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Sat, 26 May 2018 16:15:26 +0100
-Subject: [PATCH 1/2] arm64: arch_timer: Workaround for Allwinner A64 timer
- instability
-In-Reply-To: <20180511022751.9096-2-samuel@sholland.org>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <20180511022751.9096-2-samuel@sholland.org>
-Message-ID: <25fdc60f-db2f-0cf5-cee4-bd1854c429e9@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 26 May 2018 09:22:51 -0700
+Subject: [GIT PULL] Allwinner core changes for 4.18
+In-Reply-To: <20180525210218.orjdivwnkm6j4d4q@localhost>
+References: <20180521114156.6nppm5vomksxpeqv@flea>
+ <20180525210218.orjdivwnkm6j4d4q@localhost>
+Message-ID: <CAGb2v64Febv7ZLZbcTqR6+say38xu25gj0n+dbY-8KAyygDpJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2018 03:27 AM, Samuel Holland wrote:
-> The Allwinner A64 SoC is known [1] to have an unstable architectural
-> timer, which manifests itself most obviously in the time jumping forward
-> a multiple of 95 years [2][3]. This coincides with 2^56 cycles at a
-> timer frequency of 24 MHz, implying that the time went slightly backward
-> (and this was interpreted by the kernel as it jumping forward and
-> wrapping around past the epoch).
-> 
-> Further investigation revealed instability in the low bits of CNTVCT at
-> the point a high bit rolls over. This leads to power-of-two cycle
-> forward and backward jumps. (Testing shows that forward jumps are about
-> twice as likely as backward jumps.)
-> 
-> Without trapping reads to CNTVCT, a userspace program is able to read it
-> in a loop faster than it changes. A test program running on all 4 CPU
-> cores that reported jumps larger than 100 ms was run for 13.6 hours and
-> reported the following:
-> 
->  Count | Event
-> -------+---------------------------
->   9940 | jumped backward      699ms
->    268 | jumped backward     1398ms
->      1 | jumped backward     2097ms
->  16020 | jumped forward       175ms
->   6443 | jumped forward       699ms
->   2976 | jumped forward      1398ms
->      9 | jumped forward    356516ms
->      9 | jumped forward    357215ms
->      4 | jumped forward    714430ms
->      1 | jumped forward   3578440ms
-> 
-> This works out to a jump larger than 100 ms about every 5.5 seconds on
-> each CPU core.
-> 
-> The largest jump (almost an hour!) was the following sequence of reads:
->       0x0000007fffffffff ? 0x00000093feffffff ? 0x0000008000000000
-> 
-> Note that the middle bits don't necessarily all read as all zeroes or
-> all ones during the anomalous behavior; however the low 11 bits checked
-> by the function in this patch have never been observed with any other
-> value.
-> 
-> Also note that smaller jumps are much more common, with the smallest
-> backward jumps of 2048 cycles observed over 400 times per second on each
-> core. (Of course, this is partially due to lower bits rolling over more
-> frequently.) Any one of these could have caused the 95 year time skip.
-> 
-> Similar anomalies were observed while reading CNTPCT (after patching the
-> kernel to allow reads from userspace). However, the jumps are much less
-> frequent, and only small jumps were observed. The same program as before
-> (except now reading CNTPCT) observed after 72 hours:
-> 
->  Count | Event
-> -------+---------------------------
->     17 | jumped backward      699ms
->     52 | jumped forward       175ms
->   2831 | jumped forward       699ms
->      5 | jumped forward      1398ms
-> 
-> ========================================================================
-> 
-> Because the CPU can read the CNTPCT/CNTVCT registers faster than they
-> change, performing two reads of the register and comparing the high bits
-> (like other workarounds) is not a workable solution. And because the
-> timer can jump both forward and backward, no pair of reads can
-> distinguish a good value from a bad one. The only way to guarantee a
-> good value from consecutive reads would be to read _three_ times, and
-> take the middle value iff the three values are 1) individually unique
-> and 2) increasing. This takes at minimum 3 cycles (125 ns), or more if
-> an anomaly is detected.
-> 
-> However, since there is a distinct pattern to the bad values, we can
-> optimize the common case (2046/2048 of the time) to a single read by
-> simply ignoring values that match the pattern. This still takes no more
-> than 3 cycles in the worst case, and requires much less code.
+On Fri, May 25, 2018 at 2:02 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, May 21, 2018 at 01:41:56PM +0200, Maxime Ripard wrote:
+>> Hi,
+>>
+>> Here is our mach-sunxi changes for the next merge window, thanks!
+>> Maxime
+>>
+>> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+>>
+>>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>>
+>> are available in the Git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-core-for-4.18
+>>
+>> for you to fetch changes up to 6961275e72a8c15cc4ebf108a81eee758480a6a2:
+>>
+>>   ARM: sun8i: smp: Add support for A83T (2018-05-08 15:00:20 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Allwinner core changes for 4.18
+>>
+>> The A83t, unlike the other Allwinner SoCs, cannot use PSCI because of a
+>> silicon bug. As such, we needed to have some smp_ops in order to bringup
+>> the various cores (and clusters) found on this SoC.
+>
+> Hrm. that's unfortunate. Is there any public documentation of what the bug is?
 
-Clever solution, and indeed much less costly than other workarounds.
+The security extensions in the A80 and A83T is not entirely enabled.
+The security bit is not forwarded on to the bus, so all accesses from
+non-secure become secure. This is not documented, but was the result
+of some tests I did.
 
-FWIW, I tested this on a Pine64 and can confirm that it works.
-I put a test program here:
-https://github.com/apritzel/pine64/blob/master/tools/test_timer.c
+See https://lists.denx.de/pipermail/u-boot/2017-June/294672.html
+for a summary (in the quotes) of what we think is the issue.
 
-This only checks for consecutive reads going backwards, but within a
-split second yells on an unpatched kernel:
-https://gist.github.com/apritzel/fc78ca6edb17be2024d5adfd35edb520
+Marc's suggestion is that if virtualization doesn't work on it, then
+there's no point in running it non-secure. [1]
 
-Applying the patch and adding the DT property fixed that for me.
+ChenYu
 
-I second Marc's request for an upper bound on the loop. Question is just
-what we do when we reach the loop count limit?
-
-But regardless, given that this fixes this nasty issue:
-
-Tested-by: Andre Przywara <andre.przywara@arm.com>
-
-Cheers,
-Andre.
+[1] https://lists.denx.de/pipermail/u-boot/2017-June/294697.html
