@@ -1,18 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2018 14:14:20 -0700
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.18
-In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
-References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <20180526211420.jmme6ikrgdiw76u7@localhost>
+Date: Sat, 26 May 2018 14:40:45 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.18
+In-Reply-To: <cover.1526639075.git.horms+renesas@verge.net.au>
+References: <cover.1526639075.git.horms+renesas@verge.net.au>
+Message-ID: <20180526214045.ljra2xhkz3sw2ony@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Fri, May 18, 2018 at 01:16:00PM +0200, Simon Horman wrote:
+On Fri, May 18, 2018 at 01:18:11PM +0200, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM64 based SoC DT updates for v4.18.
+> Please consider these Renesas ARM based SoC updates for v4.18.
 > 
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
@@ -21,105 +19,13 @@ On Fri, May 18, 2018 at 01:16:00PM +0200, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.18
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.18
 > 
-> for you to fetch changes up to 908001d778eba06ee1d832863d4e9a1e2cfd4746:
+> for you to fetch changes up to 086b399965a7ee7e50c3b3c57f2dba30ff0334b0:
 > 
->   arm64: dts: renesas: salvator-common: Add ADV7482 support (2018-05-18 11:52:03 +0200)
+>   soc: renesas: r8a77990-sysc: Add workaround for 3DG-{A,B} (2018-05-16 10:57:44 +0200)
 
-This pull request is really, really hard for us to digest. The tag
-description is very large, and it repeats several SoCs several times,
-making it hard to get an overview of what is in it. The verbosity of "<x>
-says.." makes it harder on this size of a pull request as well.
-
-For example:
-
-> * Condor board with R-Car V3H (r8a77980) SoC
->   - Enable eMMC
-> 
->     Sergei Shtylyov says "We're adding the R8A77980 MMC (SDHI)
->     device nodes and then enable eMMC support on the Condor board."
-
-The "Enable eMMC" line is just fine here.
-
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (11):
->       arm64: dts: renesas: draak: Rename EtherAVB "mdc" pin group to "mdio"
->       arm64: dts: renesas: salvator-common: Rename EtherAVB "mdc" pin group to "mdio"
->       arm64: dts: renesas: ulcb: Rename EtherAVB "mdc" pin group to "mdio"
-
-Why can't these be done in one commit?
-
->       arm64: dts: renesas: r8a7795: Correct whitespace
->       arm64: dts: renesas: r8a7796: Correct whitespace
->       arm64: dts: renesas: r8a77965: Correct whitespace
-
-Do these really need to be three commits to fix some whitespace?
-
->       arm64: dts: renesas: ulcb: Add BD9571 PMIC
->       arm64: dts: renesas: salvator-common: Add PMIC DDR Backup Power config
->       arm64: dts: renesas: ulcb: Add PMIC DDR Backup Power config
->       arm64: dts: renesas: r8a77970: Add secondary CA53 CPU core
->       arm64: dts: renesas: r8a77970: Add Cortex-A53 PMU node
-
-Why can't these be done in the same commit?
-
-> Kieran Bingham (7):
->       arm64: dts: renesas: r8a77965: Add FCPF and FCPV instances
->       arm64: dts: renesas: r8a77965: Add VSP instances
->       arm64: dts: renesas: r8a77965: Populate the DU instance placeholder
->       arm64: dts: renesas: r8a77965: Add HDMI encoder instance
->       arm64: dts: renesas: r8a77965-salvator-x: Enable DU external clocks and HDMI
->       arm64: dts: renesas: r8a77965-salvator-xs: Enable DU external clocks and HDMI
-
-These two can probably be in one commit as well.
-
->       arm64: dts: renesas: salvator-common: Add ADV7482 support
-> 
-> Kuninori Morimoto (8):
->       arm64: dts: renesas: r8a7795: add HDMI sound support
->       arm64: dts: renesas: r8a7796: add HDMI sound support
-
-... starting to see a trend?
-
->       arm64: dts: renesas: salvator-common: use audio-graph-card for Sound
->       arm64: dts: renesas: r8a7795-es1-salvator-x: enable HDMI sound
->       arm64: dts: renesas: r8a7795-salvator-xs: enable HDMI sound
->       arm64: dts: renesas: r8a7796-salvator-xs: enable HDMI sound
->       arm64: dts: renesas: r8a7795-salvator-x: enable HDMI sound
->       arm64: dts: renesas: r8a7796-salvator-x: enable HDMI sound
-
-... and more.
-
-> 
-> Magnus Damm (5):
->       arm64: dts: renesas: r8a77970: Update IPMMU DS1 bit number
->       arm64: dts: renesas: r8a7795: Enable IPMMU devices
->       arm64: dts: renesas: r8a7796: Enable IPMMU devices
->       arm64: dts: renesas: r8a77970: Enable IPMMU devices
->       arm64: dts: renesas: r8a77995: Enable IPMMU devices
-
-I think these 4 could be in one commit too.
-
-> 
-> Niklas S?derlund (11):
->       arm64: dts: renesas: r8a7795: decrease temperature hysteresis
->       arm64: dts: renesas: r8a7796: decrease temperature hysteresis
->       arm64: dts: renesas: r8a77965: use r8a77965-sysc binding definitions
->       arm64: dts: renesas: r8a77965: Add R-Car Gen3 thermal support
->       arm64: dts: renesas: r8a77965: add I2C support
->       arm64: dts: renesas: r8a7795: add VIN and CSI-2 nodes
->       arm64: dts: renesas: r8a7795-es1: add CSI-2 node
->       arm64: dts: renesas: r8a7796: add VIN and CSI-2 nodes
->       arm64: dts: renesas: r8a77965: add VIN and CSI-2 nodes
->       arm64: dts: renesas: r8a77970: add VIN and CSI-2 nodes
-
-
-.... etc, etc. I'll stop here.
-
-
-I haven't merged this branch yet, will need to set aside more time to review
-the contents. I can't guarantee that it'll make v4.18 but I'll try.
+Merged, thanks.
 
 
 -Olof
