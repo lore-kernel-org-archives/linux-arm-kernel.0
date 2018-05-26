@@ -1,27 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2018 11:52:39 -0700
-Subject: [GIT PULL] Qualcomm Driver updates for 4.18 - RESEND
-In-Reply-To: <1527287624-26491-1-git-send-email-andy.gross@linaro.org>
-References: <1527287624-26491-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20180526185239.k4m4jmbc243oiiq5@localhost>
+Date: Sat, 26 May 2018 11:58:17 -0700
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.18
+In-Reply-To: <1527287693-26646-1-git-send-email-andy.gross@linaro.org>
+References: <1527287693-26646-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20180526185817.wrzsdku2yvnoqqck@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 05:33:44PM -0500, Andy Gross wrote:
+On Fri, May 25, 2018 at 05:34:53PM -0500, Andy Gross wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.18
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.18
 > 
-> for you to fetch changes up to 6d361c1db7b69fddf5748cf212169ab57bb13a6e:
+> for you to fetch changes up to b741377f1ff72a17e3b06e4b506b13f5c6158b1c:
 > 
->   soc: qcom: smem: introduce qcom_smem_virt_to_phys() (2018-05-25 15:53:59 -0500)
+>   arm64: defconfig: Enable PCIe on msm8996 and db820c (2018-05-25 15:49:12 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM64 Based defconfig Updates for v4.18
+> 
+> * Enable UFS and PCIe for Qualcomm msm8996/db820c
 
-Merged into next/late; if there's an -rc7 it'll go in with the regular pull
-requests.
+Thanks, merged into next/defconfig
 
 
 -Olof
