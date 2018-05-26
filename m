@@ -1,128 +1,116 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sat, 26 May 2018 19:40:42 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
-Message-ID: <d930349b-ed0a-507a-6ba6-00925f0a4136@axentia.se>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Sat, 26 May 2018 19:00:20 +0100
+Subject: [PATCH 3/6] arm64: dts: hisilicon: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <0754957a2c3842cf4e36fa27231d327fd8d6d499.1527225682.git.viresh.kumar@linaro.org>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <0754957a2c3842cf4e36fa27231d327fd8d6d499.1527225682.git.viresh.kumar@linaro.org>
+Message-ID: <5B09A0B4.2080400@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-25 16:51, Tudor Ambarus wrote:
-> Hi, Peter,
+Hi Viresh,
+
+On 2018/5/25 6:40, Viresh Kumar wrote:
+> The cooling device properties, like "#cooling-cells" and
+> "dynamic-power-coefficient", should either be present for all the CPUs
+> of a cluster or none. If these are present only for a subset of CPUs of
+> a cluster then things will start falling apart as soon as the CPUs are
+> brought online in a different order. For example, this will happen
+> because the operating system looks for such properties in the CPU node
+> it is trying to bring up, so that it can register a cooling device.
 > 
-> On 04/11/2018 06:34 PM, Nicolas Ferre wrote:
->> I'll try to move forward with your detailed explanation and with my 
->> contacts within the "product" team internally.
+> Add such missing properties.
 > 
-> We have talked with the hardware team, looks like there is an error in
-> the description of the Master to Slave Access matrix. CPU accesses DDR2
-> port0 through AXI matrix and not AHB. There is no conflict between CPU
-> and LCDC DMA when accessing DDR2 ports. This explains why using CPU
-> helps.
+> Do minor rearrangement as well to keep ordering consistent.
 > 
-> The slave numbers from "Table 14-3 Master to Slave Access" are wrong.
-> The 7th row  should be removed and all the other rows from below it,
-> shifted up with one level (DDR2 Port 1 is Slave no 7, DDR2 port 2 is
-> Slave no 8, ... , APB1 is slave no 11).
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Yes, the fact that row 7 (the 8th row, since there is a row 0, but I get
-what you mean) should be removed was pretty much what I had guessed. But
-what about the other strange things I found? To reiterate, this is my
-PRxSy register content (zeroes shown as -):
+Thanks!
+Applied to the hisilicon fix tree.
 
-PRxS0  33--3--3--3333--
-PRxS1  33--3--3--3333--
-PRxS2  33--------------
-PRxS3  -3--------333---
-PRxS4  33--------------
-PRxS5  3---------------
-PRxS6  33--33-33333333-
-PRxS7  --3-3--3--------
-PRxS8  -3---3--3--3----
-PRxS9  --3-3--3-33-333-
-PRxS10 3--3------------
-PRxS11 3-----3---------
-PRxS12 ----------------
-PRxS13 ----------------
-PRxS14 ----------------
-PRxS15 ----------------
+Best Regards,
+Wei
 
-So, PRxS7 matches row 8 (DDR2 port 1) in the datasheet.
-And PRxS8 matches row 9 (DDR2 port 2) in the datasheet.
-But PRxS9 is not matching row 10 (DDR2 port 3)!
-And PRxS10-11 match rows 11-12 (APB 0-1) in the datasheet.
-
-But also look at PRxS3 (Internal ROM), there's a missing 3 in the
-first slot (A5)! Maybe the priority of that one can't be changed
-for some fundamental reason? But there is no hint to that effect
-in the datasheet AFAICT...
-
-> We think the best way is to keep LCD on DDR Ports 2 and 3 (8th and 9th
-> slaves), to have maximum bandwidth and to use DMA on DDR port 1 for NAND
-> (7th slave).
-
-I think I tried to arrange for that last time around. Not sure though,
-so I will try again next week...
-
-> Also, some information about your configuration is useful. Can you
-> please tell us what NAND DMA configuration did you use?  Are you using
-> NAND storage for the videos that you are playing on the LCD screen?
-
-Not sure what level of detail you are after?
-
-We use W949D2CBJX5E LPDDR1 memories from Winbond. Years ago, I wrote some
-LPDDR1 patches for at91bootstrap to driver/ddramc.c (which predate the
-current upstream support) and to board/sama5d3xek/sama5d3xek.c (which doesn't
-to this day support LPDDR1 upstream, but I guess it shouldn't and that we
-should have a board of our own, so that part isn't really clean and also the
-reason I never upstreamed it). Anyway, some other trivial glue was also
-needed, but the meat are in those files. I just had a brief look at the
-LPDDR1 support in the upstream ddramc.c file and our code is very similar.
-But I did notice some differences and I will look into if that difference
-is something that matters. I can show provide patches if you think they
-are relevant?
-
-We use this in the sam-ba .qml file when we flash the devices with sam-ba and
-the nandflash applet (don't know if it's relevant, but it shows that we have
-a 16-bit bus):
-
-        device: SAMA5D3 {
-		name: "sama5d3-linea"
-
-		aliases: []
-
-		description: "SAMA5D3 Linea"
-
-		config {
-			nandflash {
-				ioset: 1
-				busWidth: 16
-				header: 0xc0902405
-			}
-		}
-	}
-
-*time passes*
-
-Oh dear ... you said NAND *DMA* configuration. Nothing special that I know
-of. So, the default? Anything specific I should check?
-
-Further, we are not playing any video. The artifacts are visible on a
-static screen on an otherwise "idle" system (i.e. just showing whatever
-on the screen and accessing the DRAM with DMA is enough to trigger the
-visual glitches).
-
-Cheers,
-Peter
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 586b281cd531..247024df714f 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -88,8 +88,8 @@
+>  			next-level-cache = <&CLUSTER0_L2>;
+>  			clocks = <&stub_clock 0>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+> -			#cooling-cells = <2>; /* min followed by max */
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+>  			dynamic-power-coefficient = <311>;
+>  		};
+>  
+> @@ -101,6 +101,8 @@
+>  			next-level-cache = <&CLUSTER0_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu2: cpu at 2 {
+> @@ -111,6 +113,8 @@
+>  			next-level-cache = <&CLUSTER0_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu3: cpu at 3 {
+> @@ -121,6 +125,8 @@
+>  			next-level-cache = <&CLUSTER0_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu4: cpu at 100 {
+> @@ -131,6 +137,8 @@
+>  			next-level-cache = <&CLUSTER1_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu5: cpu at 101 {
+> @@ -141,6 +149,8 @@
+>  			next-level-cache = <&CLUSTER1_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu6: cpu at 102 {
+> @@ -151,6 +161,8 @@
+>  			next-level-cache = <&CLUSTER1_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu7: cpu at 103 {
+> @@ -161,6 +173,8 @@
+>  			next-level-cache = <&CLUSTER1_L2>;
+>  			operating-points-v2 = <&cpu_opp_table>;
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		CLUSTER0_L2: l2-cache0 {
+> 
