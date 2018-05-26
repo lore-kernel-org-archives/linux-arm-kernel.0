@@ -1,45 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2018 11:45:42 -0700
-Subject: [GIT PULL] ARM: at91: DT for 4.18
-In-Reply-To: <20180525225033.GA26989@piout.net>
-References: <20180525225033.GA26989@piout.net>
-Message-ID: <20180526184542.rjjqwfgwlibf7fpn@localhost>
+Date: Sat, 26 May 2018 11:52:39 -0700
+Subject: [GIT PULL] Qualcomm Driver updates for 4.18 - RESEND
+In-Reply-To: <1527287624-26491-1-git-send-email-andy.gross@linaro.org>
+References: <1527287624-26491-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20180526185239.k4m4jmbc243oiiq5@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 26, 2018 at 12:50:33AM +0200, Alexandre Belloni wrote:
-> Arnd, Olof,
-> 
-> I'm a bit late for this very small PR, as I had to extend the expiration
-> date for my GPG signature key.
-> 
-> Two small DT changes that have no functional impact.
-> 
+On Fri, May 25, 2018 at 05:33:44PM -0500, Andy Gross wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.18-dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.18
 > 
-> for you to fetch changes up to a642693882ce417683012a211ca9d6e65bae1dc4:
+> for you to fetch changes up to 6d361c1db7b69fddf5748cf212169ab57bb13a6e:
 > 
->   ARM: dts: at91-sama5d2_xplained: Use IRQ_TYPE specifier (2018-05-14 15:29:52 +0200)
-> 
-> ----------------------------------------------------------------
-> AT91 DT for 4.18:
-> 
->  - small DT improvements without functional changes
-> 
-> ----------------------------------------------------------------
-> Dmitry Torokhov (1):
->       ARM: dts: at91: sama5d4ek: use canonical compatible for touchscreen
-> 
-> Hern?n Gonzalez (1):
->       ARM: dts: at91-sama5d2_xplained: Use IRQ_TYPE specifier
+>   soc: qcom: smem: introduce qcom_smem_virt_to_phys() (2018-05-25 15:53:59 -0500)
 
-Merged, thanks.
+Merged into next/late; if there's an -rc7 it'll go in with the regular pull
+requests.
 
 
 -Olof
