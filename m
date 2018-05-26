@@ -1,21 +1,75 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Fri, 25 May 2018 21:43:32 -0700
-Subject: [PATCH 0/3] Dts nodes for Keystone2 hw_rng driver
-In-Reply-To: <1527167538-29837-1-git-send-email-vitalya@ti.com>
-References: <1527167538-29837-1-git-send-email-vitalya@ti.com>
-Message-ID: <45e0a1c8-739e-0a38-bd86-047c37551f62@oracle.com>
+From: vgarodia@codeaurora.org (Vikash Garodia)
+Date: Sat, 26 May 2018 13:48:35 +0530
+Subject: qcom: add firmware file for Venus on SDM845
+In-Reply-To: <CA+5PVA67tow+prVC55XF4=CbRGXJvPi2SuCMyhRyuw5qt8T6_Q@mail.gmail.com>
+References: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
+ <1527246209-26685-2-git-send-email-vgarodia@codeaurora.org>
+ <CA+5PVA67tow+prVC55XF4=CbRGXJvPi2SuCMyhRyuw5qt8T6_Q@mail.gmail.com>
+Message-ID: <bcb4ba3ccd3b139ce03b6736d8d07cbe@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/24/18 6:12 AM, Vitaly Andrianov wrote:
-> This series adds dts nodes for Keystone2 hw_rng driver
-> 
-> Vitaly Andrianov (3):
->    ARM: dts: k2hk: add dts node for k2hk hw_rng driver
->    ARM: dts: k2l: add dts node for k2l hw_rng driver
->    ARM: dts: k2e: add dts node for k2e hw_rng driver
-> 
-Looks good. Will queue this up for 4.19. Thanks !!
+Hi Josh,
 
-Regards,
-Santosh
+On 2018-05-25 17:34, Josh Boyer wrote:
+> On Fri, May 25, 2018 at 7:03 AM Vikash Garodia 
+> <vgarodia@codeaurora.org>
+> wrote:
+> 
+>> This pull request adds firmware files for Venus h/w codec found on the
+> Qualcomm SDM845 chipset.
+> 
+>> The following changes since commit
+> 2a9b2cf50fb32e36e4fc1586c2f6f1421913b553:
+> 
+>>    Merge branch 'for-upstreaming-v1.7.2' of
+> https://github.com/felix-cavium/linux-firmware (2018-05-18 08:35:22 
+> -0400)
+> 
+>> are available in the git repository at:
+> 
+> 
+>>    https://github.com/vgarodia/linux-firmware master
+> 
+>> for you to fetch changes up to 
+>> d6088b9c9d7f49d3c6c43681190889eca0abdcce:
+> 
+>>    qcom: add venus firmware files for v5.2 (2018-05-25 15:16:43 +0530)
+> 
+>> ----------------------------------------------------------------
+>> Vikash Garodia (1):
+>>        qcom: add venus firmware files for v5.2
+> 
+>>   WHENCE                   |   9 +++++++++
+>>   qcom/venus-5.2/venus.b00 | Bin 0 -> 212 bytes
+>>   qcom/venus-5.2/venus.b01 | Bin 0 -> 6600 bytes
+>>   qcom/venus-5.2/venus.b02 | Bin 0 -> 819552 bytes
+>>   qcom/venus-5.2/venus.b03 | Bin 0 -> 33536 bytes
+>>   qcom/venus-5.2/venus.b04 |   1 +
+>>   qcom/venus-5.2/venus.mbn | Bin 0 -> 865408 bytes
+>>   qcom/venus-5.2/venus.mdt | Bin 0 -> 6812 bytes
+>>   8 files changed, 10 insertions(+)
+>>   create mode 100644 qcom/venus-5.2/venus.b00
+>>   create mode 100644 qcom/venus-5.2/venus.b01
+>>   create mode 100644 qcom/venus-5.2/venus.b02
+>>   create mode 100644 qcom/venus-5.2/venus.b03
+>>   create mode 100644 qcom/venus-5.2/venus.b04
+>>   create mode 100644 qcom/venus-5.2/venus.mbn
+>>   create mode 100644 qcom/venus-5.2/venus.mdt
+> 
+> The venus.mbn file isn't mentioned in WHENCE:
+> 
+> [jwboyer at vader linux-firmware]$ ./check_whence.py
+> E: qcom/venus-5.2/venus.mbn not listed in WHENCE
+> [jwboyer at vader linux-firmware]$
+> 
+> Can you fix that up and let me know when to re-pull?
+I have fixed the error and is ready to be re-pulled from the same git 
+repository.
+I have noted the process to run check_whence.py before uploading the 
+firmwares.
+
+Do i need to resend the pull request as the end commit is now changed to
+7602644358157e4b89960472b6d59ffcc040ca52 ?
+
+-Vikash
