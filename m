@@ -1,79 +1,125 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2018 14:01:37 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20180526210137.wbjji6vfi63k7c3a@localhost>
+Date: Sat, 26 May 2018 14:14:20 -0700
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.18
+In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
+References: <cover.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <20180526211420.jmme6ikrgdiw76u7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Simon,
+
+On Fri, May 18, 2018 at 01:16:00PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM64 based SoC DT updates for v4.18.
+> 
+> 
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> 
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.18
+> 
+> for you to fetch changes up to 908001d778eba06ee1d832863d4e9a1e2cfd4746:
+> 
+>   arm64: dts: renesas: salvator-common: Add ADV7482 support (2018-05-18 11:52:03 +0200)
+
+This pull request is really, really hard for us to digest. The tag
+description is very large, and it repeats several SoCs several times,
+making it hard to get an overview of what is in it. The verbosity of "<x>
+says.." makes it harder on this size of a pull request as well.
+
+For example:
+
+> * Condor board with R-Car V3H (r8a77980) SoC
+>   - Enable eMMC
+> 
+>     Sergei Shtylyov says "We're adding the R8A77980 MMC (SDHI)
+>     device nodes and then enable eMMC support on the Condor board."
+
+The "Enable eMMC" line is just fine here.
+
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (11):
+>       arm64: dts: renesas: draak: Rename EtherAVB "mdc" pin group to "mdio"
+>       arm64: dts: renesas: salvator-common: Rename EtherAVB "mdc" pin group to "mdio"
+>       arm64: dts: renesas: ulcb: Rename EtherAVB "mdc" pin group to "mdio"
+
+Why can't these be done in one commit?
+
+>       arm64: dts: renesas: r8a7795: Correct whitespace
+>       arm64: dts: renesas: r8a7796: Correct whitespace
+>       arm64: dts: renesas: r8a77965: Correct whitespace
+
+Do these really need to be three commits to fix some whitespace?
+
+>       arm64: dts: renesas: ulcb: Add BD9571 PMIC
+>       arm64: dts: renesas: salvator-common: Add PMIC DDR Backup Power config
+>       arm64: dts: renesas: ulcb: Add PMIC DDR Backup Power config
+>       arm64: dts: renesas: r8a77970: Add secondary CA53 CPU core
+>       arm64: dts: renesas: r8a77970: Add Cortex-A53 PMU node
+
+Why can't these be done in the same commit?
+
+> Kieran Bingham (7):
+>       arm64: dts: renesas: r8a77965: Add FCPF and FCPV instances
+>       arm64: dts: renesas: r8a77965: Add VSP instances
+>       arm64: dts: renesas: r8a77965: Populate the DU instance placeholder
+>       arm64: dts: renesas: r8a77965: Add HDMI encoder instance
+>       arm64: dts: renesas: r8a77965-salvator-x: Enable DU external clocks and HDMI
+>       arm64: dts: renesas: r8a77965-salvator-xs: Enable DU external clocks and HDMI
+
+These two can probably be in one commit as well.
+
+>       arm64: dts: renesas: salvator-common: Add ADV7482 support
+> 
+> Kuninori Morimoto (8):
+>       arm64: dts: renesas: r8a7795: add HDMI sound support
+>       arm64: dts: renesas: r8a7796: add HDMI sound support
+
+... starting to see a trend?
+
+>       arm64: dts: renesas: salvator-common: use audio-graph-card for Sound
+>       arm64: dts: renesas: r8a7795-es1-salvator-x: enable HDMI sound
+>       arm64: dts: renesas: r8a7795-salvator-xs: enable HDMI sound
+>       arm64: dts: renesas: r8a7796-salvator-xs: enable HDMI sound
+>       arm64: dts: renesas: r8a7795-salvator-x: enable HDMI sound
+>       arm64: dts: renesas: r8a7796-salvator-x: enable HDMI sound
+
+... and more.
+
+> 
+> Magnus Damm (5):
+>       arm64: dts: renesas: r8a77970: Update IPMMU DS1 bit number
+>       arm64: dts: renesas: r8a7795: Enable IPMMU devices
+>       arm64: dts: renesas: r8a7796: Enable IPMMU devices
+>       arm64: dts: renesas: r8a77970: Enable IPMMU devices
+>       arm64: dts: renesas: r8a77995: Enable IPMMU devices
+
+I think these 4 could be in one commit too.
+
+> 
+> Niklas S?derlund (11):
+>       arm64: dts: renesas: r8a7795: decrease temperature hysteresis
+>       arm64: dts: renesas: r8a7796: decrease temperature hysteresis
+>       arm64: dts: renesas: r8a77965: use r8a77965-sysc binding definitions
+>       arm64: dts: renesas: r8a77965: Add R-Car Gen3 thermal support
+>       arm64: dts: renesas: r8a77965: add I2C support
+>       arm64: dts: renesas: r8a7795: add VIN and CSI-2 nodes
+>       arm64: dts: renesas: r8a7795-es1: add CSI-2 node
+>       arm64: dts: renesas: r8a7796: add VIN and CSI-2 nodes
+>       arm64: dts: renesas: r8a77965: add VIN and CSI-2 nodes
+>       arm64: dts: renesas: r8a77970: add VIN and CSI-2 nodes
 
 
-Please merge. Thanks!
+.... etc, etc. I'll stop here.
+
+
+I haven't merged this branch yet, will need to set aside more time to review
+the contents. I can't guarantee that it'll make v4.18 but I'll try.
 
 
 -Olof
-
-
-The following changes since commit 771c577c23bac90597c685971d7297ea00f99d11:
-
-  Linux 4.17-rc6 (2018-05-20 15:31:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
-
-for you to fetch changes up to e5dd61546a777d19d4fe35e2d0a2b664ca49f6b2:
-
-  Merge tag 'hisi-fixes-for-4.17v2' of git://github.com/hisilicon/linux-hisi into fixes (2018-05-26 12:12:44 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.17-rc
-
-A few more fixes for v4.17:
- - A fix for a crash in scm_call_atomic on qcom platforms
- - Display fix for Allwinner A10
- - A fix that re-enables ethernet on Allwinner H3 (C.H.I.P et al)
- - A fix for eMMC corruption on hikey
- - i2c-gpio descriptor tables for ixp4xx
- + a small typo fix
-
-----------------------------------------------------------------
-Chen-Yu Tsai (1):
-      ARM: dts: sun8i: h3: Re-enable EMAC on Orange Pi One
-
-Colin Ian King (1):
-      ARM: sun8i: v3s: fix spelling mistake: "disbaled" -> "disabled"
-
-John Stultz (1):
-      arm64: dts: hikey: Fix eMMC corruption regression
-
-Linus Walleij (1):
-      ARM: Fix i2c-gpio GPIO descriptor tables
-
-Niklas Cassel (1):
-      firmware: qcom: scm: Fix crash in qcom_scm_call_atomic1()
-
-Olof Johansson (3):
-      Merge tag 'sunxi-fixes-for-4.17' of https://git.kernel.org/.../sunxi/linux into fixes
-      Merge tag 'qcom-fixes-for-4.17-rc7' of git://git.kernel.org/.../agross/linux into fixes
-      Merge tag 'hisi-fixes-for-4.17v2' of git://github.com/hisilicon/linux-hisi into fixes
-
-Pascal Roeleven (1):
-      ARM: dts: sun4i: Fix incorrect clocks for displays
-
- arch/arm/boot/dts/sun4i-a10.dtsi                   | 6 +++---
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 1 +
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 2 +-
- arch/arm/mach-ep93xx/core.c                        | 2 +-
- arch/arm/mach-ixp4xx/avila-setup.c                 | 2 +-
- arch/arm/mach-ixp4xx/dsmg600-setup.c               | 2 +-
- arch/arm/mach-ixp4xx/fsg-setup.c                   | 2 +-
- arch/arm/mach-ixp4xx/ixdp425-setup.c               | 2 +-
- arch/arm/mach-ixp4xx/nas100d-setup.c               | 2 +-
- arch/arm/mach-ixp4xx/nslu2-setup.c                 | 2 +-
- arch/arm/mach-pxa/palmz72.c                        | 2 +-
- arch/arm/mach-pxa/viper.c                          | 4 ++--
- arch/arm/mach-sa1100/simpad.c                      | 2 +-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     | 1 -
- drivers/firmware/qcom_scm-32.c                     | 8 ++++----
- 15 files changed, 20 insertions(+), 20 deletions(-)
