@@ -1,62 +1,32 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Sat, 26 May 2018 19:23:26 +0100
-Subject: [GIT PULL] arm64: hisilicon fixes for 4.17
-In-Reply-To: <5B09A2AB.2040002@hisilicon.com>
-References: <5B09A2AB.2040002@hisilicon.com>
-Message-ID: <5B09A61E.50006@hisilicon.com>
+From: akurz@blala.de (Alexander Kurz)
+Date: Sat, 26 May 2018 18:30:53 +0000
+Subject: [PATCH 3/3] ARM: dts: imx6dl-riotboard: fix OTG regulator polarity
+In-Reply-To: <20180526183053.14029-1-akurz@blala.de>
+References: <20180526183053.14029-1-akurz@blala.de>
+Message-ID: <20180526183053.14029-4-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+USB OTG power is switched on when the GPIO is pulled low.
 
-Please ignore this pull because of the cooling patch.
-I will send another one without that.
-Sorry for the noise!
+Signed-off-by: Alexander Kurz <akurz@blala.de>
+---
+ arch/arm/boot/dts/imx6dl-riotboard.dts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Best Regards,
-Wei
-
-On 2018/5/26 19:08, Wei Xu wrote:
-> Hi Olof, Hi Arnd,
-> 
-> Please help to pull the following fixes.
-> Sorry for the late fix pull since we got the patches at last week.
-> And if it is too late, I will rebase them after 4.18-rc1 released.
-> Thanks!
-> 
-> Best Regards,
-> Wei
-> 
-> ---
-> 
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-fixes-for-4.17
-> 
-> for you to fetch changes up to 7734370471922ad8b1d9077c876bb0774059f807:
-> 
->   arm64: dts: hisilicon: Add missing cooling device properties for CPUs (2018-05-26 18:15:27 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM64: hisi fixes for 4.17
-> 
-> - Remove eMMC max-frequency property to fix eMMC corruption on hikey board
-> - Add missing cooling related properties to avoid falling apart when the
->   CPUs are brought oneline in a different order on hi6220 SoC
-> 
-> ----------------------------------------------------------------
-> John Stultz (1):
->       arm64: dts: hikey: Fix eMMC corruption regression
-> 
-> Viresh Kumar (1):
->       arm64: dts: hisilicon: Add missing cooling device properties for CPUs
-> 
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  1 -
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 16 +++++++++++++++-
->  2 files changed, 15 insertions(+), 2 deletions(-)
-> 
-> 
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index a52e05934e3a..ef3b270c15e5 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -70,8 +70,7 @@
+ 		regulator-name = "usb_otg_vbus";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+-		gpio = <&gpio3 22 0>;
+-		enable-active-high;
++		gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
+ 	};
+ };
+ 
+-- 
+2.11.0
