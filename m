@@ -1,59 +1,128 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2018 20:21:33 +0200
-Subject: [GIT PULL] Allwinner core changes for 4.18
-In-Reply-To: <CAGb2v64Febv7ZLZbcTqR6+say38xu25gj0n+dbY-8KAyygDpJw@mail.gmail.com>
-References: <20180521114156.6nppm5vomksxpeqv@flea>
- <20180525210218.orjdivwnkm6j4d4q@localhost>
- <CAGb2v64Febv7ZLZbcTqR6+say38xu25gj0n+dbY-8KAyygDpJw@mail.gmail.com>
-Message-ID: <CAOesGMhf3Xnut4Me2KSpcb5Qd=JfmB0xfcz5XKO6U36DdRTKLQ@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Sat, 26 May 2018 19:21:40 +0100
+Subject: [PATCH 3/6] arm64: dts: hisilicon: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <5B09A0B4.2080400@hisilicon.com>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <0754957a2c3842cf4e36fa27231d327fd8d6d499.1527225682.git.viresh.kumar@linaro.org>
+ <5B09A0B4.2080400@hisilicon.com>
+Message-ID: <5B09A5B4.4050904@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 26, 2018 at 6:22 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Fri, May 25, 2018 at 2:02 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, May 21, 2018 at 01:41:56PM +0200, Maxime Ripard wrote:
->>> Hi,
->>>
->>> Here is our mach-sunxi changes for the next merge window, thanks!
->>> Maxime
->>>
->>> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
->>>
->>>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
->>>
->>> are available in the Git repository at:
->>>
->>>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-core-for-4.18
->>>
->>> for you to fetch changes up to 6961275e72a8c15cc4ebf108a81eee758480a6a2:
->>>
->>>   ARM: sun8i: smp: Add support for A83T (2018-05-08 15:00:20 +0200)
->>>
->>> ----------------------------------------------------------------
->>> Allwinner core changes for 4.18
->>>
->>> The A83t, unlike the other Allwinner SoCs, cannot use PSCI because of a
->>> silicon bug. As such, we needed to have some smp_ops in order to bringup
->>> the various cores (and clusters) found on this SoC.
+Hi Viresh,
+
+On 2018/5/26 19:00, Wei Xu wrote:
+> Hi Viresh,
+> 
+> On 2018/5/25 6:40, Viresh Kumar wrote:
+>> The cooling device properties, like "#cooling-cells" and
+>> "dynamic-power-coefficient", should either be present for all the CPUs
+>> of a cluster or none. If these are present only for a subset of CPUs of
+>> a cluster then things will start falling apart as soon as the CPUs are
+>> brought online in a different order. For example, this will happen
+>> because the operating system looks for such properties in the CPU node
+>> it is trying to bring up, so that it can register a cooling device.
 >>
->> Hrm. that's unfortunate. Is there any public documentation of what the bug is?
->
-> The security extensions in the A80 and A83T is not entirely enabled.
-> The security bit is not forwarded on to the bus, so all accesses from
-> non-secure become secure. This is not documented, but was the result
-> of some tests I did.
->
-> See https://lists.denx.de/pipermail/u-boot/2017-June/294672.html
-> for a summary (in the quotes) of what we think is the issue.
->
-> Marc's suggestion is that if virtualization doesn't work on it, then
-> there's no point in running it non-secure. [1]
+>> Add such missing properties.
+>>
+>> Do minor rearrangement as well to keep ordering consistent.
+>>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> Thanks!
+> Applied to the hisilicon fix tree.
 
-So it sounds like you can still use PSCI even if there's nothing that
-stops the kernel from also doing the same operations. It doesn't buy
-you any security benefits, but you can use the same standard
-interfaces as everybody else does. I think there's still value in
-that. Or am I missing some aspect of the errata implications?
+Sorry for the noise!
+It seems this patch is still under discussion.
+I will drop it firstly.
 
+Best Regards,
+Wei
 
--Olof
+> 
+> Best Regards,
+> Wei
+> 
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 +++++++++++++++-
+>>  1 file changed, 15 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> index 586b281cd531..247024df714f 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> @@ -88,8 +88,8 @@
+>>  			next-level-cache = <&CLUSTER0_L2>;
+>>  			clocks = <&stub_clock 0>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>> -			#cooling-cells = <2>; /* min followed by max */
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>>  			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>> @@ -101,6 +101,8 @@
+>>  			next-level-cache = <&CLUSTER0_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		cpu2: cpu at 2 {
+>> @@ -111,6 +113,8 @@
+>>  			next-level-cache = <&CLUSTER0_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		cpu3: cpu at 3 {
+>> @@ -121,6 +125,8 @@
+>>  			next-level-cache = <&CLUSTER0_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		cpu4: cpu at 100 {
+>> @@ -131,6 +137,8 @@
+>>  			next-level-cache = <&CLUSTER1_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		cpu5: cpu at 101 {
+>> @@ -141,6 +149,8 @@
+>>  			next-level-cache = <&CLUSTER1_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		cpu6: cpu at 102 {
+>> @@ -151,6 +161,8 @@
+>>  			next-level-cache = <&CLUSTER1_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		cpu7: cpu at 103 {
+>> @@ -161,6 +173,8 @@
+>>  			next-level-cache = <&CLUSTER1_L2>;
+>>  			operating-points-v2 = <&cpu_opp_table>;
+>>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>> +			#cooling-cells = <2>; /* min followed by max */
+>> +			dynamic-power-coefficient = <311>;
+>>  		};
+>>  
+>>  		CLUSTER0_L2: l2-cache0 {
+>>
