@@ -1,138 +1,87 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Mon, 28 May 2018 02:33:33 +0530
-Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
-Message-ID: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 28 May 2018 00:11:07 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+ <20180402142249.7e076a64@bbrezillon>
+ <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
+ <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
+ <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
+ <20180403091813.5fb5c18c@bbrezillon>
+ <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
+ <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+ <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
+ <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
+Message-ID: <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM64 maintainers,
+On 2018-05-27 11:18, Peter Rosin wrote:
+> On 2018-05-25 16:51, Tudor Ambarus wrote:
+>> We think the best way is to keep LCD on DDR Ports 2 and 3 (8th and 9th
+>> slaves), to have maximum bandwidth and to use DMA on DDR port 1 for NAND
+>> (7th slave).
+> 
+> Exactly how do I accomplish that?
+> 
+> I can see how I can move the LCD between slave DDR port 2 and 3 by
+> selecting LCDC DMA master 8 or 9 (but according to the above it should
+> not matter). The big question is how I control what slave the NAND flash
+> is going to use? I find nothing in the datasheet, and the code is also
+> non-transparent enough for me to figure it out by myself without
+> throwing out this question first...
 
-I am confused about the PAGE_OFFSET value (or the start of the linear
-map) on a KASLR enabled ARM64 kernel that I am seeing on a board which
-supports a compatible EFI firmware (with EFI_RNG_PROTOCOL support).
+I added this:
 
-1. 'arch/arm64/include/asm/memory.h' defines PAGE_OFFSET as:
+diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
+index e686fe73159e..3b33c63d2ed4 100644
+--- a/drivers/mtd/nand/raw/atmel/nand-controller.c
++++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
+@@ -1991,6 +1991,9 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
+ 		nc->dmac = dma_request_channel(mask, NULL, NULL);
+ 		if (!nc->dmac)
+ 			dev_err(nc->dev, "Failed to request DMA channel\n");
++
++		dev_info(nc->dev, "using %s for DMA transfers\n",
++			 dma_chan_name(nc->dmac));
+ 	}
+ 
+ 	/* We do not retrieve the SMC syscon when parsing old DTs. */
 
-/*
- * PAGE_OFFSET - the virtual address of the start of the linear map (top
- *         (VA_BITS - 1))
- */
-#define PAGE_OFFSET        (UL(0xffffffffffffffff) - \
-    (UL(1) << (VA_BITS - 1)) + 1)
 
-So for example on a platform with VA_BITS=48, we have:
-PAGE_OFFSET = 0xffff800000000000
 
-2. However, for the KASLR case, we set the 'memstart_offset_seed ' to
-use the 16-bits of the 'kaslr-seed' to randomize the linear region in
-'arch/arm64/kernel/kaslr.c' :
+and the output is
 
-u64 __init kaslr_early_init(u64 dt_phys)
-{
-<snip..>
-    /* use the top 16 bits to randomize the linear region */
-    memstart_offset_seed = seed >> 48;
-<snip..>
-}
+atmel-nand-controller 10000000.ebi:nand-controller: using dma0chan5 for DMA transfers
 
-3. Now, we use the 'memstart_offset_seed' value to randomize the
-'memstart_addr' value in 'arch/arm64/mm/init.c':
+So, DMA controller 0 is in use. I still don't know if IF0, IF1 or IF2 is used
+or how to find out. I guess IF2 is not in use since that does not allow any
+DDR2 port as slave...
 
-void __init arm64_memblock_init(void)
-{
-<snip..>
+>From the datasheet, DMAC0/IF0 uses DDR2 Port 2, and DMAC0/IF1 uses DDR2 Port 1.
+But, by the looks of the register content in my other mail, it seems as if
+DMA0/IF1 can also use DDR2 Port 3.
 
-    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-        extern u16 memstart_offset_seed;
-        u64 range = linear_region_size -
-                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+So, I think I want either
 
-        /*
-         * If the size of the linear region exceeds, by a sufficient
-         * margin, the size of the region that the available physical
-         * memory spans, randomize the linear region as well.
-         */
-        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-            range = range / ARM64_MEMSTART_ALIGN + 1;
-            memstart_addr -= ARM64_MEMSTART_ALIGN *
-                     ((range * memstart_offset_seed) >> 16);
-        }
-    }
-<snip..>
-}
+A) the NAND controller to use DMAC0/IF0 (i.e. DDR2 port 1, and possibly 3) and
+   the LCDC to use master 9 (i.e. DDR2 Port 2)
 
-4. Since 'memstart_addr' indicates the start of physical RAM, we
-randomize the same on basis of 'memstart_offset_seed' value above.
-Also the 'memstart_addr' value is available in '/proc/kallsyms' and
-hence can be accessed by user-space applications to read the
-'memstart_addr' value.
+or
 
-5. Now since the PAGE_OFFSET value is also used by several user space
-tools (for e.g. makedumpfile tool uses the same to determine the start
-of linear region and hence to read PT_NOTE fields from /proc/kcore), I
-am not sure how to read the randomized value of the same in the KASLR
-enabled case.
+B) the NAND controller to use DMAC1/IF1 (i.e. DDR2 port 2) and the LCDC to use
+   master 8 (i.e. DDR2 Port 3)
 
-6. Reading the code further and adding some debug prints, it seems the
-'memblock_start_of_DRAM()' value is more closer to the actual start of
-linear region rather than 'memstart_addr' and 'PAGE_OFFSET" in case of
-KASLR enabled kernel:
+But, again, how do I limit DMAC0 to either of IF0 or IF1 for NAND accesses?
 
-[root at qualcomm-amberwing] # dmesg | grep -i "arm64_memblock_init" -A 5
+Note that I have previously tried to move LCDC DMA from master 8 (the default)
+to master 9, and it got better, but not good enough. I.e. the visual glitches
+remained, but were a little bit harder to trigger. That makes me suspect DMAC0
+uses both IF0 and IF1 for its DMAs, but that it prefers IF0.
 
-[    0.000000] inside arm64_memblock_init, memstart_addr = ffff976a00000000,
-linearstart_addr = ffffe89600200000, memblock_start_of_DRAM = ffffe89600200000,
-PHYS_OFFSET = ffff976a00000000, PAGE_OFFSET = ffff800000000000,
-KIMAGE_VADDR = ffff000008000000, kimage_vaddr = ffff20c2d7800000
-
-[root at qualcomm-amberwing] # dmesg | grep -i "Virtual kernel memory layout" -A 15
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000
-(   128 MB)
-[    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7bdfffff0000
-(126847 GB)
-[    0.000000]       .text : 0xffff20c2d7880000 - 0xffff20c2d8040000
-(  7936 KB)
-[    0.000000]     .rodata : 0xffff20c2d8040000 - 0xffff20c2d83a0000
-(  3456 KB)
-[    0.000000]       .init : 0xffff20c2d83a0000 - 0xffff20c2d8750000
-(  3776 KB)
-[    0.000000]       .data : 0xffff20c2d8750000 - 0xffff20c2d891b200
-(  1837 KB)
-[    0.000000]        .bss : 0xffff20c2d891b200 - 0xffff20c2d90a5198
-(  7720 KB)
-[    0.000000]     fixed   : 0xffff7fdffe790000 - 0xffff7fdffec00000
-(  4544 KB)
-[    0.000000]     PCI I/O : 0xffff7fdffee00000 - 0xffff7fdfffe00000
-(    16 MB)
-[    0.000000]     vmemmap : 0xffff7fe000000000 - 0xffff800000000000
-(   128 GB maximum)
-[    0.000000]               0xffff7ffa25800800 - 0xffff7ffa2b800000
-(    95 MB actual)
-[    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
-( 98302 MB)
-
-As one can see above, the 'memblock_start_of_DRAM()' value of
-0xffffe89600200000 represents the start of linear region:
-
-[    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
-( 98302 MB)
-
-So, my question is to access the start of linear region (which was
-earlier determinable via PAGE_OFFSET macro), whether I should:
-
-- do some back-computation for the start of linear region from the
-'memstart_addr' in user-space, or
-- use a new global variable in kernel which is assigned the value of
-memblock_start_of_DRAM()' and assign it to '/proc/kallsyms', so that
-it can be read by user-space tools, or
-- whether we should rather look at removing the PAGE_OFFSET usage from
-the kernel and replace it with a global variable instead which is
-properly updated for KASLR case as well.
-
-Kindly share your opinions on what can be a suitable solution in this case.
-
-Thanks for your help.
-
-Regards,
-Bhupesh
+Cheers,
+Peter
