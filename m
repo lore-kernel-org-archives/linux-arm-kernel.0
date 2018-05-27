@@ -1,32 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 27 May 2018 19:42:43 +0100
-Subject: linux-next: manual merge of the userns tree with the arm tree
-In-Reply-To: <876039uf30.fsf@xmission.com>
-References: <20180525101455.GI4828@sirena.org.uk> <876039uf30.fsf@xmission.com>
-Message-ID: <20180527184243.GC1564@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 27 May 2018 21:23:38 +0200
+Subject: [PATCH] ARM: pxa: mioa701 convert to the new AC97 bus
+Message-ID: <20180527192338.21606-1-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 27, 2018 at 01:29:55PM -0500, Eric W. Biederman wrote:
-> Mark Brown <broonie@kernel.org> writes:
+This migration implies :
+ - wm9713 device is removed, it will be auto-probed
 
-> > I fixed it up (see below) and can carry the fix as necessary. This
-> > is now fixed as far as linux-next is concerned, but any non trivial
-> > conflicts should be mentioned to your upstream maintainer when your tree
-> > is submitted for merging.  You may also want to consider cooperating
-> > with the maintainer of the conflicting tree to minimise any particularly
-> > complex conflicts.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/mioa701.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-> Mark.  Did you get a bounce from this email?
-
-> I saw this when perusing lkml but I did not receive a copy of this
-> directly to myself.
-
-Turns out xmission has decided to blacklist it, no idea why.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180527/33af2c40/attachment.sig>
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index 9b6c7ea45a40..04dc78d0809f 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -677,14 +677,12 @@ MIO_SIMPLE_DEV(mioa701_led,	  "leds-gpio",	    &gpio_led_info)
+ MIO_SIMPLE_DEV(pxa2xx_pcm,	  "pxa2xx-pcm",	    NULL)
+ MIO_SIMPLE_DEV(mioa701_sound,	  "mioa701-wm9713", NULL)
+ MIO_SIMPLE_DEV(mioa701_board,	  "mioa701-board",  NULL)
+-MIO_SIMPLE_DEV(wm9713_acodec,	  "wm9713-codec",   NULL);
+ MIO_SIMPLE_DEV(gpio_vbus,	  "gpio-vbus",      &gpio_vbus_data);
+ 
+ static struct platform_device *devices[] __initdata = {
+ 	&mioa701_gpio_keys,
+ 	&mioa701_backlight,
+ 	&mioa701_led,
+-	&wm9713_acodec,
+ 	&pxa2xx_pcm,
+ 	&mioa701_sound,
+ 	&power_dev,
+-- 
+2.11.0
