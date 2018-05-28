@@ -1,253 +1,84 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 28 May 2018 09:24:36 +0000
-Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <AM0PR04MB421169E44830A17D8A52D3F4806A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
- <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
- <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
- <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
- <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180503124030.jkc7oox2vyjblk2y@pengutronix.de>
- <AM0PR04MB421169E44830A17D8A52D3F4806A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211FCC9F3902F14EBD28313806E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 28 May 2018 11:36:03 +0200
+Subject: [PATCH 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
+In-Reply-To: <CAMuHMdXYyN=XY6nb9RVEE+t0NeoSPhTh6fUk-9YWdFzAE1FfPA@mail.gmail.com>
+References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+ <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
+ <CAMuHMdXRnoyhNz=3v_=ZCV=FWX4TwKqx7MpH0g3c7GwtXKP1tg@mail.gmail.com>
+ <fc1cfd7e-db27-9277-dbed-cc2274c614a6@gmail.com>
+ <CAMuHMdXnNABJSJZ6MLF+aQu8QKpFoMCAvno9Yc-9LOe810NtbA@mail.gmail.com>
+ <7e1563c3-3e13-235b-3071-c3936502530f@gmail.com>
+ <20180528084135.q5xng5eaypprsypr@verge.net.au>
+ <CAMuHMdXYyN=XY6nb9RVEE+t0NeoSPhTh6fUk-9YWdFzAE1FfPA@mail.gmail.com>
+Message-ID: <20180528093602.eb36j34bbfzmpmw2@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, May 28, 2018 at 10:54:57AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Mon, May 28, 2018 at 10:41 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, May 24, 2018 at 04:52:59PM +0200, Marek Vasut wrote:
+> >> On 05/23/2018 08:25 AM, Geert Uytterhoeven wrote:
+> >> > On Wed, May 23, 2018 at 12:01 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> >> On 05/22/2018 04:43 PM, Geert Uytterhoeven wrote:
+> >> >>> On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> >>>> Drop the MTD partitioning from DT, since it does not describe HW
+> >> >>>> and to give way to a more flexible kernel command line partition
+> >> >>>> passing.
+> >> >>>>
+> >> >>>> To retain the original partitioning, assure you have enabled
+> >> >>>> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+> >> >>>> following to your kernel command line:
+> >> >>>>
+> >> >>>>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
+> >> >>>
+> >> >>> I think the "@0" can be dropped, as it's optional?
+> >> >>> 4m?
+> >> >>
+> >> >> My take on this is that the loader is actually at offset 0x0 of the MTD
+> >> >> device and we explicitly state that in the mtdparts to anchor the first
+> >> >> partition within the MTD device and all the other partitions are at
+> >> >> offset +(sum of the sizes of all partitions listed before the current
+> >> >> one) relative to that first partition.
+> >> >
+> >> > Where is this explicitly states for the first partition?
+> >> >
+> >> >> Removing the @0 feels fragile at best and it seems to depend on the
+> >> >> current behavior of the code.
+> >> >
+> >> > Better, it also depends on the documented behavior:
+> >> >
+> >> > Documentation/admin-guide/kernel-parameters.txt refers to
+> >> > drivers/mtd/cmdlinepart.c, which states:
+> >> >
+> >> >  * <offset>  := standard linux memsize
+> >> >  *              if omitted the part will immediately follow the previous part
+> >> >  *              or 0 if the first part
+> >> >
+> >> > None of the examples listed there or under the MTD_CMDLINE_PARTS Kconfig
+> >> > help text, or in a defconfig bundled with the kernel, use @0 for the first
+> >> > partition.
+> >>
+> >> I think this is exceptionally fragile and dangerous to depend on this,
+> >> but so be it.
+> >
+> > Could you respin with this change?
+> >
+> > I would also like to ask for another change, in light of recent
+> > feedback from Olof Johansson ("Re: [GIT PULL] Renesas ARM64 Based SoC DT
+> > Updates for v4.18").
+> >
+> > Please consolidate the dts patches into a single patch?
+> 
+> I think it's better to keep them split, as each commit description mentions
+> what needs to be passed on the kernel command line for the corresponding
+> board.
+> 
+> Combining it in a single patch makes it much harder to extract this information.
+> Unless you're fine with a list:
+> 
+>    koelsch: ...
+>    wheat: mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Thursday, May 24, 2018 4:56 PM
-> To: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
-> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> Subject: RE: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-> 
-> Hi Sascha,
-> 
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: Thursday, May 3, 2018 8:41 PM
-> > To: A.s. Dong <aisheng.dong@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
-> Estevam
-> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-> >
-> > On Thu, May 03, 2018 at 12:29:40PM +0000, A.s. Dong wrote:
-> > > > -----Original Message-----
-> > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > > > Sent: Thursday, May 3, 2018 7:06 PM
-> > > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> > > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
-> > > > Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > > > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-> > > >
-> > > > On Wed, May 02, 2018 at 06:40:03PM +0000, A.s. Dong wrote:
-> > > > > > -----Original Message-----
-> > > > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > > > > > Sent: Wednesday, May 2, 2018 6:04 PM
-> > > > > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > > > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> > > > > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
-> > > > > > Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > > > > > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and
-> > > > > > APIs
-> > > > > >
-> > > > > > On Sat, Apr 28, 2018 at 02:46:16AM +0800, Dong Aisheng wrote:
-> > > > > > > +/* Initialization of the MU code. */ int __init
-> > > > > > > +imx8_scu_init(void) {
-> > > > > > > +	struct device_node *np, *mu_np;
-> > > > > > > +	struct resource mu_res;
-> > > > > > > +	sc_err_t sci_err;
-> > > > > > > +	int ret;
-> > > > > > > +
-> > > > > > > +	if (!of_machine_is_compatible("fsl,imx8qxp"))
-> > > > > > > +		return 0;
-> > > > > > > +
-> > > > > > > +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-
-> > scu");
-> > > > > > > +	if (!np)
-> > > > > > > +		return -ENODEV;
-> > > > > > > +
-> > > > > > > +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
-> > > > > > > +	if (WARN_ON(!mu_np))
-> > > > > > > +		return -EINVAL;
-> > > > > > > +
-> > > > > > > +	ret = of_address_to_resource(mu_np, 0, &mu_res);
-> > > > > > > +	if (WARN_ON(ret))
-> > > > > > > +		return -EINVAL;
-> > > > > > > +
-> > > > > > > +	/* we use mu physical address as IPC communication channel
-> > ID */
-> > > > > > > +	sci_err = sc_ipc_open(&scu_ipc_handle,
-> > (sc_ipc_id_t)(mu_res.start));
-> > > > > > > +	if (sci_err != SC_ERR_NONE) {
-> > > > > > > +		pr_err("Cannot open MU channel to SCU\n");
-> > > > > > > +		return sci_err;
-> > > > > > > +	};
-> > > > > >
-> > > > > > Introducing private error codes always has the risk of just
-> > > > > > forwarding them as errno codes as done here.
-> > > > > >
-> > > > >
-> > > > > Yes, you're right.
-> > > > > We probably could do the same as scpi_to_linux_errno in
-> > > > > drivers/firmware/arm_scpi.c.
-> > > > > However, may can't fix the issue permanently.
-> > > > >
-> > > > > > > +
-> > > > > > > +	of_node_put(mu_np);
-> > > > > > > +
-> > > > > > > +	pr_info("NXP i.MX SCU Initialized (scu_ipc %u)\n",
-> > > > > > > +scu_ipc_handle);
-> > > > > > > +
-> > > > > > > +	return 0;
-> > > > > > > +}
-> > > > > > > +early_initcall(imx8_scu_init);
-> > > > > >
-> > > > > > This code shows that the separate 'scu' device node shouldn't exist.
-> > > > > > It is only used as a stepping stone to find the 'mu' node.
-> > > > > > Instead of providing a proper driver for the 'mu' node the scu
-> > > > > > code registers it
-> > > > with its physical address.
-> > > > > > I don't think it makes sense to separate mu and scu code in this way.
-> > > > > >
-> > > > >
-> > > > > I agree that may not look quite well.
-> > > > > It mainly because we want to use the MU physical address as a MU ID.
-> > > > > (can't use virtual address as sc_ipc_id_t is u32 defined by SCU
-> firmware.
-> > > > >
-> > > > > If you have any better suggestion please let me know.
-> > > >
-> > > > What I'm suggesting is a single node:
-> > > >
-> > > > 	scu at 5d1b0000 {
-> > > > 		compatible = "fsl,imx8qxp-scu";
-> > > > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
-> > > > 	};
-> > > >
-> > > > Attach your code to this one, without any further separation
-> > > > between mu and scu code.
-> > > >
-> > >
-> > > A bit confused. You're suggesting a single node here without mu or
-> > > mailbox node phandle in it? Then how SCU use MU?
-> >
-> > ioremap the address and mu_receive_msg()/mu_send_msg() on it, just
-> > like you do already.
-> >
-> > >
-> > > > We discussed this internally and came to the conclusion that the
-> > > > SCU is not a generic user of a MU. The MU is designed to work
-> > > > together with a piece of SRAM to form a mailbox system. Instead of
-> > > > working as designed the SCU morses the messages through the
-> > > > doorbell (what the MU really is). For anything that uses the MU in
-> > > > the way it is designed I would suggest using the mailbox interface
-> > > > from drivers/mailbox/ along with the binding from
-> > Documentation/devicetree/bindings/mailbox/mailbox.txt.
-> > > >
-> > > > In the way I suggest there is no need for any MU ID.
-> > > >
-> > >
-> > > So you're suggesting switch to use mailbox instead of private MU
-> > > library function calls?
-> > > Something like:
-> > >         scu {
-> > >                 compatible = "nxp,imx8qxp-scu", "simple-bus";
-> > >                 mboxes = <&mailbox 0>;
-> > >         }
-> > > Then IPC is implemented based on mailbox?
-> > >
-> > > As I replied Oleksij Rempel in another mail in this thread, we've
-> > > tried mailbox but got performance regression issue and need more
-> > > time to investigate whether it's really quite suitable for i.MX SCU
-> > > firmware as SCU handling message quite fast in micro seconds.
-> > > (Mailbox polling method has much more latency than current MU sample
-> > > polling we
-> > > used) and we want to avoid the SCU firmware API changes.
-> >
-> > I am not suggesting to do mailboxing (using shared memory) for the SCU.
-> > I am also not suggesting any API update for the SCU communication.
-> > I am just mentioning that doing mailboxing is the way the MU was
-> > originally designed for. Looking at the reference manual I see many MUs on
-> the i.MX8.
-> > I guess most of them are for communication between the different cores
-> > on the system. For these it's probably worth writing some generic MU
-> driver.
-> > The way the MU is used for communication with the SCU though is so
-> > special that it's not worth writing a generic driver, so just
-> > integrate the MU access functions in the SCU code.
-> >
-> 
-> I understand it.
-> 
-> One problem of the way you suggested may be that:
-> If we doing like below, we may lose flexibility to change the MU used for SCU
-> firmware communication.
-> 	scu at 5d1b0000 {
-> 		compatible = "fsl,imx8qxp-scu";
-> 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
-> 	};
-> 
-> And current design is that the system supports multiple MU channels used
-> by various users at the same time, e.g. SCU, Power Domain, Clock and others.
-> User can flexibly change it under their nodes: And each MU channel is
-> protected by their private lock and not affect each others.
-> 
-> e.g.
->         scu {
->                 compatible = "nxp,imx8qxp-scu", "simple-bus";
->                 fsl,mu = <&lsio_mu0>;
-> 
->                 clk: clk {
->                         compatible = "fsl,imx8qxp-clk";
->                         #clock-cells = <1>;
->                 };
-> 
->                 iomuxc: iomuxc {
->                         compatible = "fsl,imx8qxp-iomuxc";
->                         fsl,mu = <&lsio_mu3>;
->                 };
-> 
->                 imx8qx-pm {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         fsl,mu = <&lsio_mu4>;
-> 	.............
->         }
-> 
-> The default code only uses MU0 which is used by SCU.
-> 
-> The change may affect this design. Any ideas?
-> Do you think we can keep the current way?
-> 
-
-Any comments about this?
-
-Regards
-Dong Aisheng
-
-> Regards
-> Dong Aisheng
-> 
-> > Sascha
-> >
-> > --
-> > Pengutronix e.K.                           |                             |
-> > Industrial Linux Solutions                 |
-> >
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
-> >
-> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7C266
-> > 24a5c38e5488a80b708d5b0f3107b%7C686ea1d3bc2b4c6fa92cd99c5c301635%
-> >
-> 7C0%7C0%7C636609480354404338&sdata=XP%2BYdt9I7zURrQun2jRbempLhC
-> > XrYtMVMb3dEWrZuro%3D&reserved=0  |
-> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lets try a list.
