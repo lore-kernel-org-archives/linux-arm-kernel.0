@@ -1,37 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 May 2018 17:48:39 +0200
-Subject: [PATCH] PCI: versatile: include pci.h
-Message-ID: <20180528154850.2647019-1-arnd@arndb.de>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Mon, 28 May 2018 17:50:42 +0200
+Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
+In-Reply-To: <20180528072034.GB3143@dragon>
+References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
+ <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
+ <20180224074543.GF3217@dragon>
+ <20180226134741.neqkpge33zo3pfzt@earth.universe>
+ <20180227011033.GV3217@dragon>
+ <20180227101712.3zwobvs4ox4jchcj@earth.universe>
+ <20180528022652.GA3143@dragon>
+ <20180528064131.y5burm5kakiazaq4@earth.universe>
+ <20180528072034.GB3143@dragon>
+Message-ID: <20180528155042.ilmyqe4z5gekakrl@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two patches for PCI host drivers clashed recently, leading to a broken
-build for versatile-pci:
+Hi,
 
-drivers/pci/host/pci-versatile.c: In function 'versatile_pci_parse_request_of_pci_ranges':
-drivers/pci/host/pci-versatile.c:70:8: error: implicit declaration of function 'devm_of_pci_get_host_bridge_resources'; did you mean 'pci_get_host_bridge_device'? [-Werror=implicit-function-declaration]
+On Mon, May 28, 2018 at 03:20:35PM +0800, Shawn Guo wrote:
+> On Mon, May 28, 2018 at 08:41:31AM +0200, Sebastian Reichel wrote:
+> > > Are you saying this is a very specific setup required by i.MX53 only?
+> > 
+> > Yes, all other SoCs supported by Linux ARM PMU counters driver can
+> > just use the registers without having to enable platform specific
+> > bits first.
+> > 
+> > > In that case, I can live with it.
+> > 
+> > What about the DT node? I did not add it, since this is a i.MX53
+> > specific workaround anyways.
+> 
+> What you are adding here is secure-reg-access property, which has an
+> defined meaning in PMU binding doc.  I'm not really sure if it's
+> appropriate to use the property as a condition for DBGEN bit setup.
+> Or can we set up the bit regardless of the property?
 
-This adds the missing header inclusion that became necessary now.
+The description for DBGEN bit is:
 
-Fixes: 9e2aee80c78d ("PCI: Move private DT related functions into private header")
-Fixes: 64720fd1f630 ("PCI: Rework of_pci_get_host_bridge_resources() to devm_of_pci_get_host_bridge_resources()")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pci/host/pci-versatile.c | 2 ++
- 1 file changed, 2 insertions(+)
+> Debug enable. This allows the user to manually activate clocks
+> within the debug system. This register bit directly controls the
+> platform's dbgen_out output signal which connects to the DAP_SYS to
+> enable all debug clocks. Once enabled, the clocks cannot be disabled
+> except by asserting the disable_trace input of the DAP_SYS.
 
-diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
-index ff2cd12b3978..994f32061b32 100644
---- a/drivers/pci/host/pci-versatile.c
-+++ b/drivers/pci/host/pci-versatile.c
-@@ -15,6 +15,8 @@
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- 
-+#include "../pci.h"
-+
- static void __iomem *versatile_pci_base;
- static void __iomem *versatile_cfg_base[2];
- 
--- 
-2.9.0
+I only enable this bit when the kernel configuration allows
+using the PMU, since otherwise we do not need the clocks
+in the debug system. This limits any potential side-effects
+of this patchset.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180528/a922700f/attachment.sig>
