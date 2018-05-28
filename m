@@ -1,49 +1,32 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 28 May 2018 17:21:10 -0400
-Subject: [PATCH V3 1/2] PCI: Try to clean up resources via remove if shutdown
- doesn't exist
-Message-ID: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
+Date: Mon, 28 May 2018 14:25:33 -0700
+Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
+In-Reply-To: <36b790d3fb4c43349cfa560283c03ab5@microsemi.com>
+References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
+ <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
+ <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+ <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
+ <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
+ <36b790d3fb4c43349cfa560283c03ab5@microsemi.com>
+Message-ID: <667a240c-9f83-181d-9aa3-f9ee3aa66272@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is up to a driver to implement shutdown() callback. If shutdown()
-callback is not implemented, PCI device can have pending interrupt and
-even do DMA transactions while the system is going down.
+On 5/24/2018 6:37 AM, Don Brace wrote:
+>> But we really need guidance from an hpsa expert.  I don't know the
+>> filesystem/SCSI/hpsa details.
+>>
+>> Bjorn
+> It's most likely OCSD traffic that will stop when bus mastering is turned off.
+> So, I'll run some tests on my end before ACKing your patch.
 
-If kexec is in use, this can damage the newly booting kexec kernel
-or even prevent it from booting altogether. Fallback to calling the
-remove() callback if shutdown() isn't implemented for a given driver.
+Can you test V3 instead of this?
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-Cc: stable at vger.kernel.org
-Reported-by: Ryan Finnie <ryan@finnie.org>
----
- drivers/pci/pci-driver.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+I don't think adding pci_disable_device() to shutdown() is enough to put
+the HW into safe state. I moved clean  up responsibility to remove() instead
+of shutdown().
 
-diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
-index cbda0e6..75a00fe 100644
---- a/drivers/pci/pci-driver.c
-+++ b/drivers/pci/pci-driver.c
-@@ -477,8 +477,17 @@ static void pci_device_shutdown(struct device *dev)
- 
- 	pm_runtime_resume(dev);
- 
-+	/*
-+	 * Try shutdown callback if it exists, otherwise fallback to remove
-+	 * callback. PCI drivers can do DMA and have pending interrupts.
-+	 * Leaving the DMA and interrupts pending could damage the newly
-+	 * booting kexec kernel as well as prevent it from booting altogether
-+	 * if the pending interrupt is level.
-+	 */
- 	if (drv && drv->shutdown)
- 		drv->shutdown(pci_dev);
-+	else if (drv && drv->remove)
-+		drv->remove(pci_dev);
- 
- 	/*
- 	 * If this is a kexec reboot, turn off Bus Master bit on the
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
