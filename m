@@ -1,92 +1,62 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 28 May 2018 17:11:28 +0800
-Subject: [PATCH v1 3/7] drm/mediatek: add dpi driver for mt2701 and mt7623
-In-Reply-To: <20180514075243.5442-4-bibby.hsieh@mediatek.com>
-References: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
- <20180514075243.5442-4-bibby.hsieh@mediatek.com>
-Message-ID: <1527498688.14913.5.camel@mtksdaap41>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 28 May 2018 09:12:33 +0000
+Subject: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
+ maillist as reviewer
+In-Reply-To: <20180528080037.GC3143@dragon>
+References: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
+ <1524855977-15719-6-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211D5AE2B22FFB8BA532ADD80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180528080037.GC3143@dragon>
+Message-ID: <AM0PR04MB4211BC85BCB3206473D76AC0806E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+Hi Shawn,
 
-On Mon, 2018-05-14 at 15:52 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, May 28, 2018 4:01 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: dongas86 at gmail.com; catalin.marinas at arm.com; will.deacon at arm.com;
+> robh+dt at kernel.org; dl-linux-imx <linux-imx@nxp.com>;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
+> maillist as reviewer
 > 
-> This patch adds dpi driver suppot for both mt2701 and mt7623.
-> And also support other (existing or future) chips that use
-> the same binding and driver.
+> On Fri, May 25, 2018 at 02:14:07AM +0000, A.s. Dong wrote:
+> > Hi Shawn,
+> >
+> > > -----Original Message-----
+> > > From: A.s. Dong
+> > > Sent: Saturday, April 28, 2018 3:06 AM
+> > > To: linux-arm-kernel at lists.infradead.org
+> > > Cc: dongas86 at gmail.com; kernel at pengutronix.de;
+> shawnguo at kernel.org;
+> > > Fabio Estevam <fabio.estevam@nxp.com>; robh+dt at kernel.org;
+> > > catalin.marinas at arm.com; will.deacon at arm.com; dl-linux-imx <linux-
+> > > imx at nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> > > Subject: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
+> > > maillist as reviewer
+> > >
+> > > Add NXP linux team upstream maillist as reviewer
+> > >
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >
+> > Would you pick this one first?
 > 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c     | 24 ++++++++++++++++++++++--
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c |  1 +
->  2 files changed, 23 insertions(+), 2 deletions(-)
+> Okay.  I changed patch subject a bit as below and applied the patch, since
+> usually we do not have subsystem prefix for MAINTAINERS change.
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 2b8b34c72697..e1af1d0d213d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -640,8 +640,7 @@ static int mtk_dpi_bind(struct device *dev, struct device *master, void *data)
->  	}
->  	drm_encoder_helper_add(&dpi->encoder, &mtk_dpi_encoder_helper_funcs);
->  
-> -	/* Currently DPI0 is fixed to be driven by OVL1 */
-> -	dpi->encoder.possible_crtcs = BIT(1);
-> +	dpi->encoder.possible_crtcs = BIT(0) | BIT(1);
+>   MAINTAINERS: add NXP linux team maillist as i.MX reviewer
+> 
 
-This modification influence not only mt2701, but also mt8173. So move
-this to an independent patch.
+Great. Thanks.
 
-Regards,
-CK
+Regards
+Dong Aisheng
 
->  	dpi->encoder.bridge->encoder = &dpi->encoder;
->  	ret = drm_bridge_attach(&dpi->encoder, dpi->encoder.bridge, NULL);
->  	if (ret) {
-> @@ -690,12 +689,33 @@ static unsigned int mt8173_calculate_factor(int clock)
->  		return 2 * 3;
->  }
->  
-> +static unsigned int mt2701_calculate_factor(int clock)
-> +{
-> +	if (clock <= 64000)
-> +		return 16;
-> +	else if (clock <= 128000)
-> +		return 8;
-> +	else if (clock <= 256000)
-> +		return 4;
-> +	else
-> +		return 2;
-> +}
-> +
->  static const struct mtk_dpi_conf mt8173_conf = {
->  	.cal_factor = mt8173_calculate_factor,
->  	.reg_h_fre_con = 0xe0,
->  };
->  
-> +static const struct mtk_dpi_conf mt2701_conf = {
-> +	.cal_factor = mt2701_calculate_factor,
-> +	.reg_h_fre_con = 0xb0,
-> +	.edge_sel_en = true,
-> +};
-> +
->  static const struct of_device_id mtk_dpi_of_ids[] = {
-> +	{ .compatible = "mediatek,mt2701-dpi",
-> +	  .data = &mt2701_conf,
-> +	},
->  	{ .compatible = "mediatek,mt8173-dpi",
->  	  .data = &mt8173_conf,
->  	},
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index a2ca90fc403c..f4fb86ab7b8d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -372,6 +372,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
->  	{ .compatible = "mediatek,mt8173-disp-ufoe",  .data = (void *)MTK_DISP_UFOE },
->  	{ .compatible = "mediatek,mt2701-dsi",	      .data = (void *)MTK_DSI },
->  	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
-> +	{ .compatible = "mediatek,mt2701-dpi",	      .data = (void *)MTK_DPI },
->  	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
->  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
->  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> Shawn
