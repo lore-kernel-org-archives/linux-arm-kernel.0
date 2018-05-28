@@ -1,35 +1,60 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 28 May 2018 17:13:57 +0200
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Add Marvell NAND controller
- support
-Message-ID: <20180528151357.29203-1-gregory.clement@bootlin.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 May 2018 17:15:13 +0200
+Subject: [PATCH] mmc: sunxi: mark PM functions as __maybe_unused
+In-Reply-To: <CAHp75VffA5Q2VxgkQqT6M_iLwZtv46Gy5Fz4Fx7PA9CvRnX0Ag@mail.gmail.com>
+References: <20180525210752.1794502-1-arnd@arndb.de>
+ <CAPDyKFoyBZ=k5UQyTmgkPd+30Htymw99Xeh3C+bDPo+VGyjrNw@mail.gmail.com>
+ <CAK8P3a2AGu4Lec1pwi87gb4QYn9QTy7mG2i9kWtfAR=An+k-7g@mail.gmail.com>
+ <CAHp75VffA5Q2VxgkQqT6M_iLwZtv46Gy5Fz4Fx7PA9CvRnX0Ag@mail.gmail.com>
+Message-ID: <CAK8P3a1z2AyUs536ujPm8dpYrktRoeFxcbNHQ_fgQK1idM5T+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Marvell NAND controller support used by some Marvell Armada based
-boards.
+On Mon, May 28, 2018 at 2:12 PM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> +Cc: Jean
+>
+> On Mon, May 28, 2018 at 2:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Mon, May 28, 2018 at 1:04 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> On 25 May 2018 at 23:07, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> The newly added runtime-pm functions cause a harmless warning
+>>>> when CONFIG_PM is disabled:
+>>>>
+>>>> drivers/mmc/host/sunxi-mmc.c:1452:12: error: 'sunxi_mmc_runtime_suspend' defined but not used [-Werror=unused-function]
+>>>>  static int sunxi_mmc_runtime_suspend(struct device *dev)
+>>>>             ^~~~~~~~~~~~~~~~~~~~~~~~~
+>>>> drivers/mmc/host/sunxi-mmc.c:1435:12: error: 'sunxi_mmc_runtime_resume' defined but not used [-Werror=unused-function]
+>>>>  static int sunxi_mmc_runtime_resume(struct device *dev)
+>>>>
+>>>> This marks them as __maybe_unused to shut up the warning.
+>>>
+>>> Most mmc drivers uses #ifdef CONFIG_PM instead of the __maybe_unused() option.
+>>>
+>>> It's not a big deal, but consistency is always good. Would you mind changing?
+>>
+>> I'd prefer not to. Most uses of #ifdef CONFIG_PM that get introduced are wrong,
+>> and cause additional randconfig warnings that I end up having to fix,
+>> so I always
+>> do it with __maybe_unused.
+>
+> Some of the maintainers have strong objection against such changes.
+> http://lkml.iu.edu/hypermail/linux/kernel/1805.1/06100.html
+>
+> It seems we might have a split in the opinions, which is not good in
+> this case (consistency for PM callbacks overall will be broken).
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
-Changelog v1 -> v2:
+We actually talked about this at the kernel summit last year, and the conclusion
+was that we should replace the SET_RUNTIME_PM_OPS(),
+SIMPLE_DEV_PM_OPS(), SET_SYSTEM_SLEEP_PM_OPS()
+etc macros with new ones that don't require the ugly #ifdef and just silently
+drop the unused functions.
 
- - Rebased on v4.17-rc1 (Dropped "ARM: multi_v7_defconfig: Update with
-   current configuration")
+Unfortunately we can't extend the existing macros to work that way (it
+breaks for drivers that have an #ifdef today), and nobody could come up
+with a new name that is at least as readable as the current one.
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Note that incorrect #ifdef usage here is the most common source of
+newly introduced build warnings and errors in the kernel, everyone gets
+those wrong since they are just very confusing.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e6b3c96d4c09..3fcb17b38f50 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -210,6 +210,7 @@ CONFIG_MTD_NAND_DENALI_DT=y
- CONFIG_MTD_NAND_OMAP2=y
- CONFIG_MTD_NAND_OMAP_BCH=y
- CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_NAND_MARVELL=y
- CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
--- 
-2.17.0
+       Arnd
