@@ -1,70 +1,85 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 28 May 2018 17:05:59 +0800
-Subject: [PATCH v1 5/7] drm/mediatek: implement connection from BLS to DPI0
-In-Reply-To: <20180514075243.5442-6-bibby.hsieh@mediatek.com>
-References: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
- <20180514075243.5442-6-bibby.hsieh@mediatek.com>
-Message-ID: <1527498359.14913.2.camel@mtksdaap41>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 28 May 2018 11:06:45 +0200
+Subject: [PATCH v2 10/11] arm64: dts: r8a77965-salvator-x: Enable DU
+ external clocks and HDMI
+In-Reply-To: <20180427165722.19445-11-kieran.bingham+renesas@ideasonboard.com>
+References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180427165722.19445-11-kieran.bingham+renesas@ideasonboard.com>
+Message-ID: <CAMuHMdW6HeWMwRDcn6PLnwzgxvYz-h=jx=1qvYEK9okwqY0itg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+Hi Kieran, Morimoto-san,
 
-On Mon, 2018-05-14 at 15:52 +0800, Bibby Hsieh wrote:
-> Modify display driver to support connection from BLS to DPI.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+On Fri, Apr 27, 2018 at 6:57 PM, Kieran Bingham
+<kieran.bingham+renesas@ideasonboard.com> wrote:
+> The DU1 external dot clock is provided by the fixed frequency clock
+> generator X21, while the DU0 and DU3 clocks are provided by the
+> programmable Versaclock5 clock generator.
+>
+> Enable the clocks, and the HDMI encoder for the M3-N Salvator-X board
+> and hook it up to the HDMI connector.
+>
+> Based on patches from Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 8130f3dab661..289a68c6731f 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -35,6 +35,7 @@
->  #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
->  #define DISP_REG_CONFIG_OUT_SEL			0x04c
->  #define DISP_REG_CONFIG_DSI_SEL			0x050
-> +#define DISP_REG_CONFIG_DPI_SEL			0x064
->  
->  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
->  #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
-> @@ -84,7 +85,10 @@
->  
->  #define OVL_MOUT_EN_RDMA		0x1
->  #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
-> +#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
->  #define DSI_SEL_IN_BLS			0x0
-> +#define DPI_SEL_IN_BLS			0x0
-> +#define DSI_SEL_IN_RDMA			0x1
->  
->  struct mtk_disp_mutex {
->  	int id;
-> @@ -189,9 +193,17 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
->  			     enum mtk_ddp_comp_id cur,
->  			     enum mtk_ddp_comp_id next)
->  {
-> -	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
-> +	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
->  		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
->  			       config_regs + DISP_REG_CONFIG_OUT_SEL);
+> v2:
+>  - Remove LVDS clocks from DU node
+>  - Merge DU Clocks and HDMI enablement
+> ---
+>  .../boot/dts/renesas/r8a77965-salvator-x.dts  | 28 +++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+> index 75d890d91df9..340a3c72b65a 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+> @@ -19,3 +19,31 @@
+>                 reg = <0x0 0x48000000 0x0 0x78000000>;
+>         };
+>  };
+> +
+> +&du {
+> +       clocks = <&cpg CPG_MOD 724>,
+> +                <&cpg CPG_MOD 723>,
+> +                <&cpg CPG_MOD 721>,
+> +                <&versaclock5 1>,
+> +                <&x21_clk>,
+> +                <&versaclock5 2>;
+> +       clock-names = "du.0", "du.1", "du.3",
+> +                     "dclkin.0", "dclkin.1", "dclkin.3";
+> +};
+> +
+> +&hdmi0 {
+> +       status = "okay";
+> +
+> +       ports {
+> +               port at 1 {
+> +                       reg = <1>;
+> +                       rcar_dw_hdmi0_out: endpoint {
+> +                               remote-endpoint = <&hdmi0_con>;
+> +                       };
+> +               };
+> +       };
+> +};
+> +
+> +&hdmi0_con {
+> +       remote-endpoint = <&rcar_dw_hdmi0_out>;
+> +};
 
-When BLS->DIP0, DISP_REG_CONFIG_DSI_SEL and DISP_REG_CONFIG_DPI_SEL are
-configured. I think these two register should be configured when
-BLS->DSI0.
+I think the hdmi0 and hdmi0_con parts can be moved to salvator-common.dtsi.
+Can we do that now (with stubs?), or does this have to wait until r8a77965 has
+received HDMI sound support?
 
-Regards,
-CK
+Gr{oetje,eeting}s,
 
-> +	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
-> +		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
-> +			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-> +		writel_relaxed(DSI_SEL_IN_RDMA,
-> +			       config_regs + DISP_REG_CONFIG_DSI_SEL);
-> +		writel_relaxed(DPI_SEL_IN_BLS,
-> +			       config_regs + DISP_REG_CONFIG_DPI_SEL);
-> +	}
->  }
->  
->  void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
