@@ -1,57 +1,37 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 28 May 2018 11:00:49 +0300
-Subject: [PATCH v4 3/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <20180525171941.26766-4-radu.pirea@microchip.com>
-References: <20180525171941.26766-1-radu.pirea@microchip.com>
- <20180525171941.26766-4-radu.pirea@microchip.com>
-Message-ID: <CAHp75VeeiFhShuMOVzuy2FjxrkfsxxzhyfAnwQNOoeaRwZ103Q@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 28 May 2018 16:15:50 +0800
+Subject: [GIT PULL] i.MX maintainers update for 4.18
+Message-ID: <20180528081549.GD3143@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 8:19 PM, Radu Pirea <radu.pirea@microchip.com> wrote:
-> This mfd driver is just a wrapper over atmel_serial driver and
-> spi-at91-usart driver. Selection of one of the drivers is based on a
-> property from device tree. If the property is not specified, the default
-> driver is atmel_serial.
+Hi Arnd, Olof,
 
-> +       depends on OF
+I'm not sure which one is easier for you.  You can pull the request or
+apply the patch to some arm-soc branch directly.
 
-What makes this driver OF specific?
+Shawn
 
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
 
-Ditto.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-> +#include <linux/pinctrl/pinctrl.h>
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-How exactly is this used?
+are available in the git repository at:
 
-> +#include <linux/platform_device.h>
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-maintainers-4.18
 
-> +#include <linux/slab.h>
+for you to fetch changes up to c309f0cdc30667efd233f1220587fb0b18c8423b:
 
-Ditto.
+  MAINTAINERS: add NXP linux team maillist as i.MX reviewer (2018-05-28 15:55:07 +0800)
 
-> +#include <linux/types.h>
+----------------------------------------------------------------
+i.MX maintainers update for 4.18:
+ - Add NXP linux team as a reviewer for i.MX platform support.
 
-> +static int at91_usart_mode_probe(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       struct mfd_cell cell;
-> +       u32 opmode;
-> +       int err;
-> +
+----------------------------------------------------------------
+Dong Aisheng (1):
+      MAINTAINERS: add NXP linux team maillist as i.MX reviewer
 
-> +       err = of_property_read_u32(np, "atmel,usart-mode", &opmode);
-
-Check unified device property API.
-
-> +       return mfd_add_devices(&pdev->dev, PLATFORM_DEVID_AUTO, &cell, 1,
-> +                             NULL, 0, NULL);
-
-No devm_ and no ->remove(). Why to leak resources?
-
--- 
-With Best Regards,
-Andy Shevchenko
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
