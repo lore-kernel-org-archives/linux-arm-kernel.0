@@ -1,58 +1,61 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 28 May 2018 11:47:04 +0200
-Subject: [PATCH 00/12] Add TOSHIBA TC358764 DSI/LVDS bridge driver
-References: <CGME20180528094721eucas1p22b90fd838ce00f029fec7f5241cc06b5@eucas1p2.samsung.com>
-Message-ID: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+Date: Mon, 28 May 2018 11:47:06 +0200
+Subject: [PATCH 02/12] drm/exynos: move pm_runtime_get_sync() to
+ exynos_dsi_init()
+In-Reply-To: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+ <CGME20180528094723eucas1p1776829e0b57d2ec6c4e28be872cf88fc@eucas1p1.samsung.com>
+Message-ID: <1527500833-16005-3-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In order to allow bridge drivers to use DSI transfers in their
+pre_enable callbacks, pm_runtime_get_sync() should be performed before
+exynos_dsi_enable(). DSIM_STATE_ENABLED flag now should not guard
+from calling dsi_host_transfer() before enabling.
 
-this patchset is a next attempt to add the tc358764 driver.
-The previous one can be found here:
+Signed-off-by: Maciej Purski <m.purski@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-https://lists.freedesktop.org/archives/dri-devel/2014-February/053705.html
-
-Back then, TC358764 was added as a panel driver.
-
-The bridge is supposed to be a DSI peripheral. Currently exynos_dsi accepts only panels
-as its peripherals. Therefore, some logic in exynos_dsi had to be ammended. That is implemented
-in first 4 patches.
-
-Apart from the driver this patchset adds support for BOE HV070WSA-100 panel, which is used by
-TC358764 and dts nodes to exynos5250.dtsi and exynos5250-arndale.dtsi.
-
-Best regards,
-
-Maciej Purski
-
-Maciej Purski (12):
-  drm/exynos: rename "bridge_node" to "mic_bridge_node"
-  drm/exynos: move pm_runtime_get_sync() to exynos_dsi_init()
-  drm/exynos: move connector creation to attach callback
-  drm/exynos: add non-panel path to exynos_dsi_enable()
-  panel/hv070wsa-100: add DT bindings
-  drm/panel: add support for BOE HV070WSA-100 panel to simple-panel
-  dt-bindings: tc358754: add DT bindings
-  drm/bridge: tc358764: Add DSI to LVDS bridge driver
-  ARM: dts: exynos5250: add mipi-phy node
-  ARM: dts: exynos5250: add DSI node
-  ARM: dts: exynos5250-arndale: add display regulators
-  ARM: dts: exynos5250-arndale: add dsi and panel nodes
-
- .../bindings/display/bridge/toshiba,tc358764.txt   |  42 ++
- .../bindings/display/panel/boe,hv070wsa-100.txt    |   7 +
- arch/arm/boot/dts/exynos5250-arndale.dts           |  63 +++
- arch/arm/boot/dts/exynos5250.dtsi                  |  20 +
- drivers/gpu/drm/bridge/Kconfig                     |   7 +
- drivers/gpu/drm/bridge/Makefile                    |   1 +
- drivers/gpu/drm/bridge/tc358764.c                  | 547 +++++++++++++++++++++
- drivers/gpu/drm/exynos/exynos_drm_dsi.c            |  84 ++--
- drivers/gpu/drm/panel/panel-simple.c               |  25 +
- 9 files changed, 756 insertions(+), 40 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
- create mode 100644 Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt
- create mode 100644 drivers/gpu/drm/bridge/tc358764.c
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 9599e6b..94460b0 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1312,6 +1312,7 @@ static int exynos_dsi_init(struct exynos_dsi *dsi)
+ {
+ 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
+ 
++	pm_runtime_get_sync(dsi->dev);
+ 	exynos_dsi_reset(dsi);
+ 	exynos_dsi_enable_irq(dsi);
+ 
+@@ -1388,7 +1389,6 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
+ 	ret = drm_panel_prepare(dsi->panel);
+ 	if (ret < 0) {
+ 		dsi->state &= ~DSIM_STATE_ENABLED;
+-		pm_runtime_put_sync(dsi->dev);
+ 		return;
+ 	}
+ 
+@@ -1400,7 +1400,6 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
+ 		dsi->state &= ~DSIM_STATE_ENABLED;
+ 		exynos_dsi_set_display_enable(dsi, false);
+ 		drm_panel_unprepare(dsi->panel);
+-		pm_runtime_put_sync(dsi->dev);
+ 		return;
+ 	}
+ 
+@@ -1566,9 +1565,6 @@ static ssize_t exynos_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	struct exynos_dsi_transfer xfer;
+ 	int ret;
+ 
+-	if (!(dsi->state & DSIM_STATE_ENABLED))
+-		return -EINVAL;
+-
+ 	if (!(dsi->state & DSIM_STATE_INITIALIZED)) {
+ 		ret = exynos_dsi_init(dsi);
+ 		if (ret)
 -- 
 2.7.4
