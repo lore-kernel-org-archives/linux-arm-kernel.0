@@ -1,32 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 28 May 2018 14:25:33 -0700
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <36b790d3fb4c43349cfa560283c03ab5@microsemi.com>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
- <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
- <82656e20-e821-1944-3399-1667ceb27719@codeaurora.org>
- <20180524130727.GA85822@bhelgaas-glaptop.roam.corp.google.com>
- <36b790d3fb4c43349cfa560283c03ab5@microsemi.com>
-Message-ID: <667a240c-9f83-181d-9aa3-f9ee3aa66272@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 28 May 2018 15:53:42 -0600
+Subject: [RFT v3 0/4] Perf script: Add python script for CoreSight trace
+ disassembler
+In-Reply-To: <20180528200326.GJ25467@kernel.org>
+References: <1527497103-3593-1-git-send-email-leo.yan@linaro.org>
+ <20180528200326.GJ25467@kernel.org>
+Message-ID: <CANLsYkzn5qyzjxMiCPQ1GxyNjhHJp-2H6Lds11HP9rG5xug0FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/24/2018 6:37 AM, Don Brace wrote:
->> But we really need guidance from an hpsa expert.  I don't know the
->> filesystem/SCSI/hpsa details.
+On 28 May 2018 at 14:03, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Mon, May 28, 2018 at 04:44:59PM +0800, Leo Yan escreveu:
+>> This patch series is to support for using 'perf script' for CoreSight
+>> trace disassembler, for this purpose this patch series adds a new
+>> python script to parse CoreSight tracing event and use command 'objdump'
+>> for disassembled lines, finally this can generate readable program
+>> execution flow for reviewing tracing data.
 >>
->> Bjorn
-> It's most likely OCSD traffic that will stop when bus mastering is turned off.
-> So, I'll run some tests on my end before ACKing your patch.
+>> Patch 0001 is one fixing patch to generate samples for the start packet
+>> and exception packets.
+>>
+>> Patch 0002 is the prerequisite to add addr into sample dict, so this
+>> value can be used by python script to analyze instruction range.
+>>
+>> Patch 0003 is to add python script for trace disassembler.
+>>
+>> Patch 0004 is to add doc to explain python script usage and give
+>> example for it.
+>>
+>> This patch series has been rebased on acme git tree [1] with the commit
+>> 19422a9f2a3b ("perf tools: Fix kernel_start for PTI on x86") and tested
+>> on Hikey (ARM64 octa CA53 cores).
+>
+> Thanks, applied to perf/core.
 
-Can you test V3 instead of this?
+Please hold off on that Arnaldo - I'm currently reviewing the set and
+I think some things can be improved.
 
-I don't think adding pci_disable_device() to shutdown() is enough to put
-the HW into safe state. I moved clean  up responsibility to remove() instead
-of shutdown().
+Thanks,
+Mathieu
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+> - Arnaldo
