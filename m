@@ -1,62 +1,43 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 28 May 2018 12:46:35 +0200
-Subject: [PATCH v4 4/8] PCI: Replace dev_node parameter of
- of_pci_get_host_bridge_resources with device
-In-Reply-To: <a74db976-d330-80b9-939e-dd164a20c8c3@mentor.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
- <a74db976-d330-80b9-939e-dd164a20c8c3@mentor.com>
-Message-ID: <eb9b477a-33c9-db45-9e62-101e3606e8ff@siemens.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 28 May 2018 16:27:34 +0530
+Subject: [PATCH 06/15] arm: dts: sun: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <20180528084446.g24fphqqac2hi3rr@flea>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <eded393f4b508a1f377f9af6859a3b82a6787e1c.1527244201.git.viresh.kumar@linaro.org>
+ <20180528084446.g24fphqqac2hi3rr@flea>
+Message-ID: <20180528105734.bkplm7tfaqsurdrn@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-28 12:00, Vladimir Zapolskiy wrote:
-> Hi Jan, Bjorn,
+On 28-05-18, 10:44, Maxime Ripard wrote:
+> Hi,
 > 
-> On 05/15/2018 12:07 PM, Jan Kiszka wrote:
->> From: Jan Kiszka <jan.kiszka@siemens.com>
->>
->> Another step towards a managed version of
->> of_pci_get_host_bridge_resources(): Feed in the underlying device,
->> rather than just the OF node. This will allow to use managed resource
->> allocation internally later on.
->>
->> CC: Jingoo Han <jingoohan1@gmail.com>
->> CC: Joao Pinto <Joao.Pinto@synopsys.com>
->> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> On Fri, May 25, 2018 at 04:01:52PM +0530, Viresh Kumar wrote:
+> > The cooling device properties, like "#cooling-cells" and
+> > "dynamic-power-coefficient", should either be present for all the CPUs
+> > of a cluster or none. If these are present only for a subset of CPUs of
+> > a cluster then things will start falling apart as soon as the CPUs are
+> > brought online in a different order. For example, this will happen
+> > because the operating system looks for such properties in the CPU node
+> > it is trying to bring up, so that it can register a cooling device.
+> > 
+> > Add such missing properties.
+> > 
+> > Fix other missing properties (clocks, OPP, clock latency) as well to
+> > make it all work.
+> > 
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> [snip]
+> The prefix should be sunxi and not sun, but it looks good to me
+> otherwise.
 > 
->> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
->> index a6af62e0256d..61802e55a00c 100644
->> --- a/drivers/pci/host/pcie-altera.c
->> +++ b/drivers/pci/host/pcie-altera.c
->> @@ -488,11 +488,10 @@ static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
->>  {
->>  	int err, res_valid = 0;
->>  	struct device *dev = &pcie->pdev->dev;
->> -	struct device_node *np = dev->of_node;
->>  	struct resource_entry *win;
->>  
->> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
->> -					       NULL);
->> +	err = of_pci_get_host_bridge_resources(dev, 0, 0xff
->> +						    &pcie->resources, NULL);
->>  	if (err)
->>  		return err;
->>  
-> 
-> In case if it is an undiscovered issue, a comma was mistakenly removed,
-> which will result it compilation error.
-> 
-> The problem is also found in pci/next , see commit 88e3909aa125.
+> Let me know what your preferred merge method is.
 
-Yes, that's known. We have a bisection breakage: The issue was fixed
-again by patch 6 in that series.
+Please pick it up directly and send it as part of your pull request.
+Do you want me to resend or can you fix the $subject ?
 
-Jan
+Thanks.
 
 -- 
-Siemens AG, Corporate Technology, CT RDA IOT SES-DE
-Corporate Competence Center Embedded Linux
+viresh
