@@ -1,47 +1,34 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 28 May 2018 09:20:10 +0200
-Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE
- disabled
-In-Reply-To: <20180525210843.1821071-1-arnd@arndb.de>
-References: <20180525210843.1821071-1-arnd@arndb.de>
-Message-ID: <91444ee7-40fa-5022-ca4d-1c15e0807347@st.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 28 May 2018 15:20:35 +0800
+Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
+In-Reply-To: <20180528064131.y5burm5kakiazaq4@earth.universe>
+References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
+ <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
+ <20180224074543.GF3217@dragon>
+ <20180226134741.neqkpge33zo3pfzt@earth.universe>
+ <20180227011033.GV3217@dragon>
+ <20180227101712.3zwobvs4ox4jchcj@earth.universe>
+ <20180528022652.GA3143@dragon>
+ <20180528064131.y5burm5kakiazaq4@earth.universe>
+Message-ID: <20180528072034.GB3143@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2018 11:08 PM, Arnd Bergmann wrote:
-> Without dmaengine support, we get a harmless warning about an
-> unused function:
+On Mon, May 28, 2018 at 08:41:31AM +0200, Sebastian Reichel wrote:
+> > Are you saying this is a very specific setup required by i.MX53 only?
 > 
-> drivers/pwm/pwm-stm32.c:166:12: error: 'stm32_pwm_capture' defined but not used [-Werror=unused-function]
+> Yes, all other SoCs supported by Linux ARM PMU counters driver can
+> just use the registers without having to enable platform specific
+> bits first.
 > 
-> Changing the #ifdef to an IS_ENABLED() check shuts up that warning
-> and is slightly nicer to read.
+> > In that case, I can live with it.
 > 
-> Fixes: 53e38fe73f94 ("pwm: stm32: Add capture support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/pwm/pwm-stm32.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-Hi Arnd,
+> What about the DT node? I did not add it, since this is a i.MX53
+> specific workaround anyways.
 
-Acked-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+What you are adding here is secure-reg-access property, which has an
+defined meaning in PMU binding doc.  I'm not really sure if it's
+appropriate to use the property as a condition for DBGEN bit setup.
+Or can we set up the bit regardless of the property?
 
-Thanks,
-Fabrice
-> 
-> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
-> index 60bfc07c4912..97bbc1f18fd6 100644
-> --- a/drivers/pwm/pwm-stm32.c
-> +++ b/drivers/pwm/pwm-stm32.c
-> @@ -484,9 +484,7 @@ static int stm32_pwm_apply_locked(struct pwm_chip *chip, struct pwm_device *pwm,
->  static const struct pwm_ops stm32pwm_ops = {
->  	.owner = THIS_MODULE,
->  	.apply = stm32_pwm_apply_locked,
-> -#if IS_ENABLED(CONFIG_DMA_ENGINE)
-> -	.capture = stm32_pwm_capture,
-> -#endif
-> +	.capture = IS_ENABLED(CONFIG_DMA_ENGINE) ? stm32_pwm_capture : NULL,
->  };
->  
->  static int stm32_pwm_set_breakinput(struct stm32_pwm *priv,
-> 
+Shawn
