@@ -1,45 +1,39 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 28 May 2018 15:12:37 +0300
-Subject: [PATCH] mmc: sunxi: mark PM functions as __maybe_unused
-In-Reply-To: <CAK8P3a2AGu4Lec1pwi87gb4QYn9QTy7mG2i9kWtfAR=An+k-7g@mail.gmail.com>
-References: <20180525210752.1794502-1-arnd@arndb.de>
- <CAPDyKFoyBZ=k5UQyTmgkPd+30Htymw99Xeh3C+bDPo+VGyjrNw@mail.gmail.com>
- <CAK8P3a2AGu4Lec1pwi87gb4QYn9QTy7mG2i9kWtfAR=An+k-7g@mail.gmail.com>
-Message-ID: <CAHp75VffA5Q2VxgkQqT6M_iLwZtv46Gy5Fz4Fx7PA9CvRnX0Ag@mail.gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 28 May 2018 21:21:48 +0900
+Subject: [PATCH] media: v4l2-ctrl: Add control for VP9 profile
+In-Reply-To: <a618b1b5-48ac-f725-39a6-50ba81b167f0@xs4all.nl>
+References: <20180517095349.203865-1-keiichiw@chromium.org>
+ <a618b1b5-48ac-f725-39a6-50ba81b167f0@xs4all.nl>
+Message-ID: <CAAFQd5AR=At5n=_ZyB_LM8cV6Mw5H5cqBqAH7-b6JUeE0b8Q9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Cc: Jean
+Hi Hans,
 
-On Mon, May 28, 2018 at 2:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, May 28, 2018 at 1:04 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 25 May 2018 at 23:07, Arnd Bergmann <arnd@arndb.de> wrote:
->>> The newly added runtime-pm functions cause a harmless warning
->>> when CONFIG_PM is disabled:
->>>
->>> drivers/mmc/host/sunxi-mmc.c:1452:12: error: 'sunxi_mmc_runtime_suspend' defined but not used [-Werror=unused-function]
->>>  static int sunxi_mmc_runtime_suspend(struct device *dev)
->>>             ^~~~~~~~~~~~~~~~~~~~~~~~~
->>> drivers/mmc/host/sunxi-mmc.c:1435:12: error: 'sunxi_mmc_runtime_resume' defined but not used [-Werror=unused-function]
->>>  static int sunxi_mmc_runtime_resume(struct device *dev)
->>>
->>> This marks them as __maybe_unused to shut up the warning.
->>
->> Most mmc drivers uses #ifdef CONFIG_PM instead of the __maybe_unused() option.
->>
->> It's not a big deal, but consistency is always good. Would you mind changing?
->
-> I'd prefer not to. Most uses of #ifdef CONFIG_PM that get introduced are wrong,
-> and cause additional randconfig warnings that I end up having to fix,
-> so I always
-> do it with __maybe_unused.
+On Fri, May 25, 2018 at 6:09 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
 
-Some of the maintainers have strong objection against such changes.
-http://lkml.iu.edu/hypermail/linux/kernel/1805.1/06100.html
+> On 17/05/18 11:53, Keiichi Watanabe wrote:
+> > Add a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE for selecting desired
+> > profile for VP9 encoder and querying for supported profiles by VP9
+encoder
+> > or decoder.
+> >
+> > An existing control V4L2_CID_MPEG_VIDEO_VPX_PROFILE cannot be
+> > used for querying since it is not a menu control but an integer
+> > control, which cannot return an arbitrary set of supported profiles.
+> >
+> > The new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE is a menu control as
+> > with controls for other codec profiles. (e.g. H264)
 
-It seems we might have a split in the opinions, which is not good in
-this case (consistency for PM callbacks overall will be broken).
+> I don't mind adding this control (although I would like to have an Ack
+from
+> Sylwester), but we also need this to be used in an actual kernel driver.
 
--- 
-With Best Regards,
-Andy Shevchenko
+> Otherwise we're adding a control that nobody uses.
+
+Indeed. We were supposed to also include a patch for mtk-vcodec driver, but
+somehow it went MIA. Keiichi will add it in next revision. Thanks for
+giving this a look.
+
+Best regards,
+Tomasz
