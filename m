@@ -1,94 +1,104 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 28 May 2018 18:41:45 +0200
-Subject: [PATCH 12/12] ARM: dts: exynos5250-arndale: add dsi and panel
- nodes
-In-Reply-To: <1527501347-16521-1-git-send-email-m.purski@samsung.com>
-References: <CGME20180528095555eucas1p2fb61f362a3aa2d0082b8c4001b17f176@eucas1p2.samsung.com>
- <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <1527501347-16521-1-git-send-email-m.purski@samsung.com>
-Message-ID: <CAJKOXPc6Wxcs2XYKGRXT7_G8ENzgJT1ocWAqviNs1D-mGBoF7w@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 28 May 2018 10:45:08 -0600
+Subject: [PATCH] perf tools: Fix indexing for decoder packet queue
+In-Reply-To: <CALZQ+UMbndvogrSb0Ey3ac1vDGqtsiRTR=ee8VGzU2Ni9_s0og@mail.gmail.com>
+References: <1527289854-10755-1-git-send-email-mathieu.poirier@linaro.org>
+ <CALZQ+UMbndvogrSb0Ey3ac1vDGqtsiRTR=ee8VGzU2Ni9_s0og@mail.gmail.com>
+Message-ID: <CANLsYkxUfGCEzWfVeXbkX-5khJb5VofjY9Qmhvn9_3soeZ54vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 11:55 AM, Maciej Purski <m.purski@samsung.com> wrote:
-> The patch adds bridge and panel nodes.
-> It adds also DSI properties specific for arndale board.
+On 27 May 2018 at 21:13, Leo Yan <leo.yan@linaro.org> wrote:
+> On Fri, May 25, 2018 at 05:10:54PM -0600, Mathieu Poirier wrote:
+>> The tail of a queue is supposed to be pointing to the next available slot
+>> in a queue.  In this implementation the tail is incremented before it is
+>> used and as such points to the last used element, something that has the
+>> immense advantage of centralizing tail management at a single location
+>> and eliminating a lot of redundant code.
+>>
+>> But this needs to be taken into consideration on the dequeueing side where
+>> the head also needs to be incremented before it is used, or the first
+>> available element of the queue will be skipped.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 12 ++++++++++--
+>>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+>> index c8b98fa22997..4d5fc374e730 100644
+>> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+>> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+>> @@ -96,11 +96,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
+>>   /* Nothing to do, might as well just return */
+>>   if (decoder->packet_count == 0)
+>>   return 0;
+>> + /*
+>> + * The queueing process in function cs_etm_decoder__buffer_packet()
+>> + * increments the tail *before* using it.  This is somewhat counter
+>> + * intuitive but it has the advantage of centralizing tail management
+>> + * at a single location.  Because of that we need to follow the same
+>> + * heuristic with the head, i.e we increment it before using its
+>> + * value.  Otherwise the first element of the packet queue is not
+>> + * used.
+>> + */
+>> + decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+>>
+>>   *packet = decoder->packet_buffer[decoder->head];
+>>
+>> - decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+>> -
 >
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250-arndale.dts | 39 ++++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
+> I tested this patch and confirmed it can work well with python
+> decoding script:
 >
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index 80221fa..6f0b1c4 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -71,6 +71,17 @@
->                 };
->         };
+> Tested-by: Leo Yan <leo.yan@linaro.org>
 >
-> +       panel: panel {
-> +               compatible = "boe,hv070wsa-100";
-> +               power-supply = <&vcc_3v3_reg>;
-> +               enable-gpios = <&gpd1 3 GPIO_ACTIVE_HIGH>;
-> +               port {
-> +                       panel_ep: endpoint {
-> +                               remote-endpoint = <&bridge_out_ep>;
-> +                       };
-> +               };
-> +       };
-> +
->         regulators {
->                 compatible = "simple-bus";
->                 #address-cells = <1>;
-> @@ -476,6 +487,34 @@
->         };
->  };
+> Actually, I have another idea for this fixing, seems to me
+> the unchanged code has right logic for decoder->head, and I think this
+> issue is more related with incorrect initialization index.  So we can
+> change the initialization index for decoder->head as below.  How about
+> you think for this?
 >
-> +&dsi_0 {
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index c8b98fa..b133260 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -249,7 +249,7 @@ static void cs_etm_decoder__clear_buffer(struct
+> cs_etm_decoder *decoder)
+>  {
+>         int i;
+>
+> -       decoder->head = 0;
+> +       decoder->head = 1;
 
-Please put the node alphabetically, so before &dp.
+I flirted with that idea but thought the problem is really with the
+tail and as such would have done:
 
-Also this patch should be squashed with previous one (regulators),
-because adding non-controllable fixed regulators on its own does not
-bring benefits. Linux will not disable them. You added these
-regulators for the bridge below. Without the bridge, their existence
-does not have much sense.
+        decoder->tail = -1;
 
-Best regards,
-Krzysztof
+But since both head and tail are declared as u32 it would have
+required changing the types to int, necessitating modifications
+everywhere other parts of the code deals with them.  As such I just
+decided to swap the order of events in cs_etm_decoder__get_packet().
 
-> +       vddcore-supply = <&ldo8_reg>;
-> +       vddio-supply = <&ldo10_reg>;
-> +       samsung,pll-clock-frequency = <24000000>;
-> +       samsung,burst-clock-frequency = <320000000>;
-> +       samsung,esc-clock-frequency = <10000000>;
-> +       status = "okay";
-> +
-> +       bridge at 0 {
-> +               reg = <0>;
-> +               compatible = "toshiba,tc358764";
-> +               vddc-supply = <&vcc_1v2_reg>;
-> +               vddio-supply = <&vcc_1v8_reg>;
-> +               vddmipi-supply = <&vcc_1v2_reg>;
-> +               vddlvds133-supply = <&vcc_3v3_reg>;
-> +               vddlvds112-supply = <&vcc_1v2_reg>;
-> +               reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               port at 1 {
-> +                       reg = <1>;
-> +                       bridge_out_ep: endpoint {
-> +                               remote-endpoint = <&panel_ep>;
-> +                       };
-> +               };
-> +       };
-> +};
-> +
->  &i2c_2 {
->         status = "okay";
->         /* used by HDMI DDC */
-> --
-> 2.7.4
+I'm not strongly opinionated on this and can send another patch if you're keen.
+
+Thanks for the feedback,
+Mathieu
+
+
+>         decoder->tail = 0;
+>         decoder->packet_count = 0;
+>         for (i = 0; i < MAX_BUFFER; i++) {
 >
+> Thanks,
+> Leo Yan
+>
+>>   decoder->packet_count--;
+>>
+>>   return 1;
+>> --
+>> 2.7.4
+>>
