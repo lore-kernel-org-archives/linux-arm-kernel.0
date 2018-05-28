@@ -1,30 +1,34 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 28 May 2018 11:01:37 -0700
-Subject: [PATCH v4 6/6] arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
-In-Reply-To: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
-References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527530497-10392-7-git-send-email-ray.jui@broadcom.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 28 May 2018 20:53:10 +0200
+Subject: [PATCH] dt-bindings: arm: Remove obsolete insignal-boards.txt
+Message-ID: <20180528185310.21971-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the SP805 watchdog timer
+The compatibles mentioned in insignal-boards.txt are already documented
+under devicetree/bindings/arm/samsung/samsung-boards.txt.  Also the
+contents of insignal-boards.txt is not accurate, e.g. does not mention
+Arndale boards.
 
-Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/arm/insignal-boards.txt | 8 --------
+ 1 file changed, 8 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/insignal-boards.txt
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ecf6137..3fe5eb5 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -351,6 +351,7 @@ CONFIG_ROCKCHIP_THERMAL=m
- CONFIG_TEGRA_BPMP_THERMAL=m
- CONFIG_UNIPHIER_THERMAL=y
- CONFIG_WATCHDOG=y
-+CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MESON_GXBB_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=m
+diff --git a/Documentation/devicetree/bindings/arm/insignal-boards.txt b/Documentation/devicetree/bindings/arm/insignal-boards.txt
+deleted file mode 100644
+index 524c3dc5d808..000000000000
+--- a/Documentation/devicetree/bindings/arm/insignal-boards.txt
++++ /dev/null
+@@ -1,8 +0,0 @@
+-* Insignal's Exynos4210 based Origen evaluation board
+-
+-Origen low-cost evaluation board is based on Samsung's Exynos4210 SoC.
+-
+-Required root node properties:
+-    - compatible = should be one or more of the following.
+-        (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
+-        (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
 -- 
-2.1.4
+2.14.1
