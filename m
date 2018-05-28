@@ -1,65 +1,58 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 28 May 2018 11:47:10 +0200
-Subject: [PATCH 06/12] drm/panel: add support for BOE HV070WSA-100 panel to
- simple-panel
-In-Reply-To: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
-References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <CGME20180528094727eucas1p272478562b72a95dac2fc1b03be57c514@eucas1p2.samsung.com>
-Message-ID: <1527500833-16005-7-git-send-email-m.purski@samsung.com>
+Date: Mon, 28 May 2018 11:47:04 +0200
+Subject: [PATCH 00/12] Add TOSHIBA TC358764 DSI/LVDS bridge driver
+References: <CGME20180528094721eucas1p22b90fd838ce00f029fec7f5241cc06b5@eucas1p2.samsung.com>
+Message-ID: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds support for BOE HV070WSA-100 WSVGA 7.01 inch panel
-in panel-simple driver. The panel is used in Exynos5250-arndale boards.
+Hi all,
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
----
- drivers/gpu/drm/panel/panel-simple.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+this patchset is a next attempt to add the tc358764 driver.
+The previous one can be found here:
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index cbf1ab4..d5da58d 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
- 	},
- };
- 
-+static const struct drm_display_mode boe_hv070wsa_mode = {
-+	.clock = 40800,
-+	.hdisplay = 1024,
-+	.hsync_start = 1024 + 90,
-+	.hsync_end = 1024 + 90 + 90,
-+	.htotal = 1024 + 90 + 90 + 90,
-+	.vdisplay = 600,
-+	.vsync_start = 600 + 3,
-+	.vsync_end = 600 + 3 + 4,
-+	.vtotal = 600 + 3 + 4 + 3,
-+	.vrefresh = 60,
-+};
-+
-+static const struct panel_desc boe_hv070wsa = {
-+	.modes = &boe_hv070wsa_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 154,
-+		.height = 90,
-+	},
-+};
-+
- static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
- 	{
- 		.clock = 71900,
-@@ -2113,6 +2135,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "avic,tm070ddh03",
- 		.data = &avic_tm070ddh03,
- 	}, {
-+		.compatible = "boe,hv070wsa-100",
-+		.data = &boe_hv070wsa
-+	}, {
- 		.compatible = "boe,nv101wxmn51",
- 		.data = &boe_nv101wxmn51,
- 	}, {
+https://lists.freedesktop.org/archives/dri-devel/2014-February/053705.html
+
+Back then, TC358764 was added as a panel driver.
+
+The bridge is supposed to be a DSI peripheral. Currently exynos_dsi accepts only panels
+as its peripherals. Therefore, some logic in exynos_dsi had to be ammended. That is implemented
+in first 4 patches.
+
+Apart from the driver this patchset adds support for BOE HV070WSA-100 panel, which is used by
+TC358764 and dts nodes to exynos5250.dtsi and exynos5250-arndale.dtsi.
+
+Best regards,
+
+Maciej Purski
+
+Maciej Purski (12):
+  drm/exynos: rename "bridge_node" to "mic_bridge_node"
+  drm/exynos: move pm_runtime_get_sync() to exynos_dsi_init()
+  drm/exynos: move connector creation to attach callback
+  drm/exynos: add non-panel path to exynos_dsi_enable()
+  panel/hv070wsa-100: add DT bindings
+  drm/panel: add support for BOE HV070WSA-100 panel to simple-panel
+  dt-bindings: tc358754: add DT bindings
+  drm/bridge: tc358764: Add DSI to LVDS bridge driver
+  ARM: dts: exynos5250: add mipi-phy node
+  ARM: dts: exynos5250: add DSI node
+  ARM: dts: exynos5250-arndale: add display regulators
+  ARM: dts: exynos5250-arndale: add dsi and panel nodes
+
+ .../bindings/display/bridge/toshiba,tc358764.txt   |  42 ++
+ .../bindings/display/panel/boe,hv070wsa-100.txt    |   7 +
+ arch/arm/boot/dts/exynos5250-arndale.dts           |  63 +++
+ arch/arm/boot/dts/exynos5250.dtsi                  |  20 +
+ drivers/gpu/drm/bridge/Kconfig                     |   7 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/tc358764.c                  | 547 +++++++++++++++++++++
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c            |  84 ++--
+ drivers/gpu/drm/panel/panel-simple.c               |  25 +
+ 9 files changed, 756 insertions(+), 40 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt
+ create mode 100644 drivers/gpu/drm/bridge/tc358764.c
+
 -- 
 2.7.4
