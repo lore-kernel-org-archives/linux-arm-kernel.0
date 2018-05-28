@@ -1,53 +1,159 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 28 May 2018 16:46:51 +0530
-Subject: [PATCH 1/6] arm64: dts: amlogic: Add missing cooling device
- properties for CPUs
-In-Reply-To: <9f9cc086-6069-afbc-d3c6-46608ff35b79@baylibre.com>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <2a2eb28da9fecf129f6bc0ab3d3748d9f4d25a29.1527225682.git.viresh.kumar@linaro.org>
- <20180525211025.c73zdcdtyuvlewng@localhost>
- <9f9cc086-6069-afbc-d3c6-46608ff35b79@baylibre.com>
-Message-ID: <20180528111651.s7xl7e46sfduqk6j@vireshk-i7>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 28 May 2018 13:27:46 +0200
+Subject: [PATCH] mmc: sdhci-*: Don't emit error msg if sdhci_add_host()
+ fails
+In-Reply-To: <20180525151509.0270dbe1@xhacker.debian>
+References: <20180525151509.0270dbe1@xhacker.debian>
+Message-ID: <CAPDyKFoJsMwsBLgX=80QE2k+E+zYQfbNv_TyKqEJAWML5_OnWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-05-18, 10:37, Neil Armstrong wrote:
-> Hi,
-> 
-> On 25/05/2018 23:10, Olof Johansson wrote:
-> > On Fri, May 25, 2018 at 11:10:01AM +0530, Viresh Kumar wrote:
-> >> The cooling device properties, like "#cooling-cells" and
-> >> "dynamic-power-coefficient", should either be present for all the CPUs
-> >> of a cluster or none. If these are present only for a subset of CPUs of
-> >> a cluster then things will start falling apart as soon as the CPUs are
-> >> brought online in a different order. For example, this will happen
-> >> because the operating system looks for such properties in the CPU node
-> >> it is trying to bring up, so that it can register a cooling device.
-> >>
-> >> Add such missing properties.
-> > 
-> > This seems awkward compared to just having one cooling-cells in the /cpus node
-> > instead.
-> > 
-> > What's it used for? I don't see any properties in the device nodes on meson-gxm
-> > that have any cooling-foo cells in them? So why should #cooling-cells be
-> > needed?
-> 
-> 
-> There is no reason to have the cooling-cells on these other CPUs, the DVFS is
-> controlled on the first CPU of each cluster, here cpu0 and cpu4 and only
-> cpu0 and cpu4 are used as cooling-cells.
+On 25 May 2018 at 09:15, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
+> I noticed below error msg with sdhci-pxav3 on some berlin platforms:
+>
+> [.....] sdhci-pxav3 f7ab0000.sdhci failed to add host
+>
+> It is due to getting related vmmc or vqmmc regulator returns
+> -EPROBE_DEFER. It doesn't matter at all but it's confusing.
+>
+> From another side, if driver probing fails and the error number isn't
+> -EPROBE_DEFER, the core will tell us something as below:
+>
+> [.....] sdhci-pxav3: probe of f7ab0000.sdhci failed with error -EXX
+>
+> So it's not necessary to emit error msg if sdhci_add_host() fails. And
+> some other sdhci host drivers also have this issue, let's fix them
+> together.
+>
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 
-First, this is an incomplete definition of the hardware as all the
-CPUs are cooling-devices here and DT shouldn't be written assuming how
-OS will interpret it.
+Thanks, applied for next!
 
-And then it is broken right now. You can offline your second cluster
-(4567 CPUs) and bring CPU5 up first. You will see things breaking.
+Kind regards
+Uffe
 
-I have explained more in detail here.
-
-https://marc.info/?l=linux-kernel&m=152750569414761
-
--- 
-viresh
+> ---
+>  drivers/mmc/host/sdhci-bcm-kona.c | 4 +---
+>  drivers/mmc/host/sdhci-pic32.c    | 4 +---
+>  drivers/mmc/host/sdhci-pxav2.c    | 4 +---
+>  drivers/mmc/host/sdhci-pxav3.c    | 4 +---
+>  drivers/mmc/host/sdhci-s3c.c      | 4 +---
+>  drivers/mmc/host/sdhci-spear.c    | 4 +---
+>  drivers/mmc/host/sdhci-st.c       | 4 +---
+>  7 files changed, 7 insertions(+), 21 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
+> index 11ca95c60bcf..bdbd4897c0f7 100644
+> --- a/drivers/mmc/host/sdhci-bcm-kona.c
+> +++ b/drivers/mmc/host/sdhci-bcm-kona.c
+> @@ -284,10 +284,8 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
+>         sdhci_bcm_kona_sd_init(host);
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_err(dev, "Failed sdhci_add_host\n");
+> +       if (ret)
+>                 goto err_reset;
+> -       }
+>
+>         /* if device is eMMC, emulate card insert right here */
+>         if (!mmc_card_is_removable(host->mmc)) {
+> diff --git a/drivers/mmc/host/sdhci-pic32.c b/drivers/mmc/host/sdhci-pic32.c
+> index a6caa49ca25a..a11e6397d4ff 100644
+> --- a/drivers/mmc/host/sdhci-pic32.c
+> +++ b/drivers/mmc/host/sdhci-pic32.c
+> @@ -200,10 +200,8 @@ static int pic32_sdhci_probe(struct platform_device *pdev)
+>         }
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_err(&pdev->dev, "error adding host\n");
+> +       if (ret)
+>                 goto err_base_clk;
+> -       }
+>
+>         dev_info(&pdev->dev, "Successfully added sdhci host\n");
+>         return 0;
+> diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
+> index 8986f9d9cf98..2c3827f54927 100644
+> --- a/drivers/mmc/host/sdhci-pxav2.c
+> +++ b/drivers/mmc/host/sdhci-pxav2.c
+> @@ -221,10 +221,8 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
+>         host->ops = &pxav2_sdhci_ops;
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_err(&pdev->dev, "failed to add host\n");
+> +       if (ret)
+>                 goto disable_clk;
+> -       }
+>
+>         return 0;
+>
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index a34434166ca7..b8e96f392428 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -472,10 +472,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>         pm_suspend_ignore_children(&pdev->dev, 1);
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_err(&pdev->dev, "failed to add host\n");
+> +       if (ret)
+>                 goto err_add_host;
+> -       }
+>
+>         if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
+>                 device_init_wakeup(&pdev->dev, 1);
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index cda83ccb2702..9ef89d00970e 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -655,10 +655,8 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
+>                 goto err_req_regs;
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_err(dev, "sdhci_add_host() failed\n");
+> +       if (ret)
+>                 goto err_req_regs;
+> -       }
+>
+>  #ifdef CONFIG_PM
+>         if (pdata->cd_type != S3C_SDHCI_CD_INTERNAL)
+> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+> index 14511526a3a8..9247d51f2eed 100644
+> --- a/drivers/mmc/host/sdhci-spear.c
+> +++ b/drivers/mmc/host/sdhci-spear.c
+> @@ -126,10 +126,8 @@ static int sdhci_probe(struct platform_device *pdev)
+>         }
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_dbg(&pdev->dev, "error adding host\n");
+> +       if (ret)
+>                 goto disable_clk;
+> -       }
+>
+>         platform_set_drvdata(pdev, host);
+>
+> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+> index c32daed0d418..8f95647195d9 100644
+> --- a/drivers/mmc/host/sdhci-st.c
+> +++ b/drivers/mmc/host/sdhci-st.c
+> @@ -422,10 +422,8 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>         st_mmcss_cconfig(np, host);
+>
+>         ret = sdhci_add_host(host);
+> -       if (ret) {
+> -               dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+> +       if (ret)
+>                 goto err_out;
+> -       }
+>
+>         host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+>
+> --
+> 2.17.0
+>
