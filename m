@@ -1,55 +1,56 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 28 May 2018 13:00:21 +0300
-Subject: [PATCH v4 4/8] PCI: Replace dev_node parameter of
- of_pci_get_host_bridge_resources with device
-In-Reply-To: <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
-Message-ID: <a74db976-d330-80b9-939e-dd164a20c8c3@mentor.com>
+From: m.purski@samsung.com (Maciej Purski)
+Date: Mon, 28 May 2018 11:55:11 +0200
+Subject: [PATCH 11/12] ARM: dts: exynos5250-arndale: add display regulators
+In-Reply-To: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+ <CGME20180528095523eucas1p1039e1b62aaef415b66d6f62e86dbef93@eucas1p1.samsung.com>
+Message-ID: <1527501311-16428-1-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan, Bjorn,
+The patch adds fixed regulators used by DSI/LVDS bridge
+and panel. Regulators are named according to schematics.
 
-On 05/15/2018 12:07 PM, Jan Kiszka wrote:
-> From: Jan Kiszka <jan.kiszka@siemens.com>
-> 
-> Another step towards a managed version of
-> of_pci_get_host_bridge_resources(): Feed in the underlying device,
-> rather than just the OF node. This will allow to use managed resource
-> allocation internally later on.
-> 
-> CC: Jingoo Han <jingoohan1@gmail.com>
-> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Signed-off-by: Maciej Purski <m.purski@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250-arndale.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-[snip]
-
-> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
-> index a6af62e0256d..61802e55a00c 100644
-> --- a/drivers/pci/host/pcie-altera.c
-> +++ b/drivers/pci/host/pcie-altera.c
-> @@ -488,11 +488,10 @@ static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
->  {
->  	int err, res_valid = 0;
->  	struct device *dev = &pcie->pdev->dev;
-> -	struct device_node *np = dev->of_node;
->  	struct resource_entry *win;
->  
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
-> -					       NULL);
-> +	err = of_pci_get_host_bridge_resources(dev, 0, 0xff
-> +						    &pcie->resources, NULL);
->  	if (err)
->  		return err;
->  
-
-In case if it is an undiscovered issue, a comma was mistakenly removed,
-which will result it compilation error.
-
-The problem is also found in pci/next , see commit 88e3909aa125.
-
---
-With best wishes,
-Vladimir
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 7a8a5c5..80221fa 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -97,6 +97,30 @@
+ 			reg = <2>;
+ 			regulator-name = "hdmi-en";
+ 		};
++
++		vcc_1v2_reg: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "VCC_1V2";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++		};
++
++		vcc_1v8_reg: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			regulator-name = "VCC_1V8";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++
++		vcc_3v3_reg: regulator at 5 {
++			compatible = "regulator-fixed";
++			reg = <5>;
++			regulator-name = "VCC_3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
+ 	};
+ 
+ 	fixed-rate-clocks {
+-- 
+2.7.4
