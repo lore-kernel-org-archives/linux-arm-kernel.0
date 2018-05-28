@@ -1,197 +1,46 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 28 May 2018 13:32:05 -0700
-Subject: [patch v22 4/4] Documentation: jtag: Add ABI documentation
-In-Reply-To: <1527508827-30724-5-git-send-email-oleksandrs@mellanox.com>
-References: <1527508827-30724-1-git-send-email-oleksandrs@mellanox.com>
- <1527508827-30724-5-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <a2645e23-d50a-02c6-02a9-4570f0c5ba65@infradead.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 28 May 2018 17:21:11 -0400
+Subject: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
+In-Reply-To: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
+References: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1527542471-10316-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2018 05:00 AM, Oleksandr Shamray wrote:
-> Added document that describe the ABI for JTAG class drivrer
-> 
-> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
+shutdown")' has been added to kernel to shutdown pending PCIe port
+service interrupts during reboot so that a newly started kexec kernel
+wouldn't observe pending interrupts.
 
-> ---
->  Documentation/ABI/testing/jtag-dev |   27 +++++++++
->  Documentation/jtag/overview        |   28 +++++++++
->  Documentation/jtag/transactions    |  109 ++++++++++++++++++++++++++++++++++++
->  MAINTAINERS                        |    1 +
->  4 files changed, 165 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/ABI/testing/jtag-dev
->  create mode 100644 Documentation/jtag/overview
->  create mode 100644 Documentation/jtag/transactions
-> 
+pcie_port_device_remove() is disabling the root port and switches by
+calling pci_disable_device() after all PCIe service drivers are shutdown.
 
-> diff --git a/Documentation/jtag/overview b/Documentation/jtag/overview
-> new file mode 100644
-> index 0000000..42b487a
-> --- /dev/null
-> +++ b/Documentation/jtag/overview
-> @@ -0,0 +1,28 @@
-> +Linux kernel JTAG support
-> +=========================
-> +
-> +The JTAG is an industry standard for verifying hardware.
+This has been found to cause crashes on HP DL360 Gen9 machines during
+reboot due to hpsa driver not clearing the bus master bit during the
+shutdown procedure by calling pci_disable_device().
 
-JTAG is an
+Drop the shutdown API and do an orderly clean up by using the remove.
 
-> +JTAG provides access to many logic signals of a complex integrated circuit,
-> +including the device pins.
-> +
-> +A JTAG interface is a special interface added to a chip.
-> +Depending on the version of JTAG, two, four, or five pins are added.
-> +
-> +The connector pins are:
-> +	TDI (Test Data In)
-> +	TDO (Test Data Out)
-> +	TCK (Test Clock)
-> +	TMS (Test Mode Select)
-> +	TRST (Test Reset) optional
-> +
-> +JTAG interface is designed to have two parts - basic core driver and
-> +hardware specific driver. The basic driver introduces a general interface
-> +which is not dependent of specific hardware. It provides communication
-> +between user space and hardware specific driver.
-> +Each JTAG device is represented as a char device from (jtag0, jtag1, ...).
-> +Access to a JTAG device is performed through IOCTL calls.
-> +
-> +Call flow example:
-> +User: open  -> /dev/jatgX
-> +User: ioctl -> /dev/jtagX -> JTAG core driver -> JTAG hardware specific driver
-> +User: close -> /dev/jatgX
-> diff --git a/Documentation/jtag/transactions b/Documentation/jtag/transactions
-> new file mode 100644
-> index 0000000..2abf833
-> --- /dev/null
-> +++ b/Documentation/jtag/transactions
-> @@ -0,0 +1,109 @@
-> +The JTAG API
-> +=============
-> +
-> +JTAG master devices can be accessed through a character misc-device.
-> +Each JTAG master interface can be accessed by using /dev/jtagN.
-> +
-> +JTAG system calls set:
-> +- SIR (Scan Instruction Register, IEEE 1149.1 Instruction Register scan);
-> +- SDR (Scan Data Register, IEEE 1149.1 Data Register scan);
-> +- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
-> +number of clocks.
-> +
-> +open(), close()
-> +-------
-> +open() opens JTAG device. Only one open operation per JTAG device
-> +can be performed. Two or more open for one device will return error.
-> +
-> +Open/Close  device:
-> +- jtag_fd = open("/dev/jtag0", O_RDWR);
-> +- close(jtag_fd);
-> +
-> +ioctl()
-> +-------
-> +All access operations to JTAG devices performed through ioctl interface.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
+Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
+Cc: stable at vger.kernel.org
+Reported-by: Ryan Finnie <ryan@finnie.org>
+---
+ drivers/scsi/hpsa.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-                         to JTAG devices are performed through
-
-> +The IOCTL interface supports these requests:
-> +	JTAG_IOCRUNTEST - Force JTAG state machine to RUN_TEST/IDLE state
-> +	JTAG_SIOCFREQ - Set JTAG TCK frequency
-> +	JTAG_GIOCFREQ - Get JTAG TCK frequency
-> +	JTAG_IOCXFER - send JTAG data Xfer
-> +	JTAG_GIOCSTATUS - get current JTAG TAP status
-> +	JTAG_SIOCMODE - set JTAG mode flags.
-> +
-> +JTAG_SIOCFREQ, JTAG_GIOCFREQ
-> +------
-> +Set/Get JTAG clock speed:
-> +
-> +	unsigned int jtag_fd;
-> +	ioctl(jtag_fd, JTAG_SIOCFREQ, &frq);
-> +	ioctl(jtag_fd, JTAG_GIOCFREQ, &frq);
-> +
-> +JTAG_IOCRUNTEST
-> +------
-> +Force JTAG state machine to RUN_TEST/IDLE state
-> +
-> +struct jtag_run_test_idle {
-> +	__u8	reset;
-> +	__u8	endstate;
-> +	__u8	tck;
-> +};
-> +
-> +reset: 0 - run IDLE/PAUSE from current state
-> +	   1 - go through TEST_LOGIC/RESET state before  IDLE/PAUSE
-
-	                                         before IDLE/PAUSE
-
-
-> +endstate: completion flag
-> +tck: clock counter
-> +
-> +Example:
-> +	struct jtag_run_test_idle runtest;
-> +
-> +	runtest.endstate = JTAG_STATE_IDLE;
-> +	runtest.reset = 0;
-> +	runtest.tck = data_p->tck;
-> +	usleep(25 * 1000);
-> +	ioctl(jtag_fd, JTAG_IOCRUNTEST, &runtest);
-> +
-> +JTAG_IOCXFER
-> +------
-> +Send SDR/SIR transaction
-> +
-> +struct jtag_xfer {
-> +	__u8	type;
-> +	__u8	direction;
-> +	__u8	endstate;
-> +	__u8	padding;
-> +	__u32	length;
-> +	__u64	tdio;
-> +};
-> +
-> +type: transfer type - JTAG_SIR_XFER/JTAG_SDR_XFER
-> +direction: xfer direction - JTAG_SIR_XFER/JTAG_SDR_XFER,
-
-              drop ending comma                           ^
-
-> +length: xfer data len in bits
-
-s/len/length/
-
-> +tdio : xfer data array
-> +endstate: xfer end state after transaction finish
-> +	   can be: JTAG_STATE_IDLE/JTAG_STATE_PAUSEIR/JTAG_STATE_PAUSEDR
-> +
-> +Example:
-> +	struct jtag_xfer xfer;
-> +	static char buf[64];
-> +	static unsigned int buf_len = 0;
-> +	[...]
-> +	xfer.type = JTAG_SDR_XFER;
-> +	xfer.tdio = (__u64)buf;
-> +	xfer.length = buf_len;
-> +	xfer.endstate = JTAG_STATE_IDLE;
-> +
-> +	if (is_read)
-> +		xfer.direction = JTAG_READ_XFER;
-> +	else
-> +		xfer.direction = JTAG_WRITE_XFER;
-> +
-> +	ioctl(jtag_fd, JTAG_IOCXFER, &xfer);
-> +
-> +JTAG_SIOCMODE
-> +------
-> +If hardware driver can support different running modes you can change it.
-> +
-> +Example:
-> +	unsigned int mode;
-> +	mode = JTAG_XFER_HW_MODE;
-> +	ioctl(jtag_fd, JTAG_SIOCMODE, &mode);
-
-
+diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
+index 3a9eca1..3dbef28 100644
+--- a/drivers/scsi/hpsa.c
++++ b/drivers/scsi/hpsa.c
+@@ -8970,7 +8970,6 @@ static struct pci_driver hpsa_pci_driver = {
+ 	.probe = hpsa_init_one,
+ 	.remove = hpsa_remove_one,
+ 	.id_table = hpsa_pci_device_id,	/* id_table */
+-	.shutdown = hpsa_shutdown,
+ 	.suspend = hpsa_suspend,
+ 	.resume = hpsa_resume,
+ };
 -- 
-~Randy
+2.7.4
