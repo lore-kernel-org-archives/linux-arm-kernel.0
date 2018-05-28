@@ -1,10 +1,11 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 28 May 2018 16:25:13 +0800
-Subject: [PATCH v1 1/7] drm/mediatek: move dpi private data to device
-In-Reply-To: <20180514075243.5442-2-bibby.hsieh@mediatek.com>
+Date: Mon, 28 May 2018 16:30:14 +0800
+Subject: [PATCH v1 2/7] drm/mediatek: fix to get right bridge for dpi
+ encoder
+In-Reply-To: <20180514075243.5442-3-bibby.hsieh@mediatek.com>
 References: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
- <20180514075243.5442-2-bibby.hsieh@mediatek.com>
-Message-ID: <1527495913.396.3.camel@mtksdaap41>
+ <20180514075243.5442-3-bibby.hsieh@mediatek.com>
+Message-ID: <1527496214.396.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,227 +16,88 @@ Some inline comment.
 On Mon, 2018-05-14 at 15:52 +0800, Bibby Hsieh wrote:
 > From: chunhui dai <chunhui.dai@mediatek.com>
 > 
-> move clock factor and edge enable setting to private data.
+> 1, dpi is an encoder, there is an bridge in the struct
+> of decoder, we could use it.
+
+The encoder.bridge is assigned in drm_bridge_attach(), so I think the
+design is to assign this member in drm_bridge_attach().
+Any assignment outside this function may conflict with this design.
+
+> 2, using of_graph_get_remote_port_parent to get right
+> bridge in device tree.
 > 
-
-I think this modification is to separate different part of dpi driver
-for different chip.
-Describe more for this.
-
-
 > Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c      | 82 ++++++++++++++++++++++++++-------
->  drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  2 +-
->  2 files changed, 66 insertions(+), 18 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_dpi.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
 > 
 > diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index e80a603e5fb0..993dc44368bd 100644
+> index 0a44ab175422..2b8b34c72697 100644
 > --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
 > +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -71,11 +71,13 @@ struct mtk_dpi {
->  	struct clk *tvd_clk;
->  	int irq;
->  	struct drm_display_mode mode;
-> +	const struct mtk_dpi_conf *conf;
->  	enum mtk_dpi_out_color_format color_format;
->  	enum mtk_dpi_out_yc_map yc_map;
->  	enum mtk_dpi_out_bit_num bit_num;
->  	enum mtk_dpi_out_channel_swap channel_swap;
->  	bool power_sta;
-> +	int refcount;
->  	u8 power_ctl;
->  };
+> @@ -63,7 +63,6 @@ enum mtk_dpi_out_color_format {
+>  struct mtk_dpi {
+>  	struct mtk_ddp_comp ddp_comp;
+>  	struct drm_encoder encoder;
+> -	struct drm_bridge *bridge;
+>  	void __iomem *regs;
+>  	struct device *dev;
+>  	struct clk *engine_clk;
+> @@ -643,8 +642,8 @@ static int mtk_dpi_bind(struct device *dev, struct device *master, void *data)
 >  
-> @@ -115,6 +117,12 @@ struct mtk_dpi_yc_limit {
->  	u16 c_bottom;
->  };
->  
-> +struct mtk_dpi_conf {
-> +	unsigned int (*cal_factor)(int clock);
-> +	const u32 reg_h_fre_con;
-> +	bool edge_sel_en;
-> +};
-> +
->  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
->  {
->  	u32 tmp = readl(dpi->regs + offset) & ~mask;
-> @@ -340,7 +348,13 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
->  
->  static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
->  {
-> -	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
-> +	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
-> +}
-> +
-> +static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
-> +{
-> +	if (dpi->conf->edge_sel_en)
-> +		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
->  }
->  
->  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
-> @@ -368,6 +382,12 @@ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
->  
->  static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
->  {
-> +	if (WARN_ON(dpi->refcount == 0))
-> +		return;
-> +
-> +	if (--dpi->refcount != 0)
-> +		return;
-> +
+>  	/* Currently DPI0 is fixed to be driven by OVL1 */
+>  	dpi->encoder.possible_crtcs = BIT(1);
+> -
+> -	ret = drm_bridge_attach(&dpi->encoder, dpi->bridge, NULL);
+> +	dpi->encoder.bridge->encoder = &dpi->encoder;
 
-I think 'refcount' should be moved to an independent patch.
+This is done inside drm_bridge_attach().
 
->  	dpi->power_ctl &= ~pctl;
->  
->  	if ((dpi->power_ctl & DPI_POWER_START) ||
-> @@ -385,16 +405,19 @@ static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
->  
->  static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
->  {
-> -	int ret;
-> +	int ret = 0;
-> +
-> +	if (++dpi->refcount != 1)
-> +		return 0;
->  
->  	dpi->power_ctl |= pctl;
->  
->  	if (!(dpi->power_ctl & DPI_POWER_START) &&
->  	    !(dpi->power_ctl & DPI_POWER_ENABLE))
-> -		return 0;
-> +		goto err_refcount;
->  
->  	if (dpi->power_sta)
-> -		return 0;
-> +		goto err_refcount;
->  
->  	ret = clk_prepare_enable(dpi->engine_clk);
+> +	ret = drm_bridge_attach(&dpi->encoder, dpi->encoder.bridge, NULL);
 >  	if (ret) {
-> @@ -416,6 +439,8 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
->  	clk_disable_unprepare(dpi->engine_clk);
->  err_eng:
->  	dpi->power_ctl &= ~pctl;
-> +err_refcount:
-> +	dpi->refcount--;
->  	return ret;
->  }
+>  		dev_err(dev, "Failed to attach bridge: %d\n", ret);
+>  		goto err_cleanup;
+> @@ -709,7 +708,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct mtk_dpi *dpi;
+>  	struct resource *mem;
+> -	struct device_node *bridge_node;
+> +	struct device_node *ep, *bridge_node;
+>  	int comp_id;
+>  	const struct of_device_id *match;
+>  	int ret;
+> @@ -759,15 +758,21 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
 >  
-> @@ -433,16 +458,13 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
->  	unsigned long pll_rate;
->  	unsigned int factor;
->  
-> +	if (!dpi) {
-> +		dev_err(dpi->dev, "invalid argument\n");
-> +		return -EINVAL;
+> -	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
+> -	if (!bridge_node)
+> +	ep = of_graph_get_next_endpoint(dev->of_node, NULL);
+> +	if (ep) {
+> +		bridge_node = of_graph_get_remote_port_parent(ep);
+> +		of_node_put(ep);
 > +	}
->  	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
->  	pix_rate = 1000UL * mode->clock;
-> -	if (mode->clock <= 27000)
-> -		factor = 16 * 3;
-> -	else if (mode->clock <= 84000)
-> -		factor = 8 * 3;
-> -	else if (mode->clock <= 167000)
-> -		factor = 4 * 3;
-> -	else
-> -		factor = 2 * 3;
-> +	factor = dpi->conf->cal_factor(mode->clock);
->  	pll_rate = pix_rate * factor;
->  
->  	dev_dbg(dpi->dev, "Want PLL %lu Hz, pixel clock %lu Hz\n",
-> @@ -518,6 +540,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
->  	mtk_dpi_config_yc_map(dpi, dpi->yc_map);
->  	mtk_dpi_config_color_format(dpi, dpi->color_format);
->  	mtk_dpi_config_2n_h_fre(dpi);
-> +	mtk_dpi_config_disable_edge(dpi);
+> +	if (!bridge_node) {
+> +		dev_err(dev, "Failed to find bridge node\n");
+>  		return -ENODEV;
+> +	}
 
-What does this do? Separate this to an independent patch and describe
-what does this do.
-
->  	mtk_dpi_sw_reset(dpi, false);
->  
->  	return 0;
-> @@ -656,6 +679,31 @@ static const struct component_ops mtk_dpi_component_ops = {
->  	.unbind = mtk_dpi_unbind,
->  };
->  
-> +static unsigned int mt8173_calculate_factor(int clock)
-> +{
-> +	if (clock <= 27000)
-> +		return 16 * 3;
-> +	else if (clock <= 74250)
-
-Why do you change 84000 to 74250? If 74250 is correct for mt8173, use a
-new patch for this bug fix.
+This looks like mt8173 has the same bug, so send this patch
+independently and it would be more quick to merge.
+For mtk_dsi, it use drm_of_find_panel_or_bridge(), so I think you could
+use the same function to get bridge.
 
 Regards,
 CK
 
-> +		return 8 * 3;
-> +	else if (clock <= 167000)
-> +		return 4 * 3;
-> +	else
-> +		return 2 * 3;
-> +}
-> +
-> +static const struct mtk_dpi_conf mt8173_conf = {
-> +	.cal_factor = mt8173_calculate_factor,
-> +	.reg_h_fre_con = 0xe0,
-> +};
-> +
-> +static const struct of_device_id mtk_dpi_of_ids[] = {
-> +	{ .compatible = "mediatek,mt8173-dpi",
-> +	  .data = &mt8173_conf,
-> +	},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, mtk_dpi_of_ids);
-> +
->  static int mtk_dpi_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -663,13 +711,18 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  	struct resource *mem;
->  	struct device_node *bridge_node;
->  	int comp_id;
-> +	const struct of_device_id *match;
->  	int ret;
 >  
-> +	match = of_match_node(mtk_dpi_of_ids, dev->of_node);
-> +	if (!match)
-> +		return -ENODEV;
->  	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
->  	if (!dpi)
->  		return -ENOMEM;
+>  	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
 >  
->  	dpi->dev = dev;
-> +	dpi->conf = (struct mtk_dpi_conf *)match->data;
+> -	dpi->bridge = of_drm_find_bridge(bridge_node);
+> +	dpi->encoder.bridge = of_drm_find_bridge(bridge_node);
+>  	of_node_put(bridge_node);
+> -	if (!dpi->bridge)
+> +	if (!dpi->encoder.bridge)
+>  		return -EPROBE_DEFER;
 >  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	dpi->regs = devm_ioremap_resource(dev, mem);
-> @@ -748,11 +801,6 @@ static int mtk_dpi_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id mtk_dpi_of_ids[] = {
-> -	{ .compatible = "mediatek,mt8173-dpi", },
-> -	{}
-> -};
-> -
->  struct platform_driver mtk_dpi_driver = {
->  	.probe = mtk_dpi_probe,
->  	.remove = mtk_dpi_remove,
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> index 4b6ad4751a31..d9db8c4cacd7 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> @@ -223,6 +223,6 @@
->  #define ESAV_CODE2			(0xFFF << 0)
->  #define ESAV_CODE3_MSB			BIT(16)
->  
-> -#define DPI_H_FRE_CON		0xE0
-> +#define EDGE_SEL_EN			BIT(5)
->  #define H_FRE_2N			BIT(25)
->  #endif /* __MTK_DPI_REGS_H */
+>  	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
