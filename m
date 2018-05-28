@@ -1,45 +1,47 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 28 May 2018 15:13:29 +0800
-Subject: [PATCH v4 7/9] drm/mediatek: add connection from OD1 to RDMA1
-In-Reply-To: <1527489507-24453-8-git-send-email-stu.hsieh@mediatek.com>
-References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
- <1527489507-24453-8-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527491609.24367.7.camel@mtksdaap41>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 28 May 2018 09:20:10 +0200
+Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE
+ disabled
+In-Reply-To: <20180525210843.1821071-1-arnd@arndb.de>
+References: <20180525210843.1821071-1-arnd@arndb.de>
+Message-ID: <91444ee7-40fa-5022-ca4d-1c15e0807347@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
-
-On Mon, 2018-05-28 at 14:38 +0800, Stu Hsieh wrote:
-> This patch add the connection from OD1 to RDMA1 for ext path.
+On 05/25/2018 11:08 PM, Arnd Bergmann wrote:
+> Without dmaengine support, we get a harmless warning about an
+> unused function:
 > 
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> drivers/pwm/pwm-stm32.c:166:12: error: 'stm32_pwm_capture' defined but not used [-Werror=unused-function]
+> 
+> Changing the #ifdef to an IS_ENABLED() check shuts up that warning
+> and is slightly nicer to read.
+> 
+> Fixes: 53e38fe73f94 ("pwm: stm32: Add capture support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  drivers/pwm/pwm-stm32.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+Hi Arnd,
+
+Acked-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+
+Thanks,
+Fabrice
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 58e44349e315..8bfc0debd2c2 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -75,6 +75,7 @@
+> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+> index 60bfc07c4912..97bbc1f18fd6 100644
+> --- a/drivers/pwm/pwm-stm32.c
+> +++ b/drivers/pwm/pwm-stm32.c
+> @@ -484,9 +484,7 @@ static int stm32_pwm_apply_locked(struct pwm_chip *chip, struct pwm_device *pwm,
+>  static const struct pwm_ops stm32pwm_ops = {
+>  	.owner = THIS_MODULE,
+>  	.apply = stm32_pwm_apply_locked,
+> -#if IS_ENABLED(CONFIG_DMA_ENGINE)
+> -	.capture = stm32_pwm_capture,
+> -#endif
+> +	.capture = IS_ENABLED(CONFIG_DMA_ENGINE) ? stm32_pwm_capture : NULL,
+>  };
 >  
->  #define OVL0_MOUT_EN_COLOR0		0x1
->  #define OD_MOUT_EN_RDMA0		0x1
-> +#define OD1_MOUT_EN_RDMA1		BIT(16)
->  #define UFOE_MOUT_EN_DSI0		0x1
->  #define COLOR0_SEL_IN_OVL0		0x1
->  #define OVL1_MOUT_EN_COLOR1		0x1
-> @@ -151,6 +152,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_GAMMA && next == DDP_COMPONENT_RDMA1) {
->  		*addr = DISP_REG_CONFIG_DISP_GAMMA_MOUT_EN;
->  		value = GAMMA_MOUT_EN_RDMA1;
-> +	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
-> +		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
-> +		value = OD1_MOUT_EN_RDMA1;
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
->  		value = RDMA1_MOUT_DPI0;
+>  static int stm32_pwm_set_breakinput(struct stm32_pwm *priv,
+> 
