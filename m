@@ -1,104 +1,181 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 28 May 2018 10:45:08 -0600
-Subject: [PATCH] perf tools: Fix indexing for decoder packet queue
-In-Reply-To: <CALZQ+UMbndvogrSb0Ey3ac1vDGqtsiRTR=ee8VGzU2Ni9_s0og@mail.gmail.com>
-References: <1527289854-10755-1-git-send-email-mathieu.poirier@linaro.org>
- <CALZQ+UMbndvogrSb0Ey3ac1vDGqtsiRTR=ee8VGzU2Ni9_s0og@mail.gmail.com>
-Message-ID: <CANLsYkxUfGCEzWfVeXbkX-5khJb5VofjY9Qmhvn9_3soeZ54vQ@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 28 May 2018 11:54:04 -0500
+Subject: [PATCH 9/9] clk: davinci: Fix link errors when not all SoCs are
+ enabled
+In-Reply-To: <a1b62396-534c-bc68-63a4-ac493690a3e7@ti.com>
+References: <20180525181150.17873-1-david@lechnology.com>
+ <20180525181150.17873-10-david@lechnology.com>
+ <a1b62396-534c-bc68-63a4-ac493690a3e7@ti.com>
+Message-ID: <679a6a16-213c-c766-5d82-0c4ce2bdcf75@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2018 at 21:13, Leo Yan <leo.yan@linaro.org> wrote:
-> On Fri, May 25, 2018 at 05:10:54PM -0600, Mathieu Poirier wrote:
->> The tail of a queue is supposed to be pointing to the next available slot
->> in a queue.  In this implementation the tail is incremented before it is
->> used and as such points to the last used element, something that has the
->> immense advantage of centralizing tail management at a single location
->> and eliminating a lot of redundant code.
+On 05/28/2018 08:43 AM, Sekhar Nori wrote:
+> On Friday 25 May 2018 11:41 PM, David Lechner wrote:
+>> This fixes linker errors due to undefined symbols when one or more of
+>> the TI DaVinci SoCs is not enabled in the kernel config.
 >>
->> But this needs to be taken into consideration on the dequeueing side where
->> the head also needs to be incremented before it is used, or the first
->> available element of the queue will be skipped.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: David Lechner <david@lechnology.com>
 >> ---
->>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 12 ++++++++++--
->>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>   drivers/clk/davinci/pll.c   | 16 ++++++++++++++++
+>>   drivers/clk/davinci/pll.h   | 11 ++++++++---
+>>   drivers/clk/davinci/psc.c   | 14 ++++++++++++++
+>>   drivers/clk/davinci/psc.h   | 12 ++++++++++++
+>>   include/linux/clk/davinci.h | 19 +++++++++++++++----
+>>   5 files changed, 65 insertions(+), 7 deletions(-)
 >>
->> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
->> index c8b98fa22997..4d5fc374e730 100644
->> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
->> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
->> @@ -96,11 +96,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
->>   /* Nothing to do, might as well just return */
->>   if (decoder->packet_count == 0)
->>   return 0;
->> + /*
->> + * The queueing process in function cs_etm_decoder__buffer_packet()
->> + * increments the tail *before* using it.  This is somewhat counter
->> + * intuitive but it has the advantage of centralizing tail management
->> + * at a single location.  Because of that we need to follow the same
->> + * heuristic with the head, i.e we increment it before using its
->> + * value.  Otherwise the first element of the packet queue is not
->> + * used.
->> + */
->> + decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
->>
->>   *packet = decoder->packet_buffer[decoder->head];
->>
->> - decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+>> diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
+>> index 84a343060bc8..65abd371692d 100644
+>> --- a/drivers/clk/davinci/pll.c
+>> +++ b/drivers/clk/davinci/pll.c
+>> @@ -860,25 +860,41 @@ static struct davinci_pll_platform_data *davinci_pll_get_pdata(struct device *de
+>>   }
+>>   
+>>   /* needed in early boot for clocksource/clockevent */
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   CLK_OF_DECLARE(da850_pll0, "ti,da850-pll0", of_da850_pll0_init);
+>> +#endif
+>>   
+>>   static const struct of_device_id davinci_pll_of_match[] = {
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   	{ .compatible = "ti,da850-pll1", .data = of_da850_pll1_init },
+>> +#endif
+>>   	{ }
+>>   };
+>>   
+>>   static const struct platform_device_id davinci_pll_id_table[] = {
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA830
+>>   	{ .name = "da830-pll",   .driver_data = (kernel_ulong_t)da830_pll_init   },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   	{ .name = "da850-pll0",  .driver_data = (kernel_ulong_t)da850_pll0_init  },
+>>   	{ .name = "da850-pll1",  .driver_data = (kernel_ulong_t)da850_pll1_init  },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM355
+>>   	{ .name = "dm355-pll1",  .driver_data = (kernel_ulong_t)dm355_pll1_init  },
+>>   	{ .name = "dm355-pll2",  .driver_data = (kernel_ulong_t)dm355_pll2_init  },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM365
+>>   	{ .name = "dm365-pll1",  .driver_data = (kernel_ulong_t)dm365_pll1_init  },
+>>   	{ .name = "dm365-pll2",  .driver_data = (kernel_ulong_t)dm365_pll2_init  },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM644x
+>>   	{ .name = "dm644x-pll1", .driver_data = (kernel_ulong_t)dm644x_pll1_init },
+>>   	{ .name = "dm644x-pll2", .driver_data = (kernel_ulong_t)dm644x_pll2_init },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM646x
+>>   	{ .name = "dm646x-pll1", .driver_data = (kernel_ulong_t)dm646x_pll1_init },
+>>   	{ .name = "dm646x-pll2", .driver_data = (kernel_ulong_t)dm646x_pll2_init },
+>> +#endif
+>>   	{ }
+>>   };
+>>   
+>> diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
+>> index b2e5c4496645..7cc354dd29e2 100644
+>> --- a/drivers/clk/davinci/pll.h
+>> +++ b/drivers/clk/davinci/pll.h
+>> @@ -122,14 +122,19 @@ int of_davinci_pll_init(struct device *dev, struct device_node *node,
+>>   
+>>   /* Platform-specific callbacks */
+>>   
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   int da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+>>   void of_da850_pll0_init(struct device_node *node);
+>>   int of_da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
 >> -
->
-> I tested this patch and confirmed it can work well with python
-> decoding script:
->
-> Tested-by: Leo Yan <leo.yan@linaro.org>
->
-> Actually, I have another idea for this fixing, seems to me
-> the unchanged code has right logic for decoder->head, and I think this
-> issue is more related with incorrect initialization index.  So we can
-> change the initialization index for decoder->head as below.  How about
-> you think for this?
->
-> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> index c8b98fa..b133260 100644
-> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> @@ -249,7 +249,7 @@ static void cs_etm_decoder__clear_buffer(struct
-> cs_etm_decoder *decoder)
->  {
->         int i;
->
-> -       decoder->head = 0;
-> +       decoder->head = 1;
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM355
+>>   int dm355_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+>> -
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM644x
+>>   int dm644x_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+>> -
+>> +#endif
+> 
+> The traditional way of dealing with this for functions is to provide a
+> static inline stub when CONFIG_ARCH_DAVINCI_DM644x is not defined. Can
+> we use that? That helps in avoiding ifdefs elsewhere.
 
-I flirted with that idea but thought the problem is really with the
-tail and as such would have done:
+I suppose we could. But then we would be taking function pointers to
+static inline functions, which seems kind of weird to me.
 
-        decoder->tail = -1;
+> 
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM646x
+>>   int dm646x_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+>> +#endif
+>>   
+>>   #endif /* __CLK_DAVINCI_PLL_H___ */
+>> diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+>> index 6326ba1fe3cc..fffbed5e263b 100644
+>> --- a/drivers/clk/davinci/psc.c
+>> +++ b/drivers/clk/davinci/psc.c
+>> @@ -513,20 +513,34 @@ int of_davinci_psc_clk_init(struct device *dev,
+>>   }
+>>   
+>>   static const struct of_device_id davinci_psc_of_match[] = {
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   	{ .compatible = "ti,da850-psc0", .data = &of_da850_psc0_init_data },
+>>   	{ .compatible = "ti,da850-psc1", .data = &of_da850_psc1_init_data },
+>> +#endif
+>>   	{ }
+>>   };
+>>   
+>>   static const struct platform_device_id davinci_psc_id_table[] = {
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA830
+>>   	{ .name = "da830-psc0", .driver_data = (kernel_ulong_t)&da830_psc0_init_data },
+>>   	{ .name = "da830-psc1", .driver_data = (kernel_ulong_t)&da830_psc1_init_data },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   	{ .name = "da850-psc0", .driver_data = (kernel_ulong_t)&da850_psc0_init_data },
+>>   	{ .name = "da850-psc1", .driver_data = (kernel_ulong_t)&da850_psc1_init_data },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM355
+>>   	{ .name = "dm355-psc",  .driver_data = (kernel_ulong_t)&dm355_psc_init_data  },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM365
+>>   	{ .name = "dm365-psc",  .driver_data = (kernel_ulong_t)&dm365_psc_init_data  },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM644x
+>>   	{ .name = "dm644x-psc", .driver_data = (kernel_ulong_t)&dm644x_psc_init_data },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM646x
+>>   	{ .name = "dm646x-psc", .driver_data = (kernel_ulong_t)&dm646x_psc_init_data },
+>> +#endif
+>>   	{ }
+>>   };
+>>   
+>> diff --git a/drivers/clk/davinci/psc.h b/drivers/clk/davinci/psc.h
+>> index c2a7df6413fe..6a42529d31a9 100644
+>> --- a/drivers/clk/davinci/psc.h
+>> +++ b/drivers/clk/davinci/psc.h
+>> @@ -94,15 +94,27 @@ struct davinci_psc_init_data {
+>>   	int (*psc_init)(struct device *dev, void __iomem *base);
+>>   };
+>>   
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA830
+>>   extern const struct davinci_psc_init_data da830_psc0_init_data;
+>>   extern const struct davinci_psc_init_data da830_psc1_init_data;
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DA850
+>>   extern const struct davinci_psc_init_data da850_psc0_init_data;
+>>   extern const struct davinci_psc_init_data da850_psc1_init_data;
+>>   extern const struct davinci_psc_init_data of_da850_psc0_init_data;
+>>   extern const struct davinci_psc_init_data of_da850_psc1_init_data;
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM355
+>>   extern const struct davinci_psc_init_data dm355_psc_init_data;
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM356
+>>   extern const struct davinci_psc_init_data dm365_psc_init_data;
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM644x
+>>   extern const struct davinci_psc_init_data dm644x_psc_init_data;
+>> +#endif
+>> +#ifdef CONFIG_ARCH_DAVINCI_DM646x
+>>   extern const struct davinci_psc_init_data dm646x_psc_init_data;
+>> +#endif
+> 
+> ifdefs around these extern declarations are not needed.
 
-But since both head and tail are declared as u32 it would have
-required changing the types to int, necessitating modifications
-everywhere other parts of the code deals with them.  As such I just
-decided to swap the order of events in cs_etm_decoder__get_packet().
-
-I'm not strongly opinionated on this and can send another patch if you're keen.
-
-Thanks for the feedback,
-Mathieu
-
-
->         decoder->tail = 0;
->         decoder->packet_count = 0;
->         for (i = 0; i < MAX_BUFFER; i++) {
->
-> Thanks,
-> Leo Yan
->
->>   decoder->packet_count--;
->>
->>   return 1;
->> --
->> 2.7.4
->>
+True. I guess I just prefer a compiler error to a linker error.
