@@ -1,78 +1,55 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 28 May 2018 11:55:47 +0200
-Subject: [PATCH 12/12] ARM: dts: exynos5250-arndale: add dsi and panel nodes
-In-Reply-To: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
-References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <CGME20180528095555eucas1p2fb61f362a3aa2d0082b8c4001b17f176@eucas1p2.samsung.com>
-Message-ID: <1527501347-16521-1-git-send-email-m.purski@samsung.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Mon, 28 May 2018 13:00:21 +0300
+Subject: [PATCH v4 4/8] PCI: Replace dev_node parameter of
+ of_pci_get_host_bridge_resources with device
+In-Reply-To: <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+ <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
+Message-ID: <a74db976-d330-80b9-939e-dd164a20c8c3@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds bridge and panel nodes.
-It adds also DSI properties specific for arndale board.
+Hi Jan, Bjorn,
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
----
- arch/arm/boot/dts/exynos5250-arndale.dts | 39 ++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+On 05/15/2018 12:07 PM, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
+> 
+> Another step towards a managed version of
+> of_pci_get_host_bridge_resources(): Feed in the underlying device,
+> rather than just the OF node. This will allow to use managed resource
+> allocation internally later on.
+> 
+> CC: Jingoo Han <jingoohan1@gmail.com>
+> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index 80221fa..6f0b1c4 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -71,6 +71,17 @@
- 		};
- 	};
- 
-+	panel: panel {
-+		compatible = "boe,hv070wsa-100";
-+		power-supply = <&vcc_3v3_reg>;
-+		enable-gpios = <&gpd1 3 GPIO_ACTIVE_HIGH>;
-+		port {
-+			panel_ep: endpoint {
-+				remote-endpoint = <&bridge_out_ep>;
-+			};
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -476,6 +487,34 @@
- 	};
- };
- 
-+&dsi_0 {
-+	vddcore-supply = <&ldo8_reg>;
-+	vddio-supply = <&ldo10_reg>;
-+	samsung,pll-clock-frequency = <24000000>;
-+	samsung,burst-clock-frequency = <320000000>;
-+	samsung,esc-clock-frequency = <10000000>;
-+	status = "okay";
-+
-+	bridge at 0 {
-+		reg = <0>;
-+		compatible = "toshiba,tc358764";
-+		vddc-supply = <&vcc_1v2_reg>;
-+		vddio-supply = <&vcc_1v8_reg>;
-+		vddmipi-supply = <&vcc_1v2_reg>;
-+		vddlvds133-supply = <&vcc_3v3_reg>;
-+		vddlvds112-supply = <&vcc_1v2_reg>;
-+		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 1 {
-+			reg = <1>;
-+			bridge_out_ep: endpoint {
-+				remote-endpoint = <&panel_ep>;
-+			};
-+		};
-+	};
-+};
-+
- &i2c_2 {
- 	status = "okay";
- 	/* used by HDMI DDC */
--- 
-2.7.4
+[snip]
+
+> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
+> index a6af62e0256d..61802e55a00c 100644
+> --- a/drivers/pci/host/pcie-altera.c
+> +++ b/drivers/pci/host/pcie-altera.c
+> @@ -488,11 +488,10 @@ static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
+>  {
+>  	int err, res_valid = 0;
+>  	struct device *dev = &pcie->pdev->dev;
+> -	struct device_node *np = dev->of_node;
+>  	struct resource_entry *win;
+>  
+> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
+> -					       NULL);
+> +	err = of_pci_get_host_bridge_resources(dev, 0, 0xff
+> +						    &pcie->resources, NULL);
+>  	if (err)
+>  		return err;
+>  
+
+In case if it is an undiscovered issue, a comma was mistakenly removed,
+which will result it compilation error.
+
+The problem is also found in pci/next , see commit 88e3909aa125.
+
+--
+With best wishes,
+Vladimir
