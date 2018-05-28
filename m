@@ -1,60 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 May 2018 17:15:13 +0200
-Subject: [PATCH] mmc: sunxi: mark PM functions as __maybe_unused
-In-Reply-To: <CAHp75VffA5Q2VxgkQqT6M_iLwZtv46Gy5Fz4Fx7PA9CvRnX0Ag@mail.gmail.com>
-References: <20180525210752.1794502-1-arnd@arndb.de>
- <CAPDyKFoyBZ=k5UQyTmgkPd+30Htymw99Xeh3C+bDPo+VGyjrNw@mail.gmail.com>
- <CAK8P3a2AGu4Lec1pwi87gb4QYn9QTy7mG2i9kWtfAR=An+k-7g@mail.gmail.com>
- <CAHp75VffA5Q2VxgkQqT6M_iLwZtv46Gy5Fz4Fx7PA9CvRnX0Ag@mail.gmail.com>
-Message-ID: <CAK8P3a1z2AyUs536ujPm8dpYrktRoeFxcbNHQ_fgQK1idM5T+A@mail.gmail.com>
+Date: Mon, 28 May 2018 17:41:47 +0200
+Subject: [PATCH] drivers/bus: arm-cci: fix build warnings
+Message-ID: <20180528154228.2403116-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 2:12 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> +Cc: Jean
->
-> On Mon, May 28, 2018 at 2:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Mon, May 28, 2018 at 1:04 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 25 May 2018 at 23:07, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> The newly added runtime-pm functions cause a harmless warning
->>>> when CONFIG_PM is disabled:
->>>>
->>>> drivers/mmc/host/sunxi-mmc.c:1452:12: error: 'sunxi_mmc_runtime_suspend' defined but not used [-Werror=unused-function]
->>>>  static int sunxi_mmc_runtime_suspend(struct device *dev)
->>>>             ^~~~~~~~~~~~~~~~~~~~~~~~~
->>>> drivers/mmc/host/sunxi-mmc.c:1435:12: error: 'sunxi_mmc_runtime_resume' defined but not used [-Werror=unused-function]
->>>>  static int sunxi_mmc_runtime_resume(struct device *dev)
->>>>
->>>> This marks them as __maybe_unused to shut up the warning.
->>>
->>> Most mmc drivers uses #ifdef CONFIG_PM instead of the __maybe_unused() option.
->>>
->>> It's not a big deal, but consistency is always good. Would you mind changing?
->>
->> I'd prefer not to. Most uses of #ifdef CONFIG_PM that get introduced are wrong,
->> and cause additional randconfig warnings that I end up having to fix,
->> so I always
->> do it with __maybe_unused.
->
-> Some of the maintainers have strong objection against such changes.
-> http://lkml.iu.edu/hypermail/linux/kernel/1805.1/06100.html
->
-> It seems we might have a split in the opinions, which is not good in
-> this case (consistency for PM callbacks overall will be broken).
+When the arm-cci driver is enabled, but both CONFIG_ARM_CCI5xx_PMU and
+CONFIG_ARM_CCI400_PMU are not, we get a warning about how parts of
+the driver are never used:
 
-We actually talked about this at the kernel summit last year, and the conclusion
-was that we should replace the SET_RUNTIME_PM_OPS(),
-SIMPLE_DEV_PM_OPS(), SET_SYSTEM_SLEEP_PM_OPS()
-etc macros with new ones that don't require the ugly #ifdef and just silently
-drop the unused functions.
+drivers/perf/arm-cci.c:1454:29: error: 'cci_pmu_models' defined but not used [-Werror=unused-variable]
+drivers/perf/arm-cci.c:693:16: error: 'cci_pmu_event_show' defined but not used [-Werror=unused-function]
+drivers/perf/arm-cci.c:685:16: error: 'cci_pmu_format_show' defined but not used [-Werror=unused-function]
 
-Unfortunately we can't extend the existing macros to work that way (it
-breaks for drivers that have an #ifdef today), and nobody could come up
-with a new name that is at least as readable as the current one.
+Marking all three functions as __maybe_unused avoids the warnings in
+randconfig builds. I'm doing this lacking any ideas for a better fix.
 
-Note that incorrect #ifdef usage here is the most common source of
-newly introduced build warnings and errors in the kernel, everyone gets
-those wrong since they are just very confusing.
+Fixes: 3de6be7a3dd8 ("drivers/bus: Split Arm CCI driver")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/perf/arm-cci.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-       Arnd
+diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+index e6fadc8e1178..0d09d8e669cd 100644
+--- a/drivers/perf/arm-cci.c
++++ b/drivers/perf/arm-cci.c
+@@ -120,9 +120,9 @@ enum cci_models {
+ 
+ static void pmu_write_counters(struct cci_pmu *cci_pmu,
+ 				 unsigned long *mask);
+-static ssize_t cci_pmu_format_show(struct device *dev,
++static ssize_t __maybe_unused cci_pmu_format_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf);
+-static ssize_t cci_pmu_event_show(struct device *dev,
++static ssize_t __maybe_unused cci_pmu_event_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf);
+ 
+ #define CCI_EXT_ATTR_ENTRY(_name, _func, _config) 				\
+@@ -1451,7 +1451,7 @@ static int cci_pmu_offline_cpu(unsigned int cpu)
+ 	return 0;
+ }
+ 
+-static struct cci_pmu_model cci_pmu_models[] = {
++static __maybe_unused struct cci_pmu_model cci_pmu_models[] = {
+ #ifdef CONFIG_ARM_CCI400_PMU
+ 	[CCI400_R0] = {
+ 		.name = "CCI_400",
+-- 
+2.9.0
