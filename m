@@ -1,37 +1,66 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 28 May 2018 11:47:13 +0200
-Subject: [PATCH 09/12] ARM: dts: exynos5250: add mipi-phy node
+Date: Mon, 28 May 2018 11:47:08 +0200
+Subject: [PATCH 04/12] drm/exynos: add non-panel path to exynos_dsi_enable()
 In-Reply-To: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
 References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <CGME20180528094729eucas1p1cc26ea191a4ee1ba9daa06fae93037bf@eucas1p1.samsung.com>
-Message-ID: <1527500833-16005-10-git-send-email-m.purski@samsung.com>
+ <CGME20180528094725eucas1p2e80e551edb29dd4ab437246f4896d108@eucas1p2.samsung.com>
+Message-ID: <1527500833-16005-5-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds phy node, required by MIPI devices.
+As DSIM can now have a bridge connected as a peripheral, it should be
+possible to successfully enable exynos_dsi, when there is no panel
+provided.
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 2daf505..a63b655 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -733,6 +733,12 @@
- 			#phy-cells = <0>;
- 		};
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 8957faf..7d92e50 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1382,27 +1382,26 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
+ 	if (dsi->state & DSIM_STATE_ENABLED)
+ 		return;
  
-+		mipi_phy: video-phy at 10040710 {
-+			compatible = "samsung,s5pv210-mipi-video-phy";
-+			#phy-cells = <1>;
-+			syscon = <&pmu_system_controller>;
-+		};
-+
- 		adc: adc at 12d10000 {
- 			compatible = "samsung,exynos-adc-v1";
- 			reg = <0x12D10000 0x100>;
+-	pm_runtime_get_sync(dsi->dev);
+-
+-	dsi->state |= DSIM_STATE_ENABLED;
+-
+-	ret = drm_panel_prepare(dsi->panel);
+-	if (ret < 0) {
+-		dsi->state &= ~DSIM_STATE_ENABLED;
+-		return;
++	if (dsi->panel) {
++		ret = drm_panel_prepare(dsi->panel);
++		if (ret < 0) {
++			return;
++		}
+ 	}
+ 
+ 	exynos_dsi_set_display_mode(dsi);
+ 	exynos_dsi_set_display_enable(dsi, true);
+ 
+-	ret = drm_panel_enable(dsi->panel);
+-	if (ret < 0) {
+-		dsi->state &= ~DSIM_STATE_ENABLED;
+-		exynos_dsi_set_display_enable(dsi, false);
+-		drm_panel_unprepare(dsi->panel);
+-		return;
++	if (dsi->panel) {
++		ret = drm_panel_enable(dsi->panel);
++		if (ret < 0) {
++			exynos_dsi_set_display_enable(dsi, false);
++			drm_panel_unprepare(dsi->panel);
++			return;
++		}
+ 	}
+ 
++	dsi->state |= DSIM_STATE_ENABLED;
+ 	dsi->state |= DSIM_STATE_VIDOUT_AVAILABLE;
+ }
+ 
 -- 
 2.7.4
