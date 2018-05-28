@@ -1,35 +1,43 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 28 May 2018 17:03:26 -0300
-Subject: [RFT v3 0/4] Perf script: Add python script for CoreSight trace
- disassembler
-In-Reply-To: <1527497103-3593-1-git-send-email-leo.yan@linaro.org>
-References: <1527497103-3593-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20180528200326.GJ25467@kernel.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 28 May 2018 22:03:17 +0200
+Subject: [GIT PULL] pxa for v4.18
+Message-ID: <87d0xftunu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, May 28, 2018 at 04:44:59PM +0800, Leo Yan escreveu:
-> This patch series is to support for using 'perf script' for CoreSight
-> trace disassembler, for this purpose this patch series adds a new
-> python script to parse CoreSight tracing event and use command 'objdump'
-> for disassembled lines, finally this can generate readable program
-> execution flow for reviewing tracing data.
-> 
-> Patch 0001 is one fixing patch to generate samples for the start packet
-> and exception packets.
-> 
-> Patch 0002 is the prerequisite to add addr into sample dict, so this
-> value can be used by python script to analyze instruction range.
-> 
-> Patch 0003 is to add python script for trace disassembler.
-> 
-> Patch 0004 is to add doc to explain python script usage and give
-> example for it.
-> 
-> This patch series has been rebased on acme git tree [1] with the commit
-> 19422a9f2a3b ("perf tools: Fix kernel_start for PTI on x86") and tested
-> on Hikey (ARM64 octa CA53 cores).
+Hi Arnd, Kevin, and Olof,
 
-Thanks, applied to perf/core.
+This is the pxa pull request for 4.18, a minor one.
 
-- Arnaldo
+Can you please consider pulling ?
+
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-for-4.18
+
+for you to fetch changes up to c1c14f8954c6d1cb9867024618e93687d9d035ba:
+
+  ARM: pxa3xx: enable external wakeup pins (2018-05-25 22:40:17 +0200)
+
+----------------------------------------------------------------
+This is is the pxa changes for v4.18 cycle :
+ - change to phase out at24 eeprom platform data
+ - add a missing wakeup pin on pxa320 SoCs
+
+----------------------------------------------------------------
+Bartosz Golaszewski (1):
+      ARM: pxa: stargate2: use device properties for at24 eeprom
+
+Daniel Mack (1):
+      ARM: pxa3xx: enable external wakeup pins
+
+ arch/arm/mach-pxa/pxa3xx.c    |  4 ++++
+ arch/arm/mach-pxa/stargate2.c | 10 +++++-----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+-- 
+Robert
