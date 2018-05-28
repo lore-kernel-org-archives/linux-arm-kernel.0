@@ -1,154 +1,146 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 28 May 2018 14:38:27 +0800
-Subject: [PATCH v4 9/9] drm/mediatek: Add support for mediatek SOC MT2712
-In-Reply-To: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
-References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527489507-24453-10-git-send-email-stu.hsieh@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 28 May 2018 08:46:09 +0200
+Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
+In-Reply-To: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+References: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+Message-ID: <CAKv+Gu_KSDZyoLNUTAM2d769gQRfbtnGRTcU=8xOrYbmj2O4fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the Mediatek MT2712 DISP subsystem.
-There are two OVL engine and three disp output in MT2712.
+On 27 May 2018 at 23:03, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> Hi ARM64 maintainers,
+>
+> I am confused about the PAGE_OFFSET value (or the start of the linear
+> map) on a KASLR enabled ARM64 kernel that I am seeing on a board which
+> supports a compatible EFI firmware (with EFI_RNG_PROTOCOL support).
+>
+> 1. 'arch/arm64/include/asm/memory.h' defines PAGE_OFFSET as:
+>
+> /*
+>  * PAGE_OFFSET - the virtual address of the start of the linear map (top
+>  *         (VA_BITS - 1))
+>  */
+> #define PAGE_OFFSET        (UL(0xffffffffffffffff) - \
+>     (UL(1) << (VA_BITS - 1)) + 1)
+>
+> So for example on a platform with VA_BITS=48, we have:
+> PAGE_OFFSET = 0xffff800000000000
+>
+> 2. However, for the KASLR case, we set the 'memstart_offset_seed ' to
+> use the 16-bits of the 'kaslr-seed' to randomize the linear region in
+> 'arch/arm64/kernel/kaslr.c' :
+>
+> u64 __init kaslr_early_init(u64 dt_phys)
+> {
+> <snip..>
+>     /* use the top 16 bits to randomize the linear region */
+>     memstart_offset_seed = seed >> 48;
+> <snip..>
+> }
+>
+> 3. Now, we use the 'memstart_offset_seed' value to randomize the
+> 'memstart_addr' value in 'arch/arm64/mm/init.c':
+>
+> void __init arm64_memblock_init(void)
+> {
+> <snip..>
+>
+>     if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+>         extern u16 memstart_offset_seed;
+>         u64 range = linear_region_size -
+>                 (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+>
+>         /*
+>          * If the size of the linear region exceeds, by a sufficient
+>          * margin, the size of the region that the available physical
+>          * memory spans, randomize the linear region as well.
+>          */
+>         if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+>             range = range / ARM64_MEMSTART_ALIGN + 1;
+>             memstart_addr -= ARM64_MEMSTART_ALIGN *
+>                      ((range * memstart_offset_seed) >> 16);
+>         }
+>     }
+> <snip..>
+> }
+>
+> 4. Since 'memstart_addr' indicates the start of physical RAM, we
+> randomize the same on basis of 'memstart_offset_seed' value above.
+> Also the 'memstart_addr' value is available in '/proc/kallsyms' and
+> hence can be accessed by user-space applications to read the
+> 'memstart_addr' value.
+>
+> 5. Now since the PAGE_OFFSET value is also used by several user space
+> tools (for e.g. makedumpfile tool uses the same to determine the start
+> of linear region and hence to read PT_NOTE fields from /proc/kcore), I
+> am not sure how to read the randomized value of the same in the KASLR
+> enabled case.
+>
+> 6. Reading the code further and adding some debug prints, it seems the
+> 'memblock_start_of_DRAM()' value is more closer to the actual start of
+> linear region rather than 'memstart_addr' and 'PAGE_OFFSET" in case of
+> KASLR enabled kernel:
+>
+> [root at qualcomm-amberwing] # dmesg | grep -i "arm64_memblock_init" -A 5
+>
+> [    0.000000] inside arm64_memblock_init, memstart_addr = ffff976a00000000,
+> linearstart_addr = ffffe89600200000, memblock_start_of_DRAM = ffffe89600200000,
+> PHYS_OFFSET = ffff976a00000000, PAGE_OFFSET = ffff800000000000,
+> KIMAGE_VADDR = ffff000008000000, kimage_vaddr = ffff20c2d7800000
+>
+> [root at qualcomm-amberwing] # dmesg | grep -i "Virtual kernel memory layout" -A 15
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000
+> (   128 MB)
+> [    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7bdfffff0000
+> (126847 GB)
+> [    0.000000]       .text : 0xffff20c2d7880000 - 0xffff20c2d8040000
+> (  7936 KB)
+> [    0.000000]     .rodata : 0xffff20c2d8040000 - 0xffff20c2d83a0000
+> (  3456 KB)
+> [    0.000000]       .init : 0xffff20c2d83a0000 - 0xffff20c2d8750000
+> (  3776 KB)
+> [    0.000000]       .data : 0xffff20c2d8750000 - 0xffff20c2d891b200
+> (  1837 KB)
+> [    0.000000]        .bss : 0xffff20c2d891b200 - 0xffff20c2d90a5198
+> (  7720 KB)
+> [    0.000000]     fixed   : 0xffff7fdffe790000 - 0xffff7fdffec00000
+> (  4544 KB)
+> [    0.000000]     PCI I/O : 0xffff7fdffee00000 - 0xffff7fdfffe00000
+> (    16 MB)
+> [    0.000000]     vmemmap : 0xffff7fe000000000 - 0xffff800000000000
+> (   128 GB maximum)
+> [    0.000000]               0xffff7ffa25800800 - 0xffff7ffa2b800000
+> (    95 MB actual)
+> [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
+> ( 98302 MB)
+>
+> As one can see above, the 'memblock_start_of_DRAM()' value of
+> 0xffffe89600200000 represents the start of linear region:
+>
+> [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
+> ( 98302 MB)
+>
+> So, my question is to access the start of linear region (which was
+> earlier determinable via PAGE_OFFSET macro), whether I should:
+>
+> - do some back-computation for the start of linear region from the
+> 'memstart_addr' in user-space, or
+> - use a new global variable in kernel which is assigned the value of
+> memblock_start_of_DRAM()' and assign it to '/proc/kallsyms', so that
+> it can be read by user-space tools, or
+> - whether we should rather look at removing the PAGE_OFFSET usage from
+> the kernel and replace it with a global variable instead which is
+> properly updated for KASLR case as well.
+>
+> Kindly share your opinions on what can be a suitable solution in this case.
+>
+> Thanks for your help.
+>
 
-Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 39 ++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_drv.c | 38 +++++++++++++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
+Hello Bhupesh,
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 8bfc0debd2c2..3b22b48a6022 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -61,6 +61,24 @@
- #define MT8173_MUTEX_MOD_DISP_PWM1		24
- #define MT8173_MUTEX_MOD_DISP_OD		25
- 
-+#define MT2712_MUTEX_MOD_DISP_PWM2		10
-+#define MT2712_MUTEX_MOD_DISP_OVL0		11
-+#define MT2712_MUTEX_MOD_DISP_OVL1		12
-+#define MT2712_MUTEX_MOD_DISP_RDMA0		13
-+#define MT2712_MUTEX_MOD_DISP_RDMA1		14
-+#define MT2712_MUTEX_MOD_DISP_RDMA2		15
-+#define MT2712_MUTEX_MOD_DISP_WDMA0		16
-+#define MT2712_MUTEX_MOD_DISP_WDMA1		17
-+#define MT2712_MUTEX_MOD_DISP_COLOR0		18
-+#define MT2712_MUTEX_MOD_DISP_COLOR1		19
-+#define MT2712_MUTEX_MOD_DISP_AAL0		20
-+#define MT2712_MUTEX_MOD_DISP_UFOE		22
-+#define MT2712_MUTEX_MOD_DISP_PWM0		23
-+#define MT2712_MUTEX_MOD_DISP_PWM1		24
-+#define MT2712_MUTEX_MOD_DISP_OD0		25
-+#define MT2712_MUTEX_MOD2_DISP_AAL1		33
-+#define MT2712_MUTEX_MOD2_DISP_OD1		34
-+
- #define MT2701_MUTEX_MOD_DISP_OVL		3
- #define MT2701_MUTEX_MOD_DISP_WDMA		6
- #define MT2701_MUTEX_MOD_DISP_COLOR		7
-@@ -110,6 +128,26 @@ static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
- 	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
- };
- 
-+static const unsigned int mt2712_mutex_mod[DDP_COMPONENT_ID_MAX] = {
-+	[DDP_COMPONENT_AAL0] = MT2712_MUTEX_MOD_DISP_AAL0,
-+	[DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
-+	[DDP_COMPONENT_COLOR0] = MT2712_MUTEX_MOD_DISP_COLOR0,
-+	[DDP_COMPONENT_COLOR1] = MT2712_MUTEX_MOD_DISP_COLOR1,
-+	[DDP_COMPONENT_OD0] = MT2712_MUTEX_MOD_DISP_OD0,
-+	[DDP_COMPONENT_OD1] = MT2712_MUTEX_MOD2_DISP_OD1,
-+	[DDP_COMPONENT_OVL0] = MT2712_MUTEX_MOD_DISP_OVL0,
-+	[DDP_COMPONENT_OVL1] = MT2712_MUTEX_MOD_DISP_OVL1,
-+	[DDP_COMPONENT_PWM0] = MT2712_MUTEX_MOD_DISP_PWM0,
-+	[DDP_COMPONENT_PWM1] = MT2712_MUTEX_MOD_DISP_PWM1,
-+	[DDP_COMPONENT_PWM2] = MT2712_MUTEX_MOD_DISP_PWM2,
-+	[DDP_COMPONENT_RDMA0] = MT2712_MUTEX_MOD_DISP_RDMA0,
-+	[DDP_COMPONENT_RDMA1] = MT2712_MUTEX_MOD_DISP_RDMA1,
-+	[DDP_COMPONENT_RDMA2] = MT2712_MUTEX_MOD_DISP_RDMA2,
-+	[DDP_COMPONENT_UFOE] = MT2712_MUTEX_MOD_DISP_UFOE,
-+	[DDP_COMPONENT_WDMA0] = MT2712_MUTEX_MOD_DISP_WDMA0,
-+	[DDP_COMPONENT_WDMA1] = MT2712_MUTEX_MOD_DISP_WDMA1,
-+};
-+
- static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
- 	[DDP_COMPONENT_AAL0] = MT8173_MUTEX_MOD_DISP_AAL,
- 	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
-@@ -430,6 +468,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
- 
- static const struct of_device_id ddp_driver_dt_match[] = {
- 	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
-+	{ .compatible = "mediatek,mt2712-disp-mutex", .data = mt2712_mutex_mod},
- 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
- 	{},
- };
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 3d279a299383..3a866e1d6af4 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -146,6 +146,32 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
- 	DDP_COMPONENT_DPI0,
- };
- 
-+static const enum mtk_ddp_comp_id mt2712_mtk_ddp_main[] = {
-+	DDP_COMPONENT_OVL0,
-+	DDP_COMPONENT_COLOR0,
-+	DDP_COMPONENT_AAL0,
-+	DDP_COMPONENT_OD0,
-+	DDP_COMPONENT_RDMA0,
-+	DDP_COMPONENT_DPI0,
-+	DDP_COMPONENT_PWM0,
-+};
-+
-+static const enum mtk_ddp_comp_id mt2712_mtk_ddp_ext[] = {
-+	DDP_COMPONENT_OVL1,
-+	DDP_COMPONENT_COLOR1,
-+	DDP_COMPONENT_AAL1,
-+	DDP_COMPONENT_OD1,
-+	DDP_COMPONENT_RDMA1,
-+	DDP_COMPONENT_DPI1,
-+	DDP_COMPONENT_PWM1,
-+};
-+
-+static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
-+	DDP_COMPONENT_RDMA2,
-+	DDP_COMPONENT_DSI2,
-+	DDP_COMPONENT_PWM2,
-+};
-+
- static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
- 	DDP_COMPONENT_OVL0,
- 	DDP_COMPONENT_COLOR0,
-@@ -173,6 +199,15 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
- 	.shadow_register = true,
- };
- 
-+static const struct mtk_mmsys_driver_data mt2712_mmsys_driver_data = {
-+	.main_path = mt2712_mtk_ddp_main,
-+	.main_len = ARRAY_SIZE(mt2712_mtk_ddp_main),
-+	.ext_path = mt2712_mtk_ddp_ext,
-+	.ext_len = ARRAY_SIZE(mt2712_mtk_ddp_ext),
-+	.third_path = mt2712_mtk_ddp_third,
-+	.third_len = ARRAY_SIZE(mt2712_mtk_ddp_third),
-+};
-+
- static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
- 	.main_path = mt8173_mtk_ddp_main,
- 	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
-@@ -379,6 +414,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
- 	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
- 	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
- 	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
-+	{ .compatible = "mediatek,mt2712-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
- 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
- 	{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void *)MTK_DISP_BLS },
- 	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
-@@ -557,6 +593,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
- static const struct of_device_id mtk_drm_of_ids[] = {
- 	{ .compatible = "mediatek,mt2701-mmsys",
- 	  .data = &mt2701_mmsys_driver_data},
-+	{ .compatible = "mediatek,mt2712-mmsys",
-+	  .data = &mt2712_mmsys_driver_data},
- 	{ .compatible = "mediatek,mt8173-mmsys",
- 	  .data = &mt8173_mmsys_driver_data},
- 	{ }
--- 
-2.12.5
+Could you explain what the relevance is of PAGE_OFFSET to userland?
+The only thing that should matter is where the actual linear mapping
+of DRAM is, and I am not sure I understand why we care about where it
+resides relative to the base of the linear region.
