@@ -1,45 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 May 2018 17:44:36 +0200
-Subject: [PATCH] ARM: mcpm, perf/arm-cci: export mcpm_is_available
-Message-ID: <20180528154448.2494709-1-arnd@arndb.de>
+Date: Mon, 28 May 2018 17:48:39 +0200
+Subject: [PATCH] PCI: versatile: include pci.h
+Message-ID: <20180528154850.2647019-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the ARM CCI PMU driver can be built as a loadable module,
-we get a link failure when MCPM is enabled:
+Two patches for PCI host drivers clashed recently, leading to a broken
+build for versatile-pci:
 
-ERROR: "mcpm_is_available" [drivers/perf/arm-cci.ko] undefined!
+drivers/pci/host/pci-versatile.c: In function 'versatile_pci_parse_request_of_pci_ranges':
+drivers/pci/host/pci-versatile.c:70:8: error: implicit declaration of function 'devm_of_pci_get_host_bridge_resources'; did you mean 'pci_get_host_bridge_device'? [-Werror=implicit-function-declaration]
 
-The simplest fix is to export that helper function.
+This adds the missing header inclusion that became necessary now.
 
-Fixes: 8b0c93c20ef7 ("perf/arm-cci: Allow building as a module")
+Fixes: 9e2aee80c78d ("PCI: Move private DT related functions into private header")
+Fixes: 64720fd1f630 ("PCI: Rework of_pci_get_host_bridge_resources() to devm_of_pci_get_host_bridge_resources()")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-The patch that caused this is currently part of the arm-perf/for-next/perf
-branch, it would be good to have the fix there as well.
----
- arch/arm/common/mcpm_entry.c | 2 ++
+ drivers/pci/host/pci-versatile.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index ed9e87ddbb06..037a4479b8c3 100644
---- a/arch/arm/common/mcpm_entry.c
-+++ b/arch/arm/common/mcpm_entry.c
-@@ -9,6 +9,7 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
+index ff2cd12b3978..994f32061b32 100644
+--- a/drivers/pci/host/pci-versatile.c
++++ b/drivers/pci/host/pci-versatile.c
+@@ -15,6 +15,8 @@
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
  
-+#include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/irqflags.h>
-@@ -174,6 +175,7 @@ bool mcpm_is_available(void)
- {
- 	return (platform_ops) ? true : false;
- }
-+EXPORT_SYMBOL_GPL(mcpm_is_available);
++#include "../pci.h"
++
+ static void __iomem *versatile_pci_base;
+ static void __iomem *versatile_cfg_base[2];
  
- /*
-  * We can't use regular spinlocks. In the switcher case, it is possible
 -- 
 2.9.0
