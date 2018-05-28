@@ -1,80 +1,90 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Mon, 28 May 2018 08:41:31 +0200
-Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
-In-Reply-To: <20180528022652.GA3143@dragon>
-References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
- <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
- <20180224074543.GF3217@dragon>
- <20180226134741.neqkpge33zo3pfzt@earth.universe>
- <20180227011033.GV3217@dragon>
- <20180227101712.3zwobvs4ox4jchcj@earth.universe>
- <20180528022652.GA3143@dragon>
-Message-ID: <20180528064131.y5burm5kakiazaq4@earth.universe>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 28 May 2018 15:07:43 +0800
+Subject: [PATCH v4 4/9] drm/mediatek: add ddp component OD1
+In-Reply-To: <1527489507-24453-5-git-send-email-stu.hsieh@mediatek.com>
+References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
+ <1527489507-24453-5-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527491263.24367.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Stu:
 
-On Mon, May 28, 2018 at 10:26:54AM +0800, Shawn Guo wrote:
-> On Tue, Feb 27, 2018 at 11:17:12AM +0100, Sebastian Reichel wrote:
-> > Hi,
-> > 
-> > On Tue, Feb 27, 2018 at 09:10:34AM +0800, Shawn Guo wrote:
-> > > On Mon, Feb 26, 2018 at 02:47:41PM +0100, Sebastian Reichel wrote:
-> > > > On Sat, Feb 24, 2018 at 03:45:44PM +0800, Shawn Guo wrote:
-> > > > > On Mon, Feb 12, 2018 at 01:39:44PM +0100, Sebastian Reichel wrote:
-> > > > > > On i.MX53 it is necessary to set the DBG_EN bit in the
-> > > > > > platform GPC register to enable access to PMU counters
-> > > > > > other than the cycle counter.
-> > > > > > 
-> > > > > > Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> > > > > > ---
-> > > > > >  arch/arm/mach-imx/mach-imx53.c | 39 ++++++++++++++++++++++++++++++++++++++-
-> > > > > >  1 file changed, 38 insertions(+), 1 deletion(-)
-> > > > > > 
-> > > > > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> > > > > > index 07c2e8dca494..658e28604dca 100644
-> > > > > > --- a/arch/arm/mach-imx/mach-imx53.c
-> > > > > > +++ b/arch/arm/mach-imx/mach-imx53.c
-> > > > > > @@ -28,10 +28,47 @@ static void __init imx53_init_early(void)
-> > > > > >  	mxc_set_cpu_type(MXC_CPU_MX53);
-> > > > > >  }
-> > > > > >  
-> > > > > > +#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
-> > > > > 
-> > > > > The base address should be retrieved from device tree.
-> > > > 
-> > > > DT has no entry for 0x63fa0000-0x63fa3fff. iMX53 TRM lists it as "ARM Platform"
-> > > > with 8 platform specific 32 bit registers. Do you think it's worth the trouble
-> > > > adding a new binding? Do you have a suggestion for a compatible value?
-> > > 
-> > > Looking at it more closely, I feel that patching every single platform
-> > > which needs to set up additional register for secure-reg-access support
-> > > doesn't really scale.  Can we have pmu driver do it with a phandle in
-> > > DT pointing to the register and bit that need to be configured?
-> > 
-> > The PMU driver used to have a feature for initialising platform
-> > specific bits, but it is currently being removed to make the PMU
-> > code more maintainable. My understanding is, that it's very uncommon
-> > to require platform specific setup to get secure-reg-access working.
-> > I.e. it is not needed for newer iMX platforms.
+On Mon, 2018-05-28 at 14:38 +0800, Stu Hsieh wrote:
+> This patch add the component OD1 and
+> rename the OD to OD1
+
+rename the OD to OD0
+
 > 
-> Are you saying this is a very specific setup required by i.MX53 only?
-
-Yes, all other SoCs supported by Linux ARM PMU counters driver can
-just use the registers without having to enable platform specific
-bits first.
-
-> In that case, I can live with it.
-
-What about the DT node? I did not add it, since this is a i.MX53
-specific workaround anyways.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180528/03b956df/attachment-0001.sig>
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 4 ++--
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 3 ++-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 2 +-
+>  4 files changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 7217665f4b5d..58e44349e315 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -114,7 +114,7 @@ static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+>  	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
+>  	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
+>  	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
+> -	[DDP_COMPONENT_OD] = MT8173_MUTEX_MOD_DISP_OD,
+> +	[DDP_COMPONENT_OD0] = MT8173_MUTEX_MOD_DISP_OD,
+>  	[DDP_COMPONENT_OVL0] = MT8173_MUTEX_MOD_DISP_OVL0,
+>  	[DDP_COMPONENT_OVL1] = MT8173_MUTEX_MOD_DISP_OVL1,
+>  	[DDP_COMPONENT_PWM0] = MT8173_MUTEX_MOD_DISP_PWM0,
+> @@ -139,7 +139,7 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
+>  		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
+>  		value = OVL_MOUT_EN_RDMA;
+> -	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
+> +	} else if (cur == DDP_COMPONENT_OD0 && next == DDP_COMPONENT_RDMA0) {
+>  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+>  		value = OD_MOUT_EN_RDMA0;
+>  	} else if (cur == DDP_COMPONENT_UFOE && next == DDP_COMPONENT_DSI0) {
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index 0919039805aa..87acf6be87f6 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -227,7 +227,8 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+>  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+>  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+>  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
+> -	[DDP_COMPONENT_OD]	= { MTK_DISP_OD,	0, &ddp_od },
+> +	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
+> +	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
+>  	[DDP_COMPONENT_OVL0]	= { MTK_DISP_OVL,	0, NULL },
+>  	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
+>  	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> index eee3c0cc2632..9b19fc4423f1 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> @@ -50,7 +50,8 @@ enum mtk_ddp_comp_id {
+>  	DDP_COMPONENT_DSI0,
+>  	DDP_COMPONENT_DSI1,
+>  	DDP_COMPONENT_GAMMA,
+> -	DDP_COMPONENT_OD,
+> +	DDP_COMPONENT_OD0,
+> +	DDP_COMPONENT_OD1,
+>  	DDP_COMPONENT_OVL0,
+>  	DDP_COMPONENT_OVL1,
+>  	DDP_COMPONENT_PWM0,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index a415260f3d5f..08d5d0b47bfe 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -150,7 +150,7 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+>  	DDP_COMPONENT_OVL0,
+>  	DDP_COMPONENT_COLOR0,
+>  	DDP_COMPONENT_AAL0,
+> -	DDP_COMPONENT_OD,
+> +	DDP_COMPONENT_OD0,
+>  	DDP_COMPONENT_RDMA0,
+>  	DDP_COMPONENT_UFOE,
+>  	DDP_COMPONENT_DSI0,
