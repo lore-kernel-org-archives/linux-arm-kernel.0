@@ -1,33 +1,30 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 28 May 2018 14:38:19 +0800
-Subject: [PATCH v4 1/9] drm/mediatek: update dt-bindings for mt2712
+Date: Mon, 28 May 2018 14:38:23 +0800
+Subject: [PATCH v4 5/9] drm/mediatek: add ddp component PWM1
 In-Reply-To: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527489507-24453-2-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527489507-24453-6-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update device tree binding documentation for the display subsystem for
-Mediatek MT2712 SoCs.
+This patch add component PWM1 in mtk_ddp_matches
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Acked-by: CK Hu <ck.hu@mediatek.com>
 ---
- Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-index 383183a89164..8469de510001 100644
---- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-+++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-@@ -40,7 +40,7 @@ Required properties (all function blocks):
- 	"mediatek,<chip>-dpi"        - DPI controller, see mediatek,dpi.txt
- 	"mediatek,<chip>-disp-mutex" - display mutex
- 	"mediatek,<chip>-disp-od"    - overdrive
--  the supported chips are mt2701 and mt8173.
-+  the supported chips are mt2701, mt2712 and mt8173.
- - reg: Physical base address and length of the function block register space
- - interrupts: The interrupt signal from the function block (required, except for
-   merge and split function blocks).
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 87acf6be87f6..a5c7ac2d162d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -232,6 +232,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_OVL0]	= { MTK_DISP_OVL,	0, NULL },
+ 	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
+ 	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
++	[DDP_COMPONENT_PWM1]	= { MTK_DISP_PWM,	1, NULL },
+ 	[DDP_COMPONENT_RDMA0]	= { MTK_DISP_RDMA,	0, NULL },
+ 	[DDP_COMPONENT_RDMA1]	= { MTK_DISP_RDMA,	1, NULL },
+ 	[DDP_COMPONENT_RDMA2]	= { MTK_DISP_RDMA,	2, NULL },
 -- 
 2.12.5
