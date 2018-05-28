@@ -1,50 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 28 May 2018 18:24:35 +0200
-Subject: [PATCH 09/12] ARM: dts: exynos5250: add mipi-phy node
-In-Reply-To: <1527500833-16005-10-git-send-email-m.purski@samsung.com>
-References: <CGME20180528094729eucas1p1cc26ea191a4ee1ba9daa06fae93037bf@eucas1p1.samsung.com>
- <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <1527500833-16005-10-git-send-email-m.purski@samsung.com>
-Message-ID: <CAJKOXPe0gq8U+7xSaxaZFjsGxx7iRGKMEtYn==fAZajJkfasxw@mail.gmail.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 28 May 2018 09:24:55 -0700
+Subject: [PATCH 08/12] drm/bridge: tc358764: Add DSI to LVDS bridge driver
+In-Reply-To: <1527500833-16005-9-git-send-email-m.purski@samsung.com>
+References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+ <CGME20180528094728eucas1p128e8a44fa6c3bcb29d056a8191c039af@eucas1p1.samsung.com>
+ <1527500833-16005-9-git-send-email-m.purski@samsung.com>
+Message-ID: <153d1f8c-a0b4-b189-34b5-42a81d15f66b@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 11:47 AM, Maciej Purski <m.purski@samsung.com> wrote:
-> The patch adds phy node, required by MIPI devices.
->
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-
-This have pretty small changes since original Andrzej's patch so
-probably Andrzej's authorship should be preserved.
-
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 2daf505..a63b655 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -733,6 +733,12 @@
->                         #phy-cells = <0>;
->                 };
->
-> +               mipi_phy: video-phy at 10040710 {
-> +                       compatible = "samsung,s5pv210-mipi-video-phy";
-
-No DTC warnings (make dtbs W=1)? reg is missing so DTC should complain.
-
-Best regards,
-Krzysztof
-
-> +                       #phy-cells = <1>;
-> +                       syscon = <&pmu_system_controller>;
-> +               };
+On 05/28/2018 02:47 AM, Maciej Purski wrote:
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index fa2c799..58e19af 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -110,6 +110,13 @@ config DRM_THINE_THC63LVD1024
+>  	---help---
+>  	  Thine THC63LVD1024 LVDS/parallel converter driver.
+>  
+> +config DRM_TOSHIBA_TC358764
+> +	tristate "TC358764 DSI/LVDS bridge"
+> +	depends on DRM && DRM_PANEL
+> +	depends on OF
+> +	select DRM_MIPI_DSI
+> +	select VIDEOMODE_HELPERS
 > +
->                 adc: adc at 12d10000 {
->                         compatible = "samsung,exynos-adc-v1";
->                         reg = <0x12D10000 0x100>;
-> --
-> 2.7.4
->
+
+Kconfig symbols with "prompt strings" should also have help text.
+
+I expected checkpatch to catch that, but I tested it and there was no warning
+from checkpatch about help text.  OTOH, there was a warning that there are
+2 lines in this patch that end with whitespace, so that should be fixed.
+
+Did you use checkpatch (scripts/checkpatch.pl)?
+
+>  config DRM_TOSHIBA_TC358767
+>  	tristate "Toshiba TC358767 eDP bridge"
+>  	depends on OF
+
+thanks,
+-- 
+~Randy
