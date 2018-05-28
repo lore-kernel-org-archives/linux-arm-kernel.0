@@ -1,84 +1,85 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 28 May 2018 10:50:15 +0800
-Subject: [PATCH v3 8/8] drm/mediatek: add third ddp path
-In-Reply-To: <1527474417.11190.21.camel@mtksdccf07>
-References: <1527215665-11937-1-git-send-email-stu.hsieh@mediatek.com>
- <1527215665-11937-9-git-send-email-stu.hsieh@mediatek.com>
- <1527224425.27165.27.camel@mtksdaap41>
- <1527474417.11190.21.camel@mtksdccf07>
-Message-ID: <1527475815.31089.0.camel@mtksdaap41>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 28 May 2018 11:13:59 +0800
+Subject: [PATCH] perf tools: Fix indexing for decoder packet queue
+In-Reply-To: <1527289854-10755-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1527289854-10755-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CALZQ+UMbndvogrSb0Ey3ac1vDGqtsiRTR=ee8VGzU2Ni9_s0og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+On Fri, May 25, 2018 at 05:10:54PM -0600, Mathieu Poirier wrote:
+> The tail of a queue is supposed to be pointing to the next available slot
+> in a queue.  In this implementation the tail is incremented before it is
+> used and as such points to the last used element, something that has the
+> immense advantage of centralizing tail management at a single location
+> and eliminating a lot of redundant code.
+>
+> But this needs to be taken into consideration on the dequeueing side where
+> the head also needs to be incremented before it is used, or the first
+> available element of the queue will be skipped.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index c8b98fa22997..4d5fc374e730 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -96,11 +96,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
+>   /* Nothing to do, might as well just return */
+>   if (decoder->packet_count == 0)
+>   return 0;
+> + /*
+> + * The queueing process in function cs_etm_decoder__buffer_packet()
+> + * increments the tail *before* using it.  This is somewhat counter
+> + * intuitive but it has the advantage of centralizing tail management
+> + * at a single location.  Because of that we need to follow the same
+> + * heuristic with the head, i.e we increment it before using its
+> + * value.  Otherwise the first element of the packet queue is not
+> + * used.
+> + */
+> + decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+>
+>   *packet = decoder->packet_buffer[decoder->head];
+>
+> - decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+> -
 
-On Mon, 2018-05-28 at 10:26 +0800, Stu Hsieh wrote:
-> Hi, CK:
-> I've some idea as below.
-> 
-> On Fri, 2018-05-25 at 13:00 +0800, CK Hu wrote:
-> > Hi, Stu:
-> > 
-> > On Fri, 2018-05-25 at 10:34 +0800, stu.hsieh at mediatek.com wrote:
-> > > From: Stu Hsieh <stu.hsieh@mediatek.com>
-> > > 
-> > > This patch create third crtc by third ddp path
-> > > 
-> > 
-> > Apply this patch before the patch 'Add support for mediatek SOC MT2712'
-> > because this patch is necessary for mt2712.
-> > 
-> > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > > ---
-> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 5 +++++
-> > >  1 file changed, 5 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > > index b32c4cc8d051..3a866e1d6af4 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > > @@ -267,6 +267,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
-> > >  	if (ret < 0)
-> > >  		goto err_component_unbind;
-> > >  
-> > > +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
-> > > +				  private->data->third_len);
-> > 
-> > I think you should prevent doing this for mt8173 and mt2701 because that
-> > two SoC has only two ddp path.
-> 
-> Now, 8173 and 2701 have only two ddp path, there is a problem on run
-> time. 
-> There are three crtc for drm resource, and there is nothing in third
-> crtc. 
-> Because 8173 and 2701 have no third ddp, and the third ddp_len is zero.
-> So, I want to add the condition like following in mtk_crtc_create()
-> if (path_len == 0)
-> 	return 0;
-> 
-> Then, the valur ret is zero and it would not create the null third crtc.
+I tested this patch and confirmed it can work well with python
+decoding script:
 
-This sounds good to me.
+Tested-by: Leo Yan <leo.yan@linaro.org>
 
-Regards,
-CK
+Actually, I have another idea for this fixing, seems to me
+the unchanged code has right logic for decoder->head, and I think this
+issue is more related with incorrect initialization index.  So we can
+change the initialization index for decoder->head as below.  How about
+you think for this?
 
-> 
-> 
-> Regards,
-> Stu
-> 
-> > 
-> > Regards,
-> > CK
-> > 
-> > > +	if (ret < 0)
-> > > +		goto err_component_unbind;
-> > > +
-> > >  	/* Use OVL device for all DMA memory allocations */
-> > >  	np = private->comp_node[private->data->main_path[0]] ?:
-> > >  	     private->comp_node[private->data->ext_path[0]];
-> > 
-> > 
-> 
-> 
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index c8b98fa..b133260 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -249,7 +249,7 @@ static void cs_etm_decoder__clear_buffer(struct
+cs_etm_decoder *decoder)
+ {
+        int i;
+
+-       decoder->head = 0;
++       decoder->head = 1;
+        decoder->tail = 0;
+        decoder->packet_count = 0;
+        for (i = 0; i < MAX_BUFFER; i++) {
+
+Thanks,
+Leo Yan
+
+>   decoder->packet_count--;
+>
+>   return 1;
+> --
+> 2.7.4
+>
