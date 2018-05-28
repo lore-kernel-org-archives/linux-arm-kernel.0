@@ -1,53 +1,42 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 28 May 2018 16:53:04 +0200
-Subject: [PATCH 01/15] arm: dts: armada: Fix "#cooling-cells" property's
- name
-In-Reply-To: <26a0666368694db610414a85a08843435ea070a7.1527244201.git.viresh.kumar@linaro.org>
- (Viresh Kumar's message of "Fri, 25 May 2018 16:01:47 +0530")
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <cover.1527244200.git.viresh.kumar@linaro.org>
- <26a0666368694db610414a85a08843435ea070a7.1527244201.git.viresh.kumar@linaro.org>
-Message-ID: <8736ybygq7.fsf@bootlin.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 28 May 2018 17:10:16 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.17 (#2)
+Message-ID: <871sdvyfxj.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
- 
- On ven., mai 25 2018, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Hi,
 
-> It should be "#cooling-cells" instead of "cooling-cells". Fix it.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-
-Applied on mvebu/fixes
-
-Thanks,
+Here is the second pull request for fixes for mvebu for v4.17.
+Nothing really critical but it needs to be fixed.
 
 Gregory
 
-> ---
->  arch/arm/boot/dts/armada-385-synology-ds116.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/armada-385-synology-ds116.dts b/arch/arm/boot/dts/armada-385-synology-ds116.dts
-> index 6782ce481ac9..d8769956cbfc 100644
-> --- a/arch/arm/boot/dts/armada-385-synology-ds116.dts
-> +++ b/arch/arm/boot/dts/armada-385-synology-ds116.dts
-> @@ -139,7 +139,7 @@
->  					      3700 5
->  					      3900 6
->  					      4000 7>;
-> -			cooling-cells = <2>;
-> +			#cooling-cells = <2>;
->  		};
->  
->  		gpio-leds {
-> -- 
-> 2.15.0.194.g9af6a3dea062
->
+The following changes since commit f43194c1447c9536efb0859c2f3f46f6bf2b9154:
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+  ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node (2018-04-27 17:47:24 +0200)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.17-2
+
+for you to fetch changes up to ac62cc9d9cd6fa4c79e171c13dc8d58c3862b678:
+
+  arm: dts: armada: Fix "#cooling-cells" property's name (2018-05-28 16:54:44 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.17 (part 2)
+
+ - Use correct size for ICU nodes (irq controller) on Armada 7K/8K
+ - Fix "#cooling-cells" property's name on Synology DS116 (Armada 385)
+
+----------------------------------------------------------------
+Miquel Raynal (1):
+      arm64: dts: marvell: fix CP110 ICU node size
+
+Viresh Kumar (1):
+      arm: dts: armada: Fix "#cooling-cells" property's name
+
+ arch/arm/boot/dts/armada-385-synology-ds116.dts | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
