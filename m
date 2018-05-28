@@ -1,76 +1,137 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 28 May 2018 14:38:21 +0800
-Subject: [PATCH v4 3/9] drm/mediatek: add ddp component AAL1
+Date: Mon, 28 May 2018 14:38:20 +0800
+Subject: [PATCH v4 2/9] drm/mediatek: support maximum 64 mutex mod
 In-Reply-To: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1527489507-24453-4-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527489507-24453-3-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add component AAL1 and
-rename AAL to AAL0
+This patch support that if modules more than 32,
+add index more than 31 when using DISP_REG_MUTEX_MOD2 bit
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 2 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 3 ++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
- drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 2 +-
- 4 files changed, 6 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 75 +++++++++++++++++++++-------------
+ 1 file changed, 47 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 47ffa240bd25..7217665f4b5d 100644
+index 8130f3dab661..47ffa240bd25 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -110,7 +110,7 @@ static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
- };
+@@ -41,31 +41,32 @@
+ #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+ #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+ #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
++#define DISP_REG_MUTEX_MOD2(n)	(0x34 + 0x20 * (n))
  
- static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
--	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
-+	[DDP_COMPONENT_AAL0] = MT8173_MUTEX_MOD_DISP_AAL,
- 	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
- 	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
- 	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index 4672317e3ad1..0919039805aa 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -218,7 +218,8 @@ struct mtk_ddp_comp_match {
- };
+ #define INT_MUTEX				BIT(1)
  
- static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
--	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
-+	[DDP_COMPONENT_AAL0]	= { MTK_DISP_AAL,	0, &ddp_aal },
-+	[DDP_COMPONENT_AAL1]	= { MTK_DISP_AAL,	1, &ddp_aal },
- 	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
- 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
- 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 0828cf8bf85c..eee3c0cc2632 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -41,7 +41,8 @@ enum mtk_ddp_comp_type {
- };
+-#define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
+-#define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
+-#define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
+-#define MT8173_MUTEX_MOD_DISP_RDMA1		BIT(14)
+-#define MT8173_MUTEX_MOD_DISP_RDMA2		BIT(15)
+-#define MT8173_MUTEX_MOD_DISP_WDMA0		BIT(16)
+-#define MT8173_MUTEX_MOD_DISP_WDMA1		BIT(17)
+-#define MT8173_MUTEX_MOD_DISP_COLOR0		BIT(18)
+-#define MT8173_MUTEX_MOD_DISP_COLOR1		BIT(19)
+-#define MT8173_MUTEX_MOD_DISP_AAL		BIT(20)
+-#define MT8173_MUTEX_MOD_DISP_GAMMA		BIT(21)
+-#define MT8173_MUTEX_MOD_DISP_UFOE		BIT(22)
+-#define MT8173_MUTEX_MOD_DISP_PWM0		BIT(23)
+-#define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
+-#define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
+-
+-#define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
+-#define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
+-#define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
+-#define MT2701_MUTEX_MOD_DISP_BLS		BIT(9)
+-#define MT2701_MUTEX_MOD_DISP_RDMA0		BIT(10)
+-#define MT2701_MUTEX_MOD_DISP_RDMA1		BIT(12)
++#define MT8173_MUTEX_MOD_DISP_OVL0		11
++#define MT8173_MUTEX_MOD_DISP_OVL1		12
++#define MT8173_MUTEX_MOD_DISP_RDMA0		13
++#define MT8173_MUTEX_MOD_DISP_RDMA1		14
++#define MT8173_MUTEX_MOD_DISP_RDMA2		15
++#define MT8173_MUTEX_MOD_DISP_WDMA0		16
++#define MT8173_MUTEX_MOD_DISP_WDMA1		17
++#define MT8173_MUTEX_MOD_DISP_COLOR0		18
++#define MT8173_MUTEX_MOD_DISP_COLOR1		19
++#define MT8173_MUTEX_MOD_DISP_AAL		20
++#define MT8173_MUTEX_MOD_DISP_GAMMA		21
++#define MT8173_MUTEX_MOD_DISP_UFOE		22
++#define MT8173_MUTEX_MOD_DISP_PWM0		23
++#define MT8173_MUTEX_MOD_DISP_PWM1		24
++#define MT8173_MUTEX_MOD_DISP_OD		25
++
++#define MT2701_MUTEX_MOD_DISP_OVL		3
++#define MT2701_MUTEX_MOD_DISP_WDMA		6
++#define MT2701_MUTEX_MOD_DISP_COLOR		7
++#define MT2701_MUTEX_MOD_DISP_BLS		9
++#define MT2701_MUTEX_MOD_DISP_RDMA0		10
++#define MT2701_MUTEX_MOD_DISP_RDMA1		12
  
- enum mtk_ddp_comp_id {
--	DDP_COMPONENT_AAL,
-+	DDP_COMPONENT_AAL0,
-+	DDP_COMPONENT_AAL1,
- 	DDP_COMPONENT_BLS,
- 	DDP_COMPONENT_COLOR0,
- 	DDP_COMPONENT_COLOR1,
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index a2ca90fc403c..a415260f3d5f 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -149,7 +149,7 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
- static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
- 	DDP_COMPONENT_OVL0,
- 	DDP_COMPONENT_COLOR0,
--	DDP_COMPONENT_AAL,
-+	DDP_COMPONENT_AAL0,
- 	DDP_COMPONENT_OD,
- 	DDP_COMPONENT_RDMA0,
- 	DDP_COMPONENT_UFOE,
+ #define MUTEX_SOF_SINGLE_MODE		0
+ #define MUTEX_SOF_DSI0			1
+@@ -278,6 +279,7 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
+ 	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+ 					   mutex[mutex->id]);
+ 	unsigned int reg;
++	unsigned int offset;
+ 
+ 	WARN_ON(&ddp->mutex[mutex->id] != mutex);
+ 
+@@ -292,9 +294,17 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
+ 		reg = MUTEX_SOF_DPI0;
+ 		break;
+ 	default:
+-		reg = readl_relaxed(ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
+-		reg |= ddp->mutex_mod[id];
+-		writel_relaxed(reg, ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
++		if (ddp->mutex_mod[id] < 32) {
++			offset = DISP_REG_MUTEX_MOD(mutex->id);
++			reg = readl_relaxed(ddp->regs + offset);
++			reg |= 1 << ddp->mutex_mod[id];
++			writel_relaxed(reg, ddp->regs + offset);
++		} else {
++			offset = DISP_REG_MUTEX_MOD2(mutex->id);
++			reg = readl_relaxed(ddp->regs + offset);
++			reg |= 1 << (ddp->mutex_mod[id] - 32);
++			writel_relaxed(reg, ddp->regs + offset);
++		}
+ 		return;
+ 	}
+ 
+@@ -307,6 +317,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+ 	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+ 					   mutex[mutex->id]);
+ 	unsigned int reg;
++	unsigned int offset;
+ 
+ 	WARN_ON(&ddp->mutex[mutex->id] != mutex);
+ 
+@@ -318,9 +329,17 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+ 			       ddp->regs + DISP_REG_MUTEX_SOF(mutex->id));
+ 		break;
+ 	default:
+-		reg = readl_relaxed(ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
+-		reg &= ~(ddp->mutex_mod[id]);
+-		writel_relaxed(reg, ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
++		if (ddp->mutex_mod[id] < 32) {
++			offset = DISP_REG_MUTEX_MOD(mutex->id);
++			reg = readl_relaxed(ddp->regs + offset);
++			reg &= ~(1 << ddp->mutex_mod[id]);
++			writel_relaxed(reg, ddp->regs + offset);
++		} else {
++			offset = DISP_REG_MUTEX_MOD2(mutex->id);
++			reg = readl_relaxed(ddp->regs + offset);
++			reg &= ~(1 << (ddp->mutex_mod[id] - 32));
++			writel_relaxed(reg, ddp->regs + offset);
++		}
+ 		break;
+ 	}
+ }
 -- 
 2.12.5
