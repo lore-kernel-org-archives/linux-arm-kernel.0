@@ -1,62 +1,39 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 28 May 2018 09:12:33 +0000
-Subject: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
- maillist as reviewer
-In-Reply-To: <20180528080037.GC3143@dragon>
-References: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
- <1524855977-15719-6-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211D5AE2B22FFB8BA532ADD80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180528080037.GC3143@dragon>
-Message-ID: <AM0PR04MB4211BC85BCB3206473D76AC0806E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 28 May 2018 17:12:42 +0800
+Subject: [PATCH v1 6/7] drm/mediatek: add a error return value when
+ clock driver has been prepared
+In-Reply-To: <20180514075243.5442-7-bibby.hsieh@mediatek.com>
+References: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
+ <20180514075243.5442-7-bibby.hsieh@mediatek.com>
+Message-ID: <1527498762.14913.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi, Bibby:
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, May 28, 2018 4:01 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: dongas86 at gmail.com; catalin.marinas at arm.com; will.deacon at arm.com;
-> robh+dt at kernel.org; dl-linux-imx <linux-imx@nxp.com>;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
-> maillist as reviewer
-> 
-> On Fri, May 25, 2018 at 02:14:07AM +0000, A.s. Dong wrote:
-> > Hi Shawn,
-> >
-> > > -----Original Message-----
-> > > From: A.s. Dong
-> > > Sent: Saturday, April 28, 2018 3:06 AM
-> > > To: linux-arm-kernel at lists.infradead.org
-> > > Cc: dongas86 at gmail.com; kernel at pengutronix.de;
-> shawnguo at kernel.org;
-> > > Fabio Estevam <fabio.estevam@nxp.com>; robh+dt at kernel.org;
-> > > catalin.marinas at arm.com; will.deacon at arm.com; dl-linux-imx <linux-
-> > > imx at nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> > > Subject: [PATCH 5/5] MAINTAINERS: imx: add NXP linux team upstream
-> > > maillist as reviewer
-> > >
-> > > Add NXP linux team upstream maillist as reviewer
-> > >
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> > Would you pick this one first?
-> 
-> Okay.  I changed patch subject a bit as below and applied the patch, since
-> usually we do not have subsystem prefix for MAINTAINERS change.
-> 
->   MAINTAINERS: add NXP linux team maillist as i.MX reviewer
+On Mon, 2018-05-14 at 15:52 +0800, Bibby Hsieh wrote:
+> DRM driver get the comp->clk by of_clk_get(), we only
+> assign NULL to comp->clk when error happened, but do
+> not return the error number.
 > 
 
-Great. Thanks.
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-Regards
-Dong Aisheng
-
-> Shawn
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index 4672317e3ad1..d38a5303f8fc 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -283,7 +283,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+>  	comp->irq = of_irq_get(node, 0);
+>  	comp->clk = of_clk_get(node, 0);
+>  	if (IS_ERR(comp->clk))
+> -		comp->clk = NULL;
+> +		return PTR_ERR(comp->clk);
+>  
+>  	/* Only DMA capable components need the LARB property */
+>  	comp->larb_dev = NULL;
