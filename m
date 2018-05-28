@@ -1,163 +1,43 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Mon, 28 May 2018 11:58:18 +0800
-Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
-In-Reply-To: <20180528021609.GA31261@MiWiFi-R3L-srv>
-References: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
- <20180528021609.GA31261@MiWiFi-R3L-srv>
-Message-ID: <20180528035818.GB31261@MiWiFi-R3L-srv>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Mon, 28 May 2018 14:38:24 +0800
+Subject: [PATCH v4 6/9] drm/mediatek: add ddp component PWM2
+In-Reply-To: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527489507-24453-7-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/18 at 10:16am, Baoquan He wrote:
-> On 05/28/18 at 02:33am, Bhupesh Sharma wrote:
-> > Hi ARM64 maintainers,
-> > 
-> > I am confused about the PAGE_OFFSET value (or the start of the linear
-> > map) on a KASLR enabled ARM64 kernel that I am seeing on a board which
-> > supports a compatible EFI firmware (with EFI_RNG_PROTOCOL support).
-> > 
-> > 1. 'arch/arm64/include/asm/memory.h' defines PAGE_OFFSET as:
-> > 
-> > /*
-> >  * PAGE_OFFSET - the virtual address of the start of the linear map (top
-> >  *         (VA_BITS - 1))
-> >  */
-> > #define PAGE_OFFSET        (UL(0xffffffffffffffff) - \
-> >     (UL(1) << (VA_BITS - 1)) + 1)
-> > 
-> > So for example on a platform with VA_BITS=48, we have:
-> > PAGE_OFFSET = 0xffff800000000000
-> > 
-> > 2. However, for the KASLR case, we set the 'memstart_offset_seed ' to
-> > use the 16-bits of the 'kaslr-seed' to randomize the linear region in
-> > 'arch/arm64/kernel/kaslr.c' :
-> > 
-> > u64 __init kaslr_early_init(u64 dt_phys)
-> > {
-> > <snip..>
-> >     /* use the top 16 bits to randomize the linear region */
-> >     memstart_offset_seed = seed >> 48;
-> > <snip..>
-> > }
-> > 
-> > 3. Now, we use the 'memstart_offset_seed' value to randomize the
-> > 'memstart_addr' value in 'arch/arm64/mm/init.c':
-> > 
-> > void __init arm64_memblock_init(void)
-> > {
-> > <snip..>
-> > 
-> >     if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> >         extern u16 memstart_offset_seed;
-> >         u64 range = linear_region_size -
-> >                 (memblock_end_of_DRAM() - memblock_start_of_DRAM());
-> > 
-> >         /*
-> >          * If the size of the linear region exceeds, by a sufficient
-> >          * margin, the size of the region that the available physical
-> >          * memory spans, randomize the linear region as well.
-> >          */
-> >         if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> >             range = range / ARM64_MEMSTART_ALIGN + 1;
-> >             memstart_addr -= ARM64_MEMSTART_ALIGN *
-> >                      ((range * memstart_offset_seed) >> 16);
-> >         }
-> >     }
-> > <snip..>
-> > }
-> > 
-> > 4. Since 'memstart_addr' indicates the start of physical RAM, we
-> > randomize the same on basis of 'memstart_offset_seed' value above.
-> > Also the 'memstart_addr' value is available in '/proc/kallsyms' and
-> > hence can be accessed by user-space applications to read the
-> > 'memstart_addr' value.
-> > 
-> > 5. Now since the PAGE_OFFSET value is also used by several user space
-> > tools (for e.g. makedumpfile tool uses the same to determine the start
-> > of linear region and hence to read PT_NOTE fields from /proc/kcore), I
-> > am not sure how to read the randomized value of the same in the KASLR
-> > enabled case.
-> > 
-> > 6. Reading the code further and adding some debug prints, it seems the
-> > 'memblock_start_of_DRAM()' value is more closer to the actual start of
-> > linear region rather than 'memstart_addr' and 'PAGE_OFFSET" in case of
-> > KASLR enabled kernel:
-> 
-> 
-> Can you paste your complete dmesg or boot log? Here I guess it only
-> means the virtual address of memblock_start_of_DRAM, not its value.
+This patch add component PWM2
 
-Oh, it's an offset value, I was mistaken.
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-> 
-> VA_START == 0Xffff000000000000
-> PAGE_OFFSET == 0xffff800000000000
-> > 
-> > [root at qualcomm-amberwing] # dmesg | grep -i "arm64_memblock_init" -A 5
-> > 
-> > [    0.000000] inside arm64_memblock_init, memstart_addr = ffff976a00000000,
-> > linearstart_addr = ffffe89600200000, memblock_start_of_DRAM = ffffe89600200000,
-> > PHYS_OFFSET = ffff976a00000000, PAGE_OFFSET = ffff800000000000,
-> > KIMAGE_VADDR = ffff000008000000, kimage_vaddr = ffff20c2d7800000
-> > 
-> > [root at qualcomm-amberwing] # dmesg | grep -i "Virtual kernel memory layout" -A 15
-> > [    0.000000] Virtual kernel memory layout:
-> > [    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000
-> > (   128 MB)
-> > [    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7bdfffff0000
-> > (126847 GB)
-> > [    0.000000]       .text : 0xffff20c2d7880000 - 0xffff20c2d8040000
-> > (  7936 KB)
-> > [    0.000000]     .rodata : 0xffff20c2d8040000 - 0xffff20c2d83a0000
-> > (  3456 KB)
-> > [    0.000000]       .init : 0xffff20c2d83a0000 - 0xffff20c2d8750000
-> > (  3776 KB)
-> > [    0.000000]       .data : 0xffff20c2d8750000 - 0xffff20c2d891b200
-> > (  1837 KB)
-> > [    0.000000]        .bss : 0xffff20c2d891b200 - 0xffff20c2d90a5198
-> > (  7720 KB)
-> > [    0.000000]     fixed   : 0xffff7fdffe790000 - 0xffff7fdffec00000
-> > (  4544 KB)
-> > [    0.000000]     PCI I/O : 0xffff7fdffee00000 - 0xffff7fdfffe00000
-> > (    16 MB)
-> > [    0.000000]     vmemmap : 0xffff7fe000000000 - 0xffff800000000000
-> > (   128 GB maximum)
-> > [    0.000000]               0xffff7ffa25800800 - 0xffff7ffa2b800000
-> > (    95 MB actual)
-> > [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
-> > ( 98302 MB)
-> > 
-> > As one can see above, the 'memblock_start_of_DRAM()' value of
-> > 0xffffe89600200000 represents the start of linear region:
-> > 
-> > [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
-> > ( 98302 MB)
-> > 
-> > So, my question is to access the start of linear region (which was
-> > earlier determinable via PAGE_OFFSET macro), whether I should:
-> > 
-> > - do some back-computation for the start of linear region from the
-> > 'memstart_addr' in user-space, or
-> > - use a new global variable in kernel which is assigned the value of
-> > memblock_start_of_DRAM()' and assign it to '/proc/kallsyms', so that
-> > it can be read by user-space tools, or
-> > - whether we should rather look at removing the PAGE_OFFSET usage from
-> > the kernel and replace it with a global variable instead which is
-> > properly updated for KASLR case as well.
-> > 
-> > Kindly share your opinions on what can be a suitable solution in this case.
-> > 
-> > Thanks for your help.
-> > 
-> > Regards,
-> > Bhupesh
-> > 
-> > _______________________________________________
-> > kexec mailing list
-> > kexec at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/kexec
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index a5c7ac2d162d..86e8c9e5df41 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -233,6 +233,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
+ 	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
+ 	[DDP_COMPONENT_PWM1]	= { MTK_DISP_PWM,	1, NULL },
++	[DDP_COMPONENT_PWM2]	= { MTK_DISP_PWM,	2, NULL },
+ 	[DDP_COMPONENT_RDMA0]	= { MTK_DISP_RDMA,	0, NULL },
+ 	[DDP_COMPONENT_RDMA1]	= { MTK_DISP_RDMA,	1, NULL },
+ 	[DDP_COMPONENT_RDMA2]	= { MTK_DISP_RDMA,	2, NULL },
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index 9b19fc4423f1..e00c2e798abd 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -56,6 +56,7 @@ enum mtk_ddp_comp_id {
+ 	DDP_COMPONENT_OVL1,
+ 	DDP_COMPONENT_PWM0,
+ 	DDP_COMPONENT_PWM1,
++	DDP_COMPONENT_PWM2,
+ 	DDP_COMPONENT_RDMA0,
+ 	DDP_COMPONENT_RDMA1,
+ 	DDP_COMPONENT_RDMA2,
+-- 
+2.12.5
