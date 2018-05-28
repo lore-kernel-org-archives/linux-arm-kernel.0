@@ -1,158 +1,86 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 May 2018 09:44:41 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.18
-In-Reply-To: <20180526211420.jmme6ikrgdiw76u7@localhost>
-References: <cover.1526637994.git.horms+renesas@verge.net.au>
- <20180526211420.jmme6ikrgdiw76u7@localhost>
-Message-ID: <20180528074436.rctyzocv4qfmdfzy@verge.net.au>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 28 May 2018 15:47:57 +0800
+Subject: [PATCH v4 8/9] drm/mediatek: add third ddp path
+In-Reply-To: <1527489507-24453-9-git-send-email-stu.hsieh@mediatek.com>
+References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
+ <1527489507-24453-9-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1527493677.24367.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi, Stu:
 
-On Sat, May 26, 2018 at 02:14:20PM -0700, Olof Johansson wrote:
-> Hi Simon,
-> 
-> On Fri, May 18, 2018 at 01:16:00PM +0200, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM64 based SoC DT updates for v4.18.
-> > 
-> > 
-> > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> > 
-> >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.18
-> > 
-> > for you to fetch changes up to 908001d778eba06ee1d832863d4e9a1e2cfd4746:
-> > 
-> >   arm64: dts: renesas: salvator-common: Add ADV7482 support (2018-05-18 11:52:03 +0200)
-> 
-> This pull request is really, really hard for us to digest. The tag
-> description is very large, and it repeats several SoCs several times,
-> making it hard to get an overview of what is in it. The verbosity of "<x>
-> says.." makes it harder on this size of a pull request as well.
+One inline comment.
 
-I appologise that this pull-request has turned out to be hard to digest.
+On Mon, 2018-05-28 at 14:38 +0800, Stu Hsieh wrote:
+> This patch create third crtc by third ddp path
+> 
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 3 +++
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 5 +++++
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h  | 7 +++++--
+>  3 files changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 658b8dd45b83..2d6aa150a9ff 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -539,6 +539,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+>  	int ret;
+>  	int i;
+>  
+> +	if (!path)
+> +		return 0;
+> +
+>  	for (i = 0; i < path_len; i++) {
+>  		enum mtk_ddp_comp_id comp_id = path[i];
+>  		struct device_node *node;
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index 08d5d0b47bfe..3d279a299383 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -232,6 +232,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+>  	if (ret < 0)
+>  		goto err_component_unbind;
+>  
+> +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
+> +				  private->data->third_len);
+> +	if (ret < 0)
+> +		goto err_component_unbind;
+> +
+>  	/* Use OVL device for all DMA memory allocations */
+>  	np = private->comp_node[private->data->main_path[0]] ?:
+>  	     private->comp_node[private->data->ext_path[0]];
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> index c3378c452c0a..d867e2683923 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> @@ -17,8 +17,8 @@
+>  #include <linux/io.h>
+>  #include "mtk_drm_ddp_comp.h"
+>  
+> -#define MAX_CRTC	2
+> -#define MAX_CONNECTOR	2
+> +#define MAX_CRTC	3
+> +#define MAX_CONNECTOR	3
 
-I think that one reason for this is that there are an unusally large number
-of commits. It seems that the team has been a little more productive than
-usual and I might have been better to send a smaller pull-request earlier
-in the development cycle and then follow-up with a second batch. I'll try
-to pay more attention to this aspect of things going forwards.
+MAX_CONNECTOR is useless, maybe we just need to remove it in a clean up
+patch. Or you could keep its value.
 
-Regarding your specific comments:
+Regards,
+CK
 
-* Repetition of SoCs. I do try to group things in a logical manner,
-  but clearly I failed in this case. I'll try to make that a bit clearer
-  in future.
-
-* Verbosity: There as a request a few development cycles for me
-  to include more information in the commit logs. It seems that
-  I may have gone a bit too far. I'll try to find a better balance next
-  time around.
-
-* Patches for the same change split up for different SoCs/boards.
-  Featurs broken out into incremental patches. And so on.
-
-  This has been a long-standing practice for Renesas SoC development.
-  We find that in general it aids review. It also works well
-  with the way we develop patches. But I do see your point that
-  it may be a little excessive - f.e. multiple patches for the same
-  whitespace fixes. Again, we'll try to find a better balance.
-
-> 
-> For example:
-> 
-> > * Condor board with R-Car V3H (r8a77980) SoC
-> >   - Enable eMMC
-> > 
-> >     Sergei Shtylyov says "We're adding the R8A77980 MMC (SDHI)
-> >     device nodes and then enable eMMC support on the Condor board."
-> 
-> The "Enable eMMC" line is just fine here.
-> 
-> > ----------------------------------------------------------------
-> > Geert Uytterhoeven (11):
-> >       arm64: dts: renesas: draak: Rename EtherAVB "mdc" pin group to "mdio"
-> >       arm64: dts: renesas: salvator-common: Rename EtherAVB "mdc" pin group to "mdio"
-> >       arm64: dts: renesas: ulcb: Rename EtherAVB "mdc" pin group to "mdio"
-> 
-> Why can't these be done in one commit?
-> 
-> >       arm64: dts: renesas: r8a7795: Correct whitespace
-> >       arm64: dts: renesas: r8a7796: Correct whitespace
-> >       arm64: dts: renesas: r8a77965: Correct whitespace
-> 
-> Do these really need to be three commits to fix some whitespace?
-> 
-> >       arm64: dts: renesas: ulcb: Add BD9571 PMIC
-> >       arm64: dts: renesas: salvator-common: Add PMIC DDR Backup Power config
-> >       arm64: dts: renesas: ulcb: Add PMIC DDR Backup Power config
-> >       arm64: dts: renesas: r8a77970: Add secondary CA53 CPU core
-> >       arm64: dts: renesas: r8a77970: Add Cortex-A53 PMU node
-> 
-> Why can't these be done in the same commit?
-> 
-> > Kieran Bingham (7):
-> >       arm64: dts: renesas: r8a77965: Add FCPF and FCPV instances
-> >       arm64: dts: renesas: r8a77965: Add VSP instances
-> >       arm64: dts: renesas: r8a77965: Populate the DU instance placeholder
-> >       arm64: dts: renesas: r8a77965: Add HDMI encoder instance
-> >       arm64: dts: renesas: r8a77965-salvator-x: Enable DU external clocks and HDMI
-> >       arm64: dts: renesas: r8a77965-salvator-xs: Enable DU external clocks and HDMI
-> 
-> These two can probably be in one commit as well.
-> 
-> >       arm64: dts: renesas: salvator-common: Add ADV7482 support
-> > 
-> > Kuninori Morimoto (8):
-> >       arm64: dts: renesas: r8a7795: add HDMI sound support
-> >       arm64: dts: renesas: r8a7796: add HDMI sound support
-> 
-> ... starting to see a trend?
-> 
-> >       arm64: dts: renesas: salvator-common: use audio-graph-card for Sound
-> >       arm64: dts: renesas: r8a7795-es1-salvator-x: enable HDMI sound
-> >       arm64: dts: renesas: r8a7795-salvator-xs: enable HDMI sound
-> >       arm64: dts: renesas: r8a7796-salvator-xs: enable HDMI sound
-> >       arm64: dts: renesas: r8a7795-salvator-x: enable HDMI sound
-> >       arm64: dts: renesas: r8a7796-salvator-x: enable HDMI sound
-> 
-> ... and more.
-> 
-> > 
-> > Magnus Damm (5):
-> >       arm64: dts: renesas: r8a77970: Update IPMMU DS1 bit number
-> >       arm64: dts: renesas: r8a7795: Enable IPMMU devices
-> >       arm64: dts: renesas: r8a7796: Enable IPMMU devices
-> >       arm64: dts: renesas: r8a77970: Enable IPMMU devices
-> >       arm64: dts: renesas: r8a77995: Enable IPMMU devices
-> 
-> I think these 4 could be in one commit too.
-> 
-> > 
-> > Niklas S?derlund (11):
-> >       arm64: dts: renesas: r8a7795: decrease temperature hysteresis
-> >       arm64: dts: renesas: r8a7796: decrease temperature hysteresis
-> >       arm64: dts: renesas: r8a77965: use r8a77965-sysc binding definitions
-> >       arm64: dts: renesas: r8a77965: Add R-Car Gen3 thermal support
-> >       arm64: dts: renesas: r8a77965: add I2C support
-> >       arm64: dts: renesas: r8a7795: add VIN and CSI-2 nodes
-> >       arm64: dts: renesas: r8a7795-es1: add CSI-2 node
-> >       arm64: dts: renesas: r8a7796: add VIN and CSI-2 nodes
-> >       arm64: dts: renesas: r8a77965: add VIN and CSI-2 nodes
-> >       arm64: dts: renesas: r8a77970: add VIN and CSI-2 nodes
-> 
-> 
-> .... etc, etc. I'll stop here.
-> 
-> 
-> I haven't merged this branch yet, will need to set aside more time to review
-> the contents. I can't guarantee that it'll make v4.18 but I'll try.
-
-Please let me know if there is anything I can do to help make this happen.
-This work is very important to Renesas.
+>  
+>  struct device;
+>  struct device_node;
+> @@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
+>  	unsigned int main_len;
+>  	const enum mtk_ddp_comp_id *ext_path;
+>  	unsigned int ext_len;
+> +	const enum mtk_ddp_comp_id *third_path;
+> +	unsigned int third_len;
+> +
+>  	bool shadow_register;
+>  };
+>  
