@@ -1,61 +1,84 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 28 May 2018 11:47:06 +0200
-Subject: [PATCH 02/12] drm/exynos: move pm_runtime_get_sync() to
- exynos_dsi_init()
+Date: Mon, 28 May 2018 11:47:07 +0200
+Subject: [PATCH 03/12] drm/exynos: move connector creation to attach callback
 In-Reply-To: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
 References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <CGME20180528094723eucas1p1776829e0b57d2ec6c4e28be872cf88fc@eucas1p1.samsung.com>
-Message-ID: <1527500833-16005-3-git-send-email-m.purski@samsung.com>
+ <CGME20180528094724eucas1p17a37e06002ed96d97aaca87231f13bbb@eucas1p1.samsung.com>
+Message-ID: <1527500833-16005-4-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow bridge drivers to use DSI transfers in their
-pre_enable callbacks, pm_runtime_get_sync() should be performed before
-exynos_dsi_enable(). DSIM_STATE_ENABLED flag now should not guard
-from calling dsi_host_transfer() before enabling.
+The current implementation assumes that the only possible peripheral
+device for DSIM is a panel. Using an output bridge should also be
+possible.
+
+If an output bridge in available, don't create a new connector.
+Instead add bridge to DSIM encdoer in dsi_host_attach().
 
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 35 +++++++++++++++++++++------------
+ 1 file changed, 22 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 9599e6b..94460b0 100644
+index 94460b0..8957faf 100644
 --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
 +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1312,6 +1312,7 @@ static int exynos_dsi_init(struct exynos_dsi *dsi)
+@@ -1498,7 +1498,28 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
+ 				  struct mipi_dsi_device *device)
  {
- 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
+ 	struct exynos_dsi *dsi = host_to_dsi(host);
+-	struct drm_device *drm = dsi->connector.dev;
++	struct drm_encoder *encoder = &dsi->encoder;
++	struct drm_device *drm = encoder->dev;
++	struct drm_bridge *out_bridge;
++
++	out_bridge  = of_drm_find_bridge(device->dev.of_node);
++	if (out_bridge) {
++		drm_bridge_attach(encoder, out_bridge, NULL);
++	} else {
++		int ret = exynos_dsi_create_connector(encoder);
++
++		if (ret) {
++			DRM_ERROR("failed to create connector ret = %d\n", ret);
++			drm_encoder_cleanup(encoder);
++			return ret;
++		}
++
++		dsi->panel = of_drm_find_panel(device->dev.of_node);
++		if (dsi->panel) {
++			drm_panel_attach(dsi->panel, &dsi->connector);
++			dsi->connector.status = connector_status_connected;
++		}
++	}
  
-+	pm_runtime_get_sync(dsi->dev);
- 	exynos_dsi_reset(dsi);
- 	exynos_dsi_enable_irq(dsi);
+ 	/*
+ 	 * This is a temporary solution and should be made by more generic way.
+@@ -1517,11 +1538,6 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
+ 	dsi->lanes = device->lanes;
+ 	dsi->format = device->format;
+ 	dsi->mode_flags = device->mode_flags;
+-	dsi->panel = of_drm_find_panel(device->dev.of_node);
+-	if (dsi->panel) {
+-		drm_panel_attach(dsi->panel, &dsi->connector);
+-		dsi->connector.status = connector_status_connected;
+-	}
+ 	exynos_drm_crtc_get_by_type(drm, EXYNOS_DISPLAY_TYPE_LCD)->i80_mode =
+ 			!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO);
  
-@@ -1388,7 +1389,6 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
- 	ret = drm_panel_prepare(dsi->panel);
- 	if (ret < 0) {
- 		dsi->state &= ~DSIM_STATE_ENABLED;
--		pm_runtime_put_sync(dsi->dev);
- 		return;
- 	}
+@@ -1650,13 +1666,6 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+ 	if (ret < 0)
+ 		return ret;
  
-@@ -1400,7 +1400,6 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
- 		dsi->state &= ~DSIM_STATE_ENABLED;
- 		exynos_dsi_set_display_enable(dsi, false);
- 		drm_panel_unprepare(dsi->panel);
--		pm_runtime_put_sync(dsi->dev);
- 		return;
- 	}
- 
-@@ -1566,9 +1565,6 @@ static ssize_t exynos_dsi_host_transfer(struct mipi_dsi_host *host,
- 	struct exynos_dsi_transfer xfer;
- 	int ret;
- 
--	if (!(dsi->state & DSIM_STATE_ENABLED))
--		return -EINVAL;
+-	ret = exynos_dsi_create_connector(encoder);
+-	if (ret) {
+-		DRM_ERROR("failed to create connector ret = %d\n", ret);
+-		drm_encoder_cleanup(encoder);
+-		return ret;
+-	}
 -
- 	if (!(dsi->state & DSIM_STATE_INITIALIZED)) {
- 		ret = exynos_dsi_init(dsi);
- 		if (ret)
+ 	if (dsi->mic_bridge_node) {
+ 		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
+ 		if (mic_bridge)
 -- 
 2.7.4
