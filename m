@@ -1,85 +1,62 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 28 May 2018 11:13:59 +0800
-Subject: [PATCH] perf tools: Fix indexing for decoder packet queue
-In-Reply-To: <1527289854-10755-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1527289854-10755-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CALZQ+UMbndvogrSb0Ey3ac1vDGqtsiRTR=ee8VGzU2Ni9_s0og@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 28 May 2018 11:22:50 +0800
+Subject: [GIT PULL] berlin core changes for 4.18
+In-Reply-To: <20180525215159.xo7tgssmoep73oct@localhost>
+References: <20180524155944.1de22147@xhacker.debian>
+ <20180525215159.xo7tgssmoep73oct@localhost>
+Message-ID: <20180528112250.14820f56@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 05:10:54PM -0600, Mathieu Poirier wrote:
-> The tail of a queue is supposed to be pointing to the next available slot
-> in a queue.  In this implementation the tail is incremented before it is
-> used and as such points to the last used element, something that has the
-> immense advantage of centralizing tail management at a single location
-> and eliminating a lot of redundant code.
->
-> But this needs to be taken into consideration on the dequeueing side where
-> the head also needs to be incremented before it is used, or the first
-> available element of the queue will be skipped.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
->
-> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> index c8b98fa22997..4d5fc374e730 100644
-> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> @@ -96,11 +96,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
->   /* Nothing to do, might as well just return */
->   if (decoder->packet_count == 0)
->   return 0;
-> + /*
-> + * The queueing process in function cs_etm_decoder__buffer_packet()
-> + * increments the tail *before* using it.  This is somewhat counter
-> + * intuitive but it has the advantage of centralizing tail management
-> + * at a single location.  Because of that we need to follow the same
-> + * heuristic with the head, i.e we increment it before using its
-> + * value.  Otherwise the first element of the packet queue is not
-> + * used.
-> + */
-> + decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
->
->   *packet = decoder->packet_buffer[decoder->head];
->
-> - decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
-> -
+On Fri, 25 May 2018 14:51:59 -0700 Olof Johansson wrote:
 
-I tested this patch and confirmed it can work well with python
-decoding script:
+> Hi,
+> 
+> On Thu, May 24, 2018 at 03:59:44PM +0800, Jisheng Zhang wrote:
+> > Hi
+> > 
+> > Here is our mach-berlin changes for v4.18.
+> > 
+> > Thanks,
+> > Jisheng
+> > 
+> > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> > 
+> >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> > 
+> > are available in the Git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin-core-for-v4.18
+> > 
+> > for you to fetch changes up to eb14767c8a9117fdd84fc79e6263c85a4d8ec934:
+> > 
+> >   ARM: berlin: switch to SPDX license identifier (2018-05-24 14:49:09 +0800)
+> > 
+> > ----------------------------------------------------------------
+> > berlin core changes for v4.18
+> > 
+> > BG2CD SoC uses r3p0 Cortex-A9 MPCore single-CPU cluster. Autoselect
+> > pertinent errata, the SCU and the global timer, and allow use of the
+> > local timer on uniprocessor kernels.
+> > 
+> > remove non-necessary flush_cache_all() after scu_enable().
+> > 
+> > switch to SPDX license identifier for all files under mach-berlin/
+> > 
+> > ----------------------------------------------------------------
+> > Alexander Monakov (1):
+> >       ARM: berlin: extend BG2CD Kconfig entry
+> > 
+> > Jisheng Zhang (2):
+> >       arm: berlin: remove non-necessary flush_cache_all()
+> >       ARM: berlin: switch to SPDX license identifier  
+> 
+> Merged, thanks!
+> 
+> Watch out for consistency on the patch subjects, please.
+> 
+> Also, you're cutting it a bit close w.r.t. merge window opening. If you can get
+> your pull requests in before -rc6 you run less risk of missing it if there's
+> a problem with it that needs a respin.
 
-Tested-by: Leo Yan <leo.yan@linaro.org>
-
-Actually, I have another idea for this fixing, seems to me
-the unchanged code has right logic for decoder->head, and I think this
-issue is more related with incorrect initialization index.  So we can
-change the initialization index for decoder->head as below.  How about
-you think for this?
-
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index c8b98fa..b133260 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -249,7 +249,7 @@ static void cs_etm_decoder__clear_buffer(struct
-cs_etm_decoder *decoder)
- {
-        int i;
-
--       decoder->head = 0;
-+       decoder->head = 1;
-        decoder->tail = 0;
-        decoder->packet_count = 0;
-        for (i = 0; i < MAX_BUFFER; i++) {
-
-Thanks,
-Leo Yan
-
->   decoder->packet_count--;
->
->   return 1;
-> --
-> 2.7.4
->
+Got it. Thanks for the kind remind.
