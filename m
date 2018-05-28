@@ -1,108 +1,108 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 May 2018 13:18:36 +0300
-Subject: [PATCH 07/12] dt-bindings: tc358754: add DT bindings
-In-Reply-To: <1527500833-16005-8-git-send-email-m.purski@samsung.com>
-References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
- <CGME20180528094727eucas1p153b8116120cd2195b15b74776f171cbe@eucas1p1.samsung.com>
- <1527500833-16005-8-git-send-email-m.purski@samsung.com>
-Message-ID: <2275901.CJI6BsfBlP@avalon>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Mon, 28 May 2018 13:34:11 +0300
+Subject: [patch v22 3/4] Documentation: jtag: Add bindings for Aspeed SoC 24xx
+ and 25xx families JTAG master driver
+In-Reply-To: <1527503652-21975-1-git-send-email-oleksandrs@mellanox.com>
+References: <1527503652-21975-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1527503652-21975-4-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+It has been tested on Mellanox system with BMC equipped with
+Aspeed 2520 SoC for programming CPLD devices.
 
-Thank you for the patch.
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v21->v22
+v20->v21
+v19->v20
+v18->v19
 
-On Monday, 28 May 2018 12:47:11 EEST Maciej Purski wrote:
-> The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
-> Bindings describe power supplies, reset gpio and video interfaces.
-> 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
->  .../bindings/display/bridge/toshiba,tc358764.txt   | 42 +++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
-> b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt new
-> file mode 100644
-> index 0000000..d09bdc2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
-> @@ -0,0 +1,42 @@
-> +TC358764 MIPI-DSI to LVDS panel bridge
-> +
-> +Required properties:
-> +  - compatible: "toshiba,tc358764"
-> +  - reg: the virtual channel number of a DSI peripheral
-> +  - vddc-supply: core voltage supply
-> +  - vddio-supply: I/O voltage supply
-> +  - vddmipi-supply: MIPI voltage supply
-> +  - vddlvds133-supply: LVDS1 3.3V voltage supply
-> +  - vddlvds112-supply: LVDS1 1.2V voltage supply
+v17->v18
+v16->v17
+v15->v16
+Comments pointed by Joel Stanley <joel.stan@gmail.com>
+- change clocks = <&clk_apb> to proper clocks = <&syscon ASPEED_CLK_APB>
+- add reset descriptions in bndings file
 
-That's a lot of power supplies. Could some of them be merged together ? See 
-https://patchwork.freedesktop.org/patch/216058/ for an earlier discussion on 
-the same subject.
+v14->v15
+v13->v14
+v12->v13
+v11->v12
+v10->v11
+v9->v10
+v8->v9
+v7->v8
+Comments pointed by pointed by Joel Stanley <joel.stan@gmail.com>
+- Change compatible string to ast2400 and ast2000
 
-> +  - reset-gpios: a GPIO spec for the reset pin
-> +
-> +The device node can contain zero to two 'port' child nodes, each with one
-> +child
-> +'endpoint' node, according to the bindings defined in [1].
-> +The following are properties specific to those nodes.
-> +
-> +port:
-> +  - reg: (required) can be 0 for DSI port or 1 for LVDS port;
+V6->v7
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+ - Fix spell "Doccumentation" -> "Documentation"
 
-This seems pretty vague to me. It could be read as meaning that ports are 
-completely optional, and that the port number you list can be used, but that 
-something else could be used to.
+v5->v6
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+- Small nit: s/documentation/Documentation/
 
-Let's make the port nodes mandatory. I propose the following.
+v4->v5
 
-Required nodes:
+V3->v4
+Comments pointed by Rob Herring <robh@kernel.org>
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
 
-The TC358764 has DSI and LVDS ports whose connections are described using the 
-OF graph bindings defined in Documentation/devicetree/bindings/graph.txt. The 
-device node must contain one 'port' child node per DSI and LVDS port. The port 
-nodes are numbered as follows.
+v2->v3
+Comments pointed by Rob Herring <robh@kernel.org>
+- split Aspeed jtag driver and binding to sepatrate patches
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+---
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   22 ++++++++++++++++++++
+ MAINTAINERS                                        |    1 +
+ 2 files changed, 23 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
 
-  Port                  Number
--------------------------------------------------------------------
-  DSI Input             0
-  LVDS Output           1
-
-Each port node must contain endpoint nodes describing the hardware 
-connections.
-
-> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-> +
-> +Example:
-> +
-> +	bridge at 0 {
-> +		reg = <0>;
-> +		compatible = "toshiba,tc358764";
-> +		vddc-supply = <&vcc_1v2_reg>;
-> +		vddio-supply = <&vcc_1v8_reg>;
-> +		vddmipi-supply = <&vcc_1v2_reg>;
-> +		vddlvds133-supply = <&vcc_3v3_reg>;
-> +		vddlvds112-supply = <&vcc_1v2_reg>;
-> +		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		port at 1 {
-> +			reg = <1>;
-> +			lvds_ep: endpoint {
-> +				remote-endpoint = <&panel_ep>;
-> +			};
-> +		};
-> +	};
-
+diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+new file mode 100644
+index 0000000..7c36eb6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+@@ -0,0 +1,22 @@
++Aspeed JTAG driver for ast2400 and ast2500 SoC
++
++Required properties:
++- compatible:		Should be one of
++      - "aspeed,ast2400-jtag"
++      - "aspeed,ast2500-jtag"
++- reg			contains the offset and length of the JTAG memory
++			region
++- clocks		root clock of bus, should reference the APB
++			clock in the second cell
++- resets		phandle to reset controller with the reset number in
++			the second cell
++- interrupts		should contain JTAG controller interrupt
++
++Example:
++jtag: jtag at 1e6e4000 {
++	compatible = "aspeed,ast2500-jtag";
++	reg = <0x1e6e4000 0x1c>;
++	clocks = <&syscon ASPEED_CLK_APB>;
++	resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
++	interrupts = <43>;
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e7b8b2c..a5e5f75 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7617,6 +7617,7 @@ S:	Maintained
+ F:	include/linux/jtag.h
+ F:	include/uapi/linux/jtag.h
+ F:	drivers/jtag/
++F:	Documentation/devicetree/bindings/jtag/
+ 
+ K10TEMP HARDWARE MONITORING DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.1
