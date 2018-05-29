@@ -1,92 +1,68 @@
 From: akurz@blala.de (Alexander Kurz)
-Date: Tue, 29 May 2018 06:20:19 +0000
-Subject: [PATCH v2 2/4] ARM: dts: imx6dl-riotboard: remove regulators bus node
+Date: Tue, 29 May 2018 06:20:20 +0000
+Subject: [PATCH v2 3/4] ARM: dts: imx6qdl-wandboard: enable USB OTG
 In-Reply-To: <20180529062021.3154-1-akurz@blala.de>
 References: <20180529062021.3154-1-akurz@blala.de>
-Message-ID: <20180529062021.3154-3-akurz@blala.de>
+Message-ID: <20180529062021.3154-4-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To match the convention, move regulator-fixed nodes directly into
-the root node.
+Enable USB OTG (dual-role) on the Wandboard.
+Note, that the USB_OTG_VBUS current is quite limited due to a 22R resistor
+in the power line. Hence, the overcurrent signal of 1A will never be
+triggered on this board.
 
 Signed-off-by: Alexander Kurz <akurz@blala.de>
 ---
- arch/arm/boot/dts/imx6dl-riotboard.dts | 55 ++++++++++++++--------------------
- 1 file changed, 23 insertions(+), 32 deletions(-)
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-index 2e98c92adff7..a6851bfebbdb 100644
---- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-@@ -19,38 +19,6 @@
- 		reg = <0x10000000 0x40000000>;
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index b9c6c9d5d357..01ee36af7ba4 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -48,6 +48,16 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
  	};
- 
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_2p5v: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "2P5V";
--			regulator-min-microvolt = <2500000>;
--			regulator-max-microvolt = <2500000>;
--		};
--
--		reg_3p3v: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			regulator-name = "3P3V";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--		};
--
--		reg_usb_otg_vbus: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "usb_otg_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 22 0>;
--			enable-active-high;
--		};
--	};
--
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -82,6 +50,29 @@
- 			mux-int-port = <1>;
- 			mux-ext-port = <3>;
- 	};
-+
-+	reg_2p5v: regulator-2p5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "2P5V";
-+		regulator-min-microvolt = <2500000>;
-+		regulator-max-microvolt = <2500000>;
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
 +
 +	reg_usb_otg_vbus: regulator-usbotgvbus {
 +		compatible = "regulator-fixed";
 +		regulator-name = "usb_otg_vbus";
 +		regulator-min-microvolt = <5000000>;
 +		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbotgvbus>;
++		gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
 +	};
  };
  
  &audmux {
+@@ -162,6 +172,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_usbotgvbus: usbotgvbusgrp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x130b0
++			>;
++		};
++
+ 		pinctrl_usdhc1: usdhc1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
+@@ -236,10 +252,11 @@
+ };
+ 
+ &usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbotg>;
+ 	disable-over-current;
+-	dr_mode = "peripheral";
++	dr_mode = "otg";
+ 	status = "okay";
+ };
+ 
 -- 
 2.11.0
