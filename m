@@ -1,73 +1,86 @@
-From: michael@amarulasolutions.com (Michael Nazzareno Trimarchi)
-Date: Tue, 29 May 2018 16:05:55 +0200
-Subject: [PATCH] rtc: sun6i: Fix bit_idx value for clk_register_gate
-In-Reply-To: <20180529140219.auat656qcl5jdru7@flea.home>
-References: <20180528075032.6769-1-jagan@amarulasolutions.com>
- <20180529140219.auat656qcl5jdru7@flea.home>
-Message-ID: <CAOf5uwkQE2Mv3vhMVFPk69VQRptLpqjC0BkFxucf+VuGyOd2Pw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 29 May 2018 11:11:50 -0300
+Subject: [PATCH] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards
+ from K+P
+In-Reply-To: <20180529155736.275e27b1@jawa>
+References: <20180509153428.1440-1-lukma@denx.de>
+ <CAOMZO5AexXNEGVoXa9K_GAm+aFLNRQOXOhF_SdKAjV1qmuD2nA@mail.gmail.com>
+ <20180519140202.3449e3c1@jawa>
+ <CAOMZO5DoLwEmQz5BQHDLk8sBq7mDH_UxBjRA0RGKb+PunMYu-Q@mail.gmail.com>
+ <20180529155736.275e27b1@jawa>
+Message-ID: <CAOMZO5AU8PDEErHeU1yb9mwgNLJUvWipTrDsY8csXSHiNro-7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Lukasz,
 
-On Tue, May 29, 2018 at 4:02 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> Hi,
+On Tue, May 29, 2018 at 10:58 AM, Lukasz Majewski <lukma@denx.de> wrote:
+
+> Sorry for "small" delay on this.
 >
-> On Mon, May 28, 2018 at 01:20:32PM +0530, Jagan Teki wrote:
->> From: Michael Trimarchi <michael@amarulasolutions.com>
->>
->> clk-gate core will take bit_idx through clk_register_gate
->> and then do clk_gate_ops by using BIT(bit_idx), but rtc-sun6i
->> is passing bit_idx as BIT(bit_idx) it becomes BIT(BIT(bit_idx)
->> which is wrong and eventually external gate clock is not enabling.
->>
->> This patch fixed by passing bit index and the original change
->> introduced from below commit.
->> "rtc: sun6i: Add support for the external oscillator gate"
->> (sha1:        17ecd246414b3a0fe0cb248c86977a8bda465b7b)
->>
->> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Ok, so I've investigated the issue:
 >
-> Cc'ing to stable and adding a Fixes tag would be great.
+> 1. The code, which you pasted:
+> http://code.bulix.org/ik01yu-339697
 >
->> ---
->>  drivers/rtc/rtc-sun6i.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
->> index 2e6fb275acc8..a66f40c96582 100644
->> --- a/drivers/rtc/rtc-sun6i.c
->> +++ b/drivers/rtc/rtc-sun6i.c
->> @@ -74,7 +74,7 @@
->>  #define SUN6I_ALARM_CONFIG_WAKEUP            BIT(0)
->>
->>  #define SUN6I_LOSC_OUT_GATING                        0x0060
->> -#define SUN6I_LOSC_OUT_GATING_EN             BIT(0)
->> +#define SUN6I_LOSC_OUT_GATING_EN             0
+> works correctly as imx53-qsb-common.dtsi directly includes "imx53.dtsi"
+> in which iomuxc label is defined.
 >
-> All the other register definitions in that driver are the actual value
-> needed, and not the offset. Just to make it obvious that it shouldn't
-> be used as is, please add an _OFFSET at the end of the defined name
+> In my case though,
 >
-
-Make sense
-
-Michael
-
-> Thanks!
-> Maxime
+> 2. I do include imx53-tqma53.dtsi [1], in which the iomuxc" label
+> is extended:
 >
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+> &iomuxc {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_hog>;
+>
+>         imx53-tqma53 {
+>                 pinctrl_hog: hoggrp {
+>
+> .......
+>
+> };
+>
+> The imx53-tqma53.dtsi then includes imx53.dtsi.
+>
+> Moreover, my file -> imx53-kp.dtsi as it includes [1], it extends
+> further the &iomuxc label:
+>
+> &iomuxc {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_kp_common>;
+>
+>         imx53-kp-common {
+>                 pinctrl_buzzer: buzzergrp {
+> .......
+> };
+>
+> So, when I remove imx53-kp-common I will have mismatch with [1] iomuxc
+> structure.
+>
+> The code works as expected when I do remove imx53-tqma53 in [1].
+>
+> However, I would prefer to not touch this imx53-tqma53.dtsi file.
+> It is also included in: imx53-mba53.dts, which extends iomux in
+> following way:
+>
+> &iomuxc {
+>         lvds1 {
+>                 pinctrl_lvds1_1: lvds1-grp1 {
+>
+>
+> Here I would need to remove lvds1, disp1 and tve to make it working.
+> However, it will not break during build, but at run time.
+>
+> Considering the above, I would prefer to leave the code in [1] as is
+> and use imx53-kp-common as well (as in v2 of this patch).
+>
+> Fabio, what do you think?
 
+Ok, thanks for the clarification. I just wanted to make sure we did
+not have some kind of iomux bug there.
 
+I think your proposed patch is fine then.
 
--- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+Thanks
