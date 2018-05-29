@@ -1,53 +1,61 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 29 May 2018 18:01:40 +0300
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <20180529164911.29820e07@bbrezillon>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
- <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
- <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
- <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
- <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
- <20180529164911.29820e07@bbrezillon>
-Message-ID: <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 29 May 2018 18:04:34 +0300
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <MWHPR02MB3293486390485A6FCCEA7DECC7910@MWHPR02MB3293.namprd02.prod.outlook.com>
+References: <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+ <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+ <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
+ <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+ <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
+ <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
+ <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
+ <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+ <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
+ <20180424035548.GA6014@localhost>
+ <ee1dc551-7c11-6d10-651d-01bf6520f049@ti.com>
+ <MWHPR02MB3293486390485A6FCCEA7DECC7910@MWHPR02MB3293.namprd02.prod.outlook.com>
+Message-ID: <99581088-7ef8-6fac-c934-91eadddfb04e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi,
 
+On 2018-05-17 09:39, Radhey Shyam Pandey wrote:
+>> Well, let's see where this is going to go when I can send the patches
+>> for review.
+> Thanks all. @Peter: If we have metadata patchset ready may be good
+> to send an RFC?
 
-> 
-> I think you're missing something here. We use the DMA engine in memcpy
-> mode (SRAM -> DRAM), not in device mode (dev -> DRAM or DRAM -> dev).
-> So there's no dmas prop defined in the DT and there should not be.
-> 
-> Regards,
-> 
-> Boris
-> 
+Sorry for the delay, I got distracted by this:
+http://www.ti.com/lit/pdf/spruid7 Chapter 10.
 
-Ok, so the memcpy SRAM <-> DRAM will hog the transfer between DRAM and 
-LCD if my understanding is correct. That's the DMA that Peter wants to 
-disable with his patch ?
+I have given some tough to the metadata attach patches.
+In my case the 'metadata' is more like private data section within the
+DMA descriptor (10.1.2.2.1) which is used by the remote peripheral and
+the driver for the given peripheral and it is optional.
 
-Then we can then try to force NFC SRAM DMA channels to use just DDR port 
-1 or 2 for memcpy ?
+I liked the idea of treating it as metadata as it gives more generic API
+which can be adopted by other drivers if they need something similar.
 
-I have also received a suggestion to try to increase the porches in 
-LCDC_LCDCFG3 .
+Another issue I have with the attach metadata way is that it would
+require one memcpy to copy the data to the DMA descriptor and in high
+throughput case it is not acceptable.
 
->>
->>   >> [...]
-> 
-> 
+For me probably a .get_private_area / .put_private_area like API would
+be desirable where I can give the pointer of the 'metadata' are (and
+size) to the user.
+
+But these can co-exist in my opinion and DMA drivers can opt to
+implement none, either or both of the callbacks.
+
+In couple of days I can update the metadata patches I have atm and send
+as RFC.
+
+Is there anything from your side I should take into account when doing that?
+
+- P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
