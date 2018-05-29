@@ -1,59 +1,127 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 29 May 2018 12:57:19 +0530
-Subject: [PATCH 0/2] Add Mediatek X20 Development Board support
-In-Reply-To: <06dbc5ef-5bba-f3e0-1b57-3eaeab26ed68@gmail.com>
-References: <20180529045258.1415-1-manivannan.sadhasivam@linaro.org>
- <06dbc5ef-5bba-f3e0-1b57-3eaeab26ed68@gmail.com>
-Message-ID: <20180529072719.GA5529@Mani-XPS-13-9360>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 29 May 2018 08:36:25 +0100
+Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
+ bindings
+In-Reply-To: <8d8b0f05-7f04-e718-7a45-148af38a03d4@st.com>
+References: <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
+ <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
+ <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
+ <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
+ <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+ <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com>
+ <20180517063640.GK5130@dell>
+ <28c374e6-b440-f785-b371-03fe15c8bc4b@st.com>
+ <CACRpkdbZ2Hr7cc5+dyPaL0CKYuy2-oosEr=UPo60+3beDCVi9A@mail.gmail.com>
+ <8d8b0f05-7f04-e718-7a45-148af38a03d4@st.com>
+Message-ID: <20180529073625.GA4790@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+On Mon, 28 May 2018, Amelie DELAUNAY wrote:
 
-On Tue, May 29, 2018 at 08:38:27AM +0200, Matthias Brugger wrote:
-> Hi Manivannan,
+> On 05/24/2018 09:13 AM, Linus Walleij wrote:
+> > On Fri, May 18, 2018 at 9:29 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+> >> On 05/17/2018 08:36 AM, Lee Jones wrote:
+> >>> On Wed, 16 May 2018, Amelie DELAUNAY wrote:
+> >>>> On 05/16/2018 04:20 PM, Linus Walleij wrote:
+> >>>>> On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+> >>>>>
+> >>>>>> Indeed, stmfx has other functions than GPIO. But, after comments done
+> >>>>>> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
+> >>>>>> child drivers into a single PINCTRL/GPIO driver because of the following
+> >>>>>> reasons:
+> >>>>>> - Other stmfx functions (IDD measurement and TouchScreen controller) are
+> >>>>>> not used on any of the boards using an stmfx and supported by Linux, so
+> >>>>>> no way to test these functions, and no need to maintain them while they
+> >>>>>> are not being used.
+> >>>>>> - But, in the case a new board will use more than GPIO function on
+> >>>>>> stmfx, the actual implementation allow to easily extract common init
+> >>>>>> part of stmfx and put it in an MFD driver.
+> >>>>>>
+> >>>>>> So I could remove gpio sub-node and put its contents in stmfx node and
+> >>>>>> keep single PINCTRL/GPIO driver for the time being.
+> >>>>>> Please advise,
+> >>>>>
+> >>>>> I would normally advice to use the right modeling from the start, create
+> >>>>> the MFD driver and spawn the devices from there. It is confusing
+> >>>>> if the layout of the driver(s) doesn't really match the layout of the
+> >>>>> hardware.
+> >>>>>
+> >>>>> I understand that it is a pain to write new MFD drivers to get your
+> >>>>> things going and it would be "nice to get this working really quick
+> >>>>> now" but in my experience it is better to do it right from the start.
+> >>>>>
+> >>>>
+> >>>> Hi Linus,
+> >>>>
+> >>>> Thanks for your advice. I understand the point.
+> >>>> So, the right modeling would be to:
+> >>>> - create an MFD driver with the common init part of stmfx
+> >>>> - remove all common init part of stmfx-pinctrl driver and keep only all
+> >>>> gpio/pinctrl functions.
+> >>>>
+> >>>> I will not develop the other stmfx functions (IDD measurement driver and
+> >>>> TouchScreen controller driver) because, as explained ealier, they are
+> >>>> not used on any of the boards using an stmfx and supported by Linux, so
+> >>>> no way to test these functions, and no need to maintain them while they
+> >>>> are not being used.
+> >>>>
+> >>>> Lee, are you OK with that ?
+> >>>
+> >>> I missed a lot of this conversation I think, but from what I've read,
+> >>> it sounds fine.
+> >>>
+> >>
+> >> I summarize the situation:
+> >> - I still don't have an official datasheet for STMFX device which could
+> >> justify the use of an MFD driver;
+> >> - the MFD driver will contain the STMFX chip initialization stuff such
+> >> as regmap initialization (regmap structure will be shared with the
+> >> child), chip initialization, global interrupt management;
+> >> - there will be only one child (GPIO/PINCTRL node) for the time being.
+> > 
+> > But there will be more devices in it. And they will invariably be put
+> > to use later, and there will be new versions of the chip as well, and
+> > then you will be happy about doing the MFD core, which makes it
+> > easy to add new variants with different subdevices.
+> > 
+> >> So, is "MFD driver + GPIO/PINCTRL driver" the right modeling, and does
+> >> it still sound fine after this summary ? :)
+> > 
+> > No I think it should use an MFD core.
+> > 
+> > Mainly because of device tree concerns.
+> > 
+> > The main reason is that the device tree bindings will be different if
+> > you add an MFD core later, the GPIO and pinctrl driver will
+> > move to a child node, making old device trees incompatible.
+> > 
+> > We could have a single driver in GPIO+pin control if it is a child
+> > of an MFD node in the device tree, but it doesn't make much
+> > sense as the I2C device need to be probing to the MFD core.
+> > 
 > 
-> it's nice to see that someone at Linaro cares about upstreaming the 96 board.
-> From what I can see, your patches add the very same support to the board as
-> does the mt6797 evaluation board. Do you have plans to upstream more drivers for
-> the board? Do you have a roadmap or something?
+> I agree with you Linus, and that's why all STMFX chip initialization 
+> stuff was decorrelated in pinctrl-stmfx. This shows that this stuff 
+> needs to be in an MFD core.
 > 
-> I'm asking becuase I don't want to have just another dead devicetree in the
-> kernel which does nothing but provides a boot to rootfs. Especially as this can
-> be achieved on the same board with the EVB dts.
+> But as there is only one child for now (due to the reasons mentioned 
+> earlier), it can suggest that it is not a Multi-Function Device.
 > 
-
-I can understand your concern here. I do have plans to add more drivers
-in the future for this board but I can't give you any roadmap for that
-since it mostly falls under the spare time work and I have been doing a
-similar kind of work for the Bubblegum-96 board in parallel.
-
-At most I can guarentee that this board's functionality will be added
-gradually in upcoming days.
-
-Thanks,
-Mani
-
-> Regards,
-> Matthias
+> I'm not able to target when IDD or TS functions will be required on a 
+> Linux product, but it still makes sense to consider that these functions 
+> will be used on a Linux product.
 > 
-> On 29/05/18 06:52, Manivannan Sadhasivam wrote:
-> > Add devicetree support for Mediatek X20 Development Board by Archermind.
-> > This board is based on the Deca-Core MT6797 SoC from Mediatek and is
-> > one of the 96Boards Consumer Edition platform.
-> > 
-> > With this devicetree change, board can boot into initramfs.
-> > 
-> > More information about this board can be found in 96Boards product page:
-> > https://www.96boards.org/product/mediatek-x20/
-> > 
-> > Manivannan Sadhasivam (2):
-> >   dt-bindings: Add vendor prefix for ArcherMind
-> >   arm64: dts: Add Mediatek X20 Development Board support
-> > 
-> >  .../devicetree/bindings/vendor-prefixes.txt   |  1 +
-> >  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
-> >  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
-> >  3 files changed, 35 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> > 
+> So, I think MFD core + GPIO/pinctrl driver is the right modeling, but I 
+> wanted to be sure that this is okay for everyone. I don't want to spend 
+> time on something that will not be accepted due to its modeling.
+
+It's fine.  Go ahead.
+
+Thanks for seeing this through to a reasonable conclusion.
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
