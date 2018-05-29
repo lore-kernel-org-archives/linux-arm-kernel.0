@@ -1,49 +1,64 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 29 May 2018 16:16:49 -0700
-Subject: [PATCH] soc: imx: gpcv2: correct PGC offset
-In-Reply-To: <0e0690c89b24b4b028e4a0dab63334af4b37fdd3.camel@nxp.com>
-References: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
- <0e0690c89b24b4b028e4a0dab63334af4b37fdd3.camel@nxp.com>
-Message-ID: <CAHQ1cqE9dpL3DB351UbjWvh+g=BG62NP31iqoOsPm_9_tKS0sQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 30 May 2018 09:40:40 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20180530094040.5fa6dcdd@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 7:02 AM, Leonard Crestez
-<leonard.crestez@nxp.com> wrote:
-> On Tue, 2018-05-29 at 16:02 +0800, Anson Huang wrote:
->> Correct MIPI/PCIe/USB_HSIC's PGC offset based on
->> design RTL, the value on Reference Manual are incorrect.
->>
->> The correct offset should be as below:
->>
->> -#define PGC_MIPI                     4
->> -#define PGC_PCIE                     5
->> -#define PGC_USB_HSIC                 8
->> +#define PGC_MIPI                     16
->> +#define PGC_PCIE                     17
->> +#define PGC_USB_HSIC                 20
->>  #define GPC_PGC_CTRL(n)                      (0x800 + (n) * 0x40)
->>  #define GPC_PGC_SR(n)                        (GPC_PGC_CTRL(n) + 0xc)
->
-> This gpcv2 driver is currently only used for PCI, it probably only
-> works because domains happen to be turned on by default?
->
+Hi all,
 
-That'd be my guess as well. I just tried commenting all of the code
-related to GPC_PGC_CTRL in gpcv2 drive and PCIe still worked on my
-SabreSD board.
+Today's linux-next merge of the arm-soc tree got a conflict in:
 
-> On imx7d upstream platform suspend is not yet supported but even doing
-> device-level suspend causes a hang on resume somewhere in PCI on first
-> read. This patch fixes that immediate hang.
->
-> After suspend/resume lspci is broken (device doesn't properly resume),
-> that probably requires more imx pci patches and unrelated to pgc.
->
+  arch/arm/include/asm/cputype.h
 
-Yeah, suspend of any kind was not a part of the use-case for me when I
-was working on this driver, so it's not surprising to hear that it
-doesn't work very well.
+between commit:
 
-Thanks,
-Andrey Smirnov
+  1067a8130b17 ("ARM: add more CPU part numbers for Cortex and Brahma B15 CPUs")
+
+from the arm tree and commits:
+
+  9e35ddc962a6 ("ARM: add Broadcom Brahma-B53 main ID definition")
+  842fa17d6c95 ("ARM: add Broadcom Brahma-B15 main ID definition")
+
+from the arm-soc tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/include/asm/cputype.h
+index 26021980504d,d1b62ee69f3b..000000000000
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@@ -77,15 -75,11 +75,16 @@@
+  #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
+  #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
+  #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
+ +#define ARM_CPU_PART_CORTEX_A53		0x4100d030
+ +#define ARM_CPU_PART_CORTEX_A57		0x4100d070
+ +#define ARM_CPU_PART_CORTEX_A72		0x4100d080
+ +#define ARM_CPU_PART_CORTEX_A73		0x4100d090
+ +#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
+  #define ARM_CPU_PART_MASK		0xff00fff0
+  
+- /* Broadcom cores */
++ /* Broadcom implemented processors */
+  #define ARM_CPU_PART_BRAHMA_B15		0x420000f0
++ #define ARM_CPU_PART_BRAHMA_B53		0x42001000
+  
+  /* DEC implemented cores */
+  #define ARM_CPU_PART_SA1100		0x4400a110
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/9058fefc/attachment.sig>
