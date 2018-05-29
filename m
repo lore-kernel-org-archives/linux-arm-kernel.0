@@ -1,146 +1,101 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 29 May 2018 09:10:42 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
- <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
- <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
- <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
- <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
-Message-ID: <9ae5fc1d-9f02-9742-f801-2252389294eb@axentia.se>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 29 May 2018 09:16:33 +0200
+Subject: [patch v22 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <AM5PR0501MB24490173AD50A2E478DFCF35B16E0@AM5PR0501MB2449.eurprd05.prod.outlook.com>
+References: <1527503652-21975-1-git-send-email-oleksandrs@mellanox.com>
+ <1527503652-21975-2-git-send-email-oleksandrs@mellanox.com>
+ <20180528123527.GA17613@kroah.com>
+ <AM5PR0501MB24490173AD50A2E478DFCF35B16E0@AM5PR0501MB2449.eurprd05.prod.outlook.com>
+Message-ID: <20180529071633.GB20427@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-29 08:30, Eugen Hristev wrote:
+On Mon, May 28, 2018 at 03:59:46PM +0000, Oleksandr Shamray wrote:
+> > > +	const struct jtag_ops *ops;
+> > > +	int id;
+> > > +	bool opened;
+> > 
+> > You shouldn't care about this, but ok...
 > 
-> 
-> On 28.05.2018 13:10, Peter Rosin wrote:
->> On 2018-05-28 00:11, Peter Rosin wrote:
->>> On 2018-05-27 11:18, Peter Rosin wrote:
->>>> On 2018-05-25 16:51, Tudor Ambarus wrote:
->>>>> We think the best way is to keep LCD on DDR Ports 2 and 3 (8th and 9th
->>>>> slaves), to have maximum bandwidth and to use DMA on DDR port 1 for NAND
->>>>> (7th slave).
->>>>
->>>> Exactly how do I accomplish that?
->>>>
->>>> I can see how I can move the LCD between slave DDR port 2 and 3 by
->>>> selecting LCDC DMA master 8 or 9 (but according to the above it should
->>>> not matter). The big question is how I control what slave the NAND flash
->>>> is going to use? I find nothing in the datasheet, and the code is also
->>>> non-transparent enough for me to figure it out by myself without
->>>> throwing out this question first...
-> 
->  >> [...]
-> 
->>> and the output is
->>>
->>> atmel-nand-controller 10000000.ebi:nand-controller: using dma0chan5 for DMA transfers
->>>
->>> So, DMA controller 0 is in use. I still don't know if IF0, IF1 or IF2 is used
->>> or how to find out. I guess IF2 is not in use since that does not allow any
->>> DDR2 port as slave...
-> 
-> Hello Peter,
-> 
-> Thank you for all the information, I will chip in to help a little bit.
-> The Master/channel is described in the device tree. The channel has a 
-> controller, a mem/periph interface and a periph ID, plus a FIFO 
-> configuration.
-> 
-> The dma chan number reported in the dmesg is just software.
+> Jtag HW not support to using with multiple requests from different users. So we prohibit this.
 
-Got that, that was why I added the various additional traces in that
-horrid patch in the mail you are responding to :-)
+Ok, but then that's a userspace problem, not your driver's problem.
+Serial ports can't handle multiple requests in a sane way either, and so
+it's a userspace bug if they do that.  It's not up to the kernel to try
+to prevent it, and really, you are not preventing this from happening at
+all, you are only keeping more than one open() call from happening.  You
+aren't serializing the device access at all.
 
->                                                             Here is an 
-> example from DT:
-> dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(1)>,
->         <&dma0 2 AT91_DMA_CFG_PER_ID(2)>;
-> 
-> you can match this with the help from 
-> Documentation/devicetree/bindings/dma/atmel-dma.txt:
-> 
-> 1. A phandle pointing to the DMA controller. 
-> 
-> 2. The memory interface (16 most significant bits), the peripheral 
-> interface
-> (16 less significant bits). 
-> 
-> 3. Parameters for the at91 DMA configuration register which are device 
-> 
-> dependent: 
-> 
->    - bit 7-0: peripheral identifier for the hardware handshaking 
-> interface. The
->    identifier can be different for tx and rx. 
-> 
->    - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 2 for ASAP.
-> 
-> 
-> So , what was Tudor asking for, is your DT for the ebi node (if you are 
-> using ebi), or, your NFC SRAM (Nand Flash Controller SRAM) DMA 
-> devicetree chunk, so, we can figure out which type of DMA are you using.
-> 
-> Normally, the ebi should be connected to both DMA0 and DMA1 on those 
-> interfaces specified in DT. Which ones you want to use, depends on your 
-> setup (and contention on the bus/accesses, like in your case, the HLCDC)
-> 
-> Thats why we have multiple choices, to pick the right one for each case.
-> In our vanilla DT sama5d3.dtsi we do not have DMA described for ebi 
-> interface.
+So you are giving yourself a false sense of "We are protecting the
+device" here.  Just drop the whole "only one open() call" logic
+entirely.  It will make your kernel code simpler and you aren't giving
+yourself false-hope that you really prevented userspace from doing
+something stupid :)
 
-Ahh, *that* NAND DMA configuration. Of course, how silly of me...
+> > > +	case JTAG_IOCRUNTEST:
+> > > +		if (copy_from_user(&idle, (const void __user *)arg,
+> > > +				   sizeof(struct jtag_run_test_idle)))
+> > > +			return -EFAULT;
+> > > +
+> > > +		if (idle.endstate > JTAG_STATE_PAUSEDR)
+> > > +			return -EINVAL;
+> > 
+> > No validation that idle contains sane values?  Don't make every jtag driver
+> > have to do this type of validation please.
+> > 
+> 
+> I have partially validation of idle structure  (if (idle.endstate > JTAG_STATE_PAUSEDR)).
+> But I will add more validation.
 
-This is a setup based on the at91-linea.dtsi "CPU" board. That dtsi should
-have the relevant NAND/DMA info. Also, at91-nattis-2-natte-2.dts describes
-the older HW (with a 1024x768 panel) that is also affected, if you want a
-full device tree to look at.
+Go to the nearest whiteboard and write this at the top:
+	ALL INPUT IS EVIL
 
-Looks like I didn't make a selection, quoting from at91-linea.dtsi:
+Don't erase it.  You have to validate all the things, otherwise
+something bad will happen, I guarantee it.  Wait until the syzbot gets
+ahold of this layer if you don't believe me :)
 
-&ebi {
-	pinctrl-0 = <&pinctrl_ebi_nand_addr>;
-	pinctrl-names = "default";
-	status = "okay";
-};
+> > > +static int jtag_open(struct inode *inode, struct file *file) {
+> > > +	struct jtag *jtag = container_of(file->private_data, struct jtag,
+> > > +miscdev);
+> > > +
+> > > +	if (mutex_lock_interruptible(&jtag->open_lock))
+> > > +		return -ERESTARTSYS;
+> > 
+> > Why restart?  Just grab the lock, you don't want to have to do restartable
+> > logic in userspace, right?
+> 
+> Will change like:
+> 
+> ret = mutex_lock_interruptible(&jtag->open_lock);
+> if (ret)
+> 	return ret;
 
-&nand_controller {
-	status = "okay";
+No, what's wrong with a simple:
+	mutex_lock();
+?
 
-	nand: nand at 3 {
-		reg = <0x3 0x0 0x2>;
-		atmel,rb = <0>;
-		nand-bus-width = <8>;
-		nand-ecc-mode = "hw";
-		nand-ecc-strength = <4>;
-		nand-ecc-step-size = <512>;
-		nand-on-flash-bbt;
-		label = "atmel_nand";
-	};
-};
+You are only holding it for a very short time, people can wait, there is
+no rush here or "fast path" happening.
 
-The reason is probably because the sama5d3xek device-trees didn't at the
-time of "fork". Does anybody have any suggestion for some extra properties
-to try in the above nodes?
+Anyway, this whole lock should just go away entirely, due to the lack of
+needing to track open() calls.  But in the future, keep locks simple, no
+need to add complexity when it is not warranted.
 
-Further, I forgot that I had actually upstreamed linea support for
-at91bootstrap, so relevant NAND timings etc can be found in lpddr1_init()
-in
+> > > +	if (jtag->opened) {
+> > > +		mutex_unlock(&jtag->open_lock);
+> > > +		return -EBUSY;
+> > 
+> > Why do you care about only 1 userspace open call?  What does that buy you?
+> > Userspace can always pass around that file descriptor and use it in multiple
+> > places, so you are not really "protecting" yourself from anything.
+> > 
+> 
+> Accessing to JTAG HW from multiple processes will make confusion in the work of the JTAG protocol.
+> And I want to prohibit this.
 
-	at91bootstrap/contrib/board/axentia/sama5d3_linea/sama5d3_linea.c
+See my previous comments for why your attempt at protecting open() does
+not prevent this from happening.  Hint, you forgot about dup(3) :(
 
-Cheers,
-Peter
+thanks,
+
+greg k-h
