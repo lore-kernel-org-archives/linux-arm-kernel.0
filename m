@@ -1,107 +1,108 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 15:54:45 +0100
-Subject: [PATCH v5 07/15] ARM: spectre-v2: add Cortex A8 and A15 validation of
- the IBE bit
-In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNg1N-000563-Mf@rmk-PC.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 May 2018 15:59:06 +0100
+Subject: Applied "ASoC: atmel-i2s: dt-bindings: add DT bindings for I2S
+ controller" to the asoc tree
+In-Reply-To: <1527251668-31396-5-git-send-email-codrin.ciubotariu@microchip.com>
+Message-ID: <E1fNg5a-0005qO-IW@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the branch predictor hardening is enabled, firmware must have set
-the IBE bit in the auxiliary control register.  If this bit has not
-been set, the Spectre workarounds will not be functional.
+The patch
 
-Add validation that this bit is set, and print a warning at alert level
-if this is not the case.
+   ASoC: atmel-i2s: dt-bindings: add DT bindings for I2S controller
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Boot-tested-by: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Tony Lindgren <tony@atomide.com>
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 969cc0528e0efdfdeaa5bbc0ab707d8a7819a8ec Mon Sep 17 00:00:00 2001
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Date: Fri, 25 May 2018 15:34:25 +0300
+Subject: [PATCH] ASoC: atmel-i2s: dt-bindings: add DT bindings for I2S
+ controller
+
+This patch adds DT bindings for the new Atmel I2S controller embedded
+inside sama5d2x SoCs.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/mm/Makefile       |  2 +-
- arch/arm/mm/proc-v7-bugs.c | 36 ++++++++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v7.S      |  4 ++--
- 3 files changed, 39 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mm/proc-v7-bugs.c
+ .../devicetree/bindings/sound/atmel-i2s.txt   | 47 +++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-i2s.txt
 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 9dbb84923e12..a0c40610210c 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -97,7 +97,7 @@ obj-$(CONFIG_CPU_MOHAWK)	+= proc-mohawk.o
- obj-$(CONFIG_CPU_FEROCEON)	+= proc-feroceon.o
- obj-$(CONFIG_CPU_V6)		+= proc-v6.o
- obj-$(CONFIG_CPU_V6K)		+= proc-v6.o
--obj-$(CONFIG_CPU_V7)		+= proc-v7.o
-+obj-$(CONFIG_CPU_V7)		+= proc-v7.o proc-v7-bugs.o
- obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
- 
- AFLAGS_proc-v6.o	:=-Wa,-march=armv6
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+diff --git a/Documentation/devicetree/bindings/sound/atmel-i2s.txt b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
 new file mode 100644
-index 000000000000..e46557db6446
+index 000000000000..735368b8a73f
 --- /dev/null
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -0,0 +1,36 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include <linux/kernel.h>
-+#include <linux/smp.h>
++++ b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
+@@ -0,0 +1,47 @@
++* Atmel I2S controller
 +
-+static __maybe_unused void cpu_v7_check_auxcr_set(bool *warned,
-+						  u32 mask, const char *msg)
-+{
-+	u32 aux_cr;
++Required properties:
++- compatible:     Should be "atmel,sama5d2-i2s".
++- reg:            Should be the physical base address of the controller and the
++                  length of memory mapped region.
++- interrupts:     Should contain the interrupt for the controller.
++- dmas:           Should be one per channel name listed in the dma-names property,
++                  as described in atmel-dma.txt and dma.txt files.
++- dma-names:      Two dmas have to be defined, "tx" and "rx".
++                  This IP also supports one shared channel for both rx and tx;
++                  if this mode is used, one "rx-tx" name must be used.
++- clocks:         Must contain an entry for each entry in clock-names.
++                  Please refer to clock-bindings.txt.
++- clock-names:    Should be one of each entry matching the clocks phandles list:
++                  - "pclk" (peripheral clock) Required.
++                  - "gclk" (generated clock) Optional (1).
++                  - "aclk" (Audio PLL clock) Optional (1).
++                  - "muxclk" (I2S mux clock) Optional (1).
 +
-+	asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (aux_cr));
++Optional properties:
++- pinctrl-0:      Should specify pin control groups used for this controller.
++- princtrl-names: Should contain only one value - "default".
 +
-+	if ((aux_cr & mask) != mask) {
-+		if (!*warned)
-+			pr_err("CPU%u: %s", smp_processor_id(), msg);
-+		*warned = true;
-+	}
-+}
 +
-+static DEFINE_PER_CPU(bool, spectre_warned);
++(1) : Only the peripheral clock is required. The generated clock, the Audio
++      PLL clock adn the I2S mux clock are optional and should only be set
++      together, when Master Mode is required.
 +
-+static void check_spectre_auxcr(bool *warned, u32 bit)
-+{
-+	if (IS_ENABLED(CONFIG_HARDEN_BRANCH_PREDICTOR) &&
-+		cpu_v7_check_auxcr_set(warned, bit,
-+				       "Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable\n");
-+}
++Example:
 +
-+void cpu_v7_ca8_ibe(void)
-+{
-+	check_spectre_auxcr(this_cpu_ptr(&spectre_warned), BIT(6));
-+}
-+
-+void cpu_v7_ca15_ibe(void)
-+{
-+	check_spectre_auxcr(this_cpu_ptr(&spectre_warned), BIT(0));
-+}
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index a2d433d59848..fa9214036fb3 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -569,7 +569,7 @@ ENDPROC(__v7_setup)
- 	globl_equ	cpu_ca8_do_suspend,	cpu_v7_do_suspend
- 	globl_equ	cpu_ca8_do_resume,	cpu_v7_do_resume
- #endif
--	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_ca8_ibe
- 
- 	@ Cortex-A9 - needs more registers preserved across suspend/resume
- 	@ and bpiall switch_mm for hardening
-@@ -602,7 +602,7 @@ ENDPROC(__v7_setup)
- 	globl_equ	cpu_ca15_suspend_size,	cpu_v7_suspend_size
- 	globl_equ	cpu_ca15_do_suspend,	cpu_v7_do_suspend
- 	globl_equ	cpu_ca15_do_resume,	cpu_v7_do_resume
--	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_ca15_ibe
- #ifdef CONFIG_CPU_PJ4B
- 	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
- #endif
++	i2s at f8050000 {
++		compatible = "atmel,sama5d2-i2s";
++		reg = <0xf8050000 0x300>;
++		interrupts = <54 IRQ_TYPE_LEVEL_HIGH 7>;
++		dmas = <&dma0
++			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++			 AT91_XDMAC_DT_PERID(31))>,
++		       <&dma0
++			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++			 AT91_XDMAC_DT_PERID(32))>;
++		dma-names = "tx", "rx";
++		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>, <&i2s0muxck>;
++		clock-names = "pclk", "gclk", "aclk", "muxclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2s0_default>;
++	};
 -- 
-2.7.4
+2.17.0
