@@ -1,41 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 May 2018 11:51:32 -0400 (EDT)
-Subject: [PATCH] ARM: mcpm, perf/arm-cci: export mcpm_is_available
-In-Reply-To: <20180529153013.GH17159@arm.com>
-References: <20180528154448.2494709-1-arnd@arndb.de>
- <20180529153013.GH17159@arm.com>
-Message-ID: <nycvar.YSQ.7.76.1805291150330.1473@knanqh.ubzr>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 29 May 2018 17:51:29 +0200
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <20180529150823.GD17159@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+ <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
+ <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+ <20180529150823.GD17159@arm.com>
+Message-ID: <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 May 2018, Will Deacon wrote:
+Hi Will,
 
-> Hi Arnd, Russell, [+Nico and Robin]
-> 
-> On Mon, May 28, 2018 at 05:44:36PM +0200, Arnd Bergmann wrote:
-> > Now that the ARM CCI PMU driver can be built as a loadable module,
-> > we get a link failure when MCPM is enabled:
-> > 
-> > ERROR: "mcpm_is_available" [drivers/perf/arm-cci.ko] undefined!
-> > 
-> > The simplest fix is to export that helper function.
-> > 
-> > Fixes: 8b0c93c20ef7 ("perf/arm-cci: Allow building as a module")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > The patch that caused this is currently part of the arm-perf/for-next/perf
-> > branch, it would be good to have the fix there as well.
-> > ---
-> >  arch/arm/common/mcpm_entry.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> 
-> I'm happy to take this via the arm perf tree if others are ok with that.
-> Alternatively, I can revert the offending commit if there are objections
-> to exporting the symbol.
+On Tue, May 29, 2018 at 5:08 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
+>> On 29/05/18 12:56, Geert Uytterhoeven wrote:
+>> > On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> >> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+>> >>> System supend still works fine on systems with big cores only:
+>> >>>
+>> >>>     R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
+>> >>>     R-Car M3-N (2xCA57)
+>> >>>
+>> >>> Reverting this commit fixes the issue for me.
+>> >>
+>> >> I can't find anything that relates to system suspend in these patches
+>> >> unless they are messing with something during CPU hot plug-in back
+>> >> during resume.
+>> >
+>> > It's only the last patch that introduces the breakage.
+>> >
+>>
+>> As specified in the commit log, it won't change any behavior for DT
+>> systems if it's non-NUMA or single node system. So I am still wondering
+>> what could trigger this regression.
+>
+> I wonder if we're somehow giving an uninitialised/invalid NUMA configuration
+> to the scheduler, although I can't see how this would happen.
+>
+> Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff below
+> do you see anything shouting in dmesg?
 
-Looks fine to me.
+Thanks, but unfortunately it doesn't help.
+I added some debug code to print cpumask, but so far I don't see anything
+suspicious.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Gr{oetje,eeting}s,
 
+                        Geert
 
-Nicolas
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
