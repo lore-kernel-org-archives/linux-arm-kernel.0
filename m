@@ -1,21 +1,19 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 18:03:56 +0100
-Subject: [PATCH v5 14/15] ARM: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast
- handling
-In-Reply-To: <E1fNg1z-0005C1-92@rmk-PC.armlinux.org.uk>
+Date: Tue, 29 May 2018 18:04:39 +0100
+Subject: [PATCH v5 15/15] ARM: KVM: report support for
+ SMCCC_ARCH_WORKAROUND_1
+In-Reply-To: <E1fNg24-0005CC-DF@rmk-PC.armlinux.org.uk>
 References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
- <E1fNg1z-0005C1-92@rmk-PC.armlinux.org.uk>
-Message-ID: <86o9gy9ywz.wl-marc.zyngier@arm.com>
+ <E1fNg24-0005CC-DF@rmk-PC.armlinux.org.uk>
+Message-ID: <86muwi9yvs.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 May 2018 15:55:23 +0100,
+On Tue, 29 May 2018 15:55:28 +0100,
 Russell King wrote:
 > 
-> We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
-> So let's intercept it as early as we can by testing for the
-> function call number as soon as we've identified a HVC call
-> coming from the guest.
+> Report support for SMCCC_ARCH_WORKAROUND_1 to KVM guests for affected
+> CPUs.
 > 
 > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > Boot-tested-by: Tony Lindgren <tony@atomide.com>
