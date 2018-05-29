@@ -1,35 +1,254 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 29 May 2018 17:05:55 +0200
-Subject: [PATCH v3 4/8] dt-bindings: media: rcar-vin: Add 'data-enable-active'
-In-Reply-To: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1527606359-19261-5-git-send-email-jacopo+renesas@jmondi.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 May 2018 16:02:57 +0100
+Subject: [PATCH v5 00/15] ARM Spectre variant 2 fixes
+In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
+References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
+Message-ID: <20180529150257.GK17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe optional endpoint property 'data-enable-active' for R-Car VIN.
+FFS, yes, there's a build error in this.  It's an obvious fix.  I
+won't be re-posting it for a third time today for such a trivial
+change, but I'll fix up my local version.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
----
-v3:
-- new patch
----
+On Tue, May 29, 2018 at 03:53:21PM +0100, Russell King - ARM Linux wrote:
+> Sorry for another version so soon after the previous.
+> 
+> Fifth version:
+> - Really warn on the first discovery of an incorrect IBE bit, rather than
+>   only checking the first time around.
+> 
+>  arch/arm/include/asm/bugs.h        |   6 +-
+>  arch/arm/include/asm/cp15.h        |   3 +
+>  arch/arm/include/asm/cputype.h     |   8 ++
+>  arch/arm/include/asm/kvm_asm.h     |   2 -
+>  arch/arm/include/asm/kvm_host.h    |  14 ++-
+>  arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
+>  arch/arm/include/asm/proc-fns.h    |   4 +
+>  arch/arm/include/asm/system_misc.h |  15 ++++
+>  arch/arm/kernel/Makefile           |   1 +
+>  arch/arm/kernel/bugs.c             |  18 ++++
+>  arch/arm/kernel/smp.c              |   4 +
+>  arch/arm/kernel/suspend.c          |   2 +
+>  arch/arm/kvm/hyp/hyp-entry.S       | 112 ++++++++++++++++++++++-
+>  arch/arm/mm/Kconfig                |  23 +++++
+>  arch/arm/mm/Makefile               |   2 +-
+>  arch/arm/mm/fault.c                |   3 +
+>  arch/arm/mm/proc-macros.S          |   3 +-
+>  arch/arm/mm/proc-v7-2level.S       |   6 --
+>  arch/arm/mm/proc-v7-bugs.c         | 176 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++-------
+>  20 files changed, 529 insertions(+), 50 deletions(-)
+>  create mode 100644 arch/arm/kernel/bugs.c
+>  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> 
+> On Tue, May 29, 2018 at 10:07:57AM +0100, Russell King - ARM Linux wrote:
+> > Fourth version:
+> > - Only warn once per CPU about incorrect IBE bit
+> >   (this avoids spamming the kernel log on cpuidle implementations that
+> >    use cpu_suspend() - spotted by Mark Brown.)
+> > 
+> >  arch/arm/include/asm/bugs.h        |   6 +-
+> >  arch/arm/include/asm/cp15.h        |   3 +
+> >  arch/arm/include/asm/cputype.h     |   8 ++
+> >  arch/arm/include/asm/kvm_asm.h     |   2 -
+> >  arch/arm/include/asm/kvm_host.h    |  14 ++-
+> >  arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
+> >  arch/arm/include/asm/proc-fns.h    |   4 +
+> >  arch/arm/include/asm/system_misc.h |  15 ++++
+> >  arch/arm/kernel/Makefile           |   1 +
+> >  arch/arm/kernel/bugs.c             |  18 ++++
+> >  arch/arm/kernel/smp.c              |   4 +
+> >  arch/arm/kernel/suspend.c          |   2 +
+> >  arch/arm/kvm/hyp/hyp-entry.S       | 112 +++++++++++++++++++++++-
+> >  arch/arm/mm/Kconfig                |  23 +++++
+> >  arch/arm/mm/Makefile               |   2 +-
+> >  arch/arm/mm/fault.c                |   3 +
+> >  arch/arm/mm/proc-macros.S          |   3 +-
+> >  arch/arm/mm/proc-v7-2level.S       |   6 --
+> >  arch/arm/mm/proc-v7-bugs.c         | 173 +++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mm/proc-v7.S              | 154 ++++++++++++++++++++++++++-------
+> >  20 files changed, 526 insertions(+), 50 deletions(-)
+> >  create mode 100644 arch/arm/kernel/bugs.c
+> >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> > 
+> > On Fri, May 25, 2018 at 02:59:39PM +0100, Russell King - ARM Linux wrote:
+> > > Third version:
+> > > - Remove "PSCI" from the SMC version of the workaround as well.
+> > > - Avoid reporting active workaround if the IBE bit is not set.
+> > > - Only probe for workaround_1 on Cortex A57 and A72, or non-ARM CPUs.
+> > > - Require features probe for workaround_1 to return zero.
+> > > - Validation that all CPUs in the system have the same workaround status.
+> > > - Avoid corrupting r12 in workaround_1 KVM hypervisor implementation.
+> > > 
+> > >  arch/arm/include/asm/bugs.h        |   6 +-
+> > >  arch/arm/include/asm/cp15.h        |   3 +
+> > >  arch/arm/include/asm/cputype.h     |   8 ++
+> > >  arch/arm/include/asm/kvm_asm.h     |   2 -
+> > >  arch/arm/include/asm/kvm_host.h    |  14 ++-
+> > >  arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
+> > >  arch/arm/include/asm/proc-fns.h    |   4 +
+> > >  arch/arm/include/asm/system_misc.h |  15 ++++
+> > >  arch/arm/kernel/Makefile           |   1 +
+> > >  arch/arm/kernel/bugs.c             |  18 ++++
+> > >  arch/arm/kernel/smp.c              |   4 +
+> > >  arch/arm/kernel/suspend.c          |   2 +
+> > >  arch/arm/kvm/hyp/hyp-entry.S       | 112 +++++++++++++++++++++++-
+> > >  arch/arm/mm/Kconfig                |  23 +++++
+> > >  arch/arm/mm/Makefile               |   2 +-
+> > >  arch/arm/mm/fault.c                |   3 +
+> > >  arch/arm/mm/proc-macros.S          |   3 +-
+> > >  arch/arm/mm/proc-v7-2level.S       |   6 --
+> > >  arch/arm/mm/proc-v7-bugs.c         | 170 +++++++++++++++++++++++++++++++++++++
+> > >  arch/arm/mm/proc-v7.S              | 154 ++++++++++++++++++++++++++-------
+> > >  20 files changed, 523 insertions(+), 50 deletions(-)
+> > >  create mode 100644 arch/arm/kernel/bugs.c
+> > >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> > > 
+> > > On Mon, May 21, 2018 at 12:42:38PM +0100, Russell King - ARM Linux wrote:
+> > > > This is the second posting - the original cover note is below.  Comments
+> > > > from previous series addresesd:
+> > > > - Drop R7 and R8 changes.
+> > > > - Remove "PSCI" from the hypervisor version of the workaround.
+> > > > 
+> > > >  arch/arm/include/asm/bugs.h        |   6 +-
+> > > >  arch/arm/include/asm/cp15.h        |   3 +
+> > > >  arch/arm/include/asm/cputype.h     |   5 ++
+> > > >  arch/arm/include/asm/kvm_asm.h     |   2 -
+> > > >  arch/arm/include/asm/kvm_host.h    |  14 +++-
+> > > >  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
+> > > >  arch/arm/include/asm/proc-fns.h    |   4 +
+> > > >  arch/arm/include/asm/system_misc.h |   8 ++
+> > > >  arch/arm/kernel/Makefile           |   1 +
+> > > >  arch/arm/kernel/bugs.c             |  18 +++++
+> > > >  arch/arm/kernel/smp.c              |   4 +
+> > > >  arch/arm/kernel/suspend.c          |   2 +
+> > > >  arch/arm/kvm/hyp/hyp-entry.S       | 108 +++++++++++++++++++++++++-
+> > > >  arch/arm/mm/Kconfig                |  23 ++++++
+> > > >  arch/arm/mm/Makefile               |   2 +-
+> > > >  arch/arm/mm/fault.c                |   3 +
+> > > >  arch/arm/mm/proc-macros.S          |   3 +-
+> > > >  arch/arm/mm/proc-v7-2level.S       |   6 --
+> > > >  arch/arm/mm/proc-v7-bugs.c         | 130 +++++++++++++++++++++++++++++++
+> > > >  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++++++--------
+> > > >  20 files changed, 469 insertions(+), 50 deletions(-)
+> > > >  create mode 100644 arch/arm/kernel/bugs.c
+> > > >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> > > > 
+> > > > On Wed, May 16, 2018 at 11:59:49AM +0100, Russell King - ARM Linux wrote:
+> > > > > This series addresses the Spectre variant 2 issues on ARM Cortex and
+> > > > > Broadcom Brahma B15 CPUs.  Due to the complexity of the bug, it is not
+> > > > > possible to verify that this series fixes any of the bugs, since it
+> > > > > has not been able to reproduce these exact scenarios using test
+> > > > > programs.
+> > > > > 
+> > > > > I believe that this covers the entire extent of the Spectre variant 2
+> > > > > issues, with the exception of Cortex A53 and Cortex A72 processors as
+> > > > > these require a substantially more complex solution (except where the
+> > > > > workaround is implemented in PSCI firmware.)
+> > > > > 
+> > > > > Spectre variant 1 is not covered by this series.
+> > > > > 
+> > > > > The patch series is based partly on Marc Zyngier's work from February -
+> > > > > two of the KVM patches are from Marc's work.
+> > > > > 
+> > > > > The main differences are:
+> > > > > - Inclusion of more processors as per current ARM Ltd security update
+> > > > >   documentation.
+> > > > > - Extension of "bugs" infrastructure to detect Cortex A8 and Cortex A15
+> > > > >   CPUs missing out on the IBE bit being set on (re-)entry to the kernel
+> > > > >   through all paths.
+> > > > > - Handle all suspect userspace-touching-kernelspace aborts irrespective
+> > > > >   of mapping type.
+> > > > > 
+> > > > > The first patch will trivially conflict with the Broadcom Brahma
+> > > > > updates already in arm-soc - it has been necessary to independently
+> > > > > add the ID definitions for the B15 CPU.
+> > > > > 
+> > > > > Having worked through this series, I'm of the opinion that the
+> > > > > define_processor_functions macro in proc-v7 are probably  more hassle
+> > > > > than they're worth - here, we don't need the global equivalent symbols,
+> > > > > because we never refer to them from the kernel code for any V7
+> > > > > processor (MULTI_CPU is always defined.)
+> > > > > 
+> > > > > This series is currently in my "spectre" branch (along with some
+> > > > > Spectre variant 1 patches.)
+> > > > > 
+> > > > > Please carefully review.
+> > > > > 
+> > > > >  arch/arm/include/asm/bugs.h        |   6 +-
+> > > > >  arch/arm/include/asm/cp15.h        |   3 +
+> > > > >  arch/arm/include/asm/cputype.h     |   5 ++
+> > > > >  arch/arm/include/asm/kvm_asm.h     |   2 -
+> > > > >  arch/arm/include/asm/kvm_host.h    |  14 +++-
+> > > > >  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
+> > > > >  arch/arm/include/asm/proc-fns.h    |   4 +
+> > > > >  arch/arm/include/asm/system_misc.h |   8 ++
+> > > > >  arch/arm/kernel/Makefile           |   1 +
+> > > > >  arch/arm/kernel/bugs.c             |  18 +++++
+> > > > >  arch/arm/kernel/smp.c              |   4 +
+> > > > >  arch/arm/kernel/suspend.c          |   2 +
+> > > > >  arch/arm/kvm/hyp/hyp-entry.S       | 108 ++++++++++++++++++++++++-
+> > > > >  arch/arm/mm/Kconfig                |  23 ++++++
+> > > > >  arch/arm/mm/Makefile               |   2 +-
+> > > > >  arch/arm/mm/fault.c                |   3 +
+> > > > >  arch/arm/mm/proc-macros.S          |   3 +-
+> > > > >  arch/arm/mm/proc-v7-2level.S       |   6 --
+> > > > >  arch/arm/mm/proc-v7-bugs.c         | 130 ++++++++++++++++++++++++++++++
+> > > > >  arch/arm/mm/proc-v7.S              | 158 +++++++++++++++++++++++++++++--------
+> > > > >  20 files changed, 471 insertions(+), 52 deletions(-)
+> > > > > 
+> > > > > -- 
+> > > > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > > > > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> > > > > According to speedtest.net: 8.21Mbps down 510kbps up
+> > > > > 
+> > > > > _______________________________________________
+> > > > > linux-arm-kernel mailing list
+> > > > > linux-arm-kernel at lists.infradead.org
+> > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > > 
+> > > > -- 
+> > > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > > > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> > > > According to speedtest.net: 8.21Mbps down 510kbps up
+> > > > 
+> > > > _______________________________________________
+> > > > linux-arm-kernel mailing list
+> > > > linux-arm-kernel at lists.infradead.org
+> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > > -- 
+> > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> > > According to speedtest.net: 8.21Mbps down 510kbps up
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > -- 
+> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> > According to speedtest.net: 8.21Mbps down 510kbps up
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
- Documentation/devicetree/bindings/media/rcar_vin.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-index 4d91a36..ff53226 100644
---- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-+++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-@@ -58,6 +58,8 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
-       - Optional properties for endpoint nodes of port at 0:
-         - hsync-active: see [1] for description. Default is active high.
-         - vsync-active: see [1] for description. Default is active high.
-+        - data-enable-active: polarity of CLKENB signal, see [1] for
-+          description. Default is active high.
-
-         If both HSYNC and VSYNC polarities are not specified, embedded
-         synchronization is selected.
---
-2.7.4
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
