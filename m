@@ -1,67 +1,38 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 29 May 2018 21:15:26 +0200
-Subject: [PATCH] mtd: atmel-quadspi: add suspend/resume hooks
-In-Reply-To: <1527091728-19895-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1527091728-19895-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20180529211526.7653c6eb@bbrezillon>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 29 May 2018 22:39:15 +0300
+Subject: [PATCH 0/2] PCI: Initial imx7d pm support
+Message-ID: <cover.1527621510.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 May 2018 19:08:48 +0300
-Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+This series adds initial pm support on imx7d so that after
+suspend/resume lspci works again. This mostly copies the resume sequence
+from the imx tree.
 
-> Implement suspend/resume hooks.
-> 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
->  drivers/mtd/spi-nor/atmel-quadspi.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
-> index 6c5708bacad8..85d7610fb920 100644
-> --- a/drivers/mtd/spi-nor/atmel-quadspi.c
-> +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
-> @@ -737,6 +737,28 @@ static int atmel_qspi_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int atmel_qspi_suspend(struct device *dev)
-> +{
-> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
-> +
-> +	clk_disable_unprepare(aq->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_qspi_resume(struct device *dev)
-> +{
-> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
-> +
-> +	clk_prepare_enable(aq->clk);
-> +
-> +	return atmel_qspi_init(aq);
-> +}
-> +#endif
+More can be done later to reduce power in suspend as well as adding
+support for other socs.
 
-You can avoid this #ifdef section if you use the __maybe_unused
-specifier:
+This is motivated mostly by a desire to bring imx PM code closer to
+upstream. It is possible that I am missing some things about how PM
+should be done for pci host drivers, it would be great if you could
+point me the right way.
 
-static __maybe_unused int atmel_qspi_suspend(struct device *dev)
-...
+It also relies on this bugfix for PGC offsets:
+    https://lkml.org/lkml/2018/5/29/138
+Without that patch resume hangs on first PCI read from PCI-PM core. It
+is not strictly related to PCI but pci-imx6 is the only user of gpcv2
+power domains.
 
-> +
-> +static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
-> +			 atmel_qspi_resume);
->  
->  static const struct of_device_id atmel_qspi_dt_ids[] = {
->  	{ .compatible = "atmel,sama5d2-qspi" },
-> @@ -749,6 +771,7 @@ static struct platform_driver atmel_qspi_driver = {
->  	.driver = {
->  		.name	= "atmel_qspi",
->  		.of_match_table	= atmel_qspi_dt_ids,
-> +		.pm	= &atmel_qspi_pm_ops,
->  	},
->  	.probe		= atmel_qspi_probe,
->  	.remove		= atmel_qspi_remove,
+Patch 1 in this series is also technically an unrelated bugfix, however
+pci-imx6 is the only user.
+
+Leonard Crestez (2):
+  reset: imx7: Fix always writing bits as 0
+  PCI: imx: Initial imx7d pm support
+
+ drivers/pci/dwc/pci-imx6.c | 94 ++++++++++++++++++++++++++++++++++++--
+ drivers/reset/reset-imx7.c |  2 +-
+ 2 files changed, 90 insertions(+), 6 deletions(-)
+
+-- 
+2.17.0
