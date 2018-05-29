@@ -1,114 +1,45 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 29 May 2018 16:49:11 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon>
- <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
- <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
- <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
- <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
- <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
-Message-ID: <20180529164911.29820e07@bbrezillon>
+From: pmenzel@molgen.mpg.de (Paul Menzel)
+Date: Tue, 29 May 2018 16:53:04 +0200
+Subject: Status of aspeed-bmc-opp-firestone (IBM S822LC)
+Message-ID: <287c6a85-65ba-5782-e532-d17d517614f5@molgen.mpg.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eugen,
+Dear Joel, dear Linux folks,
 
-On Tue, 29 May 2018 09:30:54 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-> On 28.05.2018 13:10, Peter Rosin wrote:
-> > On 2018-05-28 00:11, Peter Rosin wrote:  
-> >> On 2018-05-27 11:18, Peter Rosin wrote:  
-> >>> On 2018-05-25 16:51, Tudor Ambarus wrote:  
-> >>>> We think the best way is to keep LCD on DDR Ports 2 and 3 (8th and 9th
-> >>>> slaves), to have maximum bandwidth and to use DMA on DDR port 1 for NAND
-> >>>> (7th slave).  
-> >>>
-> >>> Exactly how do I accomplish that?
-> >>>
-> >>> I can see how I can move the LCD between slave DDR port 2 and 3 by
-> >>> selecting LCDC DMA master 8 or 9 (but according to the above it should
-> >>> not matter). The big question is how I control what slave the NAND flash
-> >>> is going to use? I find nothing in the datasheet, and the code is also
-> >>> non-transparent enough for me to figure it out by myself without
-> >>> throwing out this question first...  
-> 
->  >> [...]  
-> 
-> >> and the output is
-> >>
-> >> atmel-nand-controller 10000000.ebi:nand-controller: using dma0chan5 for DMA transfers
-> >>
-> >> So, DMA controller 0 is in use. I still don't know if IF0, IF1 or IF2 is used
-> >> or how to find out. I guess IF2 is not in use since that does not allow any
-> >> DDR2 port as slave...  
-> 
-> Hello Peter,
-> 
-> Thank you for all the information, I will chip in to help a little bit.
-> The Master/channel is described in the device tree. The channel has a 
-> controller, a mem/periph interface and a periph ID, plus a FIFO 
-> configuration.
-> 
-> The dma chan number reported in the dmesg is just software. Here is an 
-> example from DT:
-> dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(1)>,
->         <&dma0 2 AT91_DMA_CFG_PER_ID(2)>;
-> 
-> you can match this with the help from 
-> Documentation/devicetree/bindings/dma/atmel-dma.txt:
-> 
-> 1. A phandle pointing to the DMA controller. 
-> 
-> 2. The memory interface (16 most significant bits), the peripheral 
-> interface
-> (16 less significant bits). 
-> 
-> 3. Parameters for the at91 DMA configuration register which are device 
-> 
-> dependent: 
-> 
->    - bit 7-0: peripheral identifier for the hardware handshaking 
-> interface. The
->    identifier can be different for tx and rx. 
-> 
->    - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 2 for ASAP.
-> 
-> 
-> So , what was Tudor asking for, is your DT for the ebi node (if you are 
-> using ebi), or, your NFC SRAM (Nand Flash Controller SRAM) DMA 
-> devicetree chunk, so, we can figure out which type of DMA are you using.
+We have an IBM S822LC system (Firestone(?)). Building of OpenBMC 
+currently fails, as the not everything was ported from dev-4.10 to 
+dev-4.13 [1], and therefore a file cannot be found.
 
-I think you're missing something here. We use the DMA engine in memcpy
-mode (SRAM -> DRAM), not in device mode (dev -> DRAM or DRAM -> dev).
-So there's no dmas prop defined in the DT and there should not be.
+Looking at upstream Linux, there are BMCs for Power 8 systems, like 
+Palmetto, included.
 
-Regards,
+```
+$ ls arch/arm/boot/dts/aspeed-bmc-opp-*
+arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
+arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
+```
 
-Boris
+Does somebody know, why Firestone was not upstreamed? Is somebody 
+working on upstreaming it? If not, do you have scripts to port such 
+work? Manually cherry-picking stuff in this case is hard, as there are a 
+lot of conflicts.
 
-> 
-> Normally, the ebi should be connected to both DMA0 and DMA1 on those 
-> interfaces specified in DT. Which ones you want to use, depends on your 
-> setup (and contention on the bus/accesses, like in your case, the HLCDC)
-> 
-> Thats why we have multiple choices, to pick the right one for each case.
-> In our vanilla DT sama5d3.dtsi we do not have DMA described for ebi 
-> interface.
-> 
-> Eugen
-> 
->  >> [...]  
+
+Kind regards,
+
+Paul
+
+
+[1]: https://github.com/openbmc/openbmc/issues/3206
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 5174 bytes
+Desc: S/MIME Cryptographic Signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/85b5f96e/attachment-0001.p7s>
