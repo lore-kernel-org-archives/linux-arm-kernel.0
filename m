@@ -1,71 +1,61 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 29 May 2018 18:21:40 +0300
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <20180529171555.19dd723f@bbrezillon>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
- <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
- <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
- <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
- <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
- <20180529164911.29820e07@bbrezillon>
- <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
- <20180529171555.19dd723f@bbrezillon>
-Message-ID: <1affd186-7f78-8bb0-050e-da82143c2982@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 May 2018 16:30:14 +0100
+Subject: [PATCH] ARM: mcpm, perf/arm-cci: export mcpm_is_available
+In-Reply-To: <20180528154448.2494709-1-arnd@arndb.de>
+References: <20180528154448.2494709-1-arnd@arndb.de>
+Message-ID: <20180529153013.GH17159@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Russell, [+Nico and Robin]
 
+On Mon, May 28, 2018 at 05:44:36PM +0200, Arnd Bergmann wrote:
+> Now that the ARM CCI PMU driver can be built as a loadable module,
+> we get a link failure when MCPM is enabled:
+> 
+> ERROR: "mcpm_is_available" [drivers/perf/arm-cci.ko] undefined!
+> 
+> The simplest fix is to export that helper function.
+> 
+> Fixes: 8b0c93c20ef7 ("perf/arm-cci: Allow building as a module")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> The patch that caused this is currently part of the arm-perf/for-next/perf
+> branch, it would be good to have the fix there as well.
+> ---
+>  arch/arm/common/mcpm_entry.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-On 29.05.2018 18:15, Boris Brezillon wrote:
-> On Tue, 29 May 2018 18:01:40 +0300
-> Eugen Hristev <eugen.hristev@microchip.com> wrote:
-> 
->> [...]
->>
->>
->>>
->>> I think you're missing something here. We use the DMA engine in memcpy
->>> mode (SRAM -> DRAM), not in device mode (dev -> DRAM or DRAM -> dev).
->>> So there's no dmas prop defined in the DT and there should not be.
->>>
->>> Regards,
->>>
->>> Boris
->>>    
->>
->> Ok, so the memcpy SRAM <-> DRAM will hog the transfer between DRAM and
->> LCD if my understanding is correct. That's the DMA that Peter wants to
->> disable with his patch ?
->>
->> Then we can then try to force NFC SRAM DMA channels to use just DDR port
->> 1 or 2 for memcpy ?
-> 
-> You mean the dmaengine? According to "14.1.3 Master to Slave Access"
-> that's already the case.
-> 
-> Only DMAC0 can access the NFC SRAM and it's done through DMAC0:IF0,
-> then access to DDR is going through port DDR port 1 (DMAC0:IF1) or 2
-> (DMAC0:IF0).
+I'm happy to take this via the arm perf tree if others are ok with that.
+Alternatively, I can revert the offending commit if there are objections
+to exporting the symbol.
 
-If we can make NFC use port 1 only, then HLCDC could have two ports as 
-master 8 & 9, maybe a better bandwidth.
+Russell: do you any preference?
 
-> 
->>
->> I have also received a suggestion to try to increase the porches in
->> LCDC_LCDCFG3 .
-> 
-> Yep, Nicolas suggested something similar. Peter, can you try that?
+Thanks,
+
+Will
+
+> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+> index ed9e87ddbb06..037a4479b8c3 100644
+> --- a/arch/arm/common/mcpm_entry.c
+> +++ b/arch/arm/common/mcpm_entry.c
+> @@ -9,6 +9,7 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/export.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/irqflags.h>
+> @@ -174,6 +175,7 @@ bool mcpm_is_available(void)
+>  {
+>  	return (platform_ops) ? true : false;
+>  }
+> +EXPORT_SYMBOL_GPL(mcpm_is_available);
+>  
+>  /*
+>   * We can't use regular spinlocks. In the switcher case, it is possible
+> -- 
+> 2.9.0
 > 
