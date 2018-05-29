@@ -1,50 +1,112 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 29 May 2018 15:18:45 +0200
-Subject: [PATCH 07/15] arm: dts: exynos: Add missing cooling device
- properties for CPUs
-In-Reply-To: <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
-Message-ID: <CAJKOXPcyV=fdRu7oLXHMimSFR9ktJ23uBriswTStkEkAMbTaNw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 May 2018 14:35:13 +0100
+Subject: [PATCH v2 08/17] arm64: ssbd: Restore mitigation status on CPU
+ resume
+In-Reply-To: <20180529121121.24927-9-marc.zyngier@arm.com>
+References: <20180529121121.24927-1-marc.zyngier@arm.com>
+ <20180529121121.24927-9-marc.zyngier@arm.com>
+Message-ID: <20180529133510.xopxpmxf7ypjeksc@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 12:31 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order.
+On Tue, May 29, 2018 at 01:11:12PM +0100, Marc Zyngier wrote:
+> On a system where firmware can dynamically change the state of the
+> mitigation, the CPU will always come up with the mitigation enabled,
+> including when coming back from suspend.
+> 
+> If the user has requested "no mitigation" via a command line option,
+> let's enforce it by calling into the firmware again to disable it.
+> 
+> Similarily, for a resume from hibernate, the mitigation could have
+> been disabled by the boot kernel. Let's ensure that it is set
+> back on in that case.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks for the patch.
+With teh fixup in swsusp_arch_suspend(), this looks good to me. FWIW:
 
-In case of Exynos, the booting CPU always has these information in DT
-and the booting CPU cannot be changed (chosen by firmware/hardware
-configuration). Therefore there is no real risk of falling although
-for correctness of DT your change makes sense.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-It is too late for this cycle for me so I'll pick it up after merge window.
-Alternatively, arm-soc guys can pick it up directly with my tag:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Mark.
 
-Best regards,
-Krzysztof
-
-
-> For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
->
-> Add such missing properties.
->
-> Fix other missing properties (clocks, OPP, clock latency) as well to
-> make it all work.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm/boot/dts/exynos3250.dtsi | 16 ++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi | 13 +++++++++++++
->  arch/arm/boot/dts/exynos4412.dtsi |  9 +++++++++
->  arch/arm/boot/dts/exynos5250.dtsi | 23 +++++++++++++++++++++++
->  4 files changed, 61 insertions(+)
->
+>  arch/arm64/include/asm/cpufeature.h |  6 ++++++
+>  arch/arm64/kernel/cpu_errata.c      |  2 +-
+>  arch/arm64/kernel/hibernate.c       | 11 +++++++++++
+>  arch/arm64/kernel/suspend.c         |  8 ++++++++
+>  4 files changed, 26 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index b0fc3224ce8a..55bc1f073bfb 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -553,6 +553,12 @@ static inline int arm64_get_ssbd_state(void)
+>  #endif
+>  }
+>  
+> +#ifdef CONFIG_ARM64_SSBD
+> +void arm64_set_ssbd_mitigation(bool state);
+> +#else
+> +static inline void arm64_set_ssbd_mitigation(bool state) {}
+> +#endif
+> +
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 2fef634e6953..2b9a31a6a16a 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -303,7 +303,7 @@ void __init arm64_enable_wa2_handling(struct alt_instr *alt,
+>  		*updptr = cpu_to_le32(aarch64_insn_gen_nop());
+>  }
+>  
+> -static void arm64_set_ssbd_mitigation(bool state)
+> +void arm64_set_ssbd_mitigation(bool state)
+>  {
+>  	switch (psci_ops.conduit) {
+>  	case PSCI_CONDUIT_HVC:
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index 1ec5f28c39fc..6b2686d54411 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -313,6 +313,17 @@ int swsusp_arch_suspend(void)
+>  
+>  		sleep_cpu = -EINVAL;
+>  		__cpu_suspend_exit();
+> +
+> +		/*
+> +		 * Just in case the boot kernel did turn the SSBD
+> +		 * mitigation off behind our back, let's set the state
+> +		 * to what we expect it to be.
+> +		 */
+> +		switch (arm64_get_ssbd_state()) {
+> +		case ARM64_SSBD_FORCE_ENABLE:
+> +		case ARM64_SSBD_KERNEL:
+> +			arm64_set_ssbd_mitigation(true);
+> +		}
+>  	}
+>  
+>  	local_daif_restore(flags);
+> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+> index a307b9e13392..70c283368b64 100644
+> --- a/arch/arm64/kernel/suspend.c
+> +++ b/arch/arm64/kernel/suspend.c
+> @@ -62,6 +62,14 @@ void notrace __cpu_suspend_exit(void)
+>  	 */
+>  	if (hw_breakpoint_restore)
+>  		hw_breakpoint_restore(cpu);
+> +
+> +	/*
+> +	 * On resume, firmware implementing dynamic mitigation will
+> +	 * have turned the mitigation on. If the user has forcefully
+> +	 * disabled it, make sure their wishes are obeyed.
+> +	 */
+> +	if (arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE)
+> +		arm64_set_ssbd_mitigation(false);
+>  }
+>  
+>  /*
+> -- 
+> 2.14.2
+> 
