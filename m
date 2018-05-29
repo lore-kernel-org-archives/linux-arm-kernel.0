@@ -1,87 +1,74 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 29 May 2018 11:00:21 +0100
-Subject: [PATCH v2 07/40] iommu: Add a page fault handler
-In-Reply-To: <20180525173544.05638510@jacob-builder>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-8-jean-philippe.brucker@arm.com>
- <20180518110434.150a0e64@jacob-builder>
- <8a640794-a6f3-fa01-82a9-06479a6f779a@arm.com>
- <20180522163521.413e60c6@jacob-builder>
- <bdf9f221-ab97-2168-d072-b7f6a0dba840@arm.com>
- <20180525173544.05638510@jacob-builder>
-Message-ID: <6bd83326-2da0-1250-3dfc-7d6fbf58d701@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 29 May 2018 12:04:12 +0200
+Subject: [PATCH v2 0/9] PM / Domains: Add support for multi PM domains per
+ device
+Message-ID: <20180529100421.31022-1-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/18 01:35, Jacob Pan wrote:
->>>> Not exactly, it's the IOMMU driver that makes sure all LPIG in its
->>>> queues are submitted by the above flush call. In more details the
->>>> flow is:
->>>>
->>>> * Either device driver calls unbind()/sva_device_shutdown(), or the
->>>> process exits.
->>>> * If the device driver called, then it already told the device to
->>>> stop using the PASID. Otherwise we use the mm_exit() callback to
->>>> tell the device driver to stop using the PASID.
-> Sorry I still need more clarification. For the PASID termination
-> initiated by vfio unbind, I don't see device driver given a chance to
-> stop PASID. Seems just call __iommu_sva_unbind_device() which already
-> assume device stopped issuing DMA with the PASID.
-> So it is the vfio unbind caller responsible for doing driver callback
-> to stop DMA on a given PASID?
+Changes in v2:
+	- Addressed comments from Geert around DT doc.
+	- Addressed comments from Jon around clarification of how to use this
+	and changes to returned error codes.
+	- Fixed build error in case CONFIG_PM was unset.
 
-Yes, but I don't know how to implement this. Since PCI doesn't formalize
-the PASID stop mechanism and the device doesn't have a kernel driver,
-VFIO would need help from the userspace driver for stopping PASID
-(notify the userspace driver when an other process exits).
+There are devices that are partitioned across multiple PM domains. Currently
+these can't be supported well by the available PM infrastructures we have in
+the kernel. This series is an attempt to address this.
+
+The interesting parts happens from patch 5 an onwards, including a minor DT
+update to the existing power-domain bindings, the 4 earlier are just trivial
+clean-ups of some related code in genpd, which I happened to stumble over.
+
+Some additional background:
+
+One existing case where devices are partitioned across multiple PM domains, is
+the Nvida Tegra 124/210 X-USB subsystem. A while ago Jon Hunter (Nvidia) sent a
+series, trying to address these issues, however this is a new approach, while
+it re-uses the same concepts from DT point of view.
+
+The Tegra 124/210 X-USB subsystem contains of a host controller and a device
+controller. Each controller have its own independent PM domain, but are being
+partitioned across another shared PM domain for the USB super-speed logic.
+
+Currently to make the drivers work, either the related PM domains needs to stay
+powered on always or the PM domain topology needs to be in-correctly modelled
+through sub-domains. In both cases PM domains may be powered on while they
+don't need to be, so in the end this means - wasting power -.
+
+As stated above, this series intends to address these problem from a PM
+infrastructure point of view. More details are available in each changelog.
+
+It should be noted that this series has been tested on HW, however only by using
+a home-cooked test PM domain driver for genpd and together with a test driver.
+This allowed me to play with PM domain (genpd), runtime PM and device links.
+
+Any further deployment for real use cases are greatly appreciated. I am happy to
+to help, if needed!
+
+Kind regards
+Ulf Hansson
 
 
->>>> * In either case, when receiving a stop request from the driver,
->>>> the device sends the LPIGs to the IOMMU queue.
->>>> * Then, the flush call above ensures that the IOMMU reports the
->>>> LPIG with iommu_report_device_fault.
->>>> * While submitting all LPIGs for this PASID to the work queue,
->>>> ipof_queue_fault also picked up all partial faults, so the partial
->>>> list is clean.
->>>>
->>>> Maybe I should improve this comment?
->>>>  
->>> thanks for explaining. LPIG submission is done by device
->>> asynchronously w.r.t. driver stopping/decommission PASID.  
->>
->> Hmm, it should really be synchronous, otherwise there is no way to
->> know when the PASID can be decommissioned. We need a guarantee such
->> as the one in 6.20.1 of the PCIe spec, "Managing PASID TLP Prefix
->> Usage":
->>
->> "When the stop request mechanism indicates completion, the Function
->> has:
->> * Completed all Non-Posted Requests associated with this PASID.
->> * Flushed to the host all Posted Requests addressing host memory in
->> all TCs that were used by the PASID."
->>
->> That's in combination with "The function shall [...] finish
->> transmitting any multi-page Page Request Messages for this PASID
->> (i.e. send the Page Request Message with the L bit Set)." from the
->> ATS spec.
->>
-> I am not contesting on the device side, what I meant was from the
-> host IOMMU driver perspective, LPIG is received via IOMMU host queue,
-> therefore asynchronous. Not sure about ARM, but on VT-d LPIG submission
-> could meet queue full condition. So per VT-d spec, iommu will generate a
-> successful auto response to the device. At this point, assume we
-> already stopped the given PASID on the device, there might not be
-> another LPIG sent for the device. Therefore, you could have a partial
-> list. I think we can just drop the requests in the partial list for
-> that PASID until the PASID gets re-allocated.
+Ulf Hansson (9):
+  PM / Domains: Drop extern declarations of functions in pm_domain.h
+  PM / Domains: Drop __pm_genpd_add_device()
+  PM / Domains: Drop genpd as in-param for pm_genpd_remove_device()
+  PM / Domains: Drop unused parameter in genpd_allocate_dev_data()
+  PM / Domains: dt: Allow power-domain property to be a list of
+    specifiers
+  PM / Domains: Don't attach devices in genpd with multi PM domains
+  PM / Domains: Split genpd_dev_pm_attach()
+  PM / Domains: Add support for multi PM domains per device to genpd
+  PM / Domains: Add dev_pm_domain_attach_by_id() to manage multi PM
+    domains
 
-Indeed, I'll add this in next version. For a complete solution to the
-queue-full condition (which seems to behave the same way on ARM) I was
-thinking the IOMMU driver should also have a method for removing all
-partial faults when detecting a queue overflow. Since it doesn't know
-which PRGs did receive an auto-response, all it can do is remove all
-partial faults, for all devices using this queue. But freeing the stuck
-partial faults in flush() and remove_device() should be good enough
+ .../bindings/power/power_domain.txt           |  19 ++-
+ drivers/base/power/common.c                   |  39 ++++-
+ drivers/base/power/domain.c                   | 155 ++++++++++++++----
+ drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c       |   2 +-
+ include/linux/pm_domain.h                     |  79 ++++-----
+ 5 files changed, 216 insertions(+), 78 deletions(-)
 
-Thanks,
-Jean
+-- 
+2.17.0
