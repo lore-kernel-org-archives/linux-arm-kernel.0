@@ -1,58 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 May 2018 21:16:24 +0100
-Subject: [PATCH v9 00/12] Support PPTT for ARM64
-In-Reply-To: <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
- <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
- <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
- <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
- <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
- <20180529150823.GD17159@arm.com>
- <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
-Message-ID: <20180529201623.GA591@arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 29 May 2018 15:39:55 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.18
+In-Reply-To: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
+References: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <f2304b65-7add-3a97-1ee8-b0d1ece33005@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Ping?
 
-On Tue, May 29, 2018 at 05:51:29PM +0200, Geert Uytterhoeven wrote:
-> On Tue, May 29, 2018 at 5:08 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
-> >> On 29/05/18 12:56, Geert Uytterhoeven wrote:
-> >> > On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >> >> On 29/05/18 11:48, Geert Uytterhoeven wrote:
-> >> >>> System supend still works fine on systems with big cores only:
-> >> >>>
-> >> >>>     R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
-> >> >>>     R-Car M3-N (2xCA57)
-> >> >>>
-> >> >>> Reverting this commit fixes the issue for me.
-> >> >>
-> >> >> I can't find anything that relates to system suspend in these patches
-> >> >> unless they are messing with something during CPU hot plug-in back
-> >> >> during resume.
-> >> >
-> >> > It's only the last patch that introduces the breakage.
-> >> >
-> >>
-> >> As specified in the commit log, it won't change any behavior for DT
-> >> systems if it's non-NUMA or single node system. So I am still wondering
-> >> what could trigger this regression.
-> >
-> > I wonder if we're somehow giving an uninitialised/invalid NUMA configuration
-> > to the scheduler, although I can't see how this would happen.
-> >
-> > Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff below
-> > do you see anything shouting in dmesg?
+On 04/23/2018 09:39 AM, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, and Olof:
 > 
-> Thanks, but unfortunately it doesn't help.
-> I added some debug code to print cpumask, but so far I don't see anything
-> suspicious.
-
-Damn, sorry for wasting your time. For the record, Catalin's been seeing
-boot failures under KVM on a non-big/LITTLE machine that bisect reliably
-to this patch, but we've also not been able to explain them. Worse, adding
-so much as a printk makes the problem disappear.
-
-Will
+> Please full in these SoCFPGA Stratix10 DTS updates for v4.18.
+> 
+> Thanks,
+> Dinh
+> 
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> 
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.18_part1
+> 
+> for you to fetch changes up to ab50a44404a53b12554005ed4c5a1b3547ac9492:
+> 
+>   arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts (2018-04-16 15:58:58 -0500)
+> 
+> ----------------------------------------------------------------
+> SoCFPGA DTS updates for v4.18
+> - Stratix10 platform updates
+>   - Populate clock properties for platform
+>   - Enable DMA and I2C
+> 
+> ----------------------------------------------------------------
+> Alan Tull (1):
+>       arm64: dts: stratix10: enable i2c, add i2c periperals
+> 
+> Dinh Nguyen (1):
+>       arm64: dts: stratix10: use clock bindings for the Stratix10 platform
+> 
+> Graham Moore (1):
+>       arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts
+> 
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 71 +++++++++++++++++++++-
+>  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 42 +++++++++++++
+>  2 files changed, 111 insertions(+), 2 deletions(-)
+> 
