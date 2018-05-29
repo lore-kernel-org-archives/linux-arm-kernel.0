@@ -1,80 +1,46 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 10:09:17 +0100
-Subject: [PATCH v4 04/15] ARM: bugs: add support for per-processor bug checking
-In-Reply-To: <20180529090756.GG17671@n2100.armlinux.org.uk>
-References: <20180529090756.GG17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNad3-0000fj-20@rmk-PC.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 May 2018 10:21:34 +0100
+Subject: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for
+ mark_rodata_ro
+In-Reply-To: <20180528033353.54725-1-nixiaoming@huawei.com>
+References: <20180528033353.54725-1-nixiaoming@huawei.com>
+Message-ID: <20180529092133.GA6533@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for per-processor bug checking - each processor function
-descriptor gains a function pointer for this check, which must not be
-an __init function.  If non-NULL, this will be called whenever a CPU
-enters the kernel via which ever path (boot CPU, secondary CPU startup,
-CPU resuming, etc.)
 
-This allows processor specific bug checks to validate that workaround
-bits are properly enabled by firmware via all entry paths to the kernel.
+On Mon, May 28, 2018 at 11:33:53AM +0800, nixiaoming wrote:
+> Signed-off-by: nixiaoming <nixiaoming@huawei.com>
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Boot-tested-by: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/include/asm/proc-fns.h | 4 ++++
- arch/arm/kernel/bugs.c          | 4 ++++
- arch/arm/mm/proc-macros.S       | 3 ++-
- 3 files changed, 10 insertions(+), 1 deletion(-)
+Please can you write a commit message explaining what this fixes and also
+give me a pointer to patches 2 and 3 from this series?
 
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index f2e1af45bd6f..e25f4392e1b2 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -37,6 +37,10 @@ extern struct processor {
- 	 */
- 	void (*_proc_init)(void);
- 	/*
-+	 * Check for processor bugs
-+	 */
-+	void (*check_bugs)(void);
-+	/*
- 	 * Disable any processor specifics
- 	 */
- 	void (*_proc_fin)(void);
-diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-index 16e7ba2a9cc4..7be511310191 100644
---- a/arch/arm/kernel/bugs.c
-+++ b/arch/arm/kernel/bugs.c
-@@ -5,6 +5,10 @@
- 
- void check_other_bugs(void)
- {
-+#ifdef MULTI_CPU
-+	if (processor.check_bugs)
-+		processor.check_bugs();
-+#endif
- }
- 
- void __init check_bugs(void)
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index f10e31d0730a..81d0efb055c6 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -273,13 +273,14 @@
- 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
- 	.endm
- 
--.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
-+.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
- 	.type	\name\()_processor_functions, #object
- 	.align 2
- ENTRY(\name\()_processor_functions)
- 	.word	\dabort
- 	.word	\pabort
- 	.word	cpu_\name\()_proc_init
-+	.word	\bugs
- 	.word	cpu_\name\()_proc_fin
- 	.word	cpu_\name\()_reset
- 	.word	cpu_\name\()_do_idle
--- 
-2.7.4
+Will
+
+> ---
+>  arch/arm64/mm/mmu.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 2dbb2c9..849f326 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -491,6 +491,7 @@ static void __init map_mem(pgd_t *pgdp)
+>  #endif
+>  }
+>  
+> +#ifdef CONFIG_STRICT_KERNEL_RWX
+>  void mark_rodata_ro(void)
+>  {
+>  	unsigned long section_size;
+> @@ -505,6 +506,7 @@ void mark_rodata_ro(void)
+>  
+>  	debug_checkwx();
+>  }
+> +#endif
+>  
+>  static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
+>  				      pgprot_t prot, struct vm_struct *vma,
+> -- 
+> 2.10.1
+> 
