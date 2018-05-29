@@ -1,44 +1,171 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 29 May 2018 22:39:16 +0300
-Subject: [PATCH 1/2] reset: imx7: Fix always writing bits as 0
+Date: Tue, 29 May 2018 22:39:17 +0300
+Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
 In-Reply-To: <cover.1527621510.git.leonard.crestez@nxp.com>
 References: <cover.1527621510.git.leonard.crestez@nxp.com>
-Message-ID: <c441872d7dd355ae09e945447441389e93e3b888.1527621510.git.leonard.crestez@nxp.com>
+Message-ID: <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now the only user of reset-imx7 is pci-imx6 and the
-reset_control_assert and deassert calls on pciephy_reset don't toggle
-the PCIEPHY_BTN and PCIEPHY_G_RST bits as expected. Fix this by writing
-1 or 0 respectively.
+On imx7d the phy is turned off in suspend and must be reset on resume.
+Right now lspci -v fails after a suspend/resume cycle, fix this by
+adding minimal suspend/resume code from the nxp vendor tree.
 
-The reference manual is not very clear regarding SRC_PCIEPHY_RCR but for
-other registers like MIPIPHY and HSICPHY the bits are explicitly
-documented as "1 means assert, 0 means deassert".
+This is currently only enabled for imx7 but the same sequence can be
+applied to other imx pcie variants.
 
-The values are still reversed for IMX7_RESET_PCIE_CTRL_APPS_EN.
+Tested on imx7d-sabresd with an Intel 5622ANHMW wireless pcie adapter.
+
+The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
+patch adjusts the code to the upstream imx7d implemention using reset
+controls and power domains.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- drivers/reset/reset-imx7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/dwc/pci-imx6.c | 94 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 89 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-index 4db177bc89bc..fdeac1946429 100644
---- a/drivers/reset/reset-imx7.c
-+++ b/drivers/reset/reset-imx7.c
-@@ -78,11 +78,11 @@ static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
- static int imx7_reset_set(struct reset_controller_dev *rcdev,
- 			  unsigned long id, bool assert)
- {
- 	struct imx7_src *imx7src = to_imx7_src(rcdev);
- 	const struct imx7_src_signal *signal = &imx7_src_signals[id];
--	unsigned int value = 0;
-+	unsigned int value = assert ? signal->bit : 0;
+diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+index 4818ef875f8a..ff6077eeb387 100644
+--- a/drivers/pci/dwc/pci-imx6.c
++++ b/drivers/pci/dwc/pci-imx6.c
+@@ -540,10 +540,27 @@ static int imx6_pcie_wait_for_speed_change(struct imx6_pcie *imx6_pcie)
  
- 	switch (id) {
- 	case IMX7_RESET_PCIEPHY:
- 		/*
- 		 * wait for more than 10us to release phy g_rst and
+ 	dev_err(dev, "Speed change timeout\n");
+ 	return -EINVAL;
+ }
+ 
++static void imx6_pcie_ltssm_enable(struct device *dev)
++{
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++
++	switch (imx6_pcie->variant) {
++	case IMX6Q:
++	case IMX6SX:
++	case IMX6QP:
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				   IMX6Q_GPR12_PCIE_CTL_2,
++				   IMX6Q_GPR12_PCIE_CTL_2);
++		break;
++	case IMX7D:
++		reset_control_deassert(imx6_pcie->apps_reset);
++	}
++}
++
+ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ {
+ 	struct dw_pcie *pci = imx6_pcie->pci;
+ 	struct device *dev = pci->dev;
+ 	u32 tmp;
+@@ -558,15 +575,11 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+ 	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
+ 	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
+ 
+ 	/* Start LTSSM. */
+-	if (imx6_pcie->variant == IMX7D)
+-		reset_control_deassert(imx6_pcie->apps_reset);
+-	else
+-		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-				   IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
++	imx6_pcie_ltssm_enable(dev);
+ 
+ 	ret = imx6_pcie_wait_for_link(imx6_pcie);
+ 	if (ret)
+ 		goto err_reset_phy;
+ 
+@@ -681,10 +694,80 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+ 
+ static const struct dw_pcie_ops dw_pcie_ops = {
+ 	.link_up = imx6_pcie_link_up,
+ };
+ 
++#ifdef CONFIG_PM_SLEEP
++static int imx6_pcie_suspend_noirq(struct device *dev)
++{
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++
++	if (imx6_pcie->variant == IMX7D) {
++		/* Disable clks */
++		clk_disable_unprepare(imx6_pcie->pcie);
++		clk_disable_unprepare(imx6_pcie->pcie_phy);
++		clk_disable_unprepare(imx6_pcie->pcie_bus);
++		/* turn off external osc input */
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
++	}
++
++	return 0;
++}
++
++static void imx6_pcie_ltssm_disable(struct device *dev)
++{
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++
++	switch (imx6_pcie->variant) {
++	case IMX6Q:
++	case IMX6SX:
++	case IMX6QP:
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				   IMX6Q_GPR12_PCIE_CTL_2, 0);
++		break;
++	case IMX7D:
++		reset_control_assert(imx6_pcie->apps_reset);
++		break;
++	}
++}
++
++static int imx6_pcie_resume_noirq(struct device *dev)
++{
++	int ret = 0;
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++	struct pcie_port *pp = &imx6_pcie->pci->pp;
++
++	if (imx6_pcie->variant == IMX7D) {
++		imx6_pcie_ltssm_disable(dev);
++
++		imx6_pcie_assert_core_reset(imx6_pcie);
++		imx6_pcie_init_phy(imx6_pcie);
++		imx6_pcie_deassert_core_reset(imx6_pcie);
++
++		/*
++		 * controller maybe turn off, re-configure again
++		 */
++		dw_pcie_setup_rc(pp);
++
++		imx6_pcie_ltssm_enable(dev);
++
++		ret = imx6_pcie_wait_for_link(imx6_pcie);
++		if (ret < 0)
++			pr_info("pcie link is down after resume.\n");
++	}
++
++	return 0;
++}
++
++static const struct dev_pm_ops imx6_pcie_pm_ops = {
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
++				      imx6_pcie_resume_noirq)
++};
++#endif
++
+ static int imx6_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct dw_pcie *pci;
+ 	struct imx6_pcie *imx6_pcie;
+@@ -847,10 +930,11 @@ static const struct of_device_id imx6_pcie_of_match[] = {
+ static struct platform_driver imx6_pcie_driver = {
+ 	.driver = {
+ 		.name	= "imx6q-pcie",
+ 		.of_match_table = imx6_pcie_of_match,
+ 		.suppress_bind_attrs = true,
++		.pm = &imx6_pcie_pm_ops,
+ 	},
+ 	.probe    = imx6_pcie_probe,
+ 	.shutdown = imx6_pcie_shutdown,
+ };
+ 
 -- 
 2.17.0
