@@ -1,76 +1,112 @@
-From: xuzaibo@huawei.com (Xu Zaibo)
-Date: Tue, 29 May 2018 20:24:28 +0800
-Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <99ff4f89-86ef-a251-894c-8aa8a47d2a69@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-14-jean-philippe.brucker@arm.com>
- <5B0536A3.1000304@huawei.com> <cd13f60d-b282-3804-4ca7-2d34476c597f@arm.com>
- <5B06B17C.1090809@huawei.com> <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
- <5B077765.30703@huawei.com> <fea420ff-e738-e2ed-ab1e-a3f4dde4b6ef@arm.com>
- <5B08DA21.3070507@huawei.com> <99ff4f89-86ef-a251-894c-8aa8a47d2a69@arm.com>
-Message-ID: <5B0D467C.90206@huawei.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Tue, 29 May 2018 14:20:23 +0200
+Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
+In-Reply-To: <b8fa6cc9-5d73-81a2-25b8-f0c858ef0c62@st.com>
+References: <20180529155257.5ae48830@canb.auug.org.au>
+ <1bedc0b7-21f9-1e15-a11c-3de06e81b5ba@st.com>
+ <c306fbd9-21d9-5345-e820-52bc23d1b7c7@arm.com>
+ <b01f3226-5bb8-071a-e825-73bec913ffa8@st.com>
+ <2d647302-0be8-555b-8063-06b0d2d72772@arm.com>
+ <b8fa6cc9-5d73-81a2-25b8-f0c858ef0c62@st.com>
+Message-ID: <d1e7a14d-ea49-fc8e-a95c-2b4257096187@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 2018/5/29 19:55, Jean-Philippe Brucker wrote:
-> (If possible, please reply in plain text to the list. Reading this in a
-> text-only reader is confusing, because all quotes have the same level)
-Sorry for that? I have reset the thunderbird, :) thanks.
-> On 26/05/18 04:53, Xu Zaibo wrote:
->> I guess there may be some misunderstandings :).
->>
->>  From the current patches, 'iommu_sva_device_shutdown' is called by 'vfio_iommu_sva_shutdown', which
->> is mainly used by 'vfio_iommu_type1_detach_group' that is finally called by processes' release of vfio facilitiy
->> automatically or called by 'VFIO_GROUP_UNSET_CONTAINER' manually in the processes.
->>
->> So, just image that 2 processes is working on the device with IOPF feature, and the 2 do the following to enable SVA:
->>
->>      1.open("/dev/vfio/vfio") ;
->>
->>     2.open the group of the devcie by calling open("/dev/vfio/x"), but now,
->>       I think the second processes will fail to open the group because current VFIO thinks that one group only can be used by one process/vm,
->>       at present, I use mediated device to create more groups on the parent device to support multiple processes;
->>
->>      3.VFIO_GROUP_SET_CONTAINER;
->>
->>      4.VFIO_SET_IOMMU;
->>
->>      5.VFIO_IOMMU_BIND;
-> I have a concern regarding your driver. With mdev you can't allow
-> processes to program the PASID themselves, since the parent device has a
-> single PASID table. You lose all isolation since processes could write
-> any value in the PASID field and access address spaces of other
-> processes bound to this parent device (even if the BIND call was for
-> other mdevs).
-Yes, if wrapdrive do nothing on this PASID setting procedure in kernel 
-space, I think
-there definitely exists this security risk.
-> The wrap driver has to mediate calls to bind(), and either program the
-> PASID into the device itself, or at least check that, when receiving a
-> SET_PASID ioctl from a process, the given PASID was actually allocated
-> to the process.
-Yes, good advice, thanks.
->
->>      6.Do some works with the hardware working unit filled by PASID on the device;
->>
->>     7.VFIO_IOMMU_UNBIND;
->>
->>      8.VFIO_GROUP_UNSET_CONTAINER;---here, have to sleep to wait another process to finish works of the step 6;
->>
->>      9. close(group); close(containner);
->>
->>
->> So, my idea is: If it is possible to just release the params or facilities that only belong to the current process while the process shutdown the device,
->> and while the last process releases them all. Then, as in the above step 8, we
->> don't need to wait, or maybe wait for a very long time if the other process is doing lots of work on the device.
-> Given that you need to notify the mediating driver of IOMMU_BIND calls
-> as explained above, you could do something similar for shutdown: from
-> the mdev driver, call iommu_sva_shutdown_device() only for the last mdev.
-Currently, I add an API to check if it is the last mdev in wrapdrive, as 
-vfio shutdowns the device,
-it call the API to do the check at first.
 
-Thanks
-Zaibo
+On 05/29/2018 10:55 AM, Alexandre Torgue wrote:
+> 
+> 
+> On 05/29/2018 10:39 AM, Marc Zyngier wrote:
+>> On 29/05/18 09:16, Alexandre Torgue wrote:
+>>> Hi Marc
+>>>
+>>> On 05/29/2018 09:47 AM, Marc Zyngier wrote:
+>>>> On 29/05/18 08:41, Alexandre Torgue wrote:
+>>>>> Hi Stephen
+>>>>>
+>>>>> On 05/29/2018 07:52 AM, Stephen Rothwell wrote:
+>>>>>> Hi all,
+>>>>>>
+>>>>>> Today's linux-next merge of the irqchip tree got a conflict in:
+>>>>>>
+>>>>>> ???? arch/arm/boot/dts/stm32mp157c.dtsi
+>>>>>>
+>>>>>> between commit:
+>>>>>>
+>>>>>> ???? 3c00436fdb20 ("ARM: dts: stm32: add USBPHYC support to 
+>>>>>> stm32mp157c")
+>>>>>>
+>>>>>> from the arm-soc tree and commit:
+>>>>>>
+>>>>>> ???? 5f0e9d2557d7 ("ARM: dts: stm32: Add exti support for 
+>>>>>> stm32mp157c")
+>>>>>>
+>>>>>> from the irqchip tree.
+>>>>>>
+>>>>>> I fixed it up (see below) and can carry the fix as necessary. This
+>>>>>> is now fixed as far as linux-next is concerned, but any non trivial
+>>>>>> conflicts should be mentioned to your upstream maintainer when 
+>>>>>> your tree
+>>>>>> is submitted for merging.? You may also want to consider cooperating
+>>>>>> with the maintainer of the conflicting tree to minimise any 
+>>>>>> particularly
+>>>>>> complex conflicts.
+>>>>>>
+>>>>>
+>>>>> Thanks for the fix (I will reorder nodes in a future patch). My 
+>>>>> opinion
+>>>>> is that all STM32 DT patches should come through my STM32 tree. It 
+>>>>> is my
+>>>>> role to fix this kind of conflicts. I thought it was a common rule
+>>>>> (driver patches go to sub-system maintainer tree and DT to the Machine
+>>>>> maintainer). For incoming next-series which contain DT+driver 
+>>>>> patches I
+>>>>> will indicate clearly that I take DT patch. I'm right ?
+>>>> Happy to oblige. Can you make sure you sync up with Ludovic and define
+>>>> what you want to do?
+>>>
+>>> Sorry I don't understand your reply. I just say that for series
+>>> containing DT patches + drivers patches, to my point of view it is more
+>>> safe that driver patches are taken by sub-system maintainer (you in this
+>>> case) and that I take DT patches in my tree.
+>> And I'm happy to let you deal with these patches. I'm just asking you
+>> sync with Ludovic to split the series on whichever boundary you wish to
+>> enforce.
+> ok
+> 
+>>
+>>>> In the meantime, I'm dropping the series altogether.
+>>>>
+>>> Why? We could keep it as Stephen fixed the merge issue.
+>> Well, you seem to have a strong opinion about who deals with what. I'll
+>> let Ludovic repost what you and him decide should go via the irqchip 
+>> tree.
+> 
+> It's not a "strong" opinion just my point of view and maybe not the good 
+> one. I thought that's the way of working was like I explained. If you 
+> prefer 2 series (one for driver patches and another one for DT patches) 
+> I will be happy with that.
+> 
+> Ludovic, what is your opinion ?
+
+Hi everybody
+
+For this serie, I think we could keep like that with
+Stephen fix. New stm32 irqchip will be integrated (thanks Marc)
+with no conflict with usb (thanks Stephen).
+
+For next series, we may split driver and DT to avoid misunderstanding.
+
+BR
+Ludo
+
+> 
+> Regards
+> Alexandre
+> 
+>>
+>> Thanks,
+>>
+>> ????M.
+>>
