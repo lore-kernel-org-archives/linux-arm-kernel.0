@@ -1,68 +1,99 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 29 May 2018 12:55:49 +0100
-Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <5B08DA21.3070507@huawei.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-14-jean-philippe.brucker@arm.com>
- <5B0536A3.1000304@huawei.com> <cd13f60d-b282-3804-4ca7-2d34476c597f@arm.com>
- <5B06B17C.1090809@huawei.com> <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
- <5B077765.30703@huawei.com> <fea420ff-e738-e2ed-ab1e-a3f4dde4b6ef@arm.com>
- <5B08DA21.3070507@huawei.com>
-Message-ID: <99ff4f89-86ef-a251-894c-8aa8a47d2a69@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 29 May 2018 13:56:05 +0200
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+Message-ID: <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(If possible, please reply in plain text to the list. Reading this in a
-text-only reader is confusing, because all quotes have the same level)
+Hi Sudeep,
 
-On 26/05/18 04:53, Xu Zaibo wrote:
-> I guess there may be some misunderstandings :).
-> 
-> From the current patches, 'iommu_sva_device_shutdown' is called by 'vfio_iommu_sva_shutdown', which
-> is mainly used by 'vfio_iommu_type1_detach_group' that is finally called by processes' release of vfio facilitiy
-> automatically or called by 'VFIO_GROUP_UNSET_CONTAINER' manually in the processes.
-> 
-> So, just image that 2 processes is working on the device with IOPF feature, and the 2 do the following to enable SVA:
-> 
->     1.open("/dev/vfio/vfio") ;
-> 
->    2.open the group of the devcie by calling open("/dev/vfio/x"), but now,
->      I think the second processes will fail to open the group because current VFIO thinks that one group only can be used by one process/vm,
->      at present, I use mediated device to create more groups on the parent device to support multiple processes;
-> 
->     3.VFIO_GROUP_SET_CONTAINER;
-> 
->     4.VFIO_SET_IOMMU;
-> 
->     5.VFIO_IOMMU_BIND;
+On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+>> On Thu, May 17, 2018 at 7:05 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>>> On Fri, May 11, 2018 at 06:57:55PM -0500, Jeremy Linton wrote:
+>>>> Jeremy Linton (12):
+>>>>   drivers: base: cacheinfo: move cache_setup_of_node()
+>>>>   drivers: base: cacheinfo: setup DT cache properties early
+>>>>   cacheinfo: rename of_node to fw_token
+>>>>   arm64/acpi: Create arch specific cpu to acpi id helper
+>>>>   ACPI/PPTT: Add Processor Properties Topology Table parsing
+>>>>   ACPI: Enable PPTT support on ARM64
+>>>>   drivers: base cacheinfo: Add support for ACPI based firmware tables
+>>>>   arm64: Add support for ACPI based firmware tables
+>>>>   arm64: topology: rename cluster_id
+>>>>   arm64: topology: enable ACPI/PPTT based CPU topology
+>>>>   ACPI: Add PPTT to injectable table list
+>>>>   arm64: topology: divorce MC scheduling domain from core_siblings
+>>>
+>>> Queued for 4.18 (without Sudeep's latest property_read_u64 cacheinfo
+>>> patch - http://lkml.kernel.org/r/20180517154701.GA20281 at e107155-lin; I
+>>> can add it separately).
+>>
+>> This is now commit 37c3ec2d810f87ea ("arm64: topology: divorce MC
+>> scheduling domain from core_siblings") in arm64/for-next/core, causing
+>> system suspend on big.LITTLE systems to hang after shutting down the first
+>> CPU:
+>>
+>>     $ echo mem > /sys/power/state
+>>     PM: suspend entry (deep)
+>>     PM: Syncing filesystems ... done.
+>>     Freezing user space processes ... (elapsed 0.001 seconds) done.
+>>     OOM killer disabled.
+>>     Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+>>     Disabling non-boot CPUs ...
+>>     CPU1: shutdown
+>>     psci: CPU1 killed.
+>>
+>
+> Is it OK to assume the suspend failed just after shutting down one CPU
+> or it's failing during resume ? It depends on whether you had console
+> disabled or not.
 
-I have a concern regarding your driver. With mdev you can't allow
-processes to program the PASID themselves, since the parent device has a
-single PASID table. You lose all isolation since processes could write
-any value in the PASID field and access address spaces of other
-processes bound to this parent device (even if the BIND call was for
-other mdevs).
+I have no-console-suspend enabled.
+It's failing during suspend, the next lines should be:
 
-The wrap driver has to mediate calls to bind(), and either program the
-PASID into the device itself, or at least check that, when receiving a
-SET_PASID ioctl from a process, the given PASID was actually allocated
-to the process.
+    CPU2: shutdown
+    psci: CPU2 killed.
+    ...
 
->     6.Do some works with the hardware working unit filled by PASID on the device;
-> 
->    7.VFIO_IOMMU_UNBIND;
-> 
->     8.VFIO_GROUP_UNSET_CONTAINER;---here, have to sleep to wait another process to finish works of the step 6;
-> 
->     9. close(group); close(containner);
-> 
-> 
-> So, my idea is: If it is possible to just release the params or facilities that only belong to the current process while the process shutdown the device,
-> and while the last process releases them all. Then, as in the above step 8, we
-> don't need to wait, or maybe wait for a very long time if the other process is doing lots of work on the device.
-Given that you need to notify the mediating driver of IOMMU_BIND calls
-as explained above, you could do something similar for shutdown: from
-the mdev driver, call iommu_sva_shutdown_device() only for the last mdev.
+>> For me, it fails on the following big.LITTLE systems:
+>>
+>>     R-Car H3 ES2.0 (4xCA57 + 4xCA53)
+>>     R-Car M3-W (2xCA57 + 4xCA53)
+>>
+>
+> Interesting, is it PSCI based system suspend ?
 
-Thanks,
-Jean
+Yes it is.
+
+Suspend-to-idle, which doesn't offline CPUs, still works.
+
+>> System supend still works fine on systems with big cores only:
+>>
+>>     R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
+>>     R-Car M3-N (2xCA57)
+>>
+>> Reverting this commit fixes the issue for me.
+>
+> I can't find anything that relates to system suspend in these patches
+> unless they are messing with something during CPU hot plug-in back
+> during resume.
+
+It's only the last patch that introduces the breakage.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
