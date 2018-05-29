@@ -1,40 +1,134 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 29 May 2018 13:34:33 +0100
-Subject: [PATCH 1/4] ARM: dts: Restructure Vexpress motherboard includes
-In-Reply-To: <CACRpkdZvM+2cZ3JKqzJx_1VPgc=CEkMFgwjo9h6v0E8rckuNDw@mail.gmail.com>
-References: <20180528122658.3241-1-linus.walleij@linaro.org>
- <20180528122658.3241-2-linus.walleij@linaro.org>
- <326b8b98-4f1b-926a-8124-177381368a2c@arm.com>
- <CACRpkdZvM+2cZ3JKqzJx_1VPgc=CEkMFgwjo9h6v0E8rckuNDw@mail.gmail.com>
-Message-ID: <fdede823-6918-099e-2502-4815fd0e9450@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 May 2018 13:11:18 +0100
+Subject: [PATCH v2 14/17] arm64: KVM: Add ARCH_WORKAROUND_2 discovery through
+ ARCH_FEATURES_FUNC_ID
+In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
+References: <20180529121121.24927-1-marc.zyngier@arm.com>
+Message-ID: <20180529121121.24927-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that all our infrastructure is in place, let's expose the
+availability of ARCH_WORKAROUND_2 to guests. We take this opportunity
+to tidy up a couple of SMCCC constants.
 
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_host.h   | 12 ++++++++++++
+ arch/arm64/include/asm/kvm_host.h | 23 +++++++++++++++++++++++
+ arch/arm64/kvm/reset.c            |  4 ++++
+ virt/kvm/arm/psci.c               | 18 ++++++++++++++++--
+ 4 files changed, 55 insertions(+), 2 deletions(-)
 
-On 29/05/18 12:48, Linus Walleij wrote:
-> On Tue, May 29, 2018 at 11:25 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 28/05/18 13:26, Linus Walleij wrote:
-> 
->>> This is a purely syntactic change that result in the same
->>> DTB files from the DTS/DTSI files.
-> 
->> Is it different from v1/earlier version you had posted ?
-> 
-> Don't think so. Just resent it as part of the rest.
-> 
->> I have already sent this to ARM SoC and it should be in -next by now.
-> 
-> Awesome!
-> 
->> I will add the remaining 3 patches for v4.19 once you confirm
->> that I can drop this patch as it's already queued.
-> 
-> Drop it :)
-> 
-
-Thanks, will apply the remaining patches once v4.18-rc1 is tagged.
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index c7c28c885a19..7001fb871429 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -315,6 +315,18 @@ static inline bool kvm_arm_harden_branch_predictor(void)
+ 	return false;
+ }
+ 
++#define KVM_SSBD_UNKNOWN		-1
++#define KVM_SSBD_FORCE_DISABLE		0
++#define KVM_SSBD_KERNEL		1
++#define KVM_SSBD_FORCE_ENABLE		2
++#define KVM_SSBD_MITIGATED		3
++
++static inline int kvm_arm_have_ssbd(void)
++{
++	/* No way to detect it yet, pretend it is not there. */
++	return KVM_SSBD_UNKNOWN;
++}
++
+ static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 9bef3f69bdcd..95d8a0e15b5f 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -455,6 +455,29 @@ static inline bool kvm_arm_harden_branch_predictor(void)
+ 	return cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
+ }
+ 
++#define KVM_SSBD_UNKNOWN		-1
++#define KVM_SSBD_FORCE_DISABLE		0
++#define KVM_SSBD_KERNEL		1
++#define KVM_SSBD_FORCE_ENABLE		2
++#define KVM_SSBD_MITIGATED		3
++
++static inline int kvm_arm_have_ssbd(void)
++{
++	switch (arm64_get_ssbd_state()) {
++	case ARM64_SSBD_FORCE_DISABLE:
++		return KVM_SSBD_FORCE_DISABLE;
++	case ARM64_SSBD_KERNEL:
++		return KVM_SSBD_KERNEL;
++	case ARM64_SSBD_FORCE_ENABLE:
++		return KVM_SSBD_FORCE_ENABLE;
++	case ARM64_SSBD_MITIGATED:
++		return KVM_SSBD_MITIGATED;
++	case ARM64_SSBD_UNKNOWN:
++	default:
++		return KVM_SSBD_UNKNOWN;
++	}
++}
++
+ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
+ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
+ 
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3256b9228e75..a74311beda35 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -122,6 +122,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset PMU */
+ 	kvm_pmu_vcpu_reset(vcpu);
+ 
++	/* Default workaround setup is enabled (if supported) */
++	if (kvm_arm_have_ssbd() == KVM_SSBD_KERNEL)
++		vcpu->arch.workaround_flags |= VCPU_WORKAROUND_2_FLAG;
++
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu);
+ }
+diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+index c4762bef13c6..c95ab4c5a475 100644
+--- a/virt/kvm/arm/psci.c
++++ b/virt/kvm/arm/psci.c
+@@ -405,7 +405,7 @@ static int kvm_psci_call(struct kvm_vcpu *vcpu)
+ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ {
+ 	u32 func_id = smccc_get_function(vcpu);
+-	u32 val = PSCI_RET_NOT_SUPPORTED;
++	u32 val = SMCCC_RET_NOT_SUPPORTED;
+ 	u32 feature;
+ 
+ 	switch (func_id) {
+@@ -417,7 +417,21 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ 		switch(feature) {
+ 		case ARM_SMCCC_ARCH_WORKAROUND_1:
+ 			if (kvm_arm_harden_branch_predictor())
+-				val = 0;
++				val = SMCCC_RET_SUCCESS;
++			break;
++		case ARM_SMCCC_ARCH_WORKAROUND_2:
++			switch (kvm_arm_have_ssbd()) {
++			case KVM_SSBD_FORCE_DISABLE:
++			case KVM_SSBD_UNKNOWN:
++				break;
++			case KVM_SSBD_KERNEL:
++				val = SMCCC_RET_SUCCESS;
++				break;
++			case KVM_SSBD_FORCE_ENABLE:
++			case KVM_SSBD_MITIGATED:
++				val = SMCCC_RET_NOT_REQUIRED;
++				break;
++			}
+ 			break;
+ 		}
+ 		break;
 -- 
-Regards,
-Sudeep
+2.14.2
