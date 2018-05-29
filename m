@@ -1,38 +1,29 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 May 2018 10:40:51 +0200
-Subject: [PATCH] PM / runtime: Drop usage count for suppliers at device
- link removal
-In-Reply-To: <CAJZ5v0gGLvKS6yDuBokJzm2gAhM=VMSaz5frvWq=eRPkAD-z6g@mail.gmail.com>
-References: <1527150816-8459-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0gGLvKS6yDuBokJzm2gAhM=VMSaz5frvWq=eRPkAD-z6g@mail.gmail.com>
-Message-ID: <2305835.OJaHNvgZnB@aspire.rjw.lan>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 29 May 2018 10:48:58 +0200
+Subject: [PATCH v2 4/5] clk: renesas: r8a7795: add ccree clock bindings
+In-Reply-To: <1527171551-21979-5-git-send-email-gilad@benyossef.com>
+References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
+ <1527171551-21979-5-git-send-email-gilad@benyossef.com>
+Message-ID: <CAMuHMdVxcnw5Qy4JPo5r-VvgSxDpp==g6sandNeNji+8CgKOqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, May 27, 2018 12:18:05 PM CEST Rafael J. Wysocki wrote:
-> On Thu, May 24, 2018 at 10:33 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > In the case consumer device is runtime resumed, while the link to the
-> > supplier is removed, the earlier call to pm_runtime_get_sync() made from
-> > rpm_get_suppliers() does not get properly balanced with a corresponding
-> > call to pm_runtime_put(). This leads to that suppliers remains to be
-> > runtime resumed forever, while they don't need to.
-> >
-> > Let's fix the behaviour by calling rpm_put_suppliers() when dropping a
-> > device link. Not that, since rpm_put_suppliers() checks the
-> > link->rpm_active flag, we can correctly avoid to call pm_runtime_put() in
-> > cases when we shouldn't.
-> >
-> > Reported-by: Todor Tomov <todor.tomov@linaro.org>
-> > Fixes: 21d5c57b3726 ("PM / runtime: Use device links")
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > ---
-> >
-> > Rafael, I am not sure if this is safe from locking point of view. The device
-> > link write lock has been taken when pm_runtime_drop_link() is called, hence I
-> > assume calling rpm_put_suppliers() should be fine!? If not, can you please
-> > advise how to change?
-> 
-> Holding the lock should be sufficient for the list to be stable, so
-> AFAICS it is OK.
+On Thu, May 24, 2018 at 4:19 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> This patch adds the clock used by the CryptoCell 630p instance in the SoC.
+>
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
-So the patch has been applied, thanks!
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Thanks, queueing in clk-renesas-for-v4.19, with "bindings" dropped from the
+one-line summary.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
