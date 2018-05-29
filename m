@@ -1,42 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 29 May 2018 08:48:43 +0200
-Subject: [PATCH v2 10/11] arm64: dts: r8a77965-salvator-x: Enable DU
- external clocks and HDMI
-In-Reply-To: <8736yb5jez.wl%kuninori.morimoto.gx@renesas.com>
-References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
- <20180427165722.19445-11-kieran.bingham+renesas@ideasonboard.com>
- <CAMuHMdW6HeWMwRDcn6PLnwzgxvYz-h=jx=1qvYEK9okwqY0itg@mail.gmail.com>
- <8736yb5jez.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <CAMuHMdWPFOjT9qk0Z4+-nSTumjhN_Q6Ntwh3__CgBCobquX8Rg@mail.gmail.com>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Tue, 29 May 2018 16:01:02 +0900
+Subject: [PATCH v2] arm64: dts: renesas: r8a77965: Add Watchdog Timer
+ controller node using RCLK Watchdog Timer
+Message-ID: <1527577262-8754-1-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san,
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-On Tue, May 29, 2018 at 3:44 AM, Kuninori Morimoto
-<kuninori.morimoto.gx@renesas.com> wrote:
->> > +&hdmi0_con {
->> > +       remote-endpoint = <&rcar_dw_hdmi0_out>;
->> > +};
->>
->> I think the hdmi0 and hdmi0_con parts can be moved to salvator-common.dtsi.
->> Can we do that now (with stubs?), or does this have to wait until r8a77965 has
->> received HDMI sound support?
->
-> HDMI sound doesn't use hdmi0_con.
-> You can do it now, thanks
+Add a device node for the Watchdog Timer (WDT) controller on the Renesas
+R-Car M3-N (R8A77965) SoC.
 
-Thanks, so hdmi0_con can be moved now.
+Based on a similar patch of the R8A7796 device tree
+by Geert Uytterhoeven <geert+renesas@glider.be>.
 
-But HDMI sound does use hdmi0/ports/port at 2. right?
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
 
-Gr{oetje,eeting}s,
+This patch is based on the devel branch of Simon Horman's renesas tree.
 
-                        Geert
+v2 [Yoshihiro Kaneko]
+- add tags
+* As suggested by Geert Uytterhoeven
+- fix the summary prefix of the subject
+- fix the notation of the name of SoC
 
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index 486aeca..fb7100f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -139,8 +139,13 @@
+ 		ranges;
+ 
+ 		wdt0: watchdog at e6020000 {
++			compatible = "renesas,r8a77965-wdt",
++				     "renesas,rcar-gen3-wdt";
+ 			reg = <0 0xe6020000 0 0x0c>;
+-			/* placeholder */
++			clocks = <&cpg CPG_MOD 402>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 402>;
++			status = "disabled";
+ 		};
+ 
+ 		gpio0: gpio at e6050000 {
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+1.9.1
