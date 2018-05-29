@@ -1,40 +1,87 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 29 May 2018 11:57:57 +0200
-Subject: [PATCH v10 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <20180517090224.u3ygdzjr77im2mmp@flea>
-References: <20180517090224.u3ygdzjr77im2mmp@flea>
-Message-ID: <20180529095757.qkz7jyuxza7movbc@flea.home>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 29 May 2018 11:00:21 +0100
+Subject: [PATCH v2 07/40] iommu: Add a page fault handler
+In-Reply-To: <20180525173544.05638510@jacob-builder>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-8-jean-philippe.brucker@arm.com>
+ <20180518110434.150a0e64@jacob-builder>
+ <8a640794-a6f3-fa01-82a9-06479a6f779a@arm.com>
+ <20180522163521.413e60c6@jacob-builder>
+ <bdf9f221-ab97-2168-d072-b7f6a0dba840@arm.com>
+ <20180525173544.05638510@jacob-builder>
+Message-ID: <6bd83326-2da0-1250-3dfc-7d6fbf58d701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 11:02:24AM +0200, Maxime Ripard wrote:
-> On Fri, May 04, 2018 at 02:44:08PM +0800, Yong Deng wrote:
-> > This patchset add initial support for Allwinner V3s CSI.
-> > 
-> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > interface and CSI1 is used for parallel interface. This is not
-> > documented in datasheet but by test and guess.
-> > 
-> > This patchset implement a v4l2 framework driver and add a binding 
-> > documentation for it. 
-> > 
-> > Currently, the driver only support the parallel interface. And has been
-> > tested with a BT1120 signal which generating from FPGA. The following
-> > fetures are not support with this patchset:
-> >   - ISP 
-> >   - MIPI-CSI2
-> >   - Master clock for camera sensor
-> >   - Power regulator for the front end IC
-> 
-> I tested it on my H3 with a parallel camera, and it still works. Thanks!
-> 
-> Hans, Sakari, any chance this might land in 4.18?
+On 26/05/18 01:35, Jacob Pan wrote:
+>>>> Not exactly, it's the IOMMU driver that makes sure all LPIG in its
+>>>> queues are submitted by the above flush call. In more details the
+>>>> flow is:
+>>>>
+>>>> * Either device driver calls unbind()/sva_device_shutdown(), or the
+>>>> process exits.
+>>>> * If the device driver called, then it already told the device to
+>>>> stop using the PASID. Otherwise we use the mm_exit() callback to
+>>>> tell the device driver to stop using the PASID.
+> Sorry I still need more clarification. For the PASID termination
+> initiated by vfio unbind, I don't see device driver given a chance to
+> stop PASID. Seems just call __iommu_sva_unbind_device() which already
+> assume device stopped issuing DMA with the PASID.
+> So it is the vfio unbind caller responsible for doing driver callback
+> to stop DMA on a given PASID?
 
-Ping?
+Yes, but I don't know how to implement this. Since PCI doesn't formalize
+the PASID stop mechanism and the device doesn't have a kernel driver,
+VFIO would need help from the userspace driver for stopping PASID
+(notify the userspace driver when an other process exits).
 
-Maxime
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>>>> * In either case, when receiving a stop request from the driver,
+>>>> the device sends the LPIGs to the IOMMU queue.
+>>>> * Then, the flush call above ensures that the IOMMU reports the
+>>>> LPIG with iommu_report_device_fault.
+>>>> * While submitting all LPIGs for this PASID to the work queue,
+>>>> ipof_queue_fault also picked up all partial faults, so the partial
+>>>> list is clean.
+>>>>
+>>>> Maybe I should improve this comment?
+>>>>  
+>>> thanks for explaining. LPIG submission is done by device
+>>> asynchronously w.r.t. driver stopping/decommission PASID.  
+>>
+>> Hmm, it should really be synchronous, otherwise there is no way to
+>> know when the PASID can be decommissioned. We need a guarantee such
+>> as the one in 6.20.1 of the PCIe spec, "Managing PASID TLP Prefix
+>> Usage":
+>>
+>> "When the stop request mechanism indicates completion, the Function
+>> has:
+>> * Completed all Non-Posted Requests associated with this PASID.
+>> * Flushed to the host all Posted Requests addressing host memory in
+>> all TCs that were used by the PASID."
+>>
+>> That's in combination with "The function shall [...] finish
+>> transmitting any multi-page Page Request Messages for this PASID
+>> (i.e. send the Page Request Message with the L bit Set)." from the
+>> ATS spec.
+>>
+> I am not contesting on the device side, what I meant was from the
+> host IOMMU driver perspective, LPIG is received via IOMMU host queue,
+> therefore asynchronous. Not sure about ARM, but on VT-d LPIG submission
+> could meet queue full condition. So per VT-d spec, iommu will generate a
+> successful auto response to the device. At this point, assume we
+> already stopped the given PASID on the device, there might not be
+> another LPIG sent for the device. Therefore, you could have a partial
+> list. I think we can just drop the requests in the partial list for
+> that PASID until the PASID gets re-allocated.
+
+Indeed, I'll add this in next version. For a complete solution to the
+queue-full condition (which seems to behave the same way on ARM) I was
+thinking the IOMMU driver should also have a method for removing all
+partial faults when detecting a queue overflow. Since it doesn't know
+which PRGs did receive an auto-response, all it can do is remove all
+partial faults, for all devices using this queue. But freeing the stuck
+partial faults in flush() and remove_device() should be good enough
+
+Thanks,
+Jean
