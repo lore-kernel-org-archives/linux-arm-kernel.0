@@ -1,87 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 29 May 2018 18:31:33 +0100
-Subject: [PATCH v9 00/12] Support PPTT for ARM64
-In-Reply-To: <d2c843d2-a15c-e4c3-899d-ef5c26678016@arm.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
- <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
- <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
- <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
- <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
- <20180529150823.GD17159@arm.com>
- <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
- <d2c843d2-a15c-e4c3-899d-ef5c26678016@arm.com>
-Message-ID: <eb154c8f-cfc0-f3fe-bf9b-f27d342d6d79@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 May 2018 18:33:14 +0100
+Subject: [RFC 12/13] ARM: dts: ti: add dra71-evm FIT description file
+In-Reply-To: <16a6017f-96c8-42d8-38bc-5cdd36d6793f@gmail.com>
+References: <1523956215-28154-1-git-send-email-t-kristo@ti.com>
+ <1523956215-28154-13-git-send-email-t-kristo@ti.com>
+ <20180417092924.GB20335@flint.armlinux.org.uk>
+ <ad5ef67d-d566-0034-a7cd-09a549cbd6d7@ti.com>
+ <20180417144913.GD5669@atomide.com>
+ <43ff3894-a287-1558-687c-40f50712735c@ti.com>
+ <20180522200100.GA23937@rob-hp-laptop>
+ <16a6017f-96c8-42d8-38bc-5cdd36d6793f@gmail.com>
+Message-ID: <20180529173314.GN17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 29, 2018 at 10:05:37AM -0700, Frank Rowand wrote:
+> On 05/22/18 13:01, Rob Herring wrote:
+> > I'll tell you up front, I'm not a fan of FIT image (nor uImage, 
+> > Android boot image, $bootloader image). If you want a collection of 
+> > files and some configuration data, use a filesystem and a text file.
 
+Me neither.
 
-On 29/05/18 18:08, Robin Murphy wrote:
-> On 29/05/18 16:51, Geert Uytterhoeven wrote:
->> Hi Will,
->>
->> On Tue, May 29, 2018 at 5:08 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
->>>> On 29/05/18 12:56, Geert Uytterhoeven wrote:
->>>>> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla
->>>>> <sudeep.holla@arm.com> wrote:
->>>>>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
->>>>>>> System supend still works fine on systems with big cores only:
->>>>>>>
->>>>>>> ???? R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
->>>>>>> ???? R-Car M3-N (2xCA57)
->>>>>>>
->>>>>>> Reverting this commit fixes the issue for me.
->>>>>>
->>>>>> I can't find anything that relates to system suspend in these patches
->>>>>> unless they are messing with something during CPU hot plug-in back
->>>>>> during resume.
->>>>>
->>>>> It's only the last patch that introduces the breakage.
->>>>>
->>>>
->>>> As specified in the commit log, it won't change any behavior for DT
->>>> systems if it's non-NUMA or single node system. So I am still wondering
->>>> what could trigger this regression.
->>>
->>> I wonder if we're somehow giving an uninitialised/invalid NUMA
->>> configuration
->>> to the scheduler, although I can't see how this would happen.
->>>
->>> Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff
->>> below
->>> do you see anything shouting in dmesg?
->>
->> Thanks, but unfortunately it doesn't help.
->> I added some debug code to print cpumask, but so far I don't see anything
->> suspicious.
-> 
-> Do you have CONFIG_NUMA enabled? On a hunch I've managed to reproduce
-> what looks like the same thing on a Juno board with NUMA=n; going in
-> with external debug it seems to be stuck in the loop in
-> init_sched_groups_capacity(), with an approximate stack trace of:
-> 
-> 
-> init_sched_groups_capacity()
-> partition_sched_domains()
-> cpuset_cpu_active()
-> sched_cpu_activate()
-> cpuhp_invoke_callback()
-> cpuhp_thread_fn()
-> 
-> My hunch is based on the fact that it looks like we can, under the right
-> circumstances, end up with default_topology picking up cpu_online_mask
-> as a sibling mask via cpu_coregroup_mask(), and given the great
-> coincidence that that's going to change when hotplugging out CPUs on
-> suspend, things might not react too well to that. Things also look to go
-> utterly haywire once into a full-blown systemd userspace with cpuidle,
-> but I haven't got a clear picture of that yet.
-> 
+> My gut feel is that using a filesystem and a text file is the easier way
+> to create the boot info.  But that also makes applying the overlay(s)
+> during early Linux boot (at the point of FDT unflattening) impractical
+> (can't access the file system without a driver, the driver depends on
+> the devicetree, the devicetree depends upon the overlay).
 
-Yes, I too observed the same. I was able to suspend resume if I have
-cpuidle disabled.
+Why do you want to apply overlays during the kernel boot?  The boot
+loader should be providing the kernel with the merged DT to describe
+the system that the kernel is running on - it's not the kernel's
+job to put that together.
+
+The whole point of DT is to make the kernel _less_ tied to the hardware
+and more generic.  If we're going to introduce an entirely new set of
+drivers into the kernel to "probe" the hardware to determine which
+overlays are required, then that's really defeating the purpose of DT.
 
 -- 
-Regards,
-Sudeep
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
