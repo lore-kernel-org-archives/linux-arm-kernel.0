@@ -1,32 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 May 2018 13:48:03 +0200
-Subject: [PATCH 1/4] ARM: dts: Restructure Vexpress motherboard includes
-In-Reply-To: <326b8b98-4f1b-926a-8124-177381368a2c@arm.com>
-References: <20180528122658.3241-1-linus.walleij@linaro.org>
- <20180528122658.3241-2-linus.walleij@linaro.org>
- <326b8b98-4f1b-926a-8124-177381368a2c@arm.com>
-Message-ID: <CACRpkdZvM+2cZ3JKqzJx_1VPgc=CEkMFgwjo9h6v0E8rckuNDw@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 29 May 2018 13:48:26 +0200
+Subject: [PATCH v2 0/8] Make deferring probe forever optional
+In-Reply-To: <20180524175024.19874-1-robh@kernel.org>
+References: <20180524175024.19874-1-robh@kernel.org>
+Message-ID: <20180529114825.GH18595@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 11:25 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 28/05/18 13:26, Linus Walleij wrote:
+On Thu, May 24, 2018 at 12:50:16PM -0500, Rob Herring wrote:
+> Rob Herring (8):
+>   driver core: make deferring probe after init optional
+>   driver core: add a deferred probe timeout
+>   dt-bindings: pinctrl: add a 'pinctrl-use-default' property
+>   arm: dts: bcm283x: mark the UART pin muxing nodes with
+>     pinctrl-use-default
+>   pinctrl: optionally stop deferring probe at end of initcalls
+>   iommu: Stop deferring probe at end of initcalls
+>   iommu: Remove IOMMU_OF_DECLARE
+>   PM / Domains: Stop deferring probe at the end of initcall
+> 
+>  .../admin-guide/kernel-parameters.txt         |  7 +++
+>  .../bindings/pinctrl/pinctrl-bindings.txt     |  6 +++
+>  arch/arm/boot/dts/bcm283x.dtsi                |  2 +
+>  drivers/base/dd.c                             | 43 +++++++++++++++++++
+>  drivers/base/power/domain.c                   |  2 +-
+>  drivers/iommu/arm-smmu-v3.c                   |  2 -
+>  drivers/iommu/arm-smmu.c                      |  7 ---
+>  drivers/iommu/exynos-iommu.c                  |  2 -
+>  drivers/iommu/ipmmu-vmsa.c                    |  3 --
+>  drivers/iommu/msm_iommu.c                     |  2 -
+>  drivers/iommu/of_iommu.c                      | 21 +--------
+>  drivers/iommu/qcom_iommu.c                    |  2 -
+>  drivers/iommu/rockchip-iommu.c                |  2 -
+>  drivers/pinctrl/devicetree.c                  | 14 ++++--
+>  include/linux/device.h                        |  2 +
+>  include/linux/of_iommu.h                      |  4 --
+>  16 files changed, 73 insertions(+), 48 deletions(-)
 
->> This is a purely syntactic change that result in the same
->> DTB files from the DTS/DTSI files.
+For the IOMMU bits:
 
-> Is it different from v1/earlier version you had posted ?
-
-Don't think so. Just resent it as part of the rest.
-
-> I have already sent this to ARM SoC and it should be in -next by now.
-
-Awesome!
-
-> I will add the remaining 3 patches for v4.19 once you confirm
-> that I can drop this patch as it's already queued.
-
-Drop it :)
-
-Yours,
-Linus Walleij
+Acked-by: Joerg Roedel <jroedel@suse.de>
