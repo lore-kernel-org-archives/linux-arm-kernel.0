@@ -1,102 +1,235 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 10:09:11 +0100
-Subject: [PATCH v4 03/15] ARM: bugs: hook processor bug checking into SMP and
- suspend paths
+Date: Tue, 29 May 2018 10:09:37 +0100
+Subject: [PATCH v4 08/15] ARM: spectre-v2: harden user aborts in kernel space
 In-Reply-To: <20180529090756.GG17671@n2100.armlinux.org.uk>
 References: <20180529090756.GG17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNacx-0000fc-UT@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fNadN-0000gD-I9@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for CPU bugs when secondary processors are being brought online,
-and also when CPUs are resuming from a low power mode.  This gives an
-opportunity to check that processor specific bug workarounds are
-correctly enabled for all paths that a CPU re-enters the kernel.
+In order to prevent aliasing attacks on the branch predictor,
+invalidate the BTB or instruction cache on CPUs that are known to be
+affected when taking an abort on a address that is outside of a user
+task limit:
+
+Cortex A8, A9, A12, A17, A73, A75: flush BTB.
+Cortex A15, Brahma B15: invalidate icache.
+
+If the IBE bit is not set, then there is little point to enabling the
+workaround.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Boot-tested-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/bugs.h | 2 ++
- arch/arm/kernel/bugs.c      | 5 +++++
- arch/arm/kernel/smp.c       | 4 ++++
- arch/arm/kernel/suspend.c   | 2 ++
- 4 files changed, 13 insertions(+)
+ arch/arm/include/asm/cp15.h        |  3 ++
+ arch/arm/include/asm/system_misc.h | 15 ++++++++
+ arch/arm/mm/fault.c                |  3 ++
+ arch/arm/mm/proc-v7-bugs.c         | 78 ++++++++++++++++++++++++++++++++++----
+ arch/arm/mm/proc-v7.S              |  8 ++--
+ 5 files changed, 97 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
-index ed122d294f3f..73a99c72a930 100644
---- a/arch/arm/include/asm/bugs.h
-+++ b/arch/arm/include/asm/bugs.h
-@@ -14,8 +14,10 @@ extern void check_writebuffer_bugs(void);
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 4c9fa72b59f5..07e27f212dc7 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -65,6 +65,9 @@
+ #define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
+ #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
  
- #ifdef CONFIG_MMU
- extern void check_bugs(void);
-+extern void check_other_bugs(void);
- #else
- #define check_bugs() do { } while (0)
-+#define check_other_bugs() do { } while (0)
- #endif
++#define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
++#define ICIALLU				__ACCESS_CP15(c7, 0, c5, 0)
++
+ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
  
- #endif
-diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-index 88024028bb70..16e7ba2a9cc4 100644
---- a/arch/arm/kernel/bugs.c
-+++ b/arch/arm/kernel/bugs.c
-@@ -3,7 +3,12 @@
- #include <asm/bugs.h>
- #include <asm/proc-fns.h>
+ static inline unsigned long get_cr(void)
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index 78f6db114faf..8e76db83c498 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -8,6 +8,7 @@
+ #include <linux/linkage.h>
+ #include <linux/irqflags.h>
+ #include <linux/reboot.h>
++#include <linux/percpu.h>
  
-+void check_other_bugs(void)
+ extern void cpu_init(void);
+ 
+@@ -15,6 +16,20 @@ void soft_restart(unsigned long);
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ extern void (*arm_pm_idle)(void);
+ 
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++typedef void (*harden_branch_predictor_fn_t)(void);
++DECLARE_PER_CPU(harden_branch_predictor_fn_t, harden_branch_predictor_fn);
++static inline void harden_branch_predictor(void)
 +{
++	harden_branch_predictor_fn_t fn = per_cpu(harden_branch_predictor_fn,
++						  smp_processor_id());
++	if (fn)
++		fn();
++}
++#else
++#define harden_branch_predictor() do { } while (0)
++#endif
++
+ #define UDBG_UNDEFINED	(1 << 0)
+ #define UDBG_SYSCALL	(1 << 1)
+ #define UDBG_BADABORT	(1 << 2)
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index b75eada23d0a..3b1ba003c4f9 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -163,6 +163,9 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ {
+ 	struct siginfo si;
+ 
++	if (addr > TASK_SIZE)
++		harden_branch_predictor();
++
+ #ifdef CONFIG_DEBUG_USER
+ 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
+ 	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+index cd368f1e6748..0b48270b7318 100644
+--- a/arch/arm/mm/proc-v7-bugs.c
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -2,31 +2,95 @@
+ #include <linux/kernel.h>
+ #include <linux/smp.h>
+ 
+-static __maybe_unused void cpu_v7_check_auxcr_set(u32 mask, const char *msg)
++#include <asm/cp15.h>
++#include <asm/cputype.h>
++#include <asm/system_misc.h>
++
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++DEFINE_PER_CPU(harden_branch_predictor_fn_t, harden_branch_predictor_fn);
++
++static void harden_branch_predictor_bpiall(void)
++{
++	write_sysreg(0, BPIALL);
 +}
 +
- void __init check_bugs(void)
++static void harden_branch_predictor_iciallu(void)
++{
++	write_sysreg(0, ICIALLU);
++}
++
++static void cpu_v7_spectre_init(void)
++{
++	const char *spectre_v2_method = NULL;
++	int cpu = smp_processor_id();
++
++	if (per_cpu(harden_branch_predictor_fn, cpu))
++		return;
++
++	switch (read_cpuid_part()) {
++	case ARM_CPU_PART_CORTEX_A8:
++	case ARM_CPU_PART_CORTEX_A9:
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A17:
++	case ARM_CPU_PART_CORTEX_A73:
++	case ARM_CPU_PART_CORTEX_A75:
++		per_cpu(harden_branch_predictor_fn, cpu) =
++			harden_branch_predictor_bpiall;
++		spectre_v2_method = "BPIALL";
++		break;
++
++	case ARM_CPU_PART_CORTEX_A15:
++	case ARM_CPU_PART_BRAHMA_B15:
++		per_cpu(harden_branch_predictor_fn, cpu) =
++			harden_branch_predictor_iciallu;
++		spectre_v2_method = "ICIALLU";
++		break;
++	}
++	if (spectre_v2_method)
++		pr_info("CPU%u: Spectre v2: using %s workaround\n",
++			smp_processor_id(), spectre_v2_method);
++}
++#else
++static void cpu_v7_spectre_init(void)
++{
++}
++#endif
++
++static __maybe_unused bool cpu_v7_check_auxcr_set(u32 mask, const char *msg)
  {
- 	check_writebuffer_bugs();
-+	check_other_bugs();
+ 	u32 aux_cr;
+ 
+ 	asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (aux_cr));
+ 
+-	if ((aux_cr & mask) != mask)
++	if ((aux_cr & mask) != mask) {
+ 		pr_err("CPU%u: %s", smp_processor_id(), msg);
++		return false;
++	}
++	return true;
  }
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2da087926ebe..5ad0b67b9e33 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -31,6 +31,7 @@
- #include <linux/irq_work.h>
  
- #include <linux/atomic.h>
-+#include <asm/bugs.h>
- #include <asm/smp.h>
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
-@@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
- 	 * before we continue - which happens after __cpu_up returns.
- 	 */
- 	set_cpu_online(cpu, true);
+ static DEFINE_PER_CPU(bool, spectre_checked);
+ 
+-static void check_spectre_auxcr(u32 bit)
++static bool check_spectre_auxcr(u32 bit)
+ {
+-	if (IS_ENABLED(CONFIG_HARDEN_BRANCH_PREDICTOR) &&
+-	    !__this_cpu_xchg(spectre_checked, true))
++	return IS_ENABLED(CONFIG_HARDEN_BRANCH_PREDICTOR) &&
++		!__this_cpu_xchg(spectre_checked, true) &&
+ 		cpu_v7_check_auxcr_set(bit, "Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable\n");
+ }
+ 
+ void cpu_v7_ca8_ibe(void)
+ {
+-	check_spectre_auxcr(BIT(6));
++	if (check_spectre_auxcr(BIT(6)))
++		cpu_v7_spectre_init();
+ }
+ 
+ void cpu_v7_ca15_ibe(void)
+ {
+-	check_spectre_auxcr(BIT(0));
++	if (check_spectre_auxcr(BIT(0)))
++		cpu_v7_spectre_init();
++}
 +
-+	check_other_bugs();
++void cpu_v7_bugs_init(void)
++{
++	cpu_v7_spectre_init();
+ }
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index fa9214036fb3..79510011e7eb 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -532,8 +532,10 @@ ENDPROC(__v7_setup)
+ 
+ 	__INITDATA
+ 
++	.weak cpu_v7_bugs_init
 +
- 	complete(&cpu_running);
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+-	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_bugs_init
  
- 	local_irq_enable();
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index a40ebb7c0896..d08099269e35 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -3,6 +3,7 @@
- #include <linux/slab.h>
- #include <linux/mm_types.h>
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ 	@ generic v7 bpiall on context switch
+@@ -548,7 +550,7 @@ ENDPROC(__v7_setup)
+ 	globl_equ	cpu_v7_bpiall_do_suspend,	cpu_v7_do_suspend
+ 	globl_equ	cpu_v7_bpiall_do_resume,	cpu_v7_do_resume
+ #endif
+-	define_processor_functions v7_bpiall, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions v7_bpiall, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_bugs_init
  
-+#include <asm/bugs.h>
- #include <asm/cacheflush.h>
- #include <asm/idmap.h>
- #include <asm/pgalloc.h>
-@@ -36,6 +37,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 		cpu_switch_mm(mm->pgd, mm);
- 		local_flush_bp_all();
- 		local_flush_tlb_all();
-+		check_other_bugs();
- 	}
+ #define HARDENED_BPIALL_PROCESSOR_FUNCTIONS v7_bpiall_processor_functions
+ #else
+@@ -584,7 +586,7 @@ ENDPROC(__v7_setup)
+ 	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
+ #endif
+ 	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
+-	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_bugs_init
+ #endif
  
- 	return ret;
+ 	@ Cortex-A15 - needs iciallu switch_mm for hardening
 -- 
 2.7.4
