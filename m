@@ -1,82 +1,87 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 29 May 2018 22:52:38 +0530
-Subject: [PATCH] arm64: allwinner: a64-amarula-relic: Enable AP6330 WiFi
- support
-Message-ID: <20180529172238.9718-1-jagan@amarulasolutions.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 29 May 2018 18:31:33 +0100
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <d2c843d2-a15c-e4c3-899d-ef5c26678016@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+ <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
+ <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+ <20180529150823.GD17159@arm.com>
+ <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
+ <d2c843d2-a15c-e4c3-899d-ef5c26678016@arm.com>
+Message-ID: <eb154c8f-cfc0-f3fe-bf9b-f27d342d6d79@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
-- WiFi SDIO interface is connected to MMC1
-- WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
-- WiFi WL-WAKE-AP pin connected to gpio PL3
-- 32kHz external oscillator gate clock from RTC
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-index ce4a256ff086..a77b70ca88e3 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-@@ -21,12 +21,43 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&rtc 1>;
-+		clock-names = "ext_clock";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* WL-PMU-EN: PL2 */
-+	};
- };
- 
- &ehci0 {
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	/*
-+	 * Schematic shows both dldo4 and eldo1 connected for vcc-io-wifi, but
-+	 * dldo4 connection shows DNP(Do Not Populate) and eldo1 connected with
-+	 * 0Ohm register to vcc-io-wifi so eldo1 is used.
-+	 */
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;	/* WL-WAKE-AP: PL3 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins>;
-@@ -170,6 +201,12 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&rtc {
-+	clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
-+	clocks = <&osc32k>;
-+	#clock-cells = <1>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+On 29/05/18 18:08, Robin Murphy wrote:
+> On 29/05/18 16:51, Geert Uytterhoeven wrote:
+>> Hi Will,
+>>
+>> On Tue, May 29, 2018 at 5:08 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
+>>>> On 29/05/18 12:56, Geert Uytterhoeven wrote:
+>>>>> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla
+>>>>> <sudeep.holla@arm.com> wrote:
+>>>>>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+>>>>>>> System supend still works fine on systems with big cores only:
+>>>>>>>
+>>>>>>> ???? R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
+>>>>>>> ???? R-Car M3-N (2xCA57)
+>>>>>>>
+>>>>>>> Reverting this commit fixes the issue for me.
+>>>>>>
+>>>>>> I can't find anything that relates to system suspend in these patches
+>>>>>> unless they are messing with something during CPU hot plug-in back
+>>>>>> during resume.
+>>>>>
+>>>>> It's only the last patch that introduces the breakage.
+>>>>>
+>>>>
+>>>> As specified in the commit log, it won't change any behavior for DT
+>>>> systems if it's non-NUMA or single node system. So I am still wondering
+>>>> what could trigger this regression.
+>>>
+>>> I wonder if we're somehow giving an uninitialised/invalid NUMA
+>>> configuration
+>>> to the scheduler, although I can't see how this would happen.
+>>>
+>>> Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff
+>>> below
+>>> do you see anything shouting in dmesg?
+>>
+>> Thanks, but unfortunately it doesn't help.
+>> I added some debug code to print cpumask, but so far I don't see anything
+>> suspicious.
+> 
+> Do you have CONFIG_NUMA enabled? On a hunch I've managed to reproduce
+> what looks like the same thing on a Juno board with NUMA=n; going in
+> with external debug it seems to be stuck in the loop in
+> init_sched_groups_capacity(), with an approximate stack trace of:
+> 
+> 
+> init_sched_groups_capacity()
+> partition_sched_domains()
+> cpuset_cpu_active()
+> sched_cpu_activate()
+> cpuhp_invoke_callback()
+> cpuhp_thread_fn()
+> 
+> My hunch is based on the fact that it looks like we can, under the right
+> circumstances, end up with default_topology picking up cpu_online_mask
+> as a sibling mask via cpu_coregroup_mask(), and given the great
+> coincidence that that's going to change when hotplugging out CPUs on
+> suspend, things might not react too well to that. Things also look to go
+> utterly haywire once into a full-blown systemd userspace with cpuidle,
+> but I haven't got a clear picture of that yet.
+> 
+
+Yes, I too observed the same. I was able to suspend resume if I have
+cpuidle disabled.
+
 -- 
-2.14.3
+Regards,
+Sudeep
