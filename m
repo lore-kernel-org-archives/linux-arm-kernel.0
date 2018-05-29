@@ -1,89 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 13:11:17 +0100
-Subject: [PATCH v2 13/17] arm64: KVM: Handle guest's ARCH_WORKAROUND_2 requests
+Date: Tue, 29 May 2018 13:11:14 +0100
+Subject: [PATCH v2 10/17] arm64: ssbd: Add prctl interface for per-thread
+ mitigation
 In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
 References: <20180529121121.24927-1-marc.zyngier@arm.com>
-Message-ID: <20180529121121.24927-14-marc.zyngier@arm.com>
+Message-ID: <20180529121121.24927-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to forward the guest's ARCH_WORKAROUND_2 calls to EL3,
-add a small(-ish) sequence to handle it at EL2. Special care must
-be taken to track the state of the guest itself by updating the
-workaround flags. We also rely on patching to enable calls into
-the firmware.
+If running on a system that performs dynamic SSBD mitigation, allow
+userspace to request the mitigation for itself. This is implemented
+as a prctl call, allowing the mitigation to be enabled or disabled at
+will for this particular thread.
 
-Note that since we need to execute branches, this always executes
-after the Spectre-v2 mitigation has been applied.
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kvm/hyp/hyp-entry.S  | 38 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 38 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/Makefile |   1 +
+ arch/arm64/kernel/ssbd.c   | 107 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
+ create mode 100644 arch/arm64/kernel/ssbd.c
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 5bdda651bd05..323aeb5f2fe6 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -136,6 +136,7 @@ int main(void)
- #ifdef CONFIG_KVM_ARM_HOST
-   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
-   DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
-+  DEFINE(VCPU_WORKAROUND_FLAGS,	offsetof(struct kvm_vcpu, arch.workaround_flags));
-   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
-   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index bffece27b5c1..05d836979032 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -106,8 +106,44 @@ el1_hvc_guest:
- 	 */
- 	ldr	x1, [sp]				// Guest's x0
- 	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	cbz	w1, wa_epilogue
-+
-+	/* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
-+	eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
-+			  ARM_SMCCC_ARCH_WORKAROUND_2)
- 	cbnz	w1, el1_trap
--	mov	x0, x1
-+
-+#ifdef CONFIG_ARM64_SSBD
-+alternative_cb	arm64_enable_wa2_handling
-+	b	wa2_end
-+alternative_cb_end
-+	get_vcpu_ptr	x2, x0
-+	ldr	x0, [x2, #VCPU_WORKAROUND_FLAGS]
-+
-+	// Sanitize the argument and update the guest flags
-+	ldr	x1, [sp, #8]			// Guest's x1
-+	clz	w1, w1				// Murphy's device:
-+	lsr	w1, w1, #5			// w1 = !!w1 without using
-+	eor	w1, w1, #1			// the flags...
-+	bfi	x0, x1, #VCPU_WORKAROUND_2_FLAG_SHIFT, #1
-+	str	x0, [x2, #VCPU_WORKAROUND_FLAGS]
-+
-+	/* Check that we actually need to perform the call */
-+	hyp_ldr_this_cpu x0, arm64_ssbd_callback_required, x2
-+	cbz	x0, wa2_end
-+
-+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
-+	smc	#0
-+
-+	/* Don't leak data from the SMC call */
-+	mov	x3, xzr
-+wa2_end:
-+	mov	x2, xzr
-+	mov	x1, xzr
-+#endif
-+
-+wa_epilogue:
-+	mov	x0, xzr
- 	add	sp, sp, #16
- 	eret
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index bf825f38d206..0025f8691046 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -54,6 +54,7 @@ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
++arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
  
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
+new file mode 100644
+index 000000000000..07b12c034ec2
+--- /dev/null
++++ b/arch/arm64/kernel/ssbd.c
+@@ -0,0 +1,107 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 ARM Ltd, All Rights Reserved.
++ */
++
++#include <linux/errno.h>
++#include <linux/sched.h>
++#include <linux/thread_info.h>
++
++#include <asm/cpufeature.h>
++
++/*
++ * prctl interface for SSBD
++ */
++static int ssbd_prctl_set(struct task_struct *task, unsigned long ctrl)
++{
++	int state = arm64_get_ssbd_state();
++
++	/* Unsupported */
++	if (state == ARM64_SSBD_UNKNOWN)
++		return -EINVAL;
++
++	/* Treat the unaffected/mitigated state separately */
++	if (state == ARM64_SSBD_MITIGATED) {
++		switch (ctrl) {
++		case PR_SPEC_ENABLE:
++			return -EPERM;
++		case PR_SPEC_DISABLE:
++		case PR_SPEC_FORCE_DISABLE:
++			return 0;
++		}
++	}
++
++	/*
++	 * Things are a bit backward here: the arm64 internal API
++	 * *enables the mitigation* when the userspace API *disables
++	 * speculation*. So much fun.
++	 */
++	switch (ctrl) {
++	case PR_SPEC_ENABLE:
++		/* If speculation is force disabled, enable is not allowed */
++		if (state == ARM64_SSBD_FORCE_ENABLE ||
++		    task_spec_ssb_force_disable(task))
++			return -EPERM;
++		task_clear_spec_ssb_disable(task);
++		clear_tsk_thread_flag(task, TIF_SSBD);
++		break;
++	case PR_SPEC_DISABLE:
++		if (state == ARM64_SSBD_FORCE_DISABLE)
++			return -EPERM;
++		task_set_spec_ssb_disable(task);
++		set_tsk_thread_flag(task, TIF_SSBD);
++		break;
++	case PR_SPEC_FORCE_DISABLE:
++		if (state == ARM64_SSBD_FORCE_DISABLE)
++			return -EPERM;
++		task_set_spec_ssb_disable(task);
++		task_set_spec_ssb_force_disable(task);
++		set_tsk_thread_flag(task, TIF_SSBD);
++		break;
++	default:
++		return -ERANGE;
++	}
++
++	return 0;
++}
++
++int arch_prctl_spec_ctrl_set(struct task_struct *task, unsigned long which,
++			     unsigned long ctrl)
++{
++	switch (which) {
++	case PR_SPEC_STORE_BYPASS:
++		return ssbd_prctl_set(task, ctrl);
++	default:
++		return -ENODEV;
++	}
++}
++
++static int ssbd_prctl_get(struct task_struct *task)
++{
++	switch (arm64_get_ssbd_state()) {
++	case ARM64_SSBD_UNKNOWN:
++		return -EINVAL;
++	case ARM64_SSBD_FORCE_ENABLE:
++		return PR_SPEC_DISABLE;
++	case ARM64_SSBD_KERNEL:
++		if (task_spec_ssb_force_disable(task))
++			return PR_SPEC_PRCTL | PR_SPEC_FORCE_DISABLE;
++		if (task_spec_ssb_disable(task))
++			return PR_SPEC_PRCTL | PR_SPEC_DISABLE;
++		return PR_SPEC_PRCTL | PR_SPEC_ENABLE;
++	case ARM64_SSBD_FORCE_DISABLE:
++		return PR_SPEC_ENABLE;
++	default:
++		return PR_SPEC_NOT_AFFECTED;
++	}
++}
++
++int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
++{
++	switch (which) {
++	case PR_SPEC_STORE_BYPASS:
++		return ssbd_prctl_get(task);
++	default:
++		return -ENODEV;
++	}
++}
 -- 
 2.14.2
