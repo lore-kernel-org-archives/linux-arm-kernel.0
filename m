@@ -1,65 +1,83 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 29 May 2018 19:04:48 +0300
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add I2C support
-In-Reply-To: <20180529130504.lpkpgads7lfomois@verge.net.au>
-References: <e9c94553-be9d-0eec-a1ee-1713bb97fbab@cogentembedded.com>
- <3675b19f-b800-172f-9472-c47a37760fa9@cogentembedded.com>
- <20180529130504.lpkpgads7lfomois@verge.net.au>
-Message-ID: <a33a0dd7-c301-fd44-9374-45d57df6a53d@cogentembedded.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 29 May 2018 17:46:21 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <1affd186-7f78-8bb0-050e-da82143c2982@microchip.com>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+ <20180402142249.7e076a64@bbrezillon>
+ <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
+ <20180402212843.164d5d21@bbrezillon>
+ <20180402222020.1d344c14@bbrezillon>
+ <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
+ <20180403091813.5fb5c18c@bbrezillon>
+ <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
+ <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+ <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
+ <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
+ <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
+ <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
+ <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
+ <20180529164911.29820e07@bbrezillon>
+ <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
+ <20180529171555.19dd723f@bbrezillon>
+ <1affd186-7f78-8bb0-050e-da82143c2982@microchip.com>
+Message-ID: <20180529174621.50a9001a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2018 04:05 PM, Simon Horman wrote:
+On Tue, 29 May 2018 18:21:40 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
->> Define the generic R8A77980 parts of the I2C[0-5] device node.
->>
->> Based on the original (and large) patch by Vladimir Barinov.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |  111 ++++++++++++++++++++++++++++++
->>  1 file changed, 111 insertions(+)
->>
->> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->> ===================================================================
->> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-[...]
->> @@ -135,6 +144,108 @@
-[...]
->> +		i2c3: i2c at e66d0000 {
->> +			compatible = "renesas,i2c-r8a77980",
->> +				     "renesas,rcar-gen3-i2c";
->> +			reg = <0 0xe66d0000 0 0x40>;
->> +			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 928>;
->> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
->> +			resets = <&cpg 928>;
->> +			dmas = <&dmac1 0x97>, <&dmac1 0x96>,
->> +			       <&dmac2 0x97>, <&dmac2 0x96>;
->> +			dma-names = "tx", "rx", "tx", "rx";
->> +			i2c-scl-internal-delay-ns = <6>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			status = "disabled";
->> +		};
+> On 29.05.2018 18:15, Boris Brezillon wrote:
+> > On Tue, 29 May 2018 18:01:40 +0300
+> > Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> >   
+> >> [...]
+> >>
+> >>  
+> >>>
+> >>> I think you're missing something here. We use the DMA engine in memcpy
+> >>> mode (SRAM -> DRAM), not in device mode (dev -> DRAM or DRAM -> dev).
+> >>> So there's no dmas prop defined in the DT and there should not be.
+> >>>
+> >>> Regards,
+> >>>
+> >>> Boris
+> >>>      
+> >>
+> >> Ok, so the memcpy SRAM <-> DRAM will hog the transfer between DRAM and
+> >> LCD if my understanding is correct. That's the DMA that Peter wants to
+> >> disable with his patch ?
+> >>
+> >> Then we can then try to force NFC SRAM DMA channels to use just DDR port
+> >> 1 or 2 for memcpy ?  
+> > 
+> > You mean the dmaengine? According to "14.1.3 Master to Slave Access"
+> > that's already the case.
+> > 
+> > Only DMAC0 can access the NFC SRAM and it's done through DMAC0:IF0,
+> > then access to DDR is going through port DDR port 1 (DMAC0:IF1) or 2
+> > (DMAC0:IF0).  
 > 
-> DMA for i2c3 and i2c4  seems unclear in v0.80 and v1.00 of the User's Manual.
-> Although what is described here does match v0.55E of the User's Manual.
+> If we can make NFC use port 1 only, then HLCDC could have two ports as 
+> master 8 & 9, maybe a better bandwidth.
 
-   Hm, looking at all these manuals, I'm not even seeing V3H I2C3/4 having DMA
-in v0.55E!
+Peter, can you try with the following patch?
 
-> Have you been able to confirm what is correct here?
-
-   No. Probably need to drop I2C3/4 DMA altogether...
-
-> Other than that this patch looks fine to me.
-
-   TY!
-
-[...]
-
-MBR, Sergei
+--->8---
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index ef3f227ce3e6..2a48e870f292 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -124,8 +124,8 @@
+ #define        ATC_SIF(i)              (0x3 & (i))     /* Src tx done via AHB-Lite Interface i */
+ #define        ATC_DIF(i)              ((0x3 & (i)) <<  4)     /* Dst tx done via AHB-Lite Interface i */
+                                  /* Specify AHB interfaces */
+-#define AT_DMA_MEM_IF          0 /* interface 0 as memory interface */
+-#define AT_DMA_PER_IF          1 /* interface 1 as peripheral interface */
++#define AT_DMA_MEM_IF          1 /* interface 0 as memory interface */
++#define AT_DMA_PER_IF          0 /* interface 1 as peripheral interface */
+ 
+ #define        ATC_SRC_PIP             (0x1 <<  8)     /* Source Picture-in-Picture enabled */
+ #define        ATC_DST_PIP             (0x1 << 12)     /* Destination Picture-in-Picture enabled */
