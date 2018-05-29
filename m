@@ -1,42 +1,109 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 May 2018 20:31:43 +0200
-Subject: [PATCH v2 2/2] i2c: busses: make use of i2c_8bit_addr_from_msg
-In-Reply-To: <20180516071647.29277-3-peda@axentia.se>
-References: <20180516071647.29277-1-peda@axentia.se>
- <20180516071647.29277-3-peda@axentia.se>
-Message-ID: <20180529183143.ker46to34gr5hx3w@ninjato>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 29 May 2018 11:54:30 -0700
+Subject: [patch v25 4/4] Documentation: jtag: Add ABI documentation
+In-Reply-To: <1527605618-15705-5-git-send-email-oleksandrs@mellanox.com>
+References: <1527605618-15705-1-git-send-email-oleksandrs@mellanox.com>
+ <1527605618-15705-5-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <b1afae1e-b93b-3b86-1a45-ab0e408087e1@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 09:16:47AM +0200, Peter Rosin wrote:
-> Because it looks neater.
-> 
-> For diolan, this allows factoring out some code that is now common
-> between if and else.
-> 
-> For eg20t, pch_i2c_writebytes is always called with a write in
-> msgs->flags, and pch_i2c_readbytes with a read.
-> 
-> For imx, i2c_imx_dma_write and i2c_imx_write are always called with a
-> write in msgs->flags, and i2c_imx_read with a read.
-> 
-> For qup, qup_i2c_write_tx_fifo_v1 is always called with a write in
-> qup->msg->flags.
-> 
-> For stu300, also restructure debug output for resends, since that
-> code as a result is only handling debug output.
-> 
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net> [diolan]
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [emf32 and imx]
-> Acked-by: Linus Walleij <linus.walleij@linaro.org> [stu300]
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+On 05/29/2018 07:53 AM, Oleksandr Shamray wrote:
+> Added document that describe the ABI for JTAG class drivrer
 
-Applied to for-next, thanks!
+Sorry, there are still a few typos.  Please see below.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/61fb0766/attachment-0001.sig>
+> ---
+>  Documentation/ABI/testing/gpio-cdev |    1 -
+>  Documentation/ABI/testing/jtag-dev  |   23 +++++++
+>  Documentation/jtag/overview         |   27 +++++++++
+>  Documentation/jtag/transactions     |  109 +++++++++++++++++++++++++++++++++++
+>  MAINTAINERS                         |    1 +
+>  5 files changed, 160 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/jtag-dev
+>  create mode 100644 Documentation/jtag/overview
+>  create mode 100644 Documentation/jtag/transactions
+> 
+
+> diff --git a/Documentation/jtag/overview b/Documentation/jtag/overview
+> new file mode 100644
+> index 0000000..f179095
+> --- /dev/null
+> +++ b/Documentation/jtag/overview
+> @@ -0,0 +1,27 @@
+> +Linux kernel JTAG support
+> +=========================
+> +
+> +JTAG is an industry standard for verifying hardware.JTAG provides access to
+
+needs space:
+                                              hardware. JTAG provides
+
+> +many logic signals of a complex integrated circuit, including the device pins.
+> +
+> +A JTAG interface is a special interface added to a chip.
+> +Depending on the version of JTAG, two, four, or five pins are added.
+> +
+> +The connector pins are:
+> +	TDI (Test Data In)
+> +	TDO (Test Data Out)
+> +	TCK (Test Clock)
+> +	TMS (Test Mode Select)
+> +	TRST (Test Reset) optional
+> +
+> +JTAG interface is designed to have two parts - basic core driver and
+> +hardware specific driver. The basic driver introduces a general interface
+> +which is not dependent of specific hardware. It provides communication
+> +between user space and hardware specific driver.
+> +Each JTAG device is represented as a char device from (jtag0, jtag1, ...).
+> +Access to a JTAG device is performed through IOCTL calls.
+> +
+> +Call flow example:
+> +User: open  -> /dev/jatgX
+> +User: ioctl -> /dev/jtagX -> JTAG core driver -> JTAG hardware specific driver
+> +User: close -> /dev/jatgX
+
+> diff --git a/Documentation/jtag/transactions b/Documentation/jtag/transactions
+> new file mode 100644
+> index 0000000..c5176a7
+> --- /dev/null
+> +++ b/Documentation/jtag/transactions
+> @@ -0,0 +1,109 @@
+> +The JTAG API
+> +=============
+> +
+> +JTAG master devices can be accessed through a character misc-device.
+> +Each JTAG master interface can be accessed by using /dev/jtagN.
+> +
+> +JTAG system calls set:
+> +- SIR (Scan Instruction Register, IEEE 1149.1 Instruction Register scan);
+> +- SDR (Scan Data Register, IEEE 1149.1 Data Register scan);
+> +- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
+> +number of clocks.
+> +
+> +open(), close()
+> +-------
+> +open() opens JTAG device.
+> +
+> +Open/Close  device:
+> +- jtag_fd = open("/dev/jtag0", O_RDWR);
+> +- close(jtag_fd);
+> +
+> +ioctl()
+> +-------
+> +All access operations to JTAG devices are erformed through ioctl interface.
+
+                                             performed
+
+> +The IOCTL interface supports these requests:
+> +	JTAG_IOCRUNTEST - Force JTAG state machine to RUN_TEST/IDLE state
+> +	JTAG_SIOCFREQ - Set JTAG TCK frequency
+> +	JTAG_GIOCFREQ - Get JTAG TCK frequency
+> +	JTAG_IOCXFER - send JTAG data Xfer
+> +	JTAG_GIOCSTATUS - get current JTAG TAP status
+> +	JTAG_SIOCMODE - set JTAG mode flags.
+
+
+
+-- 
+~Randy
