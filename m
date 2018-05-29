@@ -1,67 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 29 May 2018 17:01:13 +0200
-Subject: Boot failures in -next on Jetson TK1
-In-Reply-To: <20180526103629.GB1564@sirena.org.uk>
-References: <20180526103629.GB1564@sirena.org.uk>
-Message-ID: <20180529150113.GA16038@ulmo>
+From: jacopo+renesas@jmondi.org (Jacopo Mondi)
+Date: Tue, 29 May 2018 17:05:53 +0200
+Subject: [PATCH v3 2/8] dt-bindings: media: Document data-enable-active
+ property
+In-Reply-To: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
+References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1527606359-19261-3-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 26, 2018 at 11:36:29AM +0100, Mark Brown wrote:
-> Currently -next is failing to boot on Jetson TK1.  The problem looks to
-> be the Nouveau driver, during initialization it reports an address
-> decode error then starts printing error messages saying "nouveau
-> 57000000.gpu: fifo: SCHED_ERROR 20 []" over and over again.
-> 
-> I've pasted the start of the errors below, you can see a full log and
-> more details at:
-> 
->    https://kernelci.org/boot/id/5b0882a259b514339779a881/
-> 
-> The warnings about Spectre are a separate issue and don't seem to affect
-> the boot.
-> 
-> [ 15.194484] nouveau 57000000.gpu: NVIDIA GK20A (0ea000a1)
-> [   15.200109] udevd[109]: could not rename interface '3' from 'eth0' to 'enp1s0': Device or resource busy
-> [   15.206399] nouveau 57000000.gpu: imem: using IOMMU
-> [   15.315122] CPU2: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-> [   15.320021] nouveau 57000000.gpu: Direct firmware load for nvidia/gk20a/fecs_inst.bin failed with error -2
-> [   15.384841] nouveau 57000000.gpu: Direct firmware load for nouveau/nvea_fuc409c failed with error -2
-> [   15.393972] nouveau 57000000.gpu: Direct firmware load for nouveau/fuc409c failed with error -2
-> [   15.402679] nouveau 57000000.gpu: gr: failed to load fuc409c
-> [   15.409434] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-> [   15.419398] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-> [   15.482568] tegra-mc 70019000.memory-controller: gpusrd: read @0x00041200: EMEM address decode error (EMEM decode error)
-> [   15.491232] [TTM] Zone  kernel: Available graphics memory: 375202 kiB
-> [   15.502768] [TTM] Zone highmem: Available graphics memory: 1030050 kiB
-> [   15.509290] [TTM] Initializing pool allocator
-> [   15.513658] nouveau 57000000.gpu: DRM: VRAM: 0 MiB
-> [   15.518451] nouveau 57000000.gpu: DRM: GART: 1048576 MiB
-> [   15.526546] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-> [   15.527290] tegra-mc 70019000.memory-controller: gpusrd: read @0x00072000: EMEM address decode error (EMEM decode error)
-> [   15.537050] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-> [   15.546928] nouveau 57000000.gpu: fifo: SCHED_ERROR 20 []
+Add 'data-enable-active' property to endpoint node properties list.
 
-This is a known issue that was introduced in v4.16 by a combination of
-the 32-bit ARM DMA/IOMMU glue and an Tegra SMMU driver change.
+The property allows to specify the polarity of the data-enable signal, which
+when in active state determinates when data lanes have to sampled for valid
+pixel data.
 
-There is a fix here:
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+---
+v3:
+- new patch
+---
+ Documentation/devicetree/bindings/media/video-interfaces.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-	http://patchwork.ozlabs.org/patch/902830/
-
-Which got remotely NAK'ed by the DMA API maintainer. I then came up with
-this, based on feedback from Christoph:
-
-	http://patchwork.ozlabs.org/project/linux-tegra/list/?series=40853
-
-But that's kind of blocked right now, awaiting feedback. I'll send out
-another version, which will hopefully strike the right balance.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/1f1a3b2f/attachment-0001.sig>
+diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
+index 258b8df..9839d26 100644
+--- a/Documentation/devicetree/bindings/media/video-interfaces.txt
++++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
+@@ -109,6 +109,8 @@ Optional endpoint properties
+   Note, that if HSYNC and VSYNC polarities are not specified, embedded
+   synchronization may be required, where supported.
+ - data-active: similar to HSYNC and VSYNC, specifies data line polarity.
++- data-enable-active: similar to HSYNC and VSYNC, specifies the data enable
++  signal polarity.
+ - field-even-active: field signal level during the even field data transmission.
+ - pclk-sample: sample data on rising (1) or falling (0) edge of the pixel clock
+   signal.
+--
+2.7.4
