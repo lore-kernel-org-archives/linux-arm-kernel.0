@@ -1,63 +1,130 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 29 May 2018 17:15:55 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon>
- <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
- <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
- <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
- <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
- <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
- <20180529164911.29820e07@bbrezillon>
- <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
-Message-ID: <20180529171555.19dd723f@bbrezillon>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 29 May 2018 10:23:12 -0500
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+ <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
+ <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+Message-ID: <b08eee2a-6fe5-763f-f2e1-2dec05e14ef4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 May 2018 18:01:40 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+Hi,
 
-> [...]
+On 05/29/2018 08:18 AM, Sudeep Holla wrote:
 > 
 > 
-> > 
-> > I think you're missing something here. We use the DMA engine in memcpy
-> > mode (SRAM -> DRAM), not in device mode (dev -> DRAM or DRAM -> dev).
-> > So there's no dmas prop defined in the DT and there should not be.
-> > 
-> > Regards,
-> > 
-> > Boris
-> >   
+> On 29/05/18 12:56, Geert Uytterhoeven wrote:
+>> Hi Sudeep,
+>>
+>> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+>>>> On Thu, May 17, 2018 at 7:05 PM, Catalin Marinas
+>>>> <catalin.marinas@arm.com> wrote:
+>>>>> On Fri, May 11, 2018 at 06:57:55PM -0500, Jeremy Linton wrote:
+>>>>>> Jeremy Linton (12):
+>>>>>>    drivers: base: cacheinfo: move cache_setup_of_node()
+>>>>>>    drivers: base: cacheinfo: setup DT cache properties early
+>>>>>>    cacheinfo: rename of_node to fw_token
+>>>>>>    arm64/acpi: Create arch specific cpu to acpi id helper
+>>>>>>    ACPI/PPTT: Add Processor Properties Topology Table parsing
+>>>>>>    ACPI: Enable PPTT support on ARM64
+>>>>>>    drivers: base cacheinfo: Add support for ACPI based firmware tables
+>>>>>>    arm64: Add support for ACPI based firmware tables
+>>>>>>    arm64: topology: rename cluster_id
+>>>>>>    arm64: topology: enable ACPI/PPTT based CPU topology
+>>>>>>    ACPI: Add PPTT to injectable table list
+>>>>>>    arm64: topology: divorce MC scheduling domain from core_siblings
+>>>>>
+>>>>> Queued for 4.18 (without Sudeep's latest property_read_u64 cacheinfo
+>>>>> patch - http://lkml.kernel.org/r/20180517154701.GA20281 at e107155-lin; I
+>>>>> can add it separately).
+>>>>
+>>>> This is now commit 37c3ec2d810f87ea ("arm64: topology: divorce MC
+>>>> scheduling domain from core_siblings") in arm64/for-next/core, causing
+>>>> system suspend on big.LITTLE systems to hang after shutting down the first
+>>>> CPU:
+>>>>
+>>>>      $ echo mem > /sys/power/state
+>>>>      PM: suspend entry (deep)
+>>>>      PM: Syncing filesystems ... done.
+>>>>      Freezing user space processes ... (elapsed 0.001 seconds) done.
+>>>>      OOM killer disabled.
+>>>>      Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+>>>>      Disabling non-boot CPUs ...
+>>>>      CPU1: shutdown
+>>>>      psci: CPU1 killed.
+>>>>
+>>>
+>>> Is it OK to assume the suspend failed just after shutting down one CPU
+>>> or it's failing during resume ? It depends on whether you had console
+>>> disabled or not.
+>>
+>> I have no-console-suspend enabled.
+>> It's failing during suspend, the next lines should be:
+>>
+>>      CPU2: shutdown
+>>      psci: CPU2 killed.
+>>      ...
+>>
 > 
-> Ok, so the memcpy SRAM <-> DRAM will hog the transfer between DRAM and 
-> LCD if my understanding is correct. That's the DMA that Peter wants to 
-> disable with his patch ?
+> OK, I was hoping to be something during resume as this patch has nothing
+> executed during suspend. Do you see any change in topology before and
+> after this patch applied. I am interested in the output of:
 > 
-> Then we can then try to force NFC SRAM DMA channels to use just DDR port 
-> 1 or 2 for memcpy ?
-
-You mean the dmaengine? According to "14.1.3 Master to Slave Access"
-that's already the case.
-
-Only DMAC0 can access the NFC SRAM and it's done through DMAC0:IF0,
-then access to DDR is going through port DDR port 1 (DMAC0:IF1) or 2
-(DMAC0:IF0).
-
+> $ grep "" /sys/devices/system/cpu/cpu*/topology/*
 > 
-> I have also received a suggestion to try to increase the porches in 
-> LCDC_LCDCFG3 .
+>>>> For me, it fails on the following big.LITTLE systems:
+>>>>
+>>>>      R-Car H3 ES2.0 (4xCA57 + 4xCA53)
+>>>>      R-Car M3-W (2xCA57 + 4xCA53)
+>>>>
+>>>
+>>> Interesting, is it PSCI based system suspend ?
+>>
+>> Yes it is.
+>>
+>> Suspend-to-idle, which doesn't offline CPUs, still works.
+>>
+> 
+>  From DT, I guess this platform doesn't have any idle states.
+> Does this use genpd power domains ? I see power-domains in the DT, so
+> asking to get more info. Do you have any out of tree patches especially
+> if they are depending on some topology cpumasks ?
+> 
+>>>> System supend still works fine on systems with big cores only:
+>>>>
+>>>>      R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
+>>>>      R-Car M3-N (2xCA57)
+>>>>
+>>>> Reverting this commit fixes the issue for me.
+>>>
+>>> I can't find anything that relates to system suspend in these patches
+>>> unless they are messing with something during CPU hot plug-in back
+>>> during resume.
+>>
+>> It's only the last patch that introduces the breakage.
+>>
+> 
+> As specified in the commit log, it won't change any behavior for DT
+> systems if it's non-NUMA or single node system. So I am still wondering
+> what could trigger this regression.
+> 
 
-Yep, Nicolas suggested something similar. Peter, can you try that?
+So, presumably the problem is that the numa mask is smaller than the 
+normal core_siblings...
+
+I would verify that that there is a behavior change with something like 
+/proc/schedstat | cut -d ' ' -f-2
+
+There might be something odd happening with whether you have CONFIG_NUMA 
+set (looking at that right now).
+
+So, a couple quick todo's, see if the schedstat domains are changing 
+with/without the last patch, and also see if they are changing if you 
+enable/disable NUMA.
+
+Why any of that matters for suspend isn't clear at the moment.
