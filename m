@@ -1,54 +1,52 @@
 From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Tue, 29 May 2018 19:04:31 +0200
-Subject: [PATCH v3 0/5] Reintroduce i.MX EPIT Timer
-Message-ID: <20180529170436.22711-1-peron.clem@gmail.com>
+Date: Tue, 29 May 2018 19:04:34 +0200
+Subject: [PATCH v3 3/5] Documentation: DT: add i.MX EPIT timer binding
+In-Reply-To: <20180529170436.22711-1-peron.clem@gmail.com>
+References: <20180529170436.22711-1-peron.clem@gmail.com>
+Message-ID: <20180529170436.22711-4-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cl?ment Peron <clement.peron@devialet.com>
 
-As suggested in the commit message we have added the device tree support,
-proper bindings and we moved the driver into the correct folder.
+Add devicetree binding document for NXP's i.MX SoC specific
+EPIT timer driver.
 
-Moreover we made some changes like use of relaxed IO accesor,
-implement sched_clock, delay_timer and reduce the clockevents min_delta.
-
-Changes since v2 (Thanks Fabio Estevam):
-- Removed unused "ckil" clock
-- Add out_iounmap
-- Check and handle if clk_prepare_enable failed
-- Fix comment typo
-
-Changes since v1 (Thanks Vladimir Zapolskiy):
-- Add OF dependency in Kconfig
-- Sort header
-- Use BIT macro
-- Remove useless comments
-- Fix incorrect indent
-- Fix memory leak
-- Add check and handle possible returned error
-
-Cl?ment Peron (2):
-  ARM: imx: remove inexistant EPIT timer init
-  Documentation: DT: add i.MX EPIT timer binding
-
-Colin Didier (3):
-  clk: imx6: add EPIT clock support
-  clocksource: add driver for i.MX EPIT timer
-  ARM: dts: imx6qdl: add missing compatible and clock properties for
-    EPIT
-
- .../devicetree/bindings/clock/imx6q,epit.txt  |  24 ++
- arch/arm/boot/dts/imx6qdl.dtsi                |  10 +
- arch/arm/mach-imx/common.h                    |   1 -
- drivers/clk/imx/clk-imx6q.c                   |   2 +
- drivers/clocksource/Kconfig                   |  12 +
- drivers/clocksource/Makefile                  |   1 +
- drivers/clocksource/timer-imx-epit.c          | 283 ++++++++++++++++++
- include/dt-bindings/clock/imx6qdl-clock.h     |   4 +-
- 8 files changed, 335 insertions(+), 2 deletions(-)
+Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+---
+ .../devicetree/bindings/clock/imx6q,epit.txt  | 24 +++++++++++++++++++
+ 1 file changed, 24 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/imx6q,epit.txt
- create mode 100644 drivers/clocksource/timer-imx-epit.c
 
+diff --git a/Documentation/devicetree/bindings/clock/imx6q,epit.txt b/Documentation/devicetree/bindings/clock/imx6q,epit.txt
+new file mode 100644
+index 000000000000..a84a60c6ae35
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/imx6q,epit.txt
+@@ -0,0 +1,24 @@
++Binding for the i.MX6 EPIT timer
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible: should be "fsl,imx6q-epit"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: Should contain EPIT controller interrupt
++- clocks: list of clock specifiers, must contain an entry for each required
++  entry in clock-names
++- clock-names : should include entries "ipg", "per"
++
++Example:
++	epit1: epit at 20d0000 {
++		compatible = "fsl,imx6q-epit";
++		reg = <0x020d0000 0x4000>;
++		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks IMX6QDL_CLK_EPIT1>,
++			<&clks IMX6QDL_CLK_IPG_PER>;
++		clock-names = "ipg", "per";
++	};
 -- 
 2.17.0
