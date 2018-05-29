@@ -1,74 +1,76 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 29 May 2018 14:15:25 +0100
-Subject: [PATCH v2 00/12] coresight: tmc-etr Transparent buffer management
-Message-ID: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 29 May 2018 14:15:26 +0100
+Subject: [PATCH v2 01/12] coresight: ETM: Add support for Arm Cortex-A73 and
+ Cortex-A35
+In-Reply-To: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
+References: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1527599737-28408-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is split of the Coresight ETR perf support patches posted
-here [0]. The CATU support and perf backend support will be posted as
-separate series for better management and review of the patches.
+Add ETM PIDs of the Arm cortex-A CPUs to the white list of ETMs.
+While at it add a helper macro to make it easier to add the new
+entries.
 
-This series adds the support for TMC ETR Scatter-Gather mode to allow
-using physical non-contiguous buffer for holding the trace data. It
-also adds a layer to handle the buffer management in a transparent
-manner, independent of the underlying mode used by the TMC ETR.
-The layer chooses the ETR mode based on different parameters (size,
-re-using a set of pages, presence of an SMMU etc.).
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+Changes since last version:
+ - Use ETM's ID register to dump the version, rather than hard
+   coding it for each CPU.
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 31 ++++++++++++---------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-Finally we add a sysfs parameter to tune the buffer size for ETR in
-sysfs-mode.
-
-During the testing, we found out that if the TMC ETR is not properly
-connected to the memory subsystem, the ETR could lock-up the system
-while waiting for the "read" transactions to complete in scatter-gather
-mode. So, we do not use the mode on a system unless it is safe to do
-so. This is specified by a DT property "arm,scatter-gather".
-
-Applies on coreisght-next tree from Mathieu
-
-Changes since previous version [1]:
- - Rebased to Mathieu's coresight-next tree to resolve a conflict.
- - Added tags for DT changes from Rob and Mathieu
- - Split the SG mode backend support patch from the
-   ETR-BUF patch.
- - Address other comments from Mathieu
-
-Changes since splitted series [0] :
- - Split the series in [0]
- - Address comments on v2
- - Rename DT property "scatter-gather" to "arm,scatter-gather"
- - Add ETM PID for Cortex-A35, use macros to make the listing easier
-
-[0] - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/574875.html
-[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579135.html
-
-Suzuki K Poulose (12):
-  coresight: ETM: Add support for Arm Cortex-A73 and Cortex-A35
-  coresight: tmc: Hide trace buffer handling for file read
-  coresight: tmc-etr: Do not clean trace buffer
-  coresight: tmc-etr: Disallow perf mode
-  coresight: Add helper for inserting synchronization packets
-  dts: bindings: Restrict coresight tmc-etr scatter-gather mode
-  dts: juno: Add scatter-gather support for all revisions
-  coresight: Add generic TMC sg table framework
-  coresight: Add support for TMC ETR SG unit
-  coresight: tmc-etr: Add transparent buffer management
-  coresight: tmc-etr buf: Add TMC scatter gather mode backend
-  coresight: tmc: Add configuration support for trace buffer size
-
- .../ABI/testing/sysfs-bus-coresight-devices-tmc    |    8 +
- .../devicetree/bindings/arm/coresight.txt          |    5 +-
- arch/arm64/boot/dts/arm/juno-base.dtsi             |    1 +
- drivers/hwtracing/coresight/coresight-etb10.c      |   12 +-
- drivers/hwtracing/coresight/coresight-etm4x.c      |   31 +-
- drivers/hwtracing/coresight/coresight-priv.h       |   10 +-
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |   45 +-
- drivers/hwtracing/coresight/coresight-tmc-etr.c    | 1010 ++++++++++++++++++--
- drivers/hwtracing/coresight/coresight-tmc.c        |   83 +-
- drivers/hwtracing/coresight/coresight-tmc.h        |  110 ++-
- drivers/hwtracing/coresight/coresight.c            |    3 +-
- 11 files changed, 1144 insertions(+), 174 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 9bc04c5..1d94ebe 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1027,7 +1027,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	}
+ 
+ 	pm_runtime_put(&adev->dev);
+-	dev_info(dev, "%s initialized\n", (char *)id->data);
++	dev_info(dev, "CPU%d: ETM v%d.%d initialized\n",
++		 drvdata->cpu, drvdata->arch >> 4, drvdata->arch & 0xf);
+ 
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+@@ -1045,23 +1046,19 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	return ret;
+ }
+ 
++#define ETM4x_AMBA_ID(pid)			\
++	{					\
++		.id	= pid,			\
++		.mask	= 0x000fffff,		\
++	}
++
+ static const struct amba_id etm4_ids[] = {
+-	{       /* ETM 4.0 - Cortex-A53  */
+-		.id	= 0x000bb95d,
+-		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
+-	},
+-	{       /* ETM 4.0 - Cortex-A57 */
+-		.id	= 0x000bb95e,
+-		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
+-	},
+-	{       /* ETM 4.0 - A72, Maia, HiSilicon */
+-		.id = 0x000bb95a,
+-		.mask = 0x000fffff,
+-		.data = "ETM 4.0",
+-	},
+-	{ 0, 0},
++	ETM4x_AMBA_ID(0x000bb95d),		/* Cortex-A53 */
++	ETM4x_AMBA_ID(0x000bb95e),		/* Cortex-A57 */
++	ETM4x_AMBA_ID(0x000bb95a),		/* Cortex-A72 */
++	ETM4x_AMBA_ID(0x000bb959),		/* Cortex-A73 */
++	ETM4x_AMBA_ID(0x000bb9da),		/* Cortex-A35 */
++	{},
+ };
+ 
+ static struct amba_driver etm4x_driver = {
 -- 
 2.7.4
