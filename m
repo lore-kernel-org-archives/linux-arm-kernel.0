@@ -1,54 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 08:47:00 +0100
-Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
-In-Reply-To: <1bedc0b7-21f9-1e15-a11c-3de06e81b5ba@st.com>
-References: <20180529155257.5ae48830@canb.auug.org.au>
- <1bedc0b7-21f9-1e15-a11c-3de06e81b5ba@st.com>
-Message-ID: <c306fbd9-21d9-5345-e820-52bc23d1b7c7@arm.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 29 May 2018 16:02:24 +0800
+Subject: [PATCH] soc: imx: gpcv2: correct PGC offset
+Message-ID: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/18 08:41, Alexandre Torgue wrote:
-> Hi Stephen
-> 
-> On 05/29/2018 07:52 AM, Stephen Rothwell wrote:
->> Hi all,
->>
->> Today's linux-next merge of the irqchip tree got a conflict in:
->>
->>    arch/arm/boot/dts/stm32mp157c.dtsi
->>
->> between commit:
->>
->>    3c00436fdb20 ("ARM: dts: stm32: add USBPHYC support to stm32mp157c")
->>
->> from the arm-soc tree and commit:
->>
->>    5f0e9d2557d7 ("ARM: dts: stm32: Add exti support for stm32mp157c")
->>
->> from the irqchip tree.
->>
->> I fixed it up (see below) and can carry the fix as necessary. This
->> is now fixed as far as linux-next is concerned, but any non trivial
->> conflicts should be mentioned to your upstream maintainer when your tree
->> is submitted for merging.  You may also want to consider cooperating
->> with the maintainer of the conflicting tree to minimise any particularly
->> complex conflicts.
->>
-> 
-> Thanks for the fix (I will reorder nodes in a future patch). My opinion 
-> is that all STM32 DT patches should come through my STM32 tree. It is my 
-> role to fix this kind of conflicts. I thought it was a common rule 
-> (driver patches go to sub-system maintainer tree and DT to the Machine 
-> maintainer). For incoming next-series which contain DT+driver patches I 
-> will indicate clearly that I take DT patch. I'm right ?
-Happy to oblige. Can you make sure you sync up with Ludovic and define
-what you want to do?
+Correct MIPI/PCIe/USB_HSIC's PGC offset based on
+design RTL, the value on Reference Manual are incorrect.
 
-In the meantime, I'm dropping the series altogether.
+The correct offset should be as below:
 
-Thanks,
+0x800 ~ 0x83F: PGC for core0 of A7 platform;
+0x840 ~ 0x87F: PGC for core1 of A7 platform;
+0x880 ~ 0x8BF: PGC for SCU of A7 platform;
+0xA00 ~ 0xA3F: PGC for fastmix/megamix;
+0xC00 ~ 0xC3F: PGC for MIPI PHY;
+0xC40 ~ 0xC7F: PGC for PCIe_PHY;
+0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
+0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
+0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
 
-	M.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ drivers/soc/imx/gpcv2.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
+index afc7ecc..132c946 100644
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -40,9 +40,9 @@
+ #define GPC_M4_PU_PDN_FLG		0x1bc
+ 
+ 
+-#define PGC_MIPI			4
+-#define PGC_PCIE			5
+-#define PGC_USB_HSIC			8
++#define PGC_MIPI			16
++#define PGC_PCIE			17
++#define PGC_USB_HSIC			20
+ #define GPC_PGC_CTRL(n)			(0x800 + (n) * 0x40)
+ #define GPC_PGC_SR(n)			(GPC_PGC_CTRL(n) + 0xc)
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
