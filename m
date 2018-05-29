@@ -3,7 +3,7 @@ Date: Tue, 29 May 2018 15:41:14 -0500
 Subject: [GIT PULL] ARM: dts: socfpga: NAND fixes for v4.17
 In-Reply-To: <20180515134416.11349-1-dinguyen@kernel.org>
 References: <20180515134416.11349-1-dinguyen@kernel.org>
-Message-ID: <34a98cdf-53de-b146-4471-ff1dc577b12e@kernel.org>
+Message-ID: <8294255f-e5c4-ce03-ca90-016eacbf6cc9@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
