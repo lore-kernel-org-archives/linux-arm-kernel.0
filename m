@@ -1,80 +1,102 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 15:54:29 +0100
-Subject: [PATCH v5 04/15] ARM: bugs: add support for per-processor bug checking
+Date: Tue, 29 May 2018 15:54:24 +0100
+Subject: [PATCH v5 03/15] ARM: bugs: hook processor bug checking into SMP and
+ suspend paths
 In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
 References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNg17-00055G-7W@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fNg12-000557-3p@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for per-processor bug checking - each processor function
-descriptor gains a function pointer for this check, which must not be
-an __init function.  If non-NULL, this will be called whenever a CPU
-enters the kernel via which ever path (boot CPU, secondary CPU startup,
-CPU resuming, etc.)
-
-This allows processor specific bug checks to validate that workaround
-bits are properly enabled by firmware via all entry paths to the kernel.
+Check for CPU bugs when secondary processors are being brought online,
+and also when CPUs are resuming from a low power mode.  This gives an
+opportunity to check that processor specific bug workarounds are
+correctly enabled for all paths that a CPU re-enters the kernel.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Boot-tested-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/proc-fns.h | 4 ++++
- arch/arm/kernel/bugs.c          | 4 ++++
- arch/arm/mm/proc-macros.S       | 3 ++-
- 3 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/bugs.h | 2 ++
+ arch/arm/kernel/bugs.c      | 5 +++++
+ arch/arm/kernel/smp.c       | 4 ++++
+ arch/arm/kernel/suspend.c   | 2 ++
+ 4 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index f2e1af45bd6f..e25f4392e1b2 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -37,6 +37,10 @@ extern struct processor {
- 	 */
- 	void (*_proc_init)(void);
- 	/*
-+	 * Check for processor bugs
-+	 */
-+	void (*check_bugs)(void);
-+	/*
- 	 * Disable any processor specifics
- 	 */
- 	void (*_proc_fin)(void);
+diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
+index ed122d294f3f..73a99c72a930 100644
+--- a/arch/arm/include/asm/bugs.h
++++ b/arch/arm/include/asm/bugs.h
+@@ -14,8 +14,10 @@ extern void check_writebuffer_bugs(void);
+ 
+ #ifdef CONFIG_MMU
+ extern void check_bugs(void);
++extern void check_other_bugs(void);
+ #else
+ #define check_bugs() do { } while (0)
++#define check_other_bugs() do { } while (0)
+ #endif
+ 
+ #endif
 diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-index 16e7ba2a9cc4..7be511310191 100644
+index 88024028bb70..16e7ba2a9cc4 100644
 --- a/arch/arm/kernel/bugs.c
 +++ b/arch/arm/kernel/bugs.c
-@@ -5,6 +5,10 @@
+@@ -3,7 +3,12 @@
+ #include <asm/bugs.h>
+ #include <asm/proc-fns.h>
  
- void check_other_bugs(void)
- {
-+#ifdef MULTI_CPU
-+	if (processor.check_bugs)
-+		processor.check_bugs();
-+#endif
- }
- 
++void check_other_bugs(void)
++{
++}
++
  void __init check_bugs(void)
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index f10e31d0730a..81d0efb055c6 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -273,13 +273,14 @@
- 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
- 	.endm
+ {
+ 	check_writebuffer_bugs();
++	check_other_bugs();
+ }
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2da087926ebe..5ad0b67b9e33 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -31,6 +31,7 @@
+ #include <linux/irq_work.h>
  
--.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
-+.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
- 	.type	\name\()_processor_functions, #object
- 	.align 2
- ENTRY(\name\()_processor_functions)
- 	.word	\dabort
- 	.word	\pabort
- 	.word	cpu_\name\()_proc_init
-+	.word	\bugs
- 	.word	cpu_\name\()_proc_fin
- 	.word	cpu_\name\()_reset
- 	.word	cpu_\name\()_do_idle
+ #include <linux/atomic.h>
++#include <asm/bugs.h>
+ #include <asm/smp.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cpu.h>
+@@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * before we continue - which happens after __cpu_up returns.
+ 	 */
+ 	set_cpu_online(cpu, true);
++
++	check_other_bugs();
++
+ 	complete(&cpu_running);
+ 
+ 	local_irq_enable();
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index a40ebb7c0896..d08099269e35 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -3,6 +3,7 @@
+ #include <linux/slab.h>
+ #include <linux/mm_types.h>
+ 
++#include <asm/bugs.h>
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
+ #include <asm/pgalloc.h>
+@@ -36,6 +37,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 		cpu_switch_mm(mm->pgd, mm);
+ 		local_flush_bp_all();
+ 		local_flush_tlb_all();
++		check_other_bugs();
+ 	}
+ 
+ 	return ret;
 -- 
 2.7.4
