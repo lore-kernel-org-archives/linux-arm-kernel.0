@@ -1,26 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 29 May 2018 10:57:11 +0200
-Subject: [PATCH v2] arm64: dts: renesas: r8a77965: Add Watchdog Timer
- controller node using RCLK Watchdog Timer
-In-Reply-To: <1527577262-8754-1-git-send-email-ykaneko0929@gmail.com>
-References: <1527577262-8754-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <20180529085710.bwszso7ywiyvy5ld@verge.net.au>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 29 May 2018 10:59:45 +0200
+Subject: [PATCH] PM / runtime: Fixup reference counting of device link
+ suppliers at probe
+In-Reply-To: <CAPDyKFphMCQ_S5aBVToGUL=Rvd0cBQ4O3Top3AYPdM79Ak_LzA@mail.gmail.com>
+References: <1526633329-31729-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0ikXsWdXq-h8rWLd-vfzi-gFmxyHmOGvRvDUoJHC3L2XA@mail.gmail.com>
+ <CAPDyKFphMCQ_S5aBVToGUL=Rvd0cBQ4O3Top3AYPdM79Ak_LzA@mail.gmail.com>
+Message-ID: <1602619.cydcNSDU3f@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 04:01:02PM +0900, Yoshihiro Kaneko wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Friday, May 18, 2018 11:07:02 AM CEST Ulf Hansson wrote:
+> On 18 May 2018 at 10:58, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> > On Fri, May 18, 2018 at 10:48 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> >> In the driver core, before it invokes really_probe() it runtime resumes the
+> >> suppliers for the device via calling pm_runtime_get_suppliers(), which also
+> >> increases the runtime PM usage count for each of the available supplier.
+> >>
+> >> This makes sense, as to be able to allow the consumer device to be probed
+> >> by its driver. However, if the driver decides to add a new supplier link
+> >> during ->probe(), hence updating the list of suppliers,
+> >
+> > Do any of the existing drivers do that?
 > 
-> Add a device node for the Watchdog Timer (WDT) controller on the Renesas
-> R-Car M3-N (R8A77965) SoC.
+> Yes.
 > 
-> Based on a similar patch of the R8A7796 device tree
-> by Geert Uytterhoeven <geert+renesas@glider.be>.
+> At least these, but possibly even more...
 > 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> drivers/gpu/drm/tegra/dc.c
+> drivers/gpu/ipu-v3/ipu-prg.c
+> drivers/pci/dwc/pci-dra7xx.c
+> 
+> >
+> >> the following call to pm_runtime_put_suppliers(), invoked after really_probe()
+> >> in the driver core, we get into trouble.
 
-Thanks, applied.
+Patch applied, thanks!
