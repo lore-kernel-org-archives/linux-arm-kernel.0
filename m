@@ -1,32 +1,99 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 29 May 2018 09:59:27 -0300
-Subject: [PATCH v2 4/4] ARM: dts: imx6dl-riotboard: fix OTG regulator
- polarity
-In-Reply-To: <20180529062021.3154-5-akurz@blala.de>
-References: <20180529062021.3154-1-akurz@blala.de>
- <20180529062021.3154-5-akurz@blala.de>
-Message-ID: <CAOMZO5CORkXJ9zu8qRZm2JGvdPjJM1Gg40sgk7gox9Yh3gYYkQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 29 May 2018 15:08:45 +0200
+Subject: [patch v23 4/4] Documentation: jtag: Add ABI documentation
+In-Reply-To: <1527594545-19870-5-git-send-email-oleksandrs@mellanox.com>
+References: <1527594545-19870-1-git-send-email-oleksandrs@mellanox.com>
+ <1527594545-19870-5-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20180529130845.GB30119@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 3:20 AM, Alexander Kurz <akurz@blala.de> wrote:
-> USB OTG power is switched on when the GPIO is pulled low.
->
-> Signed-off-by: Alexander Kurz <akurz@blala.de>
-> ---
->  arch/arm/boot/dts/imx6dl-riotboard.dts | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> index a6851bfebbdb..89b06e20480d 100644
-> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> @@ -70,8 +70,7 @@
->                 regulator-name = "usb_otg_vbus";
->                 regulator-min-microvolt = <5000000>;
->                 regulator-max-microvolt = <5000000>;
-> -               gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-> -               enable-active-high;
-> +               gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
+On Tue, May 29, 2018 at 02:49:05PM +0300, Oleksandr Shamray wrote:
+> +++ b/Documentation/ABI/testing/jtag-dev
+> @@ -0,0 +1,27 @@
+> +What:		/dev/jtag[0-9]+
+> +Date:		May 2018
+> +KernelVersion:	4.18
+> +Contact:	oleksandrs at mellanox.com
+> +Description:
+> +		The misc device files /dev/jtag* are the interface
+> +		between JTAG master interface and userspace.
+> +
+> +		The ioctl(2)-based ABI is defined and documented in
+> +		[include/uapi]<linux/jtag.h>.
+> +
+> +		The following file operations are supported:
+> +
+> +		open(2)
+> +		The argument flag currently support only one access
+> +		mode O_RDWR.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Your open call tests for nothing, don't worry about it here at all :)
+
+> +
+> +		ioctl(2)
+> +		Initiate various actions.
+> +		See the inline documentation in [include/uapi]<linux/jtag.h>
+> +		for descriptions of all ioctls.
+> +
+> +		close(2)
+> +		Stops and free up the I/O contexts that was associated
+> +		with the file descriptor.
+
+No, your close() does not do any of that.
+
+> +
+> +Users:		TBD
+
+No users?  They why do we have this api at all?
+
+> +open(), close()
+> +-------
+> +open() opens JTAG device. Only one open operation per JTAG device
+> +can be performed. Two or more open for one device will return error.
+
+Not true :)
+
+> +
+> +Open/Close  device:
+> +- jtag_fd = open("/dev/jtag0", O_RDWR);
+> +- close(jtag_fd);
+> +
+> +ioctl()
+> +-------
+> +All access operations to JTAG devices are erformed through ioctl interface.
+> +The IOCTL interface supports these requests:
+> +	JTAG_IOCRUNTEST - Force JTAG state machine to RUN_TEST/IDLE state
+> +	JTAG_SIOCFREQ - Set JTAG TCK frequency
+> +	JTAG_GIOCFREQ - Get JTAG TCK frequency
+> +	JTAG_IOCXFER - send JTAG data Xfer
+> +	JTAG_GIOCSTATUS - get current JTAG TAP status
+> +	JTAG_SIOCMODE - set JTAG mode flags.
+> +
+> +JTAG_SIOCFREQ, JTAG_GIOCFREQ
+> +------
+> +Set/Get JTAG clock speed:
+> +
+> +	unsigned int jtag_fd;
+> +	ioctl(jtag_fd, JTAG_SIOCFREQ, &frq);
+> +	ioctl(jtag_fd, JTAG_GIOCFREQ, &frq);
+> +
+> +JTAG_IOCRUNTEST
+> +------
+> +Force JTAG state machine to RUN_TEST/IDLE state
+> +
+> +struct jtag_run_test_idle {
+> +	__u8	reset;
+> +	__u8	endstate;
+> +	__u8	tck;
+> +};
+> +
+> +reset: 0 - run IDLE/PAUSE from current state
+> +	   1 - go through TEST_LOGIC/RESET state before IDLE/PAUSE
+
+Are you sure your enums are these values?  You should explicitly set
+them in your .h file to be positive.
+
+thanks,
+
+greg k-h
