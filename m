@@ -1,171 +1,59 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 29 May 2018 22:39:17 +0300
-Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <cover.1527621510.git.leonard.crestez@nxp.com>
-References: <cover.1527621510.git.leonard.crestez@nxp.com>
-Message-ID: <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 29 May 2018 12:59:15 -0700
+Subject: [PATCH 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx
+ Subsystem driver
+In-Reply-To: <1527620084-94864-3-git-send-email-vishal.sagar@xilinx.com>
+References: <1527620084-94864-1-git-send-email-vishal.sagar@xilinx.com>
+ <1527620084-94864-3-git-send-email-vishal.sagar@xilinx.com>
+Message-ID: <5bf470c0-8737-273e-c138-58a05d7d9a30@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx7d the phy is turned off in suspend and must be reset on resume.
-Right now lspci -v fails after a suspend/resume cycle, fix this by
-adding minimal suspend/resume code from the nxp vendor tree.
+On 05/29/2018 11:54 AM, Vishal Sagar wrote:
+> 
+> Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
+> ---
+>  drivers/media/platform/xilinx/Kconfig           |   12 +
+>  drivers/media/platform/xilinx/Makefile          |    1 +
+>  drivers/media/platform/xilinx/xilinx-csi2rxss.c | 1751 +++++++++++++++++++++++
+>  include/uapi/linux/xilinx-csi2rxss.h            |   25 +
+>  include/uapi/linux/xilinx-v4l2-controls.h       |   14 +
+>  5 files changed, 1803 insertions(+)
+>  create mode 100644 drivers/media/platform/xilinx/xilinx-csi2rxss.c
+>  create mode 100644 include/uapi/linux/xilinx-csi2rxss.h
+> 
+> diff --git a/drivers/media/platform/xilinx/Kconfig b/drivers/media/platform/xilinx/Kconfig
+> index a5d21b7..06d5944 100644
+> --- a/drivers/media/platform/xilinx/Kconfig
+> +++ b/drivers/media/platform/xilinx/Kconfig
+> @@ -8,6 +8,18 @@ config VIDEO_XILINX
+> 
+>  if VIDEO_XILINX
+> 
+> +config VIDEO_XILINX_CSI2RXSS
+> +       tristate "Xilinx CSI2 Rx Subsystem"
+> +       depends on VIDEO_XILINX
+> +       help
+> +         Driver for Xilinx MIPI CSI2 Rx Subsystem. This is a V4L sub-device
+> +         based driver that takes input from CSI2 Tx source and converts
+> +         it into an AXI4-Stream. It has a DPHY (whose register interface
+> +         can be enabled, an optional I2C controller and an optional Video
 
-This is currently only enabled for imx7 but the same sequence can be
-applied to other imx pcie variants.
+	    can be enabled),
 
-Tested on imx7d-sabresd with an Intel 5622ANHMW wireless pcie adapter.
+> +         Format Bridge which converts the AXI4-Stream data to Xilinx Video
+> +         Bus formats based on UG934. The driver is used to set the number
+> +         of active lanes and get short packet data.
+> +
+>  config VIDEO_XILINX_TPG
+>         tristate "Xilinx Video Test Pattern Generator"
+>         depends on VIDEO_XILINX
 
-The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
-patch adjusts the code to the upstream imx7d implemention using reset
-controls and power domains.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- drivers/pci/dwc/pci-imx6.c | 94 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 89 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index 4818ef875f8a..ff6077eeb387 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -540,10 +540,27 @@ static int imx6_pcie_wait_for_speed_change(struct imx6_pcie *imx6_pcie)
- 
- 	dev_err(dev, "Speed change timeout\n");
- 	return -EINVAL;
- }
- 
-+static void imx6_pcie_ltssm_enable(struct device *dev)
-+{
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+
-+	switch (imx6_pcie->variant) {
-+	case IMX6Q:
-+	case IMX6SX:
-+	case IMX6QP:
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6Q_GPR12_PCIE_CTL_2,
-+				   IMX6Q_GPR12_PCIE_CTL_2);
-+		break;
-+	case IMX7D:
-+		reset_control_deassert(imx6_pcie->apps_reset);
-+	}
-+}
-+
- static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- {
- 	struct dw_pcie *pci = imx6_pcie->pci;
- 	struct device *dev = pci->dev;
- 	u32 tmp;
-@@ -558,15 +575,11 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- 	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
- 	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
- 	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
- 
- 	/* Start LTSSM. */
--	if (imx6_pcie->variant == IMX7D)
--		reset_control_deassert(imx6_pcie->apps_reset);
--	else
--		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
--				   IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
-+	imx6_pcie_ltssm_enable(dev);
- 
- 	ret = imx6_pcie_wait_for_link(imx6_pcie);
- 	if (ret)
- 		goto err_reset_phy;
- 
-@@ -681,10 +694,80 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
- 
- static const struct dw_pcie_ops dw_pcie_ops = {
- 	.link_up = imx6_pcie_link_up,
- };
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int imx6_pcie_suspend_noirq(struct device *dev)
-+{
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+
-+	if (imx6_pcie->variant == IMX7D) {
-+		/* Disable clks */
-+		clk_disable_unprepare(imx6_pcie->pcie);
-+		clk_disable_unprepare(imx6_pcie->pcie_phy);
-+		clk_disable_unprepare(imx6_pcie->pcie_bus);
-+		/* turn off external osc input */
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
-+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
-+	}
-+
-+	return 0;
-+}
-+
-+static void imx6_pcie_ltssm_disable(struct device *dev)
-+{
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+
-+	switch (imx6_pcie->variant) {
-+	case IMX6Q:
-+	case IMX6SX:
-+	case IMX6QP:
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6Q_GPR12_PCIE_CTL_2, 0);
-+		break;
-+	case IMX7D:
-+		reset_control_assert(imx6_pcie->apps_reset);
-+		break;
-+	}
-+}
-+
-+static int imx6_pcie_resume_noirq(struct device *dev)
-+{
-+	int ret = 0;
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+	struct pcie_port *pp = &imx6_pcie->pci->pp;
-+
-+	if (imx6_pcie->variant == IMX7D) {
-+		imx6_pcie_ltssm_disable(dev);
-+
-+		imx6_pcie_assert_core_reset(imx6_pcie);
-+		imx6_pcie_init_phy(imx6_pcie);
-+		imx6_pcie_deassert_core_reset(imx6_pcie);
-+
-+		/*
-+		 * controller maybe turn off, re-configure again
-+		 */
-+		dw_pcie_setup_rc(pp);
-+
-+		imx6_pcie_ltssm_enable(dev);
-+
-+		ret = imx6_pcie_wait_for_link(imx6_pcie);
-+		if (ret < 0)
-+			pr_info("pcie link is down after resume.\n");
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops imx6_pcie_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
-+				      imx6_pcie_resume_noirq)
-+};
-+#endif
-+
- static int imx6_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct dw_pcie *pci;
- 	struct imx6_pcie *imx6_pcie;
-@@ -847,10 +930,11 @@ static const struct of_device_id imx6_pcie_of_match[] = {
- static struct platform_driver imx6_pcie_driver = {
- 	.driver = {
- 		.name	= "imx6q-pcie",
- 		.of_match_table = imx6_pcie_of_match,
- 		.suppress_bind_attrs = true,
-+		.pm = &imx6_pcie_pm_ops,
- 	},
- 	.probe    = imx6_pcie_probe,
- 	.shutdown = imx6_pcie_shutdown,
- };
- 
+> This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+
+:(
+
 -- 
-2.17.0
+~Randy
