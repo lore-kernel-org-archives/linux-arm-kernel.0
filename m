@@ -1,44 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 May 2018 18:33:14 +0100
-Subject: [RFC 12/13] ARM: dts: ti: add dra71-evm FIT description file
-In-Reply-To: <16a6017f-96c8-42d8-38bc-5cdd36d6793f@gmail.com>
-References: <1523956215-28154-1-git-send-email-t-kristo@ti.com>
- <1523956215-28154-13-git-send-email-t-kristo@ti.com>
- <20180417092924.GB20335@flint.armlinux.org.uk>
- <ad5ef67d-d566-0034-a7cd-09a549cbd6d7@ti.com>
- <20180417144913.GD5669@atomide.com>
- <43ff3894-a287-1558-687c-40f50712735c@ti.com>
- <20180522200100.GA23937@rob-hp-laptop>
- <16a6017f-96c8-42d8-38bc-5cdd36d6793f@gmail.com>
-Message-ID: <20180529173314.GN17671@n2100.armlinux.org.uk>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 29 May 2018 23:09:13 +0530
+Subject: [PATCH v3] rtc: sun6i: Fix bit_idx value for clk_register_gate
+Message-ID: <20180529173913.12386-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 10:05:37AM -0700, Frank Rowand wrote:
-> On 05/22/18 13:01, Rob Herring wrote:
-> > I'll tell you up front, I'm not a fan of FIT image (nor uImage, 
-> > Android boot image, $bootloader image). If you want a collection of 
-> > files and some configuration data, use a filesystem and a text file.
+From: Michael Trimarchi <michael@amarulasolutions.com>
 
-Me neither.
+clk-gate core will take bit_idx through clk_register_gate
+and then do clk_gate_ops by using BIT(bit_idx), but rtc-sun6i
+is passing bit_idx as BIT(bit_idx) it becomes BIT(BIT(bit_idx)
+which is wrong and eventually external gate clock is not enabling.
 
-> My gut feel is that using a filesystem and a text file is the easier way
-> to create the boot info.  But that also makes applying the overlay(s)
-> during early Linux boot (at the point of FDT unflattening) impractical
-> (can't access the file system without a driver, the driver depends on
-> the devicetree, the devicetree depends upon the overlay).
+This patch fixed by passing bit index and the original change
+introduced from below commit.
+"rtc: sun6i: Add support for the external oscillator gate"
+(sha1: 17ecd246414b3a0fe0cb248c86977a8bda465b7b)
 
-Why do you want to apply overlays during the kernel boot?  The boot
-loader should be providing the kernel with the merged DT to describe
-the system that the kernel is running on - it's not the kernel's
-job to put that together.
+Fixes: 17ecd246414b ("rtc: sun6i: Add support for the external oscillator
+gate")
+Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- add fixes tag
+- Cced stable ML
+Changes for v2:
+- add suffix _OFFSET with macro name to distinguish b/w
+  register actual values vs offset.
 
-The whole point of DT is to make the kernel _less_ tied to the hardware
-and more generic.  If we're going to introduce an entirely new set of
-drivers into the kernel to "probe" the hardware to determine which
-overlays are required, then that's really defeating the purpose of DT.
+ drivers/rtc/rtc-sun6i.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index 2e6fb275acc8..2cd5a7b1a2e3 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -74,7 +74,7 @@
+ #define SUN6I_ALARM_CONFIG_WAKEUP		BIT(0)
+ 
+ #define SUN6I_LOSC_OUT_GATING			0x0060
+-#define SUN6I_LOSC_OUT_GATING_EN		BIT(0)
++#define SUN6I_LOSC_OUT_GATING_EN_OFFSET		0
+ 
+ /*
+  * Get date values
+@@ -255,7 +255,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 				      &clkout_name);
+ 	rtc->ext_losc = clk_register_gate(NULL, clkout_name, rtc->hw.init->name,
+ 					  0, rtc->base + SUN6I_LOSC_OUT_GATING,
+-					  SUN6I_LOSC_OUT_GATING_EN, 0,
++					  SUN6I_LOSC_OUT_GATING_EN_OFFSET, 0,
+ 					  &rtc->lock);
+ 	if (IS_ERR(rtc->ext_losc)) {
+ 		pr_crit("Couldn't register the LOSC external gate\n");
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.3
