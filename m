@@ -1,61 +1,45 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 29 May 2018 08:20:15 -0500
-Subject: [PATCH v4 4/8] PCI: Replace dev_node parameter of
- of_pci_get_host_bridge_resources with device
-In-Reply-To: <eb9b477a-33c9-db45-9e62-101e3606e8ff@siemens.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
- <a74db976-d330-80b9-939e-dd164a20c8c3@mentor.com>
- <eb9b477a-33c9-db45-9e62-101e3606e8ff@siemens.com>
-Message-ID: <20180529132015.GA79098@bhelgaas-glaptop.roam.corp.google.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 29 May 2018 10:32:24 -0300
+Subject: [RFT v3 0/4] Perf script: Add python script for CoreSight trace
+ disassembler
+In-Reply-To: <CANLsYkzn5qyzjxMiCPQ1GxyNjhHJp-2H6Lds11HP9rG5xug0FA@mail.gmail.com>
+References: <1527497103-3593-1-git-send-email-leo.yan@linaro.org>
+ <20180528200326.GJ25467@kernel.org>
+ <CANLsYkzn5qyzjxMiCPQ1GxyNjhHJp-2H6Lds11HP9rG5xug0FA@mail.gmail.com>
+Message-ID: <20180529133224.GA20886@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 12:46:35PM +0200, Jan Kiszka wrote:
-> On 2018-05-28 12:00, Vladimir Zapolskiy wrote:
-> > Hi Jan, Bjorn,
-> > 
-> > On 05/15/2018 12:07 PM, Jan Kiszka wrote:
-> >> From: Jan Kiszka <jan.kiszka@siemens.com>
+Em Mon, May 28, 2018 at 03:53:42PM -0600, Mathieu Poirier escreveu:
+> On 28 May 2018 at 14:03, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> > Em Mon, May 28, 2018 at 04:44:59PM +0800, Leo Yan escreveu:
+> >> This patch series is to support for using 'perf script' for CoreSight
+> >> trace disassembler, for this purpose this patch series adds a new
+> >> python script to parse CoreSight tracing event and use command 'objdump'
+> >> for disassembled lines, finally this can generate readable program
+> >> execution flow for reviewing tracing data.
 > >>
-> >> Another step towards a managed version of
-> >> of_pci_get_host_bridge_resources(): Feed in the underlying device,
-> >> rather than just the OF node. This will allow to use managed resource
-> >> allocation internally later on.
+> >> Patch 0001 is one fixing patch to generate samples for the start packet
+> >> and exception packets.
 > >>
-> >> CC: Jingoo Han <jingoohan1@gmail.com>
-> >> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> >> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> > 
-> > [snip]
-> > 
-> >> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
-> >> index a6af62e0256d..61802e55a00c 100644
-> >> --- a/drivers/pci/host/pcie-altera.c
-> >> +++ b/drivers/pci/host/pcie-altera.c
-> >> @@ -488,11 +488,10 @@ static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
-> >>  {
-> >>  	int err, res_valid = 0;
-> >>  	struct device *dev = &pcie->pdev->dev;
-> >> -	struct device_node *np = dev->of_node;
-> >>  	struct resource_entry *win;
-> >>  
-> >> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
-> >> -					       NULL);
-> >> +	err = of_pci_get_host_bridge_resources(dev, 0, 0xff
-> >> +						    &pcie->resources, NULL);
-> >>  	if (err)
-> >>  		return err;
-> >>  
-> > 
-> > In case if it is an undiscovered issue, a comma was mistakenly removed,
-> > which will result it compilation error.
-> > 
-> > The problem is also found in pci/next , see commit 88e3909aa125.
+> >> Patch 0002 is the prerequisite to add addr into sample dict, so this
+> >> value can be used by python script to analyze instruction range.
+> >>
+> >> Patch 0003 is to add python script for trace disassembler.
+> >>
+> >> Patch 0004 is to add doc to explain python script usage and give
+> >> example for it.
+> >>
+> >> This patch series has been rebased on acme git tree [1] with the commit
+> >> 19422a9f2a3b ("perf tools: Fix kernel_start for PTI on x86") and tested
+> >> on Hikey (ARM64 octa CA53 cores).
+> >
+> > Thanks, applied to perf/core.
 > 
-> Yes, that's known. We have a bisection breakage: The issue was fixed
-> again by patch 6 in that series.
+> Please hold off on that Arnaldo - I'm currently reviewing the set and
+> I think some things can be improved.
 
-I updated 88e3909aa125 to fix the bisection issue.  I'll rebuild
-pci/next later today or tomorrow.
+Ok, I dropped all but the one adding sample->addr to the python
+dictionary, that is ok to cherry pick.
+
+- Arnaldo
