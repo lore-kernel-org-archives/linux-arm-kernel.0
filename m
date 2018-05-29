@@ -1,42 +1,53 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Tue, 29 May 2018 12:15:03 +0300
-Subject: [PATCH v4 6/6] tty/serial: atmel: changed the driver to work
- under at91-usart mfd
-In-Reply-To: <e1445467-2df0-4593-852d-939e6795f318@sorico.fr>
-References: <20180525171941.26766-1-radu.pirea@microchip.com>
- <20180525171941.26766-7-radu.pirea@microchip.com>
- <e1445467-2df0-4593-852d-939e6795f318@sorico.fr>
-Message-ID: <44649341-c238-5b59-6786-50d80f9d4cba@microchip.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 29 May 2018 10:10:15 +0100
+Subject: [PATCH v4 15/15] ARM: KVM: report support for SMCCC_ARCH_WORKAROUND_1
+In-Reply-To: <20180529090756.GG17671@n2100.armlinux.org.uk>
+References: <20180529090756.GG17671@n2100.armlinux.org.uk>
+Message-ID: <E1fNadz-0000hp-KV@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Report support for SMCCC_ARCH_WORKAROUND_1 to KVM guests for affected
+CPUs.
 
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Boot-tested-by: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/include/asm/kvm_host.h | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-On 05/28/2018 01:08 PM, Richard Genoud wrote:
-> On 25/05/2018 19:19, Radu Pirea wrote:
->> This patch modifies the place where resources and device tree properties
->> are searched.
->>
->> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
->> ---
->>   drivers/tty/serial/Kconfig        |  1 +
->>   drivers/tty/serial/atmel_serial.c | 40 +++++++++++++++++--------------
->>   2 files changed, 23 insertions(+), 18 deletions(-)
-> the stdout-path property of the chosen node is still broken in this verion.
-> if :
-> stdout-path = "serial0:115200n8";
-> is set in the DTS, the console output should go on serial0 (aka dbgu)
-> cf Documentation/devicetree/bindings/chosen.txt
-> 
-> With this patch applied, this is not the case anymore.
-> Adding console=ttyS0,115200 in the chosen node is not the solution here.
-> 
-
-I fixed the issue few minutes ago :)
-
-I hope DMA setup is ok now.
-
-> 
-> regards,
-> Richard.
-> 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 248b930563e5..11f91744ffb0 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
++#include <asm/cputype.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
+@@ -311,8 +312,17 @@ static inline void kvm_arm_vhe_guest_exit(void) {}
+ 
+ static inline bool kvm_arm_harden_branch_predictor(void)
+ {
+-	/* No way to detect it yet, pretend it is not there. */
+-	return false;
++	switch(read_cpuid_part()) {
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	case ARM_CPU_PART_BRAHMA_B15:
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A15:
++	case ARM_CPU_PART_CORTEX_A17:
++		return true;
++#endif
++	default:
++		return false;
++	}
+ }
+ 
+ #endif /* __ARM_KVM_HOST_H__ */
+-- 
+2.7.4
