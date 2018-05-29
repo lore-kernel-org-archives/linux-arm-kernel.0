@@ -1,65 +1,144 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 May 2018 16:47:38 +0100
-Subject: [PATCH] ARM: mcpm, perf/arm-cci: export mcpm_is_available
-In-Reply-To: <20180529154251.GM17671@n2100.armlinux.org.uk>
-References: <20180528154448.2494709-1-arnd@arndb.de>
- <20180529153013.GH17159@arm.com>
- <20180529153324.GL17671@n2100.armlinux.org.uk>
- <20180529154120.GI17159@arm.com>
- <20180529154251.GM17671@n2100.armlinux.org.uk>
-Message-ID: <20180529154738.GL17159@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 29 May 2018 17:50:47 +0200
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+ <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
+ <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+Message-ID: <CAMuHMdWgsRTqrgwi5Z_xyNXmzS1h4gxLaawdFAL_DGF+Yt8s-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 04:42:51PM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 29, 2018 at 04:41:20PM +0100, Will Deacon wrote:
-> > Hi Russell,
-> > 
-> > On Tue, May 29, 2018 at 04:33:24PM +0100, Russell King - ARM Linux wrote:
-> > > On Tue, May 29, 2018 at 04:30:14PM +0100, Will Deacon wrote:
-> > > > Hi Arnd, Russell, [+Nico and Robin]
-> > > > 
-> > > > On Mon, May 28, 2018 at 05:44:36PM +0200, Arnd Bergmann wrote:
-> > > > > Now that the ARM CCI PMU driver can be built as a loadable module,
-> > > > > we get a link failure when MCPM is enabled:
-> > > > > 
-> > > > > ERROR: "mcpm_is_available" [drivers/perf/arm-cci.ko] undefined!
-> > > > > 
-> > > > > The simplest fix is to export that helper function.
-> > > > > 
-> > > > > Fixes: 8b0c93c20ef7 ("perf/arm-cci: Allow building as a module")
-> > > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > > ---
-> > > > > The patch that caused this is currently part of the arm-perf/for-next/perf
-> > > > > branch, it would be good to have the fix there as well.
-> > > > > ---
-> > > > >  arch/arm/common/mcpm_entry.c | 2 ++
-> > > > >  1 file changed, 2 insertions(+)
-> > > > 
-> > > > I'm happy to take this via the arm perf tree if others are ok with that.
-> > > > Alternatively, I can revert the offending commit if there are objections
-> > > > to exporting the symbol.
-> > > > 
-> > > > Russell: do you any preference?
-> > > 
-> > > As it claims to fix 8b0c93c20ef7, which I don't have, I can't take this
-> > > patch.  Do we know which tree has this?
-> > 
-> > Yes, sorry, it's in my for-next/perf branch:
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-next/perf&id=8b0c93c20ef78f15d8b760964ff79bda7f68c610
-> > 
-> > which is now in -next.
-> > 
-> > I'm happy to take the mcpm patch on top with your ack, but if you have
-> > conflicting changes (or would prefer not to export the symbol to modules)
-> > then I can just revert the patch in my tree for now.
-> 
-> I have no changes to that file, so:
-> 
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Hi Sudeep,
 
-Thanks, I've picked up the fix from Arnd with your Ack and will push out
-this evening.
+On Tue, May 29, 2018 at 3:18 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 29/05/18 12:56, Geert Uytterhoeven wrote:
+>> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+>>>> On Thu, May 17, 2018 at 7:05 PM, Catalin Marinas
+>>>> <catalin.marinas@arm.com> wrote:
+>>>>> On Fri, May 11, 2018 at 06:57:55PM -0500, Jeremy Linton wrote:
+>>>>>> Jeremy Linton (12):
+>>>>>>   arm64: topology: divorce MC scheduling domain from core_siblings
+>>>>>
+>>>>> Queued for 4.18 (without Sudeep's latest property_read_u64 cacheinfo
+>>>>> patch - http://lkml.kernel.org/r/20180517154701.GA20281 at e107155-lin; I
+>>>>> can add it separately).
+>>>>
+>>>> This is now commit 37c3ec2d810f87ea ("arm64: topology: divorce MC
+>>>> scheduling domain from core_siblings") in arm64/for-next/core, causing
+>>>> system suspend on big.LITTLE systems to hang after shutting down the first
+>>>> CPU:
+>>>>
+>>>>     $ echo mem > /sys/power/state
+>>>>     PM: suspend entry (deep)
+>>>>     PM: Syncing filesystems ... done.
+>>>>     Freezing user space processes ... (elapsed 0.001 seconds) done.
+>>>>     OOM killer disabled.
+>>>>     Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+>>>>     Disabling non-boot CPUs ...
+>>>>     CPU1: shutdown
+>>>>     psci: CPU1 killed.
+>>>
+>>> Is it OK to assume the suspend failed just after shutting down one CPU
+>>> or it's failing during resume ? It depends on whether you had console
+>>> disabled or not.
+>>
+>> I have no-console-suspend enabled.
+>> It's failing during suspend, the next lines should be:
+>>
+>>     CPU2: shutdown
+>>     psci: CPU2 killed.
+>>     ...
+>
+> OK, I was hoping to be something during resume as this patch has nothing
+> executed during suspend. Do you see any change in topology before and
+> after this patch applied. I am interested in the output of:
+>
+> $ grep "" /sys/devices/system/cpu/cpu*/topology/*
 
-Will
+/sys/devices/system/cpu/cpu0/topology/core_id:0
+/sys/devices/system/cpu/cpu0/topology/core_siblings:0f
+/sys/devices/system/cpu/cpu0/topology/core_siblings_list:0-3
+/sys/devices/system/cpu/cpu0/topology/physical_package_id:0
+/sys/devices/system/cpu/cpu0/topology/thread_siblings:01
+/sys/devices/system/cpu/cpu0/topology/thread_siblings_list:0
+/sys/devices/system/cpu/cpu1/topology/core_id:1
+/sys/devices/system/cpu/cpu1/topology/core_siblings:0f
+/sys/devices/system/cpu/cpu1/topology/core_siblings_list:0-3
+/sys/devices/system/cpu/cpu1/topology/physical_package_id:0
+/sys/devices/system/cpu/cpu1/topology/thread_siblings:02
+/sys/devices/system/cpu/cpu1/topology/thread_siblings_list:1
+/sys/devices/system/cpu/cpu2/topology/core_id:2
+/sys/devices/system/cpu/cpu2/topology/core_siblings:0f
+/sys/devices/system/cpu/cpu2/topology/core_siblings_list:0-3
+/sys/devices/system/cpu/cpu2/topology/physical_package_id:0
+/sys/devices/system/cpu/cpu2/topology/thread_siblings:04
+/sys/devices/system/cpu/cpu2/topology/thread_siblings_list:2
+/sys/devices/system/cpu/cpu3/topology/core_id:3
+/sys/devices/system/cpu/cpu3/topology/core_siblings:0f
+/sys/devices/system/cpu/cpu3/topology/core_siblings_list:0-3
+/sys/devices/system/cpu/cpu3/topology/physical_package_id:0
+/sys/devices/system/cpu/cpu3/topology/thread_siblings:08
+/sys/devices/system/cpu/cpu3/topology/thread_siblings_list:3
+/sys/devices/system/cpu/cpu4/topology/core_id:0
+/sys/devices/system/cpu/cpu4/topology/core_siblings:f0
+/sys/devices/system/cpu/cpu4/topology/core_siblings_list:4-7
+/sys/devices/system/cpu/cpu4/topology/physical_package_id:1
+/sys/devices/system/cpu/cpu4/topology/thread_siblings:10
+/sys/devices/system/cpu/cpu4/topology/thread_siblings_list:4
+/sys/devices/system/cpu/cpu5/topology/core_id:1
+/sys/devices/system/cpu/cpu5/topology/core_siblings:f0
+/sys/devices/system/cpu/cpu5/topology/core_siblings_list:4-7
+/sys/devices/system/cpu/cpu5/topology/physical_package_id:1
+/sys/devices/system/cpu/cpu5/topology/thread_siblings:20
+/sys/devices/system/cpu/cpu5/topology/thread_siblings_list:5
+/sys/devices/system/cpu/cpu6/topology/core_id:2
+/sys/devices/system/cpu/cpu6/topology/core_siblings:f0
+/sys/devices/system/cpu/cpu6/topology/core_siblings_list:4-7
+/sys/devices/system/cpu/cpu6/topology/physical_package_id:1
+/sys/devices/system/cpu/cpu6/topology/thread_siblings:40
+/sys/devices/system/cpu/cpu6/topology/thread_siblings_list:6
+/sys/devices/system/cpu/cpu7/topology/core_id:3
+/sys/devices/system/cpu/cpu7/topology/core_siblings:f0
+/sys/devices/system/cpu/cpu7/topology/core_siblings_list:4-7
+/sys/devices/system/cpu/cpu7/topology/physical_package_id:1
+/sys/devices/system/cpu/cpu7/topology/thread_siblings:80
+/sys/devices/system/cpu/cpu7/topology/thread_siblings_list:7
+
+No change before/after (both match my view of the hardware).
+
+>
+>>>> For me, it fails on the following big.LITTLE systems:
+>>>>
+>>>>     R-Car H3 ES2.0 (4xCA57 + 4xCA53)
+>>>>     R-Car M3-W (2xCA57 + 4xCA53)
+>>>>
+>>>
+>>> Interesting, is it PSCI based system suspend ?
+>>
+>> Yes it is.
+>
+> From DT, I guess this platform doesn't have any idle states.
+> Does this use genpd power domains ? I see power-domains in the DT, so
+> asking to get more info. Do you have any out of tree patches especially
+> if they are depending on some topology cpumasks ?
+
+No out-of-tree patches.
+I'm testing plain 37c3ec2d810f87ea vs. 37c3ec2d810f87ea^.
+There are power-domains in DT, but they're not managed by the new
+fancy CPU power domain code.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
