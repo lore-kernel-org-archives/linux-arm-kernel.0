@@ -1,38 +1,40 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 May 2018 11:18:27 +0100
-Subject: [PATCH 0/6] ASoC: qdsp6: Add support to TDM ports
-Message-ID: <20180529101833.30489-1-srinivas.kandagatla@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 May 2018 12:36:26 +0200
+Subject: [PATCH] ARM: disable KCOV for trusted foundations code
+Message-ID: <20180529103636.1535457-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds supports to 40 TDM ports available in q6AFE module.
+The ARM trusted foundations code is currently broken in linux-next
+when CONFIG_KCOV_INSTRUMENT_ALL is set:
 
-Among these 6 patches, there are 2 cleanup patches, first one which
-makes i2s use common prepare function and the second one is add
-macros for routings to make it easy to add new port routings.
-Rest of the 4 patches are tdm dt-bindings, afe port prepare support
-in afe, afe-dais support and adding tdm routing update.
+/tmp/ccHdQsCI.s: Assembler messages:
+/tmp/ccHdQsCI.s:37: Error: .err encountered
+/tmp/ccHdQsCI.s:38: Error: .err encountered
+/tmp/ccHdQsCI.s:39: Error: .err encountered
+scripts/Makefile.build:311: recipe for target 'arch/arm/firmware/trusted_foundations.o' failed
 
-These patches have been tested by Rohit on SDM845.
+I could not find a function attribute that lets me disable
+-fsanitize-coverage=trace-pc for just one function, so this
+turns it off for the entire file instead.
 
-Thanks,
-Srini
+Fixes: mmotm ("arm: port KCOV to arm")
+Cc: Dmitry Vyukov <dvyukov@google.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/firmware/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Srinivas Kandagatla (6):
-  ASoC: qdsp6: dt-bindings: Add q6afe tdm dt binding
-  ASoC: qdsp6: qdafe: add support to tdm ports
-  ASoC: qdsp6: q6afe-dai: use q6afe_dai_prepare() for MI2S
-  ASoC: qdsp6: q6afe-dai: add support to tdm dais
-  ASoC: qdsp6: q6routing: Add macros for mixers
-  ASoC: qdsp6: q6routing: Add support to all TDM Mixers
-
- .../devicetree/bindings/sound/qcom,q6afe.txt       |   68 ++
- include/dt-bindings/sound/qcom,q6afe.h             |   80 ++
- sound/soc/qcom/qdsp6/q6afe-dai.c                   |  621 ++++++++++-
- sound/soc/qcom/qdsp6/q6afe.c                       |  429 +++++++-
- sound/soc/qcom/qdsp6/q6afe.h                       |   20 +-
- sound/soc/qcom/qdsp6/q6routing.c                   | 1084 ++++++++++----------
- 6 files changed, 1733 insertions(+), 569 deletions(-)
-
+diff --git a/arch/arm/firmware/Makefile b/arch/arm/firmware/Makefile
+index a71f16536b6c..6e41336b0bc4 100644
+--- a/arch/arm/firmware/Makefile
++++ b/arch/arm/firmware/Makefile
+@@ -1 +1,4 @@
+ obj-$(CONFIG_TRUSTED_FOUNDATIONS)	+= trusted_foundations.o
++
++# tf_generic_smc() fails to build with -fsanitize-coverage=trace-pc
++KCOV_INSTRUMENT                := n
 -- 
-2.16.2
+2.9.0
