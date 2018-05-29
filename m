@@ -1,38 +1,40 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 29 May 2018 20:06:12 +0800
-Subject: [patch v22 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1527508827-30724-2-git-send-email-oleksandrs@mellanox.com>
-References: <1527508827-30724-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <201805291924.tuUwoWI9%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 May 2018 13:11:05 +0100
+Subject: [PATCH v2 01/17] arm/arm64: smccc: Add SMCCC-specific return codes
+In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
+References: <20180529121121.24927-1-marc.zyngier@arm.com>
+Message-ID: <20180529121121.24927-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+We've so far used the PSCI return codes for SMCCC because they
+were extremely similar. But with the new ARM DEN 0070A specification,
+"NOT_REQUIRED" (-2) is clashing with PSCI's "PSCI_RET_INVALID_PARAMS".
 
-I love your patch! Perhaps something to improve:
+Let's bite the bullet and add SMCCC specific return codes. Users
+can be repainted as and when required.
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.17-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20180529-185749
-config: i386-tinyconfig (attached as .config)
-compiler: gcc-8 (Debian 8.1.0-3) 8.1.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All warnings (new ones prefixed by >>):
-
->> ./usr/include/linux/jtag.h:63: found __[us]{8,16,32,64} type without #include <linux/types.h>
-
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6306 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/06e7f9c3/attachment.gz>
+ include/linux/arm-smccc.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index a031897fca76..c89da86de99f 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -291,5 +291,10 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+  */
+ #define arm_smccc_1_1_hvc(...)	__arm_smccc_1_1(SMCCC_HVC_INST, __VA_ARGS__)
+ 
++/* Return codes defined in ARM DEN 0070A */
++#define SMCCC_RET_SUCCESS			0
++#define SMCCC_RET_NOT_SUPPORTED			-1
++#define SMCCC_RET_NOT_REQUIRED			-2
++
+ #endif /*__ASSEMBLY__*/
+ #endif /*__LINUX_ARM_SMCCC_H*/
+-- 
+2.14.2
