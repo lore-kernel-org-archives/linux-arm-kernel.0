@@ -1,18 +1,21 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 17:48:11 +0100
-Subject: [PATCH v5 02/15] ARM: bugs: prepare processor bug infrastructure
-In-Reply-To: <E1fNg0w-00054e-W3@rmk-PC.armlinux.org.uk>
+Date: Tue, 29 May 2018 17:48:58 +0100
+Subject: [PATCH v5 03/15] ARM: bugs: hook processor bug checking into SMP
+ and suspend paths
+In-Reply-To: <E1fNg12-000557-3p@rmk-PC.armlinux.org.uk>
 References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
- <E1fNg0w-00054e-W3@rmk-PC.armlinux.org.uk>
-Message-ID: <86zi0i9zn8.wl-marc.zyngier@arm.com>
+ <E1fNg12-000557-3p@rmk-PC.armlinux.org.uk>
+Message-ID: <86y3g29zlx.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 May 2018 15:54:18 +0100,
+On Tue, 29 May 2018 15:54:24 +0100,
 Russell King wrote:
 > 
-> Prepare the processor bug infrastructure so that it can be expanded to
-> check for per-processor bugs.
+> Check for CPU bugs when secondary processors are being brought online,
+> and also when CPUs are resuming from a low power mode.  This gives an
+> opportunity to check that processor specific bug workarounds are
+> correctly enabled for all paths that a CPU re-enters the kernel.
 > 
 > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
