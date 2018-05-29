@@ -1,65 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 May 2018 09:33:49 +0100
-Subject: [PATCH v2 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <20180529083303.GF4790@dell>
-References: <20180504154714.5109-1-radu.pirea@microchip.com>
- <20180529083303.GF4790@dell>
-Message-ID: <20180529083349.GG4790@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 May 2018 09:39:15 +0100
+Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
+In-Reply-To: <b01f3226-5bb8-071a-e825-73bec913ffa8@st.com>
+References: <20180529155257.5ae48830@canb.auug.org.au>
+ <1bedc0b7-21f9-1e15-a11c-3de06e81b5ba@st.com>
+ <c306fbd9-21d9-5345-e820-52bc23d1b7c7@arm.com>
+ <b01f3226-5bb8-071a-e825-73bec913ffa8@st.com>
+Message-ID: <2d647302-0be8-555b-8063-06b0d2d72772@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 May 2018, Lee Jones wrote:
-
-> On Fri, 04 May 2018, Radu Pirea wrote:
+On 29/05/18 09:16, Alexandre Torgue wrote:
+> Hi Marc
 > 
-> > Hello,
-> > 
-> > This is the second version of driver. I added a mfd driver which by
-> > default probes atmel_serial driver and if in dt is specified to probe
-> > the spi driver, then the spi-at91-usart driver will be probed. The
-> > compatible for atmel_serial is now the compatible for at91-usart mfd
-> > driver and compatilbe for atmel_serial driver was changed in order to
-> > keep the bindings for serial as they are.
-> > 
-> > Changes in v1:
-> > - added spi-at91-usart driver
-> > 
-> > Changes in v2:
-> > - added at91-usart mfd driver
-> > - modified spi-at91-usart driver to work as mfd driver child
-> > - modified atmel_serial driver to work as mfd driver child
-> > 
-> > Radu Pirea (6):
-> >   MAINTAINERS: add at91 usart mfd driver
-> >   mfd: at91-usart: added mfd driver for usart
-> >   MAINTAINERS: add at91 usart spi driver
-> >   dt-bindings: add binding for at91-usart in spi mode
-> >   spi: at91-usart: add driver for at91-usart as spi
-> >   tty/serial: atmel: changed the driver to work under at91-usart mfd
-> > 
-> >  .../bindings/spi/microchip,at91-usart-spi.txt |  28 +
-> >  MAINTAINERS                                   |  14 +
-> >  drivers/mfd/Kconfig                           |  10 +
-> >  drivers/mfd/Makefile                          |   1 +
-> >  drivers/mfd/at91-usart.c                      |  81 +++
-> >  drivers/spi/Kconfig                           |   9 +
-> >  drivers/spi/Makefile                          |   1 +
-> >  drivers/spi/spi-at91-usart.c                  | 545 ++++++++++++++++++
-> >  drivers/tty/serial/Kconfig                    |   1 +
-> >  drivers/tty/serial/atmel_serial.c             |  29 +-
-> >  include/dt-bindings/mfd/at91-usart.h          |  17 +
-> >  11 files changed, 722 insertions(+), 14 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
-> >  create mode 100644 drivers/mfd/at91-usart.c
-> >  create mode 100644 drivers/spi/spi-at91-usart.c
-> >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> On 05/29/2018 09:47 AM, Marc Zyngier wrote:
+>> On 29/05/18 08:41, Alexandre Torgue wrote:
+>>> Hi Stephen
+>>>
+>>> On 05/29/2018 07:52 AM, Stephen Rothwell wrote:
+>>>> Hi all,
+>>>>
+>>>> Today's linux-next merge of the irqchip tree got a conflict in:
+>>>>
+>>>>     arch/arm/boot/dts/stm32mp157c.dtsi
+>>>>
+>>>> between commit:
+>>>>
+>>>>     3c00436fdb20 ("ARM: dts: stm32: add USBPHYC support to stm32mp157c")
+>>>>
+>>>> from the arm-soc tree and commit:
+>>>>
+>>>>     5f0e9d2557d7 ("ARM: dts: stm32: Add exti support for stm32mp157c")
+>>>>
+>>>> from the irqchip tree.
+>>>>
+>>>> I fixed it up (see below) and can carry the fix as necessary. This
+>>>> is now fixed as far as linux-next is concerned, but any non trivial
+>>>> conflicts should be mentioned to your upstream maintainer when your tree
+>>>> is submitted for merging.  You may also want to consider cooperating
+>>>> with the maintainer of the conflicting tree to minimise any particularly
+>>>> complex conflicts.
+>>>>
+>>>
+>>> Thanks for the fix (I will reorder nodes in a future patch). My opinion
+>>> is that all STM32 DT patches should come through my STM32 tree. It is my
+>>> role to fix this kind of conflicts. I thought it was a common rule
+>>> (driver patches go to sub-system maintainer tree and DT to the Machine
+>>> maintainer). For incoming next-series which contain DT+driver patches I
+>>> will indicate clearly that I take DT patch. I'm right ?
+>> Happy to oblige. Can you make sure you sync up with Ludovic and define
+>> what you want to do?
 > 
-> Applied, thanks.
+> Sorry I don't understand your reply. I just say that for series 
+> containing DT patches + drivers patches, to my point of view it is more 
+> safe that driver patches are taken by sub-system maintainer (you in this 
+> case) and that I take DT patches in my tree.
+And I'm happy to let you deal with these patches. I'm just asking you
+sync with Ludovic to split the series on whichever boundary you wish to
+enforce.
 
-Whoops!  Ignore this, wrong patch!
+>> In the meantime, I'm dropping the series altogether.
+>>
+> Why? We could keep it as Stephen fixed the merge issue.
+Well, you seem to have a strong opinion about who deals with what. I'll
+let Ludovic repost what you and him decide should go via the irqchip tree.
 
+Thanks,
+
+	M.
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
