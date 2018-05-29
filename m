@@ -1,149 +1,149 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 13:11:14 +0100
-Subject: [PATCH v2 10/17] arm64: ssbd: Add prctl interface for per-thread
- mitigation
-In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
-References: <20180529121121.24927-1-marc.zyngier@arm.com>
-Message-ID: <20180529121121.24927-11-marc.zyngier@arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Tue, 29 May 2018 15:19:34 +0300
+Subject: [PATCH v2 4/4] mmc: sdhci-msm: Add sdhci msm register write APIs
+ which wait for pwr irq
+In-Reply-To: <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
+References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
+ <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
+Message-ID: <74a4fe0e-7ae8-9f49-5614-1e01ae977475@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If running on a system that performs dynamic SSBD mitigation, allow
-userspace to request the mitigation for itself. This is implemented
-as a prctl call, allowing the mitigation to be enabled or disabled at
-will for this particular thread.
+Hello Vijay,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/Makefile |   1 +
- arch/arm64/kernel/ssbd.c   | 107 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
- create mode 100644 arch/arm64/kernel/ssbd.c
+On 09/27/2017 08:34 AM, Vijay Viswanath wrote:
+> Register writes which change voltage of IO lines or turn the IO bus
+> on/off require controller to be ready before progressing further. When
+> the controller is ready, it will generate a power irq which needs to be
+> handled. The thread which initiated the register write should wait for
+> power irq to complete. This will be done through the new sdhc msm write
+> APIs which will check whether the particular write can trigger a power
+> irq and wait for it with a timeout if it is expected.
+> The SDHC core power control IRQ gets triggered when -
+> * There is a state change in power control bit (bit 0)
+>   of SDHCI_POWER_CONTROL register.
+> * There is a state change in 1.8V enable bit (bit 3) of
+>   SDHCI_HOST_CONTROL2 register.
+> * Bit 1 of SDHCI_SOFTWARE_RESET is set.
+> 
+> Also add support APIs which are used by sdhc msm write APIs to check
+> if power irq is expected to be generated and wait for the power irq
+> to come and complete if the irq is expected.
+> 
+> This patch requires CONFIG_MMC_SDHCI_IO_ACCESSORS to be enabled.
+> 
+> Signed-off-by: Sahitya Tummala <stummala@codeaurora.org>
+> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
+> ---
+>  drivers/mmc/host/sdhci-msm.c | 173 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 171 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index bf825f38d206..0025f8691046 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -54,6 +54,7 @@ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
- arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
-+arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
- 
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
-new file mode 100644
-index 000000000000..07b12c034ec2
---- /dev/null
-+++ b/arch/arm64/kernel/ssbd.c
-@@ -0,0 +1,107 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 ARM Ltd, All Rights Reserved.
-+ */
-+
-+#include <linux/errno.h>
-+#include <linux/sched.h>
-+#include <linux/thread_info.h>
-+
-+#include <asm/cpufeature.h>
-+
-+/*
-+ * prctl interface for SSBD
-+ */
-+static int ssbd_prctl_set(struct task_struct *task, unsigned long ctrl)
-+{
-+	int state = arm64_get_ssbd_state();
-+
-+	/* Unsupported */
-+	if (state == ARM64_SSBD_UNKNOWN)
-+		return -EINVAL;
-+
-+	/* Treat the unaffected/mitigated state separately */
-+	if (state == ARM64_SSBD_MITIGATED) {
-+		switch (ctrl) {
-+		case PR_SPEC_ENABLE:
-+			return -EPERM;
-+		case PR_SPEC_DISABLE:
-+		case PR_SPEC_FORCE_DISABLE:
-+			return 0;
-+		}
-+	}
-+
-+	/*
-+	 * Things are a bit backward here: the arm64 internal API
-+	 * *enables the mitigation* when the userspace API *disables
-+	 * speculation*. So much fun.
-+	 */
-+	switch (ctrl) {
-+	case PR_SPEC_ENABLE:
-+		/* If speculation is force disabled, enable is not allowed */
-+		if (state == ARM64_SSBD_FORCE_ENABLE ||
-+		    task_spec_ssb_force_disable(task))
-+			return -EPERM;
-+		task_clear_spec_ssb_disable(task);
-+		clear_tsk_thread_flag(task, TIF_SSBD);
-+		break;
-+	case PR_SPEC_DISABLE:
-+		if (state == ARM64_SSBD_FORCE_DISABLE)
-+			return -EPERM;
-+		task_set_spec_ssb_disable(task);
-+		set_tsk_thread_flag(task, TIF_SSBD);
-+		break;
-+	case PR_SPEC_FORCE_DISABLE:
-+		if (state == ARM64_SSBD_FORCE_DISABLE)
-+			return -EPERM;
-+		task_set_spec_ssb_disable(task);
-+		task_set_spec_ssb_force_disable(task);
-+		set_tsk_thread_flag(task, TIF_SSBD);
-+		break;
-+	default:
-+		return -ERANGE;
-+	}
-+
-+	return 0;
-+}
-+
-+int arch_prctl_spec_ctrl_set(struct task_struct *task, unsigned long which,
-+			     unsigned long ctrl)
-+{
-+	switch (which) {
-+	case PR_SPEC_STORE_BYPASS:
-+		return ssbd_prctl_set(task, ctrl);
-+	default:
-+		return -ENODEV;
-+	}
-+}
-+
-+static int ssbd_prctl_get(struct task_struct *task)
-+{
-+	switch (arm64_get_ssbd_state()) {
-+	case ARM64_SSBD_UNKNOWN:
-+		return -EINVAL;
-+	case ARM64_SSBD_FORCE_ENABLE:
-+		return PR_SPEC_DISABLE;
-+	case ARM64_SSBD_KERNEL:
-+		if (task_spec_ssb_force_disable(task))
-+			return PR_SPEC_PRCTL | PR_SPEC_FORCE_DISABLE;
-+		if (task_spec_ssb_disable(task))
-+			return PR_SPEC_PRCTL | PR_SPEC_DISABLE;
-+		return PR_SPEC_PRCTL | PR_SPEC_ENABLE;
-+	case ARM64_SSBD_FORCE_DISABLE:
-+		return PR_SPEC_ENABLE;
-+	default:
-+		return PR_SPEC_NOT_AFFECTED;
-+	}
-+}
-+
-+int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
-+{
-+	switch (which) {
-+	case PR_SPEC_STORE_BYPASS:
-+		return ssbd_prctl_get(task);
-+	default:
-+		return -ENODEV;
-+	}
-+}
--- 
-2.14.2
+[..]
+
+> +/*
+> + * sdhci_msm_check_power_status API should be called when registers writes
+> + * which can toggle sdhci IO bus ON/OFF or change IO lines HIGH/LOW happens.
+> + * To what state the register writes will change the IO lines should be passed
+> + * as the argument req_type. This API will check whether the IO line's state
+> + * is already the expected state and will wait for power irq only if
+> + * power irq is expected to be trigerred based on the current IO line state
+> + * and expected IO line state.
+> + */
+> +static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+> +	bool done = false;
+> +
+> +	pr_debug("%s: %s: request %d curr_pwr_state %x curr_io_level %x\n",
+> +			mmc_hostname(host->mmc), __func__, req_type,
+> +			msm_host->curr_pwr_state, msm_host->curr_io_level);
+> +
+> +	/*
+> +	 * The IRQ for request type IO High/LOW will be generated when -
+> +	 * there is a state change in 1.8V enable bit (bit 3) of
+> +	 * SDHCI_HOST_CONTROL2 register. The reset state of that bit is 0
+> +	 * which indicates 3.3V IO voltage. So, when MMC core layer tries
+> +	 * to set it to 3.3V before card detection happens, the
+> +	 * IRQ doesn't get triggered as there is no state change in this bit.
+> +	 * The driver already handles this case by changing the IO voltage
+> +	 * level to high as part of controller power up sequence. Hence, check
+> +	 * for host->pwr to handle a case where IO voltage high request is
+> +	 * issued even before controller power up.
+> +	 */
+> +	if ((req_type & REQ_IO_HIGH) && !host->pwr) {
+> +		pr_debug("%s: do not wait for power IRQ that never comes, req_type: %d\n",
+> +				mmc_hostname(host->mmc), req_type);
+> +		return;
+> +	}
+> +	if ((req_type & msm_host->curr_pwr_state) ||
+> +			(req_type & msm_host->curr_io_level))
+> +		done = true;
+> +	/*
+> +	 * This is needed here to handle cases where register writes will
+> +	 * not change the current bus state or io level of the controller.
+> +	 * In this case, no power irq will be triggerred and we should
+> +	 * not wait.
+> +	 */
+> +	if (!done) {
+> +		if (!wait_event_timeout(msm_host->pwr_irq_wait,
+> +				msm_host->pwr_irq_flag,
+> +				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
+> +			__WARN_printf("%s: pwr_irq for req: (%d) timed out\n",
+> +					mmc_hostname(host->mmc), req_type);
+
+I am seeing the above error message on a db820c device (apq8096). When i
+unplug the SD card and then plug it back in, there is a 5 sec card
+detection delay and a timeout. Here is a log:
+
+[   50.253997] mmc0: card 59b4 removed
+[   50.381874] mmc0: sdhci_msm_check_power_status: request 1
+curr_pwr_state 2 curr_io_level 4 sdhci_host_ctrl2 b
+[   50.382656] mmc0: sdhci_msm_check_power_status: request 1 done
+[   50.392493] mmc0: sdhci_msm_check_power_status: request 4
+curr_pwr_state 1 curr_io_level 4 sdhci_host_ctrl2 b
+[   50.398258] mmc0: sdhci_msm_check_power_status: request 4 done
+[   50.408728] mmc0: sdhci_msm_check_power_status: request 4
+curr_pwr_state 1 curr_io_level 4 sdhci_host_ctrl2 8
+[   50.413865] mmc0: sdhci_msm_check_power_status: request 4 done
+[   54.966316] mmc0: sdhci_msm_check_power_status: request 2
+curr_pwr_state 1 curr_io_level 4 sdhci_host_ctrl2 8  <-- card is plugged
+[   54.967756] mmc0: sdhci_msm_check_power_status: request 2 done
+[   54.976822] mmc0: sdhci_msm_check_power_status: request 4
+curr_pwr_state 2 curr_io_level 8 sdhci_host_ctrl2 8
+[   60.132253] sdhci_msm 74a4900.sdhci: mmc0: pwr_irq for req: (4) timed out
+[   60.132782] mmc0: sdhci_msm_check_power_status: request 4 done
+[   60.139888] mmc0: sdhci_msm_check_power_status: request 4
+curr_pwr_state 2 curr_io_level 8 sdhci_host_ctrl2 8
+[   65.252497] sdhci_msm 74a4900.sdhci: mmc0: pwr_irq for req: (4) timed out
+
+The following patch seem to "fix" it.
+
+-- >8 --
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index b2d875afae5f..ca8ad4edcf80 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -1049,6 +1049,11 @@ static void sdhci_msm_check_power_status(struct
+sdhci_host *host, u32 req_type)
+                return;
+        }
+
++       if (req_type & REQ_IO_LOW &&
++           msm_host->curr_pwr_state & REQ_BUS_ON &&
++           msm_host->curr_io_level & REQ_IO_HIGH &&
++           !host->pwr)
++               done = true;
+        /*
+         * The IRQ for request type IO High/LOW will be generated when -
+         * there is a state change in 1.8V enable bit (bit 3) of
+-- >8 --
+
+Reverting this patch series or applying the above patch makes the issue
+go away. According to the log, there is no change in the
+sdhci_host_ctrl2 register. What do you think?
+
+Thanks,
+Georgi
