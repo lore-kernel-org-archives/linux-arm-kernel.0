@@ -1,59 +1,65 @@
-From: tommyhebb@gmail.com (Thomas Hebb)
-Date: Tue, 29 May 2018 11:41:42 -0400
-Subject: [PATCH] ARM: dts: berlin: switch to earlycon
-Message-ID: <7f67507ad697fc8c6d012f734c4d9a631d1afad1.1527608389.git.tommyhebb@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 May 2018 16:42:51 +0100
+Subject: [PATCH] ARM: mcpm, perf/arm-cci: export mcpm_is_available
+In-Reply-To: <20180529154120.GI17159@arm.com>
+References: <20180528154448.2494709-1-arnd@arndb.de>
+ <20180529153013.GH17159@arm.com>
+ <20180529153324.GL17671@n2100.armlinux.org.uk>
+ <20180529154120.GI17159@arm.com>
+Message-ID: <20180529154251.GM17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Synopsys DesignWare 8250 UART in Berlin SoCs is now supported by
-8250_early, so we can use earlycon for early console output instead
-of earlyprintk, which requires an SoC-specific kernel.
+On Tue, May 29, 2018 at 04:41:20PM +0100, Will Deacon wrote:
+> Hi Russell,
+> 
+> On Tue, May 29, 2018 at 04:33:24PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, May 29, 2018 at 04:30:14PM +0100, Will Deacon wrote:
+> > > Hi Arnd, Russell, [+Nico and Robin]
+> > > 
+> > > On Mon, May 28, 2018 at 05:44:36PM +0200, Arnd Bergmann wrote:
+> > > > Now that the ARM CCI PMU driver can be built as a loadable module,
+> > > > we get a link failure when MCPM is enabled:
+> > > > 
+> > > > ERROR: "mcpm_is_available" [drivers/perf/arm-cci.ko] undefined!
+> > > > 
+> > > > The simplest fix is to export that helper function.
+> > > > 
+> > > > Fixes: 8b0c93c20ef7 ("perf/arm-cci: Allow building as a module")
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > ---
+> > > > The patch that caused this is currently part of the arm-perf/for-next/perf
+> > > > branch, it would be good to have the fix there as well.
+> > > > ---
+> > > >  arch/arm/common/mcpm_entry.c | 2 ++
+> > > >  1 file changed, 2 insertions(+)
+> > > 
+> > > I'm happy to take this via the arm perf tree if others are ok with that.
+> > > Alternatively, I can revert the offending commit if there are objections
+> > > to exporting the symbol.
+> > > 
+> > > Russell: do you any preference?
+> > 
+> > As it claims to fix 8b0c93c20ef7, which I don't have, I can't take this
+> > patch.  Do we know which tree has this?
+> 
+> Yes, sorry, it's in my for-next/perf branch:
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-next/perf&id=8b0c93c20ef78f15d8b760964ff79bda7f68c610
+> 
+> which is now in -next.
+> 
+> I'm happy to take the mcpm patch on top with your ack, but if you have
+> conflicting changes (or would prefer not to export the symbol to modules)
+> then I can just revert the patch in my tree for now.
 
-Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
----
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        | 2 +-
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 2 +-
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts        | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+I have no changes to that file, so:
 
-diff --git a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-index 1c475796d17f..f98798bb684f 100644
---- a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-+++ b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-@@ -45,7 +45,7 @@
- 	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-index ca24def0ce13..20f31cdeaf38 100644
---- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-+++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-@@ -46,7 +46,7 @@
- 	compatible = "google,chromecast", "marvell,berlin2cd", "marvell,berlin";
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index 57aa5f8a7c77..9834e84a0797 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -49,7 +49,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Thanks.
+
 -- 
-2.17.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
