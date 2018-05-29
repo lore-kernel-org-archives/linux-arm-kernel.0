@@ -1,254 +1,63 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 May 2018 16:02:57 +0100
-Subject: [PATCH v5 00/15] ARM Spectre variant 2 fixes
-In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-Message-ID: <20180529150257.GK17671@n2100.armlinux.org.uk>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 29 May 2018 17:15:55 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+ <20180402142249.7e076a64@bbrezillon>
+ <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
+ <20180402212843.164d5d21@bbrezillon>
+ <20180402222020.1d344c14@bbrezillon>
+ <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
+ <20180403091813.5fb5c18c@bbrezillon>
+ <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
+ <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+ <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
+ <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
+ <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
+ <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
+ <19d68279-072e-7646-6fdd-8649578229ea@microchip.com>
+ <20180529164911.29820e07@bbrezillon>
+ <e3c34fb7-4881-3f49-b43b-1b07a8ab865d@microchip.com>
+Message-ID: <20180529171555.19dd723f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FFS, yes, there's a build error in this.  It's an obvious fix.  I
-won't be re-posting it for a third time today for such a trivial
-change, but I'll fix up my local version.
+On Tue, 29 May 2018 18:01:40 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-On Tue, May 29, 2018 at 03:53:21PM +0100, Russell King - ARM Linux wrote:
-> Sorry for another version so soon after the previous.
+> [...]
 > 
-> Fifth version:
-> - Really warn on the first discovery of an incorrect IBE bit, rather than
->   only checking the first time around.
 > 
->  arch/arm/include/asm/bugs.h        |   6 +-
->  arch/arm/include/asm/cp15.h        |   3 +
->  arch/arm/include/asm/cputype.h     |   8 ++
->  arch/arm/include/asm/kvm_asm.h     |   2 -
->  arch/arm/include/asm/kvm_host.h    |  14 ++-
->  arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
->  arch/arm/include/asm/proc-fns.h    |   4 +
->  arch/arm/include/asm/system_misc.h |  15 ++++
->  arch/arm/kernel/Makefile           |   1 +
->  arch/arm/kernel/bugs.c             |  18 ++++
->  arch/arm/kernel/smp.c              |   4 +
->  arch/arm/kernel/suspend.c          |   2 +
->  arch/arm/kvm/hyp/hyp-entry.S       | 112 ++++++++++++++++++++++-
->  arch/arm/mm/Kconfig                |  23 +++++
->  arch/arm/mm/Makefile               |   2 +-
->  arch/arm/mm/fault.c                |   3 +
->  arch/arm/mm/proc-macros.S          |   3 +-
->  arch/arm/mm/proc-v7-2level.S       |   6 --
->  arch/arm/mm/proc-v7-bugs.c         | 176 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++-------
->  20 files changed, 529 insertions(+), 50 deletions(-)
->  create mode 100644 arch/arm/kernel/bugs.c
->  create mode 100644 arch/arm/mm/proc-v7-bugs.c
-> 
-> On Tue, May 29, 2018 at 10:07:57AM +0100, Russell King - ARM Linux wrote:
-> > Fourth version:
-> > - Only warn once per CPU about incorrect IBE bit
-> >   (this avoids spamming the kernel log on cpuidle implementations that
-> >    use cpu_suspend() - spotted by Mark Brown.)
 > > 
-> >  arch/arm/include/asm/bugs.h        |   6 +-
-> >  arch/arm/include/asm/cp15.h        |   3 +
-> >  arch/arm/include/asm/cputype.h     |   8 ++
-> >  arch/arm/include/asm/kvm_asm.h     |   2 -
-> >  arch/arm/include/asm/kvm_host.h    |  14 ++-
-> >  arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
-> >  arch/arm/include/asm/proc-fns.h    |   4 +
-> >  arch/arm/include/asm/system_misc.h |  15 ++++
-> >  arch/arm/kernel/Makefile           |   1 +
-> >  arch/arm/kernel/bugs.c             |  18 ++++
-> >  arch/arm/kernel/smp.c              |   4 +
-> >  arch/arm/kernel/suspend.c          |   2 +
-> >  arch/arm/kvm/hyp/hyp-entry.S       | 112 +++++++++++++++++++++++-
-> >  arch/arm/mm/Kconfig                |  23 +++++
-> >  arch/arm/mm/Makefile               |   2 +-
-> >  arch/arm/mm/fault.c                |   3 +
-> >  arch/arm/mm/proc-macros.S          |   3 +-
-> >  arch/arm/mm/proc-v7-2level.S       |   6 --
-> >  arch/arm/mm/proc-v7-bugs.c         | 173 +++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mm/proc-v7.S              | 154 ++++++++++++++++++++++++++-------
-> >  20 files changed, 526 insertions(+), 50 deletions(-)
-> >  create mode 100644 arch/arm/kernel/bugs.c
-> >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
+> > I think you're missing something here. We use the DMA engine in memcpy
+> > mode (SRAM -> DRAM), not in device mode (dev -> DRAM or DRAM -> dev).
+> > So there's no dmas prop defined in the DT and there should not be.
 > > 
-> > On Fri, May 25, 2018 at 02:59:39PM +0100, Russell King - ARM Linux wrote:
-> > > Third version:
-> > > - Remove "PSCI" from the SMC version of the workaround as well.
-> > > - Avoid reporting active workaround if the IBE bit is not set.
-> > > - Only probe for workaround_1 on Cortex A57 and A72, or non-ARM CPUs.
-> > > - Require features probe for workaround_1 to return zero.
-> > > - Validation that all CPUs in the system have the same workaround status.
-> > > - Avoid corrupting r12 in workaround_1 KVM hypervisor implementation.
-> > > 
-> > >  arch/arm/include/asm/bugs.h        |   6 +-
-> > >  arch/arm/include/asm/cp15.h        |   3 +
-> > >  arch/arm/include/asm/cputype.h     |   8 ++
-> > >  arch/arm/include/asm/kvm_asm.h     |   2 -
-> > >  arch/arm/include/asm/kvm_host.h    |  14 ++-
-> > >  arch/arm/include/asm/kvm_mmu.h     |  23 ++++-
-> > >  arch/arm/include/asm/proc-fns.h    |   4 +
-> > >  arch/arm/include/asm/system_misc.h |  15 ++++
-> > >  arch/arm/kernel/Makefile           |   1 +
-> > >  arch/arm/kernel/bugs.c             |  18 ++++
-> > >  arch/arm/kernel/smp.c              |   4 +
-> > >  arch/arm/kernel/suspend.c          |   2 +
-> > >  arch/arm/kvm/hyp/hyp-entry.S       | 112 +++++++++++++++++++++++-
-> > >  arch/arm/mm/Kconfig                |  23 +++++
-> > >  arch/arm/mm/Makefile               |   2 +-
-> > >  arch/arm/mm/fault.c                |   3 +
-> > >  arch/arm/mm/proc-macros.S          |   3 +-
-> > >  arch/arm/mm/proc-v7-2level.S       |   6 --
-> > >  arch/arm/mm/proc-v7-bugs.c         | 170 +++++++++++++++++++++++++++++++++++++
-> > >  arch/arm/mm/proc-v7.S              | 154 ++++++++++++++++++++++++++-------
-> > >  20 files changed, 523 insertions(+), 50 deletions(-)
-> > >  create mode 100644 arch/arm/kernel/bugs.c
-> > >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
-> > > 
-> > > On Mon, May 21, 2018 at 12:42:38PM +0100, Russell King - ARM Linux wrote:
-> > > > This is the second posting - the original cover note is below.  Comments
-> > > > from previous series addresesd:
-> > > > - Drop R7 and R8 changes.
-> > > > - Remove "PSCI" from the hypervisor version of the workaround.
-> > > > 
-> > > >  arch/arm/include/asm/bugs.h        |   6 +-
-> > > >  arch/arm/include/asm/cp15.h        |   3 +
-> > > >  arch/arm/include/asm/cputype.h     |   5 ++
-> > > >  arch/arm/include/asm/kvm_asm.h     |   2 -
-> > > >  arch/arm/include/asm/kvm_host.h    |  14 +++-
-> > > >  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
-> > > >  arch/arm/include/asm/proc-fns.h    |   4 +
-> > > >  arch/arm/include/asm/system_misc.h |   8 ++
-> > > >  arch/arm/kernel/Makefile           |   1 +
-> > > >  arch/arm/kernel/bugs.c             |  18 +++++
-> > > >  arch/arm/kernel/smp.c              |   4 +
-> > > >  arch/arm/kernel/suspend.c          |   2 +
-> > > >  arch/arm/kvm/hyp/hyp-entry.S       | 108 +++++++++++++++++++++++++-
-> > > >  arch/arm/mm/Kconfig                |  23 ++++++
-> > > >  arch/arm/mm/Makefile               |   2 +-
-> > > >  arch/arm/mm/fault.c                |   3 +
-> > > >  arch/arm/mm/proc-macros.S          |   3 +-
-> > > >  arch/arm/mm/proc-v7-2level.S       |   6 --
-> > > >  arch/arm/mm/proc-v7-bugs.c         | 130 +++++++++++++++++++++++++++++++
-> > > >  arch/arm/mm/proc-v7.S              | 154 +++++++++++++++++++++++++++++--------
-> > > >  20 files changed, 469 insertions(+), 50 deletions(-)
-> > > >  create mode 100644 arch/arm/kernel/bugs.c
-> > > >  create mode 100644 arch/arm/mm/proc-v7-bugs.c
-> > > > 
-> > > > On Wed, May 16, 2018 at 11:59:49AM +0100, Russell King - ARM Linux wrote:
-> > > > > This series addresses the Spectre variant 2 issues on ARM Cortex and
-> > > > > Broadcom Brahma B15 CPUs.  Due to the complexity of the bug, it is not
-> > > > > possible to verify that this series fixes any of the bugs, since it
-> > > > > has not been able to reproduce these exact scenarios using test
-> > > > > programs.
-> > > > > 
-> > > > > I believe that this covers the entire extent of the Spectre variant 2
-> > > > > issues, with the exception of Cortex A53 and Cortex A72 processors as
-> > > > > these require a substantially more complex solution (except where the
-> > > > > workaround is implemented in PSCI firmware.)
-> > > > > 
-> > > > > Spectre variant 1 is not covered by this series.
-> > > > > 
-> > > > > The patch series is based partly on Marc Zyngier's work from February -
-> > > > > two of the KVM patches are from Marc's work.
-> > > > > 
-> > > > > The main differences are:
-> > > > > - Inclusion of more processors as per current ARM Ltd security update
-> > > > >   documentation.
-> > > > > - Extension of "bugs" infrastructure to detect Cortex A8 and Cortex A15
-> > > > >   CPUs missing out on the IBE bit being set on (re-)entry to the kernel
-> > > > >   through all paths.
-> > > > > - Handle all suspect userspace-touching-kernelspace aborts irrespective
-> > > > >   of mapping type.
-> > > > > 
-> > > > > The first patch will trivially conflict with the Broadcom Brahma
-> > > > > updates already in arm-soc - it has been necessary to independently
-> > > > > add the ID definitions for the B15 CPU.
-> > > > > 
-> > > > > Having worked through this series, I'm of the opinion that the
-> > > > > define_processor_functions macro in proc-v7 are probably  more hassle
-> > > > > than they're worth - here, we don't need the global equivalent symbols,
-> > > > > because we never refer to them from the kernel code for any V7
-> > > > > processor (MULTI_CPU is always defined.)
-> > > > > 
-> > > > > This series is currently in my "spectre" branch (along with some
-> > > > > Spectre variant 1 patches.)
-> > > > > 
-> > > > > Please carefully review.
-> > > > > 
-> > > > >  arch/arm/include/asm/bugs.h        |   6 +-
-> > > > >  arch/arm/include/asm/cp15.h        |   3 +
-> > > > >  arch/arm/include/asm/cputype.h     |   5 ++
-> > > > >  arch/arm/include/asm/kvm_asm.h     |   2 -
-> > > > >  arch/arm/include/asm/kvm_host.h    |  14 +++-
-> > > > >  arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
-> > > > >  arch/arm/include/asm/proc-fns.h    |   4 +
-> > > > >  arch/arm/include/asm/system_misc.h |   8 ++
-> > > > >  arch/arm/kernel/Makefile           |   1 +
-> > > > >  arch/arm/kernel/bugs.c             |  18 +++++
-> > > > >  arch/arm/kernel/smp.c              |   4 +
-> > > > >  arch/arm/kernel/suspend.c          |   2 +
-> > > > >  arch/arm/kvm/hyp/hyp-entry.S       | 108 ++++++++++++++++++++++++-
-> > > > >  arch/arm/mm/Kconfig                |  23 ++++++
-> > > > >  arch/arm/mm/Makefile               |   2 +-
-> > > > >  arch/arm/mm/fault.c                |   3 +
-> > > > >  arch/arm/mm/proc-macros.S          |   3 +-
-> > > > >  arch/arm/mm/proc-v7-2level.S       |   6 --
-> > > > >  arch/arm/mm/proc-v7-bugs.c         | 130 ++++++++++++++++++++++++++++++
-> > > > >  arch/arm/mm/proc-v7.S              | 158 +++++++++++++++++++++++++++++--------
-> > > > >  20 files changed, 471 insertions(+), 52 deletions(-)
-> > > > > 
-> > > > > -- 
-> > > > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > > > > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> > > > > According to speedtest.net: 8.21Mbps down 510kbps up
-> > > > > 
-> > > > > _______________________________________________
-> > > > > linux-arm-kernel mailing list
-> > > > > linux-arm-kernel at lists.infradead.org
-> > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > > 
-> > > > -- 
-> > > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > > > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> > > > According to speedtest.net: 8.21Mbps down 510kbps up
-> > > > 
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > 
-> > > -- 
-> > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> > > According to speedtest.net: 8.21Mbps down 510kbps up
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > Regards,
 > > 
-> > -- 
-> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> > According to speedtest.net: 8.21Mbps down 510kbps up
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > Boris
+> >   
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
+> Ok, so the memcpy SRAM <-> DRAM will hog the transfer between DRAM and 
+> LCD if my understanding is correct. That's the DMA that Peter wants to 
+> disable with his patch ?
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Then we can then try to force NFC SRAM DMA channels to use just DDR port 
+> 1 or 2 for memcpy ?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+You mean the dmaengine? According to "14.1.3 Master to Slave Access"
+that's already the case.
+
+Only DMAC0 can access the NFC SRAM and it's done through DMAC0:IF0,
+then access to DDR is going through port DDR port 1 (DMAC0:IF1) or 2
+(DMAC0:IF0).
+
+> 
+> I have also received a suggestion to try to increase the porches in 
+> LCDC_LCDCFG3 .
+
+Yep, Nicolas suggested something similar. Peter, can you try that?
