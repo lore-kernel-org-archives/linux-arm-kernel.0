@@ -1,67 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 13:11:15 +0100
-Subject: [PATCH v2 11/17] arm64: KVM: Add HYP per-cpu accessors
+Date: Tue, 29 May 2018 13:11:13 +0100
+Subject: [PATCH v2 09/17] arm64: ssbd: Introduce thread flag to control
+ userspace mitigation
 In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
 References: <20180529121121.24927-1-marc.zyngier@arm.com>
-Message-ID: <20180529121121.24927-12-marc.zyngier@arm.com>
+Message-ID: <20180529121121.24927-10-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're going to require to access per-cpu variables at EL2,
-let's craft the minimum set of accessors required to implement
-reading a per-cpu variable, relying on tpidr_el2 to contain the
-per-cpu offset.
+In order to allow userspace to be mitigated on demand, let's
+introduce a new thread flag that prevents the mitigation from
+being turned off when exiting to userspace, and doesn't turn
+it on on entry into the kernel (with the assumption that the
+mitigation is always enabled in the kernel itself).
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+This will be used by a prctl interface introduced in a later
+patch.
+
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 27 +++++++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/thread_info.h | 1 +
+ arch/arm64/kernel/entry.S            | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index f6648a3e4152..fefd8cf42c35 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -71,14 +71,37 @@ extern u32 __kvm_get_mdcr_el2(void);
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 740aa03c5f0d..cbcf11b5e637 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -94,6 +94,7 @@ void arch_release_task_struct(struct task_struct *tsk);
+ #define TIF_32BIT		22	/* 32bit process */
+ #define TIF_SVE			23	/* Scalable Vector Extension in use */
+ #define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
++#define TIF_SSBD		25	/* Wants SSB mitigation */
  
- extern u32 __init_stage2_translation(void);
- 
-+/* Home-grown __this_cpu_{ptr,read} variants that always work at HYP */
-+#define __hyp_this_cpu_ptr(sym)						\
-+	({								\
-+		void *__ptr = hyp_symbol_addr(sym);			\
-+		__ptr += read_sysreg(tpidr_el2);			\
-+		(typeof(&sym))__ptr;					\
-+	 })
-+
-+#define __hyp_this_cpu_read(sym)					\
-+	({								\
-+		*__hyp_this_cpu_ptr(sym);				\
-+	 })
-+
- #else /* __ASSEMBLY__ */
- 
--.macro get_host_ctxt reg, tmp
--	adr_l	\reg, kvm_host_cpu_state
-+.macro hyp_adr_this_cpu reg, sym, tmp
-+	adr_l	\reg, \sym
- 	mrs	\tmp, tpidr_el2
- 	add	\reg, \reg, \tmp
- .endm
- 
-+.macro hyp_ldr_this_cpu reg, sym, tmp
-+	adr_l	\reg, \sym
-+	mrs	\tmp, tpidr_el2
-+	ldr	\reg,  [\reg, \tmp]
-+.endm
-+
-+.macro get_host_ctxt reg, tmp
-+	hyp_adr_this_cpu \reg, kvm_host_cpu_state, \tmp
-+.endm
-+
- .macro get_vcpu_ptr vcpu, ctxt
- 	get_host_ctxt \ctxt, \vcpu
- 	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e6f6e2339b22..28ad8799406f 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -147,6 +147,8 @@ alternative_cb	arm64_enable_wa2_handling
+ alternative_cb_end
+ 	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
+ 	cbz	\tmp2, \targ
++	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
++	tbnz	\tmp2, #TIF_SSBD, \targ
+ 	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+ 	mov	w1, #\state
+ alternative_cb	arm64_update_smccc_conduit
 -- 
 2.14.2
