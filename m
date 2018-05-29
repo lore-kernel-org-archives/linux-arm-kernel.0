@@ -1,44 +1,102 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 10:09:01 +0100
-Subject: [PATCH v4 01/15] ARM: add more CPU part numbers for Cortex and Brahma
- B15 CPUs
+Date: Tue, 29 May 2018 10:09:11 +0100
+Subject: [PATCH v4 03/15] ARM: bugs: hook processor bug checking into SMP and
+ suspend paths
 In-Reply-To: <20180529090756.GG17671@n2100.armlinux.org.uk>
 References: <20180529090756.GG17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNacn-0000fJ-Ix@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fNacx-0000fc-UT@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CPU part numbers for Cortex A53, A57, A72, A73, A75 and the
-Broadcom Brahma B15 CPU.
+Check for CPU bugs when secondary processors are being brought online,
+and also when CPUs are resuming from a low power mode.  This gives an
+opportunity to check that processor specific bug workarounds are
+correctly enabled for all paths that a CPU re-enters the kernel.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Boot-tested-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/cputype.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/include/asm/bugs.h | 2 ++
+ arch/arm/kernel/bugs.c      | 5 +++++
+ arch/arm/kernel/smp.c       | 4 ++++
+ arch/arm/kernel/suspend.c   | 2 ++
+ 4 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb546425da8a..26021980504d 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -77,8 +77,16 @@
- #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
- #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
- #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
-+#define ARM_CPU_PART_CORTEX_A53		0x4100d030
-+#define ARM_CPU_PART_CORTEX_A57		0x4100d070
-+#define ARM_CPU_PART_CORTEX_A72		0x4100d080
-+#define ARM_CPU_PART_CORTEX_A73		0x4100d090
-+#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
- #define ARM_CPU_PART_MASK		0xff00fff0
+diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
+index ed122d294f3f..73a99c72a930 100644
+--- a/arch/arm/include/asm/bugs.h
++++ b/arch/arm/include/asm/bugs.h
+@@ -14,8 +14,10 @@ extern void check_writebuffer_bugs(void);
  
-+/* Broadcom cores */
-+#define ARM_CPU_PART_BRAHMA_B15		0x420000f0
+ #ifdef CONFIG_MMU
+ extern void check_bugs(void);
++extern void check_other_bugs(void);
+ #else
+ #define check_bugs() do { } while (0)
++#define check_other_bugs() do { } while (0)
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+index 88024028bb70..16e7ba2a9cc4 100644
+--- a/arch/arm/kernel/bugs.c
++++ b/arch/arm/kernel/bugs.c
+@@ -3,7 +3,12 @@
+ #include <asm/bugs.h>
+ #include <asm/proc-fns.h>
+ 
++void check_other_bugs(void)
++{
++}
 +
- /* DEC implemented cores */
- #define ARM_CPU_PART_SA1100		0x4400a110
+ void __init check_bugs(void)
+ {
+ 	check_writebuffer_bugs();
++	check_other_bugs();
+ }
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2da087926ebe..5ad0b67b9e33 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -31,6 +31,7 @@
+ #include <linux/irq_work.h>
  
+ #include <linux/atomic.h>
++#include <asm/bugs.h>
+ #include <asm/smp.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cpu.h>
+@@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * before we continue - which happens after __cpu_up returns.
+ 	 */
+ 	set_cpu_online(cpu, true);
++
++	check_other_bugs();
++
+ 	complete(&cpu_running);
+ 
+ 	local_irq_enable();
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index a40ebb7c0896..d08099269e35 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -3,6 +3,7 @@
+ #include <linux/slab.h>
+ #include <linux/mm_types.h>
+ 
++#include <asm/bugs.h>
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
+ #include <asm/pgalloc.h>
+@@ -36,6 +37,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 		cpu_switch_mm(mm->pgd, mm);
+ 		local_flush_bp_all();
+ 		local_flush_tlb_all();
++		check_other_bugs();
+ 	}
+ 
+ 	return ret;
 -- 
 2.7.4
