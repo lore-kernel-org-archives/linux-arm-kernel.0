@@ -1,33 +1,65 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 29 May 2018 18:02:38 +0200
-Subject: [PATCH v4] arm64: allwinner: a64: Add Amarula A64-Relic initial
- support
-In-Reply-To: <20180524111631.11864-1-jagan@amarulasolutions.com>
-References: <20180524111631.11864-1-jagan@amarulasolutions.com>
-Message-ID: <20180529160238.cdyzgl3t6jzovn23@flea.home>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 29 May 2018 19:04:48 +0300
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add I2C support
+In-Reply-To: <20180529130504.lpkpgads7lfomois@verge.net.au>
+References: <e9c94553-be9d-0eec-a1ee-1713bb97fbab@cogentembedded.com>
+ <3675b19f-b800-172f-9472-c47a37760fa9@cogentembedded.com>
+ <20180529130504.lpkpgads7lfomois@verge.net.au>
+Message-ID: <a33a0dd7-c301-fd44-9374-45d57df6a53d@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 04:46:31PM +0530, Jagan Teki wrote:
-> Amarula A64-Relic is Allwinner A64 based IoT device, which support
-> - Allwinner A64 Cortex-A53
-> - Mali-400MP2 GPU
-> - AXP803 PMIC
-> - 1GB DDR3 RAM
-> - 8GB eMMC
-> - AP6330 Wifi/BLE
-> - MIPI-DSI
-> - CSI: OV5640 sensor
-> - USB OTG
-> - 12V DC power supply
+On 05/29/2018 04:05 PM, Simon Horman wrote:
+
+>> Define the generic R8A77980 parts of the I2C[0-5] device node.
+>>
+>> Based on the original (and large) patch by Vladimir Barinov.
+>>
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |  111 ++++++++++++++++++++++++++++++
+>>  1 file changed, 111 insertions(+)
+>>
+>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+[...]
+>> @@ -135,6 +144,108 @@
+[...]
+>> +		i2c3: i2c at e66d0000 {
+>> +			compatible = "renesas,i2c-r8a77980",
+>> +				     "renesas,rcar-gen3-i2c";
+>> +			reg = <0 0xe66d0000 0 0x40>;
+>> +			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 928>;
+>> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 928>;
+>> +			dmas = <&dmac1 0x97>, <&dmac1 0x96>,
+>> +			       <&dmac2 0x97>, <&dmac2 0x96>;
+>> +			dma-names = "tx", "rx", "tx", "rx";
+>> +			i2c-scl-internal-delay-ns = <6>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			status = "disabled";
+>> +		};
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> DMA for i2c3 and i2c4  seems unclear in v0.80 and v1.00 of the User's Manual.
+> Although what is described here does match v0.55E of the User's Manual.
 
-Applied, thanks
+   Hm, looking at all these manuals, I'm not even seeing V3H I2C3/4 having DMA
+in v0.55E!
 
-Maxime
+> Have you been able to confirm what is correct here?
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+   No. Probably need to drop I2C3/4 DMA altogether...
+
+> Other than that this patch looks fine to me.
+
+   TY!
+
+[...]
+
+MBR, Sergei
