@@ -1,149 +1,76 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 29 May 2018 15:19:34 +0300
-Subject: [PATCH v2 4/4] mmc: sdhci-msm: Add sdhci msm register write APIs
- which wait for pwr irq
-In-Reply-To: <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
-References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
- <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
-Message-ID: <74a4fe0e-7ae8-9f49-5614-1e01ae977475@linaro.org>
+From: xuzaibo@huawei.com (Xu Zaibo)
+Date: Tue, 29 May 2018 20:24:28 +0800
+Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
+In-Reply-To: <99ff4f89-86ef-a251-894c-8aa8a47d2a69@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-14-jean-philippe.brucker@arm.com>
+ <5B0536A3.1000304@huawei.com> <cd13f60d-b282-3804-4ca7-2d34476c597f@arm.com>
+ <5B06B17C.1090809@huawei.com> <205c1729-8026-3efe-c363-d37d7150d622@arm.com>
+ <5B077765.30703@huawei.com> <fea420ff-e738-e2ed-ab1e-a3f4dde4b6ef@arm.com>
+ <5B08DA21.3070507@huawei.com> <99ff4f89-86ef-a251-894c-8aa8a47d2a69@arm.com>
+Message-ID: <5B0D467C.90206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vijay,
+Hi,
 
-On 09/27/2017 08:34 AM, Vijay Viswanath wrote:
-> Register writes which change voltage of IO lines or turn the IO bus
-> on/off require controller to be ready before progressing further. When
-> the controller is ready, it will generate a power irq which needs to be
-> handled. The thread which initiated the register write should wait for
-> power irq to complete. This will be done through the new sdhc msm write
-> APIs which will check whether the particular write can trigger a power
-> irq and wait for it with a timeout if it is expected.
-> The SDHC core power control IRQ gets triggered when -
-> * There is a state change in power control bit (bit 0)
->   of SDHCI_POWER_CONTROL register.
-> * There is a state change in 1.8V enable bit (bit 3) of
->   SDHCI_HOST_CONTROL2 register.
-> * Bit 1 of SDHCI_SOFTWARE_RESET is set.
-> 
-> Also add support APIs which are used by sdhc msm write APIs to check
-> if power irq is expected to be generated and wait for the power irq
-> to come and complete if the irq is expected.
-> 
-> This patch requires CONFIG_MMC_SDHCI_IO_ACCESSORS to be enabled.
-> 
-> Signed-off-by: Sahitya Tummala <stummala@codeaurora.org>
-> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
-> ---
->  drivers/mmc/host/sdhci-msm.c | 173 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 171 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+On 2018/5/29 19:55, Jean-Philippe Brucker wrote:
+> (If possible, please reply in plain text to the list. Reading this in a
+> text-only reader is confusing, because all quotes have the same level)
+Sorry for that? I have reset the thunderbird, :) thanks.
+> On 26/05/18 04:53, Xu Zaibo wrote:
+>> I guess there may be some misunderstandings :).
+>>
+>>  From the current patches, 'iommu_sva_device_shutdown' is called by 'vfio_iommu_sva_shutdown', which
+>> is mainly used by 'vfio_iommu_type1_detach_group' that is finally called by processes' release of vfio facilitiy
+>> automatically or called by 'VFIO_GROUP_UNSET_CONTAINER' manually in the processes.
+>>
+>> So, just image that 2 processes is working on the device with IOPF feature, and the 2 do the following to enable SVA:
+>>
+>>      1.open("/dev/vfio/vfio") ;
+>>
+>>     2.open the group of the devcie by calling open("/dev/vfio/x"), but now,
+>>       I think the second processes will fail to open the group because current VFIO thinks that one group only can be used by one process/vm,
+>>       at present, I use mediated device to create more groups on the parent device to support multiple processes;
+>>
+>>      3.VFIO_GROUP_SET_CONTAINER;
+>>
+>>      4.VFIO_SET_IOMMU;
+>>
+>>      5.VFIO_IOMMU_BIND;
+> I have a concern regarding your driver. With mdev you can't allow
+> processes to program the PASID themselves, since the parent device has a
+> single PASID table. You lose all isolation since processes could write
+> any value in the PASID field and access address spaces of other
+> processes bound to this parent device (even if the BIND call was for
+> other mdevs).
+Yes, if wrapdrive do nothing on this PASID setting procedure in kernel 
+space, I think
+there definitely exists this security risk.
+> The wrap driver has to mediate calls to bind(), and either program the
+> PASID into the device itself, or at least check that, when receiving a
+> SET_PASID ioctl from a process, the given PASID was actually allocated
+> to the process.
+Yes, good advice, thanks.
+>
+>>      6.Do some works with the hardware working unit filled by PASID on the device;
+>>
+>>     7.VFIO_IOMMU_UNBIND;
+>>
+>>      8.VFIO_GROUP_UNSET_CONTAINER;---here, have to sleep to wait another process to finish works of the step 6;
+>>
+>>      9. close(group); close(containner);
+>>
+>>
+>> So, my idea is: If it is possible to just release the params or facilities that only belong to the current process while the process shutdown the device,
+>> and while the last process releases them all. Then, as in the above step 8, we
+>> don't need to wait, or maybe wait for a very long time if the other process is doing lots of work on the device.
+> Given that you need to notify the mediating driver of IOMMU_BIND calls
+> as explained above, you could do something similar for shutdown: from
+> the mdev driver, call iommu_sva_shutdown_device() only for the last mdev.
+Currently, I add an API to check if it is the last mdev in wrapdrive, as 
+vfio shutdowns the device,
+it call the API to do the check at first.
 
-[..]
-
-> +/*
-> + * sdhci_msm_check_power_status API should be called when registers writes
-> + * which can toggle sdhci IO bus ON/OFF or change IO lines HIGH/LOW happens.
-> + * To what state the register writes will change the IO lines should be passed
-> + * as the argument req_type. This API will check whether the IO line's state
-> + * is already the expected state and will wait for power irq only if
-> + * power irq is expected to be trigerred based on the current IO line state
-> + * and expected IO line state.
-> + */
-> +static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
-> +{
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-> +	bool done = false;
-> +
-> +	pr_debug("%s: %s: request %d curr_pwr_state %x curr_io_level %x\n",
-> +			mmc_hostname(host->mmc), __func__, req_type,
-> +			msm_host->curr_pwr_state, msm_host->curr_io_level);
-> +
-> +	/*
-> +	 * The IRQ for request type IO High/LOW will be generated when -
-> +	 * there is a state change in 1.8V enable bit (bit 3) of
-> +	 * SDHCI_HOST_CONTROL2 register. The reset state of that bit is 0
-> +	 * which indicates 3.3V IO voltage. So, when MMC core layer tries
-> +	 * to set it to 3.3V before card detection happens, the
-> +	 * IRQ doesn't get triggered as there is no state change in this bit.
-> +	 * The driver already handles this case by changing the IO voltage
-> +	 * level to high as part of controller power up sequence. Hence, check
-> +	 * for host->pwr to handle a case where IO voltage high request is
-> +	 * issued even before controller power up.
-> +	 */
-> +	if ((req_type & REQ_IO_HIGH) && !host->pwr) {
-> +		pr_debug("%s: do not wait for power IRQ that never comes, req_type: %d\n",
-> +				mmc_hostname(host->mmc), req_type);
-> +		return;
-> +	}
-> +	if ((req_type & msm_host->curr_pwr_state) ||
-> +			(req_type & msm_host->curr_io_level))
-> +		done = true;
-> +	/*
-> +	 * This is needed here to handle cases where register writes will
-> +	 * not change the current bus state or io level of the controller.
-> +	 * In this case, no power irq will be triggerred and we should
-> +	 * not wait.
-> +	 */
-> +	if (!done) {
-> +		if (!wait_event_timeout(msm_host->pwr_irq_wait,
-> +				msm_host->pwr_irq_flag,
-> +				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
-> +			__WARN_printf("%s: pwr_irq for req: (%d) timed out\n",
-> +					mmc_hostname(host->mmc), req_type);
-
-I am seeing the above error message on a db820c device (apq8096). When i
-unplug the SD card and then plug it back in, there is a 5 sec card
-detection delay and a timeout. Here is a log:
-
-[   50.253997] mmc0: card 59b4 removed
-[   50.381874] mmc0: sdhci_msm_check_power_status: request 1
-curr_pwr_state 2 curr_io_level 4 sdhci_host_ctrl2 b
-[   50.382656] mmc0: sdhci_msm_check_power_status: request 1 done
-[   50.392493] mmc0: sdhci_msm_check_power_status: request 4
-curr_pwr_state 1 curr_io_level 4 sdhci_host_ctrl2 b
-[   50.398258] mmc0: sdhci_msm_check_power_status: request 4 done
-[   50.408728] mmc0: sdhci_msm_check_power_status: request 4
-curr_pwr_state 1 curr_io_level 4 sdhci_host_ctrl2 8
-[   50.413865] mmc0: sdhci_msm_check_power_status: request 4 done
-[   54.966316] mmc0: sdhci_msm_check_power_status: request 2
-curr_pwr_state 1 curr_io_level 4 sdhci_host_ctrl2 8  <-- card is plugged
-[   54.967756] mmc0: sdhci_msm_check_power_status: request 2 done
-[   54.976822] mmc0: sdhci_msm_check_power_status: request 4
-curr_pwr_state 2 curr_io_level 8 sdhci_host_ctrl2 8
-[   60.132253] sdhci_msm 74a4900.sdhci: mmc0: pwr_irq for req: (4) timed out
-[   60.132782] mmc0: sdhci_msm_check_power_status: request 4 done
-[   60.139888] mmc0: sdhci_msm_check_power_status: request 4
-curr_pwr_state 2 curr_io_level 8 sdhci_host_ctrl2 8
-[   65.252497] sdhci_msm 74a4900.sdhci: mmc0: pwr_irq for req: (4) timed out
-
-The following patch seem to "fix" it.
-
--- >8 --
-diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-index b2d875afae5f..ca8ad4edcf80 100644
---- a/drivers/mmc/host/sdhci-msm.c
-+++ b/drivers/mmc/host/sdhci-msm.c
-@@ -1049,6 +1049,11 @@ static void sdhci_msm_check_power_status(struct
-sdhci_host *host, u32 req_type)
-                return;
-        }
-
-+       if (req_type & REQ_IO_LOW &&
-+           msm_host->curr_pwr_state & REQ_BUS_ON &&
-+           msm_host->curr_io_level & REQ_IO_HIGH &&
-+           !host->pwr)
-+               done = true;
-        /*
-         * The IRQ for request type IO High/LOW will be generated when -
-         * there is a state change in 1.8V enable bit (bit 3) of
--- >8 --
-
-Reverting this patch series or applying the above patch makes the issue
-go away. According to the log, there is no change in the
-sdhci_host_ctrl2 register. What do you think?
-
-Thanks,
-Georgi
+Thanks
+Zaibo
