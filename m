@@ -3,7 +3,7 @@ Date: Tue, 29 May 2018 15:39:55 -0500
 Subject: [GIT PULL] SoCFPGA DTS updates for v4.18
 In-Reply-To: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
 References: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <f2304b65-7add-3a97-1ee8-b0d1ece33005@kernel.org>
+Message-ID: <fe59c431-fcc8-61bd-4312-83338cb71319@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
