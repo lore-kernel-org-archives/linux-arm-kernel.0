@@ -1,95 +1,44 @@
-From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
-Date: Tue, 29 May 2018 10:08:33 +0100
-Subject: [PATCH v2 10/11] arm64: dts: r8a77965-salvator-x: Enable DU
- external clocks and HDMI
-In-Reply-To: <CAMuHMdW6HeWMwRDcn6PLnwzgxvYz-h=jx=1qvYEK9okwqY0itg@mail.gmail.com>
-References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
- <20180427165722.19445-11-kieran.bingham+renesas@ideasonboard.com>
- <CAMuHMdW6HeWMwRDcn6PLnwzgxvYz-h=jx=1qvYEK9okwqY0itg@mail.gmail.com>
-Message-ID: <3a36b5e7-56ab-c680-e575-7a8394e5799a@ideasonboard.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 29 May 2018 10:09:01 +0100
+Subject: [PATCH v4 01/15] ARM: add more CPU part numbers for Cortex and Brahma
+ B15 CPUs
+In-Reply-To: <20180529090756.GG17671@n2100.armlinux.org.uk>
+References: <20180529090756.GG17671@n2100.armlinux.org.uk>
+Message-ID: <E1fNacn-0000fJ-Ix@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Add CPU part numbers for Cortex A53, A57, A72, A73, A75 and the
+Broadcom Brahma B15 CPU.
 
-On 28/05/18 10:06, Geert Uytterhoeven wrote:
-> Hi Kieran, Morimoto-san,
-> 
-> On Fri, Apr 27, 2018 at 6:57 PM, Kieran Bingham
-> <kieran.bingham+renesas@ideasonboard.com> wrote:
->> The DU1 external dot clock is provided by the fixed frequency clock
->> generator X21, while the DU0 and DU3 clocks are provided by the
->> programmable Versaclock5 clock generator.
->>
->> Enable the clocks, and the HDMI encoder for the M3-N Salvator-X board
->> and hook it up to the HDMI connector.
->>
->> Based on patches from Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>
->> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
->>
->> ---
->> v2:
->>  - Remove LVDS clocks from DU node
->>  - Merge DU Clocks and HDMI enablement
->> ---
->>  .../boot/dts/renesas/r8a77965-salvator-x.dts  | 28 +++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
->> index 75d890d91df9..340a3c72b65a 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
->> @@ -19,3 +19,31 @@
->>                 reg = <0x0 0x48000000 0x0 0x78000000>;
->>         };
->>  };
->> +
->> +&du {
->> +       clocks = <&cpg CPG_MOD 724>,
->> +                <&cpg CPG_MOD 723>,
->> +                <&cpg CPG_MOD 721>,
->> +                <&versaclock5 1>,
->> +                <&x21_clk>,
->> +                <&versaclock5 2>;
->> +       clock-names = "du.0", "du.1", "du.3",
->> +                     "dclkin.0", "dclkin.1", "dclkin.3";
->> +};
->> +
->> +&hdmi0 {
->> +       status = "okay";
->> +
->> +       ports {
->> +               port at 1 {
->> +                       reg = <1>;
->> +                       rcar_dw_hdmi0_out: endpoint {
->> +                               remote-endpoint = <&hdmi0_con>;
->> +                       };
->> +               };
->> +       };
->> +};
->> +
->> +&hdmi0_con {
->> +       remote-endpoint = <&rcar_dw_hdmi0_out>;
->> +};
-> 
-> I think the hdmi0 and hdmi0_con parts can be moved to salvator-common.dtsi.
-> Can we do that now (with stubs?), or does this have to wait until r8a77965 has
-> received HDMI sound support?
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Boot-tested-by: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/include/asm/cputype.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-I don't know about the sound integration I'm afraid, but common HDMI connections
-would certainly be a benefit I believe.
-
-Is this something you're looking to tackle? Or would you like
-me/Morimoto-san/media team to look at it?
-
-
---
-Regards
-
-Kieran
-
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb546425da8a..26021980504d 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -77,8 +77,16 @@
+ #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
+ #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
+ #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
++#define ARM_CPU_PART_CORTEX_A53		0x4100d030
++#define ARM_CPU_PART_CORTEX_A57		0x4100d070
++#define ARM_CPU_PART_CORTEX_A72		0x4100d080
++#define ARM_CPU_PART_CORTEX_A73		0x4100d090
++#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
+ #define ARM_CPU_PART_MASK		0xff00fff0
+ 
++/* Broadcom cores */
++#define ARM_CPU_PART_BRAHMA_B15		0x420000f0
++
+ /* DEC implemented cores */
+ #define ARM_CPU_PART_SA1100		0x4400a110
+ 
+-- 
+2.7.4
