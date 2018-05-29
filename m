@@ -1,40 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 May 2018 12:36:26 +0200
-Subject: [PATCH] ARM: disable KCOV for trusted foundations code
-Message-ID: <20180529103636.1535457-1-arnd@arndb.de>
+Date: Tue, 29 May 2018 12:46:00 +0200
+Subject: [PATCH] ARM; fix cpu_v7_bugs_init reference
+In-Reply-To: <20180529102502.GH17671@n2100.armlinux.org.uk>
+References: <20180529102301.1145470-1-arnd@arndb.de>
+ <20180529102502.GH17671@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a2TSQAdT94KMLiQF0ZvxEM_m+nVfgcY516EDoK4mQuTvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM trusted foundations code is currently broken in linux-next
-when CONFIG_KCOV_INSTRUMENT_ALL is set:
+On Tue, May 29, 2018 at 12:25 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> Please revalidate against the latest patches, this area has changed.
 
-/tmp/ccHdQsCI.s: Assembler messages:
-/tmp/ccHdQsCI.s:37: Error: .err encountered
-/tmp/ccHdQsCI.s:38: Error: .err encountered
-/tmp/ccHdQsCI.s:39: Error: .err encountered
-scripts/Makefile.build:311: recipe for target 'arch/arm/firmware/trusted_foundations.o' failed
+Ok. I assume they will be in tomorrow's linux-next kernel?
+I'll just wait for that then. Unfortunately there was no linux-next
+release yesterday, so I'm still testing on last Friday's code.
 
-I could not find a function attribute that lets me disable
--fsanitize-coverage=trace-pc for just one function, so this
-turns it off for the entire file instead.
-
-Fixes: mmotm ("arm: port KCOV to arm")
-Cc: Dmitry Vyukov <dvyukov@google.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/firmware/Makefile | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/firmware/Makefile b/arch/arm/firmware/Makefile
-index a71f16536b6c..6e41336b0bc4 100644
---- a/arch/arm/firmware/Makefile
-+++ b/arch/arm/firmware/Makefile
-@@ -1 +1,4 @@
- obj-$(CONFIG_TRUSTED_FOUNDATIONS)	+= trusted_foundations.o
-+
-+# tf_generic_smc() fails to build with -fsanitize-coverage=trace-pc
-+KCOV_INSTRUMENT                := n
--- 
-2.9.0
+      Arnd
