@@ -1,61 +1,62 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 29 May 2018 22:45:17 +0200
-Subject: v4.17-rc1: regressions on N900, N950
-In-Reply-To: <20180524094705.GA16705@amd>
-References: <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
- <20180521213952.GA11596@amd> <20180522080250.4fzyvqrgw5oigexn@pali>
- <20180522194139.GB2299@darkstar.musicnaut.iki.fi>
- <20180522205824.GA24927@amd>
- <20180522215638.GC2299@darkstar.musicnaut.iki.fi>
- <20180523140615.GA27180@amd> <20180523201208.GA31731@amd>
- <20180523220456.GY98604@atomide.com> <20180524094705.GA16705@amd>
-Message-ID: <20180529204517.GA6765@amd>
+From: brking@linux.ibm.com (Brian King)
+Date: Tue, 29 May 2018 15:45:52 -0500
+Subject: [PATCH v4 5/7] scsi: ipr: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521514207-10695-6-git-send-email-okaya@codeaurora.org>
+References: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
+ <1521514207-10695-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <a10fa941-1729-2890-50cb-59c4a5b5e596@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > still results in working touchscreen, removing any of the three fields
-> > > breaks it again.
-> > 
-> > I bisected one regression down, see "omapdrm regression in v4.17-rc series"
-> > not sure if it covers all the issues being discussed here though.
+On 03/19/2018 09:50 PM, Sinan Kaya wrote:
+> Code includes barrier() followed by writel(). writel() already has a
+> barrier
+> on some architectures like arm64.
 > 
-> Reverting 24aac6011f70 fixes screen on n900 in v4.17-rc for me. (But
-> strange dependency on tsc2005 at 0 is still there).
+> This ends up CPU observing two barriers back to back before executing the
+> register write.
+> 
+> Since code already has an explicit barrier call, changing writeX() to
+> writeX_relaxed().
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/scsi/ipr.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/scsi/ipr.c b/drivers/scsi/ipr.c
+> index e07dd99..209adac 100644
+> --- a/drivers/scsi/ipr.c
+> +++ b/drivers/scsi/ipr.c
+> @@ -762,9 +762,9 @@ static void ipr_mask_and_clear_interrupts(struct ipr_ioa_cfg *ioa_cfg,
+> 
+>  	/* Set interrupt mask to stop all new interrupts */
+>  	if (ioa_cfg->sis64)
+> -		writeq(~0, ioa_cfg->regs.set_interrupt_mask_reg);
+> +		writeq_relaxed(~0, ioa_cfg->regs.set_interrupt_mask_reg);
+>  	else
+> -		writel(~0, ioa_cfg->regs.set_interrupt_mask_reg);
+> +		writel_relaxed(~0, ioa_cfg->regs.set_interrupt_mask_reg);
+> 
+>  	/* Clear any pending interrupts */
+>  	if (ioa_cfg->sis64)
+> @@ -8435,7 +8435,8 @@ static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
+>  	wmb();
+>  	if (ioa_cfg->sis64) {
+>  		/* Set the adapter to the correct endian mode. */
+> -		writel(IPR_ENDIAN_SWAP_KEY, ioa_cfg->regs.endian_swap_reg);
+> +		writel_relaxed(IPR_ENDIAN_SWAP_KEY,
+> +			       ioa_cfg->regs.endian_swap_reg);
+>  		int_reg = readl(ioa_cfg->regs.endian_swap_reg);
+>  	}
+> 
 
-Laurent, your patch looks pretty obvious, but unfortunately breaks
-display on Nokia N900.
+Looks fine to me. Thanks.
 
-The patch is pretty big as is, perhaps you have version split to sdi
-=> *sdi and then static => dynamic allocation?
-
-Thanks,
-								Pavel
-
-commit 24aac6011f704d69b5f34514923413f85669f282
-Author: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Date:   Tue Feb 13 14:00:47 2018 +0200
-
-    drm: omapdrm: sdi: Allocate the sdi private data structure
-    dynamically
-
-    The sdi private data structure is currently stored as a global
-        variable. While no platform with multiple SDI encoders
-        currently exists
-	    nor is planned, this doesn't comply with the kernel device
-        model and
-	    should thus be fixed.
-    
-
+Acked-by: Brian King <brking@linux.vnet.ibm.com>
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/4beb1f9c/attachment.sig>
+Brian King
+Power Linux I/O
+IBM Linux Technology Center
