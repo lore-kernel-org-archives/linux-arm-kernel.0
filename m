@@ -1,51 +1,46 @@
 From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 29 May 2018 15:39:55 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.18
-In-Reply-To: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
-References: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <fe59c431-fcc8-61bd-4312-83338cb71319@kernel.org>
+Date: Tue, 29 May 2018 15:40:18 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.18, part 2
+In-Reply-To: <20180514135144.26872-1-dinguyen@kernel.org>
+References: <20180514135144.26872-1-dinguyen@kernel.org>
+Message-ID: <d634f5e4-5f20-d0bd-b92a-40b3ebc481c5@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Ping?
 
-On 04/23/2018 09:39 AM, Dinh Nguyen wrote:
+On 05/14/2018 08:51 AM, Dinh Nguyen wrote:
 > Hi Arnd, Kevin, and Olof:
 > 
-> Please full in these SoCFPGA Stratix10 DTS updates for v4.18.
+> Please pull in more updates for SoCFPGA Stratix10 DTS for v4.18.
 > 
 > Thanks,
 > Dinh
 > 
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.18_part1
-> 
-> for you to fetch changes up to ab50a44404a53b12554005ed4c5a1b3547ac9492:
+> The following changes since commit ab50a44404a53b12554005ed4c5a1b3547ac9492:
 > 
 >   arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts (2018-04-16 15:58:58 -0500)
 > 
-> ----------------------------------------------------------------
-> SoCFPGA DTS updates for v4.18
-> - Stratix10 platform updates
->   - Populate clock properties for platform
->   - Enable DMA and I2C
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_for_next_v4.18_dts_v2
+> 
+> for you to fetch changes up to 91fdd8274f32987760bbdb2981b4a896e338c09e:
+> 
+>   arm64: dts: stratix10: add sdram ecc (2018-05-08 08:11:29 -0500)
 > 
 > ----------------------------------------------------------------
-> Alan Tull (1):
->       arm64: dts: stratix10: enable i2c, add i2c periperals
+> Bartosz Golaszewski (1):
+>       ARM: dts: consistently use 'atmel' as at24 manufacturer in cyclone5
 > 
-> Dinh Nguyen (1):
->       arm64: dts: stratix10: use clock bindings for the Stratix10 platform
+> Ooi, Joyce (1):
+>       arm64: dts: stratix10: Change pad skew values for EMAC0 PHY driver
 > 
-> Graham Moore (1):
->       arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts
+> Thor Thayer (1):
+>       arm64: dts: stratix10: add sdram ecc
 > 
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 71 +++++++++++++++++++++-
->  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 42 +++++++++++++
->  2 files changed, 111 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts     |  6 +++---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi      | 12 ++++++++++++
+>  arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts |  2 +-
+>  3 files changed, 16 insertions(+), 4 deletions(-)
 > 
