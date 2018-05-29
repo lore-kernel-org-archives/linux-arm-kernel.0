@@ -1,169 +1,69 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 10:09:53 +0100
-Subject: [PATCH v4 11/15] ARM: KVM: invalidate BTB on guest exit for
- Cortex-A12/A17
+Date: Tue, 29 May 2018 10:09:06 +0100
+Subject: [PATCH v4 02/15] ARM: bugs: prepare processor bug infrastructure
 In-Reply-To: <20180529090756.GG17671@n2100.armlinux.org.uk>
 References: <20180529090756.GG17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNadd-0000gy-8I@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fNacs-0000fQ-Pe@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Prepare the processor bug infrastructure so that it can be expanded to
+check for per-processor bugs.
 
-In order to avoid aliasing attacks against the branch predictor,
-let's invalidate the BTB on guest exit. This is made complicated
-by the fact that we cannot take a branch before invalidating the
-BTB.
-
-We only apply this to A12 and A17, which are the only two ARM
-cores on which this useful.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Boot-tested-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/kvm_asm.h |  2 --
- arch/arm/include/asm/kvm_mmu.h | 17 +++++++++-
- arch/arm/kvm/hyp/hyp-entry.S   | 71 ++++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 85 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/bugs.h | 4 ++--
+ arch/arm/kernel/Makefile    | 1 +
+ arch/arm/kernel/bugs.c      | 9 +++++++++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/kernel/bugs.c
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 36dd2962a42d..df24ed48977d 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -61,8 +61,6 @@ struct kvm_vcpu;
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
+diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
+index a97f1ea708d1..ed122d294f3f 100644
+--- a/arch/arm/include/asm/bugs.h
++++ b/arch/arm/include/asm/bugs.h
+@@ -10,10 +10,10 @@
+ #ifndef __ASM_BUGS_H
+ #define __ASM_BUGS_H
  
--extern char __kvm_hyp_vector[];
--
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index de1b919404e4..d08ce9c41df4 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -297,7 +297,22 @@ static inline unsigned int kvm_get_vmid_bits(void)
+-#ifdef CONFIG_MMU
+ extern void check_writebuffer_bugs(void);
  
- static inline void *kvm_get_hyp_vector(void)
- {
--	return kvm_ksym_ref(__kvm_hyp_vector);
-+	switch(read_cpuid_part()) {
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	case ARM_CPU_PART_CORTEX_A12:
-+	case ARM_CPU_PART_CORTEX_A17:
-+	{
-+		extern char __kvm_hyp_vector_bp_inv[];
-+		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
-+	}
-+
-+#endif
-+	default:
-+	{
-+		extern char __kvm_hyp_vector[];
-+		return kvm_ksym_ref(__kvm_hyp_vector);
-+	}
-+	}
- }
+-#define check_bugs() check_writebuffer_bugs()
++#ifdef CONFIG_MMU
++extern void check_bugs(void);
+ #else
+ #define check_bugs() do { } while (0)
+ #endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index b59ac4bf82b8..8cad59465af3 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -31,6 +31,7 @@ else
+ obj-y		+= entry-armv.o
+ endif
  
- static inline int kvm_map_vectors(void)
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 95a2faefc070..e789f52a5129 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -71,6 +71,66 @@
- 	W(b)	hyp_irq
- 	W(b)	hyp_fiq
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	.align 5
-+__kvm_hyp_vector_bp_inv:
-+	.global __kvm_hyp_vector_bp_inv
++obj-$(CONFIG_MMU)		+= bugs.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+ obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+new file mode 100644
+index 000000000000..88024028bb70
+--- /dev/null
++++ b/arch/arm/kernel/bugs.c
+@@ -0,0 +1,9 @@
++// SPDX-Identifier: GPL-2.0
++#include <linux/init.h>
++#include <asm/bugs.h>
++#include <asm/proc-fns.h>
 +
-+	/*
-+	 * We encode the exception entry in the bottom 3 bits of
-+	 * SP, and we have to guarantee to be 8 bytes aligned.
-+	 */
-+	W(add)	sp, sp, #1	/* Reset 	  7 */
-+	W(add)	sp, sp, #1	/* Undef	  6 */
-+	W(add)	sp, sp, #1	/* Syscall	  5 */
-+	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-+	W(add)	sp, sp, #1	/* Data abort	  3 */
-+	W(add)	sp, sp, #1	/* HVC		  2 */
-+	W(add)	sp, sp, #1	/* IRQ		  1 */
-+	W(nop)			/* FIQ		  0 */
-+
-+	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
-+	isb
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+	/*
-+	 * Yet another silly hack: Use VPIDR as a temp register.
-+	 * Thumb2 is really a pain, as SP cannot be used with most
-+	 * of the bitwise instructions. The vect_br macro ensures
-+	 * things gets cleaned-up.
-+	 */
-+	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
-+	mov	r0, sp
-+	and	r0, r0, #7
-+	sub	sp, sp, r0
-+	push	{r1, r2}
-+	mov	r1, r0
-+	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
-+	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
-+	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
-+#endif
-+
-+.macro vect_br val, targ
-+ARM(	eor	sp, sp, #\val	)
-+ARM(	tst	sp, #7		)
-+ARM(	eorne	sp, sp, #\val	)
-+
-+THUMB(	cmp	r1, #\val	)
-+THUMB(	popeq	{r1, r2}	)
-+
-+	beq	\targ
-+.endm
-+
-+	vect_br	0, hyp_fiq
-+	vect_br	1, hyp_irq
-+	vect_br	2, hyp_hvc
-+	vect_br	3, hyp_dabt
-+	vect_br	4, hyp_pabt
-+	vect_br	5, hyp_svc
-+	vect_br	6, hyp_undef
-+	vect_br	7, hyp_reset
-+#endif
-+
- .macro invalid_vector label, cause
- 	.align
- \label:	mov	r0, #\cause
-@@ -149,7 +209,14 @@ ENDPROC(__hyp_do_panic)
- 	bx	ip
- 
- 1:
--	push	{lr}
-+	/*
-+	 * Pushing r2 here is just a way of keeping the stack aligned to
-+	 * 8 bytes on any path that can trigger a HYP exception. Here,
-+	 * we may well be about to jump into the guest, and the guest
-+	 * exit would otherwise be badly decoded by our fancy
-+	 * "decode-exception-without-a-branch" code...
-+	 */
-+	push	{r2, lr}
- 
- 	mov	lr, r0
- 	mov	r0, r1
-@@ -159,7 +226,7 @@ ENDPROC(__hyp_do_panic)
- THUMB(	orr	lr, #1)
- 	blx	lr			@ Call the HYP function
- 
--	pop	{lr}
-+	pop	{r2, lr}
- 	eret
- 
- guest_trap:
++void __init check_bugs(void)
++{
++	check_writebuffer_bugs();
++}
 -- 
 2.7.4
