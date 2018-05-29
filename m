@@ -1,88 +1,26 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 29 May 2018 10:55:25 +0200
-Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
-In-Reply-To: <2d647302-0be8-555b-8063-06b0d2d72772@arm.com>
-References: <20180529155257.5ae48830@canb.auug.org.au>
- <1bedc0b7-21f9-1e15-a11c-3de06e81b5ba@st.com>
- <c306fbd9-21d9-5345-e820-52bc23d1b7c7@arm.com>
- <b01f3226-5bb8-071a-e825-73bec913ffa8@st.com>
- <2d647302-0be8-555b-8063-06b0d2d72772@arm.com>
-Message-ID: <b8fa6cc9-5d73-81a2-25b8-f0c858ef0c62@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 29 May 2018 10:57:11 +0200
+Subject: [PATCH v2] arm64: dts: renesas: r8a77965: Add Watchdog Timer
+ controller node using RCLK Watchdog Timer
+In-Reply-To: <1527577262-8754-1-git-send-email-ykaneko0929@gmail.com>
+References: <1527577262-8754-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20180529085710.bwszso7ywiyvy5ld@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/29/2018 10:39 AM, Marc Zyngier wrote:
-> On 29/05/18 09:16, Alexandre Torgue wrote:
->> Hi Marc
->>
->> On 05/29/2018 09:47 AM, Marc Zyngier wrote:
->>> On 29/05/18 08:41, Alexandre Torgue wrote:
->>>> Hi Stephen
->>>>
->>>> On 05/29/2018 07:52 AM, Stephen Rothwell wrote:
->>>>> Hi all,
->>>>>
->>>>> Today's linux-next merge of the irqchip tree got a conflict in:
->>>>>
->>>>>      arch/arm/boot/dts/stm32mp157c.dtsi
->>>>>
->>>>> between commit:
->>>>>
->>>>>      3c00436fdb20 ("ARM: dts: stm32: add USBPHYC support to stm32mp157c")
->>>>>
->>>>> from the arm-soc tree and commit:
->>>>>
->>>>>      5f0e9d2557d7 ("ARM: dts: stm32: Add exti support for stm32mp157c")
->>>>>
->>>>> from the irqchip tree.
->>>>>
->>>>> I fixed it up (see below) and can carry the fix as necessary. This
->>>>> is now fixed as far as linux-next is concerned, but any non trivial
->>>>> conflicts should be mentioned to your upstream maintainer when your tree
->>>>> is submitted for merging.  You may also want to consider cooperating
->>>>> with the maintainer of the conflicting tree to minimise any particularly
->>>>> complex conflicts.
->>>>>
->>>>
->>>> Thanks for the fix (I will reorder nodes in a future patch). My opinion
->>>> is that all STM32 DT patches should come through my STM32 tree. It is my
->>>> role to fix this kind of conflicts. I thought it was a common rule
->>>> (driver patches go to sub-system maintainer tree and DT to the Machine
->>>> maintainer). For incoming next-series which contain DT+driver patches I
->>>> will indicate clearly that I take DT patch. I'm right ?
->>> Happy to oblige. Can you make sure you sync up with Ludovic and define
->>> what you want to do?
->>
->> Sorry I don't understand your reply. I just say that for series
->> containing DT patches + drivers patches, to my point of view it is more
->> safe that driver patches are taken by sub-system maintainer (you in this
->> case) and that I take DT patches in my tree.
-> And I'm happy to let you deal with these patches. I'm just asking you
-> sync with Ludovic to split the series on whichever boundary you wish to
-> enforce.
-ok
-
+On Tue, May 29, 2018 at 04:01:02PM +0900, Yoshihiro Kaneko wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > 
->>> In the meantime, I'm dropping the series altogether.
->>>
->> Why? We could keep it as Stephen fixed the merge issue.
-> Well, you seem to have a strong opinion about who deals with what. I'll
-> let Ludovic repost what you and him decide should go via the irqchip tree.
-
-It's not a "strong" opinion just my point of view and maybe not the good 
-one. I thought that's the way of working was like I explained. If you 
-prefer 2 series (one for driver patches and another one for DT patches) 
-I will be happy with that.
-
-Ludovic, what is your opinion ?
-
-Regards
-Alexandre
-
+> Add a device node for the Watchdog Timer (WDT) controller on the Renesas
+> R-Car M3-N (R8A77965) SoC.
 > 
-> Thanks,
+> Based on a similar patch of the R8A7796 device tree
+> by Geert Uytterhoeven <geert+renesas@glider.be>.
 > 
-> 	M.
-> 
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Thanks, applied.
