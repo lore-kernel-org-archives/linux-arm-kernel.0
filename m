@@ -1,102 +1,80 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 May 2018 11:18:30 +0100
-Subject: [PATCH 3/6] ASoC: qdsp6: q6afe-dai: use q6afe_dai_prepare() for MI2S
-In-Reply-To: <20180529101833.30489-1-srinivas.kandagatla@linaro.org>
-References: <20180529101833.30489-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180529101833.30489-4-srinivas.kandagatla@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 29 May 2018 12:14:15 +0100
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+Message-ID: <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common q6afe_dai_prepare() for MI2S dais, this will remove
-some code duplication. Also make the if statement to switch to
-make the code look neater.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- sound/soc/qcom/qdsp6/q6afe-dai.c | 53 ++++++++++++++--------------------------
- 1 file changed, 18 insertions(+), 35 deletions(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
-index 4378e29a95c5..e529edfd8001 100644
---- a/sound/soc/qcom/qdsp6/q6afe-dai.c
-+++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
-@@ -144,38 +144,6 @@ static void q6afe_dai_shutdown(struct snd_pcm_substream *substream,
- 
- }
- 
--static int q6afe_mi2s_prepare(struct snd_pcm_substream *substream,
--		struct snd_soc_dai *dai)
--{
--	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
--	int rc;
--
--	if (dai_data->is_port_started[dai->id]) {
--		/* stop the port and restart with new port config */
--		rc = q6afe_port_stop(dai_data->port[dai->id]);
--		if (rc < 0) {
--			dev_err(dai->dev, "fail to close AFE port (%d)\n", rc);
--			return rc;
--		}
--	}
--
--	rc = q6afe_i2s_port_prepare(dai_data->port[dai->id],
--			       &dai_data->port_config[dai->id].i2s_cfg);
--	if (rc < 0) {
--		dev_err(dai->dev, "fail to prepare AFE port %x\n", dai->id);
--		return rc;
--	}
--
--	rc = q6afe_port_start(dai_data->port[dai->id]);
--	if (rc < 0) {
--		dev_err(dai->dev, "fail to start AFE port %x\n", dai->id);
--		return rc;
--	}
--	dai_data->is_port_started[dai->id] = true;
--
--	return 0;
--}
--
- static int q6afe_dai_prepare(struct snd_pcm_substream *substream,
- 		struct snd_soc_dai *dai)
- {
-@@ -191,12 +159,27 @@ static int q6afe_dai_prepare(struct snd_pcm_substream *substream,
- 		}
- 	}
- 
--	if (dai->id == HDMI_RX)
-+	switch (dai->id) {
-+	case HDMI_RX:
- 		q6afe_hdmi_port_prepare(dai_data->port[dai->id],
- 					&dai_data->port_config[dai->id].hdmi);
--	else if (dai->id >= SLIMBUS_0_RX && dai->id <= SLIMBUS_6_TX)
-+		break;
-+	case SLIMBUS_0_RX ... SLIMBUS_6_TX:
- 		q6afe_slim_port_prepare(dai_data->port[dai->id],
- 					&dai_data->port_config[dai->id].slim);
-+		break;
-+	case PRIMARY_MI2S_RX ... QUATERNARY_MI2S_TX:
-+		rc = q6afe_i2s_port_prepare(dai_data->port[dai->id],
-+			       &dai_data->port_config[dai->id].i2s_cfg);
-+		if (rc < 0) {
-+			dev_err(dai->dev, "fail to prepare AFE port %x\n",
-+				dai->id);
-+			return rc;
-+		}
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
- 
- 	rc = q6afe_port_start(dai_data->port[dai->id]);
- 	if (rc < 0) {
-@@ -289,7 +272,7 @@ static struct snd_soc_dai_ops q6hdmi_ops = {
- };
- 
- static struct snd_soc_dai_ops q6i2s_ops = {
--	.prepare	= q6afe_mi2s_prepare,
-+	.prepare	= q6afe_dai_prepare,
- 	.hw_params	= q6i2s_hw_params,
- 	.set_fmt	= q6i2s_set_fmt,
- 	.shutdown	= q6afe_dai_shutdown,
+On 29/05/18 11:48, Geert Uytterhoeven wrote:
+> Hi Catalin, Jeremy,
+> 
+> On Thu, May 17, 2018 at 7:05 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>> On Fri, May 11, 2018 at 06:57:55PM -0500, Jeremy Linton wrote:
+>>> Jeremy Linton (12):
+>>>   drivers: base: cacheinfo: move cache_setup_of_node()
+>>>   drivers: base: cacheinfo: setup DT cache properties early
+>>>   cacheinfo: rename of_node to fw_token
+>>>   arm64/acpi: Create arch specific cpu to acpi id helper
+>>>   ACPI/PPTT: Add Processor Properties Topology Table parsing
+>>>   ACPI: Enable PPTT support on ARM64
+>>>   drivers: base cacheinfo: Add support for ACPI based firmware tables
+>>>   arm64: Add support for ACPI based firmware tables
+>>>   arm64: topology: rename cluster_id
+>>>   arm64: topology: enable ACPI/PPTT based CPU topology
+>>>   ACPI: Add PPTT to injectable table list
+>>>   arm64: topology: divorce MC scheduling domain from core_siblings
+>>
+>> Queued for 4.18 (without Sudeep's latest property_read_u64 cacheinfo
+>> patch - http://lkml.kernel.org/r/20180517154701.GA20281 at e107155-lin; I
+>> can add it separately).
+> 
+> This is now commit 37c3ec2d810f87ea ("arm64: topology: divorce MC
+> scheduling domain from core_siblings") in arm64/for-next/core, causing
+> system suspend on big.LITTLE systems to hang after shutting down the first
+> CPU:
+> 
+>     $ echo mem > /sys/power/state
+>     PM: suspend entry (deep)
+>     PM: Syncing filesystems ... done.
+>     Freezing user space processes ... (elapsed 0.001 seconds) done.
+>     OOM killer disabled.
+>     Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+>     Disabling non-boot CPUs ...
+>     CPU1: shutdown
+>     psci: CPU1 killed.
+> 
+
+Is it OK to assume the suspend failed just after shutting down one CPU
+or it's failing during resume ? It depends on whether you had console
+disabled or not.
+
+> For me, it fails on the following big.LITTLE systems:
+> 
+>     R-Car H3 ES2.0 (4xCA57 + 4xCA53)
+>     R-Car M3-W (2xCA57 + 4xCA53)
+> 
+
+Interesting, is it PSCI based system suspend ?
+
+> System supend still works fine on systems with big cores only:
+> 
+>     R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
+>     R-Car M3-N (2xCA57)
+> 
+> Reverting this commit fixes the issue for me.
+> 
+
+I can't find anything that relates to system suspend in these patches
+unless they are messing with something during CPU hot plug-in back
+during resume.
+
 -- 
-2.16.2
+Regards,
+Sudeep
