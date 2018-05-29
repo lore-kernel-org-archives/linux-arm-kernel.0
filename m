@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 May 2018 15:59:10 +0100
-Subject: Applied "ASoC: qdsp6: q6routing: Add support to all TDM Mixers" to
- the asoc tree
-In-Reply-To: <20180529101833.30489-7-srinivas.kandagatla@linaro.org>
-Message-ID: <E1fNg5e-0005sZ-7J@debutante>
+Date: Tue, 29 May 2018 15:59:21 +0100
+Subject: Applied "ASoC: qdsp6: q6afe-dai: add support to tdm dais" to the asoc
+ tree
+In-Reply-To: <20180529101833.30489-5-srinivas.kandagatla@linaro.org>
+Message-ID: <E1fNg5p-0005ys-4I@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6routing: Add support to all TDM Mixers
+   ASoC: qdsp6: q6afe-dai: add support to tdm dais
 
 has been applied to the asoc tree at
 
@@ -34,512 +34,665 @@ to this mail.
 Thanks,
 Mark
 
->From a303b7a6d6ef2c0194f68ac793e85e634fd9c834 Mon Sep 17 00:00:00 2001
+>From 0e66cf5c77e23c208c1547e19f62ab0d1d86ea26 Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 29 May 2018 11:18:33 +0100
-Subject: [PATCH] ASoC: qdsp6: q6routing: Add support to all TDM Mixers
+Date: Tue, 29 May 2018 11:18:31 +0100
+Subject: [PATCH] ASoC: qdsp6: q6afe-dai: add support to tdm dais
 
-This patch adds TX and RX TDM mixers for 40 TDM ports.
+This patch adds support to 40 TDM ports supported in AFE.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/qdsp6/q6routing.c | 455 ++++++++++++++++++++++++++++++-
- 1 file changed, 454 insertions(+), 1 deletion(-)
+ sound/soc/qcom/qdsp6/q6afe-dai.c | 574 ++++++++++++++++++++++++++++++-
+ 1 file changed, 573 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index a4e74cac491b..593f66b8622f 100644
---- a/sound/soc/qcom/qdsp6/q6routing.c
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -67,7 +67,47 @@
- 	{ mix_name, "PRI_MI2S_TX", "PRI_MI2S_TX" },	\
- 	{ mix_name, "SEC_MI2S_TX", "SEC_MI2S_TX" },	\
- 	{ mix_name, "QUAT_MI2S_TX", "QUAT_MI2S_TX" },	\
--	{ mix_name, "TERT_MI2S_TX", "TERT_MI2S_TX" }
-+	{ mix_name, "TERT_MI2S_TX", "TERT_MI2S_TX" },		\
-+	{ mix_name, "PRIMARY_TDM_TX_0", "PRIMARY_TDM_TX_0"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_1", "PRIMARY_TDM_TX_1"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_2", "PRIMARY_TDM_TX_2"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_3", "PRIMARY_TDM_TX_3"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_4", "PRIMARY_TDM_TX_4"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_5", "PRIMARY_TDM_TX_5"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_6", "PRIMARY_TDM_TX_6"},	\
-+	{ mix_name, "PRIMARY_TDM_TX_7", "PRIMARY_TDM_TX_7"},	\
-+	{ mix_name, "SEC_TDM_TX_0", "SEC_TDM_TX_0"},		\
-+	{ mix_name, "SEC_TDM_TX_1", "SEC_TDM_TX_1"},		\
-+	{ mix_name, "SEC_TDM_TX_2", "SEC_TDM_TX_2"},		\
-+	{ mix_name, "SEC_TDM_TX_3", "SEC_TDM_TX_3"},		\
-+	{ mix_name, "SEC_TDM_TX_4", "SEC_TDM_TX_4"},		\
-+	{ mix_name, "SEC_TDM_TX_5", "SEC_TDM_TX_5"},		\
-+	{ mix_name, "SEC_TDM_TX_6", "SEC_TDM_TX_6"},		\
-+	{ mix_name, "SEC_TDM_TX_7", "SEC_TDM_TX_7"},		\
-+	{ mix_name, "TERT_TDM_TX_0", "TERT_TDM_TX_0"},		\
-+	{ mix_name, "TERT_TDM_TX_1", "TERT_TDM_TX_1"},		\
-+	{ mix_name, "TERT_TDM_TX_2", "TERT_TDM_TX_2"},		\
-+	{ mix_name, "TERT_TDM_TX_3", "TERT_TDM_TX_3"},		\
-+	{ mix_name, "TERT_TDM_TX_4", "TERT_TDM_TX_4"},		\
-+	{ mix_name, "TERT_TDM_TX_5", "TERT_TDM_TX_5"},		\
-+	{ mix_name, "TERT_TDM_TX_6", "TERT_TDM_TX_6"},		\
-+	{ mix_name, "TERT_TDM_TX_7", "TERT_TDM_TX_7"},		\
-+	{ mix_name, "QUAT_TDM_TX_0", "QUAT_TDM_TX_0"},		\
-+	{ mix_name, "QUAT_TDM_TX_1", "QUAT_TDM_TX_1"},		\
-+	{ mix_name, "QUAT_TDM_TX_2", "QUAT_TDM_TX_2"},		\
-+	{ mix_name, "QUAT_TDM_TX_3", "QUAT_TDM_TX_3"},		\
-+	{ mix_name, "QUAT_TDM_TX_4", "QUAT_TDM_TX_4"},		\
-+	{ mix_name, "QUAT_TDM_TX_5", "QUAT_TDM_TX_5"},		\
-+	{ mix_name, "QUAT_TDM_TX_6", "QUAT_TDM_TX_6"},		\
-+	{ mix_name, "QUAT_TDM_TX_7", "QUAT_TDM_TX_7"},		\
-+	{ mix_name, "QUIN_TDM_TX_0", "QUIN_TDM_TX_0"},		\
-+	{ mix_name, "QUIN_TDM_TX_1", "QUIN_TDM_TX_1"},		\
-+	{ mix_name, "QUIN_TDM_TX_2", "QUIN_TDM_TX_2"},		\
-+	{ mix_name, "QUIN_TDM_TX_3", "QUIN_TDM_TX_3"},		\
-+	{ mix_name, "QUIN_TDM_TX_4", "QUIN_TDM_TX_4"},		\
-+	{ mix_name, "QUIN_TDM_TX_5", "QUIN_TDM_TX_5"},		\
-+	{ mix_name, "QUIN_TDM_TX_6", "QUIN_TDM_TX_6"},		\
-+	{ mix_name, "QUIN_TDM_TX_7", "QUIN_TDM_TX_7"}
+diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
+index e529edfd8001..5002dd05bf27 100644
+--- a/sound/soc/qcom/qdsp6/q6afe-dai.c
++++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+@@ -14,8 +14,56 @@
+ #include <sound/pcm_params.h>
+ #include "q6afe.h"
  
- #define Q6ROUTING_TX_MIXERS(id)						\
- 	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,			\
-@@ -80,6 +120,126 @@
- 		id, 1, 0, msm_routing_get_audio_mixer,			\
- 		msm_routing_put_audio_mixer),				\
- 	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_0", PRIMARY_TDM_TX_0,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_1", PRIMARY_TDM_TX_1,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_2", PRIMARY_TDM_TX_2,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_3", PRIMARY_TDM_TX_3,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_4", PRIMARY_TDM_TX_4,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_5", PRIMARY_TDM_TX_5,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_6", PRIMARY_TDM_TX_6,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("PRIMARY_TDM_TX_7", PRIMARY_TDM_TX_7,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_0", SECONDARY_TDM_TX_0,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_1", SECONDARY_TDM_TX_1,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_2", SECONDARY_TDM_TX_2,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_3", SECONDARY_TDM_TX_3,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_4", SECONDARY_TDM_TX_4,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_5", SECONDARY_TDM_TX_5,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_6", SECONDARY_TDM_TX_6,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SEC_TDM_TX_7", SECONDARY_TDM_TX_7,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_0", TERTIARY_TDM_TX_0,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_1", TERTIARY_TDM_TX_1,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_2", TERTIARY_TDM_TX_2,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_3", TERTIARY_TDM_TX_3,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_4", TERTIARY_TDM_TX_4,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_5", TERTIARY_TDM_TX_5,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_6", TERTIARY_TDM_TX_6,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("TERT_TDM_TX_7", TERTIARY_TDM_TX_7,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_0", QUATERNARY_TDM_TX_0,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_1", QUATERNARY_TDM_TX_1,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_2", QUATERNARY_TDM_TX_2,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_3", QUATERNARY_TDM_TX_3,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_4", QUATERNARY_TDM_TX_4,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_5", QUATERNARY_TDM_TX_5,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_6", QUATERNARY_TDM_TX_6,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUAT_TDM_TX_7", QUATERNARY_TDM_TX_7,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_0", QUINARY_TDM_TX_0,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_1", QUINARY_TDM_TX_1,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_2", QUINARY_TDM_TX_2,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_3", QUINARY_TDM_TX_3,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_4", QUINARY_TDM_TX_4,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_5", QUINARY_TDM_TX_5,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_6", QUINARY_TDM_TX_6,		\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("QUIN_TDM_TX_7", QUINARY_TDM_TX_7,		\
- 		id, 1, 0, msm_routing_get_audio_mixer,			\
- 		msm_routing_put_audio_mixer),
++#define Q6AFE_TDM_PB_DAI(pre, num, did) {				\
++		.playback = {						\
++			.stream_name = pre" TDM"#num" Playback",	\
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
++				SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
++				SNDRV_PCM_RATE_176400,			\
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |		\
++				   SNDRV_PCM_FMTBIT_S24_LE |		\
++				   SNDRV_PCM_FMTBIT_S32_LE,		\
++			.channels_min = 1,				\
++			.channels_max = 8,				\
++			.rate_min = 8000,				\
++			.rate_max = 176400,				\
++		},							\
++		.name = #did,						\
++		.ops = &q6tdm_ops,					\
++		.id = did,						\
++		.probe = msm_dai_q6_dai_probe,				\
++		.remove = msm_dai_q6_dai_remove,			\
++	}
++
++#define Q6AFE_TDM_CAP_DAI(pre, num, did) {				\
++		.capture = {						\
++			.stream_name = pre" TDM"#num" Capture",		\
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
++				SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
++				SNDRV_PCM_RATE_176400,			\
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |		\
++				   SNDRV_PCM_FMTBIT_S24_LE |		\
++				   SNDRV_PCM_FMTBIT_S32_LE,		\
++			.channels_min = 1,				\
++			.channels_max = 8,				\
++			.rate_min = 8000,				\
++			.rate_max = 176400,				\
++		},							\
++		.name = #did,						\
++		.ops = &q6tdm_ops,					\
++		.id = did,						\
++		.probe = msm_dai_q6_dai_probe,				\
++		.remove = msm_dai_q6_dai_remove,			\
++	}
++
+ struct q6afe_dai_priv_data {
+ 	uint32_t sd_line_mask;
++	uint32_t sync_mode;
++	uint32_t sync_src;
++	uint32_t data_out_enable;
++	uint32_t invert_sync;
++	uint32_t data_delay;
++	uint32_t data_align;
+ };
  
-@@ -299,6 +459,127 @@ static const struct snd_kcontrol_new slimbus_5_rx_mixer_controls[] = {
- static const struct snd_kcontrol_new slimbus_6_rx_mixer_controls[] = {
- 	Q6ROUTING_RX_MIXERS(SLIMBUS_6_RX) };
+ struct q6afe_dai_data {
+@@ -130,6 +178,137 @@ static int q6i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ 	return 0;
+ }
  
-+static const struct snd_kcontrol_new pri_tdm_rx_0_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_0) };
++static int q6tdm_set_tdm_slot(struct snd_soc_dai *dai,
++				unsigned int tx_mask,
++				unsigned int rx_mask,
++				int slots, int slot_width)
++{
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_1_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_1) };
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_tdm_cfg *tdm = &dai_data->port_config[dai->id].tdm;
++	unsigned int cap_mask;
++	int rc = 0;
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_2_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_2) };
++	/* HW only supports 16 and 32 bit slot width configuration */
++	if ((slot_width != 16) && (slot_width != 32)) {
++		dev_err(dai->dev, "%s: invalid slot_width %d\n",
++			__func__, slot_width);
++		return -EINVAL;
++	}
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_3_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_3) };
++	/* HW supports 1-32 slots configuration. Typical: 1, 2, 4, 8, 16, 32 */
++	switch (slots) {
++	case 2:
++		cap_mask = 0x03;
++		break;
++	case 4:
++		cap_mask = 0x0F;
++		break;
++	case 8:
++		cap_mask = 0xFF;
++		break;
++	case 16:
++		cap_mask = 0xFFFF;
++		break;
++	default:
++		dev_err(dai->dev, "%s: invalid slots %d\n",
++			__func__, slots);
++		return -EINVAL;
++	}
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_4_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_4) };
++	switch (dai->id) {
++	case PRIMARY_TDM_RX_0 ... QUINARY_TDM_TX_7:
++		tdm->nslots_per_frame = slots;
++		tdm->slot_width = slot_width;
++		/* TDM RX dais ids are even and tx are odd */
++		tdm->slot_mask = (dai->id & 0x1 ? tx_mask : rx_mask) & cap_mask;
++		break;
++	default:
++		dev_err(dai->dev, "%s: invalid dai id 0x%x\n",
++			__func__, dai->id);
++		return -EINVAL;
++	}
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_5_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_5) };
++	return rc;
++}
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_6_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_6) };
++static int q6tdm_set_channel_map(struct snd_soc_dai *dai,
++				unsigned int tx_num, unsigned int *tx_slot,
++				unsigned int rx_num, unsigned int *rx_slot)
++{
 +
-+static const struct snd_kcontrol_new pri_tdm_rx_7_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(PRIMARY_TDM_RX_7) };
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_tdm_cfg *tdm = &dai_data->port_config[dai->id].tdm;
++	int rc = 0;
++	int i = 0;
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_0_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_0) };
++	switch (dai->id) {
++	case PRIMARY_TDM_RX_0 ... QUINARY_TDM_TX_7:
++		if (dai->id & 0x1) {
++			if (!tx_slot) {
++				dev_err(dai->dev, "tx slot not found\n");
++				return -EINVAL;
++			}
++			if (tx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT) {
++				dev_err(dai->dev, "invalid tx num %d\n",
++					tx_num);
++				return -EINVAL;
++			}
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_1_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_1) };
++			for (i = 0; i < tx_num; i++)
++				tdm->ch_mapping[i] = tx_slot[i];
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_2_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_2) };
++			for (i = tx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT; i++)
++				tdm->ch_mapping[i] = Q6AFE_CMAP_INVALID;
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_3_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_3) };
++			tdm->num_channels = tx_num;
++		} else {
++			/* rx */
++			if (!rx_slot) {
++				dev_err(dai->dev, "rx slot not found\n");
++				return -EINVAL;
++			}
++			if (rx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT) {
++				dev_err(dai->dev, "invalid rx num %d\n",
++					rx_num);
++				return -EINVAL;
++			}
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_4_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_4) };
++			for (i = 0; i < rx_num; i++)
++				tdm->ch_mapping[i] = rx_slot[i];
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_5_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_5) };
++			for (i = rx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT; i++)
++				tdm->ch_mapping[i] = Q6AFE_CMAP_INVALID;
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_6_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_6) };
++			tdm->num_channels = rx_num;
++		}
 +
-+static const struct snd_kcontrol_new sec_tdm_rx_7_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(SECONDARY_TDM_RX_7) };
++		break;
++	default:
++		dev_err(dai->dev, "%s: invalid dai id 0x%x\n",
++			__func__, dai->id);
++		return -EINVAL;
++	}
 +
-+static const struct snd_kcontrol_new tert_tdm_rx_0_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_0) };
++	return rc;
++}
 +
-+static const struct snd_kcontrol_new tert_tdm_rx_1_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_1) };
++static int q6tdm_hw_params(struct snd_pcm_substream *substream,
++			   struct snd_pcm_hw_params *params,
++			   struct snd_soc_dai *dai)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_tdm_cfg *tdm = &dai_data->port_config[dai->id].tdm;
 +
-+static const struct snd_kcontrol_new tert_tdm_rx_2_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_2) };
++	tdm->bit_width = params_width(params);
++	tdm->sample_rate = params_rate(params);
++	tdm->num_channels = params_channels(params);
++	tdm->data_align_type = dai_data->priv[dai->id].data_align;
++	tdm->sync_src = dai_data->priv[dai->id].sync_src;
++	tdm->sync_mode = dai_data->priv[dai->id].sync_mode;
 +
-+static const struct snd_kcontrol_new tert_tdm_rx_3_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_3) };
-+
-+static const struct snd_kcontrol_new tert_tdm_rx_4_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_4) };
-+
-+static const struct snd_kcontrol_new tert_tdm_rx_5_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_5) };
-+
-+static const struct snd_kcontrol_new tert_tdm_rx_6_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_6) };
-+
-+static const struct snd_kcontrol_new tert_tdm_rx_7_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(TERTIARY_TDM_RX_7) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_0_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_0) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_1_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_1) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_2_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_2) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_3_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_3) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_4_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_4) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_5_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_5) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_6_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_6) };
-+
-+static const struct snd_kcontrol_new quat_tdm_rx_7_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUATERNARY_TDM_RX_7) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_0_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_0) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_1_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_1) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_2_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_2) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_3_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_3) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_4_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_4) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_5_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_5) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_6_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_6) };
-+
-+static const struct snd_kcontrol_new quin_tdm_rx_7_mixer_controls[] = {
-+	Q6ROUTING_RX_MIXERS(QUINARY_TDM_RX_7) };
-+
-+
- static const struct snd_kcontrol_new mmul1_mixer_controls[] = {
- 	Q6ROUTING_TX_MIXERS(MSM_FRONTEND_DAI_MULTIMEDIA1) };
++	return 0;
++}
+ static void q6afe_dai_shutdown(struct snd_pcm_substream *substream,
+ 				struct snd_soc_dai *dai)
+ {
+@@ -177,6 +356,10 @@ static int q6afe_dai_prepare(struct snd_pcm_substream *substream,
+ 			return rc;
+ 		}
+ 		break;
++	case PRIMARY_TDM_RX_0 ... QUINARY_TDM_TX_7:
++		q6afe_tdm_port_prepare(dai_data->port[dai->id],
++					&dai_data->port_config[dai->id].tdm);
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -235,11 +418,17 @@ static int q6afe_mi2s_set_sysclk(struct snd_soc_dai *dai,
+ 					     Q6AFE_LPASS_CLK_SRC_INTERNAL,
+ 					     Q6AFE_LPASS_CLK_ROOT_DEFAULT,
+ 					     freq, dir);
+-	case Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT ... Q6AFE_LPASS_CLK_ID_INT_MCLK_1:
++	case Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT ... Q6AFE_LPASS_CLK_ID_QUI_MI2S_OSR:
++	case Q6AFE_LPASS_CLK_ID_MCLK_1 ... Q6AFE_LPASS_CLK_ID_INT_MCLK_1:
+ 		return q6afe_port_set_sysclk(port, clk_id,
+ 					     Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_NO,
+ 					     Q6AFE_LPASS_CLK_ROOT_DEFAULT,
+ 					     freq, dir);
++	case Q6AFE_LPASS_CLK_ID_PRI_TDM_IBIT ... Q6AFE_LPASS_CLK_ID_QUIN_TDM_EBIT:
++		return q6afe_port_set_sysclk(port, clk_id,
++					     Q6AFE_LPASS_CLK_ATTRIBUTE_INVERT_COUPLE_NO,
++					     Q6AFE_LPASS_CLK_ROOT_DEFAULT,
++					     freq, dir);
+ 	}
  
-@@ -380,6 +661,130 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
- 	SND_SOC_DAPM_MIXER("TERT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
- 			   tertiary_mi2s_rx_mixer_controls,
- 			   ARRAY_SIZE(tertiary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_0 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_0_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_0_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_1 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_1_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_1_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_2 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_2_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_2_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_3 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_3_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_3_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_4 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_4_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_4_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_5 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_5_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_5_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_6 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_6_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_6_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRIMARY_TDM_RX_7 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				pri_tdm_rx_7_mixer_controls,
-+				ARRAY_SIZE(pri_tdm_rx_7_mixer_controls)),
+ 	return 0;
+@@ -259,6 +448,96 @@ static const struct snd_soc_dapm_route q6afe_dapm_routes[] = {
+ 	{"Tertiary MI2S Playback", NULL, "TERT_MI2S_RX"},
+ 	{"Quaternary MI2S Playback", NULL, "QUAT_MI2S_RX"},
+ 
++	{"Primary TDM0 Playback", NULL, "PRIMARY_TDM_RX_0"},
++	{"Primary TDM1 Playback", NULL, "PRIMARY_TDM_RX_1"},
++	{"Primary TDM2 Playback", NULL, "PRIMARY_TDM_RX_2"},
++	{"Primary TDM3 Playback", NULL, "PRIMARY_TDM_RX_3"},
++	{"Primary TDM4 Playback", NULL, "PRIMARY_TDM_RX_4"},
++	{"Primary TDM5 Playback", NULL, "PRIMARY_TDM_RX_5"},
++	{"Primary TDM6 Playback", NULL, "PRIMARY_TDM_RX_6"},
++	{"Primary TDM7 Playback", NULL, "PRIMARY_TDM_RX_7"},
 +
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_0 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_0_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_0_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_1 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_1_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_1_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_2 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_2_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_2_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_3 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_3_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_3_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_4 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_4_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_4_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_5 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_5_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_5_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_6 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_6_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_6_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_TDM_RX_7 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				sec_tdm_rx_7_mixer_controls,
-+				ARRAY_SIZE(sec_tdm_rx_7_mixer_controls)),
++	{"Secondary TDM0 Playback", NULL, "SEC_TDM_RX_0"},
++	{"Secondary TDM1 Playback", NULL, "SEC_TDM_RX_1"},
++	{"Secondary TDM2 Playback", NULL, "SEC_TDM_RX_2"},
++	{"Secondary TDM3 Playback", NULL, "SEC_TDM_RX_3"},
++	{"Secondary TDM4 Playback", NULL, "SEC_TDM_RX_4"},
++	{"Secondary TDM5 Playback", NULL, "SEC_TDM_RX_5"},
++	{"Secondary TDM6 Playback", NULL, "SEC_TDM_RX_6"},
++	{"Secondary TDM7 Playback", NULL, "SEC_TDM_RX_7"},
 +
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_0 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_0_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_0_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_1 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_1_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_1_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_2 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_2_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_2_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_3 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_3_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_3_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_4 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_4_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_4_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_5 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_5_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_5_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_6 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_6_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_6_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_TDM_RX_7 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				tert_tdm_rx_7_mixer_controls,
-+				ARRAY_SIZE(tert_tdm_rx_7_mixer_controls)),
++	{"Tertiary TDM0 Playback", NULL, "TERT_TDM_RX_0"},
++	{"Tertiary TDM1 Playback", NULL, "TERT_TDM_RX_1"},
++	{"Tertiary TDM2 Playback", NULL, "TERT_TDM_RX_2"},
++	{"Tertiary TDM3 Playback", NULL, "TERT_TDM_RX_3"},
++	{"Tertiary TDM4 Playback", NULL, "TERT_TDM_RX_4"},
++	{"Tertiary TDM5 Playback", NULL, "TERT_TDM_RX_5"},
++	{"Tertiary TDM6 Playback", NULL, "TERT_TDM_RX_6"},
++	{"Tertiary TDM7 Playback", NULL, "TERT_TDM_RX_7"},
 +
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_0 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_0_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_0_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_1 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_1_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_1_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_2 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_2_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_2_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_3 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_3_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_3_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_4 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_4_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_4_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_5 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_5_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_5_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_6 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_6_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_6_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_TDM_RX_7 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quat_tdm_rx_7_mixer_controls,
-+				ARRAY_SIZE(quat_tdm_rx_7_mixer_controls)),
++	{"Quaternary TDM0 Playback", NULL, "QUAT_TDM_RX_0"},
++	{"Quaternary TDM1 Playback", NULL, "QUAT_TDM_RX_1"},
++	{"Quaternary TDM2 Playback", NULL, "QUAT_TDM_RX_2"},
++	{"Quaternary TDM3 Playback", NULL, "QUAT_TDM_RX_3"},
++	{"Quaternary TDM4 Playback", NULL, "QUAT_TDM_RX_4"},
++	{"Quaternary TDM5 Playback", NULL, "QUAT_TDM_RX_5"},
++	{"Quaternary TDM6 Playback", NULL, "QUAT_TDM_RX_6"},
++	{"Quaternary TDM7 Playback", NULL, "QUAT_TDM_RX_7"},
 +
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_0 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_0_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_0_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_1 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_1_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_1_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_2 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_2_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_2_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_3 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_3_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_3_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_4 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_4_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_4_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_5 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_5_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_5_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_6 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_6_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_6_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUIN_TDM_RX_7 Audio Mixer", SND_SOC_NOPM, 0, 0,
-+				quin_tdm_rx_7_mixer_controls,
-+				ARRAY_SIZE(quin_tdm_rx_7_mixer_controls)),
- 	SND_SOC_DAPM_MIXER("MultiMedia1 Mixer", SND_SOC_NOPM, 0, 0,
- 		mmul1_mixer_controls, ARRAY_SIZE(mmul1_mixer_controls)),
- 	SND_SOC_DAPM_MIXER("MultiMedia2 Mixer", SND_SOC_NOPM, 0, 0,
-@@ -412,6 +817,54 @@ static const struct snd_soc_dapm_route intercon[] = {
- 	Q6ROUTING_RX_DAPM_ROUTE("TERT_MI2S_RX Audio Mixer", "TERT_MI2S_RX"),
- 	Q6ROUTING_RX_DAPM_ROUTE("SEC_MI2S_RX Audio Mixer", "SEC_MI2S_RX"),
- 	Q6ROUTING_RX_DAPM_ROUTE("PRI_MI2S_RX Audio Mixer", "PRI_MI2S_RX"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_0 Audio Mixer",
-+				"PRIMARY_TDM_RX_0"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_1 Audio Mixer",
-+				"PRIMARY_TDM_RX_1"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_2 Audio Mixer",
-+				"PRIMARY_TDM_RX_2"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_3 Audio Mixer",
-+				"PRIMARY_TDM_RX_3"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_4 Audio Mixer",
-+				"PRIMARY_TDM_RX_4"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_5 Audio Mixer",
-+				"PRIMARY_TDM_RX_5"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_6 Audio Mixer",
-+				"PRIMARY_TDM_RX_6"),
-+	Q6ROUTING_RX_DAPM_ROUTE("PRIMARY_TDM_RX_7 Audio Mixer",
-+				"PRIMARY_TDM_RX_7"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_0 Audio Mixer", "SEC_TDM_RX_0"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_1 Audio Mixer", "SEC_TDM_RX_1"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_2 Audio Mixer", "SEC_TDM_RX_2"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_3 Audio Mixer", "SEC_TDM_RX_3"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_4 Audio Mixer", "SEC_TDM_RX_4"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_5 Audio Mixer", "SEC_TDM_RX_5"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_6 Audio Mixer", "SEC_TDM_RX_6"),
-+	Q6ROUTING_RX_DAPM_ROUTE("SEC_TDM_RX_7 Audio Mixer", "SEC_TDM_RX_7"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_0 Audio Mixer", "TERT_TDM_RX_0"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_1 Audio Mixer", "TERT_TDM_RX_1"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_2 Audio Mixer", "TERT_TDM_RX_2"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_3 Audio Mixer", "TERT_TDM_RX_3"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_4 Audio Mixer", "TERT_TDM_RX_4"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_5 Audio Mixer", "TERT_TDM_RX_5"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_6 Audio Mixer", "TERT_TDM_RX_6"),
-+	Q6ROUTING_RX_DAPM_ROUTE("TERT_TDM_RX_7 Audio Mixer", "TERT_TDM_RX_7"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_0 Audio Mixer", "QUAT_TDM_RX_0"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_1 Audio Mixer", "QUAT_TDM_RX_1"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_2 Audio Mixer", "QUAT_TDM_RX_2"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_3 Audio Mixer", "QUAT_TDM_RX_3"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_4 Audio Mixer", "QUAT_TDM_RX_4"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_5 Audio Mixer", "QUAT_TDM_RX_5"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_6 Audio Mixer", "QUAT_TDM_RX_6"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUAT_TDM_RX_7 Audio Mixer", "QUAT_TDM_RX_7"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_0 Audio Mixer", "QUIN_TDM_RX_0"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_1 Audio Mixer", "QUIN_TDM_RX_1"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_2 Audio Mixer", "QUIN_TDM_RX_2"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_3 Audio Mixer", "QUIN_TDM_RX_3"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_4 Audio Mixer", "QUIN_TDM_RX_4"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_5 Audio Mixer", "QUIN_TDM_RX_5"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_6 Audio Mixer", "QUIN_TDM_RX_6"),
-+	Q6ROUTING_RX_DAPM_ROUTE("QUIN_TDM_RX_7 Audio Mixer", "QUIN_TDM_RX_7"),
- 	Q6ROUTING_TX_DAPM_ROUTE("MultiMedia1 Mixer"),
- 	Q6ROUTING_TX_DAPM_ROUTE("MultiMedia2 Mixer"),
- 	Q6ROUTING_TX_DAPM_ROUTE("MultiMedia3 Mixer"),
++	{"Quinary TDM0 Playback", NULL, "QUIN_TDM_RX_0"},
++	{"Quinary TDM1 Playback", NULL, "QUIN_TDM_RX_1"},
++	{"Quinary TDM2 Playback", NULL, "QUIN_TDM_RX_2"},
++	{"Quinary TDM3 Playback", NULL, "QUIN_TDM_RX_3"},
++	{"Quinary TDM4 Playback", NULL, "QUIN_TDM_RX_4"},
++	{"Quinary TDM5 Playback", NULL, "QUIN_TDM_RX_5"},
++	{"Quinary TDM6 Playback", NULL, "QUIN_TDM_RX_6"},
++	{"Quinary TDM7 Playback", NULL, "QUIN_TDM_RX_7"},
++
++	{"PRIMARY_TDM_TX_0", NULL, "Primary TDM0 Capture"},
++	{"PRIMARY_TDM_TX_1", NULL, "Primary TDM1 Capture"},
++	{"PRIMARY_TDM_TX_2", NULL, "Primary TDM2 Capture"},
++	{"PRIMARY_TDM_TX_3", NULL, "Primary TDM3 Capture"},
++	{"PRIMARY_TDM_TX_4", NULL, "Primary TDM4 Capture"},
++	{"PRIMARY_TDM_TX_5", NULL, "Primary TDM5 Capture"},
++	{"PRIMARY_TDM_TX_6", NULL, "Primary TDM6 Capture"},
++	{"PRIMARY_TDM_TX_7", NULL, "Primary TDM7 Capture"},
++
++	{"SEC_TDM_TX_0", NULL, "Secondary TDM0 Capture"},
++	{"SEC_TDM_TX_1", NULL, "Secondary TDM1 Capture"},
++	{"SEC_TDM_TX_2", NULL, "Secondary TDM2 Capture"},
++	{"SEC_TDM_TX_3", NULL, "Secondary TDM3 Capture"},
++	{"SEC_TDM_TX_4", NULL, "Secondary TDM4 Capture"},
++	{"SEC_TDM_TX_5", NULL, "Secondary TDM5 Capture"},
++	{"SEC_TDM_TX_6", NULL, "Secondary TDM6 Capture"},
++	{"SEC_TDM_TX_7", NULL, "Secondary TDM7 Capture"},
++
++	{"TERT_TDM_TX_0", NULL, "Tertiary TDM0 Capture"},
++	{"TERT_TDM_TX_1", NULL, "Tertiary TDM1 Capture"},
++	{"TERT_TDM_TX_2", NULL, "Tertiary TDM2 Capture"},
++	{"TERT_TDM_TX_3", NULL, "Tertiary TDM3 Capture"},
++	{"TERT_TDM_TX_4", NULL, "Tertiary TDM4 Capture"},
++	{"TERT_TDM_TX_5", NULL, "Tertiary TDM5 Capture"},
++	{"TERT_TDM_TX_6", NULL, "Tertiary TDM6 Capture"},
++	{"TERT_TDM_TX_7", NULL, "Tertiary TDM7 Capture"},
++
++	{"QUAT_TDM_TX_0", NULL, "Quaternary TDM0 Capture"},
++	{"QUAT_TDM_TX_1", NULL, "Quaternary TDM1 Capture"},
++	{"QUAT_TDM_TX_2", NULL, "Quaternary TDM2 Capture"},
++	{"QUAT_TDM_TX_3", NULL, "Quaternary TDM3 Capture"},
++	{"QUAT_TDM_TX_4", NULL, "Quaternary TDM4 Capture"},
++	{"QUAT_TDM_TX_5", NULL, "Quaternary TDM5 Capture"},
++	{"QUAT_TDM_TX_6", NULL, "Quaternary TDM6 Capture"},
++	{"QUAT_TDM_TX_7", NULL, "Quaternary TDM7 Capture"},
++
++	{"QUIN_TDM_TX_0", NULL, "Quinary TDM0 Capture"},
++	{"QUIN_TDM_TX_1", NULL, "Quinary TDM1 Capture"},
++	{"QUIN_TDM_TX_2", NULL, "Quinary TDM2 Capture"},
++	{"QUIN_TDM_TX_3", NULL, "Quinary TDM3 Capture"},
++	{"QUIN_TDM_TX_4", NULL, "Quinary TDM4 Capture"},
++	{"QUIN_TDM_TX_5", NULL, "Quinary TDM5 Capture"},
++	{"QUIN_TDM_TX_6", NULL, "Quinary TDM6 Capture"},
++	{"QUIN_TDM_TX_7", NULL, "Quinary TDM7 Capture"},
++
+ 	{"TERT_MI2S_TX", NULL, "Tertiary MI2S Capture"},
+ 	{"PRI_MI2S_TX", NULL, "Primary MI2S Capture"},
+ 	{"SEC_MI2S_TX", NULL, "Secondary MI2S Capture"},
+@@ -286,6 +565,15 @@ static struct snd_soc_dai_ops q6slim_ops = {
+ 	.set_channel_map = q6slim_set_channel_map,
+ };
+ 
++static struct snd_soc_dai_ops q6tdm_ops = {
++	.prepare	= q6afe_dai_prepare,
++	.shutdown	= q6afe_dai_shutdown,
++	.set_sysclk	= q6afe_mi2s_set_sysclk,
++	.set_tdm_slot     = q6tdm_set_tdm_slot,
++	.set_channel_map  = q6tdm_set_channel_map,
++	.hw_params        = q6tdm_hw_params,
++};
++
+ static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
+@@ -574,6 +862,86 @@ static struct snd_soc_dai_driver q6afe_dais[] = {
+ 		.probe = msm_dai_q6_dai_probe,
+ 		.remove = msm_dai_q6_dai_remove,
+ 	},
++	Q6AFE_TDM_PB_DAI("Primary", 0, PRIMARY_TDM_RX_0),
++	Q6AFE_TDM_PB_DAI("Primary", 1, PRIMARY_TDM_RX_1),
++	Q6AFE_TDM_PB_DAI("Primary", 2, PRIMARY_TDM_RX_2),
++	Q6AFE_TDM_PB_DAI("Primary", 3, PRIMARY_TDM_RX_3),
++	Q6AFE_TDM_PB_DAI("Primary", 4, PRIMARY_TDM_RX_4),
++	Q6AFE_TDM_PB_DAI("Primary", 5, PRIMARY_TDM_RX_5),
++	Q6AFE_TDM_PB_DAI("Primary", 6, PRIMARY_TDM_RX_6),
++	Q6AFE_TDM_PB_DAI("Primary", 7, PRIMARY_TDM_RX_7),
++	Q6AFE_TDM_CAP_DAI("Primary", 0, PRIMARY_TDM_TX_0),
++	Q6AFE_TDM_CAP_DAI("Primary", 1, PRIMARY_TDM_TX_1),
++	Q6AFE_TDM_CAP_DAI("Primary", 2, PRIMARY_TDM_TX_2),
++	Q6AFE_TDM_CAP_DAI("Primary", 3, PRIMARY_TDM_TX_3),
++	Q6AFE_TDM_CAP_DAI("Primary", 4, PRIMARY_TDM_TX_4),
++	Q6AFE_TDM_CAP_DAI("Primary", 5, PRIMARY_TDM_TX_5),
++	Q6AFE_TDM_CAP_DAI("Primary", 6, PRIMARY_TDM_TX_6),
++	Q6AFE_TDM_CAP_DAI("Primary", 7, PRIMARY_TDM_TX_7),
++	Q6AFE_TDM_PB_DAI("Secondary", 0, SECONDARY_TDM_RX_0),
++	Q6AFE_TDM_PB_DAI("Secondary", 1, SECONDARY_TDM_RX_1),
++	Q6AFE_TDM_PB_DAI("Secondary", 2, SECONDARY_TDM_RX_2),
++	Q6AFE_TDM_PB_DAI("Secondary", 3, SECONDARY_TDM_RX_3),
++	Q6AFE_TDM_PB_DAI("Secondary", 4, SECONDARY_TDM_RX_4),
++	Q6AFE_TDM_PB_DAI("Secondary", 5, SECONDARY_TDM_RX_5),
++	Q6AFE_TDM_PB_DAI("Secondary", 6, SECONDARY_TDM_RX_6),
++	Q6AFE_TDM_PB_DAI("Secondary", 7, SECONDARY_TDM_RX_7),
++	Q6AFE_TDM_CAP_DAI("Secondary", 0, SECONDARY_TDM_TX_0),
++	Q6AFE_TDM_CAP_DAI("Secondary", 1, SECONDARY_TDM_TX_1),
++	Q6AFE_TDM_CAP_DAI("Secondary", 2, SECONDARY_TDM_TX_2),
++	Q6AFE_TDM_CAP_DAI("Secondary", 3, SECONDARY_TDM_TX_3),
++	Q6AFE_TDM_CAP_DAI("Secondary", 4, SECONDARY_TDM_TX_4),
++	Q6AFE_TDM_CAP_DAI("Secondary", 5, SECONDARY_TDM_TX_5),
++	Q6AFE_TDM_CAP_DAI("Secondary", 6, SECONDARY_TDM_TX_6),
++	Q6AFE_TDM_CAP_DAI("Secondary", 7, SECONDARY_TDM_TX_7),
++	Q6AFE_TDM_PB_DAI("Tertiary", 0, TERTIARY_TDM_RX_0),
++	Q6AFE_TDM_PB_DAI("Tertiary", 1, TERTIARY_TDM_RX_1),
++	Q6AFE_TDM_PB_DAI("Tertiary", 2, TERTIARY_TDM_RX_2),
++	Q6AFE_TDM_PB_DAI("Tertiary", 3, TERTIARY_TDM_RX_3),
++	Q6AFE_TDM_PB_DAI("Tertiary", 4, TERTIARY_TDM_RX_4),
++	Q6AFE_TDM_PB_DAI("Tertiary", 5, TERTIARY_TDM_RX_5),
++	Q6AFE_TDM_PB_DAI("Tertiary", 6, TERTIARY_TDM_RX_6),
++	Q6AFE_TDM_PB_DAI("Tertiary", 7, TERTIARY_TDM_RX_7),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 0, TERTIARY_TDM_TX_0),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 1, TERTIARY_TDM_TX_1),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 2, TERTIARY_TDM_TX_2),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 3, TERTIARY_TDM_TX_3),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 4, TERTIARY_TDM_TX_4),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 5, TERTIARY_TDM_TX_5),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 6, TERTIARY_TDM_TX_6),
++	Q6AFE_TDM_CAP_DAI("Tertiary", 7, TERTIARY_TDM_TX_7),
++	Q6AFE_TDM_PB_DAI("Quaternary", 0, QUATERNARY_TDM_RX_0),
++	Q6AFE_TDM_PB_DAI("Quaternary", 1, QUATERNARY_TDM_RX_1),
++	Q6AFE_TDM_PB_DAI("Quaternary", 2, QUATERNARY_TDM_RX_2),
++	Q6AFE_TDM_PB_DAI("Quaternary", 3, QUATERNARY_TDM_RX_3),
++	Q6AFE_TDM_PB_DAI("Quaternary", 4, QUATERNARY_TDM_RX_4),
++	Q6AFE_TDM_PB_DAI("Quaternary", 5, QUATERNARY_TDM_RX_5),
++	Q6AFE_TDM_PB_DAI("Quaternary", 6, QUATERNARY_TDM_RX_6),
++	Q6AFE_TDM_PB_DAI("Quaternary", 7, QUATERNARY_TDM_RX_7),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 0, QUATERNARY_TDM_TX_0),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 1, QUATERNARY_TDM_TX_1),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 2, QUATERNARY_TDM_TX_2),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 3, QUATERNARY_TDM_TX_3),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 4, QUATERNARY_TDM_TX_4),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 5, QUATERNARY_TDM_TX_5),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 6, QUATERNARY_TDM_TX_6),
++	Q6AFE_TDM_CAP_DAI("Quaternary", 7, QUATERNARY_TDM_TX_7),
++	Q6AFE_TDM_PB_DAI("Quinary", 0, QUINARY_TDM_RX_0),
++	Q6AFE_TDM_PB_DAI("Quinary", 1, QUINARY_TDM_RX_1),
++	Q6AFE_TDM_PB_DAI("Quinary", 2, QUINARY_TDM_RX_2),
++	Q6AFE_TDM_PB_DAI("Quinary", 3, QUINARY_TDM_RX_3),
++	Q6AFE_TDM_PB_DAI("Quinary", 4, QUINARY_TDM_RX_4),
++	Q6AFE_TDM_PB_DAI("Quinary", 5, QUINARY_TDM_RX_5),
++	Q6AFE_TDM_PB_DAI("Quinary", 6, QUINARY_TDM_RX_6),
++	Q6AFE_TDM_PB_DAI("Quinary", 7, QUINARY_TDM_RX_7),
++	Q6AFE_TDM_CAP_DAI("Quinary", 0, QUINARY_TDM_TX_0),
++	Q6AFE_TDM_CAP_DAI("Quinary", 1, QUINARY_TDM_TX_1),
++	Q6AFE_TDM_CAP_DAI("Quinary", 2, QUINARY_TDM_TX_2),
++	Q6AFE_TDM_CAP_DAI("Quinary", 3, QUINARY_TDM_TX_3),
++	Q6AFE_TDM_CAP_DAI("Quinary", 4, QUINARY_TDM_TX_4),
++	Q6AFE_TDM_CAP_DAI("Quinary", 5, QUINARY_TDM_TX_5),
++	Q6AFE_TDM_CAP_DAI("Quinary", 6, QUINARY_TDM_TX_6),
++	Q6AFE_TDM_CAP_DAI("Quinary", 7, QUINARY_TDM_TX_7),
+ };
+ 
+ static int q6afe_of_xlate_dai_name(struct snd_soc_component *component,
+@@ -623,6 +991,171 @@ static const struct snd_soc_dapm_widget q6afe_dai_widgets[] = {
+ 			     0, 0, 0, 0),
+ 	SND_SOC_DAPM_AIF_IN("PRI_MI2S_TX", "Primary MI2S Capture",
+ 						0, 0, 0, 0),
++
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_0", "Primary TDM0 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_1", "Primary TDM1 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_2", "Primary TDM2 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_3", "Primary TDM3 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_4", "Primary TDM4 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_5", "Primary TDM5 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_6", "Primary TDM6 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRIMARY_TDM_RX_7", "Primary TDM7 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_0", "Primary TDM0 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_1", "Primary TDM1 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_2", "Primary TDM2 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_3", "Primary TDM3 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_4", "Primary TDM4 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_5", "Primary TDM5 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_6", "Primary TDM6 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRIMARY_TDM_TX_7", "Primary TDM7 Capture",
++						0, 0, 0, 0),
++
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_0", "Secondary TDM0 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_1", "Secondary TDM1 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_2", "Secondary TDM2 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_3", "Secondary TDM3 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_4", "Secondary TDM4 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_5", "Secondary TDM5 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_6", "Secondary TDM6 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_TDM_RX_7", "Secondary TDM7 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_0", "Secondary TDM0 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_1", "Secondary TDM1 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_2", "Secondary TDM2 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_3", "Secondary TDM3 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_4", "Secondary TDM4 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_5", "Secondary TDM5 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_6", "Secondary TDM6 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_TDM_TX_7", "Secondary TDM7 Capture",
++						0, 0, 0, 0),
++
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_0", "Tertiary TDM0 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_1", "Tertiary TDM1 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_2", "Tertiary TDM2 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_3", "Tertiary TDM3 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_4", "Tertiary TDM4 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_5", "Tertiary TDM5 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_6", "Tertiary TDM6 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_TDM_RX_7", "Tertiary TDM7 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_0", "Tertiary TDM0 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_1", "Tertiary TDM1 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_2", "Tertiary TDM2 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_3", "Tertiary TDM3 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_4", "Tertiary TDM4 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_5", "Tertiary TDM5 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_6", "Tertiary TDM6 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_TDM_TX_7", "Tertiary TDM7 Capture",
++						0, 0, 0, 0),
++
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_0", "Quaternary TDM0 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_1", "Quaternary TDM1 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_2", "Quaternary TDM2 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_3", "Quaternary TDM3 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_4", "Quaternary TDM4 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_5", "Quaternary TDM5 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_6", "Quaternary TDM6 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_TDM_RX_7", "Quaternary TDM7 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_0", "Quaternary TDM0 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_1", "Quaternary TDM1 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_2", "Quaternary TDM2 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_3", "Quaternary TDM3 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_4", "Quaternary TDM4 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_5", "Quaternary TDM5 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_6", "Quaternary TDM6 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_TDM_TX_7", "Quaternary TDM7 Capture",
++						0, 0, 0, 0),
++
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_0", "Quinary TDM0 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_1", "Quinary TDM1 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_2", "Quinary TDM2 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_3", "Quinary TDM3 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_4", "Quinary TDM4 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_5", "Quinary TDM5 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_6", "Quinary TDM6 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUIN_TDM_RX_7", "Quinary TDM7 Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_0", "Quinary TDM0 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_1", "Quinary TDM1 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_2", "Quinary TDM2 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_3", "Quinary TDM3 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_4", "Quinary TDM4 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_5", "Quinary TDM5 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_6", "Quinary TDM6 Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUIN_TDM_TX_7", "Quinary TDM7 Capture",
++						0, 0, 0, 0),
+ };
+ 
+ static const struct snd_soc_component_driver q6afe_dai_component = {
+@@ -670,6 +1203,45 @@ static void of_q6afe_parse_dai_data(struct device *dev,
+ 			for (i = 0; i < num_lines; i++)
+ 				priv->sd_line_mask |= BIT(lines[i]);
+ 
++			break;
++		case PRIMARY_TDM_RX_0 ... QUINARY_TDM_TX_7:
++			priv = &data->priv[id];
++			ret = of_property_read_u32(node, "qcom,tdm-sync-mode",
++						   &priv->sync_mode);
++			if (ret) {
++				dev_err(dev, "No Sync mode from DT\n");
++				break;
++			}
++			ret = of_property_read_u32(node, "qcom,tdm-sync-src",
++						   &priv->sync_src);
++			if (ret) {
++				dev_err(dev, "No Sync Src from DT\n");
++				break;
++			}
++			ret = of_property_read_u32(node, "qcom,tdm-data-out",
++						   &priv->data_out_enable);
++			if (ret) {
++				dev_err(dev, "No Data out enable from DT\n");
++				break;
++			}
++			ret = of_property_read_u32(node, "qcom,tdm-invert-sync",
++						   &priv->invert_sync);
++			if (ret) {
++				dev_err(dev, "No Invert sync from DT\n");
++				break;
++			}
++			ret = of_property_read_u32(node, "qcom,tdm-data-delay",
++						   &priv->data_delay);
++			if (ret) {
++				dev_err(dev, "No Data Delay from DT\n");
++				break;
++			}
++			ret = of_property_read_u32(node, "qcom,tdm-data-align",
++						   &priv->data_align);
++			if (ret) {
++				dev_err(dev, "No Data align from DT\n");
++				break;
++			}
+ 			break;
+ 		default:
+ 			break;
 -- 
 2.17.0
