@@ -1,51 +1,192 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Tue, 29 May 2018 19:04:36 +0200
-Subject: [PATCH v3 5/5] ARM: dts: imx6qdl: add missing compatible and clock
- properties for EPIT
-In-Reply-To: <20180529170436.22711-1-peron.clem@gmail.com>
-References: <20180529170436.22711-1-peron.clem@gmail.com>
-Message-ID: <20180529170436.22711-6-peron.clem@gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 29 May 2018 19:06:25 +0200
+Subject: [PATCH] kvm: no need to check return value of debugfs_create
+ functions
+In-Reply-To: <20180529162204.11757-1-gregkh@linuxfoundation.org>
+References: <20180529162204.11757-1-gregkh@linuxfoundation.org>
+Message-ID: <46079df1-2ebf-7ddb-582a-9f644a7802a0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Didier <colin.didier@devialet.com>
+On 29/05/2018 18:22, Greg Kroah-Hartman wrote:
+> When calling debugfs functions, there is no need to ever check the
+> return value.  The function can work or not, but the code logic should
+> never do something different based on this.
+> 
+> This cleans up the error handling a lot, as this code will never get
+> hit.
+> 
+> Cc: Paul Mackerras <paulus@ozlabs.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
+> Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> Cc: Eric Auger <eric.auger@redhat.com>
+> Cc: Andre Przywara <andre.przywara@arm.com>
+> Cc: kvm-ppc at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: kvmarm at lists.cs.columbia.edu
+> Cc: kvm at vger.kernel.org
+> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>  arch/powerpc/kvm/book3s_hv.c   |  3 +--
+>  virt/kvm/arm/vgic/vgic-debug.c | 17 ++++-----------
+>  virt/kvm/arm/vgic/vgic.h       |  4 ++--
+>  virt/kvm/kvm_main.c            | 40 +++++++---------------------------
+>  4 files changed, 15 insertions(+), 49 deletions(-)
+> 
+> diff --git a/arch/powerpc/kvm/book3s_hv.c b/arch/powerpc/kvm/book3s_hv.c
+> index 4d07fca5121c..67d7de1470cc 100644
+> --- a/arch/powerpc/kvm/book3s_hv.c
+> +++ b/arch/powerpc/kvm/book3s_hv.c
+> @@ -3950,8 +3950,7 @@ static int kvmppc_core_init_vm_hv(struct kvm *kvm)
+>  	 */
+>  	snprintf(buf, sizeof(buf), "vm%d", current->pid);
+>  	kvm->arch.debugfs_dir = debugfs_create_dir(buf, kvm_debugfs_dir);
+> -	if (!IS_ERR_OR_NULL(kvm->arch.debugfs_dir))
+> -		kvmppc_mmu_debugfs_init(kvm);
+> +	kvmppc_mmu_debugfs_init(kvm);
+>  
+>  	return 0;
+>  }
+> diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+> index 10b38178cff2..0140b29079b6 100644
+> --- a/virt/kvm/arm/vgic/vgic-debug.c
+> +++ b/virt/kvm/arm/vgic/vgic-debug.c
+> @@ -263,21 +263,12 @@ static const struct file_operations vgic_debug_fops = {
+>  	.release = seq_release
+>  };
+>  
+> -int vgic_debug_init(struct kvm *kvm)
+> +void vgic_debug_init(struct kvm *kvm)
+>  {
+> -	if (!kvm->debugfs_dentry)
+> -		return -ENOENT;
+> -
+> -	if (!debugfs_create_file("vgic-state", 0444,
+> -				 kvm->debugfs_dentry,
+> -				 kvm,
+> -				 &vgic_debug_fops))
+> -		return -ENOMEM;
+> -
+> -	return 0;
+> +	debugfs_create_file("vgic-state", 0444, kvm->debugfs_dentry, kvm,
+> +			    &vgic_debug_fops);
+>  }
+>  
+> -int vgic_debug_destroy(struct kvm *kvm)
+> +void vgic_debug_destroy(struct kvm *kvm)
+>  {
+> -	return 0;
+>  }
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 830e815748a0..3c38c5349953 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -229,8 +229,8 @@ void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  int vgic_lazy_init(struct kvm *kvm);
+>  int vgic_init(struct kvm *kvm);
+>  
+> -int vgic_debug_init(struct kvm *kvm);
+> -int vgic_debug_destroy(struct kvm *kvm);
+> +void vgic_debug_init(struct kvm *kvm);
+> +void vgic_debug_destroy(struct kvm *kvm);
+>  
+>  bool lock_all_vcpus(struct kvm *kvm);
+>  void unlock_all_vcpus(struct kvm *kvm);
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index c7b2e927f699..0ad400f353fc 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -572,10 +572,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
+>  		return 0;
+>  
+>  	snprintf(dir_name, sizeof(dir_name), "%d-%d", task_pid_nr(current), fd);
+> -	kvm->debugfs_dentry = debugfs_create_dir(dir_name,
+> -						 kvm_debugfs_dir);
+> -	if (!kvm->debugfs_dentry)
+> -		return -ENOMEM;
+> +	kvm->debugfs_dentry = debugfs_create_dir(dir_name, kvm_debugfs_dir);
+>  
+>  	kvm->debugfs_stat_data = kcalloc(kvm_debugfs_num_entries,
+>  					 sizeof(*kvm->debugfs_stat_data),
+> @@ -591,11 +588,8 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
+>  		stat_data->kvm = kvm;
+>  		stat_data->offset = p->offset;
+>  		kvm->debugfs_stat_data[p - debugfs_entries] = stat_data;
+> -		if (!debugfs_create_file(p->name, 0644,
+> -					 kvm->debugfs_dentry,
+> -					 stat_data,
+> -					 stat_fops_per_vm[p->kind]))
+> -			return -ENOMEM;
+> +		debugfs_create_file(p->name, 0644, kvm->debugfs_dentry,
+> +				    stat_data, stat_fops_per_vm[p->kind]);
+>  	}
+>  	return 0;
+>  }
+> @@ -3896,29 +3890,18 @@ static void kvm_uevent_notify_change(unsigned int type, struct kvm *kvm)
+>  	kfree(env);
+>  }
+>  
+> -static int kvm_init_debug(void)
+> +static void kvm_init_debug(void)
+>  {
+> -	int r = -EEXIST;
+>  	struct kvm_stats_debugfs_item *p;
+>  
+>  	kvm_debugfs_dir = debugfs_create_dir("kvm", NULL);
+> -	if (kvm_debugfs_dir == NULL)
+> -		goto out;
+>  
+>  	kvm_debugfs_num_entries = 0;
+>  	for (p = debugfs_entries; p->name; ++p, kvm_debugfs_num_entries++) {
+> -		if (!debugfs_create_file(p->name, 0644, kvm_debugfs_dir,
+> -					 (void *)(long)p->offset,
+> -					 stat_fops[p->kind]))
+> -			goto out_dir;
+> +		debugfs_create_file(p->name, 0644, kvm_debugfs_dir,
+> +				    (void *)(long)p->offset,
+> +				    stat_fops[p->kind]);
+>  	}
+> -
+> -	return 0;
+> -
+> -out_dir:
+> -	debugfs_remove_recursive(kvm_debugfs_dir);
+> -out:
+> -	return r;
+>  }
+>  
+>  static int kvm_suspend(void)
+> @@ -4046,20 +4029,13 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
+>  	kvm_preempt_ops.sched_in = kvm_sched_in;
+>  	kvm_preempt_ops.sched_out = kvm_sched_out;
+>  
+> -	r = kvm_init_debug();
+> -	if (r) {
+> -		pr_err("kvm: create debugfs files failed\n");
+> -		goto out_undebugfs;
+> -	}
+> +	kvm_init_debug();
+>  
+>  	r = kvm_vfio_ops_init();
+>  	WARN_ON(r);
+>  
+>  	return 0;
+>  
+> -out_undebugfs:
+> -	unregister_syscore_ops(&kvm_syscore_ops);
+> -	misc_deregister(&kvm_dev);
+>  out_unreg:
+>  	kvm_async_pf_deinit();
+>  out_free:
+> 
 
-Add missing compatible and clock properties for EPIT node.
+Queued, thanks.
 
-Signed-off-by: Colin Didier <colin.didier@devialet.com>
-Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index c003e62bf290..75bbaca34cbc 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -844,13 +844,23 @@
- 			};
- 
- 			epit1: epit at 20d0000 { /* EPIT1 */
-+				compatible = "fsl,imx6q-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6QDL_CLK_EPIT1>,
-+					<&clks IMX6QDL_CLK_IPG_PER>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
- 			};
- 
- 			epit2: epit at 20d4000 { /* EPIT2 */
-+				compatible = "fsl,imx6q-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6QDL_CLK_EPIT2>,
-+					<&clks IMX6QDL_CLK_IPG_PER>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
--- 
-2.17.0
+Paolo
