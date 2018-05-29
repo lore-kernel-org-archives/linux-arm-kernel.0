@@ -1,46 +1,29 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 29 May 2018 16:02:24 +0800
-Subject: [PATCH] soc: imx: gpcv2: correct PGC offset
-Message-ID: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 29 May 2018 08:08:44 +0000
+Subject: [PATCH v2 10/11] arm64: dts: r8a77965-salvator-x: Enable DU
+ external clocks and HDMI
+In-Reply-To: <CAMuHMdWPFOjT9qk0Z4+-nSTumjhN_Q6Ntwh3__CgBCobquX8Rg@mail.gmail.com>
+References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180427165722.19445-11-kieran.bingham+renesas@ideasonboard.com>
+ <CAMuHMdW6HeWMwRDcn6PLnwzgxvYz-h=jx=1qvYEK9okwqY0itg@mail.gmail.com>
+ <8736yb5jez.wl%kuninori.morimoto.gx@renesas.com>
+ <CAMuHMdWPFOjT9qk0Z4+-nSTumjhN_Q6Ntwh3__CgBCobquX8Rg@mail.gmail.com>
+Message-ID: <871sdu6g6b.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct MIPI/PCIe/USB_HSIC's PGC offset based on
-design RTL, the value on Reference Manual are incorrect.
 
-The correct offset should be as below:
+Hi Geert
 
-0x800 ~ 0x83F: PGC for core0 of A7 platform;
-0x840 ~ 0x87F: PGC for core1 of A7 platform;
-0x880 ~ 0x8BF: PGC for SCU of A7 platform;
-0xA00 ~ 0xA3F: PGC for fastmix/megamix;
-0xC00 ~ 0xC3F: PGC for MIPI PHY;
-0xC40 ~ 0xC7F: PGC for PCIe_PHY;
-0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
-0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
-0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
+> > HDMI sound doesn't use hdmi0_con.
+> > You can do it now, thanks
+> 
+> Thanks, so hdmi0_con can be moved now.
+> 
+> But HDMI sound does use hdmi0/ports/port at 2. right?
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Yes
+
+Best regards
 ---
- drivers/soc/imx/gpcv2.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
-index afc7ecc..132c946 100644
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -40,9 +40,9 @@
- #define GPC_M4_PU_PDN_FLG		0x1bc
- 
- 
--#define PGC_MIPI			4
--#define PGC_PCIE			5
--#define PGC_USB_HSIC			8
-+#define PGC_MIPI			16
-+#define PGC_PCIE			17
-+#define PGC_USB_HSIC			20
- #define GPC_PGC_CTRL(n)			(0x800 + (n) * 0x40)
- #define GPC_PGC_SR(n)			(GPC_PGC_CTRL(n) + 0xc)
- 
--- 
-2.7.4
+Kuninori Morimoto
