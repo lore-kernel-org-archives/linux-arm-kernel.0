@@ -1,65 +1,70 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 May 2018 16:42:51 +0100
-Subject: [PATCH] ARM: mcpm, perf/arm-cci: export mcpm_is_available
-In-Reply-To: <20180529154120.GI17159@arm.com>
-References: <20180528154448.2494709-1-arnd@arndb.de>
- <20180529153013.GH17159@arm.com>
- <20180529153324.GL17671@n2100.armlinux.org.uk>
- <20180529154120.GI17159@arm.com>
-Message-ID: <20180529154251.GM17671@n2100.armlinux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 29 May 2018 18:46:10 +0300
+Subject: [PATCH 2/2] arm64: dts: renesas: condor: add I2C0 support
+In-Reply-To: <20180529131012.ohyqwmiaxiiw6noi@verge.net.au>
+References: <e9c94553-be9d-0eec-a1ee-1713bb97fbab@cogentembedded.com>
+ <61f6f4a4-e55c-06e0-cba1-7d90a556950a@cogentembedded.com>
+ <20180529131012.ohyqwmiaxiiw6noi@verge.net.au>
+Message-ID: <9bc27b57-cf26-3b03-6ec4-1e9788a46426@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 04:41:20PM +0100, Will Deacon wrote:
-> Hi Russell,
-> 
-> On Tue, May 29, 2018 at 04:33:24PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, May 29, 2018 at 04:30:14PM +0100, Will Deacon wrote:
-> > > Hi Arnd, Russell, [+Nico and Robin]
-> > > 
-> > > On Mon, May 28, 2018 at 05:44:36PM +0200, Arnd Bergmann wrote:
-> > > > Now that the ARM CCI PMU driver can be built as a loadable module,
-> > > > we get a link failure when MCPM is enabled:
-> > > > 
-> > > > ERROR: "mcpm_is_available" [drivers/perf/arm-cci.ko] undefined!
-> > > > 
-> > > > The simplest fix is to export that helper function.
-> > > > 
-> > > > Fixes: 8b0c93c20ef7 ("perf/arm-cci: Allow building as a module")
-> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > ---
-> > > > The patch that caused this is currently part of the arm-perf/for-next/perf
-> > > > branch, it would be good to have the fix there as well.
-> > > > ---
-> > > >  arch/arm/common/mcpm_entry.c | 2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > 
-> > > I'm happy to take this via the arm perf tree if others are ok with that.
-> > > Alternatively, I can revert the offending commit if there are objections
-> > > to exporting the symbol.
-> > > 
-> > > Russell: do you any preference?
-> > 
-> > As it claims to fix 8b0c93c20ef7, which I don't have, I can't take this
-> > patch.  Do we know which tree has this?
-> 
-> Yes, sorry, it's in my for-next/perf branch:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-next/perf&id=8b0c93c20ef78f15d8b760964ff79bda7f68c610
-> 
-> which is now in -next.
-> 
-> I'm happy to take the mcpm patch on top with your ack, but if you have
-> conflicting changes (or would prefer not to export the symbol to modules)
-> then I can just revert the patch in my tree for now.
+Hello!
 
-I have no changes to that file, so:
+On 05/29/2018 04:10 PM, Simon Horman wrote:
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> Define the Condor board dependent part of the I2C0 device node.
+>>
+>> The I2C0 bus is populated by 2 ON Semiconductor PCA9654 I/O expanders
+>> and Analog Devices  ADV7511W HDMI transmitter (but we're only describing
+>> the former chips now).
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   27 ++++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>
+>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+>> ===================================================================
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+>> @@ -80,6 +80,28 @@
+>>  	clock-frequency = <32768>;
+>>  };
+>>  
+>> +&i2c0 {
+>> +	pinctrl-0 = <&i2c0_pins>;
+>> +	pinctrl-names = "default";
+>> +
+>> +	status = "okay";
+>> +	clock-frequency = <400000>;
+>> +
+>> +	io_expander0: gpio at 20 {
+> 
+> Hi Sergei,
+> 
+> I'm a little confused about where 0x20 and 0x21 are derived from.
+> Could you explain a little?
 
-Thanks.
+   r-carv3h_system_evaluation_board_rev020.pdf, pp. 16-17, lower left corners.
+The schematics gives the 8-bit read/write addresses but we use uniform 7-bit
+I2C address in DTs.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+>> +		compatible = "onnn,pca9654";
+>> +		reg = <0x20>;
+>> +		gpio-controller;
+>> +		#gpio-cells = <2>;
+>> +	};
+>> +
+>> +	io_expander1: gpio at 21 {
+>> +		compatible = "onnn,pca9654";
+>> +		reg = <0x21>;
+>> +		gpio-controller;
+>> +		#gpio-cells = <2>;
+>> +	};
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-0 = <&mmc_pins>;
+>>  	pinctrl-1 = <&mmc_pins_uhs>;
