@@ -1,44 +1,80 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 15:54:13 +0100
-Subject: [PATCH v5 01/15] ARM: add more CPU part numbers for Cortex and Brahma
- B15 CPUs
+Date: Tue, 29 May 2018 15:54:29 +0100
+Subject: [PATCH v5 04/15] ARM: bugs: add support for per-processor bug checking
 In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
 References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNg0r-00054X-MC@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fNg17-00055G-7W@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CPU part numbers for Cortex A53, A57, A72, A73, A75 and the
-Broadcom Brahma B15 CPU.
+Add support for per-processor bug checking - each processor function
+descriptor gains a function pointer for this check, which must not be
+an __init function.  If non-NULL, this will be called whenever a CPU
+enters the kernel via which ever path (boot CPU, secondary CPU startup,
+CPU resuming, etc.)
+
+This allows processor specific bug checks to validate that workaround
+bits are properly enabled by firmware via all entry paths to the kernel.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Boot-tested-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/cputype.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/include/asm/proc-fns.h | 4 ++++
+ arch/arm/kernel/bugs.c          | 4 ++++
+ arch/arm/mm/proc-macros.S       | 3 ++-
+ 3 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb546425da8a..26021980504d 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -77,8 +77,16 @@
- #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
- #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
- #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
-+#define ARM_CPU_PART_CORTEX_A53		0x4100d030
-+#define ARM_CPU_PART_CORTEX_A57		0x4100d070
-+#define ARM_CPU_PART_CORTEX_A72		0x4100d080
-+#define ARM_CPU_PART_CORTEX_A73		0x4100d090
-+#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
- #define ARM_CPU_PART_MASK		0xff00fff0
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index f2e1af45bd6f..e25f4392e1b2 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -37,6 +37,10 @@ extern struct processor {
+ 	 */
+ 	void (*_proc_init)(void);
+ 	/*
++	 * Check for processor bugs
++	 */
++	void (*check_bugs)(void);
++	/*
+ 	 * Disable any processor specifics
+ 	 */
+ 	void (*_proc_fin)(void);
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+index 16e7ba2a9cc4..7be511310191 100644
+--- a/arch/arm/kernel/bugs.c
++++ b/arch/arm/kernel/bugs.c
+@@ -5,6 +5,10 @@
  
-+/* Broadcom cores */
-+#define ARM_CPU_PART_BRAHMA_B15		0x420000f0
-+
- /* DEC implemented cores */
- #define ARM_CPU_PART_SA1100		0x4400a110
+ void check_other_bugs(void)
+ {
++#ifdef MULTI_CPU
++	if (processor.check_bugs)
++		processor.check_bugs();
++#endif
+ }
  
+ void __init check_bugs(void)
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index f10e31d0730a..81d0efb055c6 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -273,13 +273,14 @@
+ 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
+ 	.endm
+ 
+-.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
++.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
+ 	.type	\name\()_processor_functions, #object
+ 	.align 2
+ ENTRY(\name\()_processor_functions)
+ 	.word	\dabort
+ 	.word	\pabort
+ 	.word	cpu_\name\()_proc_init
++	.word	\bugs
+ 	.word	cpu_\name\()_proc_fin
+ 	.word	cpu_\name\()_reset
+ 	.word	cpu_\name\()_do_idle
 -- 
 2.7.4
