@@ -1,72 +1,31 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 29 May 2018 10:22:58 +0530
-Subject: [PATCH 2/2] arm64: dts: Add Mediatek X20 Development Board support
-In-Reply-To: <20180529045258.1415-1-manivannan.sadhasivam@linaro.org>
-References: <20180529045258.1415-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180529045258.1415-3-manivannan.sadhasivam@linaro.org>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Mon, 28 May 2018 22:12:14 -0700
+Subject: [PATCH v2 1/8] driver core: make deferring probe after init
+ optional
+In-Reply-To: <20180524181834.GF4828@sirena.org.uk>
+References: <20180524175024.19874-1-robh@kernel.org>
+ <20180524175024.19874-2-robh@kernel.org>
+ <20180524181834.GF4828@sirena.org.uk>
+Message-ID: <1765be22-4bd7-c870-926c-2956e46df1d9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device tree support for Mediatek X20 Development Board
-based on MT6797 Deca core SoC. This board is one of the 96Boards
-Consumer Edition platform.
+On 05/24/18 11:18, Mark Brown wrote:
+> On Thu, May 24, 2018 at 12:50:17PM -0500, Rob Herring wrote:
+> 
+>> Subsystems or drivers may opt-in to this behavior by calling
+>> driver_deferred_probe_check_init_done() instead of just returning
+>> -EPROBE_DEFER. They may use additional information from DT or kernel's
+>> config to decide whether to continue to defer probe or not.
+> 
+> Should userspace have some involvement in this decision?  It knows if
+> it's got any intention of loading modules for example.  Kernel config
+> checks might be good enough, though it's going to be a pain to work out
+> if the relevant driver is built as a module for example.
+> 
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/mediatek/Makefile         |  1 +
- .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
- 2 files changed, 34 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+A parallel issue is that loading an overlay could provide the resource
+that will allow the deferred probe to complete.  (That is, once we
+finish implementing the run time overlays feature.)
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index ac17f60f998c..5b7fd6ad96e4 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-new file mode 100644
-index 000000000000..2c09ca95d9e2
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-@@ -0,0 +1,33 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for MediaTek X20 Development Board
-+ *
-+ * Copyright (C) 2018, Linaro Ltd.
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include "mt6797.dtsi"
-+
-+/ {
-+	model = "Mediatek X20 Development Board";
-+	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
-+
-+	aliases {
-+		serial0 = &uart1;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x1e605000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
--- 
-2.17.0
+-Frank
