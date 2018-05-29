@@ -1,35 +1,40 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 29 May 2018 11:32:00 +0200
-Subject: [PATCH v4 3/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <CAHp75VeeiFhShuMOVzuy2FjxrkfsxxzhyfAnwQNOoeaRwZ103Q@mail.gmail.com>
-References: <20180525171941.26766-1-radu.pirea@microchip.com>
- <20180525171941.26766-4-radu.pirea@microchip.com>
- <CAHp75VeeiFhShuMOVzuy2FjxrkfsxxzhyfAnwQNOoeaRwZ103Q@mail.gmail.com>
-Message-ID: <20180529093200.GB4793@piout.net>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 29 May 2018 11:57:57 +0200
+Subject: [PATCH v10 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20180517090224.u3ygdzjr77im2mmp@flea>
+References: <20180517090224.u3ygdzjr77im2mmp@flea>
+Message-ID: <20180529095757.qkz7jyuxza7movbc@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/2018 11:00:49+0300, Andy Shevchenko wrote:
-> On Fri, May 25, 2018 at 8:19 PM, Radu Pirea <radu.pirea@microchip.com> wrote:
-> > This mfd driver is just a wrapper over atmel_serial driver and
-> > spi-at91-usart driver. Selection of one of the drivers is based on a
-> > property from device tree. If the property is not specified, the default
-> > driver is atmel_serial.
+On Thu, May 17, 2018 at 11:02:24AM +0200, Maxime Ripard wrote:
+> On Fri, May 04, 2018 at 02:44:08PM +0800, Yong Deng wrote:
+> > This patchset add initial support for Allwinner V3s CSI.
+> > 
+> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > interface and CSI1 is used for parallel interface. This is not
+> > documented in datasheet but by test and guess.
+> > 
+> > This patchset implement a v4l2 framework driver and add a binding 
+> > documentation for it. 
+> > 
+> > Currently, the driver only support the parallel interface. And has been
+> > tested with a BT1120 signal which generating from FPGA. The following
+> > fetures are not support with this patchset:
+> >   - ISP 
+> >   - MIPI-CSI2
+> >   - Master clock for camera sensor
+> >   - Power regulator for the front end IC
 > 
-> > +       depends on OF
+> I tested it on my H3 with a parallel camera, and it still works. Thanks!
 > 
-> What makes this driver OF specific?
-> 
-> > +       err = of_property_read_u32(np, "atmel,usart-mode", &opmode);
-> 
-> Check unified device property API.
-> 
+> Hans, Sakari, any chance this might land in 4.18?
 
-We don't care, this makes the driver OF specific and this is the correct
-thing to do.
+Ping?
 
+Maxime
 
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
+Maxime Ripard, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
 https://bootlin.com
