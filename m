@@ -1,37 +1,73 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 29 May 2018 17:02:31 +0300
-Subject: [PATCH] soc: imx: gpcv2: correct PGC offset
-In-Reply-To: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
-References: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <0e0690c89b24b4b028e4a0dab63334af4b37fdd3.camel@nxp.com>
+From: michael@amarulasolutions.com (Michael Nazzareno Trimarchi)
+Date: Tue, 29 May 2018 16:05:55 +0200
+Subject: [PATCH] rtc: sun6i: Fix bit_idx value for clk_register_gate
+In-Reply-To: <20180529140219.auat656qcl5jdru7@flea.home>
+References: <20180528075032.6769-1-jagan@amarulasolutions.com>
+ <20180529140219.auat656qcl5jdru7@flea.home>
+Message-ID: <CAOf5uwkQE2Mv3vhMVFPk69VQRptLpqjC0BkFxucf+VuGyOd2Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-05-29 at 16:02 +0800, Anson Huang wrote:
-> Correct MIPI/PCIe/USB_HSIC's PGC offset based on
-> design RTL, the value on Reference Manual are incorrect.
-> 
-> The correct offset should be as below: 
->  
-> -#define PGC_MIPI			4
-> -#define PGC_PCIE			5
-> -#define PGC_USB_HSIC			8
-> +#define PGC_MIPI			16
-> +#define PGC_PCIE			17
-> +#define PGC_USB_HSIC			20
->  #define GPC_PGC_CTRL(n)			(0x800 + (n) * 0x40)
->  #define GPC_PGC_SR(n)			(GPC_PGC_CTRL(n) + 0xc)
+Hi
 
-This gpcv2 driver is currently only used for PCI, it probably only
-works because domains happen to be turned on by default?
+On Tue, May 29, 2018 at 4:02 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> On Mon, May 28, 2018 at 01:20:32PM +0530, Jagan Teki wrote:
+>> From: Michael Trimarchi <michael@amarulasolutions.com>
+>>
+>> clk-gate core will take bit_idx through clk_register_gate
+>> and then do clk_gate_ops by using BIT(bit_idx), but rtc-sun6i
+>> is passing bit_idx as BIT(bit_idx) it becomes BIT(BIT(bit_idx)
+>> which is wrong and eventually external gate clock is not enabling.
+>>
+>> This patch fixed by passing bit index and the original change
+>> introduced from below commit.
+>> "rtc: sun6i: Add support for the external oscillator gate"
+>> (sha1:        17ecd246414b3a0fe0cb248c86977a8bda465b7b)
+>>
+>> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
+>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>
+> Cc'ing to stable and adding a Fixes tag would be great.
+>
+>> ---
+>>  drivers/rtc/rtc-sun6i.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+>> index 2e6fb275acc8..a66f40c96582 100644
+>> --- a/drivers/rtc/rtc-sun6i.c
+>> +++ b/drivers/rtc/rtc-sun6i.c
+>> @@ -74,7 +74,7 @@
+>>  #define SUN6I_ALARM_CONFIG_WAKEUP            BIT(0)
+>>
+>>  #define SUN6I_LOSC_OUT_GATING                        0x0060
+>> -#define SUN6I_LOSC_OUT_GATING_EN             BIT(0)
+>> +#define SUN6I_LOSC_OUT_GATING_EN             0
+>
+> All the other register definitions in that driver are the actual value
+> needed, and not the offset. Just to make it obvious that it shouldn't
+> be used as is, please add an _OFFSET at the end of the defined name
+>
 
-On imx7d upstream platform suspend is not yet supported but even doing
-device-level suspend causes a hang on resume somewhere in PCI on first
-read. This patch fixes that immediate hang.
+Make sense
 
-After suspend/resume lspci is broken (device doesn't properly resume),
-that probably requires more imx pci patches and unrelated to pgc.
+Michael
 
---
-Regards,
-Leonard
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+
+
+
+-- 
+| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
+| COO  -  Founder                                      Cruquiuskade 47 |
+| +31(0)851119172                                 Amsterdam 1018 AM NL |
+|                  [`as] http://www.amarulasolutions.com               |
