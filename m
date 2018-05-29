@@ -1,167 +1,67 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 15:54:56 +0100
-Subject: [PATCH v5 09/15] ARM: spectre-v2: add firmware based hardening
-In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNg1Y-00057y-FP@rmk-PC.armlinux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 29 May 2018 17:01:13 +0200
+Subject: Boot failures in -next on Jetson TK1
+In-Reply-To: <20180526103629.GB1564@sirena.org.uk>
+References: <20180526103629.GB1564@sirena.org.uk>
+Message-ID: <20180529150113.GA16038@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add firmware based hardening for cores that require more complex
-handling in firmware.
+On Sat, May 26, 2018 at 11:36:29AM +0100, Mark Brown wrote:
+> Currently -next is failing to boot on Jetson TK1.  The problem looks to
+> be the Nouveau driver, during initialization it reports an address
+> decode error then starts printing error messages saying "nouveau
+> 57000000.gpu: fifo: SCHED_ERROR 20 []" over and over again.
+> 
+> I've pasted the start of the errors below, you can see a full log and
+> more details at:
+> 
+>    https://kernelci.org/boot/id/5b0882a259b514339779a881/
+> 
+> The warnings about Spectre are a separate issue and don't seem to affect
+> the boot.
+> 
+> [ 15.194484] nouveau 57000000.gpu: NVIDIA GK20A (0ea000a1)
+> [   15.200109] udevd[109]: could not rename interface '3' from 'eth0' to 'enp1s0': Device or resource busy
+> [   15.206399] nouveau 57000000.gpu: imem: using IOMMU
+> [   15.315122] CPU2: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> [   15.320021] nouveau 57000000.gpu: Direct firmware load for nvidia/gk20a/fecs_inst.bin failed with error -2
+> [   15.384841] nouveau 57000000.gpu: Direct firmware load for nouveau/nvea_fuc409c failed with error -2
+> [   15.393972] nouveau 57000000.gpu: Direct firmware load for nouveau/fuc409c failed with error -2
+> [   15.402679] nouveau 57000000.gpu: gr: failed to load fuc409c
+> [   15.409434] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> [   15.419398] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> [   15.482568] tegra-mc 70019000.memory-controller: gpusrd: read @0x00041200: EMEM address decode error (EMEM decode error)
+> [   15.491232] [TTM] Zone  kernel: Available graphics memory: 375202 kiB
+> [   15.502768] [TTM] Zone highmem: Available graphics memory: 1030050 kiB
+> [   15.509290] [TTM] Initializing pool allocator
+> [   15.513658] nouveau 57000000.gpu: DRM: VRAM: 0 MiB
+> [   15.518451] nouveau 57000000.gpu: DRM: GART: 1048576 MiB
+> [   15.526546] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> [   15.527290] tegra-mc 70019000.memory-controller: gpusrd: read @0x00072000: EMEM address decode error (EMEM decode error)
+> [   15.537050] CPU1: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> [   15.546928] nouveau 57000000.gpu: fifo: SCHED_ERROR 20 []
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Boot-tested-by: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mm/proc-v7-bugs.c | 64 +++++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mm/proc-v7.S      | 21 +++++++++++++++
- 2 files changed, 84 insertions(+), 1 deletion(-)
+This is a known issue that was introduced in v4.16 by a combination of
+the 32-bit ARM DMA/IOMMU glue and an Tegra SMMU driver change.
 
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-index 3a03b3824eb0..9e2ae201138b 100644
---- a/arch/arm/mm/proc-v7-bugs.c
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -1,14 +1,20 @@
- // SPDX-License-Identifier: GPL-2.0
-+#include <linux/arm-smccc.h>
- #include <linux/kernel.h>
-+#include <linux/psci.h>
- #include <linux/smp.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
-+#include <asm/proc-fns.h>
- #include <asm/system_misc.h>
- 
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- DEFINE_PER_CPU(harden_branch_predictor_fn_t, harden_branch_predictor_fn);
- 
-+extern void cpu_v7_smc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-+extern void cpu_v7_hvc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-+
- static void harden_branch_predictor_bpiall(void)
- {
- 	write_sysreg(0, BPIALL);
-@@ -19,15 +25,27 @@ static void harden_branch_predictor_iciallu(void)
- 	write_sysreg(0, ICIALLU);
- }
- 
-+static void __maybe_unused call_smc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
-+static void __maybe_unused call_hvc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
- static void cpu_v7_spectre_init(void)
- {
- 	const char *spectre_v2_method = NULL;
- 	int cpu = smp_processor_id();
-+	u32 cpuid;
- 
- 	if (per_cpu(harden_branch_predictor_fn, cpu))
- 		return;
- 
--	switch (read_cpuid_part()) {
-+	cpuid = read_cpuid_part();
-+	switch (cpuid) {
- 	case ARM_CPU_PART_CORTEX_A8:
- 	case ARM_CPU_PART_CORTEX_A9:
- 	case ARM_CPU_PART_CORTEX_A12:
-@@ -45,7 +63,51 @@ static void cpu_v7_spectre_init(void)
- 			harden_branch_predictor_iciallu;
- 		spectre_v2_method = "ICIALLU";
- 		break;
-+
-+#ifdef CONFIG_ARM_PSCI
-+	default:
-+		/* Other ARM CPUs require no workaround */
-+		if (cpuid >> 24 == ARM_CPU_IMP_ARM)
-+			break;
-+		/* fallthrough */
-+		/* Cortex A57/A72 require firmware workaround */
-+	case ARM_CPU_PART_CORTEX_A57:
-+	case ARM_CPU_PART_CORTEX_A72: {
-+		struct arm_smccc_res res;
-+
-+		if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
-+			break;
-+
-+		switch (psci_ops.conduit) {
-+		case PSCI_CONDUIT_HVC:
-+			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+			if ((int)res.a0 != 0)
-+				break;
-+			per_cpu(harden_branch_predictor_fn, cpu) =
-+				call_hvc_arch_workaround_1;
-+			processor.switch_mm = cpu_v7_hvc_switch_mm;
-+			spectre_v2_method = "hypervisor";
-+			break;
-+
-+		case PSCI_CONDUIT_SMC:
-+			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+			if ((int)res.a0 != 0)
-+				break;
-+			per_cpu(harden_branch_predictor_fn, cpu) =
-+				call_smc_arch_workaround_1;
-+			processor.switch_mm = cpu_v7_smc_switch_mm;
-+			spectre_v2_method = "firmware";
-+			break;
-+
-+		default:
-+			break;
-+		}
- 	}
-+#endif
-+	}
-+
- 	if (spectre_v2_method)
- 		pr_info("CPU%u: Spectre v2: using %s workaround\n",
- 			smp_processor_id(), spectre_v2_method);
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 79510011e7eb..b78d59a1cc05 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -9,6 +9,7 @@
-  *
-  *  This is the "shell" of the ARMv7 processor support.
-  */
-+#include <linux/arm-smccc.h>
- #include <linux/init.h>
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-@@ -93,6 +94,26 @@ ENTRY(cpu_v7_dcache_clean_area)
- 	ret	lr
- ENDPROC(cpu_v7_dcache_clean_area)
- 
-+#ifdef CONFIG_ARM_PSCI
-+	.arch_extension sec
-+ENTRY(cpu_v7_smc_switch_mm)
-+	stmfd	sp!, {r0 - r3}
-+	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	smc	#0
-+	ldmfd	sp!, {r0 - r3}
-+	b	cpu_v7_switch_mm
-+ENDPROC(cpu_v7_smc_switch_mm)
-+	.arch_extension virt
-+ENTRY(cpu_v7_hvc_switch_mm)
-+	stmfd	sp!, {r0 - r3}
-+	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	hvc	#0
-+	ldmfd	sp!, {r0 - r3}
-+	b	cpu_v7_switch_mm
-+ENDPROC(cpu_v7_smc_switch_mm)
-+#endif
- ENTRY(cpu_v7_iciallu_switch_mm)
- 	mov	r3, #0
- 	mcr	p15, 0, r3, c7, c5, 0		@ ICIALLU
--- 
-2.7.4
+There is a fix here:
+
+	http://patchwork.ozlabs.org/patch/902830/
+
+Which got remotely NAK'ed by the DMA API maintainer. I then came up with
+this, based on feedback from Christoph:
+
+	http://patchwork.ozlabs.org/project/linux-tegra/list/?series=40853
+
+But that's kind of blocked right now, awaiting feedback. I'll send out
+another version, which will hopefully strike the right balance.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/1f1a3b2f/attachment-0001.sig>
