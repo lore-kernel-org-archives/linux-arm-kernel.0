@@ -1,38 +1,44 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 29 May 2018 22:39:15 +0300
-Subject: [PATCH 0/2] PCI: Initial imx7d pm support
-Message-ID: <cover.1527621510.git.leonard.crestez@nxp.com>
+Date: Tue, 29 May 2018 22:39:16 +0300
+Subject: [PATCH 1/2] reset: imx7: Fix always writing bits as 0
+In-Reply-To: <cover.1527621510.git.leonard.crestez@nxp.com>
+References: <cover.1527621510.git.leonard.crestez@nxp.com>
+Message-ID: <c441872d7dd355ae09e945447441389e93e3b888.1527621510.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds initial pm support on imx7d so that after
-suspend/resume lspci works again. This mostly copies the resume sequence
-from the imx tree.
+Right now the only user of reset-imx7 is pci-imx6 and the
+reset_control_assert and deassert calls on pciephy_reset don't toggle
+the PCIEPHY_BTN and PCIEPHY_G_RST bits as expected. Fix this by writing
+1 or 0 respectively.
 
-More can be done later to reduce power in suspend as well as adding
-support for other socs.
+The reference manual is not very clear regarding SRC_PCIEPHY_RCR but for
+other registers like MIPIPHY and HSICPHY the bits are explicitly
+documented as "1 means assert, 0 means deassert".
 
-This is motivated mostly by a desire to bring imx PM code closer to
-upstream. It is possible that I am missing some things about how PM
-should be done for pci host drivers, it would be great if you could
-point me the right way.
+The values are still reversed for IMX7_RESET_PCIE_CTRL_APPS_EN.
 
-It also relies on this bugfix for PGC offsets:
-    https://lkml.org/lkml/2018/5/29/138
-Without that patch resume hangs on first PCI read from PCI-PM core. It
-is not strictly related to PCI but pci-imx6 is the only user of gpcv2
-power domains.
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+---
+ drivers/reset/reset-imx7.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Patch 1 in this series is also technically an unrelated bugfix, however
-pci-imx6 is the only user.
-
-Leonard Crestez (2):
-  reset: imx7: Fix always writing bits as 0
-  PCI: imx: Initial imx7d pm support
-
- drivers/pci/dwc/pci-imx6.c | 94 ++++++++++++++++++++++++++++++++++++--
- drivers/reset/reset-imx7.c |  2 +-
- 2 files changed, 90 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
+index 4db177bc89bc..fdeac1946429 100644
+--- a/drivers/reset/reset-imx7.c
++++ b/drivers/reset/reset-imx7.c
+@@ -78,11 +78,11 @@ static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
+ static int imx7_reset_set(struct reset_controller_dev *rcdev,
+ 			  unsigned long id, bool assert)
+ {
+ 	struct imx7_src *imx7src = to_imx7_src(rcdev);
+ 	const struct imx7_src_signal *signal = &imx7_src_signals[id];
+-	unsigned int value = 0;
++	unsigned int value = assert ? signal->bit : 0;
+ 
+ 	switch (id) {
+ 	case IMX7_RESET_PCIEPHY:
+ 		/*
+ 		 * wait for more than 10us to release phy g_rst and
 -- 
 2.17.0
