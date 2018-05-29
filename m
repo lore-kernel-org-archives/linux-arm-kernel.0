@@ -1,45 +1,64 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 29 May 2018 23:09:09 +0200
-Subject: v4.17-rc1: regressions on N900, N950
-In-Reply-To: <20180529204517.GA6765@amd>
-References: <20180521213952.GA11596@amd> <20180522080250.4fzyvqrgw5oigexn@pali>
- <20180522194139.GB2299@darkstar.musicnaut.iki.fi>
- <20180522205824.GA24927@amd>
- <20180522215638.GC2299@darkstar.musicnaut.iki.fi>
- <20180523140615.GA27180@amd> <20180523201208.GA31731@amd>
- <20180523220456.GY98604@atomide.com> <20180524094705.GA16705@amd>
- <20180529204517.GA6765@amd>
-Message-ID: <20180529210909.7m4cyhh524xqipju@earth.universe>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 29 May 2018 14:12:56 -0700
+Subject: [PATCH 4/4] arm64: cpufeature: always log KPTI setting on boot
+In-Reply-To: <20180524190932.32118-5-mlangsdo@redhat.com>
+References: <20180524190932.32118-1-mlangsdo@redhat.com>
+ <20180524190932.32118-5-mlangsdo@redhat.com>
+Message-ID: <c41923a7-bbcd-1c29-8d51-528d9092e8b2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Tue, May 29, 2018 at 10:45:17PM +0200, Pavel Machek wrote:
-> > > > still results in working touchscreen, removing any of the three fields
-> > > > breaks it again.
-> > > 
-> > > I bisected one regression down, see "omapdrm regression in v4.17-rc series"
-> > > not sure if it covers all the issues being discussed here though.
-> > 
-> > Reverting 24aac6011f70 fixes screen on n900 in v4.17-rc for me. (But
-> > strange dependency on tsc2005 at 0 is still there).
+On 05/24/2018 12:09 PM, Mark Langsdorf wrote:
+> Always log KPTI setting at boot time, whether or not KPTI was forced
+> by a kernel parameter.
 > 
-> Laurent, your patch looks pretty obvious, but unfortunately breaks
-> display on Nokia N900.
+> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+> ---
+>   arch/arm64/kernel/cpufeature.c | 22 +++++++++++++---------
+>   1 file changed, 13 insertions(+), 9 deletions(-)
 > 
-> The patch is pretty big as is, perhaps you have version split to sdi
-> => *sdi and then static => dynamic allocation?
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 697a6ef..e50bf3c 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -889,16 +889,20 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>   		__pti_enabled = __kpti_forced > 0;
+>   		pr_info_once("kernel page table isolation forced %s by %s\n",
+>   			     __pti_enabled ? "ON" : "OFF", str);
+> +	} else {
+> +		/* Useful for KASLR robustness */
+> +		if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+> +			__pti_enabled = true;
+> +		/* Don't force KPTI for CPUs that are not vulnerable */
+> +		else if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
+> +			__pti_enabled = false;
+> +		/* Defer to CPU feature registers */
+> +		else
+> +			__pti_enabled = !has_cpuid_feature(entry, scope);
+> +
+> +		pr_info_once("kernel page table isolation %s by %s\n",
+> +			    __pti_enabled ? "ON" : "OFF", str);
 
-There is a queued fix:
+I think this needs an update for the default logged, otherwise it
+incorrectly states it was set by command line:
 
-https://github.com/freedesktop/drm-misc/commit/2bc5ff0bdc00d81d719dad74589317a260d583ed
+# dmesg | grep isolation
+[    0.000000] CPU features: kernel page table isolation ON by command line option
+[    0.000000] CPU features: detected: Kernel page table isolation (KPTI)
+# cat /proc/cmdline
+nokaslr slub_debug=- console=ttyAMA0 debug_pagealloc=on earlycon=pl011,0x9000000
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/77c08194/attachment.sig>
+>   	}
+> -	/* Useful for KASLR robustness */
+> -	else if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+> -		__pti_enabled = true;
+> -	/* Don't force KPTI for CPUs that are not vulnerable */
+> -	else if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
+> -		__pti_enabled = false;
+> -	/* Defer to CPU feature registers */
+> -	else
+> -		__pti_enabled = !has_cpuid_feature(entry, scope);
+>   
+>   	return __pti_enabled;
+>   }
+> 
