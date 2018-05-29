@@ -1,134 +1,147 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 May 2018 13:11:06 +0100
-Subject: [PATCH v2 02/17] arm64: Call ARCH_WORKAROUND_2 on transitions between
- EL0 and EL1
+Date: Tue, 29 May 2018 13:11:08 +0100
+Subject: [PATCH v2 04/17] arm64: Add ARCH_WORKAROUND_2 probing
 In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
 References: <20180529121121.24927-1-marc.zyngier@arm.com>
-Message-ID: <20180529121121.24927-3-marc.zyngier@arm.com>
+Message-ID: <20180529121121.24927-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the kernel to protect itself, let's call the SSBD mitigation
-implemented by the higher exception level (either hypervisor or firmware)
-on each transition between userspace and kernel.
+As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
+discovery mechanism for detecting the SSBD mitigation.
 
-We must take the PSCI conduit into account in order to target the
-right exception level, hence the introduction of a runtime patching
-callback.
+A new capability is also allocated for that purpose, and a
+config option.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Julien Grall <julien.grall@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 24 ++++++++++++++++++++++++
- arch/arm64/kernel/entry.S      | 22 ++++++++++++++++++++++
- include/linux/arm-smccc.h      |  5 +++++
- 3 files changed, 51 insertions(+)
+ arch/arm64/Kconfig               |  9 ++++++
+ arch/arm64/include/asm/cpucaps.h |  3 +-
+ arch/arm64/kernel/cpu_errata.c   | 69 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf4938f6d..b2103b4df467 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -938,6 +938,15 @@ config HARDEN_EL2_VECTORS
+ 
+ 	  If unsure, say Y.
+ 
++config ARM64_SSBD
++	bool "Speculative Store Bypass Disable" if EXPERT
++	default y
++	help
++	  This enables mitigation of the bypassing of previous stores
++	  by speculative loads.
++
++	  If unsure, say Y.
++
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+ 	depends on COMPAT
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index bc51b72fafd4..8a699c708fc9 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -48,7 +48,8 @@
+ #define ARM64_HAS_CACHE_IDC			27
+ #define ARM64_HAS_CACHE_DIC			28
+ #define ARM64_HW_DBM				29
++#define ARM64_SSBD				30
+ 
+-#define ARM64_NCAPS				30
++#define ARM64_NCAPS				31
+ 
+ #endif /* __ASM_CPUCAPS_H */
 diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index e4a1182deff7..d98d8ce29533 100644
+index d1a7a68dc142..0c76c9f176bb 100644
 --- a/arch/arm64/kernel/cpu_errata.c
 +++ b/arch/arm64/kernel/cpu_errata.c
-@@ -232,6 +232,30 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- }
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+@@ -256,6 +256,67 @@ void __init arm64_update_smccc_conduit(struct alt_instr *alt,
  
-+#ifdef CONFIG_ARM64_SSBD
-+void __init arm64_update_smccc_conduit(struct alt_instr *alt,
-+				       __le32 *origptr, __le32 *updptr,
-+				       int nr_inst)
+ 	*updptr = cpu_to_le32(insn);
+ }
++
++static void arm64_set_ssbd_mitigation(bool state)
 +{
-+	u32 insn;
-+
-+	BUG_ON(nr_inst != 1);
-+
 +	switch (psci_ops.conduit) {
 +	case PSCI_CONDUIT_HVC:
-+		insn = aarch64_insn_get_hvc_value();
++		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
 +		break;
++
 +	case PSCI_CONDUIT_SMC:
-+		insn = aarch64_insn_get_smc_value();
++		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
 +		break;
++
 +	default:
-+		return;
++		WARN_ON_ONCE(1);
++		break;
++	}
++}
++
++static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
++				    int scope)
++{
++	struct arm_smccc_res res;
++	bool supported = true;
++
++	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
++
++	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
++		return false;
++
++	/*
++	 * The probe function return value is either negative
++	 * (unsupported or mitigated), positive (unaffected), or zero
++	 * (requires mitigation). We only need to do anything in the
++	 * last case.
++	 */
++	switch (psci_ops.conduit) {
++	case PSCI_CONDUIT_HVC:
++		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
++		if ((int)res.a0 != 0)
++			supported = false;
++		break;
++
++	case PSCI_CONDUIT_SMC:
++		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
++		if ((int)res.a0 != 0)
++			supported = false;
++		break;
++
++	default:
++		supported = false;
 +	}
 +
-+	*updptr = cpu_to_le32(insn);
++	if (supported) {
++		__this_cpu_write(arm64_ssbd_callback_required, 1);
++		arm64_set_ssbd_mitigation(true);
++	}
++
++	return supported;
 +}
-+#endif	/* CONFIG_ARM64_SSBD */
-+
+ #endif	/* CONFIG_ARM64_SSBD */
+ 
  #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
- 	.matches = is_affected_midr_range,			\
- 	.midr_range = MIDR_RANGE(model, v_min, r_min, v_max, r_max)
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index ec2ee720e33e..f33e6aed3037 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -18,6 +18,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/arm-smccc.h>
- #include <linux/init.h>
- #include <linux/linkage.h>
- 
-@@ -137,6 +138,18 @@ alternative_else_nop_endif
- 	add	\dst, \dst, #(\sym - .entry.tramp.text)
- 	.endm
- 
-+	// This macro corrupts x0-x3. It is the caller's duty
-+	// to save/restore them if required.
-+	.macro	apply_ssbd, state
-+#ifdef CONFIG_ARM64_SSBD
-+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
-+	mov	w1, #\state
-+alternative_cb	arm64_update_smccc_conduit
-+	nop					// Patched to SMC/HVC #0
-+alternative_cb_end
+@@ -513,6 +574,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+ 		ERRATA_MIDR_RANGE_LIST(arm64_harden_el2_vectors),
+ 	},
 +#endif
-+	.endm
-+
- 	.macro	kernel_entry, el, regsize = 64
- 	.if	\regsize == 32
- 	mov	w0, w0				// zero upper 32 bits of x0
-@@ -163,6 +176,13 @@ alternative_else_nop_endif
- 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
- 	disable_step_tsk x19, x20		// exceptions when scheduling.
- 
-+	apply_ssbd 1
-+
 +#ifdef CONFIG_ARM64_SSBD
-+	ldp	x0, x1, [sp, #16 * 0]
-+	ldp	x2, x3, [sp, #16 * 1]
-+#endif
-+
- 	mov	x29, xzr			// fp pointed to user-space
- 	.else
- 	add	x21, sp, #S_FRAME_SIZE
-@@ -303,6 +323,8 @@ alternative_if ARM64_WORKAROUND_845719
- alternative_else_nop_endif
++	{
++		.desc = "Speculative Store Bypass Disable",
++		.capability = ARM64_SSBD,
++		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
++		.matches = has_ssbd_mitigation,
++	},
  #endif
- 3:
-+	apply_ssbd 0
-+
- 	.endif
- 
- 	msr	elr_el1, x21			// set up the return data
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index c89da86de99f..ca1d2cc2cdfa 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -80,6 +80,11 @@
- 			   ARM_SMCCC_SMC_32,				\
- 			   0, 0x8000)
- 
-+#define ARM_SMCCC_ARCH_WORKAROUND_2					\
-+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-+			   ARM_SMCCC_SMC_32,				\
-+			   0, 0x7fff)
-+
- #ifndef __ASSEMBLY__
- 
- #include <linux/linkage.h>
+ 	{
+ 	}
 -- 
 2.14.2
