@@ -1,32 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 May 2018 11:52:45 +0100
-Subject: [PATCH] ARM; fix cpu_v7_bugs_init reference
-In-Reply-To: <CAK8P3a2TSQAdT94KMLiQF0ZvxEM_m+nVfgcY516EDoK4mQuTvw@mail.gmail.com>
-References: <20180529102301.1145470-1-arnd@arndb.de>
- <20180529102502.GH17671@n2100.armlinux.org.uk>
- <CAK8P3a2TSQAdT94KMLiQF0ZvxEM_m+nVfgcY516EDoK4mQuTvw@mail.gmail.com>
-Message-ID: <20180529105245.GI17671@n2100.armlinux.org.uk>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 29 May 2018 11:55:55 +0100
+Subject: [PATCH v2 4/5] arm_pmu: Tidy up clear_event_idx call backs
+In-Reply-To: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
+References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1527591356-10934-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 12:46:00PM +0200, Arnd Bergmann wrote:
-> On Tue, May 29, 2018 at 12:25 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > Please revalidate against the latest patches, this area has changed.
-> 
-> Ok. I assume they will be in tomorrow's linux-next kernel?
-> I'll just wait for that then. Unfortunately there was no linux-next
-> release yesterday, so I'm still testing on last Friday's code.
+The armpmu uses get_event_idx callback to allocate an event
+counter for a given event, which marks the selected counter
+as "used". Now, when we delete the counter, the arm_pmu goes
+ahead and clears the "used" bit and then invokes the "clear_event_idx"
+call back, which kind of splits the job between the core code
+and the backend. Tidy this up by relying on the clear_event_idx
+to do the book keeping, if available. Otherwise, let the core
+driver do the default "clear" bit operation. This will be useful
+for adding the chained event support, where we leave the event
+idx maintenance to the backend.
 
-The patches are already pushed out in my for-next branch as of about
-half an hour ago.  If that results in them appearing in linux-next
-during the next 24 hours, then yes.  Look for this commit:
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm/kernel/perf_event_v7.c |  2 ++
+ drivers/perf/arm_pmu.c          | 15 +++++++++++----
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-0fb1e7b0a396 ("ARM: KVM: report support for SMCCC_ARCH_WORKAROUND_1")
-
-Thanks.
-
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 5f342fc..5e78faa 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1638,6 +1638,7 @@ static void krait_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ 	bool venum_event = EVENT_VENUM(hwc->config_base);
+ 	bool krait_event = EVENT_CPU(hwc->config_base);
+ 
++	clear_bit(hwc->idx, cpuc->used_mask);
+ 	if (venum_event || krait_event) {
+ 		bit = krait_event_to_bit(event, region, group);
+ 		clear_bit(bit, cpuc->used_mask);
+@@ -1967,6 +1968,7 @@ static void scorpion_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ 	bool venum_event = EVENT_VENUM(hwc->config_base);
+ 	bool scorpion_event = EVENT_CPU(hwc->config_base);
+ 
++	clear_bit(hwc->idx, cpuc->used_mask);
+ 	if (venum_event || scorpion_event) {
+ 		bit = scorpion_event_to_bit(event, region, group);
+ 		clear_bit(bit, cpuc->used_mask);
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index ff858e6..9ae7e68 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -226,6 +226,16 @@ static void armpmu_start(struct perf_event *event, int flags)
+ 	armpmu->enable(event);
+ }
+ 
++static void armpmu_clear_event_idx(struct arm_pmu *armpmu,
++				   struct pmu_hw_events *hw_events,
++				   struct perf_event *event)
++{
++	if (armpmu->clear_event_idx)
++		armpmu->clear_event_idx(hw_events, event);
++	else
++		clear_bit(event->hw.idx, hw_events->used_mask);
++}
++
+ static void
+ armpmu_del(struct perf_event *event, int flags)
+ {
+@@ -236,10 +246,7 @@ armpmu_del(struct perf_event *event, int flags)
+ 
+ 	armpmu_stop(event, PERF_EF_UPDATE);
+ 	hw_events->events[idx] = NULL;
+-	clear_bit(idx, hw_events->used_mask);
+-	if (armpmu->clear_event_idx)
+-		armpmu->clear_event_idx(hw_events, event);
+-
++	armpmu_clear_event_idx(armpmu, hw_events, event);
+ 	perf_event_update_userpage(event);
+ }
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
