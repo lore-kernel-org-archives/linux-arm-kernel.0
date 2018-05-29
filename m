@@ -1,117 +1,59 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 29 May 2018 17:09:39 +0200
-Subject: [PATCH] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards
- from K+P
-In-Reply-To: <CAOMZO5AU8PDEErHeU1yb9mwgNLJUvWipTrDsY8csXSHiNro-7w@mail.gmail.com>
-References: <20180509153428.1440-1-lukma@denx.de>
- <CAOMZO5AexXNEGVoXa9K_GAm+aFLNRQOXOhF_SdKAjV1qmuD2nA@mail.gmail.com>
- <20180519140202.3449e3c1@jawa>
- <CAOMZO5DoLwEmQz5BQHDLk8sBq7mDH_UxBjRA0RGKb+PunMYu-Q@mail.gmail.com>
- <20180529155736.275e27b1@jawa>
- <CAOMZO5AU8PDEErHeU1yb9mwgNLJUvWipTrDsY8csXSHiNro-7w@mail.gmail.com>
-Message-ID: <20180529170939.68419862@jawa>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 May 2018 16:08:23 +0100
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+ <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
+ <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+Message-ID: <20180529150823.GD17159@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-> Hi Lukasz,
+On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
+> On 29/05/18 12:56, Geert Uytterhoeven wrote:
+> > On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+> >>> System supend still works fine on systems with big cores only:
+> >>>
+> >>>     R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
+> >>>     R-Car M3-N (2xCA57)
+> >>>
+> >>> Reverting this commit fixes the issue for me.
+> >>
+> >> I can't find anything that relates to system suspend in these patches
+> >> unless they are messing with something during CPU hot plug-in back
+> >> during resume.
+> > 
+> > It's only the last patch that introduces the breakage.
+> > 
 > 
-> On Tue, May 29, 2018 at 10:58 AM, Lukasz Majewski <lukma@denx.de>
-> wrote:
-> 
-> > Sorry for "small" delay on this.
-> >
-> > Ok, so I've investigated the issue:
-> >
-> > 1. The code, which you pasted:
-> > http://code.bulix.org/ik01yu-339697
-> >
-> > works correctly as imx53-qsb-common.dtsi directly includes
-> > "imx53.dtsi" in which iomuxc label is defined.
-> >
-> > In my case though,
-> >
-> > 2. I do include imx53-tqma53.dtsi [1], in which the iomuxc" label
-> > is extended:
-> >
-> > &iomuxc {
-> >         pinctrl-names = "default";
-> >         pinctrl-0 = <&pinctrl_hog>;
-> >
-> >         imx53-tqma53 {
-> >                 pinctrl_hog: hoggrp {
-> >
-> > .......
-> >
-> > };
-> >
-> > The imx53-tqma53.dtsi then includes imx53.dtsi.
-> >
-> > Moreover, my file -> imx53-kp.dtsi as it includes [1], it extends
-> > further the &iomuxc label:
-> >
-> > &iomuxc {
-> >         pinctrl-names = "default";
-> >         pinctrl-0 = <&pinctrl_kp_common>;
-> >
-> >         imx53-kp-common {
-> >                 pinctrl_buzzer: buzzergrp {
-> > .......
-> > };
-> >
-> > So, when I remove imx53-kp-common I will have mismatch with [1]
-> > iomuxc structure.
-> >
-> > The code works as expected when I do remove imx53-tqma53 in [1].
-> >
-> > However, I would prefer to not touch this imx53-tqma53.dtsi file.
-> > It is also included in: imx53-mba53.dts, which extends iomux in
-> > following way:
-> >
-> > &iomuxc {
-> >         lvds1 {
-> >                 pinctrl_lvds1_1: lvds1-grp1 {
-> >
-> >
-> > Here I would need to remove lvds1, disp1 and tve to make it working.
-> > However, it will not break during build, but at run time.
-> >
-> > Considering the above, I would prefer to leave the code in [1] as is
-> > and use imx53-kp-common as well (as in v2 of this patch).
-> >
-> > Fabio, what do you think?  
-> 
-> Ok, thanks for the clarification. I just wanted to make sure we did
-> not have some kind of iomux bug there.
-> 
-> I think your proposed patch is fine then.
+> As specified in the commit log, it won't change any behavior for DT
+> systems if it's non-NUMA or single node system. So I am still wondering
+> what could trigger this regression.
 
-Would you be so kind and add your Reviwed-by or Acked-by tag to second
-version of this patch?
+I wonder if we're somehow giving an uninitialised/invalid NUMA configuration
+to the scheduler, although I can't see how this would happen.
 
-[PATCH v2] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards from
-K+P
+Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff below
+do you see anything shouting in dmesg?
 
-> 
-> Thanks
+Will
 
+--->8
 
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180529/cea5a333/attachment.sig>
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index dad128ba98bf..e3de033339b4 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -58,7 +58,7 @@ EXPORT_SYMBOL(node_to_cpumask_map);
+  */
+ const struct cpumask *cpumask_of_node(int node)
+ {
+-	if (WARN_ON(node >= nr_node_ids))
++	if (WARN_ON((unsigned)node >= nr_node_ids))
+ 		return cpu_none_mask;
+ 
+ 	if (WARN_ON(node_to_cpumask_map[node] == NULL))
