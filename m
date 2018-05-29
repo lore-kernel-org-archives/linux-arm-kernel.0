@@ -1,69 +1,44 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 29 May 2018 15:54:18 +0100
-Subject: [PATCH v5 02/15] ARM: bugs: prepare processor bug infrastructure
+Date: Tue, 29 May 2018 15:54:13 +0100
+Subject: [PATCH v5 01/15] ARM: add more CPU part numbers for Cortex and Brahma
+ B15 CPUs
 In-Reply-To: <20180529145320.GJ17671@n2100.armlinux.org.uk>
 References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
-Message-ID: <E1fNg0w-00054e-W3@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fNg0r-00054X-MC@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the processor bug infrastructure so that it can be expanded to
-check for per-processor bugs.
+Add CPU part numbers for Cortex A53, A57, A72, A73, A75 and the
+Broadcom Brahma B15 CPU.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 Boot-tested-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/bugs.h | 4 ++--
- arch/arm/kernel/Makefile    | 1 +
- arch/arm/kernel/bugs.c      | 9 +++++++++
- 3 files changed, 12 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/kernel/bugs.c
+ arch/arm/include/asm/cputype.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
-index a97f1ea708d1..ed122d294f3f 100644
---- a/arch/arm/include/asm/bugs.h
-+++ b/arch/arm/include/asm/bugs.h
-@@ -10,10 +10,10 @@
- #ifndef __ASM_BUGS_H
- #define __ASM_BUGS_H
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb546425da8a..26021980504d 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -77,8 +77,16 @@
+ #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
+ #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
+ #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
++#define ARM_CPU_PART_CORTEX_A53		0x4100d030
++#define ARM_CPU_PART_CORTEX_A57		0x4100d070
++#define ARM_CPU_PART_CORTEX_A72		0x4100d080
++#define ARM_CPU_PART_CORTEX_A73		0x4100d090
++#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
+ #define ARM_CPU_PART_MASK		0xff00fff0
  
--#ifdef CONFIG_MMU
- extern void check_writebuffer_bugs(void);
- 
--#define check_bugs() check_writebuffer_bugs()
-+#ifdef CONFIG_MMU
-+extern void check_bugs(void);
- #else
- #define check_bugs() do { } while (0)
- #endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index b59ac4bf82b8..8cad59465af3 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -31,6 +31,7 @@ else
- obj-y		+= entry-armv.o
- endif
- 
-+obj-$(CONFIG_MMU)		+= bugs.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ISA_DMA_API)	+= dma.o
- obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
-diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
-new file mode 100644
-index 000000000000..88024028bb70
---- /dev/null
-+++ b/arch/arm/kernel/bugs.c
-@@ -0,0 +1,9 @@
-+// SPDX-Identifier: GPL-2.0
-+#include <linux/init.h>
-+#include <asm/bugs.h>
-+#include <asm/proc-fns.h>
++/* Broadcom cores */
++#define ARM_CPU_PART_BRAHMA_B15		0x420000f0
 +
-+void __init check_bugs(void)
-+{
-+	check_writebuffer_bugs();
-+}
+ /* DEC implemented cores */
+ #define ARM_CPU_PART_SA1100		0x4400a110
+ 
 -- 
 2.7.4
