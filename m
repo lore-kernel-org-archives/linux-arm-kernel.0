@@ -1,75 +1,48 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 29 May 2018 15:48:36 -0500
-Subject: [PATCH v9 00/12] Support PPTT for ARM64
-In-Reply-To: <20180529201623.GA591@arm.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
- <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
- <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
- <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
- <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
- <20180529150823.GD17159@arm.com>
- <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
- <20180529201623.GA591@arm.com>
-Message-ID: <18579a87-0154-ff90-5ee6-02453c97c47b@arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 29 May 2018 15:41:14 -0500
+Subject: [GIT PULL] ARM: dts: socfpga: NAND fixes for v4.17
+In-Reply-To: <20180515134416.11349-1-dinguyen@kernel.org>
+References: <20180515134416.11349-1-dinguyen@kernel.org>
+Message-ID: <34a98cdf-53de-b146-4471-ff1dc577b12e@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2018 03:16 PM, Will Deacon wrote:
-> Hi Geert,
+Ping?
+
+On 05/15/2018 08:44 AM, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, and Olof:
 > 
-> On Tue, May 29, 2018 at 05:51:29PM +0200, Geert Uytterhoeven wrote:
->> On Tue, May 29, 2018 at 5:08 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
->>>> On 29/05/18 12:56, Geert Uytterhoeven wrote:
->>>>> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>>>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
->>>>>>> System supend still works fine on systems with big cores only:
->>>>>>>
->>>>>>>      R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
->>>>>>>      R-Car M3-N (2xCA57)
->>>>>>>
->>>>>>> Reverting this commit fixes the issue for me.
->>>>>>
->>>>>> I can't find anything that relates to system suspend in these patches
->>>>>> unless they are messing with something during CPU hot plug-in back
->>>>>> during resume.
->>>>>
->>>>> It's only the last patch that introduces the breakage.
->>>>>
->>>>
->>>> As specified in the commit log, it won't change any behavior for DT
->>>> systems if it's non-NUMA or single node system. So I am still wondering
->>>> what could trigger this regression.
->>>
->>> I wonder if we're somehow giving an uninitialised/invalid NUMA configuration
->>> to the scheduler, although I can't see how this would happen.
->>>
->>> Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff below
->>> do you see anything shouting in dmesg?
->>
->> Thanks, but unfortunately it doesn't help.
->> I added some debug code to print cpumask, but so far I don't see anything
->> suspicious.
+> Please pull in these NAND fixes for v4.17.
 > 
-> Damn, sorry for wasting your time. For the record, Catalin's been seeing
-> boot failures under KVM on a non-big/LITTLE machine that bisect reliably
-> to this patch, but we've also not been able to explain them. Worse, adding
-> so much as a printk makes the problem disappear.
-
-
-
-I was about to post a patch to remove the numa check if CONFIG_NUMA 
-disabled. But that seems pointless if the its happening with numa 
-enabled. So assuming, its the removal of the core from the numa mask 
-which is causing problems. It looks like numa_clear_node() might cause 
-similar problems when numa is enabled. In my case the problem I see is 
-NULL dereference in __bitmap_intersect called from select_task_rq_fair. 
-That said, I only see the problem when CONFIG_NUMA isn't set.
-
-So, I've also got another work around which caches the numa node to the 
-cpu_topology and then only builds it when store_cpu_topology() is 
-called. That should stabilize the numa mask, and assure that the bit 
-maps are correct when the scheduler requests them.
-
-Do you guys want that patch, or are we looking for a deeper root cause?
+> Thanks,
+> Dinh
+> 
+> The following changes since commit 67b8d5c7081221efa252e111cd52532ec6d4266f:
+> 
+>   Linux 4.17-rc5 (2018-05-13 16:15:17 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_nand_fix_v4.17
+> 
+> for you to fetch changes up to 3877ef7a1ccecaae378c497e1dcddbc2dccb664c:
+> 
+>   ARM: dts: socfpga: Fix NAND controller node compatible for Arria10 (2018-05-14 10:16:56 -0500)
+> 
+> ----------------------------------------------------------------
+> ARM: dts: socfpga: fix NAND support
+> - NAND should be using nand_x_clk, not nand_clk
+> - fix NAND node compatible for Cyclone5 and Arria10
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (1):
+>       ARM: dts: socfpga: Fix NAND controller node compatible for Arria10
+> 
+> Marek Vasut (2):
+>       ARM: dts: socfpga: Fix NAND controller clock supply
+>       ARM: dts: socfpga: Fix NAND controller node compatible
+> 
+>  arch/arm/boot/dts/socfpga.dtsi         | 4 ++--
+>  arch/arm/boot/dts/socfpga_arria10.dtsi | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
