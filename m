@@ -1,80 +1,70 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 30 May 2018 12:46:02 -0700
-Subject: [PATCH 6/9] clk: davinci: pll: allow dev == NULL
-In-Reply-To: <20180525181150.17873-7-david@lechnology.com>
-References: <20180525181150.17873-1-david@lechnology.com>
- <20180525181150.17873-7-david@lechnology.com>
-Message-ID: <20180530194559.982.42844@harbor.lan>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 30 May 2018 12:51:12 -0700
+Subject: [PATCH 04/13] staging: vc04_services: no need to check debugfs
+ return values
+In-Reply-To: <20180529142947.3250-4-gregkh@linuxfoundation.org>
+References: <20180529142947.3250-1-gregkh@linuxfoundation.org>
+ <20180529142947.3250-4-gregkh@linuxfoundation.org>
+Message-ID: <874lioorbj.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
 
-Quoting David Lechner (2018-05-25 11:11:47)
-> This modifies the TI Davinci PLL clock driver to allow for the case
-> when dev == NULL. On some (most) SoCs that use this driver, the PLL
-> clock needs to be registered during early boot because it is used
-> for clocksource/clkevent and there will be no platform device available.
+> When calling debugfs functions, there is no need to ever check the
+> return value.  The function can work or not, but the code logic should
+> never do something different based on this.
+>
+> Clean up the vchiq_arm code by not caring about the value of debugfs
+> calls.  This ends up removing a number of lines of code that are not
+> needed.
+>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Dan Carpenter <dan.carpenter@oracle.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Keerthi Reddy <keerthigd4990@gmail.com>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>  .../interface/vchiq_arm/vchiq_arm.c           | 13 +---
+>  .../interface/vchiq_arm/vchiq_debugfs.c       | 72 +++----------------
+>  .../interface/vchiq_arm/vchiq_debugfs.h       |  4 +-
+>  3 files changed, 15 insertions(+), 74 deletions(-)
+>
 
-A lot of this stuff feels like a step backwards. E.g:
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+> index 766b4fe5f32c..103fec955e2c 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
 
-> diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
-> index 23a24c944f1d..2eb981e61185 100644
-> --- a/drivers/clk/davinci/pll.c
-> +++ b/drivers/clk/davinci/pll.c
-> @@ -11,6 +11,7 @@
+> @@ -314,31 +284,13 @@ void vchiq_debugfs_remove_instance(VCHIQ_INSTANCE_T instance)
+>  	debugfs_remove_recursive(node->dentry);
+>  }
 >  
->  #include <linux/clk-provider.h>
->  #include <linux/clk.h>
-> +#include <linux/clk/davinci.h>
->  #include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> @@ -223,6 +224,7 @@ static const struct clk_ops dm365_pll_ops = {
->  
->  /**
->   * davinci_pll_div_register - common *DIV clock implementation
-> + * @dev: The PLL platform device or NULL
->   * @name: the clock name
->   * @parent_name: the parent clock name
->   * @reg: the *DIV register
-> @@ -240,17 +242,21 @@ static struct clk *davinci_pll_div_register(struct device *dev,
->         const struct clk_ops *divider_ops = &clk_divider_ops;
->         struct clk_gate *gate;
->         struct clk_divider *divider;
-> +       struct clk *clk;
-> +       int ret;
->  
-> -       gate = devm_kzalloc(dev, sizeof(*gate), GFP_KERNEL);
-> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
->         if (!gate)
->                 return ERR_PTR(-ENOMEM);
->  
->         gate->reg = reg;
->         gate->bit_idx = DIV_ENABLE_SHIFT;
->  
-> -       divider = devm_kzalloc(dev, sizeof(*divider), GFP_KERNEL);
-> -       if (!divider)
-> -               return ERR_PTR(-ENOMEM);
-> +       divider = kzalloc(sizeof(*divider), GFP_KERNEL);
-> +       if (!divider) {
-> +               ret = -ENOMEM;
-> +               goto err_free_gate;
-> +       }
->  
->         divider->reg = reg;
->         divider->shift = DIV_RATIO_SHIFT;
+> -int vchiq_debugfs_init(void)
+> +void vchiq_debugfs_init(void)
+>  {
+> -	BUG_ON(debugfs_info.vchiq_cfg_dir != NULL);
+> -
+>  	debugfs_info.vchiq_cfg_dir = debugfs_create_dir("vchiq", NULL);
+> -	if (debugfs_info.vchiq_cfg_dir == NULL)
+> -		goto fail;
+> -
 
-Oh no my poor devm_ helpers!
+I think now that we allow successful probe with this value NULL, module
+remove could vchiq_debugfs_deinit() -> vchiq_debugfs_top() -> BUG_ON().
+I think the right solution would be to just drop that BUG_ON().  With
+that change (and probably just garbage-collecting that function), this
+will be enthusiastically:
 
-I understand that we need to support early boot drivers better, so this
-patch can be merged.
-
-However I'm curious if you're tracking Bartosz's early_platform_driver
-efforts? Converting to that if it is ever merged would likely be
-cleaner:
-
-https://lkml.kernel.org/r/20180511162028.20616-1-brgl at bgdev.pl
-
-Best regards,
-Mike
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/2fb101af/attachment-0001.sig>
