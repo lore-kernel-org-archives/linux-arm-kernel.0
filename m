@@ -1,55 +1,68 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 30 May 2018 14:16:00 +0200
-Subject: [PATCH v2 09/10] ARM: dts: exynos5250: add DSI node
-In-Reply-To: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
-References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121629eucas1p2cc1a8c3f5a8e704f4d6f3cf75834cf00@eucas1p2.samsung.com>
-Message-ID: <1527682561-1386-10-git-send-email-m.purski@samsung.com>
+Date: Wed, 30 May 2018 14:15:51 +0200
+Subject: [PATCH v2 00/10] Add TOSHIBA TC358764 DSI/LVDS bridge driver
+References: <CGME20180530121622eucas1p1015b65cd12a544b1ea72fe6bfd1a3ccc@eucas1p1.samsung.com>
+Message-ID: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrzej Hajda <a.hajda@samsung.com>
+Hi all,
 
-The patch adds common part of DSI node for Exynos5250 platforms
-and a required mipi-phy node.
+this patchset is a next attempt to add the tc358764 driver.
+The previous one can be found here:
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
+https://lists.freedesktop.org/archives/dri-devel/2014-February/053705.html
+
+Back then, TC358764 was added as a panel driver.
+
+The bridge is supposed to be a DSI peripheral. Currently exynos_dsi accepts only panels
+as its peripherals. Therefore, some logic in exynos_dsi had to be ammended. That is implemented
+in first 4 patches.
+
+Apart from the driver this patchset adds support for BOE HV070WSA-100 panel, which is used by
+TC358764 and dts nodes to exynos5250.dtsi and exynos5250-arndale.dtsi.
+
+Best regards,
+
+Maciej Purski
+
 ---
- arch/arm/boot/dts/exynos5250.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 2daf505..9965eca 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -733,6 +733,27 @@
- 			#phy-cells = <0>;
- 		};
- 
-+		mipi_phy: video-phy at 10040710 {
-+			compatible = "samsung,s5pv210-mipi-video-phy";
-+			reg = <0x10040710 0x100>;
-+			#phy-cells = <1>;
-+			syscon = <&pmu_system_controller>;
-+		};
-+
-+		dsi_0: dsi at 14500000 {
-+			compatible = "samsung,exynos4210-mipi-dsi";
-+			reg = <0x14500000 0x10000>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			samsung,power-domain = <&pd_disp1>;
-+			phys = <&mipi_phy 3>;
-+			phy-names = "dsim";
-+			clocks = <&clock CLK_DSIM0>, <&clock CLK_SCLK_MIPI1>;
-+			clock-names = "bus_clk", "sclk_mipi";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		adc: adc at 12d10000 {
- 			compatible = "samsung,exynos-adc-v1";
- 			reg = <0x12D10000 0x100>;
+Changes in v2:
+- fix commits authorship
+- don't call pm_runtime_put_sync() in exyons_dsi_disable(), if pm_runtime_get_sync()
+  has not been called
+- squash dts commits
+- merge some redundant regulators in tc358764 bindings and in DTS
+- fix kbuild robot errors
+
+Andrzej Hajda (6):
+  panel/hv070wsa-100: add DT bindings
+  drm/panel: add support for BOE HV070WSA-100 panel to simple-panel
+  dt-bindings: tc358754: add DT bindings
+  drm/bridge: tc358764: Add DSI to LVDS bridge driver
+  ARM: dts: exynos5250: add DSI node
+  ARM: dts: exynos5250-arndale: add DSI and panel nodes
+
+Maciej Purski (4):
+  drm/exynos: rename "bridge_node" to "mic_bridge_node"
+  drm/exynos: move pm_runtime_get_sync() to exynos_dsi_init()
+  drm/exynos: move connector creation to attach callback
+  drm/exynos: add non-panel path to exynos_dsi_enable()
+
+ .../bindings/display/bridge/toshiba,tc358764.txt   |  37 ++
+ .../bindings/display/panel/boe,hv070wsa-100.txt    |   7 +
+ arch/arm/boot/dts/exynos5250-arndale.dts           |  61 +++
+ arch/arm/boot/dts/exynos5250.dtsi                  |  21 +
+ drivers/gpu/drm/bridge/Kconfig                     |   9 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/tc358764.c                  | 547 +++++++++++++++++++++
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c            |  88 ++--
+ drivers/gpu/drm/panel/panel-simple.c               |  25 +
+ 9 files changed, 755 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt
+ create mode 100644 drivers/gpu/drm/bridge/tc358764.c
+
 -- 
 2.7.4
