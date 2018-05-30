@@ -1,122 +1,97 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 30 May 2018 17:25:16 +0200
-Subject: [PATCH 6/6] soc: renesas: rcar-sysc: Drop legacy handling
+Date: Wed, 30 May 2018 17:25:11 +0200
+Subject: [PATCH 1/6] ARM: shmobile: rcar-gen2: Remove explicit SYSC config and
+ init
 In-Reply-To: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
 References: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1527693916-11215-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527693916-11215-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the R-Car platform code no longer supports DTBs lacking a SYSC
-device node in DT, all legacy handling can be dropped from the R-Car
-SYSC driver:
-  - Make rcar_sysc_ch private to the driver,
-  - Make rcar_sysc_power_{down,up}() static (they have been replaced by
-    rcar_sysc_power_{down,up}_cpu()),
-  - Remove the legacy wrapper rcar_sysc_init(), and the check for double
-    initialization (only the early_initcall is left).
+If the R-Car system controller is described in DT, the rcar-sysc driver
+configures SYSCIER and SYSCIMR based on the SoC-specific power area
+definitions in r8a779*-sysc.  The platform code still passed this
+information to the rcar-sysc driver, for compatibility with old R-Car H2
+and M2-W DTBs predating commit 8574de861978d518 ("ARM: dts: r8a7791: Add
+SYSC PM Domains") in v4.7.  The time has come to drop backwards
+compatibility, and delegate everything to the DT enabled rcar-sysc
+driver.
+
+After the removal of the legacy SMP fallbacks, which powered up the SCUs
+explicitly, there is no longer a need to force an early initialization
+of the rcar-sysc driver.  It will be initialized in time for secondary
+CPU bringup by its early_initcall().
+
+Hence all explicit SYSC configuration and initialization can be removed
+from the R-Car Gen2 platform code.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/soc/renesas/rcar-sysc.c       | 38 ++++++++---------------------------
- include/linux/soc/renesas/rcar-sysc.h | 11 ----------
- 2 files changed, 8 insertions(+), 41 deletions(-)
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 4ad6dcd19420a045..41af9c7b912f09ca 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -58,6 +58,12 @@
- 
- #define RCAR_PD_ALWAYS_ON	32	/* Always-on power area */
- 
-+struct rcar_sysc_ch {
-+	u16 chan_offs;
-+	u8 chan_bit;
-+	u8 isr_bit;
-+};
-+
- static void __iomem *rcar_sysc_base;
- static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
- 
-@@ -143,12 +149,12 @@ static int rcar_sysc_power(const struct rcar_sysc_ch *sysc_ch, bool on)
- 	return ret;
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index 5a798b406af05be0..345af3ebcc3aeeb6 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -15,7 +15,6 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
+-#include <linux/soc/renesas/rcar-sysc.h>
+ #include <asm/io.h>
+ #include <asm/cputype.h>
+ #include "common.h"
+@@ -46,23 +45,6 @@ static inline u32 phys_to_sbar(phys_addr_t addr)
+ 	return (addr >> 8) & 0xfffffc00;
  }
  
--int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
-+static int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
- {
- 	return rcar_sysc_power(sysc_ch, false);
- }
- 
--int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
-+static int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
- {
- 	return rcar_sysc_power(sysc_ch, true);
- }
-@@ -323,9 +329,6 @@ static int __init rcar_sysc_pd_init(void)
- 	unsigned int i;
- 	int error;
- 
--	if (rcar_sysc_base)
--		return 0;
+-/* SYSC */
+-#define SYSCIER 0x0c
+-#define SYSCIMR 0x10
 -
- 	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
- 	if (!np)
- 		return -ENODEV;
-@@ -428,31 +431,6 @@ void __init rcar_sysc_nullify(struct rcar_sysc_area *areas,
- 		}
- }
- 
--void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
+-#if defined(CONFIG_SMP)
+-
+-static void __init rcar_gen2_sysc_init(u32 syscier)
 -{
--	u32 syscimr;
--
--	if (!rcar_sysc_pd_init())
--		return;
--
--	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
--
--	/*
--	 * Mask all interrupt sources to prevent the CPU from receiving them.
--	 * Make sure not to clear reserved bits that were set before.
--	 */
--	syscimr = ioread32(rcar_sysc_base + SYSCIMR);
--	syscimr |= syscier;
--	pr_debug("%s: syscimr = 0x%08x\n", __func__, syscimr);
--	iowrite32(syscimr, rcar_sysc_base + SYSCIMR);
--
--	/*
--	 * SYSC needs all interrupt sources enabled to control power.
--	 */
--	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
--	iowrite32(syscier, rcar_sysc_base + SYSCIER);
+-	rcar_sysc_init(0xe6180000, syscier);
 -}
 -
- #ifdef CONFIG_ARCH_R8A7779
- static int rcar_sysc_power_cpu(unsigned int idx, bool on)
+-#else /* CONFIG_SMP */
+-
+-static inline void rcar_gen2_sysc_init(u32 syscier) {}
+-
+-#endif /* CONFIG_SMP */
+-
+ void __init rcar_gen2_pm_init(void)
  {
-diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
-index 9020da2111fdeea9..00fae6fd234d7895 100644
---- a/include/linux/soc/renesas/rcar-sysc.h
-+++ b/include/linux/soc/renesas/rcar-sysc.h
-@@ -2,17 +2,6 @@
- #ifndef __LINUX_SOC_RENESAS_RCAR_SYSC_H__
- #define __LINUX_SOC_RENESAS_RCAR_SYSC_H__
+ 	void __iomem *p;
+@@ -72,7 +54,6 @@ void __init rcar_gen2_pm_init(void)
+ 	bool has_a7 = false;
+ 	bool has_a15 = false;
+ 	struct resource res;
+-	u32 syscier = 0;
+ 	int error;
  
--#include <linux/types.h>
--
--struct rcar_sysc_ch {
--	u16 chan_offs;
--	u8 chan_bit;
--	u8 isr_bit;
--};
--
--int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
--int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
--void rcar_sysc_init(phys_addr_t base, u32 syscier);
- int rcar_sysc_power_down_cpu(unsigned int cpu);
- int rcar_sysc_power_up_cpu(unsigned int cpu);
+ 	if (once++)
+@@ -89,11 +70,6 @@ void __init rcar_gen2_pm_init(void)
+ 			has_a7 = true;
+ 	}
  
+-	if (of_machine_is_compatible("renesas,r8a7790"))
+-		syscier = 0x013111ef;
+-	else if (of_machine_is_compatible("renesas,r8a7791"))
+-		syscier = 0x00111003;
+-
+ 	np = of_find_compatible_node(NULL, NULL, "renesas,smp-sram");
+ 	if (!np) {
+ 		/* No smp-sram in DT, fall back to hardcoded address */
+@@ -155,6 +131,5 @@ void __init rcar_gen2_pm_init(void)
+ 	}
+ 	iounmap(p);
+ 
+-	rcar_gen2_sysc_init(syscier);
+ 	shmobile_smp_apmu_suspend_init();
+ }
 -- 
 2.7.4
