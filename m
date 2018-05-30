@@ -1,50 +1,100 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 30 May 2018 10:20:00 -0500
-Subject: [PATCH] PCI: versatile: include pci.h
-In-Reply-To: <20180528154850.2647019-1-arnd@arndb.de>
-References: <20180528154850.2647019-1-arnd@arndb.de>
-Message-ID: <20180530152000.GB39853@bhelgaas-glaptop.roam.corp.google.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 30 May 2018 17:25:13 +0200
+Subject: [PATCH 3/6] soc: renesas: rcar-sysc: Provide helpers to power up/down
+ CPUs
+In-Reply-To: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
+References: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527693916-11215-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 05:48:39PM +0200, Arnd Bergmann wrote:
-> Two patches for PCI host drivers clashed recently, leading to a broken
-> build for versatile-pci:
-> 
-> drivers/pci/host/pci-versatile.c: In function 'versatile_pci_parse_request_of_pci_ranges':
-> drivers/pci/host/pci-versatile.c:70:8: error: implicit declaration of function 'devm_of_pci_get_host_bridge_resources'; did you mean 'pci_get_host_bridge_device'? [-Werror=implicit-function-declaration]
-> 
-> This adds the missing header inclusion that became necessary now.
-> 
-> Fixes: 9e2aee80c78d ("PCI: Move private DT related functions into private header")
-> Fixes: 64720fd1f630 ("PCI: Rework of_pci_get_host_bridge_resources() to devm_of_pci_get_host_bridge_resources()")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Provide helpers to control CPU power areas from platform code, taking
+just a CPU index.  This will avoid having to pass full CPU power area
+parameter blocks, and thus duplicating information already provided by
+SoC-specific SYSC drivers.
 
-Thanks, I added this in the merge where these two commits came together,
-so hopefully there should be no bisection hole.
+This will be used on R-Car H1 only.
+Later R-Car generations rely on APMU/RST for CPU power area control.
 
-> ---
->  drivers/pci/host/pci-versatile.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
-> index ff2cd12b3978..994f32061b32 100644
-> --- a/drivers/pci/host/pci-versatile.c
-> +++ b/drivers/pci/host/pci-versatile.c
-> @@ -15,6 +15,8 @@
->  #include <linux/pci.h>
->  #include <linux/platform_device.h>
->  
-> +#include "../pci.h"
-> +
->  static void __iomem *versatile_pci_base;
->  static void __iomem *versatile_cfg_base[2];
->  
-> -- 
-> 2.9.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/soc/renesas/rcar-sysc.c       | 40 +++++++++++++++++++++++++++++++++++
+ include/linux/soc/renesas/rcar-sysc.h |  2 ++
+ 2 files changed, 42 insertions(+)
+
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 95120acc4d806da6..4ad6dcd19420a045 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -310,6 +310,8 @@ struct rcar_pm_domains {
+ 	struct generic_pm_domain *domains[RCAR_PD_ALWAYS_ON + 1];
+ };
+ 
++static struct genpd_onecell_data *rcar_sysc_onecell_data;
++
+ static int __init rcar_sysc_pd_init(void)
+ {
+ 	const struct rcar_sysc_info *info;
+@@ -356,6 +358,7 @@ static int __init rcar_sysc_pd_init(void)
+ 
+ 	domains->onecell_data.domains = domains->domains;
+ 	domains->onecell_data.num_domains = ARRAY_SIZE(domains->domains);
++	rcar_sysc_onecell_data = &domains->onecell_data;
+ 
+ 	for (i = 0, syscier = 0; i < info->num_areas; i++)
+ 		syscier |= BIT(info->areas[i].isr_bit);
+@@ -449,3 +452,40 @@ void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
+ 	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
+ 	iowrite32(syscier, rcar_sysc_base + SYSCIER);
+ }
++
++#ifdef CONFIG_ARCH_R8A7779
++static int rcar_sysc_power_cpu(unsigned int idx, bool on)
++{
++	struct generic_pm_domain *genpd;
++	struct rcar_sysc_pd *pd;
++	unsigned int i;
++
++	if (!rcar_sysc_onecell_data)
++		return -ENODEV;
++
++	for (i = 0; i < rcar_sysc_onecell_data->num_domains; i++) {
++		genpd = rcar_sysc_onecell_data->domains[i];
++		if (!genpd)
++			continue;
++
++		pd = to_rcar_pd(genpd);
++		if (!(pd->flags & PD_CPU) || pd->ch.chan_bit != idx)
++			continue;
++
++		return on ? rcar_sysc_power_up(&pd->ch)
++			  : rcar_sysc_power_down(&pd->ch);
++	}
++
++	return -ENOENT;
++}
++
++int rcar_sysc_power_down_cpu(unsigned int cpu)
++{
++	return rcar_sysc_power_cpu(cpu, false);
++}
++
++int rcar_sysc_power_up_cpu(unsigned int cpu)
++{
++	return rcar_sysc_power_cpu(cpu, true);
++}
++#endif /* CONFIG_ARCH_R8A7779 */
+diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
+index 8a6086d2e9c37585..9020da2111fdeea9 100644
+--- a/include/linux/soc/renesas/rcar-sysc.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -13,5 +13,7 @@ struct rcar_sysc_ch {
+ int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
+ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+ void rcar_sysc_init(phys_addr_t base, u32 syscier);
++int rcar_sysc_power_down_cpu(unsigned int cpu);
++int rcar_sysc_power_up_cpu(unsigned int cpu);
+ 
+ #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
+-- 
+2.7.4
