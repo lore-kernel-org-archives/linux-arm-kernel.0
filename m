@@ -1,112 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 30 May 2018 14:42:50 +0100
-Subject: [PATCH v3 1/2] ARM: dma-mapping: Implement
- arm_dma_iommu_detach_device()
-In-Reply-To: <20180530131239.GA5400@ulmo>
-References: <20180530080345.2353-1-thierry.reding@gmail.com>
- <20180530080345.2353-2-thierry.reding@gmail.com>
- <eee02391-aa25-da84-f98a-b5fed6c69599@arm.com> <20180530125446.GA1595@ulmo>
- <20180530131239.GA5400@ulmo>
-Message-ID: <d3121aeb-1d75-2ba6-681a-f1e0681e290a@arm.com>
+From: m.purski@samsung.com (Maciej Purski)
+Date: Wed, 30 May 2018 16:03:15 +0200
+Subject: Regression in Linux next again
+In-Reply-To: <20180530091314.GB6920@sirena.org.uk>
+References: <20180529221501.GJ5702@atomide.com>
+ <CGME20180530091325epcas4p20dea07f013a3512ce4ea92120da90f61@epcas4p2.samsung.com>
+ <20180530091314.GB6920@sirena.org.uk>
+Message-ID: <20180530140318eucas1p2af2d01b9678e8914c2b8e099c584ec11~zcQzVKtj30757607576eucas1p2V@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/18 14:12, Thierry Reding wrote:
-> On Wed, May 30, 2018 at 02:54:46PM +0200, Thierry Reding wrote:
->> On Wed, May 30, 2018 at 10:59:30AM +0100, Robin Murphy wrote:
->>> On 30/05/18 09:03, Thierry Reding wrote:
->>>> From: Thierry Reding <treding@nvidia.com>
->>>>
->>>> Implement this function to enable drivers from detaching from any IOMMU
->>>> domains that architecture code might have attached them to so that they
->>>> can take exclusive control of the IOMMU via the IOMMU API.
->>>>
->>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
->>>> ---
->>>> Changes in v3:
->>>> - make API 32-bit ARM specific
->>>> - avoid extra local variable
->>>>
->>>> Changes in v2:
->>>> - fix compilation
->>>>
->>>>    arch/arm/include/asm/dma-mapping.h |  3 +++
->>>>    arch/arm/mm/dma-mapping-nommu.c    |  4 ++++
->>>>    arch/arm/mm/dma-mapping.c          | 16 ++++++++++++++++
->>>>    3 files changed, 23 insertions(+)
->>>>
->>>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
->>>> index 8436f6ade57d..5960e9f3a9d0 100644
->>>> --- a/arch/arm/include/asm/dma-mapping.h
->>>> +++ b/arch/arm/include/asm/dma-mapping.h
->>>> @@ -103,6 +103,9 @@ extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>>    #define arch_teardown_dma_ops arch_teardown_dma_ops
->>>>    extern void arch_teardown_dma_ops(struct device *dev);
->>>> +#define arm_dma_iommu_detach_device arm_dma_iommu_detach_device
->>>> +extern void arm_dma_iommu_detach_device(struct device *dev);
->>>> +
->>>>    /* do not use this function in a driver */
->>>>    static inline bool is_device_dma_coherent(struct device *dev)
->>>>    {
->>>> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
->>>> index f448a0663b10..eb781369377b 100644
->>>> --- a/arch/arm/mm/dma-mapping-nommu.c
->>>> +++ b/arch/arm/mm/dma-mapping-nommu.c
->>>> @@ -241,3 +241,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>>    void arch_teardown_dma_ops(struct device *dev)
->>>>    {
->>>>    }
->>>> +
->>>> +void arm_dma_iommu_detach_device(struct device *dev)
->>>> +{
->>>> +}
->>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>>> index af27f1c22d93..6d8af08b3e7d 100644
->>>> --- a/arch/arm/mm/dma-mapping.c
->>>> +++ b/arch/arm/mm/dma-mapping.c
->>>> @@ -2400,3 +2400,19 @@ void arch_teardown_dma_ops(struct device *dev)
->>>>    	arm_teardown_iommu_dma_ops(dev);
->>>>    }
->>>> +
->>>> +void arm_dma_iommu_detach_device(struct device *dev)
->>>> +{
->>>> +#ifdef CONFIG_ARM_DMA_USE_IOMMU
->>>> +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
->>>> +
->>>> +	if (!mapping)
->>>> +		return;
->>>> +
->>>> +	arm_iommu_release_mapping(mapping);
->>>
->>> Potentially freeing the mapping before you try to operate on it is never the
->>> best idea. Plus arm_iommu_detach_device() already releases a reference
->>> appropriately anyway, so it's a double-free.
->>
->> But the reference released by arm_iommu_detach_device() is to balance
->> out the reference acquired by arm_iommu_attach_device(), isn't it? In
->> the above, the arm_iommu_release_mapping() is supposed to drop the
->> final reference which was obtained by arm_iommu_create_mapping(). The
->> mapping shouldn't go away irrespective of the order in which these
->> will be called.
-> 
-> Going over the DMA/IOMMU code I just remembered that I drew inspiration
-> from arm_teardown_iommu_dma_ops() for the initial proposal which also
-> calls both arm_iommu_detach_device() and arm_iommu_release_mapping().
-> That said, one other possibility to implement this would be to export
-> the 32-bit and 64-bit ARM implementations of arch_teardown_dma_ops()
-> and use that instead. linux/dma-mapping.h implements a stub for
-> architectures that don't provide one, so it should work without any
-> #ifdef guards.
-> 
-> That combined with the set_dma_ops() fix in arm_iommu_detach_device()
-> should fix this pretty nicely.
 
-OK, having a second look at the ARM code I see I had indeed overlooked 
-that extra reference held until arm_teardown_iommu_dma_ops() - mea culpa 
-- but frankly that looks wrong anyway, as it basically defeats the point 
-of refcounting the mapping at all. AFAICS arm_setup_iommu_dma_ops() 
-should just be made to behave 'normally' by unconditionally dropping the 
-initial reference after calling __arm_iommu_attach_device(), then we 
-don't need all these odd and confusing release calls dotted around at all.
+On 05/30/2018 11:13 AM, Mark Brown wrote:
+> On Tue, May 29, 2018 at 03:15:01PM -0700, Tony Lindgren wrote:
+> 
+>> I think I bisected this same issue for the second time now
+>> but for a different merge window. What's up with that?
+> 
+> Last time we just reverted it as Maciej was unable to reproduce your
+> problem, he's tried again with some alterations.
+> 
+>> Reverting both patches fixes the issue for me. I could
+>> not debug it further because of the compile error(s).
+> 
+> OK, unless this gets fixed really quickly I'll revert again.
+> 
 
-Robin.
+I'm afraid, I have no idea, how to fix it quickly. You can revert it and
+in the next version I'll fix the build error and split the last patch even
+more, so we could perform a more precise bisection. I'd be grateful if you
+could push it on your test coupled branch and Tony could test it again before
+merging it with next again.
+
+Best regards,
+
+Maciej Purski
