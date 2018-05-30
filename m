@@ -1,47 +1,36 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 30 May 2018 10:38:23 +0300
-Subject: [PATCH v3 3/5] Documentation: DT: add i.MX EPIT timer binding
-In-Reply-To: <7f2f8b6b-b7f6-99c1-fc5f-a7628a751fdc@mentor.com>
-References: <20180529170436.22711-1-peron.clem@gmail.com>
- <20180529170436.22711-4-peron.clem@gmail.com>
- <7f2f8b6b-b7f6-99c1-fc5f-a7628a751fdc@mentor.com>
-Message-ID: <5d71aced-cd2f-3f01-25b0-d87788f22c32@mentor.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Wed, 30 May 2018 00:44:29 -0700
+Subject: [PATCH] PCI: Add pci=safemode option
+In-Reply-To: <20180530073735.GA28793@infradead.org>
+References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
+ <20180530043103.GA19734@kroah.com>
+ <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
+ <20180530073735.GA28793@infradead.org>
+Message-ID: <6dfe2db8f974d94c9867f30ec83d9333@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2018 10:27 AM, Vladimir Zapolskiy wrote:
-> Hi Cl?ment,
+On 2018-05-30 00:37, Christoph Hellwig wrote:
+> On Tue, May 29, 2018 at 09:41:33PM -0700, Sinan Kaya wrote:
+>> Bjorn and I discussed the need for such a "safe" mode feature when you
+>> want to bring up PCI for a platform. You want to turn off everything 
+>> as
+>> a starter and just stick to bare minimum.
 > 
-> On 05/29/2018 08:04 PM, Cl?ment P?ron wrote:
->> From: Cl?ment Peron <clement.peron@devialet.com>
->>
->> Add devicetree binding document for NXP's i.MX SoC specific
->> EPIT timer driver.
->>
->> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
->> ---
->>  .../devicetree/bindings/clock/imx6q,epit.txt  | 24 +++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/imx6q,epit.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/imx6q,epit.txt b/Documentation/devicetree/bindings/clock/imx6q,epit.txt
->> new file mode 100644
->> index 000000000000..a84a60c6ae35
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/imx6q,epit.txt
-> 
-> The file should be renamed to a more generic name like 'imx,epit.txt'
-> or 'imx31,epit.txt'.
-> 
-> Also note that the folder is incorrectly selected, it must be
-> Documentation/devicetree/bindings/timer/
-> 
+> Can we please make it a config option the instead of adding code
+> to every kernel?  Also maybe the bringup should be in the name
+> to make this more clear?
 
-And linux-clk mailing list for publishing seems to be improper one,
-instead please add Daniel Lezcano <daniel.lezcano@linaro.org> and
-Thomas Gleixner <tglx@linutronix.de> to the list of addressees,
-and the proper mailing list address is linux-kernel at vger.kernel.org
+One other requirement was to have a runtime option rather than compile 
+time option.
 
---
-With best wishes,
-Vladimir
+When someone reported a problem, we wanted to be able to say "use this 
+option and see if system boots" without doing any bisects or 
+recompilation.
+
+This would be the first step in troubleshooting a system to see if 
+fundamental features are working.
+
+I don't mind changing the name
+Bjorn mentioned safe option. I made it safemode. I am looking at Bjorn 
+for suggestions at this moment.
