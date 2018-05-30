@@ -1,35 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 30 May 2018 11:28:42 -0400
-Subject: [PATCH] PCI: Add pci=safemode option
-In-Reply-To: <20180530145650.GA39853@bhelgaas-glaptop.roam.corp.google.com>
-References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
- <20180530043103.GA19734@kroah.com>
- <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
- <20180530073735.GA28793@infradead.org>
- <6dfe2db8f974d94c9867f30ec83d9333@codeaurora.org>
- <20180530145650.GA39853@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <2a5281cd-a0c7-1449-5b72-133660667fa6@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 May 2018 17:07:44 +0100
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <CAD=FV=X2u=hMyWinSDtim-PmFwAy5mXcwg3HeYojAHcsUFhV3g@mail.gmail.com>
+References: <20180523154057.GL4828@sirena.org.uk>
+ <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
+ <20180523155617.GN4828@sirena.org.uk>
+ <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
+ <20180530093701.GD6920@sirena.org.uk>
+ <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
+ <20180530150241.GO6920@sirena.org.uk>
+ <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
+ <20180530154849.GQ6920@sirena.org.uk>
+ <CAD=FV=X2u=hMyWinSDtim-PmFwAy5mXcwg3HeYojAHcsUFhV3g@mail.gmail.com>
+Message-ID: <20180530160744.GS6920@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2018 10:56 AM, Bjorn Helgaas wrote:
-> This *was* my idea, but I'm starting to think it was a bad idea.
-> 
-> I don't want people to use pci= parameters as the normal way to get a
-> system to boot.  That would be a huge support hassle (putting things
-> in release notes, diagnosing problems when people forget it, etc).
-> 
-> But the parameters *are* useful for debugging.  If we had a
-> "pci=safemode" and it avoided some problem, the next step would be to
-> narrow it down by using the more specific flags (pci=nomsi, pci=noari,
-> pci=no_ext_tags, etc).  So I think 95% of the value is in the specific
-> flags, and a "pci=safemode" might add a little bit of value but at the
-> cost of a small but nagging maintenance concern and code clutter.
+On Wed, May 30, 2018 at 09:06:16AM -0700, Doug Anderson wrote:
+> On Wed, May 30, 2018 at 8:48 AM, Mark Brown <broonie@kernel.org> wrote:
 
-OK. Let's try noXYZ feature. Can you enumerate the XYZ features that you
-want to see?
+> > Without the core doing something the regulator isn't going to get told
+> > that anything updated voltages anyway...
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> I was just suggesting that when the core tells the regulator driver to
+> disable itself that the regulator driver tell RPMh to not only disable
+> itself but also (temporarily) vote for a lower voltage.  When the core
+> tells the regulator to re-enable itself then the regulator driver
+> restores the original voltage vote (or applies any vote that might
+> have been attempted while the regulator was disabled).  That wouldn't
+> require any regulator core changes.
+
+It needs something to tell it what the new voltage to set is.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/383a4352/attachment-0001.sig>
