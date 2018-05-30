@@ -1,49 +1,93 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Wed, 30 May 2018 06:59:27 +0200
-Subject: [PATCH v3 3/3] x86/mm: add TLB purge to free pmd/pte page
- interfaces
-In-Reply-To: <1527610139.14039.58.camel@hpe.com>
-References: <20180516233207.1580-1-toshi.kani@hpe.com>
- <20180516233207.1580-4-toshi.kani@hpe.com>
- <20180529144438.GM18595@8bytes.org>
- <1527610139.14039.58.camel@hpe.com>
-Message-ID: <20180530045927.GP18595@8bytes.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 30 May 2018 15:07:11 +1000
+Subject: linux-next: manual merge of the regulator tree with the arm-soc tree
+Message-ID: <20180530150711.2c7c1fe9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 04:10:24PM +0000, Kani, Toshi wrote:
-> Can you explain why you think allocating a page here is a major problem?
+Hi all,
 
-Because a larger allocation is more likely to fail. And if you fail the
-allocation, you also fail to free more pages, which _is_ a problem. So
-better avoid any allocations in code paths that are about freeing
-memory.
+Today's linux-next merge of the regulator tree got a conflict in:
 
-> If we just revert, please apply patch 1/3 first.  This patch address the
-> BUG_ON issue on PAE.  This is a real issue that needs a fix ASAP.
+  arch/arm/mach-omap1/board-ams-delta.c
 
-It does not address the problem of dirty page-walk caches on x86-64.
+between commit:
 
-> The page-directory cache issue on x64, which is addressed by patch 3/3,
-> is a theoretical issue that I could not hit by putting ioremap() calls
-> into a loop for a whole day.  Nobody hit this issue, either.
+  0486738928bf ("ARM: OMAP1: ams-delta: add GPIO lookup tables")
 
-How do you know you didn't hit that issue? It might cause silent data
-corruption, which might not be easily detected.
+from the arm-soc tree and commit:
 
-> The simple revert patch Joerg posted a while ago causes
-> pmd_free_pte_page() to fail on x64.  This causes multiple pmd mappings
-> to fall into pte mappings on my test systems.  This can be seen as a
-> degradation, and I am afraid that it is more harmful than good.
+  6059577cb28d ("regulator: fixed: Convert to use GPIO descriptor only")
 
-The plain revert just removes all the issues with the dirty TLB that the
-original patch introduced and prevents huge mappings from being
-established when there have been smaller mappings before. This is not
-ideal, but at least its is consistent and does not leak pages and leaves
-no dirty TLBs. So this is the easiest and most reliable fix for this
-stage in the release process.
+from the regulator tree.
 
+I fixed it up (see below - it may be better done) and can carry the fix
+as necessary. This is now fixed as far as linux-next is concerned, but
+any non trivial conflicts should be mentioned to your upstream
+maintainer when your tree is submitted for merging.  You may also want
+to consider cooperating with the maintainer of the conflicting tree to
+minimise any particularly complex conflicts.
 
-Regards,
+-- 
+Cheers,
+Stephen Rothwell
 
-	Joerg
+diff --cc arch/arm/mach-omap1/board-ams-delta.c
+index 80f54cb54276,759fa18f6ab4..000000000000
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@@ -203,10 -203,8 +203,10 @@@ static struct resource latch2_resources
+  	},
+  };
+  
+- #define LATCH2_LABEL	"latch2"
+++#define LATCH2_LABEL	"ams-delta-latch2"
+ +
+  static struct bgpio_pdata latch2_pdata = {
+ -	.label	= "ams-delta-latch2",
+ +	.label	= LATCH2_LABEL,
+  	.base	= AMS_DELTA_LATCH2_GPIO_BASE,
+  	.ngpio	= AMS_DELTA_LATCH2_NGPIO,
+  };
+@@@ -303,6 -288,16 +302,15 @@@ static struct platform_device modem_nre
+  	},
+  };
+  
++ static struct gpiod_lookup_table modem_nreset_gpiod_table = {
++ 	.dev_id = "reg-fixed-voltage",
++ 	.table = {
+ -		/* The AMS_DELTA_GPIO_PIN_MODEM_NRESET is at offset 12 */
+ -		GPIO_LOOKUP("ams-delta-latch2", 12,
+++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_MODEM_NRESET,
++ 			    "enable", GPIO_ACTIVE_HIGH),
++ 		{ },
++ 	},
++ };
++ 
+  struct modem_private_data {
+  	struct regulator *regulator;
+  };
+@@@ -658,15 -581,7 +666,15 @@@ static int __init late_init(void
+  
+  	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
+  
+ +	/*
+ +	 * As soon as devices have been registered, assign their dev_names
+ +	 * to respective GPIO lookup tables before they are added.
+ +	 */
+ +	ams_delta_lcd_gpio_table.dev_id = dev_name(&ams_delta_lcd_device.dev);
+ +	ams_delta_nand_gpio_table.dev_id = dev_name(&ams_delta_nand_device.dev);
+ +
+ +	gpiod_add_lookup_tables(late_gpio_tables, ARRAY_SIZE(late_gpio_tables));
+- 
++ 	gpiod_add_lookup_table(&modem_nreset_gpiod_table);
+  	err = platform_device_register(&modem_nreset_device);
+  	if (err) {
+  		pr_err("Couldn't register the modem regulator device\n");
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/1b173abe/attachment-0001.sig>
