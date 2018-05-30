@@ -1,50 +1,64 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 30 May 2018 18:57:56 +0300
-Subject: [PATCH v2 4/4] mmc: sdhci-msm: Add sdhci msm register write APIs
- which wait for pwr irq
-In-Reply-To: <6c84f6fc-270c-d826-6d87-7f9f6fc5015f@codeaurora.org>
-References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
- <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
- <74a4fe0e-7ae8-9f49-5614-1e01ae977475@linaro.org>
- <6c84f6fc-270c-d826-6d87-7f9f6fc5015f@codeaurora.org>
-Message-ID: <06d8c601-3d9f-c08e-3cfa-b33df91486f6@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 May 2018 16:58:55 +0100
+Subject: [PATCH v2 00/17] arm64 SSBD (aka Spectre-v4) mitigation
+In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
+References: <20180529121121.24927-1-marc.zyngier@arm.com>
+Message-ID: <20180530155854.GA4122@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vijay,
+Hi Marc,
 
-On 05/30/2018 10:11 AM, Vijay Viswanath wrote:
-> Hi Georgi,
+On Tue, May 29, 2018 at 01:11:04PM +0100, Marc Zyngier wrote:
+> This patch series implements the Linux kernel side of the "Spectre-v4"
+> (CVE-2018-3639) mitigation known as "Speculative Store Bypass Disable"
+> (SSBD).
 > 
-> Thanks for testing the patch on 8096 and pointing out this issue.
-> The issue is coming because, when card is removed, the HOST_CONTROL2
-> register is retaining the 1.8V Signalling enable bit till SDHCI reset
-> happens after a new card is inserted.
+> More information can be found at:
 > 
-> Adding the change you suggested can avoid this wait, but I feel a better
-> solution is to clear the 1.8V signalling bit when the card is removed.
-> When a new card is inserted, we shouldn't be keeping the 1.8V bit set
-> until we send cmd11 to the SD card. A new SD card should start with 3V.
+>   https://bugs.chromium.org/p/project-zero/issues/detail?id=1528
+>   https://developer.arm.com/support/arm-security-updates/speculative-processor-vulnerability
 > 
-> One solution is to explicitly clear the HOST_CONTROL2 register when card
-> is removed.
+> For all released Arm Cortex-A CPUs that are affected by this issue, then
+> the preferred mitigation is simply to set a chicken bit in the firmware
+> during CPU initialisation and therefore no change to Linux is required.
+> Other CPUs may require the chicken bit to be toggled dynamically (for
+> example, when switching between user-mode and kernel-mode) and this is
+> achieved by calling into EL3 via an SMC which has been published as part
+> of the latest SMCCC specification:
 > 
-> Other way is to revert the commit:
-> 9718f84b85396e090ca42fafa730410d286d61e3 "mmc: sdhci-msm: Do not reset
-> the controller if no card in the slot"
+>   https://developer.arm.com/cache-speculation-vulnerability-firmware-specification
 > 
-> The sdhci-msm doesn't require "SDHCI_QUIRK_NO_CARD_NO_RESET". The issue
-> which above commit is trying to avoid is fixed by the pwr-irq patches.
-> Resetting the controller will clear the HOST_CONTROL2 register and avoid
-> this issue.
+> as well as an ATF update for the released ARM cores affected by SSBD:
 > 
-> Can you please try this ? I tested reverting the QUIRK on two platforms:
-> db410c(8916) and sdm845. SD card insert/remove worked fine after that
-> and I didn't get any "Reset 0x1 never completed" error during card
-> insert/remove or shutdown.
+>   https://github.com/ARM-software/arm-trusted-firmware/pull/1392
+> 
+> These patches provide the following:
+> 
+>   1. Safe probing of firmware to establish which CPUs in the system
+>      require calling into EL3 as part of the mitigation.
+> 
+>   2. For CPUs that require it, call into EL3 on exception entry/exit
+>      from EL0 to apply the SSBD mitigation when running at EL1.
+> 
+>   3. A command-line option to force the SSBD mitigation to be always on,
+>      always off, or dymamically toggled (default) for CPUs that require
+>      the EL3 call.
+> 
+>   4. An initial implementation of a prctl() backend for arm64 that allows
+>      userspace tasks to opt-in to the mitigation explicitly. This is
+>      intended to match the interface provided by x86, and so we rely on
+>      their core changes here. The seccomp interface is provided as an
+>      extra set of patches, which I'd like *not* to see merged. The main
+>      reason is that it is invasive, has ugly/unclear semantics, and could
+>      probably be left to the existing prctl interface.
 
-Thank you! I have submitted a patch to remove the quirk and tested it on
-db410c and db820c.
+I agree with you here. For patches 1-10, then:
 
-BR,
-Georgi
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+but I'd prefer to leave the seccomp stuff alone for the moment because I
+don't think the implicit enabling is necessarily the right thing to do
+there and supporting it comes at a cost.
+
+Will
