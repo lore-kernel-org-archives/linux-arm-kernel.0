@@ -1,59 +1,50 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Wed, 30 May 2018 00:56:52 -0700
-Subject: [PATCH] PCI: Add pci=safemode option
-In-Reply-To: <20180530074822.GB30177@kroah.com>
-References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
- <20180530043103.GA19734@kroah.com>
- <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
- <20180530073735.GA28793@infradead.org>
- <6dfe2db8f974d94c9867f30ec83d9333@codeaurora.org>
- <20180530074822.GB30177@kroah.com>
-Message-ID: <577f01ada5e7f08c79a28d41020fb019@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 30 May 2018 10:03:43 +0200
+Subject: [PATCH v3 0/2] drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
+Message-ID: <20180530080345.2353-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-30 00:48, Greg Kroah-Hartman wrote:
-> On Wed, May 30, 2018 at 12:44:29AM -0700, okaya at codeaurora.org wrote:
->> On 2018-05-30 00:37, Christoph Hellwig wrote:
->> > On Tue, May 29, 2018 at 09:41:33PM -0700, Sinan Kaya wrote:
->> > > Bjorn and I discussed the need for such a "safe" mode feature when you
->> > > want to bring up PCI for a platform. You want to turn off everything
->> > > as
->> > > a starter and just stick to bare minimum.
->> >
->> > Can we please make it a config option the instead of adding code
->> > to every kernel?  Also maybe the bringup should be in the name
->> > to make this more clear?
->> 
->> One other requirement was to have a runtime option rather than compile 
->> time
->> option.
->> 
->> When someone reported a problem, we wanted to be able to say "use this
->> option and see if system boots" without doing any bisects or 
->> recompilation.
->> 
->> This would be the first step in troubleshooting a system to see if
->> fundamental features are working.
-> 
-> That makes sense, people can not rebuild their kernels for the most
-> part.  Putting it behind a config option would not make sense as it
-> would always have to be enabled.
-> 
+From: Thierry Reding <treding@nvidia.com>
 
-Here is where the discussion took place. Last 5-10  messages should 
-help.
+An unfortunate interaction between the 32-bit ARM DMA/IOMMU mapping code
+and Tegra SMMU driver changes to support IOMMU groups introduced a boot-
+time regression on Tegra124. This was caught very late because none of
+the standard configurations that are tested on Tegra enable the ARM DMA/
+IOMMU mapping code since it is not needed.
 
+The reason for the failure is that the GPU found on Tegra uses a special
+bit in physical addresses to determine whether or not a buffer is mapped
+through the SMMU. In order to achieve this, the Nouveau driver needs to
+explicitly understand which buffers are mapped through the SMMU and
+which aren't. Hiding usage of the SMMU behind the DMA API is bound to
+fail because the knowledge doesn't exist. Furthermore, the GPU has its
+own IOMMU and in most cases doesn't need buffers to be physically or
+virtually contiguous. One notable exception is for compressible buffers
+which need to be mapped with large pages, which in turn require all the
+small pages in a large page to be contiguous. This can be achieved with
+an SMMU mapping, though it isn't currently supported in Nouveau. Since
+Translating through the SMMU is unnecessary and can have a negative
+impact on performance for the common case, so we want to avoid it when
+possible.
 
-https://bugzilla.kernel.org/show_bug.cgi?id=196197
+This series of patches adds a 32-bit ARM specific API that allows a
+driver to detach the device from the DMA/IOMMU mapping so that it can
+provide its own implementation for dealing with the SMMU. The second
+patch makes use of that new API in the Nouveau driver to fix the
+regression.
 
+Thierry
 
->> I don't mind changing the name Bjorn mentioned safe option. I made it
->> safemode. I am looking at Bjorn for suggestions at this moment.
-> 
-> "minimal"?  "basic"?  "crippled"?
-> "my_hardware_is_so_borked_it_needs_this_option"?  :)
-> 
-> Naming is hard...
-> 
-> greg k-h
+Thierry Reding (2):
+  ARM: dma-mapping: Implement arm_dma_iommu_detach_device()
+  drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
+
+ arch/arm/include/asm/dma-mapping.h               |  3 +++
+ arch/arm/mm/dma-mapping-nommu.c                  |  4 ++++
+ arch/arm/mm/dma-mapping.c                        | 16 ++++++++++++++++
+ .../gpu/drm/nouveau/nvkm/engine/device/tegra.c   |  5 +++++
+ 4 files changed, 28 insertions(+)
+
+-- 
+2.17.0
