@@ -1,110 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 30 May 2018 15:12:39 +0200
-Subject: [PATCH v3 1/2] ARM: dma-mapping: Implement
- arm_dma_iommu_detach_device()
-In-Reply-To: <20180530125446.GA1595@ulmo>
-References: <20180530080345.2353-1-thierry.reding@gmail.com>
- <20180530080345.2353-2-thierry.reding@gmail.com>
- <eee02391-aa25-da84-f98a-b5fed6c69599@arm.com>
- <20180530125446.GA1595@ulmo>
-Message-ID: <20180530131239.GA5400@ulmo>
+From: frieder.schrempf@exceet.de (Frieder Schrempf)
+Date: Wed, 30 May 2018 15:14:36 +0200
+Subject: [PATCH 07/11] ARM: defconfig: Use the new FSL QSPI driver under the
+ SPI framework
+In-Reply-To: <1527686082-15142-1-git-send-email-frieder.schrempf@exceet.de>
+References: <1527686082-15142-1-git-send-email-frieder.schrempf@exceet.de>
+Message-ID: <1527686082-15142-8-git-send-email-frieder.schrempf@exceet.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 02:54:46PM +0200, Thierry Reding wrote:
-> On Wed, May 30, 2018 at 10:59:30AM +0100, Robin Murphy wrote:
-> > On 30/05/18 09:03, Thierry Reding wrote:
-> > > From: Thierry Reding <treding@nvidia.com>
-> > > 
-> > > Implement this function to enable drivers from detaching from any IOMMU
-> > > domains that architecture code might have attached them to so that they
-> > > can take exclusive control of the IOMMU via the IOMMU API.
-> > > 
-> > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > ---
-> > > Changes in v3:
-> > > - make API 32-bit ARM specific
-> > > - avoid extra local variable
-> > > 
-> > > Changes in v2:
-> > > - fix compilation
-> > > 
-> > >   arch/arm/include/asm/dma-mapping.h |  3 +++
-> > >   arch/arm/mm/dma-mapping-nommu.c    |  4 ++++
-> > >   arch/arm/mm/dma-mapping.c          | 16 ++++++++++++++++
-> > >   3 files changed, 23 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > > index 8436f6ade57d..5960e9f3a9d0 100644
-> > > --- a/arch/arm/include/asm/dma-mapping.h
-> > > +++ b/arch/arm/include/asm/dma-mapping.h
-> > > @@ -103,6 +103,9 @@ extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> > >   #define arch_teardown_dma_ops arch_teardown_dma_ops
-> > >   extern void arch_teardown_dma_ops(struct device *dev);
-> > > +#define arm_dma_iommu_detach_device arm_dma_iommu_detach_device
-> > > +extern void arm_dma_iommu_detach_device(struct device *dev);
-> > > +
-> > >   /* do not use this function in a driver */
-> > >   static inline bool is_device_dma_coherent(struct device *dev)
-> > >   {
-> > > diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-> > > index f448a0663b10..eb781369377b 100644
-> > > --- a/arch/arm/mm/dma-mapping-nommu.c
-> > > +++ b/arch/arm/mm/dma-mapping-nommu.c
-> > > @@ -241,3 +241,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> > >   void arch_teardown_dma_ops(struct device *dev)
-> > >   {
-> > >   }
-> > > +
-> > > +void arm_dma_iommu_detach_device(struct device *dev)
-> > > +{
-> > > +}
-> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > > index af27f1c22d93..6d8af08b3e7d 100644
-> > > --- a/arch/arm/mm/dma-mapping.c
-> > > +++ b/arch/arm/mm/dma-mapping.c
-> > > @@ -2400,3 +2400,19 @@ void arch_teardown_dma_ops(struct device *dev)
-> > >   	arm_teardown_iommu_dma_ops(dev);
-> > >   }
-> > > +
-> > > +void arm_dma_iommu_detach_device(struct device *dev)
-> > > +{
-> > > +#ifdef CONFIG_ARM_DMA_USE_IOMMU
-> > > +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
-> > > +
-> > > +	if (!mapping)
-> > > +		return;
-> > > +
-> > > +	arm_iommu_release_mapping(mapping);
-> > 
-> > Potentially freeing the mapping before you try to operate on it is never the
-> > best idea. Plus arm_iommu_detach_device() already releases a reference
-> > appropriately anyway, so it's a double-free.
-> 
-> But the reference released by arm_iommu_detach_device() is to balance
-> out the reference acquired by arm_iommu_attach_device(), isn't it? In
-> the above, the arm_iommu_release_mapping() is supposed to drop the
-> final reference which was obtained by arm_iommu_create_mapping(). The
-> mapping shouldn't go away irrespective of the order in which these
-> will be called.
+The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
+at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
 
-Going over the DMA/IOMMU code I just remembered that I drew inspiration
-from arm_teardown_iommu_dma_ops() for the initial proposal which also
-calls both arm_iommu_detach_device() and arm_iommu_release_mapping().
-That said, one other possibility to implement this would be to export
-the 32-bit and 64-bit ARM implementations of arch_teardown_dma_ops()
-and use that instead. linux/dma-mapping.h implements a stub for
-architectures that don't provide one, so it should work without any
-#ifdef guards.
+Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 2 +-
+ arch/arm/configs/multi_v7_defconfig  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-That combined with the set_dma_ops() fix in arm_iommu_detach_device()
-should fix this pretty nicely.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/64c953e2/attachment.sig>
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index f70507a..d07a535 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -111,7 +111,6 @@ CONFIG_MTD_NAND_GPMI_NAND=y
+ CONFIG_MTD_NAND_VF610_NFC=y
+ CONFIG_MTD_NAND_MXC=y
+ CONFIG_MTD_SPI_NOR=y
+-CONFIG_SPI_FSL_QUADSPI=y
+ CONFIG_MTD_UBI=y
+ CONFIG_MTD_UBI_FASTMAP=y
+ CONFIG_MTD_UBI_BLOCK=y
+@@ -199,6 +198,7 @@ CONFIG_I2C_ALGOPCA=m
+ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_IMX=y
+ CONFIG_SPI=y
++CONFIG_SPI_FSL_QSPI=y
+ CONFIG_SPI_GPIO=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_FSL_DSPI=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 7b2283a..1423ec3 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -191,7 +191,6 @@ CONFIG_MTD_NAND_BRCMNAND=y
+ CONFIG_MTD_NAND_VF610_NFC=y
+ CONFIG_MTD_NAND_DAVINCI=y
+ CONFIG_MTD_SPI_NOR=y
+-CONFIG_SPI_FSL_QUADSPI=m
+ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+@@ -379,6 +378,7 @@ CONFIG_SPI_BCM2835=y
+ CONFIG_SPI_BCM2835AUX=y
+ CONFIG_SPI_CADENCE=y
+ CONFIG_SPI_DAVINCI=y
++CONFIG_SPI_FSL_QSPI=m
+ CONFIG_SPI_GPIO=m
+ CONFIG_SPI_FSL_DSPI=m
+ CONFIG_SPI_OMAP24XX=y
+-- 
+2.7.4
