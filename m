@@ -1,35 +1,61 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 30 May 2018 12:21:55 -0700
-Subject: [PATCH V3 2/6] hwmon: Add support for RPi voltage sensor
-In-Reply-To: <20180525193717.GA24967@roeck-us.net>
-References: <1527276279-23876-1-git-send-email-stefan.wahren@i2se.com>
- <1527276279-23876-3-git-send-email-stefan.wahren@i2se.com>
- <20180525193717.GA24967@roeck-us.net>
-Message-ID: <87lgc1ne3w.fsf@anholt.net>
+From: don.brace@microsemi.com (Don Brace)
+Date: Wed, 30 May 2018 19:25:07 +0000
+Subject: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
+In-Reply-To: <51bb7b82-c4a1-435c-7668-639db96d76e1@finnie.org>
+References: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
+ <1527542471-10316-2-git-send-email-okaya@codeaurora.org>
+ <51bb7b82-c4a1-435c-7668-639db96d76e1@finnie.org>
+Message-ID: <af772e6434e645f4a42d22821442a3bd@microsemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter Roeck <linux@roeck-us.net> writes:
+> -----Original Message-----
+> From: Ryan Finnie [mailto:ryan at finnie.org]
+> Sent: Tuesday, May 29, 2018 8:50 PM
+> To: Sinan Kaya <okaya@codeaurora.org>; linux-pci at vger.kernel.org;
+> timur at codeaurora.org
+> Cc: linux-arm-msm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> stable at vger.kernel.org; Don Brace <don.brace@microsemi.com>; James E.J.
+> Bottomley <jejb@linux.vnet.ibm.com>; Martin K. Petersen
+> <martin.petersen@oracle.com>; esc.storagedev
+> <esc.storagedev@microsemi.com>; open list:HEWLETT-PACKARD SMART ARRAY
+> RAID DRIVER (hpsa) <linux-scsi@vger.kernel.org>; open list <linux-
+> kernel at vger.kernel.org>
+> Subject: Re: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
+> 
+> EXTERNAL EMAIL
+> 
+> 
+> On 05/28/2018 02:21 PM, Sinan Kaya wrote:
+> > 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
+> > shutdown")' has been added to kernel to shutdown pending PCIe port
+> > service interrupts during reboot so that a newly started kexec kernel
+> > wouldn't observe pending interrupts.
+> >
+> > pcie_port_device_remove() is disabling the root port and switches by
+> > calling pci_disable_device() after all PCIe service drivers are shutdown.
+> >
+> > This has been found to cause crashes on HP DL360 Gen9 machines during
+> > reboot due to hpsa driver not clearing the bus master bit during the
+> > shutdown procedure by calling pci_disable_device().
+> >
+> > Drop the shutdown API and do an orderly clean up by using the remove.
+> >
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> > Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
+> > Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
+> > Cc: stable at vger.kernel.org
+> > Reported-by: Ryan Finnie <ryan@finnie.org>
+> 
+> Tested successfully on DL360 Gen9 and DL380 Gen9.
+> 
+> Tested-by: Ryan Finnie <ryan@finnie.org>
 
-> On Fri, May 25, 2018 at 09:24:35PM +0200, Stefan Wahren wrote:
->> Currently there is no easy way to detect undervoltage conditions on a
->> remote Raspberry Pi. This hwmon driver retrieves the state of the
->> undervoltage sensor via mailbox interface. The handling based on
->> Noralf's modifications to the downstream firmware driver. In case of
->> an undervoltage condition only an entry is written to the kernel log.
->> 
->> CC: "Noralf Tr?nnes" <noralf@tronnes.org>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->
-> Acked-by: Guenter Roeck <linux@roeck-us.net>
->
-> ... assuming this will go through some arm tree.
+The shutdown path issues a cache flush to the controller.
+Without this flush, you will see "Dirty Cache" messages at POST.
+It is best to keep the shutdown path.
 
-That's fine with me, I can pull this whole set for 4.19.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/0d120acc/attachment.sig>
+Thanks,
+Don Brace
+ESC - Smart Storage
+Microsemi Corporation
