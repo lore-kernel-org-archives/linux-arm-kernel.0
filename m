@@ -1,124 +1,70 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 30 May 2018 10:27:46 +0200
-Subject: [PATCH 08/12] drm/bridge: tc358764: Add DSI to LVDS bridge driver
-In-Reply-To: <201805301553.AcTypuC4%fengguang.wu@intel.com>
-References: <1527500833-16005-9-git-send-email-m.purski@samsung.com>
- <CGME20180530074642epcas1p31772422454439c0a4ed636f620a3c4bc@epcas1p3.samsung.com>
- <201805301553.AcTypuC4%fengguang.wu@intel.com>
-Message-ID: <20180530082748eucas1p1eede54cce4a257bf2795ac8474f9a9d3~zXr4CtkHD0946509465eucas1p1J@eucas1p1.samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 30 May 2018 10:42:48 +0200
+Subject: [PATCH v3 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
+In-Reply-To: <OSBPR01MB20546AE06422C9AD896F8F60D26C0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+References: <1527157834-7747-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1527157834-7747-3-git-send-email-michel.pollet@bp.renesas.com>
+ <CAMuHMdWv2ZRbX=k5+H_WfAeoQ4QsyQLU9iQ9TJ9OQ0fmwg0GOQ@mail.gmail.com>
+ <OSBPR01MB20546AE06422C9AD896F8F60D26C0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+Message-ID: <CAMuHMdUZ-sVE3z5nW30m3O5g4gB=TcQATDQ-Q5mdDsYX7c4ttQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+Hi Michel,
 
-
-On 30.05.2018 09:45, kbuild test robot wrote:
-> Hi Maciej,
+On Wed, May 30, 2018 at 10:19 AM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> On 25 May 2018 10:49, Geert wrote:
+>> On Thu, May 24, 2018 at 12:30 PM, Michel Pollet
+>> <michel.pollet@bp.renesas.com> wrote:
+>> > The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time,
+>> > it requires a special enable method to get it started.
+>> >
+>> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+>>
+>> Thanks for your patch!
+>>
+>> >  arch/arm/mach-shmobile/smp-r9a06g032.c | 85
+>> > ++++++++++++++++++++++++++++++++++
+>>
+>> I think you can safely call this driver smp-rzn1d.c, or smp-rzn1.c.
+>> Source files are not covered by the stable DT ABI, and can be reordered later
+>> at will.
+>>
+>> I expect you will just add more CPU_METHOD_OF_DECLARE() lines later
+>> (perhaps with a little bit of extra code to handle deviations).
 >
-> Thank you for the patch! Perhaps something to improve:
->
-> [auto build test WARNING on next-20180517]
-> [cannot apply to drm-exynos/exynos-drm/for-next robh/for-next drm/drm-next v4.17-rc6 v4.17-rc5 v4.17-rc4 v4.17-rc7]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Maciej-Purski/Add-TOSHIBA-TC358764-DSI-LVDS-bridge-driver/20180530-011258
-> reproduce:
->         # apt-get install sparse
->         make ARCH=x86_64 allmodconfig
->         make C=1 CF=-D__CHECK_ENDIAN__
->
->
-> sparse warnings: (new ones prefixed by >>)
->
->>> drivers/gpu/drm/bridge/tc358764.c:193:14: sparse: incorrect type in assignment (different base types) @@    expected unsigned short [unsigned] [addressable] [usertype] addr @@    got ed] [addressable] [usertype] addr @@
->    drivers/gpu/drm/bridge/tc358764.c:193:14:    expected unsigned short [unsigned] [addressable] [usertype] addr
->    drivers/gpu/drm/bridge/tc358764.c:193:14:    got restricted __le16 [usertype] <noident>
->>> drivers/gpu/drm/bridge/tc358764.c:197:24: sparse: cast to restricted __le32
->>> drivers/gpu/drm/bridge/tc358764.c:175:5: sparse: symbol 'tc358764_read' was not declared. Should it be static?
->>> drivers/gpu/drm/bridge/tc358764.c:204:5: sparse: symbol 'tc358764_write' was not declared. Should it be static?
-> vim +193 drivers/gpu/drm/bridge/tc358764.c
->
->    174	
->  > 175	int tc358764_read(struct tc358764 *ctx, u16 addr, u32 *val)
+> Now I am completely confused -- you had me remove the mention of rzn1
+> from everywhere it mattered to handle 'family' cases, and now you are
+> telling me that in *this* case where there is not a single chance of that file
+> covering another part and there's a clear cut case for it to be part specific
+> .... I should call it rzn1?!?
 
-add static
+Sorry for confusing you.
+There's a difference between stable DT ABI and (non-existing) kernel stable ABI.
+A driver that handles multiple SoCs can be named after the SoC family.
 
->    176	{
->    177		struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
->    178		const struct mipi_dsi_host_ops *ops = dsi->host->ops;
->    179		struct mipi_dsi_msg msg = {
->    180			.type = MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM,
->    181			.channel = dsi->channel,
->    182			.flags = MIPI_DSI_MSG_USE_LPM,
->    183			.tx_buf = &addr,
->    184			.tx_len = 2,
->    185			.rx_buf = val,
->    186			.rx_len = 4
->    187		};
->    188		ssize_t ret;
->    189	
->    190		if (!ops || !ops->transfer)
->    191			return -EINVAL;
->    192	
->  > 193		addr = cpu_to_le16(addr);
+I agree this one is a bit special, as only RZ/N1D has the dual Cortex A7
+(RZ/N1S has a single A7, RZ/N1L has no A7), so for now[*] there's no need
+to use it on anything but r9a06g032 aka RZ/N1D.
 
-It should be changed to:
+> I'd like consistency -- I *thought* I had a consistent naming scheme before,
+> now I've moved to your part specific one (under duress), I'd rather stick to
+> something that is consistent and keep everything as r9a06g032 now.
 
-cpu_to_le16s(&addr);
+OK for me. Driver names can be changed any time.
 
->    194	
->    195		ret = ops->transfer(dsi->host, &msg);
->    196		if (ret >= 0)
->  > 197			*val = le32_to_cpu(*val);
+[*] Until e.g. a quad A7 arrives :-)
+    Perhaps this can also be used to enable the A7s on both RZ/N1D and
+    RZ/N1S when running Linux on the Cortex M3?
 
-le32_to_cpus(val);
+Gr{oetje,eeting}s,
 
->    198	
->    199		dev_dbg(ctx->dev, "read: %d, addr: %d\n", addr, *val);
->    200	
->    201		return ret;
->    202	}
->    203	
->  > 204	int tc358764_write(struct tc358764 *ctx, u16 addr, u32 val)
+                        Geert
 
-add static
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-Regards
-Andrzej
-
->    205	{
->    206		struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
->    207		const struct mipi_dsi_host_ops *ops = dsi->host->ops;
->    208		u8 data[6];
->    209		int ret;
->    210		struct mipi_dsi_msg msg = {
->    211			.type = MIPI_DSI_GENERIC_LONG_WRITE,
->    212			.channel = dsi->channel,
->    213			.flags = MIPI_DSI_MSG_USE_LPM | MIPI_DSI_MSG_REQ_ACK,
->    214			.tx_buf = data,
->    215			.tx_len = 6
->    216		};
->    217	
->    218		if (!ops || !ops->transfer)
->    219			return -EINVAL;
->    220	
->    221		data[0] = addr;
->    222		data[1] = addr >> 8;
->    223		data[2] = val;
->    224		data[3] = val >> 8;
->    225		data[4] = val >> 16;
->    226		data[5] = val >> 24;
->    227	
->    228		ret = ops->transfer(dsi->host, &msg);
->    229	
->    230		return ret;
->    231	}
->    232	
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
->
->
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
