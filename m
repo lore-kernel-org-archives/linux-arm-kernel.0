@@ -1,158 +1,80 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 30 May 2018 12:40:35 -0700
-Subject: [PATCH 00/12] introduce support for early platform drivers
-In-Reply-To: <CAL_JsqJ=DdkDR3LtnTMHPUpwaUbjPEBgkaCV8ja+p-mTvWZuYA@mail.gmail.com>
-References: <20180511162028.20616-1-brgl@bgdev.pl>
- <CAL_JsqL3CWFSpKEGoGwQDxCQ04g4uT1hiDTxXzjz4XTjPbfsoQ@mail.gmail.com>
- <CAMRc=McDNYQ5uk8EyRkDf8eh9q7tyF=t7PcUd6DBLqXcseJ3AQ@mail.gmail.com>
- <CAL_JsqJ=DdkDR3LtnTMHPUpwaUbjPEBgkaCV8ja+p-mTvWZuYA@mail.gmail.com>
-Message-ID: <20180530194032.982.41562@harbor.lan>
+Date: Wed, 30 May 2018 12:46:02 -0700
+Subject: [PATCH 6/9] clk: davinci: pll: allow dev == NULL
+In-Reply-To: <20180525181150.17873-7-david@lechnology.com>
+References: <20180525181150.17873-1-david@lechnology.com>
+ <20180525181150.17873-7-david@lechnology.com>
+Message-ID: <20180530194559.982.42844@harbor.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi David,
 
-Quoting Rob Herring (2018-05-14 06:20:57)
-> On Mon, May 14, 2018 at 6:38 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> > 2018-05-11 22:13 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
-> >> On Fri, May 11, 2018 at 11:20 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> >>> This series is a follow-up to the RFC[1] posted a couple days ago.
-> >>>
-> >>> NOTE: this series applies on top of my recent patches[2] that move the previous
-> >>> implementation of early platform devices to arch/sh.
-> >>>
-> >>> Problem:
-> >>>
-> >>> Certain class of devices, such as timers, certain clock drivers and irq chip
-> >>> drivers need to be probed early in the boot sequence. The currently preferred
-> >>> approach is using one of the OF_DECLARE() macros. This however does not create
-> >>> a platform device which has many drawbacks - such as not being able to use
-> >>> devres routines, dev_ log functions or no way of deferring the init OF function
-> >>> if some other resources are missing.
-> >>
-> >> I skimmed though this and it doesn't look horrible (how's that for
-> >> positive feedback? ;) ). But before going into the details, I think
-> >> first there needs to be agreement this is the right direction.
-> >>
-> >> The question does remain though as to whether this class of devices
-> >> should be platform drivers. They can't be modules. They can't be
-> >> hotplugged. Can they be runtime-pm enabled? So the advantage is ...
-> >>
-> >
-> > The main (but not the only) advantage for drivers that can both be
-> > platform drivers and OF_DECLARE drivers is that we get a single entry
-> > point and can reuse code without resorting to checking if (!dev). It
-> > results in more consistent code base. Another big advantage is
-> > consolidation of device tree and machine code for SoC drivers used in
-> > different boards of which some are still using board files and others
-> > are defined in DT (see: DaVinci).
-> >
-> >> I assume that the clock maintainers had some reason to move clocks to
-> >> be platform drivers. It's just not clear to me what that was.
-> >>
-> >>> For drivers that use both platform drivers and OF_DECLARE the situation is even
-> >>> more complicated as the code needs to take into account that there can possibly
-> >>> be no struct device present. For a specific use case that we're having problems
-> >>> with, please refer to the recent DaVinci common-clock conversion patches and
-> >>> the nasty workaround that this problem implies[3].
-> >>
-> >> So devm_kzalloc will work with this solution? Why did we need
-> >> devm_kzalloc in the first place? The clocks can never be removed and
-> >> cleaning up on error paths is kind of pointless. The system would be
-> >> hosed, right?
-> >>
-> >
-> > It depends - not all clocks are necessary for system to boot.
-> 
-> That doesn't matter. You have a single driver for all/most of the
-> clocks, so the driver can't be removed.
+Quoting David Lechner (2018-05-25 11:11:47)
+> This modifies the TI Davinci PLL clock driver to allow for the case
+> when dev == NULL. On some (most) SoCs that use this driver, the PLL
+> clock needs to be registered during early boot because it is used
+> for clocksource/clkevent and there will be no platform device available.
 
--ECANOFWORMS
+A lot of this stuff feels like a step backwards. E.g:
 
-A couple of quick rebuttals, but I imagine we're going to disagree on
-the platform_driver thing as a matter of taste no matter what...
+> diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
+> index 23a24c944f1d..2eb981e61185 100644
+> --- a/drivers/clk/davinci/pll.c
+> +++ b/drivers/clk/davinci/pll.c
+> @@ -11,6 +11,7 @@
+>  
+>  #include <linux/clk-provider.h>
+>  #include <linux/clk.h>
+> +#include <linux/clk/davinci.h>
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> @@ -223,6 +224,7 @@ static const struct clk_ops dm365_pll_ops = {
+>  
+>  /**
+>   * davinci_pll_div_register - common *DIV clock implementation
+> + * @dev: The PLL platform device or NULL
+>   * @name: the clock name
+>   * @parent_name: the parent clock name
+>   * @reg: the *DIV register
+> @@ -240,17 +242,21 @@ static struct clk *davinci_pll_div_register(struct device *dev,
+>         const struct clk_ops *divider_ops = &clk_divider_ops;
+>         struct clk_gate *gate;
+>         struct clk_divider *divider;
+> +       struct clk *clk;
+> +       int ret;
+>  
+> -       gate = devm_kzalloc(dev, sizeof(*gate), GFP_KERNEL);
+> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+>         if (!gate)
+>                 return ERR_PTR(-ENOMEM);
+>  
+>         gate->reg = reg;
+>         gate->bit_idx = DIV_ENABLE_SHIFT;
+>  
+> -       divider = devm_kzalloc(dev, sizeof(*divider), GFP_KERNEL);
+> -       if (!divider)
+> -               return ERR_PTR(-ENOMEM);
+> +       divider = kzalloc(sizeof(*divider), GFP_KERNEL);
+> +       if (!divider) {
+> +               ret = -ENOMEM;
+> +               goto err_free_gate;
+> +       }
+>  
+>         divider->reg = reg;
+>         divider->shift = DIV_RATIO_SHIFT;
 
-1) There should be multiple clk drivers in a properly modeled system.
-Some folks still incorrectly put all clocks in a system into a single
-driver because That's How We Used To Do It, and some systems (simpler
-ones) really only have a single clock generator IP block.
+Oh no my poor devm_ helpers!
 
-Excepting those two reasons above, we really should have separate
-drivers for clocks controlled by the PMIC, for the (one or more) clock
-generator blocks inside of the AP/SoC, and then even more for the
-drivers that map to IP blocks that have their own clock gens.
+I understand that we need to support early boot drivers better, so this
+patch can be merged.
 
-Good examples of the latter are display controllers that generate their
-own PLL and pixel clock. Or MMC controllers that have a
-runtime-programmable clock divider. Examples of these are merged into
-mainline.
+However I'm curious if you're tracking Bartosz's early_platform_driver
+efforts? Converting to that if it is ever merged would likely be
+cleaner:
 
-2) Stephen and I wanted clock drivers to actually be represented in the
-driver model. There were these gigantic clock drivers that exclusively
-used CLK_OF_DECLARE and they just sort of floated out there in the
-ether... no representation in sysfs, no struct device to map onto a
-clock controller struct, etc.
-
-I'd be happy to hear why you think that platform_driver is a bad fit for
-a device driver that generally manages memory-mapped system resources
-that are part of the system glue and not really tied to a specific bus.
-Sounds like a good fit to me.
-
-If platform_driver doesn't handle the early boot thing well, that tells
-me that we have a problem to solve in platform_driver, not in the clk
-subsystem or drivers.
-
-3) Lots of clock controllers should be loadable modules. E.g. i2c clock
-expanders, potentially external PMIC-related drivers, external audio
-codecs, etc.
-
-Again, repeating my point #1 above, just because many platforms have a
-monolithic clock driver does not mean that this is the Right Way to do
-it.
+https://lkml.kernel.org/r/20180511162028.20616-1-brgl at bgdev.pl
 
 Best regards,
 Mike
-
-> 
-> >>> We also used to have an early platform drivers implementation but they were not
-> >>> integrated with the linux device model at all - they merely used the same data
-> >>> structures. The users could not use devres, defer probe and the early devices
-> >>> never became actual platform devices later on.
-> >>>
-> >>> Proposed solution:
-> >>>
-> >>> This series aims at solving this problem by (re-)introducing the concept of
-> >>> early platform drivers and devices - this time however in a way that seamlessly
-> >>> integrates with the existing platform drivers and also offers device-tree
-> >>> support.
-> >>>
-> >>> The idea is to provide a way for users to probe devices early, while already
-> >>> being able to use devres, devices resources and properties and also deferred
-> >>> probing.
-> >>>
-> >>> New structures are introduced: the early platform driver contains the
-> >>> early_probe callback which has the same signature as regular platform_device
-> >>> probe. This callback is called early on. The user can have both the early and
-> >>> regular probe speficied or only one of them and they both receive the same
-> >>> platform device object as argument. Any device data allocated early will be
-> >>> carried over to the normal probe.
-> >>>
-> >>> The architecture code is responsible for calling early_platform_start() in
-> >>> which the early drivers will be registered and devices populated from DT.
-> >>
-> >> Can we really do this in one spot for different devices (clk, timers,
-> >> irq). The sequence is all very carefully crafted. Platform specific
-> >> hooks is another thing to consider.
-> >>
-> >
-> > This is why I added support for early probe deferral - so that we can
-> > stop caring for the order as long as the drivers are aware of other
-> > resources they need and we call early_platform_start() the moment the
-> > earliest of the early devices is needed.
-> 
-> Deferred probe helps for inter-device dependencies, but I am more
-> concerned about timing of trying to register clocksources, irqchips,
-> etc. What happens if we probe drivers before the infrastructure is
-> initialized?
-> 
-> Rob
