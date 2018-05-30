@@ -1,150 +1,79 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 29 May 2018 17:12:52 +0100
-Subject: [PATCH v2 1/5] crypto: ccree: correct host regs offset
-In-Reply-To: <1527171551-21979-2-git-send-email-gilad@benyossef.com>
-References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
- <1527171551-21979-2-git-send-email-gilad@benyossef.com>
-Message-ID: <20180529161248.fphjnceozoyxqy7v@verge.net.au>
+Date: Wed, 30 May 2018 05:35:39 -0400
+Subject: [PATCH 2/2] arm64: dts: renesas: condor: add I2C0 support
+In-Reply-To: <9bc27b57-cf26-3b03-6ec4-1e9788a46426@cogentembedded.com>
+References: <e9c94553-be9d-0eec-a1ee-1713bb97fbab@cogentembedded.com>
+ <61f6f4a4-e55c-06e0-cba1-7d90a556950a@cogentembedded.com>
+ <20180529131012.ohyqwmiaxiiw6noi@verge.net.au>
+ <9bc27b57-cf26-3b03-6ec4-1e9788a46426@cogentembedded.com>
+Message-ID: <20180530093535.wjzhk6duxloperk6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2018 at 03:19:06PM +0100, Gilad Ben-Yossef wrote:
-> The product signature and HW revision register have different offset on the
-> older HW revisions.
-> This fixes the problem of the driver failing sanity check on silicon
-> despite working on the FPGA emulation systems.
+On Tue, May 29, 2018 at 06:46:10PM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> Fixes: 27b3b22dd98c ("crypto: ccree - add support for older HW revs")
+> On 05/29/2018 04:10 PM, Simon Horman wrote:
+> 
+> >> Define the Condor board dependent part of the I2C0 device node.
+> >>
+> >> The I2C0 bus is populated by 2 ON Semiconductor PCA9654 I/O expanders
+> >> and Analog Devices  ADV7511W HDMI transmitter (but we're only describing
+> >> the former chips now).
+> >>
+> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >> ---
+> >>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   27 ++++++++++++++++++++++++
+> >>  1 file changed, 27 insertions(+)
+> >>
+> >> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> >> ===================================================================
+> >> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> >> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> >> @@ -80,6 +80,28 @@
+> >>  	clock-frequency = <32768>;
+> >>  };
+> >>  
+> >> +&i2c0 {
+> >> +	pinctrl-0 = <&i2c0_pins>;
+> >> +	pinctrl-names = "default";
+> >> +
+> >> +	status = "okay";
+> >> +	clock-frequency = <400000>;
+> >> +
+> >> +	io_expander0: gpio at 20 {
+> > 
+> > Hi Sergei,
+> > 
+> > I'm a little confused about where 0x20 and 0x21 are derived from.
+> > Could you explain a little?
+> 
+>    r-carv3h_system_evaluation_board_rev020.pdf, pp. 16-17, lower left corners.
+> The schematics gives the 8-bit read/write addresses but we use uniform 7-bit
+> I2C address in DTs.
 
-Did the above introduce a regression that is fixed by this patch
-or did it add a feature that only works with this patch?
-
-In the case of the latter I would drop the Fixes tag,
-but I don't feel strongly about it.
-
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
-
-Minor not below not withstanding,
+Thanks, this patch looks fine to me.
+However, I'd like to give others a chance to review it,
+and it is dependent on patch 1/2 where I have a different review question.
 
 Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-> ---
->  drivers/crypto/ccree/cc_debugfs.c   | 7 +++++--
->  drivers/crypto/ccree/cc_driver.c    | 8 ++++++--
->  drivers/crypto/ccree/cc_driver.h    | 2 ++
->  drivers/crypto/ccree/cc_host_regs.h | 6 ++++--
->  4 files changed, 17 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/crypto/ccree/cc_debugfs.c b/drivers/crypto/ccree/cc_debugfs.c
-> index 08f8db4..5ca184e 100644
-> --- a/drivers/crypto/ccree/cc_debugfs.c
-> +++ b/drivers/crypto/ccree/cc_debugfs.c
-> @@ -26,7 +26,8 @@ struct cc_debugfs_ctx {
->  static struct dentry *cc_debugfs_dir;
->  
->  static struct debugfs_reg32 debug_regs[] = {
-> -	CC_DEBUG_REG(HOST_SIGNATURE),
-> +	{ .name = "SIGNATURE" }, /* Must be 0th */
-> +	{ .name = "VERSION" }, /* Must be 1st */
->  	CC_DEBUG_REG(HOST_IRR),
->  	CC_DEBUG_REG(HOST_POWER_DOWN_EN),
->  	CC_DEBUG_REG(AXIM_MON_ERR),
-> @@ -34,7 +35,6 @@ static struct debugfs_reg32 debug_regs[] = {
->  	CC_DEBUG_REG(HOST_IMR),
->  	CC_DEBUG_REG(AXIM_CFG),
->  	CC_DEBUG_REG(AXIM_CACHE_PARAMS),
-> -	CC_DEBUG_REG(HOST_VERSION),
->  	CC_DEBUG_REG(GPR_HOST),
->  	CC_DEBUG_REG(AXIM_MON_COMP),
->  };
-> @@ -58,6 +58,9 @@ int cc_debugfs_init(struct cc_drvdata *drvdata)
->  	struct debugfs_regset32 *regset;
->  	struct dentry *file;
->  
-> +	debug_regs[0].offset = drvdata->sig_offset;
-> +	debug_regs[1].offset = drvdata->ver_offset;
-> +
->  	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
->  	if (!ctx)
->  		return -ENOMEM;
-> diff --git a/drivers/crypto/ccree/cc_driver.c b/drivers/crypto/ccree/cc_driver.c
-> index 89ce013..6f93ce7 100644
-> --- a/drivers/crypto/ccree/cc_driver.c
-> +++ b/drivers/crypto/ccree/cc_driver.c
-> @@ -207,9 +207,13 @@ static int init_cc_resources(struct platform_device *plat_dev)
->  	if (hw_rev->rev >= CC_HW_REV_712) {
->  		new_drvdata->hash_len_sz = HASH_LEN_SIZE_712;
->  		new_drvdata->axim_mon_offset = CC_REG(AXIM_MON_COMP);
-> +		new_drvdata->sig_offset = CC_REG(HOST_SIGNATURE_712);
-> +		new_drvdata->ver_offset = CC_REG(HOST_VERSION_712);
->  	} else {
->  		new_drvdata->hash_len_sz = HASH_LEN_SIZE_630;
->  		new_drvdata->axim_mon_offset = CC_REG(AXIM_MON_COMP8);
-> +		new_drvdata->sig_offset = CC_REG(HOST_SIGNATURE_630);
-> +		new_drvdata->ver_offset = CC_REG(HOST_VERSION_630);
->  	}
->  
->  	platform_set_drvdata(plat_dev, new_drvdata);
-> @@ -276,7 +280,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
->  	}
->  
->  	/* Verify correct mapping */
-> -	signature_val = cc_ioread(new_drvdata, CC_REG(HOST_SIGNATURE));
-> +	signature_val = cc_ioread(new_drvdata, new_drvdata->sig_offset);
->  	if (signature_val != hw_rev->sig) {
->  		dev_err(dev, "Invalid CC signature: SIGNATURE=0x%08X != expected=0x%08X\n",
->  			signature_val, hw_rev->sig);
-> @@ -287,7 +291,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
->  
->  	/* Display HW versions */
->  	dev_info(dev, "ARM CryptoCell %s Driver: HW version 0x%08X, Driver version %s\n",
-> -		 hw_rev->name, cc_ioread(new_drvdata, CC_REG(HOST_VERSION)),
-> +		 hw_rev->name, cc_ioread(new_drvdata, new_drvdata->ver_offset),
->  		 DRV_MODULE_VERSION);
->  
->  	rc = init_cc_regs(new_drvdata, true);
-> diff --git a/drivers/crypto/ccree/cc_driver.h b/drivers/crypto/ccree/cc_driver.h
-> index 2048fde..95f82b2 100644
-> --- a/drivers/crypto/ccree/cc_driver.h
-> +++ b/drivers/crypto/ccree/cc_driver.h
-> @@ -129,6 +129,8 @@ struct cc_drvdata {
-
-This patch doesn't make things (much) worse
-but struct cc_drvdata has a rather incomplete kdoc.
-
->  	enum cc_hw_rev hw_rev;
->  	u32 hash_len_sz;
->  	u32 axim_mon_offset;
-> +	u32 sig_offset;
-> +	u32 ver_offset;
->  };
->  
->  struct cc_crypto_alg {
-> diff --git a/drivers/crypto/ccree/cc_host_regs.h b/drivers/crypto/ccree/cc_host_regs.h
-> index f510018..616b2e1 100644
-> --- a/drivers/crypto/ccree/cc_host_regs.h
-> +++ b/drivers/crypto/ccree/cc_host_regs.h
-> @@ -45,7 +45,8 @@
->  #define CC_HOST_ICR_DSCRPTR_WATERMARK_QUEUE0_CLEAR_BIT_SIZE	0x1UL
->  #define CC_HOST_ICR_AXIM_COMP_INT_CLEAR_BIT_SHIFT	0x17UL
->  #define CC_HOST_ICR_AXIM_COMP_INT_CLEAR_BIT_SIZE	0x1UL
-> -#define CC_HOST_SIGNATURE_REG_OFFSET	0xA24UL
-> +#define CC_HOST_SIGNATURE_712_REG_OFFSET	0xA24UL
-> +#define CC_HOST_SIGNATURE_630_REG_OFFSET	0xAC8UL
->  #define CC_HOST_SIGNATURE_VALUE_BIT_SHIFT	0x0UL
->  #define CC_HOST_SIGNATURE_VALUE_BIT_SIZE	0x20UL
->  #define CC_HOST_BOOT_REG_OFFSET	0xA28UL
-> @@ -105,7 +106,8 @@
->  #define CC_HOST_BOOT_ONLY_ENCRYPT_LOCAL_BIT_SIZE	0x1UL
->  #define CC_HOST_BOOT_AES_EXISTS_LOCAL_BIT_SHIFT	0x1EUL
->  #define CC_HOST_BOOT_AES_EXISTS_LOCAL_BIT_SIZE	0x1UL
-> -#define CC_HOST_VERSION_REG_OFFSET	0xA40UL
-> +#define CC_HOST_VERSION_712_REG_OFFSET	0xA40UL
-> +#define CC_HOST_VERSION_630_REG_OFFSET	0xAD8UL
->  #define CC_HOST_VERSION_VALUE_BIT_SHIFT	0x0UL
->  #define CC_HOST_VERSION_VALUE_BIT_SIZE	0x20UL
->  #define CC_HOST_KFDE0_VALID_REG_OFFSET	0xA60UL
-> -- 
-> 2.7.4
+> >> +		compatible = "onnn,pca9654";
+> >> +		reg = <0x20>;
+> >> +		gpio-controller;
+> >> +		#gpio-cells = <2>;
+> >> +	};
+> >> +
+> >> +	io_expander1: gpio at 21 {
+> >> +		compatible = "onnn,pca9654";
+> >> +		reg = <0x21>;
+> >> +		gpio-controller;
+> >> +		#gpio-cells = <2>;
+> >> +	};
+> >> +};
+> >> +
+> >>  &mmc0 {
+> >>  	pinctrl-0 = <&mmc_pins>;
+> >>  	pinctrl-1 = <&mmc_pins_uhs>;
 > 
