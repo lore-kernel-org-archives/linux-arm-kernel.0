@@ -1,310 +1,92 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 30 May 2018 12:12:11 +0200
-Subject: [PATCH V4] ARM: dts: rmobile: Drop MTD partitioning from DT
-Message-ID: <20180530101211.3625-1-marek.vasut+renesas@gmail.com>
+Date: Wed, 30 May 2018 12:13:31 +0200
+Subject: [PATCH 6/9] ARM: dts: wheat: Drop MTD partitioning from DT
+In-Reply-To: <20180528093602.eb36j34bbfzmpmw2@verge.net.au>
+References: <20180522120257.13232-1-marek.vasut+renesas@gmail.com>
+ <20180522120257.13232-6-marek.vasut+renesas@gmail.com>
+ <CAMuHMdXRnoyhNz=3v_=ZCV=FWX4TwKqx7MpH0g3c7GwtXKP1tg@mail.gmail.com>
+ <fc1cfd7e-db27-9277-dbed-cc2274c614a6@gmail.com>
+ <CAMuHMdXnNABJSJZ6MLF+aQu8QKpFoMCAvno9Yc-9LOe810NtbA@mail.gmail.com>
+ <7e1563c3-3e13-235b-3071-c3936502530f@gmail.com>
+ <20180528084135.q5xng5eaypprsypr@verge.net.au>
+ <CAMuHMdXYyN=XY6nb9RVEE+t0NeoSPhTh6fUk-9YWdFzAE1FfPA@mail.gmail.com>
+ <20180528093602.eb36j34bbfzmpmw2@verge.net.au>
+Message-ID: <d78bb8a8-a351-409c-54d2-33ee02fd8afe@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the MTD partitioning from DT, since it does not describe HW
-and to give way to a more flexible kernel command line partition
-passing.
+On 05/28/2018 11:36 AM, Simon Horman wrote:
+> On Mon, May 28, 2018 at 10:54:57AM +0200, Geert Uytterhoeven wrote:
+>> Hi Simon,
+>>
+>> On Mon, May 28, 2018 at 10:41 AM, Simon Horman <horms@verge.net.au> wrote:
+>>> On Thu, May 24, 2018 at 04:52:59PM +0200, Marek Vasut wrote:
+>>>> On 05/23/2018 08:25 AM, Geert Uytterhoeven wrote:
+>>>>> On Wed, May 23, 2018 at 12:01 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>>>> On 05/22/2018 04:43 PM, Geert Uytterhoeven wrote:
+>>>>>>> On Tue, May 22, 2018 at 2:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>>>>>> Drop the MTD partitioning from DT, since it does not describe HW
+>>>>>>>> and to give way to a more flexible kernel command line partition
+>>>>>>>> passing.
+>>>>>>>>
+>>>>>>>> To retain the original partitioning, assure you have enabled
+>>>>>>>> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+>>>>>>>> following to your kernel command line:
+>>>>>>>>
+>>>>>>>>   mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
+>>>>>>>
+>>>>>>> I think the "@0" can be dropped, as it's optional?
+>>>>>>> 4m?
+>>>>>>
+>>>>>> My take on this is that the loader is actually at offset 0x0 of the MTD
+>>>>>> device and we explicitly state that in the mtdparts to anchor the first
+>>>>>> partition within the MTD device and all the other partitions are at
+>>>>>> offset +(sum of the sizes of all partitions listed before the current
+>>>>>> one) relative to that first partition.
+>>>>>
+>>>>> Where is this explicitly states for the first partition?
+>>>>>
+>>>>>> Removing the @0 feels fragile at best and it seems to depend on the
+>>>>>> current behavior of the code.
+>>>>>
+>>>>> Better, it also depends on the documented behavior:
+>>>>>
+>>>>> Documentation/admin-guide/kernel-parameters.txt refers to
+>>>>> drivers/mtd/cmdlinepart.c, which states:
+>>>>>
+>>>>>  * <offset>  := standard linux memsize
+>>>>>  *              if omitted the part will immediately follow the previous part
+>>>>>  *              or 0 if the first part
+>>>>>
+>>>>> None of the examples listed there or under the MTD_CMDLINE_PARTS Kconfig
+>>>>> help text, or in a defconfig bundled with the kernel, use @0 for the first
+>>>>> partition.
+>>>>
+>>>> I think this is exceptionally fragile and dangerous to depend on this,
+>>>> but so be it.
+>>>
+>>> Could you respin with this change?
+>>>
+>>> I would also like to ask for another change, in light of recent
+>>> feedback from Olof Johansson ("Re: [GIT PULL] Renesas ARM64 Based SoC DT
+>>> Updates for v4.18").
+>>>
+>>> Please consolidate the dts patches into a single patch?
+>>
+>> I think it's better to keep them split, as each commit description mentions
+>> what needs to be passed on the kernel command line for the corresponding
+>> board.
+>>
+>> Combining it in a single patch makes it much harder to extract this information.
+>> Unless you're fine with a list:
+>>
+>>    koelsch: ...
+>>    wheat: mtdparts=spi0.0:256k at 0(loader),4096k(user),-(flash)
+> 
+> Lets try a list.
 
-To retain the original partitioning, assure you have enabled
-CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
-following to your kernel command line:
+Reposted with a list, twice :/
 
-lager:   mtdparts=spi0.0:256k(loader),4m(user),-(flash)
-stout:   mtdparts=spi0.0:512k(loader),256k(uboot),256k(uboot-env),-(flash)
-koelsch: mtdparts=spi0.0:512k(loader),5632k(user),-(flash)
-porter:  mtdparts=spi0.0:256k(loader_prg),4m(user_prg),-(flash_fs)
-wheat:   mtdparts=spi0.0:256k(loader),4m(user),-(flash)
-gose:    mtdparts=spi0.0:256k(loader),4m(user),-(flash)
-alt:     mtdparts=spi0.0:256k(loader),256k(system),-(user)
-silk:    mtdparts=spi0.0:256k(loader),4m(user),-(flash)
-
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> on Koelsch
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-renesas-soc at vger.kernel.org
----
-V2: Drop the @0 anchor from the commit message, use 4m
-V3: Squash the patches into one as requested by the higher ups
-V4: Add this missing Vx to PATCH Vx in subject
----
- arch/arm/boot/dts/r8a7790-lager.dts   | 21 ---------------------
- arch/arm/boot/dts/r8a7790-stout.dts   | 26 --------------------------
- arch/arm/boot/dts/r8a7791-koelsch.dts | 21 ---------------------
- arch/arm/boot/dts/r8a7791-porter.dts  | 21 ---------------------
- arch/arm/boot/dts/r8a7792-wheat.dts   | 21 ---------------------
- arch/arm/boot/dts/r8a7793-gose.dts    | 21 ---------------------
- arch/arm/boot/dts/r8a7794-alt.dts     | 21 ---------------------
- arch/arm/boot/dts/r8a7794-silk.dts    | 21 ---------------------
- 8 files changed, 173 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 092610e3f953..7c95e62efd46 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -710,27 +710,6 @@
- 		spi-cpha;
- 		spi-cpol;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "user";
--				reg = <0x00040000 0x00400000>;
--				read-only;
--			};
--			partition at 440000 {
--				label = "flash";
--				reg = <0x00440000 0x03bc0000>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/r8a7790-stout.dts b/arch/arm/boot/dts/r8a7790-stout.dts
-index a13a92c26645..dc65519d53ab 100644
---- a/arch/arm/boot/dts/r8a7790-stout.dts
-+++ b/arch/arm/boot/dts/r8a7790-stout.dts
-@@ -211,32 +211,6 @@
- 		spi-cpha;
- 		spi-cpol;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00080000>;
--				read-only;
--			};
--			partition at 80000 {
--				label = "uboot";
--				reg = <0x00080000 0x00040000>;
--				read-only;
--			};
--			partition at c0000 {
--				label = "uboot-env";
--				reg = <0x000c0000 0x00040000>;
--				read-only;
--			};
--			partition at 100000 {
--				label = "flash";
--				reg = <0x00100000 0x03f00000>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 8ab793d8b2fd..406d5d29e29c 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -724,27 +724,6 @@
- 		spi-cpha;
- 		spi-cpol;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00080000>;
--				read-only;
--			};
--			partition at 80000 {
--				label = "user";
--				reg = <0x00080000 0x00580000>;
--				read-only;
--			};
--			partition at 600000 {
--				label = "flash";
--				reg = <0x00600000 0x03a00000>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index a01101b49d99..45d89e064407 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -344,27 +344,6 @@
- 		spi-tx-bus-width = <4>;
- 		spi-rx-bus-width = <4>;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader_prg";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "user_prg";
--				reg = <0x00040000 0x00400000>;
--				read-only;
--			};
--			partition at 440000 {
--				label = "flash_fs";
--				reg = <0x00440000 0x03bc0000>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index db01de7a3811..93f78716225a 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -217,27 +217,6 @@
- 		spi-cpol;
- 		spi-cpha;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "user";
--				reg = <0x00040000 0x00400000>;
--				read-only;
--			};
--			partition at 440000 {
--				label = "flash";
--				reg = <0x00440000 0x03bc0000>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index aa209f6e5d71..b2dd54fbe40c 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -676,27 +676,6 @@
- 		spi-cpol;
- 		spi-cpha;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "user";
--				reg = <0x00040000 0x00400000>;
--				read-only;
--			};
--			partition at 440000 {
--				label = "flash";
--				reg = <0x00440000 0x03bc0000>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index e17027532941..1d044ed598f3 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -419,26 +419,5 @@
- 		spi-cpol;
- 		spi-cpha;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "system";
--				reg = <0x00040000 0x00040000>;
--				read-only;
--			};
--			partition at 80000 {
--				label = "user";
--				reg = <0x00080000 0x03f80000>;
--			};
--		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 7808aaee6644..b8163a0e2190 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -444,27 +444,6 @@
- 		spi-cpol;
- 		spi-cpha;
- 		m25p,fast-read;
--
--		partitions {
--			compatible = "fixed-partitions";
--			#address-cells = <1>;
--			#size-cells = <1>;
--
--			partition at 0 {
--				label = "loader";
--				reg = <0x00000000 0x00040000>;
--				read-only;
--			};
--			partition at 40000 {
--				label = "user";
--				reg = <0x00040000 0x00400000>;
--				read-only;
--			};
--			partition at 440000 {
--				label = "flash";
--				reg = <0x00440000 0x03bc0000>;
--			};
--		};
- 	};
- };
- 
 -- 
-2.17.0
+Best regards,
+Marek Vasut
