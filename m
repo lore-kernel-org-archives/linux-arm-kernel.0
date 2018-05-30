@@ -1,46 +1,71 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 30 May 2018 22:00:18 +0200
-Subject: [PATCH v2] dmaengine: pxa: add a default requestor policy
-Message-ID: <20180530200018.26677-1-robert.jarzmik@free.fr>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 30 May 2018 13:09:50 -0700
+Subject: [PATCH 0/9] clk: davinci: outstanding fixes
+In-Reply-To: <20180525181150.17873-1-david@lechnology.com>
+References: <20180525181150.17873-1-david@lechnology.com>
+Message-ID: <20180530200947.982.19495@harbor.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As what former drcmr -1 value meant, add a this as a default to each
-channel, ie. that by default no requestor line is used.
+Hi David,
 
-This is specifically used for network drivers smc91x and smc911x, and
-needed for their port to slave maps.
+Quoting David Lechner (2018-05-25 11:11:41)
+> This is a resend of all of the outstanding DaVinci clock patches plus one new
+> patch. All of the patches (except the new one) have been reviewed and tested
+> by someone other than me.
+> 
+> The new patch ("clk: davinci: Fix link errors when not all SoCs are enabled")
+> should be fairly trivial.
+> 
+> I am resending them all in one series to hopefully make it easier to get them
+> picked up by having them in the correct order to avoid merge conflicts. This
+> series is based on the clk/clk-davinci-psc-da830 branch.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: changed -1 to U32_MAX
----
- drivers/dma/pxa_dma.c | 5 +++++
- 1 file changed, 5 insertions(+)
+I picked them all and pushed to clk/clk-davinci based on -rc1. There are
+some comments on the individual patches, all of which are of the "please
+revisit this and fix it up later" variety.
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index 9505334f9c6e..b31c28b67ad3 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -762,6 +762,8 @@ static void pxad_free_chan_resources(struct dma_chan *dchan)
- 	dma_pool_destroy(chan->desc_pool);
- 	chan->desc_pool = NULL;
- 
-+	chan->drcmr = U32_MAX;
-+	chan->prio = PXAD_PRIO_LOWEST;
- }
- 
- static void pxad_free_desc(struct virt_dma_desc *vd)
-@@ -1386,6 +1388,9 @@ static int pxad_init_dmadev(struct platform_device *op,
- 		c = devm_kzalloc(&op->dev, sizeof(*c), GFP_KERNEL);
- 		if (!c)
- 			return -ENOMEM;
-+
-+		c->drcmr = U32_MAX;
-+		c->prio = PXAD_PRIO_LOWEST;
- 		c->vc.desc_free = pxad_free_desc;
- 		vchan_init(&c->vc, &pdev->slave);
- 		init_waitqueue_head(&c->wq_state);
--- 
-2.11.0
+Going forward I'm happy for you and/or Sekhar to send clk PRs to Stephen
+and myself. The same rules apply for PRs: all patches need to be posted
+to the list the old fashioned way for review. But PRs make our lives a
+bit easier, especially when dealing with chip variants from the same SoC
+family like we have with davinci.
+
+Best regards,
+Mike
+
+> 
+> David Lechner (7):
+>   clk: davinci: pll-dm355: drop pll2_sysclk2
+>   clk: davinci: pll-dm355: fix SYSCLKn parent names
+>   clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups
+>   clk: davinci: pll: allow dev == NULL
+>   clk: davinci: da850-pll: change PLL0 to CLK_OF_DECLARE
+>   clk: davinci: psc: allow for dev == NULL
+>   clk: davinci: Fix link errors when not all SoCs are enabled
+> 
+> Sekhar Nori (2):
+>   clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always enabled
+>   clk: davinci: psc-dm365: fix few clocks
+> 
+>  drivers/clk/davinci/pll-da830.c  |   5 +-
+>  drivers/clk/davinci/pll-da850.c  |  37 ++--
+>  drivers/clk/davinci/pll-dm355.c  |  22 ++-
+>  drivers/clk/davinci/pll-dm365.c  |   9 +-
+>  drivers/clk/davinci/pll-dm644x.c |   9 +-
+>  drivers/clk/davinci/pll-dm646x.c |  11 +-
+>  drivers/clk/davinci/pll.c        | 299 +++++++++++++++++++++----------
+>  drivers/clk/davinci/pll.h        |  41 +++--
+>  drivers/clk/davinci/psc-dm355.c  |   7 +-
+>  drivers/clk/davinci/psc-dm365.c  |  22 ++-
+>  drivers/clk/davinci/psc-dm644x.c |   3 +-
+>  drivers/clk/davinci/psc-dm646x.c |   3 +-
+>  drivers/clk/davinci/psc.c        |  72 ++++++--
+>  drivers/clk/davinci/psc.h        |  12 ++
+>  include/linux/clk/davinci.h      |  40 +++++
+>  15 files changed, 418 insertions(+), 174 deletions(-)
+>  create mode 100644 include/linux/clk/davinci.h
+> 
+> -- 
+> 2.17.0
+> 
