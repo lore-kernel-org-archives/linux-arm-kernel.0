@@ -1,95 +1,60 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 30 May 2018 13:34:18 +0200
-Subject: [PATCH v2 0/9] PM / Domains: Add support for multi PM domains per
- device
-In-Reply-To: <CAJZ5v0iOP-gcdXcaOjuWy6p+k+hSkHuapDuYYFeS+6gDrxev3w@mail.gmail.com>
-References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <CAJZ5v0iOP-gcdXcaOjuWy6p+k+hSkHuapDuYYFeS+6gDrxev3w@mail.gmail.com>
-Message-ID: <CAPDyKFpPYzPwQr2enDNTQPeKdvZ8vQb7TWP4KhT4k1gDhrrpLA@mail.gmail.com>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Wed, 30 May 2018 14:03:22 +0200
+Subject: [PATCH v4 0/5] Reintroduce i.MX EPIT Timer
+Message-ID: <20180530120327.27681-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2018 at 11:30, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Tue, May 29, 2018 at 12:04 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> Changes in v2:
->>         - Addressed comments from Geert around DT doc.
->>         - Addressed comments from Jon around clarification of how to use this
->>         and changes to returned error codes.
->>         - Fixed build error in case CONFIG_PM was unset.
->>
->> There are devices that are partitioned across multiple PM domains. Currently
->> these can't be supported well by the available PM infrastructures we have in
->> the kernel. This series is an attempt to address this.
->>
->> The interesting parts happens from patch 5 an onwards, including a minor DT
->> update to the existing power-domain bindings, the 4 earlier are just trivial
->> clean-ups of some related code in genpd, which I happened to stumble over.
->>
->> Some additional background:
->>
->> One existing case where devices are partitioned across multiple PM domains, is
->> the Nvida Tegra 124/210 X-USB subsystem. A while ago Jon Hunter (Nvidia) sent a
->> series, trying to address these issues, however this is a new approach, while
->> it re-uses the same concepts from DT point of view.
->>
->> The Tegra 124/210 X-USB subsystem contains of a host controller and a device
->> controller. Each controller have its own independent PM domain, but are being
->> partitioned across another shared PM domain for the USB super-speed logic.
->>
->> Currently to make the drivers work, either the related PM domains needs to stay
->> powered on always or the PM domain topology needs to be in-correctly modelled
->> through sub-domains. In both cases PM domains may be powered on while they
->> don't need to be, so in the end this means - wasting power -.
->>
->> As stated above, this series intends to address these problem from a PM
->> infrastructure point of view. More details are available in each changelog.
->>
->> It should be noted that this series has been tested on HW, however only by using
->> a home-cooked test PM domain driver for genpd and together with a test driver.
->> This allowed me to play with PM domain (genpd), runtime PM and device links.
->>
->> Any further deployment for real use cases are greatly appreciated. I am happy to
->> to help, if needed!
->>
->> Kind regards
->> Ulf Hansson
->>
->>
->> Ulf Hansson (9):
->>   PM / Domains: Drop extern declarations of functions in pm_domain.h
->>   PM / Domains: Drop __pm_genpd_add_device()
->>   PM / Domains: Drop genpd as in-param for pm_genpd_remove_device()
->>   PM / Domains: Drop unused parameter in genpd_allocate_dev_data()
->>   PM / Domains: dt: Allow power-domain property to be a list of
->>     specifiers
->>   PM / Domains: Don't attach devices in genpd with multi PM domains
->>   PM / Domains: Split genpd_dev_pm_attach()
->>   PM / Domains: Add support for multi PM domains per device to genpd
->>   PM / Domains: Add dev_pm_domain_attach_by_id() to manage multi PM
->>     domains
->>
->>  .../bindings/power/power_domain.txt           |  19 ++-
->>  drivers/base/power/common.c                   |  39 ++++-
->>  drivers/base/power/domain.c                   | 155 ++++++++++++++----
->>  drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c       |   2 +-
->>  include/linux/pm_domain.h                     |  79 ++++-----
->>  5 files changed, 216 insertions(+), 78 deletions(-)
->
-> I can take patches [1-4/9] from this series for 4.18.
+From: Cl?ment Peron <clement.peron@devialet.com>
 
-Thanks!
+As suggested in the commit message we have added the device tree support,
+proper bindings and we moved the driver into the correct folder.
 
->
-> I need an ACK from Rob on the bindings change.
+Moreover we made some changes like use of relaxed IO accesor,
+implement sched_clock, delay_timer and reduce the clockevents min_delta.
 
-Yes, of course!
+Changes since v3:
+- Clean Kconfig
+- Rename imx6q-epit to imx31-epit
+- Update doc and bindings
+- Indent and fix
 
->
-> The rest of the series doesn't seem to be ready yet.
+Changes since v2 (Thanks Fabio Estevam):
+- Removed unused ckil clock
+- Add out_iounmap
+- Check and handle if clk_prepare_enable failed
+- Fix comment typo
 
-It's getting reviewed and tested, so let's give it some more time.
+Changes since v1 (Thanks Vladimir Zapolskiy):
+- Add OF dependency in Kconfig
+- Sort header
+- Use BIT macro
+- Remove useless comments
+- Fix incorrect indent
+- Fix memory leak
+- Add check and handle possible returned error
 
-BTW, from an overall design point of view, you seems okay with it?
+Cl?ment Peron (2):
+  ARM: imx: remove inexistant EPIT timer init
+  Documentation: DT: add i.MX EPIT timer binding
 
-Kind regards
-Uffe
+Colin Didier (3):
+  clk: imx6: add EPIT clock support
+  clocksource: add driver for i.MX EPIT timer
+  ARM: dts: imx6qdl: add missing compatible and clock properties for
+    EPIT
+
+ .../devicetree/bindings/timer/fsl,imxepit.txt |  24 ++
+ arch/arm/boot/dts/imx6qdl.dtsi                |  10 +
+ arch/arm/mach-imx/common.h                    |   1 -
+ drivers/clk/imx/clk-imx6q.c                   |   2 +
+ drivers/clocksource/Kconfig                   |  11 +
+ drivers/clocksource/Makefile                  |   1 +
+ drivers/clocksource/timer-imx-epit.c          | 281 ++++++++++++++++++
+ include/dt-bindings/clock/imx6qdl-clock.h     |   4 +-
+ 8 files changed, 332 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+ create mode 100644 drivers/clocksource/timer-imx-epit.c
+
+-- 
+2.17.0
