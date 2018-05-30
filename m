@@ -1,44 +1,47 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 30 May 2018 18:41:59 +0300
-Subject: [PATCH v2 1/6] ARM: dra762: hwmod: Add MCAN support
-In-Reply-To: <20180530152825.GG5705@atomide.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-2-faiz_abbas@ti.com> <20180530145047.GC5705@atomide.com>
- <cfa9c9df-57a2-69f6-9509-440dc18292e7@ti.com>
- <20180530152825.GG5705@atomide.com>
-Message-ID: <b0476932-a6e9-6ef1-69ad-c9a8c55d9739@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 May 2018 16:48:49 +0100
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
+References: <20180523082908.GB4828@sirena.org.uk>
+ <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
+ <20180523154057.GL4828@sirena.org.uk>
+ <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
+ <20180523155617.GN4828@sirena.org.uk>
+ <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
+ <20180530093701.GD6920@sirena.org.uk>
+ <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
+ <20180530150241.GO6920@sirena.org.uk>
+ <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
+Message-ID: <20180530154849.GQ6920@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/18 18:28, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [180530 15:18]:
->> For the OCP if part, I think that is still needed until we switch over to
->> full sysc driver. clkctrl_offs you probably also need because that is used
->> for mapping the omap_hwmod against a specific clkctrl clock. Those can be
->> only removed once we are done with hwmod (or figure out some other way to
->> assign the clkctrl clock to a hwmod.)
-> 
-> Hmm might be worth testing. I thought your commit 70f05be32133
-> ("ARM: OMAP2+: hwmod: populate clkctrl clocks for hwmods if available")
-> already parses the clkctrl from dts?
+On Wed, May 30, 2018 at 08:34:50AM -0700, Doug Anderson wrote:
+> On Wed, May 30, 2018 at 8:02 AM, Mark Brown <broonie@kernel.org> wrote:
 
-It maps the clkctrl clock to be used by hwmod, if those are available. 
-We didn't add any specific clock entries to DT for mapping the actual 
-clkctrl clock without the hwmod_data hints yet though, as that was 
-deemed temporary solution only due to transition to interconnect driver. 
-I.e., you would need something like this in DT for every device node:
+> > What you're describing sounds like what we should be doing normally, if
+> > we're not doing that we should probably be fixing the core.
 
-&uart3 {
-   clocks = <l4per_clkctrl UART3_CLK 0>;
-   clock-names = "clkctrl";
-};
+> I'm not convinced that this behavior makes sense to move to the core.
+> On most regulators I'd expect that when the regulator driver says to
+> turn them off that they will output no voltage.  The reason RPMh is
 
-... which is currently not present.
+Oh, you mean while the regulator is off...  TBH I don't see a huge
+problem doing that anyway and just reverting to the bottom of the
+constraints when everything gets turned off since we have to see if we
+need to adjust the voltage every time we enabled anyway.
 
-Alternatively you could rename the main_clk in the hwmod_data to point 
-towards the clkctrl clock, but again, that would be a temporary solution 
-only.
+> In any other system when Linux disabled the regulator it wouldn't
+> matter that you left it set at 1.4V.  Thus RPMh is special and IMO the
+> workaround belongs there.
 
--Tero
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Without the core doing something the regulator isn't going to get told
+that anything updated voltages anyway...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/35e9ccdc/attachment.sig>
