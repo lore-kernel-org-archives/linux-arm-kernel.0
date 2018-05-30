@@ -1,48 +1,77 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 30 May 2018 16:06:23 +0200
-Subject: [PATCH v4 0/2] drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
-Message-ID: <20180530140625.21247-1-thierry.reding@gmail.com>
+Date: Wed, 30 May 2018 16:06:25 +0200
+Subject: [PATCH v4 2/2] drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
+In-Reply-To: <20180530140625.21247-1-thierry.reding@gmail.com>
+References: <20180530140625.21247-1-thierry.reding@gmail.com>
+Message-ID: <20180530140625.21247-3-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-An unfortunate interaction between the 32-bit ARM DMA/IOMMU mapping code
-and Tegra SMMU driver changes to support IOMMU groups introduced a boot-
-time regression on Tegra124. This was caught very late because none of
-the standard configurations that are tested on Tegra enable the ARM DMA/
-IOMMU mapping code since it is not needed.
+Depending on the kernel configuration, early ARM architecture setup code
+may have attached the GPU to a DMA/IOMMU mapping that transparently uses
+the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
+backed buffers (a special bit in the GPU's MMU page tables indicates the
+memory path to take: via the SMMU or directly to the memory controller).
+Transparently backing DMA memory with an IOMMU prevents Nouveau from
+properly handling such memory accesses and causes memory access faults.
 
-The reason for the failure is that the GPU found on Tegra uses a special
-bit in physical addresses to determine whether or not a buffer is mapped
-through the SMMU. In order to achieve this, the Nouveau driver needs to
-explicitly understand which buffers are mapped through the SMMU and
-which aren't. Hiding usage of the SMMU behind the DMA API is bound to
-fail because the knowledge doesn't exist. Furthermore, the GPU has its
-own IOMMU and in most cases doesn't need buffers to be physically or
-virtually contiguous. One notable exception is for compressible buffers
-which need to be mapped with large pages, which in turn require all the
-small pages in a large page to be contiguous. This can be achieved with
-an SMMU mapping, though it isn't currently supported in Nouveau. Since
-Translating through the SMMU is unnecessary and can have a negative
-impact on performance for the common case, so we want to avoid it when
-possible.
+As a side-note: buffers other than those allocated in instance memory
+don't need to be physically contiguous from the GPU's perspective since
+the GPU can map them into contiguous buffers using its own MMU. Mapping
+these buffers through the IOMMU is unnecessary and will even lead to
+performance degradation because of the additional translation. One
+exception to this are compressible buffers which need large pages. In
+order to enable these large pages, multiple small pages will have to be
+combined into one large (I/O virtually contiguous) mapping via the
+IOMMU. However, that is a topic outside the scope of this fix and isn't
+currently supported. An implementation will want to explicitly create
+these large pages in the Nouveau driver, so detaching from a DMA/IOMMU
+mapping would still be required.
 
-This series of patches adds a 32-bit ARM specific API that allows a
-driver to detach the device from the DMA/IOMMU mapping so that it can
-provide its own implementation for dealing with the SMMU. The second
-patch makes use of that new API in the Nouveau driver to fix the
-regression.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v4:
+- use existing APIs to detach from a DMA/IOMMU mapping
 
-Thierry
+Changes in v3:
+- clarify the use of IOMMU mapping for compressible buffers
+- squash multiple patches into this
 
-Thierry Reding (2):
-  ARM: dma-mapping: Set proper DMA ops in arm_iommu_detach_device()
-  drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
-
- arch/arm/mm/dma-mapping.c                          | 12 ++++++------
  drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c | 13 +++++++++++++
- 2 files changed, 19 insertions(+), 6 deletions(-)
+ 1 file changed, 13 insertions(+)
 
+diff --git a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+index 78597da6313a..0e372a190d3f 100644
+--- a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
++++ b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+@@ -23,6 +23,10 @@
+ #ifdef CONFIG_NOUVEAU_PLATFORM_DRIVER
+ #include "priv.h"
+ 
++#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
++#include <asm/dma-iommu.h>
++#endif
++
+ static int
+ nvkm_device_tegra_power_up(struct nvkm_device_tegra *tdev)
+ {
+@@ -105,6 +109,15 @@ nvkm_device_tegra_probe_iommu(struct nvkm_device_tegra *tdev)
+ 	unsigned long pgsize_bitmap;
+ 	int ret;
+ 
++#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
++	if (dev->archdata.mapping) {
++		struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
++
++		arm_iommu_detach_device(dev);
++		arm_iommu_release_mapping(mapping);
++	}
++#endif
++
+ 	if (!tdev->func->iommu_bit)
+ 		return;
+ 
 -- 
 2.17.0
