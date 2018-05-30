@@ -1,29 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 30 May 2018 15:10:30 -0300
-Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
-In-Reply-To: <20180530173414.6121-1-andrew.smirnov@gmail.com>
-References: <20180530173414.6121-1-andrew.smirnov@gmail.com>
-Message-ID: <CAOMZO5BbgG2POYvayjT99BAAkC5HzrUWr28Z7DggVwTFSCnpFQ@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 30 May 2018 23:57:44 +0530
+Subject: [PATCH v4] rtc: sun6i: Fix bit_idx value for clk_register_gate
+Message-ID: <20180530182744.27611-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 2:34 PM, Andrey Smirnov
-<andrew.smirnov@gmail.com> wrote:
-> Workaround introduced for i.MX53 in be9cae2479f48 ("usb: chipidea:
-> imx: Fix ULPI on imx53") seems to be applicable in case of i.MX51 as
-> well. Running latest kernel on ZII RDU1 Board (imx51-zii-rdu1.dts)
-> exhibits a kernel frozen on PORTSC access and applying the workaround
-> resolves the issue.
->
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Chris Healy <cphealy@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-usb at vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+From: Michael Trimarchi <michael@amarulasolutions.com>
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+clk-gate core will take bit_idx through clk_register_gate
+and then do clk_gate_ops by using BIT(bit_idx), but rtc-sun6i
+is passing bit_idx as BIT(bit_idx) it becomes BIT(BIT(bit_idx)
+which is wrong and eventually external gate clock is not enabling.
+
+This patch fixed by passing bit index and the original change
+introduced from below commit.
+"rtc: sun6i: Add support for the external oscillator gate"
+(sha1: 	17ecd246414b3a0fe0cb248c86977a8bda465b7b)
+
+Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
+Fixes: 17ecd246414b ("rtc: sun6i: Add support for the external oscillator gate")
+Cc: stable at vger.kernel.org
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v4:
+- Cc to stable tree
+Changes for v3:
+- add fixes tag
+- Cced stable ML
+Changes for v2:
+- add suffix _OFFSET with macro name to distinguish b/w
+  register actual values vs offset.
+
+ drivers/rtc/rtc-sun6i.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index 2e6fb275acc8..2cd5a7b1a2e3 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -74,7 +74,7 @@
+ #define SUN6I_ALARM_CONFIG_WAKEUP		BIT(0)
+ 
+ #define SUN6I_LOSC_OUT_GATING			0x0060
+-#define SUN6I_LOSC_OUT_GATING_EN		BIT(0)
++#define SUN6I_LOSC_OUT_GATING_EN_OFFSET		0
+ 
+ /*
+  * Get date values
+@@ -255,7 +255,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 				      &clkout_name);
+ 	rtc->ext_losc = clk_register_gate(NULL, clkout_name, rtc->hw.init->name,
+ 					  0, rtc->base + SUN6I_LOSC_OUT_GATING,
+-					  SUN6I_LOSC_OUT_GATING_EN, 0,
++					  SUN6I_LOSC_OUT_GATING_EN_OFFSET, 0,
+ 					  &rtc->lock);
+ 	if (IS_ERR(rtc->ext_losc)) {
+ 		pr_crit("Couldn't register the LOSC external gate\n");
+-- 
+2.14.3
