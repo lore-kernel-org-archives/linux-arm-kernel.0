@@ -1,64 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 May 2018 16:58:55 +0100
-Subject: [PATCH v2 00/17] arm64 SSBD (aka Spectre-v4) mitigation
-In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
-References: <20180529121121.24927-1-marc.zyngier@arm.com>
-Message-ID: <20180530155854.GA4122@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 30 May 2018 17:04:37 +0100
+Subject: [PATCH v2 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <20180529100421.31022-9-ulf.hansson@linaro.org>
+References: <20180529100421.31022-1-ulf.hansson@linaro.org>
+ <20180529100421.31022-9-ulf.hansson@linaro.org>
+Message-ID: <a53f0970-22c4-444f-10e6-c115a21d05ea@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-On Tue, May 29, 2018 at 01:11:04PM +0100, Marc Zyngier wrote:
-> This patch series implements the Linux kernel side of the "Spectre-v4"
-> (CVE-2018-3639) mitigation known as "Speculative Store Bypass Disable"
-> (SSBD).
+On 29/05/18 11:04, Ulf Hansson wrote:
+> To support devices being partitioned across multiple PM domains, let's
+> begin with extending genpd to cope with these kind of configurations.
 > 
-> More information can be found at:
+> Therefore, add a new exported function genpd_dev_pm_attach_by_id(), which
+> is similar to the existing genpd_dev_pm_attach(), but with the difference
+> that it allows its callers to provide an index to the PM domain that it
+> wants to attach.
 > 
->   https://bugs.chromium.org/p/project-zero/issues/detail?id=1528
->   https://developer.arm.com/support/arm-security-updates/speculative-processor-vulnerability
+> Note that, genpd_dev_pm_attach_by_id() shall only be called by the driver
+> core / PM core, similar to how the existing dev_pm_domain_attach() makes
+> use of genpd_dev_pm_attach(). However, this is implemented by following
+> changes on top.
 > 
-> For all released Arm Cortex-A CPUs that are affected by this issue, then
-> the preferred mitigation is simply to set a chicken bit in the firmware
-> during CPU initialisation and therefore no change to Linux is required.
-> Other CPUs may require the chicken bit to be toggled dynamically (for
-> example, when switching between user-mode and kernel-mode) and this is
-> achieved by calling into EL3 via an SMC which has been published as part
-> of the latest SMCCC specification:
+> Because, only one PM domain can be attached per device, genpd needs to
+> create a virtual device that it can attach/detach instead. More precisely,
+> let the new function genpd_dev_pm_attach_by_id() register a virtual struct
+> device via calling device_register(). Then let it attach this device to the
+> corresponding PM domain, rather than the one that is provided by the
+> caller. The actual attaching is done via re-using the existing genpd OF
+> functions.
 > 
->   https://developer.arm.com/cache-speculation-vulnerability-firmware-specification
+> At successful attachment, genpd_dev_pm_attach_by_id() returns the created
+> virtual device, which allows the caller to operate on it to deal with power
+> management. Following changes on top, provides more details in this
+> regards.
 > 
-> as well as an ATF update for the released ARM cores affected by SSBD:
+> To deal with detaching of a PM domain for the multiple PM domains case,
+> let's also extend the existing genpd_dev_pm_detach() function, to cover the
+> cleanup of the created virtual device, via make it call device_unregister()
+> on it. In this way, there is no need to introduce a new function to deal
+> with detach for the multiple PM domain case, but instead the existing one
+> is re-used.
 > 
->   https://github.com/ARM-software/arm-trusted-firmware/pull/1392
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
 > 
-> These patches provide the following:
+> Changes in v2:
+> 	- Fixed comments from Jon. Clarified function descriptions
+> 	and changelog.
 > 
->   1. Safe probing of firmware to establish which CPUs in the system
->      require calling into EL3 as part of the mitigation.
+> ---
+>  drivers/base/power/domain.c | 80 +++++++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  8 ++++
+>  2 files changed, 88 insertions(+)
 > 
->   2. For CPUs that require it, call into EL3 on exception entry/exit
->      from EL0 to apply the SSBD mitigation when running at EL1.
-> 
->   3. A command-line option to force the SSBD mitigation to be always on,
->      always off, or dymamically toggled (default) for CPUs that require
->      the EL3 call.
-> 
->   4. An initial implementation of a prctl() backend for arm64 that allows
->      userspace tasks to opt-in to the mitigation explicitly. This is
->      intended to match the interface provided by x86, and so we rely on
->      their core changes here. The seccomp interface is provided as an
->      extra set of patches, which I'd like *not* to see merged. The main
->      reason is that it is invasive, has ugly/unclear semantics, and could
->      probably be left to the existing prctl interface.
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 2af99bfcbe3c..2b496d79159d 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2171,6 +2171,15 @@ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+>  }
+>  EXPORT_SYMBOL_GPL(of_genpd_remove_last);
+>  
+> +static void genpd_release_dev(struct device *dev)
+> +{
+> +	kfree(dev);
+> +}
+> +
+> +static struct bus_type genpd_bus_type = {
+> +	.name		= "genpd",
+> +};
+> +
+>  /**
+>   * genpd_dev_pm_detach - Detach a device from its PM domain.
+>   * @dev: Device to detach.
+> @@ -2208,6 +2217,10 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
+>  
+>  	/* Check if PM domain can be powered off after removing this device. */
+>  	genpd_queue_power_off_work(pd);
+> +
+> +	/* Unregister the device if it was created by genpd. */
+> +	if (dev->bus == &genpd_bus_type)
+> +		device_unregister(dev);
+>  }
+>  
+>  static void genpd_dev_pm_sync(struct device *dev)
+> @@ -2298,6 +2311,67 @@ int genpd_dev_pm_attach(struct device *dev)
+>  }
+>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>  
+> +/**
+> + * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
+> + * @dev: Device to attach.
 
-I agree with you here. For patches 1-10, then:
+Can you update the description of the above as well?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Thanks
+Jon
 
-but I'd prefer to leave the seccomp stuff alone for the moment because I
-don't think the implicit enabling is necessarily the right thing to do
-there and supporting it comes at a cost.
-
-Will
+-- 
+nvpublic
