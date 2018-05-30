@@ -1,54 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 May 2018 07:57:26 -0700
-Subject: [PATCH v2 4/6] bus: ti-sysc: Add support for using ti-sysc for
- MCAN on dra76x
-In-Reply-To: <20180530141133.3711-5-faiz_abbas@ti.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-5-faiz_abbas@ti.com>
-Message-ID: <20180530145726.GD5705@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 May 2018 16:02:41 +0100
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
+References: <a106c337-0713-e5d6-cb40-13e05f4d361d@codeaurora.org>
+ <CAD=FV=W=BquL5ojORz4HNP889s=-uNJ-QEzUfAxwXj2Oa3cGew@mail.gmail.com>
+ <20180523082908.GB4828@sirena.org.uk>
+ <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
+ <20180523154057.GL4828@sirena.org.uk>
+ <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
+ <20180523155617.GN4828@sirena.org.uk>
+ <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
+ <20180530093701.GD6920@sirena.org.uk>
+ <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
+Message-ID: <20180530150241.GO6920@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Faiz Abbas <faiz_abbas@ti.com> [180530 14:12]:
-> The dra76x MCAN generic interconnect module has a its own
-> format for the bits in the control registers.
-...
-> --- a/drivers/bus/ti-sysc.c
-> +++ b/drivers/bus/ti-sysc.c
-> @@ -1262,6 +1262,22 @@ static const struct sysc_capabilities sysc_omap4_usb_host_fs = {
->  	.regbits = &sysc_regbits_omap4_usb_host_fs,
->  };
->  
-> +static const struct sysc_regbits sysc_regbits_dra7_mcan = {
-> +	.dmadisable_shift = -ENODEV,
-> +	.midle_shift = -ENODEV,
-> +	.sidle_shift = -ENODEV,
-> +	.clkact_shift = -ENODEV,
-> +	.enwkup_shift = 4,
-> +	.srst_shift = 0,
-> +	.emufree_shift = -ENODEV,
-> +	.autoidle_shift = -ENODEV,
-> +};
-> +
-> +static const struct sysc_capabilities sysc_dra7_mcan = {
-> +	.type = TI_SYSC_DRA7_MCAN,
-> +	.regbits = &sysc_regbits_dra7_mcan,
-> +};
-> +
->  static int sysc_init_pdata(struct sysc *ddata)
->  {
->  	struct ti_sysc_platform_data *pdata = dev_get_platdata(ddata->dev);
-> @@ -1441,6 +1457,7 @@ static const struct of_device_id sysc_match[] = {
->  	{ .compatible = "ti,sysc-mcasp", .data = &sysc_omap4_mcasp, },
->  	{ .compatible = "ti,sysc-usb-host-fs",
->  	  .data = &sysc_omap4_usb_host_fs, },
-> +	{ .compatible = "ti,sysc-dra7-mcan", .data = &sysc_dra7_mcan, },
->  	{  },
->  };
+On Wed, May 30, 2018 at 07:46:50AM -0700, Doug Anderson wrote:
+> On Wed, May 30, 2018 at 2:37 AM, Mark Brown <broonie@kernel.org> wrote:
 
-Looks good to me. And presumably you checked that no other dra7 modules
-use sysconfig register bit layout like this?
+> >> Linux vote for the lowest voltage it's comfortable with.  Linux keeps
+> >> track of the true voltage that the driver wants and will always change
+> >> its vote back to that before enabling.  Thus (assuming Linux is OK
+> >> with 1.2 V - 1.4 V for a rail):
 
-Regards,
+> > That's pretty much what it should do anyway with normally designed
+> > hardware.
 
-Tony
+> I guess the question is: do we insist that the driver include this
+> workaround, or are we OK with letting the hardware behave as the
+> hardware does?
+
+What you're describing sounds like what we should be doing normally, if
+we're not doing that we should probably be fixing the core.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/a848ca01/attachment.sig>
