@@ -1,83 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 May 2018 10:00:44 +0100
-Subject: [PATCH] arm64: alternative:flush cache with unpatched code
-In-Reply-To: <1527617488-5693-1-git-send-email-rokhanna@nvidia.com>
-References: <1527617488-5693-1-git-send-email-rokhanna@nvidia.com>
-Message-ID: <20180530090044.GA2452@arm.com>
+From: nixiaoming@huawei.com (Nixiaoming)
+Date: Wed, 30 May 2018 09:05:51 +0000
+Subject: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for
+ mark_rodata_ro
+In-Reply-To: <20180530080816.f74elebj4demiohl@salmiak>
+References: <20180529133615.26889-1-nixiaoming@huawei.com>
+ <20180529154523.GK17159@arm.com>
+ <E490CD805F7529488761C40FD9D26EF12A672E03@dggemm507-mbx.china.huawei.com>
+ <20180530080816.f74elebj4demiohl@salmiak>
+Message-ID: <E490CD805F7529488761C40FD9D26EF12A6741BA@dggemm507-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rohit,
+Because CONFIG_STRICT_KERNEL_RWX=n cannot be set by make menuconfig on arm64/x86/s390 architecture 
+So, these three patches should not be necessary
+Sorry to disturb everyone
+Thank you for your guidance
 
-Please keep me on cc for future versions of this patch. Comments inline.
+Thanks
 
-On Tue, May 29, 2018 at 11:11:28AM -0700, Rohit Khanna wrote:
-> In the current implementation,  __apply_alternatives patches
-> flush_icache_range and then executes it without invalidating the icache.
-> Thus, icache can contain some of the old instructions for
-> flush_icache_range. This can cause unpredictable behavior as during
-> execution we can get a mix of old and new instructions for
-> flush_icache_range.
+-----Original Message-----
+From: Mark Rutland [mailto:mark.rutland at arm.com] 
+Sent: Wednesday, May 30, 2018 4:08 PM
+To: Nixiaoming <nixiaoming@huawei.com>
+Cc: Will Deacon <will.deacon@arm.com>; catalin.marinas at arm.com; ard.biesheuvel at linaro.org; marc.zyngier at arm.com; james.morse at arm.com; kristina.martsenko at arm.com; steve.capper at arm.com; tglx at linutronix.de; mingo at redhat.com; hpa at zytor.com; akpm at linux-foundation.org; vbabka at suse.cz; mhocko at suse.com; dave.hansen at linux.intel.com; dan.j.williams at intel.com; kirill.shutemov at linux.intel.com; zhang.jia at linux.alibaba.com; schwidefsky at de.ibm.com; heiko.carstens at de.ibm.com; gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; x86 at kernel.org; linux-s390 at vger.kernel.org
+Subject: Re: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for mark_rodata_ro
+
+On Wed, May 30, 2018 at 03:31:38AM +0000, Nixiaoming wrote:
+> Unable to set CONFIG_STRICT_KERNEL_RWX=n by make menuconfig ARCH=arm64
+
+Indeed. Making this mandatory was a deliberate decision, in part because this
+allows simplification of code (e.g. removal of #ifdef guards).
+
+> When reading the code, I feel it is more appropriate to add macro control
+> here.
+
+I must disagree. I do not think it makes sense to add an #ifdef for a
+configuration option that is mandatory.
+
+There are other places in the kernel that should behave differently if
+CONFIG_STRICT_KERNEL_RWX were disabled, so this wouldn't be sufficient even if
+we were to make CONFIG_STRICT_KERNEL_RWX optional. i.e. the #ifdef would give
+the misleading impression that STRICT_KERNEL_RWX *could* be made optional, even
+though this might not function correctly.
+
+Having an #ifdef here makes the code more complicated and confusing, for the
+benefit of a case which cannot occur.
+
+Thanks,
+Mark.
+
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com] 
+> Sent: Tuesday, May 29, 2018 11:45 PM
+> To: Nixiaoming <nixiaoming@huawei.com>
+> Cc: catalin.marinas at arm.com; ard.biesheuvel at linaro.org; marc.zyngier at arm.com; james.morse at arm.com; kristina.martsenko at arm.com; steve.capper at arm.com; tglx at linutronix.de; mingo at redhat.com; hpa at zytor.com; akpm at linux-foundation.org; vbabka at suse.cz; mhocko at suse.com; dave.hansen at linux.intel.com; dan.j.williams at intel.com; kirill.shutemov at linux.intel.com; zhang.jia at linux.alibaba.com; schwidefsky at de.ibm.com; heiko.carstens at de.ibm.com; gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; x86 at kernel.org; linux-s390 at vger.kernel.org
+> Subject: Re: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for mark_rodata_ro
 > 
-> This patch :
-> 1. Adds a new function flush_cache_kernel_range for flushing kernel
-> memory range. This function uses non hot-patched code and can be
-> safely used to flush cache during code patching.
+> On Tue, May 29, 2018 at 09:36:15PM +0800, nixiaoming wrote:
+> > mark_rodata_ro is only called by the function mark_readonly when
+> > CONFIG_STRICT_KERNEL_RWX=y,
+> > if CONFIG_STRICT_KERNEL_RWX is not set
+> > a compile warning may be triggered: unused function
 > 
-> 2. Modifies __apply_alternatives so that it uses
-> flush_cache_kernel_range to flush the cache range after patching code.
+> How are you achieving this configuration? In our Kconfig we select this
+> unconditionally.
 > 
-> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
-> ---
->  arch/arm64/kernel/alternative.c | 31 +++++++++++++++++++++++++++++--
->  1 file changed, 29 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index 5c4bce4ac381..e93cfd26a314 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -122,6 +122,33 @@ static void patch_alternative(struct alt_instr *alt,
->  	}
->  }
->  
-> +/* This is used for flushing kernel memory range after
-> + * __apply_alternatives has patched kernel code
-> + */
-> +static void flush_cache_kernel_range(void *start, void *end)
-> +{
-
-How about something like clean_dcache_range_nopatch instead?
-
-> +	u64 d_start, i_start, d_size, i_size;
-> +
-> +	/* use sanitized value of ctr_el0 rather than raw value from CPU */
-> +	d_size = 4 << ((arm64_ftr_reg_ctrel0.sys_val >> 0x10) & 0xF); /* bytes */
-> +	i_size = 4 << (arm64_ftr_reg_ctrel0.sys_val & 0xF); /* bytes */
-
-You should be able to use read_sanitised_ftr_reg() and
-cpuid_feature_extract_unsigned_field() here.
-
-> +	d_start = (u64)start & ~(d_size - 1);
-> +	while (d_start <= (u64)end) {
-
-Please add a comment about the A53 erratum this is handling by using
-clean+inv.
-
-> +		asm volatile("dc civac, %0" : : "r" (d_start));
-> +		d_start += d_size;
-> +	}
-> +	dsb(ish);
-> +
-> +	i_start = (u64)start & ~(i_size - 1);
-> +	while (i_start <= (u64)end) {
-> +		asm volatile("ic ivau, %0" : : "r" (i_start));
-> +		i_start += i_size;
-> +	}
-> +	dsb(ish);
-> +	isb();
-
-As I mentioned before, I think it would be simpler just to avoid doing the
-I-cache invalidation by range and instead call __flush_icache_all once we've
-exiting the loop in __apply_alternatives.
-
-Will
+> Will
