@@ -1,69 +1,115 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 30 May 2018 17:42:41 +0800
-Subject: [PATCH v4 9/9] drm/mediatek: Add support for mediatek SOC MT2712
-In-Reply-To: <1527489507-24453-10-git-send-email-stu.hsieh@mediatek.com>
-References: <1527489507-24453-10-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <201805301749.tsuCf08k%fengguang.wu@intel.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 30 May 2018 11:43:58 +0200
+Subject: [PATCH] drm/bridge/synopsys: dw-hdmi: fix dw_hdmi_setup_rx_sense
+Message-ID: <1527673438-20643-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stu,
+The dw_hdmi_setup_rx_sense exported function should not use struct device
+to recover the dw-hdmi context using drvdata, but take struct dw_hdmi
+directly like other exported functions.
 
-Thank you for the patch! Yet something to improve:
+This caused a regression using Meson DRM on S905X since v4.17-rc1 :
 
-[auto build test ERROR on drm/drm-next]
-[also build test ERROR on v4.17-rc7 next-20180529]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Internal error: Oops: 96000007 [#1] PREEMPT SMP
+[...]
+CPU: 0 PID: 124 Comm: irq/32-dw_hdmi_ Not tainted 4.17.0-rc7 #2
+Hardware name: Libre Technology CC (DT)
+[...]
+pc : osq_lock+0x54/0x188
+lr : __mutex_lock.isra.0+0x74/0x530
+[...]
+Process irq/32-dw_hdmi_ (pid: 124, stack limit = 0x00000000adf418cb)
+Call trace:
+  osq_lock+0x54/0x188
+  __mutex_lock_slowpath+0x10/0x18
+  mutex_lock+0x30/0x38
+  __dw_hdmi_setup_rx_sense+0x28/0x98
+  dw_hdmi_setup_rx_sense+0x10/0x18
+  dw_hdmi_top_thread_irq+0x2c/0x50
+  irq_thread_fn+0x28/0x68
+  irq_thread+0x10c/0x1a0
+  kthread+0x128/0x130
+  ret_from_fork+0x10/0x18
+ Code: 34000964 d00050a2 51000484 9135c042 (f864d844)
+ ---[ end trace 945641e1fbbc07da ]---
+ note: irq/32-dw_hdmi_[124] exited with preempt_count 1
+ genirq: exiting task "irq/32-dw_hdmi_" (124) is an active IRQ thread (irq 32)
 
-url:    https://github.com/0day-ci/linux/commits/Stu-Hsieh/Add-support-for-mediatek-SOC-MT2712/20180530-032344
-base:   git://people.freedesktop.org/~airlied/linux.git drm-next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> drivers/gpu//drm/mediatek/mtk_drm_drv.c:165:2: error: 'DDP_COMPONENT_DPI1' undeclared here (not in a function); did you mean 'DDP_COMPONENT_DSI1'?
-     DDP_COMPONENT_DPI1,
-     ^~~~~~~~~~~~~~~~~~
-     DDP_COMPONENT_DSI1
->> drivers/gpu//drm/mediatek/mtk_drm_drv.c:171:2: error: 'DDP_COMPONENT_DSI2' undeclared here (not in a function); did you mean 'DDP_COMPONENT_DSI1'?
-     DDP_COMPONENT_DSI2,
-     ^~~~~~~~~~~~~~~~~~
-     DDP_COMPONENT_DSI1
->> drivers/gpu//drm/mediatek/mtk_drm_drv.c:171:2: error: incompatible types when initializing type 'enum mtk_ddp_comp_id' using type 'const enum mtk_ddp_comp_id *'
-
-vim +165 drivers/gpu//drm/mediatek/mtk_drm_drv.c
-
-   158	
-   159	static const enum mtk_ddp_comp_id mt2712_mtk_ddp_ext[] = {
-   160		DDP_COMPONENT_OVL1,
-   161		DDP_COMPONENT_COLOR1,
-   162		DDP_COMPONENT_AAL1,
-   163		DDP_COMPONENT_OD1,
-   164		DDP_COMPONENT_RDMA1,
- > 165		DDP_COMPONENT_DPI1,
-   166		DDP_COMPONENT_PWM1,
-   167	};
-   168	
-   169	static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
-   170		DDP_COMPONENT_RDMA2,
- > 171		DDP_COMPONENT_DSI2,
-   172		DDP_COMPONENT_PWM2,
-   173	};
-   174	
-
+Fixes: eea034af90c6 ("drm/bridge/synopsys: dw-hdmi: don't clobber drvdata")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Tested-by: Koen Kooi <koen@dominion.thruhere.net>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 65217 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/15cd8e25/attachment-0001.gz>
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 15 ++++-----------
+ drivers/gpu/drm/meson/meson_dw_hdmi.c     |  2 +-
+ include/drm/bridge/dw_hdmi.h              |  2 +-
+ 3 files changed, 6 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index ec8d000..3c136f2b 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -2077,7 +2077,7 @@ static irqreturn_t dw_hdmi_hardirq(int irq, void *dev_id)
+ 	return ret;
+ }
+ 
+-void __dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
++void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
+ {
+ 	mutex_lock(&hdmi->mutex);
+ 
+@@ -2103,13 +2103,6 @@ void __dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
+ 	}
+ 	mutex_unlock(&hdmi->mutex);
+ }
+-
+-void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense)
+-{
+-	struct dw_hdmi *hdmi = dev_get_drvdata(dev);
+-
+-	__dw_hdmi_setup_rx_sense(hdmi, hpd, rx_sense);
+-}
+ EXPORT_SYMBOL_GPL(dw_hdmi_setup_rx_sense);
+ 
+ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+@@ -2145,9 +2138,9 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+ 	 */
+ 	if (intr_stat &
+ 	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+-		__dw_hdmi_setup_rx_sense(hdmi,
+-					 phy_stat & HDMI_PHY_HPD,
+-					 phy_stat & HDMI_PHY_RX_SENSE);
++		dw_hdmi_setup_rx_sense(hdmi,
++				       phy_stat & HDMI_PHY_HPD,
++				       phy_stat & HDMI_PHY_RX_SENSE);
+ 
+ 		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
+ 			cec_notifier_set_phys_addr(hdmi->cec_notifier,
+diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+index a393095..c9ad456 100644
+--- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
++++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+@@ -529,7 +529,7 @@ static irqreturn_t dw_hdmi_top_thread_irq(int irq, void *dev_id)
+ 		if (stat & HDMITX_TOP_INTR_HPD_RISE)
+ 			hpd_connected = true;
+ 
+-		dw_hdmi_setup_rx_sense(dw_hdmi->dev, hpd_connected,
++		dw_hdmi_setup_rx_sense(dw_hdmi->hdmi, hpd_connected,
+ 				       hpd_connected);
+ 
+ 		drm_helper_hpd_irq_event(dw_hdmi->encoder.dev);
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index dd2a8cf..ccb5aa8 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -151,7 +151,7 @@ struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
+ 			     struct drm_encoder *encoder,
+ 			     const struct dw_hdmi_plat_data *plat_data);
+ 
+-void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
++void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense);
+ 
+ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
+ void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
+-- 
+2.7.4
