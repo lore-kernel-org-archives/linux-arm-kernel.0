@@ -1,105 +1,83 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 30 May 2018 17:48:30 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 471/940] drivers/usb/dwc3/core.h:1242:
- multiple definition of `dwc3_set_usb_core_power'
-Message-ID: <201805301728.X3GflHJz%fengguang.wu@intel.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 30 May 2018 11:30:33 +0200
+Subject: [PATCH v2 0/9] PM / Domains: Add support for multi PM domains per
+ device
+In-Reply-To: <20180529100421.31022-1-ulf.hansson@linaro.org>
+References: <20180529100421.31022-1-ulf.hansson@linaro.org>
+Message-ID: <CAJZ5v0iOP-gcdXcaOjuWy6p+k+hSkHuapDuYYFeS+6gDrxev3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   7a6053b3d256fa5bc23f28a9d9a23d7a2004c5b7
-commit: b5ef7eccd876aba79c9f4eca712f0d4a89c50363 [471/940] dwc3: Add code for supporting entering into D3 state during suspend
-config: i386-randconfig-s0-201821 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        git checkout b5ef7eccd876aba79c9f4eca712f0d4a89c50363
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Tue, May 29, 2018 at 12:04 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Changes in v2:
+>         - Addressed comments from Geert around DT doc.
+>         - Addressed comments from Jon around clarification of how to use this
+>         and changes to returned error codes.
+>         - Fixed build error in case CONFIG_PM was unset.
+>
+> There are devices that are partitioned across multiple PM domains. Currently
+> these can't be supported well by the available PM infrastructures we have in
+> the kernel. This series is an attempt to address this.
+>
+> The interesting parts happens from patch 5 an onwards, including a minor DT
+> update to the existing power-domain bindings, the 4 earlier are just trivial
+> clean-ups of some related code in genpd, which I happened to stumble over.
+>
+> Some additional background:
+>
+> One existing case where devices are partitioned across multiple PM domains, is
+> the Nvida Tegra 124/210 X-USB subsystem. A while ago Jon Hunter (Nvidia) sent a
+> series, trying to address these issues, however this is a new approach, while
+> it re-uses the same concepts from DT point of view.
+>
+> The Tegra 124/210 X-USB subsystem contains of a host controller and a device
+> controller. Each controller have its own independent PM domain, but are being
+> partitioned across another shared PM domain for the USB super-speed logic.
+>
+> Currently to make the drivers work, either the related PM domains needs to stay
+> powered on always or the PM domain topology needs to be in-correctly modelled
+> through sub-domains. In both cases PM domains may be powered on while they
+> don't need to be, so in the end this means - wasting power -.
+>
+> As stated above, this series intends to address these problem from a PM
+> infrastructure point of view. More details are available in each changelog.
+>
+> It should be noted that this series has been tested on HW, however only by using
+> a home-cooked test PM domain driver for genpd and together with a test driver.
+> This allowed me to play with PM domain (genpd), runtime PM and device links.
+>
+> Any further deployment for real use cases are greatly appreciated. I am happy to
+> to help, if needed!
+>
+> Kind regards
+> Ulf Hansson
+>
+>
+> Ulf Hansson (9):
+>   PM / Domains: Drop extern declarations of functions in pm_domain.h
+>   PM / Domains: Drop __pm_genpd_add_device()
+>   PM / Domains: Drop genpd as in-param for pm_genpd_remove_device()
+>   PM / Domains: Drop unused parameter in genpd_allocate_dev_data()
+>   PM / Domains: dt: Allow power-domain property to be a list of
+>     specifiers
+>   PM / Domains: Don't attach devices in genpd with multi PM domains
+>   PM / Domains: Split genpd_dev_pm_attach()
+>   PM / Domains: Add support for multi PM domains per device to genpd
+>   PM / Domains: Add dev_pm_domain_attach_by_id() to manage multi PM
+>     domains
+>
+>  .../bindings/power/power_domain.txt           |  19 ++-
+>  drivers/base/power/common.c                   |  39 ++++-
+>  drivers/base/power/domain.c                   | 155 ++++++++++++++----
+>  drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c       |   2 +-
+>  include/linux/pm_domain.h                     |  79 ++++-----
+>  5 files changed, 216 insertions(+), 78 deletions(-)
 
-All errors (new ones prefixed by >>):
+I can take patches [1-4/9] from this series for 4.18.
 
-   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
-   drivers/usb/dwc3/core.h:1236: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/trace.o: In function `dwc3_set_simple_data':
-   drivers/usb/dwc3/core.h:1236: multiple definition of `dwc3_set_simple_data'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/trace.o: In function `dwc3_simple_check_quirks':
-   drivers/usb/dwc3/core.h:1240: multiple definition of `dwc3_simple_check_quirks'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1240: first defined here
-   drivers/usb/dwc3/trace.o: In function `dwc3_set_usb_core_power':
->> drivers/usb/dwc3/core.h:1242: multiple definition of `dwc3_set_usb_core_power'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1242: first defined here
-   drivers/usb/dwc3/host.o: In function `dwc3_simple_wakeup_capable':
-   include/linux/device.h:984: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/host.o: In function `dwc3_set_simple_data':
-   include/linux/device.h:984: multiple definition of `dwc3_set_simple_data'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/host.o: In function `dwc3_simple_check_quirks':
-   drivers/usb/dwc3/core.h:1240: multiple definition of `dwc3_simple_check_quirks'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1240: first defined here
-   drivers/usb/dwc3/host.o: In function `dwc3_set_usb_core_power':
->> drivers/usb/dwc3/core.h:1242: multiple definition of `dwc3_set_usb_core_power'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1242: first defined here
-   drivers/usb/dwc3/ulpi.o: In function `dwc3_simple_wakeup_capable':
-   drivers/usb/dwc3/core.h:1236: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/ulpi.o: In function `dwc3_set_simple_data':
-   drivers/usb/dwc3/core.h:1236: multiple definition of `dwc3_set_simple_data'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/ulpi.o: In function `dwc3_simple_check_quirks':
-   drivers/usb/dwc3/core.h:1240: multiple definition of `dwc3_simple_check_quirks'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1240: first defined here
-   drivers/usb/dwc3/ulpi.o: In function `dwc3_set_usb_core_power':
->> drivers/usb/dwc3/core.h:1242: multiple definition of `dwc3_set_usb_core_power'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1242: first defined here
-   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
-   drivers/usb/dwc3/core.h:1236: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/debugfs.o: In function `dwc3_set_simple_data':
-   drivers/usb/dwc3/core.h:1236: multiple definition of `dwc3_set_simple_data'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1236: first defined here
-   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_check_quirks':
-   drivers/usb/dwc3/core.h:1240: multiple definition of `dwc3_simple_check_quirks'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1240: first defined here
-   drivers/usb/dwc3/debugfs.o: In function `dwc3_set_usb_core_power':
->> drivers/usb/dwc3/core.h:1242: multiple definition of `dwc3_set_usb_core_power'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1242: first defined here
+I need an ACK from Rob on the bindings change.
 
-vim +1242 drivers/usb/dwc3/core.h
+The rest of the series doesn't seem to be ready yet.
 
-  1222	
-  1223	#if IS_ENABLED(CONFIG_USB_DWC3_OF_SIMPLE)
-  1224	int dwc3_enable_hw_coherency(struct device *dev);
-  1225	void dwc3_set_phydata(struct device *dev, struct phy *phy);
-  1226	void dwc3_simple_wakeup_capable(struct device *dev, bool wakeup);
-  1227	void dwc3_set_simple_data(struct dwc3 *dwc);
-  1228	void dwc3_simple_check_quirks(struct dwc3 *dwc);
-  1229	int dwc3_set_usb_core_power(struct dwc3 *dwc, bool on);
-  1230	#else
-  1231	static inline int dwc3_enable_hw_coherency(struct device *dev)
-  1232	{ return 1; }
-  1233	static inline void dwc3_set_phydata(struct device *dev, struct phy *phy)
-  1234	{ ; }
-  1235	void dwc3_simple_wakeup_capable(struct device *dev, bool wakeup)
-> 1236	{ ; }
-  1237	void dwc3_set_simple_data(struct dwc3 *dwc)
-  1238	{ ; }
-  1239	void dwc3_simple_check_quirks(struct dwc3 *dwc)
-  1240	{ ; }
-  1241	int dwc3_set_usb_core_power(struct dwc3 *dwc, bool on)
-> 1242	{ ; }
-  1243	#endif
-  1244	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 29097 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/3c0fdf9e/attachment-0001.gz>
+Thanks,
+Rafael
