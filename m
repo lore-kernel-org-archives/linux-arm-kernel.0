@@ -1,68 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 May 2018 00:00:35 +0200
-Subject: [PATCH] ASoC: mediatek: export mtk-afe symbols as needed
-Message-ID: <20180530220057.1419933-1-arnd@arndb.de>
+From: rob@landley.net (Rob Landley)
+Date: Wed, 30 May 2018 17:36:45 -0500
+Subject: [PATCH] kbuild: add machine size to CHEKCFLAGS
+In-Reply-To: <d47b72cc-9209-a190-38b3-969870e1bf26@suse.de>
+References: <20180530204838.22079-1-luc.vanoostenryck@gmail.com>
+ <d47b72cc-9209-a190-38b3-969870e1bf26@suse.de>
+Message-ID: <0dd9d6dc-6cb3-157c-33ac-8c3e449a3859@landley.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new mt6797-afe driver uses some functions in a common file, which
-works for a built-in driver but fails for a loadable module:
+On 05/30/2018 05:00 PM, Andreas F?rber wrote:
+> What about the architectures not touched by your patch that previously
+> had no -m32/-m64? (arc, c6x, h8300, hexagon, m68k, microblaze, nds32,
+> nios2, openrisc, powerpc, riscv, s390, sh, unicore32, xtensa)
+> 
+> You forgot to CC them on this patch.
 
-ERROR: "mtk_afe_pcm_free" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
-ERROR: "mtk_afe_add_sub_dai_control" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
-ERROR: "mtk_afe_pcm_new" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
-ERROR: "mtk_afe_combine_sub_dai" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
-ERROR: "mtk_afe_pcm_ops" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
+A) He cc'd arch/sh on the previous patch earlier today, to which I replied:
 
-This exports the five symbols above for modules.
+https://marc.info/?l=linux-sh&m=152769132515226&w=2
 
-Fixes: b3c702f56bf5 ("ASoC: mt6797: combine DAI to register component")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/mediatek/common/mtk-afe-platform-driver.c | 5 +++++
- 1 file changed, 5 insertions(+)
+B) Every change to common infrastructure should cc: every arch? Really? So like
+filesystem changes and stuff to?
 
-diff --git a/sound/soc/mediatek/common/mtk-afe-platform-driver.c b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
-index 00618587ef1e..51ec4ff6ed95 100644
---- a/sound/soc/mediatek/common/mtk-afe-platform-driver.c
-+++ b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
-@@ -57,6 +57,7 @@ int mtk_afe_combine_sub_dai(struct mtk_base_afe *afe)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(mtk_afe_combine_sub_dai);
- 
- int mtk_afe_add_sub_dai_control(struct snd_soc_component *component)
- {
-@@ -90,6 +91,7 @@ int mtk_afe_add_sub_dai_control(struct snd_soc_component *component)
- 	return 0;
- 
- }
-+EXPORT_SYMBOL_GPL(mtk_afe_add_sub_dai_control);
- 
- static snd_pcm_uframes_t mtk_afe_pcm_pointer
- 			 (struct snd_pcm_substream *substream)
-@@ -130,6 +132,7 @@ const struct snd_pcm_ops mtk_afe_pcm_ops = {
- 	.ioctl = snd_pcm_lib_ioctl,
- 	.pointer = mtk_afe_pcm_pointer,
- };
-+EXPORT_SYMBOL_GPL(mtk_afe_pcm_ops);
- 
- int mtk_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
- {
-@@ -143,11 +146,13 @@ int mtk_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
- 						     afe->dev,
- 						     size, size);
- }
-+EXPORT_SYMBOL_GPL(mtk_afe_pcm_new);
- 
- void mtk_afe_pcm_free(struct snd_pcm *pcm)
- {
- 	snd_pcm_lib_preallocate_free_for_all(pcm);
- }
-+EXPORT_SYMBOL_GPL(mtk_afe_pcm_free);
- 
- const struct snd_soc_component_driver mtk_afe_pcm_platform = {
- 	.name = AFE_PCM_NAME,
--- 
-2.9.0
+> Have you really checked that all their toolchains support the -m32/-m64
+> flags you newly introduce for them? Apart from non-biarch architectures,
+> I'm thinking of 31-bit s390 as a corner case where !64 != 32.
+
+1) Last I heard Linux implements lp64:
+   http://www.unix.org/whitepapers/64bit.html
+
+2) it's unlikely to be worse than it was before the patch,
+
+3) last I checked https://github.com/landley/mkroot boots to an s390 shell
+prompt under qemu, although I haven't tried building with this patch. (And you
+may still need to add HOST_EXTRA='lex yacc bison flex' to the command line
+unless they've re-added the _shipped versions like the old kconfig had...) Point
+is, shouldn't be too hard to test it. Presumably that's why we have an -rc1 and
+then 6 more -rc versions each release...
+
+Rob
