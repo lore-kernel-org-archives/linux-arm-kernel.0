@@ -1,83 +1,58 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 30 May 2018 01:00:29 +0000
-Subject: [PATCH] soc: imx: gpcv2: correct PGC offset
-In-Reply-To: <CAHQ1cqF1-zkR_wQgRK1M3Wd+Hvha+St3jT=-Qvn1RM8N88qW8Q@mail.gmail.com>
-References: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
- <CAHQ1cqF1-zkR_wQgRK1M3Wd+Hvha+St3jT=-Qvn1RM8N88qW8Q@mail.gmail.com>
-Message-ID: <AM3PR04MB131532FD87FEDB5D85E43B9DF56C0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 30 May 2018 09:30:42 +0800
+Subject: [PATCH V2] soc: imx: gpcv2: correct PGC offset
+Message-ID: <1527643842-17643-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Andrey
+Correct MIPI/PCIe/USB_HSIC's PGC offset based on
+design RTL, the values in the Reference Manual
+(Rev. 1, 01/2018 and the older ones) are incorrect.
 
-Anson Huang
-Best Regards!
+The correct offset values should be as below:
 
+0x800 ~ 0x83F: PGC for core0 of A7 platform;
+0x840 ~ 0x87F: PGC for core1 of A7 platform;
+0x880 ~ 0x8BF: PGC for SCU of A7 platform;
+0xA00 ~ 0xA3F: PGC for fastmix/megamix;
+0xC00 ~ 0xC3F: PGC for MIPI PHY;
+0xC40 ~ 0xC7F: PGC for PCIe_PHY;
+0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
+0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
+0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
 
-> -----Original Message-----
-> From: Andrey Smirnov [mailto:andrew.smirnov at gmail.com]
-> Sent: Wednesday, May 30, 2018 7:11 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
-> Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
-> linux-arm-kernel <linux-arm-kernel@lists.infradead.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH] soc: imx: gpcv2: correct PGC offset
-> 
-> On Tue, May 29, 2018 at 1:02 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> > Correct MIPI/PCIe/USB_HSIC's PGC offset based on design RTL, the value
-> > on Reference Manual are incorrect.
-> >
-> 
-> Nit: I'd s/the value on/the values in the/ here.
-> 
-> > The correct offset should be as below:
-> >
-> > 0x800 ~ 0x83F: PGC for core0 of A7 platform;
-> > 0x840 ~ 0x87F: PGC for core1 of A7 platform;
-> > 0x880 ~ 0x8BF: PGC for SCU of A7 platform;
-> > 0xA00 ~ 0xA3F: PGC for fastmix/megamix;
-> > 0xC00 ~ 0xC3F: PGC for MIPI PHY;
-> > 0xC40 ~ 0xC7F: PGC for PCIe_PHY;
-> > 0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
-> > 0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
-> > 0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  drivers/soc/imx/gpcv2.c | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c index
-> > afc7ecc..132c946 100644
-> > --- a/drivers/soc/imx/gpcv2.c
-> > +++ b/drivers/soc/imx/gpcv2.c
-> > @@ -40,9 +40,9 @@
-> >  #define GPC_M4_PU_PDN_FLG              0x1bc
-> >
-> >
-> > -#define PGC_MIPI                       4
-> > -#define PGC_PCIE                       5
-> > -#define PGC_USB_HSIC                   8
-> > +#define PGC_MIPI                       16
-> > +#define PGC_PCIE                       17
-> > +#define PGC_USB_HSIC                   20
-> 
-> As a suggestion, please add a comment explicitly saying that those values
-> might differ from what some version of the RM might specify.
-> Explanation in commit message is great, but seeing a note in the code might
-> save quite a bit of digging for someone who is reading the code, double
-> checking those values and thinking that they might be wrong.
-> 
-> Other than that:
-> 
-> Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> 
-> Thanks,
-> Andrey Smirnov
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+changes since V1:
+	add comment in code to make it more readable;
+	improve the commit message.
+ drivers/soc/imx/gpcv2.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
+index f4e3bd4..6ef18cf 100644
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -39,10 +39,15 @@
  
-Thanks, I will improve them in V2 patch.
-
-Anson.
+ #define GPC_M4_PU_PDN_FLG		0x1bc
+ 
+-
+-#define PGC_MIPI			4
+-#define PGC_PCIE			5
+-#define PGC_USB_HSIC			8
++/*
++ * The PGC offset values in Reference Manual
++ * (Rev. 1, 01/2018 and the older ones) GPC chapter's
++ * GPC_PGC memory map are incorrect, below offset
++ * values are from design RTL.
++ */
++#define PGC_MIPI			16
++#define PGC_PCIE			17
++#define PGC_USB_HSIC			20
+ #define GPC_PGC_CTRL(n)			(0x800 + (n) * 0x40)
+ #define GPC_PGC_SR(n)			(GPC_PGC_CTRL(n) + 0xc)
+ 
+-- 
+2.7.4
