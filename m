@@ -1,50 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 May 2018 08:54:48 -0700
-Subject: [PATCH v2 1/6] ARM: dra762: hwmod: Add MCAN support
-In-Reply-To: <b0476932-a6e9-6ef1-69ad-c9a8c55d9739@ti.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-2-faiz_abbas@ti.com>
- <20180530145047.GC5705@atomide.com>
- <cfa9c9df-57a2-69f6-9509-440dc18292e7@ti.com>
- <20180530152825.GG5705@atomide.com>
- <b0476932-a6e9-6ef1-69ad-c9a8c55d9739@ti.com>
-Message-ID: <20180530155448.GH5705@atomide.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 30 May 2018 08:55:10 -0700
+Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+ <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
+ <20180524173926.GC14924@minitux>
+ <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
+Message-ID: <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [180530 15:44]:
-> On 30/05/18 18:28, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [180530 15:18]:
-> > > For the OCP if part, I think that is still needed until we switch over to
-> > > full sysc driver. clkctrl_offs you probably also need because that is used
-> > > for mapping the omap_hwmod against a specific clkctrl clock. Those can be
-> > > only removed once we are done with hwmod (or figure out some other way to
-> > > assign the clkctrl clock to a hwmod.)
+Quoting Sricharan R (2018-05-24 22:40:11)
+> Hi Bjorn,
+> 
+> On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
+> > On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
 > > 
-> > Hmm might be worth testing. I thought your commit 70f05be32133
-> > ("ARM: OMAP2+: hwmod: populate clkctrl clocks for hwmods if available")
-> > already parses the clkctrl from dts?
+> >> From: Stephen Boyd <sboyd@codeaurora.org>
+> >>
+> >> Krait CPUs have a handful of L2 cache controller registers that
+> >> live behind a cp15 based indirection register. First you program
+> >> the indirection register (l2cpselr) to point the L2 'window'
+> >> register (l2cpdr) at what you want to read/write.  Then you
+> >> read/write the 'window' register to do what you want. The
+> >> l2cpselr register is not banked per-cpu so we must lock around
+> >> accesses to it to prevent other CPUs from re-pointing l2cpdr
+> >> underneath us.
+> >>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > This should have your signed-off-by here as well.
+> > 
 > 
-> It maps the clkctrl clock to be used by hwmod, if those are available. We
-> didn't add any specific clock entries to DT for mapping the actual clkctrl
-> clock without the hwmod_data hints yet though, as that was deemed temporary
-> solution only due to transition to interconnect driver. I.e., you would need
-> something like this in DT for every device node:
+>  ok.
 > 
-> &uart3 {
->   clocks = <l4per_clkctrl UART3_CLK 0>;
->   clock-names = "clkctrl";
-> };
+> > Apart from that:
+> > 
+> > Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > 
 > 
-> ... which is currently not present.
 
-Hmm is that not the "fck" clkctrl clock we have already in
-the dts files for the interconnect target modules?
-
-We can also use pdata callbacks to pass the clock node if
-needed. But I guess I don't quite still understand what we
-are missing :)
-
-Regards,
-
-Tony
+Will these patches come around again? I'll do a quick sweep on them
+today but I expect them to be resent.
