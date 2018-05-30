@@ -1,7 +1,7 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 30 May 2018 12:11:30 +0200
-Subject: [PATCH] ARM: dts: rmobile: Drop MTD partitioning from DT
-Message-ID: <20180530101130.3566-1-marek.vasut+renesas@gmail.com>
+Date: Wed, 30 May 2018 12:12:11 +0200
+Subject: [PATCH V4] ARM: dts: rmobile: Drop MTD partitioning from DT
+Message-ID: <20180530101211.3625-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,6 +34,7 @@ Cc: linux-renesas-soc at vger.kernel.org
 ---
 V2: Drop the @0 anchor from the commit message, use 4m
 V3: Squash the patches into one as requested by the higher ups
+V4: Add this missing Vx to PATCH Vx in subject
 ---
  arch/arm/boot/dts/r8a7790-lager.dts   | 21 ---------------------
  arch/arm/boot/dts/r8a7790-stout.dts   | 26 --------------------------
