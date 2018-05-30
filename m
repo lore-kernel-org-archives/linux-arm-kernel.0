@@ -1,64 +1,127 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Wed, 30 May 2018 15:19:55 +0200
-Subject: [PATCH v2 1/2] ARM: debug: Add Iproc UART3 debug addresses
-Message-ID: <20180530131956.13972-1-peron.clem@gmail.com>
+From: frieder.schrempf@exceet.de (Frieder Schrempf)
+Date: Wed, 30 May 2018 15:14:35 +0200
+Subject: [PATCH 06/11] arm64: dts: Reflect change of FSL QSPI driver and
+ remove unused properties
+In-Reply-To: <1527686082-15142-1-git-send-email-frieder.schrempf@exceet.de>
+References: <1527686082-15142-1-git-send-email-frieder.schrempf@exceet.de>
+Message-ID: <1527686082-15142-7-git-send-email-frieder.schrempf@exceet.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cl?ment Peron <clement.peron@devialet.com>
+The FSL QSPI driver was moved to the SPI framework and it now
+acts as a SPI controller. Therefore the subnodes need to set
+spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
 
-Broadcom Iproc SoCs typically use the UART3 for
-debug/console, provide a known good location for that.
+Also the properties 'num-cs' and 'bus-num' were never read by the
+driver and can be removed.
 
-Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+The property 'fsl,qspi-has-second-chip' is not needed anymore
+and will be removed after the old driver was disabled to avoid
+breaking fsl-ls1046a-rdb.dts.
+
+Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
 ---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 6 ++++--
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 4 ++++
+ 4 files changed, 12 insertions(+), 5 deletions(-)
 
- arch/arm/Kconfig.debug | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 199ebc1c4538..4ea9d5793b91 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -207,6 +207,14 @@ choice
- 		depends on ARCH_BCM_HR2
- 		select DEBUG_UART_8250
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+index 6341281..31e7b31 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+@@ -170,7 +170,6 @@
+ };
  
-+	config DEBUG_BCM_IPROC_UART3
-+		bool "Kernel low-level debugging on BCM IPROC UART3"
-+		depends on ARCH_BCM_CYGNUS
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the third serial port on these devices.
-+
- 	config DEBUG_BCM_KONA_UART
- 		bool "Kernel low-level debugging messages via BCM KONA UART"
- 		depends on ARCH_BCM_MOBILE
-@@ -1557,6 +1565,7 @@ config DEBUG_UART_PHYS
- 	default 0x18000400 if DEBUG_BCM_HR2
- 	default 0x18010000 if DEBUG_SIRFATLAS7_UART0
- 	default 0x18020000 if DEBUG_SIRFATLAS7_UART1
-+	default 0x18023000 if DEBUG_BCM_IPROC_UART3
- 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0x20001000 if DEBUG_HIP01_UART
- 	default 0x20060000 if DEBUG_RK29_UART0
-@@ -1676,6 +1685,7 @@ config DEBUG_UART_VIRT
- 	default 0xf1002000 if DEBUG_MT8127_UART0
- 	default 0xf1006000 if DEBUG_MT6589_UART0
- 	default 0xf1009000 if DEBUG_MT8135_UART3
-+	default 0xf1023000 if DEBUG_BCM_IPROC_UART3
- 	default 0xf11f1000 if DEBUG_VERSATILE
- 	default 0xf1600000 if DEBUG_INTEGRATOR
- 	default 0xf1c28000 if DEBUG_SUNXI_UART0
-@@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
- 		DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
- 		DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
--		DEBUG_DAVINCI_DA8XX_UART2 || \
-+		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
+ &qspi {
+-	bus-num = <0>;
+ 	status = "okay";
  
- config DEBUG_UART_8250_PALMCHIP
+ 	qflash0: s25fl128s at 0 {
+@@ -178,6 +177,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+index 434383b..dc10105 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+@@ -198,8 +198,6 @@
+ };
+ 
+ &qspi {
+-	num-cs = <2>;
+-	bus-num = <0>;
+ 	status = "okay";
+ 
+ 	qflash0: s25fl128s at 0 {
+@@ -207,6 +205,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+index 5dc2782..1848c33 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+@@ -136,8 +136,6 @@
+ };
+ 
+ &qspi {
+-	num-cs = <2>;
+-	bus-num = <0>;
+ 	status = "okay";
+ 
+ 	qflash0: s25fs512s at 0 {
+@@ -145,6 +143,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ 
+@@ -153,6 +153,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <1>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+index 1de6188..fc62ed9 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+@@ -170,6 +170,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "st,m25p80";
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ 	flash2: s25fl256s1 at 2 {
+@@ -177,6 +179,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "st,m25p80";
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <2>;
+ 	};
+ };
 -- 
-2.17.0
+2.7.4
