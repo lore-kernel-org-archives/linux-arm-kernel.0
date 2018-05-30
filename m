@@ -1,80 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 30 May 2018 06:55:57 +0200
-Subject: [PATCH] PCI: Add pci=safemode option
-In-Reply-To: <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
-References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
- <20180530043103.GA19734@kroah.com>
- <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
-Message-ID: <20180530045557.GA26682@kroah.com>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Wed, 30 May 2018 06:59:27 +0200
+Subject: [PATCH v3 3/3] x86/mm: add TLB purge to free pmd/pte page
+ interfaces
+In-Reply-To: <1527610139.14039.58.camel@hpe.com>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+ <20180516233207.1580-4-toshi.kani@hpe.com>
+ <20180529144438.GM18595@8bytes.org>
+ <1527610139.14039.58.camel@hpe.com>
+Message-ID: <20180530045927.GP18595@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 09:41:33PM -0700, Sinan Kaya wrote:
-> On 5/29/2018 9:31 PM, Greg Kroah-Hartman wrote:
-> > On Tue, May 29, 2018 at 11:19:41PM -0400, Sinan Kaya wrote:
-> >> Adding pci=safemode kernel command line parameter to turn off all PCI
-> >> Express service driver as well as all optional PCIe features such as LTR,
-> >> Extended tags, Relaxed Ordering etc.
-> >>
-> >> Also setting MPS configuration to PCIE_BUS_SAFE so that MPS and MRRS can be
-> >> reconfigured with by the kernel in case BIOS hands off a broken
-> >> configuration.
-> > 
-> > Why not fix the BIOS?  That's what sane platforms do :)
-> > 
-> >>
-> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >> ---
-> >>  Documentation/admin-guide/kernel-parameters.txt | 2 ++
-> >>  drivers/pci/pci.c                               | 7 +++++++
-> >>  drivers/pci/pci.h                               | 2 ++
-> >>  drivers/pci/pcie/portdrv_core.c                 | 2 +-
-> >>  drivers/pci/probe.c                             | 6 ++++++
-> >>  5 files changed, 18 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> >> index 641ec9c..247adbb 100644
-> >> --- a/Documentation/admin-guide/kernel-parameters.txt
-> >> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> >> @@ -3153,6 +3153,8 @@
-> >>  		noari		do not use PCIe ARI.
-> >>  		noats		[PCIE, Intel-IOMMU, AMD-IOMMU]
-> >>  				do not use PCIe ATS (and IOMMU device IOTLB).
-> >> +		safemode	turns of all optinal PCI features. Useful
-> >> +				for bringup/troubleshooting.
-> > 
-> > s/optinal/optional/ ?
-> 
-> sure.
-> 
-> > 
-> > And you should explain what exactly in PCI is "optional".  Who defines
-> > this and where is that list and what can go wrong if those options are
-> > not enabled?
-> 
-> Bjorn and I discussed the need for such a "safe" mode feature when you
-> want to bring up PCI for a platform. You want to turn off everything as
-> a starter and just stick to bare minimum.
-> 
-> I can add a few words describing them. The goal of this option is to keep
-> base PCI features with MSI only. Things like PME, AER, ASPM, Extended
-> Tags, LTR, Relaxed Ordering, SRIOV are all considered optional. safemode
-> is certainly not intended for production environments. 
+On Tue, May 29, 2018 at 04:10:24PM +0000, Kani, Toshi wrote:
+> Can you explain why you think allocating a page here is a major problem?
 
-Ok, then you should say that here, or somewhere, so that people know
-this.  Otherwise people will see that "hey this lets my hardware boot!"
-and then never change it :(
+Because a larger allocation is more likely to fail. And if you fail the
+allocation, you also fail to free more pages, which _is_ a problem. So
+better avoid any allocations in code paths that are about freeing
+memory.
 
-> I can taint the kernel as a suggestion.
+> If we just revert, please apply patch 1/3 first.  This patch address the
+> BUG_ON issue on PAE.  This is a real issue that needs a fix ASAP.
 
-I would not worry about that.
+It does not address the problem of dirty page-walk caches on x86-64.
 
-> I defined minimum as just booting a device and to be able to do DMA traffic
-> only with 0 optimization
+> The page-directory cache issue on x64, which is addressed by patch 3/3,
+> is a theoretical issue that I could not hit by putting ioremap() calls
+> into a loop for a whole day.  Nobody hit this issue, either.
 
-Ok, again, just document this really well, so that people do not have
-questions and start wondering why their devices barely seem to work.
+How do you know you didn't hit that issue? It might cause silent data
+corruption, which might not be easily detected.
 
-thanks,
+> The simple revert patch Joerg posted a while ago causes
+> pmd_free_pte_page() to fail on x64.  This causes multiple pmd mappings
+> to fall into pte mappings on my test systems.  This can be seen as a
+> degradation, and I am afraid that it is more harmful than good.
 
-greg k-h
+The plain revert just removes all the issues with the dirty TLB that the
+original patch introduced and prevents huge mappings from being
+established when there have been smaller mappings before. This is not
+ideal, but at least its is consistent and does not leak pages and leaves
+no dirty TLBs. So this is the easiest and most reliable fix for this
+stage in the release process.
+
+
+Regards,
+
+	Joerg
