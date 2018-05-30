@@ -1,52 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 May 2018 13:47:03 +0100
-Subject: [PATCH v2 3/6] arm64: KVM: Avoid marking pages as XN in Stage-2 if
- CTR_EL0.DIC is set
-In-Reply-To: <20180530124706.25284-1-marc.zyngier@arm.com>
-References: <20180530124706.25284-1-marc.zyngier@arm.com>
-Message-ID: <20180530124706.25284-4-marc.zyngier@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 30 May 2018 09:50:42 -0300
+Subject: [PATCH V2] soc: imx: gpcv2: correct PGC offset
+In-Reply-To: <1527643842-17643-1-git-send-email-Anson.Huang@nxp.com>
+References: <1527643842-17643-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5CBgrtKpGdknpwOFbdOR219JqfVJnOeEjdL1a1GiBdg=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems where CTR_EL0.DIC is set, we don't need to perform
-icache invalidation to guarantee that we'll fetch the right
-instruction stream.
+Hi Anson,
 
-This also means that taking a permission fault to invalidate the
-icache is an unnecessary overhead.
+On Tue, May 29, 2018 at 10:30 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> Correct MIPI/PCIe/USB_HSIC's PGC offset based on
+> design RTL, the values in the Reference Manual
+> (Rev. 1, 01/2018 and the older ones) are incorrect.
+>
+> The correct offset values should be as below:
+>
+> 0x800 ~ 0x83F: PGC for core0 of A7 platform;
+> 0x840 ~ 0x87F: PGC for core1 of A7 platform;
+> 0x880 ~ 0x8BF: PGC for SCU of A7 platform;
+> 0xA00 ~ 0xA3F: PGC for fastmix/megamix;
+> 0xC00 ~ 0xC3F: PGC for MIPI PHY;
+> 0xC40 ~ 0xC7F: PGC for PCIe_PHY;
+> 0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
+> 0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
+> 0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
+>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-On such systems, we can safely leave the page as being executable.
+Thanks for the fix:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/pgtable-prot.h | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index c66c3047400e..78b942c1bea4 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -77,8 +77,18 @@
- 		__val;							\
- 	 })
- 
--#define PAGE_S2			__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(NORMAL) | PTE_S2_RDONLY | PTE_S2_XN)
--#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_S2_XN)
-+#define PAGE_S2_XN							\
-+	({								\
-+		u64 __val;						\
-+		if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC))		\
-+			__val = 0;					\
-+		else							\
-+			__val = PTE_S2_XN;				\
-+		__val;							\
-+	})
-+
-+#define PAGE_S2			__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(NORMAL) | PTE_S2_RDONLY | PAGE_S2_XN)
-+#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(DEVICE_nGnRE) | PTE_S2_RDONLY | PAGE_S2_XN)
- 
- #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
- #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
--- 
-2.17.1
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
