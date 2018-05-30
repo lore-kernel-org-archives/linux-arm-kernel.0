@@ -1,70 +1,122 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 30 May 2018 10:42:48 +0200
-Subject: [PATCH v3 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <OSBPR01MB20546AE06422C9AD896F8F60D26C0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
-References: <1527157834-7747-1-git-send-email-michel.pollet@bp.renesas.com>
- <1527157834-7747-3-git-send-email-michel.pollet@bp.renesas.com>
- <CAMuHMdWv2ZRbX=k5+H_WfAeoQ4QsyQLU9iQ9TJ9OQ0fmwg0GOQ@mail.gmail.com>
- <OSBPR01MB20546AE06422C9AD896F8F60D26C0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
-Message-ID: <CAMuHMdUZ-sVE3z5nW30m3O5g4gB=TcQATDQ-Q5mdDsYX7c4ttQ@mail.gmail.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Wed, 30 May 2018 09:52:18 +0100
+Subject: [PATCH v9 00/12] Support PPTT for ARM64
+In-Reply-To: <CAMuHMdWgsRTqrgwi5Z_xyNXmzS1h4gxLaawdFAL_DGF+Yt8s-A@mail.gmail.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
+ <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
+ <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
+ <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
+ <CAMuHMdWgsRTqrgwi5Z_xyNXmzS1h4gxLaawdFAL_DGF+Yt8s-A@mail.gmail.com>
+Message-ID: <20180530085218.GA8461@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+On Tue, May 29, 2018 at 05:50:47PM +0200, Geert Uytterhoeven wrote:
+> Hi Sudeep,
+> 
+> On Tue, May 29, 2018 at 3:18 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> > On 29/05/18 12:56, Geert Uytterhoeven wrote:
+> >> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
+> >>>> On Thu, May 17, 2018 at 7:05 PM, Catalin Marinas
+> >>>> <catalin.marinas@arm.com> wrote:
+> >>>>> On Fri, May 11, 2018 at 06:57:55PM -0500, Jeremy Linton wrote:
+> >>>>>> Jeremy Linton (12):
+> >>>>>>   arm64: topology: divorce MC scheduling domain from core_siblings
+> >>>>>
+> >>>>> Queued for 4.18 (without Sudeep's latest property_read_u64 cacheinfo
+> >>>>> patch - http://lkml.kernel.org/r/20180517154701.GA20281 at e107155-lin; I
+> >>>>> can add it separately).
+> >>>>
+> >>>> This is now commit 37c3ec2d810f87ea ("arm64: topology: divorce MC
+> >>>> scheduling domain from core_siblings") in arm64/for-next/core, causing
+> >>>> system suspend on big.LITTLE systems to hang after shutting down the first
+> >>>> CPU:
+> >>>>
+> >>>>     $ echo mem > /sys/power/state
+> >>>>     PM: suspend entry (deep)
+> >>>>     PM: Syncing filesystems ... done.
+> >>>>     Freezing user space processes ... (elapsed 0.001 seconds) done.
+> >>>>     OOM killer disabled.
+> >>>>     Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+> >>>>     Disabling non-boot CPUs ...
+> >>>>     CPU1: shutdown
+> >>>>     psci: CPU1 killed.
+> >>>
+> >>> Is it OK to assume the suspend failed just after shutting down one CPU
+> >>> or it's failing during resume ? It depends on whether you had console
+> >>> disabled or not.
+> >>
+> >> I have no-console-suspend enabled.
+> >> It's failing during suspend, the next lines should be:
+> >>
+> >>     CPU2: shutdown
+> >>     psci: CPU2 killed.
+> >>     ...
+> >
+> > OK, I was hoping to be something during resume as this patch has nothing
+> > executed during suspend. Do you see any change in topology before and
+> > after this patch applied. I am interested in the output of:
+> >
+> > $ grep "" /sys/devices/system/cpu/cpu*/topology/*
+> 
+> /sys/devices/system/cpu/cpu0/topology/core_id:0
+> /sys/devices/system/cpu/cpu0/topology/core_siblings:0f
+> /sys/devices/system/cpu/cpu0/topology/core_siblings_list:0-3
+> /sys/devices/system/cpu/cpu0/topology/physical_package_id:0
+> /sys/devices/system/cpu/cpu0/topology/thread_siblings:01
+> /sys/devices/system/cpu/cpu0/topology/thread_siblings_list:0
+> /sys/devices/system/cpu/cpu1/topology/core_id:1
+> /sys/devices/system/cpu/cpu1/topology/core_siblings:0f
+> /sys/devices/system/cpu/cpu1/topology/core_siblings_list:0-3
+> /sys/devices/system/cpu/cpu1/topology/physical_package_id:0
+> /sys/devices/system/cpu/cpu1/topology/thread_siblings:02
+> /sys/devices/system/cpu/cpu1/topology/thread_siblings_list:1
+> /sys/devices/system/cpu/cpu2/topology/core_id:2
+> /sys/devices/system/cpu/cpu2/topology/core_siblings:0f
+> /sys/devices/system/cpu/cpu2/topology/core_siblings_list:0-3
+> /sys/devices/system/cpu/cpu2/topology/physical_package_id:0
+> /sys/devices/system/cpu/cpu2/topology/thread_siblings:04
+> /sys/devices/system/cpu/cpu2/topology/thread_siblings_list:2
+> /sys/devices/system/cpu/cpu3/topology/core_id:3
+> /sys/devices/system/cpu/cpu3/topology/core_siblings:0f
+> /sys/devices/system/cpu/cpu3/topology/core_siblings_list:0-3
+> /sys/devices/system/cpu/cpu3/topology/physical_package_id:0
+> /sys/devices/system/cpu/cpu3/topology/thread_siblings:08
+> /sys/devices/system/cpu/cpu3/topology/thread_siblings_list:3
+> /sys/devices/system/cpu/cpu4/topology/core_id:0
+> /sys/devices/system/cpu/cpu4/topology/core_siblings:f0
+> /sys/devices/system/cpu/cpu4/topology/core_siblings_list:4-7
+> /sys/devices/system/cpu/cpu4/topology/physical_package_id:1
+> /sys/devices/system/cpu/cpu4/topology/thread_siblings:10
+> /sys/devices/system/cpu/cpu4/topology/thread_siblings_list:4
+> /sys/devices/system/cpu/cpu5/topology/core_id:1
+> /sys/devices/system/cpu/cpu5/topology/core_siblings:f0
+> /sys/devices/system/cpu/cpu5/topology/core_siblings_list:4-7
+> /sys/devices/system/cpu/cpu5/topology/physical_package_id:1
+> /sys/devices/system/cpu/cpu5/topology/thread_siblings:20
+> /sys/devices/system/cpu/cpu5/topology/thread_siblings_list:5
+> /sys/devices/system/cpu/cpu6/topology/core_id:2
+> /sys/devices/system/cpu/cpu6/topology/core_siblings:f0
+> /sys/devices/system/cpu/cpu6/topology/core_siblings_list:4-7
+> /sys/devices/system/cpu/cpu6/topology/physical_package_id:1
+> /sys/devices/system/cpu/cpu6/topology/thread_siblings:40
+> /sys/devices/system/cpu/cpu6/topology/thread_siblings_list:6
+> /sys/devices/system/cpu/cpu7/topology/core_id:3
+> /sys/devices/system/cpu/cpu7/topology/core_siblings:f0
+> /sys/devices/system/cpu/cpu7/topology/core_siblings_list:4-7
+> /sys/devices/system/cpu/cpu7/topology/physical_package_id:1
+> /sys/devices/system/cpu/cpu7/topology/thread_siblings:80
+> /sys/devices/system/cpu/cpu7/topology/thread_siblings_list:7
+> 
+> No change before/after (both match my view of the hardware).
 
-On Wed, May 30, 2018 at 10:19 AM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> On 25 May 2018 10:49, Geert wrote:
->> On Thu, May 24, 2018 at 12:30 PM, Michel Pollet
->> <michel.pollet@bp.renesas.com> wrote:
->> > The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time,
->> > it requires a special enable method to get it started.
->> >
->> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
->>
->> Thanks for your patch!
->>
->> >  arch/arm/mach-shmobile/smp-r9a06g032.c | 85
->> > ++++++++++++++++++++++++++++++++++
->>
->> I think you can safely call this driver smp-rzn1d.c, or smp-rzn1.c.
->> Source files are not covered by the stable DT ABI, and can be reordered later
->> at will.
->>
->> I expect you will just add more CPU_METHOD_OF_DECLARE() lines later
->> (perhaps with a little bit of extra code to handle deviations).
->
-> Now I am completely confused -- you had me remove the mention of rzn1
-> from everywhere it mattered to handle 'family' cases, and now you are
-> telling me that in *this* case where there is not a single chance of that file
-> covering another part and there's a clear cut case for it to be part specific
-> .... I should call it rzn1?!?
+There shouldn't be any change in the reported topology with this patch
+as that the topology_* functions are not touched by the patch.
 
-Sorry for confusing you.
-There's a difference between stable DT ABI and (non-existing) kernel stable ABI.
-A driver that handles multiple SoCs can be named after the SoC family.
+The patch should only affect the topology used by the scheduler which
+isn't necessarily the same as the user-space visible one.
 
-I agree this one is a bit special, as only RZ/N1D has the dual Cortex A7
-(RZ/N1S has a single A7, RZ/N1L has no A7), so for now[*] there's no need
-to use it on anything but r9a06g032 aka RZ/N1D.
-
-> I'd like consistency -- I *thought* I had a consistent naming scheme before,
-> now I've moved to your part specific one (under duress), I'd rather stick to
-> something that is consistent and keep everything as r9a06g032 now.
-
-OK for me. Driver names can be changed any time.
-
-[*] Until e.g. a quad A7 arrives :-)
-    Perhaps this can also be used to enable the A7s on both RZ/N1D and
-    RZ/N1S when running Linux on the Cortex M3?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Morten
