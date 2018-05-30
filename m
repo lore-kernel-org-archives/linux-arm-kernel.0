@@ -1,75 +1,166 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 30 May 2018 14:24:42 +0100
-Subject: [PATCH v9 00/12] Support PPTT for ARM64
-In-Reply-To: <a79f5acc-51f2-cd7c-5abf-c7c1df8064a1@arm.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180517170523.h7tuvbzdfluuidcz@armageddon.cambridge.arm.com>
- <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
- <09fb3fe7-d703-43f1-74f7-f8cb5ff1f67a@arm.com>
- <CAMuHMdXgiMeD4uF+j8W+CpNwYYK2W_8xqk_=vGBiW=bUvKeq7w@mail.gmail.com>
- <551905a6-eaa8-97df-06ec-1ceedfbc164f@arm.com>
- <20180529150823.GD17159@arm.com>
- <CAMuHMdU0yET6+-FfS8e9HJdKB7h0gDn7kzWGpJZV=UiWn5fLkA@mail.gmail.com>
- <a79f5acc-51f2-cd7c-5abf-c7c1df8064a1@arm.com>
-Message-ID: <fdbf86f6-38b8-adc6-20a8-6c450963fb62@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 May 2018 16:20:15 +0300
+Subject: [PATCH 07/12] dt-bindings: tc358754: add DT bindings
+In-Reply-To: <20180530130731eucas1p160d53c3f8500bcecd000bd8895843817~zbgGgQw3b1079710797eucas1p1H@eucas1p1.samsung.com>
+References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+ <1928297.lKUBOH9NhR@avalon>
+ <20180530130731eucas1p160d53c3f8500bcecd000bd8895843817~zbgGgQw3b1079710797eucas1p1H@eucas1p1.samsung.com>
+Message-ID: <2964003.icRy2MNiaL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andrzej,
 
+On Wednesday, 30 May 2018 16:07:29 EEST Andrzej Hajda wrote:
+> On 30.05.2018 14:35, Laurent Pinchart wrote:
+> > On Wednesday, 30 May 2018 12:59:12 EEST Andrzej Hajda wrote:
+> >> On 28.05.2018 12:18, Laurent Pinchart wrote:
+> >>> On Monday, 28 May 2018 12:47:11 EEST Maciej Purski wrote:
+> >>>> The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
+> >>>> Bindings describe power supplies, reset gpio and video interfaces.
+> >>>> 
+> >>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> >>>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> >>>> ---
+> >>>> 
+> >>>>  .../bindings/display/bridge/toshiba,tc358764.txt   | 42
+> >>>>  ++++++++++++++++
+> >>>>  1 file changed, 42 insertions(+)
+> >>>>  create mode 100644
+> >>>> 
+> >>>> Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+> >>>> 
+> >>>> diff --git
+> >>>> a/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+> >>>> b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+> >>>> new
+> >>>> file mode 100644
+> >>>> index 0000000..d09bdc2
+> >>>> --- /dev/null
+> >>>> +++
+> >>>> b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+> >>>> @@ -0,0 +1,42 @@
+> >>>> +TC358764 MIPI-DSI to LVDS panel bridge
+> >>>> +
+> >>>> +Required properties:
+> >>>> +  - compatible: "toshiba,tc358764"
+> >>>> +  - reg: the virtual channel number of a DSI peripheral
+> >>>> +  - vddc-supply: core voltage supply
+> >>>> +  - vddio-supply: I/O voltage supply
+> >>>> +  - vddmipi-supply: MIPI voltage supply
+> >>>> +  - vddlvds133-supply: LVDS1 3.3V voltage supply
+> >>>> +  - vddlvds112-supply: LVDS1 1.2V voltage supply
+> >>> 
+> >>> That's a lot of power supplies. Could some of them be merged together ?
+> >>> See https://patchwork.freedesktop.org/patch/216058/ for an earlier
+> >>> discussion on the same subject.
+> >> 
+> >> Specs says about 3 supply voltage values:
+> >> - 1.2V - digital core, DSI-RX PHY
+> >> - 1.8-3.3V - digital I/O
+> >> - 3.3V - LVDS-TX PHY
+> >> 
+> >> So I guess it should be minimal number of supplies. Natural candidates:
+> >> 
+> >> - vddc-supply: core voltage supply, 1.2V
+> >> - vddio-supply: I/O voltage supply, 1.8V or 3.3V
+> >> - vddlvds-supply: LVDS1/2 voltage supply, 3.3V
+> >> 
+> >> I have changed name of the latest supply to be more consistent with
+> >> other supplies, and changed 1.8-3.3 (which incorrectly suggest voltage
+> >> range), to more precise voltage alternative.
+> > 
+> > This looks fine to me.
+> > 
+> >>>> +  - reset-gpios: a GPIO spec for the reset pin
+> >>>> +
+> >>>> +The device node can contain zero to two 'port' child nodes, each with
+> >>>> one
+> >>>> +child
+> >>>> +'endpoint' node, according to the bindings defined in [1].
+> >>>> +The following are properties specific to those nodes.
+> >>>> +
+> >>>> +port:
+> >>>> +  - reg: (required) can be 0 for DSI port or 1 for LVDS port;
+> >>> 
+> >>> This seems pretty vague to me. It could be read as meaning that ports
+> >>> are
+> >>> completely optional, and that the port number you list can be used, but
+> >>> that something else could be used to.
+> >>> 
+> >>> Let's make the port nodes mandatory. I propose the following.
+> >>> 
+> >>> Required nodes:
+> >>> 
+> >>> The TC358764 has DSI and LVDS ports whose connections are described
+> >>> using
+> >>> the OF graph bindings defined in
+> >>> Documentation/devicetree/bindings/graph.txt. The device node must
+> >>> contain
+> >>> one 'port' child node per DSI and LVDS port. The port nodes are numbered
+> >>> as follows.
+> >>> 
+> >>>   Port                  Number
+> >>> 
+> >>> -------------------------------------------------------------------
+> >>> 
+> >>>   DSI Input             0
+> >>>   LVDS Output           1
+> >>> 
+> >>> Each port node must contain endpoint nodes describing the hardware
+> >>> connections.
+> >> 
+> >> Since the bridge is controlled via DSI bus, DSI input port is not
+> >> necessary.
+> > 
+> > I don't agree with this. Regardless of how the bridge is controlled, I
+> > think we should always use ports to describe the data connections.
+> > Otherwise it would get more complicated for display controller drivers to
+> > use different types of bridges.
+> 
+> It was discussed already, and DT guideline is to skip graphs in simple
+> case of parent/child nodes, see for example [1].
+> 
+> [1]: https://marc.info/?l=dri-devel&m=148354108702517&w=2
 
-On 29/05/18 22:52, Jeremy Linton wrote:
-> Hi,
-> 
-> On 05/29/2018 10:51 AM, Geert Uytterhoeven wrote:
->> Hi Will,
->>
->> On Tue, May 29, 2018 at 5:08 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> On Tue, May 29, 2018 at 02:18:40PM +0100, Sudeep Holla wrote:
->>>> On 29/05/18 12:56, Geert Uytterhoeven wrote:
->>>>> On Tue, May 29, 2018 at 1:14 PM, Sudeep Holla
->>>>> <sudeep.holla@arm.com> wrote:
->>>>>> On 29/05/18 11:48, Geert Uytterhoeven wrote:
->>>>>>> System supend still works fine on systems with big cores only:
->>>>>>>
->>>>>>> ???? R-Car H3 ES1.0 (4xCA57 (4xCA53 disabled in firmware))
->>>>>>> ???? R-Car M3-N (2xCA57)
->>>>>>>
->>>>>>> Reverting this commit fixes the issue for me.
->>>>>>
->>>>>> I can't find anything that relates to system suspend in these patches
->>>>>> unless they are messing with something during CPU hot plug-in back
->>>>>> during resume.
->>>>>
->>>>> It's only the last patch that introduces the breakage.
->>>>>
->>>>
->>>> As specified in the commit log, it won't change any behavior for DT
->>>> systems if it's non-NUMA or single node system. So I am still wondering
->>>> what could trigger this regression.
->>>
->>> I wonder if we're somehow giving an uninitialised/invalid NUMA
->>> configuration
->>> to the scheduler, although I can't see how this would happen.
->>>
->>> Geert -- if you enable CONFIG_DEBUG_PER_CPU_MAPS=y and apply the diff
->>> below
->>> do you see anything shouting in dmesg?
->>
->> Thanks, but unfortunately it doesn't help.
->> I added some debug code to print cpumask, but so far I don't see anything
->> suspicious.
-> 
-> I suspect most of the problem is related to the node mask changing at
-> unexpected times (particularly cores being removed from the mask). Once
-> I understand that more, there may be a simpler patch.
-> 
-> OTOH, I've been testing with this, and with it, I can't seem to
-> duplicate the problem with CONFIG_NUMA disabled I found.
-> 
+That's when the child as no other connection at all. I don't think it makes 
+sense to mix description of connections through parent/child relationships and 
+through ports for a single device.
 
-I am also giving it a run on my Juno(defconfig - CONFIG_NUMA) and CPU
-hotplug tests are fine with this change.
+And that being said, I don't agree with Rob's comment there. Having two 
+different methods to describe connections means that you have to implement 
+them both in all display controller drivers (and even all bridge drivers in 
+the case of chained bridges). That's an extra complexity that can easily be 
+avoided by standardizing DT bindings.
+
+I also wonder whether Rob's position hasn't been reconsidered since then; I 
+vaguely recalled another more recent discussion on this topic. I'm a bit too 
+busy now to try and dig it up now I'm afraid :-/
+
+> >>>> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+> >>>> +
+> >>>> +Example:
+> >>>> +
+> >>>> +	bridge at 0 {
+> >>>> +		reg = <0>;
+> >>>> +		compatible = "toshiba,tc358764";
+> >>>> +		vddc-supply = <&vcc_1v2_reg>;
+> >>>> +		vddio-supply = <&vcc_1v8_reg>;
+> >>>> +		vddmipi-supply = <&vcc_1v2_reg>;
+> >>>> +		vddlvds133-supply = <&vcc_3v3_reg>;
+> >>>> +		vddlvds112-supply = <&vcc_1v2_reg>;
+> >>>> +		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
+> >>>> +		#address-cells = <1>;
+> >>>> +		#size-cells = <0>;
+> >>>> +		port at 1 {
+> >>>> +			reg = <1>;
+> >>>> +			lvds_ep: endpoint {
+> >>>> +				remote-endpoint = <&panel_ep>;
+> >>>> +			};
+> >>>> +		};
+> >>>> +	};
 
 -- 
 Regards,
-Sudeep
+
+Laurent Pinchart
