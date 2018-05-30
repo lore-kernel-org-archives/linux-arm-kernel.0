@@ -1,62 +1,86 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 May 2018 22:23:20 -0700
-Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+Date: Tue, 29 May 2018 22:30:33 -0700
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
  bindings
-In-Reply-To: <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
-Message-ID: <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
+In-Reply-To: <20180523155617.GN4828@sirena.org.uk>
+References: <dc1fbe9c-8973-1c4d-0fbd-809c1ec0a6be@codeaurora.org>
+ <CAD=FV=XfSGs14VB464cvMGDNwGS4yvSXjN8itZLffm+Sj-D=ww@mail.gmail.com>
+ <fb390ccb-927a-8449-05c3-8dcac964bfae@codeaurora.org>
+ <CAD=FV=XARtQNo5Cyg78XuT26JUFgn=7BjWRnXPjP566=a-sF1w@mail.gmail.com>
+ <a106c337-0713-e5d6-cb40-13e05f4d361d@codeaurora.org>
+ <CAD=FV=W=BquL5ojORz4HNP889s=-uNJ-QEzUfAxwXj2Oa3cGew@mail.gmail.com>
+ <20180523082908.GB4828@sirena.org.uk>
+ <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
+ <20180523154057.GL4828@sirena.org.uk>
+ <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
+ <20180523155617.GN4828@sirena.org.uk>
+Message-ID: <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, May 22, 2018 at 7:43 PM, David Collins <collinsd@codeaurora.org> wrote:
-> +========
-> +Examples
-> +========
-> +
-> +#include <dt-bindings/regulator/qcom,rpmh-regulator.h>
-> +
-> +&apps_rsc {
-> +       pm8998-rpmh-regulators {
-> +               compatible = "qcom,pm8998-rpmh-regulators";
-> +               qcom,pmic-id = "a";
-> +
-> +               vdd-l7-l12-l14-l15-supply = <&pm8998_s5>;
-> +
-> +               smps2 {
-> +                       regulator-min-microvolt = <1100000>;
-> +                       regulator-max-microvolt = <1100000>;
-> +               };
-> +
-> +               pm8998_s5: smps5 {
-> +                       regulator-min-microvolt = <1904000>;
-> +                       regulator-max-microvolt = <2040000>;
-> +               };
-> +
-> +               ldo7 {
-> +                       regulator-min-microvolt = <1800000>;
-> +                       regulator-max-microvolt = <1800000>;
-> +                       regulator-initial-mode = <RPMH_REGULATOR_MODE_LPM>;
-> +                       regulator-allowed-modes =
-> +                               <RPMH_REGULATOR_MODE_LPM
-> +                                RPMH_REGULATOR_MODE_HPM>;
-> +                       regulator-allow-set-load;
-> +                       qcom,regulator-drms-modes =
-> +                               <RPMH_REGULATOR_MODE_LPM
-> +                                RPMH_REGULATOR_MODE_HPM>;
-> +                       qcom,drms-mode-max-microamps = <10000 1000000>;
+On Wed, May 23, 2018 at 8:56 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, May 23, 2018 at 08:50:22AM -0700, Doug Anderson wrote:
+>> On Wed, May 23, 2018 at 8:40 AM, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > It's got to be valid to think about the voltage of a disabled regulator
+>> > since drivers want to be able make sure that the regulator gets enabled
+>> > with a sensible config.  With most hardware this is really easy since
+>> > you can just look at the status reported by the hardware but the RPM
+>> > makes this hard since there's so much write only stuff in there.
+>
+>> I should be more clear.  Certainly it should be valid to set the
+>> voltage before enabling it so, as you said, the regulator turns on at
+>> the right voltage.  I'm saying that it's weird (to me) to expect that
+>> setting the voltage for a regulator that a client thinks is disabled
+>> will affect any real voltages in the system until the regulator is
+>> enabled.  In RPMh apparently setting a voltage of a regulator you
+>> think is disabled can affect the regulator output if another client
+>> (unbeknownst to you) happens to have it enabled.
+>
+> Yes, that's definitely not what's expected but it's unfortunately what
+> the firmware chose to implement so we may well be stuck with it
+> unfortunately.
 
-Things look pretty good to me now.  I'm still hesitant about the whole
-need to list the modes twice (once using the unordered
-"regulator-allowed-modes" and once to match up against the ordered
-"qcom,drms-mode-max-microamps").  I'm also still of the opinion that
-the whole "drms-mode-max-microamps" ought to be a standard property
-(not a qcom specific one) and handled in the regulator core.
+We're not really stuck with it if we do what I was suggesting.  I was
+suggesting that every time we disable the regulator in Linux we have
+Linux vote for the lowest voltage it's comfortable with.  Linux keeps
+track of the true voltage that the driver wants and will always change
+its vote back to that before enabling.  Thus (assuming Linux is OK
+with 1.2 V - 1.4 V for a rail):
 
-However, for both of these things I leave it to the discretion of Mark
-to choose what he wants.  Thus assuming Mark is OK with these two
-things, feel free to add my Reviewed-by.
+Modem: want 1.3 V and enabled.
+=> Modem votes for 1.3 V
+=> Modem votes for enabled.
+=> At least one vote for enabled? Yes
+=> Highest voltage vote: 1.3V
+=> True output: 1.3V
+
+Linux: want 1.4 V and enabled.
+=> Linux votes for 1.4 V
+=> Linux votes for enabled
+=> At least one vote for enabled? Yes
+=> Highest voltage vote: 1.4V
+=> True output: 1.4V
+
+Linux: want disabled
+=> Linux votes for disabled
+=> Linux votes for 1.2 V (keeps 1.4 V in local var)
+=> At least one vote for enabled? Yes
+=> Highest voltage vote: 1.3V
+=> True output: 1.3V
+
+Linux: want enabled
+=> Linux votes for 1.4 V (from local var)
+=> Linux votes for enabled
+=> At least one vote for enabled? Yes
+=> Highest voltage vote: 1.4V
+=> True output: 1.4V
+
+
+...but I'll leave it to you if you think this is a big deal.  If
+you're happy with how David's driver works without my suggestion then
+I won't push it.
 
 -Doug
