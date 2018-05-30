@@ -1,42 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 May 2018 10:37:01 +0100
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
-References: <fb390ccb-927a-8449-05c3-8dcac964bfae@codeaurora.org>
- <CAD=FV=XARtQNo5Cyg78XuT26JUFgn=7BjWRnXPjP566=a-sF1w@mail.gmail.com>
- <a106c337-0713-e5d6-cb40-13e05f4d361d@codeaurora.org>
- <CAD=FV=W=BquL5ojORz4HNP889s=-uNJ-QEzUfAxwXj2Oa3cGew@mail.gmail.com>
- <20180523082908.GB4828@sirena.org.uk>
- <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
- <20180523154057.GL4828@sirena.org.uk>
- <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
- <20180523155617.GN4828@sirena.org.uk>
- <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
-Message-ID: <20180530093701.GD6920@sirena.org.uk>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 30 May 2018 11:59:12 +0200
+Subject: [PATCH 07/12] dt-bindings: tc358754: add DT bindings
+In-Reply-To: <2275901.CJI6BsfBlP@avalon>
+References: <1527500833-16005-1-git-send-email-m.purski@samsung.com>
+ <CGME20180528094727eucas1p153b8116120cd2195b15b74776f171cbe@eucas1p1.samsung.com>
+ <1527500833-16005-8-git-send-email-m.purski@samsung.com>
+ <2275901.CJI6BsfBlP@avalon>
+Message-ID: <20180530095915eucas1p27f09c8424d0c3c0619d134c5e7319fa3~zY7uP6Y6R1391213912eucas1p23@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 10:30:33PM -0700, Doug Anderson wrote:
-> On Wed, May 23, 2018 at 8:56 AM, Mark Brown <broonie@kernel.org> wrote:
+On 28.05.2018 12:18, Laurent Pinchart wrote:
+> Hi Maciej,
+>
+> Thank you for the patch.
+>
+> On Monday, 28 May 2018 12:47:11 EEST Maciej Purski wrote:
+>> The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
+>> Bindings describe power supplies, reset gpio and video interfaces.
+>>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>> ---
+>>  .../bindings/display/bridge/toshiba,tc358764.txt   | 42 +++++++++++++++++++
+>>  1 file changed, 42 insertions(+)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+>>
+>> diff --git
+>> a/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+>> b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt new
+>> file mode 100644
+>> index 0000000..d09bdc2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+>> @@ -0,0 +1,42 @@
+>> +TC358764 MIPI-DSI to LVDS panel bridge
+>> +
+>> +Required properties:
+>> +  - compatible: "toshiba,tc358764"
+>> +  - reg: the virtual channel number of a DSI peripheral
+>> +  - vddc-supply: core voltage supply
+>> +  - vddio-supply: I/O voltage supply
+>> +  - vddmipi-supply: MIPI voltage supply
+>> +  - vddlvds133-supply: LVDS1 3.3V voltage supply
+>> +  - vddlvds112-supply: LVDS1 1.2V voltage supply
+> That's a lot of power supplies. Could some of them be merged together ? See 
+> https://patchwork.freedesktop.org/patch/216058/ for an earlier discussion on 
+> the same subject.
 
-> > Yes, that's definitely not what's expected but it's unfortunately what
-> > the firmware chose to implement so we may well be stuck with it
-> > unfortunately.
+Specs says about 3 supply voltage values:
+- 1.2V - digital core, DSI-RX PHY
+- 1.8-3.3V - digital I/O
+- 3.3V - LVDS-TX PHY
 
-> We're not really stuck with it if we do what I was suggesting.  I was
-> suggesting that every time we disable the regulator in Linux we have
-> Linux vote for the lowest voltage it's comfortable with.  Linux keeps
-> track of the true voltage that the driver wants and will always change
-> its vote back to that before enabling.  Thus (assuming Linux is OK
-> with 1.2 V - 1.4 V for a rail):
+So I guess it should be minimal number of supplies. Natural candidates:
 
-That's pretty much what it should do anyway with normally designed
-hardware.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/9b330fe7/attachment.sig>
+- vddc-supply: core voltage supply, 1.2V
+- vddio-supply: I/O voltage supply, 1.8V or 3.3V
+- vddlvds-supply: LVDS1/2 voltage supply, 3.3V
+
+I have changed name of the latest supply to be more consistent with
+other supplies, and changed 1.8-3.3 (which incorrectly suggest voltage
+range), to more precise voltage alternative.
+
+
+>
+>> +  - reset-gpios: a GPIO spec for the reset pin
+>> +
+>> +The device node can contain zero to two 'port' child nodes, each with one
+>> +child
+>> +'endpoint' node, according to the bindings defined in [1].
+>> +The following are properties specific to those nodes.
+>> +
+>> +port:
+>> +  - reg: (required) can be 0 for DSI port or 1 for LVDS port;
+> This seems pretty vague to me. It could be read as meaning that ports are 
+> completely optional, and that the port number you list can be used, but that 
+> something else could be used to.
+>
+> Let's make the port nodes mandatory. I propose the following.
+>
+> Required nodes:
+>
+> The TC358764 has DSI and LVDS ports whose connections are described using the 
+> OF graph bindings defined in Documentation/devicetree/bindings/graph.txt. The 
+> device node must contain one 'port' child node per DSI and LVDS port. The port 
+> nodes are numbered as follows.
+>
+>   Port                  Number
+> -------------------------------------------------------------------
+>   DSI Input             0
+>   LVDS Output           1
+>
+> Each port node must contain endpoint nodes describing the hardware 
+> connections.
+
+Since the bridge is controlled via DSI bus, DSI input port is not necessary.
+
+Regards
+Andrzej
+
+
+>
+>> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +
+>> +Example:
+>> +
+>> +	bridge at 0 {
+>> +		reg = <0>;
+>> +		compatible = "toshiba,tc358764";
+>> +		vddc-supply = <&vcc_1v2_reg>;
+>> +		vddio-supply = <&vcc_1v8_reg>;
+>> +		vddmipi-supply = <&vcc_1v2_reg>;
+>> +		vddlvds133-supply = <&vcc_3v3_reg>;
+>> +		vddlvds112-supply = <&vcc_1v2_reg>;
+>> +		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		port at 1 {
+>> +			reg = <1>;
+>> +			lvds_ep: endpoint {
+>> +				remote-endpoint = <&panel_ep>;
+>> +			};
+>> +		};
+>> +	};
