@@ -1,92 +1,88 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Wed, 30 May 2018 14:55:28 +0200
-Subject: [PATCH] ARM: debug: Add Iproc UART3 debug addresses
-In-Reply-To: <20180530123809.khyzehg62ct6jzws@sapphire.tkos.co.il>
-References: <20180530122922.1041-1-peron.clem@gmail.com>
- <20180530123809.khyzehg62ct6jzws@sapphire.tkos.co.il>
-Message-ID: <CAJiuCcdJi6Ln3+Eip+Nc=-4aZu4bsTfT-MPVZisec7e10jO4XQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 30 May 2018 15:00:45 +0200
+Subject: [PATCH v3 2/2] drm/nouveau: tegra: Detach from ARM DMA/IOMMU
+ mapping
+In-Reply-To: <7960e4fc-f680-f8d1-0c5a-3ff1e13b3154@arm.com>
+References: <20180530080345.2353-1-thierry.reding@gmail.com>
+ <20180530080345.2353-3-thierry.reding@gmail.com>
+ <7960e4fc-f680-f8d1-0c5a-3ff1e13b3154@arm.com>
+Message-ID: <20180530130045.GB1595@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-On Wed, 30 May 2018 at 14:47, Baruch Siach <baruch@tkos.co.il> wrote:
-
-> Hi Cl?ment,
-
-> On Wed, May 30, 2018 at 02:29:22PM +0200, Cl?ment P?ron wrote:
-> > From: Cl?ment Peron <clement.peron@devialet.com>
-> >
-> > Broadcom Iproc SoCs typically use the UART3 for
-> > debug/console, provide a known good location for that.
-> >
-> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+On Wed, May 30, 2018 at 11:30:25AM +0100, Robin Murphy wrote:
+> On 30/05/18 09:03, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Depending on the kernel configuration, early ARM architecture setup code
+> > may have attached the GPU to a DMA/IOMMU mapping that transparently uses
+> > the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
+> > backed buffers (a special bit in the GPU's MMU page tables indicates the
+> > memory path to take: via the SMMU or directly to the memory controller).
+> > Transparently backing DMA memory with an IOMMU prevents Nouveau from
+> > properly handling such memory accesses and causes memory access faults.
+> > 
+> > As a side-note: buffers other than those allocated in instance memory
+> > don't need to be physically contiguous from the GPU's perspective since
+> > the GPU can map them into contiguous buffers using its own MMU. Mapping
+> > these buffers through the IOMMU is unnecessary and will even lead to
+> > performance degradation because of the additional translation. One
+> > exception to this are compressible buffers which need large pages. In
+> > order to enable these large pages, multiple small pages will have to be
+> > combined into one large (I/O virtually contiguous) mapping via the
+> > IOMMU. However, that is a topic outside the scope of this fix and isn't
+> > currently supported. An implementation will want to explicitly create
+> > these large pages in the Nouveau driver, so detaching from a DMA/IOMMU
+> > mapping would still be required.
+> 
+> I wonder if it might make sense to have a hook in iommu_attach_device() to
+> notify the arch DMA API code when moving devices between unmanaged and DMA
+> ops domains? That seems like it might be the most low-impact way to address
+> the overall problem long-term.
+> 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
 > > ---
-> >  arch/arm/Kconfig.debug | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index 199ebc1c4538..fa6fa1dae94d 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -207,6 +207,14 @@ choice
-> >               depends on ARCH_BCM_HR2
-> >               select DEBUG_UART_8250
-> >
-> > +     config DEBUG_BCM_IPROC_UART3
-> > +             bool "Kernel low-level debugging on BCM IPROC UART3"
-> > +             depends on ARCH_BCM_CYGNUS
-> > +             select DEBUG_UART_8250
-> > +             help
-> > +               Say Y here if you want the debug print routines to
-direct
-> > +               their output to the third serial port on these devices.
-> > +
-> >       config DEBUG_BCM_KONA_UART
-> >               bool "Kernel low-level debugging messages via BCM KONA
-UART"
-> >               depends on ARCH_BCM_MOBILE
-> > @@ -1564,6 +1572,7 @@ config DEBUG_UART_PHYS
-> >       default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
-> >       default 0x20201000 if DEBUG_BCM2835
-> >       default 0x3f201000 if DEBUG_BCM2836
-> > +     default 0x18023000 if DEBUG_BCM_IPROC_UART3
+> > Changes in v3:
+> > - clarify the use of IOMMU mapping for compressible buffers
+> > - squash multiple patches into this
+> > 
+> >   drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c | 5 +++++
+> >   1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+> > index 78597da6313a..d0538af1b967 100644
+> > --- a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+> > +++ b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+> > @@ -105,6 +105,11 @@ nvkm_device_tegra_probe_iommu(struct nvkm_device_tegra *tdev)
+> >   	unsigned long pgsize_bitmap;
+> >   	int ret;
+> > +#if IS_ENABLED(CONFIG_ARM)
+> 
+> Wouldn't CONFIG_ARM_DMA_USE_IOMMU be even more appropriate?
 
-> Entries are sorted by the address value. Except that DEBUG_BCM_KONA_UART
-> should be listed above DEBUG_BCM2836.
+Not necessarily. arm_dma_iommu_detach_device() is always defined on ARM,
+only with CONFIG_ARM_DMA_USE_IOMMU=n it will be empty. So this check is
+a guard to make sure we don't call the function when it isn't available,
+but it may still not do anything.
 
-Indeed, can I fix the DEBUG_BCM_KONA_UART entry in the same commit ?
+> 
+> > +	/* make sure we can use the IOMMU exclusively */
+> > +	arm_dma_iommu_detach_device(dev);
+> 
+> As before, I would just use the existing infrastructure the same way the
+> Exynos DRM driver currently does in __exynos_iommu_attach() (albeit without
+> then reattaching to another DMA ops mapping).
 
+That's pretty much what I initially did and which was shot down by
+Christoph. As I said earlier, at this point I don't really care what
+color the shed will be. Can you and Christoph come to an agreement
+on what it should be?
 
-> >       default 0x3e000000 if DEBUG_BCM_KONA_UART
-> >       default 0x4000e400 if DEBUG_LL_UART_EFM32
-> >       default 0x40028000 if DEBUG_AT91_SAMV7_USART1
-> > @@ -1730,6 +1739,7 @@ config DEBUG_UART_VIRT
-> >       default 0xfe018000 if DEBUG_MMP_UART3
-> >       default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
-> >       default 0xfe230000 if DEBUG_PICOXCELL_UART
-> > +     default 0xf1023000 if DEBUG_BCM_IPROC_UART3
-
-> Same here.
-
-> >       default 0xfe300000 if DEBUG_BCM_KONA_UART
-> >       default 0xfe800000 if ARCH_IOP32X
-> >       default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
-> > @@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
-> >               DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
-> >               DEBUG_ALPINE_UART0 || \
-> >               DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
-> > -             DEBUG_DAVINCI_DA8XX_UART2 || \
-> > +             DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
-> >               DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
-
-> baruch
-
-> --
->       http://baruch.siach.name/blog/                  ~. .~   Tk Open
-Systems
-
-=}------------------------------------------------ooO--U--Ooo------------{=
->     - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
-
-Clement
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/b6e5bbcc/attachment.sig>
