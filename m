@@ -1,54 +1,48 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 May 2018 09:06:16 -0700
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+Date: Wed, 30 May 2018 09:24:37 -0700
+Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
  bindings
-In-Reply-To: <20180530154849.GQ6920@sirena.org.uk>
-References: <20180523082908.GB4828@sirena.org.uk>
- <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
- <20180523154057.GL4828@sirena.org.uk>
- <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
- <20180523155617.GN4828@sirena.org.uk>
- <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
- <20180530093701.GD6920@sirena.org.uk>
- <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
- <20180530150241.GO6920@sirena.org.uk>
- <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
- <20180530154849.GQ6920@sirena.org.uk>
-Message-ID: <CAD=FV=X2u=hMyWinSDtim-PmFwAy5mXcwg3HeYojAHcsUFhV3g@mail.gmail.com>
+In-Reply-To: <20180530162007.GU6920@sirena.org.uk>
+References: <cover.1527040878.git.collinsd@codeaurora.org>
+ <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
+ <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
+ <20180530103720.GH6920@sirena.org.uk>
+ <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
+ <20180530155044.GR6920@sirena.org.uk>
+ <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
+ <20180530162007.GU6920@sirena.org.uk>
+Message-ID: <CAD=FV=WL9enzYCoSx0fT_ny40ciLJU-hhS9joJ6nySXvWPqAxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, May 30, 2018 at 8:48 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, May 30, 2018 at 08:34:50AM -0700, Doug Anderson wrote:
->> On Wed, May 30, 2018 at 8:02 AM, Mark Brown <broonie@kernel.org> wrote:
+On Wed, May 30, 2018 at 9:20 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, May 30, 2018 at 09:12:25AM -0700, Doug Anderson wrote:
+>> On Wed, May 30, 2018 at 8:50 AM, Mark Brown <broonie@kernel.org> wrote:
 >
->> > What you're describing sounds like what we should be doing normally, if
->> > we're not doing that we should probably be fixing the core.
+>> > No, I'm saying that I don't know why that property exists at all.  This
+>> > sounds like it's intended to be the amount of current the regulator can
+>> > deliver in each mode which is normally a design property of the silicon.
 >
->> I'm not convinced that this behavior makes sense to move to the core.
->> On most regulators I'd expect that when the regulator driver says to
->> turn them off that they will output no voltage.  The reason RPMh is
+>> Ah, got it.  So the whole point here is to be able to implement either
+>> the function "set_load" or the function "get_optimum_mode".  We need
+>> some sort of table to convert from current to mode.  That's what this
+>> table does.
 >
-> Oh, you mean while the regulator is off...  TBH I don't see a huge
-> problem doing that anyway and just reverting to the bottom of the
-> constraints when everything gets turned off since we have to see if we
-> need to adjust the voltage every time we enabled anyway.
->
->> In any other system when Linux disabled the regulator it wouldn't
->> matter that you left it set at 1.4V.  Thus RPMh is special and IMO the
->> workaround belongs there.
->
-> Without the core doing something the regulator isn't going to get told
-> that anything updated voltages anyway...
+> We do need that table, my expectation would be that this table would be
+> in the driver as it's not something I'd expect to vary between different
+> systems but rather be a property of the silicon design.  No sense in
+> every single board having to copy it in.
 
-I was just suggesting that when the core tells the regulator driver to
-disable itself that the regulator driver tell RPMh to not only disable
-itself but also (temporarily) vote for a lower voltage.  When the core
-tells the regulator to re-enable itself then the regulator driver
-restores the original voltage vote (or applies any vote that might
-have been attempted while the regulator was disabled).  That wouldn't
-require any regulator core changes.
+Ah, got it!  I'd be OK with it being hardcoded in the driver.
+
+At one point I think David was making the argument that some boards
+have different noise needs for the rails and thus you might want to
+change modes at different currents.  I don't know if this is realistic
+but I believe it was part of his original argument for why this needed
+to be specified.  If we can hardcode this in the driver I'm fine with
+it...  That would actually solve many of my objections too...
+
 
 -Doug
