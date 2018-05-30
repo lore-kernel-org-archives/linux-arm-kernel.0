@@ -1,47 +1,69 @@
-From: yaojun8558363@gmail.com (YaoJun)
-Date: Wed, 30 May 2018 17:12:55 +0800
-Subject: [PATCH 0/4] arm64/mm: migrate swapper_pg_dir
-Message-ID: <20180530091259.9386-1-yaojun8558363@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 30 May 2018 17:42:41 +0800
+Subject: [PATCH v4 9/9] drm/mediatek: Add support for mediatek SOC MT2712
+In-Reply-To: <1527489507-24453-10-git-send-email-stu.hsieh@mediatek.com>
+References: <1527489507-24453-10-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <201805301749.tsuCf08k%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, The offset between swapper_pg_dir and _text is
-fixed. When attackers know the address of _text(no KASLR or
-breaking KASLR), they can caculate the address of
-swapper_pg_dir. Then KSMA(Kernel Space Mirroring Attack) can
-be applied.
+Hi Stu,
 
-The principle of KSMA is to insert a carefully constructed PGD
-entry into the translation table. The type of this entry is
-block, which maps the kernel text and its access permissions
-bits are 01. The user process can then modify kernel text
-directly through this mapping.
+Thank you for the patch! Yet something to improve:
 
-To protect against KSMA, these patches migrate swapper_pg_dir
-to new place, which is dynamically allocated. Since it is
-allocated during the kernel boot process and the address is
-relatively fixed, further randomization may be required.
+[auto build test ERROR on drm/drm-next]
+[also build test ERROR on v4.17-rc7 next-20180529]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-YaoJun (4):
-  arm64/mm: Introduce __pa_swapper_pg_dir to save physical
-	    address of swapper_pg_dir. And pass it as an
-	    argument to __enable_mmu().
-  arm64/mm: Introduce new_swapper_pg_dir to save virtual
-	    address of new swapper_pg_dir.
-  arm64/mm: Make tramp_pg_dir and swapper_pg_dir adjacent.
-  arm64/mm: Migrate swapper_pg_dir and tramp_pg_dir.
+url:    https://github.com/0day-ci/linux/commits/Stu-Hsieh/Add-support-for-mediatek-SOC-MT2712/20180530-032344
+base:   git://people.freedesktop.org/~airlied/linux.git drm-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
- arch/arm64/include/asm/mmu_context.h |  6 +--
- arch/arm64/include/asm/pgtable.h     |  2 +
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/entry.S            |  4 +-
- arch/arm64/kernel/head.S             | 10 ++--
- arch/arm64/kernel/hibernate.c        |  2 +-
- arch/arm64/kernel/sleep.S            |  2 +
- arch/arm64/kernel/vmlinux.lds.S      | 10 ++--
- arch/arm64/mm/kasan_init.c           |  6 +--
- arch/arm64/mm/mmu.c                  | 72 ++++++++++++++++++++--------
- 10 files changed, 75 insertions(+), 41 deletions(-)
+All errors (new ones prefixed by >>):
 
--- 
-2.17.0
+>> drivers/gpu//drm/mediatek/mtk_drm_drv.c:165:2: error: 'DDP_COMPONENT_DPI1' undeclared here (not in a function); did you mean 'DDP_COMPONENT_DSI1'?
+     DDP_COMPONENT_DPI1,
+     ^~~~~~~~~~~~~~~~~~
+     DDP_COMPONENT_DSI1
+>> drivers/gpu//drm/mediatek/mtk_drm_drv.c:171:2: error: 'DDP_COMPONENT_DSI2' undeclared here (not in a function); did you mean 'DDP_COMPONENT_DSI1'?
+     DDP_COMPONENT_DSI2,
+     ^~~~~~~~~~~~~~~~~~
+     DDP_COMPONENT_DSI1
+>> drivers/gpu//drm/mediatek/mtk_drm_drv.c:171:2: error: incompatible types when initializing type 'enum mtk_ddp_comp_id' using type 'const enum mtk_ddp_comp_id *'
+
+vim +165 drivers/gpu//drm/mediatek/mtk_drm_drv.c
+
+   158	
+   159	static const enum mtk_ddp_comp_id mt2712_mtk_ddp_ext[] = {
+   160		DDP_COMPONENT_OVL1,
+   161		DDP_COMPONENT_COLOR1,
+   162		DDP_COMPONENT_AAL1,
+   163		DDP_COMPONENT_OD1,
+   164		DDP_COMPONENT_RDMA1,
+ > 165		DDP_COMPONENT_DPI1,
+   166		DDP_COMPONENT_PWM1,
+   167	};
+   168	
+   169	static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
+   170		DDP_COMPONENT_RDMA2,
+ > 171		DDP_COMPONENT_DSI2,
+   172		DDP_COMPONENT_PWM2,
+   173	};
+   174	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 65217 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/15cd8e25/attachment-0001.gz>
