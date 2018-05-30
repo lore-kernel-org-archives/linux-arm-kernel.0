@@ -1,67 +1,37 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 30 May 2018 14:15:57 +0200
-Subject: [PATCH v2 06/10] drm/panel: add support for BOE HV070WSA-100 panel
- to simple-panel
+Date: Wed, 30 May 2018 14:15:56 +0200
+Subject: [PATCH v2 05/10] panel/hv070wsa-100: add DT bindings
 In-Reply-To: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
 References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121626eucas1p17699adbe488cfb34da3f648bffe97fa2@eucas1p1.samsung.com>
-Message-ID: <1527682561-1386-7-git-send-email-m.purski@samsung.com>
+ <CGME20180530121626eucas1p288656bbbace0c333decadff418e13c34@eucas1p2.samsung.com>
+Message-ID: <1527682561-1386-6-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrzej Hajda <a.hajda@samsung.com>
 
-The patch adds support for BOE HV070WSA-100 WSVGA 7.01 inch panel
-in panel-simple driver. The panel is used in Exynos5250-arndale boards.
+The patch adds bindings to BOE HV070-WSA WSVGA panel.
+Bindings are compatible with simple panel bindings.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ .../devicetree/bindings/display/panel/boe,hv070wsa-100.txt         | 7 +++++++
+ 1 file changed, 7 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index cbf1ab4..d5da58d 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
- 	},
- };
- 
-+static const struct drm_display_mode boe_hv070wsa_mode = {
-+	.clock = 40800,
-+	.hdisplay = 1024,
-+	.hsync_start = 1024 + 90,
-+	.hsync_end = 1024 + 90 + 90,
-+	.htotal = 1024 + 90 + 90 + 90,
-+	.vdisplay = 600,
-+	.vsync_start = 600 + 3,
-+	.vsync_end = 600 + 3 + 4,
-+	.vtotal = 600 + 3 + 4 + 3,
-+	.vrefresh = 60,
-+};
+diff --git a/Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt b/Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt
+new file mode 100644
+index 0000000..bfc20ac
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/boe,hv070wsa-100.txt
+@@ -0,0 +1,7 @@
++BOE HV070WSA-100 7.01" WSVGA TFT LCD panel
 +
-+static const struct panel_desc boe_hv070wsa = {
-+	.modes = &boe_hv070wsa_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 154,
-+		.height = 90,
-+	},
-+};
++Required properties:
++- compatible: should be "boe,hv070wsa-100"
 +
- static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
- 	{
- 		.clock = 71900,
-@@ -2113,6 +2135,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "avic,tm070ddh03",
- 		.data = &avic_tm070ddh03,
- 	}, {
-+		.compatible = "boe,hv070wsa-100",
-+		.data = &boe_hv070wsa
-+	}, {
- 		.compatible = "boe,nv101wxmn51",
- 		.data = &boe_nv101wxmn51,
- 	}, {
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
 -- 
 2.7.4
