@@ -1,141 +1,40 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 30 May 2018 10:35:36 +0800
-Subject: [PATCH] PCI: mediatek: Add system pm support for MT2712
-Message-ID: <1527647736-19986-1-git-send-email-honghui.zhang@mediatek.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 29 May 2018 19:41:43 -0700
+Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
+In-Reply-To: <20180525221024.GC92995@bhelgaas-glaptop.roam.corp.google.com>
+References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
+ <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
+ <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
+ <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
+ <984b9734-244d-04e9-946f-7524f148ff7c@codeaurora.org>
+ <20180525221024.GC92995@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <8eacc568-af8c-a990-ee96-d13e669e8643@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Bjorn,
 
-The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
-the internel control register will be reset after system resume. The PCIe
-link should be re-established and the related control register values should
-be re-set after system resume.
+On 5/25/2018 3:10 PM, Bjorn Helgaas wrote:
+> On Fri, May 25, 2018 at 09:30:59AM -0400, Sinan Kaya wrote:
+>> On 5/24/2018 2:35 PM, Bjorn Helgaas wrote:
+>>> That sounds like a reasonable idea, and it is definitely another can
+>>> of worms.  I looked briefly at some of the .shutdown() cases:
+>>
+>> should we throw it into 4.18 and see what happens?
+> 
+> It wouldn't solve this particular problem because hpsa *does* have a
+> .shutdown() method.  The problem is that it doesn't work -- it's
+> supposed to stop DMA and interrupts but it apparently doesn't.
+> 
+> I think we need to fix hpsa first.
+> 
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-CC: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 82 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+I don't know if you followed my latest V3 patch but I found a way to put
+these two together to reach to an, IMO, more acceptable solution.
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index dabf1086..60f98d92 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -132,12 +132,14 @@ struct mtk_pcie_port;
- /**
-  * struct mtk_pcie_soc - differentiate between host generations
-  * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-+ * @pm_support: whether the host's MTCMOS will be off when suspend
-  * @ops: pointer to configuration access functions
-  * @startup: pointer to controller setting functions
-  * @setup_irq: pointer to initialize IRQ functions
-  */
- struct mtk_pcie_soc {
- 	bool need_fix_class_id;
-+	bool pm_support;
- 	struct pci_ops *ops;
- 	int (*startup)(struct mtk_pcie_port *port);
- 	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-@@ -1179,12 +1181,91 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev;
-+	struct mtk_pcie *pcie;
-+	struct mtk_pcie_port *port;
-+	const struct mtk_pcie_soc *soc;
-+
-+	pdev = to_platform_device(dev);
-+	pcie = platform_get_drvdata(pdev);
-+	soc = pcie->soc;
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		clk_disable_unprepare(port->ahb_ck);
-+		clk_disable_unprepare(port->sys_ck);
-+		phy_power_off(port->phy);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev;
-+	struct mtk_pcie *pcie;
-+	struct mtk_pcie_port *port;
-+	const struct mtk_pcie_soc *soc;
-+	int ret;
-+
-+	pdev = to_platform_device(dev);
-+	pcie = platform_get_drvdata(pdev);
-+	soc = pcie->soc;
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		ret = phy_power_on(port->phy);
-+		if (ret) {
-+			dev_err(dev, "could not power on phy\n");
-+			return ret;
-+		}
-+		ret = clk_prepare_enable(port->sys_ck);
-+		if (ret) {
-+			dev_err(dev, "enable sys clock error\n");
-+			phy_power_off(port->phy);
-+			return ret;
-+		}
-+
-+		ret = clk_prepare_enable(port->ahb_ck);
-+		if (ret) {
-+			dev_err(dev, "enable ahb clock error\n");
-+			phy_power_off(port->phy);
-+			clk_disable_unprepare(port->sys_ck);
-+			return ret;
-+		}
-+
-+		ret = soc->startup(port);
-+		if (ret) {
-+			dev_err(dev, "pcie linkup failed\n");
-+			phy_power_off(port->phy);
-+			clk_disable_unprepare(port->sys_ck);
-+			clk_disable_unprepare(port->ahb_ck);
-+			return ret;
-+		}
-+
-+		if (IS_ENABLED(CONFIG_PCI_MSI))
-+			mtk_pcie_enable_msi(port);
-+	}
-+
-+	return 0;
-+}
-+
-+const struct dev_pm_ops mtk_pcie_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
-+				      mtk_pcie_resume_noirq)
-+};
-+
- static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
- 	.ops = &mtk_pcie_ops,
- 	.startup = mtk_pcie_startup_port,
- };
- 
- static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-+	.pm_support = true,
- 	.ops = &mtk_pcie_ops_v2,
- 	.startup = mtk_pcie_startup_port_v2,
- 	.setup_irq = mtk_pcie_setup_irq,
-@@ -1211,6 +1292,7 @@ static struct platform_driver mtk_pcie_driver = {
- 		.name = "mtk-pcie",
- 		.of_match_table = mtk_pcie_ids,
- 		.suppress_bind_attrs = true,
-+		.pm = &mtk_pcie_pm_ops,
- 	},
- };
- builtin_platform_driver(mtk_pcie_driver);
+Sinan
+
 -- 
-2.6.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
