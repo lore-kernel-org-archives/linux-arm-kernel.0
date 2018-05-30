@@ -1,46 +1,50 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 30 May 2018 08:55:10 -0700
-Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
- <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
- <20180524173926.GC14924@minitux>
- <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
-Message-ID: <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 30 May 2018 18:57:56 +0300
+Subject: [PATCH v2 4/4] mmc: sdhci-msm: Add sdhci msm register write APIs
+ which wait for pwr irq
+In-Reply-To: <6c84f6fc-270c-d826-6d87-7f9f6fc5015f@codeaurora.org>
+References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
+ <1506490483-46871-5-git-send-email-vviswana@codeaurora.org>
+ <74a4fe0e-7ae8-9f49-5614-1e01ae977475@linaro.org>
+ <6c84f6fc-270c-d826-6d87-7f9f6fc5015f@codeaurora.org>
+Message-ID: <06d8c601-3d9f-c08e-3cfa-b33df91486f6@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sricharan R (2018-05-24 22:40:11)
-> Hi Bjorn,
-> 
-> On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
-> > On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
-> > 
-> >> From: Stephen Boyd <sboyd@codeaurora.org>
-> >>
-> >> Krait CPUs have a handful of L2 cache controller registers that
-> >> live behind a cp15 based indirection register. First you program
-> >> the indirection register (l2cpselr) to point the L2 'window'
-> >> register (l2cpdr) at what you want to read/write.  Then you
-> >> read/write the 'window' register to do what you want. The
-> >> l2cpselr register is not banked per-cpu so we must lock around
-> >> accesses to it to prevent other CPUs from re-pointing l2cpdr
-> >> underneath us.
-> >>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
-> > This should have your signed-off-by here as well.
-> > 
-> 
->  ok.
-> 
-> > Apart from that:
-> > 
-> > Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > 
-> 
+Hi Vijay,
 
-Will these patches come around again? I'll do a quick sweep on them
-today but I expect them to be resent.
+On 05/30/2018 10:11 AM, Vijay Viswanath wrote:
+> Hi Georgi,
+> 
+> Thanks for testing the patch on 8096 and pointing out this issue.
+> The issue is coming because, when card is removed, the HOST_CONTROL2
+> register is retaining the 1.8V Signalling enable bit till SDHCI reset
+> happens after a new card is inserted.
+> 
+> Adding the change you suggested can avoid this wait, but I feel a better
+> solution is to clear the 1.8V signalling bit when the card is removed.
+> When a new card is inserted, we shouldn't be keeping the 1.8V bit set
+> until we send cmd11 to the SD card. A new SD card should start with 3V.
+> 
+> One solution is to explicitly clear the HOST_CONTROL2 register when card
+> is removed.
+> 
+> Other way is to revert the commit:
+> 9718f84b85396e090ca42fafa730410d286d61e3 "mmc: sdhci-msm: Do not reset
+> the controller if no card in the slot"
+> 
+> The sdhci-msm doesn't require "SDHCI_QUIRK_NO_CARD_NO_RESET". The issue
+> which above commit is trying to avoid is fixed by the pwr-irq patches.
+> Resetting the controller will clear the HOST_CONTROL2 register and avoid
+> this issue.
+> 
+> Can you please try this ? I tested reverting the QUIRK on two platforms:
+> db410c(8916) and sdm845. SD card insert/remove worked fine after that
+> and I didn't get any "Reset 0x1 never completed" error during card
+> insert/remove or shutdown.
+
+Thank you! I have submitted a patch to remove the quirk and tested it on
+db410c and db820c.
+
+BR,
+Georgi
