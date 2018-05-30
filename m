@@ -1,52 +1,52 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 May 2018 07:54:47 -0700
-Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <20180530103720.GH6920@sirena.org.uk>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
- <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
- <20180530103720.GH6920@sirena.org.uk>
-Message-ID: <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 30 May 2018 09:56:50 -0500
+Subject: [PATCH] PCI: Add pci=safemode option
+In-Reply-To: <6dfe2db8f974d94c9867f30ec83d9333@codeaurora.org>
+References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
+ <20180530043103.GA19734@kroah.com>
+ <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
+ <20180530073735.GA28793@infradead.org>
+ <6dfe2db8f974d94c9867f30ec83d9333@codeaurora.org>
+Message-ID: <20180530145650.GA39853@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 30, 2018 at 12:44:29AM -0700, okaya at codeaurora.org wrote:
+> On 2018-05-30 00:37, Christoph Hellwig wrote:
+> > On Tue, May 29, 2018 at 09:41:33PM -0700, Sinan Kaya wrote:
+> > > Bjorn and I discussed the need for such a "safe" mode feature when you
+> > > want to bring up PCI for a platform. You want to turn off everything
+> > > as
+> > > a starter and just stick to bare minimum.
+> > 
+> > Can we please make it a config option the instead of adding code
+> > to every kernel?  Also maybe the bringup should be in the name
+> > to make this more clear?
+> 
+> One other requirement was to have a runtime option rather than compile time
+> option.
+> 
+> When someone reported a problem, we wanted to be able to say "use this
+> option and see if system boots" without doing any bisects or recompilation.
+> 
+> This would be the first step in troubleshooting a system to see if
+> fundamental features are working.
+> 
+> I don't mind changing the name
+> Bjorn mentioned safe option. I made it safemode. I am looking at Bjorn for
+> suggestions at this moment.
 
-On Wed, May 30, 2018 at 3:37 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, May 29, 2018 at 10:23:20PM -0700, Doug Anderson wrote:
->
->> > +                       qcom,drms-mode-max-microamps = <10000 1000000>;
->
->> Things look pretty good to me now.  I'm still hesitant about the whole
->> need to list the modes twice (once using the unordered
->> "regulator-allowed-modes" and once to match up against the ordered
->> "qcom,drms-mode-max-microamps").  I'm also still of the opinion that
->> the whole "drms-mode-max-microamps" ought to be a standard property
->> (not a qcom specific one) and handled in the regulator core.
->
-> I'm confused as to why we are specifying the maximum current the device
-> can deliver in a given mode in the DT - surely that's a fixed property
-> of the hardware?
+This *was* my idea, but I'm starting to think it was a bad idea.
 
-Said another way: you're saying that you'd expect the "max-microamps"
-table to have one fewer element than the listed modes?  So in the
-above example you'd have:
+I don't want people to use pci= parameters as the normal way to get a
+system to boot.  That would be a huge support hassle (putting things
+in release notes, diagnosing problems when people forget it, etc).
 
-drms-modes: LPM, HPM
-max-microamps: 10000
+But the parameters *are* useful for debugging.  If we had a
+"pci=safemode" and it avoided some problem, the next step would be to
+narrow it down by using the more specific flags (pci=nomsi, pci=noari,
+pci=no_ext_tags, etc).  So I think 95% of the value is in the specific
+flags, and a "pci=safemode" might add a little bit of value but at the
+cost of a small but nagging maintenance concern and code clutter.
 
-...or in a more complicated case, you could have:
-
-drms-modes: RET, LPM, AUTO, HPM
-max-microamps: 1, 100, 10000
-
-
-Did I understand you correctly?
-
-I'm personally OK with that color for the shed.  I kinda like the
-symmetry of having the same number of elements in both lists (and
-being able to print an error message if someone ends up asking for too
-much current), but it's not a big deal for me either way.
-
--Doug
+Bjorn
