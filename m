@@ -1,51 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 May 2018 18:56:52 +0100
-Subject: arch_wb_cache_pmem on ARM64
-In-Reply-To: <92b97864-52af-88d1-f18d-c6f6764072b0@arm.com>
-References: <alpine.LRH.2.02.1805301254340.25056@file01.intranet.prod.int.rdu2.redhat.com>
- <92b97864-52af-88d1-f18d-c6f6764072b0@arm.com>
-Message-ID: <20180530175652.fapzlssmkncusier@lakrids.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 30 May 2018 15:10:30 -0300
+Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
+In-Reply-To: <20180530173414.6121-1-andrew.smirnov@gmail.com>
+References: <20180530173414.6121-1-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5BbgG2POYvayjT99BAAkC5HzrUWr28Z7DggVwTFSCnpFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 06:31:42PM +0100, Robin Murphy wrote:
-> On 30/05/18 18:00, Mikulas Patocka wrote:
-> > Hi
-> > 
-> > I'd like to ask what's the purpose of dmb(osh) in the function
-> > arch_wb_cache_pmem in arch/arm64/mm/flush.c?
-> > 
-> > void arch_wb_cache_pmem(void *addr, size_t size)
-> > {
-> >          /* Ensure order against any prior non-cacheable writes */
-> >          dmb(osh);
-> >          __clean_dcache_area_pop(addr, size);
-> > }
-> > 
-> > The processor may flush the cache spontaneously, that means that all the
-> > flushing may actually happen before the dmb(osh) instruction - so what
-> > does that dmb instruction guard against?
-> 
-> IIRC the (very subtle) problem was to do with the odd case of a transparent
-> (i.e. beyond the PoC) system cache - if data has been written to the pmem
-> region via some non-cacheable alias, then the barrier was necessary to
-> ensure that cache maintenance via the inner-shareable kernel mapping can
-> push any data already at the PoC further along to the PoP.
+On Wed, May 30, 2018 at 2:34 PM, Andrey Smirnov
+<andrew.smirnov@gmail.com> wrote:
+> Workaround introduced for i.MX53 in be9cae2479f48 ("usb: chipidea:
+> imx: Fix ULPI on imx53") seems to be applicable in case of i.MX51 as
+> well. Running latest kernel on ZII RDU1 Board (imx51-zii-rdu1.dts)
+> exhibits a kernel frozen on PORTSC access and applying the workaround
+> resolves the issue.
+>
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Chris Healy <cphealy@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-I think it's simpler than that: the cache maintenance operations
-naturally hazard against cacheable memory accesses, but they don't
-hazard against non-cacheable accesses.
-
-Thus, we need a barrier between the two to ensure ordering.
-
-Non-cacheable accesses are Outer Shareable, so thus the barrier must be
-at least Outer Shareable.
-
-We *might* be able to get away with OSHST, though.
-
-For example, Without the barrier, prior non-cacheable stores could sit
-in a store buffer while the cache maintenance was performed, and could
-subsequently be written out after the cache maintenance was complete.
-
-Thanks,
-Mark.
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
