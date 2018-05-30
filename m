@@ -1,43 +1,43 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 May 2018 09:09:02 -0700
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+Date: Wed, 30 May 2018 09:12:25 -0700
+Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
  bindings
-In-Reply-To: <20180530160744.GS6920@sirena.org.uk>
-References: <20180523154057.GL4828@sirena.org.uk>
- <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
- <20180523155617.GN4828@sirena.org.uk>
- <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
- <20180530093701.GD6920@sirena.org.uk>
- <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
- <20180530150241.GO6920@sirena.org.uk>
- <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
- <20180530154849.GQ6920@sirena.org.uk>
- <CAD=FV=X2u=hMyWinSDtim-PmFwAy5mXcwg3HeYojAHcsUFhV3g@mail.gmail.com>
- <20180530160744.GS6920@sirena.org.uk>
-Message-ID: <CAD=FV=WVGu0f+=q-C9kiEmaLEUJqGY+Jbns83h72uF-9iasrUw@mail.gmail.com>
+In-Reply-To: <20180530155044.GR6920@sirena.org.uk>
+References: <cover.1527040878.git.collinsd@codeaurora.org>
+ <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
+ <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
+ <20180530103720.GH6920@sirena.org.uk>
+ <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
+ <20180530155044.GR6920@sirena.org.uk>
+Message-ID: <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, May 30, 2018 at 9:07 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, May 30, 2018 at 09:06:16AM -0700, Doug Anderson wrote:
->> On Wed, May 30, 2018 at 8:48 AM, Mark Brown <broonie@kernel.org> wrote:
+On Wed, May 30, 2018 at 8:50 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, May 30, 2018 at 07:54:47AM -0700, Doug Anderson wrote:
+>> On Wed, May 30, 2018 at 3:37 AM, Mark Brown <broonie@kernel.org> wrote:
 >
->> > Without the core doing something the regulator isn't going to get told
->> > that anything updated voltages anyway...
+>> > I'm confused as to why we are specifying the maximum current the device
+>> > can deliver in a given mode in the DT - surely that's a fixed property
+>> > of the hardware?
 >
->> I was just suggesting that when the core tells the regulator driver to
->> disable itself that the regulator driver tell RPMh to not only disable
->> itself but also (temporarily) vote for a lower voltage.  When the core
->> tells the regulator to re-enable itself then the regulator driver
->> restores the original voltage vote (or applies any vote that might
->> have been attempted while the regulator was disabled).  That wouldn't
->> require any regulator core changes.
+>> Said another way: you're saying that you'd expect the "max-microamps"
+>> table to have one fewer element than the listed modes?  So in the
+>> above example you'd have:
 >
-> It needs something to tell it what the new voltage to set is.
+> No, I'm saying that I don't know why that property exists at all.  This
+> sounds like it's intended to be the amount of current the regulator can
+> deliver in each mode which is normally a design property of the silicon.
 
-The regulator driver has its own cache of what voltage was most
-recently requested by Linux.  It can use that, can't it?
+Ah, got it.  So the whole point here is to be able to implement either
+the function "set_load" or the function "get_optimum_mode".  We need
+some sort of table to convert from current to mode.  That's what this
+table does.
+
+My argument to David was that since set_load / get_optimum_mode were
+features of the regulator core these should actually be standard
+properties and not Qualcomm-specific ones.
 
 -Doug
