@@ -1,60 +1,92 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 30 May 2018 15:47:40 +0930
-Subject: [PATCH] ARM: dts: aspeed: Fix hwrng register address
-Message-ID: <20180530061740.31547-1-joel@jms.id.au>
+From: vsagar@xilinx.com (Vishal Sagar)
+Date: Wed, 30 May 2018 06:22:02 +0000
+Subject: [PATCH 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx
+ Subsystem driver
+In-Reply-To: <5bf470c0-8737-273e-c138-58a05d7d9a30@infradead.org>
+References: <1527620084-94864-1-git-send-email-vishal.sagar@xilinx.com>
+ <1527620084-94864-3-git-send-email-vishal.sagar@xilinx.com>
+ <5bf470c0-8737-273e-c138-58a05d7d9a30@infradead.org>
+Message-ID: <CY4PR02MB2709A481A94CB673DC8C87EBA76C0@CY4PR02MB2709.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register address should be the full address of the rng, not the
-offset from the start of the SCU.
+Hi Randy,
 
-Fixes: 5daa8212c08e ("ARM: dts: aspeed: Describe random number device")
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
-Hi ARM maintainers, this was found when testing next-20180529 after the
-merge of the aspeed 4.18 pull request.  Can you please apply this one to
-your -next tree?
+Thanks for reviewing. 
 
-I'll also send a PR with some defconfig updates so the rng driver is
-enabled by default.
----
+> -----Original Message-----
+> From: Randy Dunlap [mailto:rdunlap at infradead.org]
+> Sent: Wednesday, May 30, 2018 1:29 AM
+> To: Vishal Sagar <vishal.sagar@xilinx.com>; Hyun Kwon <hyunk@xilinx.com>;
+> laurent.pinchart at ideasonboard.com; michal.simek at xilinx.com; linux-
+> media at vger.kernel.org; devicetree at vger.kernel.org
+> Cc: sakari.ailus at linux.intel.com; hans.verkuil at cisco.com;
+> mchehab at kernel.org; robh+dt at kernel.org; mark.rutland at arm.com; Dinesh
+> Kumar <dineshk@xilinx.com>; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx Subsystem
+> driver
+> 
+> On 05/29/2018 11:54 AM, Vishal Sagar wrote:
+> >
+> > Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
+> > ---
+> >  drivers/media/platform/xilinx/Kconfig           |   12 +
+> >  drivers/media/platform/xilinx/Makefile          |    1 +
+> >  drivers/media/platform/xilinx/xilinx-csi2rxss.c | 1751
+> +++++++++++++++++++++++
+> >  include/uapi/linux/xilinx-csi2rxss.h            |   25 +
+> >  include/uapi/linux/xilinx-v4l2-controls.h       |   14 +
+> >  5 files changed, 1803 insertions(+)
+> >  create mode 100644 drivers/media/platform/xilinx/xilinx-csi2rxss.c
+> >  create mode 100644 include/uapi/linux/xilinx-csi2rxss.h
+> >
+> > diff --git a/drivers/media/platform/xilinx/Kconfig
+> b/drivers/media/platform/xilinx/Kconfig
+> > index a5d21b7..06d5944 100644
+> > --- a/drivers/media/platform/xilinx/Kconfig
+> > +++ b/drivers/media/platform/xilinx/Kconfig
+> > @@ -8,6 +8,18 @@ config VIDEO_XILINX
+> >
+> >  if VIDEO_XILINX
+> >
+> > +config VIDEO_XILINX_CSI2RXSS
+> > +       tristate "Xilinx CSI2 Rx Subsystem"
+> > +       depends on VIDEO_XILINX
+> > +       help
+> > +         Driver for Xilinx MIPI CSI2 Rx Subsystem. This is a V4L sub-device
+> > +         based driver that takes input from CSI2 Tx source and converts
+> > +         it into an AXI4-Stream. It has a DPHY (whose register interface
+> > +         can be enabled, an optional I2C controller and an optional Video
+> 
+> 	    can be enabled),
+> 
 
- arch/arm/boot/dts/aspeed-g4.dtsi | 4 ++--
- arch/arm/boot/dts/aspeed-g5.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Noted. I will update in next revision of patch.
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 5e947ed496c2..75df1573380e 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -145,9 +145,9 @@
- 
- 			};
- 
--			rng: hwrng at 78 {
-+			rng: hwrng at 1e6e2078 {
- 				compatible = "timeriomem_rng";
--				reg = <0x78 0x4>;
-+				reg = <0x1e6e2078 0x4>;
- 				period = <1>;
- 				quality = <100>;
- 			};
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 24eec00c4a95..17f2714d18a7 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -189,9 +189,9 @@
- 				};
- 			};
- 
--			rng: hwrng at 78 {
-+			rng: hwrng at 1e6e2078 {
- 				compatible = "timeriomem_rng";
--				reg = <0x78 0x4>;
-+				reg = <0x1e6e2078 0x4>;
- 				period = <1>;
- 				quality = <100>;
- 			};
--- 
-2.17.0
+> > +         Format Bridge which converts the AXI4-Stream data to Xilinx Video
+> > +         Bus formats based on UG934. The driver is used to set the number
+> > +         of active lanes and get short packet data.
+> > +
+> >  config VIDEO_XILINX_TPG
+> >         tristate "Xilinx Video Test Pattern Generator"
+> >         depends on VIDEO_XILINX
+> 
+> 
+> 
+> > This email and any attachments are intended for the sole use of the named
+> recipient(s) and contain(s) confidential information that may be proprietary,
+> privileged or copyrighted under applicable law. If you are not the intended
+> recipient, do not read, copy, or forward this email message or any attachments.
+> Delete this email message and any attachments immediately.
+> 
+> :(
+> 
+
+Sorry about that.
+I will work with IT on getting this removed before sending v2 for the patches.
+
+-- Vishal 
+
+> --
+> ~Randy
