@@ -1,100 +1,69 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 30 May 2018 17:15:27 +0200
-Subject: [PATCH 2/3] ARM: shmobile: apmu: Remove obsolete
- shmobile_smp_apmu_prepare_cpus()
+Date: Wed, 30 May 2018 17:15:26 +0200
+Subject: [PATCH 1/3] ARM: shmobile: apmu: Move cpu_leave_lowpower() to SUSPEND
+ section
 In-Reply-To: <1527693328-10559-1-git-send-email-geert+renesas@glider.be>
 References: <1527693328-10559-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1527693328-10559-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527693328-10559-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the removal of the legacy SMP fallbacks, there are no more users
-left of shmobile_smp_apmu_prepare_cpus().
-
-Remove it, together with the legacy SMP config parser.
+cpu_leave_lowpower() is used for suspend only, not for CPU hotplug.
+Hence move it from the HOTPLUG_CPU || SUSPEND section to the SUSPEND
+section.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/platsmp-apmu.c | 40 -----------------------------------
- arch/arm/mach-shmobile/platsmp-apmu.h |  8 -------
- 2 files changed, 48 deletions(-)
+ arch/arm/mach-shmobile/platsmp-apmu.c | 30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 778b6b618ce7c088..42c9405e556b14aa 100644
+index ba732effc90b019f..778b6b618ce7c088 100644
 --- a/arch/arm/mach-shmobile/platsmp-apmu.c
 +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -106,38 +106,6 @@ static void apmu_init_cpu(struct resource *res, int cpu, int bit)
- 	writel(x, apmu_cpus[cpu].iomem + DBGRCR_OFFS);
+@@ -270,21 +270,6 @@ static void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
+ 	/* Do ARM specific CPU shutdown */
+ 	cpu_enter_lowpower_a15();
+ }
+-
+-static inline void cpu_leave_lowpower(void)
+-{
+-	unsigned int v;
+-
+-	asm volatile("mrc    p15, 0, %0, c1, c0, 0\n"
+-		     "       orr     %0, %0, %1\n"
+-		     "       mcr     p15, 0, %0, c1, c0, 0\n"
+-		     "       mrc     p15, 0, %0, c1, c0, 1\n"
+-		     "       orr     %0, %0, %2\n"
+-		     "       mcr     p15, 0, %0, c1, c0, 1\n"
+-		     : "=&r" (v)
+-		     : "Ir" (CR_C), "Ir" (0x40)
+-		     : "cc");
+-}
+ #endif
+ 
+ #if defined(CONFIG_HOTPLUG_CPU)
+@@ -315,6 +300,21 @@ static int shmobile_smp_apmu_do_suspend(unsigned long cpu)
+ 	return 1;
  }
  
--static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit),
--			   struct rcar_apmu_config *apmu_config, int num)
--{
--	int id;
--	int k;
--	int bit, index;
--	bool is_allowed;
--
--	for (k = 0; k < num; k++) {
--		/* only enable the cluster that includes the boot CPU */
--		is_allowed = false;
--		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
--			id = apmu_config[k].cpus[bit];
--			if (id >= 0) {
--				if (id == cpu_logical_map(0))
--					is_allowed = true;
--			}
--		}
--		if (!is_allowed)
--			continue;
--
--		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
--			id = apmu_config[k].cpus[bit];
--			if (id >= 0) {
--				index = get_logical_index(id);
--				if (index >= 0)
--					fn(&apmu_config[k].iomem, index, bit);
--			}
--		}
--	}
--}
--
- static const struct of_device_id apmu_ids[] = {
- 	{ .compatible = "renesas,apmu" },
- 	{ /*sentinel*/ }
-@@ -194,14 +162,6 @@ static void __init shmobile_smp_apmu_setup_boot(void)
- 	shmobile_boot_fn_gen2 = shmobile_boot_fn;
- }
- 
--void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
--					   struct rcar_apmu_config *apmu_config,
--					   int num)
--{
--	shmobile_smp_apmu_setup_boot();
--	apmu_parse_cfg(apmu_init_cpu, apmu_config, num);
--}
--
- int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile("mrc    p15, 0, %0, c1, c0, 0\n"
++		     "       orr     %0, %0, %1\n"
++		     "       mcr     p15, 0, %0, c1, c0, 0\n"
++		     "       mrc     p15, 0, %0, c1, c0, 1\n"
++		     "       orr     %0, %0, %2\n"
++		     "       mcr     p15, 0, %0, c1, c0, 1\n"
++		     : "=&r" (v)
++		     : "Ir" (CR_C), "Ir" (0x40)
++		     : "cc");
++}
++
+ static int shmobile_smp_apmu_enter_suspend(suspend_state_t state)
  {
- 	/* For this particular CPU register boot vector */
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.h b/arch/arm/mach-shmobile/platsmp-apmu.h
-index 76512c9a2545da75..70424572b9da2e70 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.h
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.h
-@@ -16,14 +16,6 @@
- #ifndef PLATSMP_APMU_H
- #define PLATSMP_APMU_H
- 
--struct rcar_apmu_config {
--	struct resource iomem;
--	int cpus[4];
--};
--
--extern void shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
--					   struct rcar_apmu_config *apmu_config,
--					   int num);
- extern int shmobile_smp_apmu_boot_secondary(unsigned int cpu,
- 					    struct task_struct *idle);
- extern void shmobile_smp_apmu_cpu_die(unsigned int cpu);
+ 	cpu_suspend(smp_processor_id(), shmobile_smp_apmu_do_suspend);
 -- 
 2.7.4
