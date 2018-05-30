@@ -1,95 +1,122 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 30 May 2018 17:25:14 +0200
-Subject: [PATCH 4/6] ARM: shmobile: r8a7779: Use rcar_sysc_power_{down,
- up}_cpu()
+Date: Wed, 30 May 2018 17:25:16 +0200
+Subject: [PATCH 6/6] soc: renesas: rcar-sysc: Drop legacy handling
 In-Reply-To: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
 References: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1527693916-11215-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527693916-11215-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The r8a7779 SMP code calls rcar_sysc_power_{down,up}() to control power
-to the SYSC power areas containing CPUs. This requires passing full CPU
-power area parameter blocks.
-
-Migrate the code to call the new rcar_sysc_power_{down,up}_cpu()
-helpers, which just take a CPU index, and use the SYSC power area
-definitions from the r8a7779-sysc driver.
+Now the R-Car platform code no longer supports DTBs lacking a SYSC
+device node in DT, all legacy handling can be dropped from the R-Car
+SYSC driver:
+  - Make rcar_sysc_ch private to the driver,
+  - Make rcar_sysc_power_{down,up}() static (they have been replaced by
+    rcar_sysc_power_{down,up}_cpu()),
+  - Remove the legacy wrapper rcar_sysc_init(), and the check for double
+    initialization (only the early_initcall is left).
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 47 +++++-------------------------------
- 1 file changed, 6 insertions(+), 41 deletions(-)
+ drivers/soc/renesas/rcar-sysc.c       | 38 ++++++++---------------------------
+ include/linux/soc/renesas/rcar-sysc.h | 11 ----------
+ 2 files changed, 8 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index ff1e6fc0b861c4fc..3036f910046118ee 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -31,59 +31,24 @@
- #define AVECR IOMEM(0xfe700040)
- #define R8A7779_SCU_BASE 0xf0000000
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 4ad6dcd19420a045..41af9c7b912f09ca 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -58,6 +58,12 @@
  
--static const struct rcar_sysc_ch r8a7779_ch_cpu1 = {
--	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
--	.chan_bit = 1, /* ARM1 */
--	.isr_bit = 1, /* ARM1 */
--};
--
--static const struct rcar_sysc_ch r8a7779_ch_cpu2 = {
--	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
--	.chan_bit = 2, /* ARM2 */
--	.isr_bit = 2, /* ARM2 */
--};
--
--static const struct rcar_sysc_ch r8a7779_ch_cpu3 = {
--	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
--	.chan_bit = 3, /* ARM3 */
--	.isr_bit = 3, /* ARM3 */
--};
--
--static const struct rcar_sysc_ch * const r8a7779_ch_cpu[4] = {
--	[1] = &r8a7779_ch_cpu1,
--	[2] = &r8a7779_ch_cpu2,
--	[3] = &r8a7779_ch_cpu3,
--};
--
- static int r8a7779_platform_cpu_kill(unsigned int cpu)
- {
--	const struct rcar_sysc_ch *ch = NULL;
- 	int ret = -EIO;
+ #define RCAR_PD_ALWAYS_ON	32	/* Always-on power area */
  
- 	cpu = cpu_logical_map(cpu);
--
--	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
--		ch = r8a7779_ch_cpu[cpu];
--
--	if (ch)
--		ret = rcar_sysc_power_down(ch);
-+	if (cpu)
-+		ret = rcar_sysc_power_down_cpu(cpu);
++struct rcar_sysc_ch {
++	u16 chan_offs;
++	u8 chan_bit;
++	u8 isr_bit;
++};
++
+ static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
  
- 	return ret ? ret : 1;
- }
- 
- static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	const struct rcar_sysc_ch *ch = NULL;
--	unsigned int lcpu = cpu_logical_map(cpu);
--	int ret;
--
--	if (lcpu < ARRAY_SIZE(r8a7779_ch_cpu))
--		ch = r8a7779_ch_cpu[lcpu];
-+	int ret = -EIO;
- 
--	if (ch)
--		ret = rcar_sysc_power_up(ch);
--	else
--		ret = -EIO;
-+	cpu = cpu_logical_map(cpu);
-+	if (cpu)
-+		ret = rcar_sysc_power_up_cpu(cpu);
- 
+@@ -143,12 +149,12 @@ static int rcar_sysc_power(const struct rcar_sysc_ch *sysc_ch, bool on)
  	return ret;
  }
+ 
+-int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
++static int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_power(sysc_ch, false);
+ }
+ 
+-int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
++static int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_power(sysc_ch, true);
+ }
+@@ -323,9 +329,6 @@ static int __init rcar_sysc_pd_init(void)
+ 	unsigned int i;
+ 	int error;
+ 
+-	if (rcar_sysc_base)
+-		return 0;
+-
+ 	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
+ 	if (!np)
+ 		return -ENODEV;
+@@ -428,31 +431,6 @@ void __init rcar_sysc_nullify(struct rcar_sysc_area *areas,
+ 		}
+ }
+ 
+-void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
+-{
+-	u32 syscimr;
+-
+-	if (!rcar_sysc_pd_init())
+-		return;
+-
+-	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
+-
+-	/*
+-	 * Mask all interrupt sources to prevent the CPU from receiving them.
+-	 * Make sure not to clear reserved bits that were set before.
+-	 */
+-	syscimr = ioread32(rcar_sysc_base + SYSCIMR);
+-	syscimr |= syscier;
+-	pr_debug("%s: syscimr = 0x%08x\n", __func__, syscimr);
+-	iowrite32(syscimr, rcar_sysc_base + SYSCIMR);
+-
+-	/*
+-	 * SYSC needs all interrupt sources enabled to control power.
+-	 */
+-	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
+-	iowrite32(syscier, rcar_sysc_base + SYSCIER);
+-}
+-
+ #ifdef CONFIG_ARCH_R8A7779
+ static int rcar_sysc_power_cpu(unsigned int idx, bool on)
+ {
+diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
+index 9020da2111fdeea9..00fae6fd234d7895 100644
+--- a/include/linux/soc/renesas/rcar-sysc.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -2,17 +2,6 @@
+ #ifndef __LINUX_SOC_RENESAS_RCAR_SYSC_H__
+ #define __LINUX_SOC_RENESAS_RCAR_SYSC_H__
+ 
+-#include <linux/types.h>
+-
+-struct rcar_sysc_ch {
+-	u16 chan_offs;
+-	u8 chan_bit;
+-	u8 isr_bit;
+-};
+-
+-int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
+-int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+-void rcar_sysc_init(phys_addr_t base, u32 syscier);
+ int rcar_sysc_power_down_cpu(unsigned int cpu);
+ int rcar_sysc_power_up_cpu(unsigned int cpu);
+ 
 -- 
 2.7.4
