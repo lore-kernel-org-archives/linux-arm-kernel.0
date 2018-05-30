@@ -1,51 +1,89 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 30 May 2018 14:15:58 +0200
-Subject: [PATCH v2 07/10] dt-bindings: tc358754: add DT bindings
+Date: Wed, 30 May 2018 14:16:01 +0200
+Subject: [PATCH v2 10/10] ARM: dts: exynos5250-arndale: add DSI and panel nodes
 In-Reply-To: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
 References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121627eucas1p1c8daf24d7c95e9e8b04a523d4662dfd9@eucas1p1.samsung.com>
-Message-ID: <1527682561-1386-8-git-send-email-m.purski@samsung.com>
+ <CGME20180530121630eucas1p1584c59b67815a65d0747afab214979ef@eucas1p1.samsung.com>
+Message-ID: <1527682561-1386-11-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrzej Hajda <a.hajda@samsung.com>
 
-The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
-Bindings describe power supplies, reset gpio and video interfaces.
+The patch adds bridge and panel nodes.
+It adds also DSI properties specific for arndale board and
+regulators required by the bridge.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- .../bindings/display/bridge/toshiba,tc358764.txt   | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+ arch/arm/boot/dts/exynos5250-arndale.dts | 61 ++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
-new file mode 100644
-index 0000000..6eda14f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
-@@ -0,0 +1,37 @@
-+TC358764 MIPI-DSI to LVDS panel bridge
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 7a8a5c5..816d89d 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -71,6 +71,17 @@
+ 		};
+ 	};
+ 
++	panel: panel {
++		compatible = "boe,hv070wsa-100";
++		power-supply = <&vcc_3v3_reg>;
++		enable-gpios = <&gpd1 3 GPIO_ACTIVE_HIGH>;
++		port {
++			panel_ep: endpoint {
++				remote-endpoint = <&bridge_out_ep>;
++			};
++		};
++	};
 +
-+Required properties:
-+  - compatible: "toshiba,tc358764"
-+  - reg: the virtual channel number of a DSI peripheral
-+  - vddc-supply: core voltage supply, 1.2V
-+  - vddio-supply: I/O voltage supply, 1.8V or 3.3V
-+  - vddlvds-supply: LVDS1/2 voltage supply, 3.3V
-+  - reset-gpios: a GPIO spec for the reset pin
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -97,6 +108,30 @@
+ 			reg = <2>;
+ 			regulator-name = "hdmi-en";
+ 		};
 +
-+The device node can contain zero to two 'port' child nodes, each with one
-+child 'endpoint' node, according to the bindings defined in [1].
-+The following are properties specific to those nodes.
++		vcc_1v2_reg: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "VCC_1V2";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++		};
 +
-+port:
-+  - reg: (required) can be 0 for DSI port or 1 for LVDS port;
++		vcc_1v8_reg: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			regulator-name = "VCC_1V8";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
 +
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+
-+Example:
++		vcc_3v3_reg: regulator at 5 {
++			compatible = "regulator-fixed";
++			reg = <5>;
++			regulator-name = "VCC_3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
+ 	};
+ 
+ 	fixed-rate-clocks {
+@@ -119,6 +154,32 @@
+ 	cpu0-supply = <&buck2_reg>;
+ };
+ 
++&dsi_0 {
++	vddcore-supply = <&ldo8_reg>;
++	vddio-supply = <&ldo10_reg>;
++	samsung,pll-clock-frequency = <24000000>;
++	samsung,burst-clock-frequency = <320000000>;
++	samsung,esc-clock-frequency = <10000000>;
++	status = "okay";
 +
 +	bridge at 0 {
 +		reg = <0>;
@@ -58,10 +96,15 @@ index 0000000..6eda14f
 +		#size-cells = <0>;
 +		port at 1 {
 +			reg = <1>;
-+			lvds_ep: endpoint {
++			bridge_out_ep: endpoint {
 +				remote-endpoint = <&panel_ep>;
 +			};
 +		};
 +	};
++};
++
+ &dp {
+ 	status = "okay";
+ 	samsung,color-space = <0>;
 -- 
 2.7.4
