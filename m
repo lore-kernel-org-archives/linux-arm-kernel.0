@@ -1,119 +1,92 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 30 May 2018 14:54:46 +0200
-Subject: [PATCH v3 1/2] ARM: dma-mapping: Implement
- arm_dma_iommu_detach_device()
-In-Reply-To: <eee02391-aa25-da84-f98a-b5fed6c69599@arm.com>
-References: <20180530080345.2353-1-thierry.reding@gmail.com>
- <20180530080345.2353-2-thierry.reding@gmail.com>
- <eee02391-aa25-da84-f98a-b5fed6c69599@arm.com>
-Message-ID: <20180530125446.GA1595@ulmo>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Wed, 30 May 2018 14:55:28 +0200
+Subject: [PATCH] ARM: debug: Add Iproc UART3 debug addresses
+In-Reply-To: <20180530123809.khyzehg62ct6jzws@sapphire.tkos.co.il>
+References: <20180530122922.1041-1-peron.clem@gmail.com>
+ <20180530123809.khyzehg62ct6jzws@sapphire.tkos.co.il>
+Message-ID: <CAJiuCcdJi6Ln3+Eip+Nc=-4aZu4bsTfT-MPVZisec7e10jO4XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 10:59:30AM +0100, Robin Murphy wrote:
-> On 30/05/18 09:03, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Implement this function to enable drivers from detaching from any IOMMU
-> > domains that architecture code might have attached them to so that they
-> > can take exclusive control of the IOMMU via the IOMMU API.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+Hi Baruch,
+
+On Wed, 30 May 2018 at 14:47, Baruch Siach <baruch@tkos.co.il> wrote:
+
+> Hi Cl?ment,
+
+> On Wed, May 30, 2018 at 02:29:22PM +0200, Cl?ment P?ron wrote:
+> > From: Cl?ment Peron <clement.peron@devialet.com>
+> >
+> > Broadcom Iproc SoCs typically use the UART3 for
+> > debug/console, provide a known good location for that.
+> >
+> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
 > > ---
-> > Changes in v3:
-> > - make API 32-bit ARM specific
-> > - avoid extra local variable
-> > 
-> > Changes in v2:
-> > - fix compilation
-> > 
-> >   arch/arm/include/asm/dma-mapping.h |  3 +++
-> >   arch/arm/mm/dma-mapping-nommu.c    |  4 ++++
-> >   arch/arm/mm/dma-mapping.c          | 16 ++++++++++++++++
-> >   3 files changed, 23 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > index 8436f6ade57d..5960e9f3a9d0 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -103,6 +103,9 @@ extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >   #define arch_teardown_dma_ops arch_teardown_dma_ops
-> >   extern void arch_teardown_dma_ops(struct device *dev);
-> > +#define arm_dma_iommu_detach_device arm_dma_iommu_detach_device
-> > +extern void arm_dma_iommu_detach_device(struct device *dev);
+> >  arch/arm/Kconfig.debug | 12 +++++++++++-
+> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> > index 199ebc1c4538..fa6fa1dae94d 100644
+> > --- a/arch/arm/Kconfig.debug
+> > +++ b/arch/arm/Kconfig.debug
+> > @@ -207,6 +207,14 @@ choice
+> >               depends on ARCH_BCM_HR2
+> >               select DEBUG_UART_8250
+> >
+> > +     config DEBUG_BCM_IPROC_UART3
+> > +             bool "Kernel low-level debugging on BCM IPROC UART3"
+> > +             depends on ARCH_BCM_CYGNUS
+> > +             select DEBUG_UART_8250
+> > +             help
+> > +               Say Y here if you want the debug print routines to
+direct
+> > +               their output to the third serial port on these devices.
 > > +
-> >   /* do not use this function in a driver */
-> >   static inline bool is_device_dma_coherent(struct device *dev)
-> >   {
-> > diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-> > index f448a0663b10..eb781369377b 100644
-> > --- a/arch/arm/mm/dma-mapping-nommu.c
-> > +++ b/arch/arm/mm/dma-mapping-nommu.c
-> > @@ -241,3 +241,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >   void arch_teardown_dma_ops(struct device *dev)
-> >   {
-> >   }
-> > +
-> > +void arm_dma_iommu_detach_device(struct device *dev)
-> > +{
-> > +}
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index af27f1c22d93..6d8af08b3e7d 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -2400,3 +2400,19 @@ void arch_teardown_dma_ops(struct device *dev)
-> >   	arm_teardown_iommu_dma_ops(dev);
-> >   }
-> > +
-> > +void arm_dma_iommu_detach_device(struct device *dev)
-> > +{
-> > +#ifdef CONFIG_ARM_DMA_USE_IOMMU
-> > +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
-> > +
-> > +	if (!mapping)
-> > +		return;
-> > +
-> > +	arm_iommu_release_mapping(mapping);
-> 
-> Potentially freeing the mapping before you try to operate on it is never the
-> best idea. Plus arm_iommu_detach_device() already releases a reference
-> appropriately anyway, so it's a double-free.
+> >       config DEBUG_BCM_KONA_UART
+> >               bool "Kernel low-level debugging messages via BCM KONA
+UART"
+> >               depends on ARCH_BCM_MOBILE
+> > @@ -1564,6 +1572,7 @@ config DEBUG_UART_PHYS
+> >       default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+> >       default 0x20201000 if DEBUG_BCM2835
+> >       default 0x3f201000 if DEBUG_BCM2836
+> > +     default 0x18023000 if DEBUG_BCM_IPROC_UART3
 
-But the reference released by arm_iommu_detach_device() is to balance
-out the reference acquired by arm_iommu_attach_device(), isn't it? In
-the above, the arm_iommu_release_mapping() is supposed to drop the
-final reference which was obtained by arm_iommu_create_mapping(). The
-mapping shouldn't go away irrespective of the order in which these
-will be called.
+> Entries are sorted by the address value. Except that DEBUG_BCM_KONA_UART
+> should be listed above DEBUG_BCM2836.
 
-> > +	arm_iommu_detach_device(dev);
-> > +
-> > +	set_dma_ops(dev, arm_get_dma_map_ops(dev->archdata.dma_coherent));
-> > +#endif
-> > +}
-> > +EXPORT_SYMBOL(arm_dma_iommu_detach_device);
-> 
-> I really don't see why we need an extra function that essentially just
-> duplicates arm_iommu_detach_device(). The only real difference here is that
-> here you reset the DMA ops more appropriately, but I think the existing
-> function should be fixed to do that anyway, since set_dma_ops(dev, NULL) now
-> just behaves as an unconditional fallback to the noncoherent arm_dma_ops,
-> which clearly isn't always right.
+Indeed, can I fix the DEBUG_BCM_KONA_UART entry in the same commit ?
 
-The idea behind making this an extra function is that we can call it
-unconditionally and it will do the right things. Granted, that already
-doesn't quite work as elegantly anymore as I had hoped since this is
-now an ARM specific function, so we need an #ifdef guard anyway.
 
-I don't care very strongly either way, so if you and Christoph can both
-agree that we just want arm_iommu_detach_device() to call the proper
-variant of set_dma_ops(), that's fine with me, too.
+> >       default 0x3e000000 if DEBUG_BCM_KONA_UART
+> >       default 0x4000e400 if DEBUG_LL_UART_EFM32
+> >       default 0x40028000 if DEBUG_AT91_SAMV7_USART1
+> > @@ -1730,6 +1739,7 @@ config DEBUG_UART_VIRT
+> >       default 0xfe018000 if DEBUG_MMP_UART3
+> >       default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
+> >       default 0xfe230000 if DEBUG_PICOXCELL_UART
+> > +     default 0xf1023000 if DEBUG_BCM_IPROC_UART3
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/38fbec80/attachment-0001.sig>
+> Same here.
+
+> >       default 0xfe300000 if DEBUG_BCM_KONA_UART
+> >       default 0xfe800000 if ARCH_IOP32X
+> >       default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
+> > @@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
+> >               DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
+> >               DEBUG_ALPINE_UART0 || \
+> >               DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+> > -             DEBUG_DAVINCI_DA8XX_UART2 || \
+> > +             DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
+> >               DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
+
+> baruch
+
+> --
+>       http://baruch.siach.name/blog/                  ~. .~   Tk Open
+Systems
+
+=}------------------------------------------------ooO--U--Ooo------------{=
+>     - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+
+Clement
