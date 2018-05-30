@@ -1,58 +1,71 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 30 May 2018 09:30:42 +0800
-Subject: [PATCH V2] soc: imx: gpcv2: correct PGC offset
-Message-ID: <1527643842-17643-1-git-send-email-Anson.Huang@nxp.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 30 May 2018 01:38:22 +0000
+Subject: [PATCH] soc: imx: gpcv2: correct PGC offset
+In-Reply-To: <0e0690c89b24b4b028e4a0dab63334af4b37fdd3.camel@nxp.com>
+References: <1527580944-10043-1-git-send-email-Anson.Huang@nxp.com>
+ <0e0690c89b24b4b028e4a0dab63334af4b37fdd3.camel@nxp.com>
+Message-ID: <AM3PR04MB1315EFC9F5CA9DBD7CBC54B5F56C0@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct MIPI/PCIe/USB_HSIC's PGC offset based on
-design RTL, the values in the Reference Manual
-(Rev. 1, 01/2018 and the older ones) are incorrect.
+Hi, Leonard
 
-The correct offset values should be as below:
+Anson Huang
+Best Regards!
 
-0x800 ~ 0x83F: PGC for core0 of A7 platform;
-0x840 ~ 0x87F: PGC for core1 of A7 platform;
-0x880 ~ 0x8BF: PGC for SCU of A7 platform;
-0xA00 ~ 0xA3F: PGC for fastmix/megamix;
-0xC00 ~ 0xC3F: PGC for MIPI PHY;
-0xC40 ~ 0xC7F: PGC for PCIe_PHY;
-0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
-0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
-0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
-changes since V1:
-	add comment in code to make it more readable;
-	improve the commit message.
- drivers/soc/imx/gpcv2.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
-index f4e3bd4..6ef18cf 100644
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -39,10 +39,15 @@
+> -----Original Message-----
+> From: Leonard Crestez
+> Sent: Tuesday, May 29, 2018 10:03 PM
+> To: Anson Huang <anson.huang@nxp.com>; shawnguo at kernel.org; Andrey
+> Smirnov <andrew.smirnov@gmail.com>
+> Cc: dl-linux-imx <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; s.hauer at pengutronix.de;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; Abel Vesa
+> <abel.vesa@nxp.com>; Richard Liu <xuegang.liu@nxp.com>
+> Subject: Re: [PATCH] soc: imx: gpcv2: correct PGC offset
+> 
+> On Tue, 2018-05-29 at 16:02 +0800, Anson Huang wrote:
+> > Correct MIPI/PCIe/USB_HSIC's PGC offset based on design RTL, the value
+> > on Reference Manual are incorrect.
+> >
+> > The correct offset should be as below:
+> >
+> > -#define PGC_MIPI			4
+> > -#define PGC_PCIE			5
+> > -#define PGC_USB_HSIC			8
+> > +#define PGC_MIPI			16
+> > +#define PGC_PCIE			17
+> > +#define PGC_USB_HSIC			20
+> >  #define GPC_PGC_CTRL(n)			(0x800 + (n) * 0x40)
+> >  #define GPC_PGC_SR(n)			(GPC_PGC_CTRL(n) + 0xc)
+> 
+> This gpcv2 driver is currently only used for PCI, it probably only works because
+> domains happen to be turned on by default?
  
- #define GPC_M4_PU_PDN_FLG		0x1bc
- 
--
--#define PGC_MIPI			4
--#define PGC_PCIE			5
--#define PGC_USB_HSIC			8
-+/*
-+ * The PGC offset values in Reference Manual
-+ * (Rev. 1, 01/2018 and the older ones) GPC chapter's
-+ * GPC_PGC memory map are incorrect, below offset
-+ * values are from design RTL.
-+ */
-+#define PGC_MIPI			16
-+#define PGC_PCIE			17
-+#define PGC_USB_HSIC			20
- #define GPC_PGC_CTRL(n)			(0x800 + (n) * 0x40)
- #define GPC_PGC_SR(n)			(GPC_PGC_CTRL(n) + 0xc)
- 
--- 
-2.7.4
+I think so.
+
+> 
+> On imx7d upstream platform suspend is not yet supported but even doing
+> device-level suspend causes a hang on resume somewhere in PCI on first read.
+> This patch fixes that immediate hang.
+
+I just added the imx7d platform suspend/resume support using psci in u-boot, patches
+are sent out for review. 
+
+I did notice PCI resume cause system hang, the root cause is PCI controller registers
+can NOT be accessed after resume, and the PCI PHY PLL is NOT locked when issue happen,
+the PCI driver should implement suspend/resume and redo the init flow after resume, since
+its power VDD1P0D are OFF after suspend.
+
+I saw you sent out patch to fix it, thanks.
+
+Anson.
+
+> 
+> After suspend/resume lspci is broken (device doesn't properly resume), that
+> probably requires more imx pci patches and unrelated to pgc.
+> 
+> --
+> Regards,
+> Leonard
