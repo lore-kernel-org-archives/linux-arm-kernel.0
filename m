@@ -1,88 +1,54 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 30 May 2018 17:06:11 +0100
-Subject: [PATCH v2 6/9] PM / Domains: Don't attach devices in genpd with
- multi PM domains
-In-Reply-To: <20180529100421.31022-7-ulf.hansson@linaro.org>
-References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-7-ulf.hansson@linaro.org>
-Message-ID: <3b5072bb-f4bb-3f71-9575-5263cdf0b09f@nvidia.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 30 May 2018 09:06:16 -0700
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <20180530154849.GQ6920@sirena.org.uk>
+References: <20180523082908.GB4828@sirena.org.uk>
+ <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
+ <20180523154057.GL4828@sirena.org.uk>
+ <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
+ <20180523155617.GN4828@sirena.org.uk>
+ <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
+ <20180530093701.GD6920@sirena.org.uk>
+ <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
+ <20180530150241.GO6920@sirena.org.uk>
+ <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
+ <20180530154849.GQ6920@sirena.org.uk>
+Message-ID: <CAD=FV=X2u=hMyWinSDtim-PmFwAy5mXcwg3HeYojAHcsUFhV3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 29/05/18 11:04, Ulf Hansson wrote:
-> The power-domain DT property may now contain a list of PM domain
-> specifiers, which represents that a device are partitioned across multiple
-> PM domains. This leads to a new situation in genpd_dev_pm_attach(), as only
-> one PM domain can be attached per device.
-> 
-> To remain things simple for the most common configuration, when a single PM
-> domain is used, let's treat the multiple PM domain case as being specific.
-> 
-> In other words, let's change genpd_dev_pm_attach() to check for multiple PM
-> domains and prevent it from attach any PM domain for this case. Instead,
-> leave this to be managed separately, from following changes to genpd.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Suggested-by: Jon Hunter <jonathanh@nvidia.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
-> 
-> Changes in v2:
-> 	- Minor update to changelog to mention "PM domain specifiers" rather
-> 	than a "list of phandles".
-> 
-> ---
->  drivers/base/power/domain.c | 18 +++++++++++++-----
->  1 file changed, 13 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 7ebf7993273a..12a20f21974d 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -2229,10 +2229,10 @@ static void genpd_dev_pm_sync(struct device *dev)
->   * attaches the device to retrieved pm_domain ops.
->   *
->   * Returns 1 on successfully attached PM domain, 0 when the device don't need a
-> - * PM domain or a negative error code in case of failures. Note that if a
-> - * power-domain exists for the device, but it cannot be found or turned on,
-> - * then return -EPROBE_DEFER to ensure that the device is not probed and to
-> - * re-try again later.
-> + * PM domain or when multiple power-domains exists for it, else a negative error
-> + * code. Note that if a power-domain exists for the device, but it cannot be
-> + * found or turned on, then return -EPROBE_DEFER to ensure that the device is
-> + * not probed and to re-try again later.
->   */
->  int genpd_dev_pm_attach(struct device *dev)
->  {
-> @@ -2243,10 +2243,18 @@ int genpd_dev_pm_attach(struct device *dev)
->  	if (!dev->of_node)
->  		return 0;
->  
-> +	/*
-> +	 * Devices with multiple PM domains must be attached separately, as we
-> +	 * can only attach one PM domain per device.
-> +	 */
-> +	if (of_count_phandle_with_args(dev->of_node, "power-domains",
-> +				       "#power-domain-cells") != 1)
-> +		return 0;
-> +
->  	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
->  					"#power-domain-cells", 0, &pd_args);
->  	if (ret < 0)
-> -		return 0;
-> +		return ret;
->  
->  	mutex_lock(&gpd_list_lock);
->  	pd = genpd_get_from_provider(&pd_args);
-> 
+On Wed, May 30, 2018 at 8:48 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, May 30, 2018 at 08:34:50AM -0700, Doug Anderson wrote:
+>> On Wed, May 30, 2018 at 8:02 AM, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > What you're describing sounds like what we should be doing normally, if
+>> > we're not doing that we should probably be fixing the core.
+>
+>> I'm not convinced that this behavior makes sense to move to the core.
+>> On most regulators I'd expect that when the regulator driver says to
+>> turn them off that they will output no voltage.  The reason RPMh is
+>
+> Oh, you mean while the regulator is off...  TBH I don't see a huge
+> problem doing that anyway and just reverting to the bottom of the
+> constraints when everything gets turned off since we have to see if we
+> need to adjust the voltage every time we enabled anyway.
+>
+>> In any other system when Linux disabled the regulator it wouldn't
+>> matter that you left it set at 1.4V.  Thus RPMh is special and IMO the
+>> workaround belongs there.
+>
+> Without the core doing something the regulator isn't going to get told
+> that anything updated voltages anyway...
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Tested-by: Jon Hunter <jonathanh@nvidia.com>
+I was just suggesting that when the core tells the regulator driver to
+disable itself that the regulator driver tell RPMh to not only disable
+itself but also (temporarily) vote for a lower voltage.  When the core
+tells the regulator to re-enable itself then the regulator driver
+restores the original voltage vote (or applies any vote that might
+have been attempted while the regulator was disabled).  That wouldn't
+require any regulator core changes.
 
-Cheers
-Jon
-
--- 
-nvpublic
+-Doug
