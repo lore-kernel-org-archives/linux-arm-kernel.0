@@ -1,37 +1,42 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Wed, 30 May 2018 14:17:58 -0700
-Subject: [PATCH v7 10/10] drivers: clk: Add ZynqMP clock driver
-In-Reply-To: <1527713725-1086-11-git-send-email-jollys@xilinx.com>
-References: <1527713725-1086-1-git-send-email-jollys@xilinx.com>
- <1527713725-1086-11-git-send-email-jollys@xilinx.com>
-Message-ID: <c042fd9b-85cb-f0d3-101c-f78f3dc4fc44@infradead.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 May 2018 23:24:58 +0200
+Subject: [PATCH] ARM: pxa, regulator: fix building ezx e680
+Message-ID: <20180530212514.346474-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2018 01:55 PM, Jolly Shah wrote:
-> From: Jolly Shah <jolly.shah@xilinx.com>
+The reference to camera_supply_gpiod_table was added in the wrong function,
+as observed from this randconfig build failure:
 
+arch/arm/mach-pxa/ezx.c: In function 'e680_init':
+arch/arm/mach-pxa/ezx.c:905:26: error: 'camera_supply_gpiod_table' undeclared (first use in this function)
+  gpiod_add_lookup_table(&camera_supply_gpiod_table);
 
-> diff --git a/drivers/clk/zynqmp/Kconfig b/drivers/clk/zynqmp/Kconfig
-> new file mode 100644
-> index 0000000..fe815f7
-> --- /dev/null
-> +++ b/drivers/clk/zynqmp/Kconfig
-> @@ -0,0 +1,11 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +
-> +config COMMON_CLK_ZYNQMP
-> +	bool "Support for Xilinx ZynqMP Ultrascale+ clock controllers"
-> +	depends on OF
-> +	depends on ARCH_ZYNQMP || COMPILE_TEST
-> +	depends on ZYNQMP_FIRMWARE
-> +	help
-> +	  Support for the Zynqmp Ultrascale clock controller.
-> +	  It has a dependency on the PMU firmware.
-> +	  Say Y if you want to support clock support
+Fixes: 6059577cb28d ("regulator: fixed: Convert to use GPIO descriptor only")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-pxa/ezx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	  Say Y if you want to include clock support.
-
-
+diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
+index 2b4bd6d94855..4f33eea73f9a 100644
+--- a/arch/arm/mach-pxa/ezx.c
++++ b/arch/arm/mach-pxa/ezx.c
+@@ -902,7 +902,6 @@ static void __init e680_init(void)
+ 
+ 	pxa_set_keypad_info(&e680_keypad_platform_data);
+ 
+-	gpiod_add_lookup_table(&camera_supply_gpiod_table);
+ 	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(e680_devices));
+@@ -1132,6 +1131,7 @@ static void __init a910_init(void)
+ 	if (a910_camera_init() == 0)
+ 		pxa_set_camera_info(&a910_pxacamera_platform_data);
+ 
++	gpiod_add_lookup_table(&camera_supply_gpiod_table);
+ 	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(a910_devices));
 -- 
-~Randy
+2.9.0
