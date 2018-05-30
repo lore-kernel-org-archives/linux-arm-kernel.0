@@ -1,61 +1,211 @@
-From: don.brace@microsemi.com (Don Brace)
-Date: Wed, 30 May 2018 19:25:07 +0000
-Subject: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
-In-Reply-To: <51bb7b82-c4a1-435c-7668-639db96d76e1@finnie.org>
-References: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
- <1527542471-10316-2-git-send-email-okaya@codeaurora.org>
- <51bb7b82-c4a1-435c-7668-639db96d76e1@finnie.org>
-Message-ID: <af772e6434e645f4a42d22821442a3bd@microsemi.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 30 May 2018 12:38:37 -0700
+Subject: [PATCH RFC] ARM: dts: add Raspberry Pi Compute Module and IO board
+In-Reply-To: <1670815145.72020.1526930907735@email.1und1.de>
+References: <1526589872-13459-1-git-send-email-stefan.wahren@i2se.com>
+ <87d0xouapx.fsf@anholt.net> <1670815145.72020.1526930907735@email.1und1.de>
+Message-ID: <87a7shndc2.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ryan Finnie [mailto:ryan at finnie.org]
-> Sent: Tuesday, May 29, 2018 8:50 PM
-> To: Sinan Kaya <okaya@codeaurora.org>; linux-pci at vger.kernel.org;
-> timur at codeaurora.org
-> Cc: linux-arm-msm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> stable at vger.kernel.org; Don Brace <don.brace@microsemi.com>; James E.J.
-> Bottomley <jejb@linux.vnet.ibm.com>; Martin K. Petersen
-> <martin.petersen@oracle.com>; esc.storagedev
-> <esc.storagedev@microsemi.com>; open list:HEWLETT-PACKARD SMART ARRAY
-> RAID DRIVER (hpsa) <linux-scsi@vger.kernel.org>; open list <linux-
-> kernel at vger.kernel.org>
-> Subject: Re: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
-> 
-> EXTERNAL EMAIL
-> 
-> 
-> On 05/28/2018 02:21 PM, Sinan Kaya wrote:
-> > 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-> > shutdown")' has been added to kernel to shutdown pending PCIe port
-> > service interrupts during reboot so that a newly started kexec kernel
-> > wouldn't observe pending interrupts.
-> >
-> > pcie_port_device_remove() is disabling the root port and switches by
-> > calling pci_disable_device() after all PCIe service drivers are shutdown.
-> >
-> > This has been found to cause crashes on HP DL360 Gen9 machines during
-> > reboot due to hpsa driver not clearing the bus master bit during the
-> > shutdown procedure by calling pci_disable_device().
-> >
-> > Drop the shutdown API and do an orderly clean up by using the remove.
-> >
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-> > Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-> > Cc: stable at vger.kernel.org
-> > Reported-by: Ryan Finnie <ryan@finnie.org>
-> 
-> Tested successfully on DL360 Gen9 and DL380 Gen9.
-> 
-> Tested-by: Ryan Finnie <ryan@finnie.org>
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-The shutdown path issues a cache flush to the controller.
-Without this flush, you will see "Dirty Cache" messages at POST.
-It is best to keep the shutdown path.
+>> Eric Anholt <eric@anholt.net> hat am 21. Mai 2018 um 20:26 geschrieben:
+>> 
+>> 
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>> 
+>> > The Raspberry Pi Compute Module (CM1) is a SoM which contains a
+>> > BCM2835 processor, 512 MB RAM and a 4 GB eMMC. There is also a carrier
+>> > board which is called Compute Module IO Board.
+>> >
+>> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> > ---
+>> >  arch/arm/boot/dts/Makefile                |  1 +
+>> >  arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts | 92 +++++++++++++++++++++++++++++++
+>> >  arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi    | 34 ++++++++++++
+>> >  3 files changed, 127 insertions(+)
+>> >  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
+>> >  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+>> >
+>> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> > index ec2024e..a9883e8 100644
+>> > --- a/arch/arm/boot/dts/Makefile
+>> > +++ b/arch/arm/boot/dts/Makefile
+>> > @@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+>> >  	bcm2835-rpi-b-rev2.dtb \
+>> >  	bcm2835-rpi-b-plus.dtb \
+>> >  	bcm2835-rpi-a-plus.dtb \
+>> > +	bcm2835-rpi-cm1-io1.dtb \
+>> >  	bcm2836-rpi-2-b.dtb \
+>> >  	bcm2837-rpi-3-b.dtb \
+>> >  	bcm2837-rpi-3-b-plus.dtb \
+>> > diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
+>> > new file mode 100644
+>> > index 0000000..4d9aa22
+>> > --- /dev/null
+>> > +++ b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
+>> > @@ -0,0 +1,92 @@
+>> > +// SPDX-License-Identifier: GPL-2.0
+>> > +/dts-v1/;
+>> > +#include "bcm2835-rpi-cm1.dtsi"
+>> > +#include "bcm283x-rpi-usb-host.dtsi"
+>> > +
+>> > +/ {
+>> > +	compatible = "raspberrypi,compute-module", "brcm,bcm2835";
+>> > +	model = "Raspberry Pi Compute Module IO board rev1";
+>> > +};
+>> > +
+>> > +&dsi1 {
+>> > +	status = "okay";
+>> > +};
+>> > +
+>> > +&gpio {
+>> > +	/*
+>> > +	 * This is based on the official GPU firmware DT blob.
+>> > +	 *
+>> > +	 * Legend:
+>> > +	 * "NC" = not connected (no rail from the SoC)
+>> > +	 * "FOO" = GPIO line named "FOO" on the schematic
+>> > +	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
+>> > +	 */
+>> > +	gpio-line-names = "GPIO0",
+>> > +			  "GPIO1",
+>> > +			  "GPIO2",
+>> > +			  "GPIO3",
+>> > +			  "GPIO4",
+>> > +			  "GPIO5",
+>> > +			  "GPIO6",
+>> > +			  "GPIO7",
+>> > +			  "GPIO8",
+>> > +			  "GPIO9",
+>> > +			  "GPIO10",
+>> > +			  "GPIO11",
+>> > +			  "GPIO12",
+>> > +			  "GPIO13",
+>> > +			  "GPIO14",
+>> > +			  "GPIO15",
+>> > +			  "GPIO16",
+>> > +			  "GPIO17",
+>> > +			  "GPIO18",
+>> > +			  "GPIO19",
+>> > +			  "GPIO20",
+>> > +			  "GPIO21",
+>> > +			  "GPIO22",
+>> > +			  "GPIO23",
+>> > +			  "GPIO24",
+>> > +			  "GPIO25",
+>> > +			  "GPIO26",
+>> > +			  "GPIO27",
+>> > +			  "GPIO28",
+>> > +			  "GPIO29",
+>> > +			  "GPIO30",
+>> > +			  "GPIO31",
+>> > +			  "GPIO32",
+>> > +			  "GPIO33",
+>> > +			  "GPIO34",
+>> > +			  "GPIO35",
+>> > +			  "GPIO36",
+>> > +			  "GPIO37",
+>> > +			  "GPIO38",
+>> > +			  "GPIO39",
+>> > +			  "GPIO40",
+>> > +			  "GPIO41",
+>> > +			  "GPIO42",
+>> > +			  "GPIO43",
+>> > +			  "GPIO44",
+>> > +			  "GPIO45",
+>> > +			  "HDMI_HPD_N",
+>> > +			  /* Also used as ACT LED */
+>> > +			  "EMMC_EN_N",
+>> > +			  /* Used by eMMC */
+>> > +			  "SD_CLK_R",
+>> > +			  "SD_CMD_R",
+>> > +			  "SD_DATA0_R",
+>> > +			  "SD_DATA1_R",
+>> > +			  "SD_DATA2_R",
+>> > +			  "SD_DATA3_R";
+>> > +
+>> > +	pinctrl-0 = <&gpioout &alt0>;
+>> > +};
+>> > +
+>> > +&hdmi {
+>> > +	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
+>> > +};
+>> 
+>> I think this should be ACTIVE_LOW, since it's "HDMI_HPD_N_1V8", right?
+>
+> I just copy & paste from the rpi-4.14/bcm2708-rpi-cm.dts. I thought
+> the HDMI interface on my IO board is broken, but maybe this is a
+> downstream issue.
 
-Thanks,
-Don Brace
-ESC - Smart Storage
-Microsemi Corporation
+Downstream gets HDMI wrong pretty frequently, so it's not surprising.
+Watching xrandr -q with X11 running and plugging and unplugging HDMI can
+help figure out whether we got the polarity right.  I think you can also
+do this with libdrm's modetest, if you don't have X11 up.
+
+>> > +
+>> > +&uart0 {
+>> > +	pinctrl-names = "default";
+>> > +	pinctrl-0 = <&uart0_gpio14>;
+>> > +	status = "okay";
+>> > +};
+>> > diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+>> > new file mode 100644
+>> > index 0000000..ef22c2d
+>> > --- /dev/null
+>> > +++ b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+>> > @@ -0,0 +1,34 @@
+>> > +// SPDX-License-Identifier: GPL-2.0
+>> > +/dts-v1/;
+>> > +#include "bcm2835.dtsi"
+>> > +#include "bcm2835-rpi.dtsi"
+>> > +
+>> > +/ {
+>> > +	leds {
+>> > +		act {
+>> > +			gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
+>> > +		};
+>> > +	};
+>> > +
+>> > +	reg_3v3: fixed-regulator {
+>> > +		compatible = "regulator-fixed";
+>> > +		regulator-name = "3V3";
+>> > +		regulator-min-microvolt = <3300000>;
+>> > +		regulator-max-microvolt = <3300000>;
+>> > +		regulator-always-on;
+>> > +	};
+>> > +
+>> > +	reg_1v8: fixed-regulator {
+>> > +		compatible = "regulator-fixed";
+>> > +		regulator-name = "1V8";
+>> > +		regulator-min-microvolt = <1800000>;
+>> > +		regulator-max-microvolt = <1800000>;
+>> > +		regulator-always-on;
+>> > +	};
+>> > +};
+>> > +
+>> > +&sdhost {
+>> > +	non-removable;
+>> > +	vmmc-supply = <&reg_3v3>;
+>> > +	vqmmc-supply = <&reg_1v8>;
+>> > +};
+>> 
+>> Also, looking at some datasheets I have laying around, it says "eMMC I/O
+>> Voltage fixed at 1V8" -- is this regulator setup right, in that case?
+>
+> Usually an eMMC has 2 different voltage sources:
+> vqmmc-supply -> supply node for IO line power (usually switchable, but fixed on Compute Module)
+> vmmc-supply -> supply node for card's power (usually fixed)
+>
+> Do you have a specific concern (voltage, naming)?
+
+It was just "I was reviewing, and this stood out."  That explanation
+there seems sufficient to me.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/a42a5482/attachment.sig>
