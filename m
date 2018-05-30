@@ -1,86 +1,46 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 30 May 2018 14:59:01 -0500
-Subject: [PATCH 6/9] clk: davinci: pll: allow dev == NULL
-In-Reply-To: <20180530194559.982.42844@harbor.lan>
-References: <20180525181150.17873-1-david@lechnology.com>
- <20180525181150.17873-7-david@lechnology.com>
- <20180530194559.982.42844@harbor.lan>
-Message-ID: <41524516-3b58-0db8-1e67-3d76f8596a23@lechnology.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 30 May 2018 22:00:18 +0200
+Subject: [PATCH v2] dmaengine: pxa: add a default requestor policy
+Message-ID: <20180530200018.26677-1-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2018 02:46 PM, Michael Turquette wrote:
-> Hi David,
-> 
-> Quoting David Lechner (2018-05-25 11:11:47)
->> This modifies the TI Davinci PLL clock driver to allow for the case
->> when dev == NULL. On some (most) SoCs that use this driver, the PLL
->> clock needs to be registered during early boot because it is used
->> for clocksource/clkevent and there will be no platform device available.
-> 
-> A lot of this stuff feels like a step backwards. E.g:
-> 
->> diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
->> index 23a24c944f1d..2eb981e61185 100644
->> --- a/drivers/clk/davinci/pll.c
->> +++ b/drivers/clk/davinci/pll.c
->> @@ -11,6 +11,7 @@
->>   
->>   #include <linux/clk-provider.h>
->>   #include <linux/clk.h>
->> +#include <linux/clk/davinci.h>
->>   #include <linux/delay.h>
->>   #include <linux/err.h>
->>   #include <linux/io.h>
->> @@ -223,6 +224,7 @@ static const struct clk_ops dm365_pll_ops = {
->>   
->>   /**
->>    * davinci_pll_div_register - common *DIV clock implementation
->> + * @dev: The PLL platform device or NULL
->>    * @name: the clock name
->>    * @parent_name: the parent clock name
->>    * @reg: the *DIV register
->> @@ -240,17 +242,21 @@ static struct clk *davinci_pll_div_register(struct device *dev,
->>          const struct clk_ops *divider_ops = &clk_divider_ops;
->>          struct clk_gate *gate;
->>          struct clk_divider *divider;
->> +       struct clk *clk;
->> +       int ret;
->>   
->> -       gate = devm_kzalloc(dev, sizeof(*gate), GFP_KERNEL);
->> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
->>          if (!gate)
->>                  return ERR_PTR(-ENOMEM);
->>   
->>          gate->reg = reg;
->>          gate->bit_idx = DIV_ENABLE_SHIFT;
->>   
->> -       divider = devm_kzalloc(dev, sizeof(*divider), GFP_KERNEL);
->> -       if (!divider)
->> -               return ERR_PTR(-ENOMEM);
->> +       divider = kzalloc(sizeof(*divider), GFP_KERNEL);
->> +       if (!divider) {
->> +               ret = -ENOMEM;
->> +               goto err_free_gate;
->> +       }
->>   
->>          divider->reg = reg;
->>          divider->shift = DIV_RATIO_SHIFT;
-> 
-> Oh no my poor devm_ helpers!
-> 
-> I understand that we need to support early boot drivers better, so this
-> patch can be merged.
-> 
-> However I'm curious if you're tracking Bartosz's early_platform_driver
-> efforts? Converting to that if it is ever merged would likely be
-> cleaner:
-> 
-> https://lkml.kernel.org/r/20180511162028.20616-1-brgl at bgdev.pl
-> 
-> Best regards,
-> Mike
-> 
+As what former drcmr -1 value meant, add a this as a default to each
+channel, ie. that by default no requestor line is used.
 
-Yes. In fact, this is what got Bartosz working on it in the first
-place. :-)
+This is specifically used for network drivers smc91x and smc911x, and
+needed for their port to slave maps.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v1: changed -1 to U32_MAX
+---
+ drivers/dma/pxa_dma.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 9505334f9c6e..b31c28b67ad3 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -762,6 +762,8 @@ static void pxad_free_chan_resources(struct dma_chan *dchan)
+ 	dma_pool_destroy(chan->desc_pool);
+ 	chan->desc_pool = NULL;
+ 
++	chan->drcmr = U32_MAX;
++	chan->prio = PXAD_PRIO_LOWEST;
+ }
+ 
+ static void pxad_free_desc(struct virt_dma_desc *vd)
+@@ -1386,6 +1388,9 @@ static int pxad_init_dmadev(struct platform_device *op,
+ 		c = devm_kzalloc(&op->dev, sizeof(*c), GFP_KERNEL);
+ 		if (!c)
+ 			return -ENOMEM;
++
++		c->drcmr = U32_MAX;
++		c->prio = PXAD_PRIO_LOWEST;
+ 		c->vc.desc_free = pxad_free_desc;
+ 		vchan_init(&c->vc, &pdev->slave);
+ 		init_waitqueue_head(&c->wq_state);
+-- 
+2.11.0
