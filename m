@@ -1,67 +1,75 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Wed, 30 May 2018 01:22:10 -0700
-Subject: [PATCH] PCI: Add pci=safemode option
-In-Reply-To: <577f01ada5e7f08c79a28d41020fb019@codeaurora.org>
-References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
- <20180530043103.GA19734@kroah.com>
- <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
- <20180530073735.GA28793@infradead.org>
- <6dfe2db8f974d94c9867f30ec83d9333@codeaurora.org>
- <20180530074822.GB30177@kroah.com>
- <577f01ada5e7f08c79a28d41020fb019@codeaurora.org>
-Message-ID: <c9698153b17ca6c6dab6a00cb1f0928e@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 30 May 2018 16:24:44 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 309/940] drivers/usb/dwc3/core.h:1228:
+ multiple definition of `dwc3_set_simple_data'
+Message-ID: <201805301641.XttIFWLE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-30 00:56, okaya at codeaurora.org wrote:
-> On 2018-05-30 00:48, Greg Kroah-Hartman wrote:
->> On Wed, May 30, 2018 at 12:44:29AM -0700, okaya at codeaurora.org wrote:
->>> On 2018-05-30 00:37, Christoph Hellwig wrote:
->>> > On Tue, May 29, 2018 at 09:41:33PM -0700, Sinan Kaya wrote:
->>> > > Bjorn and I discussed the need for such a "safe" mode feature when you
->>> > > want to bring up PCI for a platform. You want to turn off everything
->>> > > as
->>> > > a starter and just stick to bare minimum.
->>> >
->>> > Can we please make it a config option the instead of adding code
->>> > to every kernel?  Also maybe the bringup should be in the name
->>> > to make this more clear?
->>> 
->>> One other requirement was to have a runtime option rather than 
->>> compile time
->>> option.
->>> 
->>> When someone reported a problem, we wanted to be able to say "use 
->>> this
->>> option and see if system boots" without doing any bisects or 
->>> recompilation.
->>> 
->>> This would be the first step in troubleshooting a system to see if
->>> fundamental features are working.
->> 
->> That makes sense, people can not rebuild their kernels for the most
->> part.  Putting it behind a config option would not make sense as it
->> would always have to be enabled.
->> 
-> 
-> Here is where the discussion took place. Last 5-10  messages should 
-> help.
-> 
-> 
-> https://bugzilla.kernel.org/show_bug.cgi?id=196197
-> 
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   7a6053b3d256fa5bc23f28a9d9a23d7a2004c5b7
+commit: 6b1601e752dd266a096860421d488efc8cffdc1f [309/940] dwc3: Add support for removing vbus when suspended
+config: i386-randconfig-s0-201821 (attached as .config)
+compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
+reproduce:
+        git checkout 6b1601e752dd266a096860421d488efc8cffdc1f
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Some more paper trail for general awareness.
+All errors (new ones prefixed by >>):
 
-https://lkml.org/lkml/2018/5/3/509
+   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
+   drivers/usb/dwc3/core.h:1226: multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1226: first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_set_simple_data':
+>> drivers/usb/dwc3/core.h:1228: multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1228: first defined here
+   drivers/usb/dwc3/host.o: In function `dwc3_simple_wakeup_capable':
+   include/linux/device.h:984: multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1226: first defined here
+   drivers/usb/dwc3/host.o: In function `dwc3_set_simple_data':
+>> drivers/usb/dwc3/core.h:1228: multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1228: first defined here
+   drivers/usb/dwc3/ulpi.o: In function `dwc3_simple_wakeup_capable':
+   drivers/usb/dwc3/core.h:1226: multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1226: first defined here
+   drivers/usb/dwc3/ulpi.o: In function `dwc3_set_simple_data':
+>> drivers/usb/dwc3/core.h:1228: multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1228: first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
+   drivers/usb/dwc3/core.h:1226: multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1226: first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_set_simple_data':
+>> drivers/usb/dwc3/core.h:1228: multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1228: first defined here
 
-> 
->>> I don't mind changing the name Bjorn mentioned safe option. I made it
->>> safemode. I am looking at Bjorn for suggestions at this moment.
->> 
->> "minimal"?  "basic"?  "crippled"?
->> "my_hardware_is_so_borked_it_needs_this_option"?  :)
->> 
->> Naming is hard...
->> 
->> greg k-h
+vim +1228 drivers/usb/dwc3/core.h
+
+  1214	
+  1215	#if IS_ENABLED(CONFIG_USB_DWC3_OF_SIMPLE)
+  1216	int dwc3_enable_hw_coherency(struct device *dev);
+  1217	void dwc3_set_phydata(struct device *dev, struct phy *phy);
+  1218	void dwc3_simple_wakeup_capable(struct device *dev, bool wakeup);
+  1219	void dwc3_set_simple_data(struct dwc3 *dwc);
+  1220	#else
+  1221	static inline int dwc3_enable_hw_coherency(struct device *dev)
+  1222	{ return 1; }
+  1223	static inline void dwc3_set_phydata(struct device *dev, struct phy *phy)
+  1224	{ ; }
+  1225	void dwc3_simple_wakeup_capable(struct device *dev, bool wakeup)
+> 1226	{ ; }
+  1227	void dwc3_set_simple_data(struct dwc3 *dwc)
+> 1228	{ ; }
+  1229	#endif
+  1230	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 29088 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/4de03207/attachment-0001.gz>
