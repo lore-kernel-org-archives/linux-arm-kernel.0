@@ -1,59 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 May 2018 13:47:00 +0100
-Subject: [PATCH v2 0/6] KVM/arm64: Cache maintenance relaxations
-Message-ID: <20180530124706.25284-1-marc.zyngier@arm.com>
+Date: Wed, 30 May 2018 13:47:06 +0100
+Subject: [PATCH v2 6/6] KVM: arm/arm64: Remove unnecessary CMOs when creating
+ HYP page tables
+In-Reply-To: <20180530124706.25284-1-marc.zyngier@arm.com>
+References: <20180530124706.25284-1-marc.zyngier@arm.com>
+Message-ID: <20180530124706.25284-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small series makes use of features recently introduced in the
-ARMv8 architecture to relax the cache maintenance operations on CPUs
-that implement these features.
+There is no need to perform cache maintenance operations when
+creating the HYP page tables if we have the multiprocessing
+extensions. ARMv7 mandates them with the virtualization support,
+and ARMv8 just mandates them unconditionally.
 
-FWB is the most important one. It allows stage-2 to enforce the
-cacheability of memory, no matter what the guest says. It also
-mandates that the whole machine is cache coherent (no non-coherent
-I/O), meaning we can drop a whole class of cache maintenance
-operations.
+Let's remove these operations.
 
-FWB, when combined with CTL_EL0.{IDC,DIC} allows the removal of all
-cache maintenance and tracking of pages being executed.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/mmu.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-We also take the opportunity to drop a few useless CMOs that were
-applied to the HYP page tables, but that were never necessary. This
-ended up requiring quite a few changes in out page table accessors so
-that they get consistent barriers. These barriers are a bit on the
-heavy side, and could be further optimized, although that's probably
-for a different patch series
-
-* From v1:
-  - Reordered the series in a slightly more consistent order
-  - Added patches refactoring the PT accessors before dropping
-    the CMOs
-  - Removed final dsb(ishst) from the last patch, as all PT accessors
-    now have their own barriers
-  - Collected Acks from Catalin
-
-Marc Zyngier (6):
-  arm64: KVM: Add support for Stage-2 control of memory types and
-    cacheability
-  arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
-  arm64: KVM: Avoid marking pages as XN in Stage-2 if CTR_EL0.DIC is set
-  KVM: arm/arm64: Consolidate page-table accessors
-  KVM: arm/arm64: Stop using {pmd,pud,pgd}_populate
-  KVM: arm/arm64: Remove unnecessary CMOs when creating HYP page tables
-
- arch/arm/include/asm/kvm_mmu.h        | 14 ++-------
- arch/arm64/include/asm/cpucaps.h      |  3 +-
- arch/arm64/include/asm/kvm_arm.h      |  1 +
- arch/arm64/include/asm/kvm_emulate.h  |  2 ++
- arch/arm64/include/asm/kvm_mmu.h      | 32 +++++++++++++------
- arch/arm64/include/asm/memory.h       |  7 +++++
- arch/arm64/include/asm/pgtable-prot.h | 24 ++++++++++++--
- arch/arm64/include/asm/sysreg.h       |  1 +
- arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++
- arch/arm64/kvm/sys_regs.c             |  8 ++++-
- virt/kvm/arm/mmu.c                    | 45 ++++++++++++++++++++++-----
- 11 files changed, 125 insertions(+), 32 deletions(-)
-
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index ad1980d2118a..ccdf544d44c0 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -607,7 +607,6 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		get_page(virt_to_page(pte));
+-		kvm_flush_dcache_to_poc(pte, sizeof(*pte));
+ 		pfn++;
+ 	} while (addr += PAGE_SIZE, addr != end);
+ }
+@@ -634,7 +633,6 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 			}
+ 			kvm_pmd_populate(pmd, pte);
+ 			get_page(virt_to_page(pmd));
+-			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
+ 		}
+ 
+ 		next = pmd_addr_end(addr, end);
+@@ -667,7 +665,6 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+ 			}
+ 			kvm_pud_populate(pud, pmd);
+ 			get_page(virt_to_page(pud));
+-			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+ 		}
+ 
+ 		next = pud_addr_end(addr, end);
+@@ -704,7 +701,6 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+ 			}
+ 			kvm_pgd_populate(pgd, pud);
+ 			get_page(virt_to_page(pgd));
+-			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+ 		}
+ 
+ 		next = pgd_addr_end(addr, end);
 -- 
 2.17.1
