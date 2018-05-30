@@ -1,40 +1,114 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 29 May 2018 19:41:43 -0700
-Subject: [PATCH V2] PCI/portdrv: do not disable device on reboot/shutdown
-In-Reply-To: <20180525221024.GC92995@bhelgaas-glaptop.roam.corp.google.com>
-References: <1527043490-17268-1-git-send-email-okaya@codeaurora.org>
- <20180523213249.GD150632@bhelgaas-glaptop.roam.corp.google.com>
- <61f70fd6-52fd-da07-ce73-303f95132131@codeaurora.org>
- <20180524183502.GB85822@bhelgaas-glaptop.roam.corp.google.com>
- <984b9734-244d-04e9-946f-7524f148ff7c@codeaurora.org>
- <20180525221024.GC92995@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <8eacc568-af8c-a990-ee96-d13e669e8643@codeaurora.org>
+Date: Tue, 29 May 2018 23:19:41 -0400
+Subject: [PATCH] PCI: Add pci=safemode option
+Message-ID: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+Adding pci=safemode kernel command line parameter to turn off all PCI
+Express service driver as well as all optional PCIe features such as LTR,
+Extended tags, Relaxed Ordering etc.
 
-On 5/25/2018 3:10 PM, Bjorn Helgaas wrote:
-> On Fri, May 25, 2018 at 09:30:59AM -0400, Sinan Kaya wrote:
->> On 5/24/2018 2:35 PM, Bjorn Helgaas wrote:
->>> That sounds like a reasonable idea, and it is definitely another can
->>> of worms.  I looked briefly at some of the .shutdown() cases:
->>
->> should we throw it into 4.18 and see what happens?
-> 
-> It wouldn't solve this particular problem because hpsa *does* have a
-> .shutdown() method.  The problem is that it doesn't work -- it's
-> supposed to stop DMA and interrupts but it apparently doesn't.
-> 
-> I think we need to fix hpsa first.
-> 
+Also setting MPS configuration to PCIE_BUS_SAFE so that MPS and MRRS can be
+reconfigured with by the kernel in case BIOS hands off a broken
+configuration.
 
-I don't know if you followed my latest V3 patch but I found a way to put
-these two together to reach to an, IMO, more acceptable solution.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ Documentation/admin-guide/kernel-parameters.txt | 2 ++
+ drivers/pci/pci.c                               | 7 +++++++
+ drivers/pci/pci.h                               | 2 ++
+ drivers/pci/pcie/portdrv_core.c                 | 2 +-
+ drivers/pci/probe.c                             | 6 ++++++
+ 5 files changed, 18 insertions(+), 1 deletion(-)
 
-Sinan
-
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 641ec9c..247adbb 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -3153,6 +3153,8 @@
+ 		noari		do not use PCIe ARI.
+ 		noats		[PCIE, Intel-IOMMU, AMD-IOMMU]
+ 				do not use PCIe ATS (and IOMMU device IOTLB).
++		safemode	turns of all optinal PCI features. Useful
++				for bringup/troubleshooting.
+ 		pcie_scan_all	Scan all possible PCIe devices.  Otherwise we
+ 				only look for one device below a PCIe downstream
+ 				port.
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index d27f771..11f0282 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -115,6 +115,9 @@ static bool pcie_ari_disabled;
+ /* If set, the PCIe ATS capability will not be used. */
+ static bool pcie_ats_disabled;
+ 
++/* If set, disables most of the optional PCI features */
++bool pci_safe_mode;
++
+ bool pci_ats_disabled(void)
+ {
+ 	return pcie_ats_disabled;
+@@ -5845,6 +5848,10 @@ static int __init pci_setup(char *str)
+ 		if (*str && (str = pcibios_setup(str)) && *str) {
+ 			if (!strcmp(str, "nomsi")) {
+ 				pci_no_msi();
++			} else if (!strncmp(str, "safemode", 8)) {
++				pr_info("PCI: safe mode with minimum features\n");
++				pci_safe_mode = true;
++				pcie_bus_config = PCIE_BUS_SAFE;
+ 			} else if (!strncmp(str, "noats", 5)) {
+ 				pr_info("PCIe: ATS is disabled\n");
+ 				pcie_ats_disabled = true;
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index c358e7a0..4517bcd 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -8,6 +8,8 @@
+ 
+ extern const unsigned char pcie_link_speed[];
+ 
++extern bool pci_safe_mode;
++
+ bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
+ 
+ /* Functions internal to the PCI core code */
+diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
+index a5b3b3a..9fe4ed6 100644
+--- a/drivers/pci/pcie/portdrv_core.c
++++ b/drivers/pci/pcie/portdrv_core.c
+@@ -311,7 +311,7 @@ int pcie_port_device_register(struct pci_dev *dev)
+ 
+ 	/* Get and check PCI Express port services */
+ 	capabilities = get_port_device_capability(dev);
+-	if (!capabilities)
++	if (!capabilities || pci_safe_mode)
+ 		return 0;
+ 
+ 	pci_set_master(dev);
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 3840207..295b79c 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2047,6 +2047,9 @@ static void pci_configure_device(struct pci_dev *dev)
+ 	struct hotplug_params hpp;
+ 	int ret;
+ 
++	if (pci_safe_mode)
++		return;
++
+ 	pci_configure_mps(dev);
+ 	pci_configure_extended_tags(dev, NULL);
+ 	pci_configure_relaxed_ordering(dev);
+@@ -2213,6 +2216,9 @@ static void pci_init_capabilities(struct pci_dev *dev)
+ 	/* Setup MSI caps & disable MSI/MSI-X interrupts */
+ 	pci_msi_setup_pci_dev(dev);
+ 
++	if (pci_safe_mode)
++		return;
++
+ 	/* Buffers for saving PCIe and PCI-X capabilities */
+ 	pci_allocate_cap_save_buffers(dev);
+ 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
