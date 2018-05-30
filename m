@@ -1,93 +1,133 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 30 May 2018 15:07:11 +1000
-Subject: linux-next: manual merge of the regulator tree with the arm-soc tree
-Message-ID: <20180530150711.2c7c1fe9@canb.auug.org.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 May 2018 22:10:08 -0700
+Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
+In-Reply-To: <d1e7a14d-ea49-fc8e-a95c-2b4257096187@st.com>
+References: <20180529155257.5ae48830@canb.auug.org.au>
+ <1bedc0b7-21f9-1e15-a11c-3de06e81b5ba@st.com>
+ <c306fbd9-21d9-5345-e820-52bc23d1b7c7@arm.com>
+ <b01f3226-5bb8-071a-e825-73bec913ffa8@st.com>
+ <2d647302-0be8-555b-8063-06b0d2d72772@arm.com>
+ <b8fa6cc9-5d73-81a2-25b8-f0c858ef0c62@st.com>
+ <d1e7a14d-ea49-fc8e-a95c-2b4257096187@st.com>
+Message-ID: <CAOesGMjgHNq5goh3UQyFBbUy+fjDbDw9rg1Eftp+4JZw5ntmxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
 
-Today's linux-next merge of the regulator tree got a conflict in:
 
-  arch/arm/mach-omap1/board-ams-delta.c
+On Tue, May 29, 2018 at 5:20 AM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>
+>
+> On 05/29/2018 10:55 AM, Alexandre Torgue wrote:
+>>
+>>
+>>
+>> On 05/29/2018 10:39 AM, Marc Zyngier wrote:
+>>>
+>>> On 29/05/18 09:16, Alexandre Torgue wrote:
+>>>>
+>>>> Hi Marc
+>>>>
+>>>> On 05/29/2018 09:47 AM, Marc Zyngier wrote:
+>>>>>
+>>>>> On 29/05/18 08:41, Alexandre Torgue wrote:
+>>>>>>
+>>>>>> Hi Stephen
+>>>>>>
+>>>>>> On 05/29/2018 07:52 AM, Stephen Rothwell wrote:
+>>>>>>>
+>>>>>>> Hi all,
+>>>>>>>
+>>>>>>> Today's linux-next merge of the irqchip tree got a conflict in:
+>>>>>>>
+>>>>>>>      arch/arm/boot/dts/stm32mp157c.dtsi
+>>>>>>>
+>>>>>>> between commit:
+>>>>>>>
+>>>>>>>      3c00436fdb20 ("ARM: dts: stm32: add USBPHYC support to
+>>>>>>> stm32mp157c")
+>>>>>>>
+>>>>>>> from the arm-soc tree and commit:
+>>>>>>>
+>>>>>>>      5f0e9d2557d7 ("ARM: dts: stm32: Add exti support for
+>>>>>>> stm32mp157c")
+>>>>>>>
+>>>>>>> from the irqchip tree.
+>>>>>>>
+>>>>>>> I fixed it up (see below) and can carry the fix as necessary. This
+>>>>>>> is now fixed as far as linux-next is concerned, but any non trivial
+>>>>>>> conflicts should be mentioned to your upstream maintainer when your
+>>>>>>> tree
+>>>>>>> is submitted for merging.  You may also want to consider cooperating
+>>>>>>> with the maintainer of the conflicting tree to minimise any
+>>>>>>> particularly
+>>>>>>> complex conflicts.
+>>>>>>>
+>>>>>>
+>>>>>> Thanks for the fix (I will reorder nodes in a future patch). My
+>>>>>> opinion
+>>>>>> is that all STM32 DT patches should come through my STM32 tree. It is
+>>>>>> my
+>>>>>> role to fix this kind of conflicts. I thought it was a common rule
+>>>>>> (driver patches go to sub-system maintainer tree and DT to the Machine
+>>>>>> maintainer). For incoming next-series which contain DT+driver patches
+>>>>>> I
+>>>>>> will indicate clearly that I take DT patch. I'm right ?
+>>>>>
+>>>>> Happy to oblige. Can you make sure you sync up with Ludovic and define
+>>>>> what you want to do?
+>>>>
+>>>>
+>>>> Sorry I don't understand your reply. I just say that for series
+>>>> containing DT patches + drivers patches, to my point of view it is more
+>>>> safe that driver patches are taken by sub-system maintainer (you in this
+>>>> case) and that I take DT patches in my tree.
+>>>
+>>> And I'm happy to let you deal with these patches. I'm just asking you
+>>> sync with Ludovic to split the series on whichever boundary you wish to
+>>> enforce.
+>>
+>> ok
+>>
+>>>
+>>>>> In the meantime, I'm dropping the series altogether.
+>>>>>
+>>>> Why? We could keep it as Stephen fixed the merge issue.
+>>>
+>>> Well, you seem to have a strong opinion about who deals with what. I'll
+>>> let Ludovic repost what you and him decide should go via the irqchip
+>>> tree.
+>>
+>>
+>> It's not a "strong" opinion just my point of view and maybe not the good
+>> one. I thought that's the way of working was like I explained. If you prefer
+>> 2 series (one for driver patches and another one for DT patches) I will be
+>> happy with that.
+>>
+>> Ludovic, what is your opinion ?
+>
+>
+> Hi everybody
+>
+> For this serie, I think we could keep like that with
+> Stephen fix. New stm32 irqchip will be integrated (thanks Marc)
+> with no conflict with usb (thanks Stephen).
+>
+> For next series, we may split driver and DT to avoid misunderstanding.
 
-between commit:
+The general rule that we try to use is to always merge DT through the
+arm-soc tree, even if the driver gets merged through the subsystem
+tree. There should be no harm in doing this for new drivers (i.e. a
+new driver won't regress if the DT update is missing, it just won't
+probe/configure). And that way we can keep the conflicts internal to
+our tree (ideally to the SoC maintainer tree) and not cause overhead
+for other maintainers and Stephen.
 
-  0486738928bf ("ARM: OMAP1: ams-delta: add GPIO lookup tables")
 
-from the arm-soc tree and commit:
+So yes, for the future please do not submit the DT updates with the
+drivers, or at the very least be very clear when you post them that
+you don't want the driver maintainer to apply them.
 
-  6059577cb28d ("regulator: fixed: Convert to use GPIO descriptor only")
 
-from the regulator tree.
-
-I fixed it up (see below - it may be better done) and can carry the fix
-as necessary. This is now fixed as far as linux-next is concerned, but
-any non trivial conflicts should be mentioned to your upstream
-maintainer when your tree is submitted for merging.  You may also want
-to consider cooperating with the maintainer of the conflicting tree to
-minimise any particularly complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/mach-omap1/board-ams-delta.c
-index 80f54cb54276,759fa18f6ab4..000000000000
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@@ -203,10 -203,8 +203,10 @@@ static struct resource latch2_resources
-  	},
-  };
-  
-- #define LATCH2_LABEL	"latch2"
-++#define LATCH2_LABEL	"ams-delta-latch2"
- +
-  static struct bgpio_pdata latch2_pdata = {
- -	.label	= "ams-delta-latch2",
- +	.label	= LATCH2_LABEL,
-  	.base	= AMS_DELTA_LATCH2_GPIO_BASE,
-  	.ngpio	= AMS_DELTA_LATCH2_NGPIO,
-  };
-@@@ -303,6 -288,16 +302,15 @@@ static struct platform_device modem_nre
-  	},
-  };
-  
-+ static struct gpiod_lookup_table modem_nreset_gpiod_table = {
-+ 	.dev_id = "reg-fixed-voltage",
-+ 	.table = {
- -		/* The AMS_DELTA_GPIO_PIN_MODEM_NRESET is at offset 12 */
- -		GPIO_LOOKUP("ams-delta-latch2", 12,
-++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_MODEM_NRESET,
-+ 			    "enable", GPIO_ACTIVE_HIGH),
-+ 		{ },
-+ 	},
-+ };
-+ 
-  struct modem_private_data {
-  	struct regulator *regulator;
-  };
-@@@ -658,15 -581,7 +666,15 @@@ static int __init late_init(void
-  
-  	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
-  
- +	/*
- +	 * As soon as devices have been registered, assign their dev_names
- +	 * to respective GPIO lookup tables before they are added.
- +	 */
- +	ams_delta_lcd_gpio_table.dev_id = dev_name(&ams_delta_lcd_device.dev);
- +	ams_delta_nand_gpio_table.dev_id = dev_name(&ams_delta_nand_device.dev);
- +
- +	gpiod_add_lookup_tables(late_gpio_tables, ARRAY_SIZE(late_gpio_tables));
-- 
-+ 	gpiod_add_lookup_table(&modem_nreset_gpiod_table);
-  	err = platform_device_register(&modem_nreset_device);
-  	if (err) {
-  		pr_err("Couldn't register the modem regulator device\n");
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/1b173abe/attachment-0001.sig>
+-Olof
