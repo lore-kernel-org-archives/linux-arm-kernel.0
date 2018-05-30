@@ -1,43 +1,133 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 30 May 2018 10:34:14 -0700
-Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
-Message-ID: <20180530173414.6121-1-andrew.smirnov@gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 30 May 2018 13:49:02 -0400
+Subject: [PATCH] drm/bridge/synopsys: dw-hdmi: fix dw_hdmi_setup_rx_sense
+In-Reply-To: <1527673438-20643-1-git-send-email-narmstrong@baylibre.com>
+References: <1527673438-20643-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20180530174902.GN3373@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Workaround introduced for i.MX53 in be9cae2479f48 ("usb: chipidea:
-imx: Fix ULPI on imx53") seems to be applicable in case of i.MX51 as
-well. Running latest kernel on ZII RDU1 Board (imx51-zii-rdu1.dts)
-exhibits a kernel frozen on PORTSC access and applying the workaround
-resolves the issue.
+On Wed, May 30, 2018 at 11:43:58AM +0200, Neil Armstrong wrote:
+> The dw_hdmi_setup_rx_sense exported function should not use struct device
+> to recover the dw-hdmi context using drvdata, but take struct dw_hdmi
+> directly like other exported functions.
+> 
+> This caused a regression using Meson DRM on S905X since v4.17-rc1 :
+> 
+> Internal error: Oops: 96000007 [#1] PREEMPT SMP
+> [...]
+> CPU: 0 PID: 124 Comm: irq/32-dw_hdmi_ Not tainted 4.17.0-rc7 #2
+> Hardware name: Libre Technology CC (DT)
+> [...]
+> pc : osq_lock+0x54/0x188
+> lr : __mutex_lock.isra.0+0x74/0x530
+> [...]
+> Process irq/32-dw_hdmi_ (pid: 124, stack limit = 0x00000000adf418cb)
+> Call trace:
+>   osq_lock+0x54/0x188
+>   __mutex_lock_slowpath+0x10/0x18
+>   mutex_lock+0x30/0x38
+>   __dw_hdmi_setup_rx_sense+0x28/0x98
+>   dw_hdmi_setup_rx_sense+0x10/0x18
+>   dw_hdmi_top_thread_irq+0x2c/0x50
+>   irq_thread_fn+0x28/0x68
+>   irq_thread+0x10c/0x1a0
+>   kthread+0x128/0x130
+>   ret_from_fork+0x10/0x18
+>  Code: 34000964 d00050a2 51000484 9135c042 (f864d844)
+>  ---[ end trace 945641e1fbbc07da ]---
+>  note: irq/32-dw_hdmi_[124] exited with preempt_count 1
+>  genirq: exiting task "irq/32-dw_hdmi_" (124) is an active IRQ thread (irq 32)
+> 
+> Fixes: eea034af90c6 ("drm/bridge/synopsys: dw-hdmi: don't clobber drvdata")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Tested-by: Koen Kooi <koen@dominion.thruhere.net>
 
-Cc: Peter Chen <peter.chen@nxp.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Chris Healy <cphealy@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/usb/chipidea/ci_hdrc_imx.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Thanks for your patch, Neil. I've applied it to -misc-fixes and will send it to
+Dave in hope it can sneak into 4.17.
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index e431c5aafe35..19f5f5f2a48a 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -291,7 +291,8 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 
- 	pdata.usb_phy = data->phy;
- 
--	if (of_device_is_compatible(np, "fsl,imx53-usb") && pdata.usb_phy &&
-+	if ((of_device_is_compatible(np, "fsl,imx53-usb") ||
-+	     of_device_is_compatible(np, "fsl,imx51-usb")) && pdata.usb_phy &&
- 	    of_usb_get_phy_mode(np) == USBPHY_INTERFACE_MODE_ULPI) {
- 		pdata.flags |= CI_HDRC_OVERRIDE_PHY_CONTROL;
- 		data->override_phy_control = true;
+Sean
+
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 15 ++++-----------
+>  drivers/gpu/drm/meson/meson_dw_hdmi.c     |  2 +-
+>  include/drm/bridge/dw_hdmi.h              |  2 +-
+>  3 files changed, 6 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index ec8d000..3c136f2b 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -2077,7 +2077,7 @@ static irqreturn_t dw_hdmi_hardirq(int irq, void *dev_id)
+>  	return ret;
+>  }
+>  
+> -void __dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
+> +void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
+>  {
+>  	mutex_lock(&hdmi->mutex);
+>  
+> @@ -2103,13 +2103,6 @@ void __dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
+>  	}
+>  	mutex_unlock(&hdmi->mutex);
+>  }
+> -
+> -void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense)
+> -{
+> -	struct dw_hdmi *hdmi = dev_get_drvdata(dev);
+> -
+> -	__dw_hdmi_setup_rx_sense(hdmi, hpd, rx_sense);
+> -}
+>  EXPORT_SYMBOL_GPL(dw_hdmi_setup_rx_sense);
+>  
+>  static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+> @@ -2145,9 +2138,9 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>  	 */
+>  	if (intr_stat &
+>  	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+> -		__dw_hdmi_setup_rx_sense(hdmi,
+> -					 phy_stat & HDMI_PHY_HPD,
+> -					 phy_stat & HDMI_PHY_RX_SENSE);
+> +		dw_hdmi_setup_rx_sense(hdmi,
+> +				       phy_stat & HDMI_PHY_HPD,
+> +				       phy_stat & HDMI_PHY_RX_SENSE);
+>  
+>  		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
+>  			cec_notifier_set_phys_addr(hdmi->cec_notifier,
+> diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> index a393095..c9ad456 100644
+> --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> @@ -529,7 +529,7 @@ static irqreturn_t dw_hdmi_top_thread_irq(int irq, void *dev_id)
+>  		if (stat & HDMITX_TOP_INTR_HPD_RISE)
+>  			hpd_connected = true;
+>  
+> -		dw_hdmi_setup_rx_sense(dw_hdmi->dev, hpd_connected,
+> +		dw_hdmi_setup_rx_sense(dw_hdmi->hdmi, hpd_connected,
+>  				       hpd_connected);
+>  
+>  		drm_helper_hpd_irq_event(dw_hdmi->encoder.dev);
+> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+> index dd2a8cf..ccb5aa8 100644
+> --- a/include/drm/bridge/dw_hdmi.h
+> +++ b/include/drm/bridge/dw_hdmi.h
+> @@ -151,7 +151,7 @@ struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
+>  			     struct drm_encoder *encoder,
+>  			     const struct dw_hdmi_plat_data *plat_data);
+>  
+> -void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
+> +void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense);
+>  
+>  void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
+>  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-2.17.0
+Sean Paul, Software Engineer, Google / Chromium OS
