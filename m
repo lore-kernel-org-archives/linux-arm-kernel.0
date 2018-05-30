@@ -1,24 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 29 May 2018 21:36:15 -0700
-Subject: [PATCH] PCI: move early dump functionality from x86 arch into the
- common code
-In-Reply-To: <1527654876-26716-1-git-send-email-okaya@codeaurora.org>
-References: <1527654876-26716-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <dc9133a4-7085-e663-172a-87601ee8775d@codeaurora.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 30 May 2018 10:08:06 +0530
+Subject: [PATCH 07/15] arm: dts: exynos: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <CAJKOXPcyV=fdRu7oLXHMimSFR9ktJ23uBriswTStkEkAMbTaNw@mail.gmail.com>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
+ <CAJKOXPcyV=fdRu7oLXHMimSFR9ktJ23uBriswTStkEkAMbTaNw@mail.gmail.com>
+Message-ID: <20180530043806.ksen4xyh3x3x4fqn@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/2018 9:34 PM, Sinan Kaya wrote:
-> -int early_pci_allowed(void)
-> -{
-> -	return (pci_probe & (PCI_PROBE_CONF1|PCI_PROBE_NOEARLY)) ==
-> -			PCI_PROBE_CONF1;
-> -}
+On 29-05-18, 15:18, Krzysztof Kozlowski wrote:
+> Thanks for the patch.
+> 
+> In case of Exynos, the booting CPU always has these information in DT
+> and the booting CPU cannot be changed (chosen by firmware/hardware
+> configuration).
 
-I should have kept this. I'll wait for more feedback before posting the
-next rev. 
+But can the booting CPU be offlined ?
+
+If yes, then this is how things are broken right now.
+
+Build cpufreq driver as module, boot kernel, hotplug out CPU0, insert
+cpufreq driver and that will try to find these properties in CPU1.
+
+> Therefore there is no real risk of falling although
+> for correctness of DT your change makes sense.
+> 
+> It is too late for this cycle for me so I'll pick it up after merge window.
+> Alternatively, arm-soc guys can pick it up directly with my tag:
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+No worries, you can pick it up later on.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+viresh
