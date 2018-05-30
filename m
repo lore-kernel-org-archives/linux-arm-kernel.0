@@ -1,85 +1,83 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 May 2018 09:59:50 +0100
-Subject: [PATCH 1/4] arm64: capabilities: add nopti command line argument
-In-Reply-To: <20180524190932.32118-2-mlangsdo@redhat.com>
-References: <20180524190932.32118-1-mlangsdo@redhat.com>
- <20180524190932.32118-2-mlangsdo@redhat.com>
-Message-ID: <2b1b39e3-38ab-848a-a1d3-d23db85b0e14@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 May 2018 10:00:44 +0100
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <1527617488-5693-1-git-send-email-rokhanna@nvidia.com>
+References: <1527617488-5693-1-git-send-email-rokhanna@nvidia.com>
+Message-ID: <20180530090044.GA2452@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rohit,
 
+Please keep me on cc for future versions of this patch. Comments inline.
 
-Hi Mark,
-
-On 24/05/18 20:09, Mark Langsdorf wrote:
-> The x86 kernel and the documentation use 'nopti' as the kernel command
-> line argument to disable kernel page table isolation, so add nopti to
-> the arm64 kernel for compatibility.
+On Tue, May 29, 2018 at 11:11:28AM -0700, Rohit Khanna wrote:
+> In the current implementation,  __apply_alternatives patches
+> flush_icache_range and then executes it without invalidating the icache.
+> Thus, icache can contain some of the old instructions for
+> flush_icache_range. This can cause unpredictable behavior as during
+> execution we can get a mix of old and new instructions for
+> flush_icache_range.
 > 
-> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+> This patch :
+> 1. Adds a new function flush_cache_kernel_range for flushing kernel
+> memory range. This function uses non hot-patched code and can be
+> safely used to flush cache during code patching.
+> 
+> 2. Modifies __apply_alternatives so that it uses
+> flush_cache_kernel_range to flush the cache range after patching code.
+> 
+> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
 > ---
->   Documentation/admin-guide/kernel-parameters.txt |  6 +++---
->   arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
->   2 files changed, 13 insertions(+), 4 deletions(-)
+>  arch/arm64/kernel/alternative.c | 31 +++++++++++++++++++++++++++++--
+>  1 file changed, 29 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index f2040d4..a987725 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -3342,8 +3342,8 @@
->   	pt.		[PARIDE]
->   			See Documentation/blockdev/paride.txt.
->   
-> -	pti=		[X86_64] Control Page Table Isolation of user and
-> -			kernel address spaces.  Disabling this feature
-> +	pti=		[X86_64, ARM64] Control Page Table Isolation of user
-> +			and kernel address spaces.  Disabling this feature
->   			removes hardening, but improves performance of
->   			system calls and interrupts.
-
-...
-
->   
-> @@ -3354,7 +3354,7 @@
->   
->   			Not specifying this option is equivalent to pti=auto.
->   
-> -	nopti		[X86_64]
-> +	nopti		[X86_64, ARM64]
->   			Equivalent to pti=off
->   
->   	pty.legacy_count=
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 9d1b06d..7c5d8712 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -934,10 +934,19 @@ static int __init parse_kpti(char *str)
->   	if (ret)
->   		return ret;
->   
-> -	__kpti_forced = enabled ? 1 : -1;
-> +	if (!__kpti_forced)
-> +		__kpti_forced = enabled ? 1 : -1;
->   	return 0;
->   }
->   __setup("kpti=", parse_kpti);
-
-The arm64 kernel parameter is named "kpti", while the Documentation update above
-says "pti". We may want to keep both in sync here.
-
-> +
-> +/* for compatibility with documentation and x86 nopti command line arg */
-> +static int __init force_nokpti(char *arg)
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index 5c4bce4ac381..e93cfd26a314 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -122,6 +122,33 @@ static void patch_alternative(struct alt_instr *alt,
+>  	}
+>  }
+>  
+> +/* This is used for flushing kernel memory range after
+> + * __apply_alternatives has patched kernel code
+> + */
+> +static void flush_cache_kernel_range(void *start, void *end)
 > +{
-> +	__kpti_forced = -1;
-> +	return 0;
-> +}
-> +early_param("nopti", force_nokpti);
->   #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
->   
->   #ifdef CONFIG_ARM64_HW_AFDBM
-> 
 
+How about something like clean_dcache_range_nopatch instead?
 
-Suzuki
+> +	u64 d_start, i_start, d_size, i_size;
+> +
+> +	/* use sanitized value of ctr_el0 rather than raw value from CPU */
+> +	d_size = 4 << ((arm64_ftr_reg_ctrel0.sys_val >> 0x10) & 0xF); /* bytes */
+> +	i_size = 4 << (arm64_ftr_reg_ctrel0.sys_val & 0xF); /* bytes */
+
+You should be able to use read_sanitised_ftr_reg() and
+cpuid_feature_extract_unsigned_field() here.
+
+> +	d_start = (u64)start & ~(d_size - 1);
+> +	while (d_start <= (u64)end) {
+
+Please add a comment about the A53 erratum this is handling by using
+clean+inv.
+
+> +		asm volatile("dc civac, %0" : : "r" (d_start));
+> +		d_start += d_size;
+> +	}
+> +	dsb(ish);
+> +
+> +	i_start = (u64)start & ~(i_size - 1);
+> +	while (i_start <= (u64)end) {
+> +		asm volatile("ic ivau, %0" : : "r" (i_start));
+> +		i_start += i_size;
+> +	}
+> +	dsb(ish);
+> +	isb();
+
+As I mentioned before, I think it would be simpler just to avoid doing the
+I-cache invalidation by range and instead call __flush_icache_all once we've
+exiting the loop in __apply_alternatives.
+
+Will
