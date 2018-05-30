@@ -1,73 +1,67 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 30 May 2018 14:15:53 +0200
-Subject: [PATCH v2 02/10] drm/exynos: move pm_runtime_get_sync() to
- exynos_dsi_init()
+Date: Wed, 30 May 2018 14:15:57 +0200
+Subject: [PATCH v2 06/10] drm/panel: add support for BOE HV070WSA-100 panel
+ to simple-panel
 In-Reply-To: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
 References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121623eucas1p1309b2c054ccd7a52a611b46346709af9@eucas1p1.samsung.com>
-Message-ID: <1527682561-1386-3-git-send-email-m.purski@samsung.com>
+ <CGME20180530121626eucas1p17699adbe488cfb34da3f648bffe97fa2@eucas1p1.samsung.com>
+Message-ID: <1527682561-1386-7-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow bridge drivers to use DSI transfers in their
-pre_enable callbacks, pm_runtime_get_sync() should be performed before
-exynos_dsi_enable(). DSIM_STATE_ENABLED flag now should not guard
-from calling dsi_host_transfer() before enabling.
+From: Andrzej Hajda <a.hajda@samsung.com>
 
+The patch adds support for BOE HV070WSA-100 WSVGA 7.01 inch panel
+in panel-simple driver. The panel is used in Exynos5250-arndale boards.
+
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/panel/panel-simple.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 9599e6b..85eb2262 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1312,6 +1312,7 @@ static int exynos_dsi_init(struct exynos_dsi *dsi)
- {
- 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index cbf1ab4..d5da58d 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
+ 	},
+ };
  
-+	pm_runtime_get_sync(dsi->dev);
- 	exynos_dsi_reset(dsi);
- 	exynos_dsi_enable_irq(dsi);
- 
-@@ -1388,7 +1389,6 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
- 	ret = drm_panel_prepare(dsi->panel);
- 	if (ret < 0) {
- 		dsi->state &= ~DSIM_STATE_ENABLED;
--		pm_runtime_put_sync(dsi->dev);
- 		return;
- 	}
- 
-@@ -1400,7 +1400,6 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
- 		dsi->state &= ~DSIM_STATE_ENABLED;
- 		exynos_dsi_set_display_enable(dsi, false);
- 		drm_panel_unprepare(dsi->panel);
--		pm_runtime_put_sync(dsi->dev);
- 		return;
- 	}
- 
-@@ -1422,7 +1421,10 @@ static void exynos_dsi_disable(struct drm_encoder *encoder)
- 
- 	dsi->state &= ~DSIM_STATE_ENABLED;
- 
--	pm_runtime_put_sync(dsi->dev);
-+	if (dsi->state & DSIM_STATE_INITIALIZED) {
-+		pm_runtime_put_sync(dsi->dev);
-+		dsi->state &= ~DSIM_STATE_INITIALIZED;
-+	}
- }
- 
- static enum drm_connector_status
-@@ -1566,9 +1568,6 @@ static ssize_t exynos_dsi_host_transfer(struct mipi_dsi_host *host,
- 	struct exynos_dsi_transfer xfer;
- 	int ret;
- 
--	if (!(dsi->state & DSIM_STATE_ENABLED))
--		return -EINVAL;
--
- 	if (!(dsi->state & DSIM_STATE_INITIALIZED)) {
- 		ret = exynos_dsi_init(dsi);
- 		if (ret)
++static const struct drm_display_mode boe_hv070wsa_mode = {
++	.clock = 40800,
++	.hdisplay = 1024,
++	.hsync_start = 1024 + 90,
++	.hsync_end = 1024 + 90 + 90,
++	.htotal = 1024 + 90 + 90 + 90,
++	.vdisplay = 600,
++	.vsync_start = 600 + 3,
++	.vsync_end = 600 + 3 + 4,
++	.vtotal = 600 + 3 + 4 + 3,
++	.vrefresh = 60,
++};
++
++static const struct panel_desc boe_hv070wsa = {
++	.modes = &boe_hv070wsa_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 154,
++		.height = 90,
++	},
++};
++
+ static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
+ 	{
+ 		.clock = 71900,
+@@ -2113,6 +2135,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "avic,tm070ddh03",
+ 		.data = &avic_tm070ddh03,
+ 	}, {
++		.compatible = "boe,hv070wsa-100",
++		.data = &boe_hv070wsa
++	}, {
+ 		.compatible = "boe,nv101wxmn51",
+ 		.data = &boe_nv101wxmn51,
+ 	}, {
 -- 
 2.7.4
