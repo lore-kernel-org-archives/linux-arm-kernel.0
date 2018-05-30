@@ -1,63 +1,32 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Wed, 30 May 2018 14:29:22 +0200
-Subject: [PATCH] ARM: debug: Add Iproc UART3 debug addresses
-Message-ID: <20180530122922.1041-1-peron.clem@gmail.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Wed, 30 May 2018 15:29:31 +0300
+Subject: [PATCH] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE dependency
+In-Reply-To: <20180525160729.92026-1-arnd@arndb.de>
+References: <20180525160729.92026-1-arnd@arndb.de>
+Message-ID: <87o9gxcono.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cl?ment Peron <clement.peron@devialet.com>
 
-Broadcom Iproc SoCs typically use the UART3 for
-debug/console, provide a known good location for that.
+Hi,
 
-Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
----
- arch/arm/Kconfig.debug | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Arnd Bergmann <arnd@arndb.de> writes:
+> Without that option, we run into a link failure:
+>
+> drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
+> hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
+>
+> Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 199ebc1c4538..fa6fa1dae94d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -207,6 +207,14 @@ choice
- 		depends on ARCH_BCM_HR2
- 		select DEBUG_UART_8250
- 
-+	config DEBUG_BCM_IPROC_UART3
-+		bool "Kernel low-level debugging on BCM IPROC UART3"
-+		depends on ARCH_BCM_CYGNUS
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the third serial port on these devices.
-+
- 	config DEBUG_BCM_KONA_UART
- 		bool "Kernel low-level debugging messages via BCM KONA UART"
- 		depends on ARCH_BCM_MOBILE
-@@ -1564,6 +1572,7 @@ config DEBUG_UART_PHYS
- 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
- 	default 0x20201000 if DEBUG_BCM2835
- 	default 0x3f201000 if DEBUG_BCM2836
-+	default 0x18023000 if DEBUG_BCM_IPROC_UART3
- 	default 0x3e000000 if DEBUG_BCM_KONA_UART
- 	default 0x4000e400 if DEBUG_LL_UART_EFM32
- 	default 0x40028000 if DEBUG_AT91_SAMV7_USART1
-@@ -1730,6 +1739,7 @@ config DEBUG_UART_VIRT
- 	default 0xfe018000 if DEBUG_MMP_UART3
- 	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
- 	default 0xfe230000 if DEBUG_PICOXCELL_UART
-+	default 0xf1023000 if DEBUG_BCM_IPROC_UART3
- 	default 0xfe300000 if DEBUG_BCM_KONA_UART
- 	default 0xfe800000 if ARCH_IOP32X
- 	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
-@@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
- 		DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
- 		DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
--		DEBUG_DAVINCI_DA8XX_UART2 || \
-+		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
- 
- config DEBUG_UART_8250_PALMCHIP
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+
 -- 
-2.17.0
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/7fc655b2/attachment.sig>
