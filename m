@@ -1,28 +1,28 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 30 May 2018 16:32:57 +0200
-Subject: [PATCH v2 09/10] ARM: dts: exynos5250: add DSI node
-In-Reply-To: <1527682561-1386-10-git-send-email-m.purski@samsung.com>
-References: <CGME20180530121629eucas1p2cc1a8c3f5a8e704f4d6f3cf75834cf00@eucas1p2.samsung.com>
- <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <1527682561-1386-10-git-send-email-m.purski@samsung.com>
-Message-ID: <CAJKOXPdRxLxw6+AC5moC4327W5GMgBN0q3a9odq=adsFGxmdqA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 May 2018 15:33:38 +0100
+Subject: Regression in Linux next again
+In-Reply-To: <20180530140318eucas1p2af2d01b9678e8914c2b8e099c584ec11~zcQzVKtj30757607576eucas1p2V@eucas1p2.samsung.com>
+References: <20180529221501.GJ5702@atomide.com>
+ <CGME20180530091325epcas4p20dea07f013a3512ce4ea92120da90f61@epcas4p2.samsung.com>
+ <20180530091314.GB6920@sirena.org.uk>
+ <20180530140318eucas1p2af2d01b9678e8914c2b8e099c584ec11~zcQzVKtj30757607576eucas1p2V@eucas1p2.samsung.com>
+Message-ID: <20180530143338.GM6920@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 2:16 PM, Maciej Purski <m.purski@samsung.com> wrote:
-> From: Andrzej Hajda <a.hajda@samsung.com>
->
-> The patch adds common part of DSI node for Exynos5250 platforms
-> and a required mipi-phy node.
->
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+On Wed, May 30, 2018 at 04:03:15PM +0200, Maciej Purski wrote:
 
-Thanks for changes. I'll take both DTS patches after bindings get
-accepted and after upcomming merge window.
+> I'm afraid, I have no idea, how to fix it quickly. You can revert it and
+> in the next version I'll fix the build error and split the last patch even
+> more, so we could perform a more precise bisection. I'd be grateful if you
+> could push it on your test coupled branch and Tony could test it again before
+> merging it with next again.
 
-Best regards,
-Krzysztof
+Yeah, if we could get testing from Tony first that'd be ideal.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/597b2dc3/attachment.sig>
