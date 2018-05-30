@@ -1,321 +1,552 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 30 May 2018 18:09:45 +0900
-Subject: [PATCH 7/8] media: uniphier: add LD11 adapter driver for ISDB
+Date: Wed, 30 May 2018 18:09:42 +0900
+Subject: [PATCH 4/8] media: uniphier: add common module of HSC MPEG2-TS I/O
+ driver
 In-Reply-To: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
 References: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180530090946.1635-8-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180530090946.1635-5-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds UniPhier LD11 DVB adapter driver for ISDB-S/T
-that equipments SONY SUT-PJ series using CXD2858 tuner and Socionext
-MN884433 demodulator.
+This patch adds common module of HSC (High speed Stream Controller)
+driver for Socionext UniPhier SoCs.
 
 Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- drivers/media/platform/uniphier/Kconfig       |  10 +
- drivers/media/platform/uniphier/Makefile      |   1 +
- .../platform/uniphier/ld11-mn884433-helene.c  | 265 ++++++++++++++++++
- 3 files changed, 276 insertions(+)
- create mode 100644 drivers/media/platform/uniphier/ld11-mn884433-helene.c
+ drivers/media/platform/uniphier/Makefile   |   2 +-
+ drivers/media/platform/uniphier/hsc-core.c | 514 +++++++++++++++++++++
+ 2 files changed, 515 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/media/platform/uniphier/hsc-core.c
 
-diff --git a/drivers/media/platform/uniphier/Kconfig b/drivers/media/platform/uniphier/Kconfig
-index 8f3a662a391c..0fc9bbfc170b 100644
---- a/drivers/media/platform/uniphier/Kconfig
-+++ b/drivers/media/platform/uniphier/Kconfig
-@@ -15,3 +15,13 @@ config DVB_UNIPHIER_LD11
- 	  Driver for the HSC (High speed Stream Controller) for
- 	  UniPhier LD11/LD20.
- 	  Say Y when you want to support this hardware.
-+
-+config DVB_UNIPHIER_LD11_ISDB
-+	bool "Support UniPhier LD11 ISDB adapters"
-+	depends on DVB_UNIPHIER
-+	help
-+	  Driver for LD11 ISDB-S/T adapters which use
-+	  Demux: Socionext LD11 HSC
-+	  Demod: Socionext MN884433
-+	  Tuner: SONY HELENE (CXD2858ER)
-+	  Say Y when you want to support this adapters.
 diff --git a/drivers/media/platform/uniphier/Makefile b/drivers/media/platform/uniphier/Makefile
-index 9e75ad081b77..e4b06f8a37b5 100644
+index 92536bc56b31..88bc860b391f 100644
 --- a/drivers/media/platform/uniphier/Makefile
 +++ b/drivers/media/platform/uniphier/Makefile
-@@ -8,3 +8,4 @@ ccflags-y += -Idrivers/media/dvb-frontends/
- ccflags-y += -Idrivers/media/tuners/
+@@ -1,4 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0
+-uniphier-dvb-y += hsc-ucode.o hsc-css.o hsc-ts.o hsc-dma.o
++uniphier-dvb-y += hsc-core.o hsc-ucode.o hsc-css.o hsc-ts.o hsc-dma.o
  
- uniphier-dvb-y += uniphier-adapter.o
-+uniphier-dvb-$(CONFIG_DVB_UNIPHIER_LD11_ISDB) += ld11-mn884433-helene.o
-diff --git a/drivers/media/platform/uniphier/ld11-mn884433-helene.c b/drivers/media/platform/uniphier/ld11-mn884433-helene.c
+ obj-$(CONFIG_DVB_UNIPHIER) += uniphier-dvb.o
+diff --git a/drivers/media/platform/uniphier/hsc-core.c b/drivers/media/platform/uniphier/hsc-core.c
 new file mode 100644
-index 000000000000..f4f48b6a0211
+index 000000000000..cdb488e4df8c
 --- /dev/null
-+++ b/drivers/media/platform/uniphier/ld11-mn884433-helene.c
-@@ -0,0 +1,265 @@
++++ b/drivers/media/platform/uniphier/hsc-core.c
+@@ -0,0 +1,514 @@
 +// SPDX-License-Identifier: GPL-2.0
 +//
-+// Socionext UniPhier LD11 adapter driver for ISDB.
-+// Using Socionext MN884433 ISDB-S/ISDB-T demodulator and
-+// SONY HELENE tuner.
++// Socionext UniPhier DVB driver for High-speed Stream Controller (HSC).
 +//
 +// Copyright (c) 2018 Socionext Inc.
 +
 +#include <linux/clk.h>
++#include <linux/interrupt.h>
 +#include <linux/kernel.h>
-+#include <linux/module.h>
++#include <linux/kthread.h>
 +#include <linux/of.h>
 +#include <linux/of_platform.h>
 +#include <linux/reset.h>
 +
-+#include "sc1501a.h"
-+#include "cxd2858.h"
-+#include "helene.h"
 +#include "hsc.h"
-+#include "uniphier-adapter.h"
++#include "hsc-reg.h"
 +
-+static struct sc1501a_config mn884433_conf[] = {
-+	{ .if_freq = LOW_IF_4MHZ, },
-+};
++#define SZ_TS_PKT      188
++#define SZ_M2TS_PKT    192
 +
-+static int uniphier_adapter_demod_probe(struct uniphier_adapter_priv *priv)
++DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nums);
++
++static int hsc_start_feed(struct dvb_demux_feed *feed)
 +{
-+	const struct uniphier_adapter_spec *spec = priv->spec;
-+	struct device *dev = &priv->pdev->dev;
-+	struct device_node *node;
-+	int ret, i;
++	struct hsc_tsif *tsif = feed->demux->priv;
++	struct hsc_dmaif *dmaif = tsif->dmaif;
++	struct hsc_chip *chip = tsif->chip;
 +
-+	priv->demod_mclk = devm_clk_get(dev, "demod-mclk");
-+	if (IS_ERR(priv->demod_mclk)) {
-+		dev_err(dev, "Failed to request demod-mclk: %ld\n",
-+			PTR_ERR(priv->demod_mclk));
-+		return PTR_ERR(priv->demod_mclk);
++	tsif->running = true;
++	dmaif->running = true;
++
++	hsc_ts_in_set_enable(chip, tsif->tsi, true);
++
++	hsc_dma_out_set_src_ts_in(&dmaif->dma_out, tsif->tsi);
++	hsc_dma_out_start(&dmaif->dma_out, true);
++
++	return 0;
++}
++
++static int hsc_stop_feed(struct dvb_demux_feed *feed)
++{
++	struct hsc_tsif *tsif = feed->demux->priv;
++	struct hsc_dmaif *dmaif = tsif->dmaif;
++	struct hsc_chip *chip = tsif->chip;
++
++	hsc_ts_in_set_enable(chip, tsif->tsi, false);
++
++	hsc_dma_out_start(&dmaif->dma_out, false);
++
++	tsif->running = false;
++	dmaif->running = false;
++
++	return 0;
++}
++
++int hsc_register_dvb(struct hsc_tsif *tsif)
++{
++	struct device *dev = &tsif->chip->pdev->dev;
++	int ret;
++
++	tsif->adapter.priv = tsif;
++	ret = dvb_register_adapter(&tsif->adapter, "uniphier-hsc",
++				   THIS_MODULE, dev, adapter_nums);
++	if (ret < 0) {
++		dev_err(dev, "Failed to register DVB adapter: %d\n", ret);
++		return ret;
 +	}
++	tsif->valid_adapter = true;
 +
-+	priv->demod_gpio = devm_gpiod_get_optional(dev, "reset-demod",
-+						   GPIOD_OUT_HIGH);
-+	if (IS_ERR(priv->demod_gpio)) {
-+		dev_err(dev, "Failed to request demod_gpio: %ld\n",
-+			PTR_ERR(priv->demod_gpio));
-+		return PTR_ERR(priv->demod_gpio);
++	tsif->demux.dmx.capabilities = DMX_TS_FILTERING | DMX_SECTION_FILTERING;
++	tsif->demux.priv = tsif;
++	tsif->demux.feednum = 256;
++	tsif->demux.filternum = 256;
++	tsif->demux.start_feed = hsc_start_feed;
++	tsif->demux.stop_feed = hsc_stop_feed;
++	tsif->demux.write_to_decoder = NULL;
++	ret = dvb_dmx_init(&tsif->demux);
++	if (ret) {
++		dev_err(dev, "Failed to register demux: %d\n", ret);
++		goto err_out_adapter;
 +	}
++	tsif->valid_demux = true;
 +
-+	node = of_parse_phandle(dev->of_node, "demod-i2c-bus", 0);
-+	if (!node) {
-+		dev_err(dev, "Failed to parse demod-i2c-bus\n");
-+		return -ENODEV;
++	tsif->dmxdev.filternum = 256;
++	tsif->dmxdev.demux = &tsif->demux.dmx;
++	tsif->dmxdev.capabilities = 0;
++	ret = dvb_dmxdev_init(&tsif->dmxdev, &tsif->adapter);
++	if (ret) {
++		dev_err(dev, "Failed to register demux dev: %d\n", ret);
++		goto err_out_dmx;
 +	}
++	tsif->valid_dmxdev = true;
 +
-+	priv->demod_i2c_adapter = of_find_i2c_adapter_by_node(node);
-+	if (!priv->demod_i2c_adapter) {
-+		dev_err(dev, "Failed to find demod i2c adapter\n");
-+		of_node_put(node);
-+		return -ENODEV;
++	ret = dvb_register_frontend(&tsif->adapter, tsif->fe);
++	if (ret) {
++		dev_err(dev, "Failed to register adapter: %d\n", ret);
++		goto err_out_dmxdev;
 +	}
-+	of_node_put(node);
-+
-+	mn884433_conf[0].reset_gpio = priv->demod_gpio;
-+	for (i = 0; i < spec->adapters; i++) {
-+		struct i2c_client *c;
-+
-+		mn884433_conf[i].mclk = priv->demod_mclk;
-+		mn884433_conf[i].fe = &priv->fe[i].fe;
-+
-+		c = dvb_module_probe(spec->demod_i2c_info[i].type, NULL,
-+				     priv->demod_i2c_adapter,
-+				     spec->demod_i2c_info[i].addr,
-+				     &mn884433_conf[i]);
-+		if (!c) {
-+			dev_err(dev, "Failed to probe demod\n");
-+			ret = -ENODEV;
-+			goto err_out;
-+		}
-+		priv->fe[i].demod_i2c = c;
-+	}
++	tsif->valid_fe = true;
 +
 +	return 0;
 +
-+err_out:
-+	for (i = 0; i < spec->adapters; i++)
-+		dvb_module_release(priv->fe[i].demod_i2c);
++err_out_dmxdev:
++	dvb_dmxdev_release(&tsif->dmxdev);
++
++err_out_dmx:
++	dvb_dmx_release(&tsif->demux);
++
++err_out_adapter:
++	dvb_unregister_adapter(&tsif->adapter);
 +
 +	return ret;
 +}
 +
-+static struct helene_config helene_conf[] = {
-+	{ .xtal = SONY_HELENE_XTAL_16000, },
-+	{ .xtal = SONY_HELENE_XTAL_16000, },
-+};
-+
-+static int uniphier_adapter_tuner_probe(struct uniphier_adapter_priv *priv)
++void hsc_unregister_dvb(struct hsc_tsif *tsif)
 +{
-+	const struct uniphier_adapter_spec *spec = priv->spec;
-+	struct device *dev = &priv->pdev->dev;
-+	struct device_node *node;
-+	int ret, i;
-+
-+	priv->tuner_gpio = devm_gpiod_get_optional(dev, "reset-tuner",
-+						   GPIOD_OUT_HIGH);
-+	if (IS_ERR(priv->tuner_gpio)) {
-+		dev_err(dev, "Failed to request tuner_gpio: %ld\n",
-+			PTR_ERR(priv->tuner_gpio));
-+		return PTR_ERR(priv->tuner_gpio);
++	if (tsif->valid_fe) {
++		dvb_frontend_detach(tsif->fe);
++		dvb_unregister_frontend(tsif->fe);
 +	}
-+	gpiod_set_value_cansleep(priv->tuner_gpio, 0);
-+
-+	node = of_parse_phandle(dev->of_node, "tuner-i2c-bus", 0);
-+	if (!node) {
-+		dev_err(dev, "Failed to parse tuner-i2c-bus\n");
-+		return -ENODEV;
-+	}
-+
-+	priv->tuner_i2c_adapter = of_find_i2c_adapter_by_node(node);
-+	if (!priv->tuner_i2c_adapter) {
-+		dev_err(dev, "Failed to find tuner i2c adapter\n");
-+		of_node_put(node);
-+		return -ENODEV;
-+	}
-+	of_node_put(node);
-+
-+	for (i = 0; i < priv->spec->adapters; i++) {
-+		struct i2c_client *c;
-+
-+		helene_conf[i].fe = priv->fe[i].fe;
-+
-+		c = dvb_module_probe(spec->tuner_i2c_info[i].type, NULL,
-+				     priv->tuner_i2c_adapter,
-+				     spec->tuner_i2c_info[i].addr,
-+				     &helene_conf[i]);
-+		if (!c) {
-+			dev_err(dev, "Failed to probe tuner\n");
-+			ret = -ENODEV;
-+			goto err_out;
-+		}
-+		priv->fe[i].tuner_i2c = c;
-+	}
-+
-+	return 0;
-+
-+err_out:
-+	for (i = 0; i < spec->adapters; i++)
-+		dvb_module_release(priv->fe[i].tuner_i2c);
-+
-+	return ret;
++	if (tsif->valid_dmxdev)
++		dvb_dmxdev_release(&tsif->dmxdev);
++	if (tsif->valid_demux)
++		dvb_dmx_release(&tsif->demux);
++	if (tsif->valid_adapter)
++		dvb_unregister_adapter(&tsif->adapter);
 +}
 +
-+static int uniphier_adapter_probe(struct platform_device *pdev)
++static bool is_tsi_error(struct hsc_tsif *tsif, u32 status)
 +{
-+	struct uniphier_adapter_priv *priv;
++	if (status & (TSI_INTR_SERR | TSI_INTR_SOF | TSI_INTR_TOF))
++		return true;
++
++	return false;
++}
++
++static void hsc_tsif_recover_worker(struct work_struct *work)
++{
++	struct delayed_work *dwork = to_delayed_work(work);
++	struct hsc_tsif *tsif = container_of(dwork,
++		struct hsc_tsif, recover_work);
++	struct hsc_chip *chip = tsif->chip;
++
++	if (!tsif->running)
++		return;
++
++	hsc_ts_in_set_enable(chip, tsif->tsi, true);
++}
++
++static irqreturn_t hsc_tsif_irq(int irq, void *p)
++{
++	struct platform_device *pdev = p;
 +	struct device *dev = &pdev->dev;
-+	int i, ret;
++	struct hsc_chip *chip = platform_get_drvdata(pdev);
++	struct regmap *r = chip->regmap;
++	int i, ret = IRQ_NONE;
 +
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+	priv->pdev = pdev;
++	for (i = 0; i < ARRAY_SIZE(chip->tsif); i++) {
++		struct hsc_tsif *tsif = &chip->tsif[i];
++		u32 st;
 +
-+	priv->spec = of_device_get_match_data(dev);
-+	if (!priv->spec)
++		if (!tsif->running)
++			continue;
++
++		regmap_read(r, TSI_SYNCSTATUS(tsif->tsi), &st);
++		if (!st)
++			continue;
++
++		regmap_write(r, TSI_SYNCSTATUS(tsif->tsi), 0xffff);
++
++		if (is_tsi_error(tsif, st)) {
++			/* Recovery */
++			dev_info(dev, "TS %d Sync lost, try recovery.\n",
++				 tsif->tsi);
++			schedule_delayed_work(&tsif->recover_work,
++					      tsif->recover_delay);
++		}
++
++		ret = IRQ_HANDLED;
++	}
++
++	return ret;
++}
++
++int hsc_tsif_init(struct hsc_tsif *tsif, const struct hsc_conf *conf)
++{
++	struct hsc_chip *chip = tsif->chip;
++	int ret;
++
++	if (!conf)
 +		return -EINVAL;
 +
-+	priv->fe = devm_kzalloc(dev, sizeof(*priv->fe) * priv->spec->adapters,
-+				GFP_KERNEL);
-+	if (!priv->fe)
-+		return -ENOMEM;
++	tsif->css_in = conf->css_in;
++	tsif->css_out = conf->css_out;
++	tsif->dpll = conf->dpll;
 +
-+	ret = uniphier_adapter_demux_probe(priv);
++	tsif->tsi = hsc_css_out_to_ts_in(tsif->css_out);
++	if (tsif->tsi == -1)
++		return -EINVAL;
++
++	tsif->dpll_src = hsc_css_out_to_dpll_src(tsif->css_out);
++	if (tsif->dpll_src == -1)
++		return -EINVAL;
++
++	ret = hsc_css_out_set_src(chip, tsif->css_in, tsif->css_out, true);
 +	if (ret)
 +		return ret;
 +
-+	ret = uniphier_adapter_demod_probe(priv);
++	ret = hsc_css_in_set_polarity(chip, tsif->css_in, false, false, false);
 +	if (ret)
 +		return ret;
 +
-+	ret = uniphier_adapter_tuner_probe(priv);
++	ret = hsc_ts_in_set_dmaparam(chip, tsif->tsi, HSC_TSIF_MPEG2_TS_ATS);
 +	if (ret)
 +		return ret;
 +
-+	platform_set_drvdata(pdev, priv);
++	ret = hsc_dpll_set_src(chip, tsif->dpll, tsif->dpll_src);
++	if (ret)
++		return ret;
 +
-+	for (i = 0; i < priv->spec->adapters; i++) {
-+		priv->chip->tsif[i].fe = priv->fe[i].fe;
-+
-+		ret = hsc_register_dvb(&priv->chip->tsif[i]);
-+		if (ret) {
-+			dev_err(dev, "Failed to register adapter\n");
-+			goto err_out_if;
-+		}
-+	}
++	INIT_DELAYED_WORK(&tsif->recover_work, hsc_tsif_recover_worker);
++	tsif->recover_delay = HZ / 10;
 +
 +	return 0;
++}
 +
-+err_out_if:
-+	for (i = 0; i < priv->spec->adapters; i++)
-+		hsc_unregister_dvb(&priv->chip->tsif[i]);
++void hsc_tsif_release(struct hsc_tsif *tsif)
++{
++	cancel_delayed_work(&tsif->recover_work);
++}
++
++static void hsc_dmaif_feed_worker(struct work_struct *work)
++{
++	struct hsc_dmaif *dmaif = container_of(work,
++		struct hsc_dmaif, feed_work);
++	struct hsc_tsif *tsif = dmaif->tsif;
++	struct hsc_dma_buf *buf = &dmaif->buf_out;
++	struct device *dev = &dmaif->chip->pdev->dev;
++	dma_addr_t dmapos;
++	u8 *pkt;
++	u64 cnt, i;
++	int wrap = 0;
++
++	if (!dmaif->running)
++		return;
++
++retry:
++	spin_lock(&dmaif->lock);
++	hsc_dma_out_sync(&dmaif->dma_out);
++	spin_unlock(&dmaif->lock);
++
++	dmapos = buf->phys + buf->rd_offs;
++	cnt = hsc_rb_cnt_to_end(buf);
++	cnt = DIV_ROUND_DOWN_ULL(cnt, SZ_M2TS_PKT) * SZ_M2TS_PKT;
++
++	dma_sync_single_for_cpu(dev, dmapos, cnt, DMA_FROM_DEVICE);
++	for (i = 0; i < cnt; i += SZ_M2TS_PKT) {
++		pkt = buf->virt + buf->rd_offs + i;
++
++		if (pkt[4] == 0x47 && pkt[5] == 0x1f && pkt[6] == 0xff)
++			continue;
++		if (pkt[5] & 0x80)
++			continue;
++		if (pkt[7] & 0xc0)
++			continue;
++
++		dvb_dmx_swfilter_packets(&tsif->demux, &pkt[4], 1);
++	}
++	dma_sync_single_for_device(dev, dmapos, cnt, DMA_FROM_DEVICE);
++
++	spin_lock(&dmaif->lock);
++
++	buf->rd_offs += cnt;
++	if (buf->rd_offs >= buf->size)
++		buf->rd_offs -= buf->size;
++
++	buf->chk_offs = buf->wr_offs + buf->size_chk;
++	if (buf->chk_offs >= buf->size)
++		buf->chk_offs -= buf->size;
++
++	if (!wrap && hsc_rb_cnt(buf) >= buf->size_chk / 2) {
++		wrap = 1;
++		spin_unlock(&dmaif->lock);
++		goto retry;
++	}
++
++	hsc_dma_out_sync(&dmaif->dma_out);
++
++	spin_unlock(&dmaif->lock);
++}
++
++static irqreturn_t hsc_dmaif_irq(int irq, void *p)
++{
++	struct platform_device *pdev = p;
++	struct hsc_chip *chip = platform_get_drvdata(pdev);
++	int i, ret = IRQ_NONE;
++	u32 st;
++
++	for (i = 0; i < ARRAY_SIZE(chip->tsif); i++) {
++		struct hsc_dmaif *dmaif = &chip->dmaif[i];
++
++		if (!dmaif->running)
++			continue;
++
++		hsc_dma_out_get_intr(&dmaif->dma_out, &st);
++		if (!st)
++			continue;
++
++		hsc_dma_out_clear_intr(&dmaif->dma_out, 0xffff);
++
++		spin_lock(&dmaif->lock);
++		hsc_dma_out_sync(&dmaif->dma_out);
++		spin_unlock(&dmaif->lock);
++
++		schedule_work(&dmaif->feed_work);
++
++		ret = IRQ_HANDLED;
++	}
 +
 +	return ret;
 +}
 +
-+static int uniphier_adapter_remove(struct platform_device *pdev)
++int hsc_dmaif_init(struct hsc_dmaif *dmaif, const struct hsc_conf *conf)
 +{
-+	struct uniphier_adapter_priv *priv = platform_get_drvdata(pdev);
-+	int i;
++	struct hsc_chip *chip = dmaif->chip;
++	struct hsc_dma_buf *buf = &dmaif->buf_out;
++	struct device *dev = &chip->pdev->dev;
++	int ret;
 +
-+	for (i = 0; i < priv->spec->adapters; i++) {
-+		hsc_dmaif_release(&priv->chip->dmaif[i]);
-+		hsc_tsif_release(&priv->chip->tsif[i]);
-+		hsc_unregister_dvb(&priv->chip->tsif[i]);
-+		dvb_module_release(priv->fe[i].tuner_i2c);
-+		dvb_module_release(priv->fe[i].demod_i2c);
-+	}
++	if (!conf)
++		return -EINVAL;
++
++	ret = hsc_dma_out_init(&dmaif->dma_out, chip, conf->dma_out, buf);
++	if (ret)
++		return ret;
++
++	buf->size = HSC_DMAIF_TS_BUFSIZE;
++	buf->size_chk = HSC_DMAIF_TS_BUFSIZE / 4;
++	buf->virt = dma_alloc_coherent(dev, buf->size, &buf->phys, GFP_KERNEL);
++	if (!buf->virt)
++		return -ENOMEM;
++
++	spin_lock_init(&dmaif->lock);
++	INIT_WORK(&dmaif->feed_work, hsc_dmaif_feed_worker);
 +
 +	return 0;
 +}
 +
-+static const struct hsc_conf ld11_hsc_conf[] = {
++void hsc_dmaif_release(struct hsc_dmaif *dmaif)
++{
++	struct hsc_chip *chip = dmaif->chip;
++	struct device *dev = &chip->pdev->dev;
++
++	flush_scheduled_work();
++
++	dma_free_coherent(dev, dmaif->buf_out.size, dmaif->buf_out.virt,
++			  dmaif->buf_out.phys);
++}
++
++static const struct regmap_config hsc_regmap_config = {
++	.reg_bits      = 32,
++	.reg_stride    = 4,
++	.val_bits      = 32,
++	.max_register  = 0xffffc,
++	.cache_type    = REGCACHE_NONE,
++};
++
++static int hsc_probe(struct platform_device *pdev)
++{
++	struct hsc_chip *chip;
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	void __iomem *preg;
++	int irq, ret, i;
++
++	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++	chip->pdev = pdev;
++
++	chip->spec = of_device_get_match_data(dev);
++	if (!chip->spec)
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	preg = devm_ioremap_resource(dev, res);
++	if (IS_ERR(preg))
++		return PTR_ERR(preg);
++
++	chip->regmap = devm_regmap_init_mmio(dev, preg,
++					     &hsc_regmap_config);
++	if (IS_ERR(chip->regmap))
++		return PTR_ERR(chip->regmap);
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(dev, "Could not get irq for TS I/F\n");
++		return irq;
++	}
++
++	ret = devm_request_irq(dev, irq, hsc_tsif_irq, IRQF_SHARED,
++			       dev_name(dev), pdev);
++	if (ret)
++		return ret;
++
++	irq = platform_get_irq(pdev, 1);
++	if (irq < 0) {
++		dev_err(dev, "Could not get irq for DMA I/F\n");
++		return irq;
++	}
++
++	ret = devm_request_irq(dev, irq, hsc_dmaif_irq, IRQF_SHARED,
++			       dev_name(dev), pdev);
++	if (ret)
++		return ret;
++
++	chip->clk_stdmac = devm_clk_get(dev, "stdmac");
++	if (IS_ERR(chip->clk_stdmac))
++		return PTR_ERR(chip->clk_stdmac);
++
++	chip->clk_hsc = devm_clk_get(dev, "hsc");
++	if (IS_ERR(chip->clk_hsc))
++		return PTR_ERR(chip->clk_hsc);
++
++	chip->rst_stdmac = devm_reset_control_get_shared(dev, "stdmac");
++	if (IS_ERR(chip->rst_stdmac))
++		return PTR_ERR(chip->rst_stdmac);
++
++	chip->rst_hsc = devm_reset_control_get_shared(dev, "hsc");
++	if (IS_ERR(chip->rst_hsc))
++		return PTR_ERR(chip->rst_hsc);
++
++	ret = clk_prepare_enable(chip->clk_stdmac);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(chip->clk_hsc);
++	if (ret)
++		goto err_out_clk_stdmac;
++
++	ret = reset_control_deassert(chip->rst_stdmac);
++	if (ret)
++		goto err_out_clk_hsc;
++
++	ret = reset_control_deassert(chip->rst_hsc);
++	if (ret)
++		goto err_out_rst_stdmac;
++
++	ret = hsc_ucode_load_all(chip);
++	if (ret)
++		goto err_out_rst_hsc;
++
++	for (i = 0; i < HSC_STREAM_IF_NUM; i++) {
++		chip->dmaif[i].chip = chip;
++		chip->dmaif[i].tsif = &chip->tsif[i];
++		chip->tsif[i].chip = chip;
++		chip->tsif[i].dmaif = &chip->dmaif[i];
++	}
++
++	platform_set_drvdata(pdev, chip);
++
++	return 0;
++
++err_out_rst_hsc:
++	reset_control_assert(chip->rst_hsc);
++
++err_out_rst_stdmac:
++	reset_control_assert(chip->rst_stdmac);
++
++err_out_clk_hsc:
++	clk_disable_unprepare(chip->clk_hsc);
++
++err_out_clk_stdmac:
++	clk_disable_unprepare(chip->clk_stdmac);
++
++	return ret;
++}
++
++static int hsc_remove(struct platform_device *pdev)
++{
++	struct hsc_chip *chip = platform_get_drvdata(pdev);
++
++	hsc_ucode_unload_all(chip);
++
++	reset_control_assert(chip->rst_hsc);
++	reset_control_assert(chip->rst_stdmac);
++	clk_disable_unprepare(chip->clk_hsc);
++	clk_disable_unprepare(chip->clk_stdmac);
++
++	return 0;
++}
++
++static const struct of_device_id uniphier_hsc_of_match[] = {
 +	{
-+		.css_in = HSC_CSS_IN_SRLTS0,
-+		.css_out = HSC_CSS_OUT_TSI0,
-+		.dpll = HSC_DPLL0,
-+		.dma_out = HSC_DMA_OUT0,
++		.compatible = "socionext,uniphier-ld11-hsc",
++		.data = &uniphier_hsc_ld11_spec,
 +	},
-+};
-+
-+static const struct i2c_board_info mn884433_i2c_info[] = {
-+	{ .type = "mn884433", .addr = 0x68, },
-+};
-+
-+static const struct i2c_board_info helene_i2c_info[] = {
-+	{ .type = "helene", .addr = 0x61, },
-+};
-+
-+static const struct uniphier_adapter_spec ld11_mn884433_helene_spec = {
-+	.adapters = 1,
-+	.hsc_conf = ld11_hsc_conf,
-+	.demod_i2c_info = mn884433_i2c_info,
-+	.tuner_i2c_info = helene_i2c_info,
-+};
-+
-+static const struct of_device_id uniphier_hsc_adapter_of_match[] = {
 +	{
-+		.compatible = "socionext,uniphier-ld11-mn884433-helene",
-+		.data = &ld11_mn884433_helene_spec,
++		.compatible = "socionext,uniphier-ld20-hsc",
++		.data = &uniphier_hsc_ld20_spec,
 +	},
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, uniphier_hsc_adapter_of_match);
++MODULE_DEVICE_TABLE(of, uniphier_hsc_of_match);
 +
-+static struct platform_driver uniphier_hsc_adapter_driver = {
++static struct platform_driver uniphier_hsc_driver = {
 +	.driver = {
-+		.name = "uniphier-ld11-isdb",
-+		.of_match_table = of_match_ptr(uniphier_hsc_adapter_of_match),
++		.name = "uniphier-hsc",
++		.of_match_table = of_match_ptr(uniphier_hsc_of_match),
 +	},
-+	.probe  = uniphier_adapter_probe,
-+	.remove = uniphier_adapter_remove,
++	.probe  = hsc_probe,
++	.remove = hsc_remove,
 +};
-+module_platform_driver(uniphier_hsc_adapter_driver);
-+
-+MODULE_AUTHOR("Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier LD11 adapter driver for ISDB.");
-+MODULE_LICENSE("GPL v2");
++module_platform_driver(uniphier_hsc_driver);
 -- 
 2.17.0
