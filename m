@@ -1,85 +1,67 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 30 May 2018 14:15:54 +0200
-Subject: [PATCH v2 03/10] drm/exynos: move connector creation to attach
- callback
+Date: Wed, 30 May 2018 14:15:58 +0200
+Subject: [PATCH v2 07/10] dt-bindings: tc358754: add DT bindings
 In-Reply-To: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
 References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121624eucas1p2678b6a5424cb8df286b6142cd3754b65@eucas1p2.samsung.com>
-Message-ID: <1527682561-1386-4-git-send-email-m.purski@samsung.com>
+ <CGME20180530121627eucas1p1c8daf24d7c95e9e8b04a523d4662dfd9@eucas1p1.samsung.com>
+Message-ID: <1527682561-1386-8-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation assumes that the only possible peripheral
-device for DSIM is a panel. Using an output bridge should also be
-possible.
+From: Andrzej Hajda <a.hajda@samsung.com>
 
-If an output bridge in available, don't create a new connector.
-Instead add bridge to DSIM encdoer in dsi_host_attach().
+The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
+Bindings describe power supplies, reset gpio and video interfaces.
 
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 35 +++++++++++++++++++++------------
- 1 file changed, 22 insertions(+), 13 deletions(-)
+ .../bindings/display/bridge/toshiba,tc358764.txt   | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 85eb2262..7b50bad 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1501,7 +1501,28 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
- 				  struct mipi_dsi_device *device)
- {
- 	struct exynos_dsi *dsi = host_to_dsi(host);
--	struct drm_device *drm = dsi->connector.dev;
-+	struct drm_encoder *encoder = &dsi->encoder;
-+	struct drm_device *drm = encoder->dev;
-+	struct drm_bridge *out_bridge;
+diff --git a/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+new file mode 100644
+index 0000000..6eda14f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+@@ -0,0 +1,37 @@
++TC358764 MIPI-DSI to LVDS panel bridge
 +
-+	out_bridge  = of_drm_find_bridge(device->dev.of_node);
-+	if (out_bridge) {
-+		drm_bridge_attach(encoder, out_bridge, NULL);
-+	} else {
-+		int ret = exynos_dsi_create_connector(encoder);
++Required properties:
++  - compatible: "toshiba,tc358764"
++  - reg: the virtual channel number of a DSI peripheral
++  - vddc-supply: core voltage supply, 1.2V
++  - vddio-supply: I/O voltage supply, 1.8V or 3.3V
++  - vddlvds-supply: LVDS1/2 voltage supply, 3.3V
++  - reset-gpios: a GPIO spec for the reset pin
 +
-+		if (ret) {
-+			DRM_ERROR("failed to create connector ret = %d\n", ret);
-+			drm_encoder_cleanup(encoder);
-+			return ret;
-+		}
++The device node can contain zero to two 'port' child nodes, each with one
++child 'endpoint' node, according to the bindings defined in [1].
++The following are properties specific to those nodes.
 +
-+		dsi->panel = of_drm_find_panel(device->dev.of_node);
-+		if (dsi->panel) {
-+			drm_panel_attach(dsi->panel, &dsi->connector);
-+			dsi->connector.status = connector_status_connected;
-+		}
-+	}
- 
- 	/*
- 	 * This is a temporary solution and should be made by more generic way.
-@@ -1520,11 +1541,6 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
- 	dsi->lanes = device->lanes;
- 	dsi->format = device->format;
- 	dsi->mode_flags = device->mode_flags;
--	dsi->panel = of_drm_find_panel(device->dev.of_node);
--	if (dsi->panel) {
--		drm_panel_attach(dsi->panel, &dsi->connector);
--		dsi->connector.status = connector_status_connected;
--	}
- 	exynos_drm_crtc_get_by_type(drm, EXYNOS_DISPLAY_TYPE_LCD)->i80_mode =
- 			!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO);
- 
-@@ -1653,13 +1669,6 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
- 	if (ret < 0)
- 		return ret;
- 
--	ret = exynos_dsi_create_connector(encoder);
--	if (ret) {
--		DRM_ERROR("failed to create connector ret = %d\n", ret);
--		drm_encoder_cleanup(encoder);
--		return ret;
--	}
--
- 	if (dsi->mic_bridge_node) {
- 		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
- 		if (mic_bridge)
++port:
++  - reg: (required) can be 0 for DSI port or 1 for LVDS port;
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++
++	bridge at 0 {
++		reg = <0>;
++		compatible = "toshiba,tc358764";
++		vddc-supply = <&vcc_1v2_reg>;
++		vddio-supply = <&vcc_1v8_reg>;
++		vddlvds-supply = <&vcc_3v3_reg>;
++		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 1 {
++			reg = <1>;
++			lvds_ep: endpoint {
++				remote-endpoint = <&panel_ep>;
++			};
++		};
++	};
 -- 
 2.7.4
