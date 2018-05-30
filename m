@@ -1,77 +1,45 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 30 May 2018 16:06:25 +0200
-Subject: [PATCH v4 2/2] drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
-In-Reply-To: <20180530140625.21247-1-thierry.reding@gmail.com>
-References: <20180530140625.21247-1-thierry.reding@gmail.com>
-Message-ID: <20180530140625.21247-3-thierry.reding@gmail.com>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Wed, 30 May 2018 19:41:30 +0530
+Subject: [PATCH v2 3/6] clk: ti: dra7: Add clkctrl clock data for the mcan
+ clocks
+In-Reply-To: <20180530141133.3711-1-faiz_abbas@ti.com>
+References: <20180530141133.3711-1-faiz_abbas@ti.com>
+Message-ID: <20180530141133.3711-4-faiz_abbas@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Add clkctrl data for the m_can clocks and register it within the
+clkctrl driver
 
-Depending on the kernel configuration, early ARM architecture setup code
-may have attached the GPU to a DMA/IOMMU mapping that transparently uses
-the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
-backed buffers (a special bit in the GPU's MMU page tables indicates the
-memory path to take: via the SMMU or directly to the memory controller).
-Transparently backing DMA memory with an IOMMU prevents Nouveau from
-properly handling such memory accesses and causes memory access faults.
-
-As a side-note: buffers other than those allocated in instance memory
-don't need to be physically contiguous from the GPU's perspective since
-the GPU can map them into contiguous buffers using its own MMU. Mapping
-these buffers through the IOMMU is unnecessary and will even lead to
-performance degradation because of the additional translation. One
-exception to this are compressible buffers which need large pages. In
-order to enable these large pages, multiple small pages will have to be
-combined into one large (I/O virtually contiguous) mapping via the
-IOMMU. However, that is a topic outside the scope of this fix and isn't
-currently supported. An implementation will want to explicitly create
-these large pages in the Nouveau driver, so detaching from a DMA/IOMMU
-mapping would still be required.
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+CC: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
 ---
-Changes in v4:
-- use existing APIs to detach from a DMA/IOMMU mapping
+ drivers/clk/ti/clk-7xx.c         | 1 +
+ include/dt-bindings/clock/dra7.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-Changes in v3:
-- clarify the use of IOMMU mapping for compressible buffers
-- squash multiple patches into this
-
- drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
-index 78597da6313a..0e372a190d3f 100644
---- a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
-+++ b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
-@@ -23,6 +23,10 @@
- #ifdef CONFIG_NOUVEAU_PLATFORM_DRIVER
- #include "priv.h"
+diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+index fb249a1637a5..71a122b2dc67 100644
+--- a/drivers/clk/ti/clk-7xx.c
++++ b/drivers/clk/ti/clk-7xx.c
+@@ -708,6 +708,7 @@ static const struct omap_clkctrl_reg_data dra7_wkupaon_clkctrl_regs[] __initcons
+ 	{ DRA7_COUNTER_32K_CLKCTRL, NULL, 0, "wkupaon_iclk_mux" },
+ 	{ DRA7_UART10_CLKCTRL, dra7_uart10_bit_data, CLKF_SW_SUP, "wkupaon_cm:clk:0060:24" },
+ 	{ DRA7_DCAN1_CLKCTRL, dra7_dcan1_bit_data, CLKF_SW_SUP, "wkupaon_cm:clk:0068:24" },
++	{ DRA7_ADC_CLKCTRL, NULL, CLKF_SW_SUP, "mcan_clk" },
+ 	{ 0 },
+ };
  
-+#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
-+#include <asm/dma-iommu.h>
-+#endif
-+
- static int
- nvkm_device_tegra_power_up(struct nvkm_device_tegra *tdev)
- {
-@@ -105,6 +109,15 @@ nvkm_device_tegra_probe_iommu(struct nvkm_device_tegra *tdev)
- 	unsigned long pgsize_bitmap;
- 	int ret;
+diff --git a/include/dt-bindings/clock/dra7.h b/include/dt-bindings/clock/dra7.h
+index 5e1061b15aed..d7549c57cac3 100644
+--- a/include/dt-bindings/clock/dra7.h
++++ b/include/dt-bindings/clock/dra7.h
+@@ -168,5 +168,6 @@
+ #define DRA7_COUNTER_32K_CLKCTRL	DRA7_CLKCTRL_INDEX(0x50)
+ #define DRA7_UART10_CLKCTRL	DRA7_CLKCTRL_INDEX(0x80)
+ #define DRA7_DCAN1_CLKCTRL	DRA7_CLKCTRL_INDEX(0x88)
++#define DRA7_ADC_CLKCTRL	DRA7_CLKCTRL_INDEX(0xa0)
  
-+#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
-+	if (dev->archdata.mapping) {
-+		struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
-+
-+		arm_iommu_detach_device(dev);
-+		arm_iommu_release_mapping(mapping);
-+	}
-+#endif
-+
- 	if (!tdev->func->iommu_bit)
- 		return;
- 
+ #endif
 -- 
 2.17.0
