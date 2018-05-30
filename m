@@ -1,68 +1,65 @@
-From: nixiaoming@huawei.com (Nixiaoming)
-Date: Wed, 30 May 2018 09:05:51 +0000
-Subject: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for
- mark_rodata_ro
-In-Reply-To: <20180530080816.f74elebj4demiohl@salmiak>
-References: <20180529133615.26889-1-nixiaoming@huawei.com>
- <20180529154523.GK17159@arm.com>
- <E490CD805F7529488761C40FD9D26EF12A672E03@dggemm507-mbx.china.huawei.com>
- <20180530080816.f74elebj4demiohl@salmiak>
-Message-ID: <E490CD805F7529488761C40FD9D26EF12A6741BA@dggemm507-mbx.china.huawei.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed, 30 May 2018 18:09:39 +0900
+Subject: [PATCH 1/8] media: uniphier: add DT bindings documentation for
+ UniPhier HSC
+In-Reply-To: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
+References: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180530090946.1635-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because CONFIG_STRICT_KERNEL_RWX=n cannot be set by make menuconfig on arm64/x86/s390 architecture 
-So, these three patches should not be necessary
-Sorry to disturb everyone
-Thank you for your guidance
+This patch adds DT binding documentation for UniPhier HSC which is
+MPEG2-TS input/output and demux subsystem.
 
-Thanks
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ .../bindings/media/uniphier,hsc.txt           | 38 +++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/uniphier,hsc.txt
 
------Original Message-----
-From: Mark Rutland [mailto:mark.rutland at arm.com] 
-Sent: Wednesday, May 30, 2018 4:08 PM
-To: Nixiaoming <nixiaoming@huawei.com>
-Cc: Will Deacon <will.deacon@arm.com>; catalin.marinas at arm.com; ard.biesheuvel at linaro.org; marc.zyngier at arm.com; james.morse at arm.com; kristina.martsenko at arm.com; steve.capper at arm.com; tglx at linutronix.de; mingo at redhat.com; hpa at zytor.com; akpm at linux-foundation.org; vbabka at suse.cz; mhocko at suse.com; dave.hansen at linux.intel.com; dan.j.williams at intel.com; kirill.shutemov at linux.intel.com; zhang.jia at linux.alibaba.com; schwidefsky at de.ibm.com; heiko.carstens at de.ibm.com; gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; x86 at kernel.org; linux-s390 at vger.kernel.org
-Subject: Re: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for mark_rodata_ro
-
-On Wed, May 30, 2018 at 03:31:38AM +0000, Nixiaoming wrote:
-> Unable to set CONFIG_STRICT_KERNEL_RWX=n by make menuconfig ARCH=arm64
-
-Indeed. Making this mandatory was a deliberate decision, in part because this
-allows simplification of code (e.g. removal of #ifdef guards).
-
-> When reading the code, I feel it is more appropriate to add macro control
-> here.
-
-I must disagree. I do not think it makes sense to add an #ifdef for a
-configuration option that is mandatory.
-
-There are other places in the kernel that should behave differently if
-CONFIG_STRICT_KERNEL_RWX were disabled, so this wouldn't be sufficient even if
-we were to make CONFIG_STRICT_KERNEL_RWX optional. i.e. the #ifdef would give
-the misleading impression that STRICT_KERNEL_RWX *could* be made optional, even
-though this might not function correctly.
-
-Having an #ifdef here makes the code more complicated and confusing, for the
-benefit of a case which cannot occur.
-
-Thanks,
-Mark.
-
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com] 
-> Sent: Tuesday, May 29, 2018 11:45 PM
-> To: Nixiaoming <nixiaoming@huawei.com>
-> Cc: catalin.marinas at arm.com; ard.biesheuvel at linaro.org; marc.zyngier at arm.com; james.morse at arm.com; kristina.martsenko at arm.com; steve.capper at arm.com; tglx at linutronix.de; mingo at redhat.com; hpa at zytor.com; akpm at linux-foundation.org; vbabka at suse.cz; mhocko at suse.com; dave.hansen at linux.intel.com; dan.j.williams at intel.com; kirill.shutemov at linux.intel.com; zhang.jia at linux.alibaba.com; schwidefsky at de.ibm.com; heiko.carstens at de.ibm.com; gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; x86 at kernel.org; linux-s390 at vger.kernel.org
-> Subject: Re: [PATCH 1/3] arm64:add missing CONFIG_STRICT_KERNEL_RWX for mark_rodata_ro
-> 
-> On Tue, May 29, 2018 at 09:36:15PM +0800, nixiaoming wrote:
-> > mark_rodata_ro is only called by the function mark_readonly when
-> > CONFIG_STRICT_KERNEL_RWX=y,
-> > if CONFIG_STRICT_KERNEL_RWX is not set
-> > a compile warning may be triggered: unused function
-> 
-> How are you achieving this configuration? In our Kconfig we select this
-> unconditionally.
-> 
-> Will
+diff --git a/Documentation/devicetree/bindings/media/uniphier,hsc.txt b/Documentation/devicetree/bindings/media/uniphier,hsc.txt
+new file mode 100644
+index 000000000000..4242483b2ecc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/uniphier,hsc.txt
+@@ -0,0 +1,38 @@
++Socionext UniPhier HSC (High-speed Stream Controller)
++
++The Socionext UniPhier HSC subsystem consists of MPEG2-TS input/output and
++demultiplexer cores in the same register space.
++
++This interface is support TS serial signals (clock, valid, sync, data) from
++external demodulators.
++
++Required properties:
++- compatible      : should be one of the following:
++		    "socionext,uniphier-ld11-hsc"
++		    "socionext,uniphier-ld20-hsc"
++- reg             : offset and length of the register set for the device.
++- interrupts      : should contain DMA and TSI error interrupt.
++- pinctrl-names   : should be "default".
++- pinctrl-0       : defined TS serial signal pins for external demodulators.
++- clock-names     : should include following entries:
++                    "hsc", "stdmac"
++- clocks          : a list of phandle, should contain an entry for each
++                    entry in clock-names.
++- reset-names     : should include following entries:
++                    "hsc", "stdmac"
++- resets          : a list of phandle, should contain an entry for each
++                    entry in reset-names.
++
++Example:
++	hsc {
++		compatible = "socionext,uniphier-ld20-hsc";
++		reg = <0x5c000000 0x100000>;
++		interrupts = <0 100 4>, <0 101 4>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hscin2_s>,
++			    <&pinctrl_hscin3_s>;
++		clock-names = "stdmac", "hsc";
++		clocks = <&sys_clk 8>, <&sys_clk 9>;
++		reset-names = "stdmac", "hsc";
++		resets = <&sys_rst 8>, <&sys_rst 9>;
++	};
+-- 
+2.17.0
