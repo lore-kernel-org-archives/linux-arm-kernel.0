@@ -1,133 +1,51 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 30 May 2018 13:49:02 -0400
-Subject: [PATCH] drm/bridge/synopsys: dw-hdmi: fix dw_hdmi_setup_rx_sense
-In-Reply-To: <1527673438-20643-1-git-send-email-narmstrong@baylibre.com>
-References: <1527673438-20643-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20180530174902.GN3373@art_vandelay>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 May 2018 18:56:52 +0100
+Subject: arch_wb_cache_pmem on ARM64
+In-Reply-To: <92b97864-52af-88d1-f18d-c6f6764072b0@arm.com>
+References: <alpine.LRH.2.02.1805301254340.25056@file01.intranet.prod.int.rdu2.redhat.com>
+ <92b97864-52af-88d1-f18d-c6f6764072b0@arm.com>
+Message-ID: <20180530175652.fapzlssmkncusier@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 11:43:58AM +0200, Neil Armstrong wrote:
-> The dw_hdmi_setup_rx_sense exported function should not use struct device
-> to recover the dw-hdmi context using drvdata, but take struct dw_hdmi
-> directly like other exported functions.
+On Wed, May 30, 2018 at 06:31:42PM +0100, Robin Murphy wrote:
+> On 30/05/18 18:00, Mikulas Patocka wrote:
+> > Hi
+> > 
+> > I'd like to ask what's the purpose of dmb(osh) in the function
+> > arch_wb_cache_pmem in arch/arm64/mm/flush.c?
+> > 
+> > void arch_wb_cache_pmem(void *addr, size_t size)
+> > {
+> >          /* Ensure order against any prior non-cacheable writes */
+> >          dmb(osh);
+> >          __clean_dcache_area_pop(addr, size);
+> > }
+> > 
+> > The processor may flush the cache spontaneously, that means that all the
+> > flushing may actually happen before the dmb(osh) instruction - so what
+> > does that dmb instruction guard against?
 > 
-> This caused a regression using Meson DRM on S905X since v4.17-rc1 :
-> 
-> Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> [...]
-> CPU: 0 PID: 124 Comm: irq/32-dw_hdmi_ Not tainted 4.17.0-rc7 #2
-> Hardware name: Libre Technology CC (DT)
-> [...]
-> pc : osq_lock+0x54/0x188
-> lr : __mutex_lock.isra.0+0x74/0x530
-> [...]
-> Process irq/32-dw_hdmi_ (pid: 124, stack limit = 0x00000000adf418cb)
-> Call trace:
->   osq_lock+0x54/0x188
->   __mutex_lock_slowpath+0x10/0x18
->   mutex_lock+0x30/0x38
->   __dw_hdmi_setup_rx_sense+0x28/0x98
->   dw_hdmi_setup_rx_sense+0x10/0x18
->   dw_hdmi_top_thread_irq+0x2c/0x50
->   irq_thread_fn+0x28/0x68
->   irq_thread+0x10c/0x1a0
->   kthread+0x128/0x130
->   ret_from_fork+0x10/0x18
->  Code: 34000964 d00050a2 51000484 9135c042 (f864d844)
->  ---[ end trace 945641e1fbbc07da ]---
->  note: irq/32-dw_hdmi_[124] exited with preempt_count 1
->  genirq: exiting task "irq/32-dw_hdmi_" (124) is an active IRQ thread (irq 32)
-> 
-> Fixes: eea034af90c6 ("drm/bridge/synopsys: dw-hdmi: don't clobber drvdata")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> Tested-by: Koen Kooi <koen@dominion.thruhere.net>
+> IIRC the (very subtle) problem was to do with the odd case of a transparent
+> (i.e. beyond the PoC) system cache - if data has been written to the pmem
+> region via some non-cacheable alias, then the barrier was necessary to
+> ensure that cache maintenance via the inner-shareable kernel mapping can
+> push any data already at the PoC further along to the PoP.
 
-Thanks for your patch, Neil. I've applied it to -misc-fixes and will send it to
-Dave in hope it can sneak into 4.17.
+I think it's simpler than that: the cache maintenance operations
+naturally hazard against cacheable memory accesses, but they don't
+hazard against non-cacheable accesses.
 
-Sean
+Thus, we need a barrier between the two to ensure ordering.
 
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 15 ++++-----------
->  drivers/gpu/drm/meson/meson_dw_hdmi.c     |  2 +-
->  include/drm/bridge/dw_hdmi.h              |  2 +-
->  3 files changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index ec8d000..3c136f2b 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -2077,7 +2077,7 @@ static irqreturn_t dw_hdmi_hardirq(int irq, void *dev_id)
->  	return ret;
->  }
->  
-> -void __dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
-> +void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
->  {
->  	mutex_lock(&hdmi->mutex);
->  
-> @@ -2103,13 +2103,6 @@ void __dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense)
->  	}
->  	mutex_unlock(&hdmi->mutex);
->  }
-> -
-> -void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense)
-> -{
-> -	struct dw_hdmi *hdmi = dev_get_drvdata(dev);
-> -
-> -	__dw_hdmi_setup_rx_sense(hdmi, hpd, rx_sense);
-> -}
->  EXPORT_SYMBOL_GPL(dw_hdmi_setup_rx_sense);
->  
->  static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
-> @@ -2145,9 +2138,9 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->  	 */
->  	if (intr_stat &
->  	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
-> -		__dw_hdmi_setup_rx_sense(hdmi,
-> -					 phy_stat & HDMI_PHY_HPD,
-> -					 phy_stat & HDMI_PHY_RX_SENSE);
-> +		dw_hdmi_setup_rx_sense(hdmi,
-> +				       phy_stat & HDMI_PHY_HPD,
-> +				       phy_stat & HDMI_PHY_RX_SENSE);
->  
->  		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
->  			cec_notifier_set_phys_addr(hdmi->cec_notifier,
-> diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> index a393095..c9ad456 100644
-> --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> @@ -529,7 +529,7 @@ static irqreturn_t dw_hdmi_top_thread_irq(int irq, void *dev_id)
->  		if (stat & HDMITX_TOP_INTR_HPD_RISE)
->  			hpd_connected = true;
->  
-> -		dw_hdmi_setup_rx_sense(dw_hdmi->dev, hpd_connected,
-> +		dw_hdmi_setup_rx_sense(dw_hdmi->hdmi, hpd_connected,
->  				       hpd_connected);
->  
->  		drm_helper_hpd_irq_event(dw_hdmi->encoder.dev);
-> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-> index dd2a8cf..ccb5aa8 100644
-> --- a/include/drm/bridge/dw_hdmi.h
-> +++ b/include/drm/bridge/dw_hdmi.h
-> @@ -151,7 +151,7 @@ struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
->  			     struct drm_encoder *encoder,
->  			     const struct dw_hdmi_plat_data *plat_data);
->  
-> -void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
-> +void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense);
->  
->  void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
->  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Non-cacheable accesses are Outer Shareable, so thus the barrier must be
+at least Outer Shareable.
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+We *might* be able to get away with OSHST, though.
+
+For example, Without the barrier, prior non-cacheable stores could sit
+in a store buffer while the cache maintenance was performed, and could
+subsequently be written out after the cache maintenance was complete.
+
+Thanks,
+Mark.
