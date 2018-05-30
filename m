@@ -1,65 +1,165 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 30 May 2018 18:09:39 +0900
-Subject: [PATCH 1/8] media: uniphier: add DT bindings documentation for
- UniPhier HSC
+Date: Wed, 30 May 2018 18:09:44 +0900
+Subject: [PATCH 6/8] media: uniphier: add common module of DVB adapter drivers
 In-Reply-To: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
 References: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180530090946.1635-2-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180530090946.1635-7-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT binding documentation for UniPhier HSC which is
-MPEG2-TS input/output and demux subsystem.
+This patch adds common module for UniPhier DVB adapter drivers
+that equipments tuners and demod that connected by I2C and
+UniPhier demux.
 
 Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- .../bindings/media/uniphier,hsc.txt           | 38 +++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/uniphier,hsc.txt
+ drivers/media/platform/uniphier/Makefile      |  5 ++
+ drivers/media/platform/uniphier/hsc-core.c    |  8 ---
+ .../platform/uniphier/uniphier-adapter.c      | 54 +++++++++++++++++++
+ .../platform/uniphier/uniphier-adapter.h      | 42 +++++++++++++++
+ 4 files changed, 101 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/media/platform/uniphier/uniphier-adapter.c
+ create mode 100644 drivers/media/platform/uniphier/uniphier-adapter.h
 
-diff --git a/Documentation/devicetree/bindings/media/uniphier,hsc.txt b/Documentation/devicetree/bindings/media/uniphier,hsc.txt
+diff --git a/drivers/media/platform/uniphier/Makefile b/drivers/media/platform/uniphier/Makefile
+index 0622f04d9e68..9e75ad081b77 100644
+--- a/drivers/media/platform/uniphier/Makefile
++++ b/drivers/media/platform/uniphier/Makefile
+@@ -3,3 +3,8 @@ uniphier-dvb-y += hsc-core.o hsc-ucode.o hsc-css.o hsc-ts.o hsc-dma.o
+ uniphier-dvb-$(CONFIG_DVB_UNIPHIER_LD11) += hsc-ld11.o
+ 
+ obj-$(CONFIG_DVB_UNIPHIER) += uniphier-dvb.o
++
++ccflags-y += -Idrivers/media/dvb-frontends/
++ccflags-y += -Idrivers/media/tuners/
++
++uniphier-dvb-y += uniphier-adapter.o
+diff --git a/drivers/media/platform/uniphier/hsc-core.c b/drivers/media/platform/uniphier/hsc-core.c
+index cdb488e4df8c..a8d247cfd302 100644
+--- a/drivers/media/platform/uniphier/hsc-core.c
++++ b/drivers/media/platform/uniphier/hsc-core.c
+@@ -256,14 +256,6 @@ static void hsc_dmaif_feed_worker(struct work_struct *work)
+ 	dma_sync_single_for_cpu(dev, dmapos, cnt, DMA_FROM_DEVICE);
+ 	for (i = 0; i < cnt; i += SZ_M2TS_PKT) {
+ 		pkt = buf->virt + buf->rd_offs + i;
+-
+-		if (pkt[4] == 0x47 && pkt[5] == 0x1f && pkt[6] == 0xff)
+-			continue;
+-		if (pkt[5] & 0x80)
+-			continue;
+-		if (pkt[7] & 0xc0)
+-			continue;
+-
+ 		dvb_dmx_swfilter_packets(&tsif->demux, &pkt[4], 1);
+ 	}
+ 	dma_sync_single_for_device(dev, dmapos, cnt, DMA_FROM_DEVICE);
+diff --git a/drivers/media/platform/uniphier/uniphier-adapter.c b/drivers/media/platform/uniphier/uniphier-adapter.c
 new file mode 100644
-index 000000000000..4242483b2ecc
+index 000000000000..c895bbd9988e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/media/uniphier,hsc.txt
-@@ -0,0 +1,38 @@
-+Socionext UniPhier HSC (High-speed Stream Controller)
++++ b/drivers/media/platform/uniphier/uniphier-adapter.c
+@@ -0,0 +1,54 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// Socionext UniPhier LD20 adapter driver for ISDB.
++// Using Socionext MN884434 ISDB-S/ISDB-T demodulator and
++// SONY HELENE tuner.
++//
++// Copyright (c) 2018 Socionext Inc.
 +
-+The Socionext UniPhier HSC subsystem consists of MPEG2-TS input/output and
-+demultiplexer cores in the same register space.
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
 +
-+This interface is support TS serial signals (clock, valid, sync, data) from
-+external demodulators.
++#include "hsc.h"
++#include "uniphier-adapter.h"
 +
-+Required properties:
-+- compatible      : should be one of the following:
-+		    "socionext,uniphier-ld11-hsc"
-+		    "socionext,uniphier-ld20-hsc"
-+- reg             : offset and length of the register set for the device.
-+- interrupts      : should contain DMA and TSI error interrupt.
-+- pinctrl-names   : should be "default".
-+- pinctrl-0       : defined TS serial signal pins for external demodulators.
-+- clock-names     : should include following entries:
-+                    "hsc", "stdmac"
-+- clocks          : a list of phandle, should contain an entry for each
-+                    entry in clock-names.
-+- reset-names     : should include following entries:
-+                    "hsc", "stdmac"
-+- resets          : a list of phandle, should contain an entry for each
-+                    entry in reset-names.
++int uniphier_adapter_demux_probe(struct uniphier_adapter_priv *priv)
++{
++	const struct uniphier_adapter_spec *spec = priv->spec;
++	struct device *dev = &priv->pdev->dev;
++	struct device_node *node;
++	int ret, i;
 +
-+Example:
-+	hsc {
-+		compatible = "socionext,uniphier-ld20-hsc";
-+		reg = <0x5c000000 0x100000>;
-+		interrupts = <0 100 4>, <0 101 4>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_hscin2_s>,
-+			    <&pinctrl_hscin3_s>;
-+		clock-names = "stdmac", "hsc";
-+		clocks = <&sys_clk 8>, <&sys_clk 9>;
-+		reset-names = "stdmac", "hsc";
-+		resets = <&sys_rst 8>, <&sys_rst 9>;
-+	};
++	node = of_parse_phandle(dev->of_node, "demux", 0);
++	if (!node) {
++		dev_err(dev, "Failed to parse demux\n");
++		return -ENODEV;
++	}
++
++	priv->pdev_demux = of_find_device_by_node(node);
++	if (!priv->pdev_demux) {
++		dev_err(dev, "Failed to find demux device\n");
++		of_node_put(node);
++		return -ENODEV;
++	}
++	of_node_put(node);
++
++	priv->chip = platform_get_drvdata(priv->pdev_demux);
++
++	for (i = 0; i < spec->adapters; i++) {
++		ret = hsc_tsif_init(&priv->chip->tsif[i], &spec->hsc_conf[i]);
++		if (ret) {
++			dev_err(dev, "Failed to init TS I/F\n");
++			return ret;
++		}
++
++		ret = hsc_dmaif_init(&priv->chip->dmaif[i], &spec->hsc_conf[i]);
++		if (ret) {
++			dev_err(dev, "Failed to init DMA I/F\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
+diff --git a/drivers/media/platform/uniphier/uniphier-adapter.h b/drivers/media/platform/uniphier/uniphier-adapter.h
+new file mode 100644
+index 000000000000..1faada3fd378
+--- /dev/null
++++ b/drivers/media/platform/uniphier/uniphier-adapter.h
+@@ -0,0 +1,42 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Socionext UniPhier DVB driver for High-speed Stream Controller (HSC).
++ *
++ * Copyright (c) 2018 Socionext Inc.
++ */
++
++#ifndef DVB_UNIPHIER_ADAPTER_H__
++#define DVB_UNIPHIER_ADAPTER_H__
++
++struct uniphier_adapter_spec {
++	int adapters;
++	const struct hsc_conf *hsc_conf;
++	const struct i2c_board_info *demod_i2c_info;
++	const struct i2c_board_info *tuner_i2c_info;
++};
++
++struct uniphier_adapter_fe {
++	struct i2c_client *demod_i2c;
++	struct i2c_client *tuner_i2c;
++	struct dvb_frontend *fe;
++};
++
++struct uniphier_adapter_priv {
++	const struct uniphier_adapter_spec *spec;
++
++	struct platform_device *pdev;
++	struct hsc_chip *chip;
++
++	struct platform_device *pdev_demux;
++	struct clk *demod_mclk;
++	struct gpio_desc *demod_gpio;
++	struct i2c_adapter *demod_i2c_adapter;
++	struct gpio_desc *tuner_gpio;
++	struct i2c_adapter *tuner_i2c_adapter;
++
++	struct uniphier_adapter_fe *fe;
++};
++
++int uniphier_adapter_demux_probe(struct uniphier_adapter_priv *priv);
++
++#endif /* DVB_UNIPHIER_ADAPTER_H__ */
 -- 
 2.17.0
