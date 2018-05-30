@@ -1,76 +1,63 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 30 May 2018 14:15:52 +0200
-Subject: [PATCH v2 01/10] drm/exynos: rename "bridge_node" to "mic_bridge_node"
-In-Reply-To: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
-References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121623eucas1p27e08223bc5b04dbb0b0253c18a9f83d5@eucas1p2.samsung.com>
-Message-ID: <1527682561-1386-2-git-send-email-m.purski@samsung.com>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Wed, 30 May 2018 14:29:22 +0200
+Subject: [PATCH] ARM: debug: Add Iproc UART3 debug addresses
+Message-ID: <20180530122922.1041-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When adding support for peripheral out bridges, the "bridge" name
-becomes imprecise as it refers to a different device than the
-"out_bridge".
+From: Cl?ment Peron <clement.peron@devialet.com>
 
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
+Broadcom Iproc SoCs typically use the UART3 for
+debug/console, provide a known good location for that.
+
+Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/Kconfig.debug | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index eae44fd..9599e6b 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -279,7 +279,7 @@ struct exynos_dsi {
- 	struct list_head transfer_list;
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 199ebc1c4538..fa6fa1dae94d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -207,6 +207,14 @@ choice
+ 		depends on ARCH_BCM_HR2
+ 		select DEBUG_UART_8250
  
- 	const struct exynos_dsi_driver_data *driver_data;
--	struct device_node *bridge_node;
-+	struct device_node *mic_bridge_node;
- };
++	config DEBUG_BCM_IPROC_UART3
++		bool "Kernel low-level debugging on BCM IPROC UART3"
++		depends on ARCH_BCM_CYGNUS
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the third serial port on these devices.
++
+ 	config DEBUG_BCM_KONA_UART
+ 		bool "Kernel low-level debugging messages via BCM KONA UART"
+ 		depends on ARCH_BCM_MOBILE
+@@ -1564,6 +1572,7 @@ config DEBUG_UART_PHYS
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+ 	default 0x20201000 if DEBUG_BCM2835
+ 	default 0x3f201000 if DEBUG_BCM2836
++	default 0x18023000 if DEBUG_BCM_IPROC_UART3
+ 	default 0x3e000000 if DEBUG_BCM_KONA_UART
+ 	default 0x4000e400 if DEBUG_LL_UART_EFM32
+ 	default 0x40028000 if DEBUG_AT91_SAMV7_USART1
+@@ -1730,6 +1739,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfe018000 if DEBUG_MMP_UART3
+ 	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
+ 	default 0xfe230000 if DEBUG_PICOXCELL_UART
++	default 0xf1023000 if DEBUG_BCM_IPROC_UART3
+ 	default 0xfe300000 if DEBUG_BCM_KONA_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+ 	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
+@@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
+ 		DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
+ 		DEBUG_ALPINE_UART0 || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+-		DEBUG_DAVINCI_DA8XX_UART2 || \
++		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
+ 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
  
- #define host_to_dsi(host) container_of(host, struct exynos_dsi, dsi_host)
-@@ -1631,7 +1631,7 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
- 	if (ret < 0)
- 		return ret;
- 
--	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
-+	dsi->mic_bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
- 
- 	return 0;
- }
-@@ -1642,7 +1642,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
- 	struct drm_encoder *encoder = dev_get_drvdata(dev);
- 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
- 	struct drm_device *drm_dev = data;
--	struct drm_bridge *bridge;
-+	struct drm_bridge *mic_bridge;
- 	int ret;
- 
- 	drm_encoder_init(drm_dev, encoder, &exynos_dsi_encoder_funcs,
-@@ -1661,10 +1661,10 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
--	if (dsi->bridge_node) {
--		bridge = of_drm_find_bridge(dsi->bridge_node);
--		if (bridge)
--			drm_bridge_attach(encoder, bridge, NULL);
-+	if (dsi->mic_bridge_node) {
-+		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
-+		if (mic_bridge)
-+			drm_bridge_attach(encoder, mic_bridge, NULL);
- 	}
- 
- 	return mipi_dsi_host_register(&dsi->dsi_host);
-@@ -1783,7 +1783,7 @@ static int exynos_dsi_remove(struct platform_device *pdev)
- {
- 	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
- 
--	of_node_put(dsi->bridge_node);
-+	of_node_put(dsi->mic_bridge_node);
- 
- 	pm_runtime_disable(&pdev->dev);
- 
+ config DEBUG_UART_8250_PALMCHIP
 -- 
-2.7.4
+2.17.0
