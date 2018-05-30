@@ -1,81 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 29 May 2018 21:41:33 -0700
-Subject: [PATCH] PCI: Add pci=safemode option
-In-Reply-To: <20180530043103.GA19734@kroah.com>
-References: <1527650389-31575-1-git-send-email-okaya@codeaurora.org>
- <20180530043103.GA19734@kroah.com>
-Message-ID: <6c317ed8-cca3-8862-5f3b-12cf14e4d53b@codeaurora.org>
+From: yaojun8558363@gmail.com (YaoJun)
+Date: Wed, 30 May 2018 12:48:06 +0800
+Subject: [PATCH] arm64: mm: mark tramp_pg_dir read-only
+Message-ID: <20180530044806.18449-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/2018 9:31 PM, Greg Kroah-Hartman wrote:
-> On Tue, May 29, 2018 at 11:19:41PM -0400, Sinan Kaya wrote:
->> Adding pci=safemode kernel command line parameter to turn off all PCI
->> Express service driver as well as all optional PCIe features such as LTR,
->> Extended tags, Relaxed Ordering etc.
->>
->> Also setting MPS configuration to PCIE_BUS_SAFE so that MPS and MRRS can be
->> reconfigured with by the kernel in case BIOS hands off a broken
->> configuration.
-> 
-> Why not fix the BIOS?  That's what sane platforms do :)
-> 
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  Documentation/admin-guide/kernel-parameters.txt | 2 ++
->>  drivers/pci/pci.c                               | 7 +++++++
->>  drivers/pci/pci.h                               | 2 ++
->>  drivers/pci/pcie/portdrv_core.c                 | 2 +-
->>  drivers/pci/probe.c                             | 6 ++++++
->>  5 files changed, 18 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
->> index 641ec9c..247adbb 100644
->> --- a/Documentation/admin-guide/kernel-parameters.txt
->> +++ b/Documentation/admin-guide/kernel-parameters.txt
->> @@ -3153,6 +3153,8 @@
->>  		noari		do not use PCIe ARI.
->>  		noats		[PCIE, Intel-IOMMU, AMD-IOMMU]
->>  				do not use PCIe ATS (and IOMMU device IOTLB).
->> +		safemode	turns of all optinal PCI features. Useful
->> +				for bringup/troubleshooting.
-> 
-> s/optinal/optional/ ?
+To protect against KSMA(Kernel Space Mirroring Attack), make
+tramp_pg_dir read-only. The principle of KSMA is to insert a
+carefully constructed PGD entry into the translation table.
+The type of this entry is block, which maps the kernel text
+and its access permissions bits are 01. The user process can
+then modify kernel text directly through this mapping. In this
+way, an arbitrary write can be converted to multiple arbitrary
+writes.
 
-sure.
+Signed-off-by: YaoJun <yaojun8558363@gmail.com>
+---
+ arch/arm64/mm/mmu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> 
-> And you should explain what exactly in PCI is "optional".  Who defines
-> this and where is that list and what can go wrong if those options are
-> not enabled?
-
-Bjorn and I discussed the need for such a "safe" mode feature when you
-want to bring up PCI for a platform. You want to turn off everything as
-a starter and just stick to bare minimum.
-
-I can add a few words describing them. The goal of this option is to keep
-base PCI features with MSI only. Things like PME, AER, ASPM, Extended
-Tags, LTR, Relaxed Ordering, SRIOV are all considered optional. safemode
-is certainly not intended for production environments. 
-
-I can taint the kernel as a suggestion.
-
-I defined minimum as just booting a device and to be able to do DMA traffic
-only with 0 optimization
-
-> 
-> In looking at your patch, I can't determine that at all, so there's no
-> way that someone just looking at this sentence will be able to
-> understand.
-> 
-> thanks,
-> 
-> greg k-h
-> 
-
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 2dbb2c9f1ec1..ac4b22c7e435 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -551,6 +551,10 @@ static int __init map_entry_trampoline(void)
+ 	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+ 			     prot, pgd_pgtable_alloc, 0);
+ 
++	update_mapping_prot(__pa_symbol(tramp_pg_dir),
++				(unsigned long)tramp_pg_dir,
++				PGD_SIZE, PAGE_KERNEL_RO);
++
+ 	/* Map both the text and data into the kernel page table */
+ 	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.17.0
