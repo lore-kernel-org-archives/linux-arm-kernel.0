@@ -1,56 +1,37 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 30 May 2018 15:12:37 +0800
-Subject: [PATCH 2/3] ARM: imx: add cpu idle support for i.MX6SLL
-In-Reply-To: <1527664358-17844-1-git-send-email-Anson.Huang@nxp.com>
-References: <1527664358-17844-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1527664358-17844-2-git-send-email-Anson.Huang@nxp.com>
+From: keiichiw@chromium.org (Keiichi Watanabe)
+Date: Wed, 30 May 2018 16:16:13 +0900
+Subject: [PATCH v2 2/2] media: mtk-vcodec: Support VP9 profile in decoder
+In-Reply-To: <20180530071613.125768-1-keiichiw@chromium.org>
+References: <20180530071613.125768-1-keiichiw@chromium.org>
+Message-ID: <20180530071613.125768-3-keiichiw@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SLL supports cpu idle with ARM power gated,
-it can reuse i.MX6SX's cpu idle driver to support
-below 3 states of cpu idle:
+Add V4L2_CID_MPEG_VIDEO_VP9_PROFILE control in MediaTek decoder's
+driver.
+MediaTek decoder only supports profile 0 for now.
 
-state0: WFI;
-state1: WAIT mode with ARM power on;
-state2: WAIT mode with ARM power off.
-
-L2_PGE in GPC_CNTR needs to be cleared to support
-state2 cpu idle.
-
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
 ---
- arch/arm/mach-imx/cpuidle-imx6sx.c | 1 +
- arch/arm/mach-imx/mach-imx6sl.c    | 5 ++++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-index d0f14b7..243a108 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-@@ -103,6 +103,7 @@ int __init imx6sx_cpuidle_init(void)
- {
- 	imx6_set_int_mem_clk_lpm(true);
- 	imx6_enable_rbc(false);
-+	imx_gpc_set_l2_mem_power_in_lpm(false);
- 	/*
- 	 * set ARM power up/down timing to the fastest,
- 	 * sw2iso and sw can be set to one 32K cycle = 31us
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index c7a1ef1..183540e 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -42,7 +42,10 @@ static void __init imx6sl_init_late(void)
- 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
- 		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
- 
--	imx6sl_cpuidle_init();
-+	if (cpu_is_imx6sl())
-+		imx6sl_cpuidle_init();
-+	else
-+		imx6sx_cpuidle_init();
- }
- 
- static void __init imx6sl_init_machine(void)
--- 
-2.7.4
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+index 86f0a7134365..f9393504356d 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+@@ -1400,6 +1400,12 @@ int mtk_vcodec_dec_ctrls_setup(struct mtk_vcodec_ctx *ctx)
+ 				V4L2_CID_MIN_BUFFERS_FOR_CAPTURE,
+ 				0, 32, 1, 1);
+ 	ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
++	v4l2_ctrl_new_std_menu(&ctx->ctrl_hdl,
++				&mtk_vcodec_dec_ctrl_ops,
++				V4L2_CID_MPEG_VIDEO_VP9_PROFILE,
++				V4L2_MPEG_VIDEO_VP9_PROFILE_3,
++				~(1U << V4L2_MPEG_VIDEO_VP9_PROFILE_0),
++				V4L2_MPEG_VIDEO_VP9_PROFILE_0);
+
+ 	if (ctx->ctrl_hdl.error) {
+ 		mtk_v4l2_err("Adding control failed %d",
+--
+2.17.0.921.gf22659ad46-goog
