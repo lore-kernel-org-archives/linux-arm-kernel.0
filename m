@@ -1,67 +1,41 @@
-From: yaojun8558363@gmail.com (YaoJun)
-Date: Wed, 30 May 2018 17:12:58 +0800
-Subject: [PATCH 3/4] arm64/mm: migrate swapper_pg_dir
-In-Reply-To: <20180530091259.9386-1-yaojun8558363@gmail.com>
-References: <20180530091259.9386-1-yaojun8558363@gmail.com>
-Message-ID: <20180530091259.9386-4-yaojun8558363@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 May 2018 10:14:58 +0100
+Subject: [PATCH] arm64: mm: mark tramp_pg_dir read-only
+In-Reply-To: <20180530044806.18449-1-yaojun8558363@gmail.com>
+References: <20180530044806.18449-1-yaojun8558363@gmail.com>
+Message-ID: <20180530091457.GB2452@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make tramp_pg_dir and swapper_pg_dir adjacent. So we can migrate
-them together.
+On Wed, May 30, 2018 at 12:48:06PM +0800, YaoJun wrote:
+> To protect against KSMA(Kernel Space Mirroring Attack), make
+> tramp_pg_dir read-only. The principle of KSMA is to insert a
+> carefully constructed PGD entry into the translation table.
+> The type of this entry is block, which maps the kernel text
+> and its access permissions bits are 01. The user process can
+> then modify kernel text directly through this mapping. In this
+> way, an arbitrary write can be converted to multiple arbitrary
+> writes.
+> 
+> Signed-off-by: YaoJun <yaojun8558363@gmail.com>
+> ---
+>  arch/arm64/mm/mmu.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 2dbb2c9f1ec1..ac4b22c7e435 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -551,6 +551,10 @@ static int __init map_entry_trampoline(void)
+>  	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+>  			     prot, pgd_pgtable_alloc, 0);
+>  
+> +	update_mapping_prot(__pa_symbol(tramp_pg_dir),
+> +				(unsigned long)tramp_pg_dir,
+> +				PGD_SIZE, PAGE_KERNEL_RO);
 
-Signed-off-by: YaoJun <yaojun8558363@gmail.com>
----
- arch/arm64/kernel/entry.S       |  4 ++--
- arch/arm64/kernel/vmlinux.lds.S | 10 +++++-----
- 2 files changed, 7 insertions(+), 7 deletions(-)
+Hmm, I like the idea but is there a risk that the page table has been mapped
+as part of a block entry, which we can't safely split at this point (i.e.
+we'll run into one of the BUG_ONs in the mapping code)?
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index ec2ee720e33e..b35425feaf56 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1004,7 +1004,7 @@ __ni_sys_trace:
- 
- 	.macro tramp_map_kernel, tmp
- 	mrs	\tmp, ttbr1_el1
--	add	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
-+	add	\tmp, \tmp, #(PAGE_SIZE)
- 	bic	\tmp, \tmp, #USER_ASID_FLAG
- 	msr	ttbr1_el1, \tmp
- #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-@@ -1023,7 +1023,7 @@ alternative_else_nop_endif
- 
- 	.macro tramp_unmap_kernel, tmp
- 	mrs	\tmp, ttbr1_el1
--	sub	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
-+	sub	\tmp, \tmp, #(PAGE_SIZE)
- 	orr	\tmp, \tmp, #USER_ASID_FLAG
- 	msr	ttbr1_el1, \tmp
- 	/*
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 0221aca6493d..a094156e05a4 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -219,15 +219,15 @@ SECTIONS
- 	idmap_pg_dir = .;
- 	. += IDMAP_DIR_SIZE;
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--	tramp_pg_dir = .;
--	. += PAGE_SIZE;
--#endif
--
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	reserved_ttbr0 = .;
- 	. += RESERVED_TTBR0_SIZE;
- #endif
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	tramp_pg_dir = .;
-+	. += PAGE_SIZE;
-+#endif
- 	swapper_pg_dir = .;
- 	. += SWAPPER_DIR_SIZE;
- 	swapper_pg_end = .;
--- 
-2.17.0
+Will
