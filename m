@@ -1,34 +1,52 @@
-From: ryan@finnie.org (Ryan Finnie)
-Date: Tue, 29 May 2018 18:50:11 -0700
-Subject: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
-In-Reply-To: <1527542471-10316-2-git-send-email-okaya@codeaurora.org>
-References: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
- <1527542471-10316-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <51bb7b82-c4a1-435c-7668-639db96d76e1@finnie.org>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Wed, 30 May 2018 08:05:28 +0530
+Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
+In-Reply-To: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+References: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+Message-ID: <CAHM4w1nFn0T0MOF7=hnE7kxAmH4gLbbXXb_BjjKwEqyNFtqYwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2018 02:21 PM, Sinan Kaya wrote:
-> 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-> shutdown")' has been added to kernel to shutdown pending PCIe port
-> service interrupts during reboot so that a newly started kexec kernel
-> wouldn't observe pending interrupts.
-> 
-> pcie_port_device_remove() is disabling the root port and switches by
-> calling pci_disable_device() after all PCIe service drivers are shutdown.
-> 
-> This has been found to cause crashes on HP DL360 Gen9 machines during
-> reboot due to hpsa driver not clearing the bus master bit during the
-> shutdown procedure by calling pci_disable_device().
-> 
-> Drop the shutdown API and do an orderly clean up by using the remove.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-> Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-> Cc: stable at vger.kernel.org
-> Reported-by: Ryan Finnie <ryan@finnie.org>
+Hi Bhupesh,
 
-Tested successfully on DL360 Gen9 and DL380 Gen9.
 
-Tested-by: Ryan Finnie <ryan@finnie.org>
+On Mon, May 28, 2018 at 2:33 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> Hi ARM64 maintainers,
+
+[...]
+
+>
+> 4. Since 'memstart_addr' indicates the start of physical RAM, we
+> randomize the same on basis of 'memstart_offset_seed' value above.
+> Also the 'memstart_addr' value is available in '/proc/kallsyms' and
+> hence can be accessed by user-space applications to read the
+> 'memstart_addr' value.
+
+User space can read, only when a system has either CONFIG_DEVMEM or
+CONFIG_PROC_KCORE  enabled. But, we can have a system which has
+CONFIG_RANDOMIZE_BASE enabled but none of the kernel memory access
+interface (other than kdump/vmcore).
+
+>
+> 5. Now since the PAGE_OFFSET value is also used by several user space
+> tools (for e.g. makedumpfile tool uses the same to determine the start
+> of linear region and hence to read PT_NOTE fields from /proc/kcore), I
+> am not sure how to read the randomized value of the same in the KASLR
+> enabled case.
+>
+
+Do we have a use case other than makedumpfile (I mean where we do not
+have vmcore access)? For makedumpfile, we have following information
+in vmcore, and I hope, that should be sufficient to find physical
+address of any symbol from vmcore.
+
+358         VMCOREINFO_NUMBER(VA_BITS);
+359         /* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
+360         vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
+361                                                 kimage_voffset);
+362         vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
+363                                                 PHYS_OFFSET);
+
+
+Regards
+Pratyush
