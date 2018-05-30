@@ -1,68 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 May 2018 08:07:10 +0200
-Subject: [PATCH 2/3] x86:add missing CONFIG_STRICT_KERNEL_RWX for
- mark_rodata_ro
-In-Reply-To: <20180530055815.GB6463@gmail.com>
-References: <20180529133622.26982-1-nixiaoming@huawei.com>
- <20180530055815.GB6463@gmail.com>
-Message-ID: <CAKv+Gu-FvWoDbMV2veh8BzW7ihbvaw-cd+rK5x_TLq0UC99FNg@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 30 May 2018 15:47:40 +0930
+Subject: [PATCH] ARM: dts: aspeed: Fix hwrng register address
+Message-ID: <20180530061740.31547-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2018 at 07:58, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * nixiaoming <nixiaoming@huawei.com> wrote:
->
->> mark_rodata_ro is only called by the function mark_readonly
->> when CONFIG_STRICT_KERNEL_RWX=y
->>
->> if CONFIG_STRICT_KERNEL_RWX is not set
->> a compile warning may be triggered: unused function
->>
->> Signed-off-by: nixiaoming <nixiaoming@huawei.com>
->> ---
->>  arch/x86/mm/init_32.c | 2 ++
->>  arch/x86/mm/init_64.c | 2 ++
->>  2 files changed, 4 insertions(+)
->>
->> diff --git a/arch/x86/mm/init_32.c b/arch/x86/mm/init_32.c
->> index c893c6a..121c567 100644
->> --- a/arch/x86/mm/init_32.c
->> +++ b/arch/x86/mm/init_32.c
->> @@ -920,6 +920,7 @@ static void mark_nxdata_nx(void)
->>       set_pages_nx(virt_to_page(start), size >> PAGE_SHIFT);
->>  }
->>
->> +#ifdef CONFIG_STRICT_KERNEL_RWX
->>  void mark_rodata_ro(void)
->>  {
->>       unsigned long start = PFN_ALIGN(_text);
->> @@ -957,3 +958,4 @@ void mark_rodata_ro(void)
->>       if (__supported_pte_mask & _PAGE_NX)
->>               debug_checkwx();
->>  }
->> +#endif /*end of CONFIG_STRICT_KERNEL_RWX*/
->> diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
->> index 0a40060..1b7a1a7 100644
->> --- a/arch/x86/mm/init_64.c
->> +++ b/arch/x86/mm/init_64.c
->> @@ -1245,6 +1245,7 @@ void set_kernel_text_ro(void)
->>       set_memory_ro(start, (end - start) >> PAGE_SHIFT);
->>  }
->>
->> +#ifdef CONFIG_STRICT_KERNEL_RWX
->>  void mark_rodata_ro(void)
->>  {
->>       unsigned long start = PFN_ALIGN(_text);
->> @@ -1298,6 +1299,7 @@ void mark_rodata_ro(void)
->>        */
->>       pti_clone_kernel_text();
->>  }
->> +#endif
->
-> NAK, this is very ugly and the changelog doesn't appear to be true: the build
-> warning does not trigger in the default build, correct?
->
+The register address should be the full address of the rng, not the
+offset from the start of the SCU.
 
-I don't see how the build warning could trigger at all, given that
-mark_rodata_ro() has external linkage.
+Fixes: 5daa8212c08e ("ARM: dts: aspeed: Describe random number device")
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+Hi ARM maintainers, this was found when testing next-20180529 after the
+merge of the aspeed 4.18 pull request.  Can you please apply this one to
+your -next tree?
+
+I'll also send a PR with some defconfig updates so the rng driver is
+enabled by default.
+---
+
+ arch/arm/boot/dts/aspeed-g4.dtsi | 4 ++--
+ arch/arm/boot/dts/aspeed-g5.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 5e947ed496c2..75df1573380e 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -145,9 +145,9 @@
+ 
+ 			};
+ 
+-			rng: hwrng at 78 {
++			rng: hwrng at 1e6e2078 {
+ 				compatible = "timeriomem_rng";
+-				reg = <0x78 0x4>;
++				reg = <0x1e6e2078 0x4>;
+ 				period = <1>;
+ 				quality = <100>;
+ 			};
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 24eec00c4a95..17f2714d18a7 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -189,9 +189,9 @@
+ 				};
+ 			};
+ 
+-			rng: hwrng at 78 {
++			rng: hwrng at 1e6e2078 {
+ 				compatible = "timeriomem_rng";
+-				reg = <0x78 0x4>;
++				reg = <0x1e6e2078 0x4>;
+ 				period = <1>;
+ 				quality = <100>;
+ 			};
+-- 
+2.17.0
