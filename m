@@ -1,60 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 30 May 2018 15:37:44 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 308/940] drivers/usb/dwc3/core.h:1225:
- multiple definition of `dwc3_simple_wakeup_capable'
-Message-ID: <201805301542.0sPvCpcu%fengguang.wu@intel.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 30 May 2018 10:38:23 +0300
+Subject: [PATCH v3 3/5] Documentation: DT: add i.MX EPIT timer binding
+In-Reply-To: <7f2f8b6b-b7f6-99c1-fc5f-a7628a751fdc@mentor.com>
+References: <20180529170436.22711-1-peron.clem@gmail.com>
+ <20180529170436.22711-4-peron.clem@gmail.com>
+ <7f2f8b6b-b7f6-99c1-fc5f-a7628a751fdc@mentor.com>
+Message-ID: <5d71aced-cd2f-3f01-25b0-d87788f22c32@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   7a6053b3d256fa5bc23f28a9d9a23d7a2004c5b7
-commit: c46d066e5633e178b138742850c37ed262a9af6d [308/940] dwc3: Add support for clock disabling during suspend
-config: i386-randconfig-s0-201821 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        git checkout c46d066e5633e178b138742850c37ed262a9af6d
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On 05/30/2018 10:27 AM, Vladimir Zapolskiy wrote:
+> Hi Cl?ment,
+> 
+> On 05/29/2018 08:04 PM, Cl?ment P?ron wrote:
+>> From: Cl?ment Peron <clement.peron@devialet.com>
+>>
+>> Add devicetree binding document for NXP's i.MX SoC specific
+>> EPIT timer driver.
+>>
+>> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+>> ---
+>>  .../devicetree/bindings/clock/imx6q,epit.txt  | 24 +++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/imx6q,epit.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/imx6q,epit.txt b/Documentation/devicetree/bindings/clock/imx6q,epit.txt
+>> new file mode 100644
+>> index 000000000000..a84a60c6ae35
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/imx6q,epit.txt
+> 
+> The file should be renamed to a more generic name like 'imx,epit.txt'
+> or 'imx31,epit.txt'.
+> 
+> Also note that the folder is incorrectly selected, it must be
+> Documentation/devicetree/bindings/timer/
+> 
 
-All errors (new ones prefixed by >>):
+And linux-clk mailing list for publishing seems to be improper one,
+instead please add Daniel Lezcano <daniel.lezcano@linaro.org> and
+Thomas Gleixner <tglx@linutronix.de> to the list of addressees,
+and the proper mailing list address is linux-kernel at vger.kernel.org
 
-   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
->> drivers/usb/dwc3/core.h:1225: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1225: first defined here
-   drivers/usb/dwc3/host.o: In function `dwc3_simple_wakeup_capable':
-   include/linux/device.h:984: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1225: first defined here
-   drivers/usb/dwc3/ulpi.o: In function `dwc3_simple_wakeup_capable':
->> drivers/usb/dwc3/core.h:1225: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1225: first defined here
-   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
->> drivers/usb/dwc3/core.h:1225: multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:drivers/usb/dwc3/core.h:1225: first defined here
-
-vim +1225 drivers/usb/dwc3/core.h
-
-  1214	
-  1215	#if IS_ENABLED(CONFIG_USB_DWC3_OF_SIMPLE)
-  1216	int dwc3_enable_hw_coherency(struct device *dev);
-  1217	void dwc3_set_phydata(struct device *dev, struct phy *phy);
-  1218	void dwc3_simple_wakeup_capable(struct device *dev, bool wakeup);
-  1219	#else
-  1220	static inline int dwc3_enable_hw_coherency(struct device *dev)
-  1221	{ return 1; }
-  1222	static inline void dwc3_set_phydata(struct device *dev, struct phy *phy)
-  1223	{ ; }
-  1224	void dwc3_simple_wakeup_capable(struct device *dev, bool wakeup)
-> 1225	{ ; }
-  1226	#endif
-  1227	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 29088 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/58a25a5f/attachment-0001.gz>
+--
+With best wishes,
+Vladimir
