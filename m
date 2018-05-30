@@ -1,47 +1,152 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 May 2018 16:48:49 +0100
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
-References: <20180523082908.GB4828@sirena.org.uk>
- <CAD=FV=XfPkpGD32MfTfcw02wQ+QetpUhY=P299uhpX6pY_iEvg@mail.gmail.com>
- <20180523154057.GL4828@sirena.org.uk>
- <CAD=FV=XWVOdJ8rWJnBTwoNqnYqYRYjknkZtUvT86+skbrTdwig@mail.gmail.com>
- <20180523155617.GN4828@sirena.org.uk>
- <CAD=FV=W4aDxWbcaJ9GZ1KkvyiTPAPR-oUoTFzJfS+LftU5ZP=Q@mail.gmail.com>
- <20180530093701.GD6920@sirena.org.uk>
- <CAD=FV=W-MLU9c-SvfLgKAKGP1eHN5xO-013f2M09XUa+QeHzrA@mail.gmail.com>
- <20180530150241.GO6920@sirena.org.uk>
- <CAD=FV=XJd-udEE6az0xP7i6x0oGsnd=BSCyZ0Og_+RjNCMXnCQ@mail.gmail.com>
-Message-ID: <20180530154849.GQ6920@sirena.org.uk>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 30 May 2018 23:49:29 +0800
+Subject: [RFT v3 1/4] perf cs-etm: Generate branch sample for missed
+ packets
+In-Reply-To: <20180530153900.GA10925@leoy-ThinkPad-X240s>
+References: <1527497103-3593-1-git-send-email-leo.yan@linaro.org>
+ <1527497103-3593-2-git-send-email-leo.yan@linaro.org>
+ <20180528221347.GA4109@xps15>
+ <5efe804f-364b-6ae1-3fca-ec7f6d8a383d@arm.com>
+ <CAJ9a7VhC7EHJ1DtTEH1uERGiBpCJgseboaH0cqgpsU3ZMcgjgQ@mail.gmail.com>
+ <20180530153900.GA10925@leoy-ThinkPad-X240s>
+Message-ID: <20180530154929.GB10925@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 08:34:50AM -0700, Doug Anderson wrote:
-> On Wed, May 30, 2018 at 8:02 AM, Mark Brown <broonie@kernel.org> wrote:
+On Wed, May 30, 2018 at 11:39:00PM +0800, Leo Yan wrote:
+> Hi Mike,
+> 
+> On Wed, May 30, 2018 at 04:04:34PM +0100, Mike Leach wrote:
+> 
+> [...]
+> 
+> > >>> +               /* Generate sample for exception packet */
+> > >>> +               if (etmq->prev_packet->exc == true)
+> > >>> +                       generate_sample = true;
+> > >>
+> > >>
+> > >> Please don't do that.  Exception packets have a type of their own and can
+> > >> be
+> > >> added to the decoder packet queue the same way INST_RANGE and TRACE_ON
+> > >> packets
+> > >> are.  Moreover exception packet containt an address that, if I'm reading
+> > >> the
+> > >> documenation properly, can be used to keep track of instructions that were
+> > >> executed between the last address of the previous range packet and the
+> > >> address
+> > >> executed just before the exception occurred.  Mike and Rob will have to
+> > >> confirm
+> > >> this as the decoder may be doing all that hard work for us.
+> > >>
+> > 
+> > clarification on the exception packets....
+> > 
+> > The Opencsd output exception packet gives you the exception number,
+> > and optionally the preferred return address. If this address is
+> > present does depend a lot on the underlying protocol - will normally
+> > be there with ETMv4.
+> > Exceptions are marked differently in the underlying protocol - the
+> > OCSD packets abstract away these differences.
+> > 
+> > consider the code:
+> > 
+> > 0x1000: <some instructions>
+> > 0x1100: BR 0x2000
+> > ....
+> > 0x2000: <some instructions>
+> > 0x2020  BZ r4
+> > 
+> > Without an exception this would result in the packets
+> > 
+> > OCSD_RANGE(0x1000,0x1104, Last instr type=Br, taken)   // recall that
+> > range packets have start addr inclusive, end addr exclusive.
+> > OCSD_RANGE(0x2000,0x2024, Last instr type=Br, <taken / not taken -
+> > depends on condition>
+> > 
+> > Now consider an exception occurring before the BR 0x2000
+> > 
+> > this will result in:-
+> > OCSD_RANGE(0x1000, 0x1100, Last instr type=Other)
+> > OCSD_EXECEPTION(IRQ, ret-addr 0x1100)
+> > OCSD_RANGE(IRQ_START, IRQ_END+4, Last instr type = BR, taken)    //
+> > this is more likely to have multiple ranges / branches before any
+> > return, but simplified here.
+> > OCSD_EXCEPTION_RETURN()  // present if exception returns are
+> > explicitly marked in underlying trace - may not always be depending on
+> > circumstances.
+> > OCSD_RANGE(0x1100,0x1104, Last=BR, taken) // continue on with short
+> > range - just the branch
+> > OCSD_RANGE(0x2000,0x2024, Last instr type=Br, <taken / not taken -
+> > depends on condition>
+> > 
+> > Now consider the exception occurring after the BR, but before any
+> > other instructions are executed.
+> > 
+> > OCSD_RANGE(0x1000,0x1104, Last instr type=Br, taken)   // recall that
+> > range packets have start addr inclusive, end addr exclusive.
+> > OCSD_EXECEPTION(IRQ, ret-addr 0x2000)     // here the preferred return
+> > address is actually the target of the branch.
+> > OCSD_RANGE(IRQ_START, IRQ_END+4, Last instr type = BR, taken)    //
+> > this is more likely to have multiple ranges / branches before any
+> > return, but simplified here.
+> > OCSD_RANGE(0x2000,0x2024, Last instr type=Br, <taken / not taken -
+> > depends on condition>
+> > 
+> > So in general it is possible to arrive in the IRQ_START range with the
+> > previous packet having been either a taken branch, a not taken branch,
+> > or not a branch.
+> > Care must be taken - whether AutoFDO or normal trace disassembly not
+> > to assume that having the last range packet as a taken branch means
+> > that the next range packet is the target, if there is an intervening
+> > exception packet.
+> 
+> Thanks a lot for detailed explaination.
+> 
+> IIUC, AutoFDO will not have such issue due every range packet will be
+> handled for it.  On the other hand, as you remind, the branch samples
+> (and its consumer trace disassembler) is very dependent on the flag
+> 'last_instr_taken_branch'.
+> 
+> According to your explaination, I think we consider the branch is
+> taken for below situations:
+> 
+> - The new coming packet is exception packet (both for exception entry
+>   and exit packets);
+> - The previous packet is expcetion packet;
+> - The previous packet is normal range packet with
+>   'last_instr_taken_branch' = true;
+> 
+> So I'd like to use below function to demonstrate my understanding for
+> exception packets handling.  I also will send out one new patch for
+> support exception packet for reviewing.
+> 
+> If you have concern or I miss anything, please let me know.
+> 
+> static bool cs_etm__is_taken_branch(struct cs_etm_packet *prev_packet,
+>                                     struct cs_etm_packet *packet,)
+> {
+>         /* The branch is taken for normal range packet with taken branch flag */
+>         if (prev_packet->sample_type == CS_ETM_RANGE &&
+>             prev_packet->last_instr_taken_branch)
+>                 return true;
+> 
+>         /* The branch is taken if previous packet is exception packet */
+>         if (prev_packet->sample_type == CS_ETM_EXCEPTION ||
+>             prev_packet->sample_type == CS_ETM_EXCEPTION_RET)
+>                 return true;
+> 
+>         /* The branch is taken for an intervening exception packet */
+>         if (packet->sample_type == CS_ETM_EXCEPTION ||
+>             packet->sample_type == CS_ETM_EXCEPTION_RET)
+>                 return true;
+> 
+>         return false;
+> }
 
-> > What you're describing sounds like what we should be doing normally, if
-> > we're not doing that we should probably be fixing the core.
+Just clarify, I missed to mention I introduce two extra sample types:
+CS_ETM_EXCEPTION and CS_ETM_EXCEPTION_RET, one is for exception
+entry packet and another is for exception exit packet.   If this is
+hard for understanding, you could hold on for reveiwing new patch.
 
-> I'm not convinced that this behavior makes sense to move to the core.
-> On most regulators I'd expect that when the regulator driver says to
-> turn them off that they will output no voltage.  The reason RPMh is
-
-Oh, you mean while the regulator is off...  TBH I don't see a huge
-problem doing that anyway and just reverting to the bottom of the
-constraints when everything gets turned off since we have to see if we
-need to adjust the voltage every time we enabled anyway.
-
-> In any other system when Linux disabled the regulator it wouldn't
-> matter that you left it set at 1.4V.  Thus RPMh is special and IMO the
-> workaround belongs there.
-
-Without the core doing something the regulator isn't going to get told
-that anything updated voltages anyway...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180530/35e9ccdc/attachment.sig>
+Thanks,
+Leo Yan
