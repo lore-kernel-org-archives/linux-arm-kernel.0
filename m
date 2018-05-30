@@ -1,108 +1,76 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Wed, 30 May 2018 13:55:17 -0700
-Subject: [PATCH v7 02/10] firmware: xilinx: Add Zynqmp firmware driver
+Date: Wed, 30 May 2018 13:55:21 -0700
+Subject: [PATCH v7 06/10] firmware: xilinx: Add debugfs interface
 In-Reply-To: <1527713725-1086-1-git-send-email-jollys@xilinx.com>
 References: <1527713725-1086-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1527713725-1086-3-git-send-email-jollys@xilinx.com>
+Message-ID: <1527713725-1086-7-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rajan Vaja <rajanv@xilinx.com>
 
-This patch is adding communication layer with firmware.
-Firmware driver provides an interface to firmware APIs.
-Interface APIs can be used by any driver to communicate to
-PMUFW(Platform Management Unit). All requests go through ATF.
+Firmware-debug provides debugfs interface to all APIs.
+Debugfs can be used to call firmware APIs with required
+parameters.
+
+Usage:
+* Calling firmware API through debugfs:
+  # echo "<api-name> <arg1> .. <argn>" > /sys/.../zynqmp-firmware/pm
+
+* Read output of last called firmware API:
+  # cat /sys/.../zynqmp-firmware/pm
+
+Refer ug1200 for more information on these APIs:
+  * https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
+
+Add basic debugfs file to get API version.
 
 Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 ---
- arch/arm64/Kconfig.platforms         |   1 +
- drivers/firmware/Kconfig             |   1 +
- drivers/firmware/Makefile            |   1 +
- drivers/firmware/xilinx/Kconfig      |  16 ++
- drivers/firmware/xilinx/Makefile     |   4 +
- drivers/firmware/xilinx/zynqmp.c     | 337 +++++++++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  63 +++++++
- 7 files changed, 423 insertions(+)
- create mode 100644 drivers/firmware/xilinx/Kconfig
- create mode 100644 drivers/firmware/xilinx/Makefile
- create mode 100644 drivers/firmware/xilinx/zynqmp.c
- create mode 100644 include/linux/firmware/xlnx-zynqmp.h
+ drivers/firmware/xilinx/Kconfig        |   7 ++
+ drivers/firmware/xilinx/Makefile       |   1 +
+ drivers/firmware/xilinx/zynqmp-debug.c | 212 +++++++++++++++++++++++++++++++++
+ drivers/firmware/xilinx/zynqmp-debug.h |  22 ++++
+ drivers/firmware/xilinx/zynqmp.c       |   9 ++
+ 5 files changed, 251 insertions(+)
+ create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
+ create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index fbedbd8..6454458 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -274,6 +274,7 @@ config ARCH_ZX
- 
- config ARCH_ZYNQMP
- 	bool "Xilinx ZynqMP Family"
-+	select ZYNQMP_FIRMWARE
- 	help
- 	  This enables support for Xilinx ZynqMP Family
- 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index b7c7482..f41eb0d 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -257,5 +257,6 @@ source "drivers/firmware/google/Kconfig"
- source "drivers/firmware/efi/Kconfig"
- source "drivers/firmware/meson/Kconfig"
- source "drivers/firmware/tegra/Kconfig"
-+source "drivers/firmware/xilinx/Kconfig"
- 
- endmenu
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index b248238..f90363e 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -31,3 +31,4 @@ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
- obj-$(CONFIG_EFI)		+= efi/
- obj-$(CONFIG_UEFI_CPER)		+= efi/
- obj-y				+= tegra/
-+obj-y				+= xilinx/
 diff --git a/drivers/firmware/xilinx/Kconfig b/drivers/firmware/xilinx/Kconfig
-new file mode 100644
-index 0000000..cce4e4f
---- /dev/null
+index cce4e4f..10faa10 100644
+--- a/drivers/firmware/xilinx/Kconfig
 +++ b/drivers/firmware/xilinx/Kconfig
-@@ -0,0 +1,16 @@
-+# SPDX-License-Identifier: GPL-2.0
-+# Kconfig for Xilinx firmwares
-+
-+menu "Zynq MPSoC Firmware Drivers"
-+	depends on ARCH_ZYNQMP
-+
-+config ZYNQMP_FIRMWARE
-+	bool "Enable Xilinx Zynq MPSoC firmware interface"
+@@ -13,4 +13,11 @@ config ZYNQMP_FIRMWARE
+ 	  Say yes to enable ZynqMP firmware interface driver.
+ 	  In doubt, say N
+ 
++config ZYNQMP_FIRMWARE_DEBUG
++	bool "Enable Xilinx Zynq MPSoC firmware debug APIs"
++	depends on ZYNQMP_FIRMWARE && DEBUG_FS
 +	help
-+	  Firmware interface driver is used by different to
-+	  communicate with the firmware for various platform
-+	  management services.
-+	  Say yes to enable ZynqMP firmware interface driver.
++	  Say yes to enable ZynqMP firmware interface debug APIs.
 +	  In doubt, say N
 +
-+endmenu
+ endmenu
 diff --git a/drivers/firmware/xilinx/Makefile b/drivers/firmware/xilinx/Makefile
-new file mode 100644
-index 0000000..29f7bf2
---- /dev/null
+index 29f7bf2..875a537 100644
+--- a/drivers/firmware/xilinx/Makefile
 +++ b/drivers/firmware/xilinx/Makefile
-@@ -0,0 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
-+# Makefile for Xilinx firmwares
-+
-+obj-$(CONFIG_ZYNQMP_FIRMWARE) += zynqmp.o
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+@@ -2,3 +2,4 @@
+ # Makefile for Xilinx firmwares
+ 
+ obj-$(CONFIG_ZYNQMP_FIRMWARE) += zynqmp.o
++obj-$(CONFIG_ZYNQMP_FIRMWARE_DEBUG) += zynqmp-debug.o
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
 new file mode 100644
-index 0000000..70e335a
+index 0000000..4800366
 --- /dev/null
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -0,0 +1,337 @@
++++ b/drivers/firmware/xilinx/zynqmp-debug.c
+@@ -0,0 +1,212 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Xilinx Zynq MPSoC Firmware layer
++ * Xilinx Zynq MPSoC Firmware layer for debugfs APIs
 + *
 + *  Copyright (C) 2014-2018 Xilinx, Inc.
 + *
@@ -112,337 +80,212 @@ index 0000000..70e335a
 + *  Rajan Vaja <rajanv@xilinx.com>
 + */
 +
-+#include <linux/arm-smccc.h>
 +#include <linux/compiler.h>
-+#include <linux/device.h>
-+#include <linux/init.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
 +#include <linux/slab.h>
++#include <linux/debugfs.h>
 +#include <linux/uaccess.h>
 +
 +#include <linux/firmware/xlnx-zynqmp.h>
++#include "zynqmp-debug.h"
++
++#define PM_API_NAME_LEN			50
++
++struct pm_api_info {
++	u32 api_id;
++	char api_name[PM_API_NAME_LEN];
++	char api_name_len;
++};
++
++static char debugfs_buf[PAGE_SIZE];
++
++#define PM_API(id)		 {id, #id, strlen(#id)}
++static struct pm_api_info pm_api_list[] = {
++	PM_API(PM_GET_API_VERSION),
++};
 +
 +/**
-+ * zynqmp_pm_ret_code() - Convert PMU-FW error codes to Linux error codes
-+ * @ret_status:		PMUFW return code
++ * zynqmp_pm_argument_value() - Extract argument value from a PM-API request
++ * @arg:	Entered PM-API argument in string format
 + *
-+ * Return: corresponding Linux error code
++ * Return: Argument value in unsigned integer format on success
++ *	   0 otherwise
 + */
-+static int zynqmp_pm_ret_code(u32 ret_status)
++static u64 zynqmp_pm_argument_value(char *arg)
 +{
-+	switch (ret_status) {
-+	case XST_PM_SUCCESS:
-+	case XST_PM_DOUBLE_REQ:
++	u64 value;
++
++	if (!arg)
 +		return 0;
-+	case XST_PM_NO_ACCESS:
-+		return -EACCES;
-+	case XST_PM_ABORT_SUSPEND:
-+		return -ECANCELED;
-+	case XST_PM_INTERNAL:
-+	case XST_PM_CONFLICT:
-+	case XST_PM_INVALID_NODE:
-+	default:
-+		return -EINVAL;
-+	}
-+}
 +
-+static noinline int do_fw_call_fail(u64 arg0, u64 arg1, u64 arg2,
-+				    u32 *ret_payload)
-+{
-+	return -ENODEV;
-+}
-+
-+/*
-+ * PM function call wrapper
-+ * Invoke do_fw_call_smc or do_fw_call_hvc, depending on the configuration
-+ */
-+static int (*do_fw_call)(u64, u64, u64, u32 *ret_payload) = do_fw_call_fail;
-+
-+/**
-+ * do_fw_call_smc() - Call system-level platform management layer (SMC)
-+ * @arg0:		Argument 0 to SMC call
-+ * @arg1:		Argument 1 to SMC call
-+ * @arg2:		Argument 2 to SMC call
-+ * @ret_payload:	Returned value array
-+ *
-+ * Invoke platform management function via SMC call (no hypervisor present).
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static noinline int do_fw_call_smc(u64 arg0, u64 arg1, u64 arg2,
-+				   u32 *ret_payload)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(arg0, arg1, arg2, 0, 0, 0, 0, 0, &res);
-+
-+	if (ret_payload) {
-+		ret_payload[0] = lower_32_bits(res.a0);
-+		ret_payload[1] = upper_32_bits(res.a0);
-+		ret_payload[2] = lower_32_bits(res.a1);
-+		ret_payload[3] = upper_32_bits(res.a1);
-+	}
-+
-+	return zynqmp_pm_ret_code((enum pm_ret_status)res.a0);
-+}
-+
-+/**
-+ * do_fw_call_hvc() - Call system-level platform management layer (HVC)
-+ * @arg0:		Argument 0 to HVC call
-+ * @arg1:		Argument 1 to HVC call
-+ * @arg2:		Argument 2 to HVC call
-+ * @ret_payload:	Returned value array
-+ *
-+ * Invoke platform management function via HVC
-+ * HVC-based for communication through hypervisor
-+ * (no direct communication with ATF).
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static noinline int do_fw_call_hvc(u64 arg0, u64 arg1, u64 arg2,
-+				   u32 *ret_payload)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_hvc(arg0, arg1, arg2, 0, 0, 0, 0, 0, &res);
-+
-+	if (ret_payload) {
-+		ret_payload[0] = lower_32_bits(res.a0);
-+		ret_payload[1] = upper_32_bits(res.a0);
-+		ret_payload[2] = lower_32_bits(res.a1);
-+		ret_payload[3] = upper_32_bits(res.a1);
-+	}
-+
-+	return zynqmp_pm_ret_code((enum pm_ret_status)res.a0);
-+}
-+
-+/**
-+ * zynqmp_pm_invoke_fn() - Invoke the system-level platform management layer
-+ *			   caller function depending on the configuration
-+ * @pm_api_id:		Requested PM-API call
-+ * @arg0:		Argument 0 to requested PM-API call
-+ * @arg1:		Argument 1 to requested PM-API call
-+ * @arg2:		Argument 2 to requested PM-API call
-+ * @arg3:		Argument 3 to requested PM-API call
-+ * @ret_payload:	Returned value array
-+ *
-+ * Invoke platform management function for SMC or HVC call, depending on
-+ * configuration.
-+ * Following SMC Calling Convention (SMCCC) for SMC64:
-+ * Pm Function Identifier,
-+ * PM_SIP_SVC + PM_API_ID =
-+ *	((SMC_TYPE_FAST << FUNCID_TYPE_SHIFT)
-+ *	((SMC_64) << FUNCID_CC_SHIFT)
-+ *	((SIP_START) << FUNCID_OEN_SHIFT)
-+ *	((PM_API_ID) & FUNCID_NUM_MASK))
-+ *
-+ * PM_SIP_SVC	- Registered ZynqMP SIP Service Call.
-+ * PM_API_ID	- Platform Management API ID.
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+int zynqmp_pm_invoke_fn(u32 pm_api_id, u32 arg0, u32 arg1,
-+			u32 arg2, u32 arg3, u32 *ret_payload)
-+{
-+	/*
-+	 * Added SIP service call Function Identifier
-+	 * Make sure to stay in x0 register
-+	 */
-+	u64 smc_arg[4];
-+
-+	smc_arg[0] = PM_SIP_SVC | pm_api_id;
-+	smc_arg[1] = ((u64)arg1 << 32) | arg0;
-+	smc_arg[2] = ((u64)arg3 << 32) | arg2;
-+
-+	return do_fw_call(smc_arg[0], smc_arg[1], smc_arg[2], ret_payload);
-+}
-+
-+static u32 pm_api_version;
-+static u32 pm_tz_version;
-+
-+/**
-+ * zynqmp_pm_get_api_version() - Get version number of PMU PM firmware
-+ * @version:	Returned version value
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_get_api_version(u32 *version)
-+{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
-+	int ret;
-+
-+	if (!version)
-+		return -EINVAL;
-+
-+	/* Check is PM API version already verified */
-+	if (pm_api_version > 0) {
-+		*version = pm_api_version;
-+		return 0;
-+	}
-+	ret = zynqmp_pm_invoke_fn(PM_GET_API_VERSION, 0, 0, 0, 0, ret_payload);
-+	*version = ret_payload[1];
-+
-+	return ret;
-+}
-+
-+/**
-+ * zynqmp_pm_get_trustzone_version() - Get secure trustzone firmware version
-+ * @version:	Returned version value
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_get_trustzone_version(u32 *version)
-+{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
-+	int ret;
-+
-+	if (!version)
-+		return -EINVAL;
-+
-+	/* Check is PM trustzone version already verified */
-+	if (pm_tz_version > 0) {
-+		*version = pm_tz_version;
-+		return 0;
-+	}
-+	ret = zynqmp_pm_invoke_fn(PM_GET_TRUSTZONE_VERSION, 0, 0,
-+				  0, 0, ret_payload);
-+	*version = ret_payload[1];
-+
-+	return ret;
-+}
-+
-+/**
-+ * get_set_conduit_method() - Choose SMC or HVC based communication
-+ * @np:		Pointer to the device_node structure
-+ *
-+ * Use SMC or HVC-based functions to communicate with EL2/EL3.
-+ *
-+ * Return: Returns 0 on success or error code
-+ */
-+static int get_set_conduit_method(struct device_node *np)
-+{
-+	const char *method;
-+
-+	if (of_property_read_string(np, "method", &method)) {
-+		pr_warn("%s missing \"method\" property\n", __func__);
-+		return -ENXIO;
-+	}
-+
-+	if (!strcmp("hvc", method)) {
-+		do_fw_call = do_fw_call_hvc;
-+	} else if (!strcmp("smc", method)) {
-+		do_fw_call = do_fw_call_smc;
-+	} else {
-+		pr_warn("%s Invalid \"method\" property: %s\n",
-+			__func__, method);
-+		return -EINVAL;
-+	}
++	if (!kstrtou64(arg, 0, &value))
++		return value;
 +
 +	return 0;
 +}
 +
-+static const struct zynqmp_eemi_ops eemi_ops = {
-+	.get_api_version = zynqmp_pm_get_api_version,
-+};
-+
 +/**
-+ * zynqmp_pm_get_eemi_ops - Get eemi ops functions
++ * get_pm_api_id() - Extract API-ID from a PM-API request
++ * @pm_api_req:		Entered PM-API argument in string format
++ * @pm_id:		API-ID
 + *
-+ * Return: pointer of eemi_ops structure
++ * Return: 0 on success else error code
 + */
-+const struct zynqmp_eemi_ops *zynqmp_pm_get_eemi_ops(void)
++static int get_pm_api_id(char *pm_api_req, u32 *pm_id)
 +{
-+	return &eemi_ops;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(pm_api_list) ; i++) {
++		if (!strncasecmp(pm_api_req, pm_api_list[i].api_name,
++				 pm_api_list[i].api_name_len)) {
++			*pm_id = pm_api_list[i].api_id;
++			break;
++		}
++	}
++
++	/* If no name was entered look for PM-API ID instead */
++	if (i == ARRAY_SIZE(pm_api_list) && kstrtouint(pm_api_req, 10, pm_id))
++		return -EINVAL;
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(zynqmp_pm_get_eemi_ops);
 +
-+static int zynqmp_firmware_probe(struct platform_device *pdev)
++static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
 +{
-+	struct device *dev = &pdev->dev;
-+
-+	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-+}
-+
-+static const struct of_device_id zynqmp_firmware_of_match[] = {
-+	{.compatible = "xlnx,zynqmp-firmware"},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, zynqmp_firmware_of_match);
-+
-+static struct platform_driver zynqmp_firmware_driver = {
-+	.driver = {
-+		.name = "zynqmp_firmware",
-+		.of_match_table = zynqmp_firmware_of_match,
-+	},
-+	.probe = zynqmp_firmware_probe,
-+};
-+module_platform_driver(zynqmp_firmware_driver);
-+
-+static int __init zynqmp_plat_init(void)
-+{
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
++	u32 pm_api_version;
 +	int ret;
-+	struct device_node *np;
 +
-+	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp");
-+	if (!np)
-+		return 0;
-+	of_node_put(np);
-+
-+	/*
-+	 * We're running on a ZynqMP machine,
-+	 * the zynqmp-firmware node is mandatory.
-+	 */
-+	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp-firmware");
-+	if (!np) {
-+		pr_warn("%s: zynqmp-firmware node not found\n", __func__);
++	if (!eemi_ops)
 +		return -ENXIO;
++
++	switch (pm_id) {
++	case PM_GET_API_VERSION:
++		ret = eemi_ops->get_api_version(&pm_api_version);
++		sprintf(debugfs_buf, "PM-API Version = %d.%d\n",
++			pm_api_version >> 16, pm_api_version & 0xffff);
++		break;
++	default:
++		sprintf(debugfs_buf, "Unsupported PM-API request\n");
++		ret = -EINVAL;
 +	}
-+
-+	ret = get_set_conduit_method(np);
-+	if (ret) {
-+		of_node_put(np);
-+		return ret;
-+	}
-+
-+	/* Check PM API version number */
-+	zynqmp_pm_get_api_version(&pm_api_version);
-+	if (pm_api_version < ZYNQMP_PM_VERSION) {
-+		panic("%s Platform Management API version error. Expected: v%d.%d - Found: v%d.%d\n",
-+		      __func__,
-+		      ZYNQMP_PM_VERSION_MAJOR, ZYNQMP_PM_VERSION_MINOR,
-+		      pm_api_version >> 16, pm_api_version & 0xFFFF);
-+	}
-+
-+	pr_info("%s Platform Management API v%d.%d\n", __func__,
-+		pm_api_version >> 16, pm_api_version & 0xFFFF);
-+
-+	/* Check trustzone version number */
-+	ret = zynqmp_pm_get_trustzone_version(&pm_tz_version);
-+	if (ret)
-+		panic("Legacy trustzone found without version support\n");
-+
-+	if (pm_tz_version < ZYNQMP_TZ_VERSION)
-+		panic("%s Trustzone version error. Expected: v%d.%d - Found: v%d.%d\n",
-+		      __func__,
-+		      ZYNQMP_TZ_VERSION_MAJOR, ZYNQMP_TZ_VERSION_MINOR,
-+		      pm_tz_version >> 16, pm_tz_version & 0xFFFF);
-+
-+	pr_info("%s Trustzone version v%d.%d\n", __func__,
-+		pm_tz_version >> 16, pm_tz_version & 0xFFFF);
-+
-+	of_node_put(np);
 +
 +	return ret;
 +}
-+early_initcall(zynqmp_plat_init);
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
++
++/**
++ * zynqmp_pm_debugfs_api_write() - debugfs write function
++ * @file:	User file structure
++ * @ptr:	User entered PM-API string
++ * @len:	Length of the userspace buffer
++ * @off:	Offset within the file
++ *
++ * Used for triggering pm api functions by writing
++ * echo <pm_api_id>	> /sys/kernel/debug/zynqmp_pm/power or
++ * echo <pm_api_name>	> /sys/kernel/debug/zynqmp_pm/power
++ *
++ * Return: Number of bytes copied if PM-API request succeeds,
++ *	   the corresponding error code otherwise
++ */
++static ssize_t zynqmp_pm_debugfs_api_write(struct file *file,
++					   const char __user *ptr, size_t len,
++					   loff_t *off)
++{
++	char *kern_buff, *tmp_buff;
++	char *pm_api_req;
++	u32 pm_id = 0;
++	u64 pm_api_arg[4] = {0, 0, 0, 0};
++	/* Return values from PM APIs calls */
++	u32 pm_api_ret[4] = {0, 0, 0, 0};
++
++	int ret;
++	int i = 0;
++
++	strcpy(debugfs_buf, "");
++
++	if (*off != 0 || len == 0)
++		return -EINVAL;
++
++	kern_buff = kzalloc(len, GFP_KERNEL);
++	if (!kern_buff)
++		return -ENOMEM;
++
++	tmp_buff = kern_buff;
++
++	ret = strncpy_from_user(kern_buff, ptr, len);
++	if (ret < 0) {
++		ret = -EFAULT;
++		goto err;
++	}
++
++	/* Read the API name from a user request */
++	pm_api_req = strsep(&kern_buff, " ");
++
++	ret = get_pm_api_id(pm_api_req, &pm_id);
++	if (ret < 0)
++		goto err;
++
++	/* Read node_id and arguments from the PM-API request */
++	pm_api_req = strsep(&kern_buff, " ");
++	while ((i < ARRAY_SIZE(pm_api_arg)) && pm_api_req) {
++		pm_api_arg[i++] = zynqmp_pm_argument_value(pm_api_req);
++		pm_api_req = strsep(&kern_buff, " ");
++	}
++
++	ret = process_api_request(pm_id, pm_api_arg, pm_api_ret);
++
++err:
++	kfree(tmp_buff);
++	if (ret)
++		return ret;
++
++	return len;
++}
++
++/**
++ * zynqmp_pm_debugfs_api_read() - debugfs read function
++ * @file:	User file structure
++ * @ptr:	Requested pm_api_version string
++ * @len:	Length of the userspace buffer
++ * @off:	Offset within the file
++ *
++ * Return: Length of the version string on success
++ *	   else error code
++ */
++static ssize_t zynqmp_pm_debugfs_api_read(struct file *file, char __user *ptr,
++					  size_t len, loff_t *off)
++{
++	return simple_read_from_buffer(ptr, len, off, debugfs_buf,
++				       strlen(debugfs_buf));
++}
++
++/* Setup debugfs fops */
++static const struct file_operations fops_zynqmp_pm_dbgfs = {
++	.owner = THIS_MODULE,
++	.write = zynqmp_pm_debugfs_api_write,
++	.read = zynqmp_pm_debugfs_api_read,
++};
++
++/**
++ * zynqmp_pm_api_debugfs_init - Initialize debugfs interface
++ *
++ * Return:	None
++ */
++void zynqmp_pm_api_debugfs_init(void)
++{
++	struct dentry *root_dir;
++
++	/* Initialize debugfs interface */
++	root_dir = debugfs_create_dir("zynqmp-firmware", NULL);
++	debugfs_create_file("pm", 0660, root_dir, NULL,
++			    &fops_zynqmp_pm_dbgfs);
++}
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.h b/drivers/firmware/xilinx/zynqmp-debug.h
 new file mode 100644
-index 0000000..cb63bed
+index 0000000..3303b37
 --- /dev/null
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -0,0 +1,63 @@
++++ b/drivers/firmware/xilinx/zynqmp-debug.h
+@@ -0,0 +1,22 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * Xilinx Zynq MPSoC Firmware layer
@@ -455,56 +298,39 @@ index 0000000..cb63bed
 + *  Rajan Vaja <rajanv@xilinx.com>
 + */
 +
-+#ifndef __FIRMWARE_ZYNQMP_H__
-+#define __FIRMWARE_ZYNQMP_H__
++#ifndef __FIRMWARE_ZYNQMP_DEBUG_H__
++#define __FIRMWARE_ZYNQMP_DEBUG_H__
 +
-+#define ZYNQMP_PM_VERSION_MAJOR	1
-+#define ZYNQMP_PM_VERSION_MINOR	0
-+
-+#define ZYNQMP_PM_VERSION	((ZYNQMP_PM_VERSION_MAJOR << 16) | \
-+					ZYNQMP_PM_VERSION_MINOR)
-+
-+#define ZYNQMP_TZ_VERSION_MAJOR	1
-+#define ZYNQMP_TZ_VERSION_MINOR	0
-+
-+#define ZYNQMP_TZ_VERSION	((ZYNQMP_TZ_VERSION_MAJOR << 16) | \
-+					ZYNQMP_TZ_VERSION_MINOR)
-+
-+/* SMC SIP service Call Function Identifier Prefix */
-+#define PM_SIP_SVC			0xC2000000
-+#define PM_GET_TRUSTZONE_VERSION	0xa03
-+
-+/* Number of 32bits values in payload */
-+#define PAYLOAD_ARG_CNT	4U
-+
-+enum pm_api_id {
-+	PM_GET_API_VERSION = 1,
-+};
-+
-+/* PMU-FW return status codes */
-+enum pm_ret_status {
-+	XST_PM_SUCCESS = 0,
-+	XST_PM_INTERNAL = 2000,
-+	XST_PM_CONFLICT,
-+	XST_PM_NO_ACCESS,
-+	XST_PM_INVALID_NODE,
-+	XST_PM_DOUBLE_REQ,
-+	XST_PM_ABORT_SUSPEND,
-+};
-+
-+struct zynqmp_eemi_ops {
-+	int (*get_api_version)(u32 *version);
-+};
-+
-+#if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
-+const struct zynqmp_eemi_ops *zynqmp_pm_get_eemi_ops(void);
++#if IS_REACHABLE(CONFIG_ZYNQMP_FIRMWARE_DEBUG)
++void zynqmp_pm_api_debugfs_init(void);
 +#else
-+static inline struct zynqmp_eemi_ops *zynqmp_pm_get_eemi_ops(void)
-+{
-+	return NULL;
-+}
++static inline void zynqmp_pm_api_debugfs_init(void) { }
 +#endif
 +
-+#endif /* __FIRMWARE_ZYNQMP_H__ */
++#endif /* __FIRMWARE_ZYNQMP_DEBUG_H__ */
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index c764d6e..83d2699 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -21,6 +21,7 @@
+ #include <linux/uaccess.h>
+ 
+ #include <linux/firmware/xlnx-zynqmp.h>
++#include "zynqmp-debug.h"
+ 
+ /**
+  * zynqmp_pm_ret_code() - Convert PMU-FW error codes to Linux error codes
+@@ -551,3 +552,11 @@ static int __init zynqmp_plat_init(void)
+ 	return ret;
+ }
+ early_initcall(zynqmp_plat_init);
++
++static int zynqmp_firmware_init(void)
++{
++	zynqmp_pm_api_debugfs_init();
++
++	return 0;
++}
++device_initcall(zynqmp_firmware_init);
 -- 
 2.7.4
