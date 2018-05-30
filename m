@@ -1,62 +1,37 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Wed, 30 May 2018 13:55:16 -0700
-Subject: [PATCH v7 01/10] dt-bindings: firmware: Add bindings for ZynqMP
- firmware
-In-Reply-To: <1527713725-1086-1-git-send-email-jollys@xilinx.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 30 May 2018 14:17:58 -0700
+Subject: [PATCH v7 10/10] drivers: clk: Add ZynqMP clock driver
+In-Reply-To: <1527713725-1086-11-git-send-email-jollys@xilinx.com>
 References: <1527713725-1086-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1527713725-1086-2-git-send-email-jollys@xilinx.com>
+ <1527713725-1086-11-git-send-email-jollys@xilinx.com>
+Message-ID: <c042fd9b-85cb-f0d3-101c-f78f3dc4fc44@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajan Vaja <rajanv@xilinx.com>
+On 05/30/2018 01:55 PM, Jolly Shah wrote:
+> From: Jolly Shah <jolly.shah@xilinx.com>
 
-Add documentation to describe Xilinx ZynqMP firmware driver
-bindings. Firmware driver provides an interface to firmware
-APIs. Interface APIs can be used by any driver to communicate
-to PMUFW (Platform Management Unit).
 
-Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-Signed-off-by: Jolly Shah <jollys@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+> diff --git a/drivers/clk/zynqmp/Kconfig b/drivers/clk/zynqmp/Kconfig
+> new file mode 100644
+> index 0000000..fe815f7
+> --- /dev/null
+> +++ b/drivers/clk/zynqmp/Kconfig
+> @@ -0,0 +1,11 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +
+> +config COMMON_CLK_ZYNQMP
+> +	bool "Support for Xilinx ZynqMP Ultrascale+ clock controllers"
+> +	depends on OF
+> +	depends on ARCH_ZYNQMP || COMPILE_TEST
+> +	depends on ZYNQMP_FIRMWARE
+> +	help
+> +	  Support for the Zynqmp Ultrascale clock controller.
+> +	  It has a dependency on the PMU firmware.
+> +	  Say Y if you want to support clock support
 
-diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-new file mode 100644
-index 0000000..1b431d9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -0,0 +1,29 @@
-+-----------------------------------------------------------------
-+Device Tree Bindings for the Xilinx Zynq MPSoC Firmware Interface
-+-----------------------------------------------------------------
-+
-+The zynqmp-firmware node describes the interface to platform firmware.
-+ZynqMP has an interface to communicate with secure firmware. Firmware
-+driver provides an interface to firmware APIs. Interface APIs can be
-+used by any driver to communicate to PMUFW(Platform Management Unit).
-+These requests include clock management, pin control, device control,
-+power management service, FPGA service and other platform management
-+services.
-+
-+Required properties:
-+ - compatible:	Must contain:	"xlnx,zynqmp-firmware"
-+ - method:	The method of calling the PM-API firmware layer.
-+		Permitted values are:
-+		  - "smc" : SMC #0, following the SMCCC
-+		  - "hvc" : HVC #0, following the SMCCC
-+
-+-------
-+Example
-+-------
-+
-+firmware {
-+	zynqmp_firmware: zynqmp-firmware {
-+		compatible = "xlnx,zynqmp-firmware";
-+		method = "smc";
-+	};
-+};
+	  Say Y if you want to include clock support.
+
+
 -- 
-2.7.4
+~Randy
