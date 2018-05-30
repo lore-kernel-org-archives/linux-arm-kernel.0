@@ -1,47 +1,33 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 30 May 2018 15:12:38 +0800
-Subject: [PATCH 3/3] ARM: imx: remove i.MX6SLL support in i.MX6SL cpu idle
- driver
-In-Reply-To: <1527664358-17844-1-git-send-email-Anson.Huang@nxp.com>
-References: <1527664358-17844-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1527664358-17844-3-git-send-email-Anson.Huang@nxp.com>
+From: keiichiw@chromium.org (Keiichi Watanabe)
+Date: Wed, 30 May 2018 16:16:11 +0900
+Subject: [PATCH v2 0/2] Add control for VP9 profile
+Message-ID: <20180530071613.125768-1-keiichiw@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SLL supports ARM power off in cpu idle, better to reuse
-i.MX6SX cpu idle driver instead of i.MX6SL which does NOT
-support ARM power off.
+This patch series adds a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE
+for VP9 profile.
+This control can be used to select a desired profile for VP9 encoder.
+In addition, it is also used to query for supported profiles by an
+encoder or a decoder.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/mach-imx/cpuidle-imx6sl.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+Patch 1 adds this control.
+By patch 2, this control is added to MediaTek decoder's driver, which
+supports VP9 profile 0.
 
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
-index fa8ead1..8d866fb 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sl.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
-@@ -12,7 +12,6 @@
- 
- #include "common.h"
- #include "cpuidle.h"
--#include "hardware.h"
- 
- static int imx6sl_enter_wait(struct cpuidle_device *dev,
- 			    struct cpuidle_driver *drv, int index)
-@@ -22,11 +21,9 @@ static int imx6sl_enter_wait(struct cpuidle_device *dev,
- 	 * Software workaround for ERR005311, see function
- 	 * description for details.
- 	 */
--	if (cpu_is_imx6sl())
--		imx6sl_set_wait_clk(true);
-+	imx6sl_set_wait_clk(true);
- 	cpu_do_idle();
--	if (cpu_is_imx6sl())
--		imx6sl_set_wait_clk(false);
-+	imx6sl_set_wait_clk(false);
- 	imx6_set_lpm(WAIT_CLOCKED);
- 
- 	return index;
--- 
-2.7.4
+
+Version 2 changes:
+- Support this control in MediaTek decoder's driver
+
+Keiichi Watanabe (2):
+  media: v4l2-ctrl: Add control for VP9 profile
+  media: mtk-vcodec: Support VP9 profile in decoder
+
+ .../media/uapi/v4l/extended-controls.rst      | 26 +++++++++++++++++++
+ .../platform/mtk-vcodec/mtk_vcodec_dec.c      |  6 +++++
+ drivers/media/v4l2-core/v4l2-ctrls.c          | 12 +++++++++
+ include/uapi/linux/v4l2-controls.h            |  8 ++++++
+ 4 files changed, 52 insertions(+)
+
+--
+2.17.0.921.gf22659ad46-goog
