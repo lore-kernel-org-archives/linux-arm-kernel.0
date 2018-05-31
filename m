@@ -1,97 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 May 2018 18:20:49 +0100
-Subject: [PATCH v5 2/2] arm64: signal: Report signal frame size to
- userspace via auxv
-In-Reply-To: <20180530104853.GB22983@e103592.cambridge.arm.com>
-References: <1527261428-6662-1-git-send-email-Dave.Martin@arm.com>
- <1527261428-6662-3-git-send-email-Dave.Martin@arm.com>
- <20180529204230.GG591@arm.com>
- <20180530104853.GB22983@e103592.cambridge.arm.com>
-Message-ID: <20180531172049.GA28915@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 31 May 2018 10:24:16 -0700
+Subject: [PATCH v2 1/2] ARM: debug: Add Iproc UART3 debug addresses
+In-Reply-To: <CAJiuCcek9KU6QWsAAxVCLUaf1v97uR6FcLOfY=A1LGCMTmjHjg@mail.gmail.com>
+References: <20180530131956.13972-1-peron.clem@gmail.com>
+ <93c2d07a-9344-ed39-261e-11084067a3fa@broadcom.com>
+ <CAJiuCcek9KU6QWsAAxVCLUaf1v97uR6FcLOfY=A1LGCMTmjHjg@mail.gmail.com>
+Message-ID: <41bbf801-f060-2056-4015-b4d05c6831bb@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 11:48:59AM +0100, Dave Martin wrote:
-> On Tue, May 29, 2018 at 09:42:31PM +0100, Will Deacon wrote:
-> > On Fri, May 25, 2018 at 04:17:08PM +0100, Dave Martin wrote:
-> > > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> > > index fac1c4d..8cf112b 100644
-> > > --- a/arch/arm64/include/asm/elf.h
-> > > +++ b/arch/arm64/include/asm/elf.h
-> > > @@ -121,6 +121,9 @@
-> > >  
-> > >  #ifndef __ASSEMBLY__
-> > >  
-> > > +#include <linux/bug.h>
-> > > +#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-> > > +
-> > >  typedef unsigned long elf_greg_t;
-> > >  
-> > >  #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
-> > > @@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-> > >  do {									\
-> > >  	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-> > >  		    (elf_addr_t)current->mm->context.vdso);		\
-> > > +									\
-> > > +	/*								\
-> > > +	 * Should always be nonzero unless there's a kernel bug.	\
-> > > +	 * If we haven't determined a sensible value to give to		\
-> > > +	 * userspace, omit the entry:					\
-> > > +	 */								\
-> > > +	if (likely(signal_minsigstksz))					\
-> > > +		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
-> > >  } while (0)
-> > 
-> > I think this is the desired behaviour, but now I'm worried that we're forced
-> > to have AT_VECTOR_SIZE_ARCH defined as 2 and, whilst you're correct that the
-> > ELF loader deals with this gracefuly, the FDPIC loader looks a lot less
-> > robust (in particular, my reading is that it decrements the stack pointer
-> > and then pushes these entries in reverse order by overloading NEW_AUX_ENT).
-> 
-> config BINFMT_ELF_FDPIC
-> 	/* ... */
-> 	depends on (ARM || (SUPERH32 & !MMU) || C6X)
 
-Ok, that's a relief. The checkpoint stuff is still a bit worrying though
-(prctl_set_mm_map).
 
-> The FDPIC loader seems to assume it's 32-bit only and also looks broken
-> with regard to auxv:
+On 5/31/2018 1:22 AM, Cl?ment P?ron wrote:
+> Hi Rai,
 > 
-> 	/* force 16 byte _final_ alignment here for generality */
-> #define DLINFO_ITEMS 15
+> On Wed, 30 May 2018 at 19:25, Ray Jui <ray.jui@broadcom.com> wrote:
+>>
+>> Hi Cl?ment,
+>>
+>> Correct me if I'm wrong, but I thought the trend is to move to use
+>> earlycon that can be activated from kernel command line for early print
+>> before the serial driver is loaded.
+>>
+>> Have you tried earlcon?
+> No, only tested this method.
 > 
-> /* ... */
+> Thanks,
+> Clement
 > 
-> 		nr = 0;
-> 		csp -= 2 * sizeof(unsigned long);
-> 		NEW_AUX_ENT(AT_EXECFD, ...);
-> 	}
-> 
-> /* ... */
-> 
-> 	csp -= DLINFO_ITEMS * 2 * sizeof(unsigned long);
-> 	NEW_AUX_ENT(AT_HWCAP,   ELF_HWCAP);
-> #ifdef ELF_HWCAP2
-> 	NEW_AUX_ENT(AT_HWCAP2,  ELF_HWCAP2);
-> #endif
-> 	/* 14 more NEW_AUX_ENT() */
-> 
-> 
-> Looks like commit 2171364d1a92 ("powerpc: Add HWCAP2 aux entry") added
-> HWCAP2 without ensuring that space is reserved.
-> 
-> I can try to draft a patch to handle the auxv in a more sane way for
-> FDPIC, but either way I don't see that it should be relevant to arm64.
-> 
-> 
-> AT_IGNORE feels like a bit of a fig leaf, but it's harmless enough.  I'm
-> happy to add it if you prefer.
 
-The only userspace code I could find that uses it is something that prints
-out auxv, but I'd still better spitting it out so we don't have to worry
-about being smaller than AT_VECTOR_SIZE_ARCH.
+If I remember it correctly, I think the trend is to use earlycon. There 
+are obvious shortcomings by making this configuration compile time based.
 
-Thanks,
-
-Will
+>>
+>> Thanks,
+>>
+>> Ray
+>>
+>> On 5/30/2018 6:19 AM, Cl?ment P?ron wrote:
+>>> From: Cl?ment Peron <clement.peron@devialet.com>
+>>>
+>>> Broadcom Iproc SoCs typically use the UART3 for
+>>> debug/console, provide a known good location for that.
+>>>
+>>> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+>>> ---
+>>>
+>>>    arch/arm/Kconfig.debug | 12 +++++++++++-
+>>>    1 file changed, 11 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>>> index 199ebc1c4538..4ea9d5793b91 100644
+>>> --- a/arch/arm/Kconfig.debug
+>>> +++ b/arch/arm/Kconfig.debug
+>>> @@ -207,6 +207,14 @@ choice
+>>>                depends on ARCH_BCM_HR2
+>>>                select DEBUG_UART_8250
+>>>
+>>> +     config DEBUG_BCM_IPROC_UART3
+>>> +             bool "Kernel low-level debugging on BCM IPROC UART3"
+>>> +             depends on ARCH_BCM_CYGNUS
+>>> +             select DEBUG_UART_8250
+>>> +             help
+>>> +               Say Y here if you want the debug print routines to direct
+>>> +               their output to the third serial port on these devices.
+>>> +
+>>>        config DEBUG_BCM_KONA_UART
+>>>                bool "Kernel low-level debugging messages via BCM KONA UART"
+>>>                depends on ARCH_BCM_MOBILE
+>>> @@ -1557,6 +1565,7 @@ config DEBUG_UART_PHYS
+>>>        default 0x18000400 if DEBUG_BCM_HR2
+>>>        default 0x18010000 if DEBUG_SIRFATLAS7_UART0
+>>>        default 0x18020000 if DEBUG_SIRFATLAS7_UART1
+>>> +     default 0x18023000 if DEBUG_BCM_IPROC_UART3
+>>>        default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
+>>>        default 0x20001000 if DEBUG_HIP01_UART
+>>>        default 0x20060000 if DEBUG_RK29_UART0
+>>> @@ -1676,6 +1685,7 @@ config DEBUG_UART_VIRT
+>>>        default 0xf1002000 if DEBUG_MT8127_UART0
+>>>        default 0xf1006000 if DEBUG_MT6589_UART0
+>>>        default 0xf1009000 if DEBUG_MT8135_UART3
+>>> +     default 0xf1023000 if DEBUG_BCM_IPROC_UART3
+>>>        default 0xf11f1000 if DEBUG_VERSATILE
+>>>        default 0xf1600000 if DEBUG_INTEGRATOR
+>>>        default 0xf1c28000 if DEBUG_SUNXI_UART0
+>>> @@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
+>>>                DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
+>>>                DEBUG_ALPINE_UART0 || \
+>>>                DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+>>> -             DEBUG_DAVINCI_DA8XX_UART2 || \
+>>> +             DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
+>>>                DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
+>>>
+>>>    config DEBUG_UART_8250_PALMCHIP
+>>>
