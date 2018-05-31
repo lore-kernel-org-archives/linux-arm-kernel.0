@@ -1,104 +1,35 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 31 May 2018 15:42:48 +0800
-Subject: [PATCH 6/7] iommu/io-pgtable-arm: add support for non-strict mode
-In-Reply-To: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1527752569-18020-7-git-send-email-thunder.leizhen@huawei.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 31 May 2018 10:03:31 +0200
+Subject: [PATCH v4] rtc: sun6i: Fix bit_idx value for clk_register_gate
+In-Reply-To: <20180530182744.27611-1-jagan@amarulasolutions.com>
+References: <20180530182744.27611-1-jagan@amarulasolutions.com>
+Message-ID: <20180531080331.5onjtjmxfolzbtc2@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support the non-strict mode, now we only tlbi and sync for the strict
-mode. But for the non-leaf case, always follow strict mode.
+On Wed, May 30, 2018 at 11:57:44PM +0530, Jagan Teki wrote:
+> From: Michael Trimarchi <michael@amarulasolutions.com>
+> 
+> clk-gate core will take bit_idx through clk_register_gate
+> and then do clk_gate_ops by using BIT(bit_idx), but rtc-sun6i
+> is passing bit_idx as BIT(bit_idx) it becomes BIT(BIT(bit_idx)
+> which is wrong and eventually external gate clock is not enabling.
+> 
+> This patch fixed by passing bit index and the original change
+> introduced from below commit.
+> "rtc: sun6i: Add support for the external oscillator gate"
+> (sha1: 	17ecd246414b3a0fe0cb248c86977a8bda465b7b)
+> 
+> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
+> Fixes: 17ecd246414b ("rtc: sun6i: Add support for the external oscillator gate")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/io-pgtable-arm.c | 22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index e0f52db..1a65b7b 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -287,7 +287,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
- 
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			       unsigned long iova, size_t size, int lvl,
--			       arm_lpae_iopte *ptep);
-+			       arm_lpae_iopte *ptep, int strict);
- 
- static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 				phys_addr_t paddr, arm_lpae_iopte prot,
-@@ -329,7 +329,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
- 
- 		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
--		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
-+		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp, IOMMU_STRICT) != sz))
- 			return -EINVAL;
- 	}
- 
-@@ -526,7 +526,7 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
- static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 				       unsigned long iova, size_t size,
- 				       arm_lpae_iopte blk_pte, int lvl,
--				       arm_lpae_iopte *ptep)
-+				       arm_lpae_iopte *ptep, int strict)
- {
- 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
- 	arm_lpae_iopte pte, *tablep;
-@@ -571,15 +571,17 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 	}
- 
- 	if (unmap_idx < 0)
--		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
-+		return __arm_lpae_unmap(data, iova, size, lvl, tablep, strict);
-+
-+	if (strict)
-+		io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
- 
--	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
- 	return size;
- }
- 
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			       unsigned long iova, size_t size, int lvl,
--			       arm_lpae_iopte *ptep)
-+			       arm_lpae_iopte *ptep, int strict)
- {
- 	arm_lpae_iopte pte;
- 	struct io_pgtable *iop = &data->iop;
-@@ -604,7 +606,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			io_pgtable_tlb_sync(iop);
- 			ptep = iopte_deref(pte, data);
- 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
--		} else {
-+		} else if (strict) {
- 			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
- 		}
- 
-@@ -615,12 +617,12 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 		 * minus the part we want to unmap
- 		 */
- 		return arm_lpae_split_blk_unmap(data, iova, size, pte,
--						lvl + 1, ptep);
-+						lvl + 1, ptep, strict);
- 	}
- 
- 	/* Keep on walkin' */
- 	ptep = iopte_deref(pte, data);
--	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
-+	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
- }
- 
- static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
-@@ -633,7 +635,7 @@ static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
- 		return 0;
- 
--	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
-+	return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
- }
- 
- static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
+Maxime
+
 -- 
-1.8.3
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
