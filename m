@@ -1,39 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 31 May 2018 14:00:11 +0100
-Subject: [PATCH v2 2/6] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is
- present
-In-Reply-To: <20180531115127.2ymmtlwemz6g5qzj@lakrids.cambridge.arm.com>
-References: <20180530124706.25284-1-marc.zyngier@arm.com>
- <20180530124706.25284-3-marc.zyngier@arm.com>
- <20180531115127.2ymmtlwemz6g5qzj@lakrids.cambridge.arm.com>
-Message-ID: <83a4edd3-abea-b6c4-9513-3705cc92b52b@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 31 May 2018 14:03:42 +0100
+Subject: [PATCH 1/7] iommu/dma: fix trival coding style mistake
+In-Reply-To: <1527752569-18020-2-git-send-email-thunder.leizhen@huawei.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+ <1527752569-18020-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <b473059d-fee6-1627-4749-192771038741@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/18 12:51, Mark Rutland wrote:
-> On Wed, May 30, 2018 at 01:47:02PM +0100, Marc Zyngier wrote:
->> Set/Way handling is one of the ugliest corners of KVM. We shouldn't
->> have to handle that, but better safe than sorry.
->>
->> Thankfully, FWB fixes this for us by not requiering any maintenance
->> whatsoever, which means we don't have to emulate S/W CMOs, and don't
->> have to track VM ops either.
->>
->> We still have to trap S/W though, if only to prevent the guest from
->> doing something bad.
+On 31/05/18 08:42, Zhen Lei wrote:
+> The static function iova_reserve_iommu_regions is only called by function
+> iommu_dma_init_domain, and the 'if (!dev)' check in iommu_dma_init_domain
+> affect it only, so we can safely move the check into it. I think it looks
+> more natural.
+
+As before, I disagree - the logic of iommu_dma_init_domain() is "we 
+expect to have a valid device, but stop here if we don't", and moving 
+the check just needlessly obfuscates that. It is not a coincidence that 
+the arguments of both functions are in effective order of importance.
+
+> In addition, the local variable 'ret' is only assigned in the branch of
+> 'if (region->type == IOMMU_RESV_MSI)', so the 'if (ret)' should also only
+> take effect in the branch, add a brace to enclose it.
+
+'ret' is clearly also assigned at its declaration, to cover the (very 
+likely) case where we don't enter the loop at all. Thus testing it in 
+the loop is harmless, and cluttering that up with extra tabs and braces 
+is just noise.
+
+Robin.
+
+> No functional changes.
 > 
-> S/W ops *also* do I-cache maintenance, so we'd still need to emulate
-> that. Though it looks like we're missing that today...
-
-This doesn't look right: CSSELR_EL1 does indeed have an InD bit, but
-that's only for the purpose of reading CSSIDR_EL1. DC CSW and co
-directly take a level *without* the InD bit, and seem to be limited to
-"data and unified cache".
-
-Am I missing something?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>   drivers/iommu/dma-iommu.c | 12 +++++++-----
+>   1 file changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index ddcbbdb..4e885f7 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -231,6 +231,9 @@ static int iova_reserve_iommu_regions(struct device *dev,
+>   	LIST_HEAD(resv_regions);
+>   	int ret = 0;
+>   
+> +	if (!dev)
+> +		return 0;
+> +
+>   	if (dev_is_pci(dev))
+>   		iova_reserve_pci_windows(to_pci_dev(dev), iovad);
+>   
+> @@ -246,11 +249,12 @@ static int iova_reserve_iommu_regions(struct device *dev,
+>   		hi = iova_pfn(iovad, region->start + region->length - 1);
+>   		reserve_iova(iovad, lo, hi);
+>   
+> -		if (region->type == IOMMU_RESV_MSI)
+> +		if (region->type == IOMMU_RESV_MSI) {
+>   			ret = cookie_init_hw_msi_region(cookie, region->start,
+>   					region->start + region->length);
+> -		if (ret)
+> -			break;
+> +			if (ret)
+> +				break;
+> +		}
+>   	}
+>   	iommu_put_resv_regions(dev, &resv_regions);
+>   
+> @@ -308,8 +312,6 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+>   	}
+>   
+>   	init_iova_domain(iovad, 1UL << order, base_pfn);
+> -	if (!dev)
+> -		return 0;
+>   
+>   	return iova_reserve_iommu_regions(dev, domain);
+>   }
+> 
