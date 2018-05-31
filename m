@@ -1,78 +1,97 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 31 May 2018 12:17:26 -0500
-Subject: [PATCH 2/2] arm64: dts: Add Mediatek X20 Development Board support
-In-Reply-To: <20180529045258.1415-3-manivannan.sadhasivam@linaro.org>
-References: <20180529045258.1415-1-manivannan.sadhasivam@linaro.org>
- <20180529045258.1415-3-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180531171726.GB23016@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 May 2018 18:20:49 +0100
+Subject: [PATCH v5 2/2] arm64: signal: Report signal frame size to
+ userspace via auxv
+In-Reply-To: <20180530104853.GB22983@e103592.cambridge.arm.com>
+References: <1527261428-6662-1-git-send-email-Dave.Martin@arm.com>
+ <1527261428-6662-3-git-send-email-Dave.Martin@arm.com>
+ <20180529204230.GG591@arm.com>
+ <20180530104853.GB22983@e103592.cambridge.arm.com>
+Message-ID: <20180531172049.GA28915@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tOn Tue, May 29, 2018 at 10:22:58AM +0530, Manivannan Sadhasivam wrote:
-> Add initial device tree support for Mediatek X20 Development Board
-> based on MT6797 Deca core SoC. This board is one of the 96Boards
-> Consumer Edition platform.
+On Wed, May 30, 2018 at 11:48:59AM +0100, Dave Martin wrote:
+> On Tue, May 29, 2018 at 09:42:31PM +0100, Will Deacon wrote:
+> > On Fri, May 25, 2018 at 04:17:08PM +0100, Dave Martin wrote:
+> > > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> > > index fac1c4d..8cf112b 100644
+> > > --- a/arch/arm64/include/asm/elf.h
+> > > +++ b/arch/arm64/include/asm/elf.h
+> > > @@ -121,6 +121,9 @@
+> > >  
+> > >  #ifndef __ASSEMBLY__
+> > >  
+> > > +#include <linux/bug.h>
+> > > +#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
+> > > +
+> > >  typedef unsigned long elf_greg_t;
+> > >  
+> > >  #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
+> > > @@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+> > >  do {									\
+> > >  	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+> > >  		    (elf_addr_t)current->mm->context.vdso);		\
+> > > +									\
+> > > +	/*								\
+> > > +	 * Should always be nonzero unless there's a kernel bug.	\
+> > > +	 * If we haven't determined a sensible value to give to		\
+> > > +	 * userspace, omit the entry:					\
+> > > +	 */								\
+> > > +	if (likely(signal_minsigstksz))					\
+> > > +		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
+> > >  } while (0)
+> > 
+> > I think this is the desired behaviour, but now I'm worried that we're forced
+> > to have AT_VECTOR_SIZE_ARCH defined as 2 and, whilst you're correct that the
+> > ELF loader deals with this gracefuly, the FDPIC loader looks a lot less
+> > robust (in particular, my reading is that it decrements the stack pointer
+> > and then pushes these entries in reverse order by overloading NEW_AUX_ENT).
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
->  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
->  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
->  2 files changed, 34 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> index ac17f60f998c..5b7fd6ad96e4 100644
-> --- a/arch/arm64/boot/dts/mediatek/Makefile
-> +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> @@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> new file mode 100644
-> index 000000000000..2c09ca95d9e2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> @@ -0,0 +1,33 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Device Tree Source for MediaTek X20 Development Board
-> + *
-> + * Copyright (C) 2018, Linaro Ltd.
-> + *
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "mt6797.dtsi"
-> +
-> +/ {
-> +	model = "Mediatek X20 Development Board";
-> +	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
+> config BINFMT_ELF_FDPIC
+> 	/* ... */
+> 	depends on (ARM || (SUPERH32 & !MMU) || C6X)
 
-The board compatible needs documenting.
+Ok, that's a relief. The checkpoint stuff is still a bit worrying though
+(prctl_set_mm_map).
 
-> +
-> +	aliases {
-> +		serial0 = &uart1;
-> +	};
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0 0x40000000 0 0x1e605000>;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> -- 
-> 2.17.0
+> The FDPIC loader seems to assume it's 32-bit only and also looks broken
+> with regard to auxv:
 > 
+> 	/* force 16 byte _final_ alignment here for generality */
+> #define DLINFO_ITEMS 15
+> 
+> /* ... */
+> 
+> 		nr = 0;
+> 		csp -= 2 * sizeof(unsigned long);
+> 		NEW_AUX_ENT(AT_EXECFD, ...);
+> 	}
+> 
+> /* ... */
+> 
+> 	csp -= DLINFO_ITEMS * 2 * sizeof(unsigned long);
+> 	NEW_AUX_ENT(AT_HWCAP,   ELF_HWCAP);
+> #ifdef ELF_HWCAP2
+> 	NEW_AUX_ENT(AT_HWCAP2,  ELF_HWCAP2);
+> #endif
+> 	/* 14 more NEW_AUX_ENT() */
+> 
+> 
+> Looks like commit 2171364d1a92 ("powerpc: Add HWCAP2 aux entry") added
+> HWCAP2 without ensuring that space is reserved.
+> 
+> I can try to draft a patch to handle the auxv in a more sane way for
+> FDPIC, but either way I don't see that it should be relevant to arm64.
+> 
+> 
+> AT_IGNORE feels like a bit of a fig leaf, but it's harmless enough.  I'm
+> happy to add it if you prefer.
+
+The only userspace code I could find that uses it is something that prints
+out auxv, but I'd still better spitting it out so we don't have to worry
+about being smaller than AT_VECTOR_SIZE_ARCH.
+
+Thanks,
+
+Will
