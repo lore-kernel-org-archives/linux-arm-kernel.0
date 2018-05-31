@@ -1,64 +1,72 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 31 May 2018 10:27:20 +0530
-Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
- <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
- <20180524173926.GC14924@minitux>
- <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
- <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
-Message-ID: <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Thu, 31 May 2018 21:08:58 +0800
+Subject: [PATCH v1 1/2] arm64: KVM: export the capability to set guest SError
+ syndrome
+In-Reply-To: <1527772139-19665-1-git-send-email-gengdongjiu@huawei.com>
+References: <1527772139-19665-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1527772139-19665-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+For the arm64 RAS Extension, user space can inject a virtual-SError
+with specified ESR. So user space needs to know whether KVM support
+to inject such SError, this interface adds this query for this capability.
 
-On 5/30/2018 9:25 PM, Stephen Boyd wrote:
-> Quoting Sricharan R (2018-05-24 22:40:11)
->> Hi Bjorn,
->>
->> On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
->>> On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
->>>
->>>> From: Stephen Boyd <sboyd@codeaurora.org>
->>>>
->>>> Krait CPUs have a handful of L2 cache controller registers that
->>>> live behind a cp15 based indirection register. First you program
->>>> the indirection register (l2cpselr) to point the L2 'window'
->>>> register (l2cpdr) at what you want to read/write.  Then you
->>>> read/write the 'window' register to do what you want. The
->>>> l2cpselr register is not banked per-cpu so we must lock around
->>>> accesses to it to prevent other CPUs from re-pointing l2cpdr
->>>> underneath us.
->>>>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>>
->>> This should have your signed-off-by here as well.
->>>
->>
->>  ok.
->>
->>> Apart from that:
->>>
->>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
->>>
->>
-> 
-> Will these patches come around again? I'll do a quick sweep on them
-> today but I expect them to be resent.
+KVM will check whether system support RAS Extension, if supported, KVM
+returns true to user space, otherwise returns false.
 
-Sure, i will have to resend them again, fixing couple of Bjorn's
-minor comments. Will address your comments that you would give
-as well along with that.
-
-Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
-This email has been checked for viruses by Avast antivirus software.
-https://www.avast.com/antivirus
+ Documentation/virtual/kvm/api.txt | 11 +++++++++++
+ arch/arm64/kvm/reset.c            |  3 +++
+ include/uapi/linux/kvm.h          |  1 +
+ 3 files changed, 15 insertions(+)
+
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 758bf40..fdac969 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -4603,3 +4603,14 @@ Architectures: s390
+ This capability indicates that kvm will implement the interfaces to handle
+ reset, migration and nested KVM for branch prediction blocking. The stfle
+ facility 82 should not be provided to the guest without this capability.
++
++8.14 KVM_CAP_ARM_SET_SERROR_ESR
++
++Architectures: arm, arm64
++
++This capability indicates that userspace can specify the syndrome value reported
++to the guest OS when guest takes a virtual SError interrupt exception.
++If KVM has this capability, userspace can only specify the ISS field for the ESR
++syndrome, it can not specify the EC field which is not under control by KVM.
++If this virtual SError is taken to EL1 using AArch64, this value will be reported
++in ISS filed of ESR_EL1.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3256b92..38c8a64 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_INJECT_SERROR_ESR:
++		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index b02c41e..e88f976 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -948,6 +948,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_S390_BPB 152
+ #define KVM_CAP_GET_MSR_FEATURES 153
+ #define KVM_CAP_HYPERV_EVENTFD 154
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 155
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+-- 
+2.7.4
