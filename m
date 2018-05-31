@@ -1,49 +1,89 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 31 May 2018 14:31:17 +0100
-Subject: [PATCH 2/3] ARM: spectre-v1: add array_index_mask_nospec()
- implementation
+Date: Thu, 31 May 2018 14:31:23 +0100
+Subject: [PATCH 3/3] ARM: spectre-v1: fix syscall entry
 In-Reply-To: <20180531133047.GS17671@n2100.armlinux.org.uk>
 References: <20180531133047.GS17671@n2100.armlinux.org.uk>
-Message-ID: <E1fONfh-00070F-Tw@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fONfn-00070N-9W@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an implementation of the array_index_mask_nospec() function for
-mitigating Spectre variant 1 throughout the kernel.
+Prevent speculation at the syscall table decoding by clamping the index
+used to zero on invalid system call numbers, and using the csdb
+speculative barrier.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/include/asm/barrier.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/kernel/entry-common.S | 14 +++-----------
+ arch/arm/kernel/entry-header.S | 25 +++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 3d9c1d4b7e75..a89adcf53b99 100644
---- a/arch/arm/include/asm/barrier.h
-+++ b/arch/arm/include/asm/barrier.h
-@@ -76,6 +76,24 @@ extern void arm_heavy_mb(void);
- #define __smp_rmb()	__smp_mb()
- #define __smp_wmb()	dmb(ishst)
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 3c4f88701f22..78b9f20dd6a3 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -242,9 +242,7 @@ ENTRY(vector_swi)
+ 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+ 	bne	__sys_trace
  
+-	cmp	scno, #NR_syscalls		@ check upper syscall limit
+-	badr	lr, ret_fast_syscall		@ return address
+-	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
++	invoke_syscall tbl, scno, r10, ret_fast_syscall
+ 
+ 	add	r1, sp, #S_OFF
+ 2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+@@ -278,14 +276,8 @@ ENDPROC(vector_swi)
+ 	mov	r1, scno
+ 	add	r0, sp, #S_OFF
+ 	bl	syscall_trace_enter
+-
+-	badr	lr, __sys_trace_return		@ return address
+-	mov	scno, r0			@ syscall number (possibly new)
+-	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
+-	cmp	scno, #NR_syscalls		@ check upper syscall limit
+-	ldmccia	r1, {r0 - r6}			@ have to reload r0 - r6
+-	stmccia	sp, {r4, r5}			@ and update the stack args
+-	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
++	mov	scno, r0
++	invoke_syscall tbl, scno, r10, __sys_trace_return, reload=1
+ 	cmp	scno, #-1			@ skip the syscall?
+ 	bne	2b
+ 	add	sp, sp, #S_OFF			@ restore stack
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 0f07579af472..773424843d6e 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -378,6 +378,31 @@
+ #endif
+ 	.endm
+ 
++	.macro	invoke_syscall, table, nr, tmp, ret, reload=0
 +#ifdef CONFIG_CPU_SPECTRE
-+static inline unsigned long array_index_mask_nospec(unsigned long idx,
-+						    unsigned long sz)
-+{
-+	unsigned long mask;
-+
-+	asm(	"cmp	%1, %2\n"
-+	"	sbc	%0, %1, %1\n"
-+	CSDB
-+	: "=r" (mask)
-+	: "r" (idx), "Ir" (sz)
-+	: "cc");
-+
-+	return mask;
-+}
-+#define array_index_mask_nospec array_index_mask_nospec
++	mov	\tmp, \nr
++	cmp	\tmp, #NR_syscalls		@ check upper syscall limit
++	movcs	\tmp, #0
++	csdb
++	badr	lr, \ret			@ return address
++	.if	\reload
++	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
++	ldmccia	r1, {r0 - r6}			@ reload r0-r6
++	stmccia	sp, {r4, r5}			@ update stack arguments
++	.endif
++	ldrcc	pc, [\table, \tmp, lsl #2]	@ call sys_* routine
++#else
++	cmp	\nr, #NR_syscalls		@ check upper syscall limit
++	badr	lr, \ret			@ return address
++	.if	\reload
++	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
++	ldmccia	r1, {r0 - r6}			@ reload r0-r6
++	stmccia	sp, {r4, r5}			@ update stack arguments
++	.endif
++	ldrcc	pc, [\table, \nr, lsl #2]	@ call sys_* routine
 +#endif
++	.endm
 +
- #include <asm-generic/barrier.h>
- 
- #endif /* !__ASSEMBLY__ */
+ /*
+  * These are the registers used in the syscall handler, and allow us to
+  * have in theory up to 7 arguments to a function - r0 to r6.
 -- 
 2.7.4
