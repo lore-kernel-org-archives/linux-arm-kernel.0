@@ -1,86 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 May 2018 12:48:16 +0100
-Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
- <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
- <20180530103720.GH6920@sirena.org.uk>
- <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
- <20180530155044.GR6920@sirena.org.uk>
- <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
- <20180530162007.GU6920@sirena.org.uk>
- <CAD=FV=WL9enzYCoSx0fT_ny40ciLJU-hhS9joJ6nySXvWPqAxQ@mail.gmail.com>
- <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
-Message-ID: <20180531114816.GC13319@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 May 2018 12:49:38 +0100
+Subject: [PATCH v2 1/6] arm64: KVM: Add support for Stage-2 control of
+ memory types and cacheability
+In-Reply-To: <20180530124706.25284-2-marc.zyngier@arm.com>
+References: <20180530124706.25284-1-marc.zyngier@arm.com>
+ <20180530124706.25284-2-marc.zyngier@arm.com>
+Message-ID: <20180531114938.2w4sbi2nkvqyc3jt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 04:39:10PM -0700, David Collins wrote:
+On Wed, May 30, 2018 at 01:47:01PM +0100, Marc Zyngier wrote:
+> Up to ARMv8.3, the combinaison of Stage-1 and Stage-2 attributes
+> results in the strongest attribute of the two stages.  This means
+> that the hypervisor has to perform quite a lot of cache maintenance
+> just in case the guest has some non-cacheable mappings around.
+> 
+> ARMv8.4 solves this problem by offering a different mode (FWB) where
+> Stage-2 has total control over the memory attribute (this is limited
+> to systems where both I/O and instruction caches are coherent with
 
-> The DRMS modes to use and max allowed current per mode need to be
-> specified at the board level in device tree instead of hard-coded per
-> regulator type in the driver.  There are at least two use cases driving
-> this need: LDOs shared between RPMh client processors and SMPSes requiring
-> PWM mode in certain circumstances.
+s/caches/fetches/ -- the I-caches themselves aren't coherent with the
+D-caches (or we could omit I-cache maintenance).
 
-Is there really no way to improve the RPM firmware?
+i.e. this implies IDC, but not DIC.
 
-> Consider the case of a regulator with physical 10 mA LPM max current. Say
-> that modem and application processors each have a load on the regulator
-> that draws 9 mA. If they each respect the 10 mA limit, then they'd each
-> vote for LPM. The VRM block in RPMh hardware will aggregate these requests
+> the dcache). This is achieved by having a different set of memory
+> attributes in the page tables, and a new bit set in HCR_EL2.
+> 
+> On such a system, we can then safely sidestep any form of dcache
+> management.
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-This is, of course, why the regulator API aggregates this stuff based on
-the current not based on having every individual user select a mode.
+>  static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+>  {
+> @@ -268,7 +269,10 @@ static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+>  {
+>  	void *va = page_address(pfn_to_page(pfn));
+>  
+> -	kvm_flush_dcache_to_poc(va, size);
+> +	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
+> +		kvm_flush_dcache_to_poc(va, size);
+> +	else
+> +		kvm_flush_dcache_to_pou(va, size);
+>  }
 
-> together using a max function which will result in the regulator being set
-> to LPM, even though the total load is 18 mA (which would require high
-> power mode (HPM)). To get around this corner case, a LPM max current of 1
-> uA can be used for all LDO supplies that have non-application processor
-> consumers. Thus, any non-zero regulator_set_load() current request will
-> result in setting the regulator to HPM (which is always safe).
+Te commit message said instruction fetches were coherent, and that no
+D-cache maintenance was necessary, so why do we need maintenance to the
+PoU?
 
-That's obviously just never going to work well, the best you can do here
-is just pretend that the other components are always operating at full
-power (which I assume all the other components are doing too...) or not
-try to use load based mode switching in the first place.
+> +static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
+> +{
+> +	u64 val = read_sysreg_s(SYS_CLIDR_EL1);
+> +
+> +	/* Check that CLIDR_EL1.LOU{U,IS} are both 0 */
+> +	WARN_ON(val & (7 << 27 | 7 << 21));
+> +}
 
-> The second situation that needs board-level DRMS mode and current limit
-> specification is SMPS regulator AUTO mode to PWM (HPM) mode switching.
-> SMPS regulators should theoretically always be able to operate in AUTO
-> mode as it switches automatically between PWM mode (which can provide the
-> maximum current) and PFM mode (which supports lower current but has higher
-> efficiency). However, there may be board/system issues that require
-> switching to PWM mode for certain use cases as it has better load
-> regulation (i.e. no PFM ripple for lower loads) and supports more
-> aggressive load current steps (i.e. greater A/ns).
+What about CTR_EL0.IDC?
 
-> If a Linux consumer requires the ability to force a given SMPS regulator
-> from AUTO mode into PWM mode and that SMPS is shared by other Linux
-> consumers (which may be the case, but at least must be guaranteed to work
-> architecturally), then regulator_set_load() is the only option since it
-> provides aggregation, where as regulator_set_mode() does not.
-
-That's obviously broken though, what you're describing is just clearly
-nothing to do with load so trying to configure it using load is just
-going to lead to problems later on.  Honestly it sounds like you just
-want to force the regulator into forced PWM mode all the time, otherwise
-you need to look into implementing support for describing the thing
-you're actually trying to do and add a mechanism for per consumer mode
-configuration.
-
-This has been a frequent pattern with these RPM drivers, trying to find
-some way to shoehorn something that happens to work right now into the
-code.  That's going to make things fragile and hard to maintain, we need
-code that does the thing it's saying it does so that it's easier to
-understand and work with - getting things running isn't enough, they
-need to be clear.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180531/53042fa7/attachment.sig>
+Thanks,
+Mark.
