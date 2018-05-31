@@ -1,57 +1,33 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 31 May 2018 12:11:03 -0500
-Subject: [PATCH 5/5] rpmsg: char: Switch to SPDX license identifier
+Date: Thu, 31 May 2018 12:11:02 -0500
+Subject: [PATCH 4/5] rpmsg: glink: Switch to SPDX license identifier
 In-Reply-To: <20180531171103.8703-1-s-anna@ti.com>
 References: <20180531171103.8703-1-s-anna@ti.com>
-Message-ID: <20180531171103.8703-6-s-anna@ti.com>
+Message-ID: <20180531171103.8703-5-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the appropriate SPDX license identifier in the rpmsg char driver
-source file and drop the previous boilerplate license text. The uapi
-header file already had the SPDX license identifier added as part of
-a mass update but the license text removal was deferred for later,
-and this patch drops the same.
+Use the appropriate SPDX license identifier in various rpmsg
+glink driver source files and drop the previous boilerplate
+license text.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/rpmsg/rpmsg_char.c | 10 +---------
- include/uapi/linux/rpmsg.h |  9 ---------
- 2 files changed, 1 insertion(+), 18 deletions(-)
+ drivers/rpmsg/qcom_glink_native.c | 10 +---------
+ drivers/rpmsg/qcom_glink_native.h | 10 +---------
+ drivers/rpmsg/qcom_glink_rpm.c    | 10 +---------
+ drivers/rpmsg/qcom_glink_smem.c   | 10 +---------
+ include/linux/rpmsg/qcom_glink.h  |  2 ++
+ 5 files changed, 6 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/rpmsg/rpmsg_char.c b/drivers/rpmsg/rpmsg_char.c
-index 1efdf9ff8679..76a4477c6364 100644
---- a/drivers/rpmsg/rpmsg_char.c
-+++ b/drivers/rpmsg/rpmsg_char.c
-@@ -1,3 +1,4 @@
+diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
+index 768ef542a841..f505f58b797d 100644
+--- a/drivers/rpmsg/qcom_glink_native.c
++++ b/drivers/rpmsg/qcom_glink_native.c
+@@ -1,14 +1,6 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
-  * Copyright (c) 2016, Linaro Ltd.
-  * Copyright (c) 2012, Michal Simek <monstr@monstr.eu>
-@@ -7,15 +8,6 @@
-  *
-  * Based on rpmsg performance statistics driver by Michal Simek, which in turn
-  * was based on TI & Google OMX rpmsg driver.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/cdev.h>
- #include <linux/device.h>
-diff --git a/include/uapi/linux/rpmsg.h b/include/uapi/linux/rpmsg.h
-index 225eb38705dc..e14c6dab4223 100644
---- a/include/uapi/linux/rpmsg.h
-+++ b/include/uapi/linux/rpmsg.h
-@@ -1,15 +1,6 @@
- /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
- /*
-  * Copyright (c) 2016, Linaro Ltd.
+  * Copyright (c) 2016-2017, Linaro Ltd
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 and
@@ -63,6 +39,76 @@ index 225eb38705dc..e14c6dab4223 100644
 - * GNU General Public License for more details.
   */
  
- #ifndef _UAPI_RPMSG_H_
+ #include <linux/idr.h>
+diff --git a/drivers/rpmsg/qcom_glink_native.h b/drivers/rpmsg/qcom_glink_native.h
+index 0cae8a8199f8..624184fc458e 100644
+--- a/drivers/rpmsg/qcom_glink_native.h
++++ b/drivers/rpmsg/qcom_glink_native.h
+@@ -1,14 +1,6 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2016-2017, Linaro Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #ifndef __QCOM_GLINK_NATIVE_H__
+diff --git a/drivers/rpmsg/qcom_glink_rpm.c b/drivers/rpmsg/qcom_glink_rpm.c
+index 69b25d157d0f..f64f45d1a735 100644
+--- a/drivers/rpmsg/qcom_glink_rpm.c
++++ b/drivers/rpmsg/qcom_glink_rpm.c
+@@ -1,14 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2016-2017, Linaro Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/idr.h>
+diff --git a/drivers/rpmsg/qcom_glink_smem.c b/drivers/rpmsg/qcom_glink_smem.c
+index 3fa9d43e2c87..2b5cf2790954 100644
+--- a/drivers/rpmsg/qcom_glink_smem.c
++++ b/drivers/rpmsg/qcom_glink_smem.c
+@@ -1,14 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2016, Linaro Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/io.h>
+diff --git a/include/linux/rpmsg/qcom_glink.h b/include/linux/rpmsg/qcom_glink.h
+index a622f029836e..96e26d94719f 100644
+--- a/include/linux/rpmsg/qcom_glink.h
++++ b/include/linux/rpmsg/qcom_glink.h
+@@ -1,3 +1,5 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
+ #ifndef _LINUX_RPMSG_QCOM_GLINK_H
+ #define _LINUX_RPMSG_QCOM_GLINK_H
+ 
 -- 
 2.17.0
