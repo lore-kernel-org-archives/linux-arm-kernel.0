@@ -1,51 +1,57 @@
-From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Thu, 31 May 2018 11:27:52 +0800
-Subject: [PATCH v3 4/5] arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
-In-Reply-To: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
-References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <1527737273-8387-5-git-send-email-djw@t-chip.com.cn>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 30 May 2018 22:43:52 -0500
+Subject: [PATCH v2 3/4] dt-bindings: soc: Add TmFifo binding for Mellanox
+ BlueField SoC
+In-Reply-To: <1527279436-14773-3-git-send-email-lsun@mellanox.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1527279436-14773-3-git-send-email-lsun@mellanox.com>
+Message-ID: <20180531034352.GA32666@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Levin Du <djw@t-chip.com.cn>
+On Fri, May 25, 2018 at 04:17:15PM -0400, Liming Sun wrote:
 
-It is necessary for the io domain setting of the SoC to match
-the voltage supplied by the regulators.
+Commit msg?
 
-Signed-off-by: Levin Du <djw@t-chip.com.cn>
+> Reviewed-by: David Woods <dwoods@mellanox.com>
+> Signed-off-by: Liming Sun <lsun@mellanox.com>
+> ---
+>  .../devicetree/bindings/soc/mellanox/tmfifo.txt      | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> new file mode 100644
+> index 0000000..0a362f5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> @@ -0,0 +1,20 @@
+> +* Mellanox BlueField SoC TmFifo
+> +
+> +BlueField TmFifo provides a shared FIFO between the target and the
+> +external host machine, which can be accessed via USB or PCIe.
 
----
-
-Changes in v3: None
-Changes in v2: None
-Changes in v1:
-- Split from V0.
-
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-index 246c317..b983abd 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-@@ -208,6 +208,18 @@
- 	};
- };
- 
-+&io_domains {
-+	status = "okay";
-+
-+	vccio1-supply = <&vcc_io>;
-+	vccio2-supply = <&vcc18_emmc>;
-+	vccio3-supply = <&vcc_io>;
-+	vccio4-supply = <&vcc_18>;
-+	vccio5-supply = <&vcc_io>;
-+	vccio6-supply = <&vcc_io>;
-+	pmuio-supply = <&vcc_io>;
-+};
-+
- &pinctrl {
- 	pmic {
- 		pmic_int_l: pmic-int-l {
--- 
-2.7.4
+A FIFO for what? I'd like to find a better spot than bindings/soc/
+> +
+> +Required properties:
+> +
+> +- compatible:	Should be "mellanox,bf-tmfifo"
+> +- reg:		Physical base address and length of Rx/Tx block
+> +- interrupts:	The interrupt number of Rx low water mark, Rx high water mark
+> +		Tx low water mark, Tx high water mark respectively.
+> +
+> +Example:
+> +
+> +tmfifo at 800a20 {
+> +	compatible = "mellanox,bf-tmfifo";
+> +	reg = <0x00800a20 0x00000018
+> +	       0x00800a40 0x00000018>;
+> +	interrupts = <41, 42, 43, 44>;
+> +};
+> -- 
+> 1.8.3.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
