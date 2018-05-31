@@ -1,41 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 May 2018 17:00:33 +0100
-Subject: [PATCH v2 2/6] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is
- present
-In-Reply-To: <83a4edd3-abea-b6c4-9513-3705cc92b52b@arm.com>
-References: <20180530124706.25284-1-marc.zyngier@arm.com>
- <20180530124706.25284-3-marc.zyngier@arm.com>
- <20180531115127.2ymmtlwemz6g5qzj@lakrids.cambridge.arm.com>
- <83a4edd3-abea-b6c4-9513-3705cc92b52b@arm.com>
-Message-ID: <20180531160032.24xw2m7oquer6tgz@lakrids.cambridge.arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 31 May 2018 18:01:17 +0200
+Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
+ <20180531005827.GA17203@rob-hp-laptop>
+ <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
+ <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
+Message-ID: <20180531160117.GC2727@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 02:00:11PM +0100, Marc Zyngier wrote:
-> On 31/05/18 12:51, Mark Rutland wrote:
-> > On Wed, May 30, 2018 at 01:47:02PM +0100, Marc Zyngier wrote:
-> >> Set/Way handling is one of the ugliest corners of KVM. We shouldn't
-> >> have to handle that, but better safe than sorry.
+On 31/05/2018 09:20:57-0500, Rob Herring wrote:
+> On Thu, May 31, 2018 at 5:25 AM, Codrin Ciubotariu
+> <codrin.ciubotariu@microchip.com> wrote:
+> > On 31.05.2018 03:58, Rob Herring wrote:
 > >>
-> >> Thankfully, FWB fixes this for us by not requiering any maintenance
-> >> whatsoever, which means we don't have to emulate S/W CMOs, and don't
-> >> have to track VM ops either.
+> >> On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
+> >>>
+> >>> The I2S mux clock can be used to select the I2S input clock. The
+> >>> available parents are the peripheral and the generated clocks.
+> >>>
+> >>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> >>> ---
+> >>>   .../devicetree/bindings/clock/at91-clock.txt       | 34
+> >>> ++++++++++++++++++++++
+> >>>   1 file changed, 34 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> index 51c259a..1c46b3c 100644
+> >>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> @@ -90,6 +90,8 @@ Required properties:
+> >>>         "atmel,sama5d2-clk-audio-pll-pmc"
+> >>>                 at91 audio pll output on AUDIOPLLCLK that feeds the PMC
+> >>>                 and can be used by peripheral clock or generic clock
+> >>> +       "atmel,sama5d2-clk-i2s-mux":
+> >>> +               at91 I2S clock source selection
 > >>
-> >> We still have to trap S/W though, if only to prevent the guest from
-> >> doing something bad.
-> > 
-> > S/W ops *also* do I-cache maintenance, so we'd still need to emulate
-> > that. Though it looks like we're missing that today...
+> >>
+> >> Is this boolean or takes some values. If latter, what are valid values?
+> >
+> >
+> > This is the compatible string of the clock driver.
 > 
-> This doesn't look right: CSSELR_EL1 does indeed have an InD bit, but
-> that's only for the purpose of reading CSSIDR_EL1. DC CSW and co
-> directly take a level *without* the InD bit, and seem to be limited to
-> "data and unified cache".
+> Ah, now I remember. AT91 uses fine grained clock nodes in DT. Is there
+> still a plan to fix this?
 > 
-> Am I missing something?
 
-No; I was mistaken.
+There is still a plan to do that, hopefully soon (I'd like to aim for
+the next release or the one after).
 
-Sorry for the noise!
+I think this one should go in as-is so it can be fixed with all the
+other one at once.
 
-Mark.
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
