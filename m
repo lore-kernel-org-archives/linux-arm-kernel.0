@@ -1,84 +1,98 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 31 May 2018 09:36:25 -0600
-Subject: [PATCH v2 00/12] coresight: tmc-etr Transparent buffer management
-In-Reply-To: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
-References: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkxStH5R0_8WFF1oe=PCCFr4Ko+0J+Xhn-wzopFFDgrRCw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 May 2018 16:55:43 +0100
+Subject: [PATCH 3/3] ARM: spectre-v1: fix syscall entry
+In-Reply-To: <E1fONfn-00070N-9W@rmk-PC.armlinux.org.uk>
+References: <20180531133047.GS17671@n2100.armlinux.org.uk>
+ <E1fONfn-00070N-9W@rmk-PC.armlinux.org.uk>
+Message-ID: <20180531155543.t6b3feckgmq6ebwa@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2018 at 07:15, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> This series is split of the Coresight ETR perf support patches posted
-> here [0]. The CATU support and perf backend support will be posted as
-> separate series for better management and review of the patches.
->
-> This series adds the support for TMC ETR Scatter-Gather mode to allow
-> using physical non-contiguous buffer for holding the trace data. It
-> also adds a layer to handle the buffer management in a transparent
-> manner, independent of the underlying mode used by the TMC ETR.
-> The layer chooses the ETR mode based on different parameters (size,
-> re-using a set of pages, presence of an SMMU etc.).
->
-> Finally we add a sysfs parameter to tune the buffer size for ETR in
-> sysfs-mode.
->
-> During the testing, we found out that if the TMC ETR is not properly
-> connected to the memory subsystem, the ETR could lock-up the system
-> while waiting for the "read" transactions to complete in scatter-gather
-> mode. So, we do not use the mode on a system unless it is safe to do
-> so. This is specified by a DT property "arm,scatter-gather".
->
-> Applies on coreisght-next tree from Mathieu
->
-> Changes since previous version [1]:
->  - Rebased to Mathieu's coresight-next tree to resolve a conflict.
->  - Added tags for DT changes from Rob and Mathieu
->  - Split the SG mode backend support patch from the
->    ETR-BUF patch.
->  - Address other comments from Mathieu
->
-> Changes since splitted series [0] :
->  - Split the series in [0]
->  - Address comments on v2
->  - Rename DT property "scatter-gather" to "arm,scatter-gather"
->  - Add ETM PID for Cortex-A35, use macros to make the listing easier
->
-> [0] - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/574875.html
-> [1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579135.html
->
-> Suzuki K Poulose (12):
->   coresight: ETM: Add support for Arm Cortex-A73 and Cortex-A35
->   coresight: tmc: Hide trace buffer handling for file read
->   coresight: tmc-etr: Do not clean trace buffer
->   coresight: tmc-etr: Disallow perf mode
->   coresight: Add helper for inserting synchronization packets
->   dts: bindings: Restrict coresight tmc-etr scatter-gather mode
->   dts: juno: Add scatter-gather support for all revisions
->   coresight: Add generic TMC sg table framework
->   coresight: Add support for TMC ETR SG unit
->   coresight: tmc-etr: Add transparent buffer management
->   coresight: tmc-etr buf: Add TMC scatter gather mode backend
->   coresight: tmc: Add configuration support for trace buffer size
->
->  .../ABI/testing/sysfs-bus-coresight-devices-tmc    |    8 +
->  .../devicetree/bindings/arm/coresight.txt          |    5 +-
->  arch/arm64/boot/dts/arm/juno-base.dtsi             |    1 +
->  drivers/hwtracing/coresight/coresight-etb10.c      |   12 +-
->  drivers/hwtracing/coresight/coresight-etm4x.c      |   31 +-
->  drivers/hwtracing/coresight/coresight-priv.h       |   10 +-
->  drivers/hwtracing/coresight/coresight-tmc-etf.c    |   45 +-
->  drivers/hwtracing/coresight/coresight-tmc-etr.c    | 1010 ++++++++++++++++++--
->  drivers/hwtracing/coresight/coresight-tmc.c        |   83 +-
->  drivers/hwtracing/coresight/coresight-tmc.h        |  110 ++-
->  drivers/hwtracing/coresight/coresight.c            |    3 +-
->  11 files changed, 1144 insertions(+), 174 deletions(-)
+On Thu, May 31, 2018 at 02:31:23PM +0100, Russell King wrote:
+> Prevent speculation at the syscall table decoding by clamping the index
+> used to zero on invalid system call numbers, and using the csdb
+> speculative barrier.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/kernel/entry-common.S | 14 +++-----------
+>  arch/arm/kernel/entry-header.S | 25 +++++++++++++++++++++++++
+>  2 files changed, 28 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 3c4f88701f22..78b9f20dd6a3 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -242,9 +242,7 @@ ENTRY(vector_swi)
+>  	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+>  	bne	__sys_trace
+>  
+> -	cmp	scno, #NR_syscalls		@ check upper syscall limit
+> -	badr	lr, ret_fast_syscall		@ return address
+> -	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
+> +	invoke_syscall tbl, scno, r10, ret_fast_syscall
+>  
+>  	add	r1, sp, #S_OFF
+>  2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+> @@ -278,14 +276,8 @@ ENDPROC(vector_swi)
+>  	mov	r1, scno
+>  	add	r0, sp, #S_OFF
+>  	bl	syscall_trace_enter
+> -
+> -	badr	lr, __sys_trace_return		@ return address
+> -	mov	scno, r0			@ syscall number (possibly new)
+> -	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
+> -	cmp	scno, #NR_syscalls		@ check upper syscall limit
+> -	ldmccia	r1, {r0 - r6}			@ have to reload r0 - r6
+> -	stmccia	sp, {r4, r5}			@ and update the stack args
+> -	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
+> +	mov	scno, r0
+> +	invoke_syscall tbl, scno, r10, __sys_trace_return, reload=1
+>  	cmp	scno, #-1			@ skip the syscall?
+>  	bne	2b
+>  	add	sp, sp, #S_OFF			@ restore stack
 
-Applied after correcting indentation problems and rectifying the
-kernel version and date in "sysfs-bus-coresight-devices-tmc".
+I *think* you might also need to adjust sys_syscall.
 
-Mathieu
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index 0f07579af472..773424843d6e 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -378,6 +378,31 @@
+>  #endif
+>  	.endm
+>  
+> +	.macro	invoke_syscall, table, nr, tmp, ret, reload=0
+> +#ifdef CONFIG_CPU_SPECTRE
+> +	mov	\tmp, \nr
+> +	cmp	\tmp, #NR_syscalls		@ check upper syscall limit
+> +	movcs	\tmp, #0
+> +	csdb
 
->
-> --
-> 2.7.4
->
+To the best of my understanding, this sequence is sufficient.
+
+> +	badr	lr, \ret			@ return address
+> +	.if	\reload
+> +	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
+> +	ldmccia	r1, {r0 - r6}			@ reload r0-r6
+> +	stmccia	sp, {r4, r5}			@ update stack arguments
+> +	.endif
+> +	ldrcc	pc, [\table, \tmp, lsl #2]	@ call sys_* routine
+> +#else
+> +	cmp	\nr, #NR_syscalls		@ check upper syscall limit
+> +	badr	lr, \ret			@ return address
+> +	.if	\reload
+> +	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
+> +	ldmccia	r1, {r0 - r6}			@ reload r0-r6
+> +	stmccia	sp, {r4, r5}			@ update stack arguments
+> +	.endif
+> +	ldrcc	pc, [\table, \nr, lsl #2]	@ call sys_* routine
+> +#endif
+> +	.endm
+
+I couldn't find a nice way to avoid dupliacting the body without more
+ifdeffery, given the nr parameter can't be clobbered.
+
+So modulo sys_syscall, this looks good to me.
+
+Mark.
