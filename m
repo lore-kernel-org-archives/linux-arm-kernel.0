@@ -1,67 +1,85 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 May 2018 15:25:20 +0100
-Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
- <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
- <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
-Message-ID: <92b240f5-596e-87a9-863a-b18475042cce@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 31 May 2018 09:45:02 -0500
+Subject: [PATCH v3 2/5] gpio: syscon: rockchip: add GPIO_MUTE support for
+ rk3328
+In-Reply-To: <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
+References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+ <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
+Message-ID: <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/18 14:49, Hanjun Guo wrote:
-> Hi Robin,
-> 
-> On 2018/5/31 19:24, Robin Murphy wrote:
->> On 31/05/18 08:42, Zhen Lei wrote:
->>> In common, a IOMMU unmap operation follow the below steps:
->>> 1. remove the mapping in page table of the specified iova range
->>> 2. execute tlbi command to invalid the mapping which is cached in TLB
->>> 3. wait for the above tlbi operation to be finished
->>> 4. free the IOVA resource
->>> 5. free the physical memory resource
->>>
->>> This maybe a problem when unmap is very frequently, the combination of tlbi
->>> and wait operation will consume a lot of time. A feasible method is put off
->>> tlbi and iova-free operation, when accumulating to a certain number or
->>> reaching a specified time, execute only one tlbi_all command to clean up
->>> TLB, then free the backup IOVAs. Mark as non-strict mode.
->>>
->>> But it must be noted that, although the mapping has already been removed in
->>> the page table, it maybe still exist in TLB. And the freed physical memory
->>> may also be reused for others. So a attacker can persistent access to memory
->>> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
->>> the VFIO should always choose the strict mode.
->>>
->>> Some may consider put off physical memory free also, that will still follow
->>> strict mode. But for the map_sg cases, the memory allocation is not controlled
->>> by IOMMU APIs, so it is not enforceable.
->>>
->>> Fortunately, Intel and AMD have already applied the non-strict mode, and put
->>> queue_iova() operation into the common file dma-iommu.c., and my work is based
->>> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
->>> unmap, but Intel and AMD IOMMU drivers are not.
->>>
->>> Below is the performance data of strict vs non-strict for NVMe device:
->>> Randomly Read? IOPS: 146K(strict) vs 573K(non-strict)
->>> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
->>
->> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
-> 
-> The hardware is the new D06 which the SMMU with MSIs,
+On Wed, May 30, 2018 at 10:27 PM,  <djw@t-chip.com.cn> wrote:
+> From: Levin Du <djw@t-chip.com.cn>
+>
+> In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
+> mute control, can also be used for general purpose. It is manipulated by
+> the GRF_SOC_CON10 register.
+>
+> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+>
+> ---
+>
+> Changes in v3:
+> - Change from general gpio-syscon to specific rk3328-gpio-mute
+>
+> Changes in v2:
+> - Rename gpio_syscon10 to gpio_mute in doc
+>
+> Changes in v1:
+> - Refactured for general gpio-syscon usage for Rockchip SoCs.
+> - Add doc rockchip,gpio-syscon.txt
+>
+>  .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28 +++++++++++++++++++
+>  drivers/gpio/gpio-syscon.c                         | 31 ++++++++++++++++++++++
+>  2 files changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>
+> diff --git a/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+> new file mode 100644
+> index 0000000..10bc632
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+> @@ -0,0 +1,28 @@
+> +Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE pin.
+> +
+> +In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec mute
+> +control, can also be used for general purpose. It is manipulated by the
+> +GRF_SOC_CON10 register.
+> +
+> +Required properties:
+> +- compatible: Should contain "rockchip,rk3328-gpio-mute".
+> +- gpio-controller: Marks the device node as a gpio controller.
+> +- #gpio-cells: Should be 2. The first cell is the pin number and
+> +  the second cell is used to specify the gpio polarity:
+> +    0 = Active high,
+> +    1 = Active low.
+> +
+> +Example:
+> +
+> +       grf: syscon at ff100000 {
+> +               compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
+> +
+> +               gpio_mute: gpio-mute {
 
-Cool! Now that profiling is fairly useful since we got rid of most of 
-the locks, are you able to get an idea of how the overhead in the normal 
-case is distributed between arm_smmu_cmdq_insert_cmd() and 
-__arm_smmu_sync_poll_msi()? We're always trying to improve our 
-understanding of where command-queue-related overheads turn out to be in 
-practice, and there's still potentially room to do nicer things than 
-TLBI_NH_ALL ;)
+Node names should be generic:
 
-Robin.
+gpio {
 
-> it's not D05 :)
-> 
-> Thanks
-> Hanjun
-> 
+This also means you can't add another GPIO node in the future and
+you'll have to live with "rockchip,rk3328-gpio-mute" covering more
+than 1 GPIO if you do need to add more GPIOs.
+
+> +                       compatible = "rockchip,rk3328-gpio-mute";
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +               };
+> +       };
+> +
+> +Note: The gpio_mute node should be declared as the child of the GRF (General
+> +Register File) node. The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
+
+This is wrong because you should have 2 cells. The phandle doesn't
+count as a cell.
+
+Rob
