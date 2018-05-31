@@ -1,106 +1,58 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 31 May 2018 09:20:57 -0500
-Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
-In-Reply-To: <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
-References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
- <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
- <20180531005827.GA17203@rob-hp-laptop>
- <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
-Message-ID: <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 May 2018 15:22:05 +0100
+Subject: [PATCH 2/3] ARM: spectre-v1: add array_index_mask_nospec()
+ implementation
+In-Reply-To: <E1fONfh-00070F-Tw@rmk-PC.armlinux.org.uk>
+References: <20180531133047.GS17671@n2100.armlinux.org.uk>
+ <E1fONfh-00070F-Tw@rmk-PC.armlinux.org.uk>
+Message-ID: <20180531142205.hzqyt46ijd5vkp77@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 5:25 AM, Codrin Ciubotariu
-<codrin.ciubotariu@microchip.com> wrote:
-> On 31.05.2018 03:58, Rob Herring wrote:
->>
->> On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
->>>
->>> The I2S mux clock can be used to select the I2S input clock. The
->>> available parents are the peripheral and the generated clocks.
->>>
->>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
->>> ---
->>>   .../devicetree/bindings/clock/at91-clock.txt       | 34
->>> ++++++++++++++++++++++
->>>   1 file changed, 34 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt
->>> b/Documentation/devicetree/bindings/clock/at91-clock.txt
->>> index 51c259a..1c46b3c 100644
->>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
->>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
->>> @@ -90,6 +90,8 @@ Required properties:
->>>         "atmel,sama5d2-clk-audio-pll-pmc"
->>>                 at91 audio pll output on AUDIOPLLCLK that feeds the PMC
->>>                 and can be used by peripheral clock or generic clock
->>> +       "atmel,sama5d2-clk-i2s-mux":
->>> +               at91 I2S clock source selection
->>
->>
->> Is this boolean or takes some values. If latter, what are valid values?
->
->
-> This is the compatible string of the clock driver.
+On Thu, May 31, 2018 at 02:31:17PM +0100, Russell King wrote:
+> Add an implementation of the array_index_mask_nospec() function for
+> mitigating Spectre variant 1 throughout the kernel.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/include/asm/barrier.h | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+> index 3d9c1d4b7e75..a89adcf53b99 100644
+> --- a/arch/arm/include/asm/barrier.h
+> +++ b/arch/arm/include/asm/barrier.h
+> @@ -76,6 +76,24 @@ extern void arm_heavy_mb(void);
+>  #define __smp_rmb()	__smp_mb()
+>  #define __smp_wmb()	dmb(ishst)
+>  
+> +#ifdef CONFIG_CPU_SPECTRE
+> +static inline unsigned long array_index_mask_nospec(unsigned long idx,
+> +						    unsigned long sz)
+> +{
+> +	unsigned long mask;
+> +
+> +	asm(	"cmp	%1, %2\n"
+> +	"	sbc	%0, %1, %1\n"
+> +	CSDB
+> +	: "=r" (mask)
+> +	: "r" (idx), "Ir" (sz)
+> +	: "cc");
+> +
+> +	return mask;
+> +}
+> +#define array_index_mask_nospec array_index_mask_nospec
+> +#endif
 
-Ah, now I remember. AT91 uses fine grained clock nodes in DT. Is there
-still a plan to fix this?
+I believe that the asm should be volatile, otherwise there are cases
+where the compiler could remove an invocation that's redundant under
+architectural execution, but required under speculation [1].
 
->>>     Required properties for SCKC node:
->>>   - reg : defines the IO memory reserved for the SCKC.
->>> @@ -507,3 +509,35 @@ For example:
->>>                         atmel,clk-output-range = <0 83000000>;
->>>                 };
->>>         };
->>> +
->>> +Required properties for I2S mux clocks:
->>> +- #size-cells : shall be 0 (reg is used to encode I2S bus id).
->>> +- #address-cells : shall be 1 (reg is used to encode I2S bus id).
->>> +- name: device tree node describing a specific mux clock.
->>> +       * #clock-cells : from common clock binding; shall be set to 0.
->>> +       * clocks : shall be the mux clock parent phandles; shall be 2
->>> phandles:
->>> +         peripheral and generated clock; the first phandle shall belong
->>> to the
->>> +         peripheral clock and the second one shall belong to the
->>> generated
->>> +         clock; "clock-indices" property can be user to specify
->>> +         the correct order.
->>> +       * reg: I2S bus id of the corresponding mux clock.
->>> +         e.g. reg = <0>; for i2s0, reg = <1>; for i2s1
->>> +
->>> +For example:
->>> +       i2s_clkmux {
->>
->>
->> What is this a child of?
->
->
-> It is a child of PMC node, since both parent clocks are generated by PMC.
->
->>
->>> +               compatible = "atmel,sama5d2-clk-i2s-mux";
->>> +               #address-cells = <1>;
->>> +               #size-cells = <0>;
->>
->>
->> How do you address this block? My guess is you don't because it is just
->> part of some other block and you are just creating this node to
->> instantiate a driver. Just make the node for the actual h/w block a
->> clock provider and define the clock ids (0 and 1).
->
->
-> This block is not addressed, but its children are. The register we access in
-> this driver is not part of other block. It's a SFR register, accessed
-> through syscon and it has nothing to do with the I2S IP (see SAMA5D2 DS,
-> page 1256, fig. 44-1: I2SC Block Diagram) that is the consumer of this
-> clock. Adding a clock-id property in the I2S node would be just like v3 of
-> this series, with the difference that we use clock-id instead of alias id to
-> set the clock parent, which is not how you suggested back then.
+With that made volatile:
 
-I wasn't suggesting a clock-id property, but a clock specifier (i.e.
-make #clock-cells 1).
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-But AT91 clocks are all a mess, so I don't know what to tell you.
+Thanks,
+Mark.
 
-Rob
+[1] https://lkml.kernel.org/r/20180530060546.jnjoltsturoduohh at salmiak
