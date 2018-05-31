@@ -1,66 +1,48 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 31 May 2018 15:42:43 +0800
-Subject: [PATCH 1/7] iommu/dma: fix trival coding style mistake
+Date: Thu, 31 May 2018 15:42:44 +0800
+Subject: [PATCH 2/7] iommu/arm-smmu-v3: fix the implementation of
+ flush_iotlb_all hook
 In-Reply-To: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1527752569-18020-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1527752569-18020-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The static function iova_reserve_iommu_regions is only called by function
-iommu_dma_init_domain, and the 'if (!dev)' check in iommu_dma_init_domain
-affect it only, so we can safely move the check into it. I think it looks
-more natural.
-
-In addition, the local variable 'ret' is only assigned in the branch of
-'if (region->type == IOMMU_RESV_MSI)', so the 'if (ret)' should also only
-take effect in the branch, add a brace to enclose it.
-
-No functional changes.
+.flush_iotlb_all can not just wait for previous tlbi operations to be
+completed, but should also invalid all TLBs of the related domain.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/dma-iommu.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index ddcbbdb..4e885f7 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -231,6 +231,9 @@ static int iova_reserve_iommu_regions(struct device *dev,
- 	LIST_HEAD(resv_regions);
- 	int ret = 0;
- 
-+	if (!dev)
-+		return 0;
-+
- 	if (dev_is_pci(dev))
- 		iova_reserve_pci_windows(to_pci_dev(dev), iovad);
- 
-@@ -246,11 +249,12 @@ static int iova_reserve_iommu_regions(struct device *dev,
- 		hi = iova_pfn(iovad, region->start + region->length - 1);
- 		reserve_iova(iovad, lo, hi);
- 
--		if (region->type == IOMMU_RESV_MSI)
-+		if (region->type == IOMMU_RESV_MSI) {
- 			ret = cookie_init_hw_msi_region(cookie, region->start,
- 					region->start + region->length);
--		if (ret)
--			break;
-+			if (ret)
-+				break;
-+		}
- 	}
- 	iommu_put_resv_regions(dev, &resv_regions);
- 
-@@ -308,8 +312,6 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
- 	}
- 
- 	init_iova_domain(iovad, 1UL << order, base_pfn);
--	if (!dev)
--		return 0;
- 
- 	return iova_reserve_iommu_regions(dev, domain);
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1d64710..4402187 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1770,6 +1770,14 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ 	return ops->unmap(ops, iova, size);
  }
+ 
++static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
++{
++	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
++
++	if (smmu_domain->smmu)
++		arm_smmu_tlb_inv_context(smmu_domain);
++}
++
+ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
+ {
+ 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
+@@ -1998,7 +2006,7 @@ static void arm_smmu_put_resv_regions(struct device *dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
+ 	.map_sg			= default_iommu_map_sg,
+-	.flush_iotlb_all	= arm_smmu_iotlb_sync,
++	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
+ 	.iotlb_sync		= arm_smmu_iotlb_sync,
+ 	.iova_to_phys		= arm_smmu_iova_to_phys,
+ 	.add_device		= arm_smmu_add_device,
 -- 
 1.8.3
