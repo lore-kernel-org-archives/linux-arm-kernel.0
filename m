@@ -1,98 +1,86 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 31 May 2018 10:31:49 +0900
-Subject: [PATCH] kbuild: add machine size to CHEKCFLAGS
-In-Reply-To: <CAMHZB6GXVPvr1uwbemuxqPPtNzYT7jeVokR6q9tz2mS_=TG6vA@mail.gmail.com>
-References: <20180530204838.22079-1-luc.vanoostenryck@gmail.com>
- <d47b72cc-9209-a190-38b3-969870e1bf26@suse.de>
- <CAMHZB6GXVPvr1uwbemuxqPPtNzYT7jeVokR6q9tz2mS_=TG6vA@mail.gmail.com>
-Message-ID: <CAK7LNARYP9T4pfuA32KrnP4-8_S+BPkvGBVyFgWXp_roXfQV7w@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 31 May 2018 09:39:40 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 3/940] drivers//dma/xgene-dma.c:459:3:
+ error: implicit declaration of function 'xgene_dma_invalidate_buffer'; did
+ you mean 'xgene_dma_set_src_buffer'?
+Message-ID: <201805310937.uE2VC9f7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-05-31 8:06 GMT+09:00 Luc Van Oostenryck <luc.vanoostenryck@gmail.com>:
-> On Thu, May 31, 2018 at 12:00 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> Hi Luc,
->>
->> The typo in the subject made me curious...
->>
->> Am 30.05.2018 um 22:48 schrieb Luc Van Oostenryck:
->>> By default, sparse assumes a 64bit machine when compiled on x86-64
->>> and 32bit when compiled on anything else.
->>>
->>> This can of course create all sort of problems for the other archs, like
->>> issuing false warnings ('shift too big (32) for type unsigned long'), or
->>> worse, failing to emit legitimate warnings.
->>>
->>> Fix this by adding the -m32/-m64 flag, depending on CONFIG_64BIT,
->>> to CHECKFLAGS in the main Makefile (and so for all archs).
->>> Also, remove the now unneeded -m32/-m64 in arch specific Makefiles.
->>>
->>> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
->>> ---
->>>  Makefile             | 3 +++
->>>  arch/alpha/Makefile  | 2 +-
->>>  arch/arm/Makefile    | 2 +-
->>>  arch/arm64/Makefile  | 2 +-
->>>  arch/ia64/Makefile   | 2 +-
->>>  arch/mips/Makefile   | 3 ---
->>>  arch/parisc/Makefile | 2 +-
->>>  arch/sparc/Makefile  | 2 +-
->>>  arch/x86/Makefile    | 2 +-
->>>  9 files changed, 10 insertions(+), 10 deletions(-)
->>
->> What about the architectures not touched by your patch that previously
->> had no -m32/-m64? (arc, c6x, h8300, hexagon, m68k, microblaze, nds32,
->> nios2, openrisc, powerpc, riscv, s390, sh, unicore32, xtensa)
->
-> As explained in the patch, by default sparse uses -m64 if compiled on x86-64
-> and 32bit on everything else (well, more recent versions use -m64 if
-> compiled on any 64 bit machine). I think that most ppc devs use a ppc
-> machine and so ppc was most probably fine (at least ppc64) but I suspect
-> that most of these others archs either had never sparse used on them
-> or had a lot of wrong warnings. IOW, it was maybe OK but most probably
-> incorrect for them and now it is OK.
->
->> You forgot to CC them on this patch.
->
-> I didn't thought/knew  it was needed and the CC list is already
-> quite long but, if needed, no problem for me.
->
->> Have you really checked that all their toolchains support the -m32/-m64
->> flags you newly introduce for them? Apart from non-biarch architectures,
->> I'm thinking of 31-bit s390 as a corner case where !64 != 32.
->
-> Hmm, there is no change to anything I call 'toolchain related', like
-> compiler and linker. The only change is sparse (or any other checker)
-> receiving now a correct and explicit -m32 or -m64.
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   7a6053b3d256fa5bc23f28a9d9a23d7a2004c5b7
+commit: 20f8898e1f01f307ab6a478e7c06894142195e4b [3/940] Revert "dmaengine: remove DMA_SG as it is dead code in kernel"
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 20f8898e1f01f307ab6a478e7c06894142195e4b
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
+All errors (new ones prefixed by >>):
 
-Right.  We are talking about sparse.
-Nobody needs to test vmlinux or whatever objects.
+   drivers//dma/xgene-dma.c: In function 'xgene_dma_prep_cpy_desc':
+>> drivers//dma/xgene-dma.c:459:3: error: implicit declaration of function 'xgene_dma_invalidate_buffer'; did you mean 'xgene_dma_set_src_buffer'? [-Werror=implicit-function-declaration]
+      xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+      xgene_dma_set_src_buffer
+   cc1: some warnings being treated as errors
 
-Except the typo in the subject (I can locally fix it up, though),
-this patch looks good to me.
+vim +459 drivers//dma/xgene-dma.c
 
+   422	
+   423	static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+   424					    struct xgene_dma_desc_sw *desc_sw,
+   425					    dma_addr_t dst, dma_addr_t src,
+   426					    size_t len)
+   427	{
+   428		struct xgene_dma_desc_hw *desc1, *desc2;
+   429		int i;
+   430	
+   431		/* Get 1st descriptor */
+   432		desc1 = &desc_sw->desc1;
+   433		xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
+   434	
+   435		/* Set destination address */
+   436		desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
+   437		desc1->m3 |= cpu_to_le64(dst);
+   438	
+   439		/* Set 1st source address */
+   440		xgene_dma_set_src_buffer(&desc1->m1, &len, &src);
+   441	
+   442		if (!len)
+   443			return;
+   444	
+   445		/*
+   446		 * We need to split this source buffer,
+   447		 * and need to use 2nd descriptor
+   448		 */
+   449		desc2 = &desc_sw->desc2;
+   450		desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
+   451	
+   452		/* Set 2nd to 5th source address */
+   453		for (i = 0; i < 4 && len; i++)
+   454			xgene_dma_set_src_buffer(xgene_dma_lookup_ext8(desc2, i),
+   455						 &len, &src);
+   456	
+   457		/* Invalidate unused source address field */
+   458		for (; i < 4; i++)
+ > 459			xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
+   460	
+   461		/* Updated flag that we have prepared 64B descriptor */
+   462		desc_sw->flags |= XGENE_DMA_FLAG_64B_DESC;
+   463	}
+   464	
 
-
-
-
-
-> For s390, as far as I know:
-> 1) it has CONFIG_64BIT unconditionally definee (because the old 31bit
->    is no more supported, now everything is s390x only).
-> 2) even if the *address space* was only 31 bit, I'm very sure
->    that sizeof(long) and sizeof(void*) was 4 on these machine
->    hence -m32 would have been correct.
->
-> Best regards,
-> -- Luc
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63972 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180531/df5d0d6a/attachment-0001.gz>
