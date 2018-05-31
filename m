@@ -1,88 +1,75 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Thu, 31 May 2018 10:22:48 +0200
-Subject: [PATCH v2 1/2] ARM: debug: Add Iproc UART3 debug addresses
-In-Reply-To: <93c2d07a-9344-ed39-261e-11084067a3fa@broadcom.com>
-References: <20180530131956.13972-1-peron.clem@gmail.com>
- <93c2d07a-9344-ed39-261e-11084067a3fa@broadcom.com>
-Message-ID: <CAJiuCcek9KU6QWsAAxVCLUaf1v97uR6FcLOfY=A1LGCMTmjHjg@mail.gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 31 May 2018 11:26:47 +0300
+Subject: [PATCH v4 3/5] Documentation: DT: add i.MX EPIT timer binding
+In-Reply-To: <20180530120327.27681-4-peron.clem@gmail.com>
+References: <20180530120327.27681-1-peron.clem@gmail.com>
+ <20180530120327.27681-4-peron.clem@gmail.com>
+Message-ID: <0eb40af3-b741-2e65-3af9-f150345beb3c@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rai,
+Hi Cl?ment,
 
-On Wed, 30 May 2018 at 19:25, Ray Jui <ray.jui@broadcom.com> wrote:
->
-> Hi Cl?ment,
->
-> Correct me if I'm wrong, but I thought the trend is to move to use
-> earlycon that can be activated from kernel command line for early print
-> before the serial driver is loaded.
->
-> Have you tried earlcon?
-No, only tested this method.
+On 05/30/2018 03:03 PM, Cl?ment P?ron wrote:
+> From: Cl?ment Peron <clement.peron@devialet.com>
+> 
+> Add devicetree binding document for NXP's i.MX SoC specific
+> EPIT timer driver.
+> 
+> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> ---
+>  .../devicetree/bindings/timer/fsl,imxepit.txt | 24 +++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/fsl,imxepit.txt b/Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+> new file mode 100644
+> index 000000000000..90112d58af10
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+> @@ -0,0 +1,24 @@
+> +Binding for the i.MX EPIT timer
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
 
-Thanks,
-Clement
+no, this leftover reference to clock-bindings.txt is invalid, please remove it.
 
->
-> Thanks,
->
-> Ray
->
-> On 5/30/2018 6:19 AM, Cl?ment P?ron wrote:
-> > From: Cl?ment Peron <clement.peron@devialet.com>
-> >
-> > Broadcom Iproc SoCs typically use the UART3 for
-> > debug/console, provide a known good location for that.
-> >
-> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
-> > ---
-> >
-> >   arch/arm/Kconfig.debug | 12 +++++++++++-
-> >   1 file changed, 11 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index 199ebc1c4538..4ea9d5793b91 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -207,6 +207,14 @@ choice
-> >               depends on ARCH_BCM_HR2
-> >               select DEBUG_UART_8250
-> >
-> > +     config DEBUG_BCM_IPROC_UART3
-> > +             bool "Kernel low-level debugging on BCM IPROC UART3"
-> > +             depends on ARCH_BCM_CYGNUS
-> > +             select DEBUG_UART_8250
-> > +             help
-> > +               Say Y here if you want the debug print routines to direct
-> > +               their output to the third serial port on these devices.
-> > +
-> >       config DEBUG_BCM_KONA_UART
-> >               bool "Kernel low-level debugging messages via BCM KONA UART"
-> >               depends on ARCH_BCM_MOBILE
-> > @@ -1557,6 +1565,7 @@ config DEBUG_UART_PHYS
-> >       default 0x18000400 if DEBUG_BCM_HR2
-> >       default 0x18010000 if DEBUG_SIRFATLAS7_UART0
-> >       default 0x18020000 if DEBUG_SIRFATLAS7_UART1
-> > +     default 0x18023000 if DEBUG_BCM_IPROC_UART3
-> >       default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
-> >       default 0x20001000 if DEBUG_HIP01_UART
-> >       default 0x20060000 if DEBUG_RK29_UART0
-> > @@ -1676,6 +1685,7 @@ config DEBUG_UART_VIRT
-> >       default 0xf1002000 if DEBUG_MT8127_UART0
-> >       default 0xf1006000 if DEBUG_MT6589_UART0
-> >       default 0xf1009000 if DEBUG_MT8135_UART3
-> > +     default 0xf1023000 if DEBUG_BCM_IPROC_UART3
-> >       default 0xf11f1000 if DEBUG_VERSATILE
-> >       default 0xf1600000 if DEBUG_INTEGRATOR
-> >       default 0xf1c28000 if DEBUG_SUNXI_UART0
-> > @@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
-> >               DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
-> >               DEBUG_ALPINE_UART0 || \
-> >               DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
-> > -             DEBUG_DAVINCI_DA8XX_UART2 || \
-> > +             DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
-> >               DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
-> >
-> >   config DEBUG_UART_8250_PALMCHIP
-> >
+Instead you may add a simple description of the timer module.
+
+> +Required properties:
+> +- compatible: should be "fsl,imx31-epit"
+
+To satisfy compatibles with multiple SoCs, apparently you may follow a model,
+which is used with other Freescale controllers, for instance
+
+gpio/fsl-imx-gpio.txt	- compatible : Should be "fsl,<soc>-gpio"
+mmc/fsl-imx-esdhc.txt	- compatible : Should be "fsl,<chip>-esdhc"
+serial/fsl-imx-uart.txt	- compatible : Should be "fsl,<soc>-uart"
+timer/fsl,imxgpt.txt	- compatible : should be "fsl,<soc>-gpt"
+
+and so on, I hope it would cover Rob's ask.
+
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: Should contain EPIT controller interrupt
+> +- clocks: list of clock specifiers, must contain an entry for each required
+> +  entry in clock-names
+> +- clock-names : should include entries "ipg", "per"
+> +
+> +Example for i.MX6QDL:
+> +	epit1: epit at 20d0000 {
+> +		compatible = "fsl,imx6q-epit", "fsl,imx31-epit";
+> +		reg = <0x020d0000 0x4000>;
+> +		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks IMX6QDL_CLK_IPG_PER>,
+> +			<&clks IMX6QDL_CLK_EPIT1>;
+> +		clock-names = "ipg", "per";
+> +	};
+> 
+
+--
+With best wishes,
+Vladimir
