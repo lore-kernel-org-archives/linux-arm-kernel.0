@@ -1,37 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 31 May 2018 12:44:51 +0200
-Subject: [PATCH v2 8/9] PM / Domains: Add support for multi PM domains per
- device to genpd
-In-Reply-To: <e313f870-ef27-7721-9395-31671f00ef4a@nvidia.com>
-References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-9-ulf.hansson@linaro.org>
- <a53f0970-22c4-444f-10e6-c115a21d05ea@nvidia.com>
- <CAPDyKFrV5fosZ1QZ4un+okzpeQDM3QSCBWJB1YZH4WNxKf_FVQ@mail.gmail.com>
- <e313f870-ef27-7721-9395-31671f00ef4a@nvidia.com>
-Message-ID: <CAPDyKFrtSGF79pFf-sx41ru_EVLk3BMg_f_5rK64k==dW=OXPA@mail.gmail.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Thu, 31 May 2018 07:32:19 -0300
+Subject: [PATCH 6/7] perf script python: Add addr into perf sample dict
+In-Reply-To: <20180531103220.24684-1-acme@kernel.org>
+References: <20180531103220.24684-1-acme@kernel.org>
+Message-ID: <20180531103220.24684-7-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 May 2018 at 10:03, Jon Hunter <jonathanh@nvidia.com> wrote:
->
-> On 31/05/18 07:17, Ulf Hansson wrote:
->> [...]
->>
->>>> +/**
->>>> + * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
->>>> + * @dev: Device to attach.
->>>
->>> Can you update the description of the above as well?
->>
->> Yes, like below?
->>
->> genpd_dev_pm_attach_by_id() - Associate a device with one of its PM domains.
->> @dev: The device used to lookup the PM domain.
->
-> Yes perfect.
+From: Leo Yan <leo.yan@linaro.org>
 
-I assume I can consider this as an ack and tested by tag, both for
-patch 8 and 9?
+ARM CoreSight auxtrace uses 'sample->addr' to record the target address
+for branch instructions, so the data of 'sample->addr' is required for
+tracing data analysis.
 
-Kind regards
-Uffe
+This commit collects data of 'sample->addr' into perf sample dict,
+finally can be used for python script for parsing event.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mike Leach <mike.leach@linaro.org>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Robert Walker <robert.walker@arm.com>
+Cc: Tor Jeremiassen <tor@ti.com>
+Cc: coresight at lists.linaro.org
+Cc: kim.phillips at arm.co
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-doc at vger.kernel.org
+Link: http://lkml.kernel.org/r/1527497103-3593-3-git-send-email-leo.yan at linaro.org
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ tools/perf/util/scripting-engines/trace-event-python.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tools/perf/util/scripting-engines/trace-event-python.c b/tools/perf/util/scripting-engines/trace-event-python.c
+index 10dd5fce082b..7f8afacd08ee 100644
+--- a/tools/perf/util/scripting-engines/trace-event-python.c
++++ b/tools/perf/util/scripting-engines/trace-event-python.c
+@@ -531,6 +531,8 @@ static PyObject *get_perf_sample_dict(struct perf_sample *sample,
+ 			PyLong_FromUnsignedLongLong(sample->period));
+ 	pydict_set_item_string_decref(dict_sample, "phys_addr",
+ 			PyLong_FromUnsignedLongLong(sample->phys_addr));
++	pydict_set_item_string_decref(dict_sample, "addr",
++			PyLong_FromUnsignedLongLong(sample->addr));
+ 	set_sample_read_in_dict(dict_sample, sample, evsel);
+ 	pydict_set_item_string_decref(dict, "sample", dict_sample);
+ 
+-- 
+2.14.3
