@@ -1,58 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 May 2018 15:22:05 +0100
-Subject: [PATCH 2/3] ARM: spectre-v1: add array_index_mask_nospec()
- implementation
-In-Reply-To: <E1fONfh-00070F-Tw@rmk-PC.armlinux.org.uk>
-References: <20180531133047.GS17671@n2100.armlinux.org.uk>
- <E1fONfh-00070F-Tw@rmk-PC.armlinux.org.uk>
-Message-ID: <20180531142205.hzqyt46ijd5vkp77@lakrids.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 31 May 2018 15:25:20 +0100
+Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
+In-Reply-To: <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+ <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
+ <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
+Message-ID: <92b240f5-596e-87a9-863a-b18475042cce@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 02:31:17PM +0100, Russell King wrote:
-> Add an implementation of the array_index_mask_nospec() function for
-> mitigating Spectre variant 1 throughout the kernel.
+On 31/05/18 14:49, Hanjun Guo wrote:
+> Hi Robin,
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/include/asm/barrier.h | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+> On 2018/5/31 19:24, Robin Murphy wrote:
+>> On 31/05/18 08:42, Zhen Lei wrote:
+>>> In common, a IOMMU unmap operation follow the below steps:
+>>> 1. remove the mapping in page table of the specified iova range
+>>> 2. execute tlbi command to invalid the mapping which is cached in TLB
+>>> 3. wait for the above tlbi operation to be finished
+>>> 4. free the IOVA resource
+>>> 5. free the physical memory resource
+>>>
+>>> This maybe a problem when unmap is very frequently, the combination of tlbi
+>>> and wait operation will consume a lot of time. A feasible method is put off
+>>> tlbi and iova-free operation, when accumulating to a certain number or
+>>> reaching a specified time, execute only one tlbi_all command to clean up
+>>> TLB, then free the backup IOVAs. Mark as non-strict mode.
+>>>
+>>> But it must be noted that, although the mapping has already been removed in
+>>> the page table, it maybe still exist in TLB. And the freed physical memory
+>>> may also be reused for others. So a attacker can persistent access to memory
+>>> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
+>>> the VFIO should always choose the strict mode.
+>>>
+>>> Some may consider put off physical memory free also, that will still follow
+>>> strict mode. But for the map_sg cases, the memory allocation is not controlled
+>>> by IOMMU APIs, so it is not enforceable.
+>>>
+>>> Fortunately, Intel and AMD have already applied the non-strict mode, and put
+>>> queue_iova() operation into the common file dma-iommu.c., and my work is based
+>>> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
+>>> unmap, but Intel and AMD IOMMU drivers are not.
+>>>
+>>> Below is the performance data of strict vs non-strict for NVMe device:
+>>> Randomly Read? IOPS: 146K(strict) vs 573K(non-strict)
+>>> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
+>>
+>> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
 > 
-> diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-> index 3d9c1d4b7e75..a89adcf53b99 100644
-> --- a/arch/arm/include/asm/barrier.h
-> +++ b/arch/arm/include/asm/barrier.h
-> @@ -76,6 +76,24 @@ extern void arm_heavy_mb(void);
->  #define __smp_rmb()	__smp_mb()
->  #define __smp_wmb()	dmb(ishst)
->  
-> +#ifdef CONFIG_CPU_SPECTRE
-> +static inline unsigned long array_index_mask_nospec(unsigned long idx,
-> +						    unsigned long sz)
-> +{
-> +	unsigned long mask;
-> +
-> +	asm(	"cmp	%1, %2\n"
-> +	"	sbc	%0, %1, %1\n"
-> +	CSDB
-> +	: "=r" (mask)
-> +	: "r" (idx), "Ir" (sz)
-> +	: "cc");
-> +
-> +	return mask;
-> +}
-> +#define array_index_mask_nospec array_index_mask_nospec
-> +#endif
+> The hardware is the new D06 which the SMMU with MSIs,
 
-I believe that the asm should be volatile, otherwise there are cases
-where the compiler could remove an invocation that's redundant under
-architectural execution, but required under speculation [1].
+Cool! Now that profiling is fairly useful since we got rid of most of 
+the locks, are you able to get an idea of how the overhead in the normal 
+case is distributed between arm_smmu_cmdq_insert_cmd() and 
+__arm_smmu_sync_poll_msi()? We're always trying to improve our 
+understanding of where command-queue-related overheads turn out to be in 
+practice, and there's still potentially room to do nicer things than 
+TLBI_NH_ALL ;)
 
-With that made volatile:
+Robin.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-[1] https://lkml.kernel.org/r/20180530060546.jnjoltsturoduohh at salmiak
+> it's not D05 :)
+> 
+> Thanks
+> Hanjun
+> 
