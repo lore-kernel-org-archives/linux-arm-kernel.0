@@ -1,51 +1,80 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Wed, 30 May 2018 16:58:54 -0700
-Subject: [PATCH v4 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <CAD=FV=WF+onhAAWrbmwcHiWyCjuZ=6vvnhodUsia=Ps-da6_4A@mail.gmail.com>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <7489cd65fedb8a31488cf8188885759bcd4820ce.1527040878.git.collinsd@codeaurora.org>
- <CAD=FV=WF+onhAAWrbmwcHiWyCjuZ=6vvnhodUsia=Ps-da6_4A@mail.gmail.com>
-Message-ID: <5e65b713-6d45-4b33-d05e-6ebe2c6b6cec@codeaurora.org>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 30 May 2018 17:06:24 -0700
+Subject: [PATCH] kbuild: add machine size to CHEKCFLAGS
+In-Reply-To: <CAMHZB6GXVPvr1uwbemuxqPPtNzYT7jeVokR6q9tz2mS_=TG6vA@mail.gmail.com>
+References: <20180530204838.22079-1-luc.vanoostenryck@gmail.com>
+ <d47b72cc-9209-a190-38b3-969870e1bf26@suse.de>
+ <CAMHZB6GXVPvr1uwbemuxqPPtNzYT7jeVokR6q9tz2mS_=TG6vA@mail.gmail.com>
+Message-ID: <01db7e93-89f3-361a-29c6-5146cda1d745@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 05/29/2018 10:32 PM, Doug Anderson wrote:
-> On Tue, May 22, 2018 at 7:43 PM, David Collins <collinsd@codeaurora.org> wrote:
->> + * @ever_enabled:              Boolean indicating that the regulator has been
->> + *                             explicitly enabled at least once.  Voltage
->> + *                             requests should be cached when this flag is not
->> + *                             set.
+On 05/30/2018 04:06 PM, Luc Van Oostenryck wrote:
+> On Thu, May 31, 2018 at 12:00 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Hi Luc,
+>>
+>> The typo in the subject made me curious...
+>>
+>> Am 30.05.2018 um 22:48 schrieb Luc Van Oostenryck:
+>>> By default, sparse assumes a 64bit machine when compiled on x86-64
+>>> and 32bit when compiled on anything else.
+>>>
+>>> This can of course create all sort of problems for the other archs, like
+>>> issuing false warnings ('shift too big (32) for type unsigned long'), or
+>>> worse, failing to emit legitimate warnings.
+>>>
+>>> Fix this by adding the -m32/-m64 flag, depending on CONFIG_64BIT,
+>>> to CHECKFLAGS in the main Makefile (and so for all archs).
+>>> Also, remove the now unneeded -m32/-m64 in arch specific Makefiles.
+>>>
+>>> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+>>> ---
+>>>  Makefile             | 3 +++
+>>>  arch/alpha/Makefile  | 2 +-
+>>>  arch/arm/Makefile    | 2 +-
+>>>  arch/arm64/Makefile  | 2 +-
+>>>  arch/ia64/Makefile   | 2 +-
+>>>  arch/mips/Makefile   | 3 ---
+>>>  arch/parisc/Makefile | 2 +-
+>>>  arch/sparc/Makefile  | 2 +-
+>>>  arch/x86/Makefile    | 2 +-
+>>>  9 files changed, 10 insertions(+), 10 deletions(-)
+>>
+>> What about the architectures not touched by your patch that previously
+>> had no -m32/-m64? (arc, c6x, h8300, hexagon, m68k, microblaze, nds32,
+>> nios2, openrisc, powerpc, riscv, s390, sh, unicore32, xtensa)
 > 
-> Do you really need this extra boolean?  Can't you just check if
-> "enabled" is still "-EINVAL"?  If it is then you don't pass the
-> voltage along.
+> As explained in the patch, by default sparse uses -m64 if compiled on x86-64
+> and 32bit on everything else (well, more recent versions use -m64 if
+> compiled on any 64 bit machine). I think that most ppc devs use a ppc
+> machine and so ppc was most probably fine (at least ppc64) but I suspect
+> that most of these others archs either had never sparse used on them
+> or had a lot of wrong warnings. IOW, it was maybe OK but most probably
+> incorrect for them and now it is OK.
 > 
-> ...this would mean that you'd also need to send the voltage vote when
-> the regulator core tries to disable unused regulators at the end of
-> bootup, but that should be OK right?  If we never touched a regulator
-> anywhere at probe time and we're about to vote to disable it, we know
-> there's nobody requiring it to still be on.  We can vote for the
-> voltage now without fear of messing up a vote that the BIOS left in
-> place.
+>> You forgot to CC them on this patch.
 > 
-> In theory this should also allow you to assert your vote about the
-> voltage of a regulator that has never been enabled, which (if I
-> understand correctly) you consider to be a feature.
+> I didn't thought/knew  it was needed and the CC list is already
+> quite long but, if needed, no problem for me.
 
-Removing 'ever_enabled' and caching the voltage when 'enabled == -EINVAL'
-seems workable.  I'm a little concerned about this resulting in voltage =
-regulator-min-microvolt requests being sent for all regulators that are
-not explicitly enabled by Linux consumers before late_initcall_sync().
-Theoretically all of the boot loader hand-off cases should be taken care
-of by this point so it should be safe.
+Ideally, adding linux-arch at vger.kernel.org would be sufficient, but
+sadly I have doubts about that.
 
-I'll make this change.
+>> Have you really checked that all their toolchains support the -m32/-m64
+>> flags you newly introduce for them? Apart from non-biarch architectures,
+>> I'm thinking of 31-bit s390 as a corner case where !64 != 32.
+> 
+> Hmm, there is no change to anything I call 'toolchain related', like
+> compiler and linker. The only change is sparse (or any other checker)
+> receiving now a correct and explicit -m32 or -m64.
+> 
+> For s390, as far as I know:
+> 1) it has CONFIG_64BIT unconditionally definee (because the old 31bit
+>    is no more supported, now everything is s390x only).
+> 2) even if the *address space* was only 31 bit, I'm very sure
+>    that sizeof(long) and sizeof(void*) was 4 on these machine
+>    hence -m32 would have been correct.
 
-Take care,
-David
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+~Randy
