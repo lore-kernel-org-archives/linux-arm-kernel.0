@@ -1,87 +1,24 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 May 2018 18:56:53 +0100
-Subject: [PATCH v4 2/2] drm/nouveau: tegra: Detach from ARM DMA/IOMMU
- mapping
-In-Reply-To: <20180530140625.21247-3-thierry.reding@gmail.com>
-References: <20180530140625.21247-1-thierry.reding@gmail.com>
- <20180530140625.21247-3-thierry.reding@gmail.com>
-Message-ID: <412f15b5-6beb-3980-1ea4-7a9719786006@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 31 May 2018 11:04:50 -0700
+Subject: [PATCH 0/3] Initial Spectre variant 1 patches
+In-Reply-To: <20180531133047.GS17671@n2100.armlinux.org.uk>
+References: <20180531133047.GS17671@n2100.armlinux.org.uk>
+Message-ID: <20180531180450.GT5705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/18 15:06, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+* Russell King - ARM Linux <linux@armlinux.org.uk> [180531 13:34]:
+> Hi,
 > 
-> Depending on the kernel configuration, early ARM architecture setup code
-> may have attached the GPU to a DMA/IOMMU mapping that transparently uses
-> the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
-> backed buffers (a special bit in the GPU's MMU page tables indicates the
-> memory path to take: via the SMMU or directly to the memory controller).
-> Transparently backing DMA memory with an IOMMU prevents Nouveau from
-> properly handling such memory accesses and causes memory access faults.
+> This series adds initial support for the Spectre variant 1 workarounds
+> to the kernel.  This does _not_ cover the user accessors, which are
+> still in development.
 > 
-> As a side-note: buffers other than those allocated in instance memory
-> don't need to be physically contiguous from the GPU's perspective since
-> the GPU can map them into contiguous buffers using its own MMU. Mapping
-> these buffers through the IOMMU is unnecessary and will even lead to
-> performance degradation because of the additional translation. One
-> exception to this are compressible buffers which need large pages. In
-> order to enable these large pages, multiple small pages will have to be
-> combined into one large (I/O virtually contiguous) mapping via the
-> IOMMU. However, that is a topic outside the scope of this fix and isn't
-> currently supported. An implementation will want to explicitly create
-> these large pages in the Nouveau driver, so detaching from a DMA/IOMMU
-> mapping would still be required.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v4:
-> - use existing APIs to detach from a DMA/IOMMU mapping
-> 
-> Changes in v3:
-> - clarify the use of IOMMU mapping for compressible buffers
-> - squash multiple patches into this
-> 
->   drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c | 13 +++++++++++++
->   1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
-> index 78597da6313a..0e372a190d3f 100644
-> --- a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
-> +++ b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
-> @@ -23,6 +23,10 @@
->   #ifdef CONFIG_NOUVEAU_PLATFORM_DRIVER
->   #include "priv.h"
->   
-> +#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
-> +#include <asm/dma-iommu.h>
-> +#endif
-> +
->   static int
->   nvkm_device_tegra_power_up(struct nvkm_device_tegra *tdev)
->   {
-> @@ -105,6 +109,15 @@ nvkm_device_tegra_probe_iommu(struct nvkm_device_tegra *tdev)
->   	unsigned long pgsize_bitmap;
->   	int ret;
->   
-> +#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
-> +	if (dev->archdata.mapping) {
-> +		struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+> The series adds support for the array_index_mask_nospec() macro, used
+> by generic kernel code to mask out of bounds pointers, and also adds
+> the syscall table hardening.
 
-Nit: there's arguably little point using the helper here after you've 
-already shattered the illusion by poking dev->archdata.mapping directly, 
-but I guess this disappears again anyway once the refcounting gets 
-sorted out and the mapping releases itself properly, so:
+For the series including v2 patch of 3/3:
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> +
-> +		arm_iommu_detach_device(dev);
-> +		arm_iommu_release_mapping(mapping);
-> +	}
-> +#endif
-> +
->   	if (!tdev->func->iommu_bit)
->   		return;
->   
-> 
+Boot-tested-by: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Tony Lindgren <tony@atomide.com>
