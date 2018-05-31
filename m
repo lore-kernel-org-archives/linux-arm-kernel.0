@@ -1,24 +1,81 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 May 2018 12:34:26 +0530
-Subject: [PATCH v2 7/9] PM / Domains: Split genpd_dev_pm_attach()
-In-Reply-To: <20180529100421.31022-8-ulf.hansson@linaro.org>
-References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-8-ulf.hansson@linaro.org>
-Message-ID: <20180531070426.3olmew36foji32ge@vireshk-i7>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Thu, 31 May 2018 15:37:40 +0800
+Subject: [PATCH] PCI: mediatek: Add system pm support for MT2712
+In-Reply-To: <20180531042020.GQ39853@bhelgaas-glaptop.roam.corp.google.com>
+References: <1527647736-19986-1-git-send-email-honghui.zhang@mediatek.com>
+ <20180531042020.GQ39853@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1527752260.28160.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-05-18, 12:04, Ulf Hansson wrote:
-> To extend genpd to deal with allowing multiple PM domains per device, some
-> of the code in genpd_dev_pm_attach() can be re-used. Let's prepare for this
-> by moving some of the code into a sub-function.
+On Wed, 2018-05-30 at 23:20 -0500, Bjorn Helgaas wrote:
+> On Wed, May 30, 2018 at 10:35:36AM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
+> > The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
+> > the internel control register will be reset after system resume. The PCIe
+> > link should be re-established and the related control register values should
+> > be re-set after system resume.
+> > 
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > CC: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  drivers/pci/host/pcie-mediatek.c | 82 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 82 insertions(+)
+> > 
+> > diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> > index dabf1086..60f98d92 100644
+> > --- a/drivers/pci/host/pcie-mediatek.c
+> > +++ b/drivers/pci/host/pcie-mediatek.c
+> > @@ -132,12 +132,14 @@ struct mtk_pcie_port;
+> >  /**
+> >   * struct mtk_pcie_soc - differentiate between host generations
+> >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> > + * @pm_support: whether the host's MTCMOS will be off when suspend
+> >   * @ops: pointer to configuration access functions
+> >   * @startup: pointer to controller setting functions
+> >   * @setup_irq: pointer to initialize IRQ functions
+> >   */
+> >  struct mtk_pcie_soc {
+> >  	bool need_fix_class_id;
+> > +	bool pm_support;
+> >  	struct pci_ops *ops;
+> >  	int (*startup)(struct mtk_pcie_port *port);
+> >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> > @@ -1179,12 +1181,91 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+> >  	return err;
+> >  }
+> >  
+> > +static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+> > +{
+> > +	struct platform_device *pdev;
+> > +	struct mtk_pcie *pcie;
+> > +	struct mtk_pcie_port *port;
+> > +	const struct mtk_pcie_soc *soc;
+> > +
+> > +	pdev = to_platform_device(dev);
+> > +	pcie = platform_get_drvdata(pdev);
+> > +	soc = pcie->soc;
+> > +	if (!soc->pm_support)
+> > +		return 0;
+> > +
+> > +	list_for_each_entry(port, &pcie->ports, list) {
+> > +		clk_disable_unprepare(port->ahb_ck);
+> > +		clk_disable_unprepare(port->sys_ck);
+> > +		phy_power_off(port->phy);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/base/power/domain.c | 60 ++++++++++++++++++++-----------------
->  1 file changed, 33 insertions(+), 27 deletions(-)
+> I don't really like the __maybe_unused annotations.  Looking at the
+> other users of SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, I think a small majority
+> of them wrap the function definitions in #ifdef CONFIG_PM_SLEEP
+> instead of using __maybe_unused.  That's also a bit ugly, but has the
+> advantage of truly omitting the definitions when they're not needed.
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Ok, I will follow your advise in the next version.
 
--- 
-viresh
+thanks.
