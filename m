@@ -1,85 +1,37 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 31 May 2018 12:40:14 +0200
-Subject: [GIT PULL 0/7] perf/urgent fixes
-In-Reply-To: <20180531103220.24684-1-acme@kernel.org>
-References: <20180531103220.24684-1-acme@kernel.org>
-Message-ID: <20180531104014.GA29957@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 31 May 2018 12:44:51 +0200
+Subject: [PATCH v2 8/9] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <e313f870-ef27-7721-9395-31671f00ef4a@nvidia.com>
+References: <20180529100421.31022-1-ulf.hansson@linaro.org>
+ <20180529100421.31022-9-ulf.hansson@linaro.org>
+ <a53f0970-22c4-444f-10e6-c115a21d05ea@nvidia.com>
+ <CAPDyKFrV5fosZ1QZ4un+okzpeQDM3QSCBWJB1YZH4WNxKf_FVQ@mail.gmail.com>
+ <e313f870-ef27-7721-9395-31671f00ef4a@nvidia.com>
+Message-ID: <CAPDyKFrtSGF79pFf-sx41ru_EVLk3BMg_f_5rK64k==dW=OXPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 31 May 2018 at 10:03, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+> On 31/05/18 07:17, Ulf Hansson wrote:
+>> [...]
+>>
+>>>> +/**
+>>>> + * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
+>>>> + * @dev: Device to attach.
+>>>
+>>> Can you update the description of the above as well?
+>>
+>> Yes, like below?
+>>
+>> genpd_dev_pm_attach_by_id() - Associate a device with one of its PM domains.
+>> @dev: The device used to lookup the PM domain.
+>
+> Yes perfect.
 
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+I assume I can consider this as an ack and tested by tag, both for
+patch 8 and 9?
 
-> Hi Ingo,
-> 
-> 	Please consider pulling,
-> 
-> - Arnaldo
-> 
-> Test results at the end of this message, as usual.
-> 
-> The following changes since commit f3903c9161f0d636a7b0ff03841628928457e64c:
-> 
->   Merge tag 'perf-urgent-for-mingo-4.17-20180514' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent (2018-05-15 08:20:45 +0200)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.17-20180531
-> 
-> for you to fetch changes up to 18a7057420f8b67f15d17087bf5c0863db752c8b:
-> 
->   perf tools: Fix perf.data format description of NRCPUS header (2018-05-30 15:40:26 -0300)
-> 
-> ----------------------------------------------------------------
-> perf/urgent fixes:
-> 
-> - Fix 'perf test Session topology' segfault on s390 (Thomas Richter)
-> 
-> - Fix NULL return handling in bpf__prepare_load() (YueHaibing)
-> 
-> - Fix indexing on Coresight ETM packet queue decoder (Mathieu Poirier)
-> 
-> - Fix perf.data format description of NRCPUS header (Arnaldo Carvalho de Melo)
-> 
-> - Update perf.data documentation section on cpu topology
-> 
-> - Handle uncore event aliases in small groups properly (Kan Liang)
-> 
-> - Add missing perf_sample.addr into python sample dictionary (Leo Yan)
-> 
-> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-> 
-> ----------------------------------------------------------------
-> Arnaldo Carvalho de Melo (1):
->       perf tools: Fix perf.data format description of NRCPUS header
-> 
-> Kan Liang (1):
->       perf parse-events: Handle uncore event aliases in small groups properly
-> 
-> Leo Yan (1):
->       perf script python: Add addr into perf sample dict
-> 
-> Mathieu Poirier (1):
->       perf cs-etm: Fix indexing for decoder packet queue
-> 
-> Thomas Richter (2):
->       perf test: "Session topology" dumps core on s390
->       perf data: Update documentation section on cpu topology
-> 
-> YueHaibing (1):
->       perf bpf: Fix NULL return handling in bpf__prepare_load()
-> 
->  tools/perf/Documentation/perf.data-file-format.txt |  10 +-
->  tools/perf/tests/topology.c                        |  30 ++++-
->  tools/perf/util/bpf-loader.c                       |   6 +-
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c    |  12 +-
->  tools/perf/util/evsel.h                            |   1 +
->  tools/perf/util/parse-events.c                     | 130 ++++++++++++++++++++-
->  tools/perf/util/parse-events.h                     |   7 +-
->  tools/perf/util/parse-events.y                     |   8 +-
->  .../util/scripting-engines/trace-event-python.c    |   2 +
->  9 files changed, 185 insertions(+), 21 deletions(-)
-
-Pulled, thanks a lot Arnaldo!
-
-	Ingo
+Kind regards
+Uffe
