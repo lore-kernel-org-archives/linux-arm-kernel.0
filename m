@@ -1,53 +1,73 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 31 May 2018 21:49:22 +0800
-Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
- <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
-Message-ID: <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Thu, 31 May 2018 08:45:38 -0500
+Subject: [PATCH 1/4] arm64: capabilities: add nopti command line argument
+In-Reply-To: <2b1b39e3-38ab-848a-a1d3-d23db85b0e14@arm.com>
+References: <20180524190932.32118-1-mlangsdo@redhat.com>
+ <20180524190932.32118-2-mlangsdo@redhat.com>
+ <2b1b39e3-38ab-848a-a1d3-d23db85b0e14@arm.com>
+Message-ID: <9d83b00a-f23c-e3e7-ab4a-598995d21f0c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 2018/5/31 19:24, Robin Murphy wrote:
-> On 31/05/18 08:42, Zhen Lei wrote:
->> In common, a IOMMU unmap operation follow the below steps:
->> 1. remove the mapping in page table of the specified iova range
->> 2. execute tlbi command to invalid the mapping which is cached in TLB
->> 3. wait for the above tlbi operation to be finished
->> 4. free the IOVA resource
->> 5. free the physical memory resource
->>
->> This maybe a problem when unmap is very frequently, the combination of tlbi
->> and wait operation will consume a lot of time. A feasible method is put off
->> tlbi and iova-free operation, when accumulating to a certain number or
->> reaching a specified time, execute only one tlbi_all command to clean up
->> TLB, then free the backup IOVAs. Mark as non-strict mode.
->>
->> But it must be noted that, although the mapping has already been removed in
->> the page table, it maybe still exist in TLB. And the freed physical memory
->> may also be reused for others. So a attacker can persistent access to memory
->> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
->> the VFIO should always choose the strict mode.
->>
->> Some may consider put off physical memory free also, that will still follow
->> strict mode. But for the map_sg cases, the memory allocation is not controlled
->> by IOMMU APIs, so it is not enforceable.
->>
->> Fortunately, Intel and AMD have already applied the non-strict mode, and put
->> queue_iova() operation into the common file dma-iommu.c., and my work is based
->> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
->> unmap, but Intel and AMD IOMMU drivers are not.
->>
->> Below is the performance data of strict vs non-strict for NVMe device:
->> Randomly Read? IOPS: 146K(strict) vs 573K(non-strict)
->> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
+On 05/30/2018 03:59 AM, Suzuki K Poulose wrote:
 > 
-> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
+> 
+> Hi Mark,
+> 
+> On 24/05/18 20:09, Mark Langsdorf wrote:
+>> The x86 kernel and the documentation use 'nopti' as the kernel command
+>> line argument to disable kernel page table isolation, so add nopti to
+>> the arm64 kernel for compatibility.
+>>
+>> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> ---
+>> ? Documentation/admin-guide/kernel-parameters.txt |? 6 +++---
+>> ? arch/arm64/kernel/cpufeature.c????????????????? | 11 ++++++++++-
+>> ? 2 files changed, 13 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt 
+>> b/Documentation/admin-guide/kernel-parameters.txt
+>> index f2040d4..a987725 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -3342,8 +3342,8 @@
+>> ????? pt.??????? [PARIDE]
+>> ????????????? See Documentation/blockdev/paride.txt.
+>> -??? pti=??????? [X86_64] Control Page Table Isolation of user and
+>> -??????????? kernel address spaces.? Disabling this feature
+>> +??? pti=??????? [X86_64, ARM64] Control Page Table Isolation of user
+>> +??????????? and kernel address spaces.? Disabling this feature
+>> ????????????? removes hardening, but improves performance of
+>> ????????????? system calls and interrupts.
+> 
+> ...
+> 
+>> @@ -3354,7 +3354,7 @@
+>> ????????????? Not specifying this option is equivalent to pti=auto.
+>> -??? nopti??????? [X86_64]
+>> +??? nopti??????? [X86_64, ARM64]
+>> ????????????? Equivalent to pti=off
+>> ????? pty.legacy_count=
+>> diff --git a/arch/arm64/kernel/cpufeature.c 
+>> b/arch/arm64/kernel/cpufeature.c
+>> index 9d1b06d..7c5d8712 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -934,10 +934,19 @@ static int __init parse_kpti(char *str)
+>> ????? if (ret)
+>> ????????? return ret;
+>> -??? __kpti_forced = enabled ? 1 : -1;
+>> +??? if (!__kpti_forced)
+>> +??????? __kpti_forced = enabled ? 1 : -1;
+>> ????? return 0;
+>> ? }
+>> ? __setup("kpti=", parse_kpti);
+> 
+> The arm64 kernel parameter is named "kpti", while the Documentation 
+> update above says "pti". We may want to keep both in sync here.
 
-The hardware is the new D06 which the SMMU with MSIs,
-it's not D05 :)
+Good point. I think I will add a new kpti entry for ARM64 in 
+kernel-parameters. Then the docs match the code, instead of trying to 
+match the code to the docs.
 
-Thanks
-Hanjun
+--Mark Langsdorf
