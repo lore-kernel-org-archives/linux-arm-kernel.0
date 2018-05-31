@@ -1,75 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 31 May 2018 09:39:21 -0700
-Subject: [PATCH v2 1/6] ARM: dra762: hwmod: Add MCAN support
-In-Reply-To: <f74763ed-7e27-146b-6856-6be1b2ba630d@ti.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-2-faiz_abbas@ti.com>
- <20180530145047.GC5705@atomide.com>
- <cfa9c9df-57a2-69f6-9509-440dc18292e7@ti.com>
- <20180530152825.GG5705@atomide.com>
- <b0476932-a6e9-6ef1-69ad-c9a8c55d9739@ti.com>
- <20180530155448.GH5705@atomide.com>
- <98c989ca-0694-5150-f74b-35f3e4bf20c0@ti.com>
- <20180531152623.GN5705@atomide.com>
- <f74763ed-7e27-146b-6856-6be1b2ba630d@ti.com>
-Message-ID: <20180531163921.GO5705@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 31 May 2018 17:41:34 +0100
+Subject: [PATCH v2 00/17] arm64 SSBD (aka Spectre-v4) mitigation
+In-Reply-To: <20180529121121.24927-1-marc.zyngier@arm.com>
+References: <20180529121121.24927-1-marc.zyngier@arm.com>
+Message-ID: <20180531164133.6z6py7nl55ty473e@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Faiz Abbas <faiz_abbas@ti.com> [180531 16:36]:
-> Hi,
-> 
-> On Thursday 31 May 2018 08:56 PM, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [180531 06:18]:
-> >> On 30/05/18 18:54, Tony Lindgren wrote:
-> >>> * Tero Kristo <t-kristo@ti.com> [180530 15:44]:
-> >>>> On 30/05/18 18:28, Tony Lindgren wrote:
-> >>>>> * Tero Kristo <t-kristo@ti.com> [180530 15:18]:
-> >>>>>> For the OCP if part, I think that is still needed until we switch over to
-> >>>>>> full sysc driver. clkctrl_offs you probably also need because that is used
-> >>>>>> for mapping the omap_hwmod against a specific clkctrl clock. Those can be
-> >>>>>> only removed once we are done with hwmod (or figure out some other way to
-> >>>>>> assign the clkctrl clock to a hwmod.)
-> >>>>>
-> >>>>> Hmm might be worth testing. I thought your commit 70f05be32133
-> >>>>> ("ARM: OMAP2+: hwmod: populate clkctrl clocks for hwmods if available")
-> >>>>> already parses the clkctrl from dts?
-> >>>>
-> >>>> It maps the clkctrl clock to be used by hwmod, if those are available. We
-> >>>> didn't add any specific clock entries to DT for mapping the actual clkctrl
-> >>>> clock without the hwmod_data hints yet though, as that was deemed temporary
-> >>>> solution only due to transition to interconnect driver. I.e., you would need
-> >>>> something like this in DT for every device node:
-> >>>>
-> >>>> &uart3 {
-> >>>>    clocks = <l4per_clkctrl UART3_CLK 0>;
-> >>>>    clock-names = "clkctrl";
-> >>>> };
-> >>>>
-> >>>> ... which is currently not present.
-> >>>
-> >>> Hmm is that not the "fck" clkctrl clock we have already in
-> >>> the dts files for the interconnect target modules?
-> >>
-> >> Oh okay, yeah, we could parse that one, but currently it is not done, and is
-> >> not present for everything either I believe.
-> >>
-> >>> We can also use pdata callbacks to pass the clock node if
-> >>> needed. But I guess I don't quite still understand what we
-> >>> are missing :)
-> >>
-> >> So, what is missing is the glue logic only from the hwmod codebase. Right
-> >> now this is not supported but should be relatively trivial thing to add if
-> >> we really want to do this.
-> > 
-> > OK let's think about this a bit for v4.19 then.
-> > 
-> 
-> I am not sure what the conclusion is. Should I try removing the
-> clkctrl_offsets, clkdm_name, and main_clk?
+On Tue, May 29, 2018 at 01:11:04PM +0100, Marc Zyngier wrote:
+> Marc Zyngier (17):
+>   arm/arm64: smccc: Add SMCCC-specific return codes
+>   arm64: Call ARCH_WORKAROUND_2 on transitions between EL0 and EL1
+>   arm64: Add per-cpu infrastructure to call ARCH_WORKAROUND_2
+>   arm64: Add ARCH_WORKAROUND_2 probing
+>   arm64: Add 'ssbd' command-line option
+>   arm64: ssbd: Add global mitigation state accessor
+>   arm64: ssbd: Skip apply_ssbd if not using dynamic mitigation
+>   arm64: ssbd: Restore mitigation status on CPU resume
+>   arm64: ssbd: Introduce thread flag to control userspace mitigation
+>   arm64: ssbd: Add prctl interface for per-thread mitigation
+>   arm64: KVM: Add HYP per-cpu accessors
+>   arm64: KVM: Add ARCH_WORKAROUND_2 support for guests
+>   arm64: KVM: Handle guest's ARCH_WORKAROUND_2 requests
+>   arm64: KVM: Add ARCH_WORKAROUND_2 discovery through
+>     ARCH_FEATURES_FUNC_ID
 
-No need to, it's not going to work currently without them.
+I queued the 14 patches above for 4.18.
 
-Regards,
+>   arm64: Add test_and_clear_flag and set_flag atomic assembler
+>     primitives
+>   arm64: ssbd: Enable delayed setting of TIF_SSBD
+>   arm64: ssbd: Implement arch_seccomp_spec_mitigate
 
-Tony
+Thanks.
+
+-- 
+Catalin
