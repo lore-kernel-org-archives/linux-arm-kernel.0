@@ -1,54 +1,120 @@
 From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Thu, 31 May 2018 11:27:51 +0800
-Subject: [PATCH v3 3/5] arm64: dts: rockchip: Add GPIO_MUTE pin support to
+Date: Thu, 31 May 2018 11:27:50 +0800
+Subject: [PATCH v3 2/5] gpio: syscon: rockchip: add GPIO_MUTE support for
  rk3328
 In-Reply-To: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
 References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <1527737273-8387-4-git-send-email-djw@t-chip.com.cn>
+Message-ID: <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Levin Du <djw@t-chip.com.cn>
 
-Adding a new gpio controller named "gpio_mute" to rk3328, providing
-access to the GPIO_MUTE pin, which is manupulated by the GRF_SOC_CON10
-register.
-
-The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
+In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
+mute control, can also be used for general purpose. It is manipulated by
+the GRF_SOC_CON10 register.
 
 Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
 ---
 
 Changes in v3:
-- Use dedicated "rockchip,rk3328-gpio-mute" driver
+- Change from general gpio-syscon to specific rk3328-gpio-mute
 
 Changes in v2:
-- Rename gpio_syscon10 to gpio_mute in rk3328.dtsi
+- Rename gpio_syscon10 to gpio_mute in doc
 
 Changes in v1:
-- Split from V0 and add to rk3328.dtsi for general use.
+- Refactured for general gpio-syscon usage for Rockchip SoCs.
+- Add doc rockchip,gpio-syscon.txt
 
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28 +++++++++++++++++++
+ drivers/gpio/gpio-syscon.c                         | 31 ++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index be2bfbc..2ee0fa3 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -309,6 +309,13 @@
- 			mode-loader = <BOOT_BL_DOWNLOAD>;
- 		};
- 
-+		/* Use <&gpio_mute 0> to refer to GPIO_MUTE pin */
+diff --git a/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+new file mode 100644
+index 0000000..10bc632
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+@@ -0,0 +1,28 @@
++Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE pin.
++
++In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec mute
++control, can also be used for general purpose. It is manipulated by the
++GRF_SOC_CON10 register.
++
++Required properties:
++- compatible: Should contain "rockchip,rk3328-gpio-mute".
++- gpio-controller: Marks the device node as a gpio controller.
++- #gpio-cells: Should be 2. The first cell is the pin number and
++  the second cell is used to specify the gpio polarity:
++    0 = Active high,
++    1 = Active low.
++
++Example:
++
++	grf: syscon at ff100000 {
++		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
++
 +		gpio_mute: gpio-mute {
 +			compatible = "rockchip,rk3328-gpio-mute";
 +			gpio-controller;
 +			#gpio-cells = <2>;
-+			status = "disabled";
 +		};
- 	};
++	};
++
++Note: The gpio_mute node should be declared as the child of the GRF (General
++Register File) node. The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
+diff --git a/drivers/gpio/gpio-syscon.c b/drivers/gpio/gpio-syscon.c
+index 7325b86..49a142a 100644
+--- a/drivers/gpio/gpio-syscon.c
++++ b/drivers/gpio/gpio-syscon.c
+@@ -135,6 +135,33 @@ static const struct syscon_gpio_data clps711x_mctrl_gpio = {
+ 	.dat_bit_offset	= 0x40 * 8 + 8,
+ };
  
- 	uart0: serial at ff110000 {
++static void rockchip_gpio_set(struct gpio_chip *chip, unsigned int offset,
++			      int val)
++{
++	struct syscon_gpio_priv *priv = gpiochip_get_data(chip);
++	unsigned int offs;
++	u8 bit;
++	u32 data;
++	int ret;
++
++	offs = priv->dreg_offset + priv->data->dat_bit_offset + offset;
++	bit = offs % SYSCON_REG_BITS;
++	data = (val ? BIT(bit) : 0) | BIT(bit + 16);
++	ret = regmap_write(priv->syscon,
++			   (offs / SYSCON_REG_BITS) * SYSCON_REG_SIZE,
++			   data);
++	if (ret < 0)
++		dev_err(chip->parent, "gpio write failed ret(%d)\n", ret);
++}
++
++static const struct syscon_gpio_data rockchip_rk3328_gpio_mute = {
++	/* RK3328 GPIO_MUTE is an output only pin at GRF_SOC_CON10[1] */
++	.flags		= GPIO_SYSCON_FEAT_OUT,
++	.bit_count	= 1,
++	.dat_bit_offset = 0x0428 * 8 + 1,
++	.set		= rockchip_gpio_set,
++};
++
+ #define KEYSTONE_LOCK_BIT BIT(0)
+ 
+ static void keystone_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+@@ -175,6 +202,10 @@ static const struct of_device_id syscon_gpio_ids[] = {
+ 		.compatible	= "ti,keystone-dsp-gpio",
+ 		.data		= &keystone_dsp_gpio,
+ 	},
++	{
++		.compatible	= "rockchip,rk3328-gpio-mute",
++		.data		= &rockchip_rk3328_gpio_mute,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, syscon_gpio_ids);
 -- 
 2.7.4
