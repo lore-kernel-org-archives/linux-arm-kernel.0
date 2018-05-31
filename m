@@ -1,27 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 May 2018 10:52:34 +0530
-Subject: [PATCH 07/15] arm: dts: exynos: Add missing cooling device
- properties for CPUs
-In-Reply-To: <CAJKOXPftrzwLMSDeTBBxG-nvpsriBuPEwQAViTcE3DYRYsnzmg@mail.gmail.com>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
- <CAJKOXPcyV=fdRu7oLXHMimSFR9ktJ23uBriswTStkEkAMbTaNw@mail.gmail.com>
- <20180530043806.ksen4xyh3x3x4fqn@vireshk-i7>
- <CAJKOXPftrzwLMSDeTBBxG-nvpsriBuPEwQAViTcE3DYRYsnzmg@mail.gmail.com>
-Message-ID: <20180531052234.tp6pw45ftsf3g2el@vireshk-i7>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Thu, 31 May 2018 11:14:18 +0530
+Subject: Regression in Linux next again
+In-Reply-To: <CA+G9fYvff4_9XH8Y4CTadexb2WGV+rAd29Jdo4ztBxqFXKbt5Q@mail.gmail.com>
+References: <20180529221501.GJ5702@atomide.com>
+ <CGME20180530091325epcas4p20dea07f013a3512ce4ea92120da90f61@epcas4p2.samsung.com>
+ <20180530091314.GB6920@sirena.org.uk>
+ <20180530140318eucas1p2af2d01b9678e8914c2b8e099c584ec11~zcQzVKtj30757607576eucas1p2V@eucas1p2.samsung.com>
+ <20180530143338.GM6920@sirena.org.uk>
+ <CA+G9fYvff4_9XH8Y4CTadexb2WGV+rAd29Jdo4ztBxqFXKbt5Q@mail.gmail.com>
+Message-ID: <CA+G9fYvmeCaSn4KvHtvygwj5yqwf=gchQAzd1YDYfd1LCwWDLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-05-18, 14:32, Krzysztof Kozlowski wrote:
-> OK, I see the possibility although it is still far away from use
-> cases. You cannot hotplug booting CPU (CPU0) on Exynos kernels. It
-> never worked. Strictly speaking - offlining will work. But bringing it
-> online will likely hang the system.
+On 30 May 2018 at 20:23, Naresh Kamboju <naresh.kamboju@linaro.org> wrote:
+> On 30 May 2018 at 20:03, Mark Brown <broonie@kernel.org> wrote:
+>> On Wed, May 30, 2018 at 04:03:15PM +0200, Maciej Purski wrote:
+>>
+>>> I'm afraid, I have no idea, how to fix it quickly. You can revert it and
+>>> in the next version I'll fix the build error and split the last patch even
+>>> more, so we could perform a more precise bisection. I'd be grateful if you
+>>> could push it on your test coupled branch and Tony could test it again before
+>>> merging it with next again.
+>>
+>> Yeah, if we could get testing from Tony first that'd be ideal.
+>
+> Linux next 4.17.0-rc7-next-20180529 boot failed on x15 device.
+> Manually reproduced boot failed problem on x15 device.
+> The qemu_arm32 boots successfully.
+>
+> Ref bug:
+> LKFT: linux-next: Boot failed on beagle board x15
+> https://bugs.linaro.org/show_bug.cgi?id=3863
 
-True and I used the following out of tree patch for a long time for my
-dual A15 exynos to make hotplug work.
+This bug still happening on 4.17.0-rc7-next-20180530 on beagle board x15.
 
-https://git.linaro.org/people/vireshk/backup/linux.git/commit/?h=bkp/exynos/hotplug&id=aab8a906a70b8f1fb15a4b7bd2ee27e6dcabf79d
+Linux version 4.17.0-rc7-next-20180530 (buildslave at x86-64-07) (gcc version
+ 6.2.1 20161016 (Linaro GCC 6.2-2016.11)) #1 SMP Wed May 30 12:38:23 UTC 2018
 
--- 
-viresh
+- Naresh
