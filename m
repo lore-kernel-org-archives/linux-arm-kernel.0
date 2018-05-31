@@ -1,70 +1,78 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 31 May 2018 17:51:31 +0100
-Subject: [PATCH v1 2/2] arm64: handle NOTIFY_SEI notification by the APEI
- driver
-In-Reply-To: <20180531110115.uglmicy3nzwfoyx3@lakrids.cambridge.arm.com>
-References: <1527770506-8076-1-git-send-email-gengdongjiu@huawei.com>
- <1527770506-8076-3-git-send-email-gengdongjiu@huawei.com>
- <20180531110115.uglmicy3nzwfoyx3@lakrids.cambridge.arm.com>
-Message-ID: <71afa669-e3c5-979e-da5b-1d9cb7056fd6@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 31 May 2018 17:55:27 +0100
+Subject: [PATCH v2 00/17] arm64 SSBD (aka Spectre-v4) mitigation
+In-Reply-To: <20180531164133.6z6py7nl55ty473e@armageddon.cambridge.arm.com>
+References: <20180529121121.24927-1-marc.zyngier@arm.com>
+ <20180531164133.6z6py7nl55ty473e@armageddon.cambridge.arm.com>
+Message-ID: <b6111f31-b128-94f2-ae6b-03a906358c0b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Dongjiu Geng,
+Hi Catalin,
 
-On 31/05/18 12:01, Mark Rutland wrote:
-> In do_serror() we already handle nmi_{enter,exit}(), so there's no need
-> for that here.
-
-Even better: nmi_enter() has a BUG_ON(in_nmi()).
-
-
-> TBH, I don't understand why do_sea() does that conditionally today.
-> Unless there's some constraint I'm missing, 
-
-APEI uses a different fixmap entry and locks when in_nmi(). This was because we
-may interrupt the irq-masked region in APEI that was using the regular memory.
-(e.g. the 'polled' notification, or something backed by an interrupt.) But,
-Borislav has spotted other things in here that are broken[0]. I'm working on
-rolling all that into 'v5' of the in_nmi() rework stuff.
-
-We currently get away with this on arm because 'SEA' is the only NMI-like thing,
-and it occurs synchronously. The problem cases are all also cases where the
-kernel text is corrupt, which we can't possibly hope to handle.
-
-For NOTIFY_SDEI and NOTIFY_SEI this is the wrong pattern as these are
-asynchronous. do_serror() has already done most of the work for NOTIFY_SEI, but
-we need to use the estatus queue in APEI, which is currently x86 only.
-
-
-> I think it would make more
-> sense to do that regardless of whether the interrupted context had
-> interrupts enabled. James -- does that make sense to you?
+On 31/05/18 17:41, Catalin Marinas wrote:
+> On Tue, May 29, 2018 at 01:11:04PM +0100, Marc Zyngier wrote:
+>> Marc Zyngier (17):
+>>   arm/arm64: smccc: Add SMCCC-specific return codes
+>>   arm64: Call ARCH_WORKAROUND_2 on transitions between EL0 and EL1
+>>   arm64: Add per-cpu infrastructure to call ARCH_WORKAROUND_2
+>>   arm64: Add ARCH_WORKAROUND_2 probing
+>>   arm64: Add 'ssbd' command-line option
+>>   arm64: ssbd: Add global mitigation state accessor
+>>   arm64: ssbd: Skip apply_ssbd if not using dynamic mitigation
+>>   arm64: ssbd: Restore mitigation status on CPU resume
+>>   arm64: ssbd: Introduce thread flag to control userspace mitigation
+>>   arm64: ssbd: Add prctl interface for per-thread mitigation
+>>   arm64: KVM: Add HYP per-cpu accessors
+>>   arm64: KVM: Add ARCH_WORKAROUND_2 support for guests
+>>   arm64: KVM: Handle guest's ARCH_WORKAROUND_2 requests
+>>   arm64: KVM: Add ARCH_WORKAROUND_2 discovery through
+>>     ARCH_FEATURES_FUNC_ID
 > 
-> If you update the prior patch with a stub for !CONFIG_ACPI_APEI_SEI, you
-> can simplify all of the above additions down to:
-> 
-> 	if (!ghes_notify_sei())
-> 		return;
-> 
-> ... which would look a lot nicer.
+> I queued the 14 patches above for 4.18.
 
-The code that calls ghes_notify_sei() may need calling by KVM too, but its
-default action to an 'unclaimed' SError will be different.
-Because of the race between memory_failure() and return-to-userspace, we may
-need to kick the irq work queue (if we can), as we return from do_serror(). [1]
-and [2] provide an example for NOTIFY_SEA. SDEI does this by returning to the
-kernel through the IRQ handler, (which handles the KVM case too).
+I just realized that your for-next/core branch is based on
+4.17-rc4, which means arch/arm64/kernel/ssbd.c won't compile
+(it relies on some of the symbols introduced with the x86
+stuff in 4.17-rc7.
 
+You can work around it by adding the following hack:
 
-I think this series is unsafe until we can use the estatus queue in APEI. Its
-also missing the handling for an SError interrupting a KVM guest.
+>From 8a0dbe9fb468c03b3913d17af9dce7358f899ee3 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Thu, 31 May 2018 17:54:11 +0100
+Subject: [PATCH] fixup! arm64: ssbd: Add prctl interface for per-thread
+ mitigation
+
+---
+ arch/arm64/kernel/ssbd.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
+index 07b12c034ec2..3432e5ef9f41 100644
+--- a/arch/arm64/kernel/ssbd.c
++++ b/arch/arm64/kernel/ssbd.c
+@@ -11,7 +11,9 @@
+ 
+ /*
+  * prctl interface for SSBD
++ * FIXME: Drop the below ifdefery once merged in 4.18.
+  */
++#ifdef PR_SPEC_STORE_BYPASS
+ static int ssbd_prctl_set(struct task_struct *task, unsigned long ctrl)
+ {
+ 	int state = arm64_get_ssbd_state();
+@@ -105,3 +107,4 @@ int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
+ 		return -ENODEV;
+ 	}
+ }
++#endif	/* PR_SPEC_STORE_BYPASS */
+-- 
+2.17.1
 
 
 Thanks,
 
-James
-
-[0] https://www.spinics.net/lists/arm-kernel/msg653332.html
-[1] https://www.spinics.net/lists/arm-kernel/msg649237.html
-[2] https://www.spinics.net/lists/arm-kernel/msg649239.html
+	M.
+-- 
+Jazz is not dead. It just smells funny...
