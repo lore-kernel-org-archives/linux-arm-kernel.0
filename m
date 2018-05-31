@@ -1,62 +1,51 @@
 From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Thu, 31 May 2018 11:27:48 +0800
-Subject: [PATCH v3 0/5] Add sdmmc UHS support to ROC-RK3328-CC board.
-Message-ID: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+Date: Thu, 31 May 2018 11:27:52 +0800
+Subject: [PATCH v3 4/5] arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
+In-Reply-To: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+Message-ID: <1527737273-8387-5-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Levin Du <djw@t-chip.com.cn>
 
+It is necessary for the io domain setting of the SoC to match
+the voltage supplied by the regulators.
 
-Hi all, this is an attemp to add sdmmc UHS support to the
-ROC-RK3328-CC board.
+Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
-This patch series adds a new compatible `rockchip,rk3328-gpio-mute` to
-the gpio-syscon driver for the access of the GPIO_MUTE pin in rk3328.
+---
 
-A new gpio controller named `gpio_mute` is defined in
-rk3328.dtsi and so that all rk3328 boards has access to it.
-
-The ROC-RK3328-CC board use the new gpio <&gpio_mute 0> in
-gpio-regulator to control the signal voltage of the sdmmc.
-It is essential for UHS support which requires 1.8V signal voltage.
-
-Many thanks to the Linux people!
-
-Changes in v3:
-- Change from general gpio-syscon to specific rk3328-gpio-mute
-- Use dedicated "rockchip,rk3328-gpio-mute" driver
-- Use <&gpio_mute 0> instead of <&gpio_mute 1> to refer to the GPIO_MUTE pin.
-
-Changes in v2:
-- Rename gpio_syscon10 to gpio_mute in doc
-- Rename gpio_syscon10 to gpio_mute in rk3328.dtsi
-- Rename gpio_syscon10 to gpio_mute in rk3328-roc-cc.dts
-
+Changes in v3: None
+Changes in v2: None
 Changes in v1:
-- New: allow fetching syscon from parent node in gpio-syscon driver
-- Refactured for general gpio-syscon usage for Rockchip SoCs.
-- Add doc rockchip,gpio-syscon.txt
-- Split from V0 and add to rk3328.dtsi for general use.
 - Split from V0.
-- Split into small patches
-- Sort dts properties in sdmmc node
 
-Heiko Stuebner (1):
-  gpio: syscon: allow fetching syscon from parent node
+ arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Levin Du (4):
-  gpio: syscon: rockchip: add GPIO_MUTE support for rk3328
-  arm64: dts: rockchip: Add GPIO_MUTE pin support to rk3328
-  arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
-  arm64: dts: rockchip: Add sdmmc UHS support for roc-rk3328-cc
-
- .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28 ++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     | 34 ++++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  7 +++++
- drivers/gpio/gpio-syscon.c                         | 33 +++++++++++++++++++++
- 4 files changed, 102 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+index 246c317..b983abd 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+@@ -208,6 +208,18 @@
+ 	};
+ };
+ 
++&io_domains {
++	status = "okay";
++
++	vccio1-supply = <&vcc_io>;
++	vccio2-supply = <&vcc18_emmc>;
++	vccio3-supply = <&vcc_io>;
++	vccio4-supply = <&vcc_18>;
++	vccio5-supply = <&vcc_io>;
++	vccio6-supply = <&vcc_io>;
++	pmuio-supply = <&vcc_io>;
++};
++
+ &pinctrl {
+ 	pmic {
+ 		pmic_int_l: pmic-int-l {
 -- 
 2.7.4
