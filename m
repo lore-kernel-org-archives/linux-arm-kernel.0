@@ -1,69 +1,265 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 May 2018 18:52:48 +0100
-Subject: [PATCH v4 1/2] ARM: dma-mapping: Set proper DMA ops in
- arm_iommu_detach_device()
-In-Reply-To: <20180530140625.21247-2-thierry.reding@gmail.com>
-References: <20180530140625.21247-1-thierry.reding@gmail.com>
- <20180530140625.21247-2-thierry.reding@gmail.com>
-Message-ID: <a898aeae-e277-928b-9b97-474ebab50f7d@arm.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 31 May 2018 19:54:08 +0200
+Subject: [PATCH 06/15] drm/sun4i: tcon: Add support for tcon-top
+In-Reply-To: <20180531092133.3gqepoabvuruiztz@flea.home>
+References: <20180519183127.2718-1-jernej.skrabec@siol.net>
+ <CAGb2v65whE-qW++cg+gu_o2O1dDdCWkumQB41nt3Aqa75Wp3dg@mail.gmail.com>
+ <20180531092133.3gqepoabvuruiztz@flea.home>
+Message-ID: <2293030.uW1p7mJGcj@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/18 15:06, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+Dne ?etrtek, 31. maj 2018 ob 11:21:33 CEST je Maxime Ripard napisal(a):
+> On Thu, May 24, 2018 at 03:01:09PM -0700, Chen-Yu Tsai wrote:
+> > >> > > + if (tcon->quirks->needs_tcon_top) {
+> > >> > > +         struct device_node *np;
+> > >> > > +
+> > >> > > +         np = of_parse_phandle(dev->of_node, "allwinner,tcon-top",
+> > >> > > 0);
+> > >> > > +         if (np) {
+> > >> > > +                 struct platform_device *pdev;
+> > >> > > +
+> > >> > > +                 pdev = of_find_device_by_node(np);
+> > >> > > +                 if (pdev)
+> > >> > > +                         tcon->tcon_top =
+> > >> > > platform_get_drvdata(pdev);
+> > >> > > +                 of_node_put(np);
+> > >> > > +
+> > >> > > +                 if (!tcon->tcon_top)
+> > >> > > +                         return -EPROBE_DEFER;
+> > >> > > +         }
+> > >> > > + }
+> > >> > > +
+> > >> > 
+> > >> > I might have missed it, but I've not seen the bindings additions for
+> > >> > that property. This shouldn't really be done that way anyway, instead
+> > >> > of using a direct phandle, you should be using the of-graph, with the
+> > >> > TCON-top sitting where it belongs in the flow of data.
+> > >> 
+> > >> Just to answer to the first question, it did describe it in "[PATCH
+> > >> 07/15] dt- bindings: display: sun4i-drm: Add R40 HDMI pipeline".
+> > >> 
+> > >> As why I designed it that way - HW representation could be described
+> > >> that way> >> 
+> > >> (ASCII art makes sense when fixed width font is used to view it):
+> > >>                             / LCD0/LVDS0
+> > >>                 
+> > >>                 / TCON-LCD0
+> > >>                 
+> > >>                 |           \ MIPI DSI
+> > >> 
+> > >> mixer0          |
+> > >> 
+> > >>        \        / TCON-LCD1 - LCD1/LVDS1
+> > >>        
+> > >>         TCON-TOP
+> > >>        
+> > >>        /        \ TCON-TV0 - TVE0/RGB
+> > >> 
+> > >> mixer1          |          \
+> > >> 
+> > >>                 |           TCON-TOP - HDMI
+> > >>                 |          
+> > >>                 |          /
+> > >>                 
+> > >>                 \ TCON-TV1 - TVE1/RGB
+> > >> 
+> > >> This is a bit simplified, since there is also TVE-TOP, which is
+> > >> responsible
+> > >> for sharing 4 DACs between both TVE encoders. You can have two TV outs
+> > >> (PAL/ NTSC) or TVE0 as TV out and TVE1 as RGB or vice versa. It even
+> > >> seems that you can arbitrarly choose which DAC is responsible for
+> > >> which signal, so there is a ton of possible end combinations, but I'm
+> > >> not 100% sure.
+> > >> 
+> > >> Even though I wrote TCON-TOP twice, this is same unit in HW. R40 manual
+> > >> suggest more possibilities, although some of them seem wrong, like RGB
+> > >> feeding from LCD TCON. That is confirmed to be wrong when checking BSP
+> > >> code.
+> > >> 
+> > >> Additionally, TCON-TOP comes in the middle of TVE0 and LCD0, TVE1 and
+> > >> LCD1 for pin muxing, although I'm not sure why is that needed at all,
+> > >> since according to R40 datasheet, TVE0 and TVE1 pins are dedicated and
+> > >> not on PORT D and PORT H, respectively, as TCON-TOP documentation
+> > >> suggest. However, HSYNC and PSYNC lines might be shared between TVE
+> > >> (when it works in RGB mode) and LCD. But that is just my guess since
+> > >> I'm not really familiar with RGB and LCD interfaces.
+> > >> 
+> > >> I'm really not sure what would be the best representation in OF-graph.
+> > >> Can you suggest one?
+> > > 
+> > > Rob might disagree on this one, but I don't see anything wrong with
+> > > having loops in the graph. If the TCON-TOP can be both the input and
+> > > output of the TCONs, then so be it, and have it described that way in
+> > > the graph.
+> > > 
+> > > The code is already able to filter out nodes that have already been
+> > > added to the list of devices we need to wait for in the component
+> > > framework, so that should work as well.
+> > > 
+> > > And we'd need to describe TVE-TOP as well, even though we don't have a
+> > > driver for it yet. That will simplify the backward compatibility later
+> > > on.
+> > 
+> > I'm getting the feeling that TCON-TOP / TVE-TOP is the glue layer that
+> > binds everything together, and provides signal routing, kind of like
+> > DE-TOP on A64. So the signal mux controls that were originally found
+> > in TCON0 and TVE0 were moved out.
+> > 
+> > The driver needs to know about that, but the graph about doesn't make
+> > much sense directly. Without looking at the manual, I understand it to
+> > likely be one mux between the mixers and TCONs, and one between the
+> > TCON-TVs and HDMI. Would it make more sense to just have the graph
+> > connections between the muxed components, and remove TCON-TOP from
+> > it, like we had in the past? A phandle could be used to reference
+> > the TCON-TOP for mux controls, in addition to the clocks and resets.
+> > 
+> > For TVE, we would need something to represent each of the output pins,
+> > so the device tree can actually describe what kind of signal, be it
+> > each component of RGB/YUV or composite video, is wanted on each pin,
+> > if any. This is also needed on the A20 for the Cubietruck, so we can
+> > describe which pins are tied to the VGA connector, and which one does
+> > R, G, or B.
 > 
-> Instead of setting the DMA ops pointer to NULL, set the correct,
-> non-IOMMU ops depending on the device's coherency setting.
+> I guess we'll see how the DT maintainers feel about this, but my
+> impression is that the OF graph should model the flow of data between
+> the devices. If there's a mux somewhere, then the data is definitely
+> going through it, and as such it should be part of the graph.
 
-It looks like it's probably been 4 or 5 years since that became subtly 
-wrong by virtue of the landscape changing around it, but it's clearly 
-not enough of a problem to consider stable backports :)
+I concur, but I spent few days thinking how to represent this sanely in graph, 
+but I didn't find any good solution. I'll represent here my idea and please 
+tell your opinion before I start implementing it.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+First, let me be clear that mixer0 and mixer1 don't have same capabilities 
+(different number of planes, mixer0 supports writeback, mixer1 does not, 
+etc.). Thus, it does matter which mixer is connected to which TCON/encoder. 
+mixer0 is meant to be connected to main display and mixer1 to auxiliary. That 
+obviously depends on end system.
 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v4:
-> - new patch to fix existing arm_iommu_detach_device() to do what we need
-> 
->   arch/arm/mm/dma-mapping.c | 12 ++++++------
->   1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index af27f1c22d93..87a0037574e4 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1151,6 +1151,11 @@ int arm_dma_supported(struct device *dev, u64 mask)
->   	return __dma_supported(dev, mask, false);
->   }
->   
-> +static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
-> +{
-> +	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
-> +}
-> +
->   #ifdef CONFIG_ARM_DMA_USE_IOMMU
->   
->   static int __dma_info_to_prot(enum dma_data_direction dir, unsigned long attrs)
-> @@ -2296,7 +2301,7 @@ void arm_iommu_detach_device(struct device *dev)
->   	iommu_detach_device(mapping->domain, dev);
->   	kref_put(&mapping->kref, release_iommu_mapping);
->   	to_dma_iommu_mapping(dev) = NULL;
-> -	set_dma_ops(dev, NULL);
-> +	set_dma_ops(dev, arm_get_dma_map_ops(dev->archdata.dma_coherent));
->   
->   	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
->   }
-> @@ -2357,11 +2362,6 @@ static void arm_teardown_iommu_dma_ops(struct device *dev) { }
->   
->   #endif	/* CONFIG_ARM_DMA_USE_IOMMU */
->   
-> -static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
-> -{
-> -	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
-> -}
-> -
->   void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->   			const struct iommu_ops *iommu, bool coherent)
->   {
-> 
+So, TCON TOP has 3 muxes, which have to be represented in graph. Two of them 
+are for mixer/TCON relationship (each of them 1 input and 4 possible outputs) 
+and one for TV TCON/HDMI pair selection (2 possible inputs, 1 output).
+
+According to current practice in sun4i-drm driver, graph has to have port 0, 
+representing input and port 1, representing output. This would mean that graph 
+looks something like that:
+
+tcon_top: tcon-top at 1c70000 {
+	compatible = "allwinner,sun8i-r40-tcon-top";
+	...
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		tcon_top_in: port at 0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+
+			tcon_top_in_mixer0: endpoint at 0 {
+				reg = <0>;
+				remote-endpoint = <&mixer0_out_tcon_top>;
+			};
+
+			tcon_top_in_mixer1: endpoint at 1 {
+				reg = <1>;
+				remote-endpoint = <&mixer1_out_tcon_top>;
+			};
+
+			tcon_top_in_tcon_tv: endpoint at 2 {
+				reg = <2>;
+				// here is HDMI input connection, part of board DTS
+				remote-endpoint = <board specific phandle to TV TCON output>;
+			};
+		};
+
+		tcon_top_out: port at 1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+
+			tcon_top_out_tcon0: endpoint at 0 {
+				reg = <0>;
+				// here is mixer0 output connection, part of board DTS
+				remote-endpoint = <board specific phandle to TCON>;
+			};
+
+			tcon_top_out_tcon1: endpoint at 1 {
+				reg = <1>;
+				// here is mixer1 output connection, part of board DTS
+				remote-endpoint = <board specific phandle to TCON>;
+			};
+
+			tcon_top_out_hdmi: endpoint at 2 {
+				reg = <2>;
+				remote-endpoint = <&hdmi_in_tcon_top>;
+			};
+		};
+	};
+};
+
+tcon_tv0: lcd-controller at 1c73000 {
+	compatible = "allwinner,sun8i-r40-tcon-tv-0";
+	...
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		tcon_tv0_in: port at 0 {
+			reg = <0>;
+
+			tcon_tv0_in_tcon_top: endpoint {
+				// endpoint depends on board, part of board DTS
+				remote-endpoint = <phandle to one of tcon_top_out_tcon>;
+			};
+		};
+
+		tcon_tv0_out: port at 1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+
+			// endpoints to TV TOP and TCON TOP HDMI input
+			...
+		};
+	};
+};
+
+tcon_tv1: lcd-controller at 1c74000 {
+	compatible = "allwinner,sun8i-r40-tcon-tv-1";
+	...
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		tcon_tv1_in: port at 0 {
+			reg = <0>;
+
+			tcon_tv1_in_tcon_top: endpoint {
+				// endpoint depends on board, part of board DTS
+				remote-endpoint = <phandle to one of tcon_top_out_tcon>;
+			};
+		};
+
+		tcon_tv1_out: port at 1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+
+			// endpoints to TV TOP and TCON TOP HDMI input
+			...
+		};
+	};
+};
+
+tcon_lcd0 and tcon_lcd1 would have similar connections, except that for 
+outputs would be LCD or LVDS panels or MIPI DSI encoder.
+
+Please note that each TCON (there are 4 of them) would need to have unique 
+compatible and have HW index stored in quirks data. It would be used by TCON 
+TOP driver for configuring muxes.
+
+What do you think about above suggestion?
+
+Best regards,
+Jernej
