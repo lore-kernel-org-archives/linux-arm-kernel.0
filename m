@@ -1,28 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 May 2018 22:13:53 -0500
-Subject: [PATCH v3 1/8] dt-bindings: media: rcar-vin: Describe optional
- ep properties
-In-Reply-To: <1527606359-19261-2-git-send-email-jacopo+renesas@jmondi.org>
-References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
- <1527606359-19261-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180531031353.GA4440@rob-hp-laptop>
+From: djw@t-chip.com.cn (djw at t-chip.com.cn)
+Date: Thu, 31 May 2018 11:27:51 +0800
+Subject: [PATCH v3 3/5] arm64: dts: rockchip: Add GPIO_MUTE pin support to
+ rk3328
+In-Reply-To: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+Message-ID: <1527737273-8387-4-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 05:05:52PM +0200, Jacopo Mondi wrote:
-> Describe the optional endpoint properties for endpoint nodes of port at 0
-> and port at 1 of the R-Car VIN driver device tree bindings documentation.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> 
-> ---
-> v2 -> v3:
-> - Do not repeat property description, just reference video-interfaces.txt
-> - Indent with spaces, not tabs as the rest of the document
-> - Do not remove (yet) the 'bus-width' property from example
-> ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+From: Levin Du <djw@t-chip.com.cn>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Adding a new gpio controller named "gpio_mute" to rk3328, providing
+access to the GPIO_MUTE pin, which is manupulated by the GRF_SOC_CON10
+register.
+
+The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
+
+Signed-off-by: Levin Du <djw@t-chip.com.cn>
+
+---
+
+Changes in v3:
+- Use dedicated "rockchip,rk3328-gpio-mute" driver
+
+Changes in v2:
+- Rename gpio_syscon10 to gpio_mute in rk3328.dtsi
+
+Changes in v1:
+- Split from V0 and add to rk3328.dtsi for general use.
+
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index be2bfbc..2ee0fa3 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -309,6 +309,13 @@
+ 			mode-loader = <BOOT_BL_DOWNLOAD>;
+ 		};
+ 
++		/* Use <&gpio_mute 0> to refer to GPIO_MUTE pin */
++		gpio_mute: gpio-mute {
++			compatible = "rockchip,rk3328-gpio-mute";
++			gpio-controller;
++			#gpio-cells = <2>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	uart0: serial at ff110000 {
+-- 
+2.7.4
