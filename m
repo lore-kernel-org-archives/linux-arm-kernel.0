@@ -1,126 +1,118 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 May 2018 18:32:22 +0100
-Subject: [PATCHv2 3/4] firmware/psci: use common SMCCC_CONDUIT_*
+Date: Thu, 31 May 2018 18:32:21 +0100
+Subject: [PATCHv2 2/4] arm64: errata: use arm_smccc_get_conduit()
 In-Reply-To: <20180531173223.9668-1-mark.rutland@arm.com>
 References: <20180531173223.9668-1-mark.rutland@arm.com>
-Message-ID: <20180531173223.9668-4-mark.rutland@arm.com>
+Message-ID: <20180531173223.9668-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have common SMCCC_CONDUIT_* definitions, migrate the PSCI
-code over to them, and kill off the old PSCI_CONDUIT_* definitions.
+Now that we have arm_smccc_get_conduit(), we can hide the PSCI
+implementation details from the arm64 cpu errata code, so let's do so.
+
+As arm_smccc_get_conduit() implicitly checks that the SMCCC version is
+at least SMCCC_VERSION_1_1, we no longer need to check this explicitly
+where switch statements have a default case.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/firmware/psci.c | 25 +++++++++----------------
- include/linux/psci.h    |  9 ++-------
- 2 files changed, 11 insertions(+), 23 deletions(-)
+ arch/arm64/kernel/cpu_errata.c | 34 ++++++++++++----------------------
+ 1 file changed, 12 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index d855c20de663..6d7d3ccc3a39 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -60,7 +60,7 @@ bool psci_tos_resident_on(int cpu)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index cf37ca6fa5f2..0d744b47fd63 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -156,9 +156,7 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+ 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
  }
  
- struct psci_operations psci_ops = {
--	.conduit = PSCI_CONDUIT_NONE,
-+	.conduit = SMCCC_CONDUIT_NONE,
- 	.smccc_version = SMCCC_VERSION_1_0,
- };
+-#include <uapi/linux/psci.h>
+ #include <linux/arm-smccc.h>
+-#include <linux/psci.h>
  
-@@ -69,14 +69,7 @@ enum arm_smccc_conduit arm_smccc_1_1_get_conduit(void)
- 	if (psci_ops.smccc_version < SMCCC_VERSION_1_1)
- 		return SMCCC_CONDUIT_NONE;
+ static void call_smc_arch_workaround_1(void)
+ {
+@@ -193,11 +191,8 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+ 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+ 		return;
+ 
+-	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+-		return;
+-
+-	switch (psci_ops.conduit) {
+-	case PSCI_CONDUIT_HVC:
++	switch (arm_smccc_1_1_get_conduit()) {
++	case SMCCC_CONDUIT_HVC:
+ 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+ 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+ 		if ((int)res.a0 < 0)
+@@ -208,7 +203,7 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+ 		smccc_end = NULL;
+ 		break;
+ 
+-	case PSCI_CONDUIT_SMC:
++	case SMCCC_CONDUIT_SMC:
+ 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+ 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+ 		if ((int)res.a0 < 0)
+@@ -275,11 +270,11 @@ void __init arm64_update_smccc_conduit(struct alt_instr *alt,
+ 
+ 	BUG_ON(nr_inst != 1);
  
 -	switch (psci_ops.conduit) {
--	case PSCI_CONDUIT_SMC:
--		return SMCCC_CONDUIT_SMC;
 -	case PSCI_CONDUIT_HVC:
--		return SMCCC_CONDUIT_HVC;
--	default:
--		return SMCCC_CONDUIT_NONE;
--	}
-+	return psci_ops.conduit;
- }
- 
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-@@ -228,13 +221,13 @@ static unsigned long psci_migrate_info_up_cpu(void)
- 			      0, 0, 0);
- }
- 
--static void set_conduit(enum psci_conduit conduit)
-+static void set_conduit(enum arm_smccc_conduit conduit)
- {
- 	switch (conduit) {
--	case PSCI_CONDUIT_HVC:
++	switch (arm_smccc_1_1_get_conduit()) {
 +	case SMCCC_CONDUIT_HVC:
- 		invoke_psci_fn = __invoke_psci_fn_hvc;
+ 		insn = aarch64_insn_get_hvc_value();
  		break;
 -	case PSCI_CONDUIT_SMC:
 +	case SMCCC_CONDUIT_SMC:
- 		invoke_psci_fn = __invoke_psci_fn_smc;
+ 		insn = aarch64_insn_get_smc_value();
  		break;
  	default:
-@@ -256,9 +249,9 @@ static int get_set_conduit_method(struct device_node *np)
- 	}
+@@ -305,12 +300,12 @@ void __init arm64_enable_wa2_handling(struct alt_instr *alt,
  
- 	if (!strcmp("hvc", method)) {
--		set_conduit(PSCI_CONDUIT_HVC);
-+		set_conduit(SMCCC_CONDUIT_HVC);
- 	} else if (!strcmp("smc", method)) {
--		set_conduit(PSCI_CONDUIT_SMC);
-+		set_conduit(SMCCC_CONDUIT_SMC);
- 	} else {
- 		pr_warn("invalid \"method\" property: %s\n", method);
- 		return -EINVAL;
-@@ -714,9 +707,9 @@ int __init psci_acpi_init(void)
- 	pr_info("probing for conduit method from ACPI.\n");
+ void arm64_set_ssbd_mitigation(bool state)
+ {
+-	switch (psci_ops.conduit) {
+-	case PSCI_CONDUIT_HVC:
++	switch (arm_smccc_1_1_get_conduit()) {
++	case SMCCC_CONDUIT_HVC:
+ 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+ 		break;
  
- 	if (acpi_psci_use_hvc())
--		set_conduit(PSCI_CONDUIT_HVC);
-+		set_conduit(SMCCC_CONDUIT_HVC);
- 	else
--		set_conduit(PSCI_CONDUIT_SMC);
-+		set_conduit(SMCCC_CONDUIT_SMC);
+-	case PSCI_CONDUIT_SMC:
++	case SMCCC_CONDUIT_SMC:
+ 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+ 		break;
  
- 	return psci_probe();
- }
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 8b1b3b5935ab..affcd2128df8 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -14,6 +14,7 @@
- #ifndef __LINUX_PSCI_H
- #define __LINUX_PSCI_H
+@@ -329,18 +324,13 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
  
-+#include <linux/arm-smccc.h>
- #include <linux/init.h>
- #include <linux/types.h>
+ 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
  
-@@ -25,12 +26,6 @@ bool psci_tos_resident_on(int cpu);
- int psci_cpu_init_idle(unsigned int cpu);
- int psci_cpu_suspend_enter(unsigned long index);
- 
--enum psci_conduit {
--	PSCI_CONDUIT_NONE,
--	PSCI_CONDUIT_SMC,
--	PSCI_CONDUIT_HVC,
--};
+-	if (psci_ops.smccc_version == SMCCC_VERSION_1_0) {
+-		ssbd_state = ARM64_SSBD_UNKNOWN;
+-		return false;
+-	}
 -
- enum smccc_version {
- 	SMCCC_VERSION_1_0,
- 	SMCCC_VERSION_1_1,
-@@ -45,7 +40,7 @@ struct psci_operations {
- 	int (*affinity_info)(unsigned long target_affinity,
- 			unsigned long lowest_affinity_level);
- 	int (*migrate_info_type)(void);
--	enum psci_conduit conduit;
-+	enum arm_smccc_conduit conduit;
- 	enum smccc_version smccc_version;
- };
+-	switch (psci_ops.conduit) {
+-	case PSCI_CONDUIT_HVC:
++	switch (arm_smccc_1_1_get_conduit()) {
++	case SMCCC_CONDUIT_HVC:
+ 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+ 				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+ 		break;
  
+-	case PSCI_CONDUIT_SMC:
++	case SMCCC_CONDUIT_SMC:
+ 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+ 				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+ 		break;
 -- 
 2.11.0
