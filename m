@@ -1,53 +1,63 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 31 May 2018 07:32:19 -0300
-Subject: [PATCH 6/7] perf script python: Add addr into perf sample dict
+Date: Thu, 31 May 2018 07:32:17 -0300
+Subject: [PATCH 4/7] perf cs-etm: Fix indexing for decoder packet queue
 In-Reply-To: <20180531103220.24684-1-acme@kernel.org>
 References: <20180531103220.24684-1-acme@kernel.org>
-Message-ID: <20180531103220.24684-7-acme@kernel.org>
+Message-ID: <20180531103220.24684-5-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-ARM CoreSight auxtrace uses 'sample->addr' to record the target address
-for branch instructions, so the data of 'sample->addr' is required for
-tracing data analysis.
+The tail of a queue is supposed to be pointing to the next available
+slot in a queue.  In this implementation the tail is incremented before
+it is used and as such points to the last used element, something that
+has the immense advantage of centralizing tail management at a single
+location and eliminating a lot of redundant code.
 
-This commit collects data of 'sample->addr' into perf sample dict,
-finally can be used for python script for parsing event.
+But this needs to be taken into consideration on the dequeueing side
+where the head also needs to be incremented before it is used, or the
+first available element of the queue will be skipped.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Tested-by: Leo Yan <leo.yan@linaro.org>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Jonathan Corbet <corbet@lwn.net>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
 Cc: Namhyung Kim <namhyung@kernel.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Robert Walker <robert.walker@arm.com>
-Cc: Tor Jeremiassen <tor@ti.com>
-Cc: coresight at lists.linaro.org
-Cc: kim.phillips at arm.co
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-doc at vger.kernel.org
-Link: http://lkml.kernel.org/r/1527497103-3593-3-git-send-email-leo.yan at linaro.org
+Link: http://lkml.kernel.org/r/1527289854-10755-1-git-send-email-mathieu.poirier at linaro.org
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- tools/perf/util/scripting-engines/trace-event-python.c | 2 ++
- 1 file changed, 2 insertions(+)
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/tools/perf/util/scripting-engines/trace-event-python.c b/tools/perf/util/scripting-engines/trace-event-python.c
-index 10dd5fce082b..7f8afacd08ee 100644
---- a/tools/perf/util/scripting-engines/trace-event-python.c
-+++ b/tools/perf/util/scripting-engines/trace-event-python.c
-@@ -531,6 +531,8 @@ static PyObject *get_perf_sample_dict(struct perf_sample *sample,
- 			PyLong_FromUnsignedLongLong(sample->period));
- 	pydict_set_item_string_decref(dict_sample, "phys_addr",
- 			PyLong_FromUnsignedLongLong(sample->phys_addr));
-+	pydict_set_item_string_decref(dict_sample, "addr",
-+			PyLong_FromUnsignedLongLong(sample->addr));
- 	set_sample_read_in_dict(dict_sample, sample, evsel);
- 	pydict_set_item_string_decref(dict, "sample", dict_sample);
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index c8b98fa22997..4d5fc374e730 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -96,11 +96,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
+ 	/* Nothing to do, might as well just return */
+ 	if (decoder->packet_count == 0)
+ 		return 0;
++	/*
++	 * The queueing process in function cs_etm_decoder__buffer_packet()
++	 * increments the tail *before* using it.  This is somewhat counter
++	 * intuitive but it has the advantage of centralizing tail management
++	 * at a single location.  Because of that we need to follow the same
++	 * heuristic with the head, i.e we increment it before using its
++	 * value.  Otherwise the first element of the packet queue is not
++	 * used.
++	 */
++	decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
  
+ 	*packet = decoder->packet_buffer[decoder->head];
+ 
+-	decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+-
+ 	decoder->packet_count--;
+ 
+ 	return 1;
 -- 
 2.14.3
