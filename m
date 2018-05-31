@@ -1,28 +1,27 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 May 2018 10:51:09 +0530
-Subject: [PATCH] ARM: dts: exynos: Add missing CPU clocks to secondary
- CPUs on Exynos542x
-In-Reply-To: <20180530164922.31851-1-krzk@kernel.org>
-References: <20180530164922.31851-1-krzk@kernel.org>
-Message-ID: <20180531052109.f43trnba7ux6tno2@vireshk-i7>
+Date: Thu, 31 May 2018 10:52:34 +0530
+Subject: [PATCH 07/15] arm: dts: exynos: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <CAJKOXPftrzwLMSDeTBBxG-nvpsriBuPEwQAViTcE3DYRYsnzmg@mail.gmail.com>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
+ <CAJKOXPcyV=fdRu7oLXHMimSFR9ktJ23uBriswTStkEkAMbTaNw@mail.gmail.com>
+ <20180530043806.ksen4xyh3x3x4fqn@vireshk-i7>
+ <CAJKOXPftrzwLMSDeTBBxG-nvpsriBuPEwQAViTcE3DYRYsnzmg@mail.gmail.com>
+Message-ID: <20180531052234.tp6pw45ftsf3g2el@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-05-18, 18:49, Krzysztof Kozlowski wrote:
-> Secondary CPUs should have the same information in DeviceTree as booting
-> CPU from both correctness point of view and for possible hotplug
-> scenarios.
-> 
-> Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm/boot/dts/exynos5420-cpus.dtsi | 6 ++++++
->  arch/arm/boot/dts/exynos5422-cpus.dtsi | 8 +++++++-
->  2 files changed, 13 insertions(+), 1 deletion(-)
+On 30-05-18, 14:32, Krzysztof Kozlowski wrote:
+> OK, I see the possibility although it is still far away from use
+> cases. You cannot hotplug booting CPU (CPU0) on Exynos kernels. It
+> never worked. Strictly speaking - offlining will work. But bringing it
+> online will likely hang the system.
 
-Nice.
+True and I used the following out of tree patch for a long time for my
+dual A15 exynos to make hotplug work.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+https://git.linaro.org/people/vireshk/backup/linux.git/commit/?h=bkp/exynos/hotplug&id=aab8a906a70b8f1fb15a4b7bd2ee27e6dcabf79d
 
 -- 
 viresh
