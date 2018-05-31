@@ -1,293 +1,61 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 30 May 2018 17:36:19 -0700
-Subject: [PATCH v2 2/3] clk: bcm: Update and add Stingray clock entries
-In-Reply-To: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
-References: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527726980-11723-3-git-send-email-ray.jui@broadcom.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Thu, 31 May 2018 00:52:17 +0000
+Subject: [PATCH 3/3] ARM: imx: remove i.MX6SLL support in i.MX6SL cpu idle
+ driver
+In-Reply-To: <CAOMZO5BYgPu_T=_x8JDkj=k6TUmP0QEQmT8qxoMfxzyTgZrF7g@mail.gmail.com>
+References: <1527664358-17844-1-git-send-email-Anson.Huang@nxp.com>
+ <1527664358-17844-3-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5BYgPu_T=_x8JDkj=k6TUmP0QEQmT8qxoMfxzyTgZrF7g@mail.gmail.com>
+Message-ID: <AM3PR04MB13157285F0D882AD1C189617F5630@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pramod Kumar <pramod.kumar@broadcom.com>
+Hi, Fabio
 
-Update and add Stingray clock definitions and tables so they match the
-binding document and the latest ASIC datasheet
+Anson Huang
+Best Regards!
 
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-Signed-off-by: Ray Jui <ray.jui@broadcom.com>
----
- drivers/clk/bcm/clk-sr.c           | 135 ++++++++++++++++++++++++++++++++-----
- include/dt-bindings/clock/bcm-sr.h |  24 +++++--
- 2 files changed, 137 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
-index adc74f4..7b9efc0 100644
---- a/drivers/clk/bcm/clk-sr.c
-+++ b/drivers/clk/bcm/clk-sr.c
-@@ -56,8 +56,8 @@ static const struct iproc_pll_ctrl sr_genpll0 = {
- };
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Wednesday, May 30, 2018 8:34 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
+> Estevam <fabio.estevam@nxp.com>; Russell King - ARM Linux
+> <linux@armlinux.org.uk>; dl-linux-imx <linux-imx@nxp.com>; moderated
+> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> <linux-arm-kernel@lists.infradead.org>; linux-kernel
+> <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH 3/3] ARM: imx: remove i.MX6SLL support in i.MX6SL cpu
+> idle driver
+> 
+> Hi Anson,
+> 
+> On Wed, May 30, 2018 at 4:12 AM, Anson Huang <Anson.Huang@nxp.com>
+> wrote:
+> > i.MX6SLL supports ARM power off in cpu idle, better to reuse i.MX6SX
+> > cpu idle driver instead of i.MX6SL which does NOT support ARM power
+> > off.
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > ---
+> >  arch/arm/mach-imx/cpuidle-imx6sl.c | 7 ++-----
+> >  1 file changed, 2 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c
+> > b/arch/arm/mach-imx/cpuidle-imx6sl.c
+> > index fa8ead1..8d866fb 100644
+> > --- a/arch/arm/mach-imx/cpuidle-imx6sl.c
+> > +++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
+> > @@ -12,7 +12,6 @@
+> >
+> >  #include "common.h"
+> >  #include "cpuidle.h"
+> > -#include "hardware.h"
+> 
+> The removal of this header file seems to be an unrelated change.
  
- static const struct iproc_clk_ctrl sr_genpll0_clk[] = {
--	[BCM_SR_GENPLL0_SATA_CLK] = {
--		.channel = BCM_SR_GENPLL0_SATA_CLK,
-+	[BCM_SR_GENPLL0_125M_CLK] = {
-+		.channel = BCM_SR_GENPLL0_125M_CLK,
- 		.flags = IPROC_CLK_AON,
- 		.enable = ENABLE_VAL(0x4, 6, 0, 12),
- 		.mdiv = REG_VAL(0x18, 0, 9),
-@@ -102,6 +102,65 @@ static int sr_genpll0_clk_init(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct iproc_pll_ctrl sr_genpll2 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 13, 12),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_genpll2_clk[] = {
-+	[BCM_SR_GENPLL2_NIC_CLK] = {
-+		.channel = BCM_SR_GENPLL2_NIC_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL2_TS_500_CLK] = {
-+		.channel = BCM_SR_GENPLL2_TS_500_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+	[BCM_SR_GENPLL2_125_NITRO_CLK] = {
-+		.channel = BCM_SR_GENPLL2_125_NITRO_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 8, 2, 14),
-+		.mdiv = REG_VAL(0x18, 20, 9),
-+	},
-+	[BCM_SR_GENPLL2_CHIMP_CLK] = {
-+		.channel = BCM_SR_GENPLL2_CHIMP_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 9, 3, 15),
-+		.mdiv = REG_VAL(0x1c, 0, 9),
-+	},
-+	[BCM_SR_GENPLL2_NIC_FLASH_CLK] = {
-+		.channel = BCM_SR_GENPLL2_NIC_FLASH_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 10, 4, 16),
-+		.mdiv = REG_VAL(0x1c, 10, 9),
-+	},
-+	[BCM_SR_GENPLL2_FS4_CLK] = {
-+		.channel = BCM_SR_GENPLL2_FS4_CLK,
-+		.enable = ENABLE_VAL(0x4, 11, 5, 17),
-+		.mdiv = REG_VAL(0x1c, 20, 9),
-+	},
-+};
-+
-+static int sr_genpll2_clk_init(struct platform_device *pdev)
-+{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_genpll2, NULL, 0, sr_genpll2_clk,
-+			    ARRAY_SIZE(sr_genpll2_clk));
-+	return 0;
-+}
-+
- static const struct iproc_pll_ctrl sr_genpll3 = {
- 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
- 		IPROC_CLK_PLL_NEEDS_SW_CFG,
-@@ -157,6 +216,30 @@ static const struct iproc_clk_ctrl sr_genpll4_clk[] = {
- 		.enable = ENABLE_VAL(0x4, 6, 0, 12),
- 		.mdiv = REG_VAL(0x18, 0, 9),
- 	},
-+	[BCM_SR_GENPLL4_TPIU_PLL_CLK] = {
-+		.channel = BCM_SR_GENPLL4_TPIU_PLL_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+	[BCM_SR_GENPLL4_NOC_CLK] = {
-+		.channel = BCM_SR_GENPLL4_NOC_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 8, 2, 14),
-+		.mdiv = REG_VAL(0x18, 20, 9),
-+	},
-+	[BCM_SR_GENPLL4_CHCLK_FS4_CLK] = {
-+		.channel = BCM_SR_GENPLL4_CHCLK_FS4_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 9, 3, 15),
-+		.mdiv = REG_VAL(0x1c, 0, 9),
-+	},
-+	[BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK] = {
-+		.channel = BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 10, 4, 16),
-+		.mdiv = REG_VAL(0x1c, 10, 9),
-+	},
- };
- 
- static int sr_genpll4_clk_init(struct platform_device *pdev)
-@@ -181,18 +264,21 @@ static const struct iproc_pll_ctrl sr_genpll5 = {
- };
- 
- static const struct iproc_clk_ctrl sr_genpll5_clk[] = {
--	[BCM_SR_GENPLL5_FS_CLK] = {
--		.channel = BCM_SR_GENPLL5_FS_CLK,
--		.flags = IPROC_CLK_AON,
-+	[BCM_SR_GENPLL5_FS4_HF_CLK] = {
-+		.channel = BCM_SR_GENPLL5_FS4_HF_CLK,
- 		.enable = ENABLE_VAL(0x4, 6, 0, 12),
- 		.mdiv = REG_VAL(0x18, 0, 9),
- 	},
--	[BCM_SR_GENPLL5_SPU_CLK] = {
--		.channel = BCM_SR_GENPLL5_SPU_CLK,
--		.flags = IPROC_CLK_AON,
--		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+	[BCM_SR_GENPLL5_CRYPTO_AE_CLK] = {
-+		.channel = BCM_SR_GENPLL5_CRYPTO_AE_CLK,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 12),
- 		.mdiv = REG_VAL(0x18, 10, 9),
- 	},
-+	[BCM_SR_GENPLL5_RAID_AE_CLK] = {
-+		.channel = BCM_SR_GENPLL5_RAID_AE_CLK,
-+		.enable = ENABLE_VAL(0x4, 8, 2, 14),
-+		.mdiv = REG_VAL(0x18, 20, 9),
-+	},
- };
- 
- static int sr_genpll5_clk_init(struct platform_device *pdev)
-@@ -214,24 +300,30 @@ static const struct iproc_pll_ctrl sr_lcpll0 = {
- };
- 
- static const struct iproc_clk_ctrl sr_lcpll0_clk[] = {
--	[BCM_SR_LCPLL0_SATA_REF_CLK] = {
--		.channel = BCM_SR_LCPLL0_SATA_REF_CLK,
-+	[BCM_SR_LCPLL0_SATA_REFP_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_REFP_CLK,
- 		.flags = IPROC_CLK_AON,
- 		.enable = ENABLE_VAL(0x0, 7, 1, 13),
- 		.mdiv = REG_VAL(0x14, 0, 9),
- 	},
--	[BCM_SR_LCPLL0_USB_REF_CLK] = {
--		.channel = BCM_SR_LCPLL0_USB_REF_CLK,
-+	[BCM_SR_LCPLL0_SATA_REFN_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_REFN_CLK,
- 		.flags = IPROC_CLK_AON,
- 		.enable = ENABLE_VAL(0x0, 8, 2, 14),
- 		.mdiv = REG_VAL(0x14, 10, 9),
- 	},
--	[BCM_SR_LCPLL0_SATA_REFPN_CLK] = {
--		.channel = BCM_SR_LCPLL0_SATA_REFPN_CLK,
-+	[BCM_SR_LCPLL0_SATA_350_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_350_CLK,
- 		.flags = IPROC_CLK_AON,
- 		.enable = ENABLE_VAL(0x0, 9, 3, 15),
- 		.mdiv = REG_VAL(0x14, 20, 9),
- 	},
-+	[BCM_SR_LCPLL0_SATA_500_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_500_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 10, 4, 16),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
- };
- 
- static int sr_lcpll0_clk_init(struct platform_device *pdev)
-@@ -259,6 +351,18 @@ static const struct iproc_clk_ctrl sr_lcpll1_clk[] = {
- 		.enable = ENABLE_VAL(0x0, 7, 1, 13),
- 		.mdiv = REG_VAL(0x14, 0, 9),
- 	},
-+	[BCM_SR_LCPLL1_USB_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL1_USB_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 8, 2, 14),
-+		.mdiv = REG_VAL(0x14, 10, 9),
-+	},
-+	[BCM_SR_LCPLL1_CRMU_TS_CLK] = {
-+		.channel = BCM_SR_LCPLL1_CRMU_TS_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 9, 3, 15),
-+		.mdiv = REG_VAL(0x14, 20, 9),
-+	},
- };
- 
- static int sr_lcpll1_clk_init(struct platform_device *pdev)
-@@ -298,6 +402,7 @@ static int sr_lcpll_pcie_clk_init(struct platform_device *pdev)
- 
- static const struct of_device_id sr_clk_dt_ids[] = {
- 	{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init },
-+	{ .compatible = "brcm,sr-genpll2", .data = sr_genpll2_clk_init },
- 	{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init },
- 	{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init },
- 	{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init },
-diff --git a/include/dt-bindings/clock/bcm-sr.h b/include/dt-bindings/clock/bcm-sr.h
-index cff6c6f..419011b 100644
---- a/include/dt-bindings/clock/bcm-sr.h
-+++ b/include/dt-bindings/clock/bcm-sr.h
-@@ -35,7 +35,7 @@
- 
- /* GENPLL 0 clock channel ID SCR HSLS FS PCIE */
- #define BCM_SR_GENPLL0			0
--#define BCM_SR_GENPLL0_SATA_CLK		1
-+#define BCM_SR_GENPLL0_125M_CLK		1
- #define BCM_SR_GENPLL0_SCR_CLK		2
- #define BCM_SR_GENPLL0_250M_CLK		3
- #define BCM_SR_GENPLL0_PCIE_AXI_CLK	4
-@@ -50,9 +50,11 @@
- /* GENPLL 2 clock channel ID NITRO MHB*/
- #define BCM_SR_GENPLL2			0
- #define BCM_SR_GENPLL2_NIC_CLK		1
--#define BCM_SR_GENPLL2_250_NITRO_CLK	2
-+#define BCM_SR_GENPLL2_TS_500_CLK	2
- #define BCM_SR_GENPLL2_125_NITRO_CLK	3
- #define BCM_SR_GENPLL2_CHIMP_CLK	4
-+#define BCM_SR_GENPLL2_NIC_FLASH_CLK	5
-+#define BCM_SR_GENPLL2_FS4_CLK		6
- 
- /* GENPLL 3 HSLS clock channel ID */
- #define BCM_SR_GENPLL3			0
-@@ -62,11 +64,16 @@
- /* GENPLL 4 SCR clock channel ID */
- #define BCM_SR_GENPLL4			0
- #define BCM_SR_GENPLL4_CCN_CLK		1
-+#define BCM_SR_GENPLL4_TPIU_PLL_CLK	2
-+#define BCM_SR_GENPLL4_NOC_CLK		3
-+#define BCM_SR_GENPLL4_CHCLK_FS4_CLK	4
-+#define BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK	5
- 
- /* GENPLL 5 FS4 clock channel ID */
- #define BCM_SR_GENPLL5			0
--#define BCM_SR_GENPLL5_FS_CLK		1
--#define BCM_SR_GENPLL5_SPU_CLK		2
-+#define BCM_SR_GENPLL5_FS4_HF_CLK	1
-+#define BCM_SR_GENPLL5_CRYPTO_AE_CLK	2
-+#define BCM_SR_GENPLL5_RAID_AE_CLK	3
- 
- /* GENPLL 6 NITRO clock channel ID */
- #define BCM_SR_GENPLL6			0
-@@ -74,13 +81,16 @@
- 
- /* LCPLL0  clock channel ID */
- #define BCM_SR_LCPLL0			0
--#define BCM_SR_LCPLL0_SATA_REF_CLK	1
--#define BCM_SR_LCPLL0_USB_REF_CLK	2
--#define BCM_SR_LCPLL0_SATA_REFPN_CLK	3
-+#define BCM_SR_LCPLL0_SATA_REFP_CLK	1
-+#define BCM_SR_LCPLL0_SATA_REFN_CLK	2
-+#define BCM_SR_LCPLL0_SATA_350_CLK	3
-+#define BCM_SR_LCPLL0_SATA_500_CLK	4
- 
- /* LCPLL1  clock channel ID */
- #define BCM_SR_LCPLL1			0
- #define BCM_SR_LCPLL1_WAN_CLK		1
-+#define BCM_SR_LCPLL1_USB_REF_CLK	2
-+#define BCM_SR_LCPLL1_CRMU_TS_CLK	3
- 
- /* LCPLL PCIE  clock channel ID */
- #define BCM_SR_LCPLL_PCIE		0
--- 
-2.1.4
+This header file is no longer needed since no " cpu_is_imx6sl()" used in this file.
+
+Anson.
