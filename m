@@ -1,150 +1,41 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Thu, 31 May 2018 20:41:45 +0800
-Subject: [PATCH v1 1/2] ACPI / APEI: Add SEI notification type support for
- ARMv8
-In-Reply-To: <1527770506-8076-1-git-send-email-gengdongjiu@huawei.com>
-References: <1527770506-8076-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1527770506-8076-2-git-send-email-gengdongjiu@huawei.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 31 May 2018 10:13:40 +0530
+Subject: [PATCH 0/9] clk: davinci: outstanding fixes
+In-Reply-To: <20180530200947.982.19495@harbor.lan>
+References: <20180525181150.17873-1-david@lechnology.com>
+ <20180530200947.982.19495@harbor.lan>
+Message-ID: <8f188ff5-50d1-f128-ecc5-d25edda325d4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 6.x adds support for NOTIFY_SEI as a GHES notification
-mechanism, so add new GHES notification handling functions.
-Expose API ghes_notify_sei() to arch code, arch code will call
-this API when it gets this NOTIFY_SEI.
+On Thursday 31 May 2018 01:39 AM, Michael Turquette wrote:
+> Hi David,
+> 
+> Quoting David Lechner (2018-05-25 11:11:41)
+>> This is a resend of all of the outstanding DaVinci clock patches plus one new
+>> patch. All of the patches (except the new one) have been reviewed and tested
+>> by someone other than me.
+>>
+>> The new patch ("clk: davinci: Fix link errors when not all SoCs are enabled")
+>> should be fairly trivial.
+>>
+>> I am resending them all in one series to hopefully make it easier to get them
+>> picked up by having them in the correct order to avoid merge conflicts. This
+>> series is based on the clk/clk-davinci-psc-da830 branch.
+> 
+> I picked them all and pushed to clk/clk-davinci based on -rc1. There are
+> some comments on the individual patches, all of which are of the "please
+> revisit this and fix it up later" variety.
+> 
+> Going forward I'm happy for you and/or Sekhar to send clk PRs to Stephen
+> and myself. The same rules apply for PRs: all patches need to be posted
+> to the list the old fashioned way for review. But PRs make our lives a
+> bit easier, especially when dealing with chip variants from the same SoC
+> family like we have with davinci.
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
-Note:
-Firmware will follow the SError mask rule, if the SError is masked,
-the firmware will not deliver NOTIFY_SEI notification.
----
- drivers/acpi/apei/Kconfig | 15 ++++++++++++++
- drivers/acpi/apei/ghes.c  | 53 +++++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h       |  1 +
- 3 files changed, 69 insertions(+)
+Thanks Mike! David is listed as maintainer for drivers/clk/davinci/* and
+I believe he can be generating pull requests going forward. I can work
+as the backup, of course.
 
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index 52ae543..ff4afc3 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -55,6 +55,21 @@ config ACPI_APEI_SEA
- 	  option allows the OS to look for such hardware error record, and
- 	  take appropriate action.
- 
-+config ACPI_APEI_SEI
-+	bool "APEI SError(System Error) Interrupt logging/recovering support"
-+	depends on ARM64 && ACPI_APEI_GHES
-+	default y
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEI (SError interrupt).
-+
-+	  SEI happens with asynchronous external abort for errors on device
-+	  memory reads on ARMv8 systems. If a system supports firmware first
-+	  handling of SEI, the platform analyzes and handles hardware error
-+	  notifications from SEI, and it may then form a hardware error record for
-+	  the OS to parse and handle. This option allows the OS to look for
-+	  such hardware error record, and take appropriate action.
-+
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 1efefe9..33f77ae 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -827,6 +827,46 @@ static inline void ghes_sea_add(struct ghes *ghes) { }
- static inline void ghes_sea_remove(struct ghes *ghes) { }
- #endif /* CONFIG_ACPI_APEI_SEA */
- 
-+#ifdef CONFIG_ACPI_APEI_SEI
-+static LIST_HEAD(ghes_sei);
-+
-+/*
-+ * Return 0 only if one of the SEI error sources successfully reported an error
-+ * record sent from the firmware.
-+ */
-+int ghes_notify_sei(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
-+		if (!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sei_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sei);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sei_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEI */
-+static inline void ghes_sei_add(struct ghes *ghes) { }
-+static inline void ghes_sei_remove(struct ghes *ghes) { }
-+#endif /* CONFIG_ACPI_APEI_SEI */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1055,6 +1095,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
-+				generic->header.source_id);
-+		goto err;
-+	}
-+	break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1126,6 +1173,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_add(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1179,6 +1229,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 8feb0c8..9ba59e2 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -120,5 +120,6 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
- 	     section = acpi_hest_get_next(section))
- 
- int ghes_notify_sea(void);
-+int ghes_notify_sei(void);
- 
- #endif /* GHES_H */
--- 
-1.9.1
+Regards,
+Sekhar
