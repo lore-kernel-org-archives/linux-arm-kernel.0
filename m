@@ -1,83 +1,68 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 31 May 2018 12:08:31 -0500
-Subject: [PATCH v2 1/2] arm64: capabilities: add nopti command line argument
-In-Reply-To: <20180531170832.14263-1-mlangsdo@redhat.com>
-References: <20180531170832.14263-1-mlangsdo@redhat.com>
-Message-ID: <20180531170832.14263-2-mlangsdo@redhat.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 31 May 2018 12:11:03 -0500
+Subject: [PATCH 5/5] rpmsg: char: Switch to SPDX license identifier
+In-Reply-To: <20180531171103.8703-1-s-anna@ti.com>
+References: <20180531171103.8703-1-s-anna@ti.com>
+Message-ID: <20180531171103.8703-6-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The x86 kernel and the documentation use 'nopti' as the kernel command
-line argument to disable kernel page table isolation, so add nopti to
-the arm64 kernel for compatibility.
+Use the appropriate SPDX license identifier in the rpmsg char driver
+source file and drop the previous boilerplate license text. The uapi
+header file already had the SPDX license identifier added as part of
+a mass update but the license text removal was deferred for later,
+and this patch drops the same.
 
-Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- Documentation/admin-guide/kernel-parameters.txt | 19 +++++++++++++++----
- arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
- 2 files changed, 25 insertions(+), 5 deletions(-)
+ drivers/rpmsg/rpmsg_char.c | 10 +---------
+ include/uapi/linux/rpmsg.h |  9 ---------
+ 2 files changed, 1 insertion(+), 18 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index f2040d4..cf0c728 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -3342,8 +3342,8 @@
- 	pt.		[PARIDE]
- 			See Documentation/blockdev/paride.txt.
+diff --git a/drivers/rpmsg/rpmsg_char.c b/drivers/rpmsg/rpmsg_char.c
+index 1efdf9ff8679..76a4477c6364 100644
+--- a/drivers/rpmsg/rpmsg_char.c
++++ b/drivers/rpmsg/rpmsg_char.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2016, Linaro Ltd.
+  * Copyright (c) 2012, Michal Simek <monstr@monstr.eu>
+@@ -7,15 +8,6 @@
+  *
+  * Based on rpmsg performance statistics driver by Michal Simek, which in turn
+  * was based on TI & Google OMX rpmsg driver.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ #include <linux/cdev.h>
+ #include <linux/device.h>
+diff --git a/include/uapi/linux/rpmsg.h b/include/uapi/linux/rpmsg.h
+index 225eb38705dc..e14c6dab4223 100644
+--- a/include/uapi/linux/rpmsg.h
++++ b/include/uapi/linux/rpmsg.h
+@@ -1,15 +1,6 @@
+ /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+ /*
+  * Copyright (c) 2016, Linaro Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
  
--	pti=		[X86_64] Control Page Table Isolation of user and
--			kernel address spaces.  Disabling this feature
-+	pti=		[X86_64] Control Page Table Isolation of user
-+			and kernel address spaces.  Disabling this feature
- 			removes hardening, but improves performance of
- 			system calls and interrupts.
- 
-@@ -3354,8 +3354,19 @@
- 
- 			Not specifying this option is equivalent to pti=auto.
- 
--	nopti		[X86_64]
--			Equivalent to pti=off
-+        kpti=           [ARM64] Control Page Table Isolation of user
-+                        and kernel address spaces.  Disabling this feature
-+                        removes hardening, but improves performance of
-+                        system calls and interrupts.
-+
-+                        on   - unconditionally enable
-+                        off  - unconditionally disable
-+
-+                        Not specifying this option will enable kpti on all
-+			systems that support it.
-+
-+	nopti		[X86_64, ARM64]
-+			Equivalent to pti=off on X86_64 or kpti=off on ARM64
- 
- 	pty.legacy_count=
- 			[KNL] Number of legacy pty's. Overwrites compiled-in
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..7c5d8712 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -934,10 +934,19 @@ static int __init parse_kpti(char *str)
- 	if (ret)
- 		return ret;
- 
--	__kpti_forced = enabled ? 1 : -1;
-+	if (!__kpti_forced)
-+		__kpti_forced = enabled ? 1 : -1;
- 	return 0;
- }
- __setup("kpti=", parse_kpti);
-+
-+/* for compatibility with documentation and x86 nopti command line arg */
-+static int __init force_nokpti(char *arg)
-+{
-+	__kpti_forced = -1;
-+	return 0;
-+}
-+early_param("nopti", force_nokpti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
- #ifdef CONFIG_ARM64_HW_AFDBM
+ #ifndef _UAPI_RPMSG_H_
 -- 
-2.9.5
+2.17.0
