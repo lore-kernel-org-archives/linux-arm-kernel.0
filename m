@@ -1,69 +1,49 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 31 May 2018 14:31:12 +0100
-Subject: [PATCH 1/3] ARM: spectre-v1: add speculation barrier (csdb) macros
+Date: Thu, 31 May 2018 14:31:17 +0100
+Subject: [PATCH 2/3] ARM: spectre-v1: add array_index_mask_nospec()
+ implementation
 In-Reply-To: <20180531133047.GS17671@n2100.armlinux.org.uk>
 References: <20180531133047.GS17671@n2100.armlinux.org.uk>
-Message-ID: <E1fONfc-000708-MX@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fONfh-00070F-Tw@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add assembly and C macros for the new CSDB instruction.
+Add an implementation of the array_index_mask_nospec() function for
+mitigating Spectre variant 1 throughout the kernel.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/include/asm/assembler.h |  8 ++++++++
- arch/arm/include/asm/barrier.h   | 13 +++++++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/include/asm/barrier.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index bc8d4bbd82e2..ef1386b1af9b 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -447,6 +447,14 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.size \name , . - \name
- 	.endm
- 
-+	.macro	csdb
-+#ifdef CONFIG_THUMB2_KERNEL
-+	.inst.w	0xf3af8014
-+#else
-+	.inst	0xe320f014
-+#endif
-+	.endm
-+
- 	.macro check_uaccess, addr:req, size:req, limit:req, tmp:req, bad:req
- #ifndef CONFIG_CPU_USE_DOMAINS
- 	adds	\tmp, \addr, #\size - 1
 diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 40f5c410fd8c..3d9c1d4b7e75 100644
+index 3d9c1d4b7e75..a89adcf53b99 100644
 --- a/arch/arm/include/asm/barrier.h
 +++ b/arch/arm/include/asm/barrier.h
-@@ -17,6 +17,12 @@
- #define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
- #define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
- #define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define CSDB	".inst.w 0xf3af8014"
-+#else
-+#define CSDB	".inst	0xe320f014"
-+#endif
-+#define csdb() __asm__ __volatile__(CSDB : : : "memory")
- #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
- #define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
- 				    : : "r" (0) : "memory")
-@@ -37,6 +43,13 @@
- #define dmb(x) __asm__ __volatile__ ("" : : : "memory")
- #endif
+@@ -76,6 +76,24 @@ extern void arm_heavy_mb(void);
+ #define __smp_rmb()	__smp_mb()
+ #define __smp_wmb()	dmb(ishst)
  
-+#ifndef CSDB
-+#define CSDB
-+#endif
-+#ifndef csdb
-+#define csdb()
++#ifdef CONFIG_CPU_SPECTRE
++static inline unsigned long array_index_mask_nospec(unsigned long idx,
++						    unsigned long sz)
++{
++	unsigned long mask;
++
++	asm(	"cmp	%1, %2\n"
++	"	sbc	%0, %1, %1\n"
++	CSDB
++	: "=r" (mask)
++	: "r" (idx), "Ir" (sz)
++	: "cc");
++
++	return mask;
++}
++#define array_index_mask_nospec array_index_mask_nospec
 +#endif
 +
- #ifdef CONFIG_ARM_HEAVY_MB
- extern void (*soc_mb)(void);
- extern void arm_heavy_mb(void);
+ #include <asm-generic/barrier.h>
+ 
+ #endif /* !__ASSEMBLY__ */
 -- 
 2.7.4
