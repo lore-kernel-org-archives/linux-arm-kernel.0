@@ -1,98 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 May 2018 16:55:43 +0100
-Subject: [PATCH 3/3] ARM: spectre-v1: fix syscall entry
-In-Reply-To: <E1fONfn-00070N-9W@rmk-PC.armlinux.org.uk>
-References: <20180531133047.GS17671@n2100.armlinux.org.uk>
- <E1fONfn-00070N-9W@rmk-PC.armlinux.org.uk>
-Message-ID: <20180531155543.t6b3feckgmq6ebwa@lakrids.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 31 May 2018 10:56:53 -0500
+Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <152778070837.144038.4555982304713569160@swboyd.mtv.corp.google.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
+ <20180531005827.GA17203@rob-hp-laptop>
+ <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
+ <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
+ <152778070837.144038.4555982304713569160@swboyd.mtv.corp.google.com>
+Message-ID: <CAL_JsqJu6=ORfutZ5tAyNp2q2rH6P+fgJMRKw750RyFy=ptjPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 02:31:23PM +0100, Russell King wrote:
-> Prevent speculation at the syscall table decoding by clamping the index
-> used to zero on invalid system call numbers, and using the csdb
-> speculative barrier.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/kernel/entry-common.S | 14 +++-----------
->  arch/arm/kernel/entry-header.S | 25 +++++++++++++++++++++++++
->  2 files changed, 28 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 3c4f88701f22..78b9f20dd6a3 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -242,9 +242,7 @@ ENTRY(vector_swi)
->  	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
->  	bne	__sys_trace
->  
-> -	cmp	scno, #NR_syscalls		@ check upper syscall limit
-> -	badr	lr, ret_fast_syscall		@ return address
-> -	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
-> +	invoke_syscall tbl, scno, r10, ret_fast_syscall
->  
->  	add	r1, sp, #S_OFF
->  2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
-> @@ -278,14 +276,8 @@ ENDPROC(vector_swi)
->  	mov	r1, scno
->  	add	r0, sp, #S_OFF
->  	bl	syscall_trace_enter
-> -
-> -	badr	lr, __sys_trace_return		@ return address
-> -	mov	scno, r0			@ syscall number (possibly new)
-> -	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
-> -	cmp	scno, #NR_syscalls		@ check upper syscall limit
-> -	ldmccia	r1, {r0 - r6}			@ have to reload r0 - r6
-> -	stmccia	sp, {r4, r5}			@ and update the stack args
-> -	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
-> +	mov	scno, r0
-> +	invoke_syscall tbl, scno, r10, __sys_trace_return, reload=1
->  	cmp	scno, #-1			@ skip the syscall?
->  	bne	2b
->  	add	sp, sp, #S_OFF			@ restore stack
+On Thu, May 31, 2018 at 10:31 AM, Stephen Boyd <sboyd@kernel.org> wrote:
+> Quoting Rob Herring (2018-05-31 07:20:57)
+>> On Thu, May 31, 2018 at 5:25 AM, Codrin Ciubotariu
+>> <codrin.ciubotariu@microchip.com> wrote:
+>> > On 31.05.2018 03:58, Rob Herring wrote:
+>> >>
+>> >> On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
+>> >>>
+>> >>> The I2S mux clock can be used to select the I2S input clock. The
+>> >>> available parents are the peripheral and the generated clocks.
+>> >>>
+>> >>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+>> >>> ---
+>> >>>   .../devicetree/bindings/clock/at91-clock.txt       | 34
+>> >>> ++++++++++++++++++++++
+>> >>>   1 file changed, 34 insertions(+)
+>> >>>
+>> >>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> >>> b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> >>> index 51c259a..1c46b3c 100644
+>> >>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> >>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> >>> @@ -90,6 +90,8 @@ Required properties:
+>> >>>         "atmel,sama5d2-clk-audio-pll-pmc"
+>> >>>                 at91 audio pll output on AUDIOPLLCLK that feeds the PMC
+>> >>>                 and can be used by peripheral clock or generic clock
+>> >>> +       "atmel,sama5d2-clk-i2s-mux":
+>> >>> +               at91 I2S clock source selection
+>> >>
+>> >>
+>> >> Is this boolean or takes some values. If latter, what are valid values?
+>> >
+>> >
+>> > This is the compatible string of the clock driver.
+>>
+>> Ah, now I remember. AT91 uses fine grained clock nodes in DT. Is there
+>> still a plan to fix this?
+>
+> I'm also interested in a plan.
+>
+>> >>
+>> >>> +               compatible = "atmel,sama5d2-clk-i2s-mux";
+>> >>> +               #address-cells = <1>;
+>> >>> +               #size-cells = <0>;
+>> >>
+>> >>
+>> >> How do you address this block? My guess is you don't because it is just
+>> >> part of some other block and you are just creating this node to
+>> >> instantiate a driver. Just make the node for the actual h/w block a
+>> >> clock provider and define the clock ids (0 and 1).
+>> >
+>> >
+>> > This block is not addressed, but its children are. The register we access in
+>> > this driver is not part of other block. It's a SFR register, accessed
+>> > through syscon and it has nothing to do with the I2S IP (see SAMA5D2 DS,
+>> > page 1256, fig. 44-1: I2SC Block Diagram) that is the consumer of this
+>> > clock. Adding a clock-id property in the I2S node would be just like v3 of
+>> > this series, with the difference that we use clock-id instead of alias id to
+>> > set the clock parent, which is not how you suggested back then.
+>>
+>> I wasn't suggesting a clock-id property, but a clock specifier (i.e.
+>> make #clock-cells 1).
+>>
+>> But AT91 clocks are all a mess, so I don't know what to tell you.
+>>
+>
+> If #clock-cells of 1 works then we should go with that. It's still weird
+> that we need random nodes to add more clks, but I guess that's how it's
+> going to be for each at91 clk driver until it changes to be one big
+> provider node.
 
-I *think* you might also need to adjust sys_syscall.
+Seems to me that clock additions could use a new binding and we start
+with a new driver that handles these few clocks initially. But I
+haven't looked whether both can coexist.
 
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> index 0f07579af472..773424843d6e 100644
-> --- a/arch/arm/kernel/entry-header.S
-> +++ b/arch/arm/kernel/entry-header.S
-> @@ -378,6 +378,31 @@
->  #endif
->  	.endm
->  
-> +	.macro	invoke_syscall, table, nr, tmp, ret, reload=0
-> +#ifdef CONFIG_CPU_SPECTRE
-> +	mov	\tmp, \nr
-> +	cmp	\tmp, #NR_syscalls		@ check upper syscall limit
-> +	movcs	\tmp, #0
-> +	csdb
-
-To the best of my understanding, this sequence is sufficient.
-
-> +	badr	lr, \ret			@ return address
-> +	.if	\reload
-> +	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
-> +	ldmccia	r1, {r0 - r6}			@ reload r0-r6
-> +	stmccia	sp, {r4, r5}			@ update stack arguments
-> +	.endif
-> +	ldrcc	pc, [\table, \tmp, lsl #2]	@ call sys_* routine
-> +#else
-> +	cmp	\nr, #NR_syscalls		@ check upper syscall limit
-> +	badr	lr, \ret			@ return address
-> +	.if	\reload
-> +	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
-> +	ldmccia	r1, {r0 - r6}			@ reload r0-r6
-> +	stmccia	sp, {r4, r5}			@ update stack arguments
-> +	.endif
-> +	ldrcc	pc, [\table, \nr, lsl #2]	@ call sys_* routine
-> +#endif
-> +	.endm
-
-I couldn't find a nice way to avoid dupliacting the body without more
-ifdeffery, given the nr parameter can't be clobbered.
-
-So modulo sys_syscall, this looks good to me.
-
-Mark.
+Rob
