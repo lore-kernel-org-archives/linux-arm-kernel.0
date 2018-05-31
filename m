@@ -1,65 +1,78 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 May 2018 17:34:43 -0700
-Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
- <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
- <20180530103720.GH6920@sirena.org.uk>
- <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
- <20180530155044.GR6920@sirena.org.uk>
- <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
- <20180530162007.GU6920@sirena.org.uk>
- <CAD=FV=WL9enzYCoSx0fT_ny40ciLJU-hhS9joJ6nySXvWPqAxQ@mail.gmail.com>
- <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
-Message-ID: <CAD=FV=VNVE5ttNg+7xmgh-p1sFbCxCY1DJiri0JtHFax+zVsnA@mail.gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 30 May 2018 17:36:18 -0700
+Subject: [PATCH v2 1/3] dt-bindings: clk: Update Stingray binding doc
+In-Reply-To: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
+References: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527726980-11723-2-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Pramod Kumar <pramod.kumar@broadcom.com>
 
-On Wed, May 30, 2018 at 4:39 PM, David Collins <collinsd@codeaurora.org> wrote:
-> Consider the case of a regulator with physical 10 mA LPM max current. Say
-> that modem and application processors each have a load on the regulator
-> that draws 9 mA. If they each respect the 10 mA limit, then they'd each
-> vote for LPM. The VRM block in RPMh hardware will aggregate these requests
-> together using a max function which will result in the regulator being set
-> to LPM, even though the total load is 18 mA (which would require high
-> power mode (HPM)). To get around this corner case, a LPM max current of 1
-> uA can be used for all LDO supplies that have non-application processor
-> consumers. Thus, any non-zero regulator_set_load() current request will
-> result in setting the regulator to HPM (which is always safe).
+Update Stingray clock binding document to add additional clock entries
+with names matching the latest ASIC datasheet. Also modify a few existing
+entries to make their naming more consistent with the rest of the entries
 
-Is there any plan to change the way this works for future versions of RPMh?
+Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+---
+ .../bindings/clock/brcm,iproc-clocks.txt           | 26 ++++++++++++----------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
 
-
-> The second situation that needs board-level DRMS mode and current limit
-> specification is SMPS regulator AUTO mode to PWM (HPM) mode switching.
-> SMPS regulators should theoretically always be able to operate in AUTO
-> mode as it switches automatically between PWM mode (which can provide the
-> maximum current) and PFM mode (which supports lower current but has higher
-> efficiency). However, there may be board/system issues that require
-> switching to PWM mode for certain use cases as it has better load
-> regulation (i.e. no PFM ripple for lower loads) and supports more
-> aggressive load current steps (i.e. greater A/ns).
->
-> If a Linux consumer requires the ability to force a given SMPS regulator
-> from AUTO mode into PWM mode and that SMPS is shared by other Linux
-> consumers (which may be the case, but at least must be guaranteed to work
-> architecturally), then regulator_set_load() is the only option since it
-> provides aggregation, where as regulator_set_mode() does not.
-> regulator_set_load() can be utilized in this case by specifying AUTO mode
-> and PWM mode as drms modes and specifying some particular AUTO mode
-> maximum current (that is known by the consumer) in device tree.  The
-> consumer can then call regulator_set_load() with the imposed AUTO mode
-> limit + delta when PWM mode is required and a lower value when AUTO mode
-> is sufficient.
-
-Mark: I'm leaving this firmly in your hands.  I can see David's points
-here.  I could even believe that some of this stuff could be board
-specific where one board might have slightly different capacitors or
-they might be placed differently and might need a higher power mode to
-keep the signal clean.
-
--Doug
+diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+index f8e4a93..ab730ea 100644
+--- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+@@ -276,36 +276,38 @@ These clock IDs are defined in:
+     clk_ts_500_ref	genpll2		2	BCM_SR_GENPLL2_TS_500_REF_CLK
+     clk_125_nitro	genpll2		3	BCM_SR_GENPLL2_125_NITRO_CLK
+     clk_chimp		genpll2		4	BCM_SR_GENPLL2_CHIMP_CLK
+-    clk_nic_flash	genpll2		5	BCM_SR_GENPLL2_NIC_FLASH
++    clk_nic_flash	genpll2		5	BCM_SR_GENPLL2_NIC_FLASH_CLK
++    clk_fs		genpll2		6	BCM_SR_GENPLL2_FS_CLK
+ 
+     genpll3		crystal		0	BCM_SR_GENPLL3
+     clk_hsls		genpll3		1	BCM_SR_GENPLL3_HSLS_CLK
+     clk_sdio		genpll3		2	BCM_SR_GENPLL3_SDIO_CLK
+ 
+     genpll4		crystal		0	BCM_SR_GENPLL4
+-    ccn			genpll4		1	BCM_SR_GENPLL4_CCN_CLK
++    clk_ccn		genpll4		1	BCM_SR_GENPLL4_CCN_CLK
+     clk_tpiu_pll	genpll4		2	BCM_SR_GENPLL4_TPIU_PLL_CLK
+-    noc_clk		genpll4		3	BCM_SR_GENPLL4_NOC_CLK
++    clk_noc		genpll4		3	BCM_SR_GENPLL4_NOC_CLK
+     clk_chclk_fs4	genpll4		4	BCM_SR_GENPLL4_CHCLK_FS4_CLK
+     clk_bridge_fscpu	genpll4		5	BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK
+ 
+-
+     genpll5		crystal		0	BCM_SR_GENPLL5
+-    fs4_hf_clk		genpll5		1	BCM_SR_GENPLL5_FS4_HF_CLK
+-    crypto_ae_clk	genpll5		2	BCM_SR_GENPLL5_CRYPTO_AE_CLK
+-    raid_ae_clk		genpll5		3	BCM_SR_GENPLL5_RAID_AE_CLK
++    clk_fs4_hf		genpll5		1	BCM_SR_GENPLL5_FS4_HF_CLK
++    clk_crypto_ae	genpll5		2	BCM_SR_GENPLL5_CRYPTO_AE_CLK
++    clk_raid_ae		genpll5		3	BCM_SR_GENPLL5_RAID_AE_CLK
+ 
+     genpll6		crystal		0	BCM_SR_GENPLL6
+-    48_usb		genpll6		1	BCM_SR_GENPLL6_48_USB_CLK
++    clk_48_usb		genpll6		1	BCM_SR_GENPLL6_48_USB_CLK
+ 
+     lcpll0		crystal		0	BCM_SR_LCPLL0
+     clk_sata_refp 	lcpll0		1	BCM_SR_LCPLL0_SATA_REFP_CLK
+     clk_sata_refn	lcpll0		2	BCM_SR_LCPLL0_SATA_REFN_CLK
+-    clk_usb_ref		lcpll0		3	BCM_SR_LCPLL0_USB_REF_CLK
+-    sata_refpn		lcpll0		3	BCM_SR_LCPLL0_SATA_REFPN_CLK
++    clk_sata_350	lcpll0		3	BCM_SR_LCPLL0_SATA_350_CLK
++    clk_sata_500	lcpll0		4	BCM_SR_LCPLL0_SATA_500_CLK
+ 
+     lcpll1		crystal		0	BCM_SR_LCPLL1
+-    wan 		lcpll1		1	BCM_SR_LCPLL0_WAN_CLK
++    clk_wan		lcpll1		1	BCM_SR_LCPLL1_WAN_CLK
++    clk_usb_ref		lcpll1		2	BCM_SR_LCPLL1_USB_REF_CLK
++    clk_crmu_ts		lcpll1		3	BCM_SR_LCPLL1_CRMU_TS_CLK
+ 
+     lcpll_pcie		crystal		0	BCM_SR_LCPLL_PCIE
+-    pcie_phy_ref 	lcpll1		1	BCM_SR_LCPLL_PCIE_PHY_REF_CLK
++    clk_pcie_phy_ref	lcpll1		1	BCM_SR_LCPLL_PCIE_PHY_REF_CLK
+-- 
+2.1.4
