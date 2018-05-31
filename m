@@ -1,39 +1,33 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 31 May 2018 22:00:51 +0800
-Subject: [PATCH 0/2] arm64/drivers: avoid alloc memory on offline node
-In-Reply-To: <1527768879-88161-1-git-send-email-xiexiuqi@huawei.com>
-References: <1527768879-88161-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <65b32f11-6c83-3497-3cbf-3d3688195291@huawei.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 31 May 2018 07:16:45 -0700
+Subject: [PATCH 00/12] introduce support for early platform drivers
+In-Reply-To: <CAMuHMdUY+-_72DHg9Tim2d4E24k5KskQxm52bHSyrSYLbZDr2g@mail.gmail.com>
+References: <20180511162028.20616-1-brgl@bgdev.pl>
+ <CAL_JsqL3CWFSpKEGoGwQDxCQ04g4uT1hiDTxXzjz4XTjPbfsoQ@mail.gmail.com>
+ <CAMRc=McDNYQ5uk8EyRkDf8eh9q7tyF=t7PcUd6DBLqXcseJ3AQ@mail.gmail.com>
+ <CAL_JsqJ=DdkDR3LtnTMHPUpwaUbjPEBgkaCV8ja+p-mTvWZuYA@mail.gmail.com>
+ <20180530194032.982.41562@harbor.lan>
+ <CAL_Jsq+7=NGj57k=E5GAuDmW7Uu_YkHJXf8jSyc_ad3r1op4yA@mail.gmail.com>
+ <CAMuHMdUY+-_72DHg9Tim2d4E24k5KskQxm52bHSyrSYLbZDr2g@mail.gmail.com>
+Message-ID: <20180531141645.GM5705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiuqi,
-
-On 2018/5/31 20:14, Xie XiuQi wrote:
-> A numa system may return node which is not online.
-> For example, a numa node:
-> 1) without memory
-> 2) NR_CPUS is very small, and the cpus on the node are not brought up
-
-I think adding detail info will be easy to be understood:
- - NUMA node will be built if CPUs and (or) memory are valid on this NUMA node;
-
- - But if we boot the system with memory-less node and also with CONFIG_NR_CPUS
-   less than CPUs in SRAT, for example, 64 CPUs total with 4 NUMA nodes, 16 CPUs
-   on each NUMA node, if we boot with CONFIG_NR_CPUS=48, then we will not built
-   numa node for node 3, but with devices on that numa node, alloc memory will
-   be panic because NUMA node 3 is not a valid node.
-
+* Geert Uytterhoeven <geert@linux-m68k.org> [180531 06:45]:
+> Yes, they should all be drivers.
 > 
-> In this situation, we use NUMA_NO_NODE to avoid oops.
-[snip]
+> Assuming clocksources, clockevents, or primary interrupt controllers are
+> special, and thus forcing everyone to use OF_DECLARE for the whole
+> subsystem, doesn't fly everywhere.
 > 
-> Xie XiuQi (2):
->   arm64: avoid alloc memory on offline node
->   drivers: check numa node's online status in dev_to_node
+> Clockevents and interrupt controllers can have a module clock.
+> All three can be part of a PM Domain, which requires a struct device to
+> be handled properly.
 
-I think we still missing devices like SMMU, ITS, so how about check
-the numa node online in the core memory allocation such as kmalloc_node()?
+I agree it sure would be nice to have all these as drivers. I believe
+SoC specific clockevent using SoC specific clocks is the reason why some
+clocks cannot currently be drivers.
 
-Thanks
-Hanjun
+Regards,
+
+Tony
