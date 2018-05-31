@@ -1,80 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 May 2018 12:24:21 +0100
-Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Thu, 31 May 2018 16:56:46 +0530
+Subject: [PATCH v2 5/6] ARM: dts: Add generic interconnect target module
+ node for MCAN
+In-Reply-To: <20180531040638.GA26751@rob-hp-laptop>
+References: <20180530141133.3711-1-faiz_abbas@ti.com>
+ <20180530141133.3711-6-faiz_abbas@ti.com>
+ <20180531040638.GA26751@rob-hp-laptop>
+Message-ID: <be0fd711-c44b-dbe2-648f-08aa88c7aec4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/18 08:42, Zhen Lei wrote:
-> In common, a IOMMU unmap operation follow the below steps:
-> 1. remove the mapping in page table of the specified iova range
-> 2. execute tlbi command to invalid the mapping which is cached in TLB
-> 3. wait for the above tlbi operation to be finished
-> 4. free the IOVA resource
-> 5. free the physical memory resource
-> 
-> This maybe a problem when unmap is very frequently, the combination of tlbi
-> and wait operation will consume a lot of time. A feasible method is put off
-> tlbi and iova-free operation, when accumulating to a certain number or
-> reaching a specified time, execute only one tlbi_all command to clean up
-> TLB, then free the backup IOVAs. Mark as non-strict mode.
-> 
-> But it must be noted that, although the mapping has already been removed in
-> the page table, it maybe still exist in TLB. And the freed physical memory
-> may also be reused for others. So a attacker can persistent access to memory
-> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
-> the VFIO should always choose the strict mode.
-> 
-> Some may consider put off physical memory free also, that will still follow
-> strict mode. But for the map_sg cases, the memory allocation is not controlled
-> by IOMMU APIs, so it is not enforceable.
-> 
-> Fortunately, Intel and AMD have already applied the non-strict mode, and put
-> queue_iova() operation into the common file dma-iommu.c., and my work is based
-> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
-> unmap, but Intel and AMD IOMMU drivers are not.
-> 
-> Below is the performance data of strict vs non-strict for NVMe device:
-> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
-> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
+Hi,
 
-What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then 
-you'll still be using the rubbish globally-blocking sync implementation. 
-If that is the case, I'd be very interested to see how much there is to 
-gain from just improving that - I've had a patch kicking around for a 
-while[1] (also on a rebased branch at [2]), but don't have the means for 
-serious performance testing.
+On Thursday 31 May 2018 09:36 AM, Rob Herring wrote:
+> On Wed, May 30, 2018 at 07:41:32PM +0530, Faiz Abbas wrote:
+>> The ti-sysc driver provides support for manipulating the idlemodes
+>> and interconnect level resets.
+>>
+>> Add the generic interconnect target module node for MCAN to support
+>> the same.
+>>
+>> CC: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+>> ---
+>>  arch/arm/boot/dts/dra76x.dtsi | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra76x.dtsi b/arch/arm/boot/dts/dra76x.dtsi
+>> index bfc82636999c..57b8dc0fe719 100644
+>> --- a/arch/arm/boot/dts/dra76x.dtsi
+>> +++ b/arch/arm/boot/dts/dra76x.dtsi
+>> @@ -11,6 +11,25 @@
+>>  / {
+>>  	compatible = "ti,dra762", "ti,dra7";
+>>  
+>> +	ocp {
+>> +
+>> +		target-module at 0x42c00000 {
+> 
+> Build your dtb with W=1 and fix warnings you add (drop '0x').
 
-Robin.
+Sure, Will fix this.
+> 
+> This is a CAN bus controller? If so, then use 'can' for node name.
 
-[1] 
-https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg20576.html
-[2] git://linux-arm.org/linux-rm iommu/smmu
+Yes but I am using m_can along the lines of dcan in other boards (For
+example, see arch/arm/boot/dts/am33xx.dtsi:1046). Are you saying all CAN
+controllers should only be called can?
 
-> 
-> 
-> Zhen Lei (7):
->    iommu/dma: fix trival coding style mistake
->    iommu/arm-smmu-v3: fix the implementation of flush_iotlb_all hook
->    iommu: prepare for the non-strict mode support
->    iommu/amd: make sure TLB to be flushed before IOVA freed
->    iommu/dma: add support for non-strict mode
->    iommu/io-pgtable-arm: add support for non-strict mode
->    iommu/arm-smmu-v3: add support for non-strict mode
-> 
->   drivers/iommu/amd_iommu.c          |  2 +-
->   drivers/iommu/arm-smmu-v3.c        | 16 ++++++++++++---
->   drivers/iommu/arm-smmu.c           |  2 +-
->   drivers/iommu/dma-iommu.c          | 41 ++++++++++++++++++++++++++++++--------
->   drivers/iommu/io-pgtable-arm-v7s.c |  6 +++---
->   drivers/iommu/io-pgtable-arm.c     | 28 ++++++++++++++------------
->   drivers/iommu/io-pgtable.h         |  2 +-
->   drivers/iommu/ipmmu-vmsa.c         |  2 +-
->   drivers/iommu/msm_iommu.c          |  2 +-
->   drivers/iommu/mtk_iommu.c          |  2 +-
->   drivers/iommu/qcom_iommu.c         |  2 +-
->   include/linux/iommu.h              |  5 +++++
->   12 files changed, 76 insertions(+), 34 deletions(-)
-> 
+Thanks,
+Faiz
