@@ -1,120 +1,88 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Thu, 31 May 2018 16:15:45 +0800
-Subject: [PATCH v2] PCI: mediatek: Add system pm support for MT2712
-Message-ID: <1527754545-32378-1-git-send-email-honghui.zhang@mediatek.com>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Thu, 31 May 2018 10:22:48 +0200
+Subject: [PATCH v2 1/2] ARM: debug: Add Iproc UART3 debug addresses
+In-Reply-To: <93c2d07a-9344-ed39-261e-11084067a3fa@broadcom.com>
+References: <20180530131956.13972-1-peron.clem@gmail.com>
+ <93c2d07a-9344-ed39-261e-11084067a3fa@broadcom.com>
+Message-ID: <CAJiuCcek9KU6QWsAAxVCLUaf1v97uR6FcLOfY=A1LGCMTmjHjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi Rai,
 
-The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
-the internal control register will be reset after system resume. The PCIe
-link should be re-established and the related control register values
-should be re-set after system resume.
+On Wed, 30 May 2018 at 19:25, Ray Jui <ray.jui@broadcom.com> wrote:
+>
+> Hi Cl?ment,
+>
+> Correct me if I'm wrong, but I thought the trend is to move to use
+> earlycon that can be activated from kernel command line for early print
+> before the serial driver is loaded.
+>
+> Have you tried earlcon?
+No, only tested this method.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-CC: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 61 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+Thanks,
+Clement
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index dabf1086..6bf7f5a 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -132,12 +132,14 @@ struct mtk_pcie_port;
- /**
-  * struct mtk_pcie_soc - differentiate between host generations
-  * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-+ * @pm_support: whether the host's MTCMOS will be off when suspend
-  * @ops: pointer to configuration access functions
-  * @startup: pointer to controller setting functions
-  * @setup_irq: pointer to initialize IRQ functions
-  */
- struct mtk_pcie_soc {
- 	bool need_fix_class_id;
-+	bool pm_support;
- 	struct pci_ops *ops;
- 	int (*startup)(struct mtk_pcie_port *port);
- 	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-@@ -1179,12 +1181,70 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mtk_pcie_suspend_noirq(struct device *dev)
-+{
-+	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-+	const struct mtk_pcie_soc *soc = pcie->soc;
-+	struct mtk_pcie_port *port;
-+
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		clk_disable_unprepare(port->ahb_ck);
-+		clk_disable_unprepare(port->sys_ck);
-+		phy_power_off(port->phy);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_pcie_resume_noirq(struct device *dev)
-+{
-+	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-+	const struct mtk_pcie_soc *soc = pcie->soc;
-+	struct mtk_pcie_port *port;
-+	int ret;
-+
-+	soc = pcie->soc;
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		phy_power_on(port->phy);
-+		clk_prepare_enable(port->sys_ck);
-+		clk_prepare_enable(port->ahb_ck);
-+
-+		ret = soc->startup(port);
-+		if (ret) {
-+			dev_err(dev, "Port%d link down\n", port->slot);
-+			phy_power_off(port->phy);
-+			clk_disable_unprepare(port->sys_ck);
-+			clk_disable_unprepare(port->ahb_ck);
-+			return ret;
-+		}
-+
-+		if (IS_ENABLED(CONFIG_PCI_MSI))
-+			mtk_pcie_enable_msi(port);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+const struct dev_pm_ops mtk_pcie_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
-+				      mtk_pcie_resume_noirq)
-+};
-+
- static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
- 	.ops = &mtk_pcie_ops,
- 	.startup = mtk_pcie_startup_port,
- };
- 
- static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-+	.pm_support = true,
- 	.ops = &mtk_pcie_ops_v2,
- 	.startup = mtk_pcie_startup_port_v2,
- 	.setup_irq = mtk_pcie_setup_irq,
-@@ -1211,6 +1271,7 @@ static struct platform_driver mtk_pcie_driver = {
- 		.name = "mtk-pcie",
- 		.of_match_table = mtk_pcie_ids,
- 		.suppress_bind_attrs = true,
-+		.pm = &mtk_pcie_pm_ops,
- 	},
- };
- builtin_platform_driver(mtk_pcie_driver);
--- 
-2.6.4
+>
+> Thanks,
+>
+> Ray
+>
+> On 5/30/2018 6:19 AM, Cl?ment P?ron wrote:
+> > From: Cl?ment Peron <clement.peron@devialet.com>
+> >
+> > Broadcom Iproc SoCs typically use the UART3 for
+> > debug/console, provide a known good location for that.
+> >
+> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> > ---
+> >
+> >   arch/arm/Kconfig.debug | 12 +++++++++++-
+> >   1 file changed, 11 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> > index 199ebc1c4538..4ea9d5793b91 100644
+> > --- a/arch/arm/Kconfig.debug
+> > +++ b/arch/arm/Kconfig.debug
+> > @@ -207,6 +207,14 @@ choice
+> >               depends on ARCH_BCM_HR2
+> >               select DEBUG_UART_8250
+> >
+> > +     config DEBUG_BCM_IPROC_UART3
+> > +             bool "Kernel low-level debugging on BCM IPROC UART3"
+> > +             depends on ARCH_BCM_CYGNUS
+> > +             select DEBUG_UART_8250
+> > +             help
+> > +               Say Y here if you want the debug print routines to direct
+> > +               their output to the third serial port on these devices.
+> > +
+> >       config DEBUG_BCM_KONA_UART
+> >               bool "Kernel low-level debugging messages via BCM KONA UART"
+> >               depends on ARCH_BCM_MOBILE
+> > @@ -1557,6 +1565,7 @@ config DEBUG_UART_PHYS
+> >       default 0x18000400 if DEBUG_BCM_HR2
+> >       default 0x18010000 if DEBUG_SIRFATLAS7_UART0
+> >       default 0x18020000 if DEBUG_SIRFATLAS7_UART1
+> > +     default 0x18023000 if DEBUG_BCM_IPROC_UART3
+> >       default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
+> >       default 0x20001000 if DEBUG_HIP01_UART
+> >       default 0x20060000 if DEBUG_RK29_UART0
+> > @@ -1676,6 +1685,7 @@ config DEBUG_UART_VIRT
+> >       default 0xf1002000 if DEBUG_MT8127_UART0
+> >       default 0xf1006000 if DEBUG_MT6589_UART0
+> >       default 0xf1009000 if DEBUG_MT8135_UART3
+> > +     default 0xf1023000 if DEBUG_BCM_IPROC_UART3
+> >       default 0xf11f1000 if DEBUG_VERSATILE
+> >       default 0xf1600000 if DEBUG_INTEGRATOR
+> >       default 0xf1c28000 if DEBUG_SUNXI_UART0
+> > @@ -1791,7 +1801,7 @@ config DEBUG_UART_8250_WORD
+> >               DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
+> >               DEBUG_ALPINE_UART0 || \
+> >               DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+> > -             DEBUG_DAVINCI_DA8XX_UART2 || \
+> > +             DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
+> >               DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
+> >
+> >   config DEBUG_UART_8250_PALMCHIP
+> >
