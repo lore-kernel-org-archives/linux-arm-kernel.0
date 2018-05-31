@@ -1,65 +1,66 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 31 May 2018 15:42:42 +0800
-Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
-Message-ID: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+Date: Thu, 31 May 2018 15:42:43 +0800
+Subject: [PATCH 1/7] iommu/dma: fix trival coding style mistake
+In-Reply-To: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1527752569-18020-2-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In common, a IOMMU unmap operation follow the below steps:
-1. remove the mapping in page table of the specified iova range
-2. execute tlbi command to invalid the mapping which is cached in TLB
-3. wait for the above tlbi operation to be finished
-4. free the IOVA resource
-5. free the physical memory resource
+The static function iova_reserve_iommu_regions is only called by function
+iommu_dma_init_domain, and the 'if (!dev)' check in iommu_dma_init_domain
+affect it only, so we can safely move the check into it. I think it looks
+more natural.
 
-This maybe a problem when unmap is very frequently, the combination of tlbi
-and wait operation will consume a lot of time. A feasible method is put off
-tlbi and iova-free operation, when accumulating to a certain number or
-reaching a specified time, execute only one tlbi_all command to clean up
-TLB, then free the backup IOVAs. Mark as non-strict mode.
+In addition, the local variable 'ret' is only assigned in the branch of
+'if (region->type == IOMMU_RESV_MSI)', so the 'if (ret)' should also only
+take effect in the branch, add a brace to enclose it.
 
-But it must be noted that, although the mapping has already been removed in
-the page table, it maybe still exist in TLB. And the freed physical memory
-may also be reused for others. So a attacker can persistent access to memory
-based on the just freed IOVA, to obtain sensible data or corrupt memory. So
-the VFIO should always choose the strict mode.
+No functional changes.
 
-Some may consider put off physical memory free also, that will still follow
-strict mode. But for the map_sg cases, the memory allocation is not controlled
-by IOMMU APIs, so it is not enforceable.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/dma-iommu.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-Fortunately, Intel and AMD have already applied the non-strict mode, and put
-queue_iova() operation into the common file dma-iommu.c., and my work is based
-on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
-unmap, but Intel and AMD IOMMU drivers are not.
-
-Below is the performance data of strict vs non-strict for NVMe device:
-Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
-Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
-
-
-Zhen Lei (7):
-  iommu/dma: fix trival coding style mistake
-  iommu/arm-smmu-v3: fix the implementation of flush_iotlb_all hook
-  iommu: prepare for the non-strict mode support
-  iommu/amd: make sure TLB to be flushed before IOVA freed
-  iommu/dma: add support for non-strict mode
-  iommu/io-pgtable-arm: add support for non-strict mode
-  iommu/arm-smmu-v3: add support for non-strict mode
-
- drivers/iommu/amd_iommu.c          |  2 +-
- drivers/iommu/arm-smmu-v3.c        | 16 ++++++++++++---
- drivers/iommu/arm-smmu.c           |  2 +-
- drivers/iommu/dma-iommu.c          | 41 ++++++++++++++++++++++++++++++--------
- drivers/iommu/io-pgtable-arm-v7s.c |  6 +++---
- drivers/iommu/io-pgtable-arm.c     | 28 ++++++++++++++------------
- drivers/iommu/io-pgtable.h         |  2 +-
- drivers/iommu/ipmmu-vmsa.c         |  2 +-
- drivers/iommu/msm_iommu.c          |  2 +-
- drivers/iommu/mtk_iommu.c          |  2 +-
- drivers/iommu/qcom_iommu.c         |  2 +-
- include/linux/iommu.h              |  5 +++++
- 12 files changed, 76 insertions(+), 34 deletions(-)
-
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index ddcbbdb..4e885f7 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -231,6 +231,9 @@ static int iova_reserve_iommu_regions(struct device *dev,
+ 	LIST_HEAD(resv_regions);
+ 	int ret = 0;
+ 
++	if (!dev)
++		return 0;
++
+ 	if (dev_is_pci(dev))
+ 		iova_reserve_pci_windows(to_pci_dev(dev), iovad);
+ 
+@@ -246,11 +249,12 @@ static int iova_reserve_iommu_regions(struct device *dev,
+ 		hi = iova_pfn(iovad, region->start + region->length - 1);
+ 		reserve_iova(iovad, lo, hi);
+ 
+-		if (region->type == IOMMU_RESV_MSI)
++		if (region->type == IOMMU_RESV_MSI) {
+ 			ret = cookie_init_hw_msi_region(cookie, region->start,
+ 					region->start + region->length);
+-		if (ret)
+-			break;
++			if (ret)
++				break;
++		}
+ 	}
+ 	iommu_put_resv_regions(dev, &resv_regions);
+ 
+@@ -308,8 +312,6 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+ 	}
+ 
+ 	init_iova_domain(iovad, 1UL << order, base_pfn);
+-	if (!dev)
+-		return 0;
+ 
+ 	return iova_reserve_iommu_regions(dev, domain);
+ }
 -- 
 1.8.3
