@@ -1,123 +1,33 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 31 May 2018 12:10:59 -0500
-Subject: [PATCH 1/5] rpmsg: Switch to SPDX license identifier
-In-Reply-To: <20180531171103.8703-1-s-anna@ti.com>
-References: <20180531171103.8703-1-s-anna@ti.com>
-Message-ID: <20180531171103.8703-2-s-anna@ti.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Thu, 31 May 2018 22:41:46 +0530
+Subject: [linux-sunxi] [PATCH v2] arm64: allwinner: a64-amarula-relic:
+ Enable AP6330 WiFi support
+In-Reply-To: <CAP03XeoY8_-gG-2h8WP+3ZZFzxeyHERG=o7Y3Btk2svy5kco_Q@mail.gmail.com>
+References: <20180531165109.8476-1-jagan@amarulasolutions.com>
+ <CAP03XeoY8_-gG-2h8WP+3ZZFzxeyHERG=o7Y3Btk2svy5kco_Q@mail.gmail.com>
+Message-ID: <CAMty3ZCM55Ug__=t9_JLnq2rcc6GZN5byZn26kyApGR=+_FaWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the appropriate SPDX license identifier in the rpmsg core
-source files and drop the previous boilerplate license text.
+On Thu, May 31, 2018 at 10:25 PM, Christopher Obbard <chris@64studio.com> wrote:
+> Hi Jagan,
+>
+> I cannot find any information on this board online, so I am guessing
+> it has not been released yet and you are developing software support
+> now.
+>
+> Do you have any datasheet/overview document of the board?
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- drivers/rpmsg/Kconfig          |  2 ++
- drivers/rpmsg/rpmsg_core.c     | 10 +---------
- drivers/rpmsg/rpmsg_internal.h | 10 +---------
- include/linux/rpmsg.h          | 27 +--------------------------
- 4 files changed, 5 insertions(+), 44 deletions(-)
+It's an industrial board for a real product and not so different than
+what we supported a software for other A64 boards [1], I will update
+the wiki for the same in couple of days.
 
-diff --git a/drivers/rpmsg/Kconfig b/drivers/rpmsg/Kconfig
-index 65a9f6b892f0..15e7b94dda5e 100644
---- a/drivers/rpmsg/Kconfig
-+++ b/drivers/rpmsg/Kconfig
-@@ -1,3 +1,5 @@
-+# SPDX-License-Identifier: GPL-2.0
-+
- menu "Rpmsg drivers"
- 
- # RPMSG always gets selected by whoever wants it
-diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
-index 920a02f0462c..7a57753ad0a1 100644
---- a/drivers/rpmsg/rpmsg_core.c
-+++ b/drivers/rpmsg/rpmsg_core.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * remote processor messaging bus
-  *
-@@ -6,15 +7,6 @@
-  *
-  * Ohad Ben-Cohen <ohad@wizery.com>
-  * Brian Swetland <swetland@google.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #define pr_fmt(fmt) "%s: " fmt, __func__
-diff --git a/drivers/rpmsg/rpmsg_internal.h b/drivers/rpmsg/rpmsg_internal.h
-index 685aa70e9cbe..0d791c30b7ea 100644
---- a/drivers/rpmsg/rpmsg_internal.h
-+++ b/drivers/rpmsg/rpmsg_internal.h
-@@ -1,3 +1,4 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * remote processor messaging bus internals
-  *
-@@ -6,15 +7,6 @@
-  *
-  * Ohad Ben-Cohen <ohad@wizery.com>
-  * Brian Swetland <swetland@google.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef __RPMSG_INTERNAL_H__
-diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
-index ca07366c4c33..9fe156d1c018 100644
---- a/include/linux/rpmsg.h
-+++ b/include/linux/rpmsg.h
-@@ -1,35 +1,10 @@
-+/* SPDX-License-Identifier: BSD-3-Clause */
- /*
-  * Remote processor messaging
-  *
-  * Copyright (C) 2011 Texas Instruments, Inc.
-  * Copyright (C) 2011 Google, Inc.
-  * All rights reserved.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions
-- * are met:
-- *
-- * * Redistributions of source code must retain the above copyright
-- *   notice, this list of conditions and the following disclaimer.
-- * * Redistributions in binary form must reproduce the above copyright
-- *   notice, this list of conditions and the following disclaimer in
-- *   the documentation and/or other materials provided with the
-- *   distribution.
-- * * Neither the name Texas Instruments nor the names of its
-- *   contributors may be used to endorse or promote products derived
-- *   from this software without specific prior written permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
- #ifndef _LINUX_RPMSG_H
+[1] https://openedev.amarulasolutions.com/display/ODWIKI/A64
+
+Jagan.
+
 -- 
-2.17.0
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
