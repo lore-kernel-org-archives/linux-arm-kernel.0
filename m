@@ -1,24 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 31 May 2018 11:04:50 -0700
-Subject: [PATCH 0/3] Initial Spectre variant 1 patches
-In-Reply-To: <20180531133047.GS17671@n2100.armlinux.org.uk>
-References: <20180531133047.GS17671@n2100.armlinux.org.uk>
-Message-ID: <20180531180450.GT5705@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 31 May 2018 23:18:57 +0300
+Subject: [PATCH v2 0/2] Add R8A77980/Condor I2C support
+Message-ID: <2a88f4e9-0a86-8e6f-0ef2-20913dc9431d@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [180531 13:34]:
-> Hi,
-> 
-> This series adds initial support for the Spectre variant 1 workarounds
-> to the kernel.  This does _not_ cover the user accessors, which are
-> still in development.
-> 
-> The series adds support for the array_index_mask_nospec() macro, used
-> by generic kernel code to mask out of bounds pointers, and also adds
-> the syscall table hardening.
+Hello!
 
-For the series including v2 patch of 3/3:
+Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20180529-v4.17-rc7' tag. We're adding the R8A77980 I2C nodes
+and then describing 2 PCA9654 I/O expanders connected to the I2C0 bus on
+the Condor board.
 
-Boot-tested-by: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Tony Lindgren <tony@atomide.com>
+[1/2] arm64: dts: renesas: r8a77980: add I2C support
+[2/2] arm64: dts: renesas: condor: add I2C0 support
+
+WBR, Sergei
