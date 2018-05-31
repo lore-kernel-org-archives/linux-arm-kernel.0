@@ -1,22 +1,83 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 30 May 2018 21:56:59 -0300
-Subject: [PATCH 3/3] ARM: imx: remove i.MX6SLL support in i.MX6SL cpu idle
- driver
-In-Reply-To: <AM3PR04MB13157285F0D882AD1C189617F5630@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1527664358-17844-1-git-send-email-Anson.Huang@nxp.com>
- <1527664358-17844-3-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5BYgPu_T=_x8JDkj=k6TUmP0QEQmT8qxoMfxzyTgZrF7g@mail.gmail.com>
- <AM3PR04MB13157285F0D882AD1C189617F5630@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5BJzSHx4zmkMWZVR-Z-y6p-=bMG+WQ2LASOroEdXHdyLA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 30 May 2018 19:58:27 -0500
+Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
+Message-ID: <20180531005827.GA17203@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
+> The I2S mux clock can be used to select the I2S input clock. The
+> available parents are the peripheral and the generated clocks.
+> 
+> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> ---
+>  .../devicetree/bindings/clock/at91-clock.txt       | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> index 51c259a..1c46b3c 100644
+> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> @@ -90,6 +90,8 @@ Required properties:
+>  	"atmel,sama5d2-clk-audio-pll-pmc"
+>  		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
+>  		and can be used by peripheral clock or generic clock
+> +	"atmel,sama5d2-clk-i2s-mux":
+> +		at91 I2S clock source selection
 
-On Wed, May 30, 2018 at 9:52 PM, Anson Huang <anson.huang@nxp.com> wrote:
+Is this boolean or takes some values. If latter, what are valid values?
 
->> The removal of this header file seems to be an unrelated change.
->
-> This header file is no longer needed since no " cpu_is_imx6sl()" used in this file.
+>  
+>  Required properties for SCKC node:
+>  - reg : defines the IO memory reserved for the SCKC.
+> @@ -507,3 +509,35 @@ For example:
+>  			atmel,clk-output-range = <0 83000000>;
+>  		};
+>  	};
+> +
+> +Required properties for I2S mux clocks:
+> +- #size-cells : shall be 0 (reg is used to encode I2S bus id).
+> +- #address-cells : shall be 1 (reg is used to encode I2S bus id).
+> +- name: device tree node describing a specific mux clock.
+> +	* #clock-cells : from common clock binding; shall be set to 0.
+> +	* clocks : shall be the mux clock parent phandles; shall be 2 phandles:
+> +	  peripheral and generated clock; the first phandle shall belong to the
+> +	  peripheral clock and the second one shall belong to the generated
+> +	  clock; "clock-indices" property can be user to specify
+> +	  the correct order.
+> +	* reg: I2S bus id of the corresponding mux clock.
+> +	  e.g. reg = <0>; for i2s0, reg = <1>; for i2s1
+> +
+> +For example:
+> +	i2s_clkmux {
 
- cpu_is_imx6sl() is not defined inside arch/arm/mach-imx/hardware.h header file.
+What is this a child of?
+
+> +		compatible = "atmel,sama5d2-clk-i2s-mux";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+How do you address this block? My guess is you don't because it is just 
+part of some other block and you are just creating this node to 
+instantiate a driver. Just make the node for the actual h/w block a 
+clock provider and define the clock ids (0 and 1).
+
+> +
+> +		i2s0muxck: i2s0_muxclk {
+> +			clocks = <&i2s0_clk>, <&i2s0_gclk>;
+> +			#clock-cells = <0>;
+> +			reg = <0>;
+> +		};
+> +
+> +		i2s1muxck: i2s1_muxclk {
+> +			clocks = <&i2s1_clk>, <&i2s1_gclk>;
+> +			#clock-cells = <0>;
+> +			reg = <1>;
+> +		};
+> +	};
+> -- 
+> 2.7.4
+> 
