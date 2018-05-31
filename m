@@ -1,31 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 May 2018 20:02:12 -0500
-Subject: [PATCH v4 3/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <20180525171941.26766-4-radu.pirea@microchip.com>
-References: <20180525171941.26766-1-radu.pirea@microchip.com>
- <20180525171941.26766-4-radu.pirea@microchip.com>
-Message-ID: <20180531010212.GA26508@rob-hp-laptop>
+From: collinsd@codeaurora.org (David Collins)
+Date: Wed, 30 May 2018 18:03:17 -0700
+Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <CAD=FV=VNVE5ttNg+7xmgh-p1sFbCxCY1DJiri0JtHFax+zVsnA@mail.gmail.com>
+References: <cover.1527040878.git.collinsd@codeaurora.org>
+ <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
+ <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
+ <20180530103720.GH6920@sirena.org.uk>
+ <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
+ <20180530155044.GR6920@sirena.org.uk>
+ <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
+ <20180530162007.GU6920@sirena.org.uk>
+ <CAD=FV=WL9enzYCoSx0fT_ny40ciLJU-hhS9joJ6nySXvWPqAxQ@mail.gmail.com>
+ <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
+ <CAD=FV=VNVE5ttNg+7xmgh-p1sFbCxCY1DJiri0JtHFax+zVsnA@mail.gmail.com>
+Message-ID: <f4eecb39-9780-c932-4c69-4c8e0d8757a5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 08:19:38PM +0300, Radu Pirea wrote:
-> This mfd driver is just a wrapper over atmel_serial driver and
-> spi-at91-usart driver. Selection of one of the drivers is based on a
-> property from device tree. If the property is not specified, the default
-> driver is atmel_serial.
+Hi Doug,
+
+On 05/30/2018 05:34 PM, Doug Anderson wrote:
+> On Wed, May 30, 2018 at 4:39 PM, David Collins <collinsd@codeaurora.org> wrote:
+>> Consider the case of a regulator with physical 10 mA LPM max current. Say
+>> that modem and application processors each have a load on the regulator
+>> that draws 9 mA. If they each respect the 10 mA limit, then they'd each
+>> vote for LPM. The VRM block in RPMh hardware will aggregate these requests
+>> together using a max function which will result in the regulator being set
+>> to LPM, even though the total load is 18 mA (which would require high
+>> power mode (HPM)). To get around this corner case, a LPM max current of 1
+>> uA can be used for all LDO supplies that have non-application processor
+>> consumers. Thus, any non-zero regulator_set_load() current request will
+>> result in setting the regulator to HPM (which is always safe).
 > 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> ---
->  drivers/mfd/Kconfig                  | 10 ++++
->  drivers/mfd/Makefile                 |  1 +
->  drivers/mfd/at91-usart.c             | 75 ++++++++++++++++++++++++++++
+> Is there any plan to change the way this works for future versions of RPMh?
 
->  include/dt-bindings/mfd/at91-usart.h | 17 +++++++
+As far as I know, no.  Adding VRM logic to sum RPMh client load current
+requests, compare the sums to thresholds, select corresponding modes, and
+override with explicit modes was determined to be too complex for RPMh.
+Instead, much simpler max aggregation was implemented along with design
+guidelines for PMICs to ensure that mode values are ordered from strictly
+lower to higher power.
 
-This really should be part of the binding patch.
+Take care,
+David
 
-Acked-by: Rob Herring <robh@kernel.org>
-
->  4 files changed, 103 insertions(+)
->  create mode 100644 drivers/mfd/at91-usart.c
->  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
