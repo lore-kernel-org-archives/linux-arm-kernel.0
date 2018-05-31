@@ -1,88 +1,64 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Thu, 31 May 2018 10:27:02 +0530
-Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
-In-Reply-To: <CAHM4w1nFn0T0MOF7=hnE7kxAmH4gLbbXXb_BjjKwEqyNFtqYwA@mail.gmail.com>
-References: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
- <CAHM4w1nFn0T0MOF7=hnE7kxAmH4gLbbXXb_BjjKwEqyNFtqYwA@mail.gmail.com>
-Message-ID: <CACi5LpM8EdeUzv5N962EgHWBa7_f-nYZnyf+wnC5KaSvJJO9qw@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 31 May 2018 10:27:20 +0530
+Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+ <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
+ <20180524173926.GC14924@minitux>
+ <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
+ <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
+Message-ID: <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+Hi Stephen,
 
-Thanks for your reply. Please see my replies inline:
-
-On Wed, May 30, 2018 at 8:05 AM, Pratyush Anand
-<pratyush.anand@gmail.com> wrote:
-> Hi Bhupesh,
->
->
-> On Mon, May 28, 2018 at 2:33 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
->> Hi ARM64 maintainers,
->
-> [...]
->
+On 5/30/2018 9:25 PM, Stephen Boyd wrote:
+> Quoting Sricharan R (2018-05-24 22:40:11)
+>> Hi Bjorn,
 >>
->> 4. Since 'memstart_addr' indicates the start of physical RAM, we
->> randomize the same on basis of 'memstart_offset_seed' value above.
->> Also the 'memstart_addr' value is available in '/proc/kallsyms' and
->> hence can be accessed by user-space applications to read the
->> 'memstart_addr' value.
->
-> User space can read, only when a system has either CONFIG_DEVMEM or
-> CONFIG_PROC_KCORE  enabled. But, we can have a system which has
-> CONFIG_RANDOMIZE_BASE enabled but none of the kernel memory access
-> interface (other than kdump/vmcore).
->
+>> On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
+>>> On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
+>>>
+>>>> From: Stephen Boyd <sboyd@codeaurora.org>
+>>>>
+>>>> Krait CPUs have a handful of L2 cache controller registers that
+>>>> live behind a cp15 based indirection register. First you program
+>>>> the indirection register (l2cpselr) to point the L2 'window'
+>>>> register (l2cpdr) at what you want to read/write.  Then you
+>>>> read/write the 'window' register to do what you want. The
+>>>> l2cpselr register is not banked per-cpu so we must lock around
+>>>> accesses to it to prevent other CPUs from re-pointing l2cpdr
+>>>> underneath us.
+>>>>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>
+>>> This should have your signed-off-by here as well.
+>>>
 >>
->> 5. Now since the PAGE_OFFSET value is also used by several user space
->> tools (for e.g. makedumpfile tool uses the same to determine the start
->> of linear region and hence to read PT_NOTE fields from /proc/kcore), I
->> am not sure how to read the randomized value of the same in the KASLR
->> enabled case.
+>>  ok.
 >>
->
-> Do we have a use case other than makedumpfile (I mean where we do not
-> have vmcore access)? For makedumpfile, we have following information
-> in vmcore, and I hope, that should be sufficient to find physical
-> address of any symbol from vmcore.
->
-> 358         VMCOREINFO_NUMBER(VA_BITS);
-> 359         /* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-> 360         vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-> 361                                                 kimage_voffset);
-> 362         vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-> 363                                                 PHYS_OFFSET);
->
+>>> Apart from that:
+>>>
+>>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>>>
+>>
+> 
+> Will these patches come around again? I'll do a quick sweep on them
+> today but I expect them to be resent.
 
-Please see more details in a mail I sent as a reply to Ard (in this
-thread itself), but one specific use case that I am working on at the
-moment is the makedumpfile '--mem-usage' for KASLR enabled arm64
-kernels.
-
-This use case requires directly reading the '/proc/kcore' and the
-hence the PAGE_OFFSET value is used to determine the base address of
-the linear region, whose value is not static in case of KASLR boot.
-
-Another use-case is where the crash-utility uses the PAGE_OFFSET value
-to perform a virtual-to-physical conversion for the address lying in
-the linear region:
-
-ulong
-arm64_VTOP(ulong addr)
-{
-    if (machdep->flags & NEW_VMEMMAP) {
-        if (addr >= machdep->machspec->page_offset)
-            return machdep->machspec->phys_offset
-                + (addr - machdep->machspec->page_offset);
-
-<..snip..>
-}
-
-There might be other use-cases (which I am unaware about), but
-presently I am seeing issues with the above two use-cases in case of
-KASLR enabled arm64 kernels and trying to find out possible acceptable
-solutions.
+Sure, i will have to resend them again, fixing couple of Bjorn's
+minor comments. Will address your comments that you would give
+as well along with that.
 
 Regards,
-Bhupesh
+ Sricharan
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
+---
+This email has been checked for viruses by Avast antivirus software.
+https://www.avast.com/antivirus
