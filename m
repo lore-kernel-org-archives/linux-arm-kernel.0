@@ -1,70 +1,75 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 31 May 2018 17:43:01 +0900
-Subject: [PATCH] media: helene: fix tuning frequency of satellite
-In-Reply-To: <CAK3bHNW8=z2WH6xCijAP2XCX94iE5z-HwHRYNhbJwZvbOav10A@mail.gmail.com>
-References: <20180516084111.28618-1-suzuki.katsuhiro@socionext.com>
- <CAK3bHNW8=z2WH6xCijAP2XCX94iE5z-HwHRYNhbJwZvbOav10A@mail.gmail.com>
-Message-ID: <004201d3f8bb$629d38c0$27d7aa40$@socionext.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 31 May 2018 11:54:04 +0300
+Subject: [PATCH v4 5/5] ARM: dts: imx6qdl: add missing compatible and
+ clock properties for EPIT
+In-Reply-To: <CAJiuCcefvMg6r=06O8m1TYa0hat_dHydcoJ7PN58qUru1K8zMQ@mail.gmail.com>
+References: <20180530120327.27681-1-peron.clem@gmail.com>
+ <20180530120327.27681-6-peron.clem@gmail.com>
+ <a4042956-24e1-6132-4606-b5b8f4e30023@mentor.com>
+ <CAJiuCcefvMg6r=06O8m1TYa0hat_dHydcoJ7PN58qUru1K8zMQ@mail.gmail.com>
+Message-ID: <f71fe02d-23a7-a475-52df-62c17089549b@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abylay,
+Hi Cl?ment,
 
-I got a mistake in this patch.
+On 05/31/2018 11:41 AM, Cl?ment P?ron wrote:
+> Hi Vladimir,
+> 
+> On Thu, 31 May 2018 at 10:33, Vladimir Zapolskiy
+> <vladimir_zapolskiy@mentor.com> wrote:
+>>
+>> On 05/30/2018 03:03 PM, Cl?ment P?ron wrote:
+>>> From: Colin Didier <colin.didier@devialet.com>
+>>>
+>>> Add missing compatible and clock properties for EPIT node.
+>>>
+>>> Signed-off-by: Colin Didier <colin.didier@devialet.com>
+>>> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+>>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>>> ---
+>>>  arch/arm/boot/dts/imx6qdl.dtsi | 10 ++++++++++
+>>>  1 file changed, 10 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>>> index c003e62bf290..0feec516847a 100644
+>>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>>> @@ -844,13 +844,23 @@
+>>>                       };
+>>>
+>>>                       epit1: epit at 20d0000 { /* EPIT1 */
+>>
+>> epit1: timer at 20d0000 { ...
+>>
+>> And /* EPIT1 */ comment can be removed, it is quite clear from the same
+>> line context.
+>>
+>> Formally it is a subject to another patch, but I think this can be
+>> accepted as a part of this one.
+> 
+> Should I also update other boards ?
+> I only did it for imx6qdl.dtsi, but the EPIT is present in other boards
+> but i can't test it myself.
+> 
 
-DTV_FREQUENCY for satellite delivery systems, the frequency is in 'kHz' not 'Hz',
-so original code is correct. Sorry for confusing...
+Sure, please do it, why not, it is quite a safe modification.
 
+One change per one dtsi file will suffice, and I see that imx25.dtsi
+already contains the requested change, however probably you may
+want to update its compatible = "fsl,imx25-epit" line.
 
-Regards,
+Regarding compatibles for other imx6* SoCs, I think all of them should
+be documented in fsl,imxepit.txt and then added to the correspondent
+dtsi files one per SoC.
+
+And I forgot the outcome of one former discussion with Uwe Kleine-K?nig,
+but if my bad memory serves me, we agreed that i.MX25 was released later
+than i.MX31, so the most generic (the last value in the list) compatible
+should be a compatible with i.MX31 like in
+
+	imx25.dtsi:367:	compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
+
 --
-Katsuhiro Suzuki
-
-
-> -----Original Message-----
-> From: Abylay Ospan <aospan@netup.ru>
-> Sent: Wednesday, May 16, 2018 7:58 PM
-> To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
-> Cc: Mauro Carvalho Chehab <mchehab@kernel.org>; linux-media
-> <linux-media@vger.kernel.org>; Masami Hiramatsu <masami.hiramatsu@linaro.org>;
-> Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH] media: helene: fix tuning frequency of satellite
-> 
-> True.
-> I'm curious but how did it worked before ...
-> Which hardware (dvb adapter) are you using ?
-> 
-> 2018-05-16 4:41 GMT-04:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> > This patch fixes tuning frequency of satellite to kHz. That as same
-> > as terrestrial one.
-> >
-> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> > ---
-> >  drivers/media/dvb-frontends/helene.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/media/dvb-frontends/helene.c
-> b/drivers/media/dvb-frontends/helene.c
-> > index 04033f0c278b..0a4f312c4368 100644
-> > --- a/drivers/media/dvb-frontends/helene.c
-> > +++ b/drivers/media/dvb-frontends/helene.c
-> > @@ -523,7 +523,7 @@ static int helene_set_params_s(struct dvb_frontend *fe)
-> >         enum helene_tv_system_t tv_system;
-> >         struct dtv_frontend_properties *p = &fe->dtv_property_cache;
-> >         struct helene_priv *priv = fe->tuner_priv;
-> > -       int frequencykHz = p->frequency;
-> > +       int frequencykHz = p->frequency / 1000;
-> >         uint32_t frequency4kHz = 0;
-> >         u32 symbol_rate = p->symbol_rate/1000;
-> >
-> > --
-> > 2.17.0
-> >
-> 
-> 
-> 
-> --
-> Abylay Ospan,
-> NetUP Inc.
-> http://www.netup.tv
+With best wishes,
+Vladimir
