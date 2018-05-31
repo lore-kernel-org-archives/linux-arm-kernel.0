@@ -1,28 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 May 2018 11:38:23 +0100
-Subject: [PATCH v4 0/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <da40510b-443d-d8fd-7285-c6e7eff45dc6@codeaurora.org>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <20180530163343.GV6920@sirena.org.uk>
- <da40510b-443d-d8fd-7285-c6e7eff45dc6@codeaurora.org>
-Message-ID: <20180531103823.GB13319@sirena.org.uk>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 31 May 2018 12:40:14 +0200
+Subject: [GIT PULL 0/7] perf/urgent fixes
+In-Reply-To: <20180531103220.24684-1-acme@kernel.org>
+References: <20180531103220.24684-1-acme@kernel.org>
+Message-ID: <20180531104014.GA29957@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 05:11:54PM -0700, David Collins wrote:
 
-> I'll split up the patches so that reviewing is easier.  For the base
-> patch, would you prefer that I remove *all* mode support (handled by
-> generic regulator framework DT properties) or only remove the special
-> purpose drms mode handling support (i.e. qcom,regulator-drms-modes and
-> qcom,drms-mode-max-microamps)?
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-Standard operations should be fine, just weird custom stuff that's been
-causing issues.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180531/cc95ff7c/attachment.sig>
+> Hi Ingo,
+> 
+> 	Please consider pulling,
+> 
+> - Arnaldo
+> 
+> Test results at the end of this message, as usual.
+> 
+> The following changes since commit f3903c9161f0d636a7b0ff03841628928457e64c:
+> 
+>   Merge tag 'perf-urgent-for-mingo-4.17-20180514' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent (2018-05-15 08:20:45 +0200)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.17-20180531
+> 
+> for you to fetch changes up to 18a7057420f8b67f15d17087bf5c0863db752c8b:
+> 
+>   perf tools: Fix perf.data format description of NRCPUS header (2018-05-30 15:40:26 -0300)
+> 
+> ----------------------------------------------------------------
+> perf/urgent fixes:
+> 
+> - Fix 'perf test Session topology' segfault on s390 (Thomas Richter)
+> 
+> - Fix NULL return handling in bpf__prepare_load() (YueHaibing)
+> 
+> - Fix indexing on Coresight ETM packet queue decoder (Mathieu Poirier)
+> 
+> - Fix perf.data format description of NRCPUS header (Arnaldo Carvalho de Melo)
+> 
+> - Update perf.data documentation section on cpu topology
+> 
+> - Handle uncore event aliases in small groups properly (Kan Liang)
+> 
+> - Add missing perf_sample.addr into python sample dictionary (Leo Yan)
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Arnaldo Carvalho de Melo (1):
+>       perf tools: Fix perf.data format description of NRCPUS header
+> 
+> Kan Liang (1):
+>       perf parse-events: Handle uncore event aliases in small groups properly
+> 
+> Leo Yan (1):
+>       perf script python: Add addr into perf sample dict
+> 
+> Mathieu Poirier (1):
+>       perf cs-etm: Fix indexing for decoder packet queue
+> 
+> Thomas Richter (2):
+>       perf test: "Session topology" dumps core on s390
+>       perf data: Update documentation section on cpu topology
+> 
+> YueHaibing (1):
+>       perf bpf: Fix NULL return handling in bpf__prepare_load()
+> 
+>  tools/perf/Documentation/perf.data-file-format.txt |  10 +-
+>  tools/perf/tests/topology.c                        |  30 ++++-
+>  tools/perf/util/bpf-loader.c                       |   6 +-
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c    |  12 +-
+>  tools/perf/util/evsel.h                            |   1 +
+>  tools/perf/util/parse-events.c                     | 130 ++++++++++++++++++++-
+>  tools/perf/util/parse-events.h                     |   7 +-
+>  tools/perf/util/parse-events.y                     |   8 +-
+>  .../util/scripting-engines/trace-event-python.c    |   2 +
+>  9 files changed, 185 insertions(+), 21 deletions(-)
+
+Pulled, thanks a lot Arnaldo!
+
+	Ingo
