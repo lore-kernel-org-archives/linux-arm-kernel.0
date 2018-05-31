@@ -1,49 +1,64 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Thu, 31 May 2018 14:51:22 +0300
-Subject: [PATCH v2 1/5] crypto: ccree: correct host regs offset
-In-Reply-To: <20180529161248.fphjnceozoyxqy7v@verge.net.au>
-References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
- <1527171551-21979-2-git-send-email-gilad@benyossef.com>
- <20180529161248.fphjnceozoyxqy7v@verge.net.au>
-Message-ID: <CAOtvUMfoyuaGac29WUYqvfRr1S7Fof3FgMZo_3K7EaozqbeT6Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 May 2018 12:51:27 +0100
+Subject: [PATCH v2 2/6] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is
+ present
+In-Reply-To: <20180530124706.25284-3-marc.zyngier@arm.com>
+References: <20180530124706.25284-1-marc.zyngier@arm.com>
+ <20180530124706.25284-3-marc.zyngier@arm.com>
+Message-ID: <20180531115127.2ymmtlwemz6g5qzj@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 7:12 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, May 24, 2018 at 03:19:06PM +0100, Gilad Ben-Yossef wrote:
->> The product signature and HW revision register have different offset on the
->> older HW revisions.
->> This fixes the problem of the driver failing sanity check on silicon
->> despite working on the FPGA emulation systems.
->>
->> Fixes: 27b3b22dd98c ("crypto: ccree - add support for older HW revs")
->
-> Did the above introduce a regression that is fixed by this patch
-> or did it add a feature that only works with this patch?
->
+On Wed, May 30, 2018 at 01:47:02PM +0100, Marc Zyngier wrote:
+> Set/Way handling is one of the ugliest corners of KVM. We shouldn't
+> have to handle that, but better safe than sorry.
+> 
+> Thankfully, FWB fixes this for us by not requiering any maintenance
+> whatsoever, which means we don't have to emulate S/W CMOs, and don't
+> have to track VM ops either.
+> 
+> We still have to trap S/W though, if only to prevent the guest from
+> doing something bad.
 
-Sort of in between - the first patch made more devices work but
-unreliability (it will sometime work, sometime doesn't).
-This one make it work reliably.
+S/W ops *also* do I-cache maintenance, so we'd still need to emulate
+that. Though it looks like we're missing that today...
 
-> In the case of the latter I would drop the Fixes tag,
-> but I don't feel strongly about it.
->
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
->
-> Minor not below not withstanding,
->
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 6e3b969391fd..9a740f159245 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -195,7 +195,13 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+>  	if (!p->is_write)
+>  		return read_from_write_only(vcpu, p, r);
+>  
+> -	kvm_set_way_flush(vcpu);
+> +	/*
+> +	 * Only track S/W ops if we don't have FWB. It still indicates
+> +	 * that the guest is a bit broken...
+> +	 */
+> +	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
+> +		kvm_set_way_flush(vcpu);
+> +
 
-Thank you for the review and help :-)
+Assuming we implement I-cache maintenance, we can have something like:
 
-Gilad
+	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
+		kvm_set_way_flush_dcache(vcpu);
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+	kvm_set_way_flush_icache(vcpu);
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+Thanks,
+Mark.
+
+>  	return true;
+>  }
+>  
+> -- 
+> 2.17.1
+> 
