@@ -1,60 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 May 2018 12:52:49 +0100
-Subject: [PATCH v2 3/6] arm64: KVM: Avoid marking pages as XN in Stage-2
- if CTR_EL0.DIC is set
-In-Reply-To: <20180530124706.25284-4-marc.zyngier@arm.com>
-References: <20180530124706.25284-1-marc.zyngier@arm.com>
- <20180530124706.25284-4-marc.zyngier@arm.com>
-Message-ID: <20180531115249.uit7ndw22ki32wm3@lakrids.cambridge.arm.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Thu, 31 May 2018 14:55:06 +0300
+Subject: [PATCH v2 5/5] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <20180529161936.prhp4oikzamr6u3n@verge.net.au>
+References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
+ <1527171551-21979-6-git-send-email-gilad@benyossef.com>
+ <20180529161936.prhp4oikzamr6u3n@verge.net.au>
+Message-ID: <CAOtvUMeBCH+23c3FDWncMwPPe5N=7yjRKzhyLmFXrYazgGbcJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 01:47:03PM +0100, Marc Zyngier wrote:
-> On systems where CTR_EL0.DIC is set, we don't need to perform
-> icache invalidation to guarantee that we'll fetch the right
-> instruction stream.
-> 
-> This also means that taking a permission fault to invalidate the
-> icache is an unnecessary overhead.
-> 
-> On such systems, we can safely leave the page as being executable.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, May 29, 2018 at 7:19 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, May 24, 2018 at 03:19:10PM +0100, Gilad Ben-Yossef wrote:
+>> Add bindings for CryptoCell instance in the SoC.
+>>
+>> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+>
+> In so far as I can review the details of this (which is not much) this
+> looks fine to me. I am, however, a little unclear in when it should be
+> accepted.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Since Herbert Xu ACKed the driver changes, I would say the only gating
+commit is Geert's CR clock patch.
+If that one is in, than I would say this one should go in as well.
 
-Mark.
+Thanks,
+Gilad
 
-> ---
->  arch/arm64/include/asm/pgtable-prot.h | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-> index c66c3047400e..78b942c1bea4 100644
-> --- a/arch/arm64/include/asm/pgtable-prot.h
-> +++ b/arch/arm64/include/asm/pgtable-prot.h
-> @@ -77,8 +77,18 @@
->  		__val;							\
->  	 })
->  
-> -#define PAGE_S2			__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(NORMAL) | PTE_S2_RDONLY | PTE_S2_XN)
-> -#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_S2_XN)
-> +#define PAGE_S2_XN							\
-> +	({								\
-> +		u64 __val;						\
-> +		if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC))		\
-> +			__val = 0;					\
-> +		else							\
-> +			__val = PTE_S2_XN;				\
-> +		__val;							\
-> +	})
-> +
-> +#define PAGE_S2			__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(NORMAL) | PTE_S2_RDONLY | PAGE_S2_XN)
-> +#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PAGE_S2_MEMATTR(DEVICE_nGnRE) | PTE_S2_RDONLY | PAGE_S2_XN)
->  
->  #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
->  #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
-> -- 
-> 2.17.1
-> 
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
+
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
