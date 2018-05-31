@@ -1,80 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 31 May 2018 13:38:51 +0100
-Subject: [PATCH v2 1/6] arm64: KVM: Add support for Stage-2 control of
- memory types and cacheability
-In-Reply-To: <20180531114938.2w4sbi2nkvqyc3jt@lakrids.cambridge.arm.com>
-References: <20180530124706.25284-1-marc.zyngier@arm.com>
- <20180530124706.25284-2-marc.zyngier@arm.com>
- <20180531114938.2w4sbi2nkvqyc3jt@lakrids.cambridge.arm.com>
-Message-ID: <6675e8b0-7c34-ce1f-99e2-1f63566b3426@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 31 May 2018 13:47:48 +0100
+Subject: [PATCH v3 4/5] PM / Domains: Add support for multi PM domains per
+ device to genpd
+In-Reply-To: <5fc1d3ee51c8dbc264fb21edf33a879c7db4056b.camel@lynxeye.de>
+References: <20180531105959.14843-1-ulf.hansson@linaro.org>
+ <20180531105959.14843-5-ulf.hansson@linaro.org>
+ <5fc1d3ee51c8dbc264fb21edf33a879c7db4056b.camel@lynxeye.de>
+Message-ID: <191ed832-3b15-f47d-c171-4039da665b36@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/18 12:49, Mark Rutland wrote:
-> On Wed, May 30, 2018 at 01:47:01PM +0100, Marc Zyngier wrote:
->> Up to ARMv8.3, the combinaison of Stage-1 and Stage-2 attributes
->> results in the strongest attribute of the two stages.  This means
->> that the hypervisor has to perform quite a lot of cache maintenance
->> just in case the guest has some non-cacheable mappings around.
+
+On 31/05/18 12:40, Lucas Stach wrote:
+> Hi Ulf,
+> 
+> Am Donnerstag, den 31.05.2018, 12:59 +0200 schrieb Ulf Hansson:
+>> To support devices being partitioned across multiple PM domains, let's
+>> begin with extending genpd to cope with these kind of configurations.
 >>
->> ARMv8.4 solves this problem by offering a different mode (FWB) where
->> Stage-2 has total control over the memory attribute (this is limited
->> to systems where both I/O and instruction caches are coherent with
-> 
-> s/caches/fetches/ -- the I-caches themselves aren't coherent with the
-> D-caches (or we could omit I-cache maintenance).
-> 
-> i.e. this implies IDC, but not DIC.
-
-It may imply IDC behaviour, but not quite IDC itself. I agree, this
-looks dodgy. I've asked for clarification on the spec.
-
-> 
->> the dcache). This is achieved by having a different set of memory
->> attributes in the page tables, and a new bit set in HCR_EL2.
+>> Therefore, add a new exported function genpd_dev_pm_attach_by_id(), which
+>> is similar to the existing genpd_dev_pm_attach(), but with the difference
+>> that it allows its callers to provide an index to the PM domain that it
+>> wants to attach.
 >>
->> On such a system, we can then safely sidestep any form of dcache
->> management.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
+>> Note that, genpd_dev_pm_attach_by_id() shall only be called by the driver
+>> core / PM core, similar to how the existing dev_pm_domain_attach() makes
+>> use of genpd_dev_pm_attach(). However, this is implemented by following
+>> changes on top.
 > 
->>  static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
->>  {
->> @@ -268,7 +269,10 @@ static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
->>  {
->>  	void *va = page_address(pfn_to_page(pfn));
->>  
->> -	kvm_flush_dcache_to_poc(va, size);
->> +	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
->> +		kvm_flush_dcache_to_poc(va, size);
->> +	else
->> +		kvm_flush_dcache_to_pou(va, size);
->>  }
-> 
-> Te commit message said instruction fetches were coherent, and that no
-> D-cache maintenance was necessary, so why do we need maintenance to the
-> PoU?
+> by_id() APIs are not really intuitive to use for driver writers. Other
+> subsystems have solved this by providing a "-names" property to give
+> the phandles a bit more meaning and then providing a by_name API. I
+> would really appreciate if PM domains could move in the same direction.
 
-That maintenance will be elided if we actually have IDC set. I'm happy
-to drop it once I have confirmation that we have an identical behaviour.
+As discussed here [0], there are plans to add that.
 
-> 
->> +static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
->> +{
->> +	u64 val = read_sysreg_s(SYS_CLIDR_EL1);
->> +
->> +	/* Check that CLIDR_EL1.LOU{U,IS} are both 0 */
->> +	WARN_ON(val & (7 << 27 | 7 << 21));
->> +}
-> 
-> What about CTR_EL0.IDC?
+Cheers
+Jon
 
-Again, that depends on whether FWB implies IDC or not.
+[0] https://patchwork.ozlabs.org/patch/921938/
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+nvpublic
