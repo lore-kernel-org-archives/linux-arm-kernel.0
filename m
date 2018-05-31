@@ -1,82 +1,84 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 31 May 2018 08:31:48 -0700
-Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
-In-Reply-To: <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
-References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
- <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
- <20180531005827.GA17203@rob-hp-laptop>
- <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
- <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
-Message-ID: <152778070837.144038.4555982304713569160@swboyd.mtv.corp.google.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 31 May 2018 09:36:25 -0600
+Subject: [PATCH v2 00/12] coresight: tmc-etr Transparent buffer management
+In-Reply-To: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
+References: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkxStH5R0_8WFF1oe=PCCFr4Ko+0J+Xhn-wzopFFDgrRCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2018-05-31 07:20:57)
-> On Thu, May 31, 2018 at 5:25 AM, Codrin Ciubotariu
-> <codrin.ciubotariu@microchip.com> wrote:
-> > On 31.05.2018 03:58, Rob Herring wrote:
-> >>
-> >> On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
-> >>>
-> >>> The I2S mux clock can be used to select the I2S input clock. The
-> >>> available parents are the peripheral and the generated clocks.
-> >>>
-> >>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
-> >>> ---
-> >>>   .../devicetree/bindings/clock/at91-clock.txt       | 34
-> >>> ++++++++++++++++++++++
-> >>>   1 file changed, 34 insertions(+)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt
-> >>> b/Documentation/devicetree/bindings/clock/at91-clock.txt
-> >>> index 51c259a..1c46b3c 100644
-> >>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
-> >>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
-> >>> @@ -90,6 +90,8 @@ Required properties:
-> >>>         "atmel,sama5d2-clk-audio-pll-pmc"
-> >>>                 at91 audio pll output on AUDIOPLLCLK that feeds the PMC
-> >>>                 and can be used by peripheral clock or generic clock
-> >>> +       "atmel,sama5d2-clk-i2s-mux":
-> >>> +               at91 I2S clock source selection
-> >>
-> >>
-> >> Is this boolean or takes some values. If latter, what are valid values?
-> >
-> >
-> > This is the compatible string of the clock driver.
-> 
-> Ah, now I remember. AT91 uses fine grained clock nodes in DT. Is there
-> still a plan to fix this?
+On 29 May 2018 at 07:15, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> This series is split of the Coresight ETR perf support patches posted
+> here [0]. The CATU support and perf backend support will be posted as
+> separate series for better management and review of the patches.
+>
+> This series adds the support for TMC ETR Scatter-Gather mode to allow
+> using physical non-contiguous buffer for holding the trace data. It
+> also adds a layer to handle the buffer management in a transparent
+> manner, independent of the underlying mode used by the TMC ETR.
+> The layer chooses the ETR mode based on different parameters (size,
+> re-using a set of pages, presence of an SMMU etc.).
+>
+> Finally we add a sysfs parameter to tune the buffer size for ETR in
+> sysfs-mode.
+>
+> During the testing, we found out that if the TMC ETR is not properly
+> connected to the memory subsystem, the ETR could lock-up the system
+> while waiting for the "read" transactions to complete in scatter-gather
+> mode. So, we do not use the mode on a system unless it is safe to do
+> so. This is specified by a DT property "arm,scatter-gather".
+>
+> Applies on coreisght-next tree from Mathieu
+>
+> Changes since previous version [1]:
+>  - Rebased to Mathieu's coresight-next tree to resolve a conflict.
+>  - Added tags for DT changes from Rob and Mathieu
+>  - Split the SG mode backend support patch from the
+>    ETR-BUF patch.
+>  - Address other comments from Mathieu
+>
+> Changes since splitted series [0] :
+>  - Split the series in [0]
+>  - Address comments on v2
+>  - Rename DT property "scatter-gather" to "arm,scatter-gather"
+>  - Add ETM PID for Cortex-A35, use macros to make the listing easier
+>
+> [0] - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/574875.html
+> [1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579135.html
+>
+> Suzuki K Poulose (12):
+>   coresight: ETM: Add support for Arm Cortex-A73 and Cortex-A35
+>   coresight: tmc: Hide trace buffer handling for file read
+>   coresight: tmc-etr: Do not clean trace buffer
+>   coresight: tmc-etr: Disallow perf mode
+>   coresight: Add helper for inserting synchronization packets
+>   dts: bindings: Restrict coresight tmc-etr scatter-gather mode
+>   dts: juno: Add scatter-gather support for all revisions
+>   coresight: Add generic TMC sg table framework
+>   coresight: Add support for TMC ETR SG unit
+>   coresight: tmc-etr: Add transparent buffer management
+>   coresight: tmc-etr buf: Add TMC scatter gather mode backend
+>   coresight: tmc: Add configuration support for trace buffer size
+>
+>  .../ABI/testing/sysfs-bus-coresight-devices-tmc    |    8 +
+>  .../devicetree/bindings/arm/coresight.txt          |    5 +-
+>  arch/arm64/boot/dts/arm/juno-base.dtsi             |    1 +
+>  drivers/hwtracing/coresight/coresight-etb10.c      |   12 +-
+>  drivers/hwtracing/coresight/coresight-etm4x.c      |   31 +-
+>  drivers/hwtracing/coresight/coresight-priv.h       |   10 +-
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c    |   45 +-
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c    | 1010 ++++++++++++++++++--
+>  drivers/hwtracing/coresight/coresight-tmc.c        |   83 +-
+>  drivers/hwtracing/coresight/coresight-tmc.h        |  110 ++-
+>  drivers/hwtracing/coresight/coresight.c            |    3 +-
+>  11 files changed, 1144 insertions(+), 174 deletions(-)
 
-I'm also interested in a plan.
+Applied after correcting indentation problems and rectifying the
+kernel version and date in "sysfs-bus-coresight-devices-tmc".
 
-> >>
-> >>> +               compatible = "atmel,sama5d2-clk-i2s-mux";
-> >>> +               #address-cells = <1>;
-> >>> +               #size-cells = <0>;
-> >>
-> >>
-> >> How do you address this block? My guess is you don't because it is just
-> >> part of some other block and you are just creating this node to
-> >> instantiate a driver. Just make the node for the actual h/w block a
-> >> clock provider and define the clock ids (0 and 1).
-> >
-> >
-> > This block is not addressed, but its children are. The register we access in
-> > this driver is not part of other block. It's a SFR register, accessed
-> > through syscon and it has nothing to do with the I2S IP (see SAMA5D2 DS,
-> > page 1256, fig. 44-1: I2SC Block Diagram) that is the consumer of this
-> > clock. Adding a clock-id property in the I2S node would be just like v3 of
-> > this series, with the difference that we use clock-id instead of alias id to
-> > set the clock parent, which is not how you suggested back then.
-> 
-> I wasn't suggesting a clock-id property, but a clock specifier (i.e.
-> make #clock-cells 1).
-> 
-> But AT91 clocks are all a mess, so I don't know what to tell you.
-> 
+Mathieu
 
-If #clock-cells of 1 works then we should go with that. It's still weird
-that we need random nodes to add more clks, but I guess that's how it's
-going to be for each at91 clk driver until it changes to be one big
-provider node.
+>
+> --
+> 2.7.4
+>
