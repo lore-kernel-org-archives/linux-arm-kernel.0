@@ -1,202 +1,86 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Thu, 31 May 2018 13:40:19 +0200
-Subject: [PATCH v3 4/5] PM / Domains: Add support for multi PM domains
- per device to genpd
-In-Reply-To: <20180531105959.14843-5-ulf.hansson@linaro.org>
-References: <20180531105959.14843-1-ulf.hansson@linaro.org>
- <20180531105959.14843-5-ulf.hansson@linaro.org>
-Message-ID: <5fc1d3ee51c8dbc264fb21edf33a879c7db4056b.camel@lynxeye.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 May 2018 12:48:16 +0100
+Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
+References: <cover.1527040878.git.collinsd@codeaurora.org>
+ <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
+ <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
+ <20180530103720.GH6920@sirena.org.uk>
+ <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
+ <20180530155044.GR6920@sirena.org.uk>
+ <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
+ <20180530162007.GU6920@sirena.org.uk>
+ <CAD=FV=WL9enzYCoSx0fT_ny40ciLJU-hhS9joJ6nySXvWPqAxQ@mail.gmail.com>
+ <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
+Message-ID: <20180531114816.GC13319@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wed, May 30, 2018 at 04:39:10PM -0700, David Collins wrote:
 
-Am Donnerstag, den 31.05.2018, 12:59 +0200 schrieb Ulf Hansson:
-> To support devices being partitioned across multiple PM domains, let's
-> begin with extending genpd to cope with these kind of configurations.
-> 
-> Therefore, add a new exported function genpd_dev_pm_attach_by_id(), which
-> is similar to the existing genpd_dev_pm_attach(), but with the difference
-> that it allows its callers to provide an index to the PM domain that it
-> wants to attach.
-> 
-> Note that, genpd_dev_pm_attach_by_id() shall only be called by the driver
-> core / PM core, similar to how the existing dev_pm_domain_attach() makes
-> use of genpd_dev_pm_attach(). However, this is implemented by following
-> changes on top.
+> The DRMS modes to use and max allowed current per mode need to be
+> specified at the board level in device tree instead of hard-coded per
+> regulator type in the driver.  There are at least two use cases driving
+> this need: LDOs shared between RPMh client processors and SMPSes requiring
+> PWM mode in certain circumstances.
 
-by_id() APIs are not really intuitive to use for driver writers. Other
-subsystems have solved this by providing a "-names" property to give
-the phandles a bit more meaning and then providing a by_name API. I
-would really appreciate if PM domains could move in the same direction.
+Is there really no way to improve the RPM firmware?
 
-Regards,
-Lucas
+> Consider the case of a regulator with physical 10 mA LPM max current. Say
+> that modem and application processors each have a load on the regulator
+> that draws 9 mA. If they each respect the 10 mA limit, then they'd each
+> vote for LPM. The VRM block in RPMh hardware will aggregate these requests
 
-> Because, only one PM domain can be attached per device, genpd needs to
-> create a virtual device that it can attach/detach instead. More precisely,
-> let the new function genpd_dev_pm_attach_by_id() register a virtual struct
-> device via calling device_register(). Then let it attach this device to the
-> corresponding PM domain, rather than the one that is provided by the
-> caller. The actual attaching is done via re-using the existing genpd OF
-> functions.
-> 
-> At successful attachment, genpd_dev_pm_attach_by_id() returns the created
-> virtual device, which allows the caller to operate on it to deal with power
-> management. Following changes on top, provides more details in this
-> regards.
-> 
-> To deal with detaching of a PM domain for the multiple PM domains case,
-> let's also extend the existing genpd_dev_pm_detach() function, to cover the
-> cleanup of the created virtual device, via make it call device_unregister()
-> on it. In this way, there is no need to introduce a new function to deal
-> with detach for the multiple PM domain case, but instead the existing one
-> is re-used.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Acked-by: Jon Hunter <jonathanh@nvidia.com>
-> Tested-by: Jon Hunter <jonathanh@nvidia.com>
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/base/power/domain.c | 80 +++++++++++++++++++++++++++++++++++++
->  include/linux/pm_domain.h   |  8 ++++
->  2 files changed, 88 insertions(+)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index b1fcbf917974..4925af5c4cf0 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -2171,6 +2171,15 @@ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
->  }
->  EXPORT_SYMBOL_GPL(of_genpd_remove_last);
->  
-> +static void genpd_release_dev(struct device *dev)
-> +{
-> +	kfree(dev);
-> +}
-> +
-> +static struct bus_type genpd_bus_type = {
-> +	.name		= "genpd",
-> +};
-> +
->  /**
->   * genpd_dev_pm_detach - Detach a device from its PM domain.
->   * @dev: Device to detach.
-> @@ -2208,6 +2217,10 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
->  
->  	/* Check if PM domain can be powered off after removing this device. */
->  	genpd_queue_power_off_work(pd);
-> +
-> +	/* Unregister the device if it was created by genpd. */
-> +	if (dev->bus == &genpd_bus_type)
-> +		device_unregister(dev);
->  }
->  
->  static void genpd_dev_pm_sync(struct device *dev)
-> @@ -2298,6 +2311,67 @@ int genpd_dev_pm_attach(struct device *dev)
->  }
->  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->  
-> +/**
-> + * genpd_dev_pm_attach_by_id - Associate a device with one of its PM domains.
-> + * @dev: The device used to lookup the PM domain.
-> + * @index: The index of the PM domain.
-> + *
-> + * Parse device's OF node to find a PM domain specifier at the provided @index.
-> + * If such is found, creates a virtual device and attaches it to the retrieved
-> + * pm_domain ops. To deal with detaching of the virtual device, the ->detach()
-> + * callback in the struct dev_pm_domain are assigned to genpd_dev_pm_detach().
-> + *
-> + * Returns the created virtual device if successfully attached PM domain, NULL
-> + * when the device don't need a PM domain, else an ERR_PTR() in case of
-> + * failures. If a power-domain exists for the device, but cannot be found or
-> + * turned on, then ERR_PTR(-EPROBE_DEFER) is returned to ensure that the device
-> + * is not probed and to re-try again later.
-> + */
-> +struct device *genpd_dev_pm_attach_by_id(struct device *dev,
-> +					 unsigned int index)
-> +{
-> +	struct device *genpd_dev;
-> +	int num_domains;
-> +	int ret;
-> +
-> +	if (!dev->of_node)
-> +		return NULL;
-> +
-> +	/* Deal only with devices using multiple PM domains. */
-> +	num_domains = of_count_phandle_with_args(dev->of_node, "power-domains",
-> +						 "#power-domain-cells");
-> +	if (num_domains < 2 || index >= num_domains)
-> +		return NULL;
-> +
-> +	/* Allocate and register device on the genpd bus. */
-> +	genpd_dev = kzalloc(sizeof(*genpd_dev), GFP_KERNEL);
-> +	if (!genpd_dev)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	dev_set_name(genpd_dev, "genpd:%u:%s", index, dev_name(dev));
-> +	genpd_dev->bus = &genpd_bus_type;
-> +	genpd_dev->release = genpd_release_dev;
-> +
-> +	ret = device_register(genpd_dev);
-> +	if (ret) {
-> +		kfree(genpd_dev);
-> +		return ERR_PTR(ret);
-> +	}
-> +
-> +	/* Try to attach the device to the PM domain at the specified index. */
-> +	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
-> +	if (ret < 1) {
-> +		device_unregister(genpd_dev);
-> +		return ret ? ERR_PTR(ret) : NULL;
-> +	}
-> +
-> +	pm_runtime_set_active(genpd_dev);
-> +	pm_runtime_enable(genpd_dev);
-> +
-> +	return genpd_dev;
-> +}
-> +EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
-> +
->  static const struct of_device_id idle_state_match[] = {
->  	{ .compatible = "domain-idle-state", },
->  	{ }
-> @@ -2457,6 +2531,12 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
->  }
->  EXPORT_SYMBOL_GPL(of_genpd_opp_to_performance_state);
->  
-> +static int __init genpd_bus_init(void)
-> +{
-> +	return bus_register(&genpd_bus_type);
-> +}
-> +core_initcall(genpd_bus_init);
-> +
->  #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
->  
->  
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 42e0d649e653..82458e8e2e01 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -237,6 +237,8 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
->  				struct device_node *opp_node);
->  
->  int genpd_dev_pm_attach(struct device *dev);
-> +struct device *genpd_dev_pm_attach_by_id(struct device *dev,
-> +					 unsigned int index);
->  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
->  static inline int of_genpd_add_provider_simple(struct device_node *np,
->  					struct generic_pm_domain *genpd)
-> @@ -282,6 +284,12 @@ static inline int genpd_dev_pm_attach(struct device *dev)
->  	return 0;
->  }
->  
-> +static inline struct device *genpd_dev_pm_attach_by_id(struct device *dev,
-> +						       unsigned int index)
-> +{
-> +	return NULL;
-> +}
-> +
->  static inline
->  struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
->  {
+This is, of course, why the regulator API aggregates this stuff based on
+the current not based on having every individual user select a mode.
+
+> together using a max function which will result in the regulator being set
+> to LPM, even though the total load is 18 mA (which would require high
+> power mode (HPM)). To get around this corner case, a LPM max current of 1
+> uA can be used for all LDO supplies that have non-application processor
+> consumers. Thus, any non-zero regulator_set_load() current request will
+> result in setting the regulator to HPM (which is always safe).
+
+That's obviously just never going to work well, the best you can do here
+is just pretend that the other components are always operating at full
+power (which I assume all the other components are doing too...) or not
+try to use load based mode switching in the first place.
+
+> The second situation that needs board-level DRMS mode and current limit
+> specification is SMPS regulator AUTO mode to PWM (HPM) mode switching.
+> SMPS regulators should theoretically always be able to operate in AUTO
+> mode as it switches automatically between PWM mode (which can provide the
+> maximum current) and PFM mode (which supports lower current but has higher
+> efficiency). However, there may be board/system issues that require
+> switching to PWM mode for certain use cases as it has better load
+> regulation (i.e. no PFM ripple for lower loads) and supports more
+> aggressive load current steps (i.e. greater A/ns).
+
+> If a Linux consumer requires the ability to force a given SMPS regulator
+> from AUTO mode into PWM mode and that SMPS is shared by other Linux
+> consumers (which may be the case, but at least must be guaranteed to work
+> architecturally), then regulator_set_load() is the only option since it
+> provides aggregation, where as regulator_set_mode() does not.
+
+That's obviously broken though, what you're describing is just clearly
+nothing to do with load so trying to configure it using load is just
+going to lead to problems later on.  Honestly it sounds like you just
+want to force the regulator into forced PWM mode all the time, otherwise
+you need to look into implementing support for describing the thing
+you're actually trying to do and add a mechanism for per consumer mode
+configuration.
+
+This has been a frequent pattern with these RPM drivers, trying to find
+some way to shoehorn something that happens to work right now into the
+code.  That's going to make things fragile and hard to maintain, we need
+code that does the thing it's saying it does so that it's easier to
+understand and work with - getting things running isn't enough, they
+need to be clear.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180531/53042fa7/attachment.sig>
