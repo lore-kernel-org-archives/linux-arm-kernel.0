@@ -1,63 +1,153 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 31 May 2018 08:26:23 -0700
-Subject: [PATCH v2 1/6] ARM: dra762: hwmod: Add MCAN support
-In-Reply-To: <98c989ca-0694-5150-f74b-35f3e4bf20c0@ti.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-2-faiz_abbas@ti.com>
- <20180530145047.GC5705@atomide.com>
- <cfa9c9df-57a2-69f6-9509-440dc18292e7@ti.com>
- <20180530152825.GG5705@atomide.com>
- <b0476932-a6e9-6ef1-69ad-c9a8c55d9739@ti.com>
- <20180530155448.GH5705@atomide.com>
- <98c989ca-0694-5150-f74b-35f3e4bf20c0@ti.com>
-Message-ID: <20180531152623.GN5705@atomide.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 31 May 2018 08:26:36 -0700
+Subject: [PATCH v4 2/7] clk: at91: add I2S clock mux driver
+In-Reply-To: <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
+Message-ID: <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [180531 06:18]:
-> On 30/05/18 18:54, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [180530 15:44]:
-> > > On 30/05/18 18:28, Tony Lindgren wrote:
-> > > > * Tero Kristo <t-kristo@ti.com> [180530 15:18]:
-> > > > > For the OCP if part, I think that is still needed until we switch over to
-> > > > > full sysc driver. clkctrl_offs you probably also need because that is used
-> > > > > for mapping the omap_hwmod against a specific clkctrl clock. Those can be
-> > > > > only removed once we are done with hwmod (or figure out some other way to
-> > > > > assign the clkctrl clock to a hwmod.)
-> > > > 
-> > > > Hmm might be worth testing. I thought your commit 70f05be32133
-> > > > ("ARM: OMAP2+: hwmod: populate clkctrl clocks for hwmods if available")
-> > > > already parses the clkctrl from dts?
-> > > 
-> > > It maps the clkctrl clock to be used by hwmod, if those are available. We
-> > > didn't add any specific clock entries to DT for mapping the actual clkctrl
-> > > clock without the hwmod_data hints yet though, as that was deemed temporary
-> > > solution only due to transition to interconnect driver. I.e., you would need
-> > > something like this in DT for every device node:
-> > > 
-> > > &uart3 {
-> > >    clocks = <l4per_clkctrl UART3_CLK 0>;
-> > >    clock-names = "clkctrl";
-> > > };
-> > > 
-> > > ... which is currently not present.
-> > 
-> > Hmm is that not the "fck" clkctrl clock we have already in
-> > the dts files for the interconnect target modules?
-> 
-> Oh okay, yeah, we could parse that one, but currently it is not done, and is
-> not present for everything either I believe.
-> 
-> > We can also use pdata callbacks to pass the clock node if
-> > needed. But I guess I don't quite still understand what we
-> > are missing :)
-> 
-> So, what is missing is the glue logic only from the hwmod codebase. Right
-> now this is not supported but should be relatively trivial thing to add if
-> we really want to do this.
+Quoting Codrin Ciubotariu (2018-05-25 05:34:23)
+> This driver is a simple muxing driver that controls the
+> I2S's clock input by using syscon/regmap to change the parrent.
 
-OK let's think about this a bit for v4.19 then.
+s/parrent/parent/
 
-Regards,
+> The available inputs can be Peripheral clock and Generated clock.
 
-Tony
+Why capitalize peripheral and generated?
+
+> 
+> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> ---
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 1254bf9..903f23c 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -27,6 +27,7 @@ config SOC_SAMA5D2
+>         select HAVE_AT91_H32MX
+>         select HAVE_AT91_GENERATED_CLK
+>         select HAVE_AT91_AUDIO_PLL
+> +       select HAVE_AT91_I2S_MUX_CLK
+>         select PINCTRL_AT91PIO4
+>         help
+>           Select this if ou are using one of Microchip's SAMA5D2 family SoC.
+> @@ -129,6 +130,9 @@ config HAVE_AT91_GENERATED_CLK
+>  config HAVE_AT91_AUDIO_PLL
+>         bool
+>  
+> +config HAVE_AT91_I2S_MUX_CLK
+> +       bool
+> +
+>  config SOC_SAM_V4_V5
+>         bool
+>  
+
+I guess this is OK.
+
+> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+> index 082596f..facc169 100644
+> --- a/drivers/clk/at91/Makefile
+> +++ b/drivers/clk/at91/Makefile
+> @@ -13,3 +13,4 @@ obj-$(CONFIG_HAVE_AT91_USB_CLK)               += clk-usb.o
+>  obj-$(CONFIG_HAVE_AT91_SMD)            += clk-smd.o
+>  obj-$(CONFIG_HAVE_AT91_H32MX)          += clk-h32mx.o
+>  obj-$(CONFIG_HAVE_AT91_GENERATED_CLK)  += clk-generated.o
+> +obj-$(CONFIG_HAVE_AT91_I2S_MUX_CLK)    += clk-i2s-mux.o
+> diff --git a/drivers/clk/at91/clk-i2s-mux.c b/drivers/clk/at91/clk-i2s-mux.c
+> new file mode 100644
+> index 0000000..2d56ded
+> --- /dev/null
+> +++ b/drivers/clk/at91/clk-i2s-mux.c
+> @@ -0,0 +1,117 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + *  Copyright (C) 2018 Microchip Technology Inc,
+> + *                     Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> + *
+> + *
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/of.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +
+> +#include <soc/at91/atmel-sfr.h>
+> +
+> +#define        I2S_BUS_NR      2
+> +
+> +struct clk_i2s_mux {
+> +       struct clk_hw hw;
+> +       struct regmap *regmap;
+> +       u32 bus_id;
+
+Can be a u8?
+
+> +};
+> +
+> +#define to_clk_i2s_mux(hw) container_of(hw, struct clk_i2s_mux, hw)
+> +
+> +static u8 clk_i2s_mux_get_parent(struct clk_hw *hw)
+> +{
+> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
+> +       u32 val;
+> +
+> +       regmap_read(mux->regmap, AT91_SFR_I2SCLKSEL, &val);
+> +
+> +       return (val & BIT(mux->bus_id)) >> mux->bus_id;
+> +}
+> +
+> +static int clk_i2s_mux_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
+> +
+> +       return regmap_update_bits(mux->regmap, AT91_SFR_I2SCLKSEL,
+> +                                 BIT(mux->bus_id), index << mux->bus_id);
+> +}
+> +
+> +const struct clk_ops clk_i2s_mux_ops = {
+
+static?
+
+> +       .get_parent = clk_i2s_mux_get_parent,
+> +       .set_parent = clk_i2s_mux_set_parent,
+> +       .determine_rate = __clk_mux_determine_rate,
+> +};
+> +
+> +static struct clk_hw * __init
+> +at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
+> +                         const char * const *parent_names,
+> +                         unsigned int num_parents, u32 bus_id)
+> +{
+> +       struct clk_init_data init = {};
+> +       struct clk_i2s_mux *i2s_ck;
+> +       int ret;
+> +
+> +       i2s_ck = kzalloc(sizeof(*i2s_ck), GFP_KERNEL);
+> +       if (!i2s_ck)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       init.ops = &clk_i2s_mux_ops;
+> +       init.parent_names = parent_names;
+> +       init.num_parents = num_parents;
+> +       init.flags = CLK_IGNORE_UNUSED;
+
+Really? Why?
+
+> +
+> +       i2s_ck->hw.init = &init;
+> +       i2s_ck->bus_id = bus_id;
+> +       i2s_ck->regmap = regmap;
+> +
+> +       ret = clk_hw_register(NULL, &i2s_ck->hw);
+> +       if (ret) {
+> +               kfree(i2s_ck);
+> +               return ERR_PTR(ret);
+> +       }
+> +
+> +       return &i2s_ck->hw;
+> +}
