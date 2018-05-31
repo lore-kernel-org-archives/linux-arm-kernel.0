@@ -1,63 +1,40 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 31 May 2018 07:32:17 -0300
-Subject: [PATCH 4/7] perf cs-etm: Fix indexing for decoder packet queue
-In-Reply-To: <20180531103220.24684-1-acme@kernel.org>
-References: <20180531103220.24684-1-acme@kernel.org>
-Message-ID: <20180531103220.24684-5-acme@kernel.org>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Thu, 31 May 2018 18:31:22 +0800
+Subject: [PATCH v2 2/2] arm64/mm: make tramp_pg_dir read-only
+Message-ID: <20180531103122.31793-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Make tramp_pg_dir read-only.
 
-The tail of a queue is supposed to be pointing to the next available
-slot in a queue.  In this implementation the tail is incremented before
-it is used and as such points to the last used element, something that
-has the immense advantage of centralizing tail management at a single
-location and eliminating a lot of redundant code.
-
-But this needs to be taken into consideration on the dequeueing side
-where the head also needs to be incremented before it is used, or the
-first available element of the queue will be skipped.
-
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Tested-by: Leo Yan <leo.yan@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Robert Walker <robert.walker@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1527289854-10755-1-git-send-email-mathieu.poirier at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/mm/mmu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index c8b98fa22997..4d5fc374e730 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -96,11 +96,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
- 	/* Nothing to do, might as well just return */
- 	if (decoder->packet_count == 0)
- 		return 0;
-+	/*
-+	 * The queueing process in function cs_etm_decoder__buffer_packet()
-+	 * increments the tail *before* using it.  This is somewhat counter
-+	 * intuitive but it has the advantage of centralizing tail management
-+	 * at a single location.  Because of that we need to follow the same
-+	 * heuristic with the head, i.e we increment it before using its
-+	 * value.  Otherwise the first element of the packet queue is not
-+	 * used.
-+	 */
-+	decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index a675fb88914e..2c6e6433090c 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -542,6 +542,7 @@ static int __init map_entry_trampoline(void)
+ {
+ 	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+ 	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
++	int segment_size;
  
- 	*packet = decoder->packet_buffer[decoder->head];
+ 	/* The trampoline is always mapped and can therefore be global */
+ 	pgprot_val(prot) &= ~PTE_NG;
+@@ -551,6 +552,11 @@ static int __init map_entry_trampoline(void)
+ 	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+ 			     prot, pgd_pgtable_alloc, 0);
  
--	decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
--
- 	decoder->packet_count--;
- 
- 	return 1;
++	segment_size = __tramp_pgdir_segment_end - __tramp_pgdir_segment_start;
++	update_mapping_prot(__pa_symbol(__tramp_pgdir_segment_start),
++				(unsigned long)__tramp_pgdir_segment_start,
++				segment_size, PAGE_KERNEL_RO);
++
+ 	/* Map both the text and data into the kernel page table */
+ 	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
 -- 
-2.14.3
+2.17.0
