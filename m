@@ -1,31 +1,24 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 May 2018 11:42:26 +0530
-Subject: [PATCH v2 1/9] PM / Domains: Drop extern declarations of
- functions in pm_domain.h
-In-Reply-To: <20180529100421.31022-2-ulf.hansson@linaro.org>
+Date: Thu, 31 May 2018 11:43:29 +0530
+Subject: [PATCH v2 2/9] PM / Domains: Drop __pm_genpd_add_device()
+In-Reply-To: <20180529100421.31022-3-ulf.hansson@linaro.org>
 References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-2-ulf.hansson@linaro.org>
-Message-ID: <20180531061226.r3zrwypmiud2ksef@vireshk-i7>
+ <20180529100421.31022-3-ulf.hansson@linaro.org>
+Message-ID: <20180531061329.2sy7tl7gjhwqv276@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 29-05-18, 12:04, Ulf Hansson wrote:
-> Using "extern" to declare a function in a public header file is somewhat
-> pointless, but also doesn't hurt. However, to make all the function
-> declarations in pm_domain.h to be consistent, let's drop the use of
-> "extern".
+> There are still a few non-DT existing users of genpd, however neither of
+> them uses __pm_genpd_add_device(), hence let's drop it.
 > 
 > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->  include/linux/pm_domain.h | 51 ++++++++++++++++++---------------------
->  1 file changed, 23 insertions(+), 28 deletions(-)
+>  drivers/base/power/domain.c | 10 ++++------
+>  include/linux/pm_domain.h   | 14 +++-----------
+>  2 files changed, 7 insertions(+), 17 deletions(-)
 
-Finally.
-
-I wanted to do that earlier as checkpatch complained non stop about
-such declarations :)
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
 viresh
