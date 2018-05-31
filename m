@@ -1,88 +1,70 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 31 May 2018 22:21:09 +0530
-Subject: [PATCH v2] arm64: allwinner: a64-amarula-relic: Enable AP6330 WiFi
- support
-Message-ID: <20180531165109.8476-1-jagan@amarulasolutions.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 31 May 2018 17:51:31 +0100
+Subject: [PATCH v1 2/2] arm64: handle NOTIFY_SEI notification by the APEI
+ driver
+In-Reply-To: <20180531110115.uglmicy3nzwfoyx3@lakrids.cambridge.arm.com>
+References: <1527770506-8076-1-git-send-email-gengdongjiu@huawei.com>
+ <1527770506-8076-3-git-send-email-gengdongjiu@huawei.com>
+ <20180531110115.uglmicy3nzwfoyx3@lakrids.cambridge.arm.com>
+Message-ID: <71afa669-e3c5-979e-da5b-1d9cb7056fd6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
-- WiFi SDIO interface is connected to MMC1
-- WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
-- WiFi WL-WAKE-AP pin connected to gpio PL3
-- 32kHz external oscillator gate clock from RTC
+Hi Mark, Dongjiu Geng,
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- Move external rtc clock nodes into main rtc node definition
-  of sun50i-a64.dtsi
+On 31/05/18 12:01, Mark Rutland wrote:
+> In do_serror() we already handle nmi_{enter,exit}(), so there's no need
+> for that here.
 
- .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 31 ++++++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  3 +++
- 2 files changed, 34 insertions(+)
+Even better: nmi_enter() has a BUG_ON(in_nmi()).
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-index ce4a256ff086..eac4793c8502 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-@@ -21,12 +21,43 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&rtc 1>;
-+		clock-names = "ext_clock";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* WL-PMU-EN: PL2 */
-+	};
- };
- 
- &ehci0 {
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	/*
-+	 * Schematic shows both dldo4 and eldo1 connected for vcc-io-wifi, but
-+	 * dldo4 connection shows DNP(Do Not Populate) and eldo1 connected with
-+	 * 0Ohm register to vcc-io-wifi so eldo1 is used.
-+	 */
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;	/* WL-WAKE-AP: PL3 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1b2ef28c42bd..82516aec4153 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -634,6 +634,9 @@
- 			reg = <0x01f00000 0x54>;
- 			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
-+			clocks = <&osc32k>;
-+			#clock-cells = <1>;
- 		};
- 
- 		r_intc: interrupt-controller at 1f00c00 {
--- 
-2.14.3
+
+> TBH, I don't understand why do_sea() does that conditionally today.
+> Unless there's some constraint I'm missing, 
+
+APEI uses a different fixmap entry and locks when in_nmi(). This was because we
+may interrupt the irq-masked region in APEI that was using the regular memory.
+(e.g. the 'polled' notification, or something backed by an interrupt.) But,
+Borislav has spotted other things in here that are broken[0]. I'm working on
+rolling all that into 'v5' of the in_nmi() rework stuff.
+
+We currently get away with this on arm because 'SEA' is the only NMI-like thing,
+and it occurs synchronously. The problem cases are all also cases where the
+kernel text is corrupt, which we can't possibly hope to handle.
+
+For NOTIFY_SDEI and NOTIFY_SEI this is the wrong pattern as these are
+asynchronous. do_serror() has already done most of the work for NOTIFY_SEI, but
+we need to use the estatus queue in APEI, which is currently x86 only.
+
+
+> I think it would make more
+> sense to do that regardless of whether the interrupted context had
+> interrupts enabled. James -- does that make sense to you?
+> 
+> If you update the prior patch with a stub for !CONFIG_ACPI_APEI_SEI, you
+> can simplify all of the above additions down to:
+> 
+> 	if (!ghes_notify_sei())
+> 		return;
+> 
+> ... which would look a lot nicer.
+
+The code that calls ghes_notify_sei() may need calling by KVM too, but its
+default action to an 'unclaimed' SError will be different.
+Because of the race between memory_failure() and return-to-userspace, we may
+need to kick the irq work queue (if we can), as we return from do_serror(). [1]
+and [2] provide an example for NOTIFY_SEA. SDEI does this by returning to the
+kernel through the IRQ handler, (which handles the KVM case too).
+
+
+I think this series is unsafe until we can use the estatus queue in APEI. Its
+also missing the handling for an SError interrupting a KVM guest.
+
+
+Thanks,
+
+James
+
+[0] https://www.spinics.net/lists/arm-kernel/msg653332.html
+[1] https://www.spinics.net/lists/arm-kernel/msg649237.html
+[2] https://www.spinics.net/lists/arm-kernel/msg649239.html
