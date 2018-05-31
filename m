@@ -1,128 +1,77 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 31 May 2018 12:59:59 +0200
-Subject: [PATCH v3 5/5] PM / Domains: Add dev_pm_domain_attach_by_id() to
- manage multi PM domains
-In-Reply-To: <20180531105959.14843-1-ulf.hansson@linaro.org>
-References: <20180531105959.14843-1-ulf.hansson@linaro.org>
-Message-ID: <20180531105959.14843-6-ulf.hansson@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 May 2018 12:01:15 +0100
+Subject: [PATCH v1 2/2] arm64: handle NOTIFY_SEI notification by the APEI
+ driver
+In-Reply-To: <1527770506-8076-3-git-send-email-gengdongjiu@huawei.com>
+References: <1527770506-8076-1-git-send-email-gengdongjiu@huawei.com>
+ <1527770506-8076-3-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20180531110115.uglmicy3nzwfoyx3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing dev_pm_domain_attach() function, allows a single PM domain to
-be attached per device. To be able to support devices that are partitioned
-across multiple PM domains, let's introduce a new interface,
-dev_pm_domain_attach_by_id().
+On Thu, May 31, 2018 at 08:41:46PM +0800, Dongjiu Geng wrote:
+> When kernel or KVM gets the NOTIFY_SEI notification, it firstly
+> calls the APEI driver to handle this notification.
+> 
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+>  arch/arm64/kernel/traps.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> ---
+> change since https://www.spinics.net/lists/kvm/msg168919.html
+> 
+> 1. Remove the handle_guest_sei() helper
+> 
+> 
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 8bbdc17..676e40c 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -50,6 +50,7 @@
+>  #include <asm/exception.h>
+>  #include <asm/system_misc.h>
+>  #include <asm/sysreg.h>
+> +#include <acpi/ghes.h>
 
-The dev_pm_domain_attach_by_id() returns a new allocated struct device with
-the corresponding attached PM domain. This enables for example a driver to
-operate on the new device from a power management point of view. The driver
-may then also benefit from using the received device, to set up so called
-device-links towards its original device. Depending on the situation, these
-links may then be dynamically changed.
+Nit: please place newline before the new include, since it comes from a
+different directory (and we do so in fault.c).
 
-The new interface is typically called by drivers during their probe phase,
-in case they manages devices which uses multiple PM domains. If that is the
-case, the driver also becomes responsible of managing the detaching of the
-PM domains, which typically should be done at the remove phase. Detaching
-is done by calling the existing dev_pm_domain_detach() function and for
-each of the received devices from dev_pm_domain_attach_by_id().
+>  static const char *handler[]= {
+>  	"Synchronous Abort",
+> @@ -701,6 +702,20 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
+>  bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
+>  {
+>  	u32 aet = arm64_ras_serror_get_severity(esr);
+> +	int ret = -ENOENT;
+> +
+> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
+> +		if (interrupts_enabled(regs))
+> +			nmi_enter();
+> +
+> +		ret = ghes_notify_sei();
+> +
+> +		if (interrupts_enabled(regs))
+> +			nmi_exit();
+> +
+> +		if (!ret)
+> +			return false;
+> +	}
 
-Note, currently its only genpd that supports multiple PM domains per
-device, but dev_pm_domain_attach_by_id() can easily by extended to cover
-other PM domain types, if/when needed.
+In do_serror() we already handle nmi_{enter,exit}(), so there's no need
+for that here.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Tested-by: Jon Hunter <jonathanh@nvidia.com>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/power/common.c | 43 ++++++++++++++++++++++++++++++++++---
- include/linux/pm_domain.h   |  7 ++++++
- 2 files changed, 47 insertions(+), 3 deletions(-)
+TBH, I don't understand why do_sea() does that conditionally today.
+Unless there's some constraint I'm missing, I think it would make more
+sense to do that regardless of whether the interrupted context had
+interrupts enabled. James -- does that make sense to you?
 
-diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-index 7ae62b6355b8..df41b4780b3b 100644
---- a/drivers/base/power/common.c
-+++ b/drivers/base/power/common.c
-@@ -116,14 +116,51 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
- }
- EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
- 
-+/**
-+ * dev_pm_domain_attach_by_id - Associate a device with one of its PM domains.
-+ * @dev: The device used to lookup the PM domain.
-+ * @index: The index of the PM domain.
-+ *
-+ * As @dev may only be attached to a single PM domain, the backend PM domain
-+ * provider creates a virtual device to attach instead. If attachment succeeds,
-+ * the ->detach() callback in the struct dev_pm_domain are assigned by the
-+ * corresponding backend attach function, as to deal with detaching of the
-+ * created virtual device.
-+ *
-+ * This function should typically be invoked by a driver during the probe phase,
-+ * in case its device requires power management through multiple PM domains. The
-+ * driver may benefit from using the received device, to configure device-links
-+ * towards its original device. Depending on the use-case and if needed, the
-+ * links may be dynamically changed by the driver, which allows it to control
-+ * the power to the PM domains independently from each other.
-+ *
-+ * Callers must ensure proper synchronization of this function with power
-+ * management callbacks.
-+ *
-+ * Returns the virtual created device when successfully attached to its PM
-+ * domain, NULL in case @dev don't need a PM domain, else an ERR_PTR().
-+ * Note that, to detach the returned virtual device, the driver shall call
-+ * dev_pm_domain_detach() on it, typically during the remove phase.
-+ */
-+struct device *dev_pm_domain_attach_by_id(struct device *dev,
-+					  unsigned int index)
-+{
-+	if (dev->pm_domain)
-+		return ERR_PTR(-EEXIST);
-+
-+	return genpd_dev_pm_attach_by_id(dev, index);
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_domain_attach_by_id);
-+
- /**
-  * dev_pm_domain_detach - Detach a device from its PM domain.
-  * @dev: Device to detach.
-  * @power_off: Used to indicate whether we should power off the device.
-  *
-- * This functions will reverse the actions from dev_pm_domain_attach() and thus
-- * try to detach the @dev from its PM domain. Typically it should be invoked
-- * from subsystem level code during the remove phase.
-+ * This functions will reverse the actions from dev_pm_domain_attach() and
-+ * dev_pm_domain_attach_by_id(), thus it detaches @dev from its PM domain.
-+ * Typically it should be invoked during the remove phase, either from
-+ * subsystem level code or from drivers.
-  *
-  * Callers must ensure proper synchronization of this function with power
-  * management callbacks.
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 82458e8e2e01..9206a4fef9ac 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -299,6 +299,8 @@ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
- 
- #ifdef CONFIG_PM
- int dev_pm_domain_attach(struct device *dev, bool power_on);
-+struct device *dev_pm_domain_attach_by_id(struct device *dev,
-+					  unsigned int index);
- void dev_pm_domain_detach(struct device *dev, bool power_off);
- void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd);
- #else
-@@ -306,6 +308,11 @@ static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
- {
- 	return 0;
- }
-+static inline struct device *dev_pm_domain_attach_by_id(struct device *dev,
-+							unsigned int index)
-+{
-+	return NULL;
-+}
- static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
- static inline void dev_pm_domain_set(struct device *dev,
- 				     struct dev_pm_domain *pd) {}
--- 
-2.17.0
+If you update the prior patch with a stub for !CONFIG_ACPI_APEI_SEI, you
+can simplify all of the above additions down to:
+
+	if (!ghes_notify_sei())
+		return;
+
+... which would look a lot nicer.
+
+Thanks,
+Mark.
