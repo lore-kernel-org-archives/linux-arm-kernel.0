@@ -1,72 +1,36 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 31 May 2018 00:41:37 -0700
-Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
- <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
- <20180524173926.GC14924@minitux>
- <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
- <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
- <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
-Message-ID: <152775249799.144038.9269415086304305030@swboyd.mtv.corp.google.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 31 May 2018 15:42:46 +0800
+Subject: [PATCH 4/7] iommu/amd: make sure TLB to be flushed before IOVA freed
+In-Reply-To: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1527752569-18020-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sricharan R (2018-05-30 21:57:20)
-> Hi Stephen,
-> 
-> On 5/30/2018 9:25 PM, Stephen Boyd wrote:
-> > Quoting Sricharan R (2018-05-24 22:40:11)
-> >> Hi Bjorn,
-> >>
-> >> On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
-> >>> On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
-> >>>
-> >>>> From: Stephen Boyd <sboyd@codeaurora.org>
-> >>>>
-> >>>> Krait CPUs have a handful of L2 cache controller registers that
-> >>>> live behind a cp15 based indirection register. First you program
-> >>>> the indirection register (l2cpselr) to point the L2 'window'
-> >>>> register (l2cpdr) at what you want to read/write.  Then you
-> >>>> read/write the 'window' register to do what you want. The
-> >>>> l2cpselr register is not banked per-cpu so we must lock around
-> >>>> accesses to it to prevent other CPUs from re-pointing l2cpdr
-> >>>> underneath us.
-> >>>>
-> >>>> Cc: Mark Rutland <mark.rutland@arm.com>
-> >>>> Cc: Russell King <linux@arm.linux.org.uk>
-> >>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> >>>
-> >>> This should have your signed-off-by here as well.
-> >>>
-> >>
-> >>  ok.
-> >>
-> >>> Apart from that:
-> >>>
-> >>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> >>>
-> >>
-> > 
-> > Will these patches come around again? I'll do a quick sweep on them
-> > today but I expect them to be resent.
-> 
-> Sure, i will have to resend them again, fixing couple of Bjorn's
-> minor comments. Will address your comments that you would give
-> as well along with that.
-> 
+Although the mapping has already been removed in the page table, it maybe
+still exist in TLB. Suppose the freed IOVAs is reused by others before the
+flush operation completed, the new user can not correctly access to its
+meomory.
 
-Ok. One general comment is that it would be nice if the bindings for all
-the nodes that are introduced included 'clocks' properties and also
-maybe 'clock-names' properties for the clocks that are consumed by each
-node. Right now, we hide those details from DT and rely on the string
-names to hook the clk tree up for us. That sort of prevents us from
-moving away from string easily, so I would just throw the clocks into
-the binding right now and always have them there just in case we want to
-use the binding to figure out the hierarchy in the future.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/amd_iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've been thinking we need to do something similar for the gcc and other
-nodes for any clks they use, but I haven't gotten around to it.
-
-Otherwise the patches look mostly ok to me. Not sure I'll have any other
-comments.
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 8fb8c73..93aa389 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -2402,9 +2402,9 @@ static void __unmap_single(struct dma_ops_domain *dma_dom,
+ 	}
+ 
+ 	if (amd_iommu_unmap_flush) {
+-		dma_ops_free_iova(dma_dom, dma_addr, pages);
+ 		domain_flush_tlb(&dma_dom->domain);
+ 		domain_flush_complete(&dma_dom->domain);
++		dma_ops_free_iova(dma_dom, dma_addr, pages);
+ 	} else {
+ 		pages = __roundup_pow_of_two(pages);
+ 		queue_iova(&dma_dom->iovad, dma_addr >> PAGE_SHIFT, pages, 0);
+-- 
+1.8.3
