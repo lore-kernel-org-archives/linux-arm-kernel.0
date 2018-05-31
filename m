@@ -1,62 +1,63 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 31 May 2018 12:59:54 +0200
-Subject: [PATCH v3 0/5] PM / Domains: Add support for multi PM domains per
- device
-Message-ID: <20180531105959.14843-1-ulf.hansson@linaro.org>
+Date: Thu, 31 May 2018 12:59:55 +0200
+Subject: [PATCH v3 1/5] PM / Domains: dt: Allow power-domain property to be a
+ list of specifiers
+In-Reply-To: <20180531105959.14843-1-ulf.hansson@linaro.org>
+References: <20180531105959.14843-1-ulf.hansson@linaro.org>
+Message-ID: <20180531105959.14843-2-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v3:
-	- Drop patch 1->4 as they have already been applied.
-	- Collected tags, for tests and reviews.
-	- Minor update to function descriptions in patch 4 (earlier 8) and 5
-	(earlier9).
-	- Note, because of the minor changes, no history is provided per patch.
+To be able to describe topologies where devices are partitioned across
+multiple power domains, let's extend the power-domain property to allow
+being a list of PM domain specifiers.
 
-Changes in v2:
-	- Addressed comments from Geert around DT doc.
-	- Addressed comments from Jon around clarification of how to use this
-	and changes to returned error codes.
-	- Fixed build error in case CONFIG_PM was unset.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: devicetree at vger.kernel.org
+Suggested-by: Jon Hunter <jonathanh@nvidia.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ .../bindings/power/power_domain.txt           | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-There are devices that are partitioned across multiple PM domains. Currently
-these can't be supported well by the available PM infrastructures we have in
-the kernel. This series is an attempt to address this.
-
-One existing case where devices are partitioned across multiple PM domains, is
-the Nvida Tegra 124/210 X-USB subsystem. A while ago Jon Hunter (Nvidia) sent a
-series, trying to address these issues, however this is a new approach, while
-it re-uses the same concepts from DT point of view.
-
-The Tegra 124/210 X-USB subsystem contains of a host controller and a device
-controller. Each controller have its own independent PM domain, but are being
-partitioned across another shared PM domain for the USB super-speed logic.
-
-Currently to make the drivers work, either the related PM domains needs to stay
-powered on always or the PM domain topology needs to be in-correctly modelled
-through sub-domains. In both cases PM domains may be powered on while they
-don't need to be, so in the end this means - wasting power -.
-
-As stated above, this series intends to address these problem from a PM
-infrastructure point of view. More details are available in each changelog.
-
-Kind regards
-Ulf Hansson
-
-Ulf Hansson (5):
-  PM / Domains: dt: Allow power-domain property to be a list of
-    specifiers
-  PM / Domains: Don't attach devices in genpd with multi PM domains
-  PM / Domains: Split genpd_dev_pm_attach()
-  PM / Domains: Add support for multi PM domains per device to genpd
-  PM / Domains: Add dev_pm_domain_attach_by_id() to manage multi PM
-    domains
-
- .../bindings/power/power_domain.txt           |  19 ++-
- drivers/base/power/common.c                   |  43 +++++-
- drivers/base/power/domain.c                   | 134 +++++++++++++++---
- include/linux/pm_domain.h                     |  15 ++
- 4 files changed, 183 insertions(+), 28 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 4733f76cbe48..9b387f861aed 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -111,8 +111,8 @@ Example 3:
+ ==PM domain consumers==
+ 
+ Required properties:
+- - power-domains : A phandle and PM domain specifier as defined by bindings of
+-                   the power controller specified by phandle.
++ - power-domains : A list of PM domain specifiers, as defined by bindings of
++		the power controller that is the PM domain provider.
+ 
+ Example:
+ 
+@@ -122,9 +122,18 @@ Example:
+ 		power-domains = <&power 0>;
+ 	};
+ 
+-The node above defines a typical PM domain consumer device, which is located
+-inside a PM domain with index 0 of a power controller represented by a node
+-with the label "power".
++	leaky-device at 12351000 {
++		compatible = "foo,i-leak-current";
++		reg = <0x12351000 0x1000>;
++		power-domains = <&power 0>, <&power 1> ;
++	};
++
++The first example above defines a typical PM domain consumer device, which is
++located inside a PM domain with index 0 of a power controller represented by a
++node with the label "power".
++In the second example the consumer device are partitioned across two PM domains,
++the first with index 0 and the second with index 1, of a power controller that
++is represented by a node with the label "power.
+ 
+ Optional properties:
+ - required-opps: This contains phandle to an OPP node in another device's OPP
 -- 
 2.17.0
