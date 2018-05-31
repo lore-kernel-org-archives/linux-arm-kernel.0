@@ -1,56 +1,18 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 31 May 2018 11:15:21 +0200
-Subject: usb: host: ohci: fix sfr kernel warning in ohci-at91 driver
-In-Reply-To: <1527285896-12811-1-git-send-email-Prasanthi.Chellakumar@microchip.com>
-References: <1527285896-12811-1-git-send-email-Prasanthi.Chellakumar@microchip.com>
-Message-ID: <525dc6c3-8654-50f8-264f-1b375664204c@microchip.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Thu, 31 May 2018 12:20:48 +0300
+Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
+In-Reply-To: <20180530173414.6121-1-andrew.smirnov@gmail.com>
+References: <20180530173414.6121-1-andrew.smirnov@gmail.com>
+Message-ID: <49e934d8-228a-35b1-8db2-0402422916fa@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/2018 at 00:04, Prasanthi Chellakumar wrote:
-> The USB Host Controller driver 'ohci-at91.c' reads a Special Function
-> Register - OHCI Interrupt Configuration Register (AT91_SFR_OHCIICR)
-> for bits SUSPEND_A/B/C. These bits are defined in sama5d2 alone, so
-> sfr register mapping is done with compatible string "atmel,sama5d2-sfr".
-> This gives a kernel warning 'failed to find sfr node' with non sama5d2
-> cpus which is removed here, thus leaving it up to having a proper DTS.
-> 
-> Signed-off-by: Prasanthi Chellakumar <prasanthi.chellakumar@microchip.com>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> Workaround introduced for i.MX53 in be9cae2479f48 ("usb: chipidea:
+> imx: Fix ULPI on imx53") seems to be applicable in case of i.MX51 as
+> well. Running latest kernel on ZII RDU1 Board (imx51-zii-rdu1.dts)
+> exhibits a kernel frozen on PORTSC access and applying the workaround
+> resolves the issue.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Confirmed on 8.9'' RDU1
 
-Thanks Prasanthi. Best regards,
-   Nicolas
-
-> ---
-> 
-> The AT91_SFR_OHCIIR register is read for USB suspend and wake
-> up control. The OHCI driver has a sfr register mapping for sama5d2
-> alone. The USB suspend proceeds only when there is valid sfr regmap.
-> So SFR access in boards that it is absent is not required. In such
-> boards, USB suspend control requests is processed by usb_hub_control().
-> But there is a kernel warning with non sama5d2 cpus. This patch fixes
-> the kernel warning, changing to debug message(dev_dbg).
-> ---
->   drivers/usb/host/ohci-at91.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index af0566d..ce11c47 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -214,7 +214,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   
->   	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
->   	if (!ohci_at91->sfr_regmap)
-> -		dev_warn(dev, "failed to find sfr node\n");
-> +		dev_dbg(dev, "failed to find sfr node\n");
->   
->   	board = hcd->self.controller->platform_data;
->   	ohci = hcd_to_ohci(hcd);
-> 
-
-
--- 
-Nicolas Ferre
+Tested-By: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
