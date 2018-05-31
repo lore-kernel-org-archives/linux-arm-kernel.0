@@ -1,30 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 May 2018 22:17:43 -0500
-Subject: [PATCH v3 8/8] ARM: dts: rcar-gen2: Remove unused VIN properties
-In-Reply-To: <1527606359-19261-9-git-send-email-jacopo+renesas@jmondi.org>
+Date: Wed, 30 May 2018 22:13:53 -0500
+Subject: [PATCH v3 1/8] dt-bindings: media: rcar-vin: Describe optional
+ ep properties
+In-Reply-To: <1527606359-19261-2-git-send-email-jacopo+renesas@jmondi.org>
 References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
- <1527606359-19261-9-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180531031743.GA8607@rob-hp-laptop>
+ <1527606359-19261-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180531031353.GA4440@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 05:05:59PM +0200, Jacopo Mondi wrote:
-> The 'bus-width' and 'pclk-sample' properties are not parsed by the VIN
-> driver and only confuse users. Remove them in all Gen2 SoC that use
-> them.
+On Tue, May 29, 2018 at 05:05:52PM +0200, Jacopo Mondi wrote:
+> Describe the optional endpoint properties for endpoint nodes of port at 0
+> and port at 1 of the R-Car VIN driver device tree bindings documentation.
 > 
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> 
 > ---
-> v3:
-> - remove bus-width from dt-bindings example
+> v2 -> v3:
+> - Do not repeat property description, just reference video-interfaces.txt
+> - Indent with spaces, not tabs as the rest of the document
+> - Do not remove (yet) the 'bus-width' property from example
 > ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 1 -
->  arch/arm/boot/dts/r8a7790-lager.dts                  | 3 ---
->  arch/arm/boot/dts/r8a7791-koelsch.dts                | 3 ---
->  arch/arm/boot/dts/r8a7791-porter.dts                 | 1 -
->  arch/arm/boot/dts/r8a7793-gose.dts                   | 3 ---
->  arch/arm/boot/dts/r8a7794-alt.dts                    | 1 -
->  arch/arm/boot/dts/r8a7794-silk.dts                   | 1 -
->  7 files changed, 13 deletions(-)
+>  Documentation/devicetree/bindings/media/rcar_vin.txt | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
