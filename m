@@ -1,31 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 May 2018 22:53:42 -0500
-Subject: [PATCH v2 5/9] PM / Domains: dt: Allow power-domain property to
- be a list of specifiers
-In-Reply-To: <20180529100421.31022-6-ulf.hansson@linaro.org>
-References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-6-ulf.hansson@linaro.org>
-Message-ID: <20180531035342.GA14184@rob-hp-laptop>
+Date: Wed, 30 May 2018 22:55:01 -0500
+Subject: [PATCH v2 12/12] coresight: tmc: Add configuration support for
+ trace buffer size
+In-Reply-To: <1527599737-28408-13-git-send-email-suzuki.poulose@arm.com>
+References: <1527599737-28408-1-git-send-email-suzuki.poulose@arm.com>
+ <1527599737-28408-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180531035501.GA15549@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 12:04:17PM +0200, Ulf Hansson wrote:
-> To be able to describe topologies where devices are partitioned across
-> multiple power domains, let's extend the power-domain property to allow
-> being a list of PM domain specifiers.
+On Tue, May 29, 2018 at 02:15:37PM +0100, Suzuki K Poulose wrote:
+> Now that we can dynamically switch between contiguous memory and
+> SG table depending on the trace buffer size, provide the support
+> for selecting an appropriate buffer size.
 > 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Suggested-by: Jon Hunter <jonathanh@nvidia.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
-> 
-> Changes in v2:
-> 	- Fixed comments from Geert. Re-worded to "PM domain specifiers" and
-> 	clarified DT example.
-> 
-> ---
->  .../bindings/power/power_domain.txt           | 19 ++++++++++++++-----
->  1 file changed, 14 insertions(+), 5 deletions(-)
+>  .../ABI/testing/sysfs-bus-coresight-devices-tmc    |  8 ++++++
+>  .../devicetree/bindings/arm/coresight.txt          |  3 +-
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/hwtracing/coresight/coresight-tmc.c        | 33 ++++++++++++++++++++++
+>  3 files changed, 43 insertions(+), 1 deletion(-)
