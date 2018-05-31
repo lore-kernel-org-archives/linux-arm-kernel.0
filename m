@@ -1,153 +1,82 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 31 May 2018 08:26:36 -0700
-Subject: [PATCH v4 2/7] clk: at91: add I2S clock mux driver
-In-Reply-To: <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
+Date: Thu, 31 May 2018 08:31:48 -0700
+Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
 References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
- <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
-Message-ID: <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
+ <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
+ <20180531005827.GA17203@rob-hp-laptop>
+ <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
+ <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
+Message-ID: <152778070837.144038.4555982304713569160@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Codrin Ciubotariu (2018-05-25 05:34:23)
-> This driver is a simple muxing driver that controls the
-> I2S's clock input by using syscon/regmap to change the parrent.
-
-s/parrent/parent/
-
-> The available inputs can be Peripheral clock and Generated clock.
-
-Why capitalize peripheral and generated?
-
+Quoting Rob Herring (2018-05-31 07:20:57)
+> On Thu, May 31, 2018 at 5:25 AM, Codrin Ciubotariu
+> <codrin.ciubotariu@microchip.com> wrote:
+> > On 31.05.2018 03:58, Rob Herring wrote:
+> >>
+> >> On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
+> >>>
+> >>> The I2S mux clock can be used to select the I2S input clock. The
+> >>> available parents are the peripheral and the generated clocks.
+> >>>
+> >>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> >>> ---
+> >>>   .../devicetree/bindings/clock/at91-clock.txt       | 34
+> >>> ++++++++++++++++++++++
+> >>>   1 file changed, 34 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> index 51c259a..1c46b3c 100644
+> >>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> >>> @@ -90,6 +90,8 @@ Required properties:
+> >>>         "atmel,sama5d2-clk-audio-pll-pmc"
+> >>>                 at91 audio pll output on AUDIOPLLCLK that feeds the PMC
+> >>>                 and can be used by peripheral clock or generic clock
+> >>> +       "atmel,sama5d2-clk-i2s-mux":
+> >>> +               at91 I2S clock source selection
+> >>
+> >>
+> >> Is this boolean or takes some values. If latter, what are valid values?
+> >
+> >
+> > This is the compatible string of the clock driver.
 > 
-> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
-> ---
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 1254bf9..903f23c 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -27,6 +27,7 @@ config SOC_SAMA5D2
->         select HAVE_AT91_H32MX
->         select HAVE_AT91_GENERATED_CLK
->         select HAVE_AT91_AUDIO_PLL
-> +       select HAVE_AT91_I2S_MUX_CLK
->         select PINCTRL_AT91PIO4
->         help
->           Select this if ou are using one of Microchip's SAMA5D2 family SoC.
-> @@ -129,6 +130,9 @@ config HAVE_AT91_GENERATED_CLK
->  config HAVE_AT91_AUDIO_PLL
->         bool
->  
-> +config HAVE_AT91_I2S_MUX_CLK
-> +       bool
-> +
->  config SOC_SAM_V4_V5
->         bool
->  
+> Ah, now I remember. AT91 uses fine grained clock nodes in DT. Is there
+> still a plan to fix this?
 
-I guess this is OK.
+I'm also interested in a plan.
 
-> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-> index 082596f..facc169 100644
-> --- a/drivers/clk/at91/Makefile
-> +++ b/drivers/clk/at91/Makefile
-> @@ -13,3 +13,4 @@ obj-$(CONFIG_HAVE_AT91_USB_CLK)               += clk-usb.o
->  obj-$(CONFIG_HAVE_AT91_SMD)            += clk-smd.o
->  obj-$(CONFIG_HAVE_AT91_H32MX)          += clk-h32mx.o
->  obj-$(CONFIG_HAVE_AT91_GENERATED_CLK)  += clk-generated.o
-> +obj-$(CONFIG_HAVE_AT91_I2S_MUX_CLK)    += clk-i2s-mux.o
-> diff --git a/drivers/clk/at91/clk-i2s-mux.c b/drivers/clk/at91/clk-i2s-mux.c
-> new file mode 100644
-> index 0000000..2d56ded
-> --- /dev/null
-> +++ b/drivers/clk/at91/clk-i2s-mux.c
-> @@ -0,0 +1,117 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + *  Copyright (C) 2018 Microchip Technology Inc,
-> + *                     Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
-> + *
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +
-> +#include <soc/at91/atmel-sfr.h>
-> +
-> +#define        I2S_BUS_NR      2
-> +
-> +struct clk_i2s_mux {
-> +       struct clk_hw hw;
-> +       struct regmap *regmap;
-> +       u32 bus_id;
+> >>
+> >>> +               compatible = "atmel,sama5d2-clk-i2s-mux";
+> >>> +               #address-cells = <1>;
+> >>> +               #size-cells = <0>;
+> >>
+> >>
+> >> How do you address this block? My guess is you don't because it is just
+> >> part of some other block and you are just creating this node to
+> >> instantiate a driver. Just make the node for the actual h/w block a
+> >> clock provider and define the clock ids (0 and 1).
+> >
+> >
+> > This block is not addressed, but its children are. The register we access in
+> > this driver is not part of other block. It's a SFR register, accessed
+> > through syscon and it has nothing to do with the I2S IP (see SAMA5D2 DS,
+> > page 1256, fig. 44-1: I2SC Block Diagram) that is the consumer of this
+> > clock. Adding a clock-id property in the I2S node would be just like v3 of
+> > this series, with the difference that we use clock-id instead of alias id to
+> > set the clock parent, which is not how you suggested back then.
+> 
+> I wasn't suggesting a clock-id property, but a clock specifier (i.e.
+> make #clock-cells 1).
+> 
+> But AT91 clocks are all a mess, so I don't know what to tell you.
+> 
 
-Can be a u8?
-
-> +};
-> +
-> +#define to_clk_i2s_mux(hw) container_of(hw, struct clk_i2s_mux, hw)
-> +
-> +static u8 clk_i2s_mux_get_parent(struct clk_hw *hw)
-> +{
-> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
-> +       u32 val;
-> +
-> +       regmap_read(mux->regmap, AT91_SFR_I2SCLKSEL, &val);
-> +
-> +       return (val & BIT(mux->bus_id)) >> mux->bus_id;
-> +}
-> +
-> +static int clk_i2s_mux_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
-> +
-> +       return regmap_update_bits(mux->regmap, AT91_SFR_I2SCLKSEL,
-> +                                 BIT(mux->bus_id), index << mux->bus_id);
-> +}
-> +
-> +const struct clk_ops clk_i2s_mux_ops = {
-
-static?
-
-> +       .get_parent = clk_i2s_mux_get_parent,
-> +       .set_parent = clk_i2s_mux_set_parent,
-> +       .determine_rate = __clk_mux_determine_rate,
-> +};
-> +
-> +static struct clk_hw * __init
-> +at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
-> +                         const char * const *parent_names,
-> +                         unsigned int num_parents, u32 bus_id)
-> +{
-> +       struct clk_init_data init = {};
-> +       struct clk_i2s_mux *i2s_ck;
-> +       int ret;
-> +
-> +       i2s_ck = kzalloc(sizeof(*i2s_ck), GFP_KERNEL);
-> +       if (!i2s_ck)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       init.name = name;
-> +       init.ops = &clk_i2s_mux_ops;
-> +       init.parent_names = parent_names;
-> +       init.num_parents = num_parents;
-> +       init.flags = CLK_IGNORE_UNUSED;
-
-Really? Why?
-
-> +
-> +       i2s_ck->hw.init = &init;
-> +       i2s_ck->bus_id = bus_id;
-> +       i2s_ck->regmap = regmap;
-> +
-> +       ret = clk_hw_register(NULL, &i2s_ck->hw);
-> +       if (ret) {
-> +               kfree(i2s_ck);
-> +               return ERR_PTR(ret);
-> +       }
-> +
-> +       return &i2s_ck->hw;
-> +}
+If #clock-cells of 1 works then we should go with that. It's still weird
+that we need random nodes to add more clks, but I guess that's how it's
+going to be for each at91 clk driver until it changes to be one big
+provider node.
