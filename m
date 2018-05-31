@@ -1,126 +1,31 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 31 May 2018 10:05:36 +0800
-Subject: [PATCH] PCI: mediatek: Add system pm support for MT2712
-In-Reply-To: <1527647736-19986-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1527647736-19986-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1527732336.9842.3.camel@mtkswgap22>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 31 May 2018 10:06:08 +0800
+Subject: [PATCH 1/2] ARM: imx: add standby mode suspend for i.MX6SLL
+Message-ID: <1527732369-19740-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-05-30 at 10:35 +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
-> the internel control register will be reset after system resume. The PCIe
-> link should be re-established and the related control register values should
-> be re-set after system resume.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> CC: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/host/pcie-mediatek.c | 82 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 82 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index dabf1086..60f98d92 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -132,12 +132,14 @@ struct mtk_pcie_port;
->  /**
->   * struct mtk_pcie_soc - differentiate between host generations
->   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-> + * @pm_support: whether the host's MTCMOS will be off when suspend
->   * @ops: pointer to configuration access functions
->   * @startup: pointer to controller setting functions
->   * @setup_irq: pointer to initialize IRQ functions
->   */
->  struct mtk_pcie_soc {
->  	bool need_fix_class_id;
-> +	bool pm_support;
->  	struct pci_ops *ops;
->  	int (*startup)(struct mtk_pcie_port *port);
->  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-> @@ -1179,12 +1181,91 @@ static int mtk_pcie_probe(struct platform_device *pdev)
->  	return err;
->  }
->  
-> +static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
-> +{
-> +	struct platform_device *pdev;
-> +	struct mtk_pcie *pcie;
-> +	struct mtk_pcie_port *port;
-> +	const struct mtk_pcie_soc *soc;
-> +
-> +	pdev = to_platform_device(dev);
-> +	pcie = platform_get_drvdata(pdev);
+Add standby mode suspend for i.MX6SLL, when
+linux kernel suspend, SoC will enter STOP mode
+with ARM core power on.
 
-How about this -
-struct mtk_pcie *pcie = dev_get_drvdata(dev);
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/mach-imx/pm-imx6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +	soc = pcie->soc;
-> +	if (!soc->pm_support)
-> +		return 0;
-> +
-> +	list_for_each_entry(port, &pcie->ports, list) {
-> +		clk_disable_unprepare(port->ahb_ck);
-> +		clk_disable_unprepare(port->sys_ck);
-> +		phy_power_off(port->phy);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
-> +{
-> +	struct platform_device *pdev;
-> +	struct mtk_pcie *pcie;
-> +	struct mtk_pcie_port *port;
-> +	const struct mtk_pcie_soc *soc;
-> +	int ret;
-> +
-> +	pdev = to_platform_device(dev);
-> +	pcie = platform_get_drvdata(pdev);
-
-struct mtk_pcie *pcie = dev_get_drvdata(dev);
-
-> +	soc = pcie->soc;
-> +	if (!soc->pm_support)
-> +		return 0;
-> +
-> +	list_for_each_entry(port, &pcie->ports, list) {
-> +		ret = phy_power_on(port->phy);
-> +		if (ret) {
-> +			dev_err(dev, "could not power on phy\n");
-> +			return ret;
-> +		}
-> +		ret = clk_prepare_enable(port->sys_ck);
-> +		if (ret) {
-> +			dev_err(dev, "enable sys clock error\n");
-> +			phy_power_off(port->phy);
-> +			return ret;
-> +		}
-> +
-> +		ret = clk_prepare_enable(port->ahb_ck);
-> +		if (ret) {
-> +			dev_err(dev, "enable ahb clock error\n");
-> +			phy_power_off(port->phy);
-> +			clk_disable_unprepare(port->sys_ck);
-> +			return ret;
-> +		}
-> +
-> +		ret = soc->startup(port);
-> +		if (ret) {
-> +			dev_err(dev, "pcie linkup failed\n");
-> +			phy_power_off(port->phy);
-> +			clk_disable_unprepare(port->sys_ck);
-> +			clk_disable_unprepare(port->ahb_ck);
-> +			return ret;
-> +		}
-> +
-> +		if (IS_ENABLED(CONFIG_PCI_MSI))
-> +			mtk_pcie_enable_msi(port);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index 017539d..d319b20 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -296,7 +296,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		if (cpu_is_imx6sl())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+ 		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+-		    cpu_is_imx6ull())
++		    cpu_is_imx6ull() || cpu_is_imx6sll())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+-- 
+2.7.4
