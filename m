@@ -1,112 +1,22 @@
-From: chris@64studio.com (Christopher Obbard)
-Date: Thu, 31 May 2018 17:55:31 +0100
-Subject: [linux-sunxi] [PATCH v2] arm64: allwinner: a64-amarula-relic:
- Enable AP6330 WiFi support
-In-Reply-To: <20180531165109.8476-1-jagan@amarulasolutions.com>
-References: <20180531165109.8476-1-jagan@amarulasolutions.com>
-Message-ID: <CAP03XeoY8_-gG-2h8WP+3ZZFzxeyHERG=o7Y3Btk2svy5kco_Q@mail.gmail.com>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Thu, 31 May 2018 12:08:30 -0500
+Subject: [PATCH v2 0/2] arm64: align KPTI interface with x86
+Message-ID: <20180531170832.14263-1-mlangsdo@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jagan,
+ARM64 supports KPTI, but support isn't documented and KPTI can be enabled
+or disabled silently. Also, x86_64 supports the nopti kernel parameter,
+but ARM64 doesn't.
 
-I cannot find any information on this board online, so I am guessing
-it has not been released yet and you are developing software support
-now.
+Add the nopti argument, update the documentation so that ARM64 as well
+as x86 supports nopti, add documentation for the existing kpti parameter,
+and revise how kpti is logged.
 
-Do you have any datasheet/overview document of the board?
+--Mark Langsdorf
 
-Rather than making a lot of noise on the various MLs, why not wait
-until all hardware has a driver written for it & bugs have been been
-smashed, then patch in one series?
-
-Christopher Obbard
-64 Studio Ltd.
-
-
-On 31 May 2018 at 17:51, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
-> - WiFi SDIO interface is connected to MMC1
-> - WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
-> - WiFi WL-WAKE-AP pin connected to gpio PL3
-> - 32kHz external oscillator gate clock from RTC
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - Move external rtc clock nodes into main rtc node definition
->   of sun50i-a64.dtsi
->
->  .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 31 ++++++++++++++++++++++
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  3 +++
->  2 files changed, 34 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-> index ce4a256ff086..eac4793c8502 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-> @@ -21,12 +21,43 @@
->         chosen {
->                 stdout-path = "serial0:115200n8";
->         };
-> +
-> +       wifi_pwrseq: wifi-pwrseq {
-> +               compatible = "mmc-pwrseq-simple";
-> +               clocks = <&rtc 1>;
-> +               clock-names = "ext_clock";
-> +               reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* WL-PMU-EN: PL2 */
-> +       };
->  };
->
->  &ehci0 {
->         status = "okay";
->  };
->
-> +&mmc1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc1_pins>;
-> +       vmmc-supply = <&reg_dcdc1>;
-> +       /*
-> +        * Schematic shows both dldo4 and eldo1 connected for vcc-io-wifi, but
-> +        * dldo4 connection shows DNP(Do Not Populate) and eldo1 connected with
-> +        * 0Ohm register to vcc-io-wifi so eldo1 is used.
-> +        */
-> +       vqmmc-supply = <&reg_eldo1>;
-> +       mmc-pwrseq = <&wifi_pwrseq>;
-> +       bus-width = <4>;
-> +       non-removable;
-> +       status = "okay";
-> +
-> +       brcmf: wifi at 1 {
-> +               reg = <1>;
-> +               compatible = "brcm,bcm4329-fmac";
-> +               interrupt-parent = <&r_pio>;
-> +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
-> +               interrupt-names = "host-wake";
-> +       };
-> +};
-> +
->  &mmc2 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&mmc2_pins>;
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 1b2ef28c42bd..82516aec4153 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -634,6 +634,9 @@
->                         reg = <0x01f00000 0x54>;
->                         interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
->                                      <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
-> +                       clocks = <&osc32k>;
-> +                       #clock-cells = <1>;
->                 };
->
->                 r_intc: interrupt-controller at 1f00c00 {
-> --
-> 2.14.3
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Changes from v1:
+- Two patches dealing with debugfs dropped as x86 doesn't have this capability
+- Documentation changed so that the existing kpti argument is documented,
+  instead of a pti argument similar to what x86 uses but arm64 does not.
+- when logging kpti status, made it clear when status is set by default
