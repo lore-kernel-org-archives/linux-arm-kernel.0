@@ -1,27 +1,69 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 May 2018 14:30:47 +0100
-Subject: [PATCH 0/3] Initial Spectre variant 1 patches
-Message-ID: <20180531133047.GS17671@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 31 May 2018 14:31:12 +0100
+Subject: [PATCH 1/3] ARM: spectre-v1: add speculation barrier (csdb) macros
+In-Reply-To: <20180531133047.GS17671@n2100.armlinux.org.uk>
+References: <20180531133047.GS17671@n2100.armlinux.org.uk>
+Message-ID: <E1fONfc-000708-MX@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add assembly and C macros for the new CSDB instruction.
 
-This series adds initial support for the Spectre variant 1 workarounds
-to the kernel.  This does _not_ cover the user accessors, which are
-still in development.
-
-The series adds support for the array_index_mask_nospec() macro, used
-by generic kernel code to mask out of bounds pointers, and also adds
-the syscall table hardening.
-
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
  arch/arm/include/asm/assembler.h |  8 ++++++++
- arch/arm/include/asm/barrier.h   | 31 +++++++++++++++++++++++++++++++
- arch/arm/kernel/entry-common.S   | 14 +++-----------
- arch/arm/kernel/entry-header.S   | 25 +++++++++++++++++++++++++
- 4 files changed, 67 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/barrier.h   | 13 +++++++++++++
+ 2 files changed, 21 insertions(+)
 
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index bc8d4bbd82e2..ef1386b1af9b 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -447,6 +447,14 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	.size \name , . - \name
+ 	.endm
+ 
++	.macro	csdb
++#ifdef CONFIG_THUMB2_KERNEL
++	.inst.w	0xf3af8014
++#else
++	.inst	0xe320f014
++#endif
++	.endm
++
+ 	.macro check_uaccess, addr:req, size:req, limit:req, tmp:req, bad:req
+ #ifndef CONFIG_CPU_USE_DOMAINS
+ 	adds	\tmp, \addr, #\size - 1
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 40f5c410fd8c..3d9c1d4b7e75 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -17,6 +17,12 @@
+ #define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
+ #define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
+ #define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
++#ifdef CONFIG_THUMB2_KERNEL
++#define CSDB	".inst.w 0xf3af8014"
++#else
++#define CSDB	".inst	0xe320f014"
++#endif
++#define csdb() __asm__ __volatile__(CSDB : : : "memory")
+ #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
+ #define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+@@ -37,6 +43,13 @@
+ #define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #endif
+ 
++#ifndef CSDB
++#define CSDB
++#endif
++#ifndef csdb
++#define csdb()
++#endif
++
+ #ifdef CONFIG_ARM_HEAVY_MB
+ extern void (*soc_mb)(void);
+ extern void arm_heavy_mb(void);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
