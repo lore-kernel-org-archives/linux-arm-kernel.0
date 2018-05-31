@@ -1,31 +1,87 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 30 May 2018 17:36:17 -0700
-Subject: [PATCH v2 0/3] Update Broadcom Stingray clock entries
-Message-ID: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
+Date: Wed, 30 May 2018 17:36:20 -0700
+Subject: [PATCH v2 3/3] arm64: dts: Update Stingray clock DT nodes
+In-Reply-To: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
+References: <1527726980-11723-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1527726980-11723-4-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series updates Broadcom Stingray clock entries so they match the
-latest ASIC datasheet
+From: Pramod Kumar <pramod.kumar@broadcom.com>
 
-This patch series is based off v4.17-rc5 and is available on GIHUB:
-repo: https://github.com/Broadcom/arm64-linux.git
-branch: sr-clk-v2
+Update clock output names in the Stingray clock DT nodes so they match
+the binding document and the latest ASIC datasheet. Also add entries
+for LCPLL2
 
-Changes since v1:
- - Fix patch author to Pramod Kumar on all 3 patches
- - Fix patch subject spelling error on patch 2/3
+Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 26 ++++++++++++++++------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-Pramod Kumar (3):
-  dt-bindings: clk: Update Stingray binding doc
-  clk: bcm: Update and add Stingray clock entries
-  arm64: dts: Update Stingray clock DT nodes
-
- .../bindings/clock/brcm,iproc-clocks.txt           |  26 ++--
- .../boot/dts/broadcom/stingray/stingray-clock.dtsi |  26 ++--
- drivers/clk/bcm/clk-sr.c                           | 135 ++++++++++++++++++---
- include/dt-bindings/clock/bcm-sr.h                 |  24 ++--
- 4 files changed, 170 insertions(+), 41 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+index 3a4d452..10a106a 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+@@ -52,12 +52,24 @@
+ 			reg = <0x0001d104 0x32>,
+ 			      <0x0001c854 0x4>;
+ 			clocks = <&osc>;
+-			clock-output-names = "genpll0", "clk_125", "clk_scr",
++			clock-output-names = "genpll0", "clk_125m", "clk_scr",
+ 					     "clk_250", "clk_pcie_axi",
+ 					     "clk_paxc_axi_x2",
+ 					     "clk_paxc_axi";
+ 		};
+ 
++		genpll2: genpll2 at 1d1ac {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-genpll2";
++			reg = <0x0001d1ac 0x32>,
++			      <0x0001c854 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "genpll2", "clk_nic",
++					     "clk_ts_500_ref", "clk_125_nitro",
++					     "clk_chimp", "clk_nic_flash",
++					     "clk_fs";
++		};
++
+ 		genpll3: genpll3 at 1d1e0 {
+ 			#clock-cells = <1>;
+ 			compatible = "brcm,sr-genpll3";
+@@ -75,8 +87,8 @@
+ 			      <0x0001c854 0x4>;
+ 			clocks = <&osc>;
+ 			clock-output-names = "genpll4", "clk_ccn",
+-					     "clk_tpiu_pll", "noc_clk",
+-					     "pll_chclk_fs4",
++					     "clk_tpiu_pll", "clk_noc",
++					     "clk_chclk_fs4",
+ 					     "clk_bridge_fscpu";
+ 		};
+ 
+@@ -86,8 +98,8 @@
+ 			reg = <0x0001d248 0x32>,
+ 			      <0x0001c870 0x4>;
+ 			clocks = <&osc>;
+-			clock-output-names = "genpll5", "fs4_hf_clk",
+-					     "crypto_ae_clk", "raid_ae_clk";
++			clock-output-names = "genpll5", "clk_fs4_hf",
++					     "clk_crypto_ae", "clk_raid_ae";
+ 		};
+ 
+ 		lcpll0: lcpll0 at 1d0c4 {
+@@ -107,9 +119,9 @@
+ 			reg = <0x0001d138 0x3c>,
+ 			      <0x0001c870 0x4>;
+ 			clocks = <&osc>;
+-			clock-output-names = "lcpll1", "clk_wanpn",
++			clock-output-names = "lcpll1", "clk_wan",
+ 					     "clk_usb_ref",
+-					     "timesync_evt_clk";
++					     "clk_crmu_ts";
+ 		};
+ 
+ 		hsls_clk: hsls_clk {
 -- 
 2.1.4
