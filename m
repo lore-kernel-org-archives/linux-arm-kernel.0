@@ -1,23 +1,22 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 May 2018 11:48:21 +0530
-Subject: [PATCH v2 5/9] PM / Domains: dt: Allow power-domain property to
- be a list of specifiers
-In-Reply-To: <20180529100421.31022-6-ulf.hansson@linaro.org>
+Date: Thu, 31 May 2018 11:46:02 +0530
+Subject: [PATCH v2 4/9] PM / Domains: Drop unused parameter in
+ genpd_allocate_dev_data()
+In-Reply-To: <20180529100421.31022-5-ulf.hansson@linaro.org>
 References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-6-ulf.hansson@linaro.org>
-Message-ID: <20180531061821.wcasbwr3s7lphr4a@vireshk-i7>
+ <20180529100421.31022-5-ulf.hansson@linaro.org>
+Message-ID: <20180531061602.jaipvmlsslsb3j55@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 29-05-18, 12:04, Ulf Hansson wrote:
-> To be able to describe topologies where devices are partitioned across
-> multiple power domains, let's extend the power-domain property to allow
-> being a list of PM domain specifiers.
+> The in-parameter struct generic_pm_domain *genpd to
+> genpd_allocate_dev_data() is unused, so let's drop it.
 > 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Suggested-by: Jon Hunter <jonathanh@nvidia.com>
 > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 
