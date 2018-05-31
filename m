@@ -1,33 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 May 2018 11:11:34 +0100
-Subject: [PATCH v5 10/15] ARM: spectre-v2: warn about incorrect context
- switching functions
-In-Reply-To: <b91753a0-7c47-1e46-6884-4643a90afdc7@arm.com>
-References: <20180529145320.GJ17671@n2100.armlinux.org.uk>
- <E1fNg1d-00059d-NR@rmk-PC.armlinux.org.uk>
- <86r2lu9yzf.wl-marc.zyngier@arm.com>
- <20180531094922.GQ17671@n2100.armlinux.org.uk>
- <b91753a0-7c47-1e46-6884-4643a90afdc7@arm.com>
-Message-ID: <20180531101134.GR17671@n2100.armlinux.org.uk>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Thu, 31 May 2018 15:44:43 +0530
+Subject: [PATCH v2 3/6] clk: ti: dra7: Add clkctrl clock data for the mcan
+ clocks
+In-Reply-To: <20180531040350.GA25132@rob-hp-laptop>
+References: <20180530141133.3711-1-faiz_abbas@ti.com>
+ <20180530141133.3711-4-faiz_abbas@ti.com>
+ <20180531040350.GA25132@rob-hp-laptop>
+Message-ID: <e7e3ade1-76b7-f216-ece5-bd64a55cede6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 11:07:18AM +0100, Marc Zyngier wrote:
-> > I notice that you haven't replied to some of the patches (7 and 8),
-> > which makes me think that you have an issue with them - and as tonight
-> > is likely the last linux-next before the merge window, we're basically
-> > out of time to do another respin if there's something you don't like
-> > there and if we want to get them in during the next merge window.
-> Patches 7 and 8 didn't compile for me, and I had to fix-up things
-> manually in order to test it. Not that it should hold you back from
-> merging it.
+Hi,
 
-As noted in a reply to the cover, I made a mistake merging some changes
-in that resulted in a simple-to-fix build error (a 'void' instead of a
-'bool' return type.)  I wasn't going to send the series out for a third
-time on the same day just because of that.
+On Thursday 31 May 2018 09:33 AM, Rob Herring wrote:
+> On Wed, May 30, 2018 at 07:41:30PM +0530, Faiz Abbas wrote:
+>> Add clkctrl data for the m_can clocks and register it within the
+...
+>>  
+>> diff --git a/include/dt-bindings/clock/dra7.h b/include/dt-bindings/clock/dra7.h
+>> index 5e1061b15aed..d7549c57cac3 100644
+>> --- a/include/dt-bindings/clock/dra7.h
+>> +++ b/include/dt-bindings/clock/dra7.h
+>> @@ -168,5 +168,6 @@
+>>  #define DRA7_COUNTER_32K_CLKCTRL	DRA7_CLKCTRL_INDEX(0x50)
+>>  #define DRA7_UART10_CLKCTRL	DRA7_CLKCTRL_INDEX(0x80)
+>>  #define DRA7_DCAN1_CLKCTRL	DRA7_CLKCTRL_INDEX(0x88)
+>> +#define DRA7_ADC_CLKCTRL	DRA7_CLKCTRL_INDEX(0xa0)
+> 
+> ADC and mcan are the same thing?
+> 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+The register to control MCAN clocks is called ADC_CLKCTRL, Yes.
+
+Thanks,
+Faiz
