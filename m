@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 May 2018 12:06:45 +0100
-Subject: Applied "ARM: pxa,
- regulator: fix building ezx e680" to the regulator tree
-In-Reply-To: <20180530212514.346474-1-arnd@arndb.de>
-Message-ID: <E1fOLPp-00023H-9S@debutante>
+Date: Thu, 31 May 2018 12:06:33 +0100
+Subject: Applied "ASoC: mediatek: export mtk-afe symbols as needed" to the
+ asoc tree
+In-Reply-To: <20180530220057.1419933-1-arnd@arndb.de>
+Message-ID: <E1fOLPd-0001zu-1m@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ARM: pxa, regulator: fix building ezx e680
+   ASoC: mediatek: export mtk-afe symbols as needed
 
-has been applied to the regulator tree at
+has been applied to the asoc tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,44 +34,70 @@ to this mail.
 Thanks,
 Mark
 
->From 2b6c00c157c5bf80417f6b814f1088da2dc588ee Mon Sep 17 00:00:00 2001
+>From 39f56b757cf9778572041f497f6fad890224c9fb Mon Sep 17 00:00:00 2001
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 30 May 2018 23:24:58 +0200
-Subject: [PATCH] ARM: pxa, regulator: fix building ezx e680
+Date: Thu, 31 May 2018 00:00:35 +0200
+Subject: [PATCH] ASoC: mediatek: export mtk-afe symbols as needed
 
-The reference to camera_supply_gpiod_table was added in the wrong function,
-as observed from this randconfig build failure:
+The new mt6797-afe driver uses some functions in a common file, which
+works for a built-in driver but fails for a loadable module:
 
-arch/arm/mach-pxa/ezx.c: In function 'e680_init':
-arch/arm/mach-pxa/ezx.c:905:26: error: 'camera_supply_gpiod_table' undeclared (first use in this function)
-  gpiod_add_lookup_table(&camera_supply_gpiod_table);
+ERROR: "mtk_afe_pcm_free" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
+ERROR: "mtk_afe_add_sub_dai_control" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
+ERROR: "mtk_afe_pcm_new" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
+ERROR: "mtk_afe_combine_sub_dai" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
+ERROR: "mtk_afe_pcm_ops" [sound/soc/mediatek/mt6797/snd-soc-mt6797-afe.ko] undefined!
 
-Fixes: 6059577cb28d ("regulator: fixed: Convert to use GPIO descriptor only")
+This exports the five symbols above for modules.
+
+Fixes: b3c702f56bf5 ("ASoC: mt6797: combine DAI to register component")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/mach-pxa/ezx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/mediatek/common/mtk-afe-platform-driver.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index 2b4bd6d94855..4f33eea73f9a 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -902,7 +902,6 @@ static void __init e680_init(void)
+diff --git a/sound/soc/mediatek/common/mtk-afe-platform-driver.c b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
+index 00618587ef1e..51ec4ff6ed95 100644
+--- a/sound/soc/mediatek/common/mtk-afe-platform-driver.c
++++ b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
+@@ -57,6 +57,7 @@ int mtk_afe_combine_sub_dai(struct mtk_base_afe *afe)
  
- 	pxa_set_keypad_info(&e680_keypad_platform_data);
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(mtk_afe_combine_sub_dai);
  
--	gpiod_add_lookup_table(&camera_supply_gpiod_table);
- 	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
- 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
- 	platform_add_devices(ARRAY_AND_SIZE(e680_devices));
-@@ -1132,6 +1131,7 @@ static void __init a910_init(void)
- 	if (a910_camera_init() == 0)
- 		pxa_set_camera_info(&a910_pxacamera_platform_data);
+ int mtk_afe_add_sub_dai_control(struct snd_soc_component *component)
+ {
+@@ -90,6 +91,7 @@ int mtk_afe_add_sub_dai_control(struct snd_soc_component *component)
+ 	return 0;
  
-+	gpiod_add_lookup_table(&camera_supply_gpiod_table);
- 	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
- 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
- 	platform_add_devices(ARRAY_AND_SIZE(a910_devices));
+ }
++EXPORT_SYMBOL_GPL(mtk_afe_add_sub_dai_control);
+ 
+ static snd_pcm_uframes_t mtk_afe_pcm_pointer
+ 			 (struct snd_pcm_substream *substream)
+@@ -130,6 +132,7 @@ const struct snd_pcm_ops mtk_afe_pcm_ops = {
+ 	.ioctl = snd_pcm_lib_ioctl,
+ 	.pointer = mtk_afe_pcm_pointer,
+ };
++EXPORT_SYMBOL_GPL(mtk_afe_pcm_ops);
+ 
+ int mtk_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
+ {
+@@ -143,11 +146,13 @@ int mtk_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
+ 						     afe->dev,
+ 						     size, size);
+ }
++EXPORT_SYMBOL_GPL(mtk_afe_pcm_new);
+ 
+ void mtk_afe_pcm_free(struct snd_pcm *pcm)
+ {
+ 	snd_pcm_lib_preallocate_free_for_all(pcm);
+ }
++EXPORT_SYMBOL_GPL(mtk_afe_pcm_free);
+ 
+ const struct snd_soc_component_driver mtk_afe_pcm_platform = {
+ 	.name = AFE_PCM_NAME,
 -- 
 2.17.0
