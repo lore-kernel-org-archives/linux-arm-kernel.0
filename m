@@ -1,80 +1,21 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Wed, 30 May 2018 17:06:24 -0700
-Subject: [PATCH] kbuild: add machine size to CHEKCFLAGS
-In-Reply-To: <CAMHZB6GXVPvr1uwbemuxqPPtNzYT7jeVokR6q9tz2mS_=TG6vA@mail.gmail.com>
-References: <20180530204838.22079-1-luc.vanoostenryck@gmail.com>
- <d47b72cc-9209-a190-38b3-969870e1bf26@suse.de>
- <CAMHZB6GXVPvr1uwbemuxqPPtNzYT7jeVokR6q9tz2mS_=TG6vA@mail.gmail.com>
-Message-ID: <01db7e93-89f3-361a-29c6-5146cda1d745@infradead.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 30 May 2018 19:10:38 -0500
+Subject: [PATCH v10 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+In-Reply-To: <20180525091712.37227-3-liwei213@huawei.com>
+References: <20180525091712.37227-1-liwei213@huawei.com>
+ <20180525091712.37227-3-liwei213@huawei.com>
+Message-ID: <20180531001038.GA1081@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2018 04:06 PM, Luc Van Oostenryck wrote:
-> On Thu, May 31, 2018 at 12:00 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> Hi Luc,
->>
->> The typo in the subject made me curious...
->>
->> Am 30.05.2018 um 22:48 schrieb Luc Van Oostenryck:
->>> By default, sparse assumes a 64bit machine when compiled on x86-64
->>> and 32bit when compiled on anything else.
->>>
->>> This can of course create all sort of problems for the other archs, like
->>> issuing false warnings ('shift too big (32) for type unsigned long'), or
->>> worse, failing to emit legitimate warnings.
->>>
->>> Fix this by adding the -m32/-m64 flag, depending on CONFIG_64BIT,
->>> to CHECKFLAGS in the main Makefile (and so for all archs).
->>> Also, remove the now unneeded -m32/-m64 in arch specific Makefiles.
->>>
->>> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
->>> ---
->>>  Makefile             | 3 +++
->>>  arch/alpha/Makefile  | 2 +-
->>>  arch/arm/Makefile    | 2 +-
->>>  arch/arm64/Makefile  | 2 +-
->>>  arch/ia64/Makefile   | 2 +-
->>>  arch/mips/Makefile   | 3 ---
->>>  arch/parisc/Makefile | 2 +-
->>>  arch/sparc/Makefile  | 2 +-
->>>  arch/x86/Makefile    | 2 +-
->>>  9 files changed, 10 insertions(+), 10 deletions(-)
->>
->> What about the architectures not touched by your patch that previously
->> had no -m32/-m64? (arc, c6x, h8300, hexagon, m68k, microblaze, nds32,
->> nios2, openrisc, powerpc, riscv, s390, sh, unicore32, xtensa)
+On Fri, May 25, 2018 at 05:17:09PM +0800, Li Wei wrote:
+> add ufs node document for Hisilicon.
 > 
-> As explained in the patch, by default sparse uses -m64 if compiled on x86-64
-> and 32bit on everything else (well, more recent versions use -m64 if
-> compiled on any 64 bit machine). I think that most ppc devs use a ppc
-> machine and so ppc was most probably fine (at least ppc64) but I suspect
-> that most of these others archs either had never sparse used on them
-> or had a lot of wrong warnings. IOW, it was maybe OK but most probably
-> incorrect for them and now it is OK.
-> 
->> You forgot to CC them on this patch.
-> 
-> I didn't thought/knew  it was needed and the CC list is already
-> quite long but, if needed, no problem for me.
+> Signed-off-by: Li Wei <liwei213@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 41 ++++++++++++++++++++++
+>  .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      | 10 ++++--
+>  2 files changed, 48 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 
-Ideally, adding linux-arch at vger.kernel.org would be sufficient, but
-sadly I have doubts about that.
-
->> Have you really checked that all their toolchains support the -m32/-m64
->> flags you newly introduce for them? Apart from non-biarch architectures,
->> I'm thinking of 31-bit s390 as a corner case where !64 != 32.
-> 
-> Hmm, there is no change to anything I call 'toolchain related', like
-> compiler and linker. The only change is sparse (or any other checker)
-> receiving now a correct and explicit -m32 or -m64.
-> 
-> For s390, as far as I know:
-> 1) it has CONFIG_64BIT unconditionally definee (because the old 31bit
->    is no more supported, now everything is s390x only).
-> 2) even if the *address space* was only 31 bit, I'm very sure
->    that sizeof(long) and sizeof(void*) was 4 on these machine
->    hence -m32 would have been correct.
-
-
--- 
-~Randy
+Reviewed-by: Rob Herring <robh@kernel.org>
