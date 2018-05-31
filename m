@@ -1,78 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 31 May 2018 17:55:27 +0100
-Subject: [PATCH v2 00/17] arm64 SSBD (aka Spectre-v4) mitigation
-In-Reply-To: <20180531164133.6z6py7nl55ty473e@armageddon.cambridge.arm.com>
-References: <20180529121121.24927-1-marc.zyngier@arm.com>
- <20180531164133.6z6py7nl55ty473e@armageddon.cambridge.arm.com>
-Message-ID: <b6111f31-b128-94f2-ae6b-03a906358c0b@arm.com>
+From: chris@64studio.com (Christopher Obbard)
+Date: Thu, 31 May 2018 17:55:31 +0100
+Subject: [linux-sunxi] [PATCH v2] arm64: allwinner: a64-amarula-relic:
+ Enable AP6330 WiFi support
+In-Reply-To: <20180531165109.8476-1-jagan@amarulasolutions.com>
+References: <20180531165109.8476-1-jagan@amarulasolutions.com>
+Message-ID: <CAP03XeoY8_-gG-2h8WP+3ZZFzxeyHERG=o7Y3Btk2svy5kco_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi Jagan,
 
-On 31/05/18 17:41, Catalin Marinas wrote:
-> On Tue, May 29, 2018 at 01:11:04PM +0100, Marc Zyngier wrote:
->> Marc Zyngier (17):
->>   arm/arm64: smccc: Add SMCCC-specific return codes
->>   arm64: Call ARCH_WORKAROUND_2 on transitions between EL0 and EL1
->>   arm64: Add per-cpu infrastructure to call ARCH_WORKAROUND_2
->>   arm64: Add ARCH_WORKAROUND_2 probing
->>   arm64: Add 'ssbd' command-line option
->>   arm64: ssbd: Add global mitigation state accessor
->>   arm64: ssbd: Skip apply_ssbd if not using dynamic mitigation
->>   arm64: ssbd: Restore mitigation status on CPU resume
->>   arm64: ssbd: Introduce thread flag to control userspace mitigation
->>   arm64: ssbd: Add prctl interface for per-thread mitigation
->>   arm64: KVM: Add HYP per-cpu accessors
->>   arm64: KVM: Add ARCH_WORKAROUND_2 support for guests
->>   arm64: KVM: Handle guest's ARCH_WORKAROUND_2 requests
->>   arm64: KVM: Add ARCH_WORKAROUND_2 discovery through
->>     ARCH_FEATURES_FUNC_ID
-> 
-> I queued the 14 patches above for 4.18.
+I cannot find any information on this board online, so I am guessing
+it has not been released yet and you are developing software support
+now.
 
-I just realized that your for-next/core branch is based on
-4.17-rc4, which means arch/arm64/kernel/ssbd.c won't compile
-(it relies on some of the symbols introduced with the x86
-stuff in 4.17-rc7.
+Do you have any datasheet/overview document of the board?
 
-You can work around it by adding the following hack:
+Rather than making a lot of noise on the various MLs, why not wait
+until all hardware has a driver written for it & bugs have been been
+smashed, then patch in one series?
 
->From 8a0dbe9fb468c03b3913d17af9dce7358f899ee3 Mon Sep 17 00:00:00 2001
-From: Marc Zyngier <marc.zyngier@arm.com>
-Date: Thu, 31 May 2018 17:54:11 +0100
-Subject: [PATCH] fixup! arm64: ssbd: Add prctl interface for per-thread
- mitigation
-
----
- arch/arm64/kernel/ssbd.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
-index 07b12c034ec2..3432e5ef9f41 100644
---- a/arch/arm64/kernel/ssbd.c
-+++ b/arch/arm64/kernel/ssbd.c
-@@ -11,7 +11,9 @@
- 
- /*
-  * prctl interface for SSBD
-+ * FIXME: Drop the below ifdefery once merged in 4.18.
-  */
-+#ifdef PR_SPEC_STORE_BYPASS
- static int ssbd_prctl_set(struct task_struct *task, unsigned long ctrl)
- {
- 	int state = arm64_get_ssbd_state();
-@@ -105,3 +107,4 @@ int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
- 		return -ENODEV;
- 	}
- }
-+#endif	/* PR_SPEC_STORE_BYPASS */
--- 
-2.17.1
+Christopher Obbard
+64 Studio Ltd.
 
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On 31 May 2018 at 17:51, Jagan Teki <jagan@amarulasolutions.com> wrote:
+> Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
+> - WiFi SDIO interface is connected to MMC1
+> - WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
+> - WiFi WL-WAKE-AP pin connected to gpio PL3
+> - 32kHz external oscillator gate clock from RTC
+>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v2:
+> - Move external rtc clock nodes into main rtc node definition
+>   of sun50i-a64.dtsi
+>
+>  .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 31 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  3 +++
+>  2 files changed, 34 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+> index ce4a256ff086..eac4793c8502 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+> @@ -21,12 +21,43 @@
+>         chosen {
+>                 stdout-path = "serial0:115200n8";
+>         };
+> +
+> +       wifi_pwrseq: wifi-pwrseq {
+> +               compatible = "mmc-pwrseq-simple";
+> +               clocks = <&rtc 1>;
+> +               clock-names = "ext_clock";
+> +               reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* WL-PMU-EN: PL2 */
+> +       };
+>  };
+>
+>  &ehci0 {
+>         status = "okay";
+>  };
+>
+> +&mmc1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&mmc1_pins>;
+> +       vmmc-supply = <&reg_dcdc1>;
+> +       /*
+> +        * Schematic shows both dldo4 and eldo1 connected for vcc-io-wifi, but
+> +        * dldo4 connection shows DNP(Do Not Populate) and eldo1 connected with
+> +        * 0Ohm register to vcc-io-wifi so eldo1 is used.
+> +        */
+> +       vqmmc-supply = <&reg_eldo1>;
+> +       mmc-pwrseq = <&wifi_pwrseq>;
+> +       bus-width = <4>;
+> +       non-removable;
+> +       status = "okay";
+> +
+> +       brcmf: wifi at 1 {
+> +               reg = <1>;
+> +               compatible = "brcm,bcm4329-fmac";
+> +               interrupt-parent = <&r_pio>;
+> +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
+> +               interrupt-names = "host-wake";
+> +       };
+> +};
+> +
+>  &mmc2 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc2_pins>;
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1b2ef28c42bd..82516aec4153 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -634,6 +634,9 @@
+>                         reg = <0x01f00000 0x54>;
+>                         interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+>                                      <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
+> +                       clocks = <&osc32k>;
+> +                       #clock-cells = <1>;
+>                 };
+>
+>                 r_intc: interrupt-controller at 1f00c00 {
+> --
+> 2.14.3
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
