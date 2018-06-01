@@ -1,39 +1,51 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 1 Jun 2018 17:06:28 +0200
-Subject: [PATCH v2] arm64: allwinner: a64-amarula-relic: Enable AP6330
- WiFi support
-In-Reply-To: <20180531165109.8476-1-jagan@amarulasolutions.com>
-References: <20180531165109.8476-1-jagan@amarulasolutions.com>
-Message-ID: <20180601150628.zqo6jjd6ch5dvqtl@flea>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  1 Jun 2018 17:06:28 +0200
+Subject: [PATCH] KVM: arm/arm64: drop resource size check for GICV window
+Message-ID: <20180601150628.10111-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When booting a 64 KB pages kernel on a ACPI GICv3 system that
+implements support for v2 emulation, the following warning is
+produced
 
-On Thu, May 31, 2018 at 10:21:09PM +0530, Jagan Teki wrote:
-> Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
-> - WiFi SDIO interface is connected to MMC1
-> - WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
-> - WiFi WL-WAKE-AP pin connected to gpio PL3
-> - 32kHz external oscillator gate clock from RTC
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - Move external rtc clock nodes into main rtc node definition
->   of sun50i-a64.dtsi
+  GICV size 0x2000 not a multiple of page size 0x10000
 
-Please make that a separate patch.
+and support for v2 emulation is disabled, preventing GICv2 VMs
+from being able to run on such hosts.
 
-Maxime
+The reason is that vgic_v3_probe() performs a sanity check on the
+size of the window (it should be a multiple of the page size),
+while the ACPI MADT parsing code hardcodes the size of the window
+to 8 KB. This makes sense, considering that ACPI does not bother
+to describe the size in the first place, under the assumption that
+platforms implementing ACPI will follow the architecture and not
+put anything else in the same 64 KB window.
+
+So let's just drop the sanity check altogether, and assume that
+the window is at least 64 KB in size.
+
+Fixes: 909777324588 ("KVM: arm/arm64: vgic-new: vgic_init: implement kvm_vgic_hyp_init")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic-v3.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index bdcf8e7a6161..72fc688c3e9d 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -552,11 +552,6 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 		pr_warn("GICV physical address 0x%llx not page aligned\n",
+ 			(unsigned long long)info->vcpu.start);
+ 		kvm_vgic_global_state.vcpu_base = 0;
+-	} else if (!PAGE_ALIGNED(resource_size(&info->vcpu))) {
+-		pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+-			(unsigned long long)resource_size(&info->vcpu),
+-			PAGE_SIZE);
+-		kvm_vgic_global_state.vcpu_base = 0;
+ 	} else {
+ 		kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 		kvm_vgic_global_state.can_emulate_gicv2 = true;
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180601/d1f386eb/attachment-0001.sig>
+2.17.0
