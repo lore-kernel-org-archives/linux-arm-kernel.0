@@ -1,35 +1,83 @@
 From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Fri,  1 Jun 2018 18:09:16 +0530
-Subject: [PATCH v12 3/5] arm64: pgtable: Add p*d_page_vaddr helper macros
+Date: Fri,  1 Jun 2018 18:09:17 +0530
+Subject: [PATCH v12 4/5] arm64: Implement page table free interfaces
 In-Reply-To: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
 References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1527856758-27169-4-git-send-email-cpandya@codeaurora.org>
+Message-ID: <1527856758-27169-5-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper macros to give virtual references to page
-tables. These will be used while freeing dangling
-page tables.
+Implement pud_free_pmd_page() and pmd_free_pte_page().
+
+Implementation requires,
+ 1) Clearing off the current pud/pmd entry
+ 2) Invalidate TLB which could have previously
+    valid but not stale entry
+ 3) Freeing of the un-used next level page tables
 
 Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
 ---
- arch/arm64/include/asm/pgtable.h | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/mm/mmu.c | 38 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7c4c8f3..ef4047f 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -580,6 +580,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 8ae5d7a..6e7e16c 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -45,6 +45,7 @@
+ #include <asm/memblock.h>
+ #include <asm/mmu_context.h>
+ #include <asm/ptdump.h>
++#include <asm/tlbflush.h>
  
- #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ #define NO_BLOCK_MAPPINGS	BIT(0)
+ #define NO_CONT_MAPPINGS	BIT(1)
+@@ -977,12 +978,41 @@ int pmd_clear_huge(pmd_t *pmdp)
+ 	return 1;
+ }
  
-+#define pmd_page_vaddr(pmd) __va(pmd_page_paddr(pmd))
-+#define pud_page_vaddr(pud) __va(pud_page_paddr(pud))
+-int pud_free_pmd_page(pud_t *pud, unsigned long addr)
++int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
+ {
+-	return pud_none(*pud);
++	pte_t *table;
++	pmd_t pmd;
 +
- #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
++	pmd = READ_ONCE(*pmdp);
++	if (pmd_present(pmd)) {
++		table = pmd_page_vaddr(pmd);
++		pmd_clear(pmdp);
++		__flush_tlb_kernel_pgtable(addr);
++		pte_free_kernel(NULL, table);
++	}
++	return 1;
+ }
  
- /* to find an entry in a page-table-directory */
+-int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
++int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+ {
+-	return pmd_none(*pmd);
++	pmd_t *table;
++	pmd_t *entry;
++	pud_t pud;
++	unsigned long next, end;
++
++	pud = READ_ONCE(*pudp);
++	if (pud_present(pud)) {
++		table = pud_page_vaddr(pud);
++		entry = table;
++		next = addr;
++		end = addr + PUD_SIZE;
++		do {
++			pmd_free_pte_page(entry, next);
++		} while (entry++, next += PMD_SIZE, next != end);
++
++		pud_clear(pudp);
++		__flush_tlb_kernel_pgtable(addr);
++		pmd_free(NULL, table);
++	}
++	return 1;
+ }
 -- 
 Qualcomm India Private Limited, on behalf of Qualcomm Innovation
 Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
