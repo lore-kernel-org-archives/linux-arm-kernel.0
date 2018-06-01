@@ -1,119 +1,65 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 1 Jun 2018 11:04:30 +0800
-Subject: [PATCH v3] PCI: mediatek: Add system pm support for MT2712
-Message-ID: <1527822270-30280-1-git-send-email-honghui.zhang@mediatek.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 1 Jun 2018 12:25:22 +0900
+Subject: [PATCH 6/6] arm64: dts: socionext: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <744f4c0a9a6f0d3acfc36e49ef62f17f53831b3b.1527225682.git.viresh.kumar@linaro.org>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <744f4c0a9a6f0d3acfc36e49ef62f17f53831b3b.1527225682.git.viresh.kumar@linaro.org>
+Message-ID: <CAK7LNASv90x3QKPYEy-3Msow0wi99hV8aRiU32aAjS7jMJKydA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+2018-05-25 14:40 GMT+09:00 Viresh Kumar <viresh.kumar@linaro.org>:
+> The cooling device properties, like "#cooling-cells" and
+> "dynamic-power-coefficient", should either be present for all the CPUs
+> of a cluster or none. If these are present only for a subset of CPUs of
+> a cluster then things will start falling apart as soon as the CPUs are
+> brought online in a different order. For example, this will happen
+> because the operating system looks for such properties in the CPU node
+> it is trying to bring up, so that it can register a cooling device.
+>
+> Add such missing properties.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
-the internal control register will be reset after system resume. The PCIe
-link should be re-established and the related control register values
-should be re-set after system resume.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-CC: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 60 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+Applied to linux-uniphier.
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index dabf1086..5363cc7 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -132,12 +132,14 @@ struct mtk_pcie_port;
- /**
-  * struct mtk_pcie_soc - differentiate between host generations
-  * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-+ * @pm_support: whether the host's MTCMOS will be off when suspend
-  * @ops: pointer to configuration access functions
-  * @startup: pointer to controller setting functions
-  * @setup_irq: pointer to initialize IRQ functions
-  */
- struct mtk_pcie_soc {
- 	bool need_fix_class_id;
-+	bool pm_support;
- 	struct pci_ops *ops;
- 	int (*startup)(struct mtk_pcie_port *port);
- 	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-@@ -1179,12 +1181,69 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mtk_pcie_suspend_noirq(struct device *dev)
-+{
-+	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-+	const struct mtk_pcie_soc *soc = pcie->soc;
-+	struct mtk_pcie_port *port;
-+
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		clk_disable_unprepare(port->ahb_ck);
-+		clk_disable_unprepare(port->sys_ck);
-+		phy_power_off(port->phy);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_pcie_resume_noirq(struct device *dev)
-+{
-+	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-+	const struct mtk_pcie_soc *soc = pcie->soc;
-+	struct mtk_pcie_port *port;
-+	int ret;
-+
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		phy_power_on(port->phy);
-+		clk_prepare_enable(port->sys_ck);
-+		clk_prepare_enable(port->ahb_ck);
-+
-+		ret = soc->startup(port);
-+		if (ret) {
-+			dev_err(dev, "Port%d link down\n", port->slot);
-+			phy_power_off(port->phy);
-+			clk_disable_unprepare(port->sys_ck);
-+			clk_disable_unprepare(port->ahb_ck);
-+			return ret;
-+		}
-+
-+		if (IS_ENABLED(CONFIG_PCI_MSI))
-+			mtk_pcie_enable_msi(port);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops mtk_pcie_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
-+				      mtk_pcie_resume_noirq)
-+};
-+
- static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
- 	.ops = &mtk_pcie_ops,
- 	.startup = mtk_pcie_startup_port,
- };
- 
- static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-+	.pm_support = true,
- 	.ops = &mtk_pcie_ops_v2,
- 	.startup = mtk_pcie_startup_port_v2,
- 	.setup_irq = mtk_pcie_setup_irq,
-@@ -1211,6 +1270,7 @@ static struct platform_driver mtk_pcie_driver = {
- 		.name = "mtk-pcie",
- 		.of_match_table = mtk_pcie_ids,
- 		.suppress_bind_attrs = true,
-+		.pm = &mtk_pcie_pm_ops,
- 	},
- };
- builtin_platform_driver(mtk_pcie_driver);
+I had already sent a PR for v4.18-rc1 before I received this patch.
+Please wait for v4.19-rc1.
+
+Thanks.
+
+> ---
+>  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+> index 3a5ed789c056..10ffb5019013 100644
+> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+> @@ -58,6 +58,7 @@
+>                         clocks = <&sys_clk 32>;
+>                         enable-method = "psci";
+>                         operating-points-v2 = <&cluster0_opp>;
+> +                       #cooling-cells = <2>;
+>                 };
+>
+>                 cpu2: cpu at 100 {
+> @@ -77,6 +78,7 @@
+>                         clocks = <&sys_clk 33>;
+>                         enable-method = "psci";
+>                         operating-points-v2 = <&cluster1_opp>;
+> +                       #cooling-cells = <2>;
+>                 };
+>         };
+>
+> --
+> 2.15.0.194.g9af6a3dea062
+>
+
+
+
 -- 
-2.6.4
+Best Regards
+Masahiro Yamada
