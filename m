@@ -1,27 +1,52 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 1 Jun 2018 09:34:04 -0400
-Subject: [PATCH V3 2/2] scsi: hpsa: drop shutdown callback
-In-Reply-To: <3ebb873ea4658275e7fa89c01cd8bfe1@codeaurora.org>
-References: <1527542471-10316-1-git-send-email-okaya@codeaurora.org>
- <1527542471-10316-2-git-send-email-okaya@codeaurora.org>
- <51bb7b82-c4a1-435c-7668-639db96d76e1@finnie.org>
- <af772e6434e645f4a42d22821442a3bd@microsemi.com>
- <3ebb873ea4658275e7fa89c01cd8bfe1@codeaurora.org>
-Message-ID: <fe49b9b4-5e15-b0ae-59c3-33b5a31eeb9c@codeaurora.org>
+From: hofrat@opentech.at (Nicholas Mc Guire)
+Date: Fri,  1 Jun 2018 13:30:14 +0000
+Subject: [PATCH] media: atmel-isi: move of_node_put() to cover success branch
+ as well
+Message-ID: <1527859814-30410-1-git-send-email-hofrat@opentech.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2018 9:08 PM, okaya at codeaurora.org wrote:
-> I have seen that shutdown() is also called from remove().
-> 
-> remove() is supposed to do a safe cleanup too. If it is leaving the hw in inconsistent state even though it is c lling shutdown , it is yet another bug.
+From: Nicholas Mc Guire <hofrat@osadl.org>
 
-Let's try to be constructive. I'll post a patch with the pci_disable added to shutdown
-only as in my original proposal.
+The of_node_put() was only covering the error branch but missed the 
+success branch so the refcount for ep which 
+of_graph_get_remote_port_parent() incremented on success would was
+not being decremented.
 
-Somebody can deal with remove another day.
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
+This patch is on top of: "media: atmel-isi: drop unnecessary while loop"
+
+Patch was compile tested with: x86_64_defconfig + CONFIG_MEDIA_SUPPORT=y
+MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_CONTROLLER=y, V4L_PLATFORM_DRIVERS=y
+OF=y, CONFIG_COMPILE_TEST=y, CONFIG_VIDEO_ATMEL_ISI=y
+
+Compile testing atmel-isi.c shows some sparse warnings. Seems to be due to
+sizeof operator being applied to a union (not related to the function being
+changed though).
+
+Patch is against 4.17-rc7 (localversion-next is next-20180531)
+
+ drivers/media/platform/atmel/atmel-isi.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/media/platform/atmel/atmel-isi.c b/drivers/media/platform/atmel/atmel-isi.c
+index 85fc7b9..e8db4df 100644
+--- a/drivers/media/platform/atmel/atmel-isi.c
++++ b/drivers/media/platform/atmel/atmel-isi.c
+@@ -1111,10 +1111,9 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
+ 		return -EINVAL;
+ 
+ 	remote = of_graph_get_remote_port_parent(ep);
+-	if (!remote) {
+-		of_node_put(ep);
++	of_node_put(ep);
++	if (!remote)
+ 		return -EINVAL;
+-	}
+ 
+ 	/* Remote node to connect */
+ 	isi->entity.node = remote;
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.1.4
