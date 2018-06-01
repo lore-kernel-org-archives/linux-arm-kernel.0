@@ -1,76 +1,42 @@
-From: hofrat@opentech.at (Nicholas Mc Guire)
-Date: Fri,  1 Jun 2018 12:46:14 +0000
-Subject: [PATCH] media: atmel-isi: drop unnecessary while loop
-Message-ID: <1527857174-24616-1-git-send-email-hofrat@opentech.at>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 1 Jun 2018 13:56:59 +0100
+Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
+ <86d0xhaucm.wl-marc.zyngier@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
+Message-ID: <31bede40-dbc5-0a88-d12c-5fc79ea02391@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicholas Mc Guire <hofrat@osadl.org>
+Hi Lei,
 
-As there is no way this can loop it actually makes no sense to have
-a while(1){} around the body - all three possible paths end in a return
-statement. 
+On 01/06/18 13:44, Zhang, Lei wrote:
+> Hi Marc
+> 
+> I have reviewed your patch.	 
+> I think the approach is same between your patch and mine.
+> Your patch is simpler and more beautiful, and match our bus's requirement.
+> 
+> I have only one question.
+> According your patch, if there are no enough lpis, amount of lpis required
+> will be divide by 2. it means someone want 16 lpis, maybe they can only get 8?
+> I don?t' understand why we need it.
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: commit c1d82b895380 "[media] atmel-isi: move out of soc_camera to atmel"
----
+That's the way the MSI allocation works in the kernel.
 
-The diff output is unfortunately not that readable - essentially only
-the outer while(1){ } was removed. 
+A driver asks a number of MSIs (let's imagine, for example, one MSI per
+CPU in the system), but the underlying HW can only provide a smaller number.
 
-Patch was compile tested with: x86_64_defconfig + CONFIG_MEDIA_SUPPORT=y
-MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_CONTROLLER=y, V4L_PLATFORM_DRIVERS=y
-OF=y, CONFIG_COMPILE_TEST=y, CONFIG_VIDEO_ATMEL_ISI=y
+Instead of failing and just returning an error, we reduce the allocation
+in order to provide the driver with something. If that's not enough,
+well, the driver itself will have the opportunity to give up.
 
-Compile testing atmel-isi.c shows some sparse warnings. Seems to be due to
-sizeof operator being applied to a union (not related to the function being
-changed though).
+See pci_alloc_irq_vectors_affinity(), which takes a min and a max number
+of vectors, for example.
 
-Patch is against 4.17-rc7 (localversion-next is next-20180531)
+Thanks,
 
- drivers/media/platform/atmel/atmel-isi.c | 28 +++++++++++++---------------
- 1 file changed, 13 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/media/platform/atmel/atmel-isi.c b/drivers/media/platform/atmel/atmel-isi.c
-index e5be21a..85fc7b9 100644
---- a/drivers/media/platform/atmel/atmel-isi.c
-+++ b/drivers/media/platform/atmel/atmel-isi.c
-@@ -1106,23 +1106,21 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
- 	struct device_node *ep = NULL;
- 	struct device_node *remote;
- 
--	while (1) {
--		ep = of_graph_get_next_endpoint(node, ep);
--		if (!ep)
--			return -EINVAL;
--
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote) {
--			of_node_put(ep);
--			return -EINVAL;
--		}
-+	ep = of_graph_get_next_endpoint(node, ep);
-+	if (!ep)
-+		return -EINVAL;
- 
--		/* Remote node to connect */
--		isi->entity.node = remote;
--		isi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
--		isi->entity.asd.match.fwnode = of_fwnode_handle(remote);
--		return 0;
-+	remote = of_graph_get_remote_port_parent(ep);
-+	if (!remote) {
-+		of_node_put(ep);
-+		return -EINVAL;
- 	}
-+
-+	/* Remote node to connect */
-+	isi->entity.node = remote;
-+	isi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
-+	isi->entity.asd.match.fwnode = of_fwnode_handle(remote);
-+	return 0;
- }
- 
- static int isi_graph_init(struct atmel_isi *isi)
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
