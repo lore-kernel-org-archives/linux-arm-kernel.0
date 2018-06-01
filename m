@@ -1,301 +1,197 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:37 +0100
-Subject: [PATCH 23/33] KVM: arm/arm64: Replace the single rdist region by a
- list
+Date: Fri,  1 Jun 2018 16:27:30 +0100
+Subject: [PATCH 16/33] KVM: arm64: Save host SVE context as appropriate
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-24-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+From: Dave Martin <Dave.Martin@arm.com>
 
-At the moment KVM supports a single rdist region. We want to
-support several separate rdist regions so let's introduce a list
-of them. This patch currently only cares about a single
-entry in this list as the functionality to register several redist
-regions is not yet there. So this only translates the existing code
-into something functionally similar using that new data struct.
+This patch adds SVE context saving to the hyp FPSIMD context switch
+path.  This means that it is no longer necessary to save the host
+SVE state in advance of entering the guest, when in use.
 
-The redistributor region handle is stored in the vgic_cpu structure
-to allow later computation of the TYPER last bit.
+In order to avoid adding pointless complexity to the code, VHE is
+assumed if SVE is in use.  VHE is an architectural prerequisite for
+SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+kernels that support both SVE and KVM.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Historically, software models exist that can expose the
+architecturally invalid configuration of SVE without VHE, so if
+this situation is detected at kvm_init() time then KVM will be
+disabled.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h              | 14 ++++++++---
- virt/kvm/arm/vgic/vgic-init.c       | 16 ++++++++++--
- virt/kvm/arm/vgic/vgic-kvm-device.c | 13 ++++++++--
- virt/kvm/arm/vgic/vgic-mmio-v3.c    | 38 +++++++++++++++++++++++------
- virt/kvm/arm/vgic/vgic-v3.c         | 20 +++++++++------
- 5 files changed, 77 insertions(+), 24 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  1 +
+ arch/arm64/Kconfig                |  7 +++++++
+ arch/arm64/include/asm/kvm_host.h | 13 +++++++++++++
+ arch/arm64/kvm/fpsimd.c           |  1 -
+ arch/arm64/kvm/hyp/switch.c       | 20 +++++++++++++++++++-
+ virt/kvm/arm/arm.c                |  7 +++++++
+ 6 files changed, 47 insertions(+), 2 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index e7efe12a81bd..90e489f685ae 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -201,6 +201,14 @@ struct vgic_its {
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index ac870b2cd5d1..3b85bbb4b23e 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -280,6 +280,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
  
- struct vgic_state_iter;
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
  
-+struct vgic_redist_region {
-+	u32 index;
-+	gpa_t base;
-+	u32 count; /* number of redistributors or 0 if single region */
-+	u32 free_index; /* index of the next free redistributor */
-+	struct list_head list;
-+};
++static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf4938f6d..b0d3820081c8 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1130,6 +1130,7 @@ endmenu
+ config ARM64_SVE
+ 	bool "ARM Scalable Vector Extension support"
+ 	default y
++	depends on !KVM || ARM64_VHE
+ 	help
+ 	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+ 	  execution state which complements and extends the SIMD functionality
+@@ -1155,6 +1156,12 @@ config ARM64_SVE
+ 	  booting the kernel.  If unsure and you are not observing these
+ 	  symptoms, you should assume that it is safe to say Y.
+ 
++	  CPUs that support SVE are architecturally required to support the
++	  Virtualization Host Extensions (VHE), so the kernel makes no
++	  provision for supporting SVE alongside KVM without VHE enabled.
++	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
++	  KVM in the same kernel image.
 +
- struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
-@@ -220,10 +228,7 @@ struct vgic_dist {
- 		/* either a GICv2 CPU interface */
- 		gpa_t			vgic_cpu_base;
- 		/* or a number of GICv3 redistributor regions */
--		struct {
--			gpa_t		vgic_redist_base;
--			gpa_t		vgic_redist_free_offset;
--		};
-+		struct list_head rd_regions;
- 	};
+ config ARM64_MODULE_PLTS
+ 	bool
+ 	select HAVE_MOD_ARCH_SPECIFIC
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index b3fe7301bdbe..fda9289f3b9c 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -405,6 +405,19 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	kvm_call_hyp(__kvm_set_tpidr_el2, tpidr_el2);
+ }
  
- 	/* distributor enabled */
-@@ -311,6 +316,7 @@ struct vgic_cpu {
- 	 */
- 	struct vgic_io_device	rd_iodev;
- 	struct vgic_io_device	sgi_iodev;
-+	struct vgic_redist_region *rdreg;
- 
- 	/* Contains the attributes and gpa of the LPI pending tables. */
- 	u64 pendbaser;
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 9a5aed7eecfd..8901b2d8fca1 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -167,8 +167,11 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
- 	kvm->arch.vgic.vgic_model = type;
- 
- 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
--	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
--	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
-+
-+	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
-+		kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
++static inline bool kvm_arch_check_sve_has_vhe(void)
++{
++	/*
++	 * The Arm architecture specifies that implementation of SVE
++	 * requires VHE also to be implemented.  The KVM code for arm64
++	 * relies on this when SVE is present:
++	 */
++	if (system_supports_sve())
++		return has_vhe();
 +	else
-+		INIT_LIST_HEAD(&kvm->arch.vgic.rd_regions);
- 
- out_unlock:
- 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
-@@ -303,6 +306,7 @@ int vgic_init(struct kvm *kvm)
- static void kvm_vgic_dist_destroy(struct kvm *kvm)
++		return true;
++}
++
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index 365933a98a7c..dc6ecfa5a2d2 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+  */
+ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
  {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_redist_region *rdreg, *next;
+-	BUG_ON(system_supports_sve());
+ 	BUG_ON(!current->mm);
  
- 	dist->ready = false;
- 	dist->initialized = false;
-@@ -311,6 +315,14 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
- 	dist->spis = NULL;
- 	dist->nr_spis = 0;
+ 	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 118f3002b9ce..a6a8c7d9157d 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,6 +21,7 @@
  
-+	if (kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
-+		list_for_each_entry_safe(rdreg, next, &dist->rd_regions, list) {
-+			list_del(&rdreg->list);
-+			kfree(rdreg);
+ #include <kvm/arm_psci.h>
+ 
++#include <asm/cpufeature.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
+@@ -28,6 +29,7 @@
+ #include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
++#include <asm/processor.h>
+ #include <asm/thread_info.h>
+ 
+ /* Check whether the FP regs were dirtied while in the host-side run loop: */
+@@ -329,6 +331,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 				    struct kvm_vcpu *vcpu)
+ {
++	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
++
+ 	if (has_vhe())
+ 		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+ 			     cpacr_el1);
+@@ -339,7 +343,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 	isb();
+ 
+ 	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
+-		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
++		/*
++		 * In the SVE case, VHE is assumed: it is enforced by
++		 * Kconfig and kvm_arch_init().
++		 */
++		if (system_supports_sve() &&
++		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
++			struct thread_struct *thread = container_of(
++				host_fpsimd,
++				struct thread_struct, uw.fpsimd_state);
++
++			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
++		} else {
++			__fpsimd_save_state(host_fpsimd);
 +		}
-+		INIT_LIST_HEAD(&dist->rd_regions);
++
+ 		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+ 	}
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index bee226cec40b..ce7c6f36471b 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
++#include <linux/bug.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -41,6 +42,7 @@
+ #include <asm/mman.h>
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
++#include <asm/cpufeature.h>
+ #include <asm/virt.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -1574,6 +1576,11 @@ int kvm_arch_init(void *opaque)
+ 		return -ENODEV;
+ 	}
+ 
++	if (!kvm_arch_check_sve_has_vhe()) {
++		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
++		return -ENODEV;
 +	}
 +
- 	if (vgic_supports_direct_msis(kvm))
- 		vgic_v4_teardown(kvm);
- }
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 10ae6f394b71..76ab3691f7fe 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -66,6 +66,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 	int r = 0;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	phys_addr_t *addr_ptr, alignment;
-+	u64 undef_value = VGIC_ADDR_UNDEF;
- 
- 	mutex_lock(&kvm->lock);
- 	switch (type) {
-@@ -84,7 +85,9 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 		addr_ptr = &vgic->vgic_dist_base;
- 		alignment = SZ_64K;
- 		break;
--	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+	case KVM_VGIC_V3_ADDR_TYPE_REDIST: {
-+		struct vgic_redist_region *rdreg;
-+
- 		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
- 		if (r)
- 			break;
-@@ -92,8 +95,14 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 			r = vgic_v3_set_redist_base(kvm, *addr);
- 			goto out;
- 		}
--		addr_ptr = &vgic->vgic_redist_base;
-+		rdreg = list_first_entry(&vgic->rd_regions,
-+					 struct vgic_redist_region, list);
-+		if (!rdreg)
-+			addr_ptr = &undef_value;
-+		else
-+			addr_ptr = &rdreg->base;
- 		break;
-+	}
- 	default:
- 		r = -ENODEV;
- 	}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 671fe81f8e1d..d1aab183a1cc 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -580,8 +580,10 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
- 	struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
-+	struct vgic_redist_region *rdreg;
- 	gpa_t rd_base, sgi_base;
- 	int ret;
- 
-@@ -591,13 +593,17 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
- 	 * function for all VCPUs when the base address is set.  Just return
- 	 * without doing any work for now.
- 	 */
--	if (IS_VGIC_ADDR_UNDEF(vgic->vgic_redist_base))
-+	rdreg = list_first_entry(&vgic->rd_regions,
-+				 struct vgic_redist_region, list);
-+	if (!rdreg)
- 		return 0;
- 
- 	if (!vgic_v3_check_base(kvm))
- 		return -EINVAL;
- 
--	rd_base = vgic->vgic_redist_base + vgic->vgic_redist_free_offset;
-+	vgic_cpu->rdreg = rdreg;
-+
-+	rd_base = rdreg->base + rdreg->free_index * KVM_VGIC_V3_REDIST_SIZE;
- 	sgi_base = rd_base + SZ_64K;
- 
- 	kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
-@@ -631,7 +637,7 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
- 		goto out;
- 	}
- 
--	vgic->vgic_redist_free_offset += 2 * SZ_64K;
-+	rdreg->free_index++;
- out:
- 	mutex_unlock(&kvm->slots_lock);
- 	return ret;
-@@ -673,19 +679,31 @@ static int vgic_register_all_redist_iodevs(struct kvm *kvm)
- int vgic_v3_set_redist_base(struct kvm *kvm, u64 addr)
- {
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	struct vgic_redist_region *rdreg;
- 	int ret;
- 
- 	/* vgic_check_ioaddr makes sure we don't do this twice */
--	ret = vgic_check_ioaddr(kvm, &vgic->vgic_redist_base, addr, SZ_64K);
-+	if (!list_empty(&vgic->rd_regions))
-+		return -EINVAL;
-+
-+	rdreg = kzalloc(sizeof(*rdreg), GFP_KERNEL);
-+	if (!rdreg)
-+		return -ENOMEM;
-+
-+	rdreg->base = VGIC_ADDR_UNDEF;
-+
-+	ret = vgic_check_ioaddr(kvm, &rdreg->base, addr, SZ_64K);
- 	if (ret)
--		return ret;
-+		goto out;
- 
--	vgic->vgic_redist_base = addr;
-+	rdreg->base = addr;
- 	if (!vgic_v3_check_base(kvm)) {
--		vgic->vgic_redist_base = VGIC_ADDR_UNDEF;
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto out;
- 	}
- 
-+	list_add(&rdreg->list, &vgic->rd_regions);
-+
- 	/*
- 	 * Register iodevs for each existing VCPU.  Adding more VCPUs
- 	 * afterwards will register the iodevs when needed.
-@@ -695,6 +713,10 @@ int vgic_v3_set_redist_base(struct kvm *kvm, u64 addr)
- 		return ret;
- 
- 	return 0;
-+
-+out:
-+	kfree(rdreg);
-+	return ret;
- }
- 
- int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index c7423f3768e5..56e6e903d998 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -427,6 +427,9 @@ bool vgic_v3_check_base(struct kvm *kvm)
- {
- 	struct vgic_dist *d = &kvm->arch.vgic;
- 	gpa_t redist_size = KVM_VGIC_V3_REDIST_SIZE;
-+	struct vgic_redist_region *rdreg =
-+		list_first_entry(&d->rd_regions,
-+				 struct vgic_redist_region, list);
- 
- 	redist_size *= atomic_read(&kvm->online_vcpus);
- 
-@@ -434,18 +437,17 @@ bool vgic_v3_check_base(struct kvm *kvm)
- 	    d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
- 		return false;
- 
--	if (!IS_VGIC_ADDR_UNDEF(d->vgic_redist_base) &&
--	    d->vgic_redist_base + redist_size < d->vgic_redist_base)
-+	if (rdreg && (rdreg->base + redist_size < rdreg->base))
- 		return false;
- 
- 	/* Both base addresses must be set to check if they overlap */
--	if (IS_VGIC_ADDR_UNDEF(d->vgic_dist_base) ||
--	    IS_VGIC_ADDR_UNDEF(d->vgic_redist_base))
-+	if (IS_VGIC_ADDR_UNDEF(d->vgic_dist_base) || !rdreg)
- 		return true;
- 
--	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE <= d->vgic_redist_base)
-+	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE <= rdreg->base)
- 		return true;
--	if (d->vgic_redist_base + redist_size <= d->vgic_dist_base)
-+
-+	if (rdreg->base + redist_size <= d->vgic_dist_base)
- 		return true;
- 
- 	return false;
-@@ -455,12 +457,14 @@ int vgic_v3_map_resources(struct kvm *kvm)
- {
- 	int ret = 0;
- 	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_redist_region *rdreg =
-+		list_first_entry(&dist->rd_regions,
-+				 struct vgic_redist_region, list);
- 
- 	if (vgic_ready(kvm))
- 		goto out;
- 
--	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
--	    IS_VGIC_ADDR_UNDEF(dist->vgic_redist_base)) {
-+	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) || !rdreg) {
- 		kvm_err("Need to set vgic distributor addresses first\n");
- 		ret = -ENXIO;
- 		goto out;
+ 	for_each_online_cpu(cpu) {
+ 		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
+ 		if (ret < 0) {
 -- 
 2.17.1
