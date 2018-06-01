@@ -1,52 +1,67 @@
-From: hofrat@opentech.at (Nicholas Mc Guire)
-Date: Fri,  1 Jun 2018 13:30:14 +0000
-Subject: [PATCH] media: atmel-isi: move of_node_put() to cover success branch
- as well
-Message-ID: <1527859814-30410-1-git-send-email-hofrat@opentech.at>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri,  1 Jun 2018 09:46:08 -0400
+Subject: [PATCH V4] scsi: hpsa: drop shutdown callback
+Message-ID: <1527860768-11367-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicholas Mc Guire <hofrat@osadl.org>
+'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
+shutdown")' has been added to kernel to shutdown pending PCIe port
+service interrupts during reboot so that a newly started kexec kernel
+wouldn't observe pending interrupts.
 
-The of_node_put() was only covering the error branch but missed the 
-success branch so the refcount for ep which 
-of_graph_get_remote_port_parent() incremented on success would was
-not being decremented.
+pcie_port_device_remove() is disabling the root port and switches by
+calling pci_disable_device() after all PCIe service drivers are shutdown.
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+This has been found to cause crashes on HP DL360 Gen9 machines during
+reboot due to hpsa driver not clearing the bus master bit during the
+shutdown procedure by calling pci_disable_device().
+
+Disable device as part of the shutdown sequence.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
+Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
+Cc: stable at vger.kernel.org
+Reported-by: Ryan Finnie <ryan@finnie.org>
 ---
+ drivers/scsi/hpsa.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-This patch is on top of: "media: atmel-isi: drop unnecessary while loop"
-
-Patch was compile tested with: x86_64_defconfig + CONFIG_MEDIA_SUPPORT=y
-MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_CONTROLLER=y, V4L_PLATFORM_DRIVERS=y
-OF=y, CONFIG_COMPILE_TEST=y, CONFIG_VIDEO_ATMEL_ISI=y
-
-Compile testing atmel-isi.c shows some sparse warnings. Seems to be due to
-sizeof operator being applied to a union (not related to the function being
-changed though).
-
-Patch is against 4.17-rc7 (localversion-next is next-20180531)
-
- drivers/media/platform/atmel/atmel-isi.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/platform/atmel/atmel-isi.c b/drivers/media/platform/atmel/atmel-isi.c
-index 85fc7b9..e8db4df 100644
---- a/drivers/media/platform/atmel/atmel-isi.c
-+++ b/drivers/media/platform/atmel/atmel-isi.c
-@@ -1111,10 +1111,9 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
- 		return -EINVAL;
+diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
+index 3a9eca1..b92f86a 100644
+--- a/drivers/scsi/hpsa.c
++++ b/drivers/scsi/hpsa.c
+@@ -8869,7 +8869,7 @@ static void hpsa_disable_rld_caching(struct ctlr_info *h)
+ 	kfree(options);
+ }
  
- 	remote = of_graph_get_remote_port_parent(ep);
--	if (!remote) {
--		of_node_put(ep);
-+	of_node_put(ep);
-+	if (!remote)
- 		return -EINVAL;
--	}
+-static void hpsa_shutdown(struct pci_dev *pdev)
++static void __hpsa_shutdown(struct pci_dev *pdev)
+ {
+ 	struct ctlr_info *h;
  
- 	/* Remote node to connect */
- 	isi->entity.node = remote;
+@@ -8884,6 +8884,12 @@ static void hpsa_shutdown(struct pci_dev *pdev)
+ 	hpsa_disable_interrupt_mode(h);		/* pci_init 2 */
+ }
+ 
++static void hpsa_shutdown(struct pci_dev *pdev)
++{
++	__hpsa_shutdown(pdev);
++	pci_disable_device(pdev);
++}
++
+ static void hpsa_free_device_info(struct ctlr_info *h)
+ {
+ 	int i;
+@@ -8927,7 +8933,7 @@ static void hpsa_remove_one(struct pci_dev *pdev)
+ 		scsi_remove_host(h->scsi_host);		/* init_one 8 */
+ 	/* includes hpsa_free_irqs - init_one 4 */
+ 	/* includes hpsa_disable_interrupt_mode - pci_init 2 */
+-	hpsa_shutdown(pdev);
++	__hpsa_shutdown(pdev);
+ 
+ 	hpsa_free_device_info(h);		/* scan */
+ 
 -- 
-2.1.4
+2.7.4
