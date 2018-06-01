@@ -1,56 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri,  1 Jun 2018 13:10:03 +0200
-Subject: [PATCH 5/6] staging: vc04_services: vchiq_debugfs_log_entry can be a
- void *
-In-Reply-To: <20180601111004.1670-1-gregkh@linuxfoundation.org>
-References: <20180601111004.1670-1-gregkh@linuxfoundation.org>
-Message-ID: <20180601111004.1670-5-gregkh@linuxfoundation.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  1 Jun 2018 12:24:23 +0100
+Subject: [PATCHv2 01/19] arm64: consistently use unsigned long for thread flags
+In-Reply-To: <20180601112441.37810-1-mark.rutland@arm.com>
+References: <20180601112441.37810-1-mark.rutland@arm.com>
+Message-ID: <20180601112441.37810-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to set this to be int * when it is only used as a void *.
-This lets us remove the unneeded cast, and unneeded temporary variable
-the one place it is referenced in the code.
+In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
+int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
+(e.g. in the entry assembly) we manipulate the flags as a 64-bit
+quantity.
 
-Suggested-by: Eric Anholt <eric@anholt.net>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Keerthi Reddy <keerthigd4990@gmail.com>
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+For consistency, and to avoid problems if we end up with more than 32
+flags, let's make do_notify_resume take the flags as a 64-bit unsigned
+long.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- .../vc04_services/interface/vchiq_arm/vchiq_debugfs.c     | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/signal.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
-index f18cd56c3634..2b353d2d25ce 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
-@@ -58,7 +58,7 @@ struct dentry *vchiq_dbg_clients;
- /* Log category debugfs entries */
- struct vchiq_debugfs_log_entry {
- 	const char *name;
--	int *plevel;
-+	void *plevel;
- 	struct dentry *dir;
- };
- 
-@@ -153,10 +153,10 @@ static void vchiq_debugfs_create_log_entries(struct dentry *top)
- 	dir = debugfs_create_dir("log", vchiq_dbg_dir);
- 
- 	for (i = 0; i < n_log_entries; i++) {
--		void *levp = (void *)vchiq_debugfs_log_entries[i].plevel;
--
- 		dir = debugfs_create_file(vchiq_debugfs_log_entries[i].name,
--					  0644, dir, levp, &debugfs_log_fops);
-+					  0644, dir,
-+					  vchiq_debugfs_log_entries[i].plevel,
-+					  &debugfs_log_fops);
- 		vchiq_debugfs_log_entries[i].dir = dir;
- 	}
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 154b7d30145d..8e624fec4707 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -896,7 +896,7 @@ static void do_signal(struct pt_regs *regs)
  }
+ 
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++				 unsigned long thread_flags)
+ {
+ 	/*
+ 	 * The assembly code enters us with IRQs off, but it hasn't
 -- 
-2.17.1
+2.11.0
