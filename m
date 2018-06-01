@@ -1,37 +1,46 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 01 Jun 2018 10:12:39 -0700
-Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <9ca51832-6095-c8a5-1347-f57abf99e8f9@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
- <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
- <20180524173926.GC14924@minitux>
- <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
- <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
- <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
- <152775249799.144038.9269415086304305030@swboyd.mtv.corp.google.com>
- <9ca51832-6095-c8a5-1347-f57abf99e8f9@codeaurora.org>
-Message-ID: <152787315975.144038.15271372565967690313@swboyd.mtv.corp.google.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 1 Jun 2018 19:18:43 +0200
+Subject: [GIT PULL] KVM/ARM updates for 4.18
+In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
+References: <20180601152747.23613-1-marc.zyngier@arm.com>
+Message-ID: <009990f0-0713-067d-8f08-331055f46b97@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sricharan R (2018-06-01 06:20:37)
-> Hi Stephen,
+On 01/06/2018 17:27, Marc Zyngier wrote:
+> Paolo, Radim,
 > 
-> On 5/31/2018 1:11 PM, Stephen Boyd wrote:
-> > 
-> > Ok. One general comment is that it would be nice if the bindings for all
-> > the nodes that are introduced included 'clocks' properties and also
-> > maybe 'clock-names' properties for the clocks that are consumed by each
-> > node. Right now, we hide those details from DT and rely on the string
-> > names to hook the clk tree up for us. That sort of prevents us from
-> > moving away from string easily, so I would just throw the clocks into
-> > the binding right now and always have them there just in case we want to
-> > use the binding to figure out the hierarchy in the future.
-> > 
+> This is the set of updates for KVM/ARM for v4.18. This time, lazy
+> context switching of the floating point registers for arm64, and the
+> ability to deal with multiple redistributor ranges (which allows for
+> larger numbers of vcpu).
 > 
->  ok, understand that mostly. So will try to revamp those patches with
->  the 'clocks' property in the binding added, reading them in the driver
->  from DT.
+> Note that some additional KVM/ARM updates will come via the arm64 tree
+> with the SSBD patches. This will generate three conflicts that are
+> pretty simple to resolve (-next has a good example of the resolution).
+> 
+> Please pull,
+> 
+> 	M.
+> 
+> The following changes since commit 75bc37fefc4471e718ba8e651aa74673d4e0a9eb:
+> 
+>   Linux 4.17-rc4 (2018-05-06 16:57:38 -1000)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-for-v4.18
+> 
+> for you to fetch changes up to e25028c8ded011d19f9a11164807507c94febc01:
+> 
+>   KVM: arm/arm64: Bump VGIC_V3_MAX_CPUS to 512 (2018-05-25 12:29:27 +0100)
+> 
+> ----------------------------------------------------------------
+> KVM/ARM updates for 4.18
+> 
+> - Lazy context-switching of FPSIMD registers on arm64
+> - Allow virtual redistributors to be part of two or more MMIO ranges
 
-Yeah. You don't even have to actually use the clocks property right now
-from the drivers. Just add the properties in the binding.
+Pulled, thanks.
+
+Paolo
