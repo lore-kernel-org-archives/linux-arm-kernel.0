@@ -1,48 +1,121 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Jun 2018 17:06:21 +0100
-Subject: [PATCH v2 1/9] h8300: Don't include linux/kernel.h in asm/atomic.h
+Date: Fri,  1 Jun 2018 17:06:27 +0100
+Subject: [PATCH v2 7/9] asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*
 In-Reply-To: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
 References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1527869189-31512-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1527869189-31512-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux/kernel.h isn't needed by asm/atomic.h and will result in circular
-dependencies when the asm-generic atomic bitops are built around the
-tomic_long_t interface.
+The lock bitops can be implemented more efficiently using the atomic_fetch_*
+ops, which provide finer-grained control over the memory ordering semantics
+than the bitops.
 
-Remove the broad include and replace it with linux/compiler.h for
-READ_ONCE etc and asm/irqflags.h for arch_local_irq_save etc.
-
-Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/h8300/include/asm/atomic.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/asm-generic/bitops/lock.h | 68 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 56 insertions(+), 12 deletions(-)
 
-diff --git a/arch/h8300/include/asm/atomic.h b/arch/h8300/include/asm/atomic.h
-index 941e7554e886..b174dec099bf 100644
---- a/arch/h8300/include/asm/atomic.h
-+++ b/arch/h8300/include/asm/atomic.h
-@@ -2,8 +2,10 @@
- #ifndef __ARCH_H8300_ATOMIC__
- #define __ARCH_H8300_ATOMIC__
+diff --git a/include/asm-generic/bitops/lock.h b/include/asm-generic/bitops/lock.h
+index 67ab280ad134..3ae021368f48 100644
+--- a/include/asm-generic/bitops/lock.h
++++ b/include/asm-generic/bitops/lock.h
+@@ -2,6 +2,10 @@
+ #ifndef _ASM_GENERIC_BITOPS_LOCK_H_
+ #define _ASM_GENERIC_BITOPS_LOCK_H_
  
++#include <linux/atomic.h>
 +#include <linux/compiler.h>
- #include <linux/types.h>
- #include <asm/cmpxchg.h>
-+#include <asm/irqflags.h>
++#include <asm/barrier.h>
++
+ /**
+  * test_and_set_bit_lock - Set a bit and return its old value, for lock
+  * @nr: Bit to set
+@@ -11,7 +15,20 @@
+  * the returned value is 0.
+  * It can be used to implement bit locks.
+  */
+-#define test_and_set_bit_lock(nr, addr)	test_and_set_bit(nr, addr)
++static inline int test_and_set_bit_lock(unsigned int nr,
++					volatile unsigned long *p)
++{
++	long old;
++	unsigned long mask = BIT_MASK(nr);
++
++	p += BIT_WORD(nr);
++	if (READ_ONCE(*p) & mask)
++		return 1;
++
++	old = atomic_long_fetch_or_acquire(mask, (atomic_long_t *)p);
++	return !!(old & mask);
++}
++
  
- /*
-  * Atomic operations that C can't guarantee us.  Useful for
-@@ -15,8 +17,6 @@
- #define atomic_read(v)		READ_ONCE((v)->counter)
- #define atomic_set(v, i)	WRITE_ONCE(((v)->counter), (i))
+ /**
+  * clear_bit_unlock - Clear a bit in memory, for unlock
+@@ -20,11 +37,11 @@
+  *
+  * This operation is atomic and provides release barrier semantics.
+  */
+-#define clear_bit_unlock(nr, addr)	\
+-do {					\
+-	smp_mb__before_atomic();	\
+-	clear_bit(nr, addr);		\
+-} while (0)
++static inline void clear_bit_unlock(unsigned int nr, volatile unsigned long *p)
++{
++	p += BIT_WORD(nr);
++	atomic_long_fetch_andnot_release(BIT_MASK(nr), (atomic_long_t *)p);
++}
  
--#include <linux/kernel.h>
--
- #define ATOMIC_OP_RETURN(op, c_op)				\
- static inline int atomic_##op##_return(int i, atomic_t *v)	\
- {								\
+ /**
+  * __clear_bit_unlock - Clear a bit in memory, for unlock
+@@ -37,11 +54,38 @@ do {					\
+  *
+  * See for example x86's implementation.
+  */
+-#define __clear_bit_unlock(nr, addr)	\
+-do {					\
+-	smp_mb__before_atomic();	\
+-	clear_bit(nr, addr);		\
+-} while (0)
++static inline void __clear_bit_unlock(unsigned int nr,
++				      volatile unsigned long *p)
++{
++	unsigned long old;
+ 
+-#endif /* _ASM_GENERIC_BITOPS_LOCK_H_ */
++	p += BIT_WORD(nr);
++	old = READ_ONCE(*p);
++	old &= ~BIT_MASK(nr);
++	atomic_long_set_release((atomic_long_t *)p, old);
++}
++
++/**
++ * clear_bit_unlock_is_negative_byte - Clear a bit in memory and test if bottom
++ *                                     byte is negative, for unlock.
++ * @nr: the bit to clear
++ * @addr: the address to start counting from
++ *
++ * This is a bit of a one-trick-pony for the filemap code, which clears
++ * PG_locked and tests PG_waiters,
++ */
++#ifndef clear_bit_unlock_is_negative_byte
++static inline bool clear_bit_unlock_is_negative_byte(unsigned int nr,
++						     volatile unsigned long *p)
++{
++	long old;
++	unsigned long mask = BIT_MASK(nr);
++
++	p += BIT_WORD(nr);
++	old = atomic_long_fetch_andnot_release(mask, (atomic_long_t *)p);
++	return !!(old & BIT(7));
++}
++#define clear_bit_unlock_is_negative_byte clear_bit_unlock_is_negative_byte
++#endif
+ 
++#endif /* _ASM_GENERIC_BITOPS_LOCK_H_ */
 -- 
 2.1.4
