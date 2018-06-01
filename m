@@ -1,73 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  1 Jun 2018 14:16:00 +0100
-Subject: [RFC PATCH 1/8] dts: binding: coresight: Document graph bindings
+Date: Fri,  1 Jun 2018 14:16:01 +0100
+Subject: [RFC PATCH 2/8] coresight: Fix remote endpoint parsing
 In-Reply-To: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
 References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1527858967-16047-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1527858967-16047-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before we updat the bindings, document the current graph bindings
-and usage of additional properties.
+When parsing the remote endpoint of an output port, we do :
+     rport = of_graph_get_remote_port(ep);
+     rparent = of_graph_get_remote_port_parent(ep);
+
+and then parse the "remote_port" as if it was the remote endpoint,
+which is wrong. The code worked fine because we used endpoint number
+as the port number. Let us fix it and optimise a bit as:
+
+     remote_ep = of_graph_get_remote_endpoint(ep);
+     if (remote_ep)
+        remote_parent = of_graph_get_port_parent(remote_ep);
+
+and then, parse the remote_ep for the port/endpoint details.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../devicetree/bindings/arm/coresight.txt          | 28 ++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ drivers/hwtracing/coresight/of_coresight.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 15ac8e8..bd36e40 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -52,9 +52,7 @@ its hardware characteristcs.
- 	  clocks the core of that coresight component. The latter clock
- 	  is optional.
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index 7c37544..e0deab0 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -128,7 +128,7 @@ of_get_coresight_platform_data(struct device *dev,
+ 	struct device *rdev;
+ 	struct device_node *ep = NULL;
+ 	struct device_node *rparent = NULL;
+-	struct device_node *rport = NULL;
++	struct device_node *rep = NULL;
  
--	* port or ports: The representation of the component's port
--	  layout using the generic DT graph presentation found in
--	  "bindings/graph.txt".
-+	* port or ports: see "Graph bindings for Coresight" below
+ 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+@@ -169,16 +169,17 @@ of_get_coresight_platform_data(struct device *dev,
+ 			pdata->outports[i] = endpoint.port;
  
- * Additional required properties for System Trace Macrocells (STM):
- 	* reg: along with the physical base address and length of the register
-@@ -71,7 +69,7 @@ its hardware characteristcs.
- 	  AMBA markee):
- 		- "arm,coresight-replicator"
+ 			/*
+-			 * Get a handle on the remote port and parent
+-			 * attached to it.
++			 * Get a handle on the remote endpoint and the device
++			 * it is attached to.
+ 			 */
+-			rparent = of_graph_get_remote_port_parent(ep);
+-			rport = of_graph_get_remote_port(ep);
+-
+-			if (!rparent || !rport)
++			rep = of_graph_get_remote_endpoint(ep);
++			if (!rep)
++				continue;
++			rparent = of_graph_get_port_parent(rep);
++			if (!rparent)
+ 				continue;
  
--	* port or ports: same as above.
-+	* port or ports: see "Graph bindings for Coresight" below.
+-			if (of_graph_parse_endpoint(rport, &rendpoint))
++			if (of_graph_parse_endpoint(rep, &rendpoint))
+ 				continue;
  
- * Optional properties for ETM/PTMs:
+ 			rdev = of_coresight_get_endpoint_device(rparent);
+@@ -186,7 +187,7 @@ of_get_coresight_platform_data(struct device *dev,
+ 				return ERR_PTR(-EPROBE_DEFER);
  
-@@ -86,6 +84,28 @@ its hardware characteristcs.
- 	* arm,buffer-size: size of contiguous buffer space for TMC ETR
- 	 (embedded trace router)
+ 			pdata->child_names[i] = dev_name(rdev);
+-			pdata->child_ports[i] = rendpoint.id;
++			pdata->child_ports[i] = rendpoint.port;
  
-+Graph bindings for Coresight
-+-------------------------------
-+
-+Coresight components are interconnected to create a data path for the flow of
-+trace data generated from the "sources" to their collection points "sink". Each
-+coresight component must describe the "input" and "output" connections.
-+The connections must be described via generic DT graph bindings as described
-+by the "bindings/graph.txt", where each "port" along with an "endpoint" component
-+represents a hardware port and the connection.
-+
-+Since it is possible to have multiple connections for any coresight component with
-+a specific direction of data flow, each connection must define the following
-+properties to uniquely identify the connection details.
-+
-+ * Direction of the data flow w.r.t the component :
-+   Each input port must have the following property defined at the "endpoint"
-+   for the port.
-+	"slave-mode"
-+
-+ * Hardware Port number at the component:
-+     -  The hardware port number is assumed to be the address of the "port" component.
-+
- 
- Example:
- 
+ 			i++;
+ 		} while (ep);
 -- 
 2.7.4
