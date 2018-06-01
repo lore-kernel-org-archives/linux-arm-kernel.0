@@ -1,143 +1,78 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:23 +0100
-Subject: [PATCH 09/33] arm64: fpsimd: Eliminate task->mm checks
+Date: Fri,  1 Jun 2018 16:27:28 +0100
+Subject: [PATCH 14/33] arm64/sve: Switch sve_pffr() argument from task to
+ thread
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-10-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dave Martin <Dave.Martin@arm.com>
 
-Currently the FPSIMD handling code uses the condition task->mm ==
-NULL as a hint that task has no FPSIMD register context.
+sve_pffr(), which is used to derive the base address used for
+low-level SVE save/restore routines, currently takes the relevant
+task_struct as an argument.
 
-The ->mm check is only there to filter out tasks that cannot
-possibly have FPSIMD context loaded, for optimisation purposes.
-Also, TIF_FOREIGN_FPSTATE must always be checked anyway before
-saving FPSIMD context back to memory.  For these reasons, the ->mm
-checks are not useful, providing that TIF_FOREIGN_FPSTATE is
-maintained in a consistent way for all threads.
+The only accessed fields are actually part of thread_struct, so
+this patch changes the argument type accordingly.  This is done in
+preparation for moving this function to a header, where we do not
+want to have to include <linux/sched.h> due to the consequent
+circular #include problems.
 
-The context switch logic is already deliberately optimised to defer
-reloads of the regs until ret_to_user (or sigreturn as a special
-case), and save them only if they have been previously loaded.
-These paths are the only places where the wrong_task and wrong_cpu
-conditions can be made false, by calling fpsimd_bind_task_to_cpu().
-Kernel threads by definition never reach these paths.  As a result,
-the wrong_task and wrong_cpu tests in fpsimd_thread_switch() will
-always yield true for kernel threads.
-
-This patch removes the redundant checks and special-case code,
-ensuring that TIF_FOREIGN_FPSTATE is set whenever a kernel thread
-is scheduled in, and ensures that this flag is set for the init
-task.  The fpsimd_flush_task_state() call already present in
-copy_thread() ensures the same for any new task.
-
-With TIF_FOREIGN_FPSTATE always set for kernel threads, this patch
-ensures that no extra context save work is added for kernel
-threads, and eliminates the redundant context saving that may
-currently occur for kernel threads that have acquired an mm via
-use_mm().
+No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/processor.h |  4 ++-
- arch/arm64/kernel/fpsimd.c         | 40 ++++++++++++------------------
- 2 files changed, 19 insertions(+), 25 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 767598932549..36d64f83cdfb 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -156,7 +156,9 @@ static inline void arch_thread_struct_whitelist(unsigned long *offset,
- /* Sync TPIDR_EL0 back to thread_struct for current */
- void tls_preserve_current_state(void);
- 
--#define INIT_THREAD  {	}
-+#define INIT_THREAD {				\
-+	.fpsimd_cpu = NR_CPUS,			\
-+}
- 
- static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
- {
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 2d9a9e8ed826..d736b6c412ef 100644
+index 6c01ee2062c4..842b2ad08bec 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -892,31 +892,25 @@ asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
- 
- void fpsimd_thread_switch(struct task_struct *next)
- {
-+	bool wrong_task, wrong_cpu;
-+
- 	if (!system_supports_fpsimd())
- 		return;
-+
-+	/* Save unsaved fpsimd state, if any: */
-+	fpsimd_save();
-+
- 	/*
--	 * Save the current FPSIMD state to memory, but only if whatever is in
--	 * the registers is in fact the most recent userland FPSIMD state of
--	 * 'current'.
-+	 * Fix up TIF_FOREIGN_FPSTATE to correctly describe next's
-+	 * state.  For kernel threads, FPSIMD registers are never loaded
-+	 * and wrong_task and wrong_cpu will always be true.
- 	 */
--	if (current->mm)
--		fpsimd_save();
--
--	if (next->mm) {
--		/*
--		 * If we are switching to a task whose most recent userland
--		 * FPSIMD state is already in the registers of *this* cpu,
--		 * we can skip loading the state from memory. Otherwise, set
--		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
--		 * upon the next return to userland.
--		 */
--		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
-+	wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
- 					&next->thread.uw.fpsimd_state;
--		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
-+	wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
- 
--		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
--				       wrong_task || wrong_cpu);
--	}
-+	update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
-+			       wrong_task || wrong_cpu);
+@@ -44,6 +44,7 @@
+ #include <asm/fpsimd.h>
+ #include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/processor.h>
+ #include <asm/simd.h>
+ #include <asm/sigcontext.h>
+ #include <asm/sysreg.h>
+@@ -167,10 +168,9 @@ static size_t sve_ffr_offset(int vl)
+ 	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
  }
  
- void fpsimd_flush_thread(void)
-@@ -1121,9 +1115,8 @@ void kernel_neon_begin(void)
- 
- 	__this_cpu_write(kernel_neon_busy, true);
- 
--	/* Save unsaved task fpsimd state, if any: */
--	if (current->mm)
--		fpsimd_save();
-+	/* Save unsaved fpsimd state, if any: */
-+	fpsimd_save();
- 
- 	/* Invalidate any task state remaining in the fpsimd regs: */
- 	fpsimd_flush_cpu_state();
-@@ -1245,8 +1238,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+-static void *sve_pffr(struct task_struct *task)
++static void *sve_pffr(struct thread_struct *thread)
  {
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
--		if (current->mm)
--			fpsimd_save();
-+		fpsimd_save();
- 		fpsimd_flush_cpu_state();
- 		break;
- 	case CPU_PM_EXIT:
+-	return (char *)task->thread.sve_state +
+-		sve_ffr_offset(task->thread.sve_vl);
++	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
+ }
+ 
+ static void change_cpacr(u64 val, u64 mask)
+@@ -253,7 +253,7 @@ static void task_fpsimd_load(void)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
+-		sve_load_state(sve_pffr(current),
++		sve_load_state(sve_pffr(&current->thread),
+ 			       &current->thread.uw.fpsimd_state.fpsr,
+ 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
+ 	else
+@@ -285,7 +285,7 @@ void fpsimd_save(void)
+ 				return;
+ 			}
+ 
+-			sve_save_state(sve_pffr(current), &st->fpsr);
++			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
+ 		} else
+ 			fpsimd_save_state(st);
+ 	}
 -- 
 2.17.1
