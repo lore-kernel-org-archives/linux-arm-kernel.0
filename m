@@ -1,77 +1,250 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri,  1 Jun 2018 23:05:27 +0530
-Subject: [PATCH v3 2/2] arm64: allwinner: a64-amarula-relic: Enable AP6330
- WiFi support
-In-Reply-To: <20180601173527.18051-1-jagan@amarulasolutions.com>
-References: <20180601173527.18051-1-jagan@amarulasolutions.com>
-Message-ID: <20180601173527.18051-2-jagan@amarulasolutions.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 1 Jun 2018 10:37:29 -0700
+Subject: [PATCH 3/3] arm64: dts: allwinner: add support for Pinebook
+In-Reply-To: <20180601092346.g2iixqupumn7xo7r@flea>
+References: <20180601062901.8052-1-anarsoul@gmail.com>
+ <20180601062901.8052-4-anarsoul@gmail.com>
+ <20180601092346.g2iixqupumn7xo7r@flea>
+Message-ID: <CA+E=qVffecgkCG2V_5ptS9oRxo4XwjpQQhWmf8ywpfF78Yy+7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
-- WiFi SDIO interface is connected to MMC1
-- WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
-- WiFi WL-WAKE-AP pin connected to gpio PL3
-- 32kHz external oscillator gate clock from RTC
+On Fri, Jun 1, 2018 at 2:23 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Thu, May 31, 2018 at 11:29:01PM -0700, Vasily Khoruzhick wrote:
+>> From: Icenowy Zheng <icenowy@aosc.xyz>
+>>
+>> Pinebook is a A64-based laptop produced by Pine64, with the following
+>> peripherals:
+>>
+>> USB:
+>> - Two external USB ports (one is directly connected to A64's OTG
+>> controller, the other is under a internal hub connected to the host-only
+>> controller.)
+>> - USB HID keyboard and touchpad connected to the internal hub.
+>> - USB UVC camera connected to the internal hub.
+>>
+>> Power-related:
+>> - A DC IN jack connected to AXP803's DCIN pin.
+>> - A Li-Polymer battery connected to AXP803's battery pins.
+>>
+>> Storage:
+>> - An eMMC by Foresee on the main board (in the product revision of the
+>> main board it's designed to be switchable).
+>> - An external MicroSD card slot.
+>>
+>> Display:
+>> - An eDP LCD panel (1366x768) connected via an ANX6345 RGB-eDP bridge.
+>> - A mini HDMI port.
+>>
+>> Misc:
+>> - A Hall sensor designed to detect the status of lid, connected to GPIO PL12.
+>> - A headphone jack connected to the SoC's internal codec.
+>> - A debug UART port muxed with headphone jack.
+>>
+>> This commit adds basical support for it.
+>>
+>> [vasily: squashed several commits into one, added simplefb node, added usbphy
+>>        to ehci0 and ohci0 nodes]
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ---
+>>  arch/arm64/boot/dts/allwinner/Makefile        |   1 +
+>>  .../dts/allwinner/sun50i-a64-pinebook.dts     | 285 ++++++++++++++++++
+>>  2 files changed, 286 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+>> index 8bebe7da5ed9..a8c6d0c6f2c5 100644
+>> --- a/arch/arm64/boot/dts/allwinner/Makefile
+>> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+>> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+>> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
+>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
+>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+>> new file mode 100644
+>> index 000000000000..d952db217702
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+>> @@ -0,0 +1,285 @@
+>> +/*
+>> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
+>> + * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
+>> + *
+>> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+>
+> The SPDX tag should be the first one.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v3:
-- move dtsi change in separate patch
-Changes for v2:
-- Move external rtc clock nodes into main rtc node definition
-  of sun50i-a64.dtsi
+OK, but it's not in number of other dts files, e.g.
+sun50i-a64-teres-i.dts or sun50i-h5-orangepi-zero-plus.dts
 
- .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "sun50i-a64.dtsi"
+>> +
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/input/input.h>
+>> +#include <dt-bindings/pwm/pwm.h>
+>> +
+>> +/ {
+>> +     model = "Pinebook";
+>> +     compatible = "pine64,pinebook", "allwinner,sun50i-a64";
+>> +
+>> +     aliases {
+>> +             serial0 = &uart0;
+>> +             ethernet0 = &rtl8723cs;
+>> +     };
+>> +
+>> +     backlight: backlight {
+>> +             compatible = "pwm-backlight";
+>> +             pwms = <&pwm 0 50000 0>;
+>> +             brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+>
+> The perceived brightness should be increasing linearly. This usually
+> means that you need an function close to a power of two sequence.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-index ce4a256ff086..eac4793c8502 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
-@@ -21,12 +21,43 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&rtc 1>;
-+		clock-names = "ext_clock";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* WL-PMU-EN: PL2 */
-+	};
- };
- 
- &ehci0 {
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	/*
-+	 * Schematic shows both dldo4 and eldo1 connected for vcc-io-wifi, but
-+	 * dldo4 connection shows DNP(Do Not Populate) and eldo1 connected with
-+	 * 0Ohm register to vcc-io-wifi so eldo1 is used.
-+	 */
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;	/* WL-WAKE-AP: PL3 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins>;
--- 
-2.14.3
+OK, I'll try, but no one complained so far.
+
+>> +             default-brightness-level = <2>;
+>> +             enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 */
+>> +     };
+>> +
+>> +     chosen {
+>> +             stdout-path = "serial0:115200n8";
+>> +
+>> +             framebuffer-lcd {
+>> +                     panel-supply = <&reg_dc1sw>;
+>> +                     dvdd25-supply = <&reg_dldo2>;
+>> +                     dvdd12-supply = <&reg_fldo1>;
+>> +             };
+>> +     };
+>> +
+>> +     gpio_keys {
+>> +             compatible = "gpio-keys";
+>> +
+>> +             lid_switch {
+>> +                     label = "Lid Switch";
+>> +                     gpios = <&r_pio 0 12 GPIO_ACTIVE_LOW>; /* PL12 */
+>> +                     linux,input-type = <EV_SW>;
+>> +                     linux,code = <SW_LID>;
+>> +                     linux,can-disable;
+>> +             };
+>> +     };
+>> +
+>> +     reg_vcc3v3: vcc3v3 {
+>> +             compatible = "regulator-fixed";
+>> +             regulator-name = "vcc3v3";
+>> +             regulator-min-microvolt = <3300000>;
+>> +             regulator-max-microvolt = <3300000>;
+>> +     };
+>> +
+>> +     wifi_pwrseq: wifi_pwrseq {
+>> +             compatible = "mmc-pwrseq-simple";
+>> +             reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>> +     };
+>> +};
+>> +
+>> +&ehci0 {
+>> +     phys = <&usbphy 0>;
+>> +     phy-names = "usb";
+>> +     status = "okay";
+>> +};
+>> +
+>> +&ehci1 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&mmc0 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&mmc0_pins>;
+>> +     vmmc-supply = <&reg_dcdc1>;
+>> +     cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+>> +     cd-inverted;
+>> +     disable-wp;
+>> +     bus-width = <4>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&mmc1 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&mmc1_pins>;
+>> +     vmmc-supply = <&reg_dldo4>;
+>> +     vqmmc-supply = <&reg_eldo1>;
+>> +     mmc-pwrseq = <&wifi_pwrseq>;
+>> +     bus-width = <4>;
+>> +     non-removable;
+>> +     status = "okay";
+>> +
+>> +     rtl8723cs: wifi at 1 {
+>> +             reg = <1>;
+>> +     };
+>> +};
+>> +
+>> +&mmc2 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&mmc2_pins>;
+>> +     vmmc-supply = <&reg_dcdc1>;
+>> +     vqmmc-supply = <&reg_eldo1>;
+>> +     bus-width = <8>;
+>> +     non-removable;
+>> +     cap-mmc-hw-reset;
+>> +     mmc-hs200-1_8v;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&ohci0 {
+>> +     phys = <&usbphy 0>;
+>> +     phy-names = "usb";
+>> +     status = "okay";
+>> +};
+>> +
+>> +&ohci1 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&pwm {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pwm_pin>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&r_rsb {
+>> +     status = "okay";
+>> +
+>> +     axp803: pmic at 3a3 {
+>> +             compatible = "x-powers,axp803";
+>> +             reg = <0x3a3>;
+>> +             interrupt-parent = <&r_intc>;
+>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> +     };
+>> +};
+>> +
+>> +/* The ANX6345 eDP-bridge is on r_i2c. There is no linux (mainline)
+>> + * driver for this chip at the moment, the bootloader initializes it.
+>> + * However it can be accessed with the i2c-dev driver from user space.
+>> + */
+>
+> The comment format is wrong, and the part after r_i2c, about i2c-dev
+> and the mainline support is not really relevant. The DT describes the
+> hardware, and is used by several different projects that might or
+> might not have i2c-dev, an interface similar, or might have or not a
+> driver for the bridge.
+
+Comment is identical to sun50i-a64-teres-i.dts (which was merged few
+months ago).
+I'll remove everything but first sentence.
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
