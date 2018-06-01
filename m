@@ -1,88 +1,92 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri,  1 Jun 2018 13:10:04 +0200
-Subject: [PATCH 6/6] staging: vc04_services: no need to save the log debufs
- dentries
-In-Reply-To: <20180601111004.1670-1-gregkh@linuxfoundation.org>
-References: <20180601111004.1670-1-gregkh@linuxfoundation.org>
-Message-ID: <20180601111004.1670-6-gregkh@linuxfoundation.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  1 Jun 2018 12:24:36 +0100
+Subject: [PATCHv2 14/19] kernel: add kcompat_sys_{f,}statfs64()
+In-Reply-To: <20180601112441.37810-1-mark.rutland@arm.com>
+References: <20180601112441.37810-1-mark.rutland@arm.com>
+Message-ID: <20180601112441.37810-15-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The log entry dentries are only set, never referenced, so no need to
-keep them around.  Remove the pointer from struct
-vchiq_debugfs_log_entry as it is not needed anymore and get rid of the
-separate vchiq_debugfs_create_log_entries() function as it is only used
-in one place.
+Using this helper allows us to avoid the in-kernel calls to the
+compat_sys_{f,}statfs64() sycalls, as are necessary for parameter
+mangling in arm64's compat handling.
 
-Suggested-by: Eric Anholt <eric@anholt.net>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Keerthi Reddy <keerthigd4990@gmail.com>
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Following the example of ksys_* functions, kcompat_sys_* functions are
+intended to be a drop-in replacement for their compat_sys_*
+counterparts, with the same calling convention.
+
+This is necessary to enable conversion of arm64's syscall handling to
+use pt_regs wrappers.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
+Cc: linux-fsdevel at vger.kernel.org
 ---
- .../interface/vchiq_arm/vchiq_debugfs.c       | 29 +++++++------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+ fs/statfs.c            | 14 ++++++++++++--
+ include/linux/compat.h | 11 +++++++++++
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
-index 2b353d2d25ce..38805504d462 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
-@@ -59,7 +59,6 @@ struct dentry *vchiq_dbg_clients;
- struct vchiq_debugfs_log_entry {
- 	const char *name;
- 	void *plevel;
--	struct dentry *dir;
- };
- 
- static struct vchiq_debugfs_log_entry vchiq_debugfs_log_entries[] = {
-@@ -144,23 +143,6 @@ static const struct file_operations debugfs_log_fops = {
- 	.release	= single_release,
- };
- 
--/* create an entry under <debugfs>/vchiq/log for each log category */
--static void vchiq_debugfs_create_log_entries(struct dentry *top)
--{
--	struct dentry *dir;
--	size_t i;
--
--	dir = debugfs_create_dir("log", vchiq_dbg_dir);
--
--	for (i = 0; i < n_log_entries; i++) {
--		dir = debugfs_create_file(vchiq_debugfs_log_entries[i].name,
--					  0644, dir,
--					  vchiq_debugfs_log_entries[i].plevel,
--					  &debugfs_log_fops);
--		vchiq_debugfs_log_entries[i].dir = dir;
--	}
--}
--
- static int debugfs_usecount_show(struct seq_file *f, void *offset)
- {
- 	VCHIQ_INSTANCE_T instance = f->private;
-@@ -268,10 +250,19 @@ void vchiq_debugfs_remove_instance(VCHIQ_INSTANCE_T instance)
- 
- void vchiq_debugfs_init(void)
- {
-+	struct dentry *dir;
-+	int i;
-+
- 	vchiq_dbg_dir = debugfs_create_dir("vchiq", NULL);
- 	vchiq_dbg_clients = debugfs_create_dir("clients", vchiq_dbg_dir);
- 
--	vchiq_debugfs_create_log_entries(vchiq_dbg_dir);
-+	/* create an entry under <debugfs>/vchiq/log for each log category */
-+	dir = debugfs_create_dir("log", vchiq_dbg_dir);
-+
-+	for (i = 0; i < n_log_entries; i++)
-+		debugfs_create_file(vchiq_debugfs_log_entries[i].name, 0644,
-+				    dir, vchiq_debugfs_log_entries[i].plevel,
-+				    &debugfs_log_fops);
+diff --git a/fs/statfs.c b/fs/statfs.c
+index 5b2a24f0f263..f0216629621d 100644
+--- a/fs/statfs.c
++++ b/fs/statfs.c
+@@ -335,7 +335,7 @@ static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstat
+ 	return 0;
  }
  
- /* remove all the debugfs entries */
+-COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz, struct compat_statfs64 __user * buf)
+ {
+ 	struct kstatfs tmp;
+ 	int error;
+@@ -349,7 +349,12 @@ COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, s
+ 	return error;
+ }
+ 
+-COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++{
++	return kcompat_sys_statfs64(pathname, sz, buf);
++}
++
++int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user * buf)
+ {
+ 	struct kstatfs tmp;
+ 	int error;
+@@ -363,6 +368,11 @@ COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct co
+ 	return error;
+ }
+ 
++COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++{
++	return kcompat_sys_fstatfs64(fd, sz, buf);
++}
++
+ /*
+  * This is a copy of sys_ustat, just dealing with a structure layout.
+  * Given how simple this syscall is that apporach is more maintainable
+diff --git a/include/linux/compat.h b/include/linux/compat.h
+index 081281ad5772..6cecf9f11d6b 100644
+--- a/include/linux/compat.h
++++ b/include/linux/compat.h
+@@ -1013,6 +1013,17 @@ static inline struct compat_timeval ns_to_compat_timeval(s64 nsec)
+ 	return ctv;
+ }
+ 
++/*
++ * Kernel code should not call compat syscalls (i.e., compat_sys_xyzyyz())
++ * directly.  Instead, use one of the functions which work equivalently, such
++ * as the kcompat_sys_xyzyyz() functions prototyped below.
++ */
++
++int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz,
++		     struct compat_statfs64 __user * buf);
++int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz,
++			  struct compat_statfs64 __user * buf);
++
+ #else /* !CONFIG_COMPAT */
+ 
+ #define is_compat_task() (0)
 -- 
-2.17.1
+2.11.0
