@@ -1,93 +1,38 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 1 Jun 2018 10:14:41 -0600
-Subject: [RFC PATCH 1/8] dts: binding: coresight: Document graph bindings
-In-Reply-To: <1527858967-16047-2-git-send-email-suzuki.poulose@arm.com>
-References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
- <1527858967-16047-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180601161441.GA9838@xps15>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Jun 2018 09:12:06 -0700
+Subject: [PATCH v2] ARM: avoid Cortex-A9 livelock on tight dmb loops
+In-Reply-To: <20180601155502.GB6920@n2100.armlinux.org.uk>
+References: <E1fOhn6-00008E-3b@rmk-PC.armlinux.org.uk>
+ <20180601153512.GV5705@atomide.com>
+ <20180601155502.GB6920@n2100.armlinux.org.uk>
+Message-ID: <20180601161206.GW5705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 02:16:00PM +0100, Suzuki K Poulose wrote:
-> Before we updat the bindings, document the current graph bindings
-
-s/updat/update
-
-> and usage of additional properties.
+* Russell King - ARM Linux <linux@armlinux.org.uk> [180601 15:57]:
+> On Fri, Jun 01, 2018 at 08:35:12AM -0700, Tony Lindgren wrote:
+> > CONFIG_KERNEL_LZMA fails:
+> > 
+> > Try gzip decompression.
+> > Try LZMA decompression.
+> > lzma_decompress_file: read on /boot/zImage of 65536 bytes failed
+> > kernel: 0xb6abb010 kernel_size: 0x43d0f0
+> > MEMORY RANGES
+> > 0000000080000000-00000000bfdfffff (0)
+> > zImage header: 0x016f2818 0x00000000 0x0043d0f0
+> > zImage size 0x43d0f0, file size 0x43d0f0
+> > Reserved memory ranges
 > 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  .../devicetree/bindings/arm/coresight.txt          | 28 ++++++++++++++++++----
->  1 file changed, 24 insertions(+), 4 deletions(-)
+> This looks like an old kexec binary as it's missing the output from:
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index 15ac8e8..bd36e40 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -52,9 +52,7 @@ its hardware characteristcs.
->  	  clocks the core of that coresight component. The latter clock
->  	  is optional.
->  
-> -	* port or ports: The representation of the component's port
-> -	  layout using the generic DT graph presentation found in
-> -	  "bindings/graph.txt".
-> +	* port or ports: see "Graph bindings for Coresight" below
->  
->  * Additional required properties for System Trace Macrocells (STM):
->  	* reg: along with the physical base address and length of the register
-> @@ -71,7 +69,7 @@ its hardware characteristcs.
->  	  AMBA markee):
->  		- "arm,coresight-replicator"
->  
-> -	* port or ports: same as above.
-> +	* port or ports: see "Graph bindings for Coresight" below.
->  
->  * Optional properties for ETM/PTMs:
->  
-> @@ -86,6 +84,28 @@ its hardware characteristcs.
->  	* arm,buffer-size: size of contiguous buffer space for TMC ETR
->  	 (embedded trace router)
->  
-> +Graph bindings for Coresight
-> +-------------------------------
-> +
-> +Coresight components are interconnected to create a data path for the flow of
-> +trace data generated from the "sources" to their collection points "sink". Each
-
-Over 80 characters.
-
-> +coresight component must describe the "input" and "output" connections.
-> +The connections must be described via generic DT graph bindings as described
-> +by the "bindings/graph.txt", where each "port" along with an "endpoint" component
-
-Same here.
-
-> +represents a hardware port and the connection.
-> +
-> +Since it is possible to have multiple connections for any coresight component with
-
-And here.
-
-> +a specific direction of data flow, each connection must define the following
-> +properties to uniquely identify the connection details.
-> +
-> + * Direction of the data flow w.r.t the component :
-> +   Each input port must have the following property defined at the "endpoint"
-> +   for the port.
-> +	"slave-mode"
-> +
-> + * Hardware Port number at the component:
-> +     -  The hardware port number is assumed to be the address of the "port" component.
-
-And here.
-
-Moveover this patches doesn't apply to my next tree. 
-
-> +
->  
->  Example:
->  
-> -- 
-> 2.7.4
+>         dbgprintf("zImage requires 0x%08llx bytes\n", (unsigned long long)len);
 > 
+> Please can you test with the current version - the official
+> repository should now be up to date with my version.  Thanks.
+
+OK great. After updating kexec-tools to latest git veresion LZMA
+crashkernel now also boots for me :)
+
+Regards,
+
+Tony
