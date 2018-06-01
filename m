@@ -1,41 +1,73 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  1 Jun 2018 12:08:22 +0100
-Subject: [PATCH] coresight: Fix check in
- coresight_tmc_etr_buf_insert_barrier_packet
-Message-ID: <1527851302-5843-1-git-send-email-suzuki.poulose@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 1 Jun 2018 13:09:44 +0200
+Subject: [PATCH 04/13] staging: vc04_services: no need to check debugfs
+ return values
+In-Reply-To: <874lioorbj.fsf@anholt.net>
+References: <20180529142947.3250-1-gregkh@linuxfoundation.org>
+ <20180529142947.3250-4-gregkh@linuxfoundation.org>
+ <874lioorbj.fsf@anholt.net>
+Message-ID: <20180601110944.GA1575@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We request for "CORESIGHT_BARRIER_PKT_SIZE" length and we should
-be happy when we get that size.
+On Wed, May 30, 2018 at 12:51:12PM -0700, Eric Anholt wrote:
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+> 
+> > When calling debugfs functions, there is no need to ever check the
+> > return value.  The function can work or not, but the code logic should
+> > never do something different based on this.
+> >
+> > Clean up the vchiq_arm code by not caring about the value of debugfs
+> > calls.  This ends up removing a number of lines of code that are not
+> > needed.
+> >
+> > Cc: Eric Anholt <eric@anholt.net>
+> > Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> > Cc: Kees Cook <keescook@chromium.org>
+> > Cc: Dan Carpenter <dan.carpenter@oracle.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Keerthi Reddy <keerthigd4990@gmail.com>
+> > Cc: linux-rpi-kernel at lists.infradead.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > ---
+> >  .../interface/vchiq_arm/vchiq_arm.c           | 13 +---
+> >  .../interface/vchiq_arm/vchiq_debugfs.c       | 72 +++----------------
+> >  .../interface/vchiq_arm/vchiq_debugfs.h       |  4 +-
+> >  3 files changed, 15 insertions(+), 74 deletions(-)
+> >
+> 
+> > diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+> > index 766b4fe5f32c..103fec955e2c 100644
+> > --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+> > +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+> 
+> > @@ -314,31 +284,13 @@ void vchiq_debugfs_remove_instance(VCHIQ_INSTANCE_T instance)
+> >  	debugfs_remove_recursive(node->dentry);
+> >  }
+> >  
+> > -int vchiq_debugfs_init(void)
+> > +void vchiq_debugfs_init(void)
+> >  {
+> > -	BUG_ON(debugfs_info.vchiq_cfg_dir != NULL);
+> > -
+> >  	debugfs_info.vchiq_cfg_dir = debugfs_create_dir("vchiq", NULL);
+> > -	if (debugfs_info.vchiq_cfg_dir == NULL)
+> > -		goto fail;
+> > -
+> 
+> I think now that we allow successful probe with this value NULL, module
+> remove could vchiq_debugfs_deinit() -> vchiq_debugfs_top() -> BUG_ON().
+> I think the right solution would be to just drop that BUG_ON().  With
+> that change (and probably just garbage-collecting that function), this
+> will be enthusiastically:
+> 
+> Reviewed-by: Eric Anholt <eric@anholt.net>
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
+Much better idea, I just did that and will send out the patch series
+now.  The end result is nicer:
+ 3 files changed, 42 insertions(+), 140 deletions(-)
 
-Mathieu,
+thanks for the suggestion.
 
-Please could you pull this patch, if you are happy with it ?
-This fixes a problem in the ETR buf series, which I just
-noticed while testing the part2 of the series.
-
-Suzuki
----
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index e2bcef3..c736250 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -862,7 +862,7 @@ tmc_etr_buf_insert_barrier_packet(struct etr_buf *etr_buf, u64 offset)
- 
- 	len = tmc_etr_buf_get_data(etr_buf, offset,
- 				   CORESIGHT_BARRIER_PKT_SIZE, &bufp);
--	if (WARN_ON(len <= CORESIGHT_BARRIER_PKT_SIZE))
-+	if (WARN_ON(len < CORESIGHT_BARRIER_PKT_SIZE))
- 		return -EINVAL;
- 	coresight_insert_barrier_packet(bufp);
- 	return offset + CORESIGHT_BARRIER_PKT_SIZE;
--- 
-2.7.4
+greg k-h
