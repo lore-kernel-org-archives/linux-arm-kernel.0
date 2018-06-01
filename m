@@ -1,80 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:36 +0100
-Subject: [PATCH 22/33] KVM: arm/arm64: Document
- KVM_VGIC_V3_ADDR_TYPE_REDIST_REGION
+Date: Fri,  1 Jun 2018 16:27:33 +0100
+Subject: [PATCH 19/33] KVM: arm64: Fold redundant exit code checks out of
+ fixup_guest_exit()
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-23-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+From: Dave Martin <Dave.Martin@arm.com>
 
-We introduce a new KVM_VGIC_V3_ADDR_TYPE_REDIST_REGION attribute in
-KVM_DEV_ARM_VGIC_GRP_ADDR group. It allows userspace to provide the
-base address and size of a redistributor region
+The entire tail of fixup_guest_exit() is contained in if statements
+of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
+we can check just once and bail out of the function early, allowing
+the remaining if conditions to be simplified.
 
-Compared to KVM_VGIC_V3_ADDR_TYPE_REDIST, this new attribute allows
-to declare several separate redistributor regions.
+The only awkward case is where *exit_code is changed to
+ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
+interface access: in that case, the GICv3 trap handling code is
+skipped using a goto.  This avoids pointlessly evaluating the
+static branch check for the GICv3 case, even though we can't have
+vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
+unless we have a GICv3 and GICv2 on the host: that sounds stupid,
+but I haven't satisfied myself that it can't happen.
 
-So the whole redist space does not need to be contiguous anymore.
+No functional change.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../virtual/kvm/devices/arm-vgic-v3.txt       | 30 +++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-index 9293b45abdb9..2408ab720ef7 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-@@ -27,16 +27,42 @@ Groups:
-       VCPU and all of the redistributor pages are contiguous.
-       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-       This address needs to be 64K aligned.
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 18d0faa8c806..4fbee9502162 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -387,11 +387,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 	 * same PC once the SError has been injected, and replay the
+ 	 * trapping instruction.
+ 	 */
+-	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
++	if (*exit_code != ARM_EXCEPTION_TRAP)
++		goto exit;
 +
-+    KVM_VGIC_V3_ADDR_TYPE_REDIST_REGION (rw, 64-bit)
-+      The attribute data pointed to by kvm_device_attr.addr is a __u64 value:
-+      bits:     | 63   ....  52  |  51   ....   16 | 15 - 12  |11 - 0
-+      values:   |     count      |       base      |  flags   | index
-+      - index encodes the unique redistributor region index
-+      - flags: reserved for future use, currently 0
-+      - base field encodes bits [51:16] of the guest physical base address
-+        of the first redistributor in the region.
-+      - count encodes the number of redistributors in the region. Must be
-+        greater than 0.
-+      There are two 64K pages for each redistributor in the region and
-+      redistributors are laid out contiguously within the region. Regions
-+      are filled with redistributors in the index order. The sum of all
-+      region count fields must be greater than or equal to the number of
-+      VCPUs. Redistributor regions must be registered in the incremental
-+      index order, starting from index 0.
-+      The characteristics of a specific redistributor region can be read
-+      by presetting the index field in the attr data.
-+      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+
-+  It is invalid to mix calls with KVM_VGIC_V3_ADDR_TYPE_REDIST and
-+  KVM_VGIC_V3_ADDR_TYPE_REDIST_REGION attributes.
-+
-   Errors:
-     -E2BIG:  Address outside of addressable IPA range
--    -EINVAL: Incorrectly aligned address
-+    -EINVAL: Incorrectly aligned address, bad redistributor region
-+             count/index, mixed redistributor region attribute usage
-     -EEXIST: Address already configured
-+    -ENOENT: Attempt to read the characteristics of a non existing
-+             redistributor region
-     -ENXIO:  The group or attribute is unknown/unsupported for this device
-              or hardware support is missing.
-     -EFAULT: Invalid user pointer for attr->addr.
++	if (!__populate_fault_info(vcpu))
+ 		return true;
  
+-	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+-	    *exit_code == ARM_EXCEPTION_TRAP) {
++	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
+ 		bool valid;
  
--
-   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-   KVM_DEV_ARM_VGIC_GRP_REDIST_REGS
-   Attributes:
+ 		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
+@@ -417,11 +419,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+ 				*exit_code = ARM_EXCEPTION_EL1_SERROR;
+ 			}
++
++			goto exit;
+ 		}
+ 	}
+ 
+ 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
+-	    *exit_code == ARM_EXCEPTION_TRAP &&
+ 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
+ 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+ 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+@@ -430,6 +433,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 			return true;
+ 	}
+ 
++exit:
+ 	/* Return to the host kernel and handle the exit */
+ 	return false;
+ }
 -- 
 2.17.1
