@@ -1,112 +1,144 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 1 Jun 2018 09:44:33 +0100
-Subject: [PATCH v5 2/2] arm64: signal: Report signal frame size to
- userspace via auxv
-In-Reply-To: <20180531172049.GA28915@arm.com>
-References: <1527261428-6662-1-git-send-email-Dave.Martin@arm.com>
- <1527261428-6662-3-git-send-email-Dave.Martin@arm.com>
- <20180529204230.GG591@arm.com>
- <20180530104853.GB22983@e103592.cambridge.arm.com>
- <20180531172049.GA28915@arm.com>
-Message-ID: <20180601084429.GC22983@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Jun 2018 10:03:22 +0100
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <1527799054-29592-1-git-send-email-rokhanna@nvidia.com>
+References: <1527799054-29592-1-git-send-email-rokhanna@nvidia.com>
+Message-ID: <20180601090321.sy3t64rtps7qn2nx@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 06:20:49PM +0100, Will Deacon wrote:
-> On Wed, May 30, 2018 at 11:48:59AM +0100, Dave Martin wrote:
-> > On Tue, May 29, 2018 at 09:42:31PM +0100, Will Deacon wrote:
-> > > On Fri, May 25, 2018 at 04:17:08PM +0100, Dave Martin wrote:
-> > > > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> > > > index fac1c4d..8cf112b 100644
-> > > > --- a/arch/arm64/include/asm/elf.h
-> > > > +++ b/arch/arm64/include/asm/elf.h
-> > > > @@ -121,6 +121,9 @@
-> > > >  
-> > > >  #ifndef __ASSEMBLY__
-> > > >  
-> > > > +#include <linux/bug.h>
-> > > > +#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-> > > > +
-> > > >  typedef unsigned long elf_greg_t;
-> > > >  
-> > > >  #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
-> > > > @@ -148,6 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-> > > >  do {									\
-> > > >  	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-> > > >  		    (elf_addr_t)current->mm->context.vdso);		\
-> > > > +									\
-> > > > +	/*								\
-> > > > +	 * Should always be nonzero unless there's a kernel bug.	\
-> > > > +	 * If we haven't determined a sensible value to give to		\
-> > > > +	 * userspace, omit the entry:					\
-> > > > +	 */								\
-> > > > +	if (likely(signal_minsigstksz))					\
-> > > > +		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
-> > > >  } while (0)
-> > > 
-> > > I think this is the desired behaviour, but now I'm worried that we're forced
-> > > to have AT_VECTOR_SIZE_ARCH defined as 2 and, whilst you're correct that the
-> > > ELF loader deals with this gracefuly, the FDPIC loader looks a lot less
-> > > robust (in particular, my reading is that it decrements the stack pointer
-> > > and then pushes these entries in reverse order by overloading NEW_AUX_ENT).
-> > 
-> > config BINFMT_ELF_FDPIC
-> > 	/* ... */
-> > 	depends on (ARM || (SUPERH32 & !MMU) || C6X)
+Hi,
+
+As a general thing, could you please add a version number to patches in future?
+i.e. this should be PATCHv4.
+
+It really helps keeping track of patches, distinguishing versions, etc.
+
+On Thu, May 31, 2018 at 01:37:34PM -0700, Rohit Khanna wrote:
+> In the current implementation,  __apply_alternatives patches
+> flush_icache_range and then executes it without invalidating the icache.
+> Thus, icache can contain some of the old instructions for
+> flush_icache_range. This can cause unpredictable behavior as during
+> execution we can get a mix of old and new instructions for
+> flush_icache_range.
 > 
-> Ok, that's a relief. The checkpoint stuff is still a bit worrying though
-> (prctl_set_mm_map).
-
-This looks like a non-issue to me, although stuffing the gap with
-AT_IGNORE reduces the scope for unexpected consequences here.
-
-Apart from avoiding buffer overruns in the kernel when stashing the
-data, I don't really see why we care what garbage userspace puts in the
-auxv that it gives to itself.  It can be invalid in many ways that the
-code doesn't check, such as a bad pointer for AT_PLATFORM etc. etc.
-
-> > The FDPIC loader seems to assume it's 32-bit only and also looks broken
-> > with regard to auxv:
-> > 
-> > 	/* force 16 byte _final_ alignment here for generality */
-> > #define DLINFO_ITEMS 15
-> > 
-> > /* ... */
-> > 
-> > 		nr = 0;
-> > 		csp -= 2 * sizeof(unsigned long);
-> > 		NEW_AUX_ENT(AT_EXECFD, ...);
-> > 	}
-> > 
-> > /* ... */
-> > 
-> > 	csp -= DLINFO_ITEMS * 2 * sizeof(unsigned long);
-> > 	NEW_AUX_ENT(AT_HWCAP,   ELF_HWCAP);
-> > #ifdef ELF_HWCAP2
-> > 	NEW_AUX_ENT(AT_HWCAP2,  ELF_HWCAP2);
-> > #endif
-> > 	/* 14 more NEW_AUX_ENT() */
-> > 
-> > 
-> > Looks like commit 2171364d1a92 ("powerpc: Add HWCAP2 aux entry") added
-> > HWCAP2 without ensuring that space is reserved.
-> > 
-> > I can try to draft a patch to handle the auxv in a more sane way for
-> > FDPIC, but either way I don't see that it should be relevant to arm64.
-> > 
-> > 
-> > AT_IGNORE feels like a bit of a fig leaf, but it's harmless enough.  I'm
-> > happy to add it if you prefer.
+> This patch :
 > 
-> The only userspace code I could find that uses it is something that prints
-> out auxv, but I'd still better spitting it out so we don't have to worry
-> about being smaller than AT_VECTOR_SIZE_ARCH.
+> 1. Adds a new function clean_dcache_range_nopatch for flushing kernel
+> memory range. This function uses non hot-patched code and can be
+> safely used to flush cache during code patching.
+> 
+> 2. Modifies __apply_alternatives so that it uses
+> clean_dcache_range_nopatch to flush the cache range after patching code.
+> 
+> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h |  3 +++
+>  arch/arm64/kernel/alternative.c | 37 ++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 39 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 6171178075dc..9d1aee7c9aba 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -617,6 +617,9 @@
+>  #define MVFR1_FPDNAN_SHIFT		4
+>  #define MVFR1_FPFTZ_SHIFT		0
+>  
+> +/* SYS_CTR_EL0 */
+> +#define SYS_CTR_ISIZE_SHIFT		0
+> +#define SYS_CTR_DSIZE_SHIFT		16
 
-OK, I'll add AT_IGNORE and respin.
+We already have CTR_DMINLINE_SHIFT in <asm/cache.h>
 
-I wondered whether we can just get rid of AT_VECTOR_SIZE{,_ARCH}, since
-they're just asking to be wrong in any case.  But that would be a battle
-for another day.
+Can we please add CTR_IMINLIN_SHIFT there too?
 
-Cheers
----Dave
+Maybe those should be moved into sysreg.h, but that can be a separate cleanup.
+
+>  #define ID_AA64MMFR0_TGRAN4_SHIFT	28
+>  #define ID_AA64MMFR0_TGRAN64_SHIFT	24
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index 5c4bce4ac381..6b8c5438b37b 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -122,6 +122,41 @@ static void patch_alternative(struct alt_instr *alt,
+>  	}
+>  }
+>  
+> +/* This is used for flushing kernel memory range after
+> + * __apply_alternatives has patched kernel code
+> + */
+> +static void clean_dcache_range_nopatch(void *start, void *end)
+> +{
+> +	u64 d_start, i_start, d_size, i_size, ctr_el0;
+
+I don't think we need separate i_start and d_start variables. A 'start' or
+'cur' variable could be used for both.
+
+> +
+> +	/* use sanitised value of ctr_el0 rather than raw value from CPU */
+> +	ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
+> +	/* size in bytes */
+> +	d_size = cpuid_feature_extract_unsigned_field(ctr_el0,
+> +			SYS_CTR_DSIZE_SHIFT);
+> +	i_size = cpuid_feature_extract_unsigned_field(ctr_el0,
+> +			SYS_CTR_ISIZE_SHIFT);
+
+This isn't the size in bytes. Each is log2 the number of (4-byte) words.
+
+i.e. the size in bytes is (xMinLine << 2).
+
+> +
+> +	d_start = (u64)start & ~(d_size - 1);
+> +	while (d_start <= (u64)end) {
+> +		/* Use civac instead of cvau. This is required
+> +		 * due to ARM errata 826319, 827319, 824069,
+> +		 * 819472 on A53
+> +		 */
+> +		asm volatile("dc civac, %0" : : "r" (d_start));
+
+Either this needs a memory clobber, or we need barrier() first, to ensure that
+the compiler doesn't re-order this against some of the patching code, however
+unlikely that may be.
+
+> +		d_start += d_size;
+> +	}
+
+The loop can be simplified to:
+
+	do {
+		asm ( ... );
+	} while (d_start += d_size, d_start < (u64)end)
+
+> +	dsb(ish);
+> +
+> +	i_start = (u64)start & ~(i_size - 1);
+> +	while (i_start <= (u64)end) {
+> +		asm volatile("ic ivau, %0" : : "r" (i_start));
+> +		i_start += i_size;
+> +	}
+
+Likewise here.
+
+Thanks,
+Mark.
+
+> +	dsb(ish);
+> +	isb();
+> +}
+> +
+>  static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>  {
+>  	struct alt_instr *alt;
+> @@ -155,7 +190,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>  
+>  		alt_cb(alt, origptr, updptr, nr_inst);
+>  
+> -		flush_icache_range((uintptr_t)origptr,
+> +		clean_dcache_range_nopatch((uintptr_t)origptr,
+>  				   (uintptr_t)(origptr + nr_inst));
+>  	}
+>  }
+> -- 
+> 2.1.4
+> 
