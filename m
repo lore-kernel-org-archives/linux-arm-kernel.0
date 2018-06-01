@@ -1,172 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  1 Jun 2018 12:24:29 +0100
-Subject: [PATCHv2 07/19] arm64: remove sigreturn wrappers
+Date: Fri,  1 Jun 2018 12:24:35 +0100
+Subject: [PATCHv2 13/19] kernel: add ksys_personality()
 In-Reply-To: <20180601112441.37810-1-mark.rutland@arm.com>
 References: <20180601112441.37810-1-mark.rutland@arm.com>
-Message-ID: <20180601112441.37810-8-mark.rutland@arm.com>
+Message-ID: <20180601112441.37810-14-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 sigreturn* syscall handlers are non-standard. Rather than
-taking a number of user parameters in registers as per the AAPCS,
-they expect the pt_regs as their sole argument.
+Using this helper allows us to avoid the in-kernel call to the
+sys_personality() syscall. The ksys_ prefix denotes that this function
+is meant as a drop-in replacement for the syscall. In particular, it
+uses the same calling convention as sys_personality().
 
-To make this work, we override the syscall definitions to invoke
-wrappers written in assembly, which mov the SP into x0, and branch to
-their respective C functions.
+Since ksys_personality is trivial, it is implemented directly in
+<linux/syscalls.h>, as we do for ksys_close() and friends.
 
-On other architectures (such as x86), the sigreturn* functions take no
-argument and instead use current_pt_regs() to acquire the user
-registers. This requires less boilerplate code, and allows for other
-features such as interposing C code in this path.
-
-This patch takes the same approach for arm64.
+This helper is necessary to enable conversion of arm64's syscall
+handling to use pt_regs wrappers.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Tentatively-reviewed-by: Dave Martin <dave.martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
+Cc: Christoph Hellwig <hch@infradead.org>
+Cc: Dave Martin <dave.martin@arm.com>
+Cc: Dominik Brodowski <linux@dominikbrodowski.net>
 ---
- arch/arm64/include/asm/unistd32.h |  4 ++--
- arch/arm64/kernel/entry.S         |  8 --------
- arch/arm64/kernel/entry32.S       | 10 ----------
- arch/arm64/kernel/signal.c        |  3 ++-
- arch/arm64/kernel/signal32.c      |  6 ++++--
- arch/arm64/kernel/sys.c           |  3 +--
- arch/arm64/kernel/sys32.c         |  4 ++--
- 7 files changed, 11 insertions(+), 27 deletions(-)
+ include/linux/syscalls.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index ef292160748c..ab95554b1734 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -260,7 +260,7 @@ __SYSCALL(117, sys_ni_syscall)
- #define __NR_fsync 118
- __SYSCALL(__NR_fsync, sys_fsync)
- #define __NR_sigreturn 119
--__SYSCALL(__NR_sigreturn, compat_sys_sigreturn_wrapper)
-+__SYSCALL(__NR_sigreturn, compat_sys_sigreturn)
- #define __NR_clone 120
- __SYSCALL(__NR_clone, sys_clone)
- #define __NR_setdomainname 121
-@@ -368,7 +368,7 @@ __SYSCALL(__NR_getresgid, sys_getresgid16)
- #define __NR_prctl 172
- __SYSCALL(__NR_prctl, sys_prctl)
- #define __NR_rt_sigreturn 173
--__SYSCALL(__NR_rt_sigreturn, compat_sys_rt_sigreturn_wrapper)
-+__SYSCALL(__NR_rt_sigreturn, compat_sys_rt_sigreturn)
- #define __NR_rt_sigaction 174
- __SYSCALL(__NR_rt_sigaction, compat_sys_rt_sigaction)
- #define __NR_rt_sigprocmask 175
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 28ad8799406f..62f2876f9c63 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1138,14 +1138,6 @@ __entry_tramp_data_start:
- #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 70fcda1a9049..652e166deb64 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -79,6 +79,7 @@ union bpf_attr;
+ #include <linux/unistd.h>
+ #include <linux/quota.h>
+ #include <linux/key.h>
++#include <linux/personality.h>
+ #include <trace/syscall.h>
  
- /*
-- * Special system call wrappers.
-- */
--ENTRY(sys_rt_sigreturn_wrapper)
--	mov	x0, sp
--	b	sys_rt_sigreturn
--ENDPROC(sys_rt_sigreturn_wrapper)
--
--/*
-  * Register switch for AArch64. The callee-saved registers need to be saved
-  * and restored. On entry:
-  *   x0 = previous task_struct (must be preserved across the switch)
-diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
-index f332d5d1f6b4..f9461696dde4 100644
---- a/arch/arm64/kernel/entry32.S
-+++ b/arch/arm64/kernel/entry32.S
-@@ -30,16 +30,6 @@
-  * System call wrappers for the AArch32 compatibility layer.
-  */
- 
--ENTRY(compat_sys_sigreturn_wrapper)
--	mov	x0, sp
--	b	compat_sys_sigreturn
--ENDPROC(compat_sys_sigreturn_wrapper)
--
--ENTRY(compat_sys_rt_sigreturn_wrapper)
--	mov	x0, sp
--	b	compat_sys_rt_sigreturn
--ENDPROC(compat_sys_rt_sigreturn_wrapper)
--
- ENTRY(compat_sys_statfs64_wrapper)
- 	mov	w3, #84
- 	cmp	w1, #88
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 8e624fec4707..caa7a68cf2d2 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -538,8 +538,9 @@ static int restore_sigframe(struct pt_regs *regs,
- 	return err;
+ #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
+@@ -1268,4 +1269,14 @@ static inline long ksys_truncate(const char __user *pathname, loff_t length)
+ 	return do_sys_truncate(pathname, length);
  }
  
--asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
-+asmlinkage long sys_rt_sigreturn(void)
- {
-+	struct pt_regs *regs = current_pt_regs();
- 	struct rt_sigframe __user *frame;
- 
- 	/* Always make any pending restarted system calls return -EINTR */
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 77b91f478995..cb10588a7cb2 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -282,8 +282,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	return err;
- }
- 
--asmlinkage int compat_sys_sigreturn(struct pt_regs *regs)
-+asmlinkage int compat_sys_sigreturn(void)
- {
-+	struct pt_regs *regs = current_pt_regs();
- 	struct compat_sigframe __user *frame;
- 
- 	/* Always make any pending restarted system calls return -EINTR */
-@@ -312,8 +313,9 @@ asmlinkage int compat_sys_sigreturn(struct pt_regs *regs)
- 	return 0;
- }
- 
--asmlinkage int compat_sys_rt_sigreturn(struct pt_regs *regs)
-+asmlinkage int compat_sys_rt_sigreturn(void)
- {
-+	struct pt_regs *regs = current_pt_regs();
- 	struct compat_rt_sigframe __user *frame;
- 
- 	/* Always make any pending restarted system calls return -EINTR */
-diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-index 72981bae10eb..31045f3fed92 100644
---- a/arch/arm64/kernel/sys.c
-+++ b/arch/arm64/kernel/sys.c
-@@ -48,8 +48,7 @@ SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
- /*
-  * Wrappers to pass the pt_regs argument.
-  */
--asmlinkage long sys_rt_sigreturn_wrapper(void);
--#define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
-+asmlinkage long sys_rt_sigreturn(void);
- #define sys_personality		sys_arm64_personality
- 
- #undef __SYSCALL
-diff --git a/arch/arm64/kernel/sys32.c b/arch/arm64/kernel/sys32.c
-index a40b1343b819..1ef103c95410 100644
---- a/arch/arm64/kernel/sys32.c
-+++ b/arch/arm64/kernel/sys32.c
-@@ -25,8 +25,8 @@
- #include <linux/compiler.h>
- #include <linux/syscalls.h>
- 
--asmlinkage long compat_sys_sigreturn_wrapper(void);
--asmlinkage long compat_sys_rt_sigreturn_wrapper(void);
-+asmlinkage long compat_sys_sigreturn(void);
-+asmlinkage long compat_sys_rt_sigreturn(void);
- asmlinkage long compat_sys_statfs64_wrapper(void);
- asmlinkage long compat_sys_fstatfs64_wrapper(void);
- asmlinkage long compat_sys_pread64_wrapper(void);
++static inline unsigned int ksys_personality(unsigned int personality)
++{
++	unsigned int old = current->personality;
++
++	if (personality != 0xffffffff)
++		set_personality(personality);
++
++	return old;
++}
++
+ #endif
 -- 
 2.11.0
