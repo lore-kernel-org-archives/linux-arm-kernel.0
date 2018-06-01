@@ -1,35 +1,41 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 1 Jun 2018 14:04:03 +0300
-Subject: [PATCH 0/4] lib/vsprintf: Remove atomic-unsafe support for printk
- format %pCr
-In-Reply-To: <CA+55aFxHHSRnDbbNGq6SwNAwEt0EhX15n_pNqon3MzGYJgMJmA@mail.gmail.com>
-References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
- <CA+55aFxHHSRnDbbNGq6SwNAwEt0EhX15n_pNqon3MzGYJgMJmA@mail.gmail.com>
-Message-ID: <CAHp75VeCmeBkUfnmx2F-czHCVVDm32WiGzvih8xozPEdv8P_Hw@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  1 Jun 2018 12:08:22 +0100
+Subject: [PATCH] coresight: Fix check in
+ coresight_tmc_etr_buf_insert_barrier_packet
+Message-ID: <1527851302-5843-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 1, 2018 at 2:00 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Fri, Jun 1, 2018 at 4:29 AM Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
->>
->> This patch series:
->>   - Changes all existing users of "%pCr" to print the result of
->>     clk_get_rate() directly, which is safe as they all do this in task
->>     context only,
->>   - Removes support for the "%pCr" printk format.
->
-> Looks good to me.
->
-> What tree will this go through? The normal printk one? Just checking
-> that this doesn't end up falling through the cracks because nobody
-> knows who would take it...
+We request for "CORESIGHT_BARRIER_PKT_SIZE" length and we should
+be happy when we get that size.
 
-We discussed few month before with Petr that he would take care of the
-patches against vsprintf.c.
-I think this is the case here.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
 
+Mathieu,
+
+Please could you pull this patch, if you are happy with it ?
+This fixes a problem in the ETR buf series, which I just
+noticed while testing the part2 of the series.
+
+Suzuki
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index e2bcef3..c736250 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -862,7 +862,7 @@ tmc_etr_buf_insert_barrier_packet(struct etr_buf *etr_buf, u64 offset)
+ 
+ 	len = tmc_etr_buf_get_data(etr_buf, offset,
+ 				   CORESIGHT_BARRIER_PKT_SIZE, &bufp);
+-	if (WARN_ON(len <= CORESIGHT_BARRIER_PKT_SIZE))
++	if (WARN_ON(len < CORESIGHT_BARRIER_PKT_SIZE))
+ 		return -EINVAL;
+ 	coresight_insert_barrier_packet(bufp);
+ 	return offset + CORESIGHT_BARRIER_PKT_SIZE;
 -- 
-With Best Regards,
-Andy Shevchenko
+2.7.4
