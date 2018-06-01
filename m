@@ -1,38 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Jun 2018 17:06:24 +0100
-Subject: [PATCH v2 4/9] openrisc: Don't pull in all of linux/bitops.h in
- asm/cmpxchg.h
+Date: Fri,  1 Jun 2018 17:06:21 +0100
+Subject: [PATCH v2 1/9] h8300: Don't include linux/kernel.h in asm/atomic.h
 In-Reply-To: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
 References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1527869189-31512-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1527869189-31512-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The openrisc implementation of asm/cmpxchg.h pulls in linux/bitops.h
-so that it can refer to BITS_PER_BYTE. It also transitively relies on
-this pulling in linux/compiler.h for READ_ONCE.
+linux/kernel.h isn't needed by asm/atomic.h and will result in circular
+dependencies when the asm-generic atomic bitops are built around the
+tomic_long_t interface.
 
-Replace the #include with linux/bits.h and linux/compiler.h
+Remove the broad include and replace it with linux/compiler.h for
+READ_ONCE etc and asm/irqflags.h for arch_local_irq_save etc.
 
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/openrisc/include/asm/cmpxchg.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/h8300/include/asm/atomic.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/openrisc/include/asm/cmpxchg.h b/arch/openrisc/include/asm/cmpxchg.h
-index d29f7db53906..f9cd43a39d72 100644
---- a/arch/openrisc/include/asm/cmpxchg.h
-+++ b/arch/openrisc/include/asm/cmpxchg.h
-@@ -16,8 +16,9 @@
- #ifndef __ASM_OPENRISC_CMPXCHG_H
- #define __ASM_OPENRISC_CMPXCHG_H
+diff --git a/arch/h8300/include/asm/atomic.h b/arch/h8300/include/asm/atomic.h
+index 941e7554e886..b174dec099bf 100644
+--- a/arch/h8300/include/asm/atomic.h
++++ b/arch/h8300/include/asm/atomic.h
+@@ -2,8 +2,10 @@
+ #ifndef __ARCH_H8300_ATOMIC__
+ #define __ARCH_H8300_ATOMIC__
  
-+#include  <linux/bits.h>
-+#include  <linux/compiler.h>
- #include  <linux/types.h>
--#include  <linux/bitops.h>
++#include <linux/compiler.h>
+ #include <linux/types.h>
+ #include <asm/cmpxchg.h>
++#include <asm/irqflags.h>
  
- #define __HAVE_ARCH_CMPXCHG 1
+ /*
+  * Atomic operations that C can't guarantee us.  Useful for
+@@ -15,8 +17,6 @@
+ #define atomic_read(v)		READ_ONCE((v)->counter)
+ #define atomic_set(v, i)	WRITE_ONCE(((v)->counter), (i))
  
+-#include <linux/kernel.h>
+-
+ #define ATOMIC_OP_RETURN(op, c_op)				\
+ static inline int atomic_##op##_return(int i, atomic_t *v)	\
+ {								\
 -- 
 2.1.4
