@@ -1,41 +1,101 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 1 Jun 2018 08:42:27 +0800
-Subject: [PATCH] PCI: mediatek: Add system pm support for MT2712
-In-Reply-To: <1527647736-19986-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1527647736-19986-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <201806010727.GOthd5OK%fengguang.wu@intel.com>
+From: djw@t-chip.com.cn (Levin)
+Date: Fri, 1 Jun 2018 10:05:24 +0800
+Subject: [PATCH v3 2/5] gpio: syscon: rockchip: add GPIO_MUTE support for
+ rk3328
+In-Reply-To: <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
+References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+ <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
+ <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
+Message-ID: <0d08ba26-77f2-6c42-8fb1-214aaf6085e9@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Honghui,
+Hi Rob,
 
-Thank you for the patch! Perhaps something to improve:
+On 2018-05-31 10:45 PM, Rob Herring wrote:
+> On Wed, May 30, 2018 at 10:27 PM,  <djw@t-chip.com.cn> wrote:
+>> From: Levin Du <djw@t-chip.com.cn>
+>>
+>> In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
+>> mute control, can also be used for general purpose. It is manipulated by
+>> the GRF_SOC_CON10 register.
+>>
+>> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+>>
+>> ---
+>>
+>> Changes in v3:
+>> - Change from general gpio-syscon to specific rk3328-gpio-mute
+>>
+>> Changes in v2:
+>> - Rename gpio_syscon10 to gpio_mute in doc
+>>
+>> Changes in v1:
+>> - Refactured for general gpio-syscon usage for Rockchip SoCs.
+>> - Add doc rockchip,gpio-syscon.txt
+>>
+>>   .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28 +++++++++++++++++++
+>>   drivers/gpio/gpio-syscon.c                         | 31 ++++++++++++++++++++++
+>>   2 files changed, 59 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>> new file mode 100644
+>> index 0000000..10bc632
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>> @@ -0,0 +1,28 @@
+>> +Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE pin.
+>> +
+>> +In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec mute
+>> +control, can also be used for general purpose. It is manipulated by the
+>> +GRF_SOC_CON10 register.
+>> +
+>> +Required properties:
+>> +- compatible: Should contain "rockchip,rk3328-gpio-mute".
+>> +- gpio-controller: Marks the device node as a gpio controller.
+>> +- #gpio-cells: Should be 2. The first cell is the pin number and
+>> +  the second cell is used to specify the gpio polarity:
+>> +    0 = Active high,
+>> +    1 = Active low.
+>> +
+>> +Example:
+>> +
+>> +       grf: syscon at ff100000 {
+>> +               compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
+>> +
+>> +               gpio_mute: gpio-mute {
+> Node names should be generic:
+>
+> gpio {
+>
+> This also means you can't add another GPIO node in the future and
+> you'll have to live with "rockchip,rk3328-gpio-mute" covering more
+> than 1 GPIO if you do need to add more GPIOs.
 
-[auto build test WARNING on pci/next]
-[also build test WARNING on next-20180531]
-[cannot apply to v4.17-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+As the first line describes, this GPIO controller is dedicated for the 
+GPIO_MUTE pin.
+There's only one GPIO pin in the GRF_SOC_CON10 register. Therefore the 
+gpio_mute
+name is proper IMHO.
 
-url:    https://github.com/0day-ci/linux/commits/honghui-zhang-mediatek-com/PCI-mediatek-Add-system-pm-support-for-MT2712/20180601-053217
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+>> +                       compatible = "rockchip,rk3328-gpio-mute";
+>> +                       gpio-controller;
+>> +                       #gpio-cells = <2>;
+>> +               };
+>> +       };
+>> +
+>> +Note: The gpio_mute node should be declared as the child of the GRF (General
+>> +Register File) node. The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
+> This is wrong because you should have 2 cells. The phandle doesn't
+> count as a cell.
+>
+> Rob
+>
+Thanks for pointing that out. So it should be:
+
+ ?? The GPIO_MUTE pin is referred to as <&gpio_mute 0 POLARITY>.
 
 
-sparse warnings: (new ones prefixed by >>)
-
-   drivers/pci/host/pcie-mediatek.c:463:40: sparse: incorrect type in argument 1 (different address spaces) @@    expected void volatile *address @@    got void [novoid volatile *address @@
-   drivers/pci/host/pcie-mediatek.c:463:40:    expected void volatile *address
-   drivers/pci/host/pcie-mediatek.c:463:40:    got void [noderef] <asn:2>*
-   drivers/pci/host/pcie-mediatek.c:586:44: sparse: incorrect type in argument 1 (different address spaces) @@    expected void volatile *address @@    got void [novoid volatile *address @@
-   drivers/pci/host/pcie-mediatek.c:586:44:    expected void volatile *address
-   drivers/pci/host/pcie-mediatek.c:586:44:    got void [noderef] <asn:2>*
->> drivers/pci/host/pcie-mediatek.c:1259:25: sparse: symbol 'mtk_pcie_pm_ops' was not declared. Should it be static?
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Thanks,
+Levin
