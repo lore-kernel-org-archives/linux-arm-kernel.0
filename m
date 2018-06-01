@@ -1,34 +1,30 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 1 Jun 2018 10:45:58 -0400
-Subject: [PATCH] PCI: move early dump functionality from x86 arch into the
- common code
-In-Reply-To: <1527654876-26716-1-git-send-email-okaya@codeaurora.org>
-References: <1527654876-26716-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <82d0852b-7c34-3fc2-85d8-c21b33aa8cf4@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Jun 2018 15:37:47 +0100
+Subject: [PATCHv2 0/4] arm64: SMCCC conduit cleanup
+In-Reply-To: <20180601142615.GU17671@n2100.armlinux.org.uk>
+References: <20180531173223.9668-1-mark.rutland@arm.com>
+ <20180601141410.e7dwvmqiqi2esbnk@armageddon.cambridge.arm.com>
+ <20180601142615.GU17671@n2100.armlinux.org.uk>
+Message-ID: <20180601143747.3axhy5a2kmxecfcs@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2018 12:34 AM, Sinan Kaya wrote:
-> Move early dump functionality into common code so that it is available for
-> all archtiectures. No need to carry arch specific reads around as the read
-> hooks are already initialized by the time pci_setup_device() is getting
-> called during scan.
+On Fri, Jun 01, 2018 at 03:26:16PM +0100, Russell King wrote:
+> On Fri, Jun 01, 2018 at 03:14:10PM +0100, Catalin Marinas wrote:
+> > On Thu, May 31, 2018 at 06:32:19PM +0100, Mark Rutland wrote:
+> > > Mark Rutland (4):
+> > >   arm/arm64: smccc/psci: add arm_smccc_1_1_get_conduit()
+> > >   arm64: errata: use arm_smccc_get_conduit()
+> > >   firmware/psci: use common SMCCC_CONDUIT_*
+> > >   firmware: arm_sdei: use common SMCCC_CONDUIT_*
+> > 
+> > Queued for 4.18. Thanks.
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  Documentation/admin-guide/kernel-parameters.txt |  2 +-
->  arch/x86/include/asm/pci-direct.h               |  5 ---
->  arch/x86/kernel/setup.c                         |  5 ---
->  arch/x86/pci/common.c                           |  4 --
->  arch/x86/pci/early.c                            | 50 -------------------------
->  drivers/pci/pci.c                               |  4 ++
->  drivers/pci/pci.h                               |  2 +-
->  drivers/pci/probe.c                             | 19 ++++++++++
->  8 files changed, 25 insertions(+), 66 deletions(-)
+> Have you considered how this affects the 32-bit ARM spectre stuff, which
+> makes use of the firmware PSCI interfaces for the workaround?
 
-Any feedback on the direction?
+No, I haven't. Thanks for the heads up. Talking to Mark, I think it's
+best if I drop this series for now.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Catalin
