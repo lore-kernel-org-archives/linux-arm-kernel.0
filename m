@@ -1,184 +1,303 @@
-From: rokhanna@nvidia.com (Rohit Khanna)
-Date: Fri, 1 Jun 2018 21:43:26 +0000
-Subject: [PATCH] arm64: alternative:flush cache with unpatched code
-In-Reply-To: <1527882765869.38555@nvidia.com>
-References: <1527799054-29592-1-git-send-email-rokhanna@nvidia.com>,
- <20180601090321.sy3t64rtps7qn2nx@salmiak>,<1527882765869.38555@nvidia.com>
-Message-ID: <1527889447350.37500@nvidia.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Sat, 2 Jun 2018 03:22:46 +0530
+Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
+In-Reply-To: <5c78224a-528d-7aa5-58ba-858681f03b6a@redhat.com>
+References: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+ <CAKv+Gu_KSDZyoLNUTAM2d769gQRfbtnGRTcU=8xOrYbmj2O4fA@mail.gmail.com>
+ <CACi5LpN=fSGhgNFOQysJWWzFarchFa1q2R_-J05uQs3wxrANRA@mail.gmail.com>
+ <5c78224a-528d-7aa5-58ba-858681f03b6a@redhat.com>
+Message-ID: <CACi5LpPMSUbyYAHi+SAEEj-cCXC6b2wgnkE0wrFpZEdL5wh4vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1 more comment inline.
-
-Thanks
-Rohit
-________________________________________
-From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org> on behalf of Rohit Khanna <rokhanna@nvidia.com>
-Sent: Friday, June 1, 2018 12:52 PM
-To: Mark Rutland
-Cc: Suzuki.Poulose at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; Bo Yan; robin.murphy at arm.com; Alexander Van Brunt; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] arm64: alternative:flush cache with unpatched code
-
-[RK] - Thanks for the comments Mark. Reply inlined.
-
-Thanks
-Rohit
-________________________________________
-From: Mark Rutland <mark.rutland@arm.com>
-Sent: Friday, June 1, 2018 2:03 AM
-To: Rohit Khanna
-Cc: catalin.marinas at arm.com; robin.murphy at arm.com; Suzuki.Poulose at arm.com; linux-arm-kernel at lists.infradead.org; Alexander Van Brunt; Bo Yan; will.deacon at arm.com
-Subject: Re: [PATCH] arm64: alternative:flush cache with unpatched code
-
-Hi,
-
-As a general thing, could you please add a version number to patches in future?
-i.e. this should be PATCHv4.
-
-It really helps keeping track of patches, distinguishing versions, etc.
-
-On Thu, May 31, 2018 at 01:37:34PM -0700, Rohit Khanna wrote:
-> In the current implementation,  __apply_alternatives patches
-> flush_icache_range and then executes it without invalidating the icache.
-> Thus, icache can contain some of the old instructions for
-> flush_icache_range. This can cause unpredictable behavior as during
-> execution we can get a mix of old and new instructions for
-> flush_icache_range.
+On Sat, Jun 2, 2018 at 3:11 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> On 05/31/2018 10:21 AM, Bhupesh Sharma wrote:
+>>
+>> Hi Ard,
+>>
+>> Sorry I was out for most of the day yesterday. Please see my responses
+>> inline.
+>>
+>> On Mon, May 28, 2018 at 12:16 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>>
+>>> On 27 May 2018 at 23:03, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+>>>>
+>>>> Hi ARM64 maintainers,
+>>>>
+>>>> I am confused about the PAGE_OFFSET value (or the start of the linear
+>>>> map) on a KASLR enabled ARM64 kernel that I am seeing on a board which
+>>>> supports a compatible EFI firmware (with EFI_RNG_PROTOCOL support).
+>>>>
+>>>> 1. 'arch/arm64/include/asm/memory.h' defines PAGE_OFFSET as:
+>>>>
+>>>> /*
+>>>>   * PAGE_OFFSET - the virtual address of the start of the linear map
+>>>> (top
+>>>>   *         (VA_BITS - 1))
+>>>>   */
+>>>> #define PAGE_OFFSET        (UL(0xffffffffffffffff) - \
+>>>>      (UL(1) << (VA_BITS - 1)) + 1)
+>>>>
+>>>> So for example on a platform with VA_BITS=48, we have:
+>>>> PAGE_OFFSET = 0xffff800000000000
+>>>>
+>>>> 2. However, for the KASLR case, we set the 'memstart_offset_seed ' to
+>>>> use the 16-bits of the 'kaslr-seed' to randomize the linear region in
+>>>> 'arch/arm64/kernel/kaslr.c' :
+>>>>
+>>>> u64 __init kaslr_early_init(u64 dt_phys)
+>>>> {
+>>>> <snip..>
+>>>>      /* use the top 16 bits to randomize the linear region */
+>>>>      memstart_offset_seed = seed >> 48;
+>>>> <snip..>
+>>>> }
+>>>>
+>>>> 3. Now, we use the 'memstart_offset_seed' value to randomize the
+>>>> 'memstart_addr' value in 'arch/arm64/mm/init.c':
+>>>>
+>>>> void __init arm64_memblock_init(void)
+>>>> {
+>>>> <snip..>
+>>>>
+>>>>      if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+>>>>          extern u16 memstart_offset_seed;
+>>>>          u64 range = linear_region_size -
+>>>>                  (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+>>>>
+>>>>          /*
+>>>>           * If the size of the linear region exceeds, by a sufficient
+>>>>           * margin, the size of the region that the available physical
+>>>>           * memory spans, randomize the linear region as well.
+>>>>           */
+>>>>          if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
+>>>> {
+>>>>              range = range / ARM64_MEMSTART_ALIGN + 1;
+>>>>              memstart_addr -= ARM64_MEMSTART_ALIGN *
+>>>>                       ((range * memstart_offset_seed) >> 16);
+>>>>          }
+>>>>      }
+>>>> <snip..>
+>>>> }
+>>>>
+>>>> 4. Since 'memstart_addr' indicates the start of physical RAM, we
+>>>> randomize the same on basis of 'memstart_offset_seed' value above.
+>>>> Also the 'memstart_addr' value is available in '/proc/kallsyms' and
+>>>> hence can be accessed by user-space applications to read the
+>>>> 'memstart_addr' value.
+>>>>
+>>>> 5. Now since the PAGE_OFFSET value is also used by several user space
+>>>> tools (for e.g. makedumpfile tool uses the same to determine the start
+>>>> of linear region and hence to read PT_NOTE fields from /proc/kcore), I
+>>>> am not sure how to read the randomized value of the same in the KASLR
+>>>> enabled case.
+>>>>
+>>>> 6. Reading the code further and adding some debug prints, it seems the
+>>>> 'memblock_start_of_DRAM()' value is more closer to the actual start of
+>>>> linear region rather than 'memstart_addr' and 'PAGE_OFFSET" in case of
+>>>> KASLR enabled kernel:
+>>>>
+>>>> [root at qualcomm-amberwing] # dmesg | grep -i "arm64_memblock_init" -A 5
+>>>>
+>>>> [    0.000000] inside arm64_memblock_init, memstart_addr =
+>>>> ffff976a00000000,
+>>>> linearstart_addr = ffffe89600200000, memblock_start_of_DRAM =
+>>>> ffffe89600200000,
+>>>> PHYS_OFFSET = ffff976a00000000, PAGE_OFFSET = ffff800000000000,
+>>>> KIMAGE_VADDR = ffff000008000000, kimage_vaddr = ffff20c2d7800000
+>>>>
+>>>> [root at qualcomm-amberwing] # dmesg | grep -i "Virtual kernel memory
+>>>> layout" -A 15
+>>>> [    0.000000] Virtual kernel memory layout:
+>>>> [    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000
+>>>> (   128 MB)
+>>>> [    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7bdfffff0000
+>>>> (126847 GB)
+>>>> [    0.000000]       .text : 0xffff20c2d7880000 - 0xffff20c2d8040000
+>>>> (  7936 KB)
+>>>> [    0.000000]     .rodata : 0xffff20c2d8040000 - 0xffff20c2d83a0000
+>>>> (  3456 KB)
+>>>> [    0.000000]       .init : 0xffff20c2d83a0000 - 0xffff20c2d8750000
+>>>> (  3776 KB)
+>>>> [    0.000000]       .data : 0xffff20c2d8750000 - 0xffff20c2d891b200
+>>>> (  1837 KB)
+>>>> [    0.000000]        .bss : 0xffff20c2d891b200 - 0xffff20c2d90a5198
+>>>> (  7720 KB)
+>>>> [    0.000000]     fixed   : 0xffff7fdffe790000 - 0xffff7fdffec00000
+>>>> (  4544 KB)
+>>>> [    0.000000]     PCI I/O : 0xffff7fdffee00000 - 0xffff7fdfffe00000
+>>>> (    16 MB)
+>>>> [    0.000000]     vmemmap : 0xffff7fe000000000 - 0xffff800000000000
+>>>> (   128 GB maximum)
+>>>> [    0.000000]               0xffff7ffa25800800 - 0xffff7ffa2b800000
+>>>> (    95 MB actual)
+>>>> [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
+>>>> ( 98302 MB)
+>>>>
+>>>> As one can see above, the 'memblock_start_of_DRAM()' value of
+>>>> 0xffffe89600200000 represents the start of linear region:
+>>>>
+>>>> [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
+>>>> ( 98302 MB)
+>>>>
+>>>> So, my question is to access the start of linear region (which was
+>>>> earlier determinable via PAGE_OFFSET macro), whether I should:
+>>>>
+>>>> - do some back-computation for the start of linear region from the
+>>>> 'memstart_addr' in user-space, or
+>>>> - use a new global variable in kernel which is assigned the value of
+>>>> memblock_start_of_DRAM()' and assign it to '/proc/kallsyms', so that
+>>>> it can be read by user-space tools, or
+>>>> - whether we should rather look at removing the PAGE_OFFSET usage from
+>>>> the kernel and replace it with a global variable instead which is
+>>>> properly updated for KASLR case as well.
+>>>>
+>>>> Kindly share your opinions on what can be a suitable solution in this
+>>>> case.
+>>>>
+>>>> Thanks for your help.
+>>>>
+>>>
+>>> Hello Bhupesh,
+>>>
+>>> Could you explain what the relevance is of PAGE_OFFSET to userland?
+>>> The only thing that should matter is where the actual linear mapping
+>>> of DRAM is, and I am not sure I understand why we care about where it
+>>> resides relative to the base of the linear region.
+>>
+>>
+>> Actually certain user-space tools like makedumpfile (which is used to
+>> generate and compress the vmcore) and crash-utility (which is used to
+>> debug the vmcore), rely on the PAGE_OFFSET value (which denotes the
+>> base of the linear map region) to determine virtual to physical
+>> mapping of the addresses lying in the linear region .
+>>
+>> One specific use case that I am working on at the moment is the
+>> makedumpfile '--mem-usage', which allows one to see the page numbers
+>> of current system (1st kernel) in different use (please see
+>> MAKEDUMPFILE(8) for more details).
+>>
+>> Using this we can know how many pages are dumpable when different
+>> dump_level is specified when invoking the makedumpfile.
+>>
+>> Normally, makedumpfile analyses the contents of '/proc/kcore' (while
+>> excluding the crashkernel range), and then calculates the page number
+>> of different kind per vmcoreinfo.
+>>
+>> For e.g. here is an output from my arm64 board (a non KASLR boot):
+>>
+>>      TYPE            PAGES                   EXCLUDABLE      DESCRIPTION
+>>
+>> ----------------------------------------------------------------------
+>>      ZERO            49524                   yes             Pages
+>> filled with zero
+>>      NON_PRI_CACHE   15143                   yes             Cache
+>> pages without private flag
+>>      PRI_CACHE       29147                   yes             Cache
+>> pages with private flag
+>>      USER            3684                    yes             User process
+>> pages
+>>      FREE            1450569                 yes             Free pages
+>>      KERN_DATA       14243                   no              Dumpable
+>> kernel data
+>>
+>>      page size:              65536
+>>      Total pages on system:  1562310
+>>      Total size on system:   102387548160     Byte
+>>
+>> This use case requires directly reading the '/proc/kcore' and the
+>> hence the PAGE_OFFSET value is used to determine the base address of
+>> the linear region, whose value is not static in case of KASLR boot.
+>>
+>> Another use-case is where the crash-utility uses the PAGE_OFFSET value
+>> to perform a virtual-to-physical conversion for the address lying in
+>> the linear region:
+>>
+>> ulong
+>> arm64_VTOP(ulong addr)
+>> {
+>>      if (machdep->flags & NEW_VMEMMAP) {
+>>          if (addr >= machdep->machspec->page_offset)
+>>              return machdep->machspec->phys_offset
+>>                  + (addr - machdep->machspec->page_offset);
+>>
+>> <..snip..>
+>> }
+>>
 >
-> This patch :
+> Another confusing concept is the rounded-up value of 'memstart_addr' in
+> 'arch/arm64/mm/init.c' when booting a non-KASLR_ kernel and when the value
+> of memblock_start_of_DRAM() < ARM64_MEMSTART_ALIGN:
 >
-> 1. Adds a new function clean_dcache_range_nopatch for flushing kernel
-> memory range. This function uses non hot-patched code and can be
-> safely used to flush cache during code patching.
+> void __init arm64_memblock_init(void)
+> {
 >
-> 2. Modifies __apply_alternatives so that it uses
-> clean_dcache_range_nopatch to flush the cache range after patching code.
+> <..snip..>
+>         /*
+>          * Select a suitable value for the base of physical memory.
+>          */
+>         memstart_addr = round_down(memblock_start_of_DRAM(),
+>                                    ARM64_MEMSTART_ALIGN);
+> <..snip..>
+> }
 >
-> Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
-> ---
->  arch/arm64/include/asm/sysreg.h |  3 +++
->  arch/arm64/kernel/alternative.c | 37 ++++++++++++++++++++++++++++++++++++-
->  2 files changed, 39 insertions(+), 1 deletion(-)
+> For example, let's consider a case (which I see on my qualcomm board) where
+> memblock_start_of_DRAM() = 0x200000 and ARM64_MEMSTART_ALIGN = 0x40000000 (I
+> am using VA_BITS = 48 and a 64K page size), in this case
+> memstart_addr is calculated at 0, as the round_down results in a value of 0.
 >
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 6171178075dc..9d1aee7c9aba 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -617,6 +617,9 @@
->  #define MVFR1_FPDNAN_SHIFT           4
->  #define MVFR1_FPFTZ_SHIFT            0
+> This is in contrast with the definition of the 'memblock_start_of_DRAM':
 >
-> +/* SYS_CTR_EL0 */
-> +#define SYS_CTR_ISIZE_SHIFT          0
-> +#define SYS_CTR_DSIZE_SHIFT          16
-
-We already have CTR_DMINLINE_SHIFT in <asm/cache.h>
-
-Can we please add CTR_IMINLIN_SHIFT there too?
-
-Maybe those should be moved into sysreg.h, but that can be a separate cleanup.
-
-[RK] -  <asm/cache.h> doesnt contain CTR_DMINLINE_SHIFT.
-[RK ] - Sorry, I was looking at kernel-4.14 and couldnt find it there. I can find it in linux-next repo.
-
->  #define ID_AA64MMFR0_TGRAN4_SHIFT    28
->  #define ID_AA64MMFR0_TGRAN64_SHIFT   24
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index 5c4bce4ac381..6b8c5438b37b 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -122,6 +122,41 @@ static void patch_alternative(struct alt_instr *alt,
->       }
->  }
+> /* lowest address */
+> phys_addr_t __init_memblock memblock_start_of_DRAM(void)
+> {
+>         return memblock.memory.regions[0].base;
+> }
 >
-> +/* This is used for flushing kernel memory range after
-> + * __apply_alternatives has patched kernel code
-> + */
-> +static void clean_dcache_range_nopatch(void *start, void *end)
-> +{
-> +     u64 d_start, i_start, d_size, i_size, ctr_el0;
-
-I don't think we need separate i_start and d_start variables. A 'start' or
-'cur' variable could be used for both.
-[RK] - ok.
-
-> +
-> +     /* use sanitised value of ctr_el0 rather than raw value from CPU */
-> +     ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
-> +     /* size in bytes */
-> +     d_size = cpuid_feature_extract_unsigned_field(ctr_el0,
-> +                     SYS_CTR_DSIZE_SHIFT);
-> +     i_size = cpuid_feature_extract_unsigned_field(ctr_el0,
-> +                     SYS_CTR_ISIZE_SHIFT);
-
-This isn't the size in bytes. Each is log2 the number of (4-byte) words.
-
-i.e. the size in bytes is (xMinLine << 2).
-[RK] - This doesnt seem right. For eg if IMinLine = 4 or 0b100
-           then with above formula ICacheSize in Bytes = 4 << 2 = 16
-           The correct formula should be (4 << xMinLine).
-            So in case IMinLine = 4 or 0b100,
-            ICacheSizeBytes = 4 << 4 = 64B
-
-> +
-> +     d_start = (u64)start & ~(d_size - 1);
-> +     while (d_start <= (u64)end) {
-> +             /* Use civac instead of cvau. This is required
-> +              * due to ARM errata 826319, 827319, 824069,
-> +              * 819472 on A53
-> +              */
-> +             asm volatile("dc civac, %0" : : "r" (d_start));
-
-Either this needs a memory clobber, or we need barrier() first, to ensure that
-the compiler doesn't re-order this against some of the patching code, however
-unlikely that may be.
-[RK] - So add barrier() before calling clean_dcache_range_nopatch() ?
-
-> +             d_start += d_size;
-> +     }
-
-The loop can be simplified to:
-
-        do {
-                asm ( ... );
-        } while (d_start += d_size, d_start < (u64)end)
-[RK] - ok
-
-> +     dsb(ish);
-> +
-> +     i_start = (u64)start & ~(i_size - 1);
-> +     while (i_start <= (u64)end) {
-> +             asm volatile("ic ivau, %0" : : "r" (i_start));
-> +             i_start += i_size;
-> +     }
-
-Likewise here.
-[RK] - ok
-
-Thanks,
-Mark.
-
-> +     dsb(ish);
-> +     isb();
-> +}
-> +
->  static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->  {
->       struct alt_instr *alt;
-> @@ -155,7 +190,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+> As indicated by logs below, the first memblock region base starts from
+> 0x200000 rather than the 'memstart_addr' value (which is 0)
 >
->               alt_cb(alt, origptr, updptr, nr_inst);
+> # dmesg | grep -i "Processing" -A 5
+> [    0.000000] efi: Processing EFI memory map:
+> [    0.000000] efi:   0x000000200000-0x00000021ffff [Runtime Data |RUN|  |
+> |  |  |  |  |   |WB|WT|WC|UC]
+> [    0.000000] efi:   0x000000400000-0x0000005fffff [ACPI Memory NVS |   |
+> |  |  |  |  |  |   |  |  |  |UC]
 >
-> -             flush_icache_range((uintptr_t)origptr,
-> +             clean_dcache_range_nopatch((uintptr_t)origptr,
->                                  (uintptr_t)(origptr + nr_inst));
->       }
->  }
-> --
-> 2.1.4
+> # head -1 /proc/iomem
+> 00200000-0021ffff : reserved
 >
+> Since we define 'PHYS_OFFSET' as the physical address of the start of memory
+> it would be 0 in this case:
+>
+> /* PHYS_OFFSET - the physical address of the start of memory. */
+> #define PHYS_OFFSET             ({ VM_BUG_ON(memstart_addr & 1);
+> memstart_addr; })
+>
+> On the other hand, the first memblock starts from 0x200000, so my question
+> is whether we should update the user-space tools which use the memblocks
+> listed in '/proc/iomem' to obtain the value of PHY_OFFSET (by reading the
+> base of the 1st memblock) and read the value of 'memstart_addr' somehow in
+> user-space to get the PHY_OFFSET, or should the change be done at the kernel
+> end to calculate 'memstart_addr' as:
+>
+>
+>         /*
+>          * Select a suitable value for the base of physical memory.
+>          */
+>         memstart_addr = round_down(memblock_start_of_DRAM(),
+>                                    ARM64_MEMSTART_ALIGN);
+>         if (memstart_addr)
 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sorry for the typo: I meant if (!memstart_addr) above
+
+Regards,
+Bhupesh
+
+>                 memstart_addr = memblock_start_of_DRAM();
+>
+> Please share your views.
+>
+> Thanks,
+> Bhupesh
