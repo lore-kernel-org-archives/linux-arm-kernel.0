@@ -1,155 +1,248 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Jun 2018 17:06:28 +0100
-Subject: [PATCH v2 8/9] arm64: Replace our atomic/lock bitop implementations
- with asm-generic
+Date: Fri,  1 Jun 2018 17:06:26 +0100
+Subject: [PATCH v2 6/9] asm-generic/bitops/atomic.h: Rewrite using atomic_*
 In-Reply-To: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
 References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1527869189-31512-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1527869189-31512-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm-generic/bitops/{atomic,lock}.h implementations are built around
-the atomic-fetch ops, which we implement efficiently for both LSE and
-LL/SC systems. Use that instead of our hand-rolled, out-of-line bitops.S.
+The atomic bitops can actually be implemented pretty efficiently using
+the atomic_* ops, rather than explicit use of spinlocks.
 
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/bitops.h | 14 ++------
- arch/arm64/lib/Makefile         |  2 +-
- arch/arm64/lib/bitops.S         | 76 -----------------------------------------
- 3 files changed, 3 insertions(+), 89 deletions(-)
- delete mode 100644 arch/arm64/lib/bitops.S
+ include/asm-generic/bitops/atomic.h | 188 +++++++-----------------------------
+ 1 file changed, 33 insertions(+), 155 deletions(-)
 
-diff --git a/arch/arm64/include/asm/bitops.h b/arch/arm64/include/asm/bitops.h
-index 9c19594ce7cb..13501460be6b 100644
---- a/arch/arm64/include/asm/bitops.h
-+++ b/arch/arm64/include/asm/bitops.h
-@@ -17,22 +17,11 @@
- #define __ASM_BITOPS_H
+diff --git a/include/asm-generic/bitops/atomic.h b/include/asm-generic/bitops/atomic.h
+index 04deffaf5f7d..dd90c9792909 100644
+--- a/include/asm-generic/bitops/atomic.h
++++ b/include/asm-generic/bitops/atomic.h
+@@ -2,189 +2,67 @@
+ #ifndef _ASM_GENERIC_BITOPS_ATOMIC_H_
+ #define _ASM_GENERIC_BITOPS_ATOMIC_H_
  
- #include <linux/compiler.h>
--#include <asm/barrier.h>
- 
- #ifndef _LINUX_BITOPS_H
- #error only <linux/bitops.h> can be included directly
- #endif
- 
--/*
-- * Little endian assembly atomic bitops.
+-#include <asm/types.h>
+-#include <linux/irqflags.h>
+-
+-#ifdef CONFIG_SMP
+-#include <asm/spinlock.h>
+-#include <asm/cache.h>		/* we use L1_CACHE_BYTES */
+-
+-/* Use an array of spinlocks for our atomic_ts.
+- * Hash function to index into a different SPINLOCK.
+- * Since "a" is usually an address, use one spinlock per cacheline.
 - */
--extern void set_bit(int nr, volatile unsigned long *p);
--extern void clear_bit(int nr, volatile unsigned long *p);
--extern void change_bit(int nr, volatile unsigned long *p);
--extern int test_and_set_bit(int nr, volatile unsigned long *p);
--extern int test_and_clear_bit(int nr, volatile unsigned long *p);
--extern int test_and_change_bit(int nr, volatile unsigned long *p);
+-#  define ATOMIC_HASH_SIZE 4
+-#  define ATOMIC_HASH(a) (&(__atomic_hash[ (((unsigned long) a)/L1_CACHE_BYTES) & (ATOMIC_HASH_SIZE-1) ]))
 -
- #include <asm-generic/bitops/builtin-__ffs.h>
- #include <asm-generic/bitops/builtin-ffs.h>
- #include <asm-generic/bitops/builtin-__fls.h>
-@@ -44,8 +33,9 @@ extern int test_and_change_bit(int nr, volatile unsigned long *p);
+-extern arch_spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned;
+-
+-/* Can't use raw_spin_lock_irq because of #include problems, so
+- * this is the substitute */
+-#define _atomic_spin_lock_irqsave(l,f) do {	\
+-	arch_spinlock_t *s = ATOMIC_HASH(l);	\
+-	local_irq_save(f);			\
+-	arch_spin_lock(s);			\
+-} while(0)
+-
+-#define _atomic_spin_unlock_irqrestore(l,f) do {	\
+-	arch_spinlock_t *s = ATOMIC_HASH(l);		\
+-	arch_spin_unlock(s);				\
+-	local_irq_restore(f);				\
+-} while(0)
+-
+-
+-#else
+-#  define _atomic_spin_lock_irqsave(l,f) do { local_irq_save(f); } while (0)
+-#  define _atomic_spin_unlock_irqrestore(l,f) do { local_irq_restore(f); } while (0)
+-#endif
++#include <linux/atomic.h>
++#include <linux/compiler.h>
++#include <asm/barrier.h>
  
- #include <asm-generic/bitops/sched.h>
- #include <asm-generic/bitops/hweight.h>
--#include <asm-generic/bitops/lock.h>
+ /*
+- * NMI events can occur at any time, including when interrupts have been
+- * disabled by *_irqsave().  So you can get NMI events occurring while a
+- * *_bit function is holding a spin lock.  If the NMI handler also wants
+- * to do bit manipulation (and they do) then you can get a deadlock
+- * between the original caller of *_bit() and the NMI handler.
+- *
+- * by Keith Owens
++ * Implementation of atomic bitops using atomic-fetch ops.
++ * See Documentation/atomic_bitops.txt for details.
+  */
  
-+#include <asm-generic/bitops/atomic.h>
-+#include <asm-generic/bitops/lock.h>
- #include <asm-generic/bitops/non-atomic.h>
- #include <asm-generic/bitops/le.h>
+-/**
+- * set_bit - Atomically set a bit in memory
+- * @nr: the bit to set
+- * @addr: the address to start counting from
+- *
+- * This function is atomic and may not be reordered.  See __set_bit()
+- * if you do not require the atomic guarantees.
+- *
+- * Note: there are no guarantees that this function will not be reordered
+- * on non x86 architectures, so if you are writing portable code,
+- * make sure not to rely on its reordering guarantees.
+- *
+- * Note that @nr may be almost arbitrarily large; this function is not
+- * restricted to acting on a single-word quantity.
+- */
+-static inline void set_bit(int nr, volatile unsigned long *addr)
++static inline void set_bit(unsigned int nr, volatile unsigned long *p)
+ {
+-	unsigned long mask = BIT_MASK(nr);
+-	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+-	unsigned long flags;
+-
+-	_atomic_spin_lock_irqsave(p, flags);
+-	*p  |= mask;
+-	_atomic_spin_unlock_irqrestore(p, flags);
++	p += BIT_WORD(nr);
++	atomic_long_or(BIT_MASK(nr), (atomic_long_t *)p);
+ }
  
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 137710f4dac3..68755fd70dcf 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -1,5 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
--lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
-+lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
-diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
-deleted file mode 100644
-index 43ac736baa5b..000000000000
---- a/arch/arm64/lib/bitops.S
-+++ /dev/null
-@@ -1,76 +0,0 @@
--/*
-- * Based on arch/arm/lib/bitops.h
+-/**
+- * clear_bit - Clears a bit in memory
+- * @nr: Bit to clear
+- * @addr: Address to start counting from
 - *
-- * Copyright (C) 2013 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- * clear_bit() is atomic and may not be reordered.  However, it does
+- * not contain a memory barrier, so if it is used for locking purposes,
+- * you should call smp_mb__before_atomic() and/or smp_mb__after_atomic()
+- * in order to ensure changes are visible on other processors.
 - */
+-static inline void clear_bit(int nr, volatile unsigned long *addr)
++static inline void clear_bit(unsigned int nr, volatile unsigned long *p)
+ {
+-	unsigned long mask = BIT_MASK(nr);
+-	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+-	unsigned long flags;
 -
--#include <linux/linkage.h>
--#include <asm/assembler.h>
--#include <asm/lse.h>
--
--/*
-- * x0: bits 5:0  bit offset
-- *     bits 31:6 word offset
-- * x1: address
+-	_atomic_spin_lock_irqsave(p, flags);
+-	*p &= ~mask;
+-	_atomic_spin_unlock_irqrestore(p, flags);
++	p += BIT_WORD(nr);
++	atomic_long_andnot(BIT_MASK(nr), (atomic_long_t *)p);
+ }
+ 
+-/**
+- * change_bit - Toggle a bit in memory
+- * @nr: Bit to change
+- * @addr: Address to start counting from
+- *
+- * change_bit() is atomic and may not be reordered. It may be
+- * reordered on other architectures than x86.
+- * Note that @nr may be almost arbitrarily large; this function is not
+- * restricted to acting on a single-word quantity.
 - */
--	.macro	bitop, name, llsc, lse
--ENTRY(	\name	)
--	and	w3, w0, #63		// Get bit offset
--	eor	w0, w0, w3		// Clear low bits
--	mov	x2, #1
--	add	x1, x1, x0, lsr #3	// Get word offset
--alt_lse "	prfm	pstl1strm, [x1]",	"nop"
--	lsl	x3, x2, x3		// Create mask
+-static inline void change_bit(int nr, volatile unsigned long *addr)
++static inline void change_bit(unsigned int nr, volatile unsigned long *p)
+ {
+-	unsigned long mask = BIT_MASK(nr);
+-	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+-	unsigned long flags;
 -
--alt_lse	"1:	ldxr	x2, [x1]",		"\lse	x3, [x1]"
--alt_lse	"	\llsc	x2, x2, x3",		"nop"
--alt_lse	"	stxr	w0, x2, [x1]",		"nop"
--alt_lse	"	cbnz	w0, 1b",		"nop"
--
--	ret
--ENDPROC(\name	)
--	.endm
--
--	.macro	testop, name, llsc, lse
--ENTRY(	\name	)
--	and	w3, w0, #63		// Get bit offset
--	eor	w0, w0, w3		// Clear low bits
--	mov	x2, #1
--	add	x1, x1, x0, lsr #3	// Get word offset
--alt_lse "	prfm	pstl1strm, [x1]",	"nop"
--	lsl	x4, x2, x3		// Create mask
--
--alt_lse	"1:	ldxr	x2, [x1]",		"\lse	x4, x2, [x1]"
--	lsr	x0, x2, x3
--alt_lse	"	\llsc	x2, x2, x4",		"nop"
--alt_lse	"	stlxr	w5, x2, [x1]",		"nop"
--alt_lse	"	cbnz	w5, 1b",		"nop"
--alt_lse	"	dmb	ish",			"nop"
--
--	and	x0, x0, #1
--	ret
--ENDPROC(\name	)
--	.endm
--
--/*
-- * Atomic bit operations.
+-	_atomic_spin_lock_irqsave(p, flags);
+-	*p ^= mask;
+-	_atomic_spin_unlock_irqrestore(p, flags);
++	p += BIT_WORD(nr);
++	atomic_long_xor(BIT_MASK(nr), (atomic_long_t *)p);
+ }
+ 
+-/**
+- * test_and_set_bit - Set a bit and return its old value
+- * @nr: Bit to set
+- * @addr: Address to count from
+- *
+- * This operation is atomic and cannot be reordered.
+- * It may be reordered on other architectures than x86.
+- * It also implies a memory barrier.
 - */
--	bitop	change_bit, eor, steor
--	bitop	clear_bit, bic, stclr
--	bitop	set_bit, orr, stset
+-static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
++static inline int test_and_set_bit(unsigned int nr, volatile unsigned long *p)
+ {
++	long old;
+ 	unsigned long mask = BIT_MASK(nr);
+-	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+-	unsigned long old;
+-	unsigned long flags;
+ 
+-	_atomic_spin_lock_irqsave(p, flags);
+-	old = *p;
+-	*p = old | mask;
+-	_atomic_spin_unlock_irqrestore(p, flags);
++	p += BIT_WORD(nr);
++	if (READ_ONCE(*p) & mask)
++		return 1;
+ 
+-	return (old & mask) != 0;
++	old = atomic_long_fetch_or(mask, (atomic_long_t *)p);
++	return !!(old & mask);
+ }
+ 
+-/**
+- * test_and_clear_bit - Clear a bit and return its old value
+- * @nr: Bit to clear
+- * @addr: Address to count from
+- *
+- * This operation is atomic and cannot be reordered.
+- * It can be reorderdered on other architectures other than x86.
+- * It also implies a memory barrier.
+- */
+-static inline int test_and_clear_bit(int nr, volatile unsigned long *addr)
++static inline int test_and_clear_bit(unsigned int nr, volatile unsigned long *p)
+ {
++	long old;
+ 	unsigned long mask = BIT_MASK(nr);
+-	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+-	unsigned long old;
+-	unsigned long flags;
+ 
+-	_atomic_spin_lock_irqsave(p, flags);
+-	old = *p;
+-	*p = old & ~mask;
+-	_atomic_spin_unlock_irqrestore(p, flags);
++	p += BIT_WORD(nr);
++	if (!(READ_ONCE(*p) & mask))
++		return 0;
+ 
+-	return (old & mask) != 0;
++	old = atomic_long_fetch_andnot(mask, (atomic_long_t *)p);
++	return !!(old & mask);
+ }
+ 
+-/**
+- * test_and_change_bit - Change a bit and return its old value
+- * @nr: Bit to change
+- * @addr: Address to count from
+- *
+- * This operation is atomic and cannot be reordered.
+- * It also implies a memory barrier.
+- */
+-static inline int test_and_change_bit(int nr, volatile unsigned long *addr)
++static inline int test_and_change_bit(unsigned int nr, volatile unsigned long *p)
+ {
++	long old;
+ 	unsigned long mask = BIT_MASK(nr);
+-	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+-	unsigned long old;
+-	unsigned long flags;
 -
--	testop	test_and_change_bit, eor, ldeoral
--	testop	test_and_clear_bit, bic, ldclral
--	testop	test_and_set_bit, orr, ldsetal
+-	_atomic_spin_lock_irqsave(p, flags);
+-	old = *p;
+-	*p = old ^ mask;
+-	_atomic_spin_unlock_irqrestore(p, flags);
+ 
+-	return (old & mask) != 0;
++	p += BIT_WORD(nr);
++	old = atomic_long_fetch_xor(mask, (atomic_long_t *)p);
++	return !!(old & mask);
+ }
+ 
+ #endif /* _ASM_GENERIC_BITOPS_ATOMIC_H */
 -- 
 2.1.4
