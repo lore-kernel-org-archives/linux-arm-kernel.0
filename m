@@ -1,25 +1,14 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  1 Jun 2018 12:24:24 +0100
-Subject: [PATCHv2 02/19] arm64: move SCTLR_EL{1,
- 2} assertions to <asm/sysreg.h>
+Date: Fri,  1 Jun 2018 12:24:26 +0100
+Subject: [PATCHv2 04/19] arm64: kill config_sctlr_el1()
 In-Reply-To: <20180601112441.37810-1-mark.rutland@arm.com>
 References: <20180601112441.37810-1-mark.rutland@arm.com>
-Message-ID: <20180601112441.37810-3-mark.rutland@arm.com>
+Message-ID: <20180601112441.37810-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we assert that the SCTLR_EL{1,2}_{SET,CLEAR} bits are
-self-consistent with an assertion in config_sctlr_el1(). This is a bit
-unusual, since config_sctlr_el1() doesn't make use of these definitions,
-and is far away from the definitions themselves.
-
-We can use the CPP #error directive to have equivalent assertions in
-<asm/sysreg.h>, next to the definitions of the set/clear bits, which is
-a bit clearer and simpler.
-
-The preprocessor handles literals differently than regular C, e.g. ~0 is
-equivalent to ~(intmax_t)0 rather than ~(int)0. Therefore, instead of ~0
-we use 0xffffffff, which is unambiguous.
+Now that we have sysreg_clear_set(), we can consistently use this
+instead of config_sctlr_el1().
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Dave Martin <dave.martin@arm.com>
@@ -27,47 +16,101 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/sysreg.h      | 10 ----------
+ arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
+ arch/arm64/kernel/cpu_errata.c       |  3 +--
+ arch/arm64/kernel/traps.c            |  2 +-
+ arch/arm64/mm/fault.c                |  2 +-
+ 5 files changed, 7 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 6171178075dc..bd1d1194a5e7 100644
+index b52762769329..3493c7048994 100644
 --- a/arch/arm64/include/asm/sysreg.h
 +++ b/arch/arm64/include/asm/sysreg.h
-@@ -452,9 +452,9 @@
- 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
- 			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
+@@ -740,16 +740,6 @@ asm(
+ 		write_sysreg(__scs_new, sysreg);			\
+ } while (0)
  
--/* Check all the bits are accounted for */
--#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
+-static inline void config_sctlr_el1(u32 clear, u32 set)
+-{
+-	u32 val;
 -
-+#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffff
-+#error "Inconsistent SCTLR_EL2 set/clear bits"
-+#endif
+-	val = read_sysreg(sctlr_el1);
+-	val &= ~clear;
+-	val |= set;
+-	write_sysreg(val, sctlr_el1);
+-}
+-
+ #endif
  
- /* SCTLR_EL1 specific flags. */
- #define SCTLR_EL1_UCI		(1 << 26)
-@@ -492,8 +492,9 @@
- 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
- 			 SCTLR_EL1_RES0)
- 
--/* Check all the bits are accounted for */
--#define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
-+#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffff
-+#error "Inconsistent SCTLR_EL1 set/clear bits"
-+#endif
- 
- /* id_aa64isar0 */
- #define ID_AA64ISAR0_TS_SHIFT		52
-@@ -732,9 +733,6 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ #endif	/* __ASM_SYSREG_H */
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 97d45d5151d4..c15847521394 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -511,9 +511,9 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+ static int cp15_barrier_set_hw_mode(bool enable)
  {
- 	u32 val;
+ 	if (enable)
+-		config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
++		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_CP15BEN);
+ 	else
+-		config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
++		sysreg_clear_set(sctlr_el1, SCTLR_EL1_CP15BEN, 0);
+ 	return 0;
+ }
  
--	SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS;
--	SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS;
--
- 	val = read_sysreg(sctlr_el1);
- 	val &= ~clear;
- 	val |= set;
+@@ -548,9 +548,9 @@ static int setend_set_hw_mode(bool enable)
+ 		return -EINVAL;
+ 
+ 	if (enable)
+-		config_sctlr_el1(SCTLR_EL1_SED, 0);
++		sysreg_clear_set(sctlr_el1, SCTLR_EL1_SED, 0);
+ 	else
+-		config_sctlr_el1(0, SCTLR_EL1_SED);
++		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_SED);
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index cf37ca6fa5f2..b99e492c44b5 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -74,8 +74,7 @@ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
+ static void
+ cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
+ {
+-	/* Clear SCTLR_EL1.UCT */
+-	config_sctlr_el1(SCTLR_EL1_UCT, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
+ }
+ 
+ atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 8bbdc17e49df..b8d3e0d8c616 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -411,7 +411,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+ {
+-	config_sctlr_el1(SCTLR_EL1_UCI, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCI, 0);
+ }
+ 
+ #define __user_cache_maint(insn, address, res)			\
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 27cbe0b38960..07926ee00053 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -822,7 +822,7 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
+ 	 */
+ 	WARN_ON_ONCE(in_interrupt());
+ 
+-	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
+ 	asm(SET_PSTATE_PAN(1));
+ }
+ #endif /* CONFIG_ARM64_PAN */
 -- 
 2.11.0
