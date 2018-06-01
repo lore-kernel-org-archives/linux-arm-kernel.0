@@ -1,61 +1,56 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:44 +0100
-Subject: [PATCH 30/33] KVM: arm/arm64: Check all vcpu redistributors are set
- on map_resources
+Date: Fri,  1 Jun 2018 16:27:43 +0100
+Subject: [PATCH 29/33] KVM: arm/arm64: Check vcpu redist base before
+ registering an iodev
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-31-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-30-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-On vcpu first run, we eventually know the actual number of vcpus.
-This is a synchronization point to check all redistributors
-were assigned. On kvm_vgic_map_resources() we check both dist and
-redist were set, eventually check potential base address inconsistencies.
+As we are going to register several redist regions,
+vgic_register_all_redist_iodevs() may be called several times. We need
+to register a redist_iodev for a given vcpu only once. So let's
+check if the base address has already been set. Initialize this latter
+in kvm_vgic_vcpu_init().
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v3.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ virt/kvm/arm/vgic/vgic-init.c    | 3 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 3 +++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index ce4476a08f5b..eb32b213f600 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -493,16 +493,25 @@ struct vgic_redist_region *vgic_v3_rdist_free_slot(struct list_head *rd_regions)
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 272af9704952..2673efce65f3 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -199,6 +199,9 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	int ret = 0;
+ 	int i;
  
- int vgic_v3_map_resources(struct kvm *kvm)
- {
--	int ret = 0;
- 	struct vgic_dist *dist = &kvm->arch.vgic;
--	struct vgic_redist_region *rdreg =
--		list_first_entry(&dist->rd_regions,
--				 struct vgic_redist_region, list);
-+	struct kvm_vcpu *vcpu;
-+	int ret = 0;
-+	int c;
- 
- 	if (vgic_ready(kvm))
- 		goto out;
- 
--	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) || !rdreg) {
-+	kvm_for_each_vcpu(c, vcpu, kvm) {
-+		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	vgic_cpu->rd_iodev.base_addr = VGIC_ADDR_UNDEF;
++	vgic_cpu->sgi_iodev.base_addr = VGIC_ADDR_UNDEF;
 +
-+		if (IS_VGIC_ADDR_UNDEF(vgic_cpu->rd_iodev.base_addr)) {
-+			kvm_debug("vcpu %d redistributor base not set\n", c);
-+			ret = -ENXIO;
-+			goto out;
-+		}
-+	}
+ 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+ 	spin_lock_init(&vgic_cpu->ap_list_lock);
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 3dbc057f861b..1c6c535585e1 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -592,6 +592,9 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+ 	gpa_t rd_base, sgi_base;
+ 	int ret;
+ 
++	if (!IS_VGIC_ADDR_UNDEF(vgic_cpu->rd_iodev.base_addr))
++		return 0;
 +
-+	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base)) {
- 		kvm_err("Need to set vgic distributor addresses first\n");
- 		ret = -ENXIO;
- 		goto out;
+ 	/*
+ 	 * We may be creating VCPUs before having set the base address for the
+ 	 * redistributor region, in which case we will come back to this
 -- 
 2.17.1
