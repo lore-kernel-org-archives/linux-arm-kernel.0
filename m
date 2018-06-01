@@ -1,44 +1,65 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Fri,  1 Jun 2018 16:08:19 +0800
-Subject: [PATCH 0/4] arm64/mm: migrate swapper_pg_dir
-Message-ID: <20180601080819.11712-1-yaojun8558363@gmail.com>
+Date: Fri,  1 Jun 2018 16:09:03 +0800
+Subject: [PATCH 3/4] arm64/mm: make tramp_pg_dir and swapper_pg_dir adjacent
+Message-ID: <20180601080903.11868-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, The offset between swapper_pg_dir and _text is
-fixed. When attackers know the address of _text(no KASLR or
-breaking KASLR), they can caculate the address of
-swapper_pg_dir. Then KSMA(Kernel Space Mirroring Attack) can
-be applied.
+To defense KSMA, we need to migrate tramp_pg_dir and swapper_pg_dir
+together. Make them adjacent to avoid modifying tramp_(un)map_kernel.
 
-The principle of KSMA is to insert a carefully constructed PGD
-entry into the translation table. The type of this entry is
-block, which maps the kernel text and its access permissions
-bits are 01. The user process can then modify kernel text
-directly through this mapping.
+Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
+---
+ arch/arm64/kernel/entry.S       | 4 ++--
+ arch/arm64/kernel/vmlinux.lds.S | 9 +++++----
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-To protect against KSMA, these patches migrate swapper_pg_dir
-to new place, which is dynamically allocated. Since it is
-allocated during the kernel boot process and the address is
-relatively fixed, further randomization may be required.
-
-Jun Yao (4):
-  arm64/mm: pass swapper_pg_dir as an argument to __enable_mmu()
-  arm64/mm: introduce variable to save new swapper_pg_dir address
-  arm64/mm: make tramp_pg_dir and swapper_pg_dir adjacent
-  arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
-
- arch/arm64/include/asm/mmu_context.h |  6 +--
- arch/arm64/include/asm/pgtable.h     |  2 +
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/entry.S            |  4 +-
- arch/arm64/kernel/head.S             | 10 ++--
- arch/arm64/kernel/hibernate.c        |  2 +-
- arch/arm64/kernel/sleep.S            |  2 +
- arch/arm64/kernel/vmlinux.lds.S      |  9 ++--
- arch/arm64/mm/kasan_init.c           |  6 +--
- arch/arm64/mm/mmu.c                  | 75 +++++++++++++++++-----------
- 10 files changed, 71 insertions(+), 47 deletions(-)
-
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index ec2ee720e33e..b35425feaf56 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -1004,7 +1004,7 @@ __ni_sys_trace:
+ 
+ 	.macro tramp_map_kernel, tmp
+ 	mrs	\tmp, ttbr1_el1
+-	add	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
++	add	\tmp, \tmp, #(PAGE_SIZE)
+ 	bic	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
+ #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+@@ -1023,7 +1023,7 @@ alternative_else_nop_endif
+ 
+ 	.macro tramp_unmap_kernel, tmp
+ 	mrs	\tmp, ttbr1_el1
+-	sub	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
++	sub	\tmp, \tmp, #(PAGE_SIZE)
+ 	orr	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
+ 	/*
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 605d1b60469c..3c72e6dec890 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -219,15 +219,16 @@ SECTIONS
+ 	idmap_pg_dir = .;
+ 	. += IDMAP_DIR_SIZE;
+ 
++#ifdef CONFIG_ARM64_SW_TTBR0_PAN
++	reserved_ttbr0 = .;
++	. += RESERVED_TTBR0_SIZE;
++#endif
++
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	tramp_pg_dir = .;
+ 	. += PAGE_SIZE;
+ #endif
+ 
+-#ifdef CONFIG_ARM64_SW_TTBR0_PAN
+-	reserved_ttbr0 = .;
+-	. += RESERVED_TTBR0_SIZE;
+-#endif
+ 	swapper_pg_dir = .;
+ 	. += SWAPPER_DIR_SIZE;
+ 	swapper_pg_end = .;
 -- 
 2.17.0
