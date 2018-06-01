@@ -1,53 +1,84 @@
-From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Fri, 1 Jun 2018 12:18:37 +0530
-Subject: [PATCH v2 3/6] clk: ti: dra7: Add clkctrl clock data for the mcan
- clocks
-In-Reply-To: <678ef467-a235-91db-8bae-f249ad98eac8@ti.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-4-faiz_abbas@ti.com>
- <20180531040350.GA25132@rob-hp-laptop>
- <e7e3ade1-76b7-f216-ece5-bd64a55cede6@ti.com>
- <678ef467-a235-91db-8bae-f249ad98eac8@ti.com>
-Message-ID: <d7532c7a-d2ae-5cbf-cfd0-c347b975ed6b@ti.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Fri, 1 Jun 2018 14:50:35 +0800
+Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
+In-Reply-To: <92b240f5-596e-87a9-863a-b18475042cce@arm.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+ <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
+ <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
+ <92b240f5-596e-87a9-863a-b18475042cce@arm.com>
+Message-ID: <5B10ECBB.209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thursday 31 May 2018 06:59 PM, Tero Kristo wrote:
-> On 31/05/18 13:14, Faiz Abbas wrote:
->> Hi,
+
+On 2018/5/31 22:25, Robin Murphy wrote:
+> On 31/05/18 14:49, Hanjun Guo wrote:
+>> Hi Robin,
 >>
->> On Thursday 31 May 2018 09:33 AM, Rob Herring wrote:
->>> On Wed, May 30, 2018 at 07:41:30PM +0530, Faiz Abbas wrote:
->>>> Add clkctrl data for the m_can clocks and register it within the
->> ...
->>>> ? diff --git a/include/dt-bindings/clock/dra7.h
->>>> b/include/dt-bindings/clock/dra7.h
->>>> index 5e1061b15aed..d7549c57cac3 100644
->>>> --- a/include/dt-bindings/clock/dra7.h
->>>> +++ b/include/dt-bindings/clock/dra7.h
->>>> @@ -168,5 +168,6 @@
->>>> ? #define DRA7_COUNTER_32K_CLKCTRL??? DRA7_CLKCTRL_INDEX(0x50)
->>>> ? #define DRA7_UART10_CLKCTRL??? DRA7_CLKCTRL_INDEX(0x80)
->>>> ? #define DRA7_DCAN1_CLKCTRL??? DRA7_CLKCTRL_INDEX(0x88)
->>>> +#define DRA7_ADC_CLKCTRL??? DRA7_CLKCTRL_INDEX(0xa0)
+>> On 2018/5/31 19:24, Robin Murphy wrote:
+>>> On 31/05/18 08:42, Zhen Lei wrote:
+>>>> In common, a IOMMU unmap operation follow the below steps:
+>>>> 1. remove the mapping in page table of the specified iova range
+>>>> 2. execute tlbi command to invalid the mapping which is cached in TLB
+>>>> 3. wait for the above tlbi operation to be finished
+>>>> 4. free the IOVA resource
+>>>> 5. free the physical memory resource
+>>>>
+>>>> This maybe a problem when unmap is very frequently, the combination of tlbi
+>>>> and wait operation will consume a lot of time. A feasible method is put off
+>>>> tlbi and iova-free operation, when accumulating to a certain number or
+>>>> reaching a specified time, execute only one tlbi_all command to clean up
+>>>> TLB, then free the backup IOVAs. Mark as non-strict mode.
+>>>>
+>>>> But it must be noted that, although the mapping has already been removed in
+>>>> the page table, it maybe still exist in TLB. And the freed physical memory
+>>>> may also be reused for others. So a attacker can persistent access to memory
+>>>> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
+>>>> the VFIO should always choose the strict mode.
+>>>>
+>>>> Some may consider put off physical memory free also, that will still follow
+>>>> strict mode. But for the map_sg cases, the memory allocation is not controlled
+>>>> by IOMMU APIs, so it is not enforceable.
+>>>>
+>>>> Fortunately, Intel and AMD have already applied the non-strict mode, and put
+>>>> queue_iova() operation into the common file dma-iommu.c., and my work is based
+>>>> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
+>>>> unmap, but Intel and AMD IOMMU drivers are not.
+>>>>
+>>>> Below is the performance data of strict vs non-strict for NVMe device:
+>>>> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
+>>>> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
 >>>
->>> ADC and mcan are the same thing?
->>>
+>>> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
+I will try your patch to see how much it can improve. I think the best way
+to resovle the globally-blocking sync is that the hardware provide 64bits
+CONS regitster, so that it can never be wrapped, and the spinlock can also
+be removed.
+
 >>
->> The register to control MCAN clocks is called ADC_CLKCTRL, Yes.
+>> The hardware is the new D06 which the SMMU with MSIs,
 > 
-> Is there any reason for this or is that just a documentation bug?
+> Cool! Now that profiling is fairly useful since we got rid of most of the locks, are you able to get an idea of how the overhead in the normal case is distributed between arm_smmu_cmdq_insert_cmd() and __arm_smmu_sync_poll_msi()? We're always trying to improve our understanding of where command-queue-related overheads turn out to be in practice, and there's still potentially room to do nicer things than TLBI_NH_ALL ;)
+Even if the software has no overhead, there may still be a problem, because
+the smmu need to execute the commands in sequence, especially before
+globally-blocking sync has been removed. Base on the actually execute time
+of single tlbi and sync, we can get the upper limit in theory.
+
+BTW, I will reply the reset of mail next week. I'm busy with other things now.
+
+> 
+> Robin.
+> 
+>> it's not D05 :)
+>>
+>> Thanks
+>> Hanjun
+>>
+> 
+> .
 > 
 
-Looks like they meant to have an ADC in dra74 or dra72 but decided
-against it and then many years later used the same registers for MCAN
-instead. You can see ADC_CLKCTRL exists in dra72 TRM but is explicitly
-disabled.
-
-http://www.ti.com/lit/ug/spruic2b/spruic2b.pdf pg:1524
-
-
-Thanks,
-Faiz
+-- 
+Thanks!
+BestRegards
