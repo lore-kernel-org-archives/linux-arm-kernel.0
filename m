@@ -1,245 +1,92 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 1 Jun 2018 11:23:46 +0200
-Subject: [PATCH 3/3] arm64: dts: allwinner: add support for Pinebook
-In-Reply-To: <20180601062901.8052-4-anarsoul@gmail.com>
-References: <20180601062901.8052-1-anarsoul@gmail.com>
- <20180601062901.8052-4-anarsoul@gmail.com>
-Message-ID: <20180601092346.g2iixqupumn7xo7r@flea>
+From: frieder.schrempf@exceet.de (Frieder Schrempf)
+Date: Fri, 1 Jun 2018 11:27:13 +0200
+Subject: [PATCH 05/11] ARM: dts: Reflect change of FSL QSPI driver and
+ remove unused properties
+In-Reply-To: <20180530171057.39f1a2be@bbrezillon>
+References: <1527686082-15142-1-git-send-email-frieder.schrempf@exceet.de>
+ <1527686082-15142-6-git-send-email-frieder.schrempf@exceet.de>
+ <20180530171057.39f1a2be@bbrezillon>
+Message-ID: <d6512adf-2d48-5bdc-d793-a7c1fcabc177@exceet.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 11:29:01PM -0700, Vasily Khoruzhick wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
-> 
-> Pinebook is a A64-based laptop produced by Pine64, with the following
-> peripherals:
-> 
-> USB:
-> - Two external USB ports (one is directly connected to A64's OTG
-> controller, the other is under a internal hub connected to the host-only
-> controller.)
-> - USB HID keyboard and touchpad connected to the internal hub.
-> - USB UVC camera connected to the internal hub.
-> 
-> Power-related:
-> - A DC IN jack connected to AXP803's DCIN pin.
-> - A Li-Polymer battery connected to AXP803's battery pins.
-> 
-> Storage:
-> - An eMMC by Foresee on the main board (in the product revision of the
-> main board it's designed to be switchable).
-> - An external MicroSD card slot.
-> 
-> Display:
-> - An eDP LCD panel (1366x768) connected via an ANX6345 RGB-eDP bridge.
-> - A mini HDMI port.
-> 
-> Misc:
-> - A Hall sensor designed to detect the status of lid, connected to GPIO PL12.
-> - A headphone jack connected to the SoC's internal codec.
-> - A debug UART port muxed with headphone jack.
-> 
-> This commit adds basical support for it.
-> 
-> [vasily: squashed several commits into one, added simplefb node, added usbphy
-> 	 to ehci0 and ohci0 nodes]
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  arch/arm64/boot/dts/allwinner/Makefile        |   1 +
->  .../dts/allwinner/sun50i-a64-pinebook.dts     | 285 ++++++++++++++++++
->  2 files changed, 286 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index 8bebe7da5ed9..a8c6d0c6f2c5 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> new file mode 100644
-> index 000000000000..d952db217702
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> @@ -0,0 +1,285 @@
-> +/*
-> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
-> + * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+Hi Boris,
 
-The SPDX tag should be the first one.
+On 30.05.2018 17:10, Boris Brezillon wrote:
+> On Wed, 30 May 2018 15:14:34 +0200
+> Frieder Schrempf <frieder.schrempf@exceet.de> wrote:
+> 
+>> The FSL QSPI driver was moved to the SPI framework and it now
+>> acts as a SPI controller. Therefore the subnodes need to set
+>> spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
+> 
+> We should try to keep the current behavior even when
+> spi-[rx/tx]-bus-width are not defined. How about considering
+> spi-[rx/tx]-bus-width as board constraints and then let the core pick
+> the best mode based on these constraints plus the SPI NOR chip
+> limitations.
 
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-a64.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pwm/pwm.h>
-> +
-> +/ {
-> +	model = "Pinebook";
-> +	compatible = "pine64,pinebook", "allwinner,sun50i-a64";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		ethernet0 = &rtl8723cs;
-> +	};
-> +
-> +	backlight: backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm 0 50000 0>;
-> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+Ok, I'll try to adjust this, so we can leave spi-[rx/tx]-bus-width 
+undefined and still get quad mode as default if possible.
 
-The perceived brightness should be increasing linearly. This usually
-means that you need an function close to a power of two sequence.
+> 
+>>
+>> Also the properties 'bus-num', 'fsl,spi-num-chipselects' and
+>> 'fsl,spi-flash-chipselects' were never read by the driver and
+>> can be removed.
+>>
+>> The 'reg' properties are adjusted to reflect the what bus and
+>> chipselect the flash is connected to, as the new driver needs
+>> this information.
+>>
+>> The property 'fsl,qspi-has-second-chip' is not needed anymore
+>> and will be removed after the old driver was disabled to avoid
+>> breaking ls1021a-moxa-uc-8410a.dts.
+>>
+>> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
+>> ---
+>>   arch/arm/boot/dts/imx6sx-sdb-reva.dts       | 8 ++++++--
+>>   arch/arm/boot/dts/imx6sx-sdb.dts            | 8 ++++++--
+>>   arch/arm/boot/dts/imx6ul-14x14-evk.dtsi     | 2 ++
+>>   arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 5 ++---
+>>   4 files changed, 16 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+>> index e3533e7..1a6f680 100644
+>> --- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+>> +++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+>> @@ -131,13 +131,17 @@
+>>   		#size-cells = <1>;
+>>   		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+>>   		spi-max-frequency = <66000000>;
+>> +		spi-rx-bus-width = <4>;
+>> +		spi-tx-bus-width = <4>;
+>>   	};
+>>   
+>> -	flash1: s25fl128s at 1 {
+>> -		reg = <1>;
+>> +	flash1: s25fl128s at 2 {
+>> +		reg = <2>;
+> 
+> Hm, you're breaking backward compat here. Can we try to re-use the
+> old numbering scheme instead of patching all DTs?
 
-> +		default-brightness-level = <2>;
-> +		enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 */
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +
-> +		framebuffer-lcd {
-> +			panel-supply = <&reg_dc1sw>;
-> +			dvdd25-supply = <&reg_dldo2>;
-> +			dvdd12-supply = <&reg_fldo1>;
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +
-> +		lid_switch {
-> +			label = "Lid Switch";
-> +			gpios = <&r_pio 0 12 GPIO_ACTIVE_LOW>; /* PL12 */
-> +			linux,input-type = <EV_SW>;
-> +			linux,code = <SW_LID>;
-> +			linux,can-disable;
-> +		};
-> +	};
-> +
-> +	reg_vcc3v3: vcc3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	wifi_pwrseq: wifi_pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-> +	};
-> +};
-> +
-> +&ehci0 {
-> +	phys = <&usbphy 0>;
-> +	phy-names = "usb";
-> +	status = "okay";
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins>;
-> +	vmmc-supply = <&reg_dcdc1>;
-> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-> +	cd-inverted;
-> +	disable-wp;
-> +	bus-width = <4>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +	vmmc-supply = <&reg_dldo4>;
-> +	vqmmc-supply = <&reg_eldo1>;
-> +	mmc-pwrseq = <&wifi_pwrseq>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	rtl8723cs: wifi at 1 {
-> +		reg = <1>;
-> +	};
-> +};
-> +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_pins>;
-> +	vmmc-supply = <&reg_dcdc1>;
-> +	vqmmc-supply = <&reg_eldo1>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	cap-mmc-hw-reset;
-> +	mmc-hs200-1_8v;
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	phys = <&usbphy 0>;
-> +	phy-names = "usb";
-> +	status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pwm_pin>;
-> +	status = "okay";
-> +};
-> +
-> +&r_rsb {
-> +	status = "okay";
-> +
-> +	axp803: pmic at 3a3 {
-> +		compatible = "x-powers,axp803";
-> +		reg = <0x3a3>;
-> +		interrupt-parent = <&r_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +};
-> +
-> +/* The ANX6345 eDP-bridge is on r_i2c. There is no linux (mainline)
-> + * driver for this chip at the moment, the bootloader initializes it.
-> + * However it can be accessed with the i2c-dev driver from user space.
-> + */
+Unfortunately in the current setup, the definitions for the reg property 
+are already broken.
 
-The comment format is wrong, and the part after r_i2c, about i2c-dev
-and the mainline support is not really relevant. The DT describes the
-hardware, and is used by several different projects that might or
-might not have i2c-dev, an interface similar, or might have or not a
-driver for the bridge.
+For example imx6sx-sdb.dts seems to have one chip connected on bus A, 
+CS0 and one on bus B, CS0. It has reg set to 0 for the first and 1 for 
+the second chip.
 
-Maxime
+While fsl-ls208xa-qds.dtsi uses the same hw setup, but has reg set to 0 
+and 2.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180601/48c13123/attachment.sig>
+So either way we need to change the reg property at some place.
+So the best approach in my opinion is to fix the definitions to use a 
+single scheme and while at it also remove the fsl,qspi-has-second-chip 
+property, that is not needed if a single consistent scheme for the reg 
+properties is used.
+
+Regards,
+
+Frieder
