@@ -1,37 +1,52 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  1 Jun 2018 11:28:21 +0200
-Subject: [PATCH 3/4] serial: sh-sci: Stop using printk format %pCr
-In-Reply-To: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
-References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1527845302-12159-4-git-send-email-geert+renesas@glider.be>
+Date: Fri,  1 Jun 2018 11:28:18 +0200
+Subject: [PATCH 0/4] lib/vsprintf: Remove atomic-unsafe support for printk
+ format %pCr
+Message-ID: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
-called in atomic context.
+	Hi all,
 
-Replace it by open-coding the operation.  This is safe here, as the code
-runs in task context.
+"%pCr" formats the current rate of a clock, and calls clk_get_rate().
+The latter obtains a mutex, hence it must not be called from atomic
+context.  As vsprintf() (and e.g. printk()) must be callable from any
+context, it's better to remove support for this (rarely-used) format.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/tty/serial/sh-sci.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This patch series:
+  - Changes all existing users of "%pCr" to print the result of
+    clk_get_rate() directly, which is safe as they all do this in task
+    context only,
+  - Removes support for the "%pCr" printk format.
 
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index b46b146524ce7495..c181eb37f98509e6 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -2724,8 +2724,8 @@ static int sci_init_clocks(struct sci_port *sci_port, struct device *dev)
- 			dev_dbg(dev, "failed to get %s (%ld)\n", clk_names[i],
- 				PTR_ERR(clk));
- 		else
--			dev_dbg(dev, "clk %s is %pC rate %pCr\n", clk_names[i],
--				clk, clk);
-+			dev_dbg(dev, "clk %s is %pC rate %lu\n", clk_names[i],
-+				clk, clk_get_rate(clk));
- 		sci_port->clks[i] = IS_ERR(clk) ? NULL : clk;
- 	}
- 	return 0;
+Note that any remaining out-of-tree users will start seeing the clock's
+name printed instead of its rate.
+
+Thanks for your comments!
+
+Geert Uytterhoeven (4):
+  clk: renesas: cpg-mssr: Stop using printk format %pCr
+  thermal: bcm2835: Stop using printk format %pCr
+  serial: sh-sci: Stop using printk format %pCr
+  lib/vsprintf: Remove atomic-unsafe support for %pCr
+
+ Documentation/core-api/printk-formats.rst  | 3 +--
+ drivers/clk/renesas/renesas-cpg-mssr.c     | 9 +++++----
+ drivers/thermal/broadcom/bcm2835_thermal.c | 4 ++--
+ drivers/tty/serial/sh-sci.c                | 4 ++--
+ lib/vsprintf.c                             | 3 ---
+ 5 files changed, 10 insertions(+), 13 deletions(-)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
