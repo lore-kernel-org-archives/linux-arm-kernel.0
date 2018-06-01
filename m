@@ -1,101 +1,119 @@
-From: djw@t-chip.com.cn (Levin)
-Date: Fri, 1 Jun 2018 10:05:24 +0800
-Subject: [PATCH v3 2/5] gpio: syscon: rockchip: add GPIO_MUTE support for
- rk3328
-In-Reply-To: <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
-References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
- <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
- <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
-Message-ID: <0d08ba26-77f2-6c42-8fb1-214aaf6085e9@t-chip.com.cn>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 1 Jun 2018 11:04:30 +0800
+Subject: [PATCH v3] PCI: mediatek: Add system pm support for MT2712
+Message-ID: <1527822270-30280-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-On 2018-05-31 10:45 PM, Rob Herring wrote:
-> On Wed, May 30, 2018 at 10:27 PM,  <djw@t-chip.com.cn> wrote:
->> From: Levin Du <djw@t-chip.com.cn>
->>
->> In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
->> mute control, can also be used for general purpose. It is manipulated by
->> the GRF_SOC_CON10 register.
->>
->> Signed-off-by: Levin Du <djw@t-chip.com.cn>
->>
->> ---
->>
->> Changes in v3:
->> - Change from general gpio-syscon to specific rk3328-gpio-mute
->>
->> Changes in v2:
->> - Rename gpio_syscon10 to gpio_mute in doc
->>
->> Changes in v1:
->> - Refactured for general gpio-syscon usage for Rockchip SoCs.
->> - Add doc rockchip,gpio-syscon.txt
->>
->>   .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28 +++++++++++++++++++
->>   drivers/gpio/gpio-syscon.c                         | 31 ++++++++++++++++++++++
->>   2 files changed, 59 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
->> new file mode 100644
->> index 0000000..10bc632
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
->> @@ -0,0 +1,28 @@
->> +Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE pin.
->> +
->> +In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec mute
->> +control, can also be used for general purpose. It is manipulated by the
->> +GRF_SOC_CON10 register.
->> +
->> +Required properties:
->> +- compatible: Should contain "rockchip,rk3328-gpio-mute".
->> +- gpio-controller: Marks the device node as a gpio controller.
->> +- #gpio-cells: Should be 2. The first cell is the pin number and
->> +  the second cell is used to specify the gpio polarity:
->> +    0 = Active high,
->> +    1 = Active low.
->> +
->> +Example:
->> +
->> +       grf: syscon at ff100000 {
->> +               compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
->> +
->> +               gpio_mute: gpio-mute {
-> Node names should be generic:
->
-> gpio {
->
-> This also means you can't add another GPIO node in the future and
-> you'll have to live with "rockchip,rk3328-gpio-mute" covering more
-> than 1 GPIO if you do need to add more GPIOs.
+The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
+the internal control register will be reset after system resume. The PCIe
+link should be re-established and the related control register values
+should be re-set after system resume.
 
-As the first line describes, this GPIO controller is dedicated for the 
-GPIO_MUTE pin.
-There's only one GPIO pin in the GRF_SOC_CON10 register. Therefore the 
-gpio_mute
-name is proper IMHO.
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+CC: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/pci/host/pcie-mediatek.c | 60 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
->> +                       compatible = "rockchip,rk3328-gpio-mute";
->> +                       gpio-controller;
->> +                       #gpio-cells = <2>;
->> +               };
->> +       };
->> +
->> +Note: The gpio_mute node should be declared as the child of the GRF (General
->> +Register File) node. The GPIO_MUTE pin is referred to as <&gpio_mute 0>.
-> This is wrong because you should have 2 cells. The phandle doesn't
-> count as a cell.
->
-> Rob
->
-Thanks for pointing that out. So it should be:
-
- ?? The GPIO_MUTE pin is referred to as <&gpio_mute 0 POLARITY>.
-
-
-Thanks,
-Levin
+diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+index dabf1086..5363cc7 100644
+--- a/drivers/pci/host/pcie-mediatek.c
++++ b/drivers/pci/host/pcie-mediatek.c
+@@ -132,12 +132,14 @@ struct mtk_pcie_port;
+ /**
+  * struct mtk_pcie_soc - differentiate between host generations
+  * @need_fix_class_id: whether this host's class ID needed to be fixed or not
++ * @pm_support: whether the host's MTCMOS will be off when suspend
+  * @ops: pointer to configuration access functions
+  * @startup: pointer to controller setting functions
+  * @setup_irq: pointer to initialize IRQ functions
+  */
+ struct mtk_pcie_soc {
+ 	bool need_fix_class_id;
++	bool pm_support;
+ 	struct pci_ops *ops;
+ 	int (*startup)(struct mtk_pcie_port *port);
+ 	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+@@ -1179,12 +1181,69 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int mtk_pcie_suspend_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	const struct mtk_pcie_soc *soc = pcie->soc;
++	struct mtk_pcie_port *port;
++
++	if (!soc->pm_support)
++		return 0;
++
++	list_for_each_entry(port, &pcie->ports, list) {
++		clk_disable_unprepare(port->ahb_ck);
++		clk_disable_unprepare(port->sys_ck);
++		phy_power_off(port->phy);
++	}
++
++	return 0;
++}
++
++static int mtk_pcie_resume_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	const struct mtk_pcie_soc *soc = pcie->soc;
++	struct mtk_pcie_port *port;
++	int ret;
++
++	if (!soc->pm_support)
++		return 0;
++
++	list_for_each_entry(port, &pcie->ports, list) {
++		phy_power_on(port->phy);
++		clk_prepare_enable(port->sys_ck);
++		clk_prepare_enable(port->ahb_ck);
++
++		ret = soc->startup(port);
++		if (ret) {
++			dev_err(dev, "Port%d link down\n", port->slot);
++			phy_power_off(port->phy);
++			clk_disable_unprepare(port->sys_ck);
++			clk_disable_unprepare(port->ahb_ck);
++			return ret;
++		}
++
++		if (IS_ENABLED(CONFIG_PCI_MSI))
++			mtk_pcie_enable_msi(port);
++	}
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops mtk_pcie_pm_ops = {
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
++				      mtk_pcie_resume_noirq)
++};
++
+ static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+ 	.ops = &mtk_pcie_ops,
+ 	.startup = mtk_pcie_startup_port,
+ };
+ 
+ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
++	.pm_support = true,
+ 	.ops = &mtk_pcie_ops_v2,
+ 	.startup = mtk_pcie_startup_port_v2,
+ 	.setup_irq = mtk_pcie_setup_irq,
+@@ -1211,6 +1270,7 @@ static struct platform_driver mtk_pcie_driver = {
+ 		.name = "mtk-pcie",
+ 		.of_match_table = mtk_pcie_ids,
+ 		.suppress_bind_attrs = true,
++		.pm = &mtk_pcie_pm_ops,
+ 	},
+ };
+ builtin_platform_driver(mtk_pcie_driver);
+-- 
+2.6.4
