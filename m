@@ -1,95 +1,26 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 01 Jun 2018 12:00:16 +0100
-Subject: [PATCH v2] ARM: avoid Cortex-A9 livelock on tight dmb loops
-Message-ID: <E1fOhn6-00008E-3b@rmk-PC.armlinux.org.uk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 1 Jun 2018 06:00:47 -0500
+Subject: [PATCH 0/4] lib/vsprintf: Remove atomic-unsafe support for printk
+ format %pCr
+In-Reply-To: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
+References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CA+55aFxHHSRnDbbNGq6SwNAwEt0EhX15n_pNqon3MzGYJgMJmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Executing loops such as:
+On Fri, Jun 1, 2018 at 4:29 AM Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+>
+> This patch series:
+>   - Changes all existing users of "%pCr" to print the result of
+>     clk_get_rate() directly, which is safe as they all do this in task
+>     context only,
+>   - Removes support for the "%pCr" printk format.
 
-	while (1)
-		cpu_relax();
+Looks good to me.
 
-with interrupts disabled results in a livelock of the entire system,
-as other CPUs are prevented making progress.  This is most noticable
-as a failure of crashdump kexec, which stops just after issuing:
+What tree will this go through? The normal printk one? Just checking
+that this doesn't end up falling through the cracks because nobody
+knows who would take it...
 
-	Loading crashdump kernel...
-
-to the system console.  Two other locations of these loops within the
-ARM code have been identified and fixed up.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-v2: use wfe() instead of cpu_do_idle
-
- arch/arm/include/asm/barrier.h   | 2 ++
- arch/arm/kernel/machine_kexec.c  | 5 ++++-
- arch/arm/kernel/smp.c            | 4 +++-
- arch/arm/mach-omap2/prm_common.c | 4 +++-
- 4 files changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 69772e742a0a..83ae97c049d9 100644
---- a/arch/arm/include/asm/barrier.h
-+++ b/arch/arm/include/asm/barrier.h
-@@ -11,6 +11,8 @@
- #define sev()	__asm__ __volatile__ ("sev" : : : "memory")
- #define wfe()	__asm__ __volatile__ ("wfe" : : : "memory")
- #define wfi()	__asm__ __volatile__ ("wfi" : : : "memory")
-+#else
-+#define wfe()	do { } while (0)
- #endif
- 
- #if __LINUX_ARM_ARCH__ >= 7
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index dd2eb5f76b9f..76300f3813e8 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -91,8 +91,11 @@ void machine_crash_nonpanic_core(void *unused)
- 
- 	set_cpu_online(smp_processor_id(), false);
- 	atomic_dec(&waiting_for_crash_ipi);
--	while (1)
-+
-+	while (1) {
- 		cpu_relax();
-+		wfe();
-+	}
- }
- 
- void crash_smp_send_stop(void)
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 9ec9a366ef44..a39fe6ab89a2 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -570,8 +570,10 @@ static void ipi_cpu_stop(unsigned int cpu)
- 	local_fiq_disable();
- 	local_irq_disable();
- 
--	while (1)
-+	while (1) {
- 		cpu_relax();
-+		wfe();
-+	}
- }
- 
- static DEFINE_PER_CPU(struct completion *, cpu_completion);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 021b5a8b9c0a..bb15a9eec05c 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -522,8 +522,10 @@ void omap_prm_reset_system(void)
- 
- 	prm_ll_data->reset_system();
- 
--	while (1)
-+	while (1) {
- 		cpu_relax();
-+		wfe();
-+	}
- }
- 
- /**
--- 
-2.7.4
+               Linus
