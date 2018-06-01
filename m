@@ -1,86 +1,267 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  1 Jun 2018 11:10:13 +0100
-Subject: [PATCH v6 1/2] arm64/sve: Thin out initialisation sanity-checks for
- sve_max_vl
+Date: Fri,  1 Jun 2018 11:10:14 +0100
+Subject: [PATCH v6 2/2] arm64: signal: Report signal frame size to userspace
+ via auxv
 In-Reply-To: <1527847814-22829-1-git-send-email-Dave.Martin@arm.com>
 References: <1527847814-22829-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527847814-22829-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1527847814-22829-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the kernel SVE support is reasonably mature, it is
-excessive to default sve_max_vl to the invalid value -1 and then
-sprinkle WARN_ON()s around the place to make sure it has been
-initialised before use.  The cpufeatures code already runs pretty
-early, and will ensure sve_max_vl gets initialised.
+Stateful CPU architecture extensions may require the signal frame
+to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+However, changing this #define is an ABI break.
 
-This patch initialises sve_max_vl to something sane that will be
-supported by every SVE implementation, and removes most of the
-sanity checks.
+To allow userspace the option of determining the signal frame size
+in a more forwards-compatible way, this patch adds a new auxv entry
+tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+size that the process can observe during its lifetime.
 
-The checks in find_supported_vector_length() are retained for now.
-If anything goes horribly wrong, we are likely to trip a check here
-sooner or later.
+If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+a consistent interface with older kernels that do not provide
+AT_MINSIGSTKSZ.
+
+The idea is that libc could expose this via sysconf() or some
+similar mechanism.
+
+There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
+about userspace's own stack overheads and should not pretend to
+know.
+
+For arm64:
+
+The primary motivation for this interface is the Scalable Vector
+Extension, which can require at least 4KB or so of extra space
+in the signal frame for the largest hardware implementations.
+
+To determine the correct value, a "Christmas tree" mode (via the
+add_all argument) is added to setup_sigframe_layout(), to simulate
+addition of all possible records to the signal frame at maximum
+possible size.
+
+If this procedure goes wrong somehow, resulting in a stupidly large
+frame layout and hence failure of sigframe_alloc() to allocate a
+record to the frame, then this is indicative of a kernel bug.  In
+this case, we WARN() and no attempt is made to populate
+AT_MINSIGSTKSZ for userspace.
+
+For arm64 SVE:
+
+The SVE context block in the signal frame needs to be considered
+too when computing the maximum possible signal frame size.
+
+Because the size of this block depends on the vector length, this
+patch computes the size based not on the thread's current vector
+length but instead on the maximum possible vector length: this
+determines the maximum size of SVE context block that can be
+observed in any signal frame for the lifetime of the process.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 17 ++++-------------
- arch/arm64/kernel/ptrace.c |  3 ---
- 2 files changed, 4 insertions(+), 16 deletions(-)
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 87a3536..f9ec640 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -129,7 +129,7 @@ static int sve_default_vl = -1;
- #ifdef CONFIG_ARM64_SVE
+---
+
+Changes since v5:
+
+Requested by Will Deacon:
+
+ * Fill the hole left by a missing AT_MINSIGSTKSZ with AT_IGNORE
+
+   (due to concerns about how a short auxv may affect the FDPIC
+   loader and PR_SET_MM related stuff.
+---
+ arch/arm64/include/asm/elf.h         | 13 +++++++++
+ arch/arm64/include/asm/processor.h   |  5 ++++
+ arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c       |  1 +
+ arch/arm64/kernel/signal.c           | 52 +++++++++++++++++++++++++++++++-----
+ 5 files changed, 66 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fac1c4d..433b955 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -121,6 +121,9 @@
  
- /* Maximum supported vector length across all CPUs (initially poisoned) */
--int __ro_after_init sve_max_vl = -1;
-+int __ro_after_init sve_max_vl = SVE_VL_MIN;
- /* Set of available vector lengths, as vq_to_bit(vq): */
- static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
- static void __percpu *efi_sve_state;
-@@ -360,22 +360,13 @@ static int sve_proc_do_default_vl(struct ctl_table *table, int write,
- 		return ret;
+ #ifndef __ASSEMBLY__
  
- 	/* Writing -1 has the special meaning "set to max": */
--	if (vl == -1) {
--		/* Fail safe if sve_max_vl wasn't initialised */
--		if (WARN_ON(!sve_vl_valid(sve_max_vl)))
--			vl = SVE_VL_MIN;
--		else
--			vl = sve_max_vl;
--
--		goto chosen;
--	}
-+	if (vl == -1)
-+		vl = sve_max_vl;
++#include <linux/bug.h>
++#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
++
+ typedef unsigned long elf_greg_t;
  
- 	if (!sve_vl_valid(vl))
- 		return -EINVAL;
+ #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
+@@ -148,6 +151,16 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+ 		    (elf_addr_t)current->mm->context.vdso);		\
++									\
++	/*								\
++	 * Should always be nonzero unless there's a kernel bug.	\
++	 * If we haven't determined a sensible value to give to		\
++	 * userspace, omit the entry:					\
++	 */								\
++	if (likely(signal_minsigstksz))					\
++		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
++	else								\
++		NEW_AUX_ENT(AT_IGNORE, 0);				\
+ } while (0)
  
--	vl = find_supported_vector_length(vl);
--chosen:
--	sve_default_vl = vl;
-+	sve_default_vl = find_supported_vector_length(vl);
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 7675989..65ab83e 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -35,6 +35,8 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/build_bug.h>
++#include <linux/cache.h>
++#include <linux/init.h>
+ #include <linux/stddef.h>
+ #include <linux/string.h>
+ 
+@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+ void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+ 
++extern unsigned long __ro_after_init signal_minsigstksz; /* sigframe size */
++extern void __init minsigstksz_setup(void);
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index ec0a86d..743c0b8 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,7 +19,8 @@
+ 
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
++#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
+ 
+-#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9d1b06d..0e0b53d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
+ 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+ 
+ 	sve_setup();
++	minsigstksz_setup();
+ 
+ 	/* Advertise that we have computed the system capabilities */
+ 	set_sys_caps_initialised();
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 154b7d3..e7da5db 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/cache.h>
+ #include <linux/compat.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
  	return 0;
  }
  
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 7ff81fe..577deb0 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -766,9 +766,6 @@ static void sve_init_header_from_task(struct user_sve_header *header,
- 	vq = sve_vq_from_vl(header->vl);
+-/* Determine the layout of optional records in the signal frame */
+-static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
++/*
++ * Determine the layout of optional records in the signal frame
++ *
++ * add_all: if true, lays out the biggest possible signal frame for
++ *	this task; otherwise, generates a layout for the current state
++ *	of the task.
++ */
++static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
++				 bool add_all)
+ {
+ 	int err;
  
- 	header->max_vl = sve_max_vl;
--	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
--		header->max_vl = header->vl;
+@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 		return err;
+ 
+ 	/* fault information, if valid */
+-	if (current->thread.fault_code) {
++	if (add_all || current->thread.fault_code) {
+ 		err = sigframe_alloc(user, &user->esr_offset,
+ 				     sizeof(struct esr_context));
+ 		if (err)
+@@ -591,8 +599,14 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	if (system_supports_sve()) {
+ 		unsigned int vq = 0;
+ 
+-		if (test_thread_flag(TIF_SVE))
+-			vq = sve_vq_from_vl(current->thread.sve_vl);
++		if (add_all || test_thread_flag(TIF_SVE)) {
++			int vl = sve_max_vl;
++
++			if (!add_all)
++				vl = current->thread.sve_vl;
++
++			vq = sve_vq_from_vl(vl);
++		}
+ 
+ 		err = sigframe_alloc(user, &user->sve_offset,
+ 				     SVE_SIG_CONTEXT_SIZE(vq));
+@@ -603,7 +617,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	return sigframe_alloc_end(user);
+ }
+ 
 -
- 	header->size = SVE_PT_SIZE(vq, header->flags);
- 	header->max_size = SVE_PT_SIZE(sve_vq_from_vl(header->max_vl),
- 				      SVE_PT_REGS_SVE);
+ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+@@ -701,7 +714,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
+ 	int err;
+ 
+ 	init_user_layout(user);
+-	err = setup_sigframe_layout(user);
++	err = setup_sigframe_layout(user, false);
+ 	if (err)
+ 		return err;
+ 
+@@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		thread_flags = READ_ONCE(current_thread_info()->flags);
+ 	} while (thread_flags & _TIF_WORK_MASK);
+ }
++
++unsigned long __ro_after_init signal_minsigstksz;
++
++/*
++ * Determine the stack space required for guaranteed signal devliery.
++ * This function is used to populate AT_MINSIGSTKSZ at process startup.
++ * cpufeatures setup is assumed to be complete.
++ */
++void __init minsigstksz_setup(void)
++{
++	struct rt_sigframe_user_layout user;
++
++	init_user_layout(&user);
++
++	/*
++	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
++	 * be big enough, but it's our best guess:
++	 */
++	if (WARN_ON(setup_sigframe_layout(&user, true)))
++		return;
++
++	signal_minsigstksz = sigframe_size(&user) +
++		round_up(sizeof(struct frame_record), 16) +
++		16; /* max alignment padding */
++}
 -- 
 2.1.4
