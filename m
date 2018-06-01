@@ -1,91 +1,54 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 4 Jun 2018 10:51:11 +0200
-Subject: [PATCH 1/3] arm64: allwinner: a64: add R_I2C controller
-In-Reply-To: <CA+E=qVfH3wWsSdzGn353q0Jf-PQ8cjU-i5osLOV1c4qWVGrR5A@mail.gmail.com>
-References: <20180601062901.8052-1-anarsoul@gmail.com>
- <20180601062901.8052-2-anarsoul@gmail.com>
- <20180601091631.wqctilk55fcmggwv@flea>
- <CA+E=qVfH3wWsSdzGn353q0Jf-PQ8cjU-i5osLOV1c4qWVGrR5A@mail.gmail.com>
-Message-ID: <20180604085111.s23qamdethe6sr6d@flea>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Jun 2018 10:42:24 +0100
+Subject: [PATCH] KVM: arm64: VHE: Migrate _elx sysreg accessors to
+ msr_s/mrs_s
+In-Reply-To: <1527603647-24787-1-git-send-email-Dave.Martin@arm.com>
+References: <1527603647-24787-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180601094224.ctyvafybcnzys6f4@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 10:30:00AM -0700, Vasily Khoruzhick wrote:
-> >> ---
-> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 17 +++++++++++++++++
-> >>  1 file changed, 17 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> index 1b2ef28c42bd..b5e903ccf0ec 100644
-> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> @@ -46,6 +46,7 @@
-> >>  #include <dt-bindings/clock/sun8i-r-ccu.h>
-> >>  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >>  #include <dt-bindings/reset/sun50i-a64-ccu.h>
-> >> +#include <dt-bindings/reset/sun8i-r-ccu.h>
-> >>
-> >>  / {
-> >>       interrupt-parent = <&gic>;
-> >> @@ -655,6 +656,17 @@
-> >>                       #reset-cells = <1>;
-> >>               };
-> >>
-> >> +             r_i2c: i2c at 1f02400 {
-> >> +                     compatible = "allwinner,sun6i-a31-i2c";
-> >
-> > You should add an a64 compatible here
+Hi,
+
+On Tue, May 29, 2018 at 03:20:47PM +0100, Dave Martin wrote:
+> Currently, the {read,write}_sysreg_el*() accessors for accessing
+> particular ELs' sysregs in the presence of VHE rely on some local
+> hacks and define their system register encodings in a way that is
+> inconsistent with the core definitions in <asm/sysreg.h>.
 > 
-> We don't have it for regular i2c, why should I add it here?
-
-We miss some of them. Adding for i2c would make sense too.
-
-> >> +                     reg = <0x01f02400 0x400>;
-> >> +                     interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                     clocks = <&r_ccu CLK_APB0_I2C>;
-> >> +                     resets = <&r_ccu RST_APB0_I2C>;
-> >> +                     status = "disabled";
-> >> +                     #address-cells = <1>;
-> >> +                     #size-cells = <0>;
-> >> +             };
-> >> +
-> >>               r_pio: pinctrl at 1f02c00 {
-> >>                       compatible = "allwinner,sun50i-a64-r-pinctrl";
-> >>                       reg = <0x01f02c00 0x400>;
-> >> @@ -670,6 +682,11 @@
-> >>                               pins = "PL0", "PL1";
-> >>                               function = "s_rsb";
-> >>                       };
-> >> +
-> >> +                     r_i2c_pins_a: i2c-a {
-> >> +                             pins = "PL8", "PL9";
-> >> +                             function = "s_i2c";
-> >> +                     };
-> >
-> > This should be ordered by alphabetical order
+> As a result, it is necessary to add duplicate definitions for any
+> system register that already needs a definition in sysreg.h for
+> other reasons.
 > 
-> OK
+> This is a bit of a maintenance headache, and the reasons for the
+> _el*() accessors working the way they do is a bit historical.
 > 
-> > If this is the only muxing option, you can also add it to the i2c DT
-> > node.
-> 
-> It's not the only option, but other option conflicts with rsb. Should
-> I still add it to i2c DT node?
+> This patch gets rid of the shadow sysreg definitions in
+> <asm/kvm_hyp.h>, converts the _el*() accessors to use the core
+> msr_s/mrs_s interface, and converts all call sites to use the
+> standard sysreg #define names (i.e., upper case, with SYS_ prefix).
 
-I guess you can put it there, the muxing will only be enforced if the
-device is enabled, and there should be only one of RSB or I2C that
-would be.
+Nice!
 
-Maxime
+[...]
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/51e52d58/attachment.sig>
+>  static inline unsigned long vcpu_read_elr_el1(const struct kvm_vcpu *vcpu)
+>  {
+>  	if (vcpu->arch.sysregs_loaded_on_cpu)
+> -		return read_sysreg_el1(elr);
+> +		return read_sysreg_el1(SYS_ELR);
+
+Could we have the macro implicitly handle the SYS_ prefix?
+
+A further bit of cleanup that I'd like to do is make {read,write}_sysreg() use
+{mrs,msr}_s, implicitly handling the SYS_ prefix, so that we can kill off
+{read,write}_sysreg_s(), and always use a {read,write}_sysreg().
+
+A minor pain point is that we'd have to convert callers to pass the sysreg name
+in upper-case, but that conversion can be scripted fairly easily.
+
+e.g. for the above, read_sysreg() would take ELR_EL1, and read_sysreg_el1()
+would take ELR.
+
+Thanks,
+Mark.
