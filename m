@@ -1,60 +1,38 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  1 Jun 2018 11:28:22 +0200
-Subject: [PATCH 4/4] lib/vsprintf: Remove atomic-unsafe support for %pCr
+Date: Fri,  1 Jun 2018 11:28:20 +0200
+Subject: [PATCH 2/4] thermal: bcm2835: Stop using printk format %pCr
 In-Reply-To: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
 References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1527845302-12159-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527845302-12159-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"%pCr" formats the current rate of a clock, and calls clk_get_rate().
-The latter obtains a mutex, hence it must not be called from atomic
+Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+called in atomic context.
+
+Replace it by printing the variable that already holds the clock rate.
+Note that calling clk_get_rate() is safe here, as the code runs in task
 context.
 
-Remove support for this rarely-used format, as vsprintf() (and e.g.
-printk()) must be callable from any context.
-
-Any remaining out-of-tree users will start seeing the clock's name
-printed instead of its rate.
-
-Reported-by: Jia-Ju Bai <baijiaju1990@gmail.com>
-Fixes: 900cca2944254edd ("lib/vsprintf: add %pC{,n,r} format specifiers for clocks")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/core-api/printk-formats.rst | 3 +--
- lib/vsprintf.c                            | 3 ---
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ drivers/thermal/broadcom/bcm2835_thermal.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/core-api/printk-formats.rst b/Documentation/core-api/printk-formats.rst
-index eb30efdd2e789616..25dc591cb1108790 100644
---- a/Documentation/core-api/printk-formats.rst
-+++ b/Documentation/core-api/printk-formats.rst
-@@ -419,11 +419,10 @@ struct clk
+diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+index a4d6a0e2e9938190..23ad4f9f21438e45 100644
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -213,8 +213,8 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
+ 	rate = clk_get_rate(data->clk);
+ 	if ((rate < 1920000) || (rate > 5000000))
+ 		dev_warn(&pdev->dev,
+-			 "Clock %pCn running at %pCr Hz is outside of the recommended range: 1.92 to 5MHz\n",
+-			 data->clk, data->clk);
++			 "Clock %pCn running at %lu Hz is outside of the recommended range: 1.92 to 5MHz\n",
++			 data->clk, rate);
  
- 	%pC	pll1
- 	%pCn	pll1
--	%pCr	1560000000
- 
- For printing struct clk structures. %pC and %pCn print the name
- (Common Clock Framework) or address (legacy clock framework) of the
--structure; %pCr prints the current clock rate.
-+structure.
- 
- Passed by reference.
- 
-diff --git a/lib/vsprintf.c b/lib/vsprintf.c
-index 247a7e0bf24f6f74..a48aaa79d352313a 100644
---- a/lib/vsprintf.c
-+++ b/lib/vsprintf.c
-@@ -1469,9 +1469,6 @@ char *clock(char *buf, char *end, struct clk *clk, struct printf_spec spec,
- 		return string(buf, end, NULL, spec);
- 
- 	switch (fmt[1]) {
--	case 'r':
--		return number(buf, end, clk_get_rate(clk), spec);
--
- 	case 'n':
- 	default:
- #ifdef CONFIG_COMMON_CLK
+ 	/* register of thermal sensor and get info from DT */
+ 	tz = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
 -- 
 2.7.4
