@@ -1,175 +1,232 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:27 +0100
-Subject: [PATCH 13/33] arm64/sve: Move read_zcr_features() out of cpufeature.h
+Date: Fri,  1 Jun 2018 16:27:25 +0100
+Subject: [PATCH 11/33] KVM: arm64: Repurpose vcpu_arch.debug_flags for
+ general-purpose flags
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-14-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-12-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dave Martin <Dave.Martin@arm.com>
 
-Having read_zcr_features() inline in cpufeature.h results in that
-header requiring #includes which make it hard to include
-<asm/fpsimd.h> elsewhere without triggering header inclusion
-cycles.
+In struct vcpu_arch, the debug_flags field is used to store
+debug-related flags about the vcpu state.
 
-This is not a hot-path function and arguably should not be in
-cpufeature.h in the first place, so this patch moves it to
-fpsimd.c, compiled conditionally if CONFIG_ARM64_SVE=y.
+Since we are about to add some more flags related to FPSIMD and
+SVE, it makes sense to add them to the existing flags field rather
+than adding new fields.  Since there is only one debug_flags flag
+defined so far, there is plenty of free space for expansion.
 
-This allows some SVE-related #includes to be dropped from
-cpufeature.h, which will ease future maintenance.
+In preparation for adding more flags, this patch renames the
+debug_flags field to simply "flags", and updates comments
+appropriately.
 
-A couple of missing #includes of <asm/fpsimd.h> are exposed by this
-change under arch/arm64/.  This patch adds the missing #includes as
-necessary.
+The flag definitions are also moved to <asm/kvm_host.h>, since
+their presence in <asm/kvm_asm.h> was for purely historical
+reasons:  these definitions are not used from asm any more, and not
+very likely to be as more Hyp asm is migrated to C.
+
+KVM_ARM64_DEBUG_DIRTY_SHIFT has not been used since commit
+1ea66d27e7b0 ("arm64: KVM: Move away from the assembly version of
+the world switch"), so this patch gets rid of that too.
 
 No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+[maz: fixed minor conflict]
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 29 -----------------------------
- arch/arm64/include/asm/fpsimd.h     |  2 ++
- arch/arm64/include/asm/processor.h  |  1 +
- arch/arm64/kernel/fpsimd.c          | 28 ++++++++++++++++++++++++++++
- arch/arm64/kernel/ptrace.c          |  1 +
- 5 files changed, 32 insertions(+), 29 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h  | 3 ---
+ arch/arm64/include/asm/kvm_host.h | 7 +++++--
+ arch/arm64/kvm/debug.c            | 8 ++++----
+ arch/arm64/kvm/hyp/debug-sr.c     | 6 +++---
+ arch/arm64/kvm/hyp/sysreg-sr.c    | 4 ++--
+ arch/arm64/kvm/sys_regs.c         | 9 ++++-----
+ 6 files changed, 18 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 09b0f2a80c8f..0a6b7133195e 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -11,9 +11,7 @@
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index a9ceeec5a76f..821a7032c0f7 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -30,9 +30,6 @@
+ /* The hyp-stub will return this for any kvm_call_hyp() call */
+ #define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
  
- #include <asm/cpucaps.h>
- #include <asm/cputype.h>
--#include <asm/fpsimd.h>
- #include <asm/hwcap.h>
--#include <asm/sigcontext.h>
- #include <asm/sysreg.h>
+-#define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+-#define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+-
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/mm.h>
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 469de8acd06f..146c16794d32 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -216,8 +216,8 @@ struct kvm_vcpu_arch {
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+-	/* Guest debug state */
+-	u64 debug_flags;
++	/* Miscellaneous vcpu state flags */
++	u64 flags;
+ 
+ 	/*
+ 	 * We maintain more than a single set of debug registers to support
+@@ -293,6 +293,9 @@ struct kvm_vcpu_arch {
+ 	bool sysregs_loaded_on_cpu;
+ };
+ 
++/* vcpu_arch flags field values: */
++#define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
++
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
  
  /*
-@@ -510,33 +508,6 @@ static inline bool system_supports_sve(void)
- 		cpus_have_const_cap(ARM64_SVE);
- }
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index a1f4ebdfe6d3..00d422336a45 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -103,7 +103,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
+  *
+  * Additionally, KVM only traps guest accesses to the debug registers if
+  * the guest is not actively using them (see the KVM_ARM64_DEBUG_DIRTY
+- * flag on vcpu->arch.debug_flags).  Since the guest must not interfere
++ * flag on vcpu->arch.flags).  Since the guest must not interfere
+  * with the hardware state when debugging the guest, we must ensure that
+  * trapping is enabled whenever we are debugging the guest using the
+  * debug registers.
+@@ -111,7 +111,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
  
--/*
-- * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
-- * vector length.
-- *
-- * Use only if SVE is present.
-- * This function clobbers the SVE vector length.
-- */
--static inline u64 read_zcr_features(void)
--{
--	u64 zcr;
--	unsigned int vq_max;
--
--	/*
--	 * Set the maximum possible VL, and write zeroes to all other
--	 * bits to see if they stick.
--	 */
--	sve_kernel_enable(NULL);
--	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
--
--	zcr = read_sysreg_s(SYS_ZCR_EL1);
--	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
--	vq_max = sve_vq_from_vl(sve_get_vl());
--	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
--
--	return zcr;
--}
--
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 3e00f701cb9c..fb60b22b8bbf 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -69,6 +69,8 @@ extern unsigned int sve_get_vl(void);
- struct arm64_cpu_capabilities;
- extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
- 
-+extern u64 read_zcr_features(void);
-+
- extern int __ro_after_init sve_max_vl;
- 
- #ifdef CONFIG_ARM64_SVE
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 36d64f83cdfb..9231b8762ca6 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -40,6 +40,7 @@
- 
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
-+#include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
- #include <asm/pgtable-hwdef.h>
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 794dd990da82..6c01ee2062c4 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -37,6 +37,7 @@
- #include <linux/sched/task_stack.h>
- #include <linux/signal.h>
- #include <linux/slab.h>
-+#include <linux/stddef.h>
- #include <linux/sysctl.h>
- 
- #include <asm/esr.h>
-@@ -755,6 +756,33 @@ void sve_kernel_enable(const struct arm64_cpu_capabilities *__always_unused p)
- 	isb();
- }
- 
-+/*
-+ * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
-+ * vector length.
-+ *
-+ * Use only if SVE is present.
-+ * This function clobbers the SVE vector length.
-+ */
-+u64 read_zcr_features(void)
-+{
-+	u64 zcr;
-+	unsigned int vq_max;
-+
-+	/*
-+	 * Set the maximum possible VL, and write zeroes to all other
-+	 * bits to see if they stick.
-+	 */
-+	sve_kernel_enable(NULL);
-+	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
-+
-+	zcr = read_sysreg_s(SYS_ZCR_EL1);
-+	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
-+	vq_max = sve_vq_from_vl(sve_get_vl());
-+	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
-+
-+	return zcr;
-+}
-+
- void __init sve_setup(void)
+ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
  {
- 	u64 zcr;
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 7ff81fed46e1..78889c4546d7 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -44,6 +44,7 @@
- #include <asm/compat.h>
- #include <asm/cpufeature.h>
+-	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
++	bool trap_debug = !(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY);
+ 	unsigned long mdscr;
+ 
+ 	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
+@@ -184,7 +184,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+ 			vcpu_write_sys_reg(vcpu, mdscr, MDSCR_EL1);
+ 
+ 			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
+-			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++			vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
+ 			trap_debug = true;
+ 
+ 			trace_kvm_arm_set_regset("BKPTS", get_num_brps(),
+@@ -206,7 +206,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+ 
+ 	/* If KDE or MDE are set, perform a full save/restore cycle. */
+ 	if (vcpu_read_sys_reg(vcpu, MDSCR_EL1) & (DBG_MDSCR_KDE | DBG_MDSCR_MDE))
+-		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
+ 
+ 	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+ 	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_read_sys_reg(vcpu, MDSCR_EL1));
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 3e717f66f011..50009766e5e5 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -163,7 +163,7 @@ void __hyp_text __debug_switch_to_guest(struct kvm_vcpu *vcpu)
+ 	if (!has_vhe())
+ 		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+ 
+-	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
++	if (!(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY))
+ 		return;
+ 
+ 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+@@ -185,7 +185,7 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
+ 	if (!has_vhe())
+ 		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
+ 
+-	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
++	if (!(vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY))
+ 		return;
+ 
+ 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+@@ -196,7 +196,7 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
+ 	__debug_save_state(vcpu, guest_dbg, guest_ctxt);
+ 	__debug_restore_state(vcpu, host_dbg, host_ctxt);
+ 
+-	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
++	vcpu->arch.flags &= ~KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+ u32 __hyp_text __kvm_get_mdcr_el2(void)
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index b3894df6bf1a..35bc16832efe 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -196,7 +196,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ 	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
+ 	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+ 
+-	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
++	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
+ 		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
+ }
+ 
+@@ -218,7 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+ 	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
+ 	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
+ 
+-	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
++	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
+ 		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+ }
+ 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 6e3b969391fd..a4363735d3f8 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -31,7 +31,6 @@
  #include <asm/debug-monitors.h>
-+#include <asm/fpsimd.h>
- #include <asm/pgtable.h>
- #include <asm/stacktrace.h>
- #include <asm/syscall.h>
+ #include <asm/esr.h>
+ #include <asm/kvm_arm.h>
+-#include <asm/kvm_asm.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
+@@ -338,7 +337,7 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
+ {
+ 	if (p->is_write) {
+ 		vcpu_write_sys_reg(vcpu, p->regval, r->reg);
+-		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
+ 	} else {
+ 		p->regval = vcpu_read_sys_reg(vcpu, r->reg);
+ 	}
+@@ -369,7 +368,7 @@ static void reg_to_dbg(struct kvm_vcpu *vcpu,
+ 	}
+ 
+ 	*dbg_reg = val;
+-	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++	vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+ static void dbg_to_reg(struct kvm_vcpu *vcpu,
+@@ -1441,7 +1440,7 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
+ {
+ 	if (p->is_write) {
+ 		vcpu_cp14(vcpu, r->reg) = p->regval;
+-		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
+ 	} else {
+ 		p->regval = vcpu_cp14(vcpu, r->reg);
+ 	}
+@@ -1473,7 +1472,7 @@ static bool trap_xvr(struct kvm_vcpu *vcpu,
+ 		val |= p->regval << 32;
+ 		*dbg_reg = val;
+ 
+-		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
+ 	} else {
+ 		p->regval = *dbg_reg >> 32;
+ 	}
 -- 
 2.17.1
