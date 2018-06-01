@@ -1,61 +1,67 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Fri,  1 Jun 2018 18:09:18 +0530
-Subject: [PATCH v12 5/5] arm64: Allow huge io mappings again
-In-Reply-To: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
-References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1527856758-27169-6-git-send-email-cpandya@codeaurora.org>
+From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
+Date: Fri, 1 Jun 2018 12:44:42 +0000
+Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <86d0xhaucm.wl-marc.zyngier@arm.com>
+References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
+ <86d0xhaucm.wl-marc.zyngier@arm.com>
+Message-ID: <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Huge mappings have had stability issues due to stale
-TLB entry and memory leak issues. Since, those are
-addressed in this series of patches, it is now safe
-to allow huge mappings.
+Hi Marc
 
-Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
----
- arch/arm64/mm/mmu.c | 18 ++----------------
- 1 file changed, 2 insertions(+), 16 deletions(-)
+I have reviewed your patch.	 
+I think the approach is same between your patch and mine.
+Your patch is simpler and more beautiful, and match our bus's requirement.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6e7e16c..c65abc4 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -934,15 +934,8 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+I have only one question.
+According your patch, if there are no enough lpis, amount of lpis required
+will be divide by 2. it means someone want 16 lpis, maybe they can only get 8?
+I don?t' understand why we need it.
+
+ static unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
  {
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
--	pud_t new_pud = pfn_pud(__phys_to_pfn(phys), sect_prot);
--
--	/* Only allow permission changes for now */
--	if (!pgattr_change_is_safe(READ_ONCE(pud_val(*pudp)),
--				   pud_val(new_pud)))
--		return 0;
--
- 	BUG_ON(phys & ~PUD_MASK);
--	set_pud(pudp, new_pud);
-+	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
- 	return 1;
- }
+         unsigned long *bitmap = NULL;
+         int err = 0;
+
+         do {
+                 err = alloc_lpi_range(nr_irqs, base);
+                 if (!err)
+                         break;
+
+                 nr_irqs /= 2;
+         } while (nr_irqs > 0);
+
+
+Best Regards,
+Lei Zhang zhang.lei at jp.fujitsu.com
+FUJITSU LIMITED
+
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+> Marc Zyngier
+> Sent: Monday, May 28, 2018 2:20 AM
+> To: Zhang, Lei/? ?
+> Cc: 'linux-arm-kernel at lists.infradead.org'
+> Subject: Re: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+> 
+> On Fri, 25 May 2018 13:45:24 +0100,
+> Zhang, Lei wrote:
+> 
  
-@@ -950,15 +943,8 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
- {
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
--	pmd_t new_pmd = pfn_pmd(__phys_to_pfn(phys), sect_prot);
--
--	/* Only allow permission changes for now */
--	if (!pgattr_change_is_safe(READ_ONCE(pmd_val(*pmdp)),
--				   pmd_val(new_pmd)))
--		return 0;
--
- 	BUG_ON(phys & ~PMD_MASK);
--	set_pmd(pmdp, new_pmd);
-+	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
- 	return 1;
- }
- 
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation
-Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
-Collaborative Project
+> I've just prototyped what I had in mind for this at [1] (see the first
+> patch for the allocator itself). As you can see, the allocator is a
+> lot simpler, yet it has all the flexibility you would need, The
+> drawback is of course that freeing LPIs is quite expensive, but that
+> almost never happens. And if it does, we can switch to a tree or some
+> more efficient data structure.
+> 
+> Thanks,
+> 
+> 	M.
+> 
+> [1]
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.gi
+> t/log/?h=irq/lpi-allocator
+> 
