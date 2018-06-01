@@ -1,250 +1,66 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 1 Jun 2018 10:37:29 -0700
-Subject: [PATCH 3/3] arm64: dts: allwinner: add support for Pinebook
-In-Reply-To: <20180601092346.g2iixqupumn7xo7r@flea>
-References: <20180601062901.8052-1-anarsoul@gmail.com>
- <20180601062901.8052-4-anarsoul@gmail.com>
- <20180601092346.g2iixqupumn7xo7r@flea>
-Message-ID: <CA+E=qVffecgkCG2V_5ptS9oRxo4XwjpQQhWmf8ywpfF78Yy+7A@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 2 Jun 2018 01:51:30 +0800
+Subject: [PATCH 5/7] iommu/dma: add support for non-strict mode
+In-Reply-To: <1527752569-18020-6-git-send-email-thunder.leizhen@huawei.com>
+References: <1527752569-18020-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <201806020106.eRUp2Ehc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 1, 2018 at 2:23 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Thu, May 31, 2018 at 11:29:01PM -0700, Vasily Khoruzhick wrote:
->> From: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> Pinebook is a A64-based laptop produced by Pine64, with the following
->> peripherals:
->>
->> USB:
->> - Two external USB ports (one is directly connected to A64's OTG
->> controller, the other is under a internal hub connected to the host-only
->> controller.)
->> - USB HID keyboard and touchpad connected to the internal hub.
->> - USB UVC camera connected to the internal hub.
->>
->> Power-related:
->> - A DC IN jack connected to AXP803's DCIN pin.
->> - A Li-Polymer battery connected to AXP803's battery pins.
->>
->> Storage:
->> - An eMMC by Foresee on the main board (in the product revision of the
->> main board it's designed to be switchable).
->> - An external MicroSD card slot.
->>
->> Display:
->> - An eDP LCD panel (1366x768) connected via an ANX6345 RGB-eDP bridge.
->> - A mini HDMI port.
->>
->> Misc:
->> - A Hall sensor designed to detect the status of lid, connected to GPIO PL12.
->> - A headphone jack connected to the SoC's internal codec.
->> - A debug UART port muxed with headphone jack.
->>
->> This commit adds basical support for it.
->>
->> [vasily: squashed several commits into one, added simplefb node, added usbphy
->>        to ehci0 and ohci0 nodes]
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> ---
->>  arch/arm64/boot/dts/allwinner/Makefile        |   1 +
->>  .../dts/allwinner/sun50i-a64-pinebook.dts     | 285 ++++++++++++++++++
->>  2 files changed, 286 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
->> index 8bebe7da5ed9..a8c6d0c6f2c5 100644
->> --- a/arch/arm64/boot/dts/allwinner/Makefile
->> +++ b/arch/arm64/boot/dts/allwinner/Makefile
->> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
->>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
->>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
->>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
->> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
->>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
->>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
->>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->> new file mode 100644
->> index 000000000000..d952db217702
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->> @@ -0,0 +1,285 @@
->> +/*
->> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
->> + * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
->> + *
->> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
->
-> The SPDX tag should be the first one.
+Hi Zhen,
 
-OK, but it's not in number of other dts files, e.g.
-sun50i-a64-teres-i.dts or sun50i-h5-orangepi-zero-plus.dts
+Thank you for the patch! Perhaps something to improve:
 
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "sun50i-a64.dtsi"
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/input/input.h>
->> +#include <dt-bindings/pwm/pwm.h>
->> +
->> +/ {
->> +     model = "Pinebook";
->> +     compatible = "pine64,pinebook", "allwinner,sun50i-a64";
->> +
->> +     aliases {
->> +             serial0 = &uart0;
->> +             ethernet0 = &rtl8723cs;
->> +     };
->> +
->> +     backlight: backlight {
->> +             compatible = "pwm-backlight";
->> +             pwms = <&pwm 0 50000 0>;
->> +             brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
->
-> The perceived brightness should be increasing linearly. This usually
-> means that you need an function close to a power of two sequence.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.17-rc7 next-20180601]
+[cannot apply to iommu/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-OK, I'll try, but no one complained so far.
+url:    https://github.com/0day-ci/linux/commits/Zhen-Lei/add-non-strict-mode-support-for-arm-smmu-v3/20180602-000418
+config: x86_64-randconfig-x008-201821 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
->> +             default-brightness-level = <2>;
->> +             enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 */
->> +     };
->> +
->> +     chosen {
->> +             stdout-path = "serial0:115200n8";
->> +
->> +             framebuffer-lcd {
->> +                     panel-supply = <&reg_dc1sw>;
->> +                     dvdd25-supply = <&reg_dldo2>;
->> +                     dvdd12-supply = <&reg_fldo1>;
->> +             };
->> +     };
->> +
->> +     gpio_keys {
->> +             compatible = "gpio-keys";
->> +
->> +             lid_switch {
->> +                     label = "Lid Switch";
->> +                     gpios = <&r_pio 0 12 GPIO_ACTIVE_LOW>; /* PL12 */
->> +                     linux,input-type = <EV_SW>;
->> +                     linux,code = <SW_LID>;
->> +                     linux,can-disable;
->> +             };
->> +     };
->> +
->> +     reg_vcc3v3: vcc3v3 {
->> +             compatible = "regulator-fixed";
->> +             regulator-name = "vcc3v3";
->> +             regulator-min-microvolt = <3300000>;
->> +             regulator-max-microvolt = <3300000>;
->> +     };
->> +
->> +     wifi_pwrseq: wifi_pwrseq {
->> +             compatible = "mmc-pwrseq-simple";
->> +             reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->> +     };
->> +};
->> +
->> +&ehci0 {
->> +     phys = <&usbphy 0>;
->> +     phy-names = "usb";
->> +     status = "okay";
->> +};
->> +
->> +&ehci1 {
->> +     status = "okay";
->> +};
->> +
->> +&mmc0 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc0_pins>;
->> +     vmmc-supply = <&reg_dcdc1>;
->> +     cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
->> +     cd-inverted;
->> +     disable-wp;
->> +     bus-width = <4>;
->> +     status = "okay";
->> +};
->> +
->> +&mmc1 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc1_pins>;
->> +     vmmc-supply = <&reg_dldo4>;
->> +     vqmmc-supply = <&reg_eldo1>;
->> +     mmc-pwrseq = <&wifi_pwrseq>;
->> +     bus-width = <4>;
->> +     non-removable;
->> +     status = "okay";
->> +
->> +     rtl8723cs: wifi at 1 {
->> +             reg = <1>;
->> +     };
->> +};
->> +
->> +&mmc2 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc2_pins>;
->> +     vmmc-supply = <&reg_dcdc1>;
->> +     vqmmc-supply = <&reg_eldo1>;
->> +     bus-width = <8>;
->> +     non-removable;
->> +     cap-mmc-hw-reset;
->> +     mmc-hs200-1_8v;
->> +     status = "okay";
->> +};
->> +
->> +&ohci0 {
->> +     phys = <&usbphy 0>;
->> +     phy-names = "usb";
->> +     status = "okay";
->> +};
->> +
->> +&ohci1 {
->> +     status = "okay";
->> +};
->> +
->> +&pwm {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&pwm_pin>;
->> +     status = "okay";
->> +};
->> +
->> +&r_rsb {
->> +     status = "okay";
->> +
->> +     axp803: pmic at 3a3 {
->> +             compatible = "x-powers,axp803";
->> +             reg = <0x3a3>;
->> +             interrupt-parent = <&r_intc>;
->> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> +     };
->> +};
->> +
->> +/* The ANX6345 eDP-bridge is on r_i2c. There is no linux (mainline)
->> + * driver for this chip at the moment, the bootloader initializes it.
->> + * However it can be accessed with the i2c-dev driver from user space.
->> + */
->
-> The comment format is wrong, and the part after r_i2c, about i2c-dev
-> and the mainline support is not really relevant. The DT describes the
-> hardware, and is used by several different projects that might or
-> might not have i2c-dev, an interface similar, or might have or not a
-> driver for the bridge.
+All warnings (new ones prefixed by >>):
 
-Comment is identical to sun50i-a64-teres-i.dts (which was merged few
-months ago).
-I'll remove everything but first sentence.
+   drivers//iommu/amd_iommu.c: In function 'amd_iommu_capable':
+>> drivers//iommu/amd_iommu.c:3053:2: warning: enumeration value 'IOMMU_CAP_NON_STRICT' not handled in switch [-Wswitch]
+     switch (cap) {
+     ^~~~~~
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+vim +/IOMMU_CAP_NON_STRICT +3053 drivers//iommu/amd_iommu.c
+
+645c4c8d arch/x86/kernel/amd_iommu.c Joerg Roedel 2008-12-02  3050  
+ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3051  static bool amd_iommu_capable(enum iommu_cap cap)
+dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3052  {
+80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27 @3053  	switch (cap) {
+80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3054  	case IOMMU_CAP_CACHE_COHERENCY:
+ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3055  		return true;
+bdddadcb drivers/iommu/amd_iommu.c   Joerg Roedel 2012-07-02  3056  	case IOMMU_CAP_INTR_REMAP:
+ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3057  		return (irq_remapping_enabled == 1);
+cfdeec22 drivers/iommu/amd_iommu.c   Will Deacon  2014-10-27  3058  	case IOMMU_CAP_NOEXEC:
+cfdeec22 drivers/iommu/amd_iommu.c   Will Deacon  2014-10-27  3059  		return false;
+80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3060  	}
+80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3061  
+ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3062  	return false;
+dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3063  }
+dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3064  
+
+:::::: The code at line 3053 was first introduced by commit
+:::::: 80a506b8fdcfa868bb53eb740f928217d0966fc1 x86/amd-iommu: Export cache-coherency capability
+
+:::::: TO: Joerg Roedel <joerg.roedel@amd.com>
+:::::: CC: Joerg Roedel <joerg.roedel@amd.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 28596 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180602/14d67fbb/attachment-0001.gz>
