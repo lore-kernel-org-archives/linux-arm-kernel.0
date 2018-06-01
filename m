@@ -1,267 +1,87 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  1 Jun 2018 11:10:14 +0100
-Subject: [PATCH v6 2/2] arm64: signal: Report signal frame size to userspace
- via auxv
-In-Reply-To: <1527847814-22829-1-git-send-email-Dave.Martin@arm.com>
-References: <1527847814-22829-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1527847814-22829-3-git-send-email-Dave.Martin@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 1 Jun 2018 13:17:36 +0300
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <DM6PR02MB43612FF66323449C7D2B4FDCC76C0@DM6PR02MB4361.namprd02.prod.outlook.com>
+References: <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+ <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+ <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
+ <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+ <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
+ <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
+ <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
+ <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+ <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
+ <20180424035548.GA6014@localhost>
+ <ee1dc551-7c11-6d10-651d-01bf6520f049@ti.com>
+ <MWHPR02MB3293486390485A6FCCEA7DECC7910@MWHPR02MB3293.namprd02.prod.outlook.com>
+ <99581088-7ef8-6fac-c934-91eadddfb04e@ti.com>
+ <DM6PR02MB43612FF66323449C7D2B4FDCC76C0@DM6PR02MB4361.namprd02.prod.outlook.com>
+Message-ID: <32208a9c-2b15-d345-1432-f1e387531f9b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stateful CPU architecture extensions may require the signal frame
-to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
-However, changing this #define is an ABI break.
+Hi Radhey,
 
-To allow userspace the option of determining the signal frame size
-in a more forwards-compatible way, this patch adds a new auxv entry
-tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
-size that the process can observe during its lifetime.
+On 2018-05-30 20:29, Radhey Shyam Pandey wrote:
+>> In couple of days I can update the metadata patches I have atm and send
+>> as RFC.
+>>
+>> Is there anything from your side I should take into account when doing that?
+> I think a generic interface to attach/share metadata buffer b/w client and the
+> dmaengine driver is good enough. Is metadata patchset (early version) 
+> available in TI external repos? 
 
-If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
-assume that the MINSIGSTKSZ #define is sufficient.  This allows for
-a consistent interface with older kernels that do not provide
-AT_MINSIGSTKSZ.
+I don't have it in public repository, but now that the TRM is public I
+can start preparing things for upstream.
 
-The idea is that libc could expose this via sysconf() or some
-similar mechanism.
+I have attached the patch I ended up with, but I need to add the
+documentation part.
 
-There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
-about userspace's own stack overheads and should not pretend to
-know.
+Since the 'metadata' is part of the DMA descriptor itself I thought that
+it might be better to reflect that -> the metadata_ops is part of the
+dma_async_tx_descriptor struct.
 
-For arm64:
+DMA drivers can initialize it when it is supported by the channel or
+setup. In my case it is optional, many peripherals did not use it at all.
 
-The primary motivation for this interface is the Scalable Vector
-Extension, which can require at least 4KB or so of extra space
-in the signal frame for the largest hardware implementations.
+I have two modes to deal with the metadata:
+1. attach mode
+Client drivers are giving a buffer and a size to the DMA driver and in
+case of TX the data is copied to the descriptor's metadata part. In case
+of RX when the transfer is completed the DMA driver will copy the data
+from the DMA descriptor to the client provided buffer.
+Here we need one memcpy for each descriptor.
 
-To determine the correct value, a "Christmas tree" mode (via the
-add_all argument) is added to setup_sigframe_layout(), to simulate
-addition of all possible records to the signal frame at maximum
-possible size.
+2. pointer mode
+If we have high throughput peripheral, the per descriptor memcpy can be
+an obstacle for performance.
 
-If this procedure goes wrong somehow, resulting in a stupidly large
-frame layout and hence failure of sigframe_alloc() to allocate a
-record to the frame, then this is indicative of a kernel bug.  In
-this case, we WARN() and no attempt is made to populate
-AT_MINSIGSTKSZ for userspace.
+TX: The client dmaengine_desc_get_metadata_ptr() to get the pointer to
+the metadata section of the descriptor, it will receive back the max
+size and the currently used size (important for RX). This is done before
+issue_pending().
+The client can update the metadata directly and when it is done calls
+the dmaengine_desc_set_metadata_len() to tell the DMA driver the size of
+the metadata it has configured.
 
-For arm64 SVE:
+RX: in the DMA callback the client calls
+dmaengine_desc_get_metadata_ptr() to get the pointer and the size of the
+metadata we have received and can process the information w/o memcpy.
 
-The SVE context block in the signal frame needs to be considered
-too when computing the maximum possible signal frame size.
+I think it might be better to rename these from metadata to client_data
+or something. It is part of the DMA descriptor, passed along with the
+DMA descriptor, but it is owned by the client driver.
 
-Because the size of this block depends on the vector length, this
-patch computes the size based not on the thread's current vector
-length but instead on the maximum possible vector length: this
-determines the maximum size of SVE context block that can be
-observed in any signal frame for the lifetime of the process.
+- P?ter
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-
----
-
-Changes since v5:
-
-Requested by Will Deacon:
-
- * Fill the hole left by a missing AT_MINSIGSTKSZ with AT_IGNORE
-
-   (due to concerns about how a short auxv may affect the FDPIC
-   loader and PR_SET_MM related stuff.
----
- arch/arm64/include/asm/elf.h         | 13 +++++++++
- arch/arm64/include/asm/processor.h   |  5 ++++
- arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
- arch/arm64/kernel/cpufeature.c       |  1 +
- arch/arm64/kernel/signal.c           | 52 +++++++++++++++++++++++++++++++-----
- 5 files changed, 66 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index fac1c4d..433b955 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -121,6 +121,9 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/bug.h>
-+#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-+
- typedef unsigned long elf_greg_t;
- 
- #define ELF_NGREG (sizeof(struct user_pt_regs) / sizeof(elf_greg_t))
-@@ -148,6 +151,16 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
- 		    (elf_addr_t)current->mm->context.vdso);		\
-+									\
-+	/*								\
-+	 * Should always be nonzero unless there's a kernel bug.	\
-+	 * If we haven't determined a sensible value to give to		\
-+	 * userspace, omit the entry:					\
-+	 */								\
-+	if (likely(signal_minsigstksz))					\
-+		NEW_AUX_ENT(AT_MINSIGSTKSZ, signal_minsigstksz);	\
-+	else								\
-+		NEW_AUX_ENT(AT_IGNORE, 0);				\
- } while (0)
- 
- #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 7675989..65ab83e 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -35,6 +35,8 @@
- #ifdef __KERNEL__
- 
- #include <linux/build_bug.h>
-+#include <linux/cache.h>
-+#include <linux/init.h>
- #include <linux/stddef.h>
- #include <linux/string.h>
- 
-@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+extern unsigned long __ro_after_init signal_minsigstksz; /* sigframe size */
-+extern void __init minsigstksz_setup(void);
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
-diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-index ec0a86d..743c0b8 100644
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,7 +19,8 @@
- 
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
-+#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
- 
--#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-+#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
- 
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..0e0b53d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
- 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
- 
- 	sve_setup();
-+	minsigstksz_setup();
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 154b7d3..e7da5db 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/cache.h>
- #include <linux/compat.h>
- #include <linux/errno.h>
- #include <linux/kernel.h>
-@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return 0;
- }
- 
--/* Determine the layout of optional records in the signal frame */
--static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-+/*
-+ * Determine the layout of optional records in the signal frame
-+ *
-+ * add_all: if true, lays out the biggest possible signal frame for
-+ *	this task; otherwise, generates a layout for the current state
-+ *	of the task.
-+ */
-+static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
-+				 bool add_all)
- {
- 	int err;
- 
-@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 		return err;
- 
- 	/* fault information, if valid */
--	if (current->thread.fault_code) {
-+	if (add_all || current->thread.fault_code) {
- 		err = sigframe_alloc(user, &user->esr_offset,
- 				     sizeof(struct esr_context));
- 		if (err)
-@@ -591,8 +599,14 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	if (system_supports_sve()) {
- 		unsigned int vq = 0;
- 
--		if (test_thread_flag(TIF_SVE))
--			vq = sve_vq_from_vl(current->thread.sve_vl);
-+		if (add_all || test_thread_flag(TIF_SVE)) {
-+			int vl = sve_max_vl;
-+
-+			if (!add_all)
-+				vl = current->thread.sve_vl;
-+
-+			vq = sve_vq_from_vl(vl);
-+		}
- 
- 		err = sigframe_alloc(user, &user->sve_offset,
- 				     SVE_SIG_CONTEXT_SIZE(vq));
-@@ -603,7 +617,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	return sigframe_alloc_end(user);
- }
- 
--
- static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 			  struct pt_regs *regs, sigset_t *set)
- {
-@@ -701,7 +714,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
- 	int err;
- 
- 	init_user_layout(user);
--	err = setup_sigframe_layout(user);
-+	err = setup_sigframe_layout(user, false);
- 	if (err)
- 		return err;
- 
-@@ -936,3 +949,28 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		thread_flags = READ_ONCE(current_thread_info()->flags);
- 	} while (thread_flags & _TIF_WORK_MASK);
- }
-+
-+unsigned long __ro_after_init signal_minsigstksz;
-+
-+/*
-+ * Determine the stack space required for guaranteed signal devliery.
-+ * This function is used to populate AT_MINSIGSTKSZ at process startup.
-+ * cpufeatures setup is assumed to be complete.
-+ */
-+void __init minsigstksz_setup(void)
-+{
-+	struct rt_sigframe_user_layout user;
-+
-+	init_user_layout(&user);
-+
-+	/*
-+	 * If this fails, SIGFRAME_MAXSZ needs to be enlarged.  It won't
-+	 * be big enough, but it's our best guess:
-+	 */
-+	if (WARN_ON(setup_sigframe_layout(&user, true)))
-+		return;
-+
-+	signal_minsigstksz = sigframe_size(&user) +
-+		round_up(sizeof(struct frame_record), 16) +
-+		16; /* max alignment padding */
-+}
--- 
-2.1.4
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-dmaengine-Add-metadat_ops-for-dma_async_tx_descripto.patch
+Type: text/x-patch
+Size: 3092 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180601/d3c18cb2/attachment-0001.bin>
