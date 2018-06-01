@@ -1,42 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 1 Jun 2018 13:56:59 +0100
-Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
- <86d0xhaucm.wl-marc.zyngier@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
-Message-ID: <31bede40-dbc5-0a88-d12c-5fc79ea02391@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  1 Jun 2018 14:16:02 +0100
+Subject: [RFC PATCH 3/8] coresight: Cleanup platform description data
+In-Reply-To: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1527858967-16047-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lei,
+Nobody uses the "clk" field in struct coresight_platform_data.
+Remove it.
 
-On 01/06/18 13:44, Zhang, Lei wrote:
-> Hi Marc
-> 
-> I have reviewed your patch.	 
-> I think the approach is same between your patch and mine.
-> Your patch is simpler and more beautiful, and match our bus's requirement.
-> 
-> I have only one question.
-> According your patch, if there are no enough lpis, amount of lpis required
-> will be divide by 2. it means someone want 16 lpis, maybe they can only get 8?
-> I don?t' understand why we need it.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ include/linux/coresight.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-That's the way the MSI allocation works in the kernel.
-
-A driver asks a number of MSIs (let's imagine, for example, one MSI per
-CPU in the system), but the underlying HW can only provide a smaller number.
-
-Instead of failing and just returning an error, we reduce the allocation
-in order to provide the driver with something. If that's not enough,
-well, the driver itself will have the opportunity to give up.
-
-See pci_alloc_irq_vectors_affinity(), which takes a min and a max number
-of vectors, for example.
-
-Thanks,
-
-	M.
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index d950dad..32aaa1c 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -94,7 +94,6 @@ struct coresight_dev_subtype {
+  * @child_ports:child component port number the current component is
+ 		connected  to.
+  * @nr_outport:	number of output ports for this component.
+- * @clk:	The clock this component is associated to.
+  */
+ struct coresight_platform_data {
+ 	int cpu;
+@@ -104,7 +103,6 @@ struct coresight_platform_data {
+ 	const char **child_names;
+ 	int *child_ports;
+ 	int nr_outport;
+-	struct clk *clk;
+ };
+ 
+ /**
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
