@@ -1,58 +1,30 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri,  1 Jun 2018 08:58:19 +0200
-Subject: [PATCH v1 2/4] dt-bindings: mailbox: provide imx-mailbox documentation
+Date: Fri,  1 Jun 2018 08:58:18 +0200
+Subject: [PATCH v1 1/4] clk: imx7d: add IMX7D_MU_ROOT_CLK
 In-Reply-To: <20180601065821.28234-1-o.rempel@pengutronix.de>
 References: <20180601065821.28234-1-o.rempel@pengutronix.de>
-Message-ID: <20180601065821.28234-3-o.rempel@pengutronix.de>
+Message-ID: <20180601065821.28234-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This clock is needed for iMX mailbox driver
+
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- .../bindings/mailbox/imx-mailbox.txt          | 35 +++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+ drivers/clk/imx/clk-imx7d.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
-new file mode 100644
-index 000000000000..a45604b33039
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
-@@ -0,0 +1,35 @@
-+i.MX Messaging Unit
-+===================
-+
-+The i.MX Messaging Unit (MU) contains two register sets: "A" and "B". In most cases
-+they are accessible from all Processor Units. On one hand, at least for mailbox functionality,
-+it makes no difference which application or processor is using which set of the MU. On
-+other hand, the register sets for each of the MU parts are not identical.
-+
-+Required properties:
-+- compatible :	Shell be one of:
-+                    "fsl,imx7s-mu-a" and "fsl,imx7s-mu-b" for i.MX7S or i.MX7D
-+- reg : 	physical base address of the mailbox and length of
-+		memory mapped region.
-+- #mbox-cells:	Common mailbox binding property to identify the number
-+		of cells required for the mailbox specifier. Should be 1.
-+- interrupts :	interrupt number. The interrupt specifier format
-+		depends on the interrupt controller parent.
-+- clocks     :  phandle to the input clock.
-+
-+Example:
-+	mu0a: mu at 30aa0000 {
-+		compatible = "fsl,imx7s-mu-a";
-+		reg = <0x30aa0000 0x28>;
-+		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&clks IMX7D_MU_ROOT_CLK>;
-+		#mbox-cells = <1>;
-+	};
-+
-+	mu0b: mu at 30ab0000 {
-+		compatible = "fsl,imx7s-mu-b";
-+		reg = <0x30ab0000 0x28>;
-+		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&clks IMX7D_MU_ROOT_CLK>;
-+		#mbox-cells = <1>;
-+	};
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 975a20d3cc94..1c2541dc40e7 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -793,6 +793,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
++	clks[IMX7D_MU_ROOT_CLK] = imx_clk_gate2("mu_root_clk", "ipg_root_clk", base + 0x4270, 0);
+ 	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
+ 	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk", base + 0x4250, 0);
+ 	clks[IMX7D_CAAM_CLK] = imx_clk_gate4("caam_clk", "ipg_root_clk", base + 0x4240, 0);
 -- 
 2.17.1
