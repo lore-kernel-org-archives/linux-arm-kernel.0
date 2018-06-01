@@ -1,66 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 2 Jun 2018 01:51:30 +0800
-Subject: [PATCH 5/7] iommu/dma: add support for non-strict mode
-In-Reply-To: <1527752569-18020-6-git-send-email-thunder.leizhen@huawei.com>
-References: <1527752569-18020-6-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <201806020106.eRUp2Ehc%fengguang.wu@intel.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Fri, 1 Jun 2018 10:54:32 -0700
+Subject: [PATCH v2 1/2] ARM: debug: Add Iproc UART3 debug addresses
+In-Reply-To: <61a35071-4304-a25f-8c99-fe504b2c2346@gmail.com>
+References: <20180530131956.13972-1-peron.clem@gmail.com>
+ <93c2d07a-9344-ed39-261e-11084067a3fa@broadcom.com>
+ <CAJiuCcek9KU6QWsAAxVCLUaf1v97uR6FcLOfY=A1LGCMTmjHjg@mail.gmail.com>
+ <41bbf801-f060-2056-4015-b4d05c6831bb@broadcom.com>
+ <61a35071-4304-a25f-8c99-fe504b2c2346@gmail.com>
+Message-ID: <152f524b-49c5-2fc3-8f65-b71f0241b530@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhen,
+Sorry Florian, I had a couple issues with my email client yesterday and 
+I'm not sure if you have received my reply.
 
-Thank you for the patch! Perhaps something to improve:
+Please see my reply inline.
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.17-rc7 next-20180601]
-[cannot apply to iommu/next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 5/31/2018 3:16 PM, Florian Fainelli wrote:
+> 
+> 
+> On 05/31/2018 10:24 AM, Ray Jui wrote:
+>>
+>>
+>> On 5/31/2018 1:22 AM, Cl?ment P?ron wrote:
+>>> Hi Rai,
+>>>
+>>> On Wed, 30 May 2018 at 19:25, Ray Jui <ray.jui@broadcom.com> wrote:
+>>>>
+>>>> Hi Cl?ment,
+>>>>
+>>>> Correct me if I'm wrong, but I thought the trend is to move to use
+>>>> earlycon that can be activated from kernel command line for early print
+>>>> before the serial driver is loaded.
+>>>>
+>>>> Have you tried earlcon?
+>>> No, only tested this method.
+>>>
+>>> Thanks,
+>>> Clement
+>>>
+>>
+>> If I remember it correctly, I think the trend is to use earlycon. There
+>> are obvious shortcomings by making this configuration compile time based.
+> 
+> This is true, though on ARM 32-bit kernels DEBUG_LL gets used by the
+> kernel self-decompressor and also before earlycon has a chance to run,
+> this is useful to debugging memory issues where your memory
+> configuration is incorrect typically.
+> 
 
-url:    https://github.com/0day-ci/linux/commits/Zhen-Lei/add-non-strict-mode-support-for-arm-smmu-v3/20180602-000418
-config: x86_64-randconfig-x008-201821 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+This is true.
 
-All warnings (new ones prefixed by >>):
+> Either way is fine with me (accepting or dropping) the patch, though
+> there is probably minimal impact in just accepting such a change.
+> 
 
-   drivers//iommu/amd_iommu.c: In function 'amd_iommu_capable':
->> drivers//iommu/amd_iommu.c:3053:2: warning: enumeration value 'IOMMU_CAP_NON_STRICT' not handled in switch [-Wswitch]
-     switch (cap) {
-     ^~~~~~
+Will leave the decision to you then.
 
-vim +/IOMMU_CAP_NON_STRICT +3053 drivers//iommu/amd_iommu.c
+Thanks,
 
-645c4c8d arch/x86/kernel/amd_iommu.c Joerg Roedel 2008-12-02  3050  
-ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3051  static bool amd_iommu_capable(enum iommu_cap cap)
-dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3052  {
-80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27 @3053  	switch (cap) {
-80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3054  	case IOMMU_CAP_CACHE_COHERENCY:
-ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3055  		return true;
-bdddadcb drivers/iommu/amd_iommu.c   Joerg Roedel 2012-07-02  3056  	case IOMMU_CAP_INTR_REMAP:
-ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3057  		return (irq_remapping_enabled == 1);
-cfdeec22 drivers/iommu/amd_iommu.c   Will Deacon  2014-10-27  3058  	case IOMMU_CAP_NOEXEC:
-cfdeec22 drivers/iommu/amd_iommu.c   Will Deacon  2014-10-27  3059  		return false;
-80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3060  	}
-80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3061  
-ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3062  	return false;
-dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3063  }
-dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3064  
-
-:::::: The code at line 3053 was first introduced by commit
-:::::: 80a506b8fdcfa868bb53eb740f928217d0966fc1 x86/amd-iommu: Export cache-coherency capability
-
-:::::: TO: Joerg Roedel <joerg.roedel@amd.com>
-:::::: CC: Joerg Roedel <joerg.roedel@amd.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28596 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180602/14d67fbb/attachment-0001.gz>
+Ray
