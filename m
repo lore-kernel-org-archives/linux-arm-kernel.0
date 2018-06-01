@@ -1,32 +1,37 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 01 Jun 2018 10:09:24 -0700
-Subject: [PATCH 1/6] staging: vc04_services: no need to check debugfs
- return values
-In-Reply-To: <20180601111004.1670-1-gregkh@linuxfoundation.org>
-References: <20180601111004.1670-1-gregkh@linuxfoundation.org>
-Message-ID: <8760321liz.fsf@anholt.net>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 01 Jun 2018 10:12:39 -0700
+Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <9ca51832-6095-c8a5-1347-f57abf99e8f9@codeaurora.org>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+ <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
+ <20180524173926.GC14924@minitux>
+ <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
+ <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
+ <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
+ <152775249799.144038.9269415086304305030@swboyd.mtv.corp.google.com>
+ <9ca51832-6095-c8a5-1347-f57abf99e8f9@codeaurora.org>
+Message-ID: <152787315975.144038.15271372565967690313@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+Quoting Sricharan R (2018-06-01 06:20:37)
+> Hi Stephen,
+> 
+> On 5/31/2018 1:11 PM, Stephen Boyd wrote:
+> > 
+> > Ok. One general comment is that it would be nice if the bindings for all
+> > the nodes that are introduced included 'clocks' properties and also
+> > maybe 'clock-names' properties for the clocks that are consumed by each
+> > node. Right now, we hide those details from DT and rely on the string
+> > names to hook the clk tree up for us. That sort of prevents us from
+> > moving away from string easily, so I would just throw the clocks into
+> > the binding right now and always have them there just in case we want to
+> > use the binding to figure out the hierarchy in the future.
+> > 
+> 
+>  ok, understand that mostly. So will try to revamp those patches with
+>  the 'clocks' property in the binding added, reading them in the driver
+>  from DT.
 
-> When calling debugfs functions, there is no need to ever check the
-> return value.  The function can work or not, but the code logic should
-> never do something different based on this.
->
-> Clean up the vchiq_arm code by not caring about the value of debugfs
-> calls.  This ends up removing a number of lines of code that are not
-> needed.
-
-This series is:
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
-
-Thanks for the cleanups!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180601/d86564ed/attachment.sig>
+Yeah. You don't even have to actually use the clocks property right now
+from the drivers. Just add the properties in the binding.
