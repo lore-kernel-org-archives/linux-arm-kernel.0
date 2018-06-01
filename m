@@ -1,84 +1,58 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Fri, 1 Jun 2018 14:50:35 +0800
-Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <92b240f5-596e-87a9-863a-b18475042cce@arm.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
- <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
- <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
- <92b240f5-596e-87a9-863a-b18475042cce@arm.com>
-Message-ID: <5B10ECBB.209@huawei.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Fri,  1 Jun 2018 08:58:19 +0200
+Subject: [PATCH v1 2/4] dt-bindings: mailbox: provide imx-mailbox documentation
+In-Reply-To: <20180601065821.28234-1-o.rempel@pengutronix.de>
+References: <20180601065821.28234-1-o.rempel@pengutronix.de>
+Message-ID: <20180601065821.28234-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ .../bindings/mailbox/imx-mailbox.txt          | 35 +++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
 
-
-On 2018/5/31 22:25, Robin Murphy wrote:
-> On 31/05/18 14:49, Hanjun Guo wrote:
->> Hi Robin,
->>
->> On 2018/5/31 19:24, Robin Murphy wrote:
->>> On 31/05/18 08:42, Zhen Lei wrote:
->>>> In common, a IOMMU unmap operation follow the below steps:
->>>> 1. remove the mapping in page table of the specified iova range
->>>> 2. execute tlbi command to invalid the mapping which is cached in TLB
->>>> 3. wait for the above tlbi operation to be finished
->>>> 4. free the IOVA resource
->>>> 5. free the physical memory resource
->>>>
->>>> This maybe a problem when unmap is very frequently, the combination of tlbi
->>>> and wait operation will consume a lot of time. A feasible method is put off
->>>> tlbi and iova-free operation, when accumulating to a certain number or
->>>> reaching a specified time, execute only one tlbi_all command to clean up
->>>> TLB, then free the backup IOVAs. Mark as non-strict mode.
->>>>
->>>> But it must be noted that, although the mapping has already been removed in
->>>> the page table, it maybe still exist in TLB. And the freed physical memory
->>>> may also be reused for others. So a attacker can persistent access to memory
->>>> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
->>>> the VFIO should always choose the strict mode.
->>>>
->>>> Some may consider put off physical memory free also, that will still follow
->>>> strict mode. But for the map_sg cases, the memory allocation is not controlled
->>>> by IOMMU APIs, so it is not enforceable.
->>>>
->>>> Fortunately, Intel and AMD have already applied the non-strict mode, and put
->>>> queue_iova() operation into the common file dma-iommu.c., and my work is based
->>>> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
->>>> unmap, but Intel and AMD IOMMU drivers are not.
->>>>
->>>> Below is the performance data of strict vs non-strict for NVMe device:
->>>> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
->>>> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
->>>
->>> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
-I will try your patch to see how much it can improve. I think the best way
-to resovle the globally-blocking sync is that the hardware provide 64bits
-CONS regitster, so that it can never be wrapped, and the spinlock can also
-be removed.
-
->>
->> The hardware is the new D06 which the SMMU with MSIs,
-> 
-> Cool! Now that profiling is fairly useful since we got rid of most of the locks, are you able to get an idea of how the overhead in the normal case is distributed between arm_smmu_cmdq_insert_cmd() and __arm_smmu_sync_poll_msi()? We're always trying to improve our understanding of where command-queue-related overheads turn out to be in practice, and there's still potentially room to do nicer things than TLBI_NH_ALL ;)
-Even if the software has no overhead, there may still be a problem, because
-the smmu need to execute the commands in sequence, especially before
-globally-blocking sync has been removed. Base on the actually execute time
-of single tlbi and sync, we can get the upper limit in theory.
-
-BTW, I will reply the reset of mail next week. I'm busy with other things now.
-
-> 
-> Robin.
-> 
->> it's not D05 :)
->>
->> Thanks
->> Hanjun
->>
-> 
-> .
-> 
-
+diff --git a/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+new file mode 100644
+index 000000000000..a45604b33039
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+@@ -0,0 +1,35 @@
++i.MX Messaging Unit
++===================
++
++The i.MX Messaging Unit (MU) contains two register sets: "A" and "B". In most cases
++they are accessible from all Processor Units. On one hand, at least for mailbox functionality,
++it makes no difference which application or processor is using which set of the MU. On
++other hand, the register sets for each of the MU parts are not identical.
++
++Required properties:
++- compatible :	Shell be one of:
++                    "fsl,imx7s-mu-a" and "fsl,imx7s-mu-b" for i.MX7S or i.MX7D
++- reg : 	physical base address of the mailbox and length of
++		memory mapped region.
++- #mbox-cells:	Common mailbox binding property to identify the number
++		of cells required for the mailbox specifier. Should be 1.
++- interrupts :	interrupt number. The interrupt specifier format
++		depends on the interrupt controller parent.
++- clocks     :  phandle to the input clock.
++
++Example:
++	mu0a: mu at 30aa0000 {
++		compatible = "fsl,imx7s-mu-a";
++		reg = <0x30aa0000 0x28>;
++		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks IMX7D_MU_ROOT_CLK>;
++		#mbox-cells = <1>;
++	};
++
++	mu0b: mu at 30ab0000 {
++		compatible = "fsl,imx7s-mu-b";
++		reg = <0x30ab0000 0x28>;
++		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks IMX7D_MU_ROOT_CLK>;
++		#mbox-cells = <1>;
++	};
 -- 
-Thanks!
-BestRegards
+2.17.1
