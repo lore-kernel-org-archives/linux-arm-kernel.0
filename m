@@ -1,38 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Jun 2018 09:12:06 -0700
-Subject: [PATCH v2] ARM: avoid Cortex-A9 livelock on tight dmb loops
-In-Reply-To: <20180601155502.GB6920@n2100.armlinux.org.uk>
-References: <E1fOhn6-00008E-3b@rmk-PC.armlinux.org.uk>
- <20180601153512.GV5705@atomide.com>
- <20180601155502.GB6920@n2100.armlinux.org.uk>
-Message-ID: <20180601161206.GW5705@atomide.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 01 Jun 2018 09:37:33 -0700
+Subject: [PATCH 1/4] clk: renesas: cpg-mssr: Stop using printk format %pCr
+In-Reply-To: <1527845302-12159-2-git-send-email-geert+renesas@glider.be>
+References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
+ <1527845302-12159-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <152787105335.144038.419639779875099925@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [180601 15:57]:
-> On Fri, Jun 01, 2018 at 08:35:12AM -0700, Tony Lindgren wrote:
-> > CONFIG_KERNEL_LZMA fails:
-> > 
-> > Try gzip decompression.
-> > Try LZMA decompression.
-> > lzma_decompress_file: read on /boot/zImage of 65536 bytes failed
-> > kernel: 0xb6abb010 kernel_size: 0x43d0f0
-> > MEMORY RANGES
-> > 0000000080000000-00000000bfdfffff (0)
-> > zImage header: 0x016f2818 0x00000000 0x0043d0f0
-> > zImage size 0x43d0f0, file size 0x43d0f0
-> > Reserved memory ranges
+Quoting Geert Uytterhoeven (2018-06-01 02:28:19)
+> Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+> called in atomic context.
 > 
-> This looks like an old kexec binary as it's missing the output from:
+> Replace it by open-coding the operation.  This is safe here, as the code
+> runs in task context.
 > 
->         dbgprintf("zImage requires 0x%08llx bytes\n", (unsigned long long)len);
-> 
-> Please can you test with the current version - the official
-> repository should now be up to date with my version.  Thanks.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
 
-OK great. After updating kexec-tools to latest git veresion LZMA
-crashkernel now also boots for me :)
-
-Regards,
-
-Tony
+Acked-by: Stephen Boyd <sboyd@kernel.org>
