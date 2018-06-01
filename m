@@ -1,104 +1,90 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 1 Jun 2018 13:35:38 +0100
-Subject: [PATCH 1/4] arm64/mm: pass swapper_pg_dir as an argument to
- __enable_mmu()
-In-Reply-To: <20180601080833.11762-1-yaojun8558363@gmail.com>
-References: <20180601080833.11762-1-yaojun8558363@gmail.com>
-Message-ID: <9e62fa1e-5322-7818-a6b9-da07d8e397da@arm.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Fri,  1 Jun 2018 18:09:13 +0530
+Subject: [PATCH v12 0/5] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jun Yao,
+This series of patches re-bring huge vmap back for arm64.
 
-On 01/06/18 09:08, Jun Yao wrote:
-> Introduce __pa_swapper_pg_dir to save physical address of
-> swapper_pg_dir. And pass it as an argument to __enable_mmu().
+Patch 1/4 has been taken by Toshi in his series of patches
+by name "[PATCH v3 0/3] fix free pmd/pte page handlings on x86"
+to avoid merge conflict with this series.
 
+These patches are tested on 4.16 kernel with Cortex-A75 based SoC.
 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b0853069702f..e3bb44b4b6c6 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -706,6 +706,8 @@ secondary_startup:
->  	 * Common entry point for secondary CPUs.
->  	 */
->  	bl	__cpu_setup			// initialise processor
-> +	adrp    x25, idmap_pg_dir
-> +	ldr_l   x26, __pa_swapper_pg_dir
->  	bl	__enable_mmu
->  	ldr	x8, =__secondary_switched
->  	br	x8
+The test used for verifying these patches is a stress test on
+ioremap/unmap which tries to re-use same io-address but changes
+size of mapping randomly i.e. 4K to 2M to 1G etc. The same test
+used to reproduce 3rd level translation fault without these fixes
+(and also of course with Revert "arm64: Enforce BBM for huge IO/VMAP
+mappings" being part of the tree).
 
-'__pa_swapper_pg_dir' here is read with the MMU off, but you write it with the
-MMU on. To make this safe, you need to clean this value to the 'PoC' each time
-you write it, so that secondaries here will read the new value.
+These patches can also go into '-stable' branch (if accepted)
+for 4.6 onwards.
 
-Please put __pa_swapper_pg_dir in the mmuoff.data.read section, this ensures
-hibernate will re-clean this value to the PoC once it has restored the memory.
+>From V11->V12:
+ - Introduced p*d_page_vaddr helper macros and using them
+ - Rebased over current tip
 
+>From V10->V11:
+ - Updated pud_free_pmd_page & pmd_free_pte_page to use consistent
+   conding style
+ - Fixed few bugs by using pmd_page_paddr & pud_page_paddr
 
-> @@ -761,10 +763,8 @@ ENTRY(__enable_mmu)
->  	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
->  	b.ne	__no_granule_support
->  	update_early_cpu_boot_status 0, x1, x2
-> -	adrp	x1, idmap_pg_dir
-> -	adrp	x2, swapper_pg_dir
-> -	phys_to_ttbr x3, x1
-> -	phys_to_ttbr x4, x2
-> +	phys_to_ttbr x3, x25
-> +	phys_to_ttbr x4, x26
->  	msr	ttbr0_el1, x3			// load TTBR0
->  	msr	ttbr1_el1, x4			// load TTBR1
->  	isb
+>From V9->V10:
+ - Updated commit log for patch 1/4 by Toshi
+ - Addressed review comments by Will on patch 3/4
 
-__enable_mmu() is now taking arguments in x25 and x26. Please update the comment
-above it that describes the 'x0' argument.
+>From V8->V9:
+ - Used __TLBI_VADDR macros in new TLB flush API
 
-Why do you pass the idmap ttbr value in too? Its always the same.
+>From V7->V8:
+ - Properly fixed compilation issue in x86 file
 
+>From V6->V7:
+ - Fixed compilation issue in x86 case
+ - V6 patches were not properly enumarated
 
-> @@ -823,6 +823,8 @@ __primary_switch:
->  	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
->  #endif
->  
-> +	adrp    x25, idmap_pg_dir
-> +	adrp    x26, swapper_pg_dir
->  	bl	__enable_mmu
->  #ifdef CONFIG_RELOCATABLE
->  	bl	__relocate_kernel
+>From V5->V6:
+ - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+   "bool tlb_inv" based variance as it is not need now
+ - Re-naming for consistency
 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 2dbb2c9f1ec1..41eee333f91a 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -55,6 +55,8 @@ u64 idmap_ptrs_per_pgd = PTRS_PER_PGD;
->  u64 kimage_voffset __ro_after_init;
->  EXPORT_SYMBOL(kimage_voffset);
->  
-> +phys_addr_t __pa_swapper_pg_dir;
+>From V4->V5:
+ - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+   for kernel addresses
 
-See the definition of 'secondary_holding_pen_release' for an example of how to
-put this in the mmuoff.data.read section.
+>From V3->V4:
+ - Add header for 'addr' in x86 implementation
+ - Re-order pmd/pud clear and table free
+ - Avoid redundant TLB invalidatation in one perticular case
 
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
 
-> +
->  /*
->   * Empty_zero_page is a special page that is used for zero-initialized data
->   * and COW.
-> @@ -631,6 +633,8 @@ void __init paging_init(void)
->  	phys_addr_t pgd_phys = early_pgtable_alloc();
->  	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
->  
-> +	__pa_swapper_pg_dir = __pa_symbol(swapper_pg_dir);
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
 
-This write needs to be cleaned to the PoC, see write_pen_release() for an example.
+Chintan Pandya (5):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+  arm64: pgtable: Add p*d_page_vaddr helper macros
+  arm64: Implement page table free interfaces
+  arm64: Re-enable huge io mappings
 
+ arch/arm64/include/asm/pgtable.h  |  3 +++
+ arch/arm64/include/asm/tlbflush.h |  7 +++++
+ arch/arm64/mm/mmu.c               | 56 +++++++++++++++++++++++++--------------
+ arch/x86/mm/pgtable.c             |  8 +++---
+ include/asm-generic/pgtable.h     |  8 +++---
+ lib/ioremap.c                     |  4 +--
+ 6 files changed, 57 insertions(+), 29 deletions(-)
 
->  	map_kernel(pgdp);
->  	map_mem(pgdp);
->  
-
-
-Thanks,
-
-James
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
