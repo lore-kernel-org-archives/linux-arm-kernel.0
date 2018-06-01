@@ -1,116 +1,85 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  1 Jun 2018 12:24:26 +0100
-Subject: [PATCHv2 04/19] arm64: kill config_sctlr_el1()
-In-Reply-To: <20180601112441.37810-1-mark.rutland@arm.com>
-References: <20180601112441.37810-1-mark.rutland@arm.com>
-Message-ID: <20180601112441.37810-5-mark.rutland@arm.com>
+Date: Fri,  1 Jun 2018 12:24:22 +0100
+Subject: [PATCHv2 00/19] arm64: invoke syscalls with pt_regs
+Message-ID: <20180601112441.37810-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have sysreg_clear_set(), we can consistently use this
-instead of config_sctlr_el1().
+This series reworks arm64's syscall handling to minimize the propagation
+of user-controlled register values into speculated code paths. As with
+x86 [1], a wrapper is generated for each syscall, which extracts the
+argument from a struct pt_regs. During kernel entry from userspace,
+registers are zeroed.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Dave Martin <dave.martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/sysreg.h      | 10 ----------
- arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
- arch/arm64/kernel/cpu_errata.c       |  3 +--
- arch/arm64/kernel/traps.c            |  2 +-
- arch/arm64/mm/fault.c                |  2 +-
- 5 files changed, 7 insertions(+), 18 deletions(-)
+The arm64 kernel code directly invokes some syscalls which the x86 code
+doesn't, so I've added ksys_* wrappers for these, following the x86
+example. The rest of the series is arm64-specific.
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index b52762769329..3493c7048994 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -740,16 +740,6 @@ asm(
- 		write_sysreg(__scs_new, sysreg);			\
- } while (0)
- 
--static inline void config_sctlr_el1(u32 clear, u32 set)
--{
--	u32 val;
--
--	val = read_sysreg(sctlr_el1);
--	val &= ~clear;
--	val |= set;
--	write_sysreg(val, sctlr_el1);
--}
--
- #endif
- 
- #endif	/* __ASM_SYSREG_H */
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 97d45d5151d4..c15847521394 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -511,9 +511,9 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
- static int cp15_barrier_set_hw_mode(bool enable)
- {
- 	if (enable)
--		config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
-+		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_CP15BEN);
- 	else
--		config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
-+		sysreg_clear_set(sctlr_el1, SCTLR_EL1_CP15BEN, 0);
- 	return 0;
- }
- 
-@@ -548,9 +548,9 @@ static int setend_set_hw_mode(bool enable)
- 		return -EINVAL;
- 
- 	if (enable)
--		config_sctlr_el1(SCTLR_EL1_SED, 0);
-+		sysreg_clear_set(sctlr_el1, SCTLR_EL1_SED, 0);
- 	else
--		config_sctlr_el1(0, SCTLR_EL1_SED);
-+		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_SED);
- 	return 0;
- }
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index cf37ca6fa5f2..b99e492c44b5 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -74,8 +74,7 @@ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
- static void
- cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
- {
--	/* Clear SCTLR_EL1.UCT */
--	config_sctlr_el1(SCTLR_EL1_UCT, 0);
-+	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
- }
- 
- atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 8bbdc17e49df..b8d3e0d8c616 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -411,7 +411,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
- {
--	config_sctlr_el1(SCTLR_EL1_UCI, 0);
-+	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCI, 0);
- }
- 
- #define __user_cache_maint(insn, address, res)			\
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 27cbe0b38960..07926ee00053 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -822,7 +822,7 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
- 	 */
- 	WARN_ON_ONCE(in_interrupt());
- 
--	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
-+	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
- 	asm(SET_PSTATE_PAN(1));
- }
- #endif /* CONFIG_ARM64_PAN */
+I've pushed the series out to my arm64/syscall-regs branch [2] on
+kernel.org.
+
+Since v1 [3]:
+* Rebase atop of arm64 for-next/core (for SSBD conflicts)
+* Move ksys_personality logic into <linux/syscalls.h>
+* Move kcompat_sys_* wrappers to <linux/compat.h>
+* Fix scno bounds check to use unisgned comparison
+* Fix sve_user_reset() call in el0_svc_handler()
+* Add BUILD_BUG() to the !CONFIG_ARM64_SVE stubs
+* Accumulate acked-by / reviewed-by tags
+
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/20180330093720.6780-1-linux at dominikbrodowski.net
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
+[3] https://lkml.kernel.org/r/20180514094640.27569-1-mark.rutland at arm.com
+
+Mark Rutland (19):
+  arm64: consistently use unsigned long for thread flags
+  arm64: move SCTLR_EL{1,2} assertions to <asm/sysreg.h>
+  arm64: introduce sysreg_clear_set()
+  arm64: kill config_sctlr_el1()
+  arm64: kill change_cpacr()
+  arm64: move sve_user_{enable,disable} to <asm/fpsimd.h>
+  arm64: remove sigreturn wrappers
+  arm64: convert raw syscall invocation to C
+  arm64: convert syscall trace logic to C
+  arm64: convert native/compat syscall entry to C
+  arm64: don't reload GPRs after apply_ssbd
+  arm64: zero GPRs upon entry from EL0
+  kernel: add ksys_personality()
+  kernel: add kcompat_sys_{f,}statfs64()
+  arm64: remove in-kernel call to sys_personality()
+  arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
+  arm64: use SYSCALL_DEFINE6() for mmap
+  arm64: convert compat wrappers to C
+  arm64: implement syscall wrappers
+
+ arch/arm64/Kconfig                       |   1 +
+ arch/arm64/include/asm/fpsimd.h          |  17 +++-
+ arch/arm64/include/asm/syscall_wrapper.h |  80 +++++++++++++++++
+ arch/arm64/include/asm/sysreg.h          |  33 ++++---
+ arch/arm64/include/asm/unistd32.h        |  26 +++---
+ arch/arm64/kernel/Makefile               |   5 +-
+ arch/arm64/kernel/armv8_deprecated.c     |   8 +-
+ arch/arm64/kernel/cpu_errata.c           |   3 +-
+ arch/arm64/kernel/entry.S                | 145 ++++---------------------------
+ arch/arm64/kernel/entry32.S              | 121 --------------------------
+ arch/arm64/kernel/fpsimd.c               |  19 ----
+ arch/arm64/kernel/signal.c               |   5 +-
+ arch/arm64/kernel/signal32.c             |   6 +-
+ arch/arm64/kernel/sys.c                  |  19 ++--
+ arch/arm64/kernel/sys32.c                | 127 ++++++++++++++++++++++++---
+ arch/arm64/kernel/syscall.c              | 114 ++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c                |   4 +-
+ arch/arm64/mm/fault.c                    |   2 +-
+ fs/statfs.c                              |  14 ++-
+ include/linux/compat.h                   |  11 +++
+ include/linux/syscalls.h                 |  11 +++
+ 21 files changed, 437 insertions(+), 334 deletions(-)
+ create mode 100644 arch/arm64/include/asm/syscall_wrapper.h
+ delete mode 100644 arch/arm64/kernel/entry32.S
+ create mode 100644 arch/arm64/kernel/syscall.c
+
 -- 
 2.11.0
