@@ -1,138 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:31 +0100
-Subject: [PATCH 17/33] KVM: arm64: Remove eager host SVE state saving
-In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
-References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-18-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  1 Jun 2018 17:06:24 +0100
+Subject: [PATCH v2 4/9] openrisc: Don't pull in all of linux/bitops.h in
+ asm/cmpxchg.h
+In-Reply-To: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
+References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1527869189-31512-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <Dave.Martin@arm.com>
+The openrisc implementation of asm/cmpxchg.h pulls in linux/bitops.h
+so that it can refer to BITS_PER_BYTE. It also transitively relies on
+this pulling in linux/compiler.h for READ_ONCE.
 
-Now that the host SVE context can be saved on demand from Hyp,
-there is no longer any need to save this state in advance before
-entering the guest.
+Replace the #include with linux/bits.h and linux/compiler.h
 
-This patch removes the relevant call to
-kvm_fpsimd_flush_cpu_state().
-
-Since the problem that function was intended to solve now no longer
-exists, the function and its dependencies are also deleted.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  3 ---
- arch/arm64/include/asm/kvm_host.h | 10 ----------
- arch/arm64/kernel/fpsimd.c        | 21 ---------------------
- virt/kvm/arm/arm.c                |  3 ---
- 4 files changed, 37 deletions(-)
+ arch/openrisc/include/asm/cmpxchg.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3b85bbb4b23e..f079a2039c8a 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -312,9 +312,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/openrisc/include/asm/cmpxchg.h b/arch/openrisc/include/asm/cmpxchg.h
+index d29f7db53906..f9cd43a39d72 100644
+--- a/arch/openrisc/include/asm/cmpxchg.h
++++ b/arch/openrisc/include/asm/cmpxchg.h
+@@ -16,8 +16,9 @@
+ #ifndef __ASM_OPENRISC_CMPXCHG_H
+ #define __ASM_OPENRISC_CMPXCHG_H
  
--/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
--static inline void kvm_fpsimd_flush_cpu_state(void) {}
--
- static inline void kvm_arm_vhe_guest_enter(void) {}
- static inline void kvm_arm_vhe_guest_exit(void) {}
++#include  <linux/bits.h>
++#include  <linux/compiler.h>
+ #include  <linux/types.h>
+-#include  <linux/bitops.h>
  
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index fda9289f3b9c..a4ca202ff3f2 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -457,16 +457,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
- }
- #endif
+ #define __HAVE_ARCH_CMPXCHG 1
  
--/*
-- * All host FP/SIMD state is restored on guest exit, so nothing needs
-- * doing here except in the SVE case:
--*/
--static inline void kvm_fpsimd_flush_cpu_state(void)
--{
--	if (system_supports_sve())
--		sve_flush_cpu_state();
--}
--
- static inline void kvm_arm_vhe_guest_enter(void)
- {
- 	local_daif_mask();
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e60c3a28380f..7074c4cd0e0e 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -120,7 +120,6 @@
-  */
- struct fpsimd_last_state_struct {
- 	struct user_fpsimd_state *st;
--	bool sve_in_use;
- };
- 
- static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
-@@ -1008,7 +1007,6 @@ void fpsimd_bind_task_to_cpu(void)
- 		this_cpu_ptr(&fpsimd_last_state);
- 
- 	last->st = &current->thread.uw.fpsimd_state;
--	last->sve_in_use = test_thread_flag(TIF_SVE);
- 	current->thread.fpsimd_cpu = smp_processor_id();
- 
- 	if (system_supports_sve()) {
-@@ -1030,7 +1028,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	last->st = st;
--	last->sve_in_use = false;
- }
- 
- /*
-@@ -1091,24 +1088,6 @@ void fpsimd_flush_cpu_state(void)
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
- }
- 
--/*
-- * Invalidate any task SVE state currently held in this CPU's regs.
-- *
-- * This is used to prevent the kernel from trying to reuse SVE register data
-- * that is detroyed by KVM guest enter/exit.  This function should go away when
-- * KVM SVE support is implemented.  Don't use it for anything else.
-- */
--#ifdef CONFIG_ARM64_SVE
--void sve_flush_cpu_state(void)
--{
--	struct fpsimd_last_state_struct const *last =
--		this_cpu_ptr(&fpsimd_last_state);
--
--	if (last->st && last->sve_in_use)
--		fpsimd_flush_cpu_state();
--}
--#endif /* CONFIG_ARM64_SVE */
--
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
- DEFINE_PER_CPU(bool, kernel_neon_busy);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index ce7c6f36471b..39e777155e7c 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 */
- 		preempt_disable();
- 
--		/* Flush FP/SIMD state that can't survive guest entry/exit */
--		kvm_fpsimd_flush_cpu_state();
--
- 		kvm_pmu_flush_hwstate(vcpu);
- 
- 		local_irq_disable();
 -- 
-2.17.1
+2.1.4
