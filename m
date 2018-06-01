@@ -1,95 +1,138 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:38 +0100
-Subject: [PATCH 24/33] KVM: arm/arm64: Helper to locate free rdist index
+Date: Fri,  1 Jun 2018 16:27:31 +0100
+Subject: [PATCH 17/33] KVM: arm64: Remove eager host SVE state saving
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-25-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+From: Dave Martin <Dave.Martin@arm.com>
 
-We introduce vgic_v3_rdist_free_slot to help identifying
-where we can place a new 2x64KB redistributor.
+Now that the host SVE context can be saved on demand from Hyp,
+there is no longer any need to save this state in advance before
+entering the guest.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+This patch removes the relevant call to
+kvm_fpsimd_flush_cpu_state().
+
+Since the problem that function was intended to solve now no longer
+exists, the function and its dependencies are also deleted.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v3.c |  3 +--
- virt/kvm/arm/vgic/vgic-v3.c      | 23 +++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h         | 11 +++++++++++
- 3 files changed, 35 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  3 ---
+ arch/arm64/include/asm/kvm_host.h | 10 ----------
+ arch/arm64/kernel/fpsimd.c        | 21 ---------------------
+ virt/kvm/arm/arm.c                |  3 ---
+ 4 files changed, 37 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index d1aab183a1cc..49ca176e2e08 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -593,8 +593,7 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
- 	 * function for all VCPUs when the base address is set.  Just return
- 	 * without doing any work for now.
- 	 */
--	rdreg = list_first_entry(&vgic->rd_regions,
--				 struct vgic_redist_region, list);
-+	rdreg = vgic_v3_rdist_free_slot(&vgic->rd_regions);
- 	if (!rdreg)
- 		return 0;
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 3b85bbb4b23e..f079a2039c8a 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -312,9 +312,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
  
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 56e6e903d998..2a11fe89943a 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -453,6 +453,29 @@ bool vgic_v3_check_base(struct kvm *kvm)
- 	return false;
+-/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+-static inline void kvm_fpsimd_flush_cpu_state(void) {}
+-
+ static inline void kvm_arm_vhe_guest_enter(void) {}
+ static inline void kvm_arm_vhe_guest_exit(void) {}
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index fda9289f3b9c..a4ca202ff3f2 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -457,16 +457,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
  }
+ #endif
  
-+/**
-+ * vgic_v3_rdist_free_slot - Look up registered rdist regions and identify one
-+ * which has free space to put a new rdist region.
-+ *
-+ * @rd_regions: redistributor region list head
-+ *
-+ * A redistributor regions maps n redistributors, n = region size / (2 x 64kB).
-+ * Stride between redistributors is 0 and regions are filled in the index order.
-+ *
-+ * Return: the redist region handle, if any, that has space to map a new rdist
-+ * region.
-+ */
-+struct vgic_redist_region *vgic_v3_rdist_free_slot(struct list_head *rd_regions)
-+{
-+	struct vgic_redist_region *rdreg;
-+
-+	list_for_each_entry(rdreg, rd_regions, list) {
-+		if (!vgic_v3_redist_region_full(rdreg))
-+			return rdreg;
-+	}
-+	return NULL;
-+}
-+
- int vgic_v3_map_resources(struct kvm *kvm)
+-/*
+- * All host FP/SIMD state is restored on guest exit, so nothing needs
+- * doing here except in the SVE case:
+-*/
+-static inline void kvm_fpsimd_flush_cpu_state(void)
+-{
+-	if (system_supports_sve())
+-		sve_flush_cpu_state();
+-}
+-
+ static inline void kvm_arm_vhe_guest_enter(void)
  {
- 	int ret = 0;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 32c25d42c93f..fddd57ff6529 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -265,6 +265,17 @@ static inline int vgic_v3_max_apr_idx(struct kvm_vcpu *vcpu)
- 	}
+ 	local_daif_mask();
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index e60c3a28380f..7074c4cd0e0e 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -120,7 +120,6 @@
+  */
+ struct fpsimd_last_state_struct {
+ 	struct user_fpsimd_state *st;
+-	bool sve_in_use;
+ };
+ 
+ static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+@@ -1008,7 +1007,6 @@ void fpsimd_bind_task_to_cpu(void)
+ 		this_cpu_ptr(&fpsimd_last_state);
+ 
+ 	last->st = &current->thread.uw.fpsimd_state;
+-	last->sve_in_use = test_thread_flag(TIF_SVE);
+ 	current->thread.fpsimd_cpu = smp_processor_id();
+ 
+ 	if (system_supports_sve()) {
+@@ -1030,7 +1028,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	last->st = st;
+-	last->sve_in_use = false;
  }
  
-+static inline bool
-+vgic_v3_redist_region_full(struct vgic_redist_region *region)
-+{
-+	if (!region->count)
-+		return false;
-+
-+	return (region->free_index >= region->count);
-+}
-+
-+struct vgic_redist_region *vgic_v3_rdist_free_slot(struct list_head *rdregs);
-+
- int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
- 			 u32 devid, u32 eventid, struct vgic_irq **irq);
- struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
+ /*
+@@ -1091,24 +1088,6 @@ void fpsimd_flush_cpu_state(void)
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ }
+ 
+-/*
+- * Invalidate any task SVE state currently held in this CPU's regs.
+- *
+- * This is used to prevent the kernel from trying to reuse SVE register data
+- * that is detroyed by KVM guest enter/exit.  This function should go away when
+- * KVM SVE support is implemented.  Don't use it for anything else.
+- */
+-#ifdef CONFIG_ARM64_SVE
+-void sve_flush_cpu_state(void)
+-{
+-	struct fpsimd_last_state_struct const *last =
+-		this_cpu_ptr(&fpsimd_last_state);
+-
+-	if (last->st && last->sve_in_use)
+-		fpsimd_flush_cpu_state();
+-}
+-#endif /* CONFIG_ARM64_SVE */
+-
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+ DEFINE_PER_CPU(bool, kernel_neon_busy);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index ce7c6f36471b..39e777155e7c 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
+ 
+-		/* Flush FP/SIMD state that can't survive guest entry/exit */
+-		kvm_fpsimd_flush_cpu_state();
+-
+ 		kvm_pmu_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
 -- 
 2.17.1
