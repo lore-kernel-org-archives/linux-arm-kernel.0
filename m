@@ -1,21 +1,110 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 01 Jun 2018 09:37:33 -0700
-Subject: [PATCH 1/4] clk: renesas: cpg-mssr: Stop using printk format %pCr
-In-Reply-To: <1527845302-12159-2-git-send-email-geert+renesas@glider.be>
-References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
- <1527845302-12159-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <152787105335.144038.419639779875099925@swboyd.mtv.corp.google.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 1 Jun 2018 12:03:22 -0500
+Subject: [PATCH v3 2/5] gpio: syscon: rockchip: add GPIO_MUTE support for
+ rk3328
+In-Reply-To: <0d08ba26-77f2-6c42-8fb1-214aaf6085e9@t-chip.com.cn>
+References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
+ <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
+ <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
+ <0d08ba26-77f2-6c42-8fb1-214aaf6085e9@t-chip.com.cn>
+Message-ID: <CAL_JsqKSy4q5dfVfXbRMLa7koTWufpAt3yNdE-9mwyJ-VzVQRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Geert Uytterhoeven (2018-06-01 02:28:19)
-> Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
-> called in atomic context.
-> 
-> Replace it by open-coding the operation.  This is safe here, as the code
-> runs in task context.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
+On Thu, May 31, 2018 at 9:05 PM, Levin <djw@t-chip.com.cn> wrote:
+> Hi Rob,
+>
+>
+> On 2018-05-31 10:45 PM, Rob Herring wrote:
+>>
+>> On Wed, May 30, 2018 at 10:27 PM,  <djw@t-chip.com.cn> wrote:
+>>>
+>>> From: Levin Du <djw@t-chip.com.cn>
+>>>
+>>> In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
+>>> mute control, can also be used for general purpose. It is manipulated by
+>>> the GRF_SOC_CON10 register.
+>>>
+>>> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+>>>
+>>> ---
+>>>
+>>> Changes in v3:
+>>> - Change from general gpio-syscon to specific rk3328-gpio-mute
+>>>
+>>> Changes in v2:
+>>> - Rename gpio_syscon10 to gpio_mute in doc
+>>>
+>>> Changes in v1:
+>>> - Refactured for general gpio-syscon usage for Rockchip SoCs.
+>>> - Add doc rockchip,gpio-syscon.txt
+>>>
+>>>   .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28
+>>> +++++++++++++++++++
+>>>   drivers/gpio/gpio-syscon.c                         | 31
+>>> ++++++++++++++++++++++
+>>>   2 files changed, 59 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>>> b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>>> new file mode 100644
+>>> index 0000000..10bc632
+>>> --- /dev/null
+>>> +++
+>>> b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
+>>> @@ -0,0 +1,28 @@
+>>> +Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE pin.
+>>> +
+>>> +In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
+>>> mute
+>>> +control, can also be used for general purpose. It is manipulated by the
+>>> +GRF_SOC_CON10 register.
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should contain "rockchip,rk3328-gpio-mute".
+>>> +- gpio-controller: Marks the device node as a gpio controller.
+>>> +- #gpio-cells: Should be 2. The first cell is the pin number and
+>>> +  the second cell is used to specify the gpio polarity:
+>>> +    0 = Active high,
+>>> +    1 = Active low.
+>>> +
+>>> +Example:
+>>> +
+>>> +       grf: syscon at ff100000 {
+>>> +               compatible = "rockchip,rk3328-grf", "syscon",
+>>> "simple-mfd";
+>>> +
+>>> +               gpio_mute: gpio-mute {
+>>
+>> Node names should be generic:
+>>
+>> gpio {
+>>
+>> This also means you can't add another GPIO node in the future and
+>> you'll have to live with "rockchip,rk3328-gpio-mute" covering more
+>> than 1 GPIO if you do need to add more GPIOs.
+>
+>
+> As the first line describes, this GPIO controller is dedicated for the
+> GPIO_MUTE pin.
+> There's only one GPIO pin in the GRF_SOC_CON10 register. Therefore the
+> gpio_mute
+> name is proper IMHO.
 
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+It's how many GPIOs in the GRF, not this register. What I'm saying is
+when you come along later to add another GPIO in the GRF, you had
+better just add it to this same node. I'm not going to accept another
+GPIO controller node within the GRF. You have the cells to support
+more than 1, so it would only be a driver change. The compatible
+string would then not be ideally named at that point. But compatible
+strings are just unique identifiers, so it doesn't really matter what
+the string is.
+
+I'm being told both "this is the only GPIO" and "the GRF has too many
+different functions for us to tell you what they all are". So which is
+it?
+
+Rob
