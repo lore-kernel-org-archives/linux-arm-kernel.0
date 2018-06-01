@@ -1,123 +1,280 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Fri, 1 Jun 2018 14:41:14 -0700
-Subject: [PATCH v4 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <20180531114816.GC13319@sirena.org.uk>
-References: <cover.1527040878.git.collinsd@codeaurora.org>
- <6d03576cf90f06afb1194301cb41fc31704def1d.1527040878.git.collinsd@codeaurora.org>
- <CAD=FV=VH0bTxPOmRr+jUyV0cGNQHLcwQTV9L-t0bxZOqD8FnHA@mail.gmail.com>
- <20180530103720.GH6920@sirena.org.uk>
- <CAD=FV=WTTKXwPchuWRh-RNTc8=X8Xo28oTqk=3wW4+SiTHhxuA@mail.gmail.com>
- <20180530155044.GR6920@sirena.org.uk>
- <CAD=FV=WVUmvPPd5BxXv9Sa_2CRPrrjQvYFyqroY-3fRr4f0Bzg@mail.gmail.com>
- <20180530162007.GU6920@sirena.org.uk>
- <CAD=FV=WL9enzYCoSx0fT_ny40ciLJU-hhS9joJ6nySXvWPqAxQ@mail.gmail.com>
- <75088820-f20d-32ac-780a-5e7dacdf20ff@codeaurora.org>
- <20180531114816.GC13319@sirena.org.uk>
-Message-ID: <949e1a0c-11d6-1423-caae-834649bd11d0@codeaurora.org>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Sat, 2 Jun 2018 03:11:44 +0530
+Subject: [Query] PAGE_OFFSET on KASLR enabled ARM64 kernel
+In-Reply-To: <CACi5LpN=fSGhgNFOQysJWWzFarchFa1q2R_-J05uQs3wxrANRA@mail.gmail.com>
+References: <CACi5LpO8KVVD_6ZJTW2SiyR8v0uDMA3H9yKHNw1=RKO+fd7KjA@mail.gmail.com>
+ <CAKv+Gu_KSDZyoLNUTAM2d769gQRfbtnGRTcU=8xOrYbmj2O4fA@mail.gmail.com>
+ <CACi5LpN=fSGhgNFOQysJWWzFarchFa1q2R_-J05uQs3wxrANRA@mail.gmail.com>
+Message-ID: <5c78224a-528d-7aa5-58ba-858681f03b6a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
-
-On 05/31/2018 04:48 AM, Mark Brown wrote:
-> On Wed, May 30, 2018 at 04:39:10PM -0700, David Collins wrote:
->> The DRMS modes to use and max allowed current per mode need to be
->> specified at the board level in device tree instead of hard-coded per
->> regulator type in the driver.  There are at least two use cases driving
->> this need: LDOs shared between RPMh client processors and SMPSes requiring
->> PWM mode in certain circumstances.
+On 05/31/2018 10:21 AM, Bhupesh Sharma wrote:
+> Hi Ard,
 > 
-> Is there really no way to improve the RPM firmware?
-
-This aggregation takes place in a discrete hardware block, not in a
-general purpose processor.  Theoretically, future chips could have
-redesigned VRM hardware; however, there is no plan to make such a change.
-
-
->> Consider the case of a regulator with physical 10 mA LPM max current. Say
->> that modem and application processors each have a load on the regulator
->> that draws 9 mA. If they each respect the 10 mA limit, then they'd each
->> vote for LPM. The VRM block in RPMh hardware will aggregate these requests
+> Sorry I was out for most of the day yesterday. Please see my responses inline.
 > 
-> This is, of course, why the regulator API aggregates this stuff based on
-> the current not based on having every individual user select a mode.
+> On Mon, May 28, 2018 at 12:16 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 27 May 2018 at 23:03, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+>>> Hi ARM64 maintainers,
+>>>
+>>> I am confused about the PAGE_OFFSET value (or the start of the linear
+>>> map) on a KASLR enabled ARM64 kernel that I am seeing on a board which
+>>> supports a compatible EFI firmware (with EFI_RNG_PROTOCOL support).
+>>>
+>>> 1. 'arch/arm64/include/asm/memory.h' defines PAGE_OFFSET as:
+>>>
+>>> /*
+>>>   * PAGE_OFFSET - the virtual address of the start of the linear map (top
+>>>   *         (VA_BITS - 1))
+>>>   */
+>>> #define PAGE_OFFSET        (UL(0xffffffffffffffff) - \
+>>>      (UL(1) << (VA_BITS - 1)) + 1)
+>>>
+>>> So for example on a platform with VA_BITS=48, we have:
+>>> PAGE_OFFSET = 0xffff800000000000
+>>>
+>>> 2. However, for the KASLR case, we set the 'memstart_offset_seed ' to
+>>> use the 16-bits of the 'kaslr-seed' to randomize the linear region in
+>>> 'arch/arm64/kernel/kaslr.c' :
+>>>
+>>> u64 __init kaslr_early_init(u64 dt_phys)
+>>> {
+>>> <snip..>
+>>>      /* use the top 16 bits to randomize the linear region */
+>>>      memstart_offset_seed = seed >> 48;
+>>> <snip..>
+>>> }
+>>>
+>>> 3. Now, we use the 'memstart_offset_seed' value to randomize the
+>>> 'memstart_addr' value in 'arch/arm64/mm/init.c':
+>>>
+>>> void __init arm64_memblock_init(void)
+>>> {
+>>> <snip..>
+>>>
+>>>      if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+>>>          extern u16 memstart_offset_seed;
+>>>          u64 range = linear_region_size -
+>>>                  (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+>>>
+>>>          /*
+>>>           * If the size of the linear region exceeds, by a sufficient
+>>>           * margin, the size of the region that the available physical
+>>>           * memory spans, randomize the linear region as well.
+>>>           */
+>>>          if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+>>>              range = range / ARM64_MEMSTART_ALIGN + 1;
+>>>              memstart_addr -= ARM64_MEMSTART_ALIGN *
+>>>                       ((range * memstart_offset_seed) >> 16);
+>>>          }
+>>>      }
+>>> <snip..>
+>>> }
+>>>
+>>> 4. Since 'memstart_addr' indicates the start of physical RAM, we
+>>> randomize the same on basis of 'memstart_offset_seed' value above.
+>>> Also the 'memstart_addr' value is available in '/proc/kallsyms' and
+>>> hence can be accessed by user-space applications to read the
+>>> 'memstart_addr' value.
+>>>
+>>> 5. Now since the PAGE_OFFSET value is also used by several user space
+>>> tools (for e.g. makedumpfile tool uses the same to determine the start
+>>> of linear region and hence to read PT_NOTE fields from /proc/kcore), I
+>>> am not sure how to read the randomized value of the same in the KASLR
+>>> enabled case.
+>>>
+>>> 6. Reading the code further and adding some debug prints, it seems the
+>>> 'memblock_start_of_DRAM()' value is more closer to the actual start of
+>>> linear region rather than 'memstart_addr' and 'PAGE_OFFSET" in case of
+>>> KASLR enabled kernel:
+>>>
+>>> [root at qualcomm-amberwing] # dmesg | grep -i "arm64_memblock_init" -A 5
+>>>
+>>> [    0.000000] inside arm64_memblock_init, memstart_addr = ffff976a00000000,
+>>> linearstart_addr = ffffe89600200000, memblock_start_of_DRAM = ffffe89600200000,
+>>> PHYS_OFFSET = ffff976a00000000, PAGE_OFFSET = ffff800000000000,
+>>> KIMAGE_VADDR = ffff000008000000, kimage_vaddr = ffff20c2d7800000
+>>>
+>>> [root at qualcomm-amberwing] # dmesg | grep -i "Virtual kernel memory layout" -A 15
+>>> [    0.000000] Virtual kernel memory layout:
+>>> [    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000
+>>> (   128 MB)
+>>> [    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7bdfffff0000
+>>> (126847 GB)
+>>> [    0.000000]       .text : 0xffff20c2d7880000 - 0xffff20c2d8040000
+>>> (  7936 KB)
+>>> [    0.000000]     .rodata : 0xffff20c2d8040000 - 0xffff20c2d83a0000
+>>> (  3456 KB)
+>>> [    0.000000]       .init : 0xffff20c2d83a0000 - 0xffff20c2d8750000
+>>> (  3776 KB)
+>>> [    0.000000]       .data : 0xffff20c2d8750000 - 0xffff20c2d891b200
+>>> (  1837 KB)
+>>> [    0.000000]        .bss : 0xffff20c2d891b200 - 0xffff20c2d90a5198
+>>> (  7720 KB)
+>>> [    0.000000]     fixed   : 0xffff7fdffe790000 - 0xffff7fdffec00000
+>>> (  4544 KB)
+>>> [    0.000000]     PCI I/O : 0xffff7fdffee00000 - 0xffff7fdfffe00000
+>>> (    16 MB)
+>>> [    0.000000]     vmemmap : 0xffff7fe000000000 - 0xffff800000000000
+>>> (   128 GB maximum)
+>>> [    0.000000]               0xffff7ffa25800800 - 0xffff7ffa2b800000
+>>> (    95 MB actual)
+>>> [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
+>>> ( 98302 MB)
+>>>
+>>> As one can see above, the 'memblock_start_of_DRAM()' value of
+>>> 0xffffe89600200000 represents the start of linear region:
+>>>
+>>> [    0.000000]     memory  : 0xffffe89600200000 - 0xffffe8ae00000000
+>>> ( 98302 MB)
+>>>
+>>> So, my question is to access the start of linear region (which was
+>>> earlier determinable via PAGE_OFFSET macro), whether I should:
+>>>
+>>> - do some back-computation for the start of linear region from the
+>>> 'memstart_addr' in user-space, or
+>>> - use a new global variable in kernel which is assigned the value of
+>>> memblock_start_of_DRAM()' and assign it to '/proc/kallsyms', so that
+>>> it can be read by user-space tools, or
+>>> - whether we should rather look at removing the PAGE_OFFSET usage from
+>>> the kernel and replace it with a global variable instead which is
+>>> properly updated for KASLR case as well.
+>>>
+>>> Kindly share your opinions on what can be a suitable solution in this case.
+>>>
+>>> Thanks for your help.
+>>>
+>>
+>> Hello Bhupesh,
+>>
+>> Could you explain what the relevance is of PAGE_OFFSET to userland?
+>> The only thing that should matter is where the actual linear mapping
+>> of DRAM is, and I am not sure I understand why we care about where it
+>> resides relative to the base of the linear region.
 > 
->> together using a max function which will result in the regulator being set
->> to LPM, even though the total load is 18 mA (which would require high
->> power mode (HPM)). To get around this corner case, a LPM max current of 1
->> uA can be used for all LDO supplies that have non-application processor
->> consumers. Thus, any non-zero regulator_set_load() current request will
->> result in setting the regulator to HPM (which is always safe).
+> Actually certain user-space tools like makedumpfile (which is used to
+> generate and compress the vmcore) and crash-utility (which is used to
+> debug the vmcore), rely on the PAGE_OFFSET value (which denotes the
+> base of the linear map region) to determine virtual to physical
+> mapping of the addresses lying in the linear region .
 > 
-> That's obviously just never going to work well, the best you can do here
-> is just pretend that the other components are always operating at full
-> power (which I assume all the other components are doing too...) or not
-> try to use load based mode switching in the first place.
-
-I will remove the DT-based mode and max load current mapping support.  In
-its place, I'll implement hard coded LPM current limits for LDOs of 10 mA
-or 30 mA (depending upon subtype) like is done in other regulator drivers.
-
-If we actually encounter an issue caused by the APPS processor and another
-RPMh client both voting for LPM when HPM is needed for the combination,
-then we can disable load-based mode control for the affected regulator in
-DT and configure its initial mode as HPM.
-
-
->> The second situation that needs board-level DRMS mode and current limit
->> specification is SMPS regulator AUTO mode to PWM (HPM) mode switching.
->> SMPS regulators should theoretically always be able to operate in AUTO
->> mode as it switches automatically between PWM mode (which can provide the
->> maximum current) and PFM mode (which supports lower current but has higher
->> efficiency). However, there may be board/system issues that require
->> switching to PWM mode for certain use cases as it has better load
->> regulation (i.e. no PFM ripple for lower loads) and supports more
->> aggressive load current steps (i.e. greater A/ns).
+> One specific use case that I am working on at the moment is the
+> makedumpfile '--mem-usage', which allows one to see the page numbers
+> of current system (1st kernel) in different use (please see
+> MAKEDUMPFILE(8) for more details).
 > 
->> If a Linux consumer requires the ability to force a given SMPS regulator
->> from AUTO mode into PWM mode and that SMPS is shared by other Linux
->> consumers (which may be the case, but at least must be guaranteed to work
->> architecturally), then regulator_set_load() is the only option since it
->> provides aggregation, where as regulator_set_mode() does not.
+> Using this we can know how many pages are dumpable when different
+> dump_level is specified when invoking the makedumpfile.
 > 
-> That's obviously broken though, what you're describing is just clearly
-> nothing to do with load so trying to configure it using load is just
-> going to lead to problems later on.  Honestly it sounds like you just
-> want to force the regulator into forced PWM mode all the time, otherwise
-> you need to look into implementing support for describing the thing
-> you're actually trying to do and add a mechanism for per consumer mode
-> configuration.
+> Normally, makedumpfile analyses the contents of '/proc/kcore' (while
+> excluding the crashkernel range), and then calculates the page number
+> of different kind per vmcoreinfo.
 > 
-> This has been a frequent pattern with these RPM drivers, trying to find
-> some way to shoehorn something that happens to work right now into the
-> code.  That's going to make things fragile and hard to maintain, we need
-> code that does the thing it's saying it does so that it's easier to
-> understand and work with - getting things running isn't enough, they
-> need to be clear.
+> For e.g. here is an output from my arm64 board (a non KASLR boot):
+> 
+>      TYPE            PAGES                   EXCLUDABLE      DESCRIPTION
+>      ----------------------------------------------------------------------
+>      ZERO            49524                   yes             Pages
+> filled with zero
+>      NON_PRI_CACHE   15143                   yes             Cache
+> pages without private flag
+>      PRI_CACHE       29147                   yes             Cache
+> pages with private flag
+>      USER            3684                    yes             User process pages
+>      FREE            1450569                 yes             Free pages
+>      KERN_DATA       14243                   no              Dumpable kernel data
+> 
+>      page size:              65536
+>      Total pages on system:  1562310
+>      Total size on system:   102387548160     Byte
+> 
+> This use case requires directly reading the '/proc/kcore' and the
+> hence the PAGE_OFFSET value is used to determine the base address of
+> the linear region, whose value is not static in case of KASLR boot.
+> 
+> Another use-case is where the crash-utility uses the PAGE_OFFSET value
+> to perform a virtual-to-physical conversion for the address lying in
+> the linear region:
+> 
+> ulong
+> arm64_VTOP(ulong addr)
+> {
+>      if (machdep->flags & NEW_VMEMMAP) {
+>          if (addr >= machdep->machspec->page_offset)
+>              return machdep->machspec->phys_offset
+>                  + (addr - machdep->machspec->page_offset);
+> 
+> <..snip..>
+> }
+> 
 
-I agree that using regulator_set_load() to handle SMPS AUTO mode to PWM
-mode switching is hacky.  Since there is no natural way to pick SMPS modes
-based on load current, I will remove the functionality completely.  In its
-place, we can configure the SMPSes to have an initial mode of AUTO.  If a
-use case requiring PWM mode arises, then the consumer driver responsible
-for it can call regulator_set_mode() to switch between AUTO and PWM modes
-explicitly.
+Another confusing concept is the rounded-up value of 'memstart_addr' in 
+'arch/arm64/mm/init.c' when booting a non-KASLR_ kernel and when the 
+value of memblock_start_of_DRAM() < ARM64_MEMSTART_ALIGN:
 
-Since regulator_set_mode() does not support aggregation currently, this
-technique would work only if there is exactly one consumer per regulator
-that needs explicit mode control.  Should we hit a situation that needs
-multiple consumers to have such mode control, then we could simply default
-the SMPS to PWM mode.
+void __init arm64_memblock_init(void)
+{
 
-I'll also start looking into per-consumer mode configuration and
-regulator_set_mode() aggregation within the regulator framework.  I think
-that we should be able to function without it for now; however, it would
-be good to have going forward.
+<..snip..>
+	/*
+	 * Select a suitable value for the base of physical memory.
+	 */
+	memstart_addr = round_down(memblock_start_of_DRAM(),
+				   ARM64_MEMSTART_ALIGN);
+<..snip..>
+}
 
-Take care,
-David
+For example, let's consider a case (which I see on my qualcomm board) 
+where memblock_start_of_DRAM() = 0x200000 and ARM64_MEMSTART_ALIGN = 
+0x40000000 (I am using VA_BITS = 48 and a 64K page size), in this case
+memstart_addr is calculated at 0, as the round_down results in a value of 0.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This is in contrast with the definition of the 'memblock_start_of_DRAM':
+
+/* lowest address */
+phys_addr_t __init_memblock memblock_start_of_DRAM(void)
+{
+	return memblock.memory.regions[0].base;
+}
+
+As indicated by logs below, the first memblock region base starts from 
+0x200000 rather than the 'memstart_addr' value (which is 0)
+
+# dmesg | grep -i "Processing" -A 5
+[    0.000000] efi: Processing EFI memory map:
+[    0.000000] efi:   0x000000200000-0x00000021ffff [Runtime Data 
+|RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]
+[    0.000000] efi:   0x000000400000-0x0000005fffff [ACPI Memory NVS 
+|   |  |  |  |  |  |  |   |  |  |  |UC]
+
+# head -1 /proc/iomem
+00200000-0021ffff : reserved
+
+Since we define 'PHYS_OFFSET' as the physical address of the start of 
+memory it would be 0 in this case:
+
+/* PHYS_OFFSET - the physical address of the start of memory. */
+#define PHYS_OFFSET		({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
+
+On the other hand, the first memblock starts from 0x200000, so my 
+question is whether we should update the user-space tools which use the 
+memblocks listed in '/proc/iomem' to obtain the value of PHY_OFFSET (by 
+reading the base of the 1st memblock) and read the value of 
+'memstart_addr' somehow in user-space to get the PHY_OFFSET, or should 
+the change be done at the kernel end to calculate 'memstart_addr' as:
+
+
+	/*
+	 * Select a suitable value for the base of physical memory.
+	 */
+	memstart_addr = round_down(memblock_start_of_DRAM(),
+				   ARM64_MEMSTART_ALIGN);
+	if (memstart_addr)
+		memstart_addr = memblock_start_of_DRAM();
+
+Please share your views.
+
+Thanks,
+Bhupesh
