@@ -1,79 +1,94 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 1 Jun 2018 09:47:17 -0400
-Subject: [PATCH V4] scsi: hpsa: drop shutdown callback
-In-Reply-To: <1527860768-11367-1-git-send-email-okaya@codeaurora.org>
-References: <1527860768-11367-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <9516f507-9c3e-cce0-5557-c5c17388f404@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 1 Jun 2018 18:50:37 +0530
+Subject: [PATCH v9 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <152775249799.144038.9269415086304305030@swboyd.mtv.corp.google.com>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+ <1520347148-27852-2-git-send-email-sricharan@codeaurora.org>
+ <20180524173926.GC14924@minitux>
+ <664089d4-b30d-99bb-2021-12128b2895ba@codeaurora.org>
+ <152769571081.144038.4314499217001219157@swboyd.mtv.corp.google.com>
+ <9f2e1aa8-21c1-10b0-6193-e6bc16993a0d@codeaurora.org>
+ <152775249799.144038.9269415086304305030@swboyd.mtv.corp.google.com>
+Message-ID: <9ca51832-6095-c8a5-1347-f57abf99e8f9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/1/2018 9:46 AM, Sinan Kaya wrote:
-> 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-> shutdown")' has been added to kernel to shutdown pending PCIe port
-> service interrupts during reboot so that a newly started kexec kernel
-> wouldn't observe pending interrupts.
-> 
-> pcie_port_device_remove() is disabling the root port and switches by
-> calling pci_disable_device() after all PCIe service drivers are shutdown.
-> 
-> This has been found to cause crashes on HP DL360 Gen9 machines during
-> reboot due to hpsa driver not clearing the bus master bit during the
-> shutdown procedure by calling pci_disable_device().
-> 
-> Disable device as part of the shutdown sequence.
+Hi Stephen,
 
-Forgot to change the commit title. Apologies for that. The rest of the
-patch should work. Waiting for tested-bys.
-
+On 5/31/2018 1:11 PM, Stephen Boyd wrote:
+> Quoting Sricharan R (2018-05-30 21:57:20)
+>> Hi Stephen,
+>>
+>> On 5/30/2018 9:25 PM, Stephen Boyd wrote:
+>>> Quoting Sricharan R (2018-05-24 22:40:11)
+>>>> Hi Bjorn,
+>>>>
+>>>> On 5/24/2018 11:09 PM, Bjorn Andersson wrote:
+>>>>> On Tue 06 Mar 06:38 PST 2018, Sricharan R wrote:
+>>>>>
+>>>>>> From: Stephen Boyd <sboyd@codeaurora.org>
+>>>>>>
+>>>>>> Krait CPUs have a handful of L2 cache controller registers that
+>>>>>> live behind a cp15 based indirection register. First you program
+>>>>>> the indirection register (l2cpselr) to point the L2 'window'
+>>>>>> register (l2cpdr) at what you want to read/write.  Then you
+>>>>>> read/write the 'window' register to do what you want. The
+>>>>>> l2cpselr register is not banked per-cpu so we must lock around
+>>>>>> accesses to it to prevent other CPUs from re-pointing l2cpdr
+>>>>>> underneath us.
+>>>>>>
+>>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>>>
+>>>>> This should have your signed-off-by here as well.
+>>>>>
+>>>>
+>>>>  ok.
+>>>>
+>>>>> Apart from that:
+>>>>>
+>>>>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>>>>>
+>>>>
+>>>
+>>> Will these patches come around again? I'll do a quick sweep on them
+>>> today but I expect them to be resent.
+>>
+>> Sure, i will have to resend them again, fixing couple of Bjorn's
+>> minor comments. Will address your comments that you would give
+>> as well along with that.
+>>
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-> Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-> Cc: stable at vger.kernel.org
-> Reported-by: Ryan Finnie <ryan@finnie.org>
-> ---
->  drivers/scsi/hpsa.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
-> index 3a9eca1..b92f86a 100644
-> --- a/drivers/scsi/hpsa.c
-> +++ b/drivers/scsi/hpsa.c
-> @@ -8869,7 +8869,7 @@ static void hpsa_disable_rld_caching(struct ctlr_info *h)
->  	kfree(options);
->  }
->  
-> -static void hpsa_shutdown(struct pci_dev *pdev)
-> +static void __hpsa_shutdown(struct pci_dev *pdev)
->  {
->  	struct ctlr_info *h;
->  
-> @@ -8884,6 +8884,12 @@ static void hpsa_shutdown(struct pci_dev *pdev)
->  	hpsa_disable_interrupt_mode(h);		/* pci_init 2 */
->  }
->  
-> +static void hpsa_shutdown(struct pci_dev *pdev)
-> +{
-> +	__hpsa_shutdown(pdev);
-> +	pci_disable_device(pdev);
-> +}
-> +
->  static void hpsa_free_device_info(struct ctlr_info *h)
->  {
->  	int i;
-> @@ -8927,7 +8933,7 @@ static void hpsa_remove_one(struct pci_dev *pdev)
->  		scsi_remove_host(h->scsi_host);		/* init_one 8 */
->  	/* includes hpsa_free_irqs - init_one 4 */
->  	/* includes hpsa_disable_interrupt_mode - pci_init 2 */
-> -	hpsa_shutdown(pdev);
-> +	__hpsa_shutdown(pdev);
->  
->  	hpsa_free_device_info(h);		/* scan */
->  
+> Ok. One general comment is that it would be nice if the bindings for all
+> the nodes that are introduced included 'clocks' properties and also
+> maybe 'clock-names' properties for the clocks that are consumed by each
+> node. Right now, we hide those details from DT and rely on the string
+> names to hook the clk tree up for us. That sort of prevents us from
+> moving away from string easily, so I would just throw the clocks into
+> the binding right now and always have them there just in case we want to
+> use the binding to figure out the hierarchy in the future.
 > 
 
+ ok, understand that mostly. So will try to revamp those patches with
+ the 'clocks' property in the binding added, reading them in the driver
+ from DT.
+
+> I've been thinking we need to do something similar for the gcc and other
+> nodes for any clks they use, but I haven't gotten around to it.
+> 
+> Otherwise the patches look mostly ok to me. Not sure I'll have any other
+> comments.
+> 
+
+ Thanks, will respin.
+
+Regards,
+ Sricharan
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
+---
+This email has been checked for viruses by Avast antivirus software.
+https://www.avast.com/antivirus
