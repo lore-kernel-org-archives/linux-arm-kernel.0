@@ -1,46 +1,16 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 1 Jun 2018 19:18:43 +0200
-Subject: [GIT PULL] KVM/ARM updates for 4.18
-In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
-References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <009990f0-0713-067d-8f08-331055f46b97@redhat.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 01 Jun 2018 10:25:39 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.18
+In-Reply-To: <20180521115947.wqrnv2hczate65lz@flea>
+References: <20180521115947.wqrnv2hczate65lz@flea>
+Message-ID: <152787393926.144038.14225302571637692770@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2018 17:27, Marc Zyngier wrote:
-> Paolo, Radim,
+Quoting Maxime Ripard (2018-05-21 04:59:47)
+> Hi Mike, Stephen,
 > 
-> This is the set of updates for KVM/ARM for v4.18. This time, lazy
-> context switching of the floating point registers for arm64, and the
-> ability to deal with multiple redistributor ranges (which allows for
-> larger numbers of vcpu).
+> Please merge the following changes for the next merge window, thanks!
 > 
-> Note that some additional KVM/ARM updates will come via the arm64 tree
-> with the SSBD patches. This will generate three conflicts that are
-> pretty simple to resolve (-next has a good example of the resolution).
-> 
-> Please pull,
-> 
-> 	M.
-> 
-> The following changes since commit 75bc37fefc4471e718ba8e651aa74673d4e0a9eb:
-> 
->   Linux 4.17-rc4 (2018-05-06 16:57:38 -1000)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-for-v4.18
-> 
-> for you to fetch changes up to e25028c8ded011d19f9a11164807507c94febc01:
-> 
->   KVM: arm/arm64: Bump VGIC_V3_MAX_CPUS to 512 (2018-05-25 12:29:27 +0100)
-> 
-> ----------------------------------------------------------------
-> KVM/ARM updates for 4.18
-> 
-> - Lazy context-switching of FPSIMD registers on arm64
-> - Allow virtual redistributors to be part of two or more MMIO ranges
 
-Pulled, thanks.
-
-Paolo
+Thanks. Pulled into clk-next.
