@@ -1,92 +1,56 @@
-From: frieder.schrempf@exceet.de (Frieder Schrempf)
-Date: Fri, 1 Jun 2018 11:27:13 +0200
-Subject: [PATCH 05/11] ARM: dts: Reflect change of FSL QSPI driver and
- remove unused properties
-In-Reply-To: <20180530171057.39f1a2be@bbrezillon>
-References: <1527686082-15142-1-git-send-email-frieder.schrempf@exceet.de>
- <1527686082-15142-6-git-send-email-frieder.schrempf@exceet.de>
- <20180530171057.39f1a2be@bbrezillon>
-Message-ID: <d6512adf-2d48-5bdc-d793-a7c1fcabc177@exceet.de>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  1 Jun 2018 11:28:19 +0200
+Subject: [PATCH 1/4] clk: renesas: cpg-mssr: Stop using printk format %pCr
+In-Reply-To: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
+References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527845302-12159-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+called in atomic context.
 
-On 30.05.2018 17:10, Boris Brezillon wrote:
-> On Wed, 30 May 2018 15:14:34 +0200
-> Frieder Schrempf <frieder.schrempf@exceet.de> wrote:
-> 
->> The FSL QSPI driver was moved to the SPI framework and it now
->> acts as a SPI controller. Therefore the subnodes need to set
->> spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
-> 
-> We should try to keep the current behavior even when
-> spi-[rx/tx]-bus-width are not defined. How about considering
-> spi-[rx/tx]-bus-width as board constraints and then let the core pick
-> the best mode based on these constraints plus the SPI NOR chip
-> limitations.
+Replace it by open-coding the operation.  This is safe here, as the code
+runs in task context.
 
-Ok, I'll try to adjust this, so we can leave spi-[rx/tx]-bus-width 
-undefined and still get quad mode as default if possible.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/clk/renesas/renesas-cpg-mssr.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-> 
->>
->> Also the properties 'bus-num', 'fsl,spi-num-chipselects' and
->> 'fsl,spi-flash-chipselects' were never read by the driver and
->> can be removed.
->>
->> The 'reg' properties are adjusted to reflect the what bus and
->> chipselect the flash is connected to, as the new driver needs
->> this information.
->>
->> The property 'fsl,qspi-has-second-chip' is not needed anymore
->> and will be removed after the old driver was disabled to avoid
->> breaking ls1021a-moxa-uc-8410a.dts.
->>
->> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
->> ---
->>   arch/arm/boot/dts/imx6sx-sdb-reva.dts       | 8 ++++++--
->>   arch/arm/boot/dts/imx6sx-sdb.dts            | 8 ++++++--
->>   arch/arm/boot/dts/imx6ul-14x14-evk.dtsi     | 2 ++
->>   arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 5 ++---
->>   4 files changed, 16 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
->> index e3533e7..1a6f680 100644
->> --- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
->> +++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
->> @@ -131,13 +131,17 @@
->>   		#size-cells = <1>;
->>   		compatible = "spansion,s25fl128s", "jedec,spi-nor";
->>   		spi-max-frequency = <66000000>;
->> +		spi-rx-bus-width = <4>;
->> +		spi-tx-bus-width = <4>;
->>   	};
->>   
->> -	flash1: s25fl128s at 1 {
->> -		reg = <1>;
->> +	flash1: s25fl128s at 2 {
->> +		reg = <2>;
-> 
-> Hm, you're breaking backward compat here. Can we try to re-use the
-> old numbering scheme instead of patching all DTs?
-
-Unfortunately in the current setup, the definitions for the reg property 
-are already broken.
-
-For example imx6sx-sdb.dts seems to have one chip connected on bus A, 
-CS0 and one on bus B, CS0. It has reg set to 0 for the first and 1 for 
-the second chip.
-
-While fsl-ls208xa-qds.dtsi uses the same hw setup, but has reg set to 0 
-and 2.
-
-So either way we need to change the reg property at some place.
-So the best approach in my opinion is to fix the definitions to use a 
-single scheme and while at it also remove the fsl,qspi-has-second-chip 
-property, that is not needed if a single consistent scheme for the reg 
-properties is used.
-
-Regards,
-
-Frieder
+diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
+index 49e510691eeeab07..f4b013e9352d9efc 100644
+--- a/drivers/clk/renesas/renesas-cpg-mssr.c
++++ b/drivers/clk/renesas/renesas-cpg-mssr.c
+@@ -258,8 +258,9 @@ struct clk *cpg_mssr_clk_src_twocell_get(struct of_phandle_args *clkspec,
+ 		dev_err(dev, "Cannot get %s clock %u: %ld", type, clkidx,
+ 		       PTR_ERR(clk));
+ 	else
+-		dev_dbg(dev, "clock (%u, %u) is %pC at %pCr Hz\n",
+-			clkspec->args[0], clkspec->args[1], clk, clk);
++		dev_dbg(dev, "clock (%u, %u) is %pC at %lu Hz\n",
++			clkspec->args[0], clkspec->args[1], clk,
++			clk_get_rate(clk));
+ 	return clk;
+ }
+ 
+@@ -326,7 +327,7 @@ static void __init cpg_mssr_register_core_clk(const struct cpg_core_clk *core,
+ 	if (IS_ERR_OR_NULL(clk))
+ 		goto fail;
+ 
+-	dev_dbg(dev, "Core clock %pC at %pCr Hz\n", clk, clk);
++	dev_dbg(dev, "Core clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
+ 	priv->clks[id] = clk;
+ 	return;
+ 
+@@ -392,7 +393,7 @@ static void __init cpg_mssr_register_mod_clk(const struct mssr_mod_clk *mod,
+ 	if (IS_ERR(clk))
+ 		goto fail;
+ 
+-	dev_dbg(dev, "Module clock %pC at %pCr Hz\n", clk, clk);
++	dev_dbg(dev, "Module clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
+ 	priv->clks[id] = clk;
+ 	priv->smstpcr_saved[clock->index / 32].mask |= BIT(clock->index % 32);
+ 	return;
+-- 
+2.7.4
