@@ -1,31 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 1 Jun 2018 10:07:49 +0200
-Subject: [PATCH v2 5/5] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <1527171551-21979-6-git-send-email-gilad@benyossef.com>
-References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
- <1527171551-21979-6-git-send-email-gilad@benyossef.com>
-Message-ID: <CAMuHMdUCZN_4yBWAJvSM89d-Vp=cQ9ndzaKvkM9jYZnO1OEg4g@mail.gmail.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Fri,  1 Jun 2018 16:08:19 +0800
+Subject: [PATCH 0/4] arm64/mm: migrate swapper_pg_dir
+Message-ID: <20180601080819.11712-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gilad,
+Currently, The offset between swapper_pg_dir and _text is
+fixed. When attackers know the address of _text(no KASLR or
+breaking KASLR), they can caculate the address of
+swapper_pg_dir. Then KSMA(Kernel Space Mirroring Attack) can
+be applied.
 
-On Thu, May 24, 2018 at 4:19 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
-> Add bindings for CryptoCell instance in the SoC.
->
-> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+The principle of KSMA is to insert a carefully constructed PGD
+entry into the translation table. The type of this entry is
+block, which maps the kernel text and its access permissions
+bits are 01. The user process can then modify kernel text
+directly through this mapping.
 
-Thanks for the update!
+To protect against KSMA, these patches migrate swapper_pg_dir
+to new place, which is dynamically allocated. Since it is
+allocated during the kernel boot process and the address is
+relatively fixed, further randomization may be required.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Jun Yao (4):
+  arm64/mm: pass swapper_pg_dir as an argument to __enable_mmu()
+  arm64/mm: introduce variable to save new swapper_pg_dir address
+  arm64/mm: make tramp_pg_dir and swapper_pg_dir adjacent
+  arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
 
-Gr{oetje,eeting}s,
-
-                        Geert
+ arch/arm64/include/asm/mmu_context.h |  6 +--
+ arch/arm64/include/asm/pgtable.h     |  2 +
+ arch/arm64/kernel/cpufeature.c       |  2 +-
+ arch/arm64/kernel/entry.S            |  4 +-
+ arch/arm64/kernel/head.S             | 10 ++--
+ arch/arm64/kernel/hibernate.c        |  2 +-
+ arch/arm64/kernel/sleep.S            |  2 +
+ arch/arm64/kernel/vmlinux.lds.S      |  9 ++--
+ arch/arm64/mm/kasan_init.c           |  6 +--
+ arch/arm64/mm/mmu.c                  | 75 +++++++++++++++++-----------
+ 10 files changed, 71 insertions(+), 47 deletions(-)
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.17.0
