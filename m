@@ -1,93 +1,299 @@
-From: don.brace@microsemi.com (Don Brace)
-Date: Fri, 1 Jun 2018 20:58:09 +0000
-Subject: [PATCH V4] scsi: hpsa: drop shutdown callback
-In-Reply-To: <1527860768-11367-1-git-send-email-okaya@codeaurora.org>
-References: <1527860768-11367-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <a46c373b432946ec89fce71d6ef7b5cc@microsemi.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 1 Jun 2018 14:59:45 -0600
+Subject: [RFC PATCH 8/8] dts: juno: Update coresight bindings for hw port
+In-Reply-To: <1527858967-16047-9-git-send-email-suzuki.poulose@arm.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+ <1527858967-16047-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180601205945.GE9838@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sinan Kaya [mailto:okaya at codeaurora.org]
-> Sent: Friday, June 01, 2018 8:46 AM
-> To: linux-pci at vger.kernel.org; ryan at finnie.org; timur at codeaurora.org
-> Cc: linux-arm-msm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Sinan Kaya <okaya@codeaurora.org>; stable at vger.kernel.org; Don Brace
-> <don.brace@microsemi.com>; James E.J. Bottomley
-> <jejb@linux.vnet.ibm.com>; Martin K. Petersen <martin.petersen@oracle.com>;
-> esc.storagedev <esc.storagedev@microsemi.com>; open list:HEWLETT-
-> PACKARD SMART ARRAY RAID DRIVER (hpsa) <linux-scsi@vger.kernel.org>; open
-> list <linux-kernel@vger.kernel.org>
-> Subject: [PATCH V4] scsi: hpsa: drop shutdown callback
+On Fri, Jun 01, 2018 at 02:16:07PM +0100, Suzuki K Poulose wrote:
+> Switch to updated coresight bindings for hw ports.
 > 
-> EXTERNAL EMAIL
-> 
-> 
-> 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-> shutdown")' has been added to kernel to shutdown pending PCIe port
-> service interrupts during reboot so that a newly started kexec kernel
-> wouldn't observe pending interrupts.
-> 
-> pcie_port_device_remove() is disabling the root port and switches by
-> calling pci_disable_device() after all PCIe service drivers are shutdown.
-> 
-> This has been found to cause crashes on HP DL360 Gen9 machines during
-> reboot due to hpsa driver not clearing the bus master bit during the
-> shutdown procedure by calling pci_disable_device().
-> 
-> Disable device as part of the shutdown sequence.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Looks good. Thanks for your patch
-Thanks for changing the patch name also.
+Reviewed-and-tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Tested-by: Don Brace <don.brace@microsemi.com>
-Acked-by: Don Brace <don.brace@microsemi.com>
-
-> Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-> Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-> Cc: stable at vger.kernel.org
-> Reported-by: Ryan Finnie <ryan@finnie.org>
 > ---
->  drivers/scsi/hpsa.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 82 +++++++++++++++++++++++++---------
+>  arch/arm64/boot/dts/arm/juno.dts       |  5 ++-
+>  2 files changed, 63 insertions(+), 24 deletions(-)
 > 
-> diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
-> index 3a9eca1..b92f86a 100644
-> --- a/drivers/scsi/hpsa.c
-> +++ b/drivers/scsi/hpsa.c
-> @@ -8869,7 +8869,7 @@ static void hpsa_disable_rld_caching(struct ctlr_info
-> *h)
->         kfree(options);
->  }
-> 
-> -static void hpsa_shutdown(struct pci_dev *pdev)
-> +static void __hpsa_shutdown(struct pci_dev *pdev)
->  {
->         struct ctlr_info *h;
-> 
-> @@ -8884,6 +8884,12 @@ static void hpsa_shutdown(struct pci_dev *pdev)
->         hpsa_disable_interrupt_mode(h);         /* pci_init 2 */
->  }
-> 
-> +static void hpsa_shutdown(struct pci_dev *pdev)
-> +{
-> +       __hpsa_shutdown(pdev);
-> +       pci_disable_device(pdev);
-> +}
-> +
->  static void hpsa_free_device_info(struct ctlr_info *h)
->  {
->         int i;
-> @@ -8927,7 +8933,7 @@ static void hpsa_remove_one(struct pci_dev *pdev)
->                 scsi_remove_host(h->scsi_host);         /* init_one 8 */
->         /* includes hpsa_free_irqs - init_one 4 */
->         /* includes hpsa_disable_interrupt_mode - pci_init 2 */
-> -       hpsa_shutdown(pdev);
-> +       __hpsa_shutdown(pdev);
-> 
->         hpsa_free_device_info(h);               /* scan */
-> 
-> --
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index eb749c5..33b41ba 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -122,15 +122,18 @@
+>  			port at 0 {
+>  				reg = <0>;
+>  				etf0_in_port: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&main_funnel_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			/* output port */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				etf0_out_port: endpoint {
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  		};
+> @@ -145,8 +148,9 @@
+>  		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			tpiu_in_port: endpoint {
+> -				slave-mode;
+> +				direction = <0>;
+>  				remote-endpoint = <&replicator_out_port0>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -168,23 +172,27 @@
+>  				reg = <0>;
+>  				main_funnel_out_port: endpoint {
+>  					remote-endpoint = <&etf0_in_port>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			/* input ports */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				main_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster0_funnel_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				main_funnel_in_port1: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_funnel_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  		};
+> @@ -200,8 +208,9 @@
+>  		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			etr_in_port: endpoint {
+> -				slave-mode;
+> +				direction = <0>;
+>  				remote-endpoint = <&replicator_out_port1>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -217,6 +226,8 @@
+>  		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			stm_out_port: endpoint {
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -240,6 +251,8 @@
+>  		port {
+>  			cluster0_etm0_out_port: endpoint {
+>  				remote-endpoint = <&cluster0_funnel_in_port0>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -259,22 +272,26 @@
+>  				reg = <0>;
+>  				cluster0_funnel_out_port: endpoint {
+>  					remote-endpoint = <&main_funnel_in_port0>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				cluster0_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster0_etm0_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				cluster0_funnel_in_port1: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster0_etm1_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  		};
+> @@ -299,6 +316,8 @@
+>  		port {
+>  			cluster0_etm1_out_port: endpoint {
+>  				remote-endpoint = <&cluster0_funnel_in_port1>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -322,6 +341,8 @@
+>  		port {
+>  			cluster1_etm0_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port0>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -341,36 +362,42 @@
+>  				reg = <0>;
+>  				cluster1_funnel_out_port: endpoint {
+>  					remote-endpoint = <&main_funnel_in_port1>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				cluster1_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm0_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				cluster1_funnel_in_port1: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm1_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  			port at 3 {
+> -				reg = <2>;
+> +				reg = <3>;
+>  				cluster1_funnel_in_port2: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm2_out_port>;
+> +					coresight,hwid = <2>;
+>  				};
+>  			};
+>  			port at 4 {
+> -				reg = <3>;
+> +				reg = <4>;
+>  				cluster1_funnel_in_port3: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm3_out_port>;
+> +					coresight,hwid = <3>;
+>  				};
+>  			};
+>  		};
+> @@ -395,6 +422,8 @@
+>  		port {
+>  			cluster1_etm1_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port1>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -418,6 +447,8 @@
+>  		port {
+>  			cluster1_etm2_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port2>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -441,6 +472,8 @@
+>  		port {
+>  			cluster1_etm3_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port3>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -462,6 +495,8 @@
+>  				reg = <0>;
+>  				replicator_out_port0: endpoint {
+>  					remote-endpoint = <&tpiu_in_port>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+> @@ -469,14 +504,17 @@
+>  				reg = <1>;
+>  				replicator_out_port1: endpoint {
+>  					remote-endpoint = <&etr_in_port>;
+> +					coresight,hwid = <1>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			/* replicator input port */
+>  			port at 2 {
+> -				reg = <0>;
+> +				reg = <2>;
+>  				replicator_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index c9236c4..27b8036 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -260,10 +260,11 @@
+>  &main_funnel {
+>  	ports {
+>  		port at 3 {
+> -			reg = <2>;
+> +			reg = <3>;
+>  			main_funnel_in_port2: endpoint {
+> -				slave-mode;
+> +				direction = <0>;
+>  				remote-endpoint = <&stm_out_port>;
+> +				coresight,hwid = <2>;
+>  			};
+>  		};
+>  	};
+> -- 
 > 2.7.4
+> 
