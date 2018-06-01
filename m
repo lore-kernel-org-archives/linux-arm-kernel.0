@@ -1,96 +1,357 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 31 May 2018 23:29:00 -0700
-Subject: [PATCH 2/3] dts: sunxi: A64: Add PWM controllers
+Date: Thu, 31 May 2018 23:29:01 -0700
+Subject: [PATCH 3/3] arm64: dts: allwinner: add support for Pinebook
 In-Reply-To: <20180601062901.8052-1-anarsoul@gmail.com>
 References: <20180601062901.8052-1-anarsoul@gmail.com>
-Message-ID: <20180601062901.8052-3-anarsoul@gmail.com>
+Message-ID: <20180601062901.8052-4-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-The Allwinner A64 SoC features two PWM controllers, which are fully
-compatible to the one used in the A13 and H3 chips.
+Pinebook is a A64-based laptop produced by Pine64, with the following
+peripherals:
 
-Add the nodes for the devices (one for the "normal" PWM, the other for
-the one in the CPUS domain) and the pins their outputs are connected to.
+USB:
+- Two external USB ports (one is directly connected to A64's OTG
+controller, the other is under a internal hub connected to the host-only
+controller.)
+- USB HID keyboard and touchpad connected to the internal hub.
+- USB UVC camera connected to the internal hub.
 
-On the A64 the "normal" PWM is muxed together with one of the MDIO pins
-used to communicate with the Ethernet PHY, so it won't be usable on many
-boards. But the Pinebook laptop uses this pin for controlling the LCD
-backlight.
+Power-related:
+- A DC IN jack connected to AXP803's DCIN pin.
+- A Li-Polymer battery connected to AXP803's battery pins.
 
-On Pine64 the CPUS PWM pin however is routed to the "RPi2" header,
-at the same location as the PWM pin on the RaspberryPi.
+Storage:
+- An eMMC by Foresee on the main board (in the product revision of the
+main board it's designed to be switchable).
+- An external MicroSD card slot.
 
-[vasily: fixed comment message as requested by Stefan Bruens]
+Display:
+- An eDP LCD panel (1366x768) connected via an ANX6345 RGB-eDP bridge.
+- A mini HDMI port.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com> on Pinebook (only the "normal" PWM)
-Tested-by: Harald Geyer <harald@ccbib.org> on Teres-I (only the "normal" PWM)
+Misc:
+- A Hall sensor designed to detect the status of lid, connected to GPIO PL12.
+- A headphone jack connected to the SoC's internal codec.
+- A debug UART port muxed with headphone jack.
+
+This commit adds basical support for it.
+
+[vasily: squashed several commits into one, added simplefb node, added usbphy
+	 to ehci0 and ohci0 nodes]
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 28 +++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm64/boot/dts/allwinner/Makefile        |   1 +
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 285 ++++++++++++++++++
+ 2 files changed, 286 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index b5e903ccf0ec..e94bfa8477f6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -365,6 +365,11 @@
- 				bias-pull-up;
- 			};
- 
-+			pwm_pin: pwm_pin {
-+				pins = "PD22";
-+				function = "pwm";
-+			};
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 8bebe7da5ed9..a8c6d0c6f2c5 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+new file mode 100644
+index 000000000000..d952db217702
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -0,0 +1,285 @@
++/*
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
++ * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
++ *
++ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
++ */
 +
- 			rmii_pins: rmii_pins {
- 				pins = "PD10", "PD11", "PD13", "PD14", "PD17",
- 				       "PD18", "PD19", "PD20", "PD22", "PD23";
-@@ -630,6 +635,15 @@
- 			#interrupt-cells = <3>;
- 		};
- 
-+		pwm: pwm at 1c21400 {
-+			compatible = "allwinner,sun50i-a64-pwm",
-+				     "allwinner,sun5i-a13-pwm";
-+			reg = <0x01c21400 0x400>;
-+			clocks = <&osc24M>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pwm/pwm.h>
++
++/ {
++	model = "Pinebook";
++	compatible = "pine64,pinebook", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++		ethernet0 = &rtl8723cs;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 50000 0>;
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <2>;
++		enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 */
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++
++		framebuffer-lcd {
++			panel-supply = <&reg_dc1sw>;
++			dvdd25-supply = <&reg_dldo2>;
++			dvdd12-supply = <&reg_fldo1>;
 +		};
++	};
 +
- 		rtc: rtc at 1f00000 {
- 			compatible = "allwinner,sun6i-a31-rtc";
- 			reg = <0x01f00000 0x54>;
-@@ -667,6 +681,15 @@
- 			#size-cells = <0>;
- 		};
- 
-+		r_pwm: pwm at 1f03800 {
-+			compatible = "allwinner,sun50i-a64-pwm",
-+				     "allwinner,sun5i-a13-pwm";
-+			reg = <0x01f03800 0x400>;
-+			clocks = <&osc24M>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		lid_switch {
++			label = "Lid Switch";
++			gpios = <&r_pio 0 12 GPIO_ACTIVE_LOW>; /* PL12 */
++			linux,input-type = <EV_SW>;
++			linux,code = <SW_LID>;
++			linux,can-disable;
 +		};
++	};
 +
- 		r_pio: pinctrl at 1f02c00 {
- 			compatible = "allwinner,sun50i-a64-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
-@@ -687,6 +710,11 @@
- 				pins = "PL8", "PL9";
- 				function = "s_i2c";
- 			};
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
 +
-+			r_pwm_pin: pwm {
-+				pins = "PL10";
-+				function = "s_pwm";
-+			};
- 		};
- 
- 		r_rsb: rsb at 1f03400 {
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
++	};
++};
++
++&ehci0 {
++	phys = <&usbphy 0>;
++	phy-names = "usb";
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_dcdc1>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&reg_dldo4>;
++	vqmmc-supply = <&reg_eldo1>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	rtl8723cs: wifi at 1 {
++		reg = <1>;
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&reg_dcdc1>;
++	vqmmc-supply = <&reg_eldo1>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	mmc-hs200-1_8v;
++	status = "okay";
++};
++
++&ohci0 {
++	phys = <&usbphy 0>;
++	phy-names = "usb";
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm_pin>;
++	status = "okay";
++};
++
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++/* The ANX6345 eDP-bridge is on r_i2c. There is no linux (mainline)
++ * driver for this chip at the moment, the bootloader initializes it.
++ * However it can be accessed with the i2c-dev driver from user space.
++ */
++&r_i2c {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_i2c_pins_a>;
++	status = "okay";
++};
++
++#include "axp803.dtsi"
++
++&reg_aldo1 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vcc-csi";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-lcd";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-hdmi";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <2500000>;
++	regulator-max-microvolt = <2500000>;
++	regulator-name = "vcc-edp";
++};
++
++&reg_dldo3 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "avdd-csi";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_eldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_eldo3 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vdd-1v8-csi";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_ldo_io0 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-usb";
++	status = "okay";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "host";
++};
++
++&usbphy {
++	usb0_vbus-supply = <&reg_ldo_io0>;
++	usb1_vbus-supply = <&reg_ldo_io0>;
++	status = "okay";
++};
 -- 
 2.17.1
