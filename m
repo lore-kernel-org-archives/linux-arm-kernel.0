@@ -1,56 +1,110 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:15 +0100
-Subject: [PATCH 01/33] arm64: KVM: Use lm_alias() for kvm_ksym_ref()
+Date: Fri,  1 Jun 2018 16:27:16 +0100
+Subject: [PATCH 02/33] arm64: fpsimd: Fix TIF_FOREIGN_FPSTATE after
+ invalidating cpu regs
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-2-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: Dave Martin <Dave.Martin@arm.com>
 
-For historical reasons, we open-code lm_alias() in kvm_ksym_ref().
+fpsimd_last_state.st is set to NULL as a way of indicating that
+current's FPSIMD registers are no longer loaded in the cpu.  In
+particular, this is done when the kernel temporarily uses or
+clobbers the FPSIMD registers for its own purposes, as in CPU PM or
+kernel-mode NEON, resulting in them being populated with garbage
+data not belonging to a task.
 
-Let's use lm_alias() to avoid duplication and make things clearer.
+Commit 17eed27b02da ("arm64/sve: KVM: Prevent guests from using
+SVE") factors this operation out as a new helper
+fpsimd_flush_cpu_state() to make it clearer what is being done
+here, and on SVE systems this helper is now used, via
+kvm_fpsimd_flush_cpu_state(), to invalidate the registers after KVM
+has run a vcpu.  The reason for this is that KVM does not yet
+understand how to restore the full host SVE registers itself after
+loading the guest FPSIMD context into them.
 
-As we have to pull this from <linux/mm.h> (which is not safe for
-inclusion in assembly), we may as well move the kvm_ksym_ref()
-definition into the existing !__ASSEMBLY__ block.
+This exposes a particular problem: if fpsimd_last_state.st is set
+to NULL without also setting TIF_FOREIGN_FPSTATE, the kernel may
+continue to think that current's FPSIMD registers are live even
+though they have actually been clobbered.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Prior to the aforementioned commit, the only path where
+fpsimd_last_state.st is set to NULL without setting
+TIF_FOREIGN_FPSTATE is when kernel_neon_begin() is called by a
+kernel thread (where current->mm can be NULL).  This does not
+matter, because the only harm is that at context-switch time
+fpsimd_thread_switch() may unnecessarily save the FPSIMD registers
+back to current's thread_struct (even though kernel threads are not
+considered to have any FPSIMD context of their own and the
+registers will never be reloaded).
+
+Note that although CPU_PM_ENTER lacks the TIF_FOREIGN_FPSTATE
+setting, every CPU passing through that path must subsequently pass
+through CPU_PM_EXIT before it can re-enter the kernel proper.
+CPU_PM_EXIT sets the flag.
+
+The sve_flush_cpu_state() function added by commit 17eed27b02da
+also lacks the proper maintenance of TIF_FOREIGN_FPSTATE.  This may
+cause the bits of a host task's SVE registers that do not alias the
+FPSIMD register file to spontaneously appear zeroed if a KVM vcpu
+runs in the same task in the meantime.  Although this effect is
+hidden by the fact that the non-FPSIMD bits of the SVE registers
+are zeroed by a syscall anyway, it is doubtless a bad idea to rely
+on these different code paths interacting correctly under future
+maintenance.
+
+This patch makes TIF_FOREIGN_FPSTATE an unconditional side-effect
+of fpsimd_flush_cpu_state(), and removes the set_thread_flag()
+calls that become redundant as a result.  This ensures that
+TIF_FOREIGN_FPSTATE cannot remain clear if the FPSIMD state in the
+FPSIMD registers is invalid.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index f6648a3e4152..a9ceeec5a76f 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -33,16 +33,19 @@
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 87a35364e750..12e1c967c7b5 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -1067,6 +1067,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
+ static inline void fpsimd_flush_cpu_state(void)
+ {
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
++	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ }
  
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/mm.h>
-+
- /* Translate a kernel address of @sym into its equivalent linear mapping */
- #define kvm_ksym_ref(sym)						\
- 	({								\
- 		void *val = &sym;					\
- 		if (!is_kernel_in_hyp_mode())				\
--			val = phys_to_virt((u64)&sym - kimage_voffset);	\
-+			val = lm_alias(&sym);				\
- 		val;							\
- 	 })
+ /*
+@@ -1121,10 +1122,8 @@ void kernel_neon_begin(void)
+ 	__this_cpu_write(kernel_neon_busy, true);
  
--#ifndef __ASSEMBLY__
- struct kvm;
- struct kvm_vcpu;
+ 	/* Save unsaved task fpsimd state, if any: */
+-	if (current->mm) {
++	if (current->mm)
+ 		task_fpsimd_save();
+-		set_thread_flag(TIF_FOREIGN_FPSTATE);
+-	}
  
+ 	/* Invalidate any task state remaining in the fpsimd regs: */
+ 	fpsimd_flush_cpu_state();
+@@ -1251,8 +1250,6 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ 		fpsimd_flush_cpu_state();
+ 		break;
+ 	case CPU_PM_EXIT:
+-		if (current->mm)
+-			set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 		break;
+ 	case CPU_PM_ENTER_FAILED:
+ 	default:
 -- 
 2.17.1
