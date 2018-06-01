@@ -1,27 +1,54 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 1 Jun 2018 11:24:45 -0400
-Subject: [PATCH] PCI: move early dump functionality from x86 arch into the
- common code
-In-Reply-To: <CAHp75VdTyvQOqnSm67Uo5heP1otE98BbquM0TjSAorEzTgUwHQ@mail.gmail.com>
-References: <1527654876-26716-1-git-send-email-okaya@codeaurora.org>
- <CAHp75Vc3YKAR1P_F0fwD+ueGub4gVUjP0=wv4Egf_fTSVkSUjw@mail.gmail.com>
- <53e4d6c3-ee19-fd04-4ba3-862d04558689@codeaurora.org>
- <CAHp75VdTyvQOqnSm67Uo5heP1otE98BbquM0TjSAorEzTgUwHQ@mail.gmail.com>
-Message-ID: <37da9c96-1444-29d0-f1a1-7250debc1a07@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 1 Jun 2018 17:28:06 +0200
+Subject: [PATCH 0/4] lib/vsprintf: Remove atomic-unsafe support for printk
+ format %pCr
+In-Reply-To: <20180601151905.yilldc6vbachfw4k@pathway.suse.cz>
+References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
+ <CA+55aFxHHSRnDbbNGq6SwNAwEt0EhX15n_pNqon3MzGYJgMJmA@mail.gmail.com>
+ <20180601114738.kdoggkha2yosjgbv@pathway.suse.cz>
+ <20180601151905.yilldc6vbachfw4k@pathway.suse.cz>
+Message-ID: <CAMuHMdX6ACCiEs=EEbQV3=Ah7BZT1RJ1G0kZKeYKi_KzWoKZgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/1/2018 11:24 AM, Andy Shevchenko wrote:
->> This was discussed here:
->>
->> https://www.spinics.net/lists/linux-pci/msg72859.html
-> I understand what is it. What I'm pointing is the variable in the
-> source without any comment. In the context you have in diff previous
-> one has a comment.
+Hi Petr,
 
-oh, ok. I can take care of that too.
+On Fri, Jun 1, 2018 at 5:19 PM, Petr Mladek <pmladek@suse.com> wrote:
+> On Fri 2018-06-01 13:47:38, Petr Mladek wrote:
+>> On Fri 2018-06-01 06:00:47, Linus Torvalds wrote:
+>> > On Fri, Jun 1, 2018 at 4:29 AM Geert Uytterhoeven
+>> > <geert+renesas@glider.be> wrote:
+>> > >
+>> > > This patch series:
+>> > >   - Changes all existing users of "%pCr" to print the result of
+>> > >     clk_get_rate() directly, which is safe as they all do this in task
+>> > >     context only,
+>> > >   - Removes support for the "%pCr" printk format.
+>> >
+>> > Looks good to me.
+>> >
+>> > What tree will this go through? The normal printk one? Just checking
+>> > that this doesn't end up falling through the cracks because nobody
+>> > knows who would take it...
+>>
+>> I will take it via printk.git. There already is bunch of vsprintf
+>> changes for-4.18.
+>
+> It is in printk.git, branch for-4.18-vsprintf-pcr-removal now.
+
+Thank you.
+
+> Also I have added Cc: stable at vger.kernel.org into the commit messages.
+
+I can confirm all stable version references ("v4.x+") match.
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
