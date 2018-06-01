@@ -1,17 +1,16 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 01 Jun 2018 12:10:47 -0700
-Subject: [PATCH] clk: imx6sl: correct ocram_podf clock type
-In-Reply-To: <1526533248-21990-2-git-send-email-Anson.Huang@nxp.com>
-References: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
- <1526533248-21990-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <152788024703.225090.10824571841764355947@swboyd.mtv.corp.google.com>
+Date: Fri, 01 Jun 2018 12:18:00 -0700
+Subject: [PATCH V2 1/3] clk: imx7d: correct enet phy ref clock gates
+In-Reply-To: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <152788068032.225090.8543051846810232845@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anson Huang (2018-05-16 22:00:48)
-> IMX6SL_CLK_OCRAM_PODF is a busy divider, its name in
-> CCM_CDHIPR register of Reference Manual CCM chapter
-> is axi_podf_busy, correct its clock type.
+Quoting Anson Huang (2018-05-17 18:01:04)
+> IMX7D_ENET_PHY_REF_ROOT_DIV supplies clock for PHY directly,
+> there is no clock gate after it, rename it to
+> IMX7D_ENET_PHY_REF_ROOT_CLK to avoid device tree change.
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
