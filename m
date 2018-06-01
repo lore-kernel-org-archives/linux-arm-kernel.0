@@ -1,57 +1,62 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  1 Jun 2018 12:24:34 +0100
-Subject: [PATCHv2 12/19] arm64: zero GPRs upon entry from EL0
+Date: Fri,  1 Jun 2018 12:24:38 +0100
+Subject: [PATCHv2 16/19] arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
 In-Reply-To: <20180601112441.37810-1-mark.rutland@arm.com>
 References: <20180601112441.37810-1-mark.rutland@arm.com>
-Message-ID: <20180601112441.37810-13-mark.rutland@arm.com>
+Message-ID: <20180601112441.37810-17-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can zero GPRs x0 - x29 upon entry from EL0 to make it harder for
-userspace to control values consumed by speculative gadgets.
+We don't currently annotate our various sigreturn functions as syscalls,
+as we need to do to use pt_regs syscall wrappers.
 
-We don't blat x30, since this is stashed much later, and we'll blat it
-before invoking C code.
+Let's mark them as real syscalls.
+
+For compat_sys_sigreturn and compat_sys_rt_sigreturn, this changes the
+return type from int to long, matching the prototypes in sys32.c.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/signal.c   | 2 +-
+ arch/arm64/kernel/signal32.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 22c58e7dfc0f..39440c2ee66d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -63,6 +63,12 @@
- #endif
- 	.endm
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index caa7a68cf2d2..04a26dcbea32 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -538,7 +538,7 @@ static int restore_sigframe(struct pt_regs *regs,
+ 	return err;
+ }
  
-+	.macro	clear_gp_regs
-+	.irp	n,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
-+	mov	x\n, xzr
-+	.endr
-+	.endm
-+
- /*
-  * Bad Abort numbers
-  *-----------------
-@@ -179,6 +185,7 @@ skip_apply_ssbd\@:
- 	stp	x28, x29, [sp, #16 * 14]
+-asmlinkage long sys_rt_sigreturn(void)
++SYSCALL_DEFINE0(rt_sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct rt_sigframe __user *frame;
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index cb10588a7cb2..1948566dcccf 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -282,7 +282,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	return err;
+ }
  
- 	.if	\el == 0
-+	clear_gp_regs
- 	mrs	x21, sp_el0
- 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
- 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-@@ -186,7 +193,6 @@ skip_apply_ssbd\@:
+-asmlinkage int compat_sys_sigreturn(void)
++COMPAT_SYSCALL_DEFINE0(sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct compat_sigframe __user *frame;
+@@ -313,7 +313,7 @@ asmlinkage int compat_sys_sigreturn(void)
+ 	return 0;
+ }
  
- 	apply_ssbd 1, x22, x23
- 
--	mov	x29, xzr			// fp pointed to user-space
- 	.else
- 	add	x21, sp, #S_FRAME_SIZE
- 	get_thread_info tsk
+-asmlinkage int compat_sys_rt_sigreturn(void)
++COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct compat_rt_sigframe __user *frame;
 -- 
 2.11.0
