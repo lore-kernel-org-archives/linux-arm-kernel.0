@@ -1,27 +1,29 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:29 +0100
-Subject: [PATCH 15/33] arm64/sve: Move sve_pffr() to fpsimd.h and make inline
+Date: Fri,  1 Jun 2018 16:27:27 +0100
+Subject: [PATCH 13/33] arm64/sve: Move read_zcr_features() out of cpufeature.h
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-16-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dave Martin <Dave.Martin@arm.com>
 
-In order to make sve_save_state()/sve_load_state() more easily
-reusable and to get rid of a potential branch on context switch
-critical paths, this patch makes sve_pffr() inline and moves it to
-fpsimd.h.
+Having read_zcr_features() inline in cpufeature.h results in that
+header requiring #includes which make it hard to include
+<asm/fpsimd.h> elsewhere without triggering header inclusion
+cycles.
 
-<asm/processor.h> must be included in fpsimd.h in order to make
-this work, and this creates an #include cycle that is tricky to
-avoid without modifying core code, due to the way the PR_SVE_*()
-prctl helpers are included in the core prctl implementation.
+This is not a hot-path function and arguably should not be in
+cpufeature.h in the first place, so this patch moves it to
+fpsimd.c, compiled conditionally if CONFIG_ARM64_SVE=y.
 
-Instead of breaking the cycle, this patch defers inclusion of
-<asm/fpsimd.h> in <asm/processor.h> until the point where it is
-actually needed: i.e., immediately before the prctl definitions.
+This allows some SVE-related #includes to be dropped from
+cpufeature.h, which will ease future maintenance.
+
+A couple of missing #includes of <asm/fpsimd.h> are exposed by this
+change under arch/arm64/.  This patch adds the missing #includes as
+necessary.
 
 No functional change.
 
@@ -31,94 +33,143 @@ Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
- arch/arm64/include/asm/processor.h | 12 +++++++++++-
- arch/arm64/kernel/fpsimd.c         | 12 ------------
- 3 files changed, 24 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 29 -----------------------------
+ arch/arm64/include/asm/fpsimd.h     |  2 ++
+ arch/arm64/include/asm/processor.h  |  1 +
+ arch/arm64/kernel/fpsimd.c          | 28 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/ptrace.c          |  1 +
+ 5 files changed, 32 insertions(+), 29 deletions(-)
 
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 09b0f2a80c8f..0a6b7133195e 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -11,9 +11,7 @@
+ 
+ #include <asm/cpucaps.h>
+ #include <asm/cputype.h>
+-#include <asm/fpsimd.h>
+ #include <asm/hwcap.h>
+-#include <asm/sigcontext.h>
+ #include <asm/sysreg.h>
+ 
+ /*
+@@ -510,33 +508,6 @@ static inline bool system_supports_sve(void)
+ 		cpus_have_const_cap(ARM64_SVE);
+ }
+ 
+-/*
+- * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
+- * vector length.
+- *
+- * Use only if SVE is present.
+- * This function clobbers the SVE vector length.
+- */
+-static inline u64 read_zcr_features(void)
+-{
+-	u64 zcr;
+-	unsigned int vq_max;
+-
+-	/*
+-	 * Set the maximum possible VL, and write zeroes to all other
+-	 * bits to see if they stick.
+-	 */
+-	sve_kernel_enable(NULL);
+-	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
+-
+-	zcr = read_sysreg_s(SYS_ZCR_EL1);
+-	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
+-	vq_max = sve_vq_from_vl(sve_get_vl());
+-	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
+-
+-	return zcr;
+-}
+-
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
 diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index fb60b22b8bbf..fa92747a49c8 100644
+index 3e00f701cb9c..fb60b22b8bbf 100644
 --- a/arch/arm64/include/asm/fpsimd.h
 +++ b/arch/arm64/include/asm/fpsimd.h
-@@ -18,6 +18,8 @@
+@@ -69,6 +69,8 @@ extern unsigned int sve_get_vl(void);
+ struct arm64_cpu_capabilities;
+ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
  
- #include <asm/ptrace.h>
- #include <asm/errno.h>
-+#include <asm/processor.h>
-+#include <asm/sigcontext.h>
- 
- #ifndef __ASSEMBLY__
- 
-@@ -61,6 +63,17 @@ extern void sve_flush_cpu_state(void);
- /* Maximum VL that SVE VL-agnostic software can transparently support */
- #define SVE_VL_ARCH_MAX 0x100
- 
-+/* Offset of FFR in the SVE register dump */
-+static inline size_t sve_ffr_offset(int vl)
-+{
-+	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
-+}
++extern u64 read_zcr_features(void);
 +
-+static inline void *sve_pffr(struct thread_struct *thread)
-+{
-+	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
-+}
-+
- extern void sve_save_state(void *state, u32 *pfpsr);
- extern void sve_load_state(void const *state, u32 const *pfpsr,
- 			   unsigned long vq_minus_1);
+ extern int __ro_after_init sve_max_vl;
+ 
+ #ifdef CONFIG_ARM64_SVE
 diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 9231b8762ca6..c99e657fdd57 100644
+index 36d64f83cdfb..9231b8762ca6 100644
 --- a/arch/arm64/include/asm/processor.h
 +++ b/arch/arm64/include/asm/processor.h
-@@ -40,7 +40,6 @@
+@@ -40,6 +40,7 @@
  
  #include <asm/alternative.h>
  #include <asm/cpufeature.h>
--#include <asm/fpsimd.h>
++#include <asm/fpsimd.h>
  #include <asm/hw_breakpoint.h>
  #include <asm/lse.h>
  #include <asm/pgtable-hwdef.h>
-@@ -247,6 +246,17 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+/*
-+ * Not at the top of the file due to a direct #include cycle between
-+ * <asm/fpsimd.h> and <asm/processor.h>.  Deferring this #include
-+ * ensures that contents of processor.h are visible to fpsimd.h even if
-+ * processor.h is included first.
-+ *
-+ * These prctl helpers are the only things in this file that require
-+ * fpsimd.h.  The core code expects them to be in this header.
-+ */
-+#include <asm/fpsimd.h>
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 842b2ad08bec..e60c3a28380f 100644
+index 794dd990da82..6c01ee2062c4 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -161,18 +161,6 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
+@@ -37,6 +37,7 @@
+ #include <linux/sched/task_stack.h>
+ #include <linux/signal.h>
+ #include <linux/slab.h>
++#include <linux/stddef.h>
+ #include <linux/sysctl.h>
+ 
+ #include <asm/esr.h>
+@@ -755,6 +756,33 @@ void sve_kernel_enable(const struct arm64_cpu_capabilities *__always_unused p)
+ 	isb();
  }
  
--
--/* Offset of FFR in the SVE register dump */
--static size_t sve_ffr_offset(int vl)
--{
--	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
--}
--
--static void *sve_pffr(struct thread_struct *thread)
--{
--	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
--}
--
- static void change_cpacr(u64 val, u64 mask)
++/*
++ * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
++ * vector length.
++ *
++ * Use only if SVE is present.
++ * This function clobbers the SVE vector length.
++ */
++u64 read_zcr_features(void)
++{
++	u64 zcr;
++	unsigned int vq_max;
++
++	/*
++	 * Set the maximum possible VL, and write zeroes to all other
++	 * bits to see if they stick.
++	 */
++	sve_kernel_enable(NULL);
++	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
++
++	zcr = read_sysreg_s(SYS_ZCR_EL1);
++	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
++	vq_max = sve_vq_from_vl(sve_get_vl());
++	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
++
++	return zcr;
++}
++
+ void __init sve_setup(void)
  {
- 	u64 cpacr = read_sysreg(CPACR_EL1);
+ 	u64 zcr;
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 7ff81fed46e1..78889c4546d7 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -44,6 +44,7 @@
+ #include <asm/compat.h>
+ #include <asm/cpufeature.h>
+ #include <asm/debug-monitors.h>
++#include <asm/fpsimd.h>
+ #include <asm/pgtable.h>
+ #include <asm/stacktrace.h>
+ #include <asm/syscall.h>
 -- 
 2.17.1
