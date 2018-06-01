@@ -1,130 +1,130 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jun 2018 16:27:21 +0100
-Subject: [PATCH 07/33] arm64: fpsimd: Generalise context saving for non-task
- contexts
+Date: Fri,  1 Jun 2018 16:27:20 +0100
+Subject: [PATCH 06/33] KVM: arm64: Convert lazy FPSIMD context switch trap to C
 In-Reply-To: <20180601152747.23613-1-marc.zyngier@arm.com>
 References: <20180601152747.23613-1-marc.zyngier@arm.com>
-Message-ID: <20180601152747.23613-8-marc.zyngier@arm.com>
+Message-ID: <20180601152747.23613-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dave Martin <Dave.Martin@arm.com>
 
-In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
-contexts to be handled by the fpsimd common code, this patch adapts
-task_fpsimd_save() to save back the currently loaded context,
-removing the explicit dependency on current.
+To make the lazy FPSIMD context switch trap code easier to hack on,
+this patch converts it to C.
 
-The relevant storage to write back to in memory is now found by
-examining the fpsimd_last_state percpu struct.
-
-fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
-fpsimd_last_state is updated under local_bh_disable() or
-local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
-thus, fpsimd_save() will write back to the correct storage for the
-loaded context.
-
-No functional change.
+This is not amazingly efficient, but the trap should typically only
+be taken once per host context switch.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+ arch/arm64/kvm/hyp/entry.S  | 57 ++++++++++++++-----------------------
+ arch/arm64/kvm/hyp/switch.c | 24 ++++++++++++++++
+ 2 files changed, 46 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 9d853732f9f4..2d9a9e8ed826 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -270,13 +270,16 @@ static void task_fpsimd_load(void)
- }
- 
- /*
-- * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
-- * with respect to the CPU registers.
-+ * Ensure FPSIMD/SVE storage in memory for the loaded context is up to
-+ * date with respect to the CPU registers.
-  *
-  * Softirqs (and preemption) must be disabled.
-  */
--static void task_fpsimd_save(void)
-+static void fpsimd_save(void)
- {
-+	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
-+	/* set by fpsimd_bind_to_cpu() */
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index e41a161d313a..40f349bc1079 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -172,40 +172,27 @@ ENTRY(__fpsimd_guest_restore)
+ 	// x1: vcpu
+ 	// x2-x29,lr: vcpu regs
+ 	// vcpu x0-x1 on the stack
+-	stp	x2, x3, [sp, #-16]!
+-	stp	x4, lr, [sp, #-16]!
+-
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+-	mrs	x2, cptr_el2
+-	bic	x2, x2, #CPTR_EL2_TFP
+-	msr	cptr_el2, x2
+-alternative_else
+-	mrs	x2, cpacr_el1
+-	orr	x2, x2, #CPACR_EL1_FPEN
+-	msr	cpacr_el1, x2
+-alternative_endif
+-	isb
+-
+-	mov	x3, x1
+-
+-	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
+-	kern_hyp_va x0
+-	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+-	bl	__fpsimd_save_state
+-
+-	add	x2, x3, #VCPU_CONTEXT
+-	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+-	bl	__fpsimd_restore_state
+-
+-	// Skip restoring fpexc32 for AArch64 guests
+-	mrs	x1, hcr_el2
+-	tbnz	x1, #HCR_RW_SHIFT, 1f
+-	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
+-	msr	fpexc32_el2, x4
+-1:
+-	ldp	x4, lr, [sp], #16
+-	ldp	x2, x3, [sp], #16
+-	ldp	x0, x1, [sp], #16
+-
++	stp	x2, x3, [sp, #-144]!
++	stp	x4, x5, [sp, #16]
++	stp	x6, x7, [sp, #32]
++	stp	x8, x9, [sp, #48]
++	stp	x10, x11, [sp, #64]
++	stp	x12, x13, [sp, #80]
++	stp	x14, x15, [sp, #96]
++	stp	x16, x17, [sp, #112]
++	stp	x18, lr, [sp, #128]
 +
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
-@@ -291,10 +294,9 @@ static void task_fpsimd_save(void)
- 				return;
- 			}
- 
--			sve_save_state(sve_pffr(current),
--				       &current->thread.uw.fpsimd_state.fpsr);
-+			sve_save_state(sve_pffr(current), &st->fpsr);
- 		} else
--			fpsimd_save_state(&current->thread.uw.fpsimd_state);
-+			fpsimd_save_state(st);
++	bl	__hyp_switch_fpsimd
++
++	ldp	x4, x5, [sp, #16]
++	ldp	x6, x7, [sp, #32]
++	ldp	x8, x9, [sp, #48]
++	ldp	x10, x11, [sp, #64]
++	ldp	x12, x13, [sp, #80]
++	ldp	x14, x15, [sp, #96]
++	ldp	x16, x17, [sp, #112]
++	ldp	x18, lr, [sp, #128]
++	ldp	x0, x1, [sp, #144]
++	ldp	x2, x3, [sp], #160
+ 	eret
+ ENDPROC(__fpsimd_guest_restore)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d9645236e474..c0796c4d93a5 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -318,6 +318,30 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
  	}
  }
  
-@@ -598,7 +600,7 @@ int sve_set_vector_length(struct task_struct *task,
- 	if (task == current) {
- 		local_bh_disable();
- 
--		task_fpsimd_save();
-+		fpsimd_save();
- 		set_thread_flag(TIF_FOREIGN_FPSTATE);
- 	}
- 
-@@ -837,7 +839,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
- 
- 	local_bh_disable();
- 
--	task_fpsimd_save();
-+	fpsimd_save();
- 	fpsimd_to_sve(current);
- 
- 	/* Force ret_to_user to reload the registers: */
-@@ -898,7 +900,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 	 * 'current'.
- 	 */
- 	if (current->mm)
--		task_fpsimd_save();
-+		fpsimd_save();
- 
- 	if (next->mm) {
- 		/*
-@@ -980,7 +982,7 @@ void fpsimd_preserve_current_state(void)
- 		return;
- 
- 	local_bh_disable();
--	task_fpsimd_save();
-+	fpsimd_save();
- 	local_bh_enable();
- }
- 
-@@ -1121,7 +1123,7 @@ void kernel_neon_begin(void)
- 
- 	/* Save unsaved task fpsimd state, if any: */
- 	if (current->mm)
--		task_fpsimd_save();
-+		fpsimd_save();
- 
- 	/* Invalidate any task state remaining in the fpsimd regs: */
- 	fpsimd_flush_cpu_state();
-@@ -1244,7 +1246,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
- 		if (current->mm)
--			task_fpsimd_save();
-+			fpsimd_save();
- 		fpsimd_flush_cpu_state();
- 		break;
- 	case CPU_PM_EXIT:
++void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
++				    struct kvm_vcpu *vcpu)
++{
++	kvm_cpu_context_t *host_ctxt;
++
++	if (has_vhe())
++		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
++			     cpacr_el1);
++	else
++		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
++			     cptr_el2);
++
++	isb();
++
++	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
++	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
++
++	/* Skip restoring fpexc32 for AArch64 guests */
++	if (!(read_sysreg(hcr_el2) & HCR_RW))
++		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
++			     fpexc32_el2);
++}
++
+ /*
+  * Return true when we were able to fixup the guest exit and should return to
+  * the guest, false when we should restore the host state and return to the
 -- 
 2.17.1
