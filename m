@@ -1,299 +1,153 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 1 Jun 2018 14:59:45 -0600
-Subject: [RFC PATCH 8/8] dts: juno: Update coresight bindings for hw port
-In-Reply-To: <1527858967-16047-9-git-send-email-suzuki.poulose@arm.com>
+Date: Fri, 1 Jun 2018 15:04:39 -0600
+Subject: [RFC PATCH 0/8] coresight: Update device tree bindings
+In-Reply-To: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
 References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
- <1527858967-16047-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180601205945.GE9838@xps15>
+Message-ID: <20180601210439.GF9838@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 02:16:07PM +0100, Suzuki K Poulose wrote:
-> Switch to updated coresight bindings for hw ports.
+On Fri, Jun 01, 2018 at 02:15:59PM +0100, Suzuki K Poulose wrote:
+> Coresight uses DT graph bindings to describe the connections of the
+> components. However we have some undocumented usage of the bindings
+> to describe some of the properties of the connections.
 > 
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Reviewed-and-tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi | 82 +++++++++++++++++++++++++---------
->  arch/arm64/boot/dts/arm/juno.dts       |  5 ++-
->  2 files changed, 63 insertions(+), 24 deletions(-)
+> The coresight driver needs to know the hardware ports invovled
+> in the connection and the direction of data flow to effectively
+> manage the trace sessions. So far we have relied on the "port"
+> address (as described by the generic graph bindings) to represent
+> the hardware port of the component for a connection.
 > 
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index eb749c5..33b41ba 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -122,15 +122,18 @@
->  			port at 0 {
->  				reg = <0>;
->  				etf0_in_port: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&main_funnel_out_port>;
-> +					coresight,hwid = <0>;
->  				};
->  			};
->  
->  			/* output port */
->  			port at 1 {
-> -				reg = <0>;
-> +				reg = <1>;
->  				etf0_out_port: endpoint {
-> +					coresight,hwid = <0>;
-> +					direction = <1>;
->  				};
->  			};
->  		};
-> @@ -145,8 +148,9 @@
->  		power-domains = <&scpi_devpd 0>;
->  		port {
->  			tpiu_in_port: endpoint {
-> -				slave-mode;
-> +				direction = <0>;
->  				remote-endpoint = <&replicator_out_port0>;
-> +				coresight,hwid = <0>;
->  			};
->  		};
->  	};
-> @@ -168,23 +172,27 @@
->  				reg = <0>;
->  				main_funnel_out_port: endpoint {
->  					remote-endpoint = <&etf0_in_port>;
-> +					coresight,hwid = <0>;
-> +					direction = <1>;
->  				};
->  			};
->  
->  			/* input ports */
->  			port at 1 {
-> -				reg = <0>;
-> +				reg = <1>;
->  				main_funnel_in_port0: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster0_funnel_out_port>;
-> +					coresight,hwid = <0>;
->  				};
->  			};
->  
->  			port at 2 {
-> -				reg = <1>;
-> +				reg = <2>;
->  				main_funnel_in_port1: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster1_funnel_out_port>;
-> +					coresight,hwid = <1>;
->  				};
->  			};
->  		};
-> @@ -200,8 +208,9 @@
->  		power-domains = <&scpi_devpd 0>;
->  		port {
->  			etr_in_port: endpoint {
-> -				slave-mode;
-> +				direction = <0>;
->  				remote-endpoint = <&replicator_out_port1>;
-> +				coresight,hwid = <0>;
->  			};
->  		};
->  	};
-> @@ -217,6 +226,8 @@
->  		power-domains = <&scpi_devpd 0>;
->  		port {
->  			stm_out_port: endpoint {
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -240,6 +251,8 @@
->  		port {
->  			cluster0_etm0_out_port: endpoint {
->  				remote-endpoint = <&cluster0_funnel_in_port0>;
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -259,22 +272,26 @@
->  				reg = <0>;
->  				cluster0_funnel_out_port: endpoint {
->  					remote-endpoint = <&main_funnel_in_port0>;
-> +					coresight,hwid = <0>;
-> +					direction = <1>;
->  				};
->  			};
->  
->  			port at 1 {
-> -				reg = <0>;
-> +				reg = <1>;
->  				cluster0_funnel_in_port0: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster0_etm0_out_port>;
-> +					coresight,hwid = <0>;
->  				};
->  			};
->  
->  			port at 2 {
-> -				reg = <1>;
-> +				reg = <2>;
->  				cluster0_funnel_in_port1: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster0_etm1_out_port>;
-> +					coresight,hwid = <1>;
->  				};
->  			};
->  		};
-> @@ -299,6 +316,8 @@
->  		port {
->  			cluster0_etm1_out_port: endpoint {
->  				remote-endpoint = <&cluster0_funnel_in_port1>;
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -322,6 +341,8 @@
->  		port {
->  			cluster1_etm0_out_port: endpoint {
->  				remote-endpoint = <&cluster1_funnel_in_port0>;
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -341,36 +362,42 @@
->  				reg = <0>;
->  				cluster1_funnel_out_port: endpoint {
->  					remote-endpoint = <&main_funnel_in_port1>;
-> +					coresight,hwid = <0>;
-> +					direction = <1>;
->  				};
->  			};
->  
->  			port at 1 {
-> -				reg = <0>;
-> +				reg = <1>;
->  				cluster1_funnel_in_port0: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster1_etm0_out_port>;
-> +					coresight,hwid = <0>;
->  				};
->  			};
->  
->  			port at 2 {
-> -				reg = <1>;
-> +				reg = <2>;
->  				cluster1_funnel_in_port1: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster1_etm1_out_port>;
-> +					coresight,hwid = <1>;
->  				};
->  			};
->  			port at 3 {
-> -				reg = <2>;
-> +				reg = <3>;
->  				cluster1_funnel_in_port2: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster1_etm2_out_port>;
-> +					coresight,hwid = <2>;
->  				};
->  			};
->  			port at 4 {
-> -				reg = <3>;
-> +				reg = <4>;
->  				cluster1_funnel_in_port3: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&cluster1_etm3_out_port>;
-> +					coresight,hwid = <3>;
->  				};
->  			};
->  		};
-> @@ -395,6 +422,8 @@
->  		port {
->  			cluster1_etm1_out_port: endpoint {
->  				remote-endpoint = <&cluster1_funnel_in_port1>;
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -418,6 +447,8 @@
->  		port {
->  			cluster1_etm2_out_port: endpoint {
->  				remote-endpoint = <&cluster1_funnel_in_port2>;
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -441,6 +472,8 @@
->  		port {
->  			cluster1_etm3_out_port: endpoint {
->  				remote-endpoint = <&cluster1_funnel_in_port3>;
-> +				coresight,hwid = <0>;
-> +				direction = <1>;
->  			};
->  		};
->  	};
-> @@ -462,6 +495,8 @@
->  				reg = <0>;
->  				replicator_out_port0: endpoint {
->  					remote-endpoint = <&tpiu_in_port>;
-> +					coresight,hwid = <0>;
-> +					direction = <1>;
->  				};
->  			};
->  
-> @@ -469,14 +504,17 @@
->  				reg = <1>;
->  				replicator_out_port1: endpoint {
->  					remote-endpoint = <&etr_in_port>;
-> +					coresight,hwid = <1>;
-> +					direction = <1>;
->  				};
->  			};
->  
->  			/* replicator input port */
->  			port at 2 {
-> -				reg = <0>;
-> +				reg = <2>;
->  				replicator_in_port0: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
-> +					coresight,hwid = <0>;
->  				};
->  			};
->  		};
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index c9236c4..27b8036 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -260,10 +260,11 @@
->  &main_funnel {
->  	ports {
->  		port at 3 {
-> -			reg = <2>;
-> +			reg = <3>;
->  			main_funnel_in_port2: endpoint {
-> -				slave-mode;
-> +				direction = <0>;
->  				remote-endpoint = <&stm_out_port>;
-> +				coresight,hwid = <2>;
->  			};
->  		};
->  	};
+> The hardware uses separate numbering scheme for input and output
+> ports, which implies, we could have two different (input and output)
+> ports with the same port number. This could create problems in the
+> graph bindings where the label of the port wouldn't match the address.
+> 
+> e.g, with the existing bindings we get :
+> 
+> 	port at 0{				// Output port 0
+> 		reg = <0>;
+> 		...
+> 	};
+> 
+> 	port at 1{
+> 		reg = <0>;		// Input port 0
+> 		endpoint {
+> 			slave-mode;
+> 			...
+> 		};
+> 	};
+> 
+> With the new enforcement in the DT rules, mismatches in label and address
+> are not allowed (as see in the case for port at 1). So, we need a new mechanism
+> to describe the hardware port number reliably.
+> 
+> Also, we relied on an undocumented "slave-mode" property (see the above
+> example) to indicate if the port is an input port. Let us formalise and
+> switch to a new property to describe the direction of data flow.
+> 
+> There were three options considered for the hardware port number scheme:
+> 
+>  1) Use natural ordering in the DT to infer the hardware port number.
+>   i.e, Mandate that the all ports are listed in the DT and in the ascending
+>   order for each class (input and output respectively).
+>    Pros :
+>       - We don't need new properties and if the existing DTS list them in
+>         order (which most of them do), they work out of the box.
+>    Cons :
+>       - We must list all the ports even if the system cannot/shouldn't use
+>         it.
+>       - It is prone to human errors (if the order is not kept).
+> 
+>  2) Use an explicit property to list both the direction and the hw port
+>     number and direction. Define "coresight,hwid" as 2 member array of u32,
+>     where the members are port number and the direction respectively.
+> 	e.g
+> 
+> 	port at 0{
+> 		reg = <0>;
+> 		endpoint {
+> 			coresight,hwid = <0 1>;	// Port # 0, Output
+> 		}
+> 	};
+> 
+> 	port at 1{
+> 		reg = <1>;
+> 		endpoint {
+> 			coresight,hwid = <0 0>;	// Port # 0, Input
+> 		};
+> 	};
+> 
+> 	Pros:
+> 	  - The bindings are formal but not so reader friendly and could potentially
+> 	    lead to human errors.
+> 	Cons:
+> 	  - Backward compatiblity is lost.
+>  3) Use explicit properties (implemented in the series) for the hardware
+>     port id and direction. We define a new property "coresight,hwid" for
+>     each endpoint in coresight devices to specify the hardware port number
+>     explicitly. Also use a separate property "direction" to specify the
+>     direction of the data flow.
+> 
+> 	e.g,
+> 
+> 	port at 0{
+> 		reg = <0>;
+> 		endpoint {
+> 			direction = <1>;	// Output
+> 			coresight,hwid = <0>;	// Port # 0
+> 		}
+> 	};
+> 
+> 	port at 1{
+> 		reg = <1>;
+> 		endpoint {
+> 			direction = <0>;	// Input
+> 			coresight,hwid = <0>;	// Port # 0
+> 		};
+> 	};
+> 
+>     Pros:
+>        - The bindings are formal and reader friendly, and less prone to errors.
+>     Cons:
+>        - Backward compatibility is lost.
+> 
+> 
+> This series achieves implements Option (3) listed above while still retaining
+> the backward compatibility. The driver now issues a warning (once) when it
+> encounters the old bindings.
+> It also cleans up the platform parsing code to reduce the memory usage by
+> reusing the platform description. The series also includes the
+> changes for Juno platform as an example. If there are no objections
+> to the approach, I could post the series, converting all the
+> in-kernel DTS to the new binding.
+> 
+> Suzuki K Poulose (8):
+>   dts: binding: coresight: Document graph bindings
+>   coresight: Fix remote endpoint parsing
+>   coresight: Cleanup platform description data
+>   coresight: platform: Cleanup coresight connection handling
+>   coresight: Handle errors in finding input/output ports
+>   dts: coresight: Clean up the device tree graph bindings
+>   dts: coresight: Define new bindings for direction of data flow
+>   dts: juno: Update coresight bindings for hw port
+> 
+>  .../devicetree/bindings/arm/coresight.txt          |  52 ++++++++--
+>  arch/arm64/boot/dts/arm/juno-base.dtsi             |  82 +++++++++++----
+>  arch/arm64/boot/dts/arm/juno.dts                   |   5 +-
+>  drivers/hwtracing/coresight/coresight.c            |  28 ++----
+>  drivers/hwtracing/coresight/of_coresight.c         | 111 ++++++++++++---------
+>  include/linux/coresight.h                          |  11 +-
+>  6 files changed, 181 insertions(+), 108 deletions(-)
+
+Aside from the comments I've already posted I'm pretty much good with this set.
+Please rebase the next revision on my "next" branch and run checkpatch.pl on the
+set.  Patch 6/8 and 7/8 are generating warnings.
+
+Thanks,
+Mathieu
+
+> 
 > -- 
 > 2.7.4
 > 
