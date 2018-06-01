@@ -1,38 +1,37 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  1 Jun 2018 11:28:20 +0200
-Subject: [PATCH 2/4] thermal: bcm2835: Stop using printk format %pCr
+Date: Fri,  1 Jun 2018 11:28:21 +0200
+Subject: [PATCH 3/4] serial: sh-sci: Stop using printk format %pCr
 In-Reply-To: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
 References: <1527845302-12159-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1527845302-12159-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1527845302-12159-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
 called in atomic context.
 
-Replace it by printing the variable that already holds the clock rate.
-Note that calling clk_get_rate() is safe here, as the code runs in task
-context.
+Replace it by open-coding the operation.  This is safe here, as the code
+runs in task context.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/thermal/broadcom/bcm2835_thermal.c | 4 ++--
+ drivers/tty/serial/sh-sci.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
-index a4d6a0e2e9938190..23ad4f9f21438e45 100644
---- a/drivers/thermal/broadcom/bcm2835_thermal.c
-+++ b/drivers/thermal/broadcom/bcm2835_thermal.c
-@@ -213,8 +213,8 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
- 	rate = clk_get_rate(data->clk);
- 	if ((rate < 1920000) || (rate > 5000000))
- 		dev_warn(&pdev->dev,
--			 "Clock %pCn running at %pCr Hz is outside of the recommended range: 1.92 to 5MHz\n",
--			 data->clk, data->clk);
-+			 "Clock %pCn running at %lu Hz is outside of the recommended range: 1.92 to 5MHz\n",
-+			 data->clk, rate);
- 
- 	/* register of thermal sensor and get info from DT */
- 	tz = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+index b46b146524ce7495..c181eb37f98509e6 100644
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -2724,8 +2724,8 @@ static int sci_init_clocks(struct sci_port *sci_port, struct device *dev)
+ 			dev_dbg(dev, "failed to get %s (%ld)\n", clk_names[i],
+ 				PTR_ERR(clk));
+ 		else
+-			dev_dbg(dev, "clk %s is %pC rate %pCr\n", clk_names[i],
+-				clk, clk);
++			dev_dbg(dev, "clk %s is %pC rate %lu\n", clk_names[i],
++				clk, clk_get_rate(clk));
+ 		sci_port->clks[i] = IS_ERR(clk) ? NULL : clk;
+ 	}
+ 	return 0;
 -- 
 2.7.4
