@@ -1,98 +1,47 @@
-From: rokhanna@nvidia.com (Rohit Khanna)
-Date: Fri, 1 Jun 2018 17:41:11 -0700
-Subject: [PATCH V5] arm64: alternative:flush cache with unpatched code
-Message-ID: <1527900071-10372-1-git-send-email-rokhanna@nvidia.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Fri, 1 Jun 2018 17:47:34 -0700
+Subject: [PATCH 2/3] clk: bcm: Update and add tingray clock entries
+In-Reply-To: <CAL_Jsq+YX01CwCycqeu5mxTUiWtnG3HKPJP5mvJO2OHcPF6v6g@mail.gmail.com>
+References: <1527266717-8406-1-git-send-email-ray.jui@broadcom.com>
+ <1527266717-8406-3-git-send-email-ray.jui@broadcom.com>
+ <20180531162556.GA955@rob-hp-laptop>
+ <a354f3d1-051d-8b68-e6b3-ce7a739c10c9@broadcom.com>
+ <CAL_Jsq+YX01CwCycqeu5mxTUiWtnG3HKPJP5mvJO2OHcPF6v6g@mail.gmail.com>
+Message-ID: <fc69e9e4-c223-512f-e76c-d9f1062d9d35@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current implementation,  __apply_alternatives patches
-flush_icache_range and then executes it without invalidating the icache.
-Thus, icache can contain some of the old instructions for
-flush_icache_range. This can cause unpredictable behavior as during
-execution we can get a mix of old and new instructions for
-flush_icache_range.
 
-This patch :
 
-1. Adds a new function clean_dcache_range_nopatch for flushing kernel
-   memory range. This function uses non hot-patched code and can be
-   safely used to flush cache during code patching.
+On 6/1/2018 12:02 PM, Rob Herring wrote:
+> On Fri, Jun 1, 2018 at 12:56 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+>> Hi Rob,
+>>
+>> On 5/31/2018 9:25 AM, Rob Herring wrote:
+>>>
+>>> On Fri, May 25, 2018 at 09:45:16AM -0700, Ray Jui wrote:
+>>>>
+>>>> Update and add Stingray clock definitions and tables so they match the
+>>>> binding document and the latest ASIC datasheet
+>>>>
+>>>> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>>>> ---
+>>>>    drivers/clk/bcm/clk-sr.c           | 135
+>>>> ++++++++++++++++++++++++++++++++-----
+>>>>    include/dt-bindings/clock/bcm-sr.h |  24 +++++--
+>>>
+>>>
+>>> This goes in the 1st patch.
+>>
+>>
+>> Please help to confirm. You want 1st patch and 2nd patch to be combined into
+>> a single patch?
+> 
+> No. include/dt-bindings/* is part of the DT binding, so it goes with
+> patch 1. The driver in patch 2.
+> 
+> Rob
+> 
 
-2. Modifies __apply_alternatives so that it uses
-   clean_dcache_range_nopatch to flush the cache range after patching code.
-
-Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
----
- arch/arm64/include/asm/cache.h  |  1 +
- arch/arm64/kernel/alternative.c | 37 ++++++++++++++++++++++++++++++++++++-
- 2 files changed, 37 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index 5df5cfe1c143..9211ecd85b15 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -21,6 +21,7 @@
- #define CTR_L1IP_SHIFT		14
- #define CTR_L1IP_MASK		3
- #define CTR_DMINLINE_SHIFT	16
-+#define CTR_IMINLINE_SHIT	0
- #define CTR_ERG_SHIFT		20
- #define CTR_CWG_SHIFT		24
- #define CTR_CWG_MASK		15
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 5c4bce4ac381..da5815807aeb 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -122,6 +122,41 @@ static void patch_alternative(struct alt_instr *alt,
- 	}
- }
- 
-+/* This is used for flushing kernel memory range after
-+ * __apply_alternatives has patched kernel code
-+ */
-+static void clean_dcache_range_nopatch(void *start, void *end)
-+{
-+	u64 cur, d_size, i_size, ctr_el0;
-+
-+	/* use sanitised value of ctr_el0 rather than raw value from CPU */
-+	ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
-+	/* size in bytes */
-+	d_size = 4 << cpuid_feature_extract_unsigned_field(ctr_el0,
-+			CTR_DMINLINE_SHIFT);
-+	i_size = 4 << cpuid_feature_extract_unsigned_field(ctr_el0,
-+			CTR_IMINLINE_SHIT);
-+
-+	cur = (u64)start & ~(d_size - 1);
-+	/* Ensure compiler doesn't reorder this against patching code */
-+	barrier();
-+	do {
-+		/* Use civac instead of cvau. This is required
-+		 * due to ARM errata 826319, 827319, 824069,
-+		 * 819472 on A53
-+		 */
-+		asm volatile("dc civac, %0" : : "r" (cur));
-+	} while (cur += d_size, cur < (u64)end);
-+	dsb(ish);
-+
-+	cur = (u64)start & ~(i_size - 1);
-+	do {
-+		asm volatile("ic ivau, %0" : : "r" (cur));
-+	} while (cur += i_size, cur < (u64)end);
-+	dsb(ish);
-+	isb();
-+}
-+
- static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- {
- 	struct alt_instr *alt;
-@@ -155,7 +190,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- 
- 		alt_cb(alt, origptr, updptr, nr_inst);
- 
--		flush_icache_range((uintptr_t)origptr,
-+		clean_dcache_range_nopatch((uintptr_t)origptr,
- 				   (uintptr_t)(origptr + nr_inst));
- 	}
- }
--- 
-2.1.4
+Okay got it. Thanks!
