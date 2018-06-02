@@ -1,42 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 2 Jun 2018 11:04:48 +0800
-Subject: [PATCH 2/3] ARM: imx: add cpu idle support for i.MX6SLL
-In-Reply-To: <1527664358-17844-2-git-send-email-Anson.Huang@nxp.com>
-References: <1527664358-17844-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <201806021025.PRhFlcyX%fengguang.wu@intel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat,  2 Jun 2018 00:28:53 -0400
+Subject: [PATCH V5] scsi: hpsa: disable device during shutdown
+Message-ID: <1527913733-16492-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
+shutdown")' has been added to kernel to shutdown pending PCIe port
+service interrupts during reboot so that a newly started kexec kernel
+wouldn't observe pending interrupts.
 
-Thank you for the patch! Yet something to improve:
+pcie_port_device_remove() is disabling the root port and switches by
+calling pci_disable_device() after all PCIe service drivers are shutdown.
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on v4.17-rc7 next-20180601]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This has been found to cause crashes on HP DL360 Gen9 machines during
+reboot due to hpsa driver not clearing the bus master bit during the
+shutdown procedure by calling pci_disable_device().
 
-url:    https://github.com/0day-ci/linux/commits/Anson-Huang/ARM-imx-add-L2-page-power-control-for-GPC/20180602-080503
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-arm67 (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Disable device as part of the shutdown sequence.
 
-All errors (new ones prefixed by >>):
-
-   arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
->> mach-imx6sl.c:(.init.text+0x2c): undefined reference to `imx6sx_cpuidle_init'
-
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
+Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
+Cc: stable at vger.kernel.org
+Reported-by: Ryan Finnie <ryan@finnie.org>
+Tested-by: Don Brace <don.brace@microsemi.com>
+Acked-by: Don Brace <don.brace@microsemi.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31074 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180602/b9cf1083/attachment-0001.gz>
+ drivers/scsi/hpsa.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
+index 3a9eca1..b92f86a 100644
+--- a/drivers/scsi/hpsa.c
++++ b/drivers/scsi/hpsa.c
+@@ -8869,7 +8869,7 @@ static void hpsa_disable_rld_caching(struct ctlr_info *h)
+ 	kfree(options);
+ }
+ 
+-static void hpsa_shutdown(struct pci_dev *pdev)
++static void __hpsa_shutdown(struct pci_dev *pdev)
+ {
+ 	struct ctlr_info *h;
+ 
+@@ -8884,6 +8884,12 @@ static void hpsa_shutdown(struct pci_dev *pdev)
+ 	hpsa_disable_interrupt_mode(h);		/* pci_init 2 */
+ }
+ 
++static void hpsa_shutdown(struct pci_dev *pdev)
++{
++	__hpsa_shutdown(pdev);
++	pci_disable_device(pdev);
++}
++
+ static void hpsa_free_device_info(struct ctlr_info *h)
+ {
+ 	int i;
+@@ -8927,7 +8933,7 @@ static void hpsa_remove_one(struct pci_dev *pdev)
+ 		scsi_remove_host(h->scsi_host);		/* init_one 8 */
+ 	/* includes hpsa_free_irqs - init_one 4 */
+ 	/* includes hpsa_disable_interrupt_mode - pci_init 2 */
+-	hpsa_shutdown(pdev);
++	__hpsa_shutdown(pdev);
+ 
+ 	hpsa_free_device_info(h);		/* scan */
+ 
+-- 
+2.7.4
