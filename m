@@ -1,33 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 2 Jun 2018 10:48:52 -0300
-Subject: [PATCH 1/2] clk: imx6ul: add GPIO clock gates
-In-Reply-To: <1439344955.9677.1526991935718@email.1und1.de>
-References: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
- <1439344955.9677.1526991935718@email.1und1.de>
-Message-ID: <CAOMZO5BVhjwGpJ22qBihKcjWyvBkzNPU0cNtNY9HToLLEkYByA@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 2 Jun 2018 21:53:11 +0800
+Subject: [clk:clk-qcom-sdm845 12/13] ERROR: "clk_fabia_pll_configure"
+ [drivers/clk/qcom/videocc-sdm845.ko] undefined!
+Message-ID: <201806022109.6nqKxaxV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-qcom-sdm845
+head:   a3dcdc7e5417a369f59214f67cd642c95017cf3b
+commit: c646b347669587790db6c703d0786bb5a2639bdd [12/13] clk: qcom: Add video clock controller driver for SDM845
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        git checkout c646b347669587790db6c703d0786bb5a2639bdd
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-On Tue, May 22, 2018 at 9:25 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+Note: the clk/clk-qcom-sdm845 HEAD a3dcdc7e5417a369f59214f67cd642c95017cf3b builds fine.
+      It only hurts bisectibility.
 
->> --- a/include/dt-bindings/clock/imx6ul-clock.h
->> +++ b/include/dt-bindings/clock/imx6ul-clock.h
->> @@ -242,20 +242,25 @@
->>  #define IMX6UL_CLK_CKO2_PODF         229
->>  #define IMX6UL_CLK_CKO2                      230
->>  #define IMX6UL_CLK_CKO                       231
->> +#define IMX6UL_CLK_GPIO1             232
->> +#define IMX6UL_CLK_GPIO2             233
->> +#define IMX6UL_CLK_GPIO3             234
->> +#define IMX6UL_CLK_GPIO4             235
->> +#define IMX6UL_CLK_GPIO5             236
->
-> this change looks like a breakage of devicetree ABI. You are changing the mean of the existing clock IDs on i.MX6ULL, which probably regress the combination of older DTBs with newer kernel.
+All errors (new ones prefixed by >>):
 
-Good point! I will send a fix for f5a4670de96678 ("clk: imx: Add new
-clo01 and clo2 controlled
-by CCOSR") which did the same reordering.
+>> ERROR: "clk_fabia_pll_configure" [drivers/clk/qcom/videocc-sdm845.ko] undefined!
 
-Thanks
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62909 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180602/93f1a1e9/attachment-0001.gz>
