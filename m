@@ -1,87 +1,80 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 2 Jun 2018 21:03:48 +0900
-Subject: [PATCH 8/8] media: uniphier: add LD20 adapter driver for ISDB
-In-Reply-To: <20180530090946.1635-9-suzuki.katsuhiro@socionext.com>
-References: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
- <20180530090946.1635-9-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNARx0Em0P9BWfTGjroGkyELeHo3T-YcWWDAwdsGePXuS0Q@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 2 Jun 2018 09:12:45 -0400
+Subject: [PATCH v2 5/5] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <CAMuHMdUX874g6pAz-Ze-yA3S+6aOhzUkfGN9wmQUhy-y0f7dMw@mail.gmail.com>
+References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
+ <1527171551-21979-6-git-send-email-gilad@benyossef.com>
+ <20180529161936.prhp4oikzamr6u3n@verge.net.au>
+ <CAOtvUMeBCH+23c3FDWncMwPPe5N=7yjRKzhyLmFXrYazgGbcJw@mail.gmail.com>
+ <CAMuHMdUX874g6pAz-Ze-yA3S+6aOhzUkfGN9wmQUhy-y0f7dMw@mail.gmail.com>
+Message-ID: <20180602131241.5cl4hkbxydvcy6mu@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-05-30 18:09 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This patch adds UniPhier LD20 DVB adapter driver for ISDB-S/T
-> that equipments SONY SUT-PJ series using CXD2858 tuner and Socionext
-> MN884434 demodulator.
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
->  drivers/media/platform/uniphier/Kconfig       |  10 +
->  drivers/media/platform/uniphier/Makefile      |   1 +
->  .../platform/uniphier/ld20-mn884434-helene.c  | 274 ++++++++++++++++++
->  3 files changed, 285 insertions(+)
->  create mode 100644 drivers/media/platform/uniphier/ld20-mn884434-helene.c
->
+On Fri, Jun 01, 2018 at 10:12:24AM +0200, Geert Uytterhoeven wrote:
+> Hi Gilad,
+> 
+> On Thu, May 31, 2018 at 1:55 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> > On Tue, May 29, 2018 at 7:19 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> On Thu, May 24, 2018 at 03:19:10PM +0100, Gilad Ben-Yossef wrote:
+> >>> Add bindings for CryptoCell instance in the SoC.
+> >>>
+> >>> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+> >>
+> >> In so far as I can review the details of this (which is not much) this
+> >> looks fine to me. I am, however, a little unclear in when it should be
+> >> accepted.
+> >
+> > Since Herbert Xu ACKed the driver changes, I would say the only gating
+> > commit is Geert's CR clock patch.
+> 
+> These are queued for v4.19.
+> 
+> > If that one is in, than I would say this one should go in as well.
+> 
+> As the device node now has a power-domains property, the genpd code will
+> try to attach it to the CPG/MSSR PM Domain, which is a clock domain.
+> In the absence of the clock patch, the device's module clock cannot be
+> found, and dev_pm_domain_attach() and thus platform_drv_probe() will fail,
+> before calling the device driver's .probe() function.
+> 
+> So there is no longer a dependency on the clock patch, and the DT patch can
+> go in in parallel (although I prefer its subject to be changed
+> s/binding/device device/).
 
+Thanks, I have applied the following (but may not push until next week).
 
-> +
-> +static const struct of_device_id uniphier_hsc_adapter_of_match[] = {
-> +       {
-> +               .compatible = "socionext,uniphier-ld20-mn884434-helene",
-> +               .data = &ld20_mn884434_helene_spec,
-> +       },
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(of, uniphier_hsc_adapter_of_match);
-> +
-> +static struct platform_driver uniphier_hsc_adapter_driver = {
-> +       .driver = {
-> +               .name = "uniphier-ld20-isdb",
-> +               .of_match_table = of_match_ptr(uniphier_hsc_adapter_of_match),
-> +       },
-> +       .probe  = uniphier_adapter_probe,
-> +       .remove = uniphier_adapter_remove,
-> +};
-> +module_platform_driver(uniphier_hsc_adapter_driver);
-> +
-> +MODULE_AUTHOR("Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>");
-> +MODULE_DESCRIPTION("UniPhier LD20 adapter driver for ISDB.");
-> +MODULE_LICENSE("GPL v2");
+From: Gilad Ben-Yossef <gilad@benyossef.com>
+Subject: [PATCH] arm64: dts: renesas: r8a7795: add ccree to device tree
 
+Add bindings for CryptoCell instance in the SoC.
 
-This is weird.
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
->From drivers/media/platform/uniphier/Makefile,
-obviously you link all the objects into the single module, uniphier-dvb.ko
-
-
-It contains zero, one, or two sets of MODULE_* depending on CONFIG options.
-
-
- - Zero MODULE_LICENSE / MODULE_AUTHOR / MODULE_DESCRIPTION
-   if CONFIG_DVB_UNIPHIER_LD11_ISDB=n &&
-      CONFIG_DVB_UNIPHIER_LD20_ISDB=n
-
-
- - Two sets of MODULE_LICENSE / MODULE_AUTHOR / MODULE_DESCRIPTION
-   if CONFIG_DVB_UNIPHIER_LD11_ISDB=y &&
-      CONFIG_DVB_UNIPHIER_LD20_ISDB=y
-
-
-
-What you can do is:
-
- - Split the module into core, ld11, ld20
-
-    or
-
- - Move the module tags and entry to hsc-core.c
-   and leave only the data arrays in ld11, ld20.
-
-
-
-
-
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index d842940b2f43..3ac75dbf2d93 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -528,6 +528,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		arm_cc630p: crypto at e6601000 {
++			compatible = "arm,cryptocell-630p-ree";
++			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++			reg = <0x0 0xe6601000 0 0x1000>;
++			clocks = <&cpg CPG_MOD 229>;
++			resets = <&cpg 229>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++		};
++
+ 		i2c3: i2c at e66d0000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-Best Regards
-Masahiro Yamada
+2.11.0
