@@ -1,34 +1,32 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 01 Jun 2018 23:32:42 -0700
-Subject: [PATCH v2 5/6] ARM: dts: Add generic interconnect target module
- node for MCAN
-In-Reply-To: <20180530141133.3711-6-faiz_abbas@ti.com>
-References: <20180530141133.3711-1-faiz_abbas@ti.com>
- <20180530141133.3711-6-faiz_abbas@ti.com>
-Message-ID: <152792116258.225090.5279546677198775320@swboyd.mtv.corp.google.com>
+From: sboyd@kernel.org (sboyd at kernel.org)
+Date: Sat,  2 Jun 2018 00:21:32 -0700
+Subject: [PATCH] clk: qcom: Export clk_fabia_pll_configure()
+Message-ID: <20180602072132.222257-1-sboyd@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Faiz Abbas (2018-05-30 07:11:32)
-> diff --git a/arch/arm/boot/dts/dra76x.dtsi b/arch/arm/boot/dts/dra76x.dtsi
-> index bfc82636999c..57b8dc0fe719 100644
-> --- a/arch/arm/boot/dts/dra76x.dtsi
-> +++ b/arch/arm/boot/dts/dra76x.dtsi
-> @@ -11,6 +11,25 @@
->  / {
->         compatible = "ti,dra762", "ti,dra7";
->  
-> +       ocp {
-> +
-> +               target-module at 0x42c00000 {
+From: Stephen Boyd <sboyd@kernel.org>
 
-Drop the 0x on unit address. Also, it should match the first register
-property. And what is a "target-module"?
+This is used by the video clk driver on sdm845 and that's a module.
+Export it to prevent module build failures.
 
-> +                       compatible = "ti,sysc-dra7-mcan";
-> +                       ranges = <0x0 0x42c00000 0x2000>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       reg = <0x42c01900 0x4>,
-> +                             <0x42c01904 0x4>,
-> 
+Cc: Amit Nischal <anischal@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@kernel.org>
+---
+ drivers/clk/qcom/clk-alpha-pll.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
+index 9722b701fbdb..3c49a60072f1 100644
+--- a/drivers/clk/qcom/clk-alpha-pll.c
++++ b/drivers/clk/qcom/clk-alpha-pll.c
+@@ -885,6 +885,7 @@ void clk_fabia_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
+ 
+ 	regmap_update_bits(regmap, PLL_MODE(pll), PLL_RESET_N, PLL_RESET_N);
+ }
++EXPORT_SYMBOL_GPL(clk_fabia_pll_configure);
+ 
+ static int alpha_pll_fabia_enable(struct clk_hw *hw)
+ {
+-- 
+Sent by a computer through tubes
