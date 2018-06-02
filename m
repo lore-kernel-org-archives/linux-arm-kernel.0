@@ -1,38 +1,26 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 01 Jun 2018 21:47:45 -0700
-Subject: [PATCH] clkdev: Remove duplicated negative index check from
- __of_clk_get()
-In-Reply-To: <CAMuHMdUNXQDdv-CQs+KpaHJ8gGFjFrPRNXF3HPZNyTdQr+23Og@mail.gmail.com>
-References: <1526641120-1585-1-git-send-email-geert+renesas@glider.be>
- <152788083877.225090.16757573144833344500@swboyd.mtv.corp.google.com>
- <CAMuHMdUNXQDdv-CQs+KpaHJ8gGFjFrPRNXF3HPZNyTdQr+23Og@mail.gmail.com>
-Message-ID: <152791486506.225090.5983323218999937025@swboyd.mtv.corp.google.com>
+Date: Fri, 01 Jun 2018 23:17:34 -0700
+Subject: [PATCH v2 08/21] clk: bcm2835: use match_string() helper
+In-Reply-To: <1527765086-19873-9-git-send-email-xieyisheng1@huawei.com>
+References: <1527765086-19873-1-git-send-email-xieyisheng1@huawei.com>
+ <1527765086-19873-9-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <152792025405.225090.5224138914235298506@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Geert Uytterhoeven (2018-06-01 12:22:33)
-> Hi Stephen,
+Quoting Yisheng Xie (2018-05-31 04:11:13)
+> match_string() returns the index of an array for a matching string,
+> which can be used instead of open coded variant.
 > 
-> On Fri, Jun 1, 2018 at 9:20 PM, Stephen Boyd <sboyd@kernel.org> wrote:
-> > Quoting Geert Uytterhoeven (2018-05-18 03:58:40)
-> >> __of_clk_get() calls of_parse_phandle_with_args(), which rejects
-> >> negative indices since commit bd69f73f2c81eed9 ("of: Create function for
-> >> counting number of phandles in a property").
-> >>
-> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> ---
-> >> Commit bd69f73f2c81eed9 is in v3.9.
-> >
-> > Did you send this to Russell's patch tracker? Otherwise I can pick it up
-> 
-> Not yet. The patch tracker is for reviewed patches, AFAIK.
-> 
-> > to clk-next.
-> 
-> Thanks!
-> 
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: linux-clk at vger.kernel.org
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> ---
 
-Ok. If you need my reviewed-by to add it to the tracker feel free to
-have:
-
-Reviewed-by: Stephen Boyd <sboyd@kernel.org>
+Applied to clk-next
