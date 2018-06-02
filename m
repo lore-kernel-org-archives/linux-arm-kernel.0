@@ -1,69 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat,  2 Jun 2018 00:28:53 -0400
-Subject: [PATCH V5] scsi: hpsa: disable device during shutdown
-Message-ID: <1527913733-16492-1-git-send-email-okaya@codeaurora.org>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 01 Jun 2018 21:47:45 -0700
+Subject: [PATCH] clkdev: Remove duplicated negative index check from
+ __of_clk_get()
+In-Reply-To: <CAMuHMdUNXQDdv-CQs+KpaHJ8gGFjFrPRNXF3HPZNyTdQr+23Og@mail.gmail.com>
+References: <1526641120-1585-1-git-send-email-geert+renesas@glider.be>
+ <152788083877.225090.16757573144833344500@swboyd.mtv.corp.google.com>
+ <CAMuHMdUNXQDdv-CQs+KpaHJ8gGFjFrPRNXF3HPZNyTdQr+23Og@mail.gmail.com>
+Message-ID: <152791486506.225090.5983323218999937025@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
-shutdown")' has been added to kernel to shutdown pending PCIe port
-service interrupts during reboot so that a newly started kexec kernel
-wouldn't observe pending interrupts.
+Quoting Geert Uytterhoeven (2018-06-01 12:22:33)
+> Hi Stephen,
+> 
+> On Fri, Jun 1, 2018 at 9:20 PM, Stephen Boyd <sboyd@kernel.org> wrote:
+> > Quoting Geert Uytterhoeven (2018-05-18 03:58:40)
+> >> __of_clk_get() calls of_parse_phandle_with_args(), which rejects
+> >> negative indices since commit bd69f73f2c81eed9 ("of: Create function for
+> >> counting number of phandles in a property").
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> Commit bd69f73f2c81eed9 is in v3.9.
+> >
+> > Did you send this to Russell's patch tracker? Otherwise I can pick it up
+> 
+> Not yet. The patch tracker is for reviewed patches, AFAIK.
+> 
+> > to clk-next.
+> 
+> Thanks!
+> 
 
-pcie_port_device_remove() is disabling the root port and switches by
-calling pci_disable_device() after all PCIe service drivers are shutdown.
+Ok. If you need my reviewed-by to add it to the tracker feel free to
+have:
 
-This has been found to cause crashes on HP DL360 Gen9 machines during
-reboot due to hpsa driver not clearing the bus master bit during the
-shutdown procedure by calling pci_disable_device().
-
-Disable device as part of the shutdown sequence.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Link: https://bugzilla.kernel.org/show_bug.cgi?id=199779
-Fixes: cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during shutdown")
-Cc: stable at vger.kernel.org
-Reported-by: Ryan Finnie <ryan@finnie.org>
-Tested-by: Don Brace <don.brace@microsemi.com>
-Acked-by: Don Brace <don.brace@microsemi.com>
----
- drivers/scsi/hpsa.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
-index 3a9eca1..b92f86a 100644
---- a/drivers/scsi/hpsa.c
-+++ b/drivers/scsi/hpsa.c
-@@ -8869,7 +8869,7 @@ static void hpsa_disable_rld_caching(struct ctlr_info *h)
- 	kfree(options);
- }
- 
--static void hpsa_shutdown(struct pci_dev *pdev)
-+static void __hpsa_shutdown(struct pci_dev *pdev)
- {
- 	struct ctlr_info *h;
- 
-@@ -8884,6 +8884,12 @@ static void hpsa_shutdown(struct pci_dev *pdev)
- 	hpsa_disable_interrupt_mode(h);		/* pci_init 2 */
- }
- 
-+static void hpsa_shutdown(struct pci_dev *pdev)
-+{
-+	__hpsa_shutdown(pdev);
-+	pci_disable_device(pdev);
-+}
-+
- static void hpsa_free_device_info(struct ctlr_info *h)
- {
- 	int i;
-@@ -8927,7 +8933,7 @@ static void hpsa_remove_one(struct pci_dev *pdev)
- 		scsi_remove_host(h->scsi_host);		/* init_one 8 */
- 	/* includes hpsa_free_irqs - init_one 4 */
- 	/* includes hpsa_disable_interrupt_mode - pci_init 2 */
--	hpsa_shutdown(pdev);
-+	__hpsa_shutdown(pdev);
- 
- 	hpsa_free_device_info(h);		/* scan */
- 
--- 
-2.7.4
+Reviewed-by: Stephen Boyd <sboyd@kernel.org>
