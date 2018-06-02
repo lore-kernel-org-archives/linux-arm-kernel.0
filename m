@@ -1,275 +1,34 @@
-From: rah@settrans.net (Bob Ham)
-Date: Sat,  2 Jun 2018 17:03:13 +0100
-Subject: [PATCH v2] arm: sun4i: Add support for Pengpod 1000 tablet
-Message-ID: <20180602160313.26763-1-rah@settrans.net>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sat,  2 Jun 2018 22:24:12 +0530
+Subject: [PATCH 0/3] Add gpio interrupt support for Actions Semi S900 SoC
+Message-ID: <20180602165415.30956-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is initial support for the Pengpod 1000 tablet.  The display is
-not currently working but the UART, SD card and USB all work fine.
+This patchset adds interrupt support for Actions Semi S900 GPIO's. Each
+port has individual register sets for configuring the below interrupt
+types:
 
-Signed-off-by: Bob Ham <rah@settrans.net>
----
-Changes since v1:
+1. Rising Edge Interrupt
+2. Falling Edge Interrupt
+3. High Level Interrupt
+4. Low Level Interrupt
 
-* Added SPDX license identifier
+Thanks,
+Mani
 
-arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts | 234 +++++++++++++++++++++++++++
- 2 files changed, 235 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts
+Manivannan Sadhasivam (3):
+  dt-bindings: pinctrl: Add gpio interrupt bindings for Actions S900 SoC
+  arm64: dts: actions: Add interrupt properties to pinctrl node for S900
+  pinctrl: actions: Add interrupt support for OWL S900 SoC
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..e6e93e7ffc8b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -893,6 +893,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-olinuxino-lime.dtb \
- 	sun4i-a10-pcduino.dtb \
- 	sun4i-a10-pcduino2.dtb \
-+	sun4i-a10-pengpod-1000.dtb \
- 	sun4i-a10-pov-protab2-ips9.dtb
- dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a10s-auxtek-t003.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts b/arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts
-new file mode 100644
-index 000000000000..788163a80f3a
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts
-@@ -0,0 +1,234 @@
-+/*
-+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-+ * Copyright 2017 Robert Ham <rah@settrans.net>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0-or-later or X11)
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun4i-a10.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pwm/pwm.h>
-+
-+/ {
-+	model = "PengPod 1000";
-+	compatible = "pengpod,1000", "allwinner,sun4i-a10";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en_pin_pengpod1000>;
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-+		default-brightness-level = <8>;
-+		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupts = <0>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	mma7660: accelerometer at 4c {
-+		compatible = "fsl,mma7660";
-+		reg = <0x4c>;
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+
-+	ft5406ee8: touchscreen at 38 {
-+		compatible = "edt,edt-ft5406";
-+		reg = <0x38>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&touchscreen_pins>;
-+		reset-gpios = <&pio 1 13 GPIO_ACTIVE_LOW>;
-+		touchscreen-size-x = <1024>;
-+		touchscreen-size-y = <600>;
-+		touchscreen-swapped-x-y;
-+	};
-+};
-+
-+&mmc0 {
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&pio {
-+	bl_en_pin_pengpod1000: bl_en_pin at 0 {
-+		pins = "PH7";
-+		function = "gpio_out";
-+	};
-+
-+	touchscreen_pins: touchscreen_pins at 0 {
-+		pins = "PB13";
-+		function = "gpio_out";
-+	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		pins = "PH4";
-+		function = "gpio_in";
-+		bias-pull-up;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		pins = "PH5";
-+		function = "gpio_in";
-+		bias-pull-down;
-+	};
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pin>;
-+	status = "okay";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1250000>;
-+	regulator-max-microvolt = <1250000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pb_pins>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
+ .../bindings/pinctrl/actions,s900-pinctrl.txt |  10 +
+ arch/arm64/boot/dts/actions/s900.dtsi         |   8 +
+ drivers/pinctrl/actions/Kconfig               |   1 +
+ drivers/pinctrl/actions/pinctrl-owl.c         | 231 +++++++++++++++++-
+ drivers/pinctrl/actions/pinctrl-owl.h         |  22 +-
+ drivers/pinctrl/actions/pinctrl-s900.c        |  31 ++-
+ 6 files changed, 285 insertions(+), 18 deletions(-)
+
 -- 
-2.11.0
+2.17.0
