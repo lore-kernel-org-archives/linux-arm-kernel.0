@@ -1,20 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Jun 2018 01:16:55 -0700
-Subject: [GIT PULL] i.MX maintainers update for 4.18
-In-Reply-To: <20180528081549.GD3143@dragon>
-References: <20180528081549.GD3143@dragon>
-Message-ID: <20180602081655.e6wvdf3mgio2fsjc@localhost>
+Date: Sat, 2 Jun 2018 01:20:18 -0700
+Subject: [GIT PULL] pxa for v4.18
+In-Reply-To: <87d0xftunu.fsf@belgarion.home>
+References: <87d0xftunu.fsf@belgarion.home>
+Message-ID: <20180602082018.t4tnffy2plqqntcr@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 04:15:50PM +0800, Shawn Guo wrote:
-> Hi Arnd, Olof,
+On Mon, May 28, 2018 at 10:03:17PM +0200, Robert Jarzmik wrote:
+> Hi Arnd, Kevin, and Olof,
 > 
-> I'm not sure which one is easier for you.  You can pull the request or
-> apply the patch to some arm-soc branch directly.
+> This is the pxa pull request for 4.18, a minor one.
 > 
-> Shawn
-> 
+> Can you please consider pulling ?
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
@@ -22,13 +20,25 @@ On Mon, May 28, 2018 at 04:15:50PM +0800, Shawn Guo wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-maintainers-4.18
+>   https://github.com/rjarzmik/linux.git tags/pxa-for-4.18
 > 
-> for you to fetch changes up to c309f0cdc30667efd233f1220587fb0b18c8423b:
+> for you to fetch changes up to c1c14f8954c6d1cb9867024618e93687d9d035ba:
 > 
->   MAINTAINERS: add NXP linux team maillist as i.MX reviewer (2018-05-28 15:55:07 +0800)
+>   ARM: pxa3xx: enable external wakeup pins (2018-05-25 22:40:17 +0200)
+> 
+> ----------------------------------------------------------------
+> This is is the pxa changes for v4.18 cycle :
+>  - change to phase out at24 eeprom platform data
+>  - add a missing wakeup pin on pxa320 SoCs
 
-Merged, thanks!
+Hi,
+
+This is coming in very late, but it's also a pretty small pull request so I've
+merged it for v4.18. If you can, please try to get your staged patches set
+around rc5/rc6 timeframe.
+
+
+Thanks,
 
 
 -Olof
