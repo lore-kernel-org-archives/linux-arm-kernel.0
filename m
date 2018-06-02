@@ -1,7 +1,7 @@
 From: rokhanna@nvidia.com (Rohit Khanna)
-Date: Fri, 1 Jun 2018 17:39:23 -0700
-Subject: [PATCH] arm64: alternative:flush cache with unpatched code
-Message-ID: <1527899963-10196-1-git-send-email-rokhanna@nvidia.com>
+Date: Fri, 1 Jun 2018 17:41:11 -0700
+Subject: [PATCH V5] arm64: alternative:flush cache with unpatched code
+Message-ID: <1527900071-10372-1-git-send-email-rokhanna@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
