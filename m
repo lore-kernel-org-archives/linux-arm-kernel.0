@@ -1,17 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Jun 2018 01:20:51 -0700
-Subject: [GIT PULL] pxa-dt for v4.18
-In-Reply-To: <878t83tujv.fsf@belgarion.home>
-References: <878t83tujv.fsf@belgarion.home>
-Message-ID: <20180602082051.buclnofttnob66fy@localhost>
+Date: Sat, 2 Jun 2018 01:33:10 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.18
+In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
+References: <cover.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <20180602083310.oatyca4abkzzwqfi@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 10:05:40PM +0200, Robert Jarzmik wrote:
-> Hi Arnd, Kevin, and Olof,
+On Fri, May 18, 2018 at 01:17:37PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> This is the pxa pull request for 4.18 device-tree, with a couple fixes from
-> Daniel for pxa3xx.
+> Please consider these Renesas ARM based SoC DT updates for v4.18.
+> 
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
@@ -19,19 +19,13 @@ On Mon, May 28, 2018 at 10:05:40PM +0200, Robert Jarzmik wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-dt-4.18
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.18
 > 
-> for you to fetch changes up to 07c8d21d08a589bc01238fe09a6edb54d24f3da0:
+> for you to fetch changes up to 7fad92d05887319998b8d2bb40082b8b224d5ef5:
 > 
->   ARM: dts: pxa3xx: fix MMC clocks (2018-05-25 23:16:18 +0200)
-> 
-> ----------------------------------------------------------------
-> This device-tree pxa update brings :
->  - fix pxa3xx MMC bindings
->  - add pxa3xx GPIOs
->  - add pxa3xx missing pin controller
+>   ARM: dts: r8a7740: Add CEU1 (2018-05-16 10:54:50 +0200)
 
-Same comment as for the other pull request but merged now. Thanks!
+Per the other subthread, I have queued this up in next/late now. Thanks.
 
 
 -Olof
