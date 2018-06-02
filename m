@@ -1,87 +1,102 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri,  1 Jun 2018 17:56:08 -0700
-Subject: [PATCH v3 3/3] arm64: dts: Update Stingray clock DT nodes
-In-Reply-To: <1527900968-12017-1-git-send-email-ray.jui@broadcom.com>
-References: <1527900968-12017-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <1527900968-12017-4-git-send-email-ray.jui@broadcom.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Fri,  1 Jun 2018 18:34:04 -0700
+Subject: [PATCH v5 0/2] regulator: add QCOM RPMh regulator driver
+Message-ID: <cover.1527901471.git.collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pramod Kumar <pramod.kumar@broadcom.com>
+This patch series adds a driver and device tree binding documentation for
+PMIC regulator control via Resource Power Manager-hardened (RPMh) on some
+Qualcomm Technologies, Inc. SoCs such as SDM845.  RPMh is a hardware block
+which contains several accelerators which are used to manage various
+hardware resources that are shared between the processors of the SoC.  The
+final hardware state of a regulator is determined within RPMh by performing
+max aggregation of the requests made by all of the processors.
 
-Update clock output names in the Stingray clock DT nodes so they match
-the binding document and the latest ASIC datasheet. Also add entries
-for LCPLL2
+The RPMh regulator driver depends upon the RPMh driver [1] and command DB
+driver [2] which are both still undergoing review.  It also depends upon
+three recent regulator changes: [3], [4], and [5].
 
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-Signed-off-by: Ray Jui <ray.jui@broadcom.com>
----
- .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 26 ++++++++++++++++------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+Changes since v4 [6]:
+ - Removed support for DT properties qcom,regulator-drms-modes and
+   qcom,drms-mode-max-microamps
+ - Specified fixed DRMS high power mode minimum limits for LDO type
+   regulators
+ - Removed DRMS support for SMPS and BOB type regulators
+ - Simplified voltage caching logic
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
-index 3a4d452..10a106a 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
-@@ -52,12 +52,24 @@
- 			reg = <0x0001d104 0x32>,
- 			      <0x0001c854 0x4>;
- 			clocks = <&osc>;
--			clock-output-names = "genpll0", "clk_125", "clk_scr",
-+			clock-output-names = "genpll0", "clk_125m", "clk_scr",
- 					     "clk_250", "clk_pcie_axi",
- 					     "clk_paxc_axi_x2",
- 					     "clk_paxc_axi";
- 		};
- 
-+		genpll2: genpll2 at 1d1ac {
-+			#clock-cells = <1>;
-+			compatible = "brcm,sr-genpll2";
-+			reg = <0x0001d1ac 0x32>,
-+			      <0x0001c854 0x4>;
-+			clocks = <&osc>;
-+			clock-output-names = "genpll2", "clk_nic",
-+					     "clk_ts_500_ref", "clk_125_nitro",
-+					     "clk_chimp", "clk_nic_flash",
-+					     "clk_fs";
-+		};
-+
- 		genpll3: genpll3 at 1d1e0 {
- 			#clock-cells = <1>;
- 			compatible = "brcm,sr-genpll3";
-@@ -75,8 +87,8 @@
- 			      <0x0001c854 0x4>;
- 			clocks = <&osc>;
- 			clock-output-names = "genpll4", "clk_ccn",
--					     "clk_tpiu_pll", "noc_clk",
--					     "pll_chclk_fs4",
-+					     "clk_tpiu_pll", "clk_noc",
-+					     "clk_chclk_fs4",
- 					     "clk_bridge_fscpu";
- 		};
- 
-@@ -86,8 +98,8 @@
- 			reg = <0x0001d248 0x32>,
- 			      <0x0001c870 0x4>;
- 			clocks = <&osc>;
--			clock-output-names = "genpll5", "fs4_hf_clk",
--					     "crypto_ae_clk", "raid_ae_clk";
-+			clock-output-names = "genpll5", "clk_fs4_hf",
-+					     "clk_crypto_ae", "clk_raid_ae";
- 		};
- 
- 		lcpll0: lcpll0 at 1d0c4 {
-@@ -107,9 +119,9 @@
- 			reg = <0x0001d138 0x3c>,
- 			      <0x0001c870 0x4>;
- 			clocks = <&osc>;
--			clock-output-names = "lcpll1", "clk_wanpn",
-+			clock-output-names = "lcpll1", "clk_wan",
- 					     "clk_usb_ref",
--					     "timesync_evt_clk";
-+					     "clk_crmu_ts";
- 		};
- 
- 		hsls_clk: hsls_clk {
+Changes since v3 [7]:
+ - Removed support for DT properties qcom,regulator-initial-microvolt
+   and qcom,headroom-microvolt
+ - Renamed DT property qcom,allowed-drms-modes to be
+   qcom,regulator-drms-modes
+ - Updated DT binding documentation to mention which common regulator
+   bindings can be used for qcom-rpmh-regulator devices
+ - Added voltage caching so that voltage requests are only sent to RPMh
+   after the regulator has been enabled at least once
+ - Changed 'voltage_selector' default value to be -ENOTRECOVERABLE to
+   interact with [5]
+ - Initialized 'enabled' to -EINVAL so that unused regulators are
+   disabled by regulator_late_cleanup()
+ - Removed rpmh_regulator_load_default_parameters() as it is no longer
+   needed
+ - Updated the mode usage description in qcom,rpmh-regulator.h
+
+Changes since v2 [8]:
+ - Replaced '_' with '-' in device tree supply property names
+ - Renamed qcom_rpmh-regulator.c to be qcom-rpmh-regulator.c
+ - Updated various DT property names to use "microvolt" and "microamp"
+ - Moved allowed modes constraint specification out of the driver [4]
+ - Replaced rpmh_client with device pointer to match new RPMh API [1]
+ - Corrected drms mode threshold checking
+ - Initialized voltage_selector to -EINVAL when not specified in DT
+ - Added constants for PMIC regulator hardware modes
+ - Corrected type sign of mode mapping tables
+ - Made variable names for mode arrays plural
+ - Simplified Kconfig depends on
+ - Removed unnecessary constants and struct fields
+ - Added some descriptive comments
+
+Changes since v1 [9]:
+ - Addressed review feedback from Doug, Mark, and Stephen
+ - Replaced set_voltage()/get_voltage() callbacks with set_voltage_sel()/
+   get_voltage_sel()
+ - Added set_bypass()/get_bypass() callbacks for BOB pass-through mode
+   control
+ - Removed top-level PMIC data structures
+ - Removed initialization variables from structs and passed them as
+   function parameters
+ - Removed various comments and error messages
+ - Simplified mode handling
+ - Refactored per-PMIC rpmh-regulator data specification
+ - Simplified probe function
+ - Moved header into DT patch
+ - Removed redundant property listings from DT binding documentation
+
+[1]: https://lkml.org/lkml/2018/5/9/729
+[2]: https://lkml.org/lkml/2018/4/10/714
+[3]: https://lkml.org/lkml/2018/4/18/556
+[4]: https://lkml.org/lkml/2018/5/11/696
+[5]: https://lkml.org/lkml/2018/5/15/1005
+[6]: https://lkml.org/lkml/2018/5/22/1168
+[7]: https://lkml.org/lkml/2018/5/11/701
+[8]: https://lkml.org/lkml/2018/4/13/687
+[9]: https://lkml.org/lkml/2018/3/16/1431
+
+David Collins (2):
+  regulator: dt-bindings: add QCOM RPMh regulator bindings
+  regulator: add QCOM RPMh regulator driver
+
+ .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/qcom-rpmh-regulator.c            | 770 +++++++++++++++++++++
+ .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +
+ 5 files changed, 976 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+ create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
+ create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
+
 -- 
-2.1.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
