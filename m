@@ -1,26 +1,30 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 01 Jun 2018 23:17:34 -0700
-Subject: [PATCH v2 08/21] clk: bcm2835: use match_string() helper
-In-Reply-To: <1527765086-19873-9-git-send-email-xieyisheng1@huawei.com>
-References: <1527765086-19873-1-git-send-email-xieyisheng1@huawei.com>
- <1527765086-19873-9-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <152792025405.225090.5224138914235298506@swboyd.mtv.corp.google.com>
+Date: Fri, 01 Jun 2018 23:19:23 -0700
+Subject: [PATCH 1/2] clk: imx6ul: add GPIO clock gates
+In-Reply-To: <1439344955.9677.1526991935718@email.1und1.de>
+References: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
+ <1439344955.9677.1526991935718@email.1und1.de>
+Message-ID: <152792036327.225090.14543251343485084840@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Yisheng Xie (2018-05-31 04:11:13)
-> match_string() returns the index of an array for a matching string,
-> which can be used instead of open coded variant.
+Quoting Stefan Wahren (2018-05-22 05:25:35)
+> > +++ b/include/dt-bindings/clock/imx6ul-clock.h
+> > @@ -242,20 +242,25 @@
+> >  #define IMX6UL_CLK_CKO2_PODF         229
+> >  #define IMX6UL_CLK_CKO2                      230
+> >  #define IMX6UL_CLK_CKO                       231
+> > +#define IMX6UL_CLK_GPIO1             232
+> > +#define IMX6UL_CLK_GPIO2             233
+> > +#define IMX6UL_CLK_GPIO3             234
+> > +#define IMX6UL_CLK_GPIO4             235
+> > +#define IMX6UL_CLK_GPIO5             236
 > 
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@kernel.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: linux-clk at vger.kernel.org
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-> ---
+> this change looks like a breakage of devicetree ABI. You are changing the mean of the existing clock IDs on i.MX6ULL, which probably regress the combination of older DTBs with newer kernel.
+> 
 
-Applied to clk-next
+Agreed. Why can't we just tack on more numbers at the end?
+
+> >  
+> >  /* For i.MX6ULL */
+> > -#define IMX6ULL_CLK_ESAI_PRED                232
