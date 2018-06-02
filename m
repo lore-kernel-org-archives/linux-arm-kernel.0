@@ -1,80 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 2 Jun 2018 09:12:45 -0400
-Subject: [PATCH v2 5/5] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <CAMuHMdUX874g6pAz-Ze-yA3S+6aOhzUkfGN9wmQUhy-y0f7dMw@mail.gmail.com>
-References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
- <1527171551-21979-6-git-send-email-gilad@benyossef.com>
- <20180529161936.prhp4oikzamr6u3n@verge.net.au>
- <CAOtvUMeBCH+23c3FDWncMwPPe5N=7yjRKzhyLmFXrYazgGbcJw@mail.gmail.com>
- <CAMuHMdUX874g6pAz-Ze-yA3S+6aOhzUkfGN9wmQUhy-y0f7dMw@mail.gmail.com>
-Message-ID: <20180602131241.5cl4hkbxydvcy6mu@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 2 Jun 2018 10:48:52 -0300
+Subject: [PATCH 1/2] clk: imx6ul: add GPIO clock gates
+In-Reply-To: <1439344955.9677.1526991935718@email.1und1.de>
+References: <1526959560-6014-1-git-send-email-Anson.Huang@nxp.com>
+ <1439344955.9677.1526991935718@email.1und1.de>
+Message-ID: <CAOMZO5BVhjwGpJ22qBihKcjWyvBkzNPU0cNtNY9HToLLEkYByA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 10:12:24AM +0200, Geert Uytterhoeven wrote:
-> Hi Gilad,
-> 
-> On Thu, May 31, 2018 at 1:55 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
-> > On Tue, May 29, 2018 at 7:19 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> On Thu, May 24, 2018 at 03:19:10PM +0100, Gilad Ben-Yossef wrote:
-> >>> Add bindings for CryptoCell instance in the SoC.
-> >>>
-> >>> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
-> >>
-> >> In so far as I can review the details of this (which is not much) this
-> >> looks fine to me. I am, however, a little unclear in when it should be
-> >> accepted.
-> >
-> > Since Herbert Xu ACKed the driver changes, I would say the only gating
-> > commit is Geert's CR clock patch.
-> 
-> These are queued for v4.19.
-> 
-> > If that one is in, than I would say this one should go in as well.
-> 
-> As the device node now has a power-domains property, the genpd code will
-> try to attach it to the CPG/MSSR PM Domain, which is a clock domain.
-> In the absence of the clock patch, the device's module clock cannot be
-> found, and dev_pm_domain_attach() and thus platform_drv_probe() will fail,
-> before calling the device driver's .probe() function.
-> 
-> So there is no longer a dependency on the clock patch, and the DT patch can
-> go in in parallel (although I prefer its subject to be changed
-> s/binding/device device/).
+Hi Stefan,
 
-Thanks, I have applied the following (but may not push until next week).
+On Tue, May 22, 2018 at 9:25 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-From: Gilad Ben-Yossef <gilad@benyossef.com>
-Subject: [PATCH] arm64: dts: renesas: r8a7795: add ccree to device tree
+>> --- a/include/dt-bindings/clock/imx6ul-clock.h
+>> +++ b/include/dt-bindings/clock/imx6ul-clock.h
+>> @@ -242,20 +242,25 @@
+>>  #define IMX6UL_CLK_CKO2_PODF         229
+>>  #define IMX6UL_CLK_CKO2                      230
+>>  #define IMX6UL_CLK_CKO                       231
+>> +#define IMX6UL_CLK_GPIO1             232
+>> +#define IMX6UL_CLK_GPIO2             233
+>> +#define IMX6UL_CLK_GPIO3             234
+>> +#define IMX6UL_CLK_GPIO4             235
+>> +#define IMX6UL_CLK_GPIO5             236
+>
+> this change looks like a breakage of devicetree ABI. You are changing the mean of the existing clock IDs on i.MX6ULL, which probably regress the combination of older DTBs with newer kernel.
 
-Add bindings for CryptoCell instance in the SoC.
+Good point! I will send a fix for f5a4670de96678 ("clk: imx: Add new
+clo01 and clo2 controlled
+by CCOSR") which did the same reordering.
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index d842940b2f43..3ac75dbf2d93 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -528,6 +528,15 @@
- 			status = "disabled";
- 		};
- 
-+		arm_cc630p: crypto at e6601000 {
-+			compatible = "arm,cryptocell-630p-ree";
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x0 0xe6601000 0 0x1000>;
-+			clocks = <&cpg CPG_MOD 229>;
-+			resets = <&cpg 229>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+		};
-+
- 		i2c3: i2c at e66d0000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--- 
-2.11.0
+Thanks
