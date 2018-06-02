@@ -1,85 +1,36 @@
 From: vbhadram@nvidia.com (Bhadram Varka)
-Date: Sat, 2 Jun 2018 14:50:50 +0530
-Subject: [PATCH V2 2/3] arm64: tegra: Enable multi-queue for DWC EQOS
+Date: Sat, 2 Jun 2018 14:50:51 +0530
+Subject: [PATCH V2 3/3] arm64: tegra: Configure DWC EQOS TxPBL for multi-queue
 In-Reply-To: <1527931251-4809-1-git-send-email-vbhadram@nvidia.com>
 References: <1527931251-4809-1-git-send-email-vbhadram@nvidia.com>
-Message-ID: <1527931251-4809-2-git-send-email-vbhadram@nvidia.com>
+Message-ID: <1527931251-4809-3-git-send-email-vbhadram@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DWC EQOS supports four MTL queues for Tx and Rx
-separately.
+PBL should be limited to half of the Queue size.
+
+For multi-queue: Total MTL queue size 4KB.
+PBL = 16, PBLx8 = 1 -> This setting would lead
+to an effective burst = 8*16 = 128, which would
+mean 128*16B = 2KB (half of queue size)
 
 Signed-off-by: Bhadram Varka <vbhadram@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 48 ++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index 252133b..48c6caf 100644
+index 48c6caf..c4d70c5 100644
 --- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
 +++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -37,6 +37,52 @@
- 		gpio-controller;
- 	};
- 
-+	mtl_rx_setup: rx-queues-config {
-+		snps,rx-queues-to-use = <4>;
-+		snps,rx-sched-sp;
-+		queue0 {
-+			snps,dcb-algorithm;
-+			snps,map-to-dma-channel = <0x0>;
-+			snps,priority = <0x0>;
-+		};
-+		queue1 {
-+			snps,dcb-algorithm;
-+			snps,map-to-dma-channel = <0x1>;
-+			snps,priority = <0x1>;
-+		};
-+		queue2 {
-+			snps,dcb-algorithm;
-+			snps,map-to-dma-channel = <0x2>;
-+			snps,priority = <0x2>;
-+		};
-+		queue3 {
-+			snps,dcb-algorithm;
-+			snps,map-to-dma-channel = <0x2>;
-+			snps,priority = <0x3>;
-+		};
-+	};
-+
-+	mtl_tx_setup: tx-queues-config {
-+		snps,tx-queues-to-use = <4>;
-+		snps,tx-sched-sp;
-+		queue0 {
-+			snps,dcb-algorithm;
-+			snps,priority = <0x0>;
-+		};
-+		queue1 {
-+			snps,dcb-algorithm;
-+			snps,priority = <0x1>;
-+		};
-+		queue2 {
-+			snps,dcb-algorithm;
-+			snps,priority = <0x2>;
-+		};
-+		queue3 {
-+			snps,dcb-algorithm;
-+			snps,priority = <0x3>;
-+		};
-+	};
-+
- 	ethernet at 2490000 {
- 		compatible = "nvidia,tegra186-eqos",
- 			     "snps,dwc-qos-ethernet-4.10";
-@@ -57,6 +103,8 @@
+@@ -101,7 +101,7 @@
+ 		snps,write-requests = <1>;
+ 		snps,read-requests = <3>;
  		snps,burst-map = <0x7>;
- 		snps,txpbl = <32>;
+-		snps,txpbl = <32>;
++		snps,txpbl = <16>;
  		snps,rxpbl = <8>;
-+		snps,mtl-rx-config = <&mtl_rx_setup>;
-+		snps,mtl-tx-config = <&mtl_tx_setup>;
- 	};
- 
- 	memory-controller at 2c00000 {
+ 		snps,mtl-rx-config = <&mtl_rx_setup>;
+ 		snps,mtl-tx-config = <&mtl_tx_setup>;
 -- 
 2.7.4
