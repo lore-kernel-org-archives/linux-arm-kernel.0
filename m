@@ -1,19 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 3 Jun 2018 09:54:00 -0300
-Subject: [PATCH 1/4] clk: imx6q: remove clks_init_on array
-In-Reply-To: <2D554312-36F2-4781-899C-8D9F5BD20B46@nxp.com>
-References: <1527994847-2363-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5CmgBsaaegVV9OjdyXv5_O0V9iTS2qYbtuH26qkG2_zrA@mail.gmail.com>
- <2D554312-36F2-4781-899C-8D9F5BD20B46@nxp.com>
-Message-ID: <CAOMZO5ANz-B-s93+R_xnF0LOux1zTY3E8Ky4KvrZ8EX1ZKmpAQ@mail.gmail.com>
+From: abdun.nihaal@gmail.com (Abdun Nihaal)
+Date: Sun,  3 Jun 2018 21:29:57 +0530
+Subject: [PATCH 0/7] staging: mt7621-pci: Fix coding style issues
+Message-ID: <cover.1528040188.git.abdun.nihaal@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+This patchset fixes the following set of coding style 
+issues found using checkpatch.
 
-On Sun, Jun 3, 2018 at 9:48 AM, Anson Huang <anson.huang@nxp.com> wrote:
+ERROR: space prohibited after that open parenthesis '('
+ERROR: trailing whitespace
+ERROR: space required before the open parenthesis '('
+ERROR: space required after that ',' (ctx:VxV)
+ERROR: spaces required around that '=' (ctx:VxW)
+ERROR: spaces required around that '==' (ctx:WxV)
+ERROR: that open brace { should be on the previous line
 
-> As I explain in previous mail, busy divider clk type already include the flag when registered.
+Abdun Nihaal (7):
+  staging: mt7621-pci: Remove space after open parenthesis
+  staging: mt7621-pci: remove trailing whitespace
+  staging: mt7621-pci: add space before open parenthesis
+  staging: mt7621-pci: add space after comma symbol
+  staging: mt7621-pci: add spaces around equal symbol
+  staging: mt7621-pci: add space after '==' symbol
+  staging: mt7621-pci: fix coding style error
 
-Ok, then please add this information in the commit log to make the
-review process easier.
+ drivers/staging/mt7621-pci/pci-mt7621.c | 114 ++++++++++++------------
+ 1 file changed, 56 insertions(+), 58 deletions(-)
+
+-- 
+2.17.0
