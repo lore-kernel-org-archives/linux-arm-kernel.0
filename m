@@ -1,80 +1,64 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Sun, 3 Jun 2018 07:12:53 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYxMCAwLzVdIHNjc2k6IHVmczogYWRkIHVmcyBkcml2?=
- =?gb2312?Q?er_code_for_Hisilicon_Hi3660_SoC?=
-In-Reply-To: <20180525091712.37227-1-liwei213@huawei.com>
-References: <20180525091712.37227-1-liwei213@huawei.com>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA6CD55@DGGEMM506-MBX.china.huawei.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 3 Jun 2018 11:37:53 +0300
+Subject: [PATCH 3/3] pinctrl: actions: Add interrupt support for OWL S900
+ SoC
+In-Reply-To: <20180602165415.30956-4-manivannan.sadhasivam@linaro.org>
+References: <20180602165415.30956-1-manivannan.sadhasivam@linaro.org>
+ <20180602165415.30956-4-manivannan.sadhasivam@linaro.org>
+Message-ID: <CAHp75Ve8ZCbEqnYK0KqtCHQm-EOUWRSyMzi51P+3_7brtXq6dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
-Sorry to bother you. Anybody else have any comments?
+On Sat, Jun 2, 2018 at 7:54 PM, Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
+> Add interrupt support for Actions Semi OWL S900 SoC.
 
-Hi, Philippe
-This patch has been submitted for a long time, can it be merged?
+> +       port = owl_gpio_get_port(pctrl, &gpio);
+> +       if (WARN_ON(port == NULL))
+> +               return;
 
-Reviews and tests for previous versions of the patch are as follows:
-Acked-by: Wei Xu <xuwei5@hisilicon.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Philippe Ombredanne <pombredanne@nexb.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Riku Voipio <riku.voipio@linaro.org>
+At which circumstances the above possible?
 
-Thank you all for your attention and look forward to your reply.
+> +       port = owl_gpio_get_port(pctrl, &gpio);
+> +       if (WARN_ON(port == NULL))
+> +               return;
 
-Thanks!
+Ditto.
 
------????-----
-???: liwei (CM) 
-????: 2018?5?25? 17:17
-???: robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org
-??: zangleigang; Gengjianfeng; guodong.xu at linaro.org; Chenfeng (puck); john.stultz at linaro.org; liwei (CM); Fengbaopeng (kevin, Kirin Solution Dept)
-??: [PATCH v10 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660 SoC
+> +       port = owl_gpio_get_port(pctrl, &gpio);
+> +       if (WARN_ON(port == NULL))
+> +               return;
 
-This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
+Ditto.
 
-Li Wei (5):
-  scsi: ufs: add Hisilicon ufs driver code
-  dt-bindings: scsi: ufs: add document for hisi-ufs
-  arm64: dts: add ufs dts node
-  arm64: defconfig: enable configs for Hisilicon ufs
-  arm64: defconfig: enable f2fs and squashfs
+> +       port = owl_gpio_get_port(pctrl, &gpio);
+> +       if (WARN_ON(port == NULL))
+> +               return -ENODEV;
 
- Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
- .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
- arch/arm64/configs/defconfig                       |  11 +
- drivers/scsi/ufs/Kconfig                           |   9 +
- drivers/scsi/ufs/Makefile                          |   1 +
- drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
- drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
- 8 files changed, 821 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
- create mode 100644 drivers/scsi/ufs/ufs-hisi.c
- create mode 100644 drivers/scsi/ufs/ufs-hisi.h
+Ditto.
 
-Major changes in v10:
- - solve review comments from Rob Herring.
-   *Modify the "reset-names" describe in ufs-hisi.txt binding file.
-   *List clocks in ufs-hisi.txt binding file.
-   *remove the "arst" and keep only "rst" in the binging files.
-   *remove the "arst" member from both dts and c code. 
-Major changes in v9:
- - solve review comments from Rob Herring.
-   *remove freq-table-hz in ufs-hisi.txt binding file.
-   *Move the rst to the ufshcd_pltfm.txt common binding file.
-   *Modify the member "assert" of UFS host structure to "arst".
-Major changes in v8:
- - solve review comments from zhangfei.
-   *Add Version history.
- - solve review comments from Rob Herring.
-   *remove freq-table-hz.
- -  solve review comments from Riku Voipio.
-   *Add MODULE_DEVICE_TABLE for ufs driver.
+
+> +       for (i = 0; i < chip->ngpio; i++) {
+> +               irqno = irq_create_mapping(pctrl->domain, i);
+> +               irq_set_chip_and_handler(irqno, &owl_gpio_irq_chip,
+> +                                        handle_edge_irq);
+> +               irq_set_chip_data(irqno, pctrl);
+> +       }
+
+I'm not sure the handle_edge_irq() is a correct handler here. It would
+be handle_bad_irq() until IRQ has been requested properly.
+No?
+
+> +/* GPIO TYPE Bit Definition */
+> +#define OWL_GPIO_INT_LEVEL_HIGH                0
+> +#define OWL_GPIO_INT_LEVEL_LOW         1
+> +#define OWL_GPIO_INT_EDGE_RISING       2
+> +#define OWL_GPIO_INT_EDGE_FALLING      3
+
+> +#define OWL_GPIO_INT_MASK              3
+
+GENMASK?
+
 -- 
-Major changes in v7:
- - solve review comments from Philippe Ombredanne.
-   *use the new SPDX license ids instead of the GNU General Public License.
--- 
-2.15.0
+With Best Regards,
+Andy Shevchenko
