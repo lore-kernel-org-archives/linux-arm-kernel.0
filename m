@@ -1,17 +1,17 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 3 Jun 2018 17:57:19 -0300
-Subject: [PATCH V2 1/3] ARM: imx: add L2 page power control for GPC
-In-Reply-To: <1527993226-19587-1-git-send-email-Anson.Huang@nxp.com>
-References: <1527993226-19587-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5BiAHjrMQnwuOFR7XMcpQpi=WXO=Uh=mZO1vDLNoJdGzA@mail.gmail.com>
+Date: Sun, 3 Jun 2018 17:57:41 -0300
+Subject: [PATCH V2 2/2] ARM: dts: imx6ul: add GPIO clocks
+In-Reply-To: <1527990245-13619-2-git-send-email-Anson.Huang@nxp.com>
+References: <1527990245-13619-1-git-send-email-Anson.Huang@nxp.com>
+ <1527990245-13619-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5BZB_t5VYt3aGtjNuyFCwNK6KYnf9=4BN3Pd5oqYr58LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 2, 2018 at 11:33 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> Some platforms like i.MX6UL/i.MX6SLL have L2
-> page power control in GPC, it needs to be
-> disabled if ARM is power gated and L2 is NOT
-> flushed, add GPC interface to control it.
+On Sat, Jun 2, 2018 at 10:44 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> i.MX6UL has GPIO clock gates in CCM CCGR, add
+> clock property for GPIO driver to make sure all
+> GPIO banks work as expected.
 >
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
