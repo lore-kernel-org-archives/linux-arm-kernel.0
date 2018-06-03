@@ -1,92 +1,44 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sun, 3 Jun 2018 22:27:23 +0530
-Subject: [PATCH 3/3] pinctrl: actions: Add interrupt support for OWL S900
- SoC
-In-Reply-To: <CAHp75Ve8ZCbEqnYK0KqtCHQm-EOUWRSyMzi51P+3_7brtXq6dA@mail.gmail.com>
-References: <20180602165415.30956-1-manivannan.sadhasivam@linaro.org>
- <20180602165415.30956-4-manivannan.sadhasivam@linaro.org>
- <CAHp75Ve8ZCbEqnYK0KqtCHQm-EOUWRSyMzi51P+3_7brtXq6dA@mail.gmail.com>
-Message-ID: <20180603165723.GA14907@Mani-XPS-13-9360>
+From: abdun.nihaal@gmail.com (Abdun Nihaal)
+Date: Sun,  3 Jun 2018 21:30:02 +0530
+Subject: [PATCH 5/7] staging: mt7621-pci: add spaces around equal symbol
+In-Reply-To: <cover.1528040188.git.abdun.nihaal@gmail.com>
+References: <cover.1528040188.git.abdun.nihaal@gmail.com>
+Message-ID: <1e90044ff2eff4012fbdf546607354074a580fcf.1528040188.git.abdun.nihaal@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+This fixes the following checkpatch error:
 
-On Sun, Jun 03, 2018 at 11:37:53AM +0300, Andy Shevchenko wrote:
-> On Sat, Jun 2, 2018 at 7:54 PM, Manivannan Sadhasivam
-> <manivannan.sadhasivam@linaro.org> wrote:
-> > Add interrupt support for Actions Semi OWL S900 SoC.
-> 
-> > +       port = owl_gpio_get_port(pctrl, &gpio);
-> > +       if (WARN_ON(port == NULL))
-> > +               return;
-> 
-> At which circumstances the above possible?
-> 
+ERROR: spaces required around that '=' (ctx:VxW)
 
-Only possible when the requested GPIO exceeds chip->ngpio. I know it is
-a kind of redundant check, but it is good to have this during development.
+Signed-off-by: Abdun Nihaal <abdun.nihaal@gmail.com>
+---
+ drivers/staging/mt7621-pci/pci-mt7621.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> > +       port = owl_gpio_get_port(pctrl, &gpio);
-> > +       if (WARN_ON(port == NULL))
-> > +               return;
-> 
-> Ditto.
->
-
-Same as above.
-
-> > +       port = owl_gpio_get_port(pctrl, &gpio);
-> > +       if (WARN_ON(port == NULL))
-> > +               return;
-> 
-> Ditto.
->
-
-Same as above.
-
-> > +       port = owl_gpio_get_port(pctrl, &gpio);
-> > +       if (WARN_ON(port == NULL))
-> > +               return -ENODEV;
-> 
-> Ditto.
->
-
-Same as above.
-
-> 
-> > +       for (i = 0; i < chip->ngpio; i++) {
-> > +               irqno = irq_create_mapping(pctrl->domain, i);
-> > +               irq_set_chip_and_handler(irqno, &owl_gpio_irq_chip,
-> > +                                        handle_edge_irq);
-> > +               irq_set_chip_data(irqno, pctrl);
-> > +       }
-> 
-> I'm not sure the handle_edge_irq() is a correct handler here. It would
-> be handle_bad_irq() until IRQ has been requested properly.
-> No?
->
-
-Hmmm, good question. Since the handler used in irq_set_chip_and_handler
-is superseded by irq_set_chained_handler_and_data, this doesn't matter
-anyway. But I would like to hear what Linus suggests here!
-
-> > +/* GPIO TYPE Bit Definition */
-> > +#define OWL_GPIO_INT_LEVEL_HIGH                0
-> > +#define OWL_GPIO_INT_LEVEL_LOW         1
-> > +#define OWL_GPIO_INT_EDGE_RISING       2
-> > +#define OWL_GPIO_INT_EDGE_FALLING      3
-> 
-> > +#define OWL_GPIO_INT_MASK              3
-> 
-> GENMASK?
->
-
-Ack.
-
-Thanks,
-Mani
-
-> -- 
-> With Best Regards,
-> Andy Shevchenko
+diff --git a/drivers/staging/mt7621-pci/pci-mt7621.c b/drivers/staging/mt7621-pci/pci-mt7621.c
+index f347eaf9063c..3bd715a4b139 100644
+--- a/drivers/staging/mt7621-pci/pci-mt7621.c
++++ b/drivers/staging/mt7621-pci/pci-mt7621.c
+@@ -308,7 +308,7 @@ pci_config_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u
+ 	}
+ }
+ 
+-struct pci_ops mt7621_pci_ops= {
++struct pci_ops mt7621_pci_ops = {
+ 	.read		=  pci_config_read,
+ 	.write		= pci_config_write,
+ };
+@@ -584,8 +584,8 @@ static int mt7621_pci_probe(struct platform_device *pdev)
+ 	unsigned long val = 0;
+ 
+ 	iomem_resource.start = 0;
+-	iomem_resource.end= ~0;
+-	ioport_resource.start= 0;
++	iomem_resource.end = ~0;
++	ioport_resource.start = 0;
+ 	ioport_resource.end = ~0;
+ 
+ #if defined (CONFIG_PCIE_PORT0)
+-- 
+2.17.0
