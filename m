@@ -1,35 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 3 Jun 2018 09:44:20 -0300
-Subject: [PATCH 1/4] clk: imx6q: remove clks_init_on array
-In-Reply-To: <1527994847-2363-1-git-send-email-Anson.Huang@nxp.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Sun, 3 Jun 2018 12:45:38 +0000
+Subject: [PATCH 2/4] clk: imx6sl: remove clks_init_on array
+In-Reply-To: <CAOMZO5Af_Wdp=MNR28v3ALiguxQSQv4x2Zf224FXSiEGtP68Bw@mail.gmail.com>
 References: <1527994847-2363-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5CmgBsaaegVV9OjdyXv5_O0V9iTS2qYbtuH26qkG2_zrA@mail.gmail.com>
+ <1527994847-2363-2-git-send-email-Anson.Huang@nxp.com>,
+ <CAOMZO5Af_Wdp=MNR28v3ALiguxQSQv4x2Zf224FXSiEGtP68Bw@mail.gmail.com>
+Message-ID: <682824A6-C55E-4680-9FD5-E5E7E37F27A0@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 3, 2018 at 12:00 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> Clock framework will enable those clocks registered
-> with CLK_IS_CRITICAL flag, so no need to have
-> clks_init_on array during clock initialization now.
->
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  drivers/clk/imx/clk-imx6q.c | 14 ++------------
->  1 file changed, 2 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-> index b9ea703..8754c61 100644
-> --- a/drivers/clk/imx/clk-imx6q.c
-> +++ b/drivers/clk/imx/clk-imx6q.c
-> @@ -96,12 +96,6 @@ static const char *pll7_bypass_sels[] = { "pll7", "pll7_bypass_src", };
->  static struct clk *clk[IMX6QDL_CLK_END];
->  static struct clk_onecell_data clk_data;
->
-> -static unsigned int const clks_init_on[] __initconst = {
-> -       IMX6QDL_CLK_MMDC_CH0_AXI,
-> -       IMX6QDL_CLK_ROM,
-> -       IMX6QDL_CLK_ARM,
+Hi, Fabio
 
- IMX6QDL_CLK_ARM does not have the CLK_IS_CRITICAL flag.
+>From Anson's iPhone 6
 
-Is this intended? If so, please mention in the commit log.
+
+> ? 2018?6?3??20:17?Fabio Estevam <festevam@gmail.com> ???
+> 
+> Hi Anson,
+> 
+>> On Sun, Jun 3, 2018 at 12:00 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
+>> Clock framework will enable those clocks registered
+>> with CLK_IS_CRITICAL flag, so no need to have
+>> clks_init_on array during clock initialization now.
+>> 
+>> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+>> ---
+>> drivers/clk/imx/clk-imx6sl.c | 12 ------------
+>> 1 file changed, 12 deletions(-)
+>> 
+>> diff --git a/drivers/clk/imx/clk-imx6sl.c b/drivers/clk/imx/clk-imx6sl.c
+>> index 66b1dd1..eb6bcbf 100644
+>> --- a/drivers/clk/imx/clk-imx6sl.c
+>> +++ b/drivers/clk/imx/clk-imx6sl.c
+>> @@ -104,10 +104,6 @@ static struct clk_onecell_data clk_data;
+>> static void __iomem *ccm_base;
+>> static void __iomem *anatop_base;
+>> 
+>> -static const u32 clks_init_on[] __initconst = {
+>> -       IMX6SL_CLK_IPG, IMX6SL_CLK_ARM, IMX6SL_CLK_MMDC_ROOT,
+>> -};
+> 
+> It looks like you missed to pass the CLK_IS_CRITICAL flag to these clocks.
+
+The ARM and mmdc root are busy divider, the CLK_IS_CRITICAL flag is included by default when busy divider is registered. IPG?parent is AHB which is also a busy divider. And IPG itself has no gate, no need to add flag.
+
+Anson.
