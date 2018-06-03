@@ -1,90 +1,80 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Sun,  3 Jun 2018 11:00:47 +0800
-Subject: [PATCH 4/4] clk: imx6ul: remove clks_init_on array
-In-Reply-To: <1527994847-2363-1-git-send-email-Anson.Huang@nxp.com>
-References: <1527994847-2363-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1527994847-2363-4-git-send-email-Anson.Huang@nxp.com>
+From: liwei213@huawei.com (liwei (CM))
+Date: Sun, 3 Jun 2018 07:12:53 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYxMCAwLzVdIHNjc2k6IHVmczogYWRkIHVmcyBkcml2?=
+ =?gb2312?Q?er_code_for_Hisilicon_Hi3660_SoC?=
+In-Reply-To: <20180525091712.37227-1-liwei213@huawei.com>
+References: <20180525091712.37227-1-liwei213@huawei.com>
+Message-ID: <1699CE87DE933F49876AD744B5DC140FA6CD55@DGGEMM506-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock framework will enable those clocks registered
-with CLK_IS_CRITICAL flag, so no need to have
-clks_init_on array during clock initialization now.
+Hi, all
+Sorry to bother you. Anybody else have any comments?
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-	This patch is based on "[V2,1/2] clk: imx6ul: add GPIO clock gates".
- drivers/clk/imx/clk-imx6ul.c | 23 ++++++-----------------
- 1 file changed, 6 insertions(+), 17 deletions(-)
+Hi, Philippe
+This patch has been submitted for a long time, can it be merged?
 
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index 3ea2d97..d3f7f4d 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -79,12 +79,6 @@ static const char *cko_sels[] = { "cko1", "cko2", };
- static struct clk *clks[IMX6UL_CLK_END];
- static struct clk_onecell_data clk_data;
- 
--static int const clks_init_on[] __initconst = {
--	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2,
--	IMX6UL_CLK_AXI, IMX6UL_CLK_ARM, IMX6UL_CLK_ROM,
--	IMX6UL_CLK_MMDC_P0_FAST, IMX6UL_CLK_MMDC_P0_IPG,
--};
--
- static const struct clk_div_table clk_enet_ref_table[] = {
- 	{ .val = 0, .div = 20, },
- 	{ .val = 1, .div = 10, },
-@@ -129,7 +123,6 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
- 	void __iomem *base;
--	int i;
- 
- 	clks[IMX6UL_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
- 
-@@ -336,8 +329,8 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6UL_CLK_AHB]		= imx_clk_busy_divider("ahb",	    "periph",	base +  0x14, 10, 3,  base + 0x48, 1);
- 
- 	/* CCGR0 */
--	clks[IMX6UL_CLK_AIPSTZ1]	= imx_clk_gate2("aips_tz1",	"ahb",		base + 0x68,	0);
--	clks[IMX6UL_CLK_AIPSTZ2]	= imx_clk_gate2("aips_tz2",	"ahb",		base + 0x68,	2);
-+	clks[IMX6UL_CLK_AIPSTZ1]	= imx_clk_gate2_flags("aips_tz1", "ahb", base + 0x68, 0, CLK_IS_CRITICAL);
-+	clks[IMX6UL_CLK_AIPSTZ2]	= imx_clk_gate2_flags("aips_tz2", "ahb", base + 0x68, 2, CLK_IS_CRITICAL);
- 	clks[IMX6UL_CLK_APBHDMA]	= imx_clk_gate2("apbh_dma",	"bch_podf",	base + 0x68,	4);
- 	clks[IMX6UL_CLK_ASRC_IPG]	= imx_clk_gate2_shared("asrc_ipg",	"ahb",	base + 0x68,	6, &share_count_asrc);
- 	clks[IMX6UL_CLK_ASRC_MEM]	= imx_clk_gate2_shared("asrc_mem",	"ahb",	base + 0x68,	6, &share_count_asrc);
-@@ -412,9 +405,9 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6UL_CLK_GPIO4]		= imx_clk_gate2("gpio4",	"ipg",		base + 0x74,	12);
- 	clks[IMX6UL_CLK_QSPI]		= imx_clk_gate2("qspi1",	"qspi1_podf",	base + 0x74,	14);
- 	clks[IMX6UL_CLK_WDOG1]		= imx_clk_gate2("wdog1",	"ipg",		base + 0x74,	16);
--	clks[IMX6UL_CLK_MMDC_P0_FAST]	= imx_clk_gate("mmdc_p0_fast", "mmdc_podf", base + 0x74,	20);
--	clks[IMX6UL_CLK_MMDC_P0_IPG]	= imx_clk_gate2("mmdc_p0_ipg",	"ipg",		base + 0x74,	24);
--	clks[IMX6UL_CLK_AXI]		= imx_clk_gate("axi",	"axi_podf",	base + 0x74,	28);
-+	clks[IMX6UL_CLK_MMDC_P0_FAST]	= imx_clk_gate_flags("mmdc_p0_fast", "mmdc_podf", base + 0x74,	20, CLK_IS_CRITICAL);
-+	clks[IMX6UL_CLK_MMDC_P0_IPG]	= imx_clk_gate2_flags("mmdc_p0_ipg",	"ipg",		base + 0x74,	24, CLK_IS_CRITICAL);
-+	clks[IMX6UL_CLK_AXI]		= imx_clk_gate_flags("axi",	"axi_podf",	base + 0x74,	28, CLK_IS_CRITICAL);
- 
- 	/* CCGR4 */
- 	clks[IMX6UL_CLK_PER_BCH]	= imx_clk_gate2("per_bch",	"bch_podf",	base + 0x78,	12);
-@@ -428,7 +421,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6UL_CLK_GPMI_APB]	= imx_clk_gate2("gpmi_apb",	"bch_podf",	base + 0x78,	30);
- 
- 	/* CCGR5 */
--	clks[IMX6UL_CLK_ROM]		= imx_clk_gate2("rom",		"ahb",		base + 0x7c,	0);
-+	clks[IMX6UL_CLK_ROM]		= imx_clk_gate2_flags("rom",	"ahb",		base + 0x7c,	0,	CLK_IS_CRITICAL);
- 	clks[IMX6UL_CLK_SDMA]		= imx_clk_gate2("sdma",		"ahb",		base + 0x7c,	6);
- 	clks[IMX6UL_CLK_KPP]		= imx_clk_gate2("kpp",		"ipg",		base + 0x7c,	8);
- 	clks[IMX6UL_CLK_WDOG2]		= imx_clk_gate2("wdog2",	"ipg",		base + 0x7c,	10);
-@@ -502,10 +495,6 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clk_set_rate(clks[IMX6UL_CLK_ENET2_REF], 50000000);
- 	clk_set_rate(clks[IMX6UL_CLK_CSI], 24000000);
- 
--	/* keep all the clks on just for bringup */
--	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
--		clk_prepare_enable(clks[clks_init_on[i]]);
--
- 	if (clk_on_imx6ull())
- 		clk_prepare_enable(clks[IMX6UL_CLK_AIPSTZ3]);
- 
+Reviews and tests for previous versions of the patch are as follows:
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philippe Ombredanne <pombredanne@nexb.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Riku Voipio <riku.voipio@linaro.org>
+
+Thank you all for your attention and look forward to your reply.
+
+Thanks!
+
+-----????-----
+???: liwei (CM) 
+????: 2018?5?25? 17:17
+???: robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org
+??: zangleigang; Gengjianfeng; guodong.xu at linaro.org; Chenfeng (puck); john.stultz at linaro.org; liwei (CM); Fengbaopeng (kevin, Kirin Solution Dept)
+??: [PATCH v10 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660 SoC
+
+This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
+
+Li Wei (5):
+  scsi: ufs: add Hisilicon ufs driver code
+  dt-bindings: scsi: ufs: add document for hisi-ufs
+  arm64: dts: add ufs dts node
+  arm64: defconfig: enable configs for Hisilicon ufs
+  arm64: defconfig: enable f2fs and squashfs
+
+ Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
+ .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
+ arch/arm64/configs/defconfig                       |  11 +
+ drivers/scsi/ufs/Kconfig                           |   9 +
+ drivers/scsi/ufs/Makefile                          |   1 +
+ drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
+ drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
+ 8 files changed, 821 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.h
+
+Major changes in v10:
+ - solve review comments from Rob Herring.
+   *Modify the "reset-names" describe in ufs-hisi.txt binding file.
+   *List clocks in ufs-hisi.txt binding file.
+   *remove the "arst" and keep only "rst" in the binging files.
+   *remove the "arst" member from both dts and c code. 
+Major changes in v9:
+ - solve review comments from Rob Herring.
+   *remove freq-table-hz in ufs-hisi.txt binding file.
+   *Move the rst to the ufshcd_pltfm.txt common binding file.
+   *Modify the member "assert" of UFS host structure to "arst".
+Major changes in v8:
+ - solve review comments from zhangfei.
+   *Add Version history.
+ - solve review comments from Rob Herring.
+   *remove freq-table-hz.
+ -  solve review comments from Riku Voipio.
+   *Add MODULE_DEVICE_TABLE for ufs driver.
 -- 
-2.7.4
+Major changes in v7:
+ - solve review comments from Philippe Ombredanne.
+   *use the new SPDX license ids instead of the GNU General Public License.
+-- 
+2.15.0
