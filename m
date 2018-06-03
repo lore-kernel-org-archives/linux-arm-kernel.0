@@ -1,17 +1,18 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 3 Jun 2018 17:57:41 -0300
-Subject: [PATCH V2 2/2] ARM: dts: imx6ul: add GPIO clocks
-In-Reply-To: <1527990245-13619-2-git-send-email-Anson.Huang@nxp.com>
-References: <1527990245-13619-1-git-send-email-Anson.Huang@nxp.com>
- <1527990245-13619-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5BZB_t5VYt3aGtjNuyFCwNK6KYnf9=4BN3Pd5oqYr58LQ@mail.gmail.com>
+Date: Sun, 3 Jun 2018 17:58:13 -0300
+Subject: [PATCH V2 3/3] ARM: imx: remove i.MX6SLL support in i.MX6SL cpu
+ idle driver
+In-Reply-To: <1527993226-19587-3-git-send-email-Anson.Huang@nxp.com>
+References: <1527993226-19587-1-git-send-email-Anson.Huang@nxp.com>
+ <1527993226-19587-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5CjOyy-rohwfLS+TuWqTFVHExj=_R2_P-N7BTb_Kn5FuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 2, 2018 at 10:44 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> i.MX6UL has GPIO clock gates in CCM CCGR, add
-> clock property for GPIO driver to make sure all
-> GPIO banks work as expected.
+On Sat, Jun 2, 2018 at 11:33 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> i.MX6SLL supports ARM power off in cpu idle, better to reuse
+> i.MX6SX cpu idle driver instead of i.MX6SL which does NOT
+> support ARM power off.
 >
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
