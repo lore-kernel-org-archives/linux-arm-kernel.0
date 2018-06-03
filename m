@@ -1,117 +1,44 @@
 From: abdun.nihaal@gmail.com (Abdun Nihaal)
-Date: Sun,  3 Jun 2018 21:30:01 +0530
-Subject: [PATCH 4/7] staging: mt7621-pci: add space after comma symbol
+Date: Sun,  3 Jun 2018 21:30:04 +0530
+Subject: [PATCH 7/7] staging: mt7621-pci: fix coding style error
 In-Reply-To: <cover.1528040188.git.abdun.nihaal@gmail.com>
 References: <cover.1528040188.git.abdun.nihaal@gmail.com>
-Message-ID: <2204d11fb9c2ff5ccb0ae003a6a81e5415d4e65e.1528040188.git.abdun.nihaal@gmail.com>
+Message-ID: <dd5a61ff6074778d813183464fd65020098978c1.1528040188.git.abdun.nihaal@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following checkpatch error:
+This fixes the following checkpatch error:
 
-ERROR: space required after that ',' (ctx:VxV)
+ERROR: that open brace { should be on the previous line
 
 Signed-off-by: Abdun Nihaal <abdun.nihaal@gmail.com>
 ---
- drivers/staging/mt7621-pci/pci-mt7621.c | 36 ++++++++++++-------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+ drivers/staging/mt7621-pci/pci-mt7621.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/mt7621-pci/pci-mt7621.c b/drivers/staging/mt7621-pci/pci-mt7621.c
-index 28b9a11e9ecb..f347eaf9063c 100644
+index 510aa633589a..96cae1e1838b 100644
 --- a/drivers/staging/mt7621-pci/pci-mt7621.c
 +++ b/drivers/staging/mt7621-pci/pci-mt7621.c
-@@ -373,17 +373,17 @@ pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 		write_config(0, 0, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
- 		read_config(0, 0, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
- 		printk("BAR0 at slot 0 = %x\n", val);
--		printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
-+		printk("bus=0x%x, slot = 0x%x\n", dev->bus->number, slot);
- 	} else if ((dev->bus->number == 0) && (slot == 0x1)) {
- 		write_config(0, 1, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
- 		read_config(0, 1, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
- 		printk("BAR0 at slot 1 = %x\n", val);
--		printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
-+		printk("bus=0x%x, slot = 0x%x\n", dev->bus->number, slot);
- 	} else if ((dev->bus->number == 0) && (slot == 0x2)) {
- 		write_config(0, 2, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
- 		read_config(0, 2, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
- 		printk("BAR0 at slot 2 = %x\n", val);
--		printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
-+		printk("bus=0x%x, slot = 0x%x\n", dev->bus->number, slot);
- 	} else if ((dev->bus->number == 1) && (slot == 0x0)) {
- 		switch (pcie_link_status) {
- 		case 2:
-@@ -396,7 +396,7 @@ pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 		default:
- 			irq = RALINK_INT_PCIE0;
- 		}
--		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
-+		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
- 	} else if ((dev->bus->number == 2) && (slot == 0x0)) {
- 		switch (pcie_link_status) {
- 		case 5:
-@@ -406,7 +406,7 @@ pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 		default:
- 			irq = RALINK_INT_PCIE1;
- 		}
--		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
-+		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
- 	} else if ((dev->bus->number == 2) && (slot == 0x1)) {
- 		switch (pcie_link_status) {
- 		case 5:
-@@ -416,18 +416,18 @@ pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 		default:
- 			irq = RALINK_INT_PCIE1;
- 		}
--		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
-+		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
- 	} else if ((dev->bus->number ==3) && (slot == 0x0)) {
- 		irq = RALINK_INT_PCIE2;
--		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
-+		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
- 	} else if ((dev->bus->number ==3) && (slot == 0x1)) {
- 		irq = RALINK_INT_PCIE2;
--		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
-+		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
- 	} else if ((dev->bus->number ==3) && (slot == 0x2)) {
- 		irq = RALINK_INT_PCIE2;
--		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
-+		printk("bus=0x%x, slot = 0x%x, irq=0x%x\n", dev->bus->number, slot, dev->irq);
- 	} else {
--		printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
-+		printk("bus=0x%x, slot = 0x%x\n", dev->bus->number, slot);
- 		return 0;
- 	}
+@@ -663,8 +663,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
  
-@@ -501,10 +501,10 @@ set_phy_for_ssc(void)
- 		if (reg >= 6) {
- 			printk("***** Xtal 25MHz *****\n");
- 			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4bc),  4, 2, 0x01);	// RG_PE1_H_PLL_FBKSEL             //Feedback clock select
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x49c),  0,31, 0x18000000);	// RG_PE1_H_LCDDS_PCW_NCPO         //DDS NCPO PCW (for host mode)
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4a4),  0,16, 0x18d);	// RG_PE1_H_LCDDS_SSC_PRD          //DDS SSC dither period control
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4a8),  0,12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA        //DDS SSC dither amplitude control
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4a8), 16,12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA1       //DDS SSC dither amplitude control for initial
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x49c),  0, 31, 0x18000000);	// RG_PE1_H_LCDDS_PCW_NCPO         //DDS NCPO PCW (for host mode)
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4a4),  0, 16, 0x18d);	// RG_PE1_H_LCDDS_SSC_PRD          //DDS SSC dither period control
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4a8),  0, 12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA        //DDS SSC dither amplitude control
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x4a8), 16, 12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA1       //DDS SSC dither amplitude control for initial
- 		} else {
- 			printk("***** Xtal 20MHz *****\n");
- 		}
-@@ -539,10 +539,10 @@ set_phy_for_ssc(void)
- 		set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x490),  6, 2, 0x00);	// RG_PE1_H_PLL_PREDIV             //Pre-divider ratio (for host mode)
- 		if (reg >= 6) { 	// 25MHz Xtal
- 			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4bc),  4, 2, 0x01);	// RG_PE1_H_PLL_FBKSEL             //Feedback clock select
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x49c),  0,31, 0x18000000);	// RG_PE1_H_LCDDS_PCW_NCPO         //DDS NCPO PCW (for host mode)
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a4),  0,16, 0x18d);	// RG_PE1_H_LCDDS_SSC_PRD          //DDS SSC dither period control
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a8),  0,12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA        //DDS SSC dither amplitude control
--			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a8), 16,12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA1       //DDS SSC dither amplitude control for initial
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x49c),  0, 31, 0x18000000);	// RG_PE1_H_LCDDS_PCW_NCPO         //DDS NCPO PCW (for host mode)
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a4),  0, 16, 0x18d);	// RG_PE1_H_LCDDS_SSC_PRD          //DDS SSC dither period control
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a8),  0, 12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA        //DDS SSC dither amplitude control
-+			set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a8), 16, 12, 0x4a);	// RG_PE1_H_LCDDS_SSC_DELTA1       //DDS SSC dither amplitude control for initial
- 		}
+ 	mdelay(500);
+ #if defined (CONFIG_PCIE_PORT0)
+-	if ((RALINK_PCI0_STATUS & 0x1) == 0)
+-	{
++	if ((RALINK_PCI0_STATUS & 0x1) == 0) {
+ 		printk("PCIE0 no card, disable it(RST&CLK)\n");
+ 		ASSERT_SYSRST_PCIE(RALINK_PCIE0_RST);
+ 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
+@@ -675,8 +674,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
  	}
- 	set_pcie_phy((u32 *)(RALINK_PCIEPHY_P2_CTL_OFFSET + 0x4a0),  5, 1, 0x01);	// RG_PE1_LCDDS_CLK_PH_INV         //DDS clock inversion
+ #endif
+ #if defined (CONFIG_PCIE_PORT1)
+-	if ((RALINK_PCI1_STATUS & 0x1) == 0)
+-	{
++	if ((RALINK_PCI1_STATUS & 0x1) == 0) {
+ 		printk("PCIE1 no card, disable it(RST&CLK)\n");
+ 		ASSERT_SYSRST_PCIE(RALINK_PCIE1_RST);
+ 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE1_CLK_EN);
 -- 
 2.17.0
