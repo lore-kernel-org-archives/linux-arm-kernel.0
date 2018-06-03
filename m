@@ -1,46 +1,18 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun,  3 Jun 2018 22:17:02 +0200
-Subject: [PATCH] ARM: pxa: zylonite: use the new ac97 bus support
-Message-ID: <20180603201702.15919-1-robert.jarzmik@free.fr>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 3 Jun 2018 17:57:19 -0300
+Subject: [PATCH V2 1/3] ARM: imx: add L2 page power control for GPC
+In-Reply-To: <1527993226-19587-1-git-send-email-Anson.Huang@nxp.com>
+References: <1527993226-19587-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5BiAHjrMQnwuOFR7XMcpQpi=WXO=Uh=mZO1vDLNoJdGzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the PXA is converted to new ac97 bus support, the wm9713 is
-automatically detected and probed. Remove it from the platform bus.
+On Sat, Jun 2, 2018 at 11:33 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> Some platforms like i.MX6UL/i.MX6SLL have L2
+> page power control in GPC, it needs to be
+> disabled if ARM is power gated and L2 is NOT
+> flushed, add GPC interface to control it.
+>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/zylonite.c | 11 -----------
- 1 file changed, 11 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
-index d69de312d8d9..52e70a5c1281 100644
---- a/arch/arm/mach-pxa/zylonite.c
-+++ b/arch/arm/mach-pxa/zylonite.c
-@@ -47,16 +47,6 @@ int wm9713_irq;
- int lcd_id;
- int lcd_orientation;
- 
--struct platform_device pxa_device_wm9713_audio = {
--	.name		= "wm9713-codec",
--	.id		= -1,
--};
--
--static void __init zylonite_init_wm9713_audio(void)
--{
--	platform_device_register(&pxa_device_wm9713_audio);
--}
--
- static struct resource smc91x_resources[] = {
- 	[0] = {
- 		.start	= ZYLONITE_ETH_PHYS + 0x300,
-@@ -428,7 +418,6 @@ static void __init zylonite_init(void)
- 	zylonite_init_nand();
- 	zylonite_init_leds();
- 	zylonite_init_ohci();
--	zylonite_init_wm9713_audio();
- }
- 
- MACHINE_START(ZYLONITE, "PXA3xx Platform Development Kit (aka Zylonite)")
--- 
-2.11.0
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
