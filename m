@@ -1,30 +1,43 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Mon, 4 Jun 2018 08:58:14 -0600
-Subject: [PATCH 1/5] arm64: topology: refactor reset_cpu_topology to add
- support for removing topology
-In-Reply-To: <1528108797-13743-2-git-send-email-sudeep.holla@arm.com>
-References: <1528108797-13743-1-git-send-email-sudeep.holla@arm.com>
- <1528108797-13743-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <9f76f11f-d77b-ae39-f06b-97ab1b981e31@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 4 Jun 2018 22:57:30 +0800
+Subject: [PATCH v5 4/4] ARM: dts: imx: add missing compatible and clock
+ properties for EPIT
+In-Reply-To: <20180604100035.19558-5-peron.clem@gmail.com>
+References: <20180604100035.19558-5-peron.clem@gmail.com>
+Message-ID: <201806042209.Muyb3cE5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/4/2018 4:39 AM, Sudeep Holla wrote:
-> Currently reset_cpu_topology clears all the CPU topology information
-> and resets to default values. However we may need to just clear the
-> information when we hotplig out the CPU. In preparation to add the
+Hi Colin,
 
-hotplug
+Thank you for the patch! Yet something to improve:
 
-> support the same, let's refactor reset_cpu_topology to clear out the
-> information and reset them only if explicitly requested.
-> 
+[auto build test ERROR on shawnguo/for-next]
+[also build test ERROR on v4.17 next-20180601]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
+url:    https://github.com/0day-ci/linux/commits/Cl-ment-P-ron/Reintroduce-i-MX-EPIT-Timer/20180604-211036
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+config: arm-realview_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
+All errors (new ones prefixed by >>):
 
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+>> Error: arch/arm/boot/dts/imx6sl.dtsi:661.19-20 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 18007 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/87639177/attachment-0001.gz>
