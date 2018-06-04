@@ -1,43 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jun 2018 13:14:52 +0100
-Subject: [PATCH v12 5/5] arm64: Allow huge io mappings again
-In-Reply-To: <1527856758-27169-6-git-send-email-cpandya@codeaurora.org>
-References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
- <1527856758-27169-6-git-send-email-cpandya@codeaurora.org>
-Message-ID: <20180604121452.GK9482@arm.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Mon, 4 Jun 2018 14:19:33 +0200
+Subject: [PATCH v3 6/8] dt-bindings: rcar-vin: Add 'hsync-as-de' custom
+ prop
+In-Reply-To: <1527606359-19261-7-git-send-email-jacopo+renesas@jmondi.org>
+References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1527606359-19261-7-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180604121933.GG19674@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 06:09:18PM +0530, Chintan Pandya wrote:
-> Huge mappings have had stability issues due to stale
-> TLB entry and memory leak issues. Since, those are
-> addressed in this series of patches, it is now safe
-> to allow huge mappings.
+Hi Jacopo,
+
+Thanks for your work.
+
+On 2018-05-29 17:05:57 +0200, Jacopo Mondi wrote:
+> Document the boolean custom property 'renesas,hsync-as-de' that indicates
+> that the HSYNC signal is internally used as data-enable, when the
+> CLKENB signal is not connected.
 > 
-> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+> As this is a VIN specificity create a custom property specific to the R-Car
+> VIN driver.
+> 
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 > ---
->  arch/arm64/mm/mmu.c | 18 ++----------------
->  1 file changed, 2 insertions(+), 16 deletions(-)
+> v3:
+> - new patch
+> ---
+>  Documentation/devicetree/bindings/media/rcar_vin.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 6e7e16c..c65abc4 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -934,15 +934,8 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
->  {
->  	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
->  					pgprot_val(mk_sect_prot(prot)));
-> -	pud_t new_pud = pfn_pud(__phys_to_pfn(phys), sect_prot);
-> -
-> -	/* Only allow permission changes for now */
-> -	if (!pgattr_change_is_safe(READ_ONCE(pud_val(*pudp)),
-> -				   pud_val(new_pud)))
-> -		return 0;
+> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> index ff53226..024c109 100644
+> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> @@ -60,6 +60,9 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
+>          - vsync-active: see [1] for description. Default is active high.
+>          - data-enable-active: polarity of CLKENB signal, see [1] for
+>            description. Default is active high.
+> +        - renesas,hsync-as-de: a boolean property to indicate that HSYNC signal
+> +          is internally used as data-enable when the CLKENB signal is
+> +          not available.
 
-Do you actually need to remove these checks? If we're doing
-break-before-make properly, then the check won't fire but it would be
-good to keep it there so we can catch misuse of these in future.
+I'm not sure I like this, is there really a need to add a custom 
+property for this? The datasheet states that when the CLKENB pin is not 
+connected the driver should enable 'Clock Enable Hsync Select (CHS)'.  
+With the new generic property 'data-enable-active' which describes the 
+polarity of the CLKENB pin we also gain the knowledge if the CLKENB pin 
+is connected or not.
 
-In other words, can we drop this patch?
+I propose we drop this custom property and instead let the driver check 
+if the CLKENB polarity is described or not and use that to determine if 
+CHS bit should be set or not. IMHO that is much simpler then having two 
+properties describing the same pin.
 
-Will
+> 
+>          If both HSYNC and VSYNC polarities are not specified, embedded
+>          synchronization is selected.
+> --
+> 2.7.4
+> 
+
+-- 
+Regards,
+Niklas S?derlund
