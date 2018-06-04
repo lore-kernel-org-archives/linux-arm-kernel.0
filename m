@@ -1,41 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jun 2018 10:42:43 +0100
-Subject: [PATCH v2] ARM: avoid Cortex-A9 livelock on tight dmb loops
-In-Reply-To: <E1fOhn6-00008E-3b@rmk-PC.armlinux.org.uk>
-References: <E1fOhn6-00008E-3b@rmk-PC.armlinux.org.uk>
-Message-ID: <20180604094241.GE9482@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Jun 2018 11:46:18 +0200
+Subject: [PATCH v2 0/2] Add R8A77980/Condor I2C support
+In-Reply-To: <2a88f4e9-0a86-8e6f-0ef2-20913dc9431d@cogentembedded.com>
+References: <2a88f4e9-0a86-8e6f-0ef2-20913dc9431d@cogentembedded.com>
+Message-ID: <20180604094613.3uxggbt3bvisq65l@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Fri, Jun 01, 2018 at 12:00:16PM +0100, Russell King wrote:
-> Executing loops such as:
+On Thu, May 31, 2018 at 11:18:57PM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> 	while (1)
-> 		cpu_relax();
->
-> with interrupts disabled results in a livelock of the entire system,
-> as other CPUs are prevented making progress.  This is most noticable
-> as a failure of crashdump kexec, which stops just after issuing:
-> 
-> 	Loading crashdump kernel...
-> 
-> to the system console.  Two other locations of these loops within the
-> ARM code have been identified and fixed up.
+> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180529-v4.17-rc7' tag. We're adding the R8A77980 I2C nodes
+> and then describing 2 PCA9654 I/O expanders connected to the I2C0 bus on
+> the Condor board.
 
-Can you confirm that this only happens if CONFIG_ARM_ERRATA_754327=y?
-The only erratum I can find for A9 that matches this behaviour exists
-when the body of the tight loop contains a DMB and some of the possible
-workarounds are:
-
-  - Add ten NOPs after the DMB
-  - Use DSB instead of DMB in the tight loop
-  - Set bit 16 in the diagnostic control register (p15, c1, 5, 0, c0, 1)
-
-WFE is probably fine (the write-up isn't clear), but if this only occurs
-due to CONFIG_ARM_ERRATA_754327=y it would be nice to mitigate it in the
-alternative cpu_relax() definition itself, which isn't generally possible
-with WFE.
-
-Will
+Thanks, applied.
