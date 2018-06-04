@@ -1,237 +1,39 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Mon,  4 Jun 2018 12:15:11 -0700
-Subject: [PATCH v6 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <cover.1528138319.git.collinsd@codeaurora.org>
-References: <cover.1528138319.git.collinsd@codeaurora.org>
-Message-ID: <38cb1906c96504f74517018ca4e0aed63bb77356.1528138319.git.collinsd@codeaurora.org>
+From: avanbrunt@nvidia.com (Alexander Van Brunt)
+Date: Mon, 4 Jun 2018 19:34:10 +0000
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <20180604091609.GD9482@arm.com>
+References: <1527617488-5693-1-git-send-email-rokhanna@nvidia.com>
+ <20180530090044.GA2452@arm.com>
+ <1527788750049.85185@nvidia.com>,<20180604091609.GD9482@arm.com>
+Message-ID: <1528140881044.41145@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce bindings for RPMh regulator devices found on some
-Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
-processor within the SoC to make PMIC regulator requests which
-are aggregated within the RPMh hardware block along with requests
-from other processors in the SoC to determine the final PMIC
-regulator hardware state.
+__flush_icache_all all cache is slow in large systems. It flushes the instruction caches cache in the inner-shareable domain. That includes other NUMA nodes in multi-socket systems. The CPU issuing the invalidate has to wait for all of the other CPUs to complete the invalidate instruction. The remote CPU's responding to the request all need to slow down.
 
-Signed-off-by: David Collins <collinsd@codeaurora.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++++++++++++++++++
- .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +++++
- 2 files changed, 196 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
- create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
+In contrast, flushes by range can be checked in a snoop filter to see if the addresses are relevant to the CPU. So, it scales to systems with more than two clusters much better.
 
-diff --git a/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
-new file mode 100644
-index 0000000..7ef2dbe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
-@@ -0,0 +1,160 @@
-+Qualcomm Technologies, Inc. RPMh Regulators
-+
-+rpmh-regulator devices support PMIC regulator management via the Voltage
-+Regulator Manager (VRM) and Oscillator Buffer (XOB) RPMh accelerators.  The APPS
-+processor communicates with these hardware blocks via a Resource State
-+Coordinator (RSC) using command packets.  The VRM allows changing three
-+parameters for a given regulator: enable state, output voltage, and operating
-+mode.  The XOB allows changing only a single parameter for a given regulator:
-+its enable state.  Despite its name, the XOB is capable of controlling the
-+enable state of any PMIC peripheral.  It is used for clock buffers, low-voltage
-+switches, and LDO/SMPS regulators which have a fixed voltage and mode.
-+
-+=======================
-+Required Node Structure
-+=======================
-+
-+RPMh regulators must be described in two levels of device nodes.  The first
-+level describes the PMIC containing the regulators and must reside within an
-+RPMh device node.  The second level describes each regulator within the PMIC
-+which is to be used on the board.  Each of these regulators maps to a single
-+RPMh resource.
-+
-+The names used for regulator nodes must match those supported by a given PMIC.
-+Supported regulator node names:
-+	PM8998:		smps1 - smps13, ldo1 - ldo28, lvs1 - lvs2
-+	PMI8998:	bob
-+	PM8005:		smps1 - smps4
-+
-+========================
-+First Level Nodes - PMIC
-+========================
-+
-+- compatible
-+	Usage:      required
-+	Value type: <string>
-+	Definition: Must be one of: "qcom,pm8998-rpmh-regulators",
-+		    "qcom,pmi8998-rpmh-regulators" or
-+		    "qcom,pm8005-rpmh-regulators".
-+
-+- qcom,pmic-id
-+	Usage:      required
-+	Value type: <string>
-+	Definition: RPMh resource name suffix used for the regulators found on
-+		    this PMIC.  Typical values: "a", "b", "c", "d", "e", "f".
-+
-+- vdd-s1-supply
-+- vdd-s2-supply
-+- vdd-s3-supply
-+- vdd-s4-supply
-+	Usage:      optional (PM8998 and PM8005 only)
-+	Value type: <phandle>
-+	Definition: phandle of the parent supply regulator of one or more of the
-+		    regulators for this PMIC.
-+
-+- vdd-s5-supply
-+- vdd-s6-supply
-+- vdd-s7-supply
-+- vdd-s8-supply
-+- vdd-s9-supply
-+- vdd-s10-supply
-+- vdd-s11-supply
-+- vdd-s12-supply
-+- vdd-s13-supply
-+- vdd-l1-l27-supply
-+- vdd-l2-l8-l17-supply
-+- vdd-l3-l11-supply
-+- vdd-l4-l5-supply
-+- vdd-l6-supply
-+- vdd-l7-l12-l14-l15-supply
-+- vdd-l9-supply
-+- vdd-l10-l23-l25-supply
-+- vdd-l13-l19-l21-supply
-+- vdd-l16-l28-supply
-+- vdd-l18-l22-supply
-+- vdd-l20-l24-supply
-+- vdd-l26-supply
-+- vin-lvs-1-2-supply
-+	Usage:      optional (PM8998 only)
-+	Value type: <phandle>
-+	Definition: phandle of the parent supply regulator of one or more of the
-+		    regulators for this PMIC.
-+
-+- vdd-bob-supply
-+	Usage:      optional (PMI8998 only)
-+	Value type: <phandle>
-+	Definition: BOB regulator parent supply phandle
-+
-+===============================
-+Second Level Nodes - Regulators
-+===============================
-+
-+- qcom,always-wait-for-ack
-+	Usage:      optional
-+	Value type: <empty>
-+	Definition: Boolean flag which indicates that the application processor
-+		    must wait for an ACK or a NACK from RPMh for every request
-+		    sent for this regulator including those which are for a
-+		    strictly lower power state.
-+
-+Other properties defined in Documentation/devicetree/bindings/regulator.txt
-+may also be used.  regulator-initial-mode and regulator-allowed-modes may be
-+specified for VRM regulators using mode values from
-+include/dt-bindings/regulator/qcom,rpmh-regulator.h.  regulator-allow-bypass
-+may be specified for BOB type regulators managed via VRM.
-+regulator-allow-set-load may be specified for LDO type regulators managed via
-+VRM.
-+
-+========
-+Examples
-+========
-+
-+#include <dt-bindings/regulator/qcom,rpmh-regulator.h>
-+
-+&apps_rsc {
-+	pm8998-rpmh-regulators {
-+		compatible = "qcom,pm8998-rpmh-regulators";
-+		qcom,pmic-id = "a";
-+
-+		vdd-l7-l12-l14-l15-supply = <&pm8998_s5>;
-+
-+		smps2 {
-+			regulator-min-microvolt = <1100000>;
-+			regulator-max-microvolt = <1100000>;
-+		};
-+
-+		pm8998_s5: smps5 {
-+			regulator-min-microvolt = <1904000>;
-+			regulator-max-microvolt = <2040000>;
-+		};
-+
-+		ldo7 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
-+			regulator-allowed-modes =
-+				<RPMH_REGULATOR_MODE_LPM
-+				 RPMH_REGULATOR_MODE_HPM>;
-+			regulator-allow-set-load;
-+		};
-+
-+		lvs1 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+	};
-+
-+	pmi8998-rpmh-regulators {
-+		compatible = "qcom,pmi8998-rpmh-regulators";
-+		qcom,pmic-id = "b";
-+
-+		bob {
-+			regulator-min-microvolt = <3312000>;
-+			regulator-max-microvolt = <3600000>;
-+			regulator-allowed-modes =
-+				<RPMH_REGULATOR_MODE_AUTO
-+				 RPMH_REGULATOR_MODE_HPM>;
-+			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
-+		};
-+	};
-+};
-diff --git a/include/dt-bindings/regulator/qcom,rpmh-regulator.h b/include/dt-bindings/regulator/qcom,rpmh-regulator.h
-new file mode 100644
-index 0000000..86713dc
---- /dev/null
-+++ b/include/dt-bindings/regulator/qcom,rpmh-regulator.h
-@@ -0,0 +1,36 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/* Copyright (c) 2018, The Linux Foundation. All rights reserved. */
-+
-+#ifndef __QCOM_RPMH_REGULATOR_H
-+#define __QCOM_RPMH_REGULATOR_H
-+
-+/*
-+ * These mode constants may be used to specify modes for various RPMh regulator
-+ * device tree properties (e.g. regulator-initial-mode).  Each type of regulator
-+ * supports a subset of the possible modes.
-+ *
-+ * %RPMH_REGULATOR_MODE_RET:	Retention mode in which only an extremely small
-+ *				load current is allowed.  This mode is supported
-+ *				by LDO and SMPS type regulators.
-+ * %RPMH_REGULATOR_MODE_LPM:	Low power mode in which a small load current is
-+ *				allowed.  This mode corresponds to PFM for SMPS
-+ *				and BOB type regulators.  This mode is supported
-+ *				by LDO, HFSMPS, BOB, and PMIC4 FTSMPS type
-+ *				regulators.
-+ * %RPMH_REGULATOR_MODE_AUTO:	Auto mode in which the regulator hardware
-+ *				automatically switches between LPM and HPM based
-+ *				upon the real-time load current.  This mode is
-+ *				supported by HFSMPS, BOB, and PMIC4 FTSMPS type
-+ *				regulators.
-+ * %RPMH_REGULATOR_MODE_HPM:	High power mode in which the full rated current
-+ *				of the regulator is allowed.  This mode
-+ *				corresponds to PWM for SMPS and BOB type
-+ *				regulators.  This mode is supported by all types
-+ *				of regulators.
-+ */
-+#define RPMH_REGULATOR_MODE_RET		0
-+#define RPMH_REGULATOR_MODE_LPM		1
-+#define RPMH_REGULATOR_MODE_AUTO	2
-+#define RPMH_REGULATOR_MODE_HPM		3
-+
-+#endif
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The flush ignores the VMID. So, one guest OS can slow down others. That creates a big covert channel between guests unless the hypervisor traps and emulates it by invalidating an entire VMID. By flushing by VA range, the hardware only flushes lines associated with the VMID, ASID, and VA associated with the line.
+
+Selfishly, NVIDIA's Denver CPU's are even more sensitive because the optimized code stored in DRAM is effectively a very large (on the order of 64 MB) instruction cache. "ic ialluis" can result in the entire optimization cache for all guests to be invalidated.
+
+I am aware that the arguments I made apply to TLB invalidates and the other places that Linux calls __flush_icache_all. But, that doesn't mean I don't like those either. For now, I just don't want more calls to __flush_icache_all.
+
+Alex VB
+________________________________________
+From: Will Deacon <will.deacon@arm.com>
+Sent: Monday, June 4, 2018 2:16 AM
+To: Rohit Khanna
+Cc: catalin.marinas at arm.com; robin.murphy at arm.com; mark.rutland at arm.com; Suzuki.Poulose at arm.com; Bo Yan; Alexander Van Brunt; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] arm64: alternative:flush cache with unpatched code
+
+On Thu, May 31, 2018 at 05:45:11PM +0000, Rohit Khanna wrote:
+> Will, thanks for the comments.
+> I will push a new patch set.
+> We want to avoid using __flush_icache_all as much as possible and hence
+> trying to flush cache by range.
+
+Why? We're going to do it once at boot and once on each module load, so I
+can't see it being a performance concern.
+
+Will
