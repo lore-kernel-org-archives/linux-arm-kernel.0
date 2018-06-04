@@ -1,69 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jun 2018 19:08:06 +0100
-Subject: [PATCH v2] ARM: avoid Cortex-A9 livelock on tight dmb loops
-In-Reply-To: <20180604094241.GE9482@arm.com>
-References: <E1fOhn6-00008E-3b@rmk-PC.armlinux.org.uk>
- <20180604094241.GE9482@arm.com>
-Message-ID: <20180604180806.GC6920@n2100.armlinux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 5 Jun 2018 03:06:03 +0800
+Subject: [PATCH v1 2/2] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+In-Reply-To: <1527772139-19665-3-git-send-email-gengdongjiu@huawei.com>
+References: <1527772139-19665-3-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <201806050356.CUEc4QFL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 10:42:43AM +0100, Will Deacon wrote:
-> Hi Russell,
-> 
-> On Fri, Jun 01, 2018 at 12:00:16PM +0100, Russell King wrote:
-> > Executing loops such as:
-> > 
-> > 	while (1)
-> > 		cpu_relax();
-> >
-> > with interrupts disabled results in a livelock of the entire system,
-> > as other CPUs are prevented making progress.  This is most noticable
-> > as a failure of crashdump kexec, which stops just after issuing:
-> > 
-> > 	Loading crashdump kernel...
-> > 
-> > to the system console.  Two other locations of these loops within the
-> > ARM code have been identified and fixed up.
-> 
-> Can you confirm that this only happens if CONFIG_ARM_ERRATA_754327=y?
+Hi Dongjiu,
 
-CONFIG_ARM_ERRATA_754327=y + patch => works
-CONFIG_ARM_ERRATA_754327=y => fails
-CONFIG_ARM_ERRATA_754327=n => works
+Thank you for the patch! Perhaps something to improve:
 
-> The only erratum I can find for A9 that matches this behaviour exists
-> when the body of the tight loop contains a DMB and some of the possible
-> workarounds are:
-> 
->   - Add ten NOPs after the DMB
->   - Use DSB instead of DMB in the tight loop
->   - Set bit 16 in the diagnostic control register (p15, c1, 5, 0, c0, 1)
+[auto build test WARNING on arm64/for-next/core]
+[also build test WARNING on v4.17 next-20180601]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Yes, I think you pointed me at that.  It may be appropriate to mitigate
-the cases where we have a tight loop where the loop has a termination
-condition, but in these cases, all the loops are infinite - finding some
-way to avoid spinning in this case is probably a good idea in any case.
+url:    https://github.com/0day-ci/linux/commits/Dongjiu-Geng/arm64-KVM-export-the-capability-to-set-guest-SError-syndrome/20180602-175846
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-What I'm more interested in this patch is to fix kexec crashdump when
-CONFIG_ARM_ERRATA_754327=y on OMAP4 (and similar) platforms.
+All warnings (new ones prefixed by >>):
 
-> WFE is probably fine (the write-up isn't clear), but if this only occurs
-> due to CONFIG_ARM_ERRATA_754327=y it would be nice to mitigate it in the
-> alternative cpu_relax() definition itself, which isn't generally possible
-> with WFE.
+   In file included from include/linux/kvm_host.h:37:0,
+                    from arch/arm/kernel/asm-offsets.c:18:
+>> arch/arm/include/asm/kvm_host.h:217:11: warning: 'struct kvm_vcpu_events' declared inside parameter list will not be visible outside of this definition or declaration
+       struct kvm_vcpu_events *events);
+              ^~~~~~~~~~~~~~~
+   arch/arm/include/asm/kvm_host.h:220:11: warning: 'struct kvm_vcpu_events' declared inside parameter list will not be visible outside of this definition or declaration
+       struct kvm_vcpu_events *events);
+              ^~~~~~~~~~~~~~~
 
-With the WFE, it is no longer "a tight loop", although WFE is just a
-hint to the processor, it could ultimately ignore it.  That said, in
-all these cases, either:
+vim +217 arch/arm/include/asm/kvm_host.h
 
-- we're either talking about a secondary CPU, so SMP must be supported
-  (which presumably guarantees implementation of SEV/WFE)
-or:
-- we're the only CPU so this problem doesn't apply to the infinite loop
-  case.
+   210	
+   211	int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+   212	unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+   213	int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+   214	int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+   215	int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+   216	int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+ > 217				struct kvm_vcpu_events *events);
+   218	
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 19855 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/eeecc0b2/attachment-0001.gz>
