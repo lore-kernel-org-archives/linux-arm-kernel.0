@@ -1,65 +1,70 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Mon, 4 Jun 2018 14:19:33 +0200
-Subject: [PATCH v3 6/8] dt-bindings: rcar-vin: Add 'hsync-as-de' custom
- prop
-In-Reply-To: <1527606359-19261-7-git-send-email-jacopo+renesas@jmondi.org>
-References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
- <1527606359-19261-7-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180604121933.GG19674@bigcity.dyn.berto.se>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 4 Jun 2018 20:19:25 +0800
+Subject: [PATCH 5/7] iommu/dma: add support for non-strict mode
+In-Reply-To: <201806020106.eRUp2Ehc%fengguang.wu@intel.com>
+References: <1527752569-18020-6-git-send-email-thunder.leizhen@huawei.com>
+ <201806020106.eRUp2Ehc%fengguang.wu@intel.com>
+Message-ID: <5B152E4D.4040205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
 
-Thanks for your work.
 
-On 2018-05-29 17:05:57 +0200, Jacopo Mondi wrote:
-> Document the boolean custom property 'renesas,hsync-as-de' that indicates
-> that the HSYNC signal is internally used as data-enable, when the
-> CLKENB signal is not connected.
+On 2018/6/2 1:51, kbuild test robot wrote:
+> Hi Zhen,
 > 
-> As this is a VIN specificity create a custom property specific to the R-Car
-> VIN driver.
+> Thank you for the patch! Perhaps something to improve:
 > 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> [auto build test WARNING on linus/master]
+> [also build test WARNING on v4.17-rc7 next-20180601]
+> [cannot apply to iommu/next]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Zhen-Lei/add-non-strict-mode-support-for-arm-smmu-v3/20180602-000418
+> config: x86_64-randconfig-x008-201821 (attached as .config)
+> compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=x86_64 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    drivers//iommu/amd_iommu.c: In function 'amd_iommu_capable':
+>>> drivers//iommu/amd_iommu.c:3053:2: warning: enumeration value 'IOMMU_CAP_NON_STRICT' not handled in switch [-Wswitch]
+>      switch (cap) {
+>      ^~~~~~
+> 
+> vim +/IOMMU_CAP_NON_STRICT +3053 drivers//iommu/amd_iommu.c
+> 
+> 645c4c8d arch/x86/kernel/amd_iommu.c Joerg Roedel 2008-12-02  3050  
+> ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3051  static bool amd_iommu_capable(enum iommu_cap cap)
+> dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3052  {
+> 80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27 @3053  	switch (cap) {
+> 80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3054  	case IOMMU_CAP_CACHE_COHERENCY:
+> ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3055  		return true;
+> bdddadcb drivers/iommu/amd_iommu.c   Joerg Roedel 2012-07-02  3056  	case IOMMU_CAP_INTR_REMAP:
+> ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3057  		return (irq_remapping_enabled == 1);
+> cfdeec22 drivers/iommu/amd_iommu.c   Will Deacon  2014-10-27  3058  	case IOMMU_CAP_NOEXEC:
+It seems that it's better to change this to 'default'.
+
+> cfdeec22 drivers/iommu/amd_iommu.c   Will Deacon  2014-10-27  3059  		return false;
+> 80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3060  	}
+> 80a506b8 arch/x86/kernel/amd_iommu.c Joerg Roedel 2010-07-27  3061  
+> ab636481 drivers/iommu/amd_iommu.c   Joerg Roedel 2014-09-05  3062  	return false;
+> dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3063  }
+> dbb9fd86 arch/x86/kernel/amd_iommu.c Sheng Yang   2009-03-18  3064  
+> 
+> :::::: The code at line 3053 was first introduced by commit
+> :::::: 80a506b8fdcfa868bb53eb740f928217d0966fc1 x86/amd-iommu: Export cache-coherency capability
+> 
+> :::::: TO: Joerg Roedel <joerg.roedel@amd.com>
+> :::::: CC: Joerg Roedel <joerg.roedel@amd.com>
+> 
 > ---
-> v3:
-> - new patch
-> ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> index ff53226..024c109 100644
-> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> @@ -60,6 +60,9 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
->          - vsync-active: see [1] for description. Default is active high.
->          - data-enable-active: polarity of CLKENB signal, see [1] for
->            description. Default is active high.
-> +        - renesas,hsync-as-de: a boolean property to indicate that HSYNC signal
-> +          is internally used as data-enable when the CLKENB signal is
-> +          not available.
-
-I'm not sure I like this, is there really a need to add a custom 
-property for this? The datasheet states that when the CLKENB pin is not 
-connected the driver should enable 'Clock Enable Hsync Select (CHS)'.  
-With the new generic property 'data-enable-active' which describes the 
-polarity of the CLKENB pin we also gain the knowledge if the CLKENB pin 
-is connected or not.
-
-I propose we drop this custom property and instead let the driver check 
-if the CLKENB polarity is described or not and use that to determine if 
-CHS bit should be set or not. IMHO that is much simpler then having two 
-properties describing the same pin.
-
-> 
->          If both HSYNC and VSYNC polarities are not specified, embedded
->          synchronization is selected.
-> --
-> 2.7.4
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > 
 
 -- 
-Regards,
-Niklas S?derlund
+Thanks!
+BestRegards
