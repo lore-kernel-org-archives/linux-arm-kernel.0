@@ -1,43 +1,39 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 4 Jun 2018 22:57:30 +0800
-Subject: [PATCH v5 4/4] ARM: dts: imx: add missing compatible and clock
- properties for EPIT
-In-Reply-To: <20180604100035.19558-5-peron.clem@gmail.com>
-References: <20180604100035.19558-5-peron.clem@gmail.com>
-Message-ID: <201806042209.Muyb3cE5%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Jun 2018 16:07:10 +0100
+Subject: [PATCH v12 4/5] arm64: Implement page table free interfaces
+In-Reply-To: <98ef3cd0-a9a1-d5b5-f1a6-c0ab8b15ec6a@codeaurora.org>
+References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
+ <1527856758-27169-5-git-send-email-cpandya@codeaurora.org>
+ <20180604121328.GG9482@arm.com>
+ <98ef3cd0-a9a1-d5b5-f1a6-c0ab8b15ec6a@codeaurora.org>
+Message-ID: <20180604150709.GA8593@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+On Mon, Jun 04, 2018 at 07:13:18PM +0530, Chintan Pandya wrote:
+> On 6/4/2018 5:43 PM, Will Deacon wrote:
+> >On Fri, Jun 01, 2018 at 06:09:17PM +0530, Chintan Pandya wrote:
+> >>+		next = addr;
+> >>+		end = addr + PUD_SIZE;
+> >>+		do {
+> >>+			pmd_free_pte_page(entry, next);
+> >>+		} while (entry++, next += PMD_SIZE, next != end);
+> >>+
+> >>+		pud_clear(pudp);
+> >>+		__flush_tlb_kernel_pgtable(addr);
+> >>+		pmd_free(NULL, table);
+> >>+	}
+> >>+	return 1;
+> >
+> >So with these patches, we only ever return 1 from these helpers. It looks
+> >like the same is true for x86, so how about we make them void and move the
+> >calls inside the conditionals in lib/ioremap.c? Obviously, this would be a
+> >separate patch on the end.
+> 
+> That sounds valid code churn to me. But since x86 discussion is not
+> concluded yet, I would wait to share until that gets resolved. May be
+> not in v13 but separate effort. Would that be okay to you ?
 
-Thank you for the patch! Yet something to improve:
+Yes, fine by me.
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on v4.17 next-20180601]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Cl-ment-P-ron/Reintroduce-i-MX-EPIT-Timer/20180604-211036
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-realview_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/imx6sl.dtsi:661.19-20 syntax error
-   FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 18007 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/87639177/attachment-0001.gz>
+Will
