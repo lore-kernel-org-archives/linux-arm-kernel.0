@@ -1,66 +1,84 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Mon, 04 Jun 2018 15:28:19 +0200
-Subject: [Resend PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
-In-Reply-To: <20180604132137.32136-2-lionel.debieve@st.com>
-References: <20180604132137.32136-1-lionel.debieve@st.com>
- <20180604132137.32136-2-lionel.debieve@st.com>
-Message-ID: <6364434.VVWtcepFll@blindfold>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 4 Jun 2018 15:27:36 +0200
+Subject: [PATCH] media: atmel-isi: drop unnecessary while loop
+In-Reply-To: <1527857174-24616-1-git-send-email-hofrat@opentech.at>
+References: <1527857174-24616-1-git-send-email-hofrat@opentech.at>
+Message-ID: <20180604132736.zay3ae5we6d7adsk@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 4. Juni 2018, 15:21:37 CEST schrieb Lionel Debieve:
-> Update license template using SPDX. Move the global layout
-> of UBI headers to dual license helping UBI to be the standard
-> solution for raw NAND management.
+On Fri, Jun 01, 2018 at 12:46:14PM +0000, Nicholas Mc Guire wrote:
+> From: Nicholas Mc Guire <hofrat@osadl.org>
 > 
-> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Artem Bityutskiy <dedekind1@gmail.com>
-> Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> As there is no way this can loop it actually makes no sense to have
+> a while(1){} around the body - all three possible paths end in a return
+> statement. 
+> 
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: commit c1d82b895380 "[media] atmel-isi: move out of soc_camera to atmel"
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+
+Thanks.
+
 > ---
->  drivers/mtd/ubi/ubi-media.h | 22 +++-------------------
->  1 file changed, 3 insertions(+), 19 deletions(-)
 > 
-> diff --git a/drivers/mtd/ubi/ubi-media.h b/drivers/mtd/ubi/ubi-media.h
-> index bfceae5a890e..195ff8ca8211 100644
-> --- a/drivers/mtd/ubi/ubi-media.h
-> +++ b/drivers/mtd/ubi/ubi-media.h
-> @@ -1,28 +1,12 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
->  /*
-> - * Copyright (c) International Business Machines Corp., 2006
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
-> - * the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program; if not, write to the Free Software
-> - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> - *
-> + * Copyright (C) International Business Machines Corp., 2006
->   * Authors: Artem Bityutskiy (???????????????? ??????????)
->   *          Thomas Gleixner
->   *          Frank Haverkamp
->   *          Oliver Lohmann
->   *          Andreas Arnez
-> - */
+> The diff output is unfortunately not that readable - essentially only
+> the outer while(1){ } was removed. 
+> 
+> Patch was compile tested with: x86_64_defconfig + CONFIG_MEDIA_SUPPORT=y
+> MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_CONTROLLER=y, V4L_PLATFORM_DRIVERS=y
+> OF=y, CONFIG_COMPILE_TEST=y, CONFIG_VIDEO_ATMEL_ISI=y
+> 
+> Compile testing atmel-isi.c shows some sparse warnings. Seems to be due to
+> sizeof operator being applied to a union (not related to the function being
+> changed though).
+> 
+> Patch is against 4.17-rc7 (localversion-next is next-20180531)
+> 
+>  drivers/media/platform/atmel/atmel-isi.c | 28 +++++++++++++---------------
+>  1 file changed, 13 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/media/platform/atmel/atmel-isi.c b/drivers/media/platform/atmel/atmel-isi.c
+> index e5be21a..85fc7b9 100644
+> --- a/drivers/media/platform/atmel/atmel-isi.c
+> +++ b/drivers/media/platform/atmel/atmel-isi.c
+> @@ -1106,23 +1106,21 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
+>  	struct device_node *ep = NULL;
+>  	struct device_node *remote;
+>  
+> -	while (1) {
+> -		ep = of_graph_get_next_endpoint(node, ep);
+> -		if (!ep)
+> -			return -EINVAL;
 > -
-> -/*
-> + *
->   * This file defines the layout of UBI headers and all the other UBI on-flash
->   * data structures.
->   */
+> -		remote = of_graph_get_remote_port_parent(ep);
+> -		if (!remote) {
+> -			of_node_put(ep);
+> -			return -EINVAL;
+> -		}
+> +	ep = of_graph_get_next_endpoint(node, ep);
+> +	if (!ep)
+> +		return -EINVAL;
+>  
+> -		/* Remote node to connect */
+> -		isi->entity.node = remote;
+> -		isi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
+> -		isi->entity.asd.match.fwnode = of_fwnode_handle(remote);
+> -		return 0;
+> +	remote = of_graph_get_remote_port_parent(ep);
+> +	if (!remote) {
+> +		of_node_put(ep);
+> +		return -EINVAL;
+>  	}
+> +
+> +	/* Remote node to connect */
+> +	isi->entity.node = remote;
+> +	isi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
+> +	isi->entity.asd.match.fwnode = of_fwnode_handle(remote);
+> +	return 0;
+>  }
+>  
+>  static int isi_graph_init(struct atmel_isi *isi)
+> -- 
+> 2.1.4
 > 
-
-Applied.
-Thanks everyone for sorting this out!
-
-Thanks,
-//richard
