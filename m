@@ -1,38 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jun 2018 10:04:22 +0100
-Subject: [PATCH v2 0/9] Rewrite asm-generic/bitops/{atomic,lock}.h and
- use on arm64
-In-Reply-To: <20180604074029.GN12217@hirez.programming.kicks-ass.net>
-References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
- <20180604074029.GN12217@hirez.programming.kicks-ass.net>
-Message-ID: <20180604090421.GA9482@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 4 Jun 2018 11:09:19 +0200
+Subject: [PATCH v3 2/2] arm64: allwinner: a64-amarula-relic: Enable
+ AP6330 WiFi support
+In-Reply-To: <20180601173527.18051-2-jagan@amarulasolutions.com>
+References: <20180601173527.18051-1-jagan@amarulasolutions.com>
+ <20180601173527.18051-2-jagan@amarulasolutions.com>
+Message-ID: <20180604090919.s2mp7etd2eao3w6b@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 09:40:29AM +0200, Peter Zijlstra wrote:
-> On Fri, Jun 01, 2018 at 05:06:20PM +0100, Will Deacon wrote:
-> > Hi all,
-> > 
-> > This patch series has previously been posted in RFC form here:
-> > 
-> >   RFCv1: https://www.spinics.net/lists/arm-kernel/msg634719.html
-> >   RFCv2: https://www.spinics.net/lists/arm-kernel/msg636875.html
-> >      v1: https://www.spinics.net/lists/arm-kernel/msg655262.html
-> > 
-> > The only change since v1 is that some of the fetch ops are replaced
-> > by non-value-returning ops for some of the atomic bitops.
-> > 
+On Fri, Jun 01, 2018 at 11:05:27PM +0530, Jagan Teki wrote:
+> Enable AP6330 WiFi/BT combo chip on Amarula A64-Relic board:
+> - WiFi SDIO interface is connected to MMC1
+> - WiFi WL-PMU-EN pin connected to gpio PL2: attach to mmc-pwrseq
+> - WiFi WL-WAKE-AP pin connected to gpio PL3
+> - 32kHz external oscillator gate clock from RTC
 > 
-> Looks good,
-> 
-> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-Thanks, Peter!
+Applied both, thanks
 
-> How do you want to route this, through tip or the arm64 tree?
+Maxime
 
-I think -tip would make the most sense, if that's ok with Ingo.
-
-Cheers,
-
-Will
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/e54d5fa4/attachment.sig>
