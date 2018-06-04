@@ -1,73 +1,58 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  4 Jun 2018 11:39:53 +0100
-Subject: [PATCH 1/5] arm64: topology: refactor reset_cpu_topology to add
- support for removing topology
+Date: Mon,  4 Jun 2018 11:39:54 +0100
+Subject: [PATCH 2/5] arm64: topology: add support to remove cpu topology
 In-Reply-To: <1528108797-13743-1-git-send-email-sudeep.holla@arm.com>
 References: <1528108797-13743-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1528108797-13743-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1528108797-13743-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently reset_cpu_topology clears all the CPU topology information
-and resets to default values. However we may need to just clear the
-information when we hotplig out the CPU. In preparation to add the
-support the same, let's refactor reset_cpu_topology to clear out the
-information and reset them only if explicitly requested.
+This patch adds support to remove all the CPU topology information using
+clear_cpu_topology and also resetting the sibling information on other
+sibling CPUs. This will be used in cpu_disable so that all the topology
+information is removed on CPU hotplug out.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/kernel/topology.c | 31 +++++++++++++++++++------------
- 1 file changed, 19 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/topology.h |  1 +
+ arch/arm64/kernel/topology.c      | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
 
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index df48212f767b..fb996f454305 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -23,6 +23,7 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+ 
+ void init_cpu_topology(void);
+ void store_cpu_topology(unsigned int cpuid);
++void remove_cpu_topology(unsigned int cpuid);
+ const struct cpumask *cpu_coregroup_mask(int cpu);
+ 
+ #ifdef CONFIG_NUMA
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 7415c166281f..f10babcc112b 100644
+index f10babcc112b..bf522bcf40ec 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -296,28 +296,35 @@ void store_cpu_topology(unsigned int cpuid)
- 	update_siblings_masks(cpuid);
+@@ -325,6 +325,21 @@ static void __init reset_cpu_topology(void)
+ 		clear_cpu_topology(cpu, true);
  }
  
--static void __init reset_cpu_topology(void)
-+static void clear_cpu_topology(int cpu, bool reset)
- {
--	unsigned int cpu;
-+	struct cpu_topology *cpu_topo = &cpu_topology[cpu];
- 
--	for_each_possible_cpu(cpu) {
--		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
-+	cpu_topo->core_id = -1;
-+	cpu_topo->thread_id = -1;
-+	cpu_topo->package_id = -1;
-+	cpu_topo->llc_id = -1;
- 
--		cpu_topo->thread_id = -1;
--		cpu_topo->core_id = 0;
--		cpu_topo->package_id = -1;
-+	cpumask_clear(&cpu_topo->llc_siblings);
-+	cpumask_clear(&cpu_topo->core_sibling);
-+	cpumask_clear(&cpu_topo->thread_sibling);
- 
--		cpu_topo->llc_id = -1;
--		cpumask_clear(&cpu_topo->llc_siblings);
-+	if (reset) {
-+		cpu_topo->core_id = 0;
- 		cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
--
--		cpumask_clear(&cpu_topo->core_sibling);
- 		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
--		cpumask_clear(&cpu_topo->thread_sibling);
- 		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
- 	}
- }
- 
-+static void __init reset_cpu_topology(void)
++#define cpu_llc_shared_mask(cpu)	(&cpu_topology[cpu].llc_siblings)
++void remove_cpu_topology(unsigned int cpu)
 +{
-+	unsigned int cpu;
++	int sibling;
 +
-+	for_each_possible_cpu(cpu)
-+		clear_cpu_topology(cpu, true);
++	for_each_cpu(sibling, topology_core_cpumask(cpu))
++		cpumask_clear_cpu(cpu, topology_core_cpumask(sibling));
++	for_each_cpu(sibling, topology_sibling_cpumask(cpu))
++		cpumask_clear_cpu(cpu, topology_sibling_cpumask(sibling));
++	for_each_cpu(sibling, cpu_llc_shared_mask(cpu))
++		cpumask_clear_cpu(cpu, cpu_llc_shared_mask(sibling));
++
++	clear_cpu_topology(cpu, false);
 +}
 +
  #ifdef CONFIG_ACPI
