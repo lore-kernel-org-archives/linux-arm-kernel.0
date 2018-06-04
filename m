@@ -1,36 +1,43 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 04 Jun 2018 12:19:39 +0200
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
- files
-In-Reply-To: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
-References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
-Message-ID: <1700848.99AcjQORKy@phil>
+From: h.grohne@intenta.de (Helmut Grohne)
+Date: Mon, 4 Jun 2018 12:22:05 +0200
+Subject: [PATCH v3 1/3] serial: xuartps: fix typo in cdns_uart_startup
+In-Reply-To: <cover.1528106392.git.h.grohne@intenta.de>
+References: <cover.1528106392.git.h.grohne@intenta.de>
+Message-ID: <5fbc35e1a4285e149cc0db3b1d989932260a8386.1528106392.git.h.grohne@intenta.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. Dezember 2017, 12:44:25 CEST schrieb Klaus Goger:
-> This patch series replaces all the license text in rockchip devicetree
-> files text with a proper SPDX-License-Identifier.
-> It follows the guidelines submitted[1] by Thomas Gleixner that are not
-> yet merged.
-> 
-> These series also fixes the issue with contradicting statements in most
-> licenses. The introduction text claims to be GPL or X11[2] but the
-> following verbatim copy of the license is actually a MIT[3] license.
-> The X11 license includes a advertise clause and trademark information
-> related to the X Consortium. As these X Consortium specfic points are
-> irrelevant for us we stick with the actuall license text.
-> 
-> [1] https://patchwork.kernel.org/patch/10091607/
-> [2] https://spdx.org/licenses/X11.html
-> [3] https://spdx.org/licenses/MIT.html
-> 
-> 
-> Klaus Goger (2):
->   arm64: dts: rockchip: use SPDX-License-Identifier
->   ARM: dts: rockchip: use SPDX-License-Identifier
+The bit mask changes in commit 6e14f7c1f2c2 ("tty: xuartps: Improve
+startup function") doesn't do what the commit message advertises. The
+original behaviour was clearing the RX_DIS bit, but due to missing ~,
+that bit is now the only bit kept.
 
-This had now 6 months for anybody concerned about this change to speak
-up - with no NACKs received, so I've applied both patches for 4.19
+Currently, the regression is harmless, because the previous write to the
+control register sets it to TXRST | RXRST. Thus the RX_DIS bit is
+previously cleared. The *RST bits are cleared by the hardware, so this
+commit does not currently change behaviour, but makes future changes
+less risky.
 
-Heiko
+Link: https://www.spinics.net/lists/linux-serial/msg23157.html
+Signed-off-by: Helmut Grohne <h.grohne@intenta.de>
+Fixes: 6e14f7c1f2c2 ("tty: xuartps: Improve startup function")
+Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/tty/serial/xilinx_uartps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index bd72dd843338..e4b2d8102a04 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -829,7 +829,7 @@ static int cdns_uart_startup(struct uart_port *port)
+ 	 * the receiver.
+ 	 */
+ 	status = readl(port->membase + CDNS_UART_CR);
+-	status &= CDNS_UART_CR_RX_DIS;
++	status &= ~CDNS_UART_CR_RX_DIS;
+ 	status |= CDNS_UART_CR_RX_EN;
+ 	writel(status, port->membase + CDNS_UART_CR);
+ 
+-- 
+2.11.0
