@@ -1,63 +1,33 @@
-From: h.grohne@intenta.de (Helmut Grohne)
-Date: Mon, 4 Jun 2018 08:42:13 +0200
-Subject: [RFC PATCH] sdhci-of-arasan: card initialization failure -84
-Message-ID: <20180604064211.q2thyftgpffuaer2@laureti-dev>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Mon,  4 Jun 2018 15:08:28 +0800
+Subject: [PATCH 01/10] fsl/fman: share the event interrupt
+In-Reply-To: <20180604070837.19265-1-yangbo.lu@nxp.com>
+References: <20180604070837.19265-1-yangbo.lu@nxp.com>
+Message-ID: <20180604070837.19265-2-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Work around repeated:
+This patch is to share fman event interrupt because
+the 1588 timer driver will also use this interrupt.
 
-    mmc0: error -84 whilst initialising SD card
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
- drivers/mmc/host/sdhci.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/freescale/fman/fman.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-I'm seeing the above error -84 with a series of Kingston cards of 4GB capacity
-when used with an arasan host controller. Using the cards with other hosts or
-using other cards with the host is not problematic. The host controller has the
-following device tree:
-
-	ps7-sdio at e0100000 {
-		compatible = "arasan,sdhci-8.9a";
-		reg = <0xe0100000 0x1000>;
-		clock-names = "clk_xin", "clk_ahb";
-		clock-frequency = <50000000>;
-		clocks = <&clkc 21>, <&clkc 32>;
-		interrupt-parent = <&ps7_scugic_0>;
-		interrupts = <0 24 4>;
-	};
-
-When enabling sufficient debugging (and thus slowing the kernel down), the
-problem goes away. Without debug features, the insertion of this delay suffices
-for my particular instance. Inserting the same delay before the
-SDHCI_CLOCK_CARD_EN write also makes the error go away.
-
-While instrumenting the code I found that the loop waiting for the
-SDHCI_CLOCK_INT_STABLE would always terminate immediately (regardless of the
-card being used). Only when the card is removed, the loop would spin once. This
-hints that potentially the stable checking is broken for this host controller.
-
-During my testing I checked 7 Kingston cards, 2 Transcend Cards, 1 Apacer card,
-3 arasn hosts, 3 non-arasan hosts and had consistent reports for a similar
-number of devices from others.
-
-If my hypothesis is reasonable, I can turn this patch into a new quirk that
-replaces the stable polling with msleep(20), which is the poll timeout. Is
-there anything else I should investigate before doing so?
-
-Helmut
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 90cc1977b792..5d2809aeb4eb 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1430,6 +1430,7 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
+diff --git a/drivers/net/ethernet/freescale/fman/fman.c b/drivers/net/ethernet/freescale/fman/fman.c
+index 9530405..c415ac6 100644
+--- a/drivers/net/ethernet/freescale/fman/fman.c
++++ b/drivers/net/ethernet/freescale/fman/fman.c
+@@ -2801,7 +2801,8 @@ static irqreturn_t fman_irq(int irq, void *handle)
+ 	of_node_put(muram_node);
+ 	of_node_put(fm_node);
  
- 	clk |= SDHCI_CLOCK_CARD_EN;
- 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-+	udelay(80);
- }
- EXPORT_SYMBOL_GPL(sdhci_enable_clk);
- 
+-	err = devm_request_irq(&of_dev->dev, irq, fman_irq, 0, "fman", fman);
++	err = devm_request_irq(&of_dev->dev, irq, fman_irq, IRQF_SHARED,
++			       "fman", fman);
+ 	if (err < 0) {
+ 		dev_err(&of_dev->dev, "%s: irq %d allocation failed (error = %d)\n",
+ 			__func__, irq, err);
 -- 
-2.11.0
+1.7.1
