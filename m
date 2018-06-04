@@ -1,84 +1,60 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Mon, 4 Jun 2018 09:08:11 +0900
-Subject: [PATCH 6/8] media: uniphier: add common module of DVB adapter
- drivers
-In-Reply-To: <CAK7LNAS8JT8+MAuH+eYUJ3Xa4r07=ecJS0E=SX-tgmV7db_FKw@mail.gmail.com>
-References: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
- <20180530090946.1635-7-suzuki.katsuhiro@socionext.com>
- <CAK7LNAS8JT8+MAuH+eYUJ3Xa4r07=ecJS0E=SX-tgmV7db_FKw@mail.gmail.com>
-Message-ID: <005d01d3fb98$20711900$61534b00$@socionext.com>
+From: neil@brown.name (NeilBrown)
+Date: Mon, 04 Jun 2018 10:13:58 +1000
+Subject: [PATCH 0/7] staging: mt7621-pci: Fix coding style issues
+In-Reply-To: <cover.1528040188.git.abdun.nihaal@gmail.com>
+References: <cover.1528040188.git.abdun.nihaal@gmail.com>
+Message-ID: <877enfqugp.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yamada-san,
+On Sun, Jun 03 2018, Abdun Nihaal wrote:
 
-> -----Original Message-----
-> From: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Sent: Saturday, June 2, 2018 9:00 PM
-> To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
-> Cc: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>;
-> linux-media at vger.kernel.org; Masami Hiramatsu <masami.hiramatsu@linaro.org>;
-> Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel
-> <linux-arm-kernel@lists.infradead.org>; Linux Kernel Mailing List
-> <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH 6/8] media: uniphier: add common module of DVB adapter drivers
-> 
-> 2018-05-30 18:09 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> > This patch adds common module for UniPhier DVB adapter drivers
-> > that equipments tuners and demod that connected by I2C and
-> > UniPhier demux.
-> >
-> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> > ---
-> >  drivers/media/platform/uniphier/Makefile      |  5 ++
-> >  drivers/media/platform/uniphier/hsc-core.c    |  8 ---
-> >  .../platform/uniphier/uniphier-adapter.c      | 54 +++++++++++++++++++
-> >  .../platform/uniphier/uniphier-adapter.h      | 42 +++++++++++++++
-> >  4 files changed, 101 insertions(+), 8 deletions(-)
-> >  create mode 100644 drivers/media/platform/uniphier/uniphier-adapter.c
-> >  create mode 100644 drivers/media/platform/uniphier/uniphier-adapter.h
-> >
-> > diff --git a/drivers/media/platform/uniphier/Makefile
-> b/drivers/media/platform/uniphier/Makefile
-> > index 0622f04d9e68..9e75ad081b77 100644
-> > --- a/drivers/media/platform/uniphier/Makefile
-> > +++ b/drivers/media/platform/uniphier/Makefile
-> > @@ -3,3 +3,8 @@ uniphier-dvb-y += hsc-core.o hsc-ucode.o hsc-css.o hsc-ts.o
-> hsc-dma.o
-> >  uniphier-dvb-$(CONFIG_DVB_UNIPHIER_LD11) += hsc-ld11.o
-> >
-> >  obj-$(CONFIG_DVB_UNIPHIER) += uniphier-dvb.o
-> > +
-> > +ccflags-y += -Idrivers/media/dvb-frontends/
-> > +ccflags-y += -Idrivers/media/tuners/
-> 
-> 
-> Please add $(srctree)/ like
-> 
-> ccflags-y += -I$(srctree)/drivers/media/dvb-frontends/
-> ccflags-y += -I$(srctree)/drivers/media/tuners/
-> 
-> 
-> Currently, it works $(srctree)/,
-> but I really want to rip off the build system hack.
+> This patchset fixes the following set of coding style 
+> issues found using checkpatch.
+>
+> ERROR: space prohibited after that open parenthesis '('
+> ERROR: trailing whitespace
+> ERROR: space required before the open parenthesis '('
+> ERROR: space required after that ',' (ctx:VxV)
+> ERROR: spaces required around that '=' (ctx:VxW)
+> ERROR: spaces required around that '==' (ctx:WxV)
+> ERROR: that open brace { should be on the previous line
 
-Thanks, I agree with your opinion, but other Makefiles in drivers/media use 
-same hack. I don't know other way to include headers of demodulators and 
-tuners...
+Hi,
+ thanks for contributing these, how ever some of these issues have
+ already been address (not all).  I think you must be working from an
+ old try.
+ When submitting patches to drives/staging, they should be based on
+ the staging-next branch of
+    git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging.git
 
-Do you have any good ideas?
+ Also, I'd suggest leaving linux-arm-kernel and linux-mediatek off the
+ cc list.  They are unlikely to be interested until the driver is ready
+ to be moved out of drivers/staging.
+
+Thanks,
+NeilBrown
 
 
-Regards,
---
-Katsuhiro Suzuki
-
-
-> 
-> 
-> 
-> 
-> 
-> --
-> Best Regards
-> Masahiro Yamada
+>
+> Abdun Nihaal (7):
+>   staging: mt7621-pci: Remove space after open parenthesis
+>   staging: mt7621-pci: remove trailing whitespace
+>   staging: mt7621-pci: add space before open parenthesis
+>   staging: mt7621-pci: add space after comma symbol
+>   staging: mt7621-pci: add spaces around equal symbol
+>   staging: mt7621-pci: add space after '==' symbol
+>   staging: mt7621-pci: fix coding style error
+>
+>  drivers/staging/mt7621-pci/pci-mt7621.c | 114 ++++++++++++------------
+>  1 file changed, 56 insertions(+), 58 deletions(-)
+>
+> -- 
+> 2.17.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/e81a42a0/attachment.sig>
