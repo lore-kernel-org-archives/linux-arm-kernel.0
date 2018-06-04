@@ -1,93 +1,58 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 04 Jun 2018 15:59:24 +0200
-Subject: [PATCH 7/7] regulator: core: Enable voltage balancing
-In-Reply-To: <1528120764-14316-1-git-send-email-m.purski@samsung.com>
-References: <20180530144505.GB5705@atomide.com>
- <1528120764-14316-1-git-send-email-m.purski@samsung.com>
- <CGME20180604135954eucas1p2bebd1c4970401bb957da228056f9a662@eucas1p2.samsung.com>
-Message-ID: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon,  4 Jun 2018 16:15:28 +0200
+Subject: [PATCH 3/3] rtc: ftrtc010: let the core handle range
+In-Reply-To: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
+References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
+Message-ID: <20180604141528.15635-3-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call regulator_balance_voltage() instead of set_voltage_rdev()
-in set_voltage_unlocked() and in enabling and disabling functions,
-but only if the regulator is coupled.
+The current range handling is highly suspicious. Anyway, let the core
+handle it.
+The RTC has a 32 bit counter on top of days + hh:mm:ss registers.
 
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- drivers/regulator/core.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ drivers/rtc/rtc-ftrtc010.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 2a7ffb7..2dd1f99 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -2296,6 +2296,11 @@ int regulator_enable(struct regulator *regulator)
- 	int ret = 0;
+diff --git a/drivers/rtc/rtc-ftrtc010.c b/drivers/rtc/rtc-ftrtc010.c
+index 2cdc78ffeb17..61f798c6101f 100644
+--- a/drivers/rtc/rtc-ftrtc010.c
++++ b/drivers/rtc/rtc-ftrtc010.c
+@@ -95,9 +95,6 @@ static int ftrtc010_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 	u32 sec, min, hour, day, offset;
+ 	timeu64_t time;
  
- 	pr_err("%s: %d\n", __func__, __LINE__);
-+	if (rdev->coupling_desc.n_resolved != rdev->coupling_desc.n_coupled) {
-+		rdev_err(rdev, "not all coupled regulators registered\n");
-+		return -EPERM;
-+	}
+-	if (tm->tm_year >= 2148)	/* EPOCH Year + 179 */
+-		return -EINVAL;
+-
+ 	time = rtc_tm_to_time64(tm);
+ 
+ 	sec = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
+@@ -120,6 +117,7 @@ static const struct rtc_class_ops ftrtc010_rtc_ops = {
+ 
+ static int ftrtc010_rtc_probe(struct platform_device *pdev)
+ {
++	u32 days, hour, min, sec;
+ 	struct ftrtc010_rtc *rtc;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+@@ -172,6 +170,15 @@ static int ftrtc010_rtc_probe(struct platform_device *pdev)
+ 
+ 	rtc->rtc_dev->ops = &ftrtc010_rtc_ops;
+ 
++	sec  = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
++	min  = readl(rtc->rtc_base + FTRTC010_RTC_MINUTE);
++	hour = readl(rtc->rtc_base + FTRTC010_RTC_HOUR);
++	days = readl(rtc->rtc_base + FTRTC010_RTC_DAYS);
 +
- 	if (regulator->always_on)
- 		return 0;
- 
-@@ -2307,6 +2312,9 @@ int regulator_enable(struct regulator *regulator)
- 
- 	regulator_lock_dependent(rdev);
- 	ret = _regulator_enable(rdev);
-+	/* balance only if there are regulators coupled */
-+	if (rdev->coupling_desc.n_coupled > 1)
-+		regulator_balance_voltage(rdev, PM_SUSPEND_ON);
- 	regulator_unlock_dependent(rdev);
- 
- 	if (ret != 0 && rdev->supply)
-@@ -2417,6 +2425,8 @@ int regulator_disable(struct regulator *regulator)
- 
- 	regulator_lock_dependent(rdev);
- 	ret = _regulator_disable(rdev);
-+	if (rdev->coupling_desc.n_coupled > 1)
-+		regulator_balance_voltage(rdev, PM_SUSPEND_ON);
- 	regulator_unlock_dependent(rdev);
- 
- 	if (ret == 0 && rdev->supply)
-@@ -2470,6 +2480,8 @@ int regulator_force_disable(struct regulator *regulator)
- 	regulator_lock_dependent(rdev);
- 	regulator->uA_load = 0;
- 	ret = _regulator_force_disable(regulator->rdev);
-+	if (rdev->coupling_desc.n_coupled > 1)
-+		regulator_balance_voltage(rdev, PM_SUSPEND_ON);
- 	regulator_unlock_dependent(rdev);
- 
- 	if (rdev->supply)
-@@ -3031,7 +3043,16 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
- 	int old_min_uV, old_max_uV;
- 	int current_uV;
- 
-+<<<<<<< HEAD
- 	pr_err("%s: %d\n", __func__, __LINE__);
-+=======
-+	if (rdev->coupling_desc.n_resolved != rdev->coupling_desc.n_coupled) {
-+		rdev_err(rdev, "not all coupled regulators registered\n");
-+		ret = -EPERM;
-+		goto out;
-+	}
++	rtc->rtc_dev->range_min = (u64)days * 86400 + hour * 3600 +
++				  min * 60 + sec;
++	rtc->rtc_dev->range_max = U32_MAX + rtc->rtc_dev->range_min;
 +
-+>>>>>>> fcbf6fa... regulator: core: Enable voltage balancing
- 	/* If we're setting the same range as last time the change
- 	 * should be a noop (some cpufreq implementations use the same
- 	 * voltage for multiple frequencies, for example).
-@@ -3074,7 +3095,8 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
- 	if (ret < 0)
- 		goto out2;
- 
--	ret = regulator_set_voltage_rdev(rdev, min_uV, max_uV, state);
-+	/* for not coupled regulators this will just set the voltage */
-+	ret = regulator_balance_voltage(rdev, state);
- 	if (ret < 0)
- 		goto out2;
- 
+ 	ret = devm_request_irq(dev, rtc->rtc_irq, ftrtc010_rtc_interrupt,
+ 			       IRQF_SHARED, pdev->name, dev);
+ 	if (unlikely(ret))
 -- 
-2.7.4
+2.17.1
