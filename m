@@ -1,162 +1,240 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Mon,  4 Jun 2018 12:00:35 +0200
-Subject: [PATCH v5 4/4] ARM: dts: imx: add missing compatible and clock
- properties for EPIT
-In-Reply-To: <20180604100035.19558-1-peron.clem@gmail.com>
-References: <20180604100035.19558-1-peron.clem@gmail.com>
-Message-ID: <20180604100035.19558-5-peron.clem@gmail.com>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Mon, 04 Jun 2018 11:04:08 +0100
+Subject: [PATCH v7 0/9] Add support for SAMA5D2 touchscreen
+In-Reply-To: <45ff713b-7811-22c6-2124-4fbcad59b7e8@microchip.com>
+References: <1526975559-18966-1-git-send-email-eugen.hristev@microchip.com>
+ <20180522185732.0336d29c@archlinux>
+ <45ff713b-7811-22c6-2124-4fbcad59b7e8@microchip.com>
+Message-ID: <DB1C0B30-BEB4-4FA6-9A13-F87F419CB822@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Didier <colin.didier@devialet.com>
 
-Add missing compatible and clock properties for EPIT node.
 
-Signed-off-by: Colin Didier <colin.didier@devialet.com>
-Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
----
- arch/arm/boot/dts/imx25.dtsi   |  8 ++++++--
- arch/arm/boot/dts/imx6qdl.dtsi | 10 ++++++++--
- arch/arm/boot/dts/imx6sl.dtsi  | 14 ++++++++++----
- arch/arm/boot/dts/imx6sx.dtsi  | 10 ++++++++--
- arch/arm/boot/dts/imx6ul.dtsi  | 10 ++++++++--
- 5 files changed, 40 insertions(+), 12 deletions(-)
+On 4 June 2018 07:15:57 BST, Eugen Hristev <eugen.hristev@microchip.com> wrote:
+>
+>
+>On 22.05.2018 20:57, Jonathan Cameron wrote:
+>> On Tue, 22 May 2018 10:52:30 +0300
+>> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+>> 
+>>> Hello,
+>>>
+>>> This patch series is a rework of my previous series named:
+>>> [PATCH 00/14] iio: triggers: add consumer support
+>>>
+>>> This is the version 7 of the series, and addresses the received
+>feedback
+>>> on the v2 series named:
+>>> [PATCH v2 00/10]  Add support for SAMA5D2 touchscreen
+>>> and the v3 series named
+>>> [PATCH v3 00/11]  Add support for SAMA5D2 touchscreen
+>>> and the v4 series named
+>>> [PATCH v4 0/9]  Add support for SAMA5D2 touchscreen
+>>> and fixes one bug found in series named
+>>> [PATCH v5 0/9]  Add support for SAMA5D2 touchscreen
+>>> and addresses comments in series named
+>>> [PATCH v6 0/9]  Add support for SAMA5D2 touchscreen
+>>>
+>>> This series applies on top of fixes-togreg branch of iio.git,
+>>> specifically on top of commit:
+>>> "f0c8d1f" : iio: adc: at91-sama5d2_adc:
+>>>   fix channel configuration for differential channels
+>>>
+>>> Jonathan, if you need me to rebase this on top of testing, let me
+>know.
+>>>
+>>> Changes in previous versions are presented at the end of the cover
+>letter below.
+>>> Thanks everyone for the feedback. Below is the original v2 cover
+>letter:
+>>>
+>>> In few words, this is the implementation of splitting the
+>functionality
+>>> of the IP block ADC device in SAMA5D2 SoC from ADC with touchscreen
+>>> support. In order to avoid having a MFD device, two separate
+>>> drivers that would work on same register base and split the IRQ,etc,
+>>> as advised on the mailing list, I created a consumer driver for the
+>>> channels, that will connect to the ADC as described in the device
+>tree.
+>>>
+>>> I have collected feedback from everyone and here is the result:
+>>> I have added a new generic resistive touchscreen driver, which acts
+>>> as a iio consumer for the given channels and will create an input
+>>> device and report the events. It uses a callback buffer to register
+>>> to the IIO device and waits for data to be pushed.
+>>> Inside the IIO device, I have kept a similar approach with the first
+>version
+>>> of the series, except that now the driver can take multiple buffers,
+>and
+>>> will configure the touchscreen part of the hardware device if the
+>specific
+>>> channels are requested.
+>>>
+>>> The SAMA5D2 ADC driver registers three new channels: two for the
+>>> position on the X and Y axis, and one for the touch pressure.
+>>> When channels are requested, it will check if the touchscreen
+>channel mask
+>>> includes the requested channels (it is possible that the consumer
+>driver
+>>> will not request pressure for example). If it's the case, it will
+>work
+>>> in touchscreen mode, and will refuse to do usual analog-digital
+>conversion,
+>>> because we have a single trigger and the touchscreen needs it.
+>>> When the scan mask will include only old channels, the driver will
+>function
+>>> in the same way as before. If the scan mask somehow is a mix of the
+>two (the
+>>> masks intersect), the driver will refuse to work whatsoever (cannot
+>have both
+>>> in the same time).
+>>> The driver allows reading raw data for the new channels, if claim
+>direct
+>>> mode works: no touchscreen driver requested anything. The new
+>channels can
+>>> act like the old ones. However, when requesting these channels, the
+>usual
+>>> trigger will not work and will not be enabled. The touchscreen
+>channels
+>>> require special trigger and irq configuration: pen detect, no pen
+>detect
+>>> and a periodic trigger to sample the touchscreen position and
+>pressure.
+>>> If the user attempts to use another trigger while there is a buffer
+>>> that already requested the touchscreen channels (thus the trigger),
+>the
+>>> driver will refuse to comply.
+>>>
+>>> In order to have defines for the channel numbers, I added a bindings
+>include
+>>> file that goes on a separate commit :
+>>> dt-bindings: iio: adc: at91-sama5d2_adc: add channel specific
+>consumer info
+>>> This should go in the same tree with the following commits :
+>>>    ARM: dts: at91: sama5d2: add channel cells for ADC device
+>>>    ARM: dts: at91: sama5d2: Add resistive touch device
+>>>
+>>> as build will break because these commits depend on the binding one
+>>> which creates the included header file.
+>>> V5 update: After discussing with Alexandre Belloni on Mailing list,
+>the two
+>>> DTS patches are to be taken in the next version after bindings reach
+>mainline.
+>>>
+>>> Changes in v7:
+>>>   - Addressed some feedback from Dmitry, explained in input driver
+>patch
+>>> changelog.
+>>>   - Added Acked-by Dmitry.
+>>>
+>>> Changes in v6:
+>>>   - Fixed a crash in ADC driver , explained in driver patch
+>changelog.
+>>>   - changed a dev_err to dev_dbg in input driver.
+>>>   - added Reviewed-by Rob Herring.
+>>>
+>>> Changes in v5:
+>>>   - renamed property touchscreen-threshold-pressure to
+>touchscreen-min-pressure
+>>>   - added one return in touchscreen driver
+>>>
+>>> Changes in v4:
+>>>   - removed patch for inkern module get/set kref
+>>>   - addressed feedback on both the ADC and the touchscreen driver.
+>each
+>>> patch has a history inside the patch file for the specific changes.
+>>>   - patch that fixes the channel fix
+>>> [PATCH v3 01/11] iio: adc: at91-sama5d2_adc:
+>>>   fix channel configuration for differential channels
+>>> was accepted in fixes-togreg branch thus removed from this series.
+>>>   - added Reviewed-by for the bindings by Rob Herring
+>>>
+>>> Changes in v3:
+>>>   - changed input driver name according to feedback and reworked in
+>commits
+>>> to adapt to binding changes and new name.
+>>>   - moved channel index fix in at91-sama5d2_adc at the beginning of
+>the series
+>>> (PATCH 01/11)
+>>>   - created a new optional binding for the touchscreen as a separate
+>commit
+>>> and added it to the series :
+>>>   [PATCH v3 04/11] dt-bindings: input: touchscreen: add pressure
+>>>   threshold touchscreen property
+>>>   - changed at91-sama5d2_adc driver patch to address the comments.
+>Exact changes
+>>> are in the patch file for the driver source file.
+>>>
+>>> Eugen Hristev (9):
+>>>    MAINTAINERS: add generic resistive touchscreen adc
+>>>    iio: Add channel for Position Relative
+>>>    dt-bindings: input: touchscreen: add minimum pressure touchscreen
+>>>      property
+>>>    dt-bindings: input: touchscreen: resistive-adc-touch: create
+>bindings
+>>>    iio: adc: at91-sama5d2_adc: add support for position and pressure
+>>>      channels
+>>>    input: touchscreen: resistive-adc-touch: add generic resistive
+>ADC
+>>>      touchscreen
+>>>    dt-bindings: iio: adc: at91-sama5d2_adc: add channel specific
+>consumer
+>>>      info
+>>>    ARM: dts: at91: sama5d2: add channel cells for ADC device
+>>>    ARM: dts: at91: sama5d2: Add resistive touch device
+>>>
+>>>   Documentation/ABI/testing/sysfs-bus-iio            |  12 +
+>>>   .../bindings/iio/adc/at91-sama5d2_adc.txt          |   9 +
+>>>   .../input/touchscreen/resistive-adc-touch.txt      |  30 +
+>>>   .../bindings/input/touchscreen/touchscreen.txt     |   3 +
+>>>   MAINTAINERS                                        |   6 +
+>>>   arch/arm/boot/dts/sama5d2.dtsi                     |  12 +
+>>>   drivers/iio/adc/at91-sama5d2_adc.c                 | 609
+>+++++++++++++++++++--
+>>>   drivers/iio/industrialio-core.c                    |   1 +
+>>>   drivers/input/touchscreen/Kconfig                  |  13 +
+>>>   drivers/input/touchscreen/Makefile                 |   1 +
+>>>   drivers/input/touchscreen/resistive-adc-touch.c    | 204 +++++++
+>>>   include/dt-bindings/iio/adc/at91-sama5d2_adc.h     |  16 +
+>>>   include/uapi/linux/iio/types.h                     |   1 +
+>>>   tools/iio/iio_event_monitor.c                      |   2 +
+>>>   14 files changed, 861 insertions(+), 58 deletions(-)
+>>>   create mode 100644
+>Documentation/devicetree/bindings/input/touchscreen/resistive-adc-touch.txt
+>>>   create mode 100644 drivers/input/touchscreen/resistive-adc-touch.c
+>>>   create mode 100644 include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+>>>
+>> 
+>> Hi All,
+>> 
+>> I'm happy to take this, but there is a slight issue that we have a
+>fix working
+>> it's way in which this is dependent on.
+>> 
+>> I'll see if we can get this sorted before the merge window, but we
+>may be
+>> cutting it fine.
+>> 
+>> Jonathan
+>> 
+>
+>Hello Jonathan,
+>
+>I can see the dependency fix made it to 4.17. What is the plan for this
+>
+>series? Getting into this merge window ?
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index cf70df20b19c..15fd4308dad8 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -396,15 +396,19 @@
- 			};
- 
- 			epit1: timer at 53f94000 {
--				compatible = "fsl,imx25-epit";
-+				compatible = "fsl,imx25-epit", "fsl,imx31-epit";
- 				reg = <0x53f94000 0x4000>;
- 				interrupts = <28>;
-+				clocks = <&clks 83>;
-+				status = "disabled";
- 			};
- 
- 			epit2: timer at 53f98000 {
--				compatible = "fsl,imx25-epit";
-+				compatible = "fsl,imx25-epit", "fsl,imx31-epit";
- 				reg = <0x53f98000 0x4000>;
- 				interrupts = <27>;
-+				clocks = <&clks 84>;
-+				status = "disabled";
- 			};
- 
- 			gpio4: gpio at 53f9c000 {
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index c003e62bf290..65c4ee07454c 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -843,14 +843,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 { /* EPIT1 */
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6qdl-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6QDL_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 { /* EPIT2 */
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6qdl-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6QDL_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ab6a7e2e7e8f..6229bbef7ccc 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -671,14 +671,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 {
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6sl-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
--				interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SL_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 {
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6sl-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
--				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SL_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 49c7205b8db8..2b30559d3270 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -736,14 +736,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 {
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6sx-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SX_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 {
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6sx-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SX_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 1241972b16ba..d5f765da1ee2 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -658,14 +658,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 {
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6ul-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 {
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6ul-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
+Sorry, no. We were to tight on time. Will get it into linux-next in a few weeks, ready for the next merge window.
+
+Jonathan
+>
+>Thanks,
+>Eugen
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-2.17.0
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
