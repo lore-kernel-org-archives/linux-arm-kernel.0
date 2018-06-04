@@ -1,200 +1,57 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon,  4 Jun 2018 15:08:31 +0800
-Subject: [PATCH 04/10] powerpc/mpc85xx: move ptp timer out of fman in dts
+Date: Mon,  4 Jun 2018 15:08:34 +0800
+Subject: [PATCH 07/10] fsl/fman_port: support getting timestamp field
 In-Reply-To: <20180604070837.19265-1-yangbo.lu@nxp.com>
 References: <20180604070837.19265-1-yangbo.lu@nxp.com>
-Message-ID: <20180604070837.19265-5-yangbo.lu@nxp.com>
+Message-ID: <20180604070837.19265-8-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to move ptp timer node out of fman.
-Because ptp timer will be probed by ptp_qoriq driver,
-it should be an independent device in case of conflict
-memory mapping.
+This patch is to add fman_port_get_tstamp_field() interface
+to get timestamp field data.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
- arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi   |   14 ++++++++------
- arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi   |   14 ++++++++------
- arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi  |   14 ++++++++------
- arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi  |   14 ++++++++------
- arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi |   14 ++++++++------
- 5 files changed, 40 insertions(+), 30 deletions(-)
+ drivers/net/ethernet/freescale/fman/fman_port.c |   12 ++++++++++++
+ drivers/net/ethernet/freescale/fman/fman_port.h |    3 +++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi
-index abd01d4..6b124f7 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi
-@@ -37,12 +37,13 @@ fman0: fman at 400000 {
- 	#size-cells = <1>;
- 	cell-index = <0>;
- 	compatible = "fsl,fman";
--	ranges = <0 0x400000 0x100000>;
--	reg = <0x400000 0x100000>;
-+	ranges = <0 0x400000 0xfe000>;
-+	reg = <0x400000 0xfe000>;
- 	interrupts = <96 2 0 0>, <16 2 1 1>;
- 	clocks = <&clockgen 3 0>;
- 	clock-names = "fmanclk";
- 	fsl,qman-channel-range = <0x40 0xc>;
-+	ptimer-handle = <&ptp_timer0>;
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
+index ce6e24c..86f0094 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.c
++++ b/drivers/net/ethernet/freescale/fman/fman_port.c
+@@ -1731,6 +1731,18 @@ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
+ }
+ EXPORT_SYMBOL(fman_port_get_hash_result_offset);
  
- 	muram at 0 {
- 		compatible = "fsl,fman-muram";
-@@ -93,9 +94,10 @@ fman0: fman at 400000 {
- 		reg = <0x87000 0x1000>;
- 		status = "disabled";
- 	};
-+};
++int fman_port_get_tstamp_field(struct fman_port *port, const void *data,
++			       u64 *tstamp)
++{
++	if (port->buffer_offsets.time_stamp_offset == ILLEGAL_BASE)
++		return -EINVAL;
++
++	*tstamp = *(u64 *)(data + port->buffer_offsets.time_stamp_offset);
++
++	return 0;
++}
++EXPORT_SYMBOL(fman_port_get_tstamp_field);
++
+ static int fman_port_probe(struct platform_device *of_dev)
+ {
+ 	struct fman_port *port;
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
+index e86ca6a..d10e48d 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.h
++++ b/drivers/net/ethernet/freescale/fman/fman_port.h
+@@ -153,6 +153,9 @@ int fman_port_cfg_buf_prefix_content(struct fman_port *port,
  
--	ptp_timer0: ptp-timer at fe000 {
--		compatible = "fsl,fman-ptp-timer";
--		reg = <0xfe000 0x1000>;
--	};
-+ptp_timer0: ptp-timer at 4fe000 {
-+	compatible = "fsl,fman-ptp-timer";
-+	reg = <0x4fe000 0x1000>;
-+	interrupts = <96 2 0 0>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi
-index debea75..b80aaf5 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi
-@@ -37,12 +37,13 @@ fman1: fman at 500000 {
- 	#size-cells = <1>;
- 	cell-index = <1>;
- 	compatible = "fsl,fman";
--	ranges = <0 0x500000 0x100000>;
--	reg = <0x500000 0x100000>;
-+	ranges = <0 0x500000 0xfe000>;
-+	reg = <0x500000 0xfe000>;
- 	interrupts = <97 2 0 0>, <16 2 1 0>;
- 	clocks = <&clockgen 3 1>;
- 	clock-names = "fmanclk";
- 	fsl,qman-channel-range = <0x60 0xc>;
-+	ptimer-handle = <&ptp_timer1>;
+ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset);
  
- 	muram at 0 {
- 		compatible = "fsl,fman-muram";
-@@ -93,9 +94,10 @@ fman1: fman at 500000 {
- 		reg = <0x87000 0x1000>;
- 		status = "disabled";
- 	};
-+};
++int fman_port_get_tstamp_field(struct fman_port *port, const void *data,
++			       u64 *tstamp);
++
+ struct fman_port *fman_port_bind(struct device *dev);
  
--	ptp_timer1: ptp-timer at fe000 {
--		compatible = "fsl,fman-ptp-timer";
--		reg = <0xfe000 0x1000>;
--	};
-+ptp_timer1: ptp-timer at 5fe000 {
-+	compatible = "fsl,fman-ptp-timer";
-+	reg = <0x5fe000 0x1000>;
-+	interrupts = <97 2 0 0>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi
-index 3a20e0d..d3720fd 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi
-@@ -37,12 +37,13 @@ fman0: fman at 400000 {
- 	#size-cells = <1>;
- 	cell-index = <0>;
- 	compatible = "fsl,fman";
--	ranges = <0 0x400000 0x100000>;
--	reg = <0x400000 0x100000>;
-+	ranges = <0 0x400000 0xfe000>;
-+	reg = <0x400000 0xfe000>;
- 	interrupts = <96 2 0 0>, <16 2 1 1>;
- 	clocks = <&clockgen 3 0>;
- 	clock-names = "fmanclk";
- 	fsl,qman-channel-range = <0x800 0x10>;
-+	ptimer-handle = <&ptp_timer0>;
- 
- 	muram at 0 {
- 		compatible = "fsl,fman-muram";
-@@ -98,9 +99,10 @@ fman0: fman at 400000 {
- 		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
- 		reg = <0xfd000 0x1000>;
- 	};
-+};
- 
--	ptp_timer0: ptp-timer at fe000 {
--		compatible = "fsl,fman-ptp-timer";
--		reg = <0xfe000 0x1000>;
--	};
-+ptp_timer0: ptp-timer at 4fe000 {
-+	compatible = "fsl,fman-ptp-timer";
-+	reg = <0x4fe000 0x1000>;
-+	interrupts = <96 2 0 0>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi
-index 82750ac..ae34c20 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi
-@@ -37,12 +37,13 @@ fman1: fman at 500000 {
- 	#size-cells = <1>;
- 	cell-index = <1>;
- 	compatible = "fsl,fman";
--	ranges = <0 0x500000 0x100000>;
--	reg = <0x500000 0x100000>;
-+	ranges = <0 0x500000 0xfe000>;
-+	reg = <0x500000 0xfe000>;
- 	interrupts = <97 2 0 0>, <16 2 1 0>;
- 	clocks = <&clockgen 3 1>;
- 	clock-names = "fmanclk";
- 	fsl,qman-channel-range = <0x820 0x10>;
-+	ptimer-handle = <&ptp_timer1>;
- 
- 	muram at 0 {
- 		compatible = "fsl,fman-muram";
-@@ -98,9 +99,10 @@ fman1: fman at 500000 {
- 		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
- 		reg = <0xfd000 0x1000>;
- 	};
-+};
- 
--	ptp_timer1: ptp-timer at fe000 {
--		compatible = "fsl,fman-ptp-timer";
--		reg = <0xfe000 0x1000>;
--	};
-+ptp_timer1: ptp-timer at 5fe000 {
-+	compatible = "fsl,fman-ptp-timer";
-+	reg = <0x5fe000 0x1000>;
-+	interrupts = <97 2 0 0>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi
-index 7f60b60..02f2755 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi
-@@ -37,12 +37,13 @@ fman0: fman at 400000 {
- 	#size-cells = <1>;
- 	cell-index = <0>;
- 	compatible = "fsl,fman";
--	ranges = <0 0x400000 0x100000>;
--	reg = <0x400000 0x100000>;
-+	ranges = <0 0x400000 0xfe000>;
-+	reg = <0x400000 0xfe000>;
- 	interrupts = <96 2 0 0>, <16 2 1 1>;
- 	clocks = <&clockgen 3 0>;
- 	clock-names = "fmanclk";
- 	fsl,qman-channel-range = <0x800 0x10>;
-+	ptimer-handle = <&ptp_timer0>;
- 
- 	muram at 0 {
- 		compatible = "fsl,fman-muram";
-@@ -86,9 +87,10 @@ fman0: fman at 400000 {
- 		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
- 		reg = <0xfd000 0x1000>;
- 	};
-+};
- 
--	ptp_timer0: ptp-timer at fe000 {
--		compatible = "fsl,fman-ptp-timer";
--		reg = <0xfe000 0x1000>;
--	};
-+ptp_timer0: ptp-timer at 4fe000 {
-+	compatible = "fsl,fman-ptp-timer";
-+	reg = <0x4fe000 0x1000>;
-+	interrupts = <96 2 0 0>;
- };
+ #endif /* __FMAN_PORT_H */
 -- 
 1.7.1
