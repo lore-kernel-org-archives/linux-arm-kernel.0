@@ -1,59 +1,35 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Mon, 4 Jun 2018 14:13:16 +0200
-Subject: [PATCH v3 5/8] media: rcar-vin: Handle data-enable polarity
-In-Reply-To: <1527606359-19261-6-git-send-email-jacopo+renesas@jmondi.org>
-References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
- <1527606359-19261-6-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180604121316.GF19674@bigcity.dyn.berto.se>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Jun 2018 13:13:51 +0100
+Subject: [PATCH v12 3/5] arm64: pgtable: Add p*d_page_vaddr helper macros
+In-Reply-To: <1527856758-27169-4-git-send-email-cpandya@codeaurora.org>
+References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
+ <1527856758-27169-4-git-send-email-cpandya@codeaurora.org>
+Message-ID: <20180604121351.GJ9482@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
-
-Thanks for your work.
-
-On 2018-05-29 17:05:56 +0200, Jacopo Mondi wrote:
-> Handle data-enable signal polarity. If the polarity is not specifically
-> requested to be active low, use the active high default.
+On Fri, Jun 01, 2018 at 06:09:16PM +0530, Chintan Pandya wrote:
+> Add helper macros to give virtual references to page
+> tables. These will be used while freeing dangling
+> page tables.
 > 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
 > ---
-> v3:
-> - use new property to set the CES bit
-> ---
->  drivers/media/platform/rcar-vin/rcar-dma.c | 5 +++++
->  1 file changed, 5 insertions(+)
+>  arch/arm64/include/asm/pgtable.h | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/drivers/media/platform/rcar-vin/rcar-dma.c b/drivers/media/platform/rcar-vin/rcar-dma.c
-> index d2b7002..9145b56 100644
-> --- a/drivers/media/platform/rcar-vin/rcar-dma.c
-> +++ b/drivers/media/platform/rcar-vin/rcar-dma.c
-> @@ -123,6 +123,7 @@
->  /* Video n Data Mode Register 2 bits */
->  #define VNDMR2_VPS		(1 << 30)
->  #define VNDMR2_HPS		(1 << 29)
-> +#define VNDMR2_CES		(1 << 28)
->  #define VNDMR2_FTEV		(1 << 17)
->  #define VNDMR2_VLV(n)		((n & 0xf) << 12)
-> 
-> @@ -698,6 +699,10 @@ static int rvin_setup(struct rvin_dev *vin)
->  		/* Vsync Signal Polarity Select */
->  		if (!(vin->parallel->mbus_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW))
->  			dmr2 |= VNDMR2_VPS;
-> +
-> +		/* Data Enable Polarity Select */
-> +		if (vin->parallel->mbus_flags & V4L2_MBUS_DATA_ENABLE_LOW)
-> +			dmr2 |= VNDMR2_CES;
->  	}
-> 
->  	/*
-> --
-> 2.7.4
-> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 7c4c8f3..ef4047f 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -580,6 +580,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+>  
+>  #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+>  
+> +#define pmd_page_vaddr(pmd) __va(pmd_page_paddr(pmd))
+> +#define pud_page_vaddr(pud) __va(pud_page_paddr(pud))
 
--- 
-Regards,
-Niklas S?derlund
+Are these actually needed, or do pte_offset_kernel and pmd_offset do the
+job already?
+
+Will
