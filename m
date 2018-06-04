@@ -1,57 +1,96 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon,  4 Jun 2018 15:08:34 +0800
-Subject: [PATCH 07/10] fsl/fman_port: support getting timestamp field
+Date: Mon,  4 Jun 2018 15:08:30 +0800
+Subject: [PATCH 03/10] dt-binding: ptp_qoriq: add DPAA FMan support
 In-Reply-To: <20180604070837.19265-1-yangbo.lu@nxp.com>
 References: <20180604070837.19265-1-yangbo.lu@nxp.com>
-Message-ID: <20180604070837.19265-8-yangbo.lu@nxp.com>
+Message-ID: <20180604070837.19265-4-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add fman_port_get_tstamp_field() interface
-to get timestamp field data.
+This patch is to add bindings description for DPAA
+FMan 1588 timer, and also remove its description in
+fsl-fman dt-bindings document.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
- drivers/net/ethernet/freescale/fman/fman_port.c |   12 ++++++++++++
- drivers/net/ethernet/freescale/fman/fman_port.h |    3 +++
- 2 files changed, 15 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/net/fsl-fman.txt |   25 +-------------------
+ .../devicetree/bindings/ptp/ptp-qoriq.txt          |   15 +++++++++--
+ 2 files changed, 13 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
-index ce6e24c..86f0094 100644
---- a/drivers/net/ethernet/freescale/fman/fman_port.c
-+++ b/drivers/net/ethernet/freescale/fman/fman_port.c
-@@ -1731,6 +1731,18 @@ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
- }
- EXPORT_SYMBOL(fman_port_get_hash_result_offset);
+diff --git a/Documentation/devicetree/bindings/net/fsl-fman.txt b/Documentation/devicetree/bindings/net/fsl-fman.txt
+index df873d1..74603dd 100644
+--- a/Documentation/devicetree/bindings/net/fsl-fman.txt
++++ b/Documentation/devicetree/bindings/net/fsl-fman.txt
+@@ -356,30 +356,7 @@ ethernet at e0000 {
+ ============================================================================
+ FMan IEEE 1588 Node
  
-+int fman_port_get_tstamp_field(struct fman_port *port, const void *data,
-+			       u64 *tstamp)
-+{
-+	if (port->buffer_offsets.time_stamp_offset == ILLEGAL_BASE)
-+		return -EINVAL;
-+
-+	*tstamp = *(u64 *)(data + port->buffer_offsets.time_stamp_offset);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(fman_port_get_tstamp_field);
-+
- static int fman_port_probe(struct platform_device *of_dev)
- {
- 	struct fman_port *port;
-diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
-index e86ca6a..d10e48d 100644
---- a/drivers/net/ethernet/freescale/fman/fman_port.h
-+++ b/drivers/net/ethernet/freescale/fman/fman_port.h
-@@ -153,6 +153,9 @@ int fman_port_cfg_buf_prefix_content(struct fman_port *port,
+-DESCRIPTION
+-
+-The FMan interface to support IEEE 1588
+-
+-
+-PROPERTIES
+-
+-- compatible
+-		Usage: required
+-		Value type: <stringlist>
+-		Definition: A standard property.
+-		Must include "fsl,fman-ptp-timer".
+-
+-- reg
+-		Usage: required
+-		Value type: <prop-encoded-array>
+-		Definition: A standard property.
+-
+-EXAMPLE
+-
+-ptp-timer at fe000 {
+-	compatible = "fsl,fman-ptp-timer";
+-	reg = <0xfe000 0x1000>;
+-};
++Refer to Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
  
- int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset);
+ =============================================================================
+ FMan MDIO Node
+diff --git a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
+index 0f569d8..c5d0e79 100644
+--- a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
++++ b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
+@@ -2,7 +2,8 @@
  
-+int fman_port_get_tstamp_field(struct fman_port *port, const void *data,
-+			       u64 *tstamp);
+ General Properties:
+ 
+-  - compatible   Should be "fsl,etsec-ptp"
++  - compatible   Should be "fsl,etsec-ptp" for eTSEC
++                 Should be "fsl,fman-ptp-timer" for DPAA FMan
+   - reg          Offset and length of the register set for the device
+   - interrupts   There should be at least two interrupts. Some devices
+                  have as many as four PTP related interrupts.
+@@ -43,14 +44,22 @@ Clock Properties:
+   value, which will be directly written in those bits, that is why,
+   according to reference manual, the next clock sources can be used:
+ 
++  For eTSEC,
+   <0> - external high precision timer reference clock (TSEC_TMR_CLK
+         input is used for this purpose);
+   <1> - eTSEC system clock;
+   <2> - eTSEC1 transmit clock;
+   <3> - RTC clock input.
+ 
+-  When this attribute is not used, eTSEC system clock will serve as
+-  IEEE 1588 timer reference clock.
++  For DPAA FMan,
++  <0> - external high precision timer reference clock (TMR_1588_CLK)
++  <1> - MAC system clock (1/2 FMan clock)
++  <2> - reserved
++  <3> - RTC clock oscillator
 +
- struct fman_port *fman_port_bind(struct device *dev);
++  When this attribute is not used, the IEEE 1588 timer reference clock
++  will use the eTSEC system clock (for Gianfar) or the MAC system
++  clock (for DPAA).
  
- #endif /* __FMAN_PORT_H */
+ Example:
+ 
 -- 
 1.7.1
