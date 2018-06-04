@@ -1,60 +1,107 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 5 Jun 2018 03:06:03 +0800
-Subject: [PATCH v1 2/2] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-In-Reply-To: <1527772139-19665-3-git-send-email-gengdongjiu@huawei.com>
-References: <1527772139-19665-3-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <201806050356.CUEc4QFL%fengguang.wu@intel.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Mon,  4 Jun 2018 12:15:10 -0700
+Subject: [PATCH v6 0/2] regulator: add QCOM RPMh regulator driver
+Message-ID: <cover.1528138319.git.collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu,
+This patch series adds a driver and device tree binding documentation for
+PMIC regulator control via Resource Power Manager-hardened (RPMh) on some
+Qualcomm Technologies, Inc. SoCs such as SDM845.  RPMh is a hardware block
+which contains several accelerators which are used to manage various
+hardware resources that are shared between the processors of the SoC.  The
+final hardware state of a regulator is determined within RPMh by performing
+max aggregation of the requests made by all of the processors.
 
-Thank you for the patch! Perhaps something to improve:
+The RPMh regulator driver depends upon the RPMh driver [1] and command DB
+driver [2] which are both still undergoing review.  It also depends upon
+three recent regulator changes: [3], [4], and [5].
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.17 next-20180601]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Changes since v5 [6]:
+ - Removed unused constants
+ - Added Reviewed-by tag for DT patch 1/2
 
-url:    https://github.com/0day-ci/linux/commits/Dongjiu-Geng/arm64-KVM-export-the-capability-to-set-guest-SError-syndrome/20180602-175846
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Changes since v4 [7]:
+ - Removed support for DT properties qcom,regulator-drms-modes and
+   qcom,drms-mode-max-microamps
+ - Specified fixed DRMS high power mode minimum limits for LDO type
+   regulators
+ - Removed DRMS support for SMPS and BOB type regulators
+ - Simplified voltage caching logic
 
-All warnings (new ones prefixed by >>):
+Changes since v3 [8]:
+ - Removed support for DT properties qcom,regulator-initial-microvolt
+   and qcom,headroom-microvolt
+ - Renamed DT property qcom,allowed-drms-modes to be
+   qcom,regulator-drms-modes
+ - Updated DT binding documentation to mention which common regulator
+   bindings can be used for qcom-rpmh-regulator devices
+ - Added voltage caching so that voltage requests are only sent to RPMh
+   after the regulator has been enabled at least once
+ - Changed 'voltage_selector' default value to be -ENOTRECOVERABLE to
+   interact with [5]
+ - Initialized 'enabled' to -EINVAL so that unused regulators are
+   disabled by regulator_late_cleanup()
+ - Removed rpmh_regulator_load_default_parameters() as it is no longer
+   needed
+ - Updated the mode usage description in qcom,rpmh-regulator.h
 
-   In file included from include/linux/kvm_host.h:37:0,
-                    from arch/arm/kernel/asm-offsets.c:18:
->> arch/arm/include/asm/kvm_host.h:217:11: warning: 'struct kvm_vcpu_events' declared inside parameter list will not be visible outside of this definition or declaration
-       struct kvm_vcpu_events *events);
-              ^~~~~~~~~~~~~~~
-   arch/arm/include/asm/kvm_host.h:220:11: warning: 'struct kvm_vcpu_events' declared inside parameter list will not be visible outside of this definition or declaration
-       struct kvm_vcpu_events *events);
-              ^~~~~~~~~~~~~~~
+Changes since v2 [9]:
+ - Replaced '_' with '-' in device tree supply property names
+ - Renamed qcom_rpmh-regulator.c to be qcom-rpmh-regulator.c
+ - Updated various DT property names to use "microvolt" and "microamp"
+ - Moved allowed modes constraint specification out of the driver [4]
+ - Replaced rpmh_client with device pointer to match new RPMh API [1]
+ - Corrected drms mode threshold checking
+ - Initialized voltage_selector to -EINVAL when not specified in DT
+ - Added constants for PMIC regulator hardware modes
+ - Corrected type sign of mode mapping tables
+ - Made variable names for mode arrays plural
+ - Simplified Kconfig depends on
+ - Removed unnecessary constants and struct fields
+ - Added some descriptive comments
 
-vim +217 arch/arm/include/asm/kvm_host.h
+Changes since v1 [10]:
+ - Addressed review feedback from Doug, Mark, and Stephen
+ - Replaced set_voltage()/get_voltage() callbacks with set_voltage_sel()/
+   get_voltage_sel()
+ - Added set_bypass()/get_bypass() callbacks for BOB pass-through mode
+   control
+ - Removed top-level PMIC data structures
+ - Removed initialization variables from structs and passed them as
+   function parameters
+ - Removed various comments and error messages
+ - Simplified mode handling
+ - Refactored per-PMIC rpmh-regulator data specification
+ - Simplified probe function
+ - Moved header into DT patch
+ - Removed redundant property listings from DT binding documentation
 
-   210	
-   211	int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
-   212	unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
-   213	int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
-   214	int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-   215	int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-   216	int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
- > 217				struct kvm_vcpu_events *events);
-   218	
+[1]: https://lkml.org/lkml/2018/5/9/729
+[2]: https://lkml.org/lkml/2018/4/10/714
+[3]: https://lkml.org/lkml/2018/4/18/556
+[4]: https://lkml.org/lkml/2018/5/11/696
+[5]: https://lkml.org/lkml/2018/5/15/1005
+[6]: https://lkml.org/lkml/2018/6/1/895
+[7]: https://lkml.org/lkml/2018/5/22/1168
+[8]: https://lkml.org/lkml/2018/5/11/701
+[9]: https://lkml.org/lkml/2018/4/13/687
+[10]: https://lkml.org/lkml/2018/3/16/1431
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 19855 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/eeecc0b2/attachment-0001.gz>
+David Collins (2):
+  regulator: dt-bindings: add QCOM RPMh regulator bindings
+  regulator: add QCOM RPMh regulator driver
+
+ .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/qcom-rpmh-regulator.c            | 767 +++++++++++++++++++++
+ .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +
+ 5 files changed, 973 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+ create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
+ create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
