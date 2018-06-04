@@ -1,82 +1,40 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 4 Jun 2018 19:05:30 +0800
-Subject: [PATCH 1/7] iommu/dma: fix trival coding style mistake
-In-Reply-To: <b473059d-fee6-1627-4749-192771038741@arm.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
- <1527752569-18020-2-git-send-email-thunder.leizhen@huawei.com>
- <b473059d-fee6-1627-4749-192771038741@arm.com>
-Message-ID: <5B151CFA.10808@huawei.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon,  4 Jun 2018 12:13:26 +0100
+Subject: [PATCH v2] ASoC: dapm: delete dapm_kcontrol_data paths list before
+ freeing it
+Message-ID: <20180604111326.15708-1-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+dapm_kcontrol_data is freed as part of dapm_kcontrol_free(), leaving the
+paths pointer dangling in the list.
 
+This leads to system crash when we try to unload and reload sound card.
+I hit this bug during ADSP crash/reboot test case on Dragon board DB410c.
 
-On 2018/5/31 21:03, Robin Murphy wrote:
-> On 31/05/18 08:42, Zhen Lei wrote:
->> The static function iova_reserve_iommu_regions is only called by function
->> iommu_dma_init_domain, and the 'if (!dev)' check in iommu_dma_init_domain
->> affect it only, so we can safely move the check into it. I think it looks
->> more natural.
-> 
-> As before, I disagree - the logic of iommu_dma_init_domain() is "we expect to have a valid device, but stop here if we don't", and moving the check just needlessly obfuscates that. It is not a coincidence that the arguments of both functions are in effective order of importance.
-OK
+Without this patch, on SLAB Poisoning enabled build, kernel crashes with
+"BUG kmalloc-128 (Tainted: G        W        ): Poison overwritten"
 
-> 
->> In addition, the local variable 'ret' is only assigned in the branch of
->> 'if (region->type == IOMMU_RESV_MSI)', so the 'if (ret)' should also only
->> take effect in the branch, add a brace to enclose it.
-> 
-> 'ret' is clearly also assigned at its declaration, to cover the (very likely) case where we don't enter the loop at all. Thus testing it in the loop is harmless, and cluttering that up with extra tabs and braces is just noise.
-OK, I will drop this patch in v2
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+Changes since v1:
+	-remove unnecessary very long bug trace.
 
-> 
-> Robin.
-> 
->> No functional changes.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/dma-iommu.c | 12 +++++++-----
->>   1 file changed, 7 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index ddcbbdb..4e885f7 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -231,6 +231,9 @@ static int iova_reserve_iommu_regions(struct device *dev,
->>       LIST_HEAD(resv_regions);
->>       int ret = 0;
->>   +    if (!dev)
->> +        return 0;
->> +
->>       if (dev_is_pci(dev))
->>           iova_reserve_pci_windows(to_pci_dev(dev), iovad);
->>   @@ -246,11 +249,12 @@ static int iova_reserve_iommu_regions(struct device *dev,
->>           hi = iova_pfn(iovad, region->start + region->length - 1);
->>           reserve_iova(iovad, lo, hi);
->>   -        if (region->type == IOMMU_RESV_MSI)
->> +        if (region->type == IOMMU_RESV_MSI) {
->>               ret = cookie_init_hw_msi_region(cookie, region->start,
->>                       region->start + region->length);
->> -        if (ret)
->> -            break;
->> +            if (ret)
->> +                break;
->> +        }
->>       }
->>       iommu_put_resv_regions(dev, &resv_regions);
->>   @@ -308,8 +312,6 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->>       }
->>         init_iova_domain(iovad, 1UL << order, base_pfn);
->> -    if (!dev)
->> -        return 0;
->>         return iova_reserve_iommu_regions(dev, domain);
->>   }
->>
-> 
-> .
-> 
+ sound/soc/soc-dapm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
+index 1e9a36389667..36a39ba30226 100644
+--- a/sound/soc/soc-dapm.c
++++ b/sound/soc/soc-dapm.c
+@@ -433,6 +433,8 @@ static int dapm_kcontrol_data_alloc(struct snd_soc_dapm_widget *widget,
+ static void dapm_kcontrol_free(struct snd_kcontrol *kctl)
+ {
+ 	struct dapm_kcontrol_data *data = snd_kcontrol_chip(kctl);
++
++	list_del(&data->paths);
+ 	kfree(data->wlist);
+ 	kfree(data);
+ }
 -- 
-Thanks!
-BestRegards
+2.16.2
