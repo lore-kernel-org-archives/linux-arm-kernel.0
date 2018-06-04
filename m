@@ -1,51 +1,36 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Mon, 4 Jun 2018 17:53:33 +0800
-Subject: [PATCH v1 2/2] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-In-Reply-To: <CAG7+5M08R5MDHbR-oYK+un1jgGta2UfuaLaVG5Hf9qT7usHKfg@mail.gmail.com>
-References: <1527772139-19665-1-git-send-email-gengdongjiu@huawei.com>
- <1527772139-19665-3-git-send-email-gengdongjiu@huawei.com>
- <CAG7+5M08R5MDHbR-oYK+un1jgGta2UfuaLaVG5Hf9qT7usHKfg@mail.gmail.com>
-Message-ID: <2d6fda7c-653a-4a36-62fb-4e0fc25767b3@huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Jun 2018 11:59:46 +0200
+Subject: [PATCH 0/3] ARM: shmobile: apmu: Cleanups after legacy SMP
+ fallback removal
+In-Reply-To: <20180531143947.j56rcjmscflmvf6a@verge.net.au>
+References: <1527693328-10559-1-git-send-email-geert+renesas@glider.be>
+ <20180531143947.j56rcjmscflmvf6a@verge.net.au>
+Message-ID: <20180604095945.qglbwc5rp67g4jpv@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2018/6/2 5:22, Eric Northup wrote:
-> On Wed, May 30, 2018 at 10:04 PM Dongjiu Geng <gengdongjiu@huawei.com> wrote:
->>
->> For the migrating VMs, user space may need to know the exception
-
-[...]
-
->> +               __u8 pad[6];
->> +               __u64 serror_esr;
->> +       } exception;
->> +       __u32 reserved[12];
+On Thu, May 31, 2018 at 10:39:48AM -0400, Simon Horman wrote:
+> On Wed, May 30, 2018 at 05:15:25PM +0200, Geert Uytterhoeven wrote:
+> > 	Hi Simon, Magnus,
+> > 
+> > Now the legacy SMP fallbacks for R-Car H2 and M2-W have been removed, a
+> > few more code cleanups can be applied.
+> > 
+> > The third patch is a bit larger than I had hoped, due to the need to
+> > reshuffle a few functions in the absence of forward declarations.
+> > 
+> > Tested on Lager (R-Car H2) and Koelsch (R-Car M2-W).
+> > 
+> > Thanks!
+> > 
+> > Geert Uytterhoeven (3):
+> >   ARM: shmobile: apmu: Move cpu_leave_lowpower() to SUSPEND section
+> >   ARM: shmobile: apmu: Remove obsolete shmobile_smp_apmu_prepare_cpus()
+> >   ARM: shmobile: apmu: Remove platsmp-apmu.h
 > 
-> It will be easier to re-purpose this in the future if the field is
-> reserved and is checked that it must be zero.  SET_VCPU_EVENTS would
-> return EINVAL if reserved fields get used until a later meaning is
-> defined for them.
-Ok, thanks. I will check the reserved fields when calling SET_VCPU_EVENTS.
+> This looks fine but I will wait to see if there are other reviews before
+> applying.
+> 
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-> 
->> +};
->> +
->>  /* If you need to interpret the index values, here is the key: */
->>  #define KVM_REG_ARM_COPROC_MASK                0x000000000FFF0000
->>  #define KVM_REG_ARM_COPROC_SHIFT       16
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> index 56a0260..71d3841 100644
->> --- a/arch/arm64/kvm/guest.c
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -289,6 +289,42 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->>         return -EINVAL;
->>  }
->>
-[...]
->> --
->> 2.7.4
->>
-> 
-> .
-> 
+Thanks, applied.
