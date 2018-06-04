@@ -1,60 +1,58 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 4 Jun 2018 15:31:58 +0200
-Subject: [PATCH] media: atmel-isi: move of_node_put() to cover success
- branch as well
-In-Reply-To: <1527859814-30410-1-git-send-email-hofrat@opentech.at>
-References: <1527859814-30410-1-git-send-email-hofrat@opentech.at>
-Message-ID: <20180604133158.jnys4jliy4d7rwpi@rfolt0960.corp.atmel.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Mon, 4 Jun 2018 19:12:57 +0530
+Subject: [PATCH v12 5/5] arm64: Allow huge io mappings again
+In-Reply-To: <20180604121452.GK9482@arm.com>
+References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
+ <1527856758-27169-6-git-send-email-cpandya@codeaurora.org>
+ <20180604121452.GK9482@arm.com>
+Message-ID: <d7118026-2f37-85e0-9f4e-854b34b23e57@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 01:30:14PM +0000, Nicholas Mc Guire wrote:
-> From: Nicholas Mc Guire <hofrat@osadl.org>
-> 
-> The of_node_put() was only covering the error branch but missed the 
-> success branch so the refcount for ep which 
-> of_graph_get_remote_port_parent() incremented on success would was
-> not being decremented.
-> 
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-Thanks
 
-> ---
+On 6/4/2018 5:44 PM, Will Deacon wrote:
+> On Fri, Jun 01, 2018 at 06:09:18PM +0530, Chintan Pandya wrote:
+>> Huge mappings have had stability issues due to stale
+>> TLB entry and memory leak issues. Since, those are
+>> addressed in this series of patches, it is now safe
+>> to allow huge mappings.
+>>
+>> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+>> ---
+>>   arch/arm64/mm/mmu.c | 18 ++----------------
+>>   1 file changed, 2 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 6e7e16c..c65abc4 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -934,15 +934,8 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+>>   {
+>>   	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
+>>   					pgprot_val(mk_sect_prot(prot)));
+>> -	pud_t new_pud = pfn_pud(__phys_to_pfn(phys), sect_prot);
+>> -
+>> -	/* Only allow permission changes for now */
+>> -	if (!pgattr_change_is_safe(READ_ONCE(pud_val(*pudp)),
+>> -				   pud_val(new_pud)))
+>> -		return 0;
 > 
-> This patch is on top of: "media: atmel-isi: drop unnecessary while loop"
+> Do you actually need to remove these checks? If we're doing
+> break-before-make properly, then the check won't fire but it would be
+> good to keep it there so we can catch misuse of these in future.
 > 
-> Patch was compile tested with: x86_64_defconfig + CONFIG_MEDIA_SUPPORT=y
-> MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_CONTROLLER=y, V4L_PLATFORM_DRIVERS=y
-> OF=y, CONFIG_COMPILE_TEST=y, CONFIG_VIDEO_ATMEL_ISI=y
+> In other words, can we drop this patch?
+
+Yes, we don't need this patch as BBM is happening before this. I missed
+that. I'll remove this patch in v13.
+
 > 
-> Compile testing atmel-isi.c shows some sparse warnings. Seems to be due to
-> sizeof operator being applied to a union (not related to the function being
-> changed though).
+> Will
 > 
-> Patch is against 4.17-rc7 (localversion-next is next-20180531)
-> 
->  drivers/media/platform/atmel/atmel-isi.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/media/platform/atmel/atmel-isi.c b/drivers/media/platform/atmel/atmel-isi.c
-> index 85fc7b9..e8db4df 100644
-> --- a/drivers/media/platform/atmel/atmel-isi.c
-> +++ b/drivers/media/platform/atmel/atmel-isi.c
-> @@ -1111,10 +1111,9 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
->  		return -EINVAL;
->  
->  	remote = of_graph_get_remote_port_parent(ep);
-> -	if (!remote) {
-> -		of_node_put(ep);
-> +	of_node_put(ep);
-> +	if (!remote)
->  		return -EINVAL;
-> -	}
->  
->  	/* Remote node to connect */
->  	isi->entity.node = remote;
-> -- 
-> 2.1.4
-> 
+
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
