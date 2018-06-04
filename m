@@ -1,338 +1,302 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 4 Jun 2018 09:22:25 -0700
-Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
- sata ports
-In-Reply-To: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
-References: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 4 Jun 2018 18:23:57 +0200
+Subject: [PATCH 06/15] drm/sun4i: tcon: Add support for tcon-top
+In-Reply-To: <8937075.mEvrCV6laa@jernej-laptop>
+References: <20180519183127.2718-1-jernej.skrabec@siol.net>
+ <CAGb2v667pdjfHXYpBk1ER5sC8vgpcaOFKEbEByWoD1zh9Z0cyg@mail.gmail.com>
+ <20180604115034.kuy35s4ajewapk4m@flea>
+ <8937075.mEvrCV6laa@jernej-laptop>
+Message-ID: <20180604162357.rige4rcsiowdl725@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 05/18/2018 11:34 AM, Scott Branden wrote:
-> Move remaining sata configuration to stingray-sata.dtsi and enable
-> ports based on NUM_SATA defined.
-> Now, all that needs to be done is define NUM_SATA per board.
-
-Rob could you review this and let us know if this approach is okay or
-not? Thank you!
-
+On Mon, Jun 04, 2018 at 05:09:56PM +0200, Jernej ?krabec wrote:
+> Dne ponedeljek, 04. junij 2018 ob 13:50:34 CEST je Maxime Ripard napisal(a):
+> > On Fri, Jun 01, 2018 at 09:19:43AM -0700, Chen-Yu Tsai wrote:
+> > > On Fri, Jun 1, 2018 at 8:29 AM, Maxime Ripard <maxime.ripard@bootlin.com> 
+> wrote:
+> > > > On Thu, May 31, 2018 at 07:54:08PM +0200, Jernej ?krabec wrote:
+> > > >> Dne ?etrtek, 31. maj 2018 ob 11:21:33 CEST je Maxime Ripard napisal(a):
+> > > >> > On Thu, May 24, 2018 at 03:01:09PM -0700, Chen-Yu Tsai wrote:
+> > > >> > > >> > > + if (tcon->quirks->needs_tcon_top) {
+> > > >> > > >> > > +         struct device_node *np;
+> > > >> > > >> > > +
+> > > >> > > >> > > +         np = of_parse_phandle(dev->of_node,
+> > > >> > > >> > > "allwinner,tcon-top",
+> > > >> > > >> > > 0);
+> > > >> > > >> > > +         if (np) {
+> > > >> > > >> > > +                 struct platform_device *pdev;
+> > > >> > > >> > > +
+> > > >> > > >> > > +                 pdev = of_find_device_by_node(np);
+> > > >> > > >> > > +                 if (pdev)
+> > > >> > > >> > > +                         tcon->tcon_top =
+> > > >> > > >> > > platform_get_drvdata(pdev);
+> > > >> > > >> > > +                 of_node_put(np);
+> > > >> > > >> > > +
+> > > >> > > >> > > +                 if (!tcon->tcon_top)
+> > > >> > > >> > > +                         return -EPROBE_DEFER;
+> > > >> > > >> > > +         }
+> > > >> > > >> > > + }
+> > > >> > > >> > > +
+> > > >> > > >> > 
+> > > >> > > >> > I might have missed it, but I've not seen the bindings
+> > > >> > > >> > additions for
+> > > >> > > >> > that property. This shouldn't really be done that way anyway,
+> > > >> > > >> > instead
+> > > >> > > >> > of using a direct phandle, you should be using the of-graph,
+> > > >> > > >> > with the
+> > > >> > > >> > TCON-top sitting where it belongs in the flow of data.
+> > > >> > > >> 
+> > > >> > > >> Just to answer to the first question, it did describe it in
+> > > >> > > >> "[PATCH
+> > > >> > > >> 07/15] dt- bindings: display: sun4i-drm: Add R40 HDMI pipeline".
+> > > >> > > >> 
+> > > >> > > >> As why I designed it that way - HW representation could be
+> > > >> > > >> described
+> > > >> > > >> that way> >>
+> > > >> > > >> 
+> > > >> > > >> (ASCII art makes sense when fixed width font is used to view 
+> it):
+> > > >> > > >>                             / LCD0/LVDS0
+> > > >> > > >>                 
+> > > >> > > >>                 / TCON-LCD0
+> > > >> > > >>                 
+> > > >> > > >>                 |           \ MIPI DSI
+> > > >> > > >> 
+> > > >> > > >> mixer0          |
+> > > >> > > >> 
+> > > >> > > >>        \        / TCON-LCD1 - LCD1/LVDS1
+> > > >> > > >>        
+> > > >> > > >>         TCON-TOP
+> > > >> > > >>        
+> > > >> > > >>        /        \ TCON-TV0 - TVE0/RGB
+> > > >> > > >> 
+> > > >> > > >> mixer1          |          \
+> > > >> > > >> 
+> > > >> > > >>                 |           TCON-TOP - HDMI
+> > > >> > > >>                 |          
+> > > >> > > >>                 |          /
+> > > >> > > >>                 
+> > > >> > > >>                 \ TCON-TV1 - TVE1/RGB
+> > > >> > > >> 
+> > > >> > > >> This is a bit simplified, since there is also TVE-TOP, which is
+> > > >> > > >> responsible
+> > > >> > > >> for sharing 4 DACs between both TVE encoders. You can have two
+> > > >> > > >> TV outs
+> > > >> > > >> (PAL/ NTSC) or TVE0 as TV out and TVE1 as RGB or vice versa. It
+> > > >> > > >> even
+> > > >> > > >> seems that you can arbitrarly choose which DAC is responsible
+> > > >> > > >> for
+> > > >> > > >> which signal, so there is a ton of possible end combinations,
+> > > >> > > >> but I'm
+> > > >> > > >> not 100% sure.
+> > > >> > > >> 
+> > > >> > > >> Even though I wrote TCON-TOP twice, this is same unit in HW. R40
+> > > >> > > >> manual
+> > > >> > > >> suggest more possibilities, although some of them seem wrong,
+> > > >> > > >> like RGB
+> > > >> > > >> feeding from LCD TCON. That is confirmed to be wrong when
+> > > >> > > >> checking BSP
+> > > >> > > >> code.
+> > > >> > > >> 
+> > > >> > > >> Additionally, TCON-TOP comes in the middle of TVE0 and LCD0,
+> > > >> > > >> TVE1 and
+> > > >> > > >> LCD1 for pin muxing, although I'm not sure why is that needed at
+> > > >> > > >> all,
+> > > >> > > >> since according to R40 datasheet, TVE0 and TVE1 pins are
+> > > >> > > >> dedicated and
+> > > >> > > >> not on PORT D and PORT H, respectively, as TCON-TOP
+> > > >> > > >> documentation
+> > > >> > > >> suggest. However, HSYNC and PSYNC lines might be shared between
+> > > >> > > >> TVE
+> > > >> > > >> (when it works in RGB mode) and LCD. But that is just my guess
+> > > >> > > >> since
+> > > >> > > >> I'm not really familiar with RGB and LCD interfaces.
+> > > >> > > >> 
+> > > >> > > >> I'm really not sure what would be the best representation in
+> > > >> > > >> OF-graph.
+> > > >> > > >> Can you suggest one?
+> > > >> > > > 
+> > > >> > > > Rob might disagree on this one, but I don't see anything wrong
+> > > >> > > > with
+> > > >> > > > having loops in the graph. If the TCON-TOP can be both the input
+> > > >> > > > and
+> > > >> > > > output of the TCONs, then so be it, and have it described that
+> > > >> > > > way in
+> > > >> > > > the graph.
+> > > >> > > > 
+> > > >> > > > The code is already able to filter out nodes that have already
+> > > >> > > > been
+> > > >> > > > added to the list of devices we need to wait for in the component
+> > > >> > > > framework, so that should work as well.
+> > > >> > > > 
+> > > >> > > > And we'd need to describe TVE-TOP as well, even though we don't
+> > > >> > > > have a
+> > > >> > > > driver for it yet. That will simplify the backward compatibility
+> > > >> > > > later
+> > > >> > > > on.
+> > > >> > > 
+> > > >> > > I'm getting the feeling that TCON-TOP / TVE-TOP is the glue layer
+> > > >> > > that
+> > > >> > > binds everything together, and provides signal routing, kind of
+> > > >> > > like
+> > > >> > > DE-TOP on A64. So the signal mux controls that were originally
+> > > >> > > found
+> > > >> > > in TCON0 and TVE0 were moved out.
+> > > >> > > 
+> > > >> > > The driver needs to know about that, but the graph about doesn't
+> > > >> > > make
+> > > >> > > much sense directly. Without looking at the manual, I understand it
+> > > >> > > to
+> > > >> > > likely be one mux between the mixers and TCONs, and one between the
+> > > >> > > TCON-TVs and HDMI. Would it make more sense to just have the graph
+> > > >> > > connections between the muxed components, and remove TCON-TOP from
+> > > >> > > it, like we had in the past? A phandle could be used to reference
+> > > >> > > the TCON-TOP for mux controls, in addition to the clocks and
+> > > >> > > resets.
+> > > >> > > 
+> > > >> > > For TVE, we would need something to represent each of the output
+> > > >> > > pins,
+> > > >> > > so the device tree can actually describe what kind of signal, be it
+> > > >> > > each component of RGB/YUV or composite video, is wanted on each
+> > > >> > > pin,
+> > > >> > > if any. This is also needed on the A20 for the Cubietruck, so we
+> > > >> > > can
+> > > >> > > describe which pins are tied to the VGA connector, and which one
+> > > >> > > does
+> > > >> > > R, G, or B.
+> > > >> > 
+> > > >> > I guess we'll see how the DT maintainers feel about this, but my
+> > > >> > impression is that the OF graph should model the flow of data between
+> > > >> > the devices. If there's a mux somewhere, then the data is definitely
+> > > >> > going through it, and as such it should be part of the graph.
+> > > >> 
+> > > >> I concur, but I spent few days thinking how to represent this sanely in
+> > > >> graph, but I didn't find any good solution. I'll represent here my
+> > > >> idea and please tell your opinion before I start implementing it.
+> > > >> 
+> > > >> First, let me be clear that mixer0 and mixer1 don't have same
+> > > >> capabilities
+> > > >> (different number of planes, mixer0 supports writeback, mixer1 does
+> > > >> not,
+> > > >> etc.). Thus, it does matter which mixer is connected to which
+> > > >> TCON/encoder.
+> > > >> mixer0 is meant to be connected to main display and mixer1 to
+> > > >> auxiliary. That obviously depends on end system.
+> > > >> 
+> > > >> So, TCON TOP has 3 muxes, which have to be represented in graph. Two of
+> > > >> them are for mixer/TCON relationship (each of them 1 input and 4
+> > > >> possible outputs) and one for TV TCON/HDMI pair selection (2 possible
+> > > >> inputs, 1 output).
+> > > >> 
+> > > >> According to current practice in sun4i-drm driver, graph has to have
+> > > >> port 0, representing input and port 1, representing output. This would
+> > > >> mean that graph looks something like that:
+> > > >> 
+> > > >> tcon_top: tcon-top at 1c70000 {
+> > > >> 
+> > > >>       compatible = "allwinner,sun8i-r40-tcon-top";
+> > > >>       ...
+> > > >>       ports {
+> > > >>       
+> > > >>               #address-cells = <1>;
+> > > >>               #size-cells = <0>;
+> > > >>               
+> > > >>               tcon_top_in: port at 0 {
+> > > >>               
+> > > >>                       #address-cells = <1>;
+> > > >>                       #size-cells = <0>;
+> > > >>                       reg = <0>;
+> > > >>                       
+> > > >>                       tcon_top_in_mixer0: endpoint at 0 {
+> > > >>                       
+> > > >>                               reg = <0>;
+> > > >>                               remote-endpoint = <&mixer0_out_tcon_top>;
+> > > >>                       
+> > > >>                       };
+> > > >>                       
+> > > >>                       tcon_top_in_mixer1: endpoint at 1 {
+> > > >>                       
+> > > >>                               reg = <1>;
+> > > >>                               remote-endpoint = <&mixer1_out_tcon_top>;
+> > > >>                       
+> > > >>                       };
+> > > >>                       
+> > > >>                       tcon_top_in_tcon_tv: endpoint at 2 {
+> > > >>                       
+> > > >>                               reg = <2>;
+> > > >>                               // here is HDMI input connection, part of
+> > > >>                               board DTS
+> > > >>                               remote-endpoint = <board specific phandle
+> > > >>                               to TV TCON output>;
+> > > >>                       
+> > > >>                       };
+> > > >>               
+> > > >>               };
+> > > >>               
+> > > >>               tcon_top_out: port at 1 {
+> > > >>               
+> > > >>                       #address-cells = <1>;
+> > > >>                       #size-cells = <0>;
+> > > >>                       reg = <1>;
+> > > >>                       
+> > > >>                       tcon_top_out_tcon0: endpoint at 0 {
+> > > >>                       
+> > > >>                               reg = <0>;
+> > > >>                               // here is mixer0 output connection, part
+> > > >>                               of board DTS
+> > > >>                               remote-endpoint = <board specific phandle
+> > > >>                               to TCON>;
+> > > >>                       
+> > > >>                       };
+> > > >>                       
+> > > >>                       tcon_top_out_tcon1: endpoint at 1 {
+> > > >>                       
+> > > >>                               reg = <1>;
+> > > >>                               // here is mixer1 output connection, part
+> > > >>                               of board DTS
+> > > >>                               remote-endpoint = <board specific phandle
+> > > >>                               to TCON>;
+> > > >>                       
+> > > >>                       };
+> > > >>                       
+> > > >>                       tcon_top_out_hdmi: endpoint at 2 {
+> > > >>                       
+> > > >>                               reg = <2>;
+> > > >>                               remote-endpoint = <&hdmi_in_tcon_top>;
+> > > >>                       
+> > > >>                       };
+> > > >>               
+> > > >>               };
+> > > >>       
+> > > >>       };
+> > > >> 
+> > > >> };
+> > > > 
+> > > > IIRC, each port is supposed to be one route for the data, so we would
+> > > > have multiple ports, one for the mixers in input and for the tcon in
+> > > > output, and one for the TCON in input and for the HDMI/TV in
+> > > > output. Rob might correct me here.
 > 
-> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 64 --------------------
->  .../boot/dts/broadcom/stingray/bcm958742k.dts      |  2 +
->  .../boot/dts/broadcom/stingray/bcm958742t.dts      |  2 +
->  .../boot/dts/broadcom/stingray/stingray-sata.dtsi  | 68 ++++++++++++++++++++++
->  4 files changed, 72 insertions(+), 64 deletions(-)
+> Ok, that seems more clean approach. I'll have to extend graph traversing 
+> algorithm in sun4i_drv.c, but that's no problem.
 > 
-> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-> index 8862ec9..cacc25e 100644
-> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-> @@ -72,70 +72,6 @@
->  	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
->  };
->  
-> -&sata0 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy0{
-> -	status = "okay";
-> -};
-> -
-> -&sata1 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy1{
-> -	status = "okay";
-> -};
-> -
-> -&sata2 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy2{
-> -	status = "okay";
-> -};
-> -
-> -&sata3 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy3{
-> -	status = "okay";
-> -};
-> -
-> -&sata4 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy4{
-> -	status = "okay";
-> -};
-> -
-> -&sata5 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy5{
-> -	status = "okay";
-> -};
-> -
-> -&sata6 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy6{
-> -	status = "okay";
-> -};
-> -
-> -&sata7 {
-> -	status = "okay";
-> -};
-> -
-> -&sata_phy7{
-> -	status = "okay";
-> -};
-> -
->  &mdio_mux_iproc {
->  	mdio at 10 {
->  		gphy0: eth-phy at 10 {
-> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-> index 77efa28..a515346 100644
-> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-> @@ -32,6 +32,8 @@
->  
->  /dts-v1/;
->  
-> +#define NUM_SATA	8
-> +
->  #include "bcm958742-base.dtsi"
->  
->  / {
-> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-> index 5084b03..6a4d19e 100644
-> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-> @@ -32,6 +32,8 @@
->  
->  /dts-v1/;
->  
-> +#define NUM_SATA	8
-> +
->  #include "bcm958742-base.dtsi"
->  
->  / {
-> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-> index 8c68e0c..7f6d176 100644
-> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-> @@ -43,7 +43,11 @@
->  			interrupts = <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 0)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata0_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -58,7 +62,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 0)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata0_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -73,7 +81,11 @@
->  			interrupts = <GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 1)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata1_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -88,7 +100,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 1)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata1_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -103,7 +119,11 @@
->  			interrupts = <GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 2)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata2_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -118,7 +138,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 2)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata2_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -133,7 +157,11 @@
->  			interrupts = <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 3)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata3_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -148,7 +176,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 3)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata3_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -163,7 +195,11 @@
->  			interrupts = <GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 4)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata4_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -178,7 +214,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 4)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata4_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -193,7 +233,11 @@
->  			interrupts = <GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 5)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata5_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -208,7 +252,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 5)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata5_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -223,7 +271,11 @@
->  			interrupts = <GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 6)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata6_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -238,7 +290,11 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 6)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata6_phy0: sata-phy at 0 {
->  				reg = <0>;
-> @@ -253,7 +309,11 @@
->  			interrupts = <GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 7)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata7_port0: sata-port at 0 {
->  				reg = <0>;
-> @@ -268,11 +328,19 @@
->  			reg-names = "phy";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +#if (NUM_SATA > 7)
-> +			status = "okay";
-> +#else
->  			status = "disabled";
-> +#endif
->  
->  			sata7_phy0: sata-phy at 0 {
->  				reg = <0>;
->  				#phy-cells = <0>;
->  			};
->  		};
-> +
-> +#if (NUM_SATA > 8)
-> +#error "NUM_SATA > 8"
-> +#endif
->  	};
-> 
+> Just to be clear, you have in mind 3 pairs of ports (0/1 for mixer0 mux, 2/3 
+> for mixer1 and 4/5 for HDMI input), right? That way each mux is represented 
+> with one pair of ports, even numbered for input and odd numbered for output.
 
+Yep, unless Rob feels otherwise.
+
+Maxime
 
 -- 
-Florian
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/dcdd3d1c/attachment-0001.sig>
