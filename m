@@ -1,97 +1,338 @@
-From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
-Date: Mon, 04 Jun 2018 09:18:20 -0700
-Subject: [PATCH v8 0/2] SDM845 System Cache Driver
-In-Reply-To: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
-References: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <88e899d928575c59ee5beacd3b3b16f5@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 4 Jun 2018 09:22:25 -0700
+Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
+ sata ports
+In-Reply-To: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
+References: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-23 17:35, Rishabh Bhatnagar wrote:
-> This series implements system cache or LLCC(Last Level Cache 
-> Controller)
-> driver for SDM845 SOC. The purpose of the driver is to partition the
-> system cache and program the settings such as priortiy, lines to probe
-> while doing a look up in the system cache, low power related settings 
-> etc.
-> The partitions are called cache slices. Each cache slice is associated
-> with size and SCID(System Cache ID). The driver also provides API for
-> clients to query the cache slice details,activate and deactivate them.
-> 
-> The driver can be broadly classified into:
-> * SOC specific driver: llcc-sdm845.c: Cache partitioning and cache 
-> slice
-> properties for usecases on sdm845 that need to use system cache.
-> 
-> * API : llcc-slice.c: Exports APIs to clients to query cache slice 
-> details,
-> activate and deactivate cache slices.
-> 
-> Changes since v7:
-> * Change the DT node name to cache-controller.
-> * Use the module_platform_driver_macro
-> * Use GENMASK and SZ_* macros
-> * Correct indentation, and remove unnecessary assignemnts.
-> * Addresed all comments by Andy Schevchenko except the comment to 
-> ignore some
->   lines of code going over 80 characters.
-> 
-> Changes since v6:
-> * Remove the max-slices property from DT.
-> * Make client's slice_ids as macros.
-> * Unlock mutex while returning from function in case of error.
-> 
-> Changes since v5:
-> * Remove client information from DT.
-> * Make the llcc driver data as global.
-> * Check return value of llcc_update_act_ctrl function
-> * Change error returned from -EFAULT to -EINVAL
-> 
-> Changes since v4:
-> * Remove null pointer checks as per comments.
-> * Remove extra blank lines.
-> 
-> Changes since v3:
-> * Use the regmap_read_poll_timeout function
-> * Check for regmap read/write errors.
-> * Remove memory barrier after regmap write
-> * Derive memory bank offsets using stride macro variable
-> * Remove debug statements from code
-> * Remove the qcom_llcc_remove function
-> * Use if IS_ENABLED in place of ifdef for built-in module
-> * Change EXPORT_SYMBOL to EXPORT_SYMBOL_GPL
-> * Remove unnecessary free functions
-> * Change the variable names as per review comments
-> 
-> Changes since v2:
-> * Corrected the Makefile to fix compilation.
-> 
-> Changes since v1:
-> * Added Makefile and Kconfig.
-> 
-> Changes since v0:
-> * Removed the syscon and simple-mfd approach
-> * Updated the device tree nodes to mention LLCC as a single HW block
-> * Moved llcc bank offsets from device tree and handled the offset
->   in the driver.
-> 
-> ckadabi at codeaurora.org (2):
->   dt-bindings: Documentation for qcom, llcc
->   drivers: soc: Add LLCC driver
-> 
->  .../devicetree/bindings/arm/msm/qcom,llcc.txt      |  26 ++
->  drivers/soc/qcom/Kconfig                           |  17 ++
->  drivers/soc/qcom/Makefile                          |   2 +
->  drivers/soc/qcom/llcc-sdm845.c                     |  94 ++++++
->  drivers/soc/qcom/llcc-slice.c                      | 335 
-> +++++++++++++++++++++
->  include/linux/soc/qcom/llcc-qcom.h                 | 180 +++++++++++
->  6 files changed, 654 insertions(+)
->  create mode 100644 
-> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->  create mode 100644 drivers/soc/qcom/llcc-sdm845.c
->  create mode 100644 drivers/soc/qcom/llcc-slice.c
->  create mode 100644 include/linux/soc/qcom/llcc-qcom.h
 
-Does this spin look fine to everyone? If yes can we go ahead and merge 
-this?
+On 05/18/2018 11:34 AM, Scott Branden wrote:
+> Move remaining sata configuration to stingray-sata.dtsi and enable
+> ports based on NUM_SATA defined.
+> Now, all that needs to be done is define NUM_SATA per board.
+
+Rob could you review this and let us know if this approach is okay or
+not? Thank you!
+
+> 
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 64 --------------------
+>  .../boot/dts/broadcom/stingray/bcm958742k.dts      |  2 +
+>  .../boot/dts/broadcom/stingray/bcm958742t.dts      |  2 +
+>  .../boot/dts/broadcom/stingray/stingray-sata.dtsi  | 68 ++++++++++++++++++++++
+>  4 files changed, 72 insertions(+), 64 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+> index 8862ec9..cacc25e 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+> @@ -72,70 +72,6 @@
+>  	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
+>  };
+>  
+> -&sata0 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy0{
+> -	status = "okay";
+> -};
+> -
+> -&sata1 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy1{
+> -	status = "okay";
+> -};
+> -
+> -&sata2 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy2{
+> -	status = "okay";
+> -};
+> -
+> -&sata3 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy3{
+> -	status = "okay";
+> -};
+> -
+> -&sata4 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy4{
+> -	status = "okay";
+> -};
+> -
+> -&sata5 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy5{
+> -	status = "okay";
+> -};
+> -
+> -&sata6 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy6{
+> -	status = "okay";
+> -};
+> -
+> -&sata7 {
+> -	status = "okay";
+> -};
+> -
+> -&sata_phy7{
+> -	status = "okay";
+> -};
+> -
+>  &mdio_mux_iproc {
+>  	mdio at 10 {
+>  		gphy0: eth-phy at 10 {
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+> index 77efa28..a515346 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+> @@ -32,6 +32,8 @@
+>  
+>  /dts-v1/;
+>  
+> +#define NUM_SATA	8
+> +
+>  #include "bcm958742-base.dtsi"
+>  
+>  / {
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+> index 5084b03..6a4d19e 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+> @@ -32,6 +32,8 @@
+>  
+>  /dts-v1/;
+>  
+> +#define NUM_SATA	8
+> +
+>  #include "bcm958742-base.dtsi"
+>  
+>  / {
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+> index 8c68e0c..7f6d176 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+> @@ -43,7 +43,11 @@
+>  			interrupts = <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 0)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata0_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -58,7 +62,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 0)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata0_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -73,7 +81,11 @@
+>  			interrupts = <GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 1)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata1_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -88,7 +100,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 1)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata1_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -103,7 +119,11 @@
+>  			interrupts = <GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 2)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata2_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -118,7 +138,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 2)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata2_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -133,7 +157,11 @@
+>  			interrupts = <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 3)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata3_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -148,7 +176,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 3)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata3_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -163,7 +195,11 @@
+>  			interrupts = <GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 4)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata4_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -178,7 +214,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 4)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata4_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -193,7 +233,11 @@
+>  			interrupts = <GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 5)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata5_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -208,7 +252,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 5)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata5_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -223,7 +271,11 @@
+>  			interrupts = <GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 6)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata6_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -238,7 +290,11 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 6)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata6_phy0: sata-phy at 0 {
+>  				reg = <0>;
+> @@ -253,7 +309,11 @@
+>  			interrupts = <GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 7)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata7_port0: sata-port at 0 {
+>  				reg = <0>;
+> @@ -268,11 +328,19 @@
+>  			reg-names = "phy";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +#if (NUM_SATA > 7)
+> +			status = "okay";
+> +#else
+>  			status = "disabled";
+> +#endif
+>  
+>  			sata7_phy0: sata-phy at 0 {
+>  				reg = <0>;
+>  				#phy-cells = <0>;
+>  			};
+>  		};
+> +
+> +#if (NUM_SATA > 8)
+> +#error "NUM_SATA > 8"
+> +#endif
+>  	};
+> 
+
+
+-- 
+Florian
