@@ -1,80 +1,97 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 4 Jun 2018 18:03:31 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <28c58ca3-d8ca-7195-3aa2-10d7c703dd65@microchip.com>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon>
- <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
- <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
- <a25ca617-d3da-d401-1ba9-8e5887f8a8e5@microchip.com>
- <024079cb-77ad-9c48-e370-e6e8f2de171b@axentia.se>
- <9c496531-f7b6-4b9d-dd51-0bfb68ead303@axentia.se>
- <c3cc1894-2d7d-93b6-a9de-ed9ca4564ae9@axentia.se>
- <28c58ca3-d8ca-7195-3aa2-10d7c703dd65@microchip.com>
-Message-ID: <20180604180331.67299cc3@bbrezillon>
+From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
+Date: Mon, 04 Jun 2018 09:18:20 -0700
+Subject: [PATCH v8 0/2] SDM845 System Cache Driver
+In-Reply-To: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
+References: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <88e899d928575c59ee5beacd3b3b16f5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jun 2018 18:46:56 +0300
-Tudor Ambarus <tudor.ambarus@microchip.com> wrote:
+On 2018-05-23 17:35, Rishabh Bhatnagar wrote:
+> This series implements system cache or LLCC(Last Level Cache 
+> Controller)
+> driver for SDM845 SOC. The purpose of the driver is to partition the
+> system cache and program the settings such as priortiy, lines to probe
+> while doing a look up in the system cache, low power related settings 
+> etc.
+> The partitions are called cache slices. Each cache slice is associated
+> with size and SCID(System Cache ID). The driver also provides API for
+> clients to query the cache slice details,activate and deactivate them.
+> 
+> The driver can be broadly classified into:
+> * SOC specific driver: llcc-sdm845.c: Cache partitioning and cache 
+> slice
+> properties for usecases on sdm845 that need to use system cache.
+> 
+> * API : llcc-slice.c: Exports APIs to clients to query cache slice 
+> details,
+> activate and deactivate cache slices.
+> 
+> Changes since v7:
+> * Change the DT node name to cache-controller.
+> * Use the module_platform_driver_macro
+> * Use GENMASK and SZ_* macros
+> * Correct indentation, and remove unnecessary assignemnts.
+> * Addresed all comments by Andy Schevchenko except the comment to 
+> ignore some
+>   lines of code going over 80 characters.
+> 
+> Changes since v6:
+> * Remove the max-slices property from DT.
+> * Make client's slice_ids as macros.
+> * Unlock mutex while returning from function in case of error.
+> 
+> Changes since v5:
+> * Remove client information from DT.
+> * Make the llcc driver data as global.
+> * Check return value of llcc_update_act_ctrl function
+> * Change error returned from -EFAULT to -EINVAL
+> 
+> Changes since v4:
+> * Remove null pointer checks as per comments.
+> * Remove extra blank lines.
+> 
+> Changes since v3:
+> * Use the regmap_read_poll_timeout function
+> * Check for regmap read/write errors.
+> * Remove memory barrier after regmap write
+> * Derive memory bank offsets using stride macro variable
+> * Remove debug statements from code
+> * Remove the qcom_llcc_remove function
+> * Use if IS_ENABLED in place of ifdef for built-in module
+> * Change EXPORT_SYMBOL to EXPORT_SYMBOL_GPL
+> * Remove unnecessary free functions
+> * Change the variable names as per review comments
+> 
+> Changes since v2:
+> * Corrected the Makefile to fix compilation.
+> 
+> Changes since v1:
+> * Added Makefile and Kconfig.
+> 
+> Changes since v0:
+> * Removed the syscon and simple-mfd approach
+> * Updated the device tree nodes to mention LLCC as a single HW block
+> * Moved llcc bank offsets from device tree and handled the offset
+>   in the driver.
+> 
+> ckadabi at codeaurora.org (2):
+>   dt-bindings: Documentation for qcom, llcc
+>   drivers: soc: Add LLCC driver
+> 
+>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      |  26 ++
+>  drivers/soc/qcom/Kconfig                           |  17 ++
+>  drivers/soc/qcom/Makefile                          |   2 +
+>  drivers/soc/qcom/llcc-sdm845.c                     |  94 ++++++
+>  drivers/soc/qcom/llcc-slice.c                      | 335 
+> +++++++++++++++++++++
+>  include/linux/soc/qcom/llcc-qcom.h                 | 180 +++++++++++
+>  6 files changed, 654 insertions(+)
+>  create mode 100644 
+> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+>  create mode 100644 drivers/soc/qcom/llcc-sdm845.c
+>  create mode 100644 drivers/soc/qcom/llcc-slice.c
+>  create mode 100644 include/linux/soc/qcom/llcc-qcom.h
 
-> Hi, Peter,
-> 
-> On 05/28/2018 01:10 PM, Peter Rosin wrote:
-> 
-> [cut]
-> 
-> > So, I think I want either
-> > 
-> > A) the NAND controller to use master 1 DMAC0/IF0 (i.e. slave 8 DDR2 port 2) and
-> >     the LCDC to use master 9 (i.e. slave 9 DDR2 Port 3)
-> > 
-> > or
-> > 
-> > B) the NAND controller to use master 2 DMAC0/IF1 (i.e. slave 7 DDR2 port 1, and
-> >     possibly slave 9 DDR2 port 3 (if my previous findings are relevant) and the
-> >     LCDC to use master 8 (i.e. slave 8 DDR2 Port 2)  
-> 
-> My understanding is that "Table 14-3. Master to Slave Access" describes
-> what connections are allowed between the masters and slaves, while the
-> PRxSy registers just set the priorities. What happens when you assign
-> the highest priority to a master to slave connection that is not
-> allowed? Probably it is ignored, but I'll check with the hardware team.
-> So I expect that the NAND controller can not use DDR2 port 3 regardless
-> of the priority set.
-> 
-> [cut]
-> 
-> > So, output is as expected and I believe that the patch makes the NAND DMA
-> > accesses use master 2 DMAC0/IF1 and are thus forced to use slave 7 DDR2 Port 1
-> > (and possibly 9). The LCDC is using slave 8 DDR2 Port 2. So there should be no
-> > slave conflict?
-> > 
-> > But the on-screen crap remains during NAND accesses.  
-> 
-> No conflict, but you missed to dispatch the load on the LCDC DMA
-> masters, if I understood correctly.
-> 
-> So, I think we want to test the following:
-> - NAND controller to use DMAC0/IF1 (slave 7 DDR2 port 1)
-
-As I explained in one of my previous email, it's not that easy to set
-up, because the SRAM is connected to IF0, and we're using DMA memcpy
-here. Also, I don't see how it could solve Peter's problem if, even
-when he switches to LCDC master 9 for the primary overlay, he still
-keeps experiencing FIFO underruns.
-
-> - LCDC to use master 8 (slave 8 DDR2 Port 2) and master 9 (slave 9 DDR2
-> Port 3).
-
-Except that only works if you have several overlays activated, which
-AFAIR, is not the case in Peter's setup.
+Does this spin look fine to everyone? If yes can we go ahead and merge 
+this?
