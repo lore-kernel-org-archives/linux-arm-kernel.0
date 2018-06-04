@@ -1,45 +1,52 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 4 Jun 2018 12:33:02 +0200
-Subject: [PATCH 2/3] arm64: dts: renesas: condor: specify EtherAVB PHY IRQ
-In-Reply-To: <21578b79-7ba0-b3a6-ae45-7e9ffbb7c8db@cogentembedded.com>
-References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
- <21578b79-7ba0-b3a6-ae45-7e9ffbb7c8db@cogentembedded.com>
-Message-ID: <20180604103302.f5kx5fqhbl3ohfpi@verge.net.au>
+Date: Mon, 4 Jun 2018 12:13:08 +0200
+Subject: [PATCH 0/6] ARM: shmobile: rcar: Drop lehacy SYSC fallbacks
+In-Reply-To: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
+References: <1527693916-11215-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180604101307.gwakbdqnka6arhxc@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 11:45:55PM +0300, Sergei Shtylyov wrote:
-> Specify EtherAVB PHY IRQ in the Condor board's device tree, now that
-> we have the GPIO support (previously phylib had to resort to polling).
+On Wed, May 30, 2018 at 05:25:10PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> Based on the original (and large) patch by Vladimir Barinov.
+> When DT SYSC support was introduced in v4.7, legacy fallbacks were kept
+> to keep secondary CPUs working on R-Car H1, H2, and M2-W using old DTBs.
+> However, the time has come to drop these fallbacks, and clean up the
+> resulting code.
 > 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Most of this was written when I worked on DT SYSC support, but postponed
+> until the time was ripe.  So basically I've been running this during the
+> last +2 years.
 > 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |    2 ++
->  1 file changed, 2 insertions(+)
+> I avoided touching drivers/soc/renesas and arch/arm/mach-shmobile code
+> in the same patch.  If you prefer some patches to be squashed, please
+> let me know.
 > 
-> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> ===================================================================
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> @@ -59,6 +59,8 @@
->  	phy0: ethernet-phy at 0 {
->  		rxc-skew-ps = <1500>;
->  		reg = <0>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
+> Tested on Marzen (R-Car H1), Lager (R-Car H2), and Koelsch (R-Car M2-W).
+> 
+> Thanks!
+> 
+> Geert Uytterhoeven (6):
+>   ARM: shmobile: rcar-gen2: Remove explicit SYSC config and init
+>   ARM: shmobile: r8a7779: Stop powering down secondary CPUs during early
+>     boot
+>   soc: renesas: rcar-sysc: Provide helpers to power up/down CPUs
+>   ARM: shmobile: r8a7779: Use rcar_sysc_power_{down,up}_cpu()
+>   ARM: shmobile: r8a7779: Remove explicit SYSC config and init
+>   soc: renesas: rcar-sysc: Drop legacy handling
+> 
+>  arch/arm/mach-shmobile/Makefile       |  2 +-
+>  arch/arm/mach-shmobile/pm-r8a7779.c   | 41 ----------------------
+>  arch/arm/mach-shmobile/pm-rcar-gen2.c | 25 --------------
+>  arch/arm/mach-shmobile/r8a7779.h      |  2 --
+>  arch/arm/mach-shmobile/smp-r8a7779.c  | 54 ++++-------------------------
+>  drivers/soc/renesas/rcar-sysc.c       | 64 ++++++++++++++++++++++-------------
+>  include/linux/soc/renesas/rcar-sysc.h | 13 ++-----
+>  7 files changed, 50 insertions(+), 151 deletions(-)
+>  delete mode 100644 arch/arm/mach-shmobile/pm-r8a7779.c
 
-I don't see this documented. Perhaps I'm missing something obvious.
-Or you have some extra information or newer documentation?
+Thanks, I have applied this and intend to push shortly.
 
-Also, given Olof Johansson's recent comments in ("Re: [GIT PULL] Renesas
-ARM64 Based SoC DT Updates for v4.18") please consider squashing this patch
-and the following one.
-
->  	};
->  };
->  
-> 
+I had a conflict in the Makefile when applying patch 5/6.
+Please check to make sure I applied that patch correctly.
