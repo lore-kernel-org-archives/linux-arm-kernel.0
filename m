@@ -1,69 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 5 Jun 2018 07:54:18 +0800
-Subject: [PATCH 7/7] regulator: core: Enable voltage balancing
-In-Reply-To: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
-References: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
-Message-ID: <201806050726.U21wgPhQ%fengguang.wu@intel.com>
+From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
+Date: Mon, 4 Jun 2018 23:58:47 +0000
+Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F30297@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
+ <86d0xhaucm.wl-marc.zyngier@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
+ <31bede40-dbc5-0a88-d12c-5fc79ea02391@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69F30297@G01JPEXMBKW03>
+Message-ID: <8898674D84E3B24BA3A2D289B872026A69F31014@G01JPEXMBKW03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+Hi Marc
 
-Thank you for the patch! Yet something to improve:
+Please let me know is there any plan to push your patch to v4.18.
 
-[auto build test ERROR on regulator/for-next]
-[also build test ERROR on next-20180604]
-[cannot apply to v4.17]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks
 
-url:    https://github.com/0day-ci/linux/commits/Maciej-Purski/regulator-core-Add-debug-messages/20180605-052333
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
-config: i386-randconfig-a1-06041847 (attached as .config)
-compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   drivers/regulator/core.c: In function 'regulator_set_voltage_unlocked':
->> drivers/regulator/core.c:3046:1: error: expected expression before '<<' token
-    <<<<<<< HEAD
-    ^
-   drivers/regulator/core.c:3048:1: error: expected expression before '==' token
-    =======
-    ^
-
-vim +3046 drivers/regulator/core.c
-
-  3035	
-  3036	static int regulator_set_voltage_unlocked(struct regulator *regulator,
-  3037						  int min_uV, int max_uV,
-  3038						  suspend_state_t state)
-  3039	{
-  3040		struct regulator_dev *rdev = regulator->rdev;
-  3041		struct regulator_voltage *voltage = &regulator->voltage[state];
-  3042		int ret = 0;
-  3043		int old_min_uV, old_max_uV;
-  3044		int current_uV;
-  3045	
-> 3046	<<<<<<< HEAD
-  3047		pr_err("%s: %d\n", __func__, __LINE__);
-  3048	=======
-  3049		if (rdev->coupling_desc.n_resolved != rdev->coupling_desc.n_coupled) {
-  3050			rdev_err(rdev, "not all coupled regulators registered\n");
-  3051			ret = -EPERM;
-  3052			goto out;
-  3053		}
-  3054	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 26101 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/699454b6/attachment-0001.gz>
+Best Regards,
+Lei Zhang zhang.lei at fujitsu.com
+FUJITSU LIMITED
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+> Zhang, Lei
+> Sent: Friday, June 01, 2018 10:47 PM
+> To: 'Marc Zyngier'; 'linux-arm-kernel at lists.infradead.org'
+> Subject: RE: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+> 
+> Hi Marc
+> 
+> Thanks. Now I understood the policy of MSI allocation.
+> So this patch is great for our bus, and looks no problem for PCI.
+> 
+> Best Regards,
+> Lei Zhang zhang.lei at jp.fujitsu.com
+> FUJITSU LIMITED
+> 
+> > -----Original Message-----
+> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> > Sent: Friday, June 01, 2018 9:57 PM
+> > To: Zhang, Lei/? ?; 'linux-arm-kernel at lists.infradead.org'
+> > Subject: Re: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+> >
+> > Hi Lei,
+> >
+> > On 01/06/18 13:44, Zhang, Lei wrote:
+> > > Hi Marc
+> > >
+> > > I have reviewed your patch.
+> > > I think the approach is same between your patch and mine.
+> > > Your patch is simpler and more beautiful, and match our bus's
+> > requirement.
+> > >
+> > > I have only one question.
+> > > According your patch, if there are no enough lpis, amount of lpis
+> > required
+> > > will be divide by 2. it means someone want 16 lpis, maybe they can
+> only
+> > get 8?
+> > > I don?t' understand why we need it.
+> >
+> > That's the way the MSI allocation works in the kernel.
+> >
+> > A driver asks a number of MSIs (let's imagine, for example, one MSI
+> per
+> > CPU in the system), but the underlying HW can only provide a smaller
+> > number.
+> >
+> > Instead of failing and just returning an error, we reduce the allocation
+> > in order to provide the driver with something. If that's not enough,
+> > well, the driver itself will have the opportunity to give up.
+> >
+> > See pci_alloc_irq_vectors_affinity(), which takes a min and a max
+> number
+> > of vectors, for example.
+> >
+> > Thanks,
+> >
+> > 	M.
+> > --
+> > Jazz is not dead. It just smells funny...
+> >
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
