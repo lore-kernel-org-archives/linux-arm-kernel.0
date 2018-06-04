@@ -1,188 +1,104 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Jun 2018 10:13:57 -0500
-Subject: [PATCHv9 1/3] ARM:dt-bindings:display Intel FPGA Video and Image
- Processing Suite
-In-Reply-To: <1528094404-3542-2-git-send-email-hean.loong.ong@intel.com>
-References: <1528094404-3542-1-git-send-email-hean.loong.ong@intel.com>
- <1528094404-3542-2-git-send-email-hean.loong.ong@intel.com>
-Message-ID: <20180604151357.GA13693@rob-hp-laptop>
+Date: Mon, 4 Jun 2018 09:46:48 -0600
+Subject: [PATCH v3] of: platform: stop accessing invalid dev in
+ of_platform_device_destroy
+In-Reply-To: <20180604141408.3179-1-srinivas.kandagatla@linaro.org>
+References: <20180604141408.3179-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180604154648.GA30196@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 02:40:02PM +0800, Hean-Loong, Ong wrote:
-> From: Ong, Hean Loong <hean.loong.ong@intel.com>
+On Mon, Jun 04, 2018 at 03:14:08PM +0100, Srinivas Kandagatla wrote:
+> Immediately after the platform_device_unregister() the device will be
+> cleaned up. Accessing the freed pointer immediately after that will
+> crash the system.
 > 
-> Device tree binding for Intel FPGA Video and Image Processing Suite. The binding involved would be generated from the Altera (Intel) Qsys system. The bindings would set the max width, max height, buts per pixel and memory port width. The device tree binding only supports the Intel
-> Arria10 devkit and its variants. Vendor name retained as altr.
-
-You need to wrap long lines.
-
+> Found this bug when kernel is built with CONFIG_PAGE_POISONING and testing
+> loading/unloading audio drivers in a loop on Qcom platforms.
 > 
-> V8:
-> *Add port to Display port decoder
+> Fix this by moving of_node_clear_flag() just before the unregister calls.
 > 
-> V7:
-> *Fix OF graph for better description
-> *Add description for encoder
+> Below is the crash trace:
 > 
-> V6:
-> *Description have not describe DT device in general
+> Unable to handle kernel paging request at virtual address 6b6b6b6b6b6c03
+> Mem abort info:
+>   ESR = 0x96000021
+>   Exception class = DABT (current EL), IL = 32 bits
+>   SET = 0, FnV = 0
+>   EA = 0, S1PTW = 0
+> Data abort info:
+>   ISV = 0, ISS = 0x00000021
+>   CM = 0, WnR = 0
+> [006b6b6b6b6b6c03] address between user and kernel address ranges
+> Internal error: Oops: 96000021 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 2 PID: 1784 Comm: sh Tainted: G        W         4.17.0-rc7-02230-ge3a63a7ef641-dirty #204
+> Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
+> pstate: 80000005 (Nzcv daif -PAN -UAO)
+> pc : clear_bit+0x18/0x2c
+> lr : of_platform_device_destroy+0x64/0xb8
+> sp : ffff00000c9c3930
+> x29: ffff00000c9c3930 x28: ffff80003d39b200
+> x27: ffff000008bb1000 x26: 0000000000000040
+> x25: 0000000000000124 x24: ffff80003a9a3080
+> x23: 0000000000000060 x22: ffff00000939f518
+> x21: ffff80003aa79e98 x20: ffff80003aa3dae0
+> x19: ffff80003aa3c890 x18: ffff800009feb794
+> x17: 0000000000000000 x16: 0000000000000000
+> x15: ffff800009feb790 x14: 0000000000000000
+> x13: ffff80003a058778 x12: ffff80003a058728
+> x11: ffff80003a058750 x10: 0000000000000000
+> x9 : 0000000000000006 x8 : ffff80003a825988
+> x7 : bbbbbbbbbbbbbbbb x6 : 0000000000000001
+> x5 : 0000000000000000 x4 : 0000000000000001
+> x3 : 0000000000000008 x2 : 0000000000000001
+> x1 : 6b6b6b6b6b6b6c03 x0 : 0000000000000000
+> Process sh (pid: 1784, stack limit = 0x        (ptrval))
+> Call trace:
+>  clear_bit+0x18/0x2c
+>  q6afe_remove+0x20/0x38
+>  apr_device_remove+0x30/0x70
+>  device_release_driver_internal+0x170/0x208
+>  device_release_driver+0x14/0x20
+>  bus_remove_device+0xcc/0x150
+>  device_del+0x10c/0x310
+>  device_unregister+0x1c/0x70
+>  apr_remove_device+0xc/0x18
+>  device_for_each_child+0x50/0x80
+>  apr_remove+0x18/0x20
+>  rpmsg_dev_remove+0x38/0x68
+>  device_release_driver_internal+0x170/0x208
+>  device_release_driver+0x14/0x20
+>  bus_remove_device+0xcc/0x150
+>  device_del+0x10c/0x310
+>  device_unregister+0x1c/0x70
+>  qcom_smd_remove_device+0xc/0x18
+>  device_for_each_child+0x50/0x80
+>  qcom_smd_unregister_edge+0x3c/0x70
+>  smd_subdev_remove+0x18/0x28
+>  rproc_stop+0x48/0xd8
+>  rproc_shutdown+0x60/0xe8
+>  state_store+0xbc/0xf8
+>  dev_attr_store+0x18/0x28
+>  sysfs_kf_write+0x3c/0x50
+>  kernfs_fop_write+0x118/0x1e0
+>  __vfs_write+0x18/0x110
+>  vfs_write+0xa4/0x1a8
+>  ksys_write+0x48/0xb0
+>  sys_write+0xc/0x18
+>  el0_svc_naked+0x30/0x34
+> Code: d2800022 8b400c21 f9800031 9ac32043 (c85f7c22)
+> ---[ end trace 32020935775616a2 ]---
 > 
-> V5:
-> *remove bindings for bits per symbol as it has only one value which is 8
-> 
-> V4:
-> *fix properties that does not describe the values
-> 
-> V3:
-> *OF graph not in accordance to graph.txt
-> 
-> V2:
-> *Remove Linux driver description
-> 
-> V1:
-> *Missing vendor prefix
-> 
-> Signed-off-by: Ong, Hean Loong <hean.loong.ong@intel.com>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->  .../devicetree/bindings/display/altr,vip-fb2.txt   |   99 ++++++++++++++++++++
->  1 files changed, 99 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/altr,vip-fb2.txt
+> Changes since v2:
+>  Move the calls to of_node_clear_flag just before unregister,
+>  suggested by Rob.
 > 
-> diff --git a/Documentation/devicetree/bindings/display/altr,vip-fb2.txt b/Documentation/devicetree/bindings/display/altr,vip-fb2.txt
-> new file mode 100644
-> index 0000000..4092804
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/altr,vip-fb2.txt
-> @@ -0,0 +1,99 @@
-> +Intel Video and Image Processing(VIP) Frame Buffer II bindings
-> +
-> +Supported hardware: Intel FPGA SoC Arria10 and above with display port IP
-> +
-> +The Video Frame Buffer II in Video Image Processing (VIP) suite is an IP core
-> +that interfaces between system memory and Avalon-ST video ports. The IP core
-> +can be configured to support the memory reader (from memory to Avalon-ST)
-> +and/or memory writer (from Avalon-ST to memory) interfaces.
-> +
-> +More information the FPGA video IP component can be acquired from
-> +https://www.altera.com/content/dam/altera-www/global/en_US/pdfs\
-> +/literature/ug/ug_vip.pdf
+>  drivers/of/platform.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-But URLs you don't need to wrap.
+Applied, thanks.
 
-> +
-> +DT-Bindings:
-> +=============
-> +Required properties:
-> +----------------------------
-> +- compatible: "altr,vip-frame-buffer-2.0"
-> +- reg: Physical base address and length of the framebuffer controller's
-> +	registers.
-> +- altr,max-width: The maximum width of the framebuffer in pixels.
-> +- altr,max-height: The maximum height of the framebuffer in pixels.
-> +- altr,mem-port-width = the bus width of the avalon master port
-> +	on the frame reader
-> +
-> +Optional sub-nodes:
-> +- ports: The connection to the encoder
-> +
-> +Optional properties
-
-These are not optional properties because this is a whole other node. 
-Group things by node (perhaps even make this 2 docments) and within each 
-node you describe required and optional properties.
-
-> +----------------------------
-> +- compatible: "altr, display-port"
-
-spurious space         ^
-
-This needs to be more specific. Is there an IP version?
-
-This is a DisplayPort encoder?
-
-> +- reg: Physical base address and length of the display port controller's
-> +	registers
-> +- clocks: required clock handles for specified pairs in clock name
-> +- clock-names: required clock names. Contains:
-> +	- aux_clk: auxiliary clock,
-> +	- clk: 100 MHz output clock
-
-But 'clocks' are input clocks.
-
-Needs a better name than 'clk'.
-
-> +	- xcvr_mgmt_clk: transceiver management clock
-
-'_clk' is redundant.
-
-> +
-> +Optional sub-nodes:
-> +- ports: The connection to the controller
-> +
-> +Connections between the Frame Buffer II and other video IP cores in the system
-> +are modelled using the OF graph DT bindings. The Frame Buffer II node has up
-
-s/modelled/modeled/
-
-> +to two OF graph ports. When the memory writer interface is enabled, port 0
-> +maps to the Avalon-ST Input (din) port. When the memory reader interface is
-> +enabled, port 1 maps to the Avalon-ST Output (dout) port.
-> +
-> +The encoder is built into the FPGA HW design and therefore would not
-> +be accessible from the DDR.
-> +
-> +		Port 0				Port1
-> +---------------------------------------------------------
-> +ARRIA10 AVALON_ST (DIN)		AVALON_ST (DOUT)
-> +
-> +Required Properties Example:
-> +----------------------------
-> +
-> +framebuffer at 100000280 {
-> +		compatible = "altr,vip-frame-buffer-2.0";
-> +		reg = <0x00000001 0x00000280 0x00000040>;
-> +		altr,max-width = <1280>;
-> +		altr,max-height = <720>;
-> +		altr,mem-port-width = <128>;
-
-Doesn't this block require some clocks too?
-
-> +
-> +		ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +					fb_output: endpoint {
-> +						remote-endpoint = <&dp_encoder_input>;
-> +					};
-> +			};
-> +		};
-> +};
-> +
-> +Optional Properties Example:
-> +This is not required unless there are needs to customize
-> +Display Port controller settings.
-> +
-> +displayport at 100002000 {
-> +		compatible = "altr, display-port";
-> +		reg = <0x00000001 0x00002000 0x00000800>;
-> +		clocks = <&dp_0_clk_16 &dp_0_clk_100 &dp_0_clk_100>;
-> +		clock-names = "aux_clk", "clk", "xcvr_mgmt_clk";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <1>;
-> +					dp_input: endpoint {
-> +						remote-endpoint = <&dp_controller_input>;
-> +					};
-> +			};
-> +};
-> -- 
-> 1.7.1
-> 
+Rob
