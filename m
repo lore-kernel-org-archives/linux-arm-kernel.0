@@ -1,29 +1,29 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 4 Jun 2018 15:27:36 +0200
-Subject: [PATCH] media: atmel-isi: drop unnecessary while loop
-In-Reply-To: <1527857174-24616-1-git-send-email-hofrat@opentech.at>
-References: <1527857174-24616-1-git-send-email-hofrat@opentech.at>
-Message-ID: <20180604132736.zay3ae5we6d7adsk@rfolt0960.corp.atmel.com>
+Date: Mon, 4 Jun 2018 15:31:58 +0200
+Subject: [PATCH] media: atmel-isi: move of_node_put() to cover success
+ branch as well
+In-Reply-To: <1527859814-30410-1-git-send-email-hofrat@opentech.at>
+References: <1527859814-30410-1-git-send-email-hofrat@opentech.at>
+Message-ID: <20180604133158.jnys4jliy4d7rwpi@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 12:46:14PM +0000, Nicholas Mc Guire wrote:
+On Fri, Jun 01, 2018 at 01:30:14PM +0000, Nicholas Mc Guire wrote:
 > From: Nicholas Mc Guire <hofrat@osadl.org>
 > 
-> As there is no way this can loop it actually makes no sense to have
-> a while(1){} around the body - all three possible paths end in a return
-> statement. 
+> The of_node_put() was only covering the error branch but missed the 
+> success branch so the refcount for ep which 
+> of_graph_get_remote_port_parent() incremented on success would was
+> not being decremented.
 > 
 > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> Fixes: commit c1d82b895380 "[media] atmel-isi: move out of soc_camera to atmel"
 Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-Thanks.
+Thanks
 
 > ---
 > 
-> The diff output is unfortunately not that readable - essentially only
-> the outer while(1){ } was removed. 
+> This patch is on top of: "media: atmel-isi: drop unnecessary while loop"
 > 
 > Patch was compile tested with: x86_64_defconfig + CONFIG_MEDIA_SUPPORT=y
 > MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_CONTROLLER=y, V4L_PLATFORM_DRIVERS=y
@@ -35,50 +35,26 @@ Thanks.
 > 
 > Patch is against 4.17-rc7 (localversion-next is next-20180531)
 > 
->  drivers/media/platform/atmel/atmel-isi.c | 28 +++++++++++++---------------
->  1 file changed, 13 insertions(+), 15 deletions(-)
+>  drivers/media/platform/atmel/atmel-isi.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/media/platform/atmel/atmel-isi.c b/drivers/media/platform/atmel/atmel-isi.c
-> index e5be21a..85fc7b9 100644
+> index 85fc7b9..e8db4df 100644
 > --- a/drivers/media/platform/atmel/atmel-isi.c
 > +++ b/drivers/media/platform/atmel/atmel-isi.c
-> @@ -1106,23 +1106,21 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
->  	struct device_node *ep = NULL;
->  	struct device_node *remote;
+> @@ -1111,10 +1111,9 @@ static int isi_graph_parse(struct atmel_isi *isi, struct device_node *node)
+>  		return -EINVAL;
 >  
-> -	while (1) {
-> -		ep = of_graph_get_next_endpoint(node, ep);
-> -		if (!ep)
-> -			return -EINVAL;
-> -
-> -		remote = of_graph_get_remote_port_parent(ep);
-> -		if (!remote) {
-> -			of_node_put(ep);
-> -			return -EINVAL;
-> -		}
-> +	ep = of_graph_get_next_endpoint(node, ep);
-> +	if (!ep)
-> +		return -EINVAL;
+>  	remote = of_graph_get_remote_port_parent(ep);
+> -	if (!remote) {
+> -		of_node_put(ep);
+> +	of_node_put(ep);
+> +	if (!remote)
+>  		return -EINVAL;
+> -	}
 >  
-> -		/* Remote node to connect */
-> -		isi->entity.node = remote;
-> -		isi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
-> -		isi->entity.asd.match.fwnode = of_fwnode_handle(remote);
-> -		return 0;
-> +	remote = of_graph_get_remote_port_parent(ep);
-> +	if (!remote) {
-> +		of_node_put(ep);
-> +		return -EINVAL;
->  	}
-> +
-> +	/* Remote node to connect */
-> +	isi->entity.node = remote;
-> +	isi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
-> +	isi->entity.asd.match.fwnode = of_fwnode_handle(remote);
-> +	return 0;
->  }
->  
->  static int isi_graph_init(struct atmel_isi *isi)
+>  	/* Remote node to connect */
+>  	isi->entity.node = remote;
 > -- 
 > 2.1.4
 > 
