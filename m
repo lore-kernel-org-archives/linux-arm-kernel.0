@@ -1,9 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 5 Jun 2018 07:13:23 +0800
+Date: Tue, 5 Jun 2018 07:54:18 +0800
 Subject: [PATCH 7/7] regulator: core: Enable voltage balancing
 In-Reply-To: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
 References: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
-Message-ID: <201806050737.uIMHUHzq%fengguang.wu@intel.com>
+Message-ID: <201806050726.U21wgPhQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,23 +18,23 @@ Thank you for the patch! Yet something to improve:
 
 url:    https://github.com/0day-ci/linux/commits/Maciej-Purski/regulator-core-Add-debug-messages/20180605-052333
 base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
-config: x86_64-randconfig-x011-201822 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+config: i386-randconfig-a1-06041847 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
 reproduce:
         # save the attached .config to linux build tree
-        make ARCH=x86_64 
+        make ARCH=i386 
 
 All errors (new ones prefixed by >>):
 
-   drivers//regulator/core.c: In function 'regulator_set_voltage_unlocked':
->> drivers//regulator/core.c:3046:1: error: version control conflict marker in file
+   drivers/regulator/core.c: In function 'regulator_set_voltage_unlocked':
+>> drivers/regulator/core.c:3046:1: error: expected expression before '<<' token
     <<<<<<< HEAD
-    ^~~~~~~
-   drivers//regulator/core.c:3048:1: error: version control conflict marker in file
+    ^
+   drivers/regulator/core.c:3048:1: error: expected expression before '==' token
     =======
-    ^~~~~~~
+    ^
 
-vim +3046 drivers//regulator/core.c
+vim +3046 drivers/regulator/core.c
 
   3035	
   3036	static int regulator_set_voltage_unlocked(struct regulator *regulator,
@@ -64,6 +64,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 34005 bytes
+Size: 26101 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/c5e61c9a/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/699454b6/attachment-0001.gz>
