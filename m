@@ -1,174 +1,178 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 4 Jun 2018 10:13:02 +0200
-Subject: [PATCH v2] arm: sun4i: Add support for Pengpod 1000 tablet
-In-Reply-To: <20180602160313.26763-1-rah@settrans.net>
-References: <20180602160313.26763-1-rah@settrans.net>
-Message-ID: <20180604081302.hcn7j36gt6xeyquq@flea>
+From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
+Date: Mon, 4 Jun 2018 11:20:29 +0300
+Subject: [PATCH v4 2/7] clk: at91: add I2S clock mux driver
+In-Reply-To: <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
+ <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
+Message-ID: <d2558674-9aee-8b08-293f-34754fd2b185@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Jun 02, 2018 at 05:03:13PM +0100, Bob Ham wrote:
-> This is initial support for the Pengpod 1000 tablet.  The display is
-> not currently working but the UART, SD card and USB all work fine.
+On 31.05.2018 18:26, Stephen Boyd wrote:
+> Quoting Codrin Ciubotariu (2018-05-25 05:34:23)
+>> This driver is a simple muxing driver that controls the
+>> I2S's clock input by using syscon/regmap to change the parrent.
 > 
-> Signed-off-by: Bob Ham <rah@settrans.net>
-> ---
-> Changes since v1:
+> s/parrent/parent/
+
+I will fix it.
+
 > 
-> * Added SPDX license identifier
+>> The available inputs can be Peripheral clock and Generated clock.
 > 
-> arch/arm/boot/dts/Makefile                   |   1 +
->  arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts | 234 +++++++++++++++++++++++++++
->  2 files changed, 235 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts
+> Why capitalize peripheral and generated?
+
+In DS, at I2S block these clocks appear defined with capital letters... 
+I will fix it.
+
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ade7a38543dc..e6e93e7ffc8b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -893,6 +893,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
->  	sun4i-a10-olinuxino-lime.dtb \
->  	sun4i-a10-pcduino.dtb \
->  	sun4i-a10-pcduino2.dtb \
-> +	sun4i-a10-pengpod-1000.dtb \
->  	sun4i-a10-pov-protab2-ips9.dtb
->  dtb-$(CONFIG_MACH_SUN5I) += \
->  	sun5i-a10s-auxtek-t003.dtb \
-> diff --git a/arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts b/arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts
-> new file mode 100644
-> index 000000000000..788163a80f3a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun4i-a10-pengpod-1000.dts
-> @@ -0,0 +1,234 @@
-> +/*
-> + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-> + * Copyright 2017 Robert Ham <rah@settrans.net>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0-or-later or X11)
+>>
+>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+>> ---
+>> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+>> index 1254bf9..903f23c 100644
+>> --- a/arch/arm/mach-at91/Kconfig
+>> +++ b/arch/arm/mach-at91/Kconfig
+>> @@ -27,6 +27,7 @@ config SOC_SAMA5D2
+>>          select HAVE_AT91_H32MX
+>>          select HAVE_AT91_GENERATED_CLK
+>>          select HAVE_AT91_AUDIO_PLL
+>> +       select HAVE_AT91_I2S_MUX_CLK
+>>          select PINCTRL_AT91PIO4
+>>          help
+>>            Select this if ou are using one of Microchip's SAMA5D2 family SoC.
+>> @@ -129,6 +130,9 @@ config HAVE_AT91_GENERATED_CLK
+>>   config HAVE_AT91_AUDIO_PLL
+>>          bool
+>>   
+>> +config HAVE_AT91_I2S_MUX_CLK
+>> +       bool
+>> +
+>>   config SOC_SAM_V4_V5
+>>          bool
+>>   
+> 
+> I guess this is OK.
+> 
+>> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+>> index 082596f..facc169 100644
+>> --- a/drivers/clk/at91/Makefile
+>> +++ b/drivers/clk/at91/Makefile
+>> @@ -13,3 +13,4 @@ obj-$(CONFIG_HAVE_AT91_USB_CLK)               += clk-usb.o
+>>   obj-$(CONFIG_HAVE_AT91_SMD)            += clk-smd.o
+>>   obj-$(CONFIG_HAVE_AT91_H32MX)          += clk-h32mx.o
+>>   obj-$(CONFIG_HAVE_AT91_GENERATED_CLK)  += clk-generated.o
+>> +obj-$(CONFIG_HAVE_AT91_I2S_MUX_CLK)    += clk-i2s-mux.o
+>> diff --git a/drivers/clk/at91/clk-i2s-mux.c b/drivers/clk/at91/clk-i2s-mux.c
+>> new file mode 100644
+>> index 0000000..2d56ded
+>> --- /dev/null
+>> +++ b/drivers/clk/at91/clk-i2s-mux.c
+>> @@ -0,0 +1,117 @@
+>> +/* SPDX-License-Identifier: GPL-2.0 */
+>> +/*
+>> + *  Copyright (C) 2018 Microchip Technology Inc,
+>> + *                     Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+>> + *
+>> + *
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/of.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#include <soc/at91/atmel-sfr.h>
+>> +
+>> +#define        I2S_BUS_NR      2
+>> +
+>> +struct clk_i2s_mux {
+>> +       struct clk_hw hw;
+>> +       struct regmap *regmap;
+>> +       u32 bus_id;
+> 
+> Can be a u8?
 
-This should be the very first line.
+I think so, I will cast out_value parameter of of_property_read_u32() to u8.
 
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
+> 
+>> +};
+>> +
+>> +#define to_clk_i2s_mux(hw) container_of(hw, struct clk_i2s_mux, hw)
+>> +
+>> +static u8 clk_i2s_mux_get_parent(struct clk_hw *hw)
+>> +{
+>> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
+>> +       u32 val;
+>> +
+>> +       regmap_read(mux->regmap, AT91_SFR_I2SCLKSEL, &val);
+>> +
+>> +       return (val & BIT(mux->bus_id)) >> mux->bus_id;
+>> +}
+>> +
+>> +static int clk_i2s_mux_set_parent(struct clk_hw *hw, u8 index)
+>> +{
+>> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
+>> +
+>> +       return regmap_update_bits(mux->regmap, AT91_SFR_I2SCLKSEL,
+>> +                                 BIT(mux->bus_id), index << mux->bus_id);
+>> +}
+>> +
+>> +const struct clk_ops clk_i2s_mux_ops = {
+> 
+> static?
 
-And this is redundant with the SPDX header.
+Yes, I will fix it.
 
-> +/dts-v1/;
-> +#include "sun4i-a10.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/pwm/pwm.h>
-> +
-> +/ {
-> +	model = "PengPod 1000";
-> +	compatible = "pengpod,1000", "allwinner,sun4i-a10";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	backlight: backlight {
-> +		compatible = "pwm-backlight";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&bl_en_pin_pengpod1000>;
+> 
+>> +       .get_parent = clk_i2s_mux_get_parent,
+>> +       .set_parent = clk_i2s_mux_set_parent,
+>> +       .determine_rate = __clk_mux_determine_rate,
+>> +};
+>> +
+>> +static struct clk_hw * __init
+>> +at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
+>> +                         const char * const *parent_names,
+>> +                         unsigned int num_parents, u32 bus_id)
+>> +{
+>> +       struct clk_init_data init = {};
+>> +       struct clk_i2s_mux *i2s_ck;
+>> +       int ret;
+>> +
+>> +       i2s_ck = kzalloc(sizeof(*i2s_ck), GFP_KERNEL);
+>> +       if (!i2s_ck)
+>> +               return ERR_PTR(-ENOMEM);
+>> +
+>> +       init.name = name;
+>> +       init.ops = &clk_i2s_mux_ops;
+>> +       init.parent_names = parent_names;
+>> +       init.num_parents = num_parents;
+>> +       init.flags = CLK_IGNORE_UNUSED;
+> 
+> Really? Why?
 
-These two pinctrl property aren't needed.
+I am thinking that there is no need to gate this clock, since there is 
+no way to gate this clock in HW.
 
-> +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> 
+>> +
+>> +       i2s_ck->hw.init = &init;
+>> +       i2s_ck->bus_id = bus_id;
+>> +       i2s_ck->regmap = regmap;
+>> +
+>> +       ret = clk_hw_register(NULL, &i2s_ck->hw);
+>> +       if (ret) {
+>> +               kfree(i2s_ck);
+>> +               return ERR_PTR(ret);
+>> +       }
+>> +
+>> +       return &i2s_ck->hw;
+>> +}
 
-Each step should increase the perceived brightness by roughly 1/Nth, N
-being the number of steps. Usually PWM backlights don't work like that.
+Thank you for your review. I will wait a few more days for more comments 
+on this series and send a V5 afterwards.
 
-> +&i2c2 {
-> +	status = "okay";
-> +
-> +	ft5406ee8: touchscreen at 38 {
-> +		compatible = "edt,edt-ft5406";
-> +		reg = <0x38>;
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&touchscreen_pins>;
-
-You can drop these two pinctrl properties as well
-
-> +&pio {
-> +	bl_en_pin_pengpod1000: bl_en_pin at 0 {
-> +		pins = "PH7";
-> +		function = "gpio_out";
-> +	};
-> +
-> +	touchscreen_pins: touchscreen_pins at 0 {
-> +		pins = "PB13";
-> +		function = "gpio_out";
-> +	};
-> +
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		pins = "PH4";
-> +		function = "gpio_in";
-> +		bias-pull-up;
-> +	};
-> +
-> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +		pins = "PH5";
-> +		function = "gpio_in";
-> +		bias-pull-down;
-> +	};
-> +};
-
-And all these nodes.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/466cc03c/attachment.sig>
+Best regards,
+Codrin
