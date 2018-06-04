@@ -1,73 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 04 Jun 2018 14:56:44 +0100
-Subject: Applied "ASoC: dapm: delete dapm_kcontrol_data paths list before
- freeing it" to the asoc tree
-In-Reply-To: <20180604111326.15708-1-srinivas.kandagatla@linaro.org>
-Message-ID: <E1fPpyW-0004Ko-In@debutante>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 4 Jun 2018 08:44:39 -0500
+Subject: [PATCH v2] of: platform: stop accessing invalid dev in
+ of_platform_device_destroy
+In-Reply-To: <20180602000343.20045-1-srinivas.kandagatla@linaro.org>
+References: <20180602000343.20045-1-srinivas.kandagatla@linaro.org>
+Message-ID: <CAL_JsqJ9AMDiYCfgGgHZ=XL_1yJjTdSA4Jb_GqHAZML3jwB6+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Fri, Jun 1, 2018 at 7:03 PM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> Immediately after the platform_device_unregister() the device will be cleaned up.
+> Accessing the freed pointer immediately after that will crash the system.
+>
+> Found this bug when kernel is built with CONFIG_PAGE_POISONING and testing
+> loading/unloading audio drivers in a loop on Qcom platforms.
 
-   ASoC: dapm: delete dapm_kcontrol_data paths list before freeing it
+Curious, does the unittest not catch this too?
 
-has been applied to the asoc tree at
+>
+> Fix this by removing accessing the dev pointer.
+> Below is the carsh trace:
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+s/carsh/crash/
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+[...]
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index c00d81dfac0b..84c5c899187b 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -529,10 +529,13 @@ arch_initcall_sync(of_platform_default_populate_init);
+>
+>  int of_platform_device_destroy(struct device *dev, void *data)
+>  {
+> +       struct device_node *np;
+> +
+>         /* Do not touch devices not populated from the device tree */
+>         if (!dev->of_node || !of_node_check_flag(dev->of_node, OF_POPULATED))
+>                 return 0;
+>
+> +       np = dev->of_node;
+>         /* Recurse for any nodes that were treated as busses */
+>         if (of_node_check_flag(dev->of_node, OF_POPULATED_BUS))
+>                 device_for_each_child(dev, NULL, of_platform_device_destroy);
+> @@ -544,8 +547,8 @@ int of_platform_device_destroy(struct device *dev, void *data)
+>                 amba_device_unregister(to_amba_device(dev));
+>  #endif
+>
+> -       of_node_clear_flag(dev->of_node, OF_POPULATED);
+> -       of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Just move these 2 lines to before unregister calls.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From ff2faf1289c1f81b5b26b9451dd1c2006aac8db8 Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Mon, 4 Jun 2018 12:13:26 +0100
-Subject: [PATCH] ASoC: dapm: delete dapm_kcontrol_data paths list before
- freeing it
-
-dapm_kcontrol_data is freed as part of dapm_kcontrol_free(), leaving the
-paths pointer dangling in the list.
-
-This leads to system crash when we try to unload and reload sound card.
-I hit this bug during ADSP crash/reboot test case on Dragon board DB410c.
-
-Without this patch, on SLAB Poisoning enabled build, kernel crashes with
-"BUG kmalloc-128 (Tainted: G        W        ): Poison overwritten"
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
-Cc: stable at vger.kernel.org
----
- sound/soc/soc-dapm.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-index 1e9a36389667..36a39ba30226 100644
---- a/sound/soc/soc-dapm.c
-+++ b/sound/soc/soc-dapm.c
-@@ -433,6 +433,8 @@ static int dapm_kcontrol_data_alloc(struct snd_soc_dapm_widget *widget,
- static void dapm_kcontrol_free(struct snd_kcontrol *kctl)
- {
- 	struct dapm_kcontrol_data *data = snd_kcontrol_chip(kctl);
-+
-+	list_del(&data->paths);
- 	kfree(data->wlist);
- 	kfree(data);
- }
--- 
-2.17.0
+> +       of_node_clear_flag(np, OF_POPULATED);
+> +       of_node_clear_flag(np, OF_POPULATED_BUS);
+>         return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(of_platform_device_destroy);
+> --
+> 2.16.2
+>
