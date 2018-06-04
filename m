@@ -1,112 +1,56 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Mon, 4 Jun 2018 11:26:28 +0530
-Subject: [PATCH v12 0/5] Fix issues with huge mapping in ioremap for ARM64
-In-Reply-To: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
-References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1a648674-da56-6664-bf3c-0cdf825ad1e3@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 4 Jun 2018 07:10:04 +0100
+Subject: [RESEND PATCH v5 2/6] mfd: stm32-timers: add support for dmas
+In-Reply-To: <1526456161-27865-3-git-send-email-fabrice.gasnier@st.com>
+References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+ <1526456161-27865-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180604061004.GA25455@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, 16 May 2018, Fabrice Gasnier wrote:
 
-Just curious to know, is there anything that I should be addressing
-in these patches ? For now, I don't see anything from my side that
-requires modification, unless one has some more review comments on
-this.
+> STM32 Timers can support up to 7 DMA requests:
+> - 4 channels, update, compare and trigger.
+> Optionally request part, or all DMAs from stm32-timers MFD core.
+> 
+> Also add routine to implement burst reads using DMA from timer registers.
+> This is exported. So, it can be used by child drivers, PWM capture
+> for instance (but not limited to).
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
+> Changes in v5:
+> - fix warning on dma_mapping_error() that doesn't return an error code.
+> - move stm32_timers_dma struct to header file as discussed with Lee.
+>   This allows to remove alloc for this struct in stm32_timers_dma_probe.
+> 
+> Changes in v4:
+> - Lee's comments: Add kerneldoc header, better format comments.
+> 
+> Changes in v3:
+> - Basically Lee's comments:
+> - rather create a struct stm32_timers_dma, and place a reference to it
+>   in existing ddata (instead of adding priv struct).
+> - rather use a struct device in exported routine prototype, and use
+>   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
+> - simplify error handling in probe (remove a goto)
+> - comment on devm_of_platform_*populate() usage.
+> 
+> Changes in v2:
+> - Abstract DMA handling from child driver: move it to MFD core
+> - Add comments on optional dma support
+> ---
+>  drivers/mfd/stm32-timers.c       | 201 ++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/stm32-timers.h |  46 +++++++++
+>  2 files changed, 245 insertions(+), 2 deletions(-)
 
-Status so far on and around this:
-  - Status of Toshi's series of patches is still not clear to me.
-    However, if this series can get through first, there won't
-    be conflicting scenarios as far as arm64 is concerned.
-  - I've rebased these patches on tip
-  - Also re-tested these patches for long duration tests with
-    1 GB mapping case also exercised enough. Test ended positively.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks,
-
-On 6/1/2018 6:09 PM, Chintan Pandya wrote:
-> This series of patches re-bring huge vmap back for arm64.
-> 
-> Patch 1/4 has been taken by Toshi in his series of patches
-> by name "[PATCH v3 0/3] fix free pmd/pte page handlings on x86"
-> to avoid merge conflict with this series.
-> 
-> These patches are tested on 4.16 kernel with Cortex-A75 based SoC.
-> 
-> The test used for verifying these patches is a stress test on
-> ioremap/unmap which tries to re-use same io-address but changes
-> size of mapping randomly i.e. 4K to 2M to 1G etc. The same test
-> used to reproduce 3rd level translation fault without these fixes
-> (and also of course with Revert "arm64: Enforce BBM for huge IO/VMAP
-> mappings" being part of the tree).
-> 
-> These patches can also go into '-stable' branch (if accepted)
-> for 4.6 onwards.
-> 
->  From V11->V12:
->   - Introduced p*d_page_vaddr helper macros and using them
->   - Rebased over current tip
-> 
->  From V10->V11:
->   - Updated pud_free_pmd_page & pmd_free_pte_page to use consistent
->     conding style
->   - Fixed few bugs by using pmd_page_paddr & pud_page_paddr
-> 
->  From V9->V10:
->   - Updated commit log for patch 1/4 by Toshi
->   - Addressed review comments by Will on patch 3/4
-> 
->  From V8->V9:
->   - Used __TLBI_VADDR macros in new TLB flush API
-> 
->  From V7->V8:
->   - Properly fixed compilation issue in x86 file
-> 
->  From V6->V7:
->   - Fixed compilation issue in x86 case
->   - V6 patches were not properly enumarated
-> 
->  From V5->V6:
->   - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
->     "bool tlb_inv" based variance as it is not need now
->   - Re-naming for consistency
-> 
->  From V4->V5:
->   - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
->     for kernel addresses
-> 
->  From V3->V4:
->   - Add header for 'addr' in x86 implementation
->   - Re-order pmd/pud clear and table free
->   - Avoid redundant TLB invalidatation in one perticular case
-> 
->  From V2->V3:
->   - Use the exisiting page table free interface to do arm64
->     specific things
-> 
->  From V1->V2:
->   - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
->     Add interfaces to free unmapped page table"
->   - Honored BBM for ARM64
-> 
-> Chintan Pandya (5):
->    ioremap: Update pgtable free interfaces with addr
->    arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
->    arm64: pgtable: Add p*d_page_vaddr helper macros
->    arm64: Implement page table free interfaces
->    arm64: Re-enable huge io mappings
-> 
->   arch/arm64/include/asm/pgtable.h  |  3 +++
->   arch/arm64/include/asm/tlbflush.h |  7 +++++
->   arch/arm64/mm/mmu.c               | 56 +++++++++++++++++++++++++--------------
->   arch/x86/mm/pgtable.c             |  8 +++---
->   include/asm-generic/pgtable.h     |  8 +++---
->   lib/ioremap.c                     |  4 +--
->   6 files changed, 57 insertions(+), 29 deletions(-)
-> 
-
-Chintan
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
