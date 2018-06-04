@@ -1,77 +1,69 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 4 Jun 2018 16:09:22 -0700
-Subject: [PATCH] arm64: dts: stingray: Add otp device node
-In-Reply-To: <2d6cc541-7987-5b4c-a847-6fcbb27e12d2@gmail.com>
-References: <1527106630-4760-1-git-send-email-scott.branden@broadcom.com>
- <c9219029-6e45-1889-6326-470d2bc9e46c@gmail.com>
- <f6f3e76e-eac9-797d-fea5-eac64327ec7f@broadcom.com>
- <efaf0373-2959-b238-e5f3-ae7e16534384@gmail.com>
- <e641f180-0b7e-678c-07c4-834ff0676b34@broadcom.com>
- <2d6cc541-7987-5b4c-a847-6fcbb27e12d2@gmail.com>
-Message-ID: <2a159d0f-77dc-f03f-a7f6-9e5c51eba70a@broadcom.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 5 Jun 2018 07:13:23 +0800
+Subject: [PATCH 7/7] regulator: core: Enable voltage balancing
+In-Reply-To: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
+References: <1528120764-14316-8-git-send-email-m.purski@samsung.com>
+Message-ID: <201806050737.uIMHUHzq%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maciej,
 
+Thank you for the patch! Yet something to improve:
 
-On 18-06-04 03:41 PM, Florian Fainelli wrote:
-> On 06/04/2018 03:33 PM, Scott Branden wrote:
->>
->> On 18-06-04 02:33 PM, Florian Fainelli wrote:
->>> On 06/04/2018 02:30 PM, Scott Branden wrote:
->>>> Hi Florian,
->>>>
->>>>
->>>> On 18-06-04 02:24 PM, Florian Fainelli wrote:
->>>>> On 05/23/2018 01:17 PM, Scott Branden wrote:
->>>>>> Add otp device node for Stingray SOC.
->>>>>>
->>>>>> Fixes: 2fa9e9e29ea2 ("arm64: dts: Add GPIO DT nodes for Stingray SOC")
->>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->>>>> Applied to devicetree-arm64/next with s/otp/OTP/ and removing the Fixes
->>>>> line since that is not a bug fix AFAICT.
->>>> It fixes the issue that OTP is not active as it is missing the device
->>>> node?
->>> By that token, any peripheral that is being added at some point in the
->>> lifetime of this DTS would qualify as a bugfix when it is in fact
->>> feature/peripheral enabling.
->>>
->>> I could not see the relationship between the commit being provided in
->>> the "Fixes:" tag and OTP, am I missing something?
->> The relationship is the fixes tag points was selected to the last tag
->> when the commit applies directly against (and is far enough back that it
->> covers any possible LTS kernels that would have needed it).
-> I understand how ones gets to select an appropriate Fixes: tag, what I
-> don't understand is the relationship between the two changes, like why
-> would a GPIO Device Tree node influence the OTP peripheral here when
-> there is no pinmux or GPIO phandle of some sort linking the two. Also,
-> since you guys were very trigger happy with Fixes: tag lately (referring
-> to the internal review of Srinath's changes) this one looked a lot like
-> that.
->
-> The only thing I am questioning here is treating that particular
-> changeset as a bugfix proper. Yes it is technically a fix in that,
-> without this changeset the OTP node is not there and that is
-> functionality you want, but it is not preventing the platform from not
-> booting for instance, or having an incorrect behavior for an established
-> behavior before, right?
->
->> In this case
->> I don't care too much about whether this is fixed in LTS or not.? If
->> needed I'll send a request for the commit be ported to stable.
-> If this is a true fix, I don't mind taking it as-is and keeping the
-> Fixes: tag, keep in mind the following:
->
-> I always treat bug fixes with a higher priority than features, and I
-> will do my best to queue up fixes (separate branches, all ending in
-> /fixes) and submit those at any time in the release cycle so they can
-> land in Linus' tree and in the -stable trees as fast as possible.
->
-> Don't bypass the maintainer if you can convince me this is a proper fix,
-> then I will just move that patch into the appropriate branch, and you
-> will get those stable backports automatically.
-For now, nobody needs it in the LTS.? The OTP driver hasn't actively 
-been used by applications.
-So not critical for backport right now.? It's in now so OTP won't be a 
-problem going forward.
-> Thanks for reading me.
+[auto build test ERROR on regulator/for-next]
+[also build test ERROR on next-20180604]
+[cannot apply to v4.17]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Maciej-Purski/regulator-core-Add-debug-messages/20180605-052333
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
+config: x86_64-randconfig-x011-201822 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+   drivers//regulator/core.c: In function 'regulator_set_voltage_unlocked':
+>> drivers//regulator/core.c:3046:1: error: version control conflict marker in file
+    <<<<<<< HEAD
+    ^~~~~~~
+   drivers//regulator/core.c:3048:1: error: version control conflict marker in file
+    =======
+    ^~~~~~~
+
+vim +3046 drivers//regulator/core.c
+
+  3035	
+  3036	static int regulator_set_voltage_unlocked(struct regulator *regulator,
+  3037						  int min_uV, int max_uV,
+  3038						  suspend_state_t state)
+  3039	{
+  3040		struct regulator_dev *rdev = regulator->rdev;
+  3041		struct regulator_voltage *voltage = &regulator->voltage[state];
+  3042		int ret = 0;
+  3043		int old_min_uV, old_max_uV;
+  3044		int current_uV;
+  3045	
+> 3046	<<<<<<< HEAD
+  3047		pr_err("%s: %d\n", __func__, __LINE__);
+  3048	=======
+  3049		if (rdev->coupling_desc.n_resolved != rdev->coupling_desc.n_coupled) {
+  3050			rdev_err(rdev, "not all coupled regulators registered\n");
+  3051			ret = -EPERM;
+  3052			goto out;
+  3053		}
+  3054	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 34005 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/c5e61c9a/attachment-0001.gz>
