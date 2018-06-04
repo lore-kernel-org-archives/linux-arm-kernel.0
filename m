@@ -1,178 +1,59 @@
-From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Mon, 4 Jun 2018 11:20:29 +0300
-Subject: [PATCH v4 2/7] clk: at91: add I2S clock mux driver
-In-Reply-To: <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
-References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
- <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
- <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
-Message-ID: <d2558674-9aee-8b08-293f-34754fd2b185@microchip.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Mon, 4 Jun 2018 11:46:33 +0300
+Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
+Message-ID: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.05.2018 18:26, Stephen Boyd wrote:
-> Quoting Codrin Ciubotariu (2018-05-25 05:34:23)
->> This driver is a simple muxing driver that controls the
->> I2S's clock input by using syscon/regmap to change the parrent.
-> 
-> s/parrent/parent/
+Implement suspend/resume hooks.
 
-I will fix it.
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
 
-> 
->> The available inputs can be Peripheral clock and Generated clock.
-> 
-> Why capitalize peripheral and generated?
+Changes in v2:
+- use __maybe_unused instead of #ifdef CONFIG_PM_SLEEP
 
-In DS, at I2S block these clocks appear defined with capital letters... 
-I will fix it.
+ drivers/mtd/spi-nor/atmel-quadspi.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-> 
->>
->> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
->> ---
->> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
->> index 1254bf9..903f23c 100644
->> --- a/arch/arm/mach-at91/Kconfig
->> +++ b/arch/arm/mach-at91/Kconfig
->> @@ -27,6 +27,7 @@ config SOC_SAMA5D2
->>          select HAVE_AT91_H32MX
->>          select HAVE_AT91_GENERATED_CLK
->>          select HAVE_AT91_AUDIO_PLL
->> +       select HAVE_AT91_I2S_MUX_CLK
->>          select PINCTRL_AT91PIO4
->>          help
->>            Select this if ou are using one of Microchip's SAMA5D2 family SoC.
->> @@ -129,6 +130,9 @@ config HAVE_AT91_GENERATED_CLK
->>   config HAVE_AT91_AUDIO_PLL
->>          bool
->>   
->> +config HAVE_AT91_I2S_MUX_CLK
->> +       bool
->> +
->>   config SOC_SAM_V4_V5
->>          bool
->>   
-> 
-> I guess this is OK.
-> 
->> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
->> index 082596f..facc169 100644
->> --- a/drivers/clk/at91/Makefile
->> +++ b/drivers/clk/at91/Makefile
->> @@ -13,3 +13,4 @@ obj-$(CONFIG_HAVE_AT91_USB_CLK)               += clk-usb.o
->>   obj-$(CONFIG_HAVE_AT91_SMD)            += clk-smd.o
->>   obj-$(CONFIG_HAVE_AT91_H32MX)          += clk-h32mx.o
->>   obj-$(CONFIG_HAVE_AT91_GENERATED_CLK)  += clk-generated.o
->> +obj-$(CONFIG_HAVE_AT91_I2S_MUX_CLK)    += clk-i2s-mux.o
->> diff --git a/drivers/clk/at91/clk-i2s-mux.c b/drivers/clk/at91/clk-i2s-mux.c
->> new file mode 100644
->> index 0000000..2d56ded
->> --- /dev/null
->> +++ b/drivers/clk/at91/clk-i2s-mux.c
->> @@ -0,0 +1,117 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +/*
->> + *  Copyright (C) 2018 Microchip Technology Inc,
->> + *                     Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
->> + *
->> + *
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/of.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/regmap.h>
->> +#include <linux/slab.h>
->> +
->> +#include <soc/at91/atmel-sfr.h>
->> +
->> +#define        I2S_BUS_NR      2
->> +
->> +struct clk_i2s_mux {
->> +       struct clk_hw hw;
->> +       struct regmap *regmap;
->> +       u32 bus_id;
-> 
-> Can be a u8?
-
-I think so, I will cast out_value parameter of of_property_read_u32() to u8.
-
-> 
->> +};
->> +
->> +#define to_clk_i2s_mux(hw) container_of(hw, struct clk_i2s_mux, hw)
->> +
->> +static u8 clk_i2s_mux_get_parent(struct clk_hw *hw)
->> +{
->> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
->> +       u32 val;
->> +
->> +       regmap_read(mux->regmap, AT91_SFR_I2SCLKSEL, &val);
->> +
->> +       return (val & BIT(mux->bus_id)) >> mux->bus_id;
->> +}
->> +
->> +static int clk_i2s_mux_set_parent(struct clk_hw *hw, u8 index)
->> +{
->> +       struct clk_i2s_mux *mux = to_clk_i2s_mux(hw);
->> +
->> +       return regmap_update_bits(mux->regmap, AT91_SFR_I2SCLKSEL,
->> +                                 BIT(mux->bus_id), index << mux->bus_id);
->> +}
->> +
->> +const struct clk_ops clk_i2s_mux_ops = {
-> 
-> static?
-
-Yes, I will fix it.
-
-> 
->> +       .get_parent = clk_i2s_mux_get_parent,
->> +       .set_parent = clk_i2s_mux_set_parent,
->> +       .determine_rate = __clk_mux_determine_rate,
->> +};
->> +
->> +static struct clk_hw * __init
->> +at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
->> +                         const char * const *parent_names,
->> +                         unsigned int num_parents, u32 bus_id)
->> +{
->> +       struct clk_init_data init = {};
->> +       struct clk_i2s_mux *i2s_ck;
->> +       int ret;
->> +
->> +       i2s_ck = kzalloc(sizeof(*i2s_ck), GFP_KERNEL);
->> +       if (!i2s_ck)
->> +               return ERR_PTR(-ENOMEM);
->> +
->> +       init.name = name;
->> +       init.ops = &clk_i2s_mux_ops;
->> +       init.parent_names = parent_names;
->> +       init.num_parents = num_parents;
->> +       init.flags = CLK_IGNORE_UNUSED;
-> 
-> Really? Why?
-
-I am thinking that there is no need to gate this clock, since there is 
-no way to gate this clock in HW.
-
-> 
->> +
->> +       i2s_ck->hw.init = &init;
->> +       i2s_ck->bus_id = bus_id;
->> +       i2s_ck->regmap = regmap;
->> +
->> +       ret = clk_hw_register(NULL, &i2s_ck->hw);
->> +       if (ret) {
->> +               kfree(i2s_ck);
->> +               return ERR_PTR(ret);
->> +       }
->> +
->> +       return &i2s_ck->hw;
->> +}
-
-Thank you for your review. I will wait a few more days for more comments 
-on this series and send a V5 afterwards.
-
-Best regards,
-Codrin
+diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
+index 6c5708bacad8..ceaaef47f02e 100644
+--- a/drivers/mtd/spi-nor/atmel-quadspi.c
++++ b/drivers/mtd/spi-nor/atmel-quadspi.c
+@@ -737,6 +737,26 @@ static int atmel_qspi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int __maybe_unused atmel_qspi_suspend(struct device *dev)
++{
++	struct atmel_qspi *aq = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(aq->clk);
++
++	return 0;
++}
++
++static int __maybe_unused atmel_qspi_resume(struct device *dev)
++{
++	struct atmel_qspi *aq = dev_get_drvdata(dev);
++
++	clk_prepare_enable(aq->clk);
++
++	return atmel_qspi_init(aq);
++}
++
++static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
++			 atmel_qspi_resume);
+ 
+ static const struct of_device_id atmel_qspi_dt_ids[] = {
+ 	{ .compatible = "atmel,sama5d2-qspi" },
+@@ -749,6 +769,7 @@ static struct platform_driver atmel_qspi_driver = {
+ 	.driver = {
+ 		.name	= "atmel_qspi",
+ 		.of_match_table	= atmel_qspi_dt_ids,
++		.pm	= &atmel_qspi_pm_ops,
+ 	},
+ 	.probe		= atmel_qspi_probe,
+ 	.remove		= atmel_qspi_remove,
+-- 
+2.7.4
