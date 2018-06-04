@@ -1,23 +1,21 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 4 Jun 2018 14:11:18 -0700
-Subject: [PATCH v3 3/3] arm64: dts: Update Stingray clock DT nodes
-In-Reply-To: <1527900968-12017-4-git-send-email-ray.jui@broadcom.com>
-References: <1527900968-12017-1-git-send-email-ray.jui@broadcom.com>
- <1527900968-12017-4-git-send-email-ray.jui@broadcom.com>
-Message-ID: <9305e486-9c67-0fca-7fd8-c954ee0d8c6f@gmail.com>
+Date: Mon,  4 Jun 2018 14:12:27 -0700
+Subject: [PATCH v2 1/2] ARM: debug: Add Iproc UART3 debug addresses
+In-Reply-To: <20180530131956.13972-1-peron.clem@gmail.com>
+References: <20180530131956.13972-1-peron.clem@gmail.com>
+Message-ID: <20180604211227.20438-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2018 05:56 PM, Ray Jui wrote:
-> From: Pramod Kumar <pramod.kumar@broadcom.com>
+On Wed, 30 May 2018 15:19:55 +0200, Cl?ment P?ron <peron.clem@gmail.com> wrote:
+> From: Cl?ment Peron <clement.peron@devialet.com>
 > 
-> Update clock output names in the Stingray clock DT nodes so they match
-> the binding document and the latest ASIC datasheet. Also add entries
-> for LCPLL2
+> Broadcom Iproc SoCs typically use the UART3 for
+> debug/console, provide a known good location for that.
 > 
-> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> ---
 
-Applied to devicetree-arm64/next, thanks!
--- 
+Applied to soc/next, thanks!
+--
 Florian
