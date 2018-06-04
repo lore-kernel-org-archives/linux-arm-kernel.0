@@ -1,214 +1,72 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 4 Jun 2018 19:27:48 +0800
-Subject: [PATCH 3/7] iommu: prepare for the non-strict mode support
-In-Reply-To: <f6b2b67e-2178-91a1-1e54-c15fc8c0a7c6@arm.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
- <1527752569-18020-4-git-send-email-thunder.leizhen@huawei.com>
- <f6b2b67e-2178-91a1-1e54-c15fc8c0a7c6@arm.com>
-Message-ID: <5B152234.80607@huawei.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Tue, 5 Jun 2018 03:45:41 +0800
+Subject: [PATCH v2 1/2] arm64: KVM: export the capability to set guest SError
+ syndrome
+In-Reply-To: <1528141542-44048-1-git-send-email-gengdongjiu@huawei.com>
+References: <1528141542-44048-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1528141542-44048-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+For the arm64 RAS Extension, user space can inject a virtual-SError
+with specified ESR. So user space needs to know whether KVM support
+to inject such SError, this interface adds this query for this capability.
 
+KVM will check whether system support RAS Extension, if supported, KVM
+returns true to user space, otherwise returns false.
 
-On 2018/5/31 21:04, Robin Murphy wrote:
-> On 31/05/18 08:42, Zhen Lei wrote:
->> In common, a IOMMU unmap operation follow the below steps:
->> 1. remove the mapping in page table of the specified iova range
->> 2. execute tlbi command to invalid the mapping which is cached in TLB
->> 3. wait for the above tlbi operation to be finished
->> 4. free the IOVA resource
->> 5. free the physical memory resource
->>
->> This maybe a problem when unmap is very frequently, the combination of tlbi
->> and wait operation will consume a lot of time. A feasible method is put off
->> tlbi and iova-free operation, when accumulating to a certain number or
->> reaching a specified time, execute only one tlbi_all command to clean up
->> TLB, then free the backup IOVAs. Mark as non-strict mode.
->>
->> But it must be noted that, although the mapping has already been removed in
->> the page table, it maybe still exist in TLB. And the freed physical memory
->> may also be reused for others. So a attacker can persistent access to memory
->> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
->> the VFIO should always choose the strict mode.
->>
->> This patch just add a new parameter for the unmap operation, to help the
->> upper functions capable choose which mode to be applied.
-> 
-> This seems like it might be better handled by a flag in io_pgtable_cfg->quirks. This interface change on its own looks rather invasive, and teh fact that it ends up only being used to pass through a constant property of the domain (which is already known by the point io_pgtable_alloc() is called) implies that it is indeed the wrong level of abstraction.
-> 
-Sound good. Thanks for your suggestion, I will try it in v2.
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Reviewed-by: James Morse <james.morse@arm.com>
+---
+ Documentation/virtual/kvm/api.txt | 11 +++++++++++
+ arch/arm64/kvm/reset.c            |  3 +++
+ include/uapi/linux/kvm.h          |  1 +
+ 3 files changed, 15 insertions(+)
 
->> No functional changes.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/arm-smmu-v3.c        | 2 +-
->>   drivers/iommu/arm-smmu.c           | 2 +-
->>   drivers/iommu/io-pgtable-arm-v7s.c | 6 +++---
->>   drivers/iommu/io-pgtable-arm.c     | 6 +++---
->>   drivers/iommu/io-pgtable.h         | 2 +-
->>   drivers/iommu/ipmmu-vmsa.c         | 2 +-
->>   drivers/iommu/msm_iommu.c          | 2 +-
->>   drivers/iommu/mtk_iommu.c          | 2 +-
->>   drivers/iommu/qcom_iommu.c         | 2 +-
->>   include/linux/iommu.h              | 2 ++
-> 
-> Plus things specific to io-pgtable shouldn't really be spilling into the core API header either.
-> 
-> Robin.
-> 
->>   10 files changed, 15 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 4402187..59b3387 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -1767,7 +1767,7 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
->>       if (!ops)
->>           return 0;
->>   -    return ops->unmap(ops, iova, size);
->> +    return ops->unmap(ops, iova, size, IOMMU_STRICT);
->>   }
->>     static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 69e7c60..253e807 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1249,7 +1249,7 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
->>       if (!ops)
->>           return 0;
->>   -    return ops->unmap(ops, iova, size);
->> +    return ops->unmap(ops, iova, size, IOMMU_STRICT);
->>   }
->>     static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
->> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
->> index 10e4a3d..799eced 100644
->> --- a/drivers/iommu/io-pgtable-arm-v7s.c
->> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
->> @@ -658,7 +658,7 @@ static size_t __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
->>   }
->>     static size_t arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
->> -                size_t size)
->> +                size_t size, int strict)
->>   {
->>       struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);
->>   @@ -883,7 +883,7 @@ static int __init arm_v7s_do_selftests(void)
->>       size = 1UL << __ffs(cfg.pgsize_bitmap);
->>       while (i < loopnr) {
->>           iova_start = i * SZ_16M;
->> -        if (ops->unmap(ops, iova_start + size, size) != size)
->> +        if (ops->unmap(ops, iova_start + size, size, IOMMU_STRICT) != size)
->>               return __FAIL(ops);
->>             /* Remap of partial unmap */
->> @@ -902,7 +902,7 @@ static int __init arm_v7s_do_selftests(void)
->>       while (i != BITS_PER_LONG) {
->>           size = 1UL << i;
->>   -        if (ops->unmap(ops, iova, size) != size)
->> +        if (ops->unmap(ops, iova, size, IOMMU_STRICT) != size)
->>               return __FAIL(ops);
->>             if (ops->iova_to_phys(ops, iova + 42))
->> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
->> index 39c2a05..e0f52db 100644
->> --- a/drivers/iommu/io-pgtable-arm.c
->> +++ b/drivers/iommu/io-pgtable-arm.c
->> @@ -624,7 +624,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
->>   }
->>     static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
->> -                 size_t size)
->> +                 size_t size, int strict)
->>   {
->>       struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
->>       arm_lpae_iopte *ptep = data->pgd;
->> @@ -1108,7 +1108,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
->>             /* Partial unmap */
->>           size = 1UL << __ffs(cfg->pgsize_bitmap);
->> -        if (ops->unmap(ops, SZ_1G + size, size) != size)
->> +        if (ops->unmap(ops, SZ_1G + size, size, IOMMU_STRICT) != size)
->>               return __FAIL(ops, i);
->>             /* Remap of partial unmap */
->> @@ -1124,7 +1124,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
->>           while (j != BITS_PER_LONG) {
->>               size = 1UL << j;
->>   -            if (ops->unmap(ops, iova, size) != size)
->> +            if (ops->unmap(ops, iova, size, IOMMU_STRICT) != size)
->>                   return __FAIL(ops, i);
->>                 if (ops->iova_to_phys(ops, iova + 42))
->> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
->> index 2df7909..2908806 100644
->> --- a/drivers/iommu/io-pgtable.h
->> +++ b/drivers/iommu/io-pgtable.h
->> @@ -120,7 +120,7 @@ struct io_pgtable_ops {
->>       int (*map)(struct io_pgtable_ops *ops, unsigned long iova,
->>              phys_addr_t paddr, size_t size, int prot);
->>       size_t (*unmap)(struct io_pgtable_ops *ops, unsigned long iova,
->> -            size_t size);
->> +            size_t size, int strict);
->>       phys_addr_t (*iova_to_phys)(struct io_pgtable_ops *ops,
->>                       unsigned long iova);
->>   };
->> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
->> index 40ae6e8..e6d9e11 100644
->> --- a/drivers/iommu/ipmmu-vmsa.c
->> +++ b/drivers/iommu/ipmmu-vmsa.c
->> @@ -716,7 +716,7 @@ static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
->>   {
->>       struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
->>   -    return domain->iop->unmap(domain->iop, iova, size);
->> +    return domain->iop->unmap(domain->iop, iova, size, IOMMU_STRICT);
->>   }
->>     static void ipmmu_iotlb_sync(struct iommu_domain *io_domain)
->> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
->> index 0d33504..180fa3d 100644
->> --- a/drivers/iommu/msm_iommu.c
->> +++ b/drivers/iommu/msm_iommu.c
->> @@ -532,7 +532,7 @@ static size_t msm_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
->>       unsigned long flags;
->>         spin_lock_irqsave(&priv->pgtlock, flags);
->> -    len = priv->iop->unmap(priv->iop, iova, len);
->> +    len = priv->iop->unmap(priv->iop, iova, len, IOMMU_STRICT);
->>       spin_unlock_irqrestore(&priv->pgtlock, flags);
->>         return len;
->> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
->> index f2832a1..54661ed 100644
->> --- a/drivers/iommu/mtk_iommu.c
->> +++ b/drivers/iommu/mtk_iommu.c
->> @@ -386,7 +386,7 @@ static size_t mtk_iommu_unmap(struct iommu_domain *domain,
->>       size_t unmapsz;
->>         spin_lock_irqsave(&dom->pgtlock, flags);
->> -    unmapsz = dom->iop->unmap(dom->iop, iova, size);
->> +    unmapsz = dom->iop->unmap(dom->iop, iova, size, IOMMU_STRICT);
->>       spin_unlock_irqrestore(&dom->pgtlock, flags);
->>         return unmapsz;
->> diff --git a/drivers/iommu/qcom_iommu.c b/drivers/iommu/qcom_iommu.c
->> index 65b9c99..90abde1 100644
->> --- a/drivers/iommu/qcom_iommu.c
->> +++ b/drivers/iommu/qcom_iommu.c
->> @@ -444,7 +444,7 @@ static size_t qcom_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
->>        */
->>       pm_runtime_get_sync(qcom_domain->iommu->dev);
->>       spin_lock_irqsave(&qcom_domain->pgtbl_lock, flags);
->> -    ret = ops->unmap(ops, iova, size);
->> +    ret = ops->unmap(ops, iova, size, IOMMU_STRICT);
->>       spin_unlock_irqrestore(&qcom_domain->pgtbl_lock, flags);
->>       pm_runtime_put_sync(qcom_domain->iommu->dev);
->>   diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->> index 19938ee..39b3150 100644
->> --- a/include/linux/iommu.h
->> +++ b/include/linux/iommu.h
->> @@ -86,6 +86,8 @@ struct iommu_domain_geometry {
->>   #define IOMMU_DOMAIN_DMA    (__IOMMU_DOMAIN_PAGING |    \
->>                    __IOMMU_DOMAIN_DMA_API)
->>   +#define IOMMU_STRICT        1
->> +
->>   struct iommu_domain {
->>       unsigned type;
->>       const struct iommu_ops *ops;
->>
-> 
-> .
-> 
-
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 758bf40..fdac969 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -4603,3 +4603,14 @@ Architectures: s390
+ This capability indicates that kvm will implement the interfaces to handle
+ reset, migration and nested KVM for branch prediction blocking. The stfle
+ facility 82 should not be provided to the guest without this capability.
++
++8.14 KVM_CAP_ARM_SET_SERROR_ESR
++
++Architectures: arm, arm64
++
++This capability indicates that userspace can specify the syndrome value reported
++to the guest OS when guest takes a virtual SError interrupt exception.
++If KVM has this capability, userspace can only specify the ISS field for the ESR
++syndrome, it can not specify the EC field which is not under control by KVM.
++If this virtual SError is taken to EL1 using AArch64, this value will be reported
++in ISS filed of ESR_EL1.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3256b92..38c8a64 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_INJECT_SERROR_ESR:
++		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index b02c41e..e88f976 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -948,6 +948,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_S390_BPB 152
+ #define KVM_CAP_GET_MSR_FEATURES 153
+ #define KVM_CAP_HYPERV_EVENTFD 154
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 155
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
-Thanks!
-BestRegards
+2.7.4
