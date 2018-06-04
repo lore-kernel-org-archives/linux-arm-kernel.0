@@ -1,42 +1,50 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon,  4 Jun 2018 15:27:06 -0700
-Subject: [PATCH] ARM64: dts: meson-axg: fix register ranges for SD/eMMC
-Message-ID: <20180604222706.36167-1-khilman@baylibre.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 4 Jun 2018 17:30:48 -0500
+Subject: [PATCH][RFC] PCI: rcar: Add bus notifier so we can limit the DMA
+ range
+In-Reply-To: <c2897d82-fe33-52cd-5aa6-3bddb478cb9f@gmail.com>
+References: <20180521220514.30256-1-marek.vasut+renesas@gmail.com>
+ <CAK8P3a1PZ_MfgEcvWdUbN-eCcs5Xo38LQ54imLc4kNtSKO9Txw@mail.gmail.com>
+ <c2897d82-fe33-52cd-5aa6-3bddb478cb9f@gmail.com>
+Message-ID: <20180604223048.GC30381@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on updated information from Amlogic, correct the register
-range for the SD/eMMC blocks to the right size.
+[+cc ARM64 folks, linux-kernel]
 
-Reported-by: Yixun Lan <yixun.lan@amlogic.com>
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
-Yixun, please test and confirm this still works on AXG boards.
+The original patch under discussion is:
+https://lkml.kernel.org/r/20180521220514.30256-1-marek.vasut+renesas at gmail.com
 
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index fee87737a201..67d7115e4eff 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -132,7 +132,7 @@
- 
- 			sd_emmc_b: sd at 5000 {
- 				compatible = "amlogic,meson-axg-mmc";
--				reg = <0x0 0x5000 0x0 0x2000>;
-+				reg = <0x0 0x5000 0x0 0x800>;
- 				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
- 				clocks = <&clkc CLKID_SD_EMMC_B>,
-@@ -144,7 +144,7 @@
- 
- 			sd_emmc_c: mmc at 7000 {
- 				compatible = "amlogic,meson-axg-mmc";
--				reg = <0x0 0x7000 0x0 0x2000>;
-+				reg = <0x0 0x7000 0x0 0x800>;
- 				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
- 				clocks = <&clkc CLKID_SD_EMMC_C>,
--- 
-2.11.0
+On Tue, May 22, 2018 at 11:52:21AM +0200, Marek Vasut wrote:
+> On 05/22/2018 10:10 AM, Arnd Bergmann wrote:
+> > On Tue, May 22, 2018 at 12:05 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> From: Phil Edworthy <phil.edworthy@renesas.com>
+> >>
+> >> The PCIe DMA controller on RCar Gen2 and earlier is on 32bit bus,
+> >> so limit the DMA range to 32bit.
+> >>
+> >> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> >> Cc: Simon Horman <horms+renesas@verge.net.au>
+> >> Cc: Wolfram Sang <wsa@the-dreams.de>
+> >> Cc: linux-renesas-soc at vger.kernel.org
+> >> To: linux-pci at vger.kernel.org
+> >> ---
+> >> NOTE: I'm aware of https://patchwork.kernel.org/patch/9495895/ , but the
+> >>       discussion seems to have gone way off, so I'm sending this as a
+> >>       RFC. Any feedback on how to do this limiting properly would be nice.
+> > 
+> > Doing it in the driver is clearly not appropriate, we must do this in
+> > common code. If I remember correctly, it's specifically ARM64 that is
+> > broken here, it incorrectly allows setting a DMA mask to 64 bit
+> > when that is not available.
+> 
+> Yep, that's correct. ARM64 with devices mapping tremendous amounts of
+> memory. So did anything change since that discussion references in the NOTE?
+> 
+> -- 
+> Best regards,
+> Marek Vasut
