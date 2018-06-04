@@ -1,74 +1,96 @@
-From: rah@settrans.net (Bob Ham)
-Date: Mon, 4 Jun 2018 18:33:02 +0100
-Subject: [PATCH v2] arm: sun4i: Add support for Pengpod 1000 tablet
-In-Reply-To: <20180604081302.hcn7j36gt6xeyquq@flea>
-References: <20180602160313.26763-1-rah@settrans.net>
- <20180604081302.hcn7j36gt6xeyquq@flea>
-Message-ID: <313a74ea-0be6-cff1-6b2f-06a4b0b7ba8d@settrans.net>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Tue,  5 Jun 2018 02:49:08 +0900
+Subject: [PATCH] arm64: dts: renesas: r8a7796: Add PCIe device nodes
+Message-ID: <1528134548-17492-1-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/18 09:13, Maxime Ripard wrote:
-> On Sat, Jun 02, 2018 at 05:03:13PM +0100, Bob Ham wrote:
+From: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
 
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
+This patch adds PCIe{0,1} device nodes for R8A7796 SoC.
 
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
+Signed-off-by: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+---
 
-> And this is redundant with the SPDX header.
+This patch is based on the devel branch of Simon Horman's renesas tree.
 
-The X11 license notice states explicitly that the notice has to be
-included in the file.  Wouldn't removing it be a violation of the license?
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 50 ++++++++++++++++++++++++++++++--
+ 1 file changed, 47 insertions(+), 3 deletions(-)
 
-
->> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-> 
-> Each step should increase the perceived brightness by roughly 1/Nth, N
-> being the number of steps. Usually PWM backlights don't work like that.
-
-FYI, this was copied from another .dts file.  All of the other
-brightness-levels settings in sun{4,5,7}i .dts files follow similar
-patterns:
-
-sun4i-a10-dserve-dsrv9703c.dts:               brightness-levels = <0 10
-20 30 40 50 60 70 80 90 100>;
-sun4i-a10-inet1.dts:          brightness-levels = <0 10 20 30 40 50 60
-70 80 90 100>;
-sun4i-a10-pov-protab2-ips9.dts:               brightness-levels = <0 10
-20 30 40 50 60 70 80 90 100>;
-sun5i-a13-empire-electronix-d709.dts:         brightness-levels = <0 10
-20 30 40 50 60 70 80 90 100>;
-sun5i-a13-utoo-p66.dts:       brightness-levels = <0 30 40 50 60 70 80
-90 100>;
-sun5i-gr8-evb.dts:            brightness-levels = <0 10 20 30 40 50 60
-70 80 90 100>;
-sun7i-a20-wexler-tab7200.dts:         brightness-levels = <0 10 20 30 40
-50 60 70 80 90 100>;
-
-I'll take the brightness-levels from sun8i-a83t-tbs-a711.dts which
-follows a more appropriate pattern:
-
-sun8i-a83t-tbs-a711.dts:              brightness-levels = <0 1 2 4 8 16
-32 64 128 255>;
-
-
-Thanks,
-
-Bob
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 7c25be6..2a04635b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Source for the r8a7796 SoC
+  *
+- * Copyright (C) 2016 Renesas Electronics Corp.
++ * Copyright (C) 2016-2017 Renesas Electronics Corp.
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+@@ -2108,13 +2108,57 @@
+ 		};
+ 
+ 		pciec0: pcie at fe000000 {
++			compatible = "renesas,pcie-r8a7796",
++				     "renesas,pcie-rcar-gen3";
+ 			reg = <0 0xfe000000 0 0x80000>;
+-			/* placeholder */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++				0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++				0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++				0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 319>;
++			status = "disabled";
+ 		};
+ 
+ 		pciec1: pcie at ee800000 {
++			compatible = "renesas,pcie-r8a7796",
++				     "renesas,pcie-rcar-gen3";
+ 			reg = <0 0xee800000 0 0x80000>;
+-			/* placeholder */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xee900000 0 0x00100000
++				0x02000000 0 0xeea00000 0 0xeea00000 0 0x00200000
++				0x02000000 0 0xc0000000 0 0xc0000000 0 0x08000000
++				0x42000000 0 0xc8000000 0 0xc8000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
+ 		};
+ 
+ 		imr-lx4 at fe860000 {
 -- 
-Bob Ham <rah@settrans.net>
-
-for (;;) { ++pancakes; }
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 2913 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/b46aec55/attachment.sig>
+1.9.1
