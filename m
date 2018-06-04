@@ -1,22 +1,26 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  4 Jun 2018 14:12:39 -0700
-Subject: [PATCH v2 2/2] ARM: debug: fix BCM2836 order entry
-In-Reply-To: <20180530131956.13972-2-peron.clem@gmail.com>
-References: <20180530131956.13972-1-peron.clem@gmail.com>
- <20180530131956.13972-2-peron.clem@gmail.com>
-Message-ID: <20180604211239.20528-1-f.fainelli@gmail.com>
+Date: Mon,  4 Jun 2018 14:15:26 -0700
+Subject: [PATCH 1/2] soc: bcm: brcmstb: pm: Add support for newer rev B3.0
+ controllers
+In-Reply-To: <20180511220242.837-2-f.fainelli@gmail.com>
+References: <20180511220242.837-1-f.fainelli@gmail.com>
+ <20180511220242.837-2-f.fainelli@gmail.com>
+Message-ID: <20180604211526.21230-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 May 2018 15:19:56 +0200, Cl?ment P?ron <peron.clem@gmail.com> wrote:
-> From: Cl?ment Peron <clement.peron@devialet.com>
+On Fri, 11 May 2018 15:02:41 -0700, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> From: Doug Berger <opendmb@gmail.com>
 > 
-> Entries are sorted by their address value, except the BCM2836/KONA
-> which are not in the proper order.
+> Update the Device Tree binding document and add a matching entry for the
+> MEMC DDR controller revision B3.0 which is found on chips like 7278A0
+> and newer.
 > 
-> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> [florian: tweak commit message, make it apply to upstream kernel]
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
 
-Applied to soc/next, thanks!
+Applied to drivers/next, thanks!
 --
 Florian
