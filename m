@@ -1,99 +1,171 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 4 Jun 2018 09:17:49 -0500
-Subject: [PATCH 1/6] PCI: iproc: Update iProc PCI binding for INTx support
-In-Reply-To: <1527631130-20045-2-git-send-email-ray.jui@broadcom.com>
-References: <1527631130-20045-1-git-send-email-ray.jui@broadcom.com>
- <1527631130-20045-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <CAL_Jsq+ac6dmHKS6m0h5N3bv=VseKVL8XLU5K7j1Rn=mgFNLsA@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 04 Jun 2018 16:20:47 +0200
+Subject: [PATCH 5/7] regulator: core: Lock dependent regulators
+In-Reply-To: <1528120764-14316-6-git-send-email-m.purski@samsung.com>
+References: <20180530144505.GB5705@atomide.com>
+ <1528120764-14316-1-git-send-email-m.purski@samsung.com>
+ <CGME20180604135954eucas1p2156fed3300b5514a4efa2baf9e7b9bc5@eucas1p2.samsung.com>
+ <1528120764-14316-6-git-send-email-m.purski@samsung.com>
+Message-ID: <1528122047.2728.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Arnd
+Hi Maciej,
 
-On Tue, May 29, 2018 at 4:58 PM, Ray Jui <ray.jui@broadcom.com> wrote:
-> Update the iProc PCIe binding document for better modeling of the legacy
-> interrupt (INTx) support
->
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+Am Montag, den 04.06.2018, 15:59 +0200 schrieb Maciej Purski:
+> Implementing coupled regulators adds a new dependency between
+> regulators. Therefore, the current locking model should be changed.
+> Coupled regulators should be locked with regulator's supplies at the
+> same time.
+> 
+> Add new function regulator_lock_dependent(), which locks all regulators
+> related with the one, that is being changed.
+
+Sort of high level comment, but this doesn't look right: With dependent
+regulators you don't strictly lock the regulators in the direction of
+the tree root, but also siblings at the same level. This is prone with
+deadlocks, as you can't control the order of the regulator locks being
+taken by different tasks. This really needs a ww_mutex to be
+implemented in a robust way.
+
+Regards,
+Lucas
+
+> Signed-off-by: Maciej Purski <m.purski@samsung.com>
 > ---
->  .../devicetree/bindings/pci/brcm,iproc-pcie.txt    | 31 +++++++++++++++++-----
->  1 file changed, 24 insertions(+), 7 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-> index b8e48b4..7ea24dc 100644
-> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-> @@ -13,9 +13,6 @@ controller, used in Stingray
->    PAXB-based root complex is used for external endpoint devices. PAXC-based
->  root complex is connected to emulated endpoint devices internal to the ASIC
->  - reg: base address and length of the PCIe controller I/O register space
-> -- #interrupt-cells: set to <1>
-> -- interrupt-map-mask and interrupt-map, standard PCI properties to define the
-> -  mapping of the PCIe interface to interrupt numbers
->  - linux,pci-domain: PCI domain ID. Should be unique for each host controller
->  - bus-range: PCI bus numbers covered
->  - #address-cells: set to <3>
-> @@ -41,6 +38,16 @@ Required:
->  - brcm,pcie-ob-axi-offset: The offset from the AXI address to the internal
->  address used by the iProc PCIe core (not the PCIe address)
->
-> +Legacy interrupt (INTx) support (optional):
+> ?drivers/regulator/core.c | 75 +++++++++++++++++++++++++++++++++---------------
+> ?1 file changed, 52 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> index 0b366c5..7c57268 100644
+> --- a/drivers/regulator/core.c
+> +++ b/drivers/regulator/core.c
+> @@ -201,38 +201,67 @@ static void regulator_unlock(struct regulator_dev *rdev)
+> > ?	}
+> ?}
+> ?
+> -/**
+> - * regulator_lock_supply - lock a regulator and its supplies
+> - * @rdev:?????????regulator source
+> - */
+> -static void regulator_lock_supply(struct regulator_dev *rdev)
+> +static int regulator_lock_recursive(struct regulator_dev *rdev,
+> > +				????unsigned int subclass)
+> ?{
+> > +	struct regulator_dev *c_rdev;
+> > ?	int i;
+> ?
+> > -	for (i = 0; rdev; rdev = rdev_get_supply(rdev), i++)
+> > -		regulator_lock_nested(rdev, i);
+> > +	for (i = 0; i < rdev->coupling_desc.n_coupled; i++) {
+> > +		c_rdev = rdev->coupling_desc.coupled_rdevs[i];
 > +
-> +Note INTx is for PAXB only.
+> > +		if (!c_rdev)
+> > +			continue;
 > +
-> +- interrupt-controller: claims itself as an interrupt controller for INTx
-> +- #interrupt-cells: set to <1>
-> +- interrupt-map-mask and interrupt-map, standard PCI properties to define
-> +the mapping of the PCIe interface to interrupt numbers
-> +- interrupts: interrupt line wired to the generic GIC for INTx support
+> > +		regulator_lock_nested(c_rdev, subclass++);
 > +
->  MSI support (optional):
->
->  For older platforms without MSI integrated in the GIC, iProc PCIe core provides
-> @@ -77,9 +84,14 @@ Example:
->                 compatible = "brcm,iproc-pcie";
->                 reg = <0x18012000 0x1000>;
->
-> +               interrupt-controller;
->                 #interrupt-cells = <1>;
-> -               interrupt-map-mask = <0 0 0 0>;
-> -               interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
-> +               interrupt-map-mask = <0 0 0 7>;
-> +               interrupt-map = <0 0 0 1 &pcie0 1>,
-
-Are you sure this works? The irq parsing code will ignore
-interrupt-map if interrupt-controller is found. In other words, you
-should have one or the other, but not both.
-
-Maybe it happens to work because "pcie0" is this node and your irq
-numbers are the same.
-
-Arnd, any thoughts on this?
-
-> +                               <0 0 0 2 &pcie0 2>,
-> +                               <0 0 0 3 &pcie0 3>,
-> +                               <0 0 0 4 &pcie0 4>;
-> +               interrupts = <GIC_SPI 100 IRQ_TYPE_NONE>;
->
->                 linux,pci-domain = <0>;
->
-> @@ -115,9 +127,14 @@ Example:
->                 compatible = "brcm,iproc-pcie";
->                 reg = <0x18013000 0x1000>;
->
-> +               interrupt-controller;
->                 #interrupt-cells = <1>;
-> -               interrupt-map-mask = <0 0 0 0>;
-> -               interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
-> +               interrupt-map-mask = <0 0 0 7>;
-> +               interrupt-map = <0 0 0 1 &pcie1 1>,
-> +                               <0 0 0 2 &pcie1 2>,
-> +                               <0 0 0 3 &pcie1 3>,
-> +                               <0 0 0 4 &pcie1 4>;
-> +               interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
->
->                 linux,pci-domain = <1>;
->
-> --
-> 2.1.4
->
+> > +		if (c_rdev->supply)
+> > +			subclass =
+> > +				regulator_lock_recursive(c_rdev->supply->rdev,
+> > +							?subclass);
+> > +	}
+> +
+> > +	return subclass;
+> ?}
+> ?
+> ?/**
+> - * regulator_unlock_supply - unlock a regulator and its supplies
+> - * @rdev:?????????regulator source
+> + * regulator_unlock_dependent - unlock regulator's suppliers and coupled
+> > + *				regulators
+> > + * @rdev:			regulator source
+> + *
+> + * Unlock all regulators related with rdev by coupling or suppling.
+> ? */
+> -static void regulator_unlock_supply(struct regulator_dev *rdev)
+> +static void regulator_unlock_dependent(struct regulator_dev *rdev)
+> ?{
+> > -	struct regulator *supply;
+> > +	struct regulator_dev *c_rdev;
+> > +	int i;
+> ?
+> > -	while (1) {
+> > -		regulator_unlock(rdev);
+> > -		supply = rdev->supply;
+> > +	for (i = 0; i < rdev->coupling_desc.n_coupled; i++) {
+> > +		c_rdev = rdev->coupling_desc.coupled_rdevs[i];
+> ?
+> > -		if (!rdev->supply)
+> > -			return;
+> > +		if (!c_rdev)
+> > +			continue;
+> +
+> > +		regulator_unlock(c_rdev);
+> ?
+> > -		rdev = supply->rdev;
+> > +		if (c_rdev->supply)
+> > +			regulator_unlock_dependent(c_rdev->supply->rdev);
+> > ?	}
+> ?}
+> ?
+> ?/**
+> + * regulator_lock_dependent - lock regulator's suppliers and coupled regulators
+> > + * @rdev:			regulator source
+> + *
+> + * This function as a wrapper on regulator_lock_recursive(), which locks
+> + * all regulators related with rdev by coupling or suppling.
+> + */
+> +static inline void regulator_lock_dependent(struct regulator_dev *rdev)
+> +{
+> > +	regulator_lock_recursive(rdev, 0);
+> +}
+> +
+> +/**
+> ? * of_get_regulator - get a regulator device node based on supply name
+> ? * @dev: Device pointer for the consumer (of regulator) device
+> ? * @supply: regulator supply name
+> @@ -3332,12 +3361,12 @@ int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
+> > ?	int ret = 0;
+> ?
+> > ?	pr_err("%s: %d\n", __func__, __LINE__);
+> > -	regulator_lock_supply(regulator->rdev);
+> > +	regulator_lock_dependent(regulator->rdev);
+> ?
+> > ?	ret = regulator_set_voltage_unlocked(regulator, min_uV, max_uV,
+> > ?					?????PM_SUSPEND_ON);
+> ?
+> > -	regulator_unlock_supply(regulator->rdev);
+> > +	regulator_unlock_dependent(regulator->rdev);
+> ?
+> > ?	return ret;
+> ?}
+> @@ -3415,12 +3444,12 @@ int regulator_set_suspend_voltage(struct regulator *regulator, int min_uV,
+> > ?	if (regulator_check_states(state) || state == PM_SUSPEND_ON)
+> > ?		return -EINVAL;
+> ?
+> > -	regulator_lock_supply(regulator->rdev);
+> > +	regulator_lock_dependent(regulator->rdev);
+> ?
+> > ?	ret = _regulator_set_suspend_voltage(regulator, min_uV,
+> > ?					?????max_uV, state);
+> ?
+> > -	regulator_unlock_supply(regulator->rdev);
+> > +	regulator_unlock_dependent(regulator->rdev);
+> ?
+> > ?	return ret;
+> ?}
+> @@ -3612,11 +3641,11 @@ int regulator_get_voltage(struct regulator *regulator)
+> ?{
+> > ?	int ret;
+> ?
+> > -	regulator_lock_supply(regulator->rdev);
+> > +	regulator_lock_dependent(regulator->rdev);
+> ?
+> > ?	ret = _regulator_get_voltage(regulator->rdev);
+> ?
+> > -	regulator_unlock_supply(regulator->rdev);
+> > +	regulator_unlock_dependent(regulator->rdev);
+> ?
+> > ?	return ret;
+> ?}
