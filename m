@@ -1,35 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jun 2018 13:13:51 +0100
-Subject: [PATCH v12 3/5] arm64: pgtable: Add p*d_page_vaddr helper macros
-In-Reply-To: <1527856758-27169-4-git-send-email-cpandya@codeaurora.org>
+Date: Mon, 4 Jun 2018 13:14:52 +0100
+Subject: [PATCH v12 5/5] arm64: Allow huge io mappings again
+In-Reply-To: <1527856758-27169-6-git-send-email-cpandya@codeaurora.org>
 References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
- <1527856758-27169-4-git-send-email-cpandya@codeaurora.org>
-Message-ID: <20180604121351.GJ9482@arm.com>
+ <1527856758-27169-6-git-send-email-cpandya@codeaurora.org>
+Message-ID: <20180604121452.GK9482@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 06:09:16PM +0530, Chintan Pandya wrote:
-> Add helper macros to give virtual references to page
-> tables. These will be used while freeing dangling
-> page tables.
+On Fri, Jun 01, 2018 at 06:09:18PM +0530, Chintan Pandya wrote:
+> Huge mappings have had stability issues due to stale
+> TLB entry and memory leak issues. Since, those are
+> addressed in this series of patches, it is now safe
+> to allow huge mappings.
 > 
 > Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
 > ---
->  arch/arm64/include/asm/pgtable.h | 3 +++
->  1 file changed, 3 insertions(+)
+>  arch/arm64/mm/mmu.c | 18 ++----------------
+>  1 file changed, 2 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 7c4c8f3..ef4047f 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -580,6 +580,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
->  
->  #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
->  
-> +#define pmd_page_vaddr(pmd) __va(pmd_page_paddr(pmd))
-> +#define pud_page_vaddr(pud) __va(pud_page_paddr(pud))
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 6e7e16c..c65abc4 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -934,15 +934,8 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+>  {
+>  	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
+>  					pgprot_val(mk_sect_prot(prot)));
+> -	pud_t new_pud = pfn_pud(__phys_to_pfn(phys), sect_prot);
+> -
+> -	/* Only allow permission changes for now */
+> -	if (!pgattr_change_is_safe(READ_ONCE(pud_val(*pudp)),
+> -				   pud_val(new_pud)))
+> -		return 0;
 
-Are these actually needed, or do pte_offset_kernel and pmd_offset do the
-job already?
+Do you actually need to remove these checks? If we're doing
+break-before-make properly, then the check won't fire but it would be
+good to keep it there so we can catch misuse of these in future.
+
+In other words, can we drop this patch?
 
 Will
