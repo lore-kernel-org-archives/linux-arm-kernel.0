@@ -1,80 +1,133 @@
-From: jwboyer@kernel.org (Josh Boyer)
-Date: Mon, 4 Jun 2018 08:52:14 -0400
-Subject: qcom: add firmware file for Venus on SDM845
-In-Reply-To: <bcb4ba3ccd3b139ce03b6736d8d07cbe@codeaurora.org>
-References: <1527246209-26685-1-git-send-email-vgarodia@codeaurora.org>
- <1527246209-26685-2-git-send-email-vgarodia@codeaurora.org>
- <CA+5PVA67tow+prVC55XF4=CbRGXJvPi2SuCMyhRyuw5qt8T6_Q@mail.gmail.com>
- <bcb4ba3ccd3b139ce03b6736d8d07cbe@codeaurora.org>
-Message-ID: <CA+5PVA5OETGW0JWMrrDhp-eFpgBMQ9Ud2sed_z67Qj4biXTnVw@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 4 Jun 2018 15:03:51 +0200
+Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
+ encoder
+In-Reply-To: <20180518162815.GA24966@rob-hp-laptop>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
+ <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
+ <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
+ <20180518162815.GA24966@rob-hp-laptop>
+Message-ID: <CA+M3ks43RzdhYPwz7i0kB_CPYPLmRfwtALS-bPzuwEQEMcts0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 26, 2018 at 4:18 AM Vikash Garodia <vgarodia@codeaurora.org> wrote:
+2018-05-18 18:28 GMT+02:00 Rob Herring <robh@kernel.org>:
+> On Thu, May 17, 2018 at 08:59:40PM +0200, Benjamin Gaignard wrote:
+>> 2018-05-17 18:23 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
+>> > On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
+>> > <vilhelm.gray@gmail.com> wrote:
+>> >> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> >
+>> > v6? Where's v1-v5?
+>> >
+>> >> Add bindings for STM32 Timer quadrature encoder.
+>> >> It is a sub-node of STM32 Timer which implement the
+>> >> counter part of the hardware.
+>> >>
+>> >> Cc: Rob Herring <robh+dt@kernel.org>
+>> >> Cc: Mark Rutland <mark.rutland@arm.com>
+>> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> >> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+>> >> ---
+>> >>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
+>> >>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+>> >>  2 files changed, 33 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> >> new file mode 100644
+>> >> index 000000000000..377728128bef
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> >> @@ -0,0 +1,26 @@
+>> >> +STMicroelectronics STM32 Timer quadrature encoder
+>> >> +
+>> >> +STM32 Timer provides quadrature encoder counter mode to detect
+>> >
+>> > 'mode' does not sound like a sub-block of the timers block.
+>>
+>> quadrature encoding is one of the counting modes of this hardware
+>> block which is enable to count on other signals/triggers
 >
-> Hi Josh,
->
-> On 2018-05-25 17:34, Josh Boyer wrote:
-> > On Fri, May 25, 2018 at 7:03 AM Vikash Garodia
-> > <vgarodia@codeaurora.org>
-> > wrote:
-> >
-> >> This pull request adds firmware files for Venus h/w codec found on the
-> > Qualcomm SDM845 chipset.
-> >
-> >> The following changes since commit
-> > 2a9b2cf50fb32e36e4fc1586c2f6f1421913b553:
-> >
-> >>    Merge branch 'for-upstreaming-v1.7.2' of
-> > https://github.com/felix-cavium/linux-firmware (2018-05-18 08:35:22
-> > -0400)
-> >
-> >> are available in the git repository at:
-> >
-> >
-> >>    https://github.com/vgarodia/linux-firmware master
-> >
-> >> for you to fetch changes up to
-> >> d6088b9c9d7f49d3c6c43681190889eca0abdcce:
-> >
-> >>    qcom: add venus firmware files for v5.2 (2018-05-25 15:16:43 +0530)
-> >
-> >> ----------------------------------------------------------------
-> >> Vikash Garodia (1):
-> >>        qcom: add venus firmware files for v5.2
-> >
-> >>   WHENCE                   |   9 +++++++++
-> >>   qcom/venus-5.2/venus.b00 | Bin 0 -> 212 bytes
-> >>   qcom/venus-5.2/venus.b01 | Bin 0 -> 6600 bytes
-> >>   qcom/venus-5.2/venus.b02 | Bin 0 -> 819552 bytes
-> >>   qcom/venus-5.2/venus.b03 | Bin 0 -> 33536 bytes
-> >>   qcom/venus-5.2/venus.b04 |   1 +
-> >>   qcom/venus-5.2/venus.mbn | Bin 0 -> 865408 bytes
-> >>   qcom/venus-5.2/venus.mdt | Bin 0 -> 6812 bytes
-> >>   8 files changed, 10 insertions(+)
-> >>   create mode 100644 qcom/venus-5.2/venus.b00
-> >>   create mode 100644 qcom/venus-5.2/venus.b01
-> >>   create mode 100644 qcom/venus-5.2/venus.b02
-> >>   create mode 100644 qcom/venus-5.2/venus.b03
-> >>   create mode 100644 qcom/venus-5.2/venus.b04
-> >>   create mode 100644 qcom/venus-5.2/venus.mbn
-> >>   create mode 100644 qcom/venus-5.2/venus.mdt
-> >
-> > The venus.mbn file isn't mentioned in WHENCE:
-> >
-> > [jwboyer at vader linux-firmware]$ ./check_whence.py
-> > E: qcom/venus-5.2/venus.mbn not listed in WHENCE
-> > [jwboyer at vader linux-firmware]$
-> >
-> > Can you fix that up and let me know when to re-pull?
-> I have fixed the error and is ready to be re-pulled from the same git
-> repository.
-> I have noted the process to run check_whence.py before uploading the
-> firmwares.
->
-> Do i need to resend the pull request as the end commit is now changed to
-> 7602644358157e4b89960472b6d59ffcc040ca52 ?
+> You don't need a child node and compatible to set a mode.
 
-Nope.  Pulled and pushed out now.  Thanks.
+"mode" isn't the good word here because quadratic encoder enable a
+sub-block of this hardware.
+Timer internal counter input could be internal or external clocks,
+some IIO triggers
+or the output of the quadratic encoder sub-block.
+It is a child like pwm or IIO trigger.
 
-josh
+>
+>> >> +angular position and direction of rotary elements,
+>> >> +from IN1 and IN2 input signals.
+>> >> +
+>> >> +Must be a sub-node of an STM32 Timer device tree node.
+>> >> +See ../mfd/stm32-timers.txt for details about the parent node.
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible:          Must be "st,stm32-timer-counter".
+>> >> +- pinctrl-names:       Set to "default".
+>> >> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
+>> >> +                       to set IN1/IN2 pins in mode of operation for Low-Power
+>> >> +                       Timer input on external pin.
+>> >> +
+>> >> +Example:
+>> >> +       timers at 40010000  {
+>> >> +               compatible = "st,stm32-timers";
+>> >> +               ...
+>> >> +               counter {
+>> >> +                       compatible = "st,stm32-timer-counter";
+>> >
+>> > Is there only 1? How is the counter addressed?
+>>
+>> Yes there is only one counter per hardware block.
+>> Counter is addressed like the two others sub-nodes and the details
+>> about parent mode are describe in stm32-timers.txt
+>> Should I add them here too ? so example will be like that:
+>
+> No, you should drop the child node and add pinctrl to the parent.
+>
+> Any other functions this block has that you plan on adding? Please make
+> bindings as complete as possible, not what you currently have drivers
+> for.
+
+Counter framework didn't exist when I pushed timer node but thanks to
+William's effort
+it will allow us to use this kindf of hardware
+
+Benjamin
+
+>
+>> timers at 40010000  {
+>>   #address-cells = <1>;
+>>   #size-cells = <0>;
+>>   compatible = "st,stm32-timers";
+>>   reg = <0x40010000 0x400>;
+>>   clocks = <&rcc 0 160>;
+>>   clock-names = "int";
+>>   counter {
+>>     compatible = "st,stm32-timer-counter";
+>>     pinctrl-names = "default";
+>>     pinctrl-0 = <&tim1_in_pins>;
+>>     };
+>>  };
+>>
+>> Benjamin
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
