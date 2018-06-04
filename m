@@ -1,51 +1,112 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sun, 3 Jun 2018 17:40:16 -0700
-Subject: [PATCH 0/5] rpmsg: Convert to use SPDX license identifiers
-In-Reply-To: <20180531171103.8703-1-s-anna@ti.com>
-References: <20180531171103.8703-1-s-anna@ti.com>
-Message-ID: <20180604004016.GA11998@builder>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 4 Jun 2018 09:52:39 +0900
+Subject: [PATCH 6/8] media: uniphier: add common module of DVB adapter
+ drivers
+In-Reply-To: <005d01d3fb98$20711900$61534b00$@socionext.com>
+References: <20180530090946.1635-1-suzuki.katsuhiro@socionext.com>
+ <20180530090946.1635-7-suzuki.katsuhiro@socionext.com>
+ <CAK7LNAS8JT8+MAuH+eYUJ3Xa4r07=ecJS0E=SX-tgmV7db_FKw@mail.gmail.com>
+ <005d01d3fb98$20711900$61534b00$@socionext.com>
+Message-ID: <CAK7LNAQT-yigu83t7xOF_4-G1_0DX9OXz_YhJ3SAMH_CkGJcrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 31 May 10:10 PDT 2018, Suman Anna wrote:
+2018-06-04 9:08 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> Hello Yamada-san,
+>
+>> -----Original Message-----
+>> From: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Sent: Saturday, June 2, 2018 9:00 PM
+>> To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
+>> Cc: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>;
+>> linux-media at vger.kernel.org; Masami Hiramatsu <masami.hiramatsu@linaro.org>;
+>> Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel
+>> <linux-arm-kernel@lists.infradead.org>; Linux Kernel Mailing List
+>> <linux-kernel@vger.kernel.org>
+>> Subject: Re: [PATCH 6/8] media: uniphier: add common module of DVB adapter drivers
+>>
+>> 2018-05-30 18:09 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+>> > This patch adds common module for UniPhier DVB adapter drivers
+>> > that equipments tuners and demod that connected by I2C and
+>> > UniPhier demux.
+>> >
+>> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+>> > ---
+>> >  drivers/media/platform/uniphier/Makefile      |  5 ++
+>> >  drivers/media/platform/uniphier/hsc-core.c    |  8 ---
+>> >  .../platform/uniphier/uniphier-adapter.c      | 54 +++++++++++++++++++
+>> >  .../platform/uniphier/uniphier-adapter.h      | 42 +++++++++++++++
+>> >  4 files changed, 101 insertions(+), 8 deletions(-)
+>> >  create mode 100644 drivers/media/platform/uniphier/uniphier-adapter.c
+>> >  create mode 100644 drivers/media/platform/uniphier/uniphier-adapter.h
+>> >
+>> > diff --git a/drivers/media/platform/uniphier/Makefile
+>> b/drivers/media/platform/uniphier/Makefile
+>> > index 0622f04d9e68..9e75ad081b77 100644
+>> > --- a/drivers/media/platform/uniphier/Makefile
+>> > +++ b/drivers/media/platform/uniphier/Makefile
+>> > @@ -3,3 +3,8 @@ uniphier-dvb-y += hsc-core.o hsc-ucode.o hsc-css.o hsc-ts.o
+>> hsc-dma.o
+>> >  uniphier-dvb-$(CONFIG_DVB_UNIPHIER_LD11) += hsc-ld11.o
+>> >
+>> >  obj-$(CONFIG_DVB_UNIPHIER) += uniphier-dvb.o
+>> > +
+>> > +ccflags-y += -Idrivers/media/dvb-frontends/
+>> > +ccflags-y += -Idrivers/media/tuners/
+>>
+>>
+>> Please add $(srctree)/ like
+>>
+>> ccflags-y += -I$(srctree)/drivers/media/dvb-frontends/
+>> ccflags-y += -I$(srctree)/drivers/media/tuners/
+>>
+>>
+>> Currently, it works $(srctree)/,
+>> but I really want to rip off the build system hack.
+>
+> Thanks, I agree with your opinion, but other Makefiles in drivers/media use
+> same hack. I don't know other way to include headers of demodulators and
+> tuners...
+>
+> Do you have any good ideas?
+>
+>
 
-> Hi Bjorn,
-> 
-> The following series switches over the current licensing text in
-> various rpmsg drivers to the SPDX licensing format. I see that you
-> have already picked up my series for the HwSpinlock drivers, so this
-> series does the same for the rpmsg drivers. Please pick these as well
-> for 4.18. Patches done on top of latest upstream kernel.
-> 
-> regards
-> Suman
 
-Thanks Summan,
-Bjorn
+My suggestion is to add '$(srctree)/'.
 
-> 
-> Suman Anna (5):
->   rpmsg: Switch to SPDX license identifier
->   rpmsg: virtio_rpmsg_bus: Switch to SPDX license identifier
->   rpmsg: smd: Switch to SPDX license identifier
->   rpmsg: glink: Switch to SPDX license identifier
->   rpmsg: char: Switch to SPDX license identifier
-> 
->  drivers/rpmsg/Kconfig             |  2 ++
->  drivers/rpmsg/qcom_glink_native.c | 10 +---------
->  drivers/rpmsg/qcom_glink_native.h | 10 +---------
->  drivers/rpmsg/qcom_glink_rpm.c    | 10 +---------
->  drivers/rpmsg/qcom_glink_smem.c   | 10 +---------
->  drivers/rpmsg/qcom_smd.c          | 10 +---------
->  drivers/rpmsg/rpmsg_char.c        | 10 +---------
->  drivers/rpmsg/rpmsg_core.c        | 10 +---------
->  drivers/rpmsg/rpmsg_internal.h    | 10 +---------
->  drivers/rpmsg/virtio_rpmsg_bus.c  | 10 +---------
->  include/linux/rpmsg.h             | 27 +--------------------------
->  include/linux/rpmsg/qcom_glink.h  |  2 ++
->  include/uapi/linux/rpmsg.h        |  9 ---------
->  13 files changed, 14 insertions(+), 116 deletions(-)
-> 
-> -- 
-> 2.17.0
-> 
+For clarification,
+
+
+
+Bad:
+
+ccflags-y += -Idrivers/media/dvb-frontends/
+ccflags-y += -Idrivers/media/tuners/
+
+
+
+Good:
+
+ccflags-y += -I$(srctree)/drivers/media/dvb-frontends/
+ccflags-y += -I$(srctree)/drivers/media/tuners/
+
+
+
+
+
+I want to fix this tree-wide,
+then remove the 'addtree' from scripts/Kbuild.include
+but I have not been able to find time for that.
+
+This is a new file, so just suggested to add '$(srctree)/'
+
+
+
+If you want to know the context:
+https://patchwork.kernel.org/patch/9632347/
+
+
+-- 
+Best Regards
+Masahiro Yamada
