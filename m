@@ -1,123 +1,99 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon,  4 Jun 2018 15:14:08 +0100
-Subject: [PATCH v3] of: platform: stop accessing invalid dev in
- of_platform_device_destroy
-Message-ID: <20180604141408.3179-1-srinivas.kandagatla@linaro.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 4 Jun 2018 09:17:49 -0500
+Subject: [PATCH 1/6] PCI: iproc: Update iProc PCI binding for INTx support
+In-Reply-To: <1527631130-20045-2-git-send-email-ray.jui@broadcom.com>
+References: <1527631130-20045-1-git-send-email-ray.jui@broadcom.com>
+ <1527631130-20045-2-git-send-email-ray.jui@broadcom.com>
+Message-ID: <CAL_Jsq+ac6dmHKS6m0h5N3bv=VseKVL8XLU5K7j1Rn=mgFNLsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Immediately after the platform_device_unregister() the device will be
-cleaned up. Accessing the freed pointer immediately after that will
-crash the system.
++Arnd
 
-Found this bug when kernel is built with CONFIG_PAGE_POISONING and testing
-loading/unloading audio drivers in a loop on Qcom platforms.
+On Tue, May 29, 2018 at 4:58 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+> Update the iProc PCIe binding document for better modeling of the legacy
+> interrupt (INTx) support
+>
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> ---
+>  .../devicetree/bindings/pci/brcm,iproc-pcie.txt    | 31 +++++++++++++++++-----
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+> index b8e48b4..7ea24dc 100644
+> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+> @@ -13,9 +13,6 @@ controller, used in Stingray
+>    PAXB-based root complex is used for external endpoint devices. PAXC-based
+>  root complex is connected to emulated endpoint devices internal to the ASIC
+>  - reg: base address and length of the PCIe controller I/O register space
+> -- #interrupt-cells: set to <1>
+> -- interrupt-map-mask and interrupt-map, standard PCI properties to define the
+> -  mapping of the PCIe interface to interrupt numbers
+>  - linux,pci-domain: PCI domain ID. Should be unique for each host controller
+>  - bus-range: PCI bus numbers covered
+>  - #address-cells: set to <3>
+> @@ -41,6 +38,16 @@ Required:
+>  - brcm,pcie-ob-axi-offset: The offset from the AXI address to the internal
+>  address used by the iProc PCIe core (not the PCIe address)
+>
+> +Legacy interrupt (INTx) support (optional):
+> +
+> +Note INTx is for PAXB only.
+> +
+> +- interrupt-controller: claims itself as an interrupt controller for INTx
+> +- #interrupt-cells: set to <1>
+> +- interrupt-map-mask and interrupt-map, standard PCI properties to define
+> +the mapping of the PCIe interface to interrupt numbers
+> +- interrupts: interrupt line wired to the generic GIC for INTx support
+> +
+>  MSI support (optional):
+>
+>  For older platforms without MSI integrated in the GIC, iProc PCIe core provides
+> @@ -77,9 +84,14 @@ Example:
+>                 compatible = "brcm,iproc-pcie";
+>                 reg = <0x18012000 0x1000>;
+>
+> +               interrupt-controller;
+>                 #interrupt-cells = <1>;
+> -               interrupt-map-mask = <0 0 0 0>;
+> -               interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
+> +               interrupt-map-mask = <0 0 0 7>;
+> +               interrupt-map = <0 0 0 1 &pcie0 1>,
 
-Fix this by moving of_node_clear_flag() just before the unregister calls.
+Are you sure this works? The irq parsing code will ignore
+interrupt-map if interrupt-controller is found. In other words, you
+should have one or the other, but not both.
 
-Below is the crash trace:
+Maybe it happens to work because "pcie0" is this node and your irq
+numbers are the same.
 
-Unable to handle kernel paging request at virtual address 6b6b6b6b6b6c03
-Mem abort info:
-  ESR = 0x96000021
-  Exception class = DABT (current EL), IL = 32 bits
-  SET = 0, FnV = 0
-  EA = 0, S1PTW = 0
-Data abort info:
-  ISV = 0, ISS = 0x00000021
-  CM = 0, WnR = 0
-[006b6b6b6b6b6c03] address between user and kernel address ranges
-Internal error: Oops: 96000021 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 2 PID: 1784 Comm: sh Tainted: G        W         4.17.0-rc7-02230-ge3a63a7ef641-dirty #204
-Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
-pstate: 80000005 (Nzcv daif -PAN -UAO)
-pc : clear_bit+0x18/0x2c
-lr : of_platform_device_destroy+0x64/0xb8
-sp : ffff00000c9c3930
-x29: ffff00000c9c3930 x28: ffff80003d39b200
-x27: ffff000008bb1000 x26: 0000000000000040
-x25: 0000000000000124 x24: ffff80003a9a3080
-x23: 0000000000000060 x22: ffff00000939f518
-x21: ffff80003aa79e98 x20: ffff80003aa3dae0
-x19: ffff80003aa3c890 x18: ffff800009feb794
-x17: 0000000000000000 x16: 0000000000000000
-x15: ffff800009feb790 x14: 0000000000000000
-x13: ffff80003a058778 x12: ffff80003a058728
-x11: ffff80003a058750 x10: 0000000000000000
-x9 : 0000000000000006 x8 : ffff80003a825988
-x7 : bbbbbbbbbbbbbbbb x6 : 0000000000000001
-x5 : 0000000000000000 x4 : 0000000000000001
-x3 : 0000000000000008 x2 : 0000000000000001
-x1 : 6b6b6b6b6b6b6c03 x0 : 0000000000000000
-Process sh (pid: 1784, stack limit = 0x        (ptrval))
-Call trace:
- clear_bit+0x18/0x2c
- q6afe_remove+0x20/0x38
- apr_device_remove+0x30/0x70
- device_release_driver_internal+0x170/0x208
- device_release_driver+0x14/0x20
- bus_remove_device+0xcc/0x150
- device_del+0x10c/0x310
- device_unregister+0x1c/0x70
- apr_remove_device+0xc/0x18
- device_for_each_child+0x50/0x80
- apr_remove+0x18/0x20
- rpmsg_dev_remove+0x38/0x68
- device_release_driver_internal+0x170/0x208
- device_release_driver+0x14/0x20
- bus_remove_device+0xcc/0x150
- device_del+0x10c/0x310
- device_unregister+0x1c/0x70
- qcom_smd_remove_device+0xc/0x18
- device_for_each_child+0x50/0x80
- qcom_smd_unregister_edge+0x3c/0x70
- smd_subdev_remove+0x18/0x28
- rproc_stop+0x48/0xd8
- rproc_shutdown+0x60/0xe8
- state_store+0xbc/0xf8
- dev_attr_store+0x18/0x28
- sysfs_kf_write+0x3c/0x50
- kernfs_fop_write+0x118/0x1e0
- __vfs_write+0x18/0x110
- vfs_write+0xa4/0x1a8
- ksys_write+0x48/0xb0
- sys_write+0xc/0x18
- el0_svc_naked+0x30/0x34
-Code: d2800022 8b400c21 f9800031 9ac32043 (c85f7c22)
----[ end trace 32020935775616a2 ]---
+Arnd, any thoughts on this?
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
-Changes since v2:
- Move the calls to of_node_clear_flag just before unregister,
- suggested by Rob.
-
- drivers/of/platform.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index c00d81dfac0b..9c91f97ffbe1 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -537,6 +537,9 @@ int of_platform_device_destroy(struct device *dev, void *data)
- 	if (of_node_check_flag(dev->of_node, OF_POPULATED_BUS))
- 		device_for_each_child(dev, NULL, of_platform_device_destroy);
- 
-+	of_node_clear_flag(dev->of_node, OF_POPULATED);
-+	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
-+
- 	if (dev->bus == &platform_bus_type)
- 		platform_device_unregister(to_platform_device(dev));
- #ifdef CONFIG_ARM_AMBA
-@@ -544,8 +547,6 @@ int of_platform_device_destroy(struct device *dev, void *data)
- 		amba_device_unregister(to_amba_device(dev));
- #endif
- 
--	of_node_clear_flag(dev->of_node, OF_POPULATED);
--	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(of_platform_device_destroy);
--- 
-2.16.2
+> +                               <0 0 0 2 &pcie0 2>,
+> +                               <0 0 0 3 &pcie0 3>,
+> +                               <0 0 0 4 &pcie0 4>;
+> +               interrupts = <GIC_SPI 100 IRQ_TYPE_NONE>;
+>
+>                 linux,pci-domain = <0>;
+>
+> @@ -115,9 +127,14 @@ Example:
+>                 compatible = "brcm,iproc-pcie";
+>                 reg = <0x18013000 0x1000>;
+>
+> +               interrupt-controller;
+>                 #interrupt-cells = <1>;
+> -               interrupt-map-mask = <0 0 0 0>;
+> -               interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
+> +               interrupt-map-mask = <0 0 0 7>;
+> +               interrupt-map = <0 0 0 1 &pcie1 1>,
+> +                               <0 0 0 2 &pcie1 2>,
+> +                               <0 0 0 3 &pcie1 3>,
+> +                               <0 0 0 4 &pcie1 4>;
+> +               interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+>
+>                 linux,pci-domain = <1>;
+>
+> --
+> 2.1.4
+>
