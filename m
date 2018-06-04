@@ -1,133 +1,56 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 4 Jun 2018 15:03:51 +0200
-Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
- encoder
-In-Reply-To: <20180518162815.GA24966@rob-hp-laptop>
-References: <cover.1526487615.git.vilhelm.gray@gmail.com>
- <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
- <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
- <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
- <20180518162815.GA24966@rob-hp-laptop>
-Message-ID: <CA+M3ks43RzdhYPwz7i0kB_CPYPLmRfwtALS-bPzuwEQEMcts0Q@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 4 Jun 2018 19:41:39 +0800
+Subject: [PATCH 4/7] iommu/amd: make sure TLB to be flushed before IOVA
+ freed
+In-Reply-To: <ccc47903-d946-13ed-3c68-b264bc44b216@arm.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+ <1527752569-18020-5-git-send-email-thunder.leizhen@huawei.com>
+ <ccc47903-d946-13ed-3c68-b264bc44b216@arm.com>
+Message-ID: <5B152573.2080905@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-05-18 18:28 GMT+02:00 Rob Herring <robh@kernel.org>:
-> On Thu, May 17, 2018 at 08:59:40PM +0200, Benjamin Gaignard wrote:
->> 2018-05-17 18:23 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
->> > On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
->> > <vilhelm.gray@gmail.com> wrote:
->> >> From: Benjamin Gaignard <benjamin.gaignard@st.com>
->> >
->> > v6? Where's v1-v5?
->> >
->> >> Add bindings for STM32 Timer quadrature encoder.
->> >> It is a sub-node of STM32 Timer which implement the
->> >> counter part of the hardware.
->> >>
->> >> Cc: Rob Herring <robh+dt@kernel.org>
->> >> Cc: Mark Rutland <mark.rutland@arm.com>
->> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> >> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
->> >> ---
->> >>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
->> >>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
->> >>  2 files changed, 33 insertions(+)
->> >>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
->> >> new file mode 100644
->> >> index 000000000000..377728128bef
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
->> >> @@ -0,0 +1,26 @@
->> >> +STMicroelectronics STM32 Timer quadrature encoder
->> >> +
->> >> +STM32 Timer provides quadrature encoder counter mode to detect
->> >
->> > 'mode' does not sound like a sub-block of the timers block.
+
+
+On 2018/5/31 21:04, Robin Murphy wrote:
+> On 31/05/18 08:42, Zhen Lei wrote:
+>> Although the mapping has already been removed in the page table, it maybe
+>> still exist in TLB. Suppose the freed IOVAs is reused by others before the
+>> flush operation completed, the new user can not correctly access to its
+>> meomory.
+> 
+> This change seems reasonable in isolation, but why is it right in the middle of a series which has nothing to do with x86?
+Because I described more in the previous patch, which may help this patch to be understood well.
+
+You're right, I will repost this patch separately.
+
+> 
+> Robin.
+> 
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>   drivers/iommu/amd_iommu.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> quadrature encoding is one of the counting modes of this hardware
->> block which is enable to count on other signals/triggers
->
-> You don't need a child node and compatible to set a mode.
-
-"mode" isn't the good word here because quadratic encoder enable a
-sub-block of this hardware.
-Timer internal counter input could be internal or external clocks,
-some IIO triggers
-or the output of the quadratic encoder sub-block.
-It is a child like pwm or IIO trigger.
-
->
->> >> +angular position and direction of rotary elements,
->> >> +from IN1 and IN2 input signals.
->> >> +
->> >> +Must be a sub-node of an STM32 Timer device tree node.
->> >> +See ../mfd/stm32-timers.txt for details about the parent node.
->> >> +
->> >> +Required properties:
->> >> +- compatible:          Must be "st,stm32-timer-counter".
->> >> +- pinctrl-names:       Set to "default".
->> >> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
->> >> +                       to set IN1/IN2 pins in mode of operation for Low-Power
->> >> +                       Timer input on external pin.
->> >> +
->> >> +Example:
->> >> +       timers at 40010000  {
->> >> +               compatible = "st,stm32-timers";
->> >> +               ...
->> >> +               counter {
->> >> +                       compatible = "st,stm32-timer-counter";
->> >
->> > Is there only 1? How is the counter addressed?
+>> diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+>> index 8fb8c73..93aa389 100644
+>> --- a/drivers/iommu/amd_iommu.c
+>> +++ b/drivers/iommu/amd_iommu.c
+>> @@ -2402,9 +2402,9 @@ static void __unmap_single(struct dma_ops_domain *dma_dom,
+>>       }
+>>         if (amd_iommu_unmap_flush) {
+>> -        dma_ops_free_iova(dma_dom, dma_addr, pages);
+>>           domain_flush_tlb(&dma_dom->domain);
+>>           domain_flush_complete(&dma_dom->domain);
+>> +        dma_ops_free_iova(dma_dom, dma_addr, pages);
+>>       } else {
+>>           pages = __roundup_pow_of_two(pages);
+>>           queue_iova(&dma_dom->iovad, dma_addr >> PAGE_SHIFT, pages, 0);
 >>
->> Yes there is only one counter per hardware block.
->> Counter is addressed like the two others sub-nodes and the details
->> about parent mode are describe in stm32-timers.txt
->> Should I add them here too ? so example will be like that:
->
-> No, you should drop the child node and add pinctrl to the parent.
->
-> Any other functions this block has that you plan on adding? Please make
-> bindings as complete as possible, not what you currently have drivers
-> for.
-
-Counter framework didn't exist when I pushed timer node but thanks to
-William's effort
-it will allow us to use this kindf of hardware
-
-Benjamin
-
->
->> timers at 40010000  {
->>   #address-cells = <1>;
->>   #size-cells = <0>;
->>   compatible = "st,stm32-timers";
->>   reg = <0x40010000 0x400>;
->>   clocks = <&rcc 0 160>;
->>   clock-names = "int";
->>   counter {
->>     compatible = "st,stm32-timer-counter";
->>     pinctrl-names = "default";
->>     pinctrl-0 = <&tim1_in_pins>;
->>     };
->>  };
->>
->> Benjamin
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+> 
+> .
+> 
 
 -- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Thanks!
+BestRegards
