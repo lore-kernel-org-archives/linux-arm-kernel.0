@@ -1,171 +1,61 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 04 Jun 2018 16:20:47 +0200
-Subject: [PATCH 5/7] regulator: core: Lock dependent regulators
-In-Reply-To: <1528120764-14316-6-git-send-email-m.purski@samsung.com>
-References: <20180530144505.GB5705@atomide.com>
- <1528120764-14316-1-git-send-email-m.purski@samsung.com>
- <CGME20180604135954eucas1p2156fed3300b5514a4efa2baf9e7b9bc5@eucas1p2.samsung.com>
- <1528120764-14316-6-git-send-email-m.purski@samsung.com>
-Message-ID: <1528122047.2728.10.camel@pengutronix.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 4 Jun 2018 17:22:52 +0300
+Subject: [PATCH 2/3] arm64: dts: renesas: condor: specify EtherAVB PHY IRQ
+In-Reply-To: <20180604103302.f5kx5fqhbl3ohfpi@verge.net.au>
+References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
+ <21578b79-7ba0-b3a6-ae45-7e9ffbb7c8db@cogentembedded.com>
+ <20180604103302.f5kx5fqhbl3ohfpi@verge.net.au>
+Message-ID: <049a712d-7381-c771-c352-6badc2978175@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+On 06/04/2018 01:33 PM, Simon Horman wrote:
 
-Am Montag, den 04.06.2018, 15:59 +0200 schrieb Maciej Purski:
-> Implementing coupled regulators adds a new dependency between
-> regulators. Therefore, the current locking model should be changed.
-> Coupled regulators should be locked with regulator's supplies at the
-> same time.
+>> Specify EtherAVB PHY IRQ in the Condor board's device tree, now that
+>> we have the GPIO support (previously phylib had to resort to polling).
+>>
+>> Based on the original (and large) patch by Vladimir Barinov.
+>>
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |    2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+>> ===================================================================
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+>> @@ -59,6 +59,8 @@
+>>  	phy0: ethernet-phy at 0 {
+>>  		rxc-skew-ps = <1500>;
+>>  		reg = <0>;
+>> +		interrupt-parent = <&gpio1>;
+>> +		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
 > 
-> Add new function regulator_lock_dependent(), which locks all regulators
-> related with the one, that is being changed.
+> I don't see this documented. Perhaps I'm missing something obvious.
 
-Sort of high level comment, but this doesn't look right: With dependent
-regulators you don't strictly lock the regulators in the direction of
-the tree root, but also siblings at the same level. This is prone with
-deadlocks, as you can't control the order of the regulator locks being
-taken by different tasks. This really needs a ww_mutex to be
-implemented in a robust way.
+   Have you looked into the V3H PFC section for where in the GPSRs AVB_PHY_INT
+is mapped?
+   The Condor schematics doesn't explicitly list the GPIO for AVB_PHY_INT
+because that signal is meant to be routed thru the MAC. Unfortunately, the
+sh_eth/ravb drivers don't support the PHY interrupt (the phylib function,
+phy_mac_interrupt() reporting the PHY interrupts routed thru MAC is clearly
+inadequate as it wants the link state as an argument), so we have to resort
+to the GPIO interrupts...
 
-Regards,
-Lucas
+> Or you have some extra information or newer documentation?
 
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
-> ?drivers/regulator/core.c | 75 +++++++++++++++++++++++++++++++++---------------
-> ?1 file changed, 52 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-> index 0b366c5..7c57268 100644
-> --- a/drivers/regulator/core.c
-> +++ b/drivers/regulator/core.c
-> @@ -201,38 +201,67 @@ static void regulator_unlock(struct regulator_dev *rdev)
-> > ?	}
-> ?}
-> ?
-> -/**
-> - * regulator_lock_supply - lock a regulator and its supplies
-> - * @rdev:?????????regulator source
-> - */
-> -static void regulator_lock_supply(struct regulator_dev *rdev)
-> +static int regulator_lock_recursive(struct regulator_dev *rdev,
-> > +				????unsigned int subclass)
-> ?{
-> > +	struct regulator_dev *c_rdev;
-> > ?	int i;
-> ?
-> > -	for (i = 0; rdev; rdev = rdev_get_supply(rdev), i++)
-> > -		regulator_lock_nested(rdev, i);
-> > +	for (i = 0; i < rdev->coupling_desc.n_coupled; i++) {
-> > +		c_rdev = rdev->coupling_desc.coupled_rdevs[i];
-> +
-> > +		if (!c_rdev)
-> > +			continue;
-> +
-> > +		regulator_lock_nested(c_rdev, subclass++);
-> +
-> > +		if (c_rdev->supply)
-> > +			subclass =
-> > +				regulator_lock_recursive(c_rdev->supply->rdev,
-> > +							?subclass);
-> > +	}
-> +
-> > +	return subclass;
-> ?}
-> ?
-> ?/**
-> - * regulator_unlock_supply - unlock a regulator and its supplies
-> - * @rdev:?????????regulator source
-> + * regulator_unlock_dependent - unlock regulator's suppliers and coupled
-> > + *				regulators
-> > + * @rdev:			regulator source
-> + *
-> + * Unlock all regulators related with rdev by coupling or suppling.
-> ? */
-> -static void regulator_unlock_supply(struct regulator_dev *rdev)
-> +static void regulator_unlock_dependent(struct regulator_dev *rdev)
-> ?{
-> > -	struct regulator *supply;
-> > +	struct regulator_dev *c_rdev;
-> > +	int i;
-> ?
-> > -	while (1) {
-> > -		regulator_unlock(rdev);
-> > -		supply = rdev->supply;
-> > +	for (i = 0; i < rdev->coupling_desc.n_coupled; i++) {
-> > +		c_rdev = rdev->coupling_desc.coupled_rdevs[i];
-> ?
-> > -		if (!rdev->supply)
-> > -			return;
-> > +		if (!c_rdev)
-> > +			continue;
-> +
-> > +		regulator_unlock(c_rdev);
-> ?
-> > -		rdev = supply->rdev;
-> > +		if (c_rdev->supply)
-> > +			regulator_unlock_dependent(c_rdev->supply->rdev);
-> > ?	}
-> ?}
-> ?
-> ?/**
-> + * regulator_lock_dependent - lock regulator's suppliers and coupled regulators
-> > + * @rdev:			regulator source
-> + *
-> + * This function as a wrapper on regulator_lock_recursive(), which locks
-> + * all regulators related with rdev by coupling or suppling.
-> + */
-> +static inline void regulator_lock_dependent(struct regulator_dev *rdev)
-> +{
-> > +	regulator_lock_recursive(rdev, 0);
-> +}
-> +
-> +/**
-> ? * of_get_regulator - get a regulator device node based on supply name
-> ? * @dev: Device pointer for the consumer (of regulator) device
-> ? * @supply: regulator supply name
-> @@ -3332,12 +3361,12 @@ int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
-> > ?	int ret = 0;
-> ?
-> > ?	pr_err("%s: %d\n", __func__, __LINE__);
-> > -	regulator_lock_supply(regulator->rdev);
-> > +	regulator_lock_dependent(regulator->rdev);
-> ?
-> > ?	ret = regulator_set_voltage_unlocked(regulator, min_uV, max_uV,
-> > ?					?????PM_SUSPEND_ON);
-> ?
-> > -	regulator_unlock_supply(regulator->rdev);
-> > +	regulator_unlock_dependent(regulator->rdev);
-> ?
-> > ?	return ret;
-> ?}
-> @@ -3415,12 +3444,12 @@ int regulator_set_suspend_voltage(struct regulator *regulator, int min_uV,
-> > ?	if (regulator_check_states(state) || state == PM_SUSPEND_ON)
-> > ?		return -EINVAL;
-> ?
-> > -	regulator_lock_supply(regulator->rdev);
-> > +	regulator_lock_dependent(regulator->rdev);
-> ?
-> > ?	ret = _regulator_set_suspend_voltage(regulator, min_uV,
-> > ?					?????max_uV, state);
-> ?
-> > -	regulator_unlock_supply(regulator->rdev);
-> > +	regulator_unlock_dependent(regulator->rdev);
-> ?
-> > ?	return ret;
-> ?}
-> @@ -3612,11 +3641,11 @@ int regulator_get_voltage(struct regulator *regulator)
-> ?{
-> > ?	int ret;
-> ?
-> > -	regulator_lock_supply(regulator->rdev);
-> > +	regulator_lock_dependent(regulator->rdev);
-> ?
-> > ?	ret = _regulator_get_voltage(regulator->rdev);
-> ?
-> > -	regulator_unlock_supply(regulator->rdev);
-> > +	regulator_unlock_dependent(regulator->rdev);
-> ?
-> > ?	return ret;
-> ?}
+   No.
+
+> Also, given Olof Johansson's recent comments in ("Re: [GIT PULL] Renesas
+> ARM64 Based SoC DT Updates for v4.18") please consider squashing this patch
+> and the following one.
+
+   Hm... note that the different Ether cores are involved in these 2 PHY IRQ
+patches. If that's OK, I can merge the patches...
+
+[...]
+
+MBR< Sergei
