@@ -1,36 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 4 Jun 2018 11:59:46 +0200
-Subject: [PATCH 0/3] ARM: shmobile: apmu: Cleanups after legacy SMP
- fallback removal
-In-Reply-To: <20180531143947.j56rcjmscflmvf6a@verge.net.au>
-References: <1527693328-10559-1-git-send-email-geert+renesas@glider.be>
- <20180531143947.j56rcjmscflmvf6a@verge.net.au>
-Message-ID: <20180604095945.qglbwc5rp67g4jpv@verge.net.au>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Mon,  4 Jun 2018 12:00:32 +0200
+Subject: [PATCH v5 1/4] ARM: imx: remove inexistant EPIT timer init
+In-Reply-To: <20180604100035.19558-1-peron.clem@gmail.com>
+References: <20180604100035.19558-1-peron.clem@gmail.com>
+Message-ID: <20180604100035.19558-2-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 10:39:48AM -0400, Simon Horman wrote:
-> On Wed, May 30, 2018 at 05:15:25PM +0200, Geert Uytterhoeven wrote:
-> > 	Hi Simon, Magnus,
-> > 
-> > Now the legacy SMP fallbacks for R-Car H2 and M2-W have been removed, a
-> > few more code cleanups can be applied.
-> > 
-> > The third patch is a bit larger than I had hoped, due to the need to
-> > reshuffle a few functions in the absence of forward declarations.
-> > 
-> > Tested on Lager (R-Car H2) and Koelsch (R-Car M2-W).
-> > 
-> > Thanks!
-> > 
-> > Geert Uytterhoeven (3):
-> >   ARM: shmobile: apmu: Move cpu_leave_lowpower() to SUSPEND section
-> >   ARM: shmobile: apmu: Remove obsolete shmobile_smp_apmu_prepare_cpus()
-> >   ARM: shmobile: apmu: Remove platsmp-apmu.h
-> 
-> This looks fine but I will wait to see if there are other reviews before
-> applying.
-> 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+From: Cl?ment Peron <clement.peron@devialet.com>
 
-Thanks, applied.
+i.MX EPIT timer has been removed but not the init function declaration.
+
+Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/mach-imx/common.h | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index c8d68e918b2f..18aae76fa2da 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -38,7 +38,6 @@ void imx21_soc_init(void);
+ void imx27_soc_init(void);
+ void imx31_soc_init(void);
+ void imx35_soc_init(void);
+-void epit_timer_init(void __iomem *base, int irq);
+ int mx21_clocks_init(unsigned long lref, unsigned long fref);
+ int mx27_clocks_init(unsigned long fref);
+ int mx31_clocks_init(unsigned long fref);
+-- 
+2.17.0
