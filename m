@@ -1,74 +1,69 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 4 Jun 2018 14:54:21 +0100
-Subject: [PATCH v2] of: platform: stop accessing invalid dev in
- of_platform_device_destroy
-In-Reply-To: <CAL_JsqJ9AMDiYCfgGgHZ=XL_1yJjTdSA4Jb_GqHAZML3jwB6+Q@mail.gmail.com>
-References: <20180602000343.20045-1-srinivas.kandagatla@linaro.org>
- <CAL_JsqJ9AMDiYCfgGgHZ=XL_1yJjTdSA4Jb_GqHAZML3jwB6+Q@mail.gmail.com>
-Message-ID: <467d5a5d-bb58-299e-a1fc-06e6974b7a0f@linaro.org>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Mon, 4 Jun 2018 19:28:01 +0530
+Subject: [PATCH v2 3/6] clk: ti: dra7: Add clkctrl clock data for the mcan
+ clocks
+In-Reply-To: <20180601142613.GU5705@atomide.com>
+References: <20180530141133.3711-1-faiz_abbas@ti.com>
+ <20180530141133.3711-4-faiz_abbas@ti.com>
+ <20180531040350.GA25132@rob-hp-laptop>
+ <e7e3ade1-76b7-f216-ece5-bd64a55cede6@ti.com>
+ <678ef467-a235-91db-8bae-f249ad98eac8@ti.com>
+ <d7532c7a-d2ae-5cbf-cfd0-c347b975ed6b@ti.com>
+ <20180601142613.GU5705@atomide.com>
+Message-ID: <6df7e0cd-5574-aa19-6c99-4438e5e377e0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Friday 01 June 2018 07:56 PM, Tony Lindgren wrote:
+> * Faiz Abbas <faiz_abbas@ti.com> [180601 06:49]:
+>> Hi,
+>>
+>> On Thursday 31 May 2018 06:59 PM, Tero Kristo wrote:
+>>> On 31/05/18 13:14, Faiz Abbas wrote:
+>>>> Hi,
+>>>>
+>>>> On Thursday 31 May 2018 09:33 AM, Rob Herring wrote:
+>>>>> On Wed, May 30, 2018 at 07:41:30PM +0530, Faiz Abbas wrote:
+>>>>>> Add clkctrl data for the m_can clocks and register it within the
+>>>> ...
+>>>>>> ? diff --git a/include/dt-bindings/clock/dra7.h
+>>>>>> b/include/dt-bindings/clock/dra7.h
+>>>>>> index 5e1061b15aed..d7549c57cac3 100644
+>>>>>> --- a/include/dt-bindings/clock/dra7.h
+>>>>>> +++ b/include/dt-bindings/clock/dra7.h
+>>>>>> @@ -168,5 +168,6 @@
+>>>>>> ? #define DRA7_COUNTER_32K_CLKCTRL??? DRA7_CLKCTRL_INDEX(0x50)
+>>>>>> ? #define DRA7_UART10_CLKCTRL??? DRA7_CLKCTRL_INDEX(0x80)
+>>>>>> ? #define DRA7_DCAN1_CLKCTRL??? DRA7_CLKCTRL_INDEX(0x88)
+>>>>>> +#define DRA7_ADC_CLKCTRL??? DRA7_CLKCTRL_INDEX(0xa0)
+>>>>>
+>>>>> ADC and mcan are the same thing?
+>>>>>
+>>>>
+>>>> The register to control MCAN clocks is called ADC_CLKCTRL, Yes.
+>>>
+>>> Is there any reason for this or is that just a documentation bug?
+>>>
+>>
+>> Looks like they meant to have an ADC in dra74 or dra72 but decided
+>> against it and then many years later used the same registers for MCAN
+>> instead. You can see ADC_CLKCTRL exists in dra72 TRM but is explicitly
+>> disabled.
+>>
+>> http://www.ti.com/lit/ug/spruic2b/spruic2b.pdf pg:1524
+> 
+> How about make add also something like to dra7.h:
+> 
+> #define DRA7_MCAN_CLKCTRL DRA7_ADC_CLKCTRL
+> 
+> And you can add a comment to the dts file to avoid people
+> getting confused with this constantly.
+> 
 
-On 04/06/18 14:44, Rob Herring wrote:
-> On Fri, Jun 1, 2018 at 7:03 PM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
->> Immediately after the platform_device_unregister() the device will be cleaned up.
->> Accessing the freed pointer immediately after that will crash the system.
->>
->> Found this bug when kernel is built with CONFIG_PAGE_POISONING and testing
->> loading/unloading audio drivers in a loop on Qcom platforms.
-> 
-> Curious, does the unittest not catch this too?
-> 
-Not sure!
->>
->> Fix this by removing accessing the dev pointer.
->> Below is the carsh trace:
-> 
-> s/carsh/crash/
-Yep.
-> 
-> [...]
-> 
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index c00d81dfac0b..84c5c899187b 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -529,10 +529,13 @@ arch_initcall_sync(of_platform_default_populate_init);
->>
->>   int of_platform_device_destroy(struct device *dev, void *data)
->>   {
->> +       struct device_node *np;
->> +
->>          /* Do not touch devices not populated from the device tree */
->>          if (!dev->of_node || !of_node_check_flag(dev->of_node, OF_POPULATED))
->>                  return 0;
->>
->> +       np = dev->of_node;
->>          /* Recurse for any nodes that were treated as busses */
->>          if (of_node_check_flag(dev->of_node, OF_POPULATED_BUS))
->>                  device_for_each_child(dev, NULL, of_platform_device_destroy);
->> @@ -544,8 +547,8 @@ int of_platform_device_destroy(struct device *dev, void *data)
->>                  amba_device_unregister(to_amba_device(dev));
->>   #endif
->>
->> -       of_node_clear_flag(dev->of_node, OF_POPULATED);
->> -       of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
-> 
-> Just move these 2 lines to before unregister calls.
-Make sense.. I will do that in v3.
+I would prefer to follow the TRM so that people don't look for registers
+that don't exist at all.
 
-thanks,
-srini
-> 
->> +       of_node_clear_flag(np, OF_POPULATED);
->> +       of_node_clear_flag(np, OF_POPULATED_BUS);
->>          return 0;
->>   }
->>   EXPORT_SYMBOL_GPL(of_platform_device_destroy);
-
->> --
->> 2.16.2
->>
+Thanks,
+Faiz
