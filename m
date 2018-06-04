@@ -1,142 +1,225 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Mon, 4 Jun 2018 11:21:30 +0200
-Subject: [PATCH v4 4/5] clocksource: add driver for i.MX EPIT timer
-In-Reply-To: <677be207-67be-ccbc-8bb3-ab90bf9d05a7@mentor.com>
-References: <20180530120327.27681-1-peron.clem@gmail.com>
- <20180530120327.27681-5-peron.clem@gmail.com>
- <677be207-67be-ccbc-8bb3-ab90bf9d05a7@mentor.com>
-Message-ID: <CAJiuCcfwiut6rN3d_Yn+zCTLChS8kNUYCmpzHQEFmVxan_qfVw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Jun 2018 11:34:28 +0200
+Subject: [PATCH V2] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <20180525200508.22207-1-marek.vasut+renesas@gmail.com>
+References: <20180525200508.22207-1-marek.vasut+renesas@gmail.com>
+Message-ID: <20180604093428.x3br3wb7m7r3jaoj@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Fri, May 25, 2018 at 10:05:08PM +0200, Marek Vasut wrote:
+> Rather than hard-coding the quirk topology, which stopped scaling,
+> parse the information from DT. The code looks for all compatible
+> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
+> to the same pin. If so, the code sends a matching sequence to the
+> PMIC to deassert the IRQ.
+> 
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Cc: linux-renesas-soc at vger.kernel.org
+> ---
+> V2: - Replace the DT shared IRQ check loop with memcmp()
+>     - Send the I2C message to deassert the IRQ line to all PMICs
+>       in the list with shared IRQ line instead of just one
+>     - Add comment that this works only in case all the PMICs are
+>       on the same I2C bus
+> ---
+>  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 117 ++++++++++++++++-----
+>  1 file changed, 93 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+> index 93f628acfd94..4db8d9ea5f97 100644
+> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+> @@ -31,8 +31,10 @@
+>  #include <linux/i2c.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> +#include <linux/list.h>
+>  #include <linux/notifier.h>
+>  #include <linux/of.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/mfd/da9063/registers.h>
+>  
+>  
+> @@ -44,34 +46,47 @@
+>  /* start of DA9210 System Control and Event Registers */
+>  #define DA9210_REG_MASK_A		0x54
+>  
+> +struct regulator_quirk {
+> +	struct list_head		list;
+> +	const struct of_device_id	*id;
+> +	struct of_phandle_args		irq_args;
+> +	struct i2c_msg			i2c_msg;
+> +	bool				shared;	/* IRQ line is shared */
+> +};
+> +
+> +static LIST_HEAD(quirk_list);
+>  static void __iomem *irqc;
+>  
+>  /* first byte sets the memory pointer, following are consecutive reg values */
+>  static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
+>  static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
+>  
+> -static struct i2c_msg da9xxx_msgs[3] = {
+> -	{
+> -		.addr = 0x58,
+> -		.len = ARRAY_SIZE(da9063_irq_clr),
+> -		.buf = da9063_irq_clr,
+> -	}, {
+> -		.addr = 0x68,
+> -		.len = ARRAY_SIZE(da9210_irq_clr),
+> -		.buf = da9210_irq_clr,
+> -	}, {
+> -		.addr = 0x70,
+> -		.len = ARRAY_SIZE(da9210_irq_clr),
+> -		.buf = da9210_irq_clr,
+> -	},
+> +static struct i2c_msg da9063_msgs = {
+> +	.addr = 0x00,
 
-On Thu, 31 May 2018 at 10:36, Vladimir Zapolskiy
-<vladimir_zapolskiy@mentor.com> wrote:
->
-> Hi Cl?ment,
->
-> On 05/30/2018 03:03 PM, Cl?ment P?ron wrote:
-> > From: Colin Didier <colin.didier@devialet.com>
-> >
-> > Add driver for NXP's EPIT timer used in i.MX 6 family of SoC.
-> >
-> > Signed-off-by: Colin Didier <colin.didier@devialet.com>
-> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
-> > ---
->
-> [snip]
->
-> > +++ b/drivers/clocksource/timer-imx-epit.c
-> > @@ -0,0 +1,281 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * i.MX EPIT Timer
-> > + *
-> > + * Copyright (C) 2010 Sascha Hauer <s.hauer@pengutronix.de>
-> > + * Copyright (C) 2018 Colin Didier <colin.didier@devialet.com>
-> > + * Copyright (C) 2018 Cl?ment P?ron <clement.peron@devialet.com>
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/clockchips.h>
-> > +#include <linux/err.h>
->
-> The included header above still can be removed.
+I don't think you need to explicitly initialise the .addr fields to 0.
 
-Ok.
+> +	.len = ARRAY_SIZE(da9063_irq_clr),
+> +	.buf = da9063_irq_clr,
+> +};
+> +
+> +static struct i2c_msg da9210_msgs = {
+> +	.addr = 0x00,
+> +	.len = ARRAY_SIZE(da9210_irq_clr),
+> +	.buf = da9210_irq_clr,
+> +};
+> +
+> +static const struct of_device_id rcar_gen2_quirk_match[] = {
+> +	{ .compatible = "dlg,da9063", .data = &da9063_msgs },
+> +	{ .compatible = "dlg,da9210", .data = &da9210_msgs },
+> +	{},
+>  };
+>  
+>  static int regulator_quirk_notify(struct notifier_block *nb,
+>  				  unsigned long action, void *data)
+>  {
+> +	struct regulator_quirk *pos, *tmp;
+>  	struct device *dev = data;
+>  	struct i2c_client *client;
+>  	static bool done;
+> +	int ret;
+>  	u32 mon;
+>  
+>  	if (done)
+> @@ -88,17 +103,20 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+>  	client = to_i2c_client(dev);
+>  	dev_dbg(dev, "Detected %s\n", client->name);
+>  
+> -	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
+> -	    (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
+> -	    (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
+> -		int ret, len;
+> +	/*
+> +	 * Send message to all PMICs that share an IRQ line to deassert it.
+> +	 *
+> +	 * WARNING: This works only if all the PMICs are on the same I2C bus.
+> +	 */
+> +	list_for_each_entry(pos, &quirk_list, list) {
+> +		if (!pos->shared)
+> +			continue;
+>  
+> -		/* There are two DA9210 on Stout, one on the other boards. */
+> -		len = of_machine_is_compatible("renesas,stout") ? 3 : 2;
+> +		dev_info(&client->dev, "clearing %s at 0x%02x interrupts\n",
+> +			 pos->id->compatible, pos->i2c_msg.addr);
+>  
+> -		dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
+> -		ret = i2c_transfer(client->adapter, da9xxx_msgs, len);
+> -		if (ret != len)
+> +		ret = i2c_transfer(client->adapter, &pos->i2c_msg, 1);
+> +		if (ret != 1)
+>  			dev_err(&client->dev, "i2c error %d\n", ret);
+>  	}
+>  
+> @@ -111,6 +129,11 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+>  remove:
+>  	dev_info(dev, "IRQ2 is not asserted, removing quirk\n");
+>  
+> +	list_for_each_entry_safe(pos, tmp, &quirk_list, list) {
+> +		list_del(&pos->list);
+> +		kfree(pos);
+> +	}
+> +
+>  	done = true;
+>  	iounmap(irqc);
+>  	return 0;
+> @@ -122,7 +145,13 @@ static struct notifier_block regulator_quirk_nb = {
+>  
+>  static int __init rcar_gen2_regulator_quirk(void)
+>  {
+> -	u32 mon;
+> +	struct device_node *np;
+> +	const struct of_device_id *id;
+> +	struct regulator_quirk *quirk;
+> +	struct regulator_quirk *pos;
+> +	struct of_phandle_args *argsa, *argsb;
+> +	u32 mon, addr;
+> +	int ret;
+>  
+>  	if (!of_machine_is_compatible("renesas,koelsch") &&
+>  	    !of_machine_is_compatible("renesas,lager") &&
+> @@ -130,6 +159,46 @@ static int __init rcar_gen2_regulator_quirk(void)
+>  	    !of_machine_is_compatible("renesas,gose"))
+>  		return -ENODEV;
+>  
+> +	for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
+> +		if (!np || !of_device_is_available(np))
+> +			break;
+> +
+> +		quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
+> +
+> +		argsa = &quirk->irq_args;
+> +		memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
+> +
+> +		ret = of_property_read_u32(np, "reg", &addr);
+> +		if (ret)
+> +			return ret;
+> +
+> +		quirk->id = id;
+> +		quirk->i2c_msg.addr = addr;
+> +		quirk->shared = false;
+> +
+> +		ret = of_irq_parse_one(np, 0, &quirk->irq_args);
 
->
-> I have no more comments about the code, I will try to find time to
-> test the driver, but please don't take it as a promise.
+&quirk->irq_args is assigned to argsa above and used directly here.
 
-Regarding the clks, i think the management of the ipg clk in the
-driver is useless
-has it is already handled by the imx clk driver.
+> +		if (ret)
+> +			return ret;
+> +
+> +		list_for_each_entry(pos, &quirk_list, list) {
+> +			argsa = &quirk->irq_args;
 
-I remove the ipg clk and test it on i.MX6Q.
+argsa is initialised both here and further above.
 
-My test is limited to disabled the GPT and enabled the EPIT in the device-tree
-&gpt {
-        status = "disabled";
-};
-
-&epit1 {
-        status = "okay";
-};
-
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.17.0-rc6 (cperon at cperon-Latitude-7490)
-(gcc version 6.4.1 20170707 (Linaro GCC 6.4-2017.08)) #1 SMP PREEMPT
-Mon Jun 4 11:13:41 CEST 2018
-[    0.000000] CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
-instruction cache
-[    0.000000] OF: fdt: Machine model: Devialet Aerobase
-[    0.000000] Memory policy: Data cache writealloc
-[    0.000000] On node 0 totalpages: 262144
-[    0.000000]   Normal zone: 2048 pages used for memmap
-[    0.000000]   Normal zone: 0 pages reserved
-[    0.000000]   Normal zone: 262144 pages, LIFO batch:31
-[    0.000000] random: get_random_bytes called from
-start_kernel+0x80/0x398 with crng_init=0
-[    0.000000] percpu: Embedded 16 pages/cpu @(ptrval) s35084 r8192
-d22260 u65536
-[    0.000000] pcpu-alloc: s35084 r8192 d22260 u65536 alloc=16*4096
-[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3
-[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 260096
-[    0.000000] Kernel command line: console=ttymxc0,115200
-root=/dev/nfs rw nfsroot=192.168.0.4:/opt/nfsroot,v3,tcp ip=dhcp
-[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
-[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
-[    0.000000] Memory: 1029544K/1048576K available (6144K kernel code,
-194K rwdata, 1312K rodata, 1024K init, 224K bss, 19032K reserved, 0K
-cma-reserved)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
-[    0.000000] Preemptible hierarchical RCU implementation.
-[    0.000000]  Tasks RCU enabled.\x00
-[    0.000000] NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
-[    0.000000] L2C-310 errata 752271 769419 enabled
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-[    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-[    0.000000] L2C-310 ID prefetch enabled, offset 16 lines
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-[    0.000000] L2C-310 cache controller enabled, 16 ways, 1024 kB
-[    0.000000] L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x76470001
-[    0.000012] sched_clock: 32 bits at 66MHz, resolution 15ns, wraps
-every 32537631224ns
-[    0.000032] clocksource: epit: mask: 0xffffffff max_cycles:
-0xffffffff, max_idle_ns: 28958491609 ns
-[    0.001231] Calibrating delay loop... 1560.57 BogoMIPS (lpj=780288)
-[    0.008161] pid_max: default: 32768 minimum: 301
-[    0.008336] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.008360] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.009042] CPU: Testing write buffer coherency: ok
-[    0.009506] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.014238] Setting up static identity map for 0x10100000 - 0x10100060
-[    0.015207] Hierarchical SRCU implementation.
-[    0.017208] smp: Bringing up secondary CPUs ...
-[    0.029147] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[    0.041146] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
-[    0.053146] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
-[    0.053321] smp: Brought up 1 node, 4 CPUs
-[    0.053340] SMP: Total of 4 processors activated (6303.74 BogoMIPS).
-[    0.053349] CPU: All CPU(s) started in SVC mode.
-[    0.054441] devtmpfs: initialized
-[    0.063770] VFP support v0.3: implementor 41 architecture 3 part 30
-variant 9 rev 4
-[    0.064454] clocksource: jiffies: mask: 0xffffffff max_cycles:
-0xffffffff, max_idle_ns: 1911260446275000 ns
-[    0.064477] futex hash table entries: 1024 (order: 4, 65536 bytes)
-[    0.064742] pinctrl core: initialized pinctrl subsystem
-[    0.066693] NET: Registered protocol family 16
-[    0.068623] DMA: preallocated 256 KiB pool for atomic coherent allocations
-[    0.071654] cpuidle: using governor menu
-[    0.071802] CPU identified as i.MX6Q, silicon rev 1.2
-
-
->
-> --
-> With best wishes,
-> Vladimir
+> +			argsb = &pos->irq_args;
+> +
+> +			if (argsa->args_count != argsb->args_count)
+> +				continue;
+> +
+> +			ret = memcmp(argsa->args, argsb->args,
+> +				     argsa->args_count *
+> +				     sizeof(argsa->args[0]));
+> +			if (!ret) {
+> +				pos->shared = true;
+> +				quirk->shared = true;
+> +			}
+> +		}
+> +
+> +		list_add_tail(&quirk->list, &quirk_list);
+> +	}
+> +
+>  	irqc = ioremap(IRQC_BASE, PAGE_SIZE);
+>  	if (!irqc)
+>  		return -ENOMEM;
+> -- 
+> 2.16.2
+> 
