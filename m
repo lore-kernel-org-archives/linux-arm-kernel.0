@@ -1,21 +1,73 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 4 Jun 2018 14:43:45 -0700
-Subject: [PATCH] ARM: dts: cygnus: add ethernet0 alias
-In-Reply-To: <20180503095618.2312-1-peron.clem@gmail.com>
-References: <20180503095618.2312-1-peron.clem@gmail.com>
-Message-ID: <40012b6c-d7c3-29b7-95cb-899bbbd008a5@gmail.com>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Mon, 4 Jun 2018 23:45:18 +0200
+Subject: [PATCH 1/1] arm64: dts: rockchip: correct voltage selector
+ Firefly-RK3399
+In-Reply-To: <20180604171523.28454-1-xypron.glpk@gmx.de>
+References: <20180604171523.28454-1-xypron.glpk@gmx.de>
+Message-ID: <1d5c4a57-c89c-07e9-e4ad-1bda2247e2be@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2018 02:56 AM, Cl?ment P?ron wrote:
-> In order to avoid Linux generating a random mac address on every boot,
-> add an ethernet0 alias that will allow u-boot to patch the dtb with
-> the MAC address.
+On 06/04/2018 07:15 PM, Heinrich Schuchardt wrote:
+> Without this patch the Firefly-RK3399 board boot process hangs after these
+> lines:
 > 
-> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+>    fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
+>    fan53555-reg: supplied by vcc_sys
+>    vcc1v8_s3: supplied by vcc_1v8
+> 
+> Blacklisting driver fan53555 allows booting.
+> 
+> The device tree uses a value of fcs,suspend-voltage-selector different to
+> any other board.
+> 
+> Changing this setting to the usual value is sufficient to enable booting.
+> 
+> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+> index 4f28628aa091..50940ef844a7 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+> @@ -458,7 +458,7 @@
+>  	vdd_cpu_b: regulator at 40 {
+>  		compatible = "silergy,syr827";
+>  		reg = <0x40>;
+> -		fcs,suspend-voltage-selector = <0>;
+> +		fcs,suspend-voltage-selector = <1>;
 
-Applied to devicetree/next, thanks. Next time, please do include the
-proper mailing-lists, that way it does not escape my workflow involving
-patchwork behind bcm-kernel-feedback-list at broadcom.com. Thank you
--- 
-Florian
+The same value <1> is used in the legacy kernel:
+
+https://github.com/rockchip-linux/kernel/blob/release-4.4/arch/arm64/boot/dts/rockchip/rk3399-firefly-linux.dts
+
+	vdd_cpu_b: syr827 at 40 {
+		compatible = "silergy,syr827";
+		reg = <0x40>;
+		vin-supply = <&vcc5v0_sys>;
+		regulator-compatible = "fan53555-reg";
+		regulator-name = "vdd_cpu_b";
+		regulator-min-microvolt = <712500>;
+		regulator-max-microvolt = <1500000>;
+		regulator-ramp-delay = <1000>;
+		vsel-gpios = <&gpio1 18 GPIO_ACTIVE_HIGH>;
+		fcs,suspend-voltage-selector = <1>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-initial-state = <3>;
+			regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+};
+
+Best regards
+
+Heinrich
+
+
+>  		regulator-name = "vdd_cpu_b";
+>  		regulator-min-microvolt = <712500>;
+>  		regulator-max-microvolt = <1500000>;
+> 
