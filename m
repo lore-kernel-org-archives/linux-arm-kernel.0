@@ -1,29 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jun 2018 11:33:32 +0100
-Subject: [PATCH v12 0/5] Fix issues with huge mapping in ioremap for ARM64
-In-Reply-To: <1a648674-da56-6664-bf3c-0cdf825ad1e3@codeaurora.org>
-References: <1527856758-27169-1-git-send-email-cpandya@codeaurora.org>
- <1a648674-da56-6664-bf3c-0cdf825ad1e3@codeaurora.org>
-Message-ID: <20180604103332.GF9482@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Jun 2018 12:33:02 +0200
+Subject: [PATCH 2/3] arm64: dts: renesas: condor: specify EtherAVB PHY IRQ
+In-Reply-To: <21578b79-7ba0-b3a6-ae45-7e9ffbb7c8db@cogentembedded.com>
+References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
+ <21578b79-7ba0-b3a6-ae45-7e9ffbb7c8db@cogentembedded.com>
+Message-ID: <20180604103302.f5kx5fqhbl3ohfpi@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chintan,
-
-On Mon, Jun 04, 2018 at 11:26:28AM +0530, Chintan Pandya wrote:
-> Just curious to know, is there anything that I should be addressing
-> in these patches ? For now, I don't see anything from my side that
-> requires modification, unless one has some more review comments on
-> this.
+On Fri, Jun 01, 2018 at 11:45:55PM +0300, Sergei Shtylyov wrote:
+> Specify EtherAVB PHY IRQ in the Condor board's device tree, now that
+> we have the GPIO support (previously phylib had to resort to polling).
 > 
-> Status so far on and around this:
->  - Status of Toshi's series of patches is still not clear to me.
->    However, if this series can get through first, there won't
->    be conflicting scenarios as far as arm64 is concerned.
->  - I've rebased these patches on tip
->  - Also re-tested these patches for long duration tests with
->    1 GB mapping case also exercised enough. Test ended positively.
+> Based on the original (and large) patch by Vladimir Barinov.
+> 
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> ===================================================================
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> @@ -59,6 +59,8 @@
+>  	phy0: ethernet-phy at 0 {
+>  		rxc-skew-ps = <1500>;
+>  		reg = <0>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
 
-I'll try to review this version today.
+I don't see this documented. Perhaps I'm missing something obvious.
+Or you have some extra information or newer documentation?
 
-Will
+Also, given Olof Johansson's recent comments in ("Re: [GIT PULL] Renesas
+ARM64 Based SoC DT Updates for v4.18") please consider squashing this patch
+and the following one.
+
+>  	};
+>  };
+>  
+> 
