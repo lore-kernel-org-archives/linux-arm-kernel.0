@@ -1,39 +1,62 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 4 Jun 2018 18:26:03 +0200
-Subject: [PATCH] arm: cntvoff: Add a function definition when !SMP
-In-Reply-To: <20180528084016.9271-1-maxime.ripard@bootlin.com>
-References: <20180528084016.9271-1-maxime.ripard@bootlin.com>
-Message-ID: <20180604162603.j3rtfbg3hqhast6p@flea>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Mon, 4 Jun 2018 19:59:37 +0300
+Subject: [PATCH v5 0/6] Driver for at91 usart in spi mode
+Message-ID: <20180604165943.31381-1-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2018 at 10:40:16AM +0200, Maxime Ripard wrote:
-> The secure_cntvoff_init function is only compiled if CONFIG_SMP is set to
-> true. However, that will lead to linking errors if one uses this function
-> without an ifdef CONFIG_SMP guard, which isn't ideal.
-> 
-> Provide a dumb implementation when CONFIG_SMP is false so that we don't end
-> up with a compilation error on our hands.
-> 
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Fixes: cad160ed0a94 ("ARM: shmobile: Convert file to use cntvoff")
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Hello,
 
-Ping?
+This is the second version of driver. I added a mfd driver which by
+default probes atmel_serial driver and if in dt is specified to probe
+the spi driver, then the spi-at91-usart driver will be probed. The
+compatible for atmel_serial is now the compatible for at91-usart mfd
+driver and compatilbe for atmel_serial driver was changed in order to
+keep the bindings for serial as they are.
 
-Maxime
+Changes in v1:
+- added spi-at91-usart driver
+
+Changes in v2:
+- added at91-usart mfd driver
+- modified spi-at91-usart driver to work as mfd driver child
+- modified atmel_serial driver to work as mfd driver child
+
+Changes in v3:
+- fixed spi slaves probing
+
+Changes in v4:
+- modified the spi driver to use cs gpio support form spi subsystem
+- fixed dma transfers for serial driver
+- squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+
+Changes in v5:
+- fixed usage of stdout-path property with atmel_serial driver
+
+Radu Pirea (6):
+  MAINTAINERS: add at91 usart mfd driver
+  dt-bindings: add binding for atmel-usart in SPI mode
+  mfd: at91-usart: added mfd driver for usart
+  MAINTAINERS: add at91 usart spi driver
+  spi: at91-usart: add driver for at91-usart as spi
+  tty/serial: atmel: changed the driver to work under at91-usart mfd
+
+ .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+ MAINTAINERS                                   |  16 +
+ drivers/mfd/Kconfig                           |   9 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/at91-usart.c                      |  67 +++
+ drivers/spi/Kconfig                           |   9 +
+ drivers/spi/Makefile                          |   1 +
+ drivers/spi/spi-at91-usart.c                  | 436 ++++++++++++++++++
+ drivers/tty/serial/Kconfig                    |   1 +
+ drivers/tty/serial/atmel_serial.c             |  41 +-
+ include/dt-bindings/mfd/at91-usart.h          |  17 +
+ 11 files changed, 604 insertions(+), 19 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/43cdc1b2/attachment.sig>
+2.17.1
