@@ -1,58 +1,47 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 4 Jun 2018 09:34:47 +0530
-Subject: [PATCH v5 0/2] Add ThunderX2 SoC Performance Monitoring Unit
- driver
-In-Reply-To: <20180516045518.6876-1-ganapatrao.kulkarni@cavium.com>
-References: <20180516045518.6876-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <CAKTKpr4NycrojxFFZ+SvP0YYHrhTMyDfLi9qHG9i8ekkbUjZoA@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 4 Jun 2018 05:27:41 +0000
+Subject: [PATCH v7 2/2] ARM: dts: imx: Add basic dts support for imx6sll
+ EVK board
+In-Reply-To: <AM0PR04MB42110126E2FA536C0EFE0E2F80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1527234127-11991-1-git-send-email-ping.bai@nxp.com>
+ <1527234127-11991-2-git-send-email-ping.bai@nxp.com>
+ <AM0PR04MB42110126E2FA536C0EFE0E2F80690@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211DBAF2D870199B7B4C7CE80670@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Gently ping...
 
-can you please share your review comments?
-
-On Wed, May 16, 2018 at 10:25 AM, Ganapatrao Kulkarni
-<ganapatrao.kulkarni@cavium.com> wrote:
-> This patchset adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
-> The SoC has PMU support in L3 cache controller (L3C) and in the
-> DDR4 Memory Controller (DMC).
->
-> v5:
->      -Incroporated review comments from Mark Rutland[2]
-> v4:
->      -Incroporated review comments from Mark Rutland[1]
->
-> [1] https://www.spinics.net/lists/arm-kernel/msg588563.html
-> [2] https://lkml.org/lkml/2018/4/26/376
->
-> v3:
->      - fixed warning reported by kbuild robot
->
-> v2:
->      - rebased to 4.12-rc1
->      - Removed Arch VULCAN dependency.
->      - update SMC call parameters as per latest firmware.
->
-> v1:
->      -Initial patch
->
-> Ganapatrao Kulkarni (2):
->   perf: uncore: Adding documentation for ThunderX2 pmu uncore driver
->   ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU driver
->
->  Documentation/perf/thunderx2-pmu.txt |  66 +++
->  drivers/perf/Kconfig                 |   8 +
->  drivers/perf/Makefile                |   1 +
->  drivers/perf/thunderx2_pmu.c         | 965 +++++++++++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h           |   1 +
->  5 files changed, 1041 insertions(+)
->  create mode 100644 Documentation/perf/thunderx2-pmu.txt
->  create mode 100644 drivers/perf/thunderx2_pmu.c
->
-> --
-> 2.9.4
->
-
-thanks
-Ganapat
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Friday, May 25, 2018 3:56 PM
+> To: Jacky Bai <ping.bai@nxp.com>; shawnguo at kernel.org;
+> robh+dt at kernel.org; kernel at pengutronix.de
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-
+> linux-imx <linux-imx@nxp.com>; jacky.baip at gmail.com
+> Subject: RE: [PATCH v7 2/2] ARM: dts: imx: Add basic dts support for imx6sll
+> EVK board
+> 
+> Hi Shawn,
+> 
+> > -----Original Message-----
+> > From: Jacky Bai
+> > Sent: Friday, May 25, 2018 3:42 PM
+> > To: shawnguo at kernel.org; robh+dt at kernel.org; kernel at pengutronix.de
+> > Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > dl- linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
+> > jacky.baip at gmail.com
+> > Subject: [PATCH v7 2/2] ARM: dts: imx: Add basic dts support for
+> > imx6sll EVK board
+> >
+> > Add dts file support for imx6sll EVK board.
+> >
+> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> > Reviewed-by: Rob Herring <robh@kernel.org>
+> > Acked-by: Dong Aisheng <Aisheng.dong@nxp.com>
+> 
+> Would you help pick this patch series?
+> It seems there's only DTS part left for MX6SLL support.
+> 
+> Regards
+> Dong Aisheng
