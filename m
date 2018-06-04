@@ -1,60 +1,51 @@
-From: neil@brown.name (NeilBrown)
-Date: Mon, 04 Jun 2018 10:13:58 +1000
-Subject: [PATCH 0/7] staging: mt7621-pci: Fix coding style issues
-In-Reply-To: <cover.1528040188.git.abdun.nihaal@gmail.com>
-References: <cover.1528040188.git.abdun.nihaal@gmail.com>
-Message-ID: <877enfqugp.fsf@notabene.neil.brown.name>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Sun, 3 Jun 2018 17:40:16 -0700
+Subject: [PATCH 0/5] rpmsg: Convert to use SPDX license identifiers
+In-Reply-To: <20180531171103.8703-1-s-anna@ti.com>
+References: <20180531171103.8703-1-s-anna@ti.com>
+Message-ID: <20180604004016.GA11998@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 03 2018, Abdun Nihaal wrote:
+On Thu 31 May 10:10 PDT 2018, Suman Anna wrote:
 
-> This patchset fixes the following set of coding style 
-> issues found using checkpatch.
->
-> ERROR: space prohibited after that open parenthesis '('
-> ERROR: trailing whitespace
-> ERROR: space required before the open parenthesis '('
-> ERROR: space required after that ',' (ctx:VxV)
-> ERROR: spaces required around that '=' (ctx:VxW)
-> ERROR: spaces required around that '==' (ctx:WxV)
-> ERROR: that open brace { should be on the previous line
+> Hi Bjorn,
+> 
+> The following series switches over the current licensing text in
+> various rpmsg drivers to the SPDX licensing format. I see that you
+> have already picked up my series for the HwSpinlock drivers, so this
+> series does the same for the rpmsg drivers. Please pick these as well
+> for 4.18. Patches done on top of latest upstream kernel.
+> 
+> regards
+> Suman
 
-Hi,
- thanks for contributing these, how ever some of these issues have
- already been address (not all).  I think you must be working from an
- old try.
- When submitting patches to drives/staging, they should be based on
- the staging-next branch of
-    git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging.git
+Thanks Summan,
+Bjorn
 
- Also, I'd suggest leaving linux-arm-kernel and linux-mediatek off the
- cc list.  They are unlikely to be interested until the driver is ready
- to be moved out of drivers/staging.
-
-Thanks,
-NeilBrown
-
-
->
-> Abdun Nihaal (7):
->   staging: mt7621-pci: Remove space after open parenthesis
->   staging: mt7621-pci: remove trailing whitespace
->   staging: mt7621-pci: add space before open parenthesis
->   staging: mt7621-pci: add space after comma symbol
->   staging: mt7621-pci: add spaces around equal symbol
->   staging: mt7621-pci: add space after '==' symbol
->   staging: mt7621-pci: fix coding style error
->
->  drivers/staging/mt7621-pci/pci-mt7621.c | 114 ++++++++++++------------
->  1 file changed, 56 insertions(+), 58 deletions(-)
->
+> 
+> Suman Anna (5):
+>   rpmsg: Switch to SPDX license identifier
+>   rpmsg: virtio_rpmsg_bus: Switch to SPDX license identifier
+>   rpmsg: smd: Switch to SPDX license identifier
+>   rpmsg: glink: Switch to SPDX license identifier
+>   rpmsg: char: Switch to SPDX license identifier
+> 
+>  drivers/rpmsg/Kconfig             |  2 ++
+>  drivers/rpmsg/qcom_glink_native.c | 10 +---------
+>  drivers/rpmsg/qcom_glink_native.h | 10 +---------
+>  drivers/rpmsg/qcom_glink_rpm.c    | 10 +---------
+>  drivers/rpmsg/qcom_glink_smem.c   | 10 +---------
+>  drivers/rpmsg/qcom_smd.c          | 10 +---------
+>  drivers/rpmsg/rpmsg_char.c        | 10 +---------
+>  drivers/rpmsg/rpmsg_core.c        | 10 +---------
+>  drivers/rpmsg/rpmsg_internal.h    | 10 +---------
+>  drivers/rpmsg/virtio_rpmsg_bus.c  | 10 +---------
+>  include/linux/rpmsg.h             | 27 +--------------------------
+>  include/linux/rpmsg/qcom_glink.h  |  2 ++
+>  include/uapi/linux/rpmsg.h        |  9 ---------
+>  13 files changed, 14 insertions(+), 116 deletions(-)
+> 
 > -- 
 > 2.17.0
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180604/e81a42a0/attachment.sig>
+> 
