@@ -1,45 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 6 Jun 2018 05:34:29 +0800
-Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
- disable compiler auto-inline optimizations
-In-Reply-To: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
-References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
-Message-ID: <201806060444.hdHcKOBy%fengguang.wu@intel.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue,  5 Jun 2018 22:43:12 +0100
+Subject: [PATCH 01/20] coresight: Fix memory leak in coresight_register
+In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1528235011-30691-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Changbin,
+commit 6403587a930c ("coresight: use put_device() instead of kfree()")
+introduced a memory leak where, if we fail to register the device
+for coresight_device, we don't free the "coresight_device" object,
+which was allocated via kzalloc(). Fix this by jumping to the
+appropriate error path.
 
-Thank you for the patch! Perhaps something to improve:
-
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.17 next-20180605]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/changbin-du-intel-com/kernel-hacking-GCC-optimization-for-better-debug-experience-Og/20180606-001415
-config: sparc64-allyesconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=sparc64 
-
-All warnings (new ones prefixed by >>):
-
->> WARNING: vmlinux.o(.text.unlikely+0x1fc): Section mismatch in reference from the function init_tick_ops() to the function .init.text:get_tick_patch()
-   The function init_tick_ops() references
-   the function __init get_tick_patch().
-   This is often because init_tick_ops lacks a __init
-   annotation or the annotation of get_tick_patch is wrong.
-
+Fixes: commit 6403587a930c ("coresight: use put_device() instead of kfree()")
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 53264 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180606/a2ea7dd7/attachment-0001.gz>
+ drivers/hwtracing/coresight/coresight.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 4969b32..2893cfe 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -1020,7 +1020,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 	ret = device_register(&csdev->dev);
+ 	if (ret) {
+ 		put_device(&csdev->dev);
+-		goto err_kzalloc_csdev;
++		goto err_kzalloc_refcnts;
+ 	}
+ 
+ 	mutex_lock(&coresight_mutex);
+-- 
+2.7.4
