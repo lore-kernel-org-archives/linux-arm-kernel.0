@@ -1,42 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Jun 2018 21:45:54 -0700
-Subject: Regression in Linux next again
-In-Reply-To: <1528120764-14316-1-git-send-email-m.purski@samsung.com>
-References: <20180530144505.GB5705@atomide.com>
- <CGME20180604135952eucas1p292f7bcec405e6a1a6261031df36cad32@eucas1p2.samsung.com>
- <1528120764-14316-1-git-send-email-m.purski@samsung.com>
-Message-ID: <20180605044554.GC5738@atomide.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue,  5 Jun 2018 10:17:48 +0530
+Subject: [PATCH V2 1/2] arm: dts: sun8i-h3: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <20180601151701.sshwfdbflic6mybv@flea>
+References: <20180601151701.sshwfdbflic6mybv@flea>
+Message-ID: <d894f425b7c32bce4dc4a982db8f4dface2db31d.1528173943.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The cooling device properties, like "#cooling-cells" and
+"dynamic-power-coefficient", should either be present for all the CPUs
+of a cluster or none. If these are present only for a subset of CPUs of
+a cluster then things will start falling apart as soon as the CPUs are
+brought online in a different order. For example, this will happen
+because the operating system looks for such properties in the CPU node
+it is trying to bring up, so that it can register a cooling device.
 
-* Maciej Purski <m.purski@samsung.com> [180604 14:02]:
-> Tony, please apply this patchset and test it on your Beaglebone. It'd be
-> great if you could try to find out, which patch causes failure. They should
-> be appliable on the current next.
+Add such missing properties.
 
-It seems beagle-x15 boots for me except with the last patch in the
-series with compile issue fixed. With that applied after modules
-get loaded it just hangs with:
+Fix other missing properties (clocks, clock-names) as well to make it all
+work.
 
-[   25.925607] regulator_resolve_supply: 1608
-[   25.930620] regulator_resolve_supply: 1608
-[   26.098449] lib80211: common routines for IEEE802.11 drivers
-[   26.446713] cfg80211: Loading compiled-in X.509 certificates for regulatory database
-[   26.514834] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
-[   26.525311] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
-[   26.534250] cfg80211: failed to load regulatory.db
-[   26.998736] regulator_set_voltage: 3381
-[   27.007662] _regulator_do_set_voltage: 2913
-[   27.012593] regulator_set_voltage: 3381
-[   27.016969] _regulator_do_set_voltage: 2913
-[   27.022847] regulator_set_voltage: 3381
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+V2: Separated patch for h3.
 
-Not sure what module gets loaded at that point, I'll test again
-with initcall_debug once you post a compiling version of your last
-patch.
+ arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 41d57c76f290..9dff6887923c 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -84,21 +84,30 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <1>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <2>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <3>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 	};
+ 
+-- 
+2.15.0.194.g9af6a3dea062
