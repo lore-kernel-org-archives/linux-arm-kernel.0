@@ -1,66 +1,23 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  5 Jun 2018 14:55:37 +0100
-Subject: [PATCH 2/3] ACPI / PPTT: fix build when CONFIG_ACPI_PPTT is not
- enabled
-In-Reply-To: <1528206938-2702-1-git-send-email-sudeep.holla@arm.com>
-References: <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
- <1528206938-2702-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1528206938-2702-2-git-send-email-sudeep.holla@arm.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 5 Jun 2018 06:57:49 -0700
+Subject: [PATCH 09/10] dpaa_eth: add support for hardware timestamping
+In-Reply-To: <DB6PR0401MB2536376432EC481473A5B4A3F8660@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+References: <20180604070837.19265-1-yangbo.lu@nxp.com>
+ <20180604070837.19265-10-yangbo.lu@nxp.com>
+ <20180604134920.ezhe6jz5ntpnqyzj@localhost>
+ <DB6PR0401MB2536376432EC481473A5B4A3F8660@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+Message-ID: <20180605135748.mlarwiyzf2oe27ax@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though CONFIG_ACPI_PPTT is selected by platforms and nor user visible,
-it may be useful to support the build with CONFIG_ACPI_PPTT disabled.
+On Tue, Jun 05, 2018 at 03:35:28AM +0000, Y.b. Lu wrote:
+> [Y.b. Lu] Actually these timestamping codes affected DPAA networking performance in our previous performance test.
+> That's why we used ifdef for it.
 
-This patch adds the missing dummy/boiler plate implementation to fix
-the build.
+How much does time stamping hurt performance?
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- include/linux/acpi.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+If the time stamping is compiled in but not enabled at run time, does
+it still affect performace?
 
-Hi Rafael,
-
-If you are fine with this, can you provide Ack, so that we route this
-through ARM64 tree where most of the ACPI PPTT support is present.
-
-Regards,
-Sudeep
-
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 8f2cdb0eca71..0fa28265d095 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -1299,8 +1299,28 @@ static inline int lpit_read_residency_count_address(u64 *address)
- }
- #endif
- 
-+#ifdef CONFIG_ACPI_PPTT
- int find_acpi_cpu_topology(unsigned int cpu, int level);
- int find_acpi_cpu_topology_package(unsigned int cpu);
- int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
-+int acpi_find_last_cache_level(unsigned int cpu);
-+#else
-+static inline int find_acpi_cpu_topology(unsigned int cpu, int level)
-+{
-+	return -EINVAL;
-+}
-+static inline int find_acpi_cpu_topology_package(unsigned int cpu)
-+{
-+	return -EINVAL;
-+}
-+static inline int find_acpi_cpu_cache_topology(unsigned int cpu, int level)
-+{
-+	return -EINVAL;
-+}
-+static inline int acpi_find_last_cache_level(unsigned int cpu)
-+{
-+	return -EINVAL;
-+}
-+#endif
- 
- #endif	/*_LINUX_ACPI_H*/
--- 
-2.7.4
+Thanks,
+Richard
