@@ -1,99 +1,61 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:01:20 -0500
-Subject: [RFC PATCH 1/6] Documentation: arm: ti: Add bindings for AM654 SoC
-In-Reply-To: <20180605060125.9518-1-nm@ti.com>
-References: <20180605060125.9518-1-nm@ti.com>
-Message-ID: <20180605060125.9518-2-nm@ti.com>
+Date: Tue, 5 Jun 2018 01:01:19 -0500
+Subject: [RFC PATCH 0/6] arm64: Initial support Texas Instrument's AM654
+ Platform
+Message-ID: <20180605060125.9518-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi,
+
+The following series enables support for newest addition in TI's SoC
+portfolio - AM654 SoC.
+
+The series is an RFC based off next-20180604 and will post formally once
+v4.18-rc1 is available.
+
+The series (part 1 of 4) is available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/next-20180604/k3-1-am6-base
+
+Full Boot log is available here: https://pastebin.ubuntu.com/p/vWCzMKtBCW/
 
 The AM654 SoC is a lead device of the K3 Multicore SoC architecture
 platform, targeted for broad market and industrial control with aim to
 meet the complex processing needs of modern embedded products.
 
-Some highlights of this SoC are:
-* Quad ARMv8 A53 cores split over two clusters
-* GICv3 compliant GIC500
-* Configurable L3 Cache and IO-coherent architecture
-* Dual lock-step capable R5F uC for safety-critical applications
-* High data throughput capable distributed DMA architecture under NAVSS
-* Three Gigabit Industrial Communication Subsystems (ICSSG), each with dual
-  PRUs and dual RTUs
-* Hardware accelerator block containing AES/DES/SHA/MD5 called SA2UL
-* Centralized System Controller for Security, Power, and Resource
-  management.
-* Dual ADCSS, eQEP/eCAP, eHRPWM, dual CAN-FD
-* Flash subystem with OSPI and Hyperbus interfaces
-* Multimedia capability with CAL, DSS7-UL, SGX544, McASP
-* Peripheral connectivity including USB3, PCIE, MMC/SD, GPMC, I2C, SPI,
-  GPIO
+The Linux development follows closely the 66AK2G SoC model in aarch64.
 
 See AM65x Technical Reference Manual (SPRUID7, April 2018)
 for further details: http://www.ti.com/lit/pdf/spruid7
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- Documentation/devicetree/bindings/arm/ti/k3.txt | 33 +++++++++++++++++++++++++
- MAINTAINERS                                     |  7 ++++++
- 2 files changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
+Lokesh Vutla (1):
+  serial: 8250_omap: Make 8250_omap driver driver depend on ARCH_K3
 
-diff --git a/Documentation/devicetree/bindings/arm/ti/k3.txt b/Documentation/devicetree/bindings/arm/ti/k3.txt
-new file mode 100644
-index 000000000000..cbabb1b89f6f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/ti/k3.txt
-@@ -0,0 +1,33 @@
-+Texas Instruments K3 Multicore SoC architecture device tree bindings
-+--------------------------------------------------------------------
-+
-+Boards based on K3 Multicore SoC architecture shall have the following property:
-+- compatible: Every hardware block introduced in K3 Multicore SoC
-+  architecture shall be of the form:
-+  "ti,XXX-YYY", where:
-+     'XXX' represents the specific SoC part for which the support is added.
-+     'YYY' represents the corresponding peripheral in SoC being supported.
-+
-+  NOTE: Generic devices such as GIC or legacy devices shall use the specified
-+  compatible for those devices.
-+
-+  Example:
-+    compatible = "ti,am654-i2c";
-+
-+SoCs
-+-------------------------------------------
-+
-+Each device tree root node must specify which exact SoC in K3 Multicore SoC
-+architecture it uses, using one of the following compatible values:
-+
-+- AM654
-+  compatible = "ti,am654";
-+
-+Boards
-+-------------------------------------------
-+
-+In addition, each device tree root node must specify which one or more
-+of the following board-specific compatible values:
-+
-+- AM654 EVM
-+  compatible = "ti,am654-evm", "ti,am654";
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f39a8de1bbd7..cfb35b252ac7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2086,6 +2086,13 @@ L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/memory/*emif*
- 
-+ARM/TEXAS INSTRUMENTS K3 ARCHITECTURE
-+M:	Tero Kristo <t-kristo@ti.com>
-+M:	Nishanth Menon <nm@ti.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Supported
-+F:	Documentation/devicetree/bindings/arm/ti/k3.txt
-+
- ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
- M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+Nishanth Menon (5):
+  Documentation: arm: ti: Add bindings for AM654 SoC
+  arm64: Add support for TI's K3 Multicore SoC architecture
+  serial: 8250_omap: Add support for AM654 UART controller
+  arm64: dts: ti: Add Support for AM654 SoC
+  arm64: dts: ti: Add support for AM654 EVM base board
+
+ Documentation/devicetree/bindings/arm/ti/k3.txt    |  33 +++++
+ .../devicetree/bindings/serial/omap_serial.txt     |   1 +
+ MAINTAINERS                                        |   9 ++
+ arch/arm64/Kconfig.platforms                       |   7 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/ti/Makefile                    |   9 ++
+ arch/arm64/boot/dts/ti/k3-am6.dtsi                 | 144 +++++++++++++++++++++
+ arch/arm64/boot/dts/ti/k3-am654-base-board.dts     |  40 ++++++
+ arch/arm64/boot/dts/ti/k3-am654.dtsi               | 117 +++++++++++++++++
+ drivers/soc/ti/Kconfig                             |  14 ++
+ drivers/tty/serial/8250/8250_omap.c                |   1 +
+ drivers/tty/serial/8250/Kconfig                    |   2 +-
+ 12 files changed, 377 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
+ create mode 100644 arch/arm64/boot/dts/ti/Makefile
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am6.dtsi
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654.dtsi
+
 -- 
 2.15.1
