@@ -1,112 +1,42 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:26:39 -0500
-Subject: [RFC PATCH 2/3] firmware: ti_sci: Provide host-id as an optional dt
- parameter
-In-Reply-To: <20180605062640.3356-1-nm@ti.com>
-References: <20180605062640.3356-1-nm@ti.com>
-Message-ID: <20180605062640.3356-3-nm@ti.com>
+Date: Tue, 5 Jun 2018 01:26:37 -0500
+Subject: [RFC PATCH 0/3] firmware: Add K3 Support for TISCI driver
+Message-ID: <20180605062640.3356-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instrument's System Control Interface (TISCI) permits the
-ability for Operating Systems to running in virtual machines to be
-able to independently communicate with the firmware without the need
-going through an hypervisor.
+Hi,
 
-The "host-id" in effect is the hardware representation of the
-host (example: VMs locked to a core) as identified to the System
-Controller.
+The following series enables TI System Control Interface(TISCI) support for
+the newest addition in TI's SoC portfolio - AM654 SoC.
 
-Provide support as an optional parameter implementation and use the compatible
-data as default if one is not provided by device tree.
+The series is an RFC based off next-20180604 and will post formally once
+v4.18-rc1 is available.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- drivers/firmware/ti_sci.c | 24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
+The series (part 4 of 4) is available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/next-20180604/k3-4-am6-tisci
 
-diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
-index b74a533ef35b..6b08ee815b24 100644
---- a/drivers/firmware/ti_sci.c
-+++ b/drivers/firmware/ti_sci.c
-@@ -66,14 +66,14 @@ struct ti_sci_xfers_info {
- 
- /**
-  * struct ti_sci_desc - Description of SoC integration
-- * @host_id:		Host identifier representing the compute entity
-+ * @default_host_id:	Host identifier representing the compute entity
-  * @max_rx_timeout_ms:	Timeout for communication with SoC (in Milliseconds)
-  * @max_msgs: Maximum number of messages that can be pending
-  *		  simultaneously in the system
-  * @max_msg_size: Maximum size of data per message that can be handled.
-  */
- struct ti_sci_desc {
--	u8 host_id;
-+	u8 default_host_id;
- 	int max_rx_timeout_ms;
- 	int max_msgs;
- 	int max_msg_size;
-@@ -94,6 +94,7 @@ struct ti_sci_desc {
-  * @chan_rx:	Receive mailbox channel
-  * @minfo:	Message info
-  * @node:	list head
-+ * @host_id:	Host ID
-  * @users:	Number of users of this instance
-  */
- struct ti_sci_info {
-@@ -110,6 +111,7 @@ struct ti_sci_info {
- 	struct mbox_chan *chan_rx;
- 	struct ti_sci_xfers_info minfo;
- 	struct list_head node;
-+	u8 host_id;
- 	/* protected by ti_sci_list_mutex */
- 	int users;
- 
-@@ -370,7 +372,7 @@ static struct ti_sci_xfer *ti_sci_get_one_xfer(struct ti_sci_info *info,
- 
- 	hdr->seq = xfer_id;
- 	hdr->type = msg_type;
--	hdr->host = info->desc->host_id;
-+	hdr->host = info->host_id;
- 	hdr->flags = msg_flags;
- 
- 	return xfer;
-@@ -1793,7 +1795,7 @@ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
- 
- /* Description for K2G */
- static const struct ti_sci_desc ti_sci_pmmc_k2g_desc = {
--	.host_id = 2,
-+	.default_host_id = 2,
- 	/* Conservative duration */
- 	.max_rx_timeout_ms = 1000,
- 	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
-@@ -1819,6 +1821,7 @@ static int ti_sci_probe(struct platform_device *pdev)
- 	int ret = -EINVAL;
- 	int i;
- 	int reboot = 0;
-+	u32 h_id;
- 
- 	of_id = of_match_device(ti_sci_of_match, dev);
- 	if (!of_id) {
-@@ -1833,6 +1836,19 @@ static int ti_sci_probe(struct platform_device *pdev)
- 
- 	info->dev = dev;
- 	info->desc = desc;
-+	ret = of_property_read_u32(dev->of_node, "ti,host-id", &h_id);
-+	/* if the property is not present in DT, use a default from desc */
-+	if (ret < 0) {
-+		info->host_id = info->desc->default_host_id;
-+	} else {
-+		if (!h_id) {
-+			dev_warn(dev, "Host ID 0 is reserved for firmware\n");
-+			info->host_id = info->desc->default_host_id;
-+		} else {
-+			info->host_id = h_id;
-+		}
-+	}
-+
- 	reboot = of_property_read_bool(dev->of_node,
- 				       "ti,system-reboot-controller");
- 	INIT_LIST_HEAD(&info->node);
+Full Boot log is available here: https://pastebin.ubuntu.com/p/vWCzMKtBCW/
+
+The Linux development follows closely the 66AK2G SoC model in aarch64 with a
+few additions to handle the flexibility of firmware.
+
+The architecture and dts support depends on part 1 of the series:
+https://marc.info/?l=linux-arm-kernel&m=152817866312732&w=2
+
+See AM65x Technical Reference Manual (SPRUID7, April 2018)
+for further details: http://www.ti.com/lit/pdf/spruid7
+
+Nishanth Menon (3):
+  Documentation: dt: keystone: ti-sci: Add optional host-id parameter
+  firmware: ti_sci: Provide host-id as an optional dt parameter
+  arm64: dts: ti: k3-am6: Add Device Management Security Controller
+    support
+
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 +++
+ arch/arm64/boot/dts/ti/k3-am6.dtsi                 | 32 ++++++++++++++++++++++
+ drivers/firmware/ti_sci.c                          | 24 +++++++++++++---
+ 3 files changed, 56 insertions(+), 4 deletions(-)
+
 -- 
 2.15.1
