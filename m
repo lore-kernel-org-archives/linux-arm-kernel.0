@@ -1,43 +1,38 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 05 Jun 2018 15:42:11 +0200
-Subject: [PATCH v7 1/5] drm/rockchip: add transfer function for cdn-dp
-In-Reply-To: <1527061353-16902-1-git-send-email-hl@rock-chips.com>
-References: <1527061353-16902-1-git-send-email-hl@rock-chips.com>
-Message-ID: <2246202.0LhvmkcTbg@diego>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue,  5 Jun 2018 14:55:38 +0100
+Subject: [PATCH 3/3] arm64: disable ACPI PPTT support temporarily
+In-Reply-To: <1528206938-2702-1-git-send-email-sudeep.holla@arm.com>
+References: <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
+ <1528206938-2702-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1528206938-2702-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently, ARM64 doesn't support updating the CPU topology masks on
+CPU hotplug operations. ACPI PPTT support rely on that missing feature
+which is technically not incorrect. Instead of reverting all the PPTT
+support, let's keep it simple and disable ACPI PPTT support on ARM64
+for time-being until the topology updates are added for CPU hotplug
+operations.
 
-Am Mittwoch, 23. Mai 2018, 09:42:29 CEST schrieb Lin Huang:
-> From: Chris Zhong <zyw@rock-chips.com>
-> 
-> We may support training outside firmware, so we need support
-> dpcd read/write to get the message or do some setting with
-> display.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> Reviewed-by: Enric Balletbo <enric.balletbo@collabora.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-> @@ -1030,6 +1064,13 @@ static int cdn_dp_bind(struct device *dev, struct
-> device *master, void *data) dp->active = false;
->  	dp->active_port = -1;
->  	dp->fw_loaded = false;
-> +	dp->aux.name = "DP-AUX";
-> +	dp->aux.transfer = cdn_dp_aux_transfer;
-> +	dp->aux.dev = dev;
-> +
-> +	ret = drm_dp_aux_register(&dp->aux);
-> +	if (ret)
-> +		return ret;
-
-this is missing matching drm_dp_aux_unregister calls both in the error path as 
-well as in the unbind callback.
-
-With the code as is, the kernel gives warnings about it trying to initialize 
-an already initialized object ... in cases like probe-deferrals.
-
-
-Heiko
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9fd4a8ccce07..98a5c78a80f9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -7,7 +7,6 @@ config ARM64
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ACPI_MCFG if ACPI
+ 	select ACPI_SPCR_TABLE if ACPI
+-	select ACPI_PPTT if ACPI
+ 	select ARCH_CLOCKSOURCE_DATA
+ 	select ARCH_HAS_DEBUG_VIRTUAL
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+-- 
+2.7.4
