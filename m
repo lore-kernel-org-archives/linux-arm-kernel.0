@@ -1,71 +1,47 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue,  5 Jun 2018 14:59:37 -0700
-Subject: [PATCH v2] ARM64: dts: meson: fix register ranges for SD/eMMC
-Message-ID: <20180605215937.16634-1-khilman@baylibre.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue,  5 Jun 2018 22:43:29 +0100
+Subject: [PATCH 18/20] dts: sama5d2: Update coresight bindings for hardware
+ ports
+In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1528235011-30691-19-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on updated information from Amlogic, correct the register range
-for the SD/eMMC blocks to the right size.
+Switch to the new coresight bindings for hardware ports
 
-Reported-by: Yixun Lan <yixun.lan@amlogic.com>
-Tested-by: Yixun Lan <yixun.lan@amlogic.com>
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sama5d2.dtsi | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index fee87737a201..67d7115e4eff 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -132,7 +132,7 @@
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 61f68e5..92ce7b8 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -86,8 +86,9 @@
  
- 			sd_emmc_b: sd at 5000 {
- 				compatible = "amlogic,meson-axg-mmc";
--				reg = <0x0 0x5000 0x0 0x2000>;
-+				reg = <0x0 0x5000 0x0 0x800>;
- 				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
- 				clocks = <&clkc CLKID_SD_EMMC_B>,
-@@ -144,7 +144,7 @@
- 
- 			sd_emmc_c: mmc at 7000 {
- 				compatible = "amlogic,meson-axg-mmc";
--				reg = <0x0 0x7000 0x0 0x2000>;
-+				reg = <0x0 0x7000 0x0 0x800>;
- 				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
- 				clocks = <&clkc CLKID_SD_EMMC_C>,
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 3c31e21cbed7..b003f324ca31 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -457,21 +457,21 @@
- 
- 			sd_emmc_a: mmc at 70000 {
- 				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
--				reg = <0x0 0x70000 0x0 0x2000>;
-+				reg = <0x0 0x70000 0x0 0x800>;
- 				interrupts = <GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
+ 		port {
+ 			etb_in: endpoint {
+-				slave-mode;
++				direction = <0>;
+ 				remote-endpoint = <&etm_out>;
++				coresight,hwid = <0>;
  			};
+ 		};
+ 	};
+@@ -101,7 +102,9 @@
  
- 			sd_emmc_b: mmc at 72000 {
- 				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
--				reg = <0x0 0x72000 0x0 0x2000>;
-+				reg = <0x0 0x72000 0x0 0x800>;
- 				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
+ 		port {
+ 			etm_out: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&etb_in>;
++				coresight,hwid = <0>;
  			};
- 
- 			sd_emmc_c: mmc at 74000 {
- 				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
--				reg = <0x0 0x74000 0x0 0x2000>;
-+				reg = <0x0 0x74000 0x0 0x800>;
- 				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
- 				status = "disabled";
- 			};
+ 		};
+ 	};
 -- 
-2.11.0
+2.7.4
