@@ -1,71 +1,59 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 5 Jun 2018 16:50:38 +0200
-Subject: [PATCH v2] arm: sun4i: Add support for Pengpod 1000 tablet
-In-Reply-To: <313a74ea-0be6-cff1-6b2f-06a4b0b7ba8d@settrans.net>
-References: <20180602160313.26763-1-rah@settrans.net>
- <20180604081302.hcn7j36gt6xeyquq@flea>
- <313a74ea-0be6-cff1-6b2f-06a4b0b7ba8d@settrans.net>
-Message-ID: <20180605145038.qptdlcphdbnw6jyg@flea>
+From: valentin.schneider@arm.com (Valentin Schneider)
+Date: Tue, 5 Jun 2018 15:59:28 +0100
+Subject: [PATCH v10 0/5] scsi: ufs: add ufs driver code for Hisilicon
+ Hi3660 SoC
+In-Reply-To: <20180525091712.37227-1-liwei213@huawei.com>
+References: <20180525091712.37227-1-liwei213@huawei.com>
+Message-ID: <f9cde7df-2d4d-3d7e-5269-ef879211b2ee@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 06:33:02PM +0100, Bob Ham wrote:
-> On 04/06/18 09:13, Maxime Ripard wrote:
-> > On Sat, Jun 02, 2018 at 05:03:13PM +0100, Bob Ham wrote:
-> 
-> >> + * This file is dual-licensed: you can use it either under the terms
-> >> + * of the GPL or the X11 license, at your option. Note that this dual
-> >> + * licensing only applies to this file, and not this project as a
-> >> + * whole.
-> 
-> >> + *     The above copyright notice and this permission notice shall be
-> >> + *     included in all copies or substantial portions of the Software.
-> 
-> > And this is redundant with the SPDX header.
-> 
-> The X11 license notice states explicitly that the notice has to be
-> included in the file.  Wouldn't removing it be a violation of the license?
+Hi,
 
-The SPDX header is explicitly here to remove the license text and
-create a tag that is in a indirect reference to the license text in
-LICENSES. It's not going away.
-
-> >> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-> > 
-> > Each step should increase the perceived brightness by roughly 1/Nth, N
-> > being the number of steps. Usually PWM backlights don't work like that.
+On 25/05/18 10:17, Li Wei wrote:
+> This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
 > 
-> FYI, this was copied from another .dts file.  All of the other
-> brightness-levels settings in sun{4,5,7}i .dts files follow similar
-> patterns:
+> Li Wei (5):
+>   scsi: ufs: add Hisilicon ufs driver code
+>   dt-bindings: scsi: ufs: add document for hisi-ufs
+>   arm64: dts: add ufs dts node
+>   arm64: defconfig: enable configs for Hisilicon ufs
+>   arm64: defconfig: enable f2fs and squashfs
 > 
-> sun4i-a10-dserve-dsrv9703c.dts:               brightness-levels = <0 10
-> 20 30 40 50 60 70 80 90 100>;
-> sun4i-a10-inet1.dts:          brightness-levels = <0 10 20 30 40 50 60
-> 70 80 90 100>;
-> sun4i-a10-pov-protab2-ips9.dts:               brightness-levels = <0 10
-> 20 30 40 50 60 70 80 90 100>;
-> sun5i-a13-empire-electronix-d709.dts:         brightness-levels = <0 10
-> 20 30 40 50 60 70 80 90 100>;
-> sun5i-a13-utoo-p66.dts:       brightness-levels = <0 30 40 50 60 70 80
-> 90 100>;
-> sun5i-gr8-evb.dts:            brightness-levels = <0 10 20 30 40 50 60
-> 70 80 90 100>;
-> sun7i-a20-wexler-tab7200.dts:         brightness-levels = <0 10 20 30 40
-> 50 60 70 80 90 100>;
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
+>  .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
+>  arch/arm64/configs/defconfig                       |  11 +
+>  drivers/scsi/ufs/Kconfig                           |   9 +
+>  drivers/scsi/ufs/Makefile                          |   1 +
+>  drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
+>  drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
+>  8 files changed, 821 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+>  create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+>  create mode 100644 drivers/scsi/ufs/ufs-hisi.h
+> 
+> Major changes in v10:
+>  - solve review comments from Rob Herring.
+>    *Modify the "reset-names" describe in ufs-hisi.txt binding file.
+>    *List clocks in ufs-hisi.txt binding file.
+>    *remove the "arst" and keep only "rst" in the binging files.
+>    *remove the "arst" member from both dts and c code. 
+> Major changes in v9:
+>  - solve review comments from Rob Herring.
+>    *remove freq-table-hz in ufs-hisi.txt binding file.
+>    *Move the rst to the ufshcd_pltfm.txt common binding file.
+>    *Modify the member "assert" of UFS host structure to "arst".
+> Major changes in v8:
+>  - solve review comments from zhangfei.
+>    *Add Version history.
+>  - solve review comments from Rob Herring.
+>    *remove freq-table-hz.
+>  -  solve review comments from Riku Voipio.
+>    *Add MODULE_DEVICE_TABLE for ufs driver.
+> 
 
-I never said we were perfect reviewers. Feel free to help in the process.
+Tested on top of linux-next (4.17.0-next-20180605), I can reliably load
+my debian userspace flashed on the 'system' fastboot partition.
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/ec5e1ba7/attachment-0001.sig>
+Tested-by: Valentin Schneider <valentin.schneider@arm.com>
