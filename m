@@ -1,67 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 5 Jun 2018 11:57:02 +0200
-Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <20180605092151.57ezynjgf23yunkf@ninjato>
-References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
- <20180605080727.ygh25rmjsrs3dmlq@verge.net.au>
- <20180605092151.57ezynjgf23yunkf@ninjato>
-Message-ID: <3b06b61c-4527-9f0a-d397-5076513e196a@gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 5 Jun 2018 15:35:52 +0530
+Subject: [PATCH] ARM: davinci: da850: Fix interrups property for gpio
+Message-ID: <1528193152-10657-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2018 11:21 AM, Wolfram Sang wrote:
-> Hi Marek,
-> 
-> On Tue, Jun 05, 2018 at 10:07:28AM +0200, Simon Horman wrote:
->> On Mon, Jun 04, 2018 at 07:59:11PM +0200, Marek Vasut wrote:
->>> Rather than hard-coding the quirk topology, which stopped scaling,
->>> parse the information from DT. The code looks for all compatible
->>> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
->>> to the same pin. If so, the code sends a matching sequence to the
->>> PMIC to deassert the IRQ.
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->>> Cc: Simon Horman <horms+renesas@verge.net.au>
->>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> From an I2C point of view:
-> 
-> Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> Minor nits:
-> 
->>> @@ -122,7 +143,13 @@ static struct notifier_block regulator_quirk_nb = {
->>>  
->>>  static int __init rcar_gen2_regulator_quirk(void)
->>>  {
->>> -	u32 mon;
->>> +	struct device_node *np;
->>> +	const struct of_device_id *id;
->>> +	struct regulator_quirk *quirk;
->>> +	struct regulator_quirk *pos;
-> 
-> Merge the last two lines into one?
-> 
->>> +	struct of_phandle_args *argsa, *argsb;
->>> +	u32 mon, addr;
->>> +	int ret;
->>>  
->>>  	if (!of_machine_is_compatible("renesas,koelsch") &&
->>>  	    !of_machine_is_compatible("renesas,lager") &&
->>> @@ -130,6 +157,45 @@ static int __init rcar_gen2_regulator_quirk(void)
->>>  	    !of_machine_is_compatible("renesas,gose"))
->>>  		return -ENODEV;
->>>  
->>> +	for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
->>> +		if (!np || !of_device_is_available(np))
-> 
-> Can '!np' actually happen? This is the exit condition of the for-loop,
-> or am I overlooking something?
+The intc #interrupt-cells is equal to 1. Currently gpio
+node has 2 cells per IRQ which is wrong. Remove the additional
+cell for each of the interrupts.
 
-I had to take a look again, no, it's not needed.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Fixes: 2e38b946dc54 ("ARM: davinci: da850: add GPIO DT node")
+---
+ arch/arm/boot/dts/da850.dtsi | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index f6f1597..0f4f817 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -549,11 +549,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			reg = <0x226000 0x1000>;
+-			interrupts = <42 IRQ_TYPE_EDGE_BOTH
+-				43 IRQ_TYPE_EDGE_BOTH 44 IRQ_TYPE_EDGE_BOTH
+-				45 IRQ_TYPE_EDGE_BOTH 46 IRQ_TYPE_EDGE_BOTH
+-				47 IRQ_TYPE_EDGE_BOTH 48 IRQ_TYPE_EDGE_BOTH
+-				49 IRQ_TYPE_EDGE_BOTH 50 IRQ_TYPE_EDGE_BOTH>;
++			interrupts = <42 43 44 45 46 47 48 49 50>;
+ 			ti,ngpio = <144>;
+ 			ti,davinci-gpio-unbanked = <0>;
+ 			status = "disabled";
 -- 
-Best regards,
-Marek Vasut
+1.9.1
