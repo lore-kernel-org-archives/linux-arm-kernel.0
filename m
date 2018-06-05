@@ -1,69 +1,52 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 5 Jun 2018 11:16:05 +0100
-Subject: [PATCH] irqchip/gic-v3-its: fix ITS queue timeout
-In-Reply-To: <1528180225-16144-1-git-send-email-yangyingliang@huawei.com>
-References: <1528180225-16144-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <834fde1b-5ae0-afc6-283f-2a470757e54a@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 5 Jun 2018 12:19:53 +0200
+Subject: [PATCH v4.9-stable] serial: pl011: add console matching function
+In-Reply-To: <20180604131612.14407-1-ard.biesheuvel@linaro.org>
+References: <20180604131612.14407-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180605101953.GC26129@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yang,
-
-On 05/06/18 07:30, Yang Yingliang wrote:
-> When the kernel booted with maxcpus=x, 'x' is smaller
-> than actual cpu numbers, the TAs of offline cpus won't
-> be set to its->collection.
+On Mon, Jun 04, 2018 at 03:16:12PM +0200, Ard Biesheuvel wrote:
+> From: Aleksey Makarov <aleksey.makarov@linaro.org>
 > 
-> If LPI is bind to offline cpu, sync cmd will use zero TA,
-> it leads to ITS queue timeout.  Fix this by choosing a
-> online cpu, if there is no online cpu in cpu_mask.
+> Commit 10879ae5f12e9cab3c4e8e9504c1aaa8a033bde7 upstream.
 > 
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> This patch adds function pl011_console_match() that implements
+> method match of struct console.  It allows to match consoles against
+> data specified in a string, for example taken from command line or
+> compiled by ACPI SPCR table handler.
+> 
+> This patch was merged to tty-next but then reverted because of
+> conflict with
+> 
+> commit 46e36683f433 ("serial: earlycon: Extend earlycon command line option to support 64-bit addresses")
+> 
+> Now it is fixed.
+> 
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Tested-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->   drivers/irqchip/irq-gic-v3-its.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 5416f2b..edd92a9 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -2309,7 +2309,9 @@ static int its_irq_domain_activate(struct irq_domain *domain,
->   		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
->   
->   	/* Bind the LPI to the first possible CPU */
-> -	cpu = cpumask_first(cpu_mask);
-> +	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
-> +	if (!cpu_online(cpu))
-
-Testing for cpu being online here feels a bit redundant.
-
-Since cpu is online if the cpumask_first_and returns a valid cpu, I 
-think you could replace this test with:
-
-	if (cpu >= nr_cpu_ids)
-
-> +		cpu = cpumask_first(cpu_online_mask);
->   	its_dev->event_map.col_map[event] = cpu;
->   	irq_data_update_effective_affinity(d, cpumask_of(cpu));
->   
-> @@ -2466,7 +2468,10 @@ static int its_vpe_set_affinity(struct irq_data *d,
->   				bool force)
->   {
->   	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-> -	int cpu = cpumask_first(mask_val);
-> +	int cpu = cpumask_first_and(mask_val, cpu_online_mask);
-> +
-> +	if (!cpu_online(cpu))
-
-Same thing here.
-
-> +		cpu = cpumask_first(cpu_online_mask);
->   
->   	/*
->   	 * Changing affinity is mega expensive, so let's be as lazy as
+> Please consider for v4.9-stable. It is the missing puzzle piece for SPCR
+> support on arm64 ACPI systems, which got merged for v4.9 [0]. Now that more
+> systems are becoming available to people working in the kernel community, it
+> turns out that v4.9 distro installers (e.g., Debian Stretch) won't work
+> unless you pass a 'console=' parameter explicitly, which is annoying.
+> Given that it was clearly the intent to include this code at the time,
+> I hope it will be considered for backporting.
 > 
+> [0] To quote the tty maintainer:
+> 
+>       Also in here is the long-suffering ACPI SPCR patchset, which was
+>       passed around from maintainer to maintainer like a hot-potato. Seems I
+>       was the sucker^Wlucky one. All of those patches have been acked by the
+>       various subsystem maintainers as well.
 
-Cheers,
+Now queued up, thanks.
 
--- 
-Julien Thierry
+greg k-h
