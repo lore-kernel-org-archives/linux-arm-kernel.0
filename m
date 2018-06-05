@@ -1,45 +1,30 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 05 Jun 2018 15:06:56 +0200
-Subject: [PATCH V2] ARM: dts: armada388-helios4
-In-Reply-To: <20180605124738.24844-1-dennis@ausil.us> (Dennis Gilmore's
- message of "Tue, 5 Jun 2018 07:47:38 -0500")
-References: <20180605124738.24844-1-dennis@ausil.us>
-Message-ID: <87muw9tma7.fsf@bootlin.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 5 Jun 2018 15:23:25 +0200
+Subject: [PATCH v4 1/3] dt-bindings: cpu: Add Renesas R9A06G032 SMP enable
+ method.
+In-Reply-To: <1528198148-23308-2-git-send-email-michel.pollet@bp.renesas.com>
+References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1528198148-23308-2-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdX3kmvYfGxXmcCT34rqfXm36cuQXb0ncy4kNrbAAX0oKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dennis,
- 
- On mar., juin 05 2018, Dennis Gilmore <dennis@ausil.us> wrote:
+On Tue, Jun 5, 2018 at 1:28 PM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> Add a special enable method for second CA7 of the R9A06G032
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-> The helios4 is a Armada388 based nas board designed by SolidRun and
-> based on their SOM. It is sold by kobol.io the dts file came from
-> https://raw.githubusercontent.com/armbian/build/master/patch/kernel/mvebu-default/95-helios4-device-tree.patch
-> I added a SPDX license line to match the clearfog it says it was based
-> on and a compatible line for "kobol,helios4"
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch looks good, I have only two remarks for now.
+Gr{oetje,eeting}s,
 
-> +	usb3_phy: usb3-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		//vbus-regulator = <&reg_5p0v_usb>;
-Why did you comment this line?
-What about removing it, if you don't need it?
-
-[...]
-> +
-> +			usb at 58000 {
-> +				//vcc-supply = <&reg_5p0v_usb>;
-Same here
-
-> +				usb-phy = <&usb2_phy>;
-> +				status = "okay";
-> +			};
-> +
-
-Gregory
+                        Geert
 
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
