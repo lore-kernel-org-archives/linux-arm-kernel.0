@@ -1,27 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 Jun 2018 16:37:07 +0100
-Subject: [RFC PATCH -tip v5 17/27] arm64: kprobes: Don't call the
- ->break_handler() in arm kprobes code
-In-Reply-To: <152812780433.10068.4191004481518140821.stgit@devbox>
-References: <152812730943.10068.5166429445118734697.stgit@devbox>
- <152812780433.10068.4191004481518140821.stgit@devbox>
-Message-ID: <20180605153706.GB26352@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 5 Jun 2018 16:50:48 +0100
+Subject: [PATCH] arm64: cpu_errata: include required headers
+In-Reply-To: <20180605115227.1621618-1-arnd@arndb.de>
+References: <20180605115227.1621618-1-arnd@arndb.de>
+Message-ID: <20180605155048.zz6zjxpmyeoliflj@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 12:56:44AM +0900, Masami Hiramatsu wrote:
-> Don't call the ->break_handler() from the arm kprobes code,
-> because it was only used by jprobes which got removed.
+On Tue, Jun 05, 2018 at 01:50:07PM +0200, Arnd Bergmann wrote:
+> Without including psci.h and arm-smccc.h, we now get a build failure in
+> some configurations:
 > 
-> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> arch/arm64/kernel/cpu_errata.c: In function 'arm64_update_smccc_conduit':
+> arch/arm64/kernel/cpu_errata.c:278:10: error: 'psci_ops' undeclared (first use in this function); did you mean 'sysfs_ops'?
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+> arch/arm64/kernel/cpu_errata.c: In function 'arm64_set_ssbd_mitigation':
+> arch/arm64/kernel/cpu_errata.c:311:3: error: implicit declaration of function 'arm_smccc_1_1_hvc' [-Werror=implicit-function-declaration]
+>    arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm64/kernel/probes/kprobes.c |    8 --------
->  1 file changed, 8 deletions(-)
+> This showed up only recently, but I have not bisected what caused it.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I haven't hit it yet, not sure why. I'm queuing the patch anyway.
+Thanks.
 
-Will
+-- 
+Catalin
