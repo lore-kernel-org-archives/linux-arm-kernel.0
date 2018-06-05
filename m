@@ -1,17 +1,18 @@
 From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue,  5 Jun 2018 16:07:07 -0500
-Subject: [PATCH v4 11/14] coresight: allow tpiu to be built as a module
+Date: Tue,  5 Jun 2018 16:07:01 -0500
+Subject: [PATCH v4 05/14] coresight: get/put module in
+ coresight_build/release_path
 In-Reply-To: <20180605210710.22227-1-kim.phillips@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
-Message-ID: <20180605210710.22227-12-kim.phillips@arm.com>
+Message-ID: <20180605210710.22227-6-kim.phillips@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow to build coresight-tpiu as a module, for ease of development.
+Increment the refcnt for driver modules in current use by calling
+module_get in coresight_build_path and module_put in release_path.
 
-- Kconfig becomes a tristate, to allow =m
-- add a tpiu_remove function, for module unload
-- add a MODULE_DEVICE_TABLE for autoloading on boot
+This prevents driver modules from being unloaded when they are in use,
+either in sysfs or perf mode.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: Leo Yan <leo.yan@linaro.org>
@@ -22,75 +23,35 @@ Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 ---
- drivers/hwtracing/coresight/Kconfig          |  5 ++++-
- drivers/hwtracing/coresight/coresight-tpiu.c | 19 ++++++++++++++++++-
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-index 3c3256425a7f..2f44adb82361 100644
---- a/drivers/hwtracing/coresight/Kconfig
-+++ b/drivers/hwtracing/coresight/Kconfig
-@@ -32,7 +32,7 @@ config CORESIGHT_LINK_AND_SINK_TMC
- 	  special enhancement or added features.
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 338f1719641c..1c941351f1d1 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -465,6 +465,12 @@ static int _coresight_build_path(struct coresight_device *csdev,
  
- config CORESIGHT_SINK_TPIU
--	bool "Coresight generic TPIU driver"
-+	tristate "Coresight generic TPIU driver"
- 	depends on CORESIGHT_LINKS_AND_SINKS
- 	help
- 	  This enables support for the Trace Port Interface Unit driver,
-@@ -42,6 +42,9 @@ config CORESIGHT_SINK_TPIU
- 	  connected to an external host for use case capturing more traces than
- 	  the on-board coresight memory can handle.
+ 	node->csdev = csdev;
+ 	list_add(&node->link, path);
++
++	if (!try_module_get(csdev->dev.parent->driver->owner)) {
++		dev_err(&csdev->dev, "could not get coresight driver module\n");
++		return -ENODEV;
++	}
++
+ 	pm_runtime_get_sync(csdev->dev.parent);
  
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called coresight-tpiu.
-+
- config CORESIGHT_SINK_ETBV10
- 	tristate "Coresight ETBv1.0 driver"
- 	depends on CORESIGHT_LINKS_AND_SINKS
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 01b7457fe8fc..ab53ce1a9ce3 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -164,6 +164,15 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
- 	return PTR_ERR_OR_ZERO(drvdata->csdev);
- }
+ 	return 0;
+@@ -510,6 +516,9 @@ void coresight_release_path(struct list_head *path)
+ 		csdev = nd->csdev;
  
-+static int __exit tpiu_remove(struct amba_device *adev)
-+{
-+	struct tpiu_drvdata *drvdata = dev_get_drvdata(&adev->dev);
+ 		pm_runtime_put_sync(csdev->dev.parent);
 +
-+	coresight_unregister(drvdata->csdev);
++		module_put(csdev->dev.parent->driver->owner);
 +
-+	return 0;
-+}
-+
- #ifdef CONFIG_PM
- static int tpiu_runtime_suspend(struct device *dev)
- {
-@@ -207,6 +216,8 @@ static const struct amba_id tpiu_ids[] = {
- 	{ 0, 0},
- };
- 
-+MODULE_DEVICE_TABLE(amba, tpiu_ids);
-+
- static struct amba_driver tpiu_driver = {
- 	.drv = {
- 		.name	= "coresight-tpiu",
-@@ -215,6 +226,12 @@ static struct amba_driver tpiu_driver = {
- 		.suppress_bind_attrs = true,
- 	},
- 	.probe		= tpiu_probe,
-+	.remove         = tpiu_remove,
- 	.id_table	= tpiu_ids,
- };
--builtin_amba_driver(tpiu_driver);
-+module_amba_driver(tpiu_driver);
-+
-+MODULE_AUTHOR("Pratik Patel <pratikp@codeaurora.org>");
-+MODULE_AUTHOR("Mathieu Poirier <mathieu.poirier@linaro.org>");
-+MODULE_DESCRIPTION("Arm CoreSight TPIU (Trace Port Interface Unit) driver");
-+MODULE_LICENSE("GPL v2");
+ 		list_del(&nd->link);
+ 		kfree(nd);
+ 	}
 -- 
 2.17.0
