@@ -1,33 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Jun 2018 13:48:38 +0200
-Subject: [PATCH] coresight: include vmalloc.h for vmap/vunmap
-Message-ID: <20180605114856.1558554-1-arnd@arndb.de>
+Date: Tue,  5 Jun 2018 13:50:07 +0200
+Subject: [PATCH] arm64: cpu_errata: include required headers
+Message-ID: <20180605115227.1621618-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced code fails to build in some configurations
-unless we include the right headers:
+Without including psci.h and arm-smccc.h, we now get a build failure in
+some configurations:
 
-drivers/hwtracing/coresight/coresight-tmc-etr.c: In function 'tmc_free_table_pages':
-drivers/hwtracing/coresight/coresight-tmc-etr.c:206:3: error: implicit declaration of function 'vunmap'; did you mean 'iounmap'? [-Werror=implicit-function-declaration]
+arch/arm64/kernel/cpu_errata.c: In function 'arm64_update_smccc_conduit':
+arch/arm64/kernel/cpu_errata.c:278:10: error: 'psci_ops' undeclared (first use in this function); did you mean 'sysfs_ops'?
 
-Fixes: 79613ae8715a ("coresight: Add generic TMC sg table framework")
+arch/arm64/kernel/cpu_errata.c: In function 'arm64_set_ssbd_mitigation':
+arch/arm64/kernel/cpu_errata.c:311:3: error: implicit declaration of function 'arm_smccc_1_1_hvc' [-Werror=implicit-function-declaration]
+   arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 1 +
- 1 file changed, 1 insertion(+)
+This showed up only recently, but I have not bisected what caused it.
+---
+ arch/arm64/kernel/cpu_errata.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 6164eed0b5fe..3556d9a849e9 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -8,6 +8,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/iommu.h>
- #include <linux/slab.h>
-+#include <linux/vmalloc.h>
- #include "coresight-priv.h"
- #include "coresight-tmc.h"
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 2b9a31a6a16a..1d2b6d768efe 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -16,6 +16,8 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
++#include <linux/arm-smccc.h>
++#include <linux/psci.h>
+ #include <linux/types.h>
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
 -- 
 2.9.0
