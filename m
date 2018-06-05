@@ -1,78 +1,84 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Jun 2018 15:44:07 -0500
-Subject: [PATCH] PCI: Clean up resource allocation in
- devm_of_pci_get_host_bridge_resources()
-In-Reply-To: <CAHp75VdWhCDYt3jvii92g222WeHTvwX5e8Sthr0pknXvCgwHDA@mail.gmail.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
- <CAHp75VeUbjobse6uLeM4h_xXRUw+YUQUN+EOye67AJy77a5euQ@mail.gmail.com>
- <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
- <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
- <CAHp75VdWhCDYt3jvii92g222WeHTvwX5e8Sthr0pknXvCgwHDA@mail.gmail.com>
-Message-ID: <20180605204407.GA226399@bhelgaas-glaptop.roam.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 5 Jun 2018 14:51:21 -0600
+Subject: [PATCH v2 13/16] dt-bindings/interrupt-controller: add
+ documentation for Marvell SEI controller
+In-Reply-To: <20180522094042.24770-14-miquel.raynal@bootlin.com>
+References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
+ <20180522094042.24770-14-miquel.raynal@bootlin.com>
+Message-ID: <20180605205121.GA19249@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 07:26:57PM +0300, Andy Shevchenko wrote:
-> On Wed, May 16, 2018 at 3:31 PM, Jan Kiszka <jan.kiszka@siemens.com> wrote:
-> > Instead of first allocating and then freeing memory for struct resource
-> > in case we cannot parse a PCI resource from the device tree, work
-> > against a local struct and kmemdup it when we decide to go with it.
-> >
+On Tue, May 22, 2018 at 11:40:39AM +0200, Miquel Raynal wrote:
+> Describe the System Error Interrupt (SEI) controller. It aggregates two
+> types of interrupts, wired and MSIs from respectively the AP and the
+> CPs, into a single SPI interrupt.
 > 
-> Bjorn, any comments on this?
+> Suggested-by: Haim Boot <hayim@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  .../bindings/interrupt-controller/marvell,sei.txt  | 50 ++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+> new file mode 100644
+> index 000000000000..689981036c30
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+> @@ -0,0 +1,50 @@
+> +Marvell SEI (System Error Interrupt) Controller
+> +-----------------------------------------------
+> +
+> +Marvell SEI (System Error Interrupt) controller is an interrupt
+> +aggregator. It receives interrupts from several sources and aggregates
+> +them to a single interrupt line (an SPI) on the parent interrupt
+> +controller.
+> +
+> +This interrupt controller can handle up to 64 SEIs, a set comes from the
+> +AP and is wired while a second set comes from the CPs by the mean of
+> +MSIs. Each 'domain' is represented as a subnode.
+> +
+> +Required properties:
+> +
+> +- compatible: should be "marvell,armada-8k-sei".
+> +- reg: SEI registers location and length.
+> +- interrupts: identifies the parent IRQ that will be triggered.
+> +
+> +Child node 'sei-wired-controller' required properties:
+> +
+> +- marvell,sei-ranges: ranges of wired interrupts.
+> +- #interrupt-cells: number of cells to define an SEI wired interrupt
+> +                    coming from the AP, should be 1. The cell is the IRQ
+> +                    number.
+> +- interrupt-controller: identifies the node as an interrupt controller.
+> +
+> +Child node 'sei-msi-controller' required properties:
+> +
+> +- marvell,sei-ranges: ranges of non-wired interrupts triggered by way of
+> +                      MSIs.
+> +- msi-controller: identifies the node as an MSI controller.
+> +
+> +Example:
+> +
+> +        sei: sei at 3f0200 {
+> +               compatible = "marvell,armada-8k-sei";
+> +               reg = <0x3f0200 0x40>;
+> +               interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +               sei_wired_controller: sei-wired-controller at 0 {
+> +                       marvell,sei-ranges = <0 21>;
+> +                       #interrupt-cells = <1>;
+> +                       interrupt-controller;
+> +               };
+> +
+> +               sei_msi_controller: sei-msi-controller at 21 {
+> +                       marvell,sei-ranges = <21 43>;
+> +                       msi-controller;
+> +               };
 
-I'm trying to finish up the v4.18 changes now, but I'll look at this later.
-If it's urgent, let me know and I can look sooner.
+I still think this should just be all one node. There's several examples 
+in the tree of nodes which are both interrupt-controller and 
+msi-controller. Marvell MPIC is one example.
 
-> > Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> > ---
-> >  drivers/pci/of.c | 14 ++++++--------
-> >  1 file changed, 6 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-> > index b06585a1da75..fc0f906c5c25 100644
-> > --- a/drivers/pci/of.c
-> > +++ b/drivers/pci/of.c
-> > @@ -266,7 +266,7 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
-> >                         struct list_head *resources, resource_size_t *io_base)
-> >  {
-> >         struct device_node *dev_node = dev->of_node;
-> > -       struct resource *res;
-> > +       struct resource *res, tmp_res;
-> >         struct resource *bus_range;
-> >         struct of_pci_range range;
-> >         struct of_pci_range_parser parser;
-> > @@ -320,18 +320,16 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
-> >                 if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> >                         continue;
-> >
-> > -               res = devm_kzalloc(dev, sizeof(struct resource), GFP_KERNEL);
-> > +               err = of_pci_range_to_resource(&range, dev_node, &tmp_res);
-> > +               if (err)
-> > +                       continue;
-> > +
-> > +               res = devm_kmemdup(dev, &tmp_res, sizeof(tmp_res), GFP_KERNEL);
-> >                 if (!res) {
-> >                         err = -ENOMEM;
-> >                         goto failed;
-> >                 }
-> >
-> > -               err = of_pci_range_to_resource(&range, dev_node, res);
-> > -               if (err) {
-> > -                       devm_kfree(dev, res);
-> > -                       continue;
-> > -               }
-> > -
-> >                 if (resource_type(res) == IORESOURCE_IO) {
-> >                         if (!io_base) {
-> >                                 dev_err(dev,
-> > --
-> > 2.13.6
-> 
-> 
-> 
-> -- 
-> With Best Regards,
-> Andy Shevchenko
+Rob
