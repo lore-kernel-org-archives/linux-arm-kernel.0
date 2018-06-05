@@ -1,35 +1,49 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:01:23 -0500
-Subject: [RFC PATCH 4/6] serial: 8250_omap: Make 8250_omap driver driver
- depend on ARCH_K3
+Date: Tue, 5 Jun 2018 01:01:22 -0500
+Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
+ controller
 In-Reply-To: <20180605060125.9518-1-nm@ti.com>
 References: <20180605060125.9518-1-nm@ti.com>
-Message-ID: <20180605060125.9518-5-nm@ti.com>
+Message-ID: <20180605060125.9518-4-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+AM654 uses a UART controller that is compatible (partially) with
+existing 8250 UART, however, has a few differences with respect to DMA
+support and control paths. Introduce a base definition that allows us
+to build up the differences in follow on patches.
 
-Allow 8250 omap serial driver to be used for K3 platforms.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Vignesh R <vigneshr@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/tty/serial/8250/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
+ drivers/tty/serial/8250/8250_omap.c                      | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index f005eaf8bc57..15c2c5463835 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -375,7 +375,7 @@ config SERIAL_8250_RT288X
+diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
+index 4b0f05adb228..c35d5ece1156 100644
+--- a/Documentation/devicetree/bindings/serial/omap_serial.txt
++++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
+@@ -1,6 +1,7 @@
+ OMAP UART controller
  
- config SERIAL_8250_OMAP
- 	tristate "Support for OMAP internal UART (8250 based driver)"
--	depends on SERIAL_8250 && ARCH_OMAP2PLUS
-+	depends on SERIAL_8250 && (ARCH_OMAP2PLUS || ARCH_K3)
- 	help
- 	  If you have a machine based on an Texas Instruments OMAP CPU you
- 	  can enable its onboard serial ports by enabling this option.
+ Required properties:
++- compatible : should be "ti,am654-uart" for AM654 controllers
+ - compatible : should be "ti,omap2-uart" for OMAP2 controllers
+ - compatible : should be "ti,omap3-uart" for OMAP3 controllers
+ - compatible : should be "ti,omap4-uart" for OMAP4 controllers
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index 1b337fee07ed..a019286f8bb6 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -1115,6 +1115,7 @@ static const u8 am3352_habit = OMAP_DMA_TX_KICK | UART_ERRATA_CLOCK_DISABLE;
+ static const u8 dra742_habit = UART_ERRATA_CLOCK_DISABLE;
+ 
+ static const struct of_device_id omap8250_dt_ids[] = {
++	{ .compatible = "ti,am654-uart" },
+ 	{ .compatible = "ti,omap2-uart" },
+ 	{ .compatible = "ti,omap3-uart" },
+ 	{ .compatible = "ti,omap4-uart", .data = &omap4_habit, },
 -- 
 2.15.1
