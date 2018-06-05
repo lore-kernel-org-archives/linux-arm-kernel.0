@@ -1,91 +1,63 @@
-From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
-Date: Mon, 4 Jun 2018 23:58:47 +0000
-Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F30297@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
- <86d0xhaucm.wl-marc.zyngier@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
- <31bede40-dbc5-0a88-d12c-5fc79ea02391@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69F30297@G01JPEXMBKW03>
-Message-ID: <8898674D84E3B24BA3A2D289B872026A69F31014@G01JPEXMBKW03>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  4 Jun 2018 21:56:49 -0300
+Subject: [PATCH] ARM: dts: imx53-qsb: Let the codec control MCLK pinctrl
+Message-ID: <1528160209-2849-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Please let me know is there any plan to push your patch to v4.18.
+sgtl5000 codec needs MCLK clock to be present so that it can
+successfully read/write via I2C.
 
-Thanks
+In the case of imx53-qsb, MCLK is provided via
+MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK pad. 
 
-Best Regards,
-Lei Zhang zhang.lei at fujitsu.com
-FUJITSU LIMITED
-> -----Original Message-----
-> From: linux-arm-kernel
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> Zhang, Lei
-> Sent: Friday, June 01, 2018 10:47 PM
-> To: 'Marc Zyngier'; 'linux-arm-kernel at lists.infradead.org'
-> Subject: RE: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-> 
-> Hi Marc
-> 
-> Thanks. Now I understood the policy of MSI allocation.
-> So this patch is great for our bus, and looks no problem for PCI.
-> 
-> Best Regards,
-> Lei Zhang zhang.lei at jp.fujitsu.com
-> FUJITSU LIMITED
-> 
-> > -----Original Message-----
-> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> > Sent: Friday, June 01, 2018 9:57 PM
-> > To: Zhang, Lei/? ?; 'linux-arm-kernel at lists.infradead.org'
-> > Subject: Re: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-> >
-> > Hi Lei,
-> >
-> > On 01/06/18 13:44, Zhang, Lei wrote:
-> > > Hi Marc
-> > >
-> > > I have reviewed your patch.
-> > > I think the approach is same between your patch and mine.
-> > > Your patch is simpler and more beautiful, and match our bus's
-> > requirement.
-> > >
-> > > I have only one question.
-> > > According your patch, if there are no enough lpis, amount of lpis
-> > required
-> > > will be divide by 2. it means someone want 16 lpis, maybe they can
-> only
-> > get 8?
-> > > I don?t' understand why we need it.
-> >
-> > That's the way the MSI allocation works in the kernel.
-> >
-> > A driver asks a number of MSIs (let's imagine, for example, one MSI
-> per
-> > CPU in the system), but the underlying HW can only provide a smaller
-> > number.
-> >
-> > Instead of failing and just returning an error, we reduce the allocation
-> > in order to provide the driver with something. If that's not enough,
-> > well, the driver itself will have the opportunity to give up.
-> >
-> > See pci_alloc_irq_vectors_affinity(), which takes a min and a max
-> number
-> > of vectors, for example.
-> >
-> > Thanks,
-> >
-> > 	M.
-> > --
-> > Jazz is not dead. It just smells funny...
-> >
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Move the MCLK pinctrl from hog group to the codec group, so that the
+codec clock can be present prior to reading the codec ID.
+
+This avoids the following sgtl5000 probe error:
+
+sgtl5000 1-000a: Error reading chip id -6
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index ef7658a..7423d46 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -153,7 +153,6 @@
+ 	imx53-qsb {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+ 				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+ 				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+ 				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+@@ -180,6 +179,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_codec: codecgrp {
++			fsl,pins = <
++				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x1c4
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+@@ -310,6 +315,8 @@
+ 	sgtl5000: codec@a {
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_codec>;
+ 		#sound-dai-cells = <0>;
+ 		VDDA-supply = <&reg_3p2v>;
+ 		VDDIO-supply = <&reg_3p2v>;
+-- 
+2.7.4
