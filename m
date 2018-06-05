@@ -1,69 +1,69 @@
-From: rah@settrans.net (Bob Ham)
-Date: Tue, 5 Jun 2018 19:18:48 +0100
-Subject: [linux-sunxi] Re: [PATCH v2] arm: sun4i: Add support for Pengpod
- 1000 tablet
-In-Reply-To: <20180605145038.qptdlcphdbnw6jyg@flea>
-References: <20180602160313.26763-1-rah@settrans.net>
- <20180604081302.hcn7j36gt6xeyquq@flea>
- <313a74ea-0be6-cff1-6b2f-06a4b0b7ba8d@settrans.net>
- <20180605145038.qptdlcphdbnw6jyg@flea>
-Message-ID: <e2787b2a-230d-ea3c-89b9-316ddcd20f67@settrans.net>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 05 Jun 2018 20:29:37 +0200
+Subject: [alsa-devel] [PATCH 0/3] ASoC: stm32: sai: add support of iec958
+ controls
+In-Reply-To: <2ae6c5b6-872a-9aaa-6ca4-e29adb7c8bc0@st.com>
+References: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
+ <a0552849-47fa-dc72-a512-a3e075adb07f@st.com>
+ <20180417111733.GG8973@sirena.org.uk>
+ <2ae6c5b6-872a-9aaa-6ca4-e29adb7c8bc0@st.com>
+Message-ID: <s5hpo15xf1q.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/18 15:50, Maxime Ripard wrote:
-> On Mon, Jun 04, 2018 at 06:33:02PM +0100, Bob Ham wrote:
->> On 04/06/18 09:13, Maxime Ripard wrote:
->>> On Sat, Jun 02, 2018 at 05:03:13PM +0100, Bob Ham wrote:
->>
->>>> + * This file is dual-licensed: you can use it either under the terms
->>>> + * of the GPL or the X11 license, at your option. Note that this dual
->>>> + * licensing only applies to this file, and not this project as a
->>>> + * whole.
->>
->>>> + *     The above copyright notice and this permission notice shall be
->>>> + *     included in all copies or substantial portions of the Software.
->>
->>> And this is redundant with the SPDX header.
->>
->> The X11 license notice states explicitly that the notice has to be
->> included in the file.  Wouldn't removing it be a violation of the license?
+On Tue, 05 Jun 2018 17:50:57 +0200,
+Arnaud Pouliquen wrote:
 > 
-> The SPDX header is explicitly here to remove the license text and
-> create a tag that is in a indirect reference to the license text in
-> LICENSES. It's not going away.
+> Hi Takashi,
+> 
+> On 04/17/2018 01:17 PM, Mark Brown wrote:
+> > On Tue, Apr 17, 2018 at 08:29:17AM +0000, Olivier MOYSAN wrote:
+> > 
+> >> I guess the blocking patch in this patchset is the patch "add IEC958 
+> >> channel status control helper". This patch has been reviewed several 
+> >> times, but did not get a ack so far.
+> >> If you think these helpers will not be merged, I will reintegrate the 
+> >> corresponding code in stm driver.
+> >> Please let me know, if I need to prepare a v2 without helpers, or if we 
+> >> can go further in the review of iec helpers patch ?
+> > 
+> > I don't mind either way but you're right here, I'm waiting for Takashi
+> > to review the first patch.? I'd probably be OK with it just integrated
+> > into the driver if we have to go that way though.
+> 
+> Gentlemen reminder for this patch set. We would appreciate to have your
+> feedback on iec helper.
+> From our point of view it could be useful to have a generic management
+> of the iec controls based on helpers instead of redefining them in DAIs.
+> Having the same behavior for these controls could be useful to ensure
+> coherence of the control management used by application (for instance
+> Gstreamer uses it to determine iec raw mode capability for iec61937 streams)
 
-Well, the top bit that I quoted above says that the licenses refer to
-only that one file in particular and not the project as a whole.  Then
-the X11 license states that the notice can't be removed from 'this
-software and associated documentation files (the "Software")' which
-would seem to refer to the single file.  Therefore, removing the notice
-from the single file and replacing it with an SPDX header would seem to
-violate the license.
+Oh sorry for the late reply, I've totally overlooked the thread.
 
-It's a fine point but it makes me nervous.  I originally based my .dts
-on sun4i-a10-inet1.dts.  I've CC'd the original copyright holder, Hans
-de Goede.  Hans, are you willing to give permission for the license
-notice to be replaced with just an SPDX header indicating the dual
-licensing?
+And, another sorry: the patchset doesn't look convincing enough to
+me.
 
-While we're at it, there are a number of other files with the same
-license text.  Hans, are you prepared to give permission for your other
-license notices to be replaced with SPDX headers?
+First off, the provided API definition appears somewhat
+unconventional, the mixture of the ops, the static data and the
+dynamic data.
 
-Thanks,
+Moreover, this is only for your driver, ATM.  If it were an API that
+does clean up the already existing usages, I'd happily apply it. There
+are lots of drivers creating and controlling the IEC958 ctls even
+now.
 
-Bob
+Also, the patchset requires more fine-tuning, in anyways.  The changes
+in create_iec958_consumre() are basically irrelevant, should be split
+off as an individual fix.  Also, the new function doesn't create the
+"XXX Mask" controls.  And the byte comparison should be replaced with
+memcmp(), etc, etc.
 
--- 
-Bob Ham <rah@settrans.net>
+So, please proceed rather with the open codes for now.  If you can
+provide a patch that cleans up the *multiple* driver codes, again,
+I'll happily take it.  But it can be done anytime later, too.
 
-for (;;) { ++pancakes; }
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 2913 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/c91f541e/attachment.sig>
+thanks,
+
+Takashi
