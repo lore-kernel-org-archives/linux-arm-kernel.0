@@ -1,206 +1,253 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  5 Jun 2018 22:43:20 +0100
-Subject: [PATCH 09/20] coresight: dts: Define new bindings for direction of
- data flow
+Date: Tue,  5 Jun 2018 22:43:19 +0100
+Subject: [PATCH 08/20] coresight: dts: Cleanup device tree graph bindings
 In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
 References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1528235011-30691-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1528235011-30691-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we have relied on an undocumented property "slave-mode",
-to indicate if the given port is input or not. Since we are
-redefining the coresight bindings, define new property for the
-"direction" of data flow for a given connection endpoint in the
-device.
+The coresight drivers relied on default bindings for graph
+in DT, while reusing the "reg" field of the "ports" to indicate
+the actual hardware port number for the connections. However,
+with the rules getting stricter w.r.t to the address mismatch
+with the label, it is no longer possible to use the port address
+field for the hardware port number. Hence, we add an explicit
+property to denote the hardware port number, "coresight,hwid"
+which must be specified for each "endpoint".
 
-Each endpoint must define the following property.
-
- - "direction" : 0 => Port is input
-		 1 => Port is output
-
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Rob Herring <robh@kernel.org>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../devicetree/bindings/arm/coresight.txt          | 24 ++++++++++++++--------
- drivers/hwtracing/coresight/of_coresight.c         | 22 ++++++++++++++++----
- 2 files changed, 34 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/arm/coresight.txt          | 29 ++++++++++---
+ drivers/hwtracing/coresight/of_coresight.c         | 49 +++++++++++++++++-----
+ 2 files changed, 62 insertions(+), 16 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index bf75ab3..ff382bc 100644
+index ed6b555..bf75ab3 100644
 --- a/Documentation/devicetree/bindings/arm/coresight.txt
 +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -103,9 +103,11 @@ with a specific direction of data flow, each connection must define the
- following properties to uniquely identify the connection details.
- 
-  * Direction of the data flow w.r.t the component :
--   Each input port must have the following property defined at the "endpoint"
-+   Each hardware port must have the following property defined at the "endpoint"
-    for the port.
--	"slave-mode"
-+	"direction" - 32bit integer, whose values are defined as follows :
-+		0 => the endpoint is an Input port
-+		1 => the endpoint is an Output port.
+@@ -108,8 +108,13 @@ following properties to uniquely identify the connection details.
+ 	"slave-mode"
  
   * Hardware Port number at the component:
-      - Each "endpoint" must define the hardware port of the local end of the
-@@ -129,7 +131,7 @@ Example:
- 		clock-names = "apb_pclk";
- 		port {
+-     -  The hardware port number is assumed to be the address of the "port"
+-         component.
++     - Each "endpoint" must define the hardware port of the local end of the
++       connection using the following property :
++
++	"coresight,hwid" - 32bit integer, local hardware port.
++
++     - [ ** Obsolete ** ] The hardware port number is assumed to be the address
++       of the "port" component.
+ 
+ 
+ 
+@@ -126,6 +131,7 @@ Example:
  			etb_in_port: endpoint at 0 {
--				slave-mode;
-+				direction = <0>;
+ 				slave-mode;
  				remote-endpoint = <&replicator_out_port0>;
- 				coresight,hwid = <0>;
++				coresight,hwid = <0>;
  			};
-@@ -144,7 +146,7 @@ Example:
- 		clock-names = "apb_pclk";
- 		port {
+ 		};
+ 	};
+@@ -140,6 +146,7 @@ Example:
  			tpiu_in_port: endpoint at 0 {
--				slave-mode;
-+				direction = <0>;
+ 				slave-mode;
  				remote-endpoint = <&replicator_out_port1>;
- 				coresight,hwid = <0>;
++				coresight,hwid = <0>;
  			};
-@@ -166,6 +168,7 @@ Example:
- 			port at 0 {
+ 		};
+ 	};
+@@ -160,6 +167,7 @@ Example:
  				reg = <0>;
  				replicator_out_port0: endpoint {
-+					direction = <1>;
  					remote-endpoint = <&etb_in_port>;
- 					coresight,hwid = <0>;
++					coresight,hwid = <0>;
  				};
-@@ -174,6 +177,7 @@ Example:
- 			port at 1 {
+ 			};
+ 
+@@ -167,15 +175,17 @@ Example:
  				reg = <1>;
  				replicator_out_port1: endpoint {
-+					direction = <1>;
  					remote-endpoint = <&tpiu_in_port>;
- 					coresight,hwid = <1>;
++					coresight,hwid = <1>;
  				};
-@@ -183,7 +187,7 @@ Example:
+ 			};
+ 
+ 			/* replicator input port */
  			port at 2 {
- 				reg = <1>;
+-				reg = <0>;
++				reg = <1>;
  				replicator_in_port0: endpoint {
--					slave-mode;
-+					direction = <0>;
+ 					slave-mode;
  					remote-endpoint = <&funnel_out_port0>;
- 					coresight,hwid = <0>;
++					coresight,hwid = <0>;
  				};
-@@ -205,6 +209,7 @@ Example:
- 			port at 0 {
- 				reg = <0>;
+ 			};
+ 		};
+@@ -197,31 +207,35 @@ Example:
  				funnel_out_port0: endpoint {
-+					direction = <1>;
  					remote-endpoint =
  							<&replicator_in_port0>;
- 					coresight,hwid = <0>;
-@@ -215,7 +220,7 @@ Example:
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 
+ 			/* funnel input ports */
  			port at 1 {
- 				reg = <1>;
+-				reg = <0>;
++				reg = <1>;
  				funnel_in_port0: endpoint {
--					slave-mode;
-+					direction = <0>;
+ 					slave-mode;
  					remote-endpoint = <&ptm0_out_port>;
- 					coresight,hwid = <0>;
++					coresight,hwid = <0>;
  				};
-@@ -224,7 +229,7 @@ Example:
+ 			};
+ 
  			port at 2 {
- 				reg = <2>;
+-				reg = <1>;
++				reg = <2>;
  				funnel_in_port1: endpoint {
--					slave-mode;
-+					direction = <0>;
+ 					slave-mode;
  					remote-endpoint = <&ptm1_out_port>;
- 					coresight,hwid = <1>;
++					coresight,hwid = <1>;
  				};
-@@ -233,7 +238,7 @@ Example:
+ 			};
+ 
  			port at 3 {
- 				reg = <3>;
+-				reg = <2>;
++				reg = <3>;
  				funnel_in_port2: endpoint {
--					slave-mode;
-+					direction = <0>;
+ 					slave-mode;
  					remote-endpoint = <&etm0_out_port>;
- 					coresight,hwid = <2>;
++					coresight,hwid = <2>;
  				};
-@@ -252,6 +257,7 @@ Example:
- 		clock-names = "apb_pclk";
+ 			};
+ 
+@@ -239,6 +253,7 @@ Example:
  		port {
  			ptm0_out_port: endpoint {
-+				direction = <1>;
  				remote-endpoint = <&funnel_in_port0>;
- 				coresight,hwid = <0>;
++				coresight,hwid = <0>;
  			};
-@@ -267,6 +273,7 @@ Example:
- 		clock-names = "apb_pclk";
+ 		};
+ 	};
+@@ -253,6 +268,7 @@ Example:
  		port {
  			ptm1_out_port: endpoint {
-+				direction = <1>;
  				remote-endpoint = <&funnel_in_port1>;
- 				coresight,hwid = <0>;
++				coresight,hwid = <0>;
  			};
-@@ -284,6 +291,7 @@ Example:
- 		clock-names = "apb_pclk";
+ 		};
+ 	};
+@@ -269,6 +285,7 @@ Example:
  		port {
  			stm_out_port: endpoint {
-+				direction = <1>;
  				remote-endpoint = <&main_funnel_in_port2>;
- 				coresight,hwid = <0>;
++				coresight,hwid = <0>;
  			};
+ 		};
+ 	};
 diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index d23d7dd..0d6e6a9 100644
+index d01a9ce..d23d7dd 100644
 --- a/drivers/hwtracing/coresight/of_coresight.c
 +++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -45,7 +45,20 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
- 			       endpoint, of_dev_node_match);
- }
+@@ -99,6 +99,31 @@ int of_coresight_get_cpu(const struct device_node *node)
+ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
  
--static void of_coresight_get_ports(const struct device_node *node,
-+static bool of_coresight_endpoint_is_input(struct device *dev,
-+					   struct device_node *ep_node)
+ /*
++ * of_coresight_endpoint_get_port_id : Get the hardware port number for the
++ * given endpoint device node. Prefer the explicit "coresight,hwid" property
++ * over the endpoint register id (obsolete bindings).
++ */
++static int of_coresight_endpoint_get_port_id(struct device *dev,
++					     struct device_node *ep_node)
 +{
-+	u32 dir;
++	struct of_endpoint ep;
++	int rc, port_id;
 +
-+	if (!of_property_read_u32(ep_node, "direction", &dir))
-+		return dir == 0;
 +
-+	dev_warn_once(dev, "Missing mandatory \"direction\" property!\n");
-+	return of_property_read_bool(ep_node, "slave-mode");
++	if (!of_property_read_u32(ep_node, "coresight,hwid", &port_id))
++		return port_id;
++
++	rc = of_graph_parse_endpoint(ep_node, &ep);
++	if (rc)
++		return rc;
++	dev_warn_once(dev,
++		      "ep%d: Mandatory \"coresight,hwid\" property missing.\n",
++		      ep.port);
++	dev_warn_once(dev, "DT uses obsolete coresight bindings\n");
++	return ep.port;
 +}
 +
-+static void of_coresight_get_ports(struct device *dev,
-+				   const struct device_node *node,
- 				   int *nr_inport, int *nr_outport)
++/*
+  * of_coresight_parse_endpoint : Parse the given output endpoint @ep
+  * and fill the connection information in *@pconn.
+  *
+@@ -109,11 +134,11 @@ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+  *	 0	- If the parsing completed without any fatal errors.
+  *	-Errno	- Fatal error, abort the scanning.
+  */
+-static int of_coresight_parse_endpoint(struct device_node *ep,
++static int of_coresight_parse_endpoint(struct device *dev,
++				       struct device_node *ep,
+ 				       struct coresight_connection **pconn)
  {
- 	struct device_node *ep = NULL;
-@@ -56,7 +69,7 @@ static void of_coresight_get_ports(const struct device_node *node,
- 		if (!ep)
- 			break;
- 
--		if (of_property_read_bool(ep, "slave-mode"))
-+		if (of_coresight_endpoint_is_input(dev, ep))
- 			in++;
- 		else
- 			out++;
-@@ -149,7 +162,7 @@ static int of_coresight_parse_endpoint(struct device *dev,
- 		 * No need to deal with input ports, processing for as
- 		 * processing for output ports will deal with them.
- 		 */
--		if (of_find_property(ep, "slave-mode", NULL))
-+		if (of_coresight_endpoint_is_input(dev, ep))
+-	int ret = 0;
+-	struct of_endpoint endpoint, rendpoint;
++	int ret = 0, local_port, child_port;
+ 	struct device_node *rparent = NULL;
+ 	struct device_node *rep = NULL;
+ 	struct device *rdev = NULL;
+@@ -128,7 +153,8 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
  			break;
  
  		/* Parse the local port details */
-@@ -212,7 +225,8 @@ of_get_coresight_platform_data(struct device *dev,
- 	pdata->cpu = of_coresight_get_cpu(node);
+-		if (of_graph_parse_endpoint(ep, &endpoint))
++		local_port = of_coresight_endpoint_get_port_id(dev, ep);
++		if (local_port < 0)
+ 			break;
+ 		/*
+ 		 * Get a handle on the remote endpoint and the device it is
+@@ -140,9 +166,6 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+ 		rparent = of_graph_get_port_parent(rep);
+ 		if (!rparent)
+ 			break;
+-		if (of_graph_parse_endpoint(rep, &rendpoint))
+-			break;
+-
+ 		/* If the remote device is not available, defer probing */
+ 		rdev = of_coresight_get_endpoint_device(rparent);
+ 		if (!rdev) {
+@@ -150,9 +173,15 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+ 			break;
+ 		}
  
- 	/* Get the number of input and output port for this component */
--	of_coresight_get_ports(node, &pdata->nr_inport, &pdata->nr_outport);
-+	of_coresight_get_ports(dev, node,
-+			       &pdata->nr_inport, &pdata->nr_outport);
- 
- 	/* If there are not output connections, we are done */
- 	if (!pdata->nr_outport)
+-		conn->outport = endpoint.port;
++		child_port = of_coresight_endpoint_get_port_id(rdev, rep);
++		if (child_port < 0) {
++			ret = 0;
++			break;
++		}
++
++		conn->outport = local_port;
+ 		conn->child_name = dev_name(rdev);
+-		conn->child_port = rendpoint.port;
++		conn->child_port = child_port;
+ 		/* Move the connection record */
+ 		(*pconn)++;
+ 	} while (0);
+@@ -200,7 +229,7 @@ of_get_coresight_platform_data(struct device *dev,
+ 		ep = of_graph_get_next_endpoint(node, ep);
+ 		if (!ep)
+ 			break;
+-		ret = of_coresight_parse_endpoint(ep, &conn);
++		ret = of_coresight_parse_endpoint(dev, ep, &conn);
+ 		if (ret)
+ 			return ERR_PTR(ret);
+ 	} while (ep);
 -- 
 2.7.4
