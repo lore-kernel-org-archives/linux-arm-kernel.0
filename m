@@ -1,53 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:20:46 -0500
-Subject: [RFC PATCH] clk: keystone: Enable TISCI clocks if K3_ARCH
-Message-ID: <20180605062046.31437-1-nm@ti.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Tue, 5 Jun 2018 14:30:25 +0800
+Subject: [PATCH] irqchip/gic-v3-its: fix ITS queue timeout
+Message-ID: <1528180225-16144-1-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-K3_ARCH uses TISCI for clocks as well. Enable the same
-for the driver support.
+When the kernel booted with maxcpus=x, 'x' is smaller
+than actual cpu numbers, the TAs of offline cpus won't
+be set to its->collection.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+If LPI is bind to offline cpu, sync cmd will use zero TA,
+it leads to ITS queue timeout.  Fix this by choosing a
+online cpu, if there is no online cpu in cpu_mask.
+
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 ---
+ drivers/irqchip/irq-gic-v3-its.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Hi,
-
-This patch depends on https://marc.info/?l=linux-arm-kernel&m=152817866312732&w=2
-and is an RFC based off next-20180604 and will post formally once
-v4.18-rc1 is available.
-
-The consolidated series is also available at:
-https://github.com/nmenon/linux-2.6-playground/commits/upstream/next-20180604/k3-3-am6-clk
-
- drivers/clk/Makefile         | 1 +
- drivers/clk/keystone/Kconfig | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 0bb25dd009d1..c14187526b46 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -72,6 +72,7 @@ obj-$(CONFIG_ARCH_HISI)			+= hisilicon/
- obj-y					+= imgtec/
- obj-$(CONFIG_ARCH_MXC)			+= imx/
- obj-$(CONFIG_MACH_INGENIC)		+= ingenic/
-+obj-$(CONFIG_ARCH_K3)			+= keystone/
- obj-$(CONFIG_ARCH_KEYSTONE)		+= keystone/
- obj-$(CONFIG_MACH_LOONGSON32)		+= loongson1/
- obj-y					+= mediatek/
-diff --git a/drivers/clk/keystone/Kconfig b/drivers/clk/keystone/Kconfig
-index 7e9f0176578a..b04927d06cd1 100644
---- a/drivers/clk/keystone/Kconfig
-+++ b/drivers/clk/keystone/Kconfig
-@@ -7,7 +7,7 @@ config COMMON_CLK_KEYSTONE
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 5416f2b..edd92a9 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -2309,7 +2309,9 @@ static int its_irq_domain_activate(struct irq_domain *domain,
+ 		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
  
- config TI_SCI_CLK
- 	tristate "TI System Control Interface clock drivers"
--	depends on (ARCH_KEYSTONE || COMPILE_TEST) && OF
-+	depends on (ARCH_KEYSTONE || ARCH_K3 || COMPILE_TEST) && OF
- 	depends on TI_SCI_PROTOCOL
- 	default ARCH_KEYSTONE
- 	---help---
+ 	/* Bind the LPI to the first possible CPU */
+-	cpu = cpumask_first(cpu_mask);
++	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
++	if (!cpu_online(cpu))
++		cpu = cpumask_first(cpu_online_mask);
+ 	its_dev->event_map.col_map[event] = cpu;
+ 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
+ 
+@@ -2466,7 +2468,10 @@ static int its_vpe_set_affinity(struct irq_data *d,
+ 				bool force)
+ {
+ 	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
+-	int cpu = cpumask_first(mask_val);
++	int cpu = cpumask_first_and(mask_val, cpu_online_mask);
++
++	if (!cpu_online(cpu))
++		cpu = cpumask_first(cpu_online_mask);
+ 
+ 	/*
+ 	 * Changing affinity is mega expensive, so let's be as lazy as
 -- 
-2.15.1
+1.8.3
