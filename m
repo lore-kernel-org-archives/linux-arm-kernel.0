@@ -1,40 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 5 Jun 2018 15:24:55 +0200
-Subject: [PATCH v4 3/3] ARM: dts: Renesas R9A06G032 SMP enable method
-In-Reply-To: <1528198148-23308-4-git-send-email-michel.pollet@bp.renesas.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
- <1528198148-23308-4-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdU1n0tQgPaEXAn6W1aVCDBjk-h0Mz2kgh2vu4e9CEi0XQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 05 Jun 2018 15:42:11 +0200
+Subject: [PATCH v7 1/5] drm/rockchip: add transfer function for cdn-dp
+In-Reply-To: <1527061353-16902-1-git-send-email-hl@rock-chips.com>
+References: <1527061353-16902-1-git-send-email-hl@rock-chips.com>
+Message-ID: <2246202.0LhvmkcTbg@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 5, 2018 at 1:28 PM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> Add a special enable method for the second CA7 of the R9A06G032
-> as well as the default value for the "cpu-release-addr" property.
->
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+Hi,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Am Mittwoch, 23. Mai 2018, 09:42:29 CEST schrieb Lin Huang:
+> From: Chris Zhong <zyw@rock-chips.com>
+> 
+> We may support training outside firmware, so we need support
+> dpcd read/write to get the message or do some setting with
+> display.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> Reviewed-by: Enric Balletbo <enric.balletbo@collabora.com>
 
-> --- a/arch/arm/boot/dts/r9a06g032.dtsi
-> +++ b/arch/arm/boot/dts/r9a06g032.dtsi
-> @@ -1,3 +1,4 @@
+> @@ -1030,6 +1064,13 @@ static int cdn_dp_bind(struct device *dev, struct
+> device *master, void *data) dp->active = false;
+>  	dp->active_port = -1;
+>  	dp->fw_loaded = false;
+> +	dp->aux.name = "DP-AUX";
+> +	dp->aux.transfer = cdn_dp_aux_transfer;
+> +	dp->aux.dev = dev;
 > +
+> +	ret = drm_dp_aux_register(&dp->aux);
+> +	if (ret)
+> +		return ret;
 
-Bogus change
+this is missing matching drm_dp_aux_unregister calls both in the error path as 
+well as in the unbind callback.
 
->  // SPDX-License-Identifier: GPL-2.0
->  /*
->   * Base Device Tree Source for the Renesas RZ/N1D (R9A06G032)
+With the code as is, the kernel gives warnings about it trying to initialize 
+an already initialized object ... in cases like probe-deferrals.
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Heiko
