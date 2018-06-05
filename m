@@ -1,39 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Jun 2018 13:50:07 +0200
-Subject: [PATCH] arm64: cpu_errata: include required headers
-Message-ID: <20180605115227.1621618-1-arnd@arndb.de>
+Date: Tue,  5 Jun 2018 13:53:19 +0200
+Subject: [PATCH] ARM: rpc: use designated initializers in ecard_default_ops
+Message-ID: <20180605115330.1733640-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without including psci.h and arm-smccc.h, we now get a build failure in
-some configurations:
+When the randstruct plugin is enabled, we get a warning about the
+use of traditional struct initializers for this structure, which
+results in incorrect behavior:
 
-arch/arm64/kernel/cpu_errata.c: In function 'arm64_update_smccc_conduit':
-arch/arm64/kernel/cpu_errata.c:278:10: error: 'psci_ops' undeclared (first use in this function); did you mean 'sysfs_ops'?
+arch/arm/mach-rpc/ecard.c:416:2: error: positional initialization of field in 'struct' declared with 'designated_init' attribute [-Werror=designated-init]
+  ecard_def_irq_enable,
+  ^~~~~~~~~~~~~~~~~~~~
+arch/arm/mach-rpc/ecard.c:416:2: note: (near initialization for 'ecard_default_ops')
+arch/arm/mach-rpc/ecard.c:416:2: error: invalid initializer
+arch/arm/mach-rpc/ecard.c:416:2: note: (near initialization for 'ecard_default_ops.<anonymous>')
+arch/arm/mach-rpc/ecard.c:417:2: error: positional initialization of field in 'struct' declared with 'designated_init' attribute [-Werror=designated-init]
+  ecard_def_irq_disable,
+  ^~~~~~~~~~~~~~~~~~~~~
 
-arch/arm64/kernel/cpu_errata.c: In function 'arm64_set_ssbd_mitigation':
-arch/arm64/kernel/cpu_errata.c:311:3: error: implicit declaration of function 'arm_smccc_1_1_hvc' [-Werror=implicit-function-declaration]
-   arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+This changes it to use designated initializers like we do for all
+other structures.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-This showed up only recently, but I have not bisected what caused it.
----
- arch/arm64/kernel/cpu_errata.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-rpc/ecard.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 2b9a31a6a16a..1d2b6d768efe 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -16,6 +16,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm/mach-rpc/ecard.c b/arch/arm/mach-rpc/ecard.c
+index 39aef4876ed4..d0c4e20de4f3 100644
+--- a/arch/arm/mach-rpc/ecard.c
++++ b/arch/arm/mach-rpc/ecard.c
+@@ -413,12 +413,12 @@ static int ecard_def_fiq_pending(ecard_t *ec)
+ }
  
-+#include <linux/arm-smccc.h>
-+#include <linux/psci.h>
- #include <linux/types.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
+ static expansioncard_ops_t ecard_default_ops = {
+-	ecard_def_irq_enable,
+-	ecard_def_irq_disable,
+-	ecard_def_irq_pending,
+-	ecard_def_fiq_enable,
+-	ecard_def_fiq_disable,
+-	ecard_def_fiq_pending
++	.irqenable  = ecard_def_irq_enable,
++	.irqdisable = ecard_def_irq_disable,
++	.irqpending = ecard_def_irq_pending,
++	.fiqenable  = ecard_def_fiq_enable,
++	.fiqdisable = ecard_def_fiq_disable,
++	.fiqpending = ecard_def_fiq_pending
+ };
+ 
+ /*
 -- 
 2.9.0
