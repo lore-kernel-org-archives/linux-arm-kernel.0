@@ -1,59 +1,87 @@
-From: valentin.schneider@arm.com (Valentin Schneider)
-Date: Tue, 5 Jun 2018 15:59:28 +0100
-Subject: [PATCH v10 0/5] scsi: ufs: add ufs driver code for Hisilicon
- Hi3660 SoC
-In-Reply-To: <20180525091712.37227-1-liwei213@huawei.com>
-References: <20180525091712.37227-1-liwei213@huawei.com>
-Message-ID: <f9cde7df-2d4d-3d7e-5269-ef879211b2ee@arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 5 Jun 2018 17:00:33 +0200
+Subject: [PATCH v2 2/3] ACPI / PPTT: fix build when CONFIG_ACPI_PPTT is
+ not enabled
+In-Reply-To: <1528209304-3280-2-git-send-email-sudeep.holla@arm.com>
+References: <1528209304-3280-1-git-send-email-sudeep.holla@arm.com>
+ <1528209304-3280-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAJZ5v0gqQNHCuaeduQ8oQtGNUQcZxK171nDfyMNi1VVfnVsMqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 5, 2018 at 4:35 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Though CONFIG_ACPI_PPTT is selected by platforms and nor user visible,
+> it may be useful to support the build with CONFIG_ACPI_PPTT disabled.
+>
+> This patch adds the missing dummy/boiler plate implementation to fix
+> the build.
+>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  include/linux/acpi.h      | 15 +++++++++++++++
+>  include/linux/cacheinfo.h |  2 +-
+>  2 files changed, 16 insertions(+), 1 deletion(-)
+>
+> Hi Rafael,
+>
+> If you are fine with this, can you provide Ack, so that we route this
+> through ARM64 tree where most of the ACPI PPTT support is present.
+>
+> Regards,
+> Sudeep
+>
+> v1->v2:
+>         - removed duplicate definition for acpi_find_last_cache_level
+>
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 8f2cdb0eca71..4b35a66383f9 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -1299,8 +1299,23 @@ static inline int lpit_read_residency_count_address(u64 *address)
+>  }
+>  #endif
+>
+> +#ifdef CONFIG_ACPI_PPTT
+>  int find_acpi_cpu_topology(unsigned int cpu, int level);
+>  int find_acpi_cpu_topology_package(unsigned int cpu);
+>  int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
+> +#else
+> +static inline int find_acpi_cpu_topology(unsigned int cpu, int level)
+> +{
+> +       return -EINVAL;
 
-On 25/05/18 10:17, Li Wei wrote:
-> This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
-> 
-> Li Wei (5):
->   scsi: ufs: add Hisilicon ufs driver code
->   dt-bindings: scsi: ufs: add document for hisi-ufs
->   arm64: dts: add ufs dts node
->   arm64: defconfig: enable configs for Hisilicon ufs
->   arm64: defconfig: enable f2fs and squashfs
-> 
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
->  .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
->  arch/arm64/configs/defconfig                       |  11 +
->  drivers/scsi/ufs/Kconfig                           |   9 +
->  drivers/scsi/ufs/Makefile                          |   1 +
->  drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
->  drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
->  8 files changed, 821 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
->  create mode 100644 drivers/scsi/ufs/ufs-hisi.c
->  create mode 100644 drivers/scsi/ufs/ufs-hisi.h
-> 
-> Major changes in v10:
->  - solve review comments from Rob Herring.
->    *Modify the "reset-names" describe in ufs-hisi.txt binding file.
->    *List clocks in ufs-hisi.txt binding file.
->    *remove the "arst" and keep only "rst" in the binging files.
->    *remove the "arst" member from both dts and c code. 
-> Major changes in v9:
->  - solve review comments from Rob Herring.
->    *remove freq-table-hz in ufs-hisi.txt binding file.
->    *Move the rst to the ufshcd_pltfm.txt common binding file.
->    *Modify the member "assert" of UFS host structure to "arst".
-> Major changes in v8:
->  - solve review comments from zhangfei.
->    *Add Version history.
->  - solve review comments from Rob Herring.
->    *remove freq-table-hz.
->  -  solve review comments from Riku Voipio.
->    *Add MODULE_DEVICE_TABLE for ufs driver.
-> 
+Why -EINVAL?
 
-Tested on top of linux-next (4.17.0-next-20180605), I can reliably load
-my debian userspace flashed on the 'system' fastboot partition.
-
-Tested-by: Valentin Schneider <valentin.schneider@arm.com>
+> +}
+> +static inline int find_acpi_cpu_topology_package(unsigned int cpu)
+> +{
+> +       return -EINVAL;
+> +}
+> +static inline int find_acpi_cpu_cache_topology(unsigned int cpu, int level)
+> +{
+> +       return -EINVAL;
+> +}
+> +#endif
+>
+>  #endif /*_LINUX_ACPI_H*/
+> diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
+> index 89397e30e269..70e19bc6cc9f 100644
+> --- a/include/linux/cacheinfo.h
+> +++ b/include/linux/cacheinfo.h
+> @@ -98,7 +98,7 @@ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
+>  int init_cache_level(unsigned int cpu);
+>  int populate_cache_leaves(unsigned int cpu);
+>  int cache_setup_acpi(unsigned int cpu);
+> -#ifndef CONFIG_ACPI
+> +#ifndef CONFIG_ACPI_PPTT
+>  /*
+>   * acpi_find_last_cache_level is only called on ACPI enabled
+>   * platforms using the PPTT for topology. This means that if
+> --
+> 2.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
