@@ -1,87 +1,53 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  5 Jun 2018 22:43:14 +0100
-Subject: [PATCH 03/20] coresight: Fix remote endpoint parsing
+Date: Tue,  5 Jun 2018 22:43:17 +0100
+Subject: [PATCH 06/20] coresight: Handle errors in finding input/output ports
 In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
 References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1528235011-30691-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1528235011-30691-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When parsing the remote endpoint of an output port, we do :
-     rport = of_graph_get_remote_port(ep);
-     rparent = of_graph_get_remote_port_parent(ep);
-
-and then parse the "remote_port" as if it was the remote endpoint,
-which is wrong. The code worked fine because we used endpoint number
-as the port number. Let us fix it and optimise a bit as:
-
-     remote_ep = of_graph_get_remote_endpoint(ep);
-     if (remote_ep)
-        remote_parent = of_graph_get_port_parent(remote_ep);
-
-and then, parse the remote_ep for the port/endpoint details.
+If we fail to find the input / output port for a LINK component
+while enabling a path, we should fail gracefully rather than
+assuming port "0".
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/of_coresight.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index 8a23c63..ada4f07 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -129,7 +129,7 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
- 	int ret = 0;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device_node *rparent = NULL;
--	struct device_node *rport = NULL;
-+	struct device_node *rep = NULL;
- 	struct device *rdev = NULL;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 69e9136..3c1c058 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -107,7 +107,7 @@ static int coresight_find_link_inport(struct coresight_device *csdev,
+ 	dev_err(&csdev->dev, "couldn't find inport, parent: %s, child: %s\n",
+ 		dev_name(&parent->dev), dev_name(&csdev->dev));
  
- 	do {
-@@ -144,16 +144,16 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
- 		if (of_graph_parse_endpoint(ep, &endpoint))
- 			break;
- 		/*
--		 * Get a handle on the remote port and parent
--		 * attached to it.
-+		 * Get a handle on the remote endpoint and the device it is
-+		 * attached to.
- 		 */
--		rparent = of_graph_get_remote_port_parent(ep);
-+		rep = of_graph_get_remote_endpoint(ep);
-+		if (!rep)
-+			break;
-+		rparent = of_graph_get_port_parent(rep);
- 		if (!rparent)
- 			break;
--		rport = of_graph_get_remote_port(ep);
--		if (!rport)
--			break;
--		if (of_graph_parse_endpoint(rport, &rendpoint))
-+		if (of_graph_parse_endpoint(rep, &rendpoint))
- 			break;
- 
- 		/* If the remote device is not available, defer probing */
-@@ -165,15 +165,15 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
- 
- 		pdata->outports[*i] = endpoint.port;
- 		pdata->child_names[*i] = dev_name(rdev);
--		pdata->child_ports[*i] = rendpoint.id;
-+		pdata->child_ports[*i] = rendpoint.port;
- 		/* Move the index */
- 		(*i)++;
- 	} while (0);
- 
- 	if (rparent)
- 		of_node_put(rparent);
--	if (rport)
--		of_node_put(rport);
-+	if (rep)
-+		of_node_put(rep);
- 
- 	return ret;
+-	return 0;
++	return -ENODEV;
  }
+ 
+ static int coresight_find_link_outport(struct coresight_device *csdev,
+@@ -125,7 +125,7 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
+ 	dev_err(&csdev->dev, "couldn't find outport, parent: %s, child: %s\n",
+ 		dev_name(&csdev->dev), dev_name(&child->dev));
+ 
+-	return 0;
++	return -ENODEV;
+ }
+ 
+ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
+@@ -178,6 +178,9 @@ static int coresight_enable_link(struct coresight_device *csdev,
+ 	else
+ 		refport = 0;
+ 
++	if (refport < 0)
++		return refport;
++
+ 	if (atomic_inc_return(&csdev->refcnt[refport]) == 1) {
+ 		if (link_ops(csdev)->enable) {
+ 			ret = link_ops(csdev)->enable(csdev, inport, outport);
 -- 
 2.7.4
