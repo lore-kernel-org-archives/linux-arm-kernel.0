@@ -1,34 +1,73 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue,  5 Jun 2018 22:04:41 +0530
-Subject: [PATCH v2 1/2] dt-bindings: arm: mediatek: Document Mediatek X20
- Development Board
-In-Reply-To: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
-References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180605163442.4812-2-manivannan.sadhasivam@linaro.org>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 5 Jun 2018 19:26:57 +0300
+Subject: [PATCH] PCI: Clean up resource allocation in
+ devm_of_pci_get_host_bridge_resources()
+In-Reply-To: <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+ <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
+ <CAHp75VeUbjobse6uLeM4h_xXRUw+YUQUN+EOye67AJy77a5euQ@mail.gmail.com>
+ <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
+ <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+Message-ID: <CAHp75VdWhCDYt3jvii92g222WeHTvwX5e8Sthr0pknXvCgwHDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Mediatek X20 Development Board which is a 96Boards Consumer
-Edition platform based on MT6797 SoC.
+On Wed, May 16, 2018 at 3:31 PM, Jan Kiszka <jan.kiszka@siemens.com> wrote:
+> Instead of first allocating and then freeing memory for struct resource
+> in case we cannot parse a PCI resource from the device tree, work
+> against a local struct and kmemdup it when we decide to go with it.
+>
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- Documentation/devicetree/bindings/arm/mediatek.txt | 3 +++
- 1 file changed, 3 insertions(+)
+Bjorn, any comments on this?
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index 7d21ab37c19c..356df1ee11b9 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -47,6 +47,9 @@ Supported boards:
- - Evaluation board for MT6797(Helio X20):
-     Required root node properties:
-       - compatible = "mediatek,mt6797-evb", "mediatek,mt6797";
-+- Mediatek X20 Development Board:
-+    Required root node properties:
-+      - compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
- - Reference board variant 1 for MT7622:
-     Required root node properties:
-       - compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
+> Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> ---
+>  drivers/pci/of.c | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+> index b06585a1da75..fc0f906c5c25 100644
+> --- a/drivers/pci/of.c
+> +++ b/drivers/pci/of.c
+> @@ -266,7 +266,7 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
+>                         struct list_head *resources, resource_size_t *io_base)
+>  {
+>         struct device_node *dev_node = dev->of_node;
+> -       struct resource *res;
+> +       struct resource *res, tmp_res;
+>         struct resource *bus_range;
+>         struct of_pci_range range;
+>         struct of_pci_range_parser parser;
+> @@ -320,18 +320,16 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
+>                 if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+>                         continue;
+>
+> -               res = devm_kzalloc(dev, sizeof(struct resource), GFP_KERNEL);
+> +               err = of_pci_range_to_resource(&range, dev_node, &tmp_res);
+> +               if (err)
+> +                       continue;
+> +
+> +               res = devm_kmemdup(dev, &tmp_res, sizeof(tmp_res), GFP_KERNEL);
+>                 if (!res) {
+>                         err = -ENOMEM;
+>                         goto failed;
+>                 }
+>
+> -               err = of_pci_range_to_resource(&range, dev_node, res);
+> -               if (err) {
+> -                       devm_kfree(dev, res);
+> -                       continue;
+> -               }
+> -
+>                 if (resource_type(res) == IORESOURCE_IO) {
+>                         if (!io_base) {
+>                                 dev_err(dev,
+> --
+> 2.13.6
+
+
+
 -- 
-2.17.0
+With Best Regards,
+Andy Shevchenko
