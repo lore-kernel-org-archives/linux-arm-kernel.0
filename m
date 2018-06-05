@@ -1,191 +1,157 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 5 Jun 2018 13:58:54 -0600
-Subject: [PATCH v3 2/5] gpio: syscon: rockchip: add GPIO_MUTE support for
- rk3328
-In-Reply-To: <87zi0d8tue.fsf@t-chip.com.cn>
-References: <1527737273-8387-1-git-send-email-djw@t-chip.com.cn>
- <1527737273-8387-3-git-send-email-djw@t-chip.com.cn>
- <CAL_JsqJK4vrmLBeN_ZeGCXAyqshshL16B0KN_+8uvt+=-O9TEw@mail.gmail.com>
- <0d08ba26-77f2-6c42-8fb1-214aaf6085e9@t-chip.com.cn>
- <CAL_JsqKSy4q5dfVfXbRMLa7koTWufpAt3yNdE-9mwyJ-VzVQRQ@mail.gmail.com>
- <87zi0d8tue.fsf@t-chip.com.cn>
-Message-ID: <20180605195854.GA16394@rob-hp-laptop>
+Date: Tue, 5 Jun 2018 14:29:02 -0600
+Subject: [PATCH v2 12/16] dt-bindings/interrupt-controller: update
+ Marvell ICU bindings
+In-Reply-To: <20180522094042.24770-13-miquel.raynal@bootlin.com>
+References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
+ <20180522094042.24770-13-miquel.raynal@bootlin.com>
+Message-ID: <20180605202902.GA8875@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 02, 2018 at 04:40:09PM +0800, Levin Du wrote:
-> 
-> Rob Herring <robh+dt@kernel.org> writes:
-> 
-> > On Thu, May 31, 2018 at 9:05 PM, Levin <djw@t-chip.com.cn> wrote:
-> > > Hi Rob,
-> > > 
-> > > 
-> > > On 2018-05-31 10:45 PM, Rob Herring wrote:
-> > > > 
-> > > > On Wed, May 30, 2018 at 10:27 PM,  <djw@t-chip.com.cn> wrote:
-> > > > > 
-> > > > > From: Levin Du <djw@t-chip.com.cn>
-> > > > > 
-> > > > > In Rockchip RK3328, the output only GPIO_MUTE pin,
-> > > > > originally for codec
-> > > > > mute control, can also be used for general purpose. It is
-> > > > > manipulated by
-> > > > > the GRF_SOC_CON10 register.
-> > > > > 
-> > > > > Signed-off-by: Levin Du <djw@t-chip.com.cn>
-> > > > > 
-> > > > > ---
-> > > > > 
-> > > > > Changes in v3:
-> > > > > - Change from general gpio-syscon to specific
-> > > > > rk3328-gpio-mute
-> > > > > 
-> > > > > Changes in v2:
-> > > > > - Rename gpio_syscon10 to gpio_mute in doc
-> > > > > 
-> > > > > Changes in v1:
-> > > > > - Refactured for general gpio-syscon usage for Rockchip SoCs.
-> > > > > - Add doc rockchip,gpio-syscon.txt
-> > > > > 
-> > > > >   .../bindings/gpio/rockchip,rk3328-gpio-mute.txt    | 28
-> > > > > +++++++++++++++++++
-> > > > >   drivers/gpio/gpio-syscon.c                         | 31
-> > > > > ++++++++++++++++++++++
-> > > > >   2 files changed, 59 insertions(+)
-> > > > >   create mode 100644
-> > > > > Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
-> > > > > 
-> > > > > diff --git
-> > > > > a/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
-> > > > > b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
-> > > > > new file mode 100644
-> > > > > index 0000000..10bc632
-> > > > > --- /dev/null
-> > > > > +++
-> > > > > b/Documentation/devicetree/bindings/gpio/rockchip,rk3328-gpio-mute.txt
-> > > > > @@ -0,0 +1,28 @@
-> > > > > +Rockchip RK3328 GPIO controller dedicated for the GPIO_MUTE
-> > > > > pin.
-> > > > > +
-> > > > > +In Rockchip RK3328, the output only GPIO_MUTE pin,
-> > > > > originally for codec
-> > > > > mute
-> > > > > +control, can also be used for general purpose. It is
-> > > > > manipulated by the
-> > > > > +GRF_SOC_CON10 register.
-> > > > > +
-> > > > > +Required properties:
-> > > > > +- compatible: Should contain "rockchip,rk3328-gpio-mute".
-> > > > > +- gpio-controller: Marks the device node as a gpio
-> > > > > controller.
-> > > > > +- #gpio-cells: Should be 2. The first cell is the pin
-> > > > > number and
-> > > > > +  the second cell is used to specify the gpio polarity:
-> > > > > +    0 = Active high,
-> > > > > +    1 = Active low.
-> > > > > +
-> > > > > +Example:
-> > > > > +
-> > > > > +       grf: syscon at ff100000 {
-> > > > > +               compatible = "rockchip,rk3328-grf", "syscon",
-> > > > > "simple-mfd";
-> > > > > +
-> > > > > +               gpio_mute: gpio-mute {
-> > > > 
-> > > > Node names should be generic:
-> > > > 
-> > > > gpio {
-> > > > 
-> > > > This also means you can't add another GPIO node in the future
-> > > > and
-> > > > you'll have to live with "rockchip,rk3328-gpio-mute" covering
-> > > > more
-> > > > than 1 GPIO if you do need to add more GPIOs.
-> > > 
-> > > 
-> > > As the first line describes, this GPIO controller is dedicated for
-> > > the
-> > > GPIO_MUTE pin.
-> > > There's only one GPIO pin in the GRF_SOC_CON10 register. Therefore
-> > > the
-> > > gpio_mute
-> > > name is proper IMHO.
-> > 
-> > It's how many GPIOs in the GRF, not this register. What I'm saying is
-> > when you come along later to add another GPIO in the GRF, you had
-> > better just add it to this same node. I'm not going to accept another
-> > GPIO controller node within the GRF. You have the cells to support
-> > more than 1, so it would only be a driver change. The compatible
-> > string would then not be ideally named at that point. But compatible
-> > strings are just unique identifiers, so it doesn't really matter what
-> > the string is.
-> > 
-> 
-> I'll try my best to introduce the situation here. The GRF, GPIO0~GPIO3
-> are register blocks in the RK3328 Soc. The GPIO0~GPIO3 contain registers
-> for GPIO operations like reading/writing data, setting direction,
-> interruption etc, which corresponds to the GPIO banks (gpio0~gpio3)
-> defined in rk3328.dtsi:
+On Tue, May 22, 2018 at 11:40:38AM +0200, Miquel Raynal wrote:
+> Change the documentation to reflect the new bindings used for Marvell
+> ICU. This involves describing each interrupt group as a subnode of the
+> ICU node. Each of them having their own compatible.
 
-I'm only talking about GRF functions, not "regular" GPIOs.
+Need to explain why you need to do this and why breaking backwards 
+compatibility is okay.
 
-> 	pinctrl: pinctrl {
-> 		compatible = "rockchip,rk3328-pinctrl";
-> 		rockchip,grf = <&grf>;
-> 		#address-cells = <2>;
-> 		#size-cells = <2>;
-> 		ranges;
 > 
-> 		gpio0: gpio0 at ff210000 {
-> 			compatible = "rockchip,gpio-bank";
-> 			reg = <0x0 0xff210000 0x0 0x100>;
-> 			interrupts = <GIC_SPI 51 			IRQ_TYPE_LEVEL_HIGH>;
-> 			clocks = <&cru PCLK_GPIO0>;
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  .../bindings/interrupt-controller/marvell,icu.txt  | 81 ++++++++++++++++++----
+>  1 file changed, 69 insertions(+), 12 deletions(-)
 > 
-> 			gpio-controller;
-> 			#gpio-cells = <2>;
-> 
-> 			interrupt-controller;
-> 			#interrupt-cells = <2>;
-> 		};
-> 
-> 		gpio1: gpio1 at ff220000 {
->                //...
-> 		};
-> 
-> 		gpio2: gpio2 at ff230000 {
->                //...
-> 		};
-> 
-> 		gpio3: gpio3 at ff240000 {
->                //...
-> 		};
->         }
-> 
-> However, these general GPIO pins has multiplexed functions and their
-> pull up/down and driving strength can also be configured. These settings
-> are manipulated by the GRF registers in pinctrl driver. Quoted from the
-> TRM, the GRF has the following function:
-> 
-> - IOMUX control
-> - Control the state of GPIO in power-down mode
-> - GPIO PAD pull down and pull up control
-> - Used for common system control
-> - Used to record the system state
-> 
-> Therefore the functions of the GRF are messy and scattered in different
-> nodes. The so-called GPIO_MUTE does not belong to GPIO0~GPIO3. It is
-> manipulated by the GRF_SOC_CON10 register in the GRF block.
-> 
-> > I'm being told both "this is the only GPIO" and "the GRF has too many
-> > different functions for us to tell you what they all are". So which is
-> > it?
-> > 
-> > Rob
-> 
-> They are both true, but lack of context. See the above description.
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> index 649b7ec9d9b1..6f7e4355b3d8 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> @@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
+>  responsible for collecting all wired-interrupt sources in the CP and
+>  communicating them to the GIC in the AP, the unit translates interrupt
+>  requests on input wires to MSG memory mapped transactions to the GIC.
+> +These messages will access a different GIC memory area depending on
+> +their type (NSR, SR, SEI, REI, etc).
+>  
+>  Required properties:
+>  
+> @@ -12,20 +14,19 @@ Required properties:
+>  
+>  - reg: Should contain ICU registers location and length.
+>  
+> +Subnodes: Each group of interrupt is declared as a subnode of the ICU,
+> +with their own compatible.
+> +
+> +Required properties for the icu_nsr/icu_sei subnodes:
+> +
+> +- compatible: Should be "marvell,cp110-icu-nsr" or "marvell,cp110-icu-sei".
+> +
+>  - #interrupt-cells: Specifies the number of cells needed to encode an
+> -  interrupt source. The value shall be 3.
+> +  interrupt source. The value shall be 2.
+>  
+> -  The 1st cell is the group type of the ICU interrupt. Possible group
+> -  types are:
+> +  The 1st cell is the index of the interrupt in the ICU unit.
+>  
+> -   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
+> -   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
+> -   ICU_GRP_SEI (0x4) : System error interrupt
+> -   ICU_GRP_REI (0x5) : RAM error interrupt
 
-What I meant was "only GPIO in GRF registers"...
+What happens to SR and REI interrupts?
 
-Rob
+> -
+> -  The 2nd cell is the index of the interrupt in the ICU unit.
+> -
+> -  The 3rd cell is the type of the interrupt. See arm,gic.txt for
+> +  The 2nd cell is the type of the interrupt. See arm,gic.txt for
+>    details.
+>  
+>  - interrupt-controller: Identifies the node as an interrupt
+> @@ -35,17 +36,73 @@ Required properties:
+>    that allows to trigger interrupts using MSG memory mapped
+>    transactions.
+>  
+> +Note: each 'interrupts' property referring to any 'icu_xxx' node shall
+> +      have a different number within [0:206].
+> +
+>  Example:
+>  
+>  icu: interrupt-controller at 1e0000 {
+>  	compatible = "marvell,cp110-icu";
+>  	reg = <0x1e0000 0x440>;
+> +
+> +	CP110_LABEL(icu_nsr): icu-nsr {
+
+'interrupt-controller' is the proper node name. Is there no register 
+range associated sub nodes?
+
+> +		compatible = "marvell,cp110-icu-nsr";
+> +		#interrupt-cells = <2>;
+> +		interrupt-controller;
+> +		msi-parent = <&gicp>;
+> +	};
+> +
+> +        CP110_LABEL(icu_sei): icu-sei {
+> +                compatible = "marvell,cp110-icu-sei";
+> +                #interrupt-cells = <2>;
+> +                interrupt-controller;
+> +                msi-parent = <&sei>;
+> +        };
+
+Mixture of tabs and spaces.
+
+> +};
+> +
+> +node1 {
+> +	interrupt-parent = <&icu_nsr>;
+> +	interrupts = <106 IRQ_TYPE_LEVEL_HIGH>;
+> +};
+> +
+> +node2 {
+> +	interrupt-parent = <&icu_sei>;
+> +	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+> +};
+> +
+> +/* Would not work with the above nodes */
+> +node3 {
+> +	interrupt-parent = <&icu_nsr>;
+> +	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+> +};
+> +
+> +Note on legacy bindings:
+> +Before using a subnode for each domain, only NSR were
+> +supported. Bindings were different in this way:
+> +
+> +- #interrupt-cells: The value was 3.
+> +	The 1st cell was the group type of the ICU interrupt. Possible
+> +	group types were:
+> +	ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
+> +	ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
+> +	ICU_GRP_SEI (0x4) : System error interrupt
+> +	ICU_GRP_REI (0x5) : RAM error interrupt
+> +	The 2nd cell was the index of the interrupt in the ICU unit.
+> +	The 3rd cell was the type of the interrupt. See arm,gic.txt for
+> +	details.
+> +
+> +Example:
+> +
+> +icu: interrupt-controller at 1e0000 {
+> +	compatible = "marvell,cp110-icu";
+> +	reg = <0x1e0000 0x440>;
+> +
+>  	#interrupt-cells = <3>;
+>  	interrupt-controller;
+>  	msi-parent = <&gicp>;
+>  };
+>  
+> -usb3h0: usb3 at 500000 {
+> +node1 {
+>  	interrupt-parent = <&icu>;
+>  	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
+>  };
+> -- 
+> 2.14.1
+> 
