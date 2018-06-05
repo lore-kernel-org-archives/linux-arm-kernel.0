@@ -1,36 +1,30 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 5 Jun 2018 15:12:01 +0100
-Subject: [PATCH 1/3] Revert "arm64: topology: divorce MC scheduling domain
- from core_siblings"
-In-Reply-To: <CAMuHMdVPRLt34SUDsbbHvEG2OzvbJoT6id7Rb_2j32=zb1TuKg@mail.gmail.com>
-References: <CAMuHMdWJWj3a0MZgEi7VJTUJRNoeR+X3eoN8A-sW6fwimEr6Fg@mail.gmail.com>
- <1528206938-2702-1-git-send-email-sudeep.holla@arm.com>
- <CAMuHMdVPRLt34SUDsbbHvEG2OzvbJoT6id7Rb_2j32=zb1TuKg@mail.gmail.com>
-Message-ID: <36920292-9a04-9fe6-8a85-cc50b484dce5@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Jun 2018 07:14:30 -0700
+Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
+In-Reply-To: <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
+References: <20180605060510.32473-1-nm@ti.com>
+ <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
+Message-ID: <20180605141430.GE5738@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Rob Herring <robh+dt@kernel.org> [180605 14:08]:
+> On Tue, Jun 5, 2018 at 1:05 AM, Nishanth Menon <nm@ti.com> wrote:
+> > +       soc0: soc0 {
+> > +               compatible = "simple-bus";
+> > +               #address-cells = <2>;
+> > +               #size-cells = <2>;
+> > +               ranges;
+> 
+> Really need 64-bit addresses and sizes? Use ranges to limit the
+> address space if possible.
 
+And in addition to using ranges, please set up separate bus instances
+for the interconnects. This will then allow you to probe WKUP or
+similar instance first and the other bus instances after. And that
+pretty much allows you to get rid of the annoying -EPROBE_DEFER
+ping pong and allows making clocks proper device drivers ;)
 
-On 05/06/18 15:09, Geert Uytterhoeven wrote:
-> Hi Sudeep,
-> 
-> On Tue, Jun 5, 2018 at 3:55 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> This reverts commit 37c3ec2d810f87eac73822f76b30391a83bded19.
->>
->> Currently on ARM64 platforms, we don't update the CPU topology masks
->> on each hotplug operation. However, the updates to cpu_coregroup_mask
-> 
-> I would add
-> 
->     "leading to e.g. a system hang during system suspend."
-> 
-> to avoid people thinking this is purely a small bookkeeping issue without  any
-> percussions.
-> 
-
-Sure, thanks. Sorry for missing that.
-
--- 
 Regards,
-Sudeep
+
+Tony
