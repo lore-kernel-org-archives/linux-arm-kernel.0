@@ -1,111 +1,43 @@
-From: yangbo.lu@nxp.com (Y.b. Lu)
-Date: Tue, 5 Jun 2018 03:35:28 +0000
-Subject: [PATCH 09/10] dpaa_eth: add support for hardware timestamping
-In-Reply-To: <20180604134920.ezhe6jz5ntpnqyzj@localhost>
-References: <20180604070837.19265-1-yangbo.lu@nxp.com>
- <20180604070837.19265-10-yangbo.lu@nxp.com>
- <20180604134920.ezhe6jz5ntpnqyzj@localhost>
-Message-ID: <DB6PR0401MB2536376432EC481473A5B4A3F8660@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Jun 2018 21:26:27 -0700
+Subject: Common config for N900 and D4
+In-Reply-To: <20180603210115.GA7438@amd>
+References: <20180603104839.GA21197@amd> <20180603165336.GA26995@amd>
+ <20180603210115.GA7438@amd>
+Message-ID: <20180605042627.GB5738@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+* Pavel Machek <pavel@ucw.cz> [180603 21:03]:
+> Hi!
+> 
+> > > Aaro, I know I have asked before, but if you have common config for
+> > > N900 and Droid4, please send me a copy. Yes, it should be somewhere in
+> > > my inbox already, but I can't find it and version for v4.17 would be
+> > > more useful.
+> > > 
+> > > While trying to came up with common config, I hit:
+> > > 
+> > > [    0.000000] L2C-310 erratum 727915 enabled
+> > > [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+> > > [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+> > 
+> > I tried disabling outer cache to get rid of this. That got me further
+> > in boot, but not to working system:
+> 
+> I now have config that works.
+> 
+> My kernels were probably grossly misconfigured (OMAP4 not enabled on
+> droid4)... still I'd expect some kind of panic explaining board is not
+> compatible with kernel, not a random oops...
 
-> -----Original Message-----
-> From: Richard Cochran [mailto:richardcochran at gmail.com]
-> Sent: Monday, June 4, 2018 9:49 PM
-> To: Y.b. Lu <yangbo.lu@nxp.com>
-> Cc: netdev at vger.kernel.org; Madalin-cristian Bucur
-> <madalin.bucur@nxp.com>; Rob Herring <robh+dt@kernel.org>; Shawn Guo
-> <shawnguo@kernel.org>; David S . Miller <davem@davemloft.net>;
-> devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 09/10] dpaa_eth: add support for hardware timestamping
-> 
-> On Mon, Jun 04, 2018 at 03:08:36PM +0800, Yangbo Lu wrote:
-> 
-> > +if FSL_DPAA_ETH
-> > +config FSL_DPAA_ETH_TS
-> > +	bool "DPAA hardware timestamping support"
-> > +	select PTP_1588_CLOCK_QORIQ
-> > +	default n
-> > +	help
-> > +	  Enable DPAA hardware timestamping support.
-> > +	  This option is useful for applications to get
-> > +	  hardware time stamps on the Ethernet packets
-> > +	  using the SO_TIMESTAMPING API.
-> > +endif
-> 
-> You should drop this #ifdef.  In general, if a MAC supports time stamping and
-> PHC, then the driver support should simply be compiled in.
-> 
-> [ When time stamping incurs a large run time performance penalty to
->   non-PTP users, then it might make sense to have a Kconfig option to
->   disable it, but that doesn't appear to be the case here. ]
+Like "clk-provider not found" error? :) I agree it's not very
+descriptive and I think we could easily print something from
+after the SoC detection for missing pdata.
 
-[Y.b. Lu] Actually these timestamping codes affected DPAA networking performance in our previous performance test.
-That's why we used ifdef for it.
+Eventually we should just get rid of all ARMv7 Kconfig variants
+once most of the hwmod SoC pdata is gone.
 
-> 
-> > @@ -1615,6 +1635,24 @@ static int dpaa_eth_refill_bpools(struct
-> dpaa_priv *priv)
-> >  	skbh = (struct sk_buff **)phys_to_virt(addr);
-> >  	skb = *skbh;
-> >
-> > +#ifdef CONFIG_FSL_DPAA_ETH_TS
-> > +	if (priv->tx_tstamp &&
-> > +	    skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
-> 
-> This condition fits on one line easily.
+Regards,
 
-[Y.b. Lu] Right. I will use one line in next version.
-
-> 
-> > +		struct skb_shared_hwtstamps shhwtstamps;
-> > +		u64 ns;
-> 
-> Local variables belong at the top of the function.
-
-[Y.b. Lu] Ok, will move them to the top in next verison.
-
-> 
-> > +		memset(&shhwtstamps, 0, sizeof(shhwtstamps));
-> > +
-> > +		if (!dpaa_get_tstamp_ns(priv->net_dev, &ns,
-> > +					priv->mac_dev->port[TX],
-> > +					(void *)skbh)) {
-> > +			shhwtstamps.hwtstamp = ns_to_ktime(ns);
-> > +			skb_tstamp_tx(skb, &shhwtstamps);
-> > +		} else {
-> > +			dev_warn(dev, "dpaa_get_tstamp_ns failed!\n");
-> > +		}
-> > +	}
-> > +#endif
-> >  	if (unlikely(qm_fd_get_format(fd) == qm_fd_sg)) {
-> >  		nr_frags = skb_shinfo(skb)->nr_frags;
-> >  		dma_unmap_single(dev, addr, qm_fd_get_offset(fd) + @@ -2086,6
-> > +2124,14 @@ static int dpaa_start_xmit(struct sk_buff *skb, struct
-> net_device *net_dev)
-> >  	if (unlikely(err < 0))
-> >  		goto skb_to_fd_failed;
-> >
-> > +#ifdef CONFIG_FSL_DPAA_ETH_TS
-> > +	if (priv->tx_tstamp &&
-> > +	    skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
-> 
-> One line please.
-
-[Y.b. Lu] No problem.
-
-> 
-> > +		fd.cmd |= FM_FD_CMD_UPD;
-> > +		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
-> > +	}
-> > +#endif
-> > +
-> >  	if (likely(dpaa_xmit(priv, percpu_stats, queue_mapping, &fd) == 0))
-> >  		return NETDEV_TX_OK;
-> >
-> 
-> Thanks,
-> Richard
+Tony
