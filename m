@@ -1,69 +1,57 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 5 Jun 2018 17:15:06 +0200
-Subject: [PATCH 0/2] Add Mediatek X20 Development Board support
-In-Reply-To: <20180529072719.GA5529@Mani-XPS-13-9360>
-References: <20180529045258.1415-1-manivannan.sadhasivam@linaro.org>
- <06dbc5ef-5bba-f3e0-1b57-3eaeab26ed68@gmail.com>
- <20180529072719.GA5529@Mani-XPS-13-9360>
-Message-ID: <06a0535a-132e-9466-80e0-9af74b9af07b@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 5 Jun 2018 09:23:23 -0600
+Subject: [PATCH v5 2/4] dt-bindings: timer: add i.MX EPIT timer binding
+In-Reply-To: <20180604100035.19558-3-peron.clem@gmail.com>
+References: <20180604100035.19558-1-peron.clem@gmail.com>
+ <20180604100035.19558-3-peron.clem@gmail.com>
+Message-ID: <20180605152323.GA25218@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 29/05/18 09:27, Manivannan Sadhasivam wrote:
-> Hi Matthias,
+On Mon, Jun 04, 2018 at 12:00:33PM +0200, Cl?ment P?ron wrote:
+> From: Cl?ment Peron <clement.peron@devialet.com>
 > 
-> On Tue, May 29, 2018 at 08:38:27AM +0200, Matthias Brugger wrote:
->> Hi Manivannan,
->>
->> it's nice to see that someone at Linaro cares about upstreaming the 96 board.
->> From what I can see, your patches add the very same support to the board as
->> does the mt6797 evaluation board. Do you have plans to upstream more drivers for
->> the board? Do you have a roadmap or something?
->>
->> I'm asking becuase I don't want to have just another dead devicetree in the
->> kernel which does nothing but provides a boot to rootfs. Especially as this can
->> be achieved on the same board with the EVB dts.
->>
+> Add devicetree binding document for NXP's i.MX SoC specific
+> EPIT timer driver.
 > 
-> I can understand your concern here. I do have plans to add more drivers
-> in the future for this board but I can't give you any roadmap for that
-> since it mostly falls under the spare time work and I have been doing a
-> similar kind of work for the Bubblegum-96 board in parallel.
+> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> ---
+>  .../devicetree/bindings/timer/fsl,imxepit.txt | 21 +++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxepit.txt
 > 
-> At most I can guarentee that this board's functionality will be added
-> gradually in upcoming days.
-> 
+> diff --git a/Documentation/devicetree/bindings/timer/fsl,imxepit.txt b/Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+> new file mode 100644
+> index 000000000000..de2e6ef68d24
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+> @@ -0,0 +1,21 @@
+> +Binding for the i.MX Enhanced Periodic Interrupt Timer (EPIT)
+> +
+> +The Enhanced Periodic Interrupt Timer (EPIT) is a 32-bit set-and-forget timer
+> +that is capable of providing precise interrupts at regular intervals with
+> +minimal processor intervention.
+> +
+> +Required properties:
+> +- compatible: should be "fsl,<chip>-epit", "fsl,imx31-epit" where <chip> is
+> +  imx25, imx6qdl, imx6sl, imx6sul or imx6sx.
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: Should contain EPIT controller interrupt
+> +- clocks : The clock provided by the SoC to drive the timer.
+> +
+> +Example for i.MX6QDL:
+> +	epit1: epit at 20d0000 {
 
-Sounds good. Fancy to send a v2 with the comments from Rob?
+I think I already mentioned this, but:
 
-Regards,
-Matthias
+timer at ...
 
-> Thanks,
-> Mani
+> +		compatible = "fsl,imx6qdl-epit", "fsl,imx31-epit";
+> +		reg = <0x020d0000 0x4000>;
+> +		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks IMX6QDL_CLK_EPIT1>;
+> +	};
+> -- 
+> 2.17.0
 > 
->> Regards,
->> Matthias
->>
->> On 29/05/18 06:52, Manivannan Sadhasivam wrote:
->>> Add devicetree support for Mediatek X20 Development Board by Archermind.
->>> This board is based on the Deca-Core MT6797 SoC from Mediatek and is
->>> one of the 96Boards Consumer Edition platform.
->>>
->>> With this devicetree change, board can boot into initramfs.
->>>
->>> More information about this board can be found in 96Boards product page:
->>> https://www.96boards.org/product/mediatek-x20/
->>>
->>> Manivannan Sadhasivam (2):
->>>   dt-bindings: Add vendor prefix for ArcherMind
->>>   arm64: dts: Add Mediatek X20 Development Board support
->>>
->>>  .../devicetree/bindings/vendor-prefixes.txt   |  1 +
->>>  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
->>>  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
->>>  3 files changed, 35 insertions(+)
->>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
->>>
