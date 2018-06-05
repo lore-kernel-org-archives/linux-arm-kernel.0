@@ -1,68 +1,120 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 5 Jun 2018 10:23:22 +0200
-Subject: [PATCH v3 8/8] ARM: dts: rcar-gen2: Remove unused VIN properties
-In-Reply-To: <20180605081222.GL10472@w540>
-References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
- <1527606359-19261-9-git-send-email-jacopo+renesas@jmondi.org>
- <20180604122325.GH19674@bigcity.dyn.berto.se>
- <20180605074938.mljwmgpjlplvkp2v@verge.net.au>
- <20180605081222.GL10472@w540>
-Message-ID: <CAMuHMdXVF_OZCXJ449TJdm3f7ECMabgpRoWEBSmxJ=7f0zA_7Q@mail.gmail.com>
+From: changbin.du@intel.com (changbin.du at intel.com)
+Date: Tue,  5 Jun 2018 16:13:36 +0800
+Subject: [RESEND PATCH v5 0/4] kernel hacking: GCC optimization for better
+ debug experience (-Og)
+Message-ID: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+From: Changbin Du <changbin.du@intel.com>
 
-On Tue, Jun 5, 2018 at 10:12 AM, jacopo mondi <jacopo@jmondi.org> wrote:
-> On Tue, Jun 05, 2018 at 09:49:38AM +0200, Simon Horman wrote:
->> On Mon, Jun 04, 2018 at 02:23:25PM +0200, Niklas S?derlund wrote:
->> > On 2018-05-29 17:05:59 +0200, Jacopo Mondi wrote:
->> > > The 'bus-width' and 'pclk-sample' properties are not parsed by the VIN
->> > > driver and only confuse users. Remove them in all Gen2 SoC that use
->> > > them.
->> > >
->> > > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->> >
->> > The more I think about this the more I lean towards that this patch
->> > should be dropped. The properties accurately describes the hardware and
->> > I think there is value in that. That the driver currently don't parse or
->> > make use of them don't in my view reduce there value. Maybe you should
->> > break out this patch to a separate series?
->>
->> I also think there is value in describing the hardware not the state of the
->> driver at this time.  Is there any missmatch between these properties and
->> the bindings?
->
-> Niklas and I discussed a bit offline on this yesterday. My main
-> concern, and sorry for being pedant on this, is that changing those
-> properties value does not change the interface behaviour, and this
-> could cause troubles when integrating image sensor not known to be
-> working on the VIN interface.
->
-> This said, the documentation of those (and all other) properties is in the
-> generic "video-interfaces.txt" file and it is my understanding, but I think
-> Laurent and Rob agree on this as well from their replies to my previous series,
-> that each driver should list which properties it actually supports, as
+Hi all,
+I know some kernel developers was searching for a method to dissable GCC
+optimizations, probably they want to apply GCC '-O0' option. But since Linux
+kernel replys on GCC optimization to remove some dead code, so '-O0' just
+breaks the build. They do need this because they want to debug kernel with
+qemu, simics, kgtp or kgdb.
 
-s/driver/device-specific binding/
+Thanks for the GCC '-Og' optimization level introduced in GCC 4.8, which
+offers a reasonable level of optimization while maintaining fast compilation
+and a good debugging experience. It is similar to '-O1' while perferring to
+keep debug ability over runtime speed. With '-Og', we can build a kernel with
+better debug ability and little performance drop after some simple change.
 
-> some aspects are very implementation specific, like default values and
-> what happens if the property is not specified [1]. Nonetheless, all
+In this series, firstly introduce a new config CONFIG_NO_AUTO_INLINE after two
+fixes for this new option. With this option, only functions explicitly marked
+with "inline" will  be inlined. This will allow the function tracer to trace
+more functions because it only traces functions that the compiler has not
+inlined.
 
-In se defaults are not (Linux) implementation-specific, but fixed in the
-DT bindings.
+Then introduce new config CC_OPTIMIZE_FOR_DEBUGGING which apply '-Og'
+optimization level for whole kernel, with a simple fix in fix_to_virt().
+Currently I have only tested this option on x86 and ARM platform. Other
+platforms should also work but probably need some compiling fixes as what
+having done in this series. I leave that to who want to try this debug
+option.
 
-> properties describing hardware features and documented in the generic
-> file should be accepted in DTS, as those aims to be OS-independent and
-> even independent from the single driver implementation.
+Comparison of vmlinux size: a bit smaller.
 
-Gr{oetje,eeting}s,
+    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ size vmlinux
+       text    data     bss     dec     hex filename
+    22665554   9709674  2920908 35296136        21a9388 vmlinux
 
-                        Geert
+    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ size vmlinux
+       text    data     bss     dec     hex filename
+    21499032   10102758 2920908 34522698        20ec64a vmlinux
+
+
+Comparison of system performance: a bit drop (~6%).
+    This benchmark of kernel compilation is suggested by Ingo Molnar.
+    https://lkml.org/lkml/2018/5/2/74
+
+    Preparation: Set cpufreq to 'performance'.
+    for ((cpu=0; cpu<120; cpu++)); do
+      G=/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor
+      [ -f $G ] && echo performance > $G
+    done
+
+    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ perf stat --repeat 5 --null --pre                 '\
+        cp -a kernel ../kernel.copy.$(date +%s);         \
+        rm -rf *;                                        \
+        git checkout .;                                  \
+        echo 1 > /proc/sys/vm/drop_caches;               \
+        find ../kernel* -type f | xargs cat >/dev/null;  \
+        make -j kernel >/dev/null;                       \
+        make clean >/dev/null 2>&1;                      \
+        sync                                            '\
+                                                         \
+        make -j8 >/dev/null
+
+     Performance counter stats for 'make -j8' (5 runs):
+
+        219.764246652 seconds time elapsed                   ( +-  0.78% )
+
+    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ perf stat --repeat 5 --null --pre                 '\
+        cp -a kernel ../kernel.copy.$(date +%s);         \
+        rm -rf *;                                        \
+        git checkout .;                                  \
+        echo 1 > /proc/sys/vm/drop_caches;               \
+        find ../kernel* -type f | xargs cat >/dev/null;  \
+        make -j kernel >/dev/null;                       \
+        make clean >/dev/null 2>&1;                      \
+        sync                                            '\
+                                                         \
+        make -j8 >/dev/null
+
+    Performance counter stats for 'make -j8' (5 runs):
+
+         233.574187771 seconds time elapsed                  ( +-  0.19% )
+
+v5:
+  o Exchange the position of last two patches to avoid compiling error.
+v4:
+  o Remove aready merged one "regulator: add dummy function of_find_regulator_by_node".
+
+Changbin Du (4):
+  x86/mm: surround level4_kernel_pgt with #ifdef
+    CONFIG_X86_5LEVEL...#endif
+  kernel hacking: new config NO_AUTO_INLINE to disable compiler
+    auto-inline optimizations
+  ARM: mm: fix build error in fix_to_virt with
+    CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+  kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
+    optimization
+
+ Makefile                          | 10 ++++++++++
+ arch/arm/mm/mmu.c                 |  2 +-
+ arch/x86/include/asm/pgtable_64.h |  2 ++
+ arch/x86/kernel/head64.c          | 13 ++++++-------
+ include/linux/compiler-gcc.h      |  2 +-
+ include/linux/compiler.h          |  2 +-
+ init/Kconfig                      | 19 +++++++++++++++++++
+ lib/Kconfig.debug                 | 17 +++++++++++++++++
+ 8 files changed, 57 insertions(+), 10 deletions(-)
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.7.4
