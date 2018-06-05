@@ -1,362 +1,56 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  5 Jun 2018 22:43:28 +0100
-Subject: [PATCH 17/20] dts: arm: qcom: Update coresight bindings for hardware
- ports
-In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1528235011-30691-18-git-send-email-suzuki.poulose@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 05 Jun 2018 14:56:04 -0700
+Subject: [PATCH] ARM64: dts: meson-axg: fix register ranges for SD/eMMC
+In-Reply-To: <1528185904.10642.52.camel@baylibre.com> (Jerome Brunet's message
+ of "Tue, 05 Jun 2018 10:05:04 +0200")
+References: <20180604222706.36167-1-khilman@baylibre.com>
+ <1528185904.10642.52.camel@baylibre.com>
+Message-ID: <7hlgbskidn.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the new hardware port bindings for coresight
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi | 37 +++++++++++++++++------
- arch/arm/boot/dts/qcom-msm8974.dtsi | 60 +++++++++++++++++++++++++++----------
- 2 files changed, 73 insertions(+), 24 deletions(-)
+> On Mon, 2018-06-04 at 15:27 -0700, Kevin Hilman wrote:
+>> Based on updated information from Amlogic, correct the register
+>> range for the SD/eMMC blocks to the right size.
+>> 
+>> Reported-by: Yixun Lan <yixun.lan@amlogic.com>
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>
+> Shouldn't we make the same the change on the gx family ?
+>
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 5341a39..d854220 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -1609,8 +1609,9 @@
- 
- 			port {
- 				etb_in: endpoint {
--					slave-mode;
-+					direction = <0>;
- 					remote-endpoint = <&replicator_out0>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1624,8 +1625,9 @@
- 
- 			port {
- 				tpiu_in: endpoint {
--					slave-mode;
-+					direction = <0>;
- 					remote-endpoint = <&replicator_out1>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1644,19 +1646,22 @@
- 					reg = <0>;
- 					replicator_out0: endpoint {
- 						remote-endpoint = <&etb_in>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 				port at 1 {
- 					reg = <1>;
- 					replicator_out1: endpoint {
- 						remote-endpoint = <&tpiu_in>;
-+						coresight,hwid = <1>;
- 					};
- 				};
- 				port at 2 {
--					reg = <0>;
-+					reg = <2>;
- 					replicator_in: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&funnel_out>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -1683,35 +1688,41 @@
- 				port at 0 {
- 					reg = <0>;
- 					funnel_in0: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm0_out>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 				port at 1 {
- 					reg = <1>;
- 					funnel_in1: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm1_out>;
-+						coresight,hwid = <1>;
- 					};
- 				};
- 				port at 4 {
- 					reg = <4>;
- 					funnel_in4: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm2_out>;
-+						coresight,hwid = <4>;
- 					};
- 				};
- 				port at 5 {
- 					reg = <5>;
- 					funnel_in5: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm3_out>;
-+						coresight,hwid = <5>;
- 					};
- 				};
- 				port at 8 {
--					reg = <0>;
-+					reg = <8>;
- 					funnel_out: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&replicator_in>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -1728,7 +1739,9 @@
- 
- 			port {
- 				etm0_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&funnel_in0>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1744,7 +1757,9 @@
- 
- 			port {
- 				etm1_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&funnel_in1>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1760,7 +1775,9 @@
- 
- 			port {
- 				etm2_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&funnel_in4>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1776,7 +1793,9 @@
- 
- 			port {
- 				etm3_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&funnel_in5>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index d9019a4..89c7eb3 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -772,8 +772,9 @@
- 
- 			port {
- 				etr_in: endpoint {
--					slave-mode;
-+					direction = <0>;
- 					remote-endpoint = <&replicator_out0>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -787,8 +788,9 @@
- 
- 			port {
- 				tpiu_in: endpoint {
--					 slave-mode;
-+					 direction = <0>;
- 					 remote-endpoint = <&replicator_out1>;
-+					coresight,hwid = <0>;
- 				 };
- 			};
- 		};
-@@ -807,20 +809,25 @@
- 				port at 0 {
- 					reg = <0>;
- 					replicator_out0: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&etr_in>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 				port at 1 {
- 					reg = <1>;
- 					replicator_out1: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&tpiu_in>;
-+						coresight,hwid = <1>;
- 					};
- 				};
- 				port at 2 {
--					reg = <0>;
-+					reg = <2>;
- 					replicator_in: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etf_out>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -840,14 +847,17 @@
- 				port at 0 {
- 					reg = <0>;
- 					etf_out: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&replicator_in>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 				port at 1 {
--					reg = <0>;
-+					reg = <1>;
- 					etf_in: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&merger_out>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -873,14 +883,17 @@
- 				port at 1 {
- 					reg = <1>;
- 					merger_in1: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&funnel1_out>;
-+						coresight,hwid = <1>;
- 					};
- 				};
- 				port at 8 {
--					reg = <0>;
-+					reg = <8>;
- 					merger_out: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&etf_in>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -910,14 +923,17 @@
- 				port at 5 {
- 					reg = <5>;
- 					funnel1_in5: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&kpss_out>;
-+						coresight,hwid = <5>;
- 					};
- 				};
- 				port at 8 {
--					reg = <0>;
-+					reg = <8>;
- 					funnel1_out: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&merger_in1>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -937,35 +953,41 @@
- 				port at 0 {
- 					reg = <0>;
- 					kpss_in0: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm0_out>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 				port at 1 {
- 					reg = <1>;
- 					kpss_in1: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm1_out>;
-+						coresight,hwid = <1>;
- 					};
- 				};
- 				port at 2 {
- 					reg = <2>;
- 					kpss_in2: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm2_out>;
-+						coresight,hwid = <2>;
- 					};
- 				};
- 				port at 3 {
- 					reg = <3>;
- 					kpss_in3: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm3_out>;
-+						coresight,hwid = <3>;
- 					};
- 				};
- 				port at 8 {
--					reg = <0>;
-+					reg = <8>;
- 					kpss_out: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&funnel1_in5>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 			};
-@@ -982,7 +1004,9 @@
- 
- 			port {
- 				etm0_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&kpss_in0>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -998,7 +1022,9 @@
- 
- 			port {
- 				etm1_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&kpss_in1>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1014,7 +1040,9 @@
- 
- 			port {
- 				etm2_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&kpss_in2>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
-@@ -1030,7 +1058,9 @@
- 
- 			port {
- 				etm3_out: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&kpss_in3>;
-+					coresight,hwid = <0>;
- 				};
- 			};
- 		};
--- 
-2.7.4
+Yes, I was waiting for confirmation from Yixun.  Will spin a v2 with GX
+included.
+
+Kevin
+
+>> ---
+>> Yixun, please test and confirm this still works on AXG boards.
+>> 
+>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> index fee87737a201..67d7115e4eff 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> @@ -132,7 +132,7 @@
+>>  
+>>  			sd_emmc_b: sd at 5000 {
+>>  				compatible = "amlogic,meson-axg-mmc";
+>> -				reg = <0x0 0x5000 0x0 0x2000>;
+>> +				reg = <0x0 0x5000 0x0 0x800>;
+>>  				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
+>>  				status = "disabled";
+>>  				clocks = <&clkc CLKID_SD_EMMC_B>,
+>> @@ -144,7 +144,7 @@
+>>  
+>>  			sd_emmc_c: mmc at 7000 {
+>>  				compatible = "amlogic,meson-axg-mmc";
+>> -				reg = <0x0 0x7000 0x0 0x2000>;
+>> +				reg = <0x0 0x7000 0x0 0x800>;
+>>  				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
+>>  				status = "disabled";
+>>  				clocks = <&clkc CLKID_SD_EMMC_C>,
