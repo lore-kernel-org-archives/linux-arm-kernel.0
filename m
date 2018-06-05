@@ -1,124 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:05:10 -0500
-Subject: [RFC PATCH 6/6] arm64: dts: ti: Add support for AM654 EVM base board
-In-Reply-To: <20180605060510.32473-1-nm@ti.com>
-References: <=<20180605060125.9518-1-nm@ti.com>
- <20180605060510.32473-1-nm@ti.com>
-Message-ID: <20180605060510.32473-2-nm@ti.com>
+From: liuwenliang@huawei.com (Abbott Liu)
+Date: Tue, 5 Jun 2018 14:14:16 +0800
+Subject: [PATCH v5 6/6] Enable KASan for arm
+In-Reply-To: <20180605061416.18690-1-liuwenliang@huawei.com>
+References: <20180605061416.18690-1-liuwenliang@huawei.com>
+Message-ID: <20180605061416.18690-7-liuwenliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EValuation Module(EVM) platform for AM654 consists of a
-common Base board + one or more of daughter cards, which include:
-a) "Personality Modules", which can be specific to a profile, such as
- ICSSG enabled or Multi-media (including audio).
-b) SERDES modules, which may be 2 lane PCIe or two port PCIe + USB2
-c) Camera daughter card
-d) various display panels
+From: Andrey Ryabinin <ryabinin@virtuozzo.com>
 
-Among other options. There are two basic configurations defined which
-include an "EVM" configuration and "IDK" (Industrial development kit)
-which differ in the specific combination of daughter cards that are
-used.
+This patch enable kernel address sanitizer for arm.
 
-To simplify support, we choose to support just the base board as the
-core device tree file and all daughter cards would be expected to be
-device tree overlays.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Acked-by: Dmitry Vyukov <dvyukov@google.com>
+Tested-by: Joel Stanley <joel@jms.id.au>
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+Tested-by: Abbott Liu <liuwenliang@huawei.com>
+Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
 ---
- MAINTAINERS                                    |  1 +
- arch/arm64/boot/dts/Makefile                   |  1 +
- arch/arm64/boot/dts/ti/Makefile                |  9 ++++++
- arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 40 ++++++++++++++++++++++++++
- 4 files changed, 51 insertions(+)
- create mode 100644 arch/arm64/boot/dts/ti/Makefile
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+ Documentation/dev-tools/kasan.rst | 2 +-
+ arch/arm/Kconfig                  | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5f5c4eddec7a..4491a0f0625f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2092,6 +2092,7 @@ M:	Nishanth Menon <nm@ti.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Supported
- F:	Documentation/devicetree/bindings/arm/ti/k3.txt
-+F:	arch/arm64/boot/dts/ti/Makefile
- F:	arch/arm64/boot/dts/ti/k3-*
+diff --git a/Documentation/dev-tools/kasan.rst b/Documentation/dev-tools/kasan.rst
+index f7a18f2..d92120d 100644
+--- a/Documentation/dev-tools/kasan.rst
++++ b/Documentation/dev-tools/kasan.rst
+@@ -12,7 +12,7 @@ KASAN uses compile-time instrumentation for checking every memory access,
+ therefore you will need a GCC version 4.9.2 or later. GCC 5.0 or later is
+ required for detection of out-of-bounds accesses to stack or global variables.
  
- ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 3543bc324553..4690364d584b 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -23,5 +23,6 @@ subdir-y += rockchip
- subdir-y += socionext
- subdir-y += sprd
- subdir-y += synaptics
-+subdir-y += ti
- subdir-y += xilinx
- subdir-y += zte
-diff --git a/arch/arm64/boot/dts/ti/Makefile b/arch/arm64/boot/dts/ti/Makefile
-new file mode 100644
-index 000000000000..63e619d0b5b8
---- /dev/null
-+++ b/arch/arm64/boot/dts/ti/Makefile
-@@ -0,0 +1,9 @@
-+# SPDX-License-Identifier: GPL-2.0
-+#
-+# Make file to build device tree binaries for boards based on
-+# Texas Instruments Inc processors
-+#
-+# Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
-+#
-+
-+dtb-$(CONFIG_ARCH_K3_AM6_SOC) += k3-am654-base-board.dtb
-diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-new file mode 100644
-index 000000000000..d227d792de60
---- /dev/null
-+++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-@@ -0,0 +1,40 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
-+ */
-+
-+/dts-v1/;
-+
-+#include "k3-am654.dtsi"
-+
-+/ {
-+	compatible =  "ti,am654-evm", "ti,am654";
-+	model = "Texas Instruments AM654 Base Board";
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+		bootargs = "earlycon=ns16550a,mmio32,0x02800000";
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		/* 4G RAM */
-+		reg = <0x00000000 0x80000000 0x00000000 0x80000000>,
-+		      <0x00000008 0x80000000 0x00000000 0x80000000>;
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		secure_ddr: secure_ddr at 9e800000 {
-+			reg = <0 0x9e800000 0 0x01800000>; /* for OP-TEE */
-+			alignment = <0x1000>;
-+			no-map;
-+		};
-+	};
-+};
-+
-+&main_uart0 {
-+	status = "okay";
-+};
+-Currently KASAN is supported only for the x86_64 and arm64 architectures.
++Currently KASAN is supported only for the x86_64, arm64 and arm architectures.
+ 
+ Usage
+ -----
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7f8e7f..a43a746 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -50,6 +50,7 @@ config ARM
+ 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
++	select HAVE_ARCH_KASAN if MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+ 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
 -- 
-2.15.1
+2.9.0
