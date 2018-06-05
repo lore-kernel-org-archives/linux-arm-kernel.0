@@ -1,32 +1,69 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 5 Jun 2018 16:00:39 +0100
-Subject: [PATCH v2 0/5] arm64: perf: Support for chained counters
-In-Reply-To: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
-References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <3cbe09d3-7878-d53d-0918-dfb38ac89353@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 5 Jun 2018 17:15:06 +0200
+Subject: [PATCH 0/2] Add Mediatek X20 Development Board support
+In-Reply-To: <20180529072719.GA5529@Mani-XPS-13-9360>
+References: <20180529045258.1415-1-manivannan.sadhasivam@linaro.org>
+ <06dbc5ef-5bba-f3e0-1b57-3eaeab26ed68@gmail.com>
+ <20180529072719.GA5529@Mani-XPS-13-9360>
+Message-ID: <06a0535a-132e-9466-80e0-9af74b9af07b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 29/05/18 11:55, Suzuki K Poulose wrote:
-> This series adds support for counting PMU events using 64bit counters
-> for arm64 PMU.
+On 29/05/18 09:27, Manivannan Sadhasivam wrote:
+> Hi Matthias,
 > 
-> The Arm v8 PMUv3 supports combining two adjacent 32bit counters
-> (low even and hig odd counters) to count a given "event" in 64bit mode.
-> This series adds the support for 64bit events in the core arm_pmu driver
-> infrastructure and adds the support for armv8 64bit kernel PMU to use
-> chained counters to count in 64bit mode. For CPU cycles, we use the cycle
-> counter in 64bit mode, when requested. If the cycle counter is not available,
-> we fall back to chaining the counters.
+> On Tue, May 29, 2018 at 08:38:27AM +0200, Matthias Brugger wrote:
+>> Hi Manivannan,
+>>
+>> it's nice to see that someone at Linaro cares about upstreaming the 96 board.
+>> From what I can see, your patches add the very same support to the board as
+>> does the mt6797 evaluation board. Do you have plans to upstream more drivers for
+>> the board? Do you have a roadmap or something?
+>>
+>> I'm asking becuase I don't want to have just another dead devicetree in the
+>> kernel which does nothing but provides a boot to rootfs. Especially as this can
+>> be achieved on the same board with the EVB dts.
+>>
 > 
-> Tested on Juno, Fast models. Applies on 4.17-rc4
+> I can understand your concern here. I do have plans to add more drivers
+> in the future for this board but I can't give you any roadmap for that
+> since it mostly falls under the spare time work and I have been doing a
+> similar kind of work for the Bubblegum-96 board in parallel.
+> 
+> At most I can guarentee that this board's functionality will be added
+> gradually in upcoming days.
 > 
 
-For the series:
+Sounds good. Fancy to send a v2 with the comments from Rob?
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Regards,
+Matthias
 
--- 
-Julien Thierry
+> Thanks,
+> Mani
+> 
+>> Regards,
+>> Matthias
+>>
+>> On 29/05/18 06:52, Manivannan Sadhasivam wrote:
+>>> Add devicetree support for Mediatek X20 Development Board by Archermind.
+>>> This board is based on the Deca-Core MT6797 SoC from Mediatek and is
+>>> one of the 96Boards Consumer Edition platform.
+>>>
+>>> With this devicetree change, board can boot into initramfs.
+>>>
+>>> More information about this board can be found in 96Boards product page:
+>>> https://www.96boards.org/product/mediatek-x20/
+>>>
+>>> Manivannan Sadhasivam (2):
+>>>   dt-bindings: Add vendor prefix for ArcherMind
+>>>   arm64: dts: Add Mediatek X20 Development Board support
+>>>
+>>>  .../devicetree/bindings/vendor-prefixes.txt   |  1 +
+>>>  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
+>>>  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
+>>>  3 files changed, 35 insertions(+)
+>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+>>>
