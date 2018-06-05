@@ -1,32 +1,42 @@
 From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Tue,  5 Jun 2018 12:28:46 +0100
-Subject: [PATCH v4 1/3] dt-bindings: cpu: Add Renesas R9A06G032 SMP enable
- method.
-In-Reply-To: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1528198148-23308-2-git-send-email-michel.pollet@bp.renesas.com>
+Date: Tue,  5 Jun 2018 12:28:45 +0100
+Subject: [PATCH v4 0/3] Renesas R9A06G032 SMP enabler
+Message-ID: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a special enable method for second CA7 of the R9A06G032
+*WARNING -- this requires the base R9A06G032 support patches
+already posted
 
-Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/cpus.txt | 1 +
- 1 file changed, 1 insertion(+)
+This patch series is for enabling the second CA7 of the R9A06G032.
+It's based on a spin_table method, and it reuses the same binding
+property as that driver.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 29e1dc5..b395d107 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -219,6 +219,7 @@ described below.
- 			    "qcom,kpss-acc-v1"
- 			    "qcom,kpss-acc-v2"
- 			    "renesas,apmu"
-+			    "renesas,r9a06g032-smp"
- 			    "rockchip,rk3036-smp"
- 			    "rockchip,rk3066-smp"
- 			    "ste,dbx500-smp"
+v4:
+  + Geert's comments adressed.
+  + Renamed symbols to r9a06g032 to match the rest of patchset
+  + Rebased on base patch v8
+v3:
+  + Removed mentions of rz/?n1d?
+  + Rebased on base patch v7
+v2:
+  + Added suggestions from Florian Fainelli
+  + Use __pa_symbol()
+  + Simplified logic in prepare_cpu()
+  + Reordered the patches
+  + Rebased on RZN1 Base patch v5
+
+Michel Pollet (3):
+  dt-bindings: cpu: Add Renesas R9A06G032 SMP enable method.
+  arm: shmobile: Add the R9A06G032 SMP enabler driver
+  ARM: dts: Renesas R9A06G032 SMP enable method
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/r9a06g032.dtsi               |  3 +
+ arch/arm/mach-shmobile/Makefile                |  1 +
+ arch/arm/mach-shmobile/smp-r9a06g032.c         | 79 ++++++++++++++++++++++++++
+ 4 files changed, 84 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+
 -- 
 2.7.4
