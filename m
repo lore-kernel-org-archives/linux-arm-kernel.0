@@ -1,44 +1,66 @@
 From: changbin.du@intel.com (changbin.du at intel.com)
-Date: Tue,  5 Jun 2018 16:13:39 +0800
-Subject: [PATCH v5 3/4] ARM: mm: fix build error in fix_to_virt with
- CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+Date: Tue,  5 Jun 2018 16:13:37 +0800
+Subject: [PATCH v5 1/4] x86/mm: surround level4_kernel_pgt with #ifdef
+ CONFIG_X86_5LEVEL...#endif
 In-Reply-To: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
 References: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
-Message-ID: <1528186420-6615-4-git-send-email-changbin.du@intel.com>
+Message-ID: <1528186420-6615-2-git-send-email-changbin.du@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Changbin Du <changbin.du@intel.com>
 
-With '-Og' optimization level, GCC would not optimize a count for a loop
-as a constant value. But BUILD_BUG_ON() only accept compile-time constant
-values. Let's use __fix_to_virt() to avoid the error.
-
-arch/arm/mm/mmu.o: In function `fix_to_virt':
-/home/changbin/work/linux/./include/asm-generic/fixmap.h:31: undefined reference to `__compiletime_assert_31'
-Makefile:1051: recipe for target 'vmlinux' failed
-make: *** [vmlinux] Error 1
+The level4_kernel_pgt is only defined when X86_5LEVEL is enabled. So
+surround level4_kernel_pgt with #ifdef CONFIG_X86_5LEVEL...#endif to
+make code correct.
 
 Signed-off-by: Changbin Du <changbin.du@intel.com>
 Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 ---
-v2: use __fix_to_virt() to fix the issue.
----
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/x86/include/asm/pgtable_64.h |  2 ++
+ arch/x86/kernel/head64.c          | 13 ++++++-------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e46a6a4..c08d74e 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1599,7 +1599,7 @@ static void __init early_fixmap_shutdown(void)
- 		pte_t *pte;
- 		struct map_desc map;
+diff --git a/arch/x86/include/asm/pgtable_64.h b/arch/x86/include/asm/pgtable_64.h
+index 877bc27..9e7f667 100644
+--- a/arch/x86/include/asm/pgtable_64.h
++++ b/arch/x86/include/asm/pgtable_64.h
+@@ -15,7 +15,9 @@
+ #include <linux/bitops.h>
+ #include <linux/threads.h>
  
--		map.virtual = fix_to_virt(i);
-+		map.virtual = __fix_to_virt(i);
- 		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
++#ifdef CONFIG_X86_5LEVEL
+ extern p4d_t level4_kernel_pgt[512];
++#endif
+ extern p4d_t level4_ident_pgt[512];
+ extern pud_t level3_kernel_pgt[512];
+ extern pud_t level3_ident_pgt[512];
+diff --git a/arch/x86/kernel/head64.c b/arch/x86/kernel/head64.c
+index 0c408f8..775d7a6 100644
+--- a/arch/x86/kernel/head64.c
++++ b/arch/x86/kernel/head64.c
+@@ -143,16 +143,15 @@ unsigned long __head __startup_64(unsigned long physaddr,
  
- 		/* Only i/o device mappings are supported ATM */
+ 	pgd = fixup_pointer(&early_top_pgt, physaddr);
+ 	p = pgd + pgd_index(__START_KERNEL_map);
+-	if (la57)
+-		*p = (unsigned long)level4_kernel_pgt;
+-	else
+-		*p = (unsigned long)level3_kernel_pgt;
+-	*p += _PAGE_TABLE_NOENC - __START_KERNEL_map + load_delta;
+-
++#ifdef CONFIG_X86_5LEVEL
+ 	if (la57) {
++		*p = (unsigned long)level4_kernel_pgt;
+ 		p4d = fixup_pointer(&level4_kernel_pgt, physaddr);
+ 		p4d[511] += load_delta;
+-	}
++	} else
++#endif
++		*p = (unsigned long)level3_kernel_pgt;
++	*p += _PAGE_TABLE_NOENC - __START_KERNEL_map + load_delta;
+ 
+ 	pud = fixup_pointer(&level3_kernel_pgt, physaddr);
+ 	pud[510] += load_delta;
 -- 
 2.7.4
