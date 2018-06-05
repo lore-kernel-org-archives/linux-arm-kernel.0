@@ -1,41 +1,17 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 5 Jun 2018 15:37:51 +0530
-Subject: [PATCH v2] ARM: dts: da850: Fix interrups property for gpio
-Message-ID: <1528193271-10726-1-git-send-email-j-keerthy@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 5 Jun 2018 08:01:47 -0300
+Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
+In-Reply-To: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
+References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
+Message-ID: <CAOMZO5CsX-oiUXGicL1P61PcT67S9mhTTO5ibuXsQNd+UGt-Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The intc #interrupt-cells is equal to 1. Currently gpio
-node has 2 cells per IRQ which is wrong. Remove the additional
-cell for each of the interrupts.
+On Tue, May 22, 2018 at 3:28 AM, S?bastien Szymanski
+<sebastien.szymanski@armadeus.com> wrote:
+> Check the max speed supported from the fuses for i.MX6ULL and update the
+> operating points table accordingly.
+>
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Fixes: 2e38b946dc54 ("ARM: davinci: da850: add GPIO DT node")
----
-
-Changes in v2:
-
-  * Fixed $Subject
-
- arch/arm/boot/dts/da850.dtsi | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index f6f1597..0f4f817 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -549,11 +549,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			reg = <0x226000 0x1000>;
--			interrupts = <42 IRQ_TYPE_EDGE_BOTH
--				43 IRQ_TYPE_EDGE_BOTH 44 IRQ_TYPE_EDGE_BOTH
--				45 IRQ_TYPE_EDGE_BOTH 46 IRQ_TYPE_EDGE_BOTH
--				47 IRQ_TYPE_EDGE_BOTH 48 IRQ_TYPE_EDGE_BOTH
--				49 IRQ_TYPE_EDGE_BOTH 50 IRQ_TYPE_EDGE_BOTH>;
-+			interrupts = <42 43 44 45 46 47 48 49 50>;
- 			ti,ngpio = <144>;
- 			ti,davinci-gpio-unbanked = <0>;
- 			status = "disabled";
--- 
-1.9.1
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
