@@ -1,118 +1,355 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 4 Jun 2018 18:17:04 -0700
-Subject: [PATCH 1/6] PCI: iproc: Update iProc PCI binding for INTx support
-In-Reply-To: <CAL_Jsq+ac6dmHKS6m0h5N3bv=VseKVL8XLU5K7j1Rn=mgFNLsA@mail.gmail.com>
-References: <1527631130-20045-1-git-send-email-ray.jui@broadcom.com>
- <1527631130-20045-2-git-send-email-ray.jui@broadcom.com>
- <CAL_Jsq+ac6dmHKS6m0h5N3bv=VseKVL8XLU5K7j1Rn=mgFNLsA@mail.gmail.com>
-Message-ID: <808cc0bd-3ff2-a601-9c2d-09705fd36e51@broadcom.com>
+From: dennis@ausil.us (Dennis Gilmore)
+Date: Mon,  4 Jun 2018 20:13:43 -0500
+Subject: [PATCH] ARM: dts: armada388-helios4
+Message-ID: <20180605011343.14999-1-dennis@ausil.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob/Arnd,
+The helios4 is a Armada388 based nas board designed by SolidRun and
+based on their SOM. It is sold by kobol.io the dts file came from
+https://raw.githubusercontent.com/armbian/build/master/patch/kernel/mvebu-default/95-helios4-device-tree.patch
+I added a SPDX license line to match the clearfog it says it was based
+on and a compatible line for "solidrun,helios4"
 
-On 6/4/2018 7:17 AM, Rob Herring wrote:
-> +Arnd
-> 
-> On Tue, May 29, 2018 at 4:58 PM, Ray Jui <ray.jui@broadcom.com> wrote:
->> Update the iProc PCIe binding document for better modeling of the legacy
->> interrupt (INTx) support
->>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> ---
->>   .../devicetree/bindings/pci/brcm,iproc-pcie.txt    | 31 +++++++++++++++++-----
->>   1 file changed, 24 insertions(+), 7 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> index b8e48b4..7ea24dc 100644
->> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> @@ -13,9 +13,6 @@ controller, used in Stingray
->>     PAXB-based root complex is used for external endpoint devices. PAXC-based
->>   root complex is connected to emulated endpoint devices internal to the ASIC
->>   - reg: base address and length of the PCIe controller I/O register space
->> -- #interrupt-cells: set to <1>
->> -- interrupt-map-mask and interrupt-map, standard PCI properties to define the
->> -  mapping of the PCIe interface to interrupt numbers
->>   - linux,pci-domain: PCI domain ID. Should be unique for each host controller
->>   - bus-range: PCI bus numbers covered
->>   - #address-cells: set to <3>
->> @@ -41,6 +38,16 @@ Required:
->>   - brcm,pcie-ob-axi-offset: The offset from the AXI address to the internal
->>   address used by the iProc PCIe core (not the PCIe address)
->>
->> +Legacy interrupt (INTx) support (optional):
->> +
->> +Note INTx is for PAXB only.
->> +
->> +- interrupt-controller: claims itself as an interrupt controller for INTx
->> +- #interrupt-cells: set to <1>
->> +- interrupt-map-mask and interrupt-map, standard PCI properties to define
->> +the mapping of the PCIe interface to interrupt numbers
->> +- interrupts: interrupt line wired to the generic GIC for INTx support
->> +
->>   MSI support (optional):
->>
->>   For older platforms without MSI integrated in the GIC, iProc PCIe core provides
->> @@ -77,9 +84,14 @@ Example:
->>                  compatible = "brcm,iproc-pcie";
->>                  reg = <0x18012000 0x1000>;
->>
->> +               interrupt-controller;
->>                  #interrupt-cells = <1>;
->> -               interrupt-map-mask = <0 0 0 0>;
->> -               interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
->> +               interrupt-map-mask = <0 0 0 7>;
->> +               interrupt-map = <0 0 0 1 &pcie0 1>,
-> 
-> Are you sure this works? The irq parsing code will ignore
-> interrupt-map if interrupt-controller is found. In other words, you
-> should have one or the other, but not both.
+Signed-off-by: Dennis Gilmore <dennis@ausil.us>
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/armada-388-helios4.dts | 315 +++++++++++++++++++++++
+ 2 files changed, 316 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-388-helios4.dts
 
-Yes, it does work. I tested this by using an Intel E1000E PCIe NIC card 
-installed in our system and have it fall back to INTx.
-
-> 
-> Maybe it happens to work because "pcie0" is this node and your irq
-> numbers are the same.
-
-Perhaps it works because we are claiming "pcie0" as an interrupt 
-controller by itself and the INTx is modeled under that.
-
-> 
-> Arnd, any thoughts on this?
-> 
-
-Please let me know if the above model makes sense or not.
-
-Thanks,
-
-Ray
-
->> +                               <0 0 0 2 &pcie0 2>,
->> +                               <0 0 0 3 &pcie0 3>,
->> +                               <0 0 0 4 &pcie0 4>;
->> +               interrupts = <GIC_SPI 100 IRQ_TYPE_NONE>;
->>
->>                  linux,pci-domain = <0>;
->>
->> @@ -115,9 +127,14 @@ Example:
->>                  compatible = "brcm,iproc-pcie";
->>                  reg = <0x18013000 0x1000>;
->>
->> +               interrupt-controller;
->>                  #interrupt-cells = <1>;
->> -               interrupt-map-mask = <0 0 0 0>;
->> -               interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
->> +               interrupt-map-mask = <0 0 0 7>;
->> +               interrupt-map = <0 0 0 1 &pcie1 1>,
->> +                               <0 0 0 2 &pcie1 2>,
->> +                               <0 0 0 3 &pcie1 3>,
->> +                               <0 0 0 4 &pcie1 4>;
->> +               interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
->>
->>                  linux,pci-domain = <1>;
->>
->> --
->> 2.1.4
->>
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7e2424957809..490bfd586198 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1123,6 +1123,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
+ 	armada-388-clearfog-pro.dtb \
+ 	armada-388-db.dtb \
+ 	armada-388-gp.dtb \
++	armada-388-helios4.dtb \
+ 	armada-388-rd.dtb
+ dtb-$(CONFIG_MACH_ARMADA_39X) += \
+ 	armada-398-db.dtb
+diff --git a/arch/arm/boot/dts/armada-388-helios4.dts b/arch/arm/boot/dts/armada-388-helios4.dts
+new file mode 100644
+index 000000000000..a6d6996e1378
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-388-helios4.dts
+@@ -0,0 +1,315 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * Device Tree file for Helios4
++ * based on SolidRun Clearfog revision A1 rev 2.0 (88F6828)
++ *
++ *  Copyright (C) 2017
++ *
++ */
++
++/dts-v1/;
++#include "armada-388.dtsi"
++#include "armada-38x-solidrun-microsom.dtsi"
++
++/ {
++	model = "Helios4";
++	compatible = "solidrun,helios4", "marvell,armada388",
++		"marvell,armada385", "marvell,armada380";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000>; /* 2 GB */
++	};
++
++	aliases {
++		/* So that mvebu u-boot can update the MAC addresses */
++		ethernet1 = &eth0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_12v: regulator-12v {
++		compatible = "regulator-fixed";
++		regulator-name = "power_brick_12V";
++		regulator-min-microvolt = <12000000>;
++		regulator-max-microvolt = <12000000>;
++		regulator-always-on;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		vin-supply = <&reg_12v>;
++	};
++
++	reg_5p0v_hdd: regulator-5v-hdd {
++		compatible = "regulator-fixed";
++		regulator-name = "5V_HDD";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&reg_12v>;
++	};
++
++	reg_5p0v_usb: regulator-5v-usb {
++		compatible = "regulator-fixed";
++		regulator-name = "USB-PWR";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++		regulator-always-on;
++		enable-active-high;
++		gpio = <&expander0 6 GPIO_ACTIVE_HIGH>;
++		vin-supply = <&reg_12v>;
++	};
++
++	system-leds {
++		compatible = "gpio-leds";
++		status-led {
++			label = "helios4:green:status";
++			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++			default-state = "on";
++		};
++
++		fault-led {
++			label = "helios4:red:fault";
++			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++		};
++	};
++
++	io-leds {
++		compatible = "gpio-leds";
++		sata1-led {
++			label = "helios4:green:ata1";
++			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "ata1";
++			default-state = "off";
++		};
++		sata2-led {
++			label = "helios4:green:ata2";
++			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "ata2";
++			default-state = "off";
++		};
++		sata3-led {
++			label = "helios4:green:ata3";
++			gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "ata3";
++			default-state = "off";
++		};
++		sata4-led {
++			label = "helios4:green:ata4";
++			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "ata4";
++			default-state = "off";
++		};
++		usb-led {
++			label = "helios4:green:usb";
++			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "usb-host";
++			default-state = "off";
++		};
++	};
++
++	fan1: j10-pwm {
++		compatible = "pwm-fan";
++		pwms = <&gpio1 9 40000>;	/* Target freq:25 kHz */
++	};
++
++	fan2: j17-pwm {
++		compatible = "pwm-fan";
++		pwms = <&gpio1 23 40000>;	/* Target freq:25 kHz */
++	};
++
++	usb2_phy: usb2-phy {
++		compatible = "usb-nop-xceiv";
++		vbus-regulator = <&reg_5p0v_usb>;
++	};
++
++	usb3_phy: usb3-phy {
++		compatible = "usb-nop-xceiv";
++		//vbus-regulator = <&reg_5p0v_usb>;
++	};
++
++	soc {
++		internal-regs {
++			i2c at 11000 {
++				clock-frequency = <400000>;
++				pinctrl-0 = <&i2c0_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++
++				/*
++				 * PCA9655 GPIO expander, up to 1MHz clock.
++				 *  0-Board Revision bit 0 #
++				 *  1-Board Revision bit 1 #
++				 *  5-USB3 overcurrent
++				 *  6-USB3 power
++				 */
++				expander0: gpio-expander at 20 {
++					/*
++					 * This is how it should be:
++					 * compatible = "onnn,pca9655",
++					 *	 "nxp,pca9555";
++					 * but you can't do this because of
++					 * the way I2C works.
++					 */
++					compatible = "nxp,pca9555";
++					gpio-controller;
++					#gpio-cells = <2>;
++					reg = <0x20>;
++					pinctrl-names = "default";
++					pinctrl-0 = <&pca0_pins>;
++					interrupt-parent = <&gpio0>;
++					interrupts = <23 IRQ_TYPE_EDGE_FALLING>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++
++					board_rev_bit_0 {
++						gpio-hog;
++						gpios = <0 GPIO_ACTIVE_LOW>;
++						input;
++						line-name = "board-rev-0";
++					};
++					board_rev_bit_1 {
++						gpio-hog;
++						gpios = <1 GPIO_ACTIVE_LOW>;
++						input;
++						line-name = "board-rev-1";
++					};
++					usb3_ilimit {
++						gpio-hog;
++						gpios = <5 GPIO_ACTIVE_HIGH>;
++						input;
++						line-name = "usb-overcurrent-status";
++					};
++				};
++
++				temp_sensor: temp at 4c {
++					compatible = "ti,lm75";
++					reg = <0x4c>;
++					vcc-supply = <&reg_3p3v>;
++				};
++			};
++
++			i2c at 11100 {
++				/*
++				 * External I2C Bus for user peripheral
++				 */
++				clock-frequency = <400000>;
++				pinctrl-0 = <&helios_i2c1_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++			};
++
++			sata at a8000 {
++				status = "okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				sata0: sata-port at 0 {
++					reg = <0>;
++				};
++
++				sata1: sata-port at 1 {
++					reg = <1>;
++				};
++			};
++
++			sata at e0000 {
++				status = "okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				sata2: sata-port at 0 {
++					reg = <0>;
++				};
++
++				sata3: sata-port at 1 {
++					reg = <1>;
++				};
++			};
++
++			spi at 10680 {
++				pinctrl-0 = <&spi1_pins
++					     &microsom_spi1_cs_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++			};
++
++			sdhci at d8000 {
++				bus-width = <4>;
++				cd-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
++				no-1-8-v;
++				pinctrl-0 = <&helios_sdhci_pins
++					     &helios_sdhci_cd_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++				vmmc = <&reg_3p3v>;
++				wp-inverted;
++			};
++
++			usb at 58000 {
++				//vcc-supply = <&reg_5p0v_usb>;
++				usb-phy = <&usb2_phy>;
++				status = "okay";
++			};
++
++			usb3 at f0000 {
++				status = "okay";
++			};
++
++			usb3 at f8000 {
++				status = "okay";
++			};
++
++			pinctrl at 18000 {
++				pca0_pins: pca0-pins {
++					marvell,pins = "mpp23";
++					marvell,function = "gpio";
++				};
++				microsom_phy0_int_pins: microsom-phy0-int-pins {
++					marvell,pins = "mpp18";
++					marvell,function = "gpio";
++				};
++				helios_i2c1_pins: i2c1-pins {
++					marvell,pins = "mpp26", "mpp27";
++					marvell,function = "i2c1";
++				};
++				helios_sdhci_cd_pins: helios-sdhci-cd-pins {
++					marvell,pins = "mpp20";
++					marvell,function = "gpio";
++				};
++				helios_sdhci_pins: helios-sdhci-pins {
++					marvell,pins = "mpp21", "mpp28",
++						       "mpp37", "mpp38",
++						       "mpp39", "mpp40";
++					marvell,function = "sd0";
++				};
++				helios_led_pins: helios-led-pins {
++					marvell,pins = "mpp24", "mpp25",
++						       "mpp49", "mpp50",
++						       "mpp52", "mpp53",
++						       "mpp54";
++					marvell,function = "gpio";
++				};
++				helios_fan_pins: helios-fan-pins {
++					marvell,pins = "mpp41", "mpp43",
++						       "mpp48", "mpp55";
++					marvell,function = "gpio";
++				};
++				microsom_spi1_cs_pins: spi1-cs-pins {
++					marvell,pins = "mpp59";
++					marvell,function = "spi1";
++				};
++			};
++		};
++	};
++};
+-- 
+2.17.1
