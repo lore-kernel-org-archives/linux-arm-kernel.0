@@ -1,29 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 5 Jun 2018 16:50:48 +0100
-Subject: [PATCH] arm64: cpu_errata: include required headers
-In-Reply-To: <20180605115227.1621618-1-arnd@arndb.de>
-References: <20180605115227.1621618-1-arnd@arndb.de>
-Message-ID: <20180605155048.zz6zjxpmyeoliflj@armageddon.cambridge.arm.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 5 Jun 2018 17:50:57 +0200
+Subject: [alsa-devel] [PATCH 0/3] ASoC: stm32: sai: add support of iec958
+ controls
+In-Reply-To: <20180417111733.GG8973@sirena.org.uk>
+References: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
+ <a0552849-47fa-dc72-a512-a3e075adb07f@st.com>
+ <20180417111733.GG8973@sirena.org.uk>
+Message-ID: <2ae6c5b6-872a-9aaa-6ca4-e29adb7c8bc0@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 01:50:07PM +0200, Arnd Bergmann wrote:
-> Without including psci.h and arm-smccc.h, we now get a build failure in
-> some configurations:
-> 
-> arch/arm64/kernel/cpu_errata.c: In function 'arm64_update_smccc_conduit':
-> arch/arm64/kernel/cpu_errata.c:278:10: error: 'psci_ops' undeclared (first use in this function); did you mean 'sysfs_ops'?
-> 
-> arch/arm64/kernel/cpu_errata.c: In function 'arm64_set_ssbd_mitigation':
-> arch/arm64/kernel/cpu_errata.c:311:3: error: implicit declaration of function 'arm_smccc_1_1_hvc' [-Werror=implicit-function-declaration]
->    arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This showed up only recently, but I have not bisected what caused it.
+Hi Takashi,
 
-I haven't hit it yet, not sure why. I'm queuing the patch anyway.
-Thanks.
+On 04/17/2018 01:17 PM, Mark Brown wrote:
+> On Tue, Apr 17, 2018 at 08:29:17AM +0000, Olivier MOYSAN wrote:
+> 
+>> I guess the blocking patch in this patchset is the patch "add IEC958 
+>> channel status control helper". This patch has been reviewed several 
+>> times, but did not get a ack so far.
+>> If you think these helpers will not be merged, I will reintegrate the 
+>> corresponding code in stm driver.
+>> Please let me know, if I need to prepare a v2 without helpers, or if we 
+>> can go further in the review of iec helpers patch ?
+> 
+> I don't mind either way but you're right here, I'm waiting for Takashi
+> to review the first patch.? I'd probably be OK with it just integrated
+> into the driver if we have to go that way though.
 
--- 
-Catalin
+Gentlemen reminder for this patch set. We would appreciate to have your
+feedback on iec helper.
+>From our point of view it could be useful to have a generic management
+of the iec controls based on helpers instead of redefining them in DAIs.
+Having the same behavior for these controls could be useful to ensure
+coherence of the control management used by application (for instance
+Gstreamer uses it to determine iec raw mode capability for iec61937 streams)
+
+
+Thanks,
+Arnaud
