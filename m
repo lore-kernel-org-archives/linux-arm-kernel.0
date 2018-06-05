@@ -1,56 +1,106 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 5 Jun 2018 14:56:34 +0800
-Subject: [PATCH] ARM64: dts: meson-axg: fix register ranges for SD/eMMC
-In-Reply-To: <20180604222706.36167-1-khilman@baylibre.com>
-References: <20180604222706.36167-1-khilman@baylibre.com>
-Message-ID: <8b1a25e1-2447-40b7-1394-d10ff200a4ec@amlogic.com>
+From: liuwenliang@huawei.com (Abbott Liu)
+Date: Tue, 5 Jun 2018 14:14:12 +0800
+Subject: [PATCH v5 2/6] Disable instrumentation for some code
+In-Reply-To: <20180605061416.18690-1-liuwenliang@huawei.com>
+References: <20180605061416.18690-1-liuwenliang@huawei.com>
+Message-ID: <20180605061416.18690-3-liuwenliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
+From: Andrey Ryabinin <aryabinin@virtuozzo.com>
 
-On 06/05/18 06:27, Kevin Hilman wrote:
-> Based on updated information from Amlogic, correct the register
-> range for the SD/eMMC blocks to the right size.
-> 
-> Reported-by: Yixun Lan <yixun.lan@amlogic.com>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
-> Yixun, please test and confirm this still works on AXG boards.
-> 
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index fee87737a201..67d7115e4eff 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -132,7 +132,7 @@
->  
->  			sd_emmc_b: sd at 5000 {
->  				compatible = "amlogic,meson-axg-mmc";
-> -				reg = <0x0 0x5000 0x0 0x2000>;
-> +				reg = <0x0 0x5000 0x0 0x800>;
->  				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
->  				status = "disabled";
->  				clocks = <&clkc CLKID_SD_EMMC_B>,
-> @@ -144,7 +144,7 @@
->  
->  			sd_emmc_c: mmc at 7000 {
->  				compatible = "amlogic,meson-axg-mmc";
-> -				reg = <0x0 0x7000 0x0 0x2000>;
-> +				reg = <0x0 0x7000 0x0 0x800>;
->  				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
->  				status = "disabled";
->  				clocks = <&clkc CLKID_SD_EMMC_C>,
-> 
+Disable instrumentation for arch/arm/boot/compressed/*
+and arch/arm/vdso/* because those code won't linkd with
+kernel image.
 
-Starting from GXBB series, the SD/eMMC register range is changed to
-0x800, so arch/arm64/boot/dts/amlogic/meson-gx.dtsi also need to be adjusted
+Disable instrumentation for arch/arm/kvm/hyp/*. See commit a6cdf1c08cbf
+("kvm: arm64: Disable compiler instrumentation for hypervisor code")
+for more details.
 
-Also, test passed on boards: GXBB(p200), GXL(p212, p230), AXG(s400)
+Disable instrumentation for arch/arm/mm/physaddr.c. See
+commit ec6d06efb0ba ("arm64: Add support for CONFIG_DEBUG_VIRTUAL")
+for more details.
 
-Thanks for bringing up this, and fix them.
+Disable kasan check in the function unwind_pop_register
+because it doesn't matter that kasan checks failed when
+unwind_pop_register read stack memory of task.
 
+Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Joel Stanley <joel@jms.id.au>
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+Tested-by: Abbott Liu <liuwenliang@huawei.com>
+Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+---
+ arch/arm/boot/compressed/Makefile | 1 +
+ arch/arm/kernel/unwind.c          | 3 ++-
+ arch/arm/kvm/hyp/Makefile         | 4 ++++
+ arch/arm/mm/Makefile              | 1 +
+ arch/arm/vdso/Makefile            | 2 ++
+ 5 files changed, 10 insertions(+), 1 deletion(-)
 
-Yixun
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 6a4e734..b29e0a3 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -24,6 +24,7 @@ OBJS		+= hyp-stub.o
+ endif
+ 
+ GCOV_PROFILE		:= n
++KASAN_SANITIZE		:= n
+ 
+ #
+ # Architecture dependencies
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 0bee233..2e55c7d 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -249,7 +249,8 @@ static int unwind_pop_register(struct unwind_ctrl_block *ctrl,
+ 		if (*vsp >= (unsigned long *)ctrl->sp_high)
+ 			return -URC_FAILURE;
+ 
+-	ctrl->vrs[reg] = *(*vsp)++;
++	ctrl->vrs[reg] = READ_ONCE_NOCHECK(*(*vsp));
++	(*vsp)++;
+ 	return URC_OK;
+ }
+ 
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 7fc0638..1bd89ed 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -23,3 +23,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+ CFLAGS_switch.o		   += $(CFLAGS_ARMV7VE)
+ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
++
++GCOV_PROFILE	:= n
++KASAN_SANITIZE	:= n
++UBSAN_SANITIZE	:= n
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 9dbb849..c056e17 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -16,6 +16,7 @@ endif
+ obj-$(CONFIG_ARM_PTDUMP_CORE)	+= dump.o
+ obj-$(CONFIG_ARM_PTDUMP_DEBUGFS)	+= ptdump_debugfs.o
+ obj-$(CONFIG_MODULES)		+= proc-syms.o
++KASAN_SANITIZE_physaddr.o	:= n
+ obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+ 
+ obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index bb411821..87abbb7 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -30,6 +30,8 @@ CFLAGS_vgettimeofday.o = -O2
+ # Disable gcov profiling for VDSO code
+ GCOV_PROFILE := n
+ 
++KASAN_SANITIZE := n
++
+ # Force dependency
+ $(obj)/vdso.o : $(obj)/vdso.so
+ 
+-- 
+2.9.0
