@@ -1,155 +1,164 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  5 Jun 2018 22:43:26 +0100
-Subject: [PATCH 15/20] dts: arm: imx7{d,
- s}: Update coresight binding for hardware ports
+Date: Tue,  5 Jun 2018 22:43:23 +0100
+Subject: [PATCH 12/20] dts: spreadtrum: Update coresight bindings for hw ports
 In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
 References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1528235011-30691-16-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1528235011-30691-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the updated coresight bindings.
+Switch to the new coresight bindings for hw ports
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: orsonzhai at gmail.com
+Cc: zhang.lyra at gmail.com
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi |  5 ++++-
- arch/arm/boot/dts/imx7s.dtsi | 41 ++++++++++++++++++++++++++++++-----------
- 2 files changed, 34 insertions(+), 12 deletions(-)
+ arch/arm64/boot/dts/sprd/sc9836.dtsi |  40 ++++++++++----
+ arch/arm64/boot/dts/sprd/sc9860.dtsi | 101 +++++++++++++++++++++++++----------
+ 2 files changed, 102 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 200714e..5faff17 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -87,7 +87,9 @@
- 
- 			port {
- 				etm1_out_port: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&ca_funnel_in_port1>;
-+					coresight,hwid = <0>;
- 				};
+diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+index 63894c4..27ccc29 100644
+--- a/arch/arm64/boot/dts/sprd/sc9836.dtsi
++++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+@@ -52,8 +52,9 @@
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			etf_in: endpoint {
+-				slave-mode;
++				direction = <0>;
+ 				remote-endpoint = <&funnel_out_port0>;
++				coresight,hwid = <0>;
  			};
- 		};
-@@ -174,8 +176,9 @@
- 	port at 1 {
- 		reg = <1>;
- 		ca_funnel_in_port1: endpoint {
--			slave-mode;
-+			direction = <0>;
- 			remote-endpoint = <&etm1_out_port>;
-+			coresight,hwid = <1>;
  		};
  	};
- };
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 4d42335..8e90915 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -151,23 +151,28 @@
+@@ -71,48 +72,55 @@
  			port at 0 {
  				reg = <0>;
- 				replicator_out_port0: endpoint {
+ 				funnel_out_port0: endpoint {
 +					direction = <1>;
- 					remote-endpoint = <&tpiu_in_port>;
+ 					remote-endpoint = <&etf_in>;
 +					coresight,hwid = <0>;
  				};
  			};
  
+ 			/* funnel input port 0-4 */
  			port at 1 {
- 				reg = <1>;
- 				replicator_out_port1: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&etr_in_port>;
+-				reg = <0>;
++				reg = <1>;
+ 				funnel_in_port0: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&etm0_out>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 
+ 			port at 2 {
+-				reg = <1>;
++				reg = <2>;
+ 				funnel_in_port1: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&etm1_out>;
 +					coresight,hwid = <1>;
  				};
  			};
  
- 			/* replicator input port */
- 			port at 2 {
--				reg = <0>;
-+				reg = <2>;
- 				replicator_in_port0: endpoint {
+ 			port at 3 {
+-				reg = <2>;
++				reg = <3>;
+ 				funnel_in_port2: endpoint {
 -					slave-mode;
 +					direction = <0>;
- 					remote-endpoint = <&etf_out_port>;
-+					coresight,hwid = <0>;
+ 					remote-endpoint = <&etm2_out>;
++					coresight,hwid = <2>;
  				};
  			};
- 		};
-@@ -203,16 +208,19 @@
- 				port at 0 {
- 					reg = <0>;
- 					ca_funnel_in_port0: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&etm0_out_port>;
-+						coresight,hwid = <0>;
- 					};
- 				};
  
- 				/* funnel output port */
- 				port at 2 {
--					reg = <0>;
-+					reg = <2>;
- 					ca_funnel_out_port0: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&hugo_funnel_in_port0>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 
-@@ -229,7 +237,9 @@
- 
- 			port {
- 				etm0_out_port: endpoint {
-+					direction = <1>;
- 					remote-endpoint = <&ca_funnel_in_port0>;
-+					coresight,hwid = <0>;
+ 			port at 4 {
+-				reg = <3>;
++				reg = <4>;
+ 				funnel_in_port3: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&etm3_out>;
++					coresight,hwid = <3>;
  				};
  			};
+ 
+ 			port at 5 {
+-				reg = <4>;
++				reg = <5>;
+ 				funnel_in_port4: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&stm_out>;
++					coresight,hwid = <4>;
+ 				};
+ 			};
+ 			/* Other input ports aren't connected to anyone */
+@@ -128,7 +136,9 @@
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			etm0_out: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port0>;
++				coresight,hwid = <0>;
+ 			};
  		};
-@@ -248,22 +258,26 @@
+ 	};
+@@ -142,7 +152,9 @@
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			etm1_out: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port1>;
++				coresight,hwid = <0>;
+ 			};
+ 		};
+ 	};
+@@ -156,7 +168,9 @@
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			etm2_out: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port2>;
++				coresight,hwid = <0>;
+ 			};
+ 		};
+ 	};
+@@ -170,7 +184,9 @@
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			etm3_out: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port3>;
++				coresight,hwid = <0>;
+ 			};
+ 		};
+ 	};
+@@ -184,7 +200,9 @@
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			stm_out: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port4>;
++				coresight,hwid = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+index 5dbfb79..1615014 100644
+--- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
++++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+@@ -309,25 +309,29 @@
  				port at 0 {
  					reg = <0>;
- 					hugo_funnel_in_port0: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&ca_funnel_out_port0>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 
- 				port at 1 {
- 					reg = <1>;
- 					hugo_funnel_in_port1: endpoint {
--						slave-mode; /* M4 input */
-+						direction = <0>; /* M4 input */
-+						coresight,hwid = <1>;
- 					};
- 				};
- 
- 				port at 2 {
--					reg = <0>;
-+					reg = <2>;
- 					hugo_funnel_out_port0: endpoint {
+ 					soc_funnel_out_port: endpoint {
 +						direction = <1>;
- 						remote-endpoint = <&etf_in_port>;
-+						coresight,hwid = <0>;
- 					};
- 				};
- 
-@@ -284,15 +298,18 @@
- 				port at 0 {
- 					reg = <0>;
- 					etf_in_port: endpoint {
--						slave-mode;
-+						direction = <0>;
- 						remote-endpoint = <&hugo_funnel_out_port0>;
+ 						remote-endpoint = <&etb_in>;
 +						coresight,hwid = <0>;
  					};
  				};
@@ -157,31 +166,324 @@ index 4d42335..8e90915 100644
  				port at 1 {
 -					reg = <0>;
 +					reg = <1>;
- 					etf_out_port: endpoint {
-+						direction = <1>;
- 						remote-endpoint = <&replicator_in_port0>;
+ 					soc_funnel_in_port0: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint =
+ 						<&main_funnel_out_port>;
 +						coresight,hwid = <0>;
  					};
  				};
- 			};
-@@ -306,8 +323,9 @@
  
+ 				port at 2 {
+-					reg = <4>;
++					reg = <2>;
+ 					soc_funnel_in_port1: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpioint =
+ 							<&stm_out_port>;
++						coresight,hwid = <4>;
+ 					};
+ 				};
+ 			};
+@@ -340,9 +344,10 @@
+ 			clock-names = "apb_pclk";
  			port {
- 				etr_in_port: endpoint {
+ 				etb_in: endpoint {
 -					slave-mode;
 +					direction = <0>;
- 					remote-endpoint = <&replicator_out_port1>;
+ 					remote-endpoint =
+ 						<&soc_funnel_out_port>;
 +					coresight,hwid = <0>;
  				};
  			};
  		};
-@@ -320,8 +338,9 @@
+@@ -356,8 +361,10 @@
+ 			clock-names = "apb_pclk";
+ 			port {
+ 				stm_out_port: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&soc_funnel_in_port1>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -374,40 +381,46 @@
+ 				port at 0 {
+ 					reg = <0>;
+ 					cluster0_funnel_out_port: endpoint {
++						direction = <1>;
+ 						remote-endpoint =
+ 							<&cluster0_etf_in>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 1 {
+-					reg = <0>;
++					reg = <1>;
+ 					cluster0_funnel_in_port0: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm0_out>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 2 {
+-					reg = <1>;
++					reg = <2>;
+ 					cluster0_funnel_in_port1: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm1_out>;
++						coresight,hwid = <1>;
+ 					};
+ 				};
+ 
+ 				port at 3 {
+-					reg = <2>;
++					reg = <3>;
+ 					cluster0_funnel_in_port2: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm2_out>;
++						coresight,hwid = <2>;
+ 					};
+ 				};
+ 
+ 				port at 4 {
+ 					reg = <4>;
+ 					cluster0_funnel_in_port3: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm3_out>;
++						coresight,hwid = <4>;
+ 					};
+ 				};
+ 			};
+@@ -425,40 +438,46 @@
+ 				port at 0 {
+ 					reg = <0>;
+ 					cluster1_funnel_out_port: endpoint {
++						direction = <1>;
+ 						remote-endpoint =
+ 							<&cluster1_etf_in>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 1 {
+-					reg = <0>;
++					reg = <1>;
+ 					cluster1_funnel_in_port0: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm4_out>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 2 {
+-					reg = <1>;
++					reg = <2>;
+ 					cluster1_funnel_in_port1: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm5_out>;
++						coresight,hwid = <1>;
+ 					};
+ 				};
+ 
+ 				port at 3 {
+-					reg = <2>;
++					reg = <3>;
+ 					cluster1_funnel_in_port2: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm6_out>;
++						coresight,hwid = <2>;
+ 					};
+ 				};
+ 
+ 				port at 4 {
+-					reg = <3>;
++					reg = <4>;
+ 					cluster1_funnel_in_port3: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint = <&etm7_out>;
++						coresight,hwid = <3>;
+ 					};
+ 				};
+ 			};
+@@ -477,17 +496,20 @@
+ 				port at 0 {
+ 					reg = <0>;
+ 					cluster0_etf_out: endpoint {
++						direction = <1>;
+ 						remote-endpoint =
+ 						<&main_funnel_in_port0>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 1 {
+-					reg = <0>;
++					reg = <1>;
+ 					cluster0_etf_in: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint =
+ 						<&cluster0_funnel_out_port>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 			};
+@@ -506,17 +528,20 @@
+ 				port at 0 {
+ 					reg = <0>;
+ 					cluster1_etf_out: endpoint {
++						direction = <1>;
+ 						remote-endpoint =
+ 						<&main_funnel_in_port1>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 1 {
+-					reg = <0>;
++					reg = <1>;
+ 					cluster1_etf_in: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint =
+ 						<&cluster1_funnel_out_port>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 			};
+@@ -535,26 +560,30 @@
+ 				port at 0 {
+ 					reg = <0>;
+ 					main_funnel_out_port: endpoint {
++						direction = <1>;
+ 						remote-endpoint =
+ 							<&soc_funnel_in_port0>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 1 {
+-					reg = <0>;
++					reg = <1>;
+ 					main_funnel_in_port0: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint =
+ 							<&cluster0_etf_out>;
++						coresight,hwid = <0>;
+ 					};
+ 				};
+ 
+ 				port at 2 {
+-					reg = <1>;
++					reg = <2>;
+ 					main_funnel_in_port1: endpoint {
+-						slave-mode;
++						direction = <0>;
+ 						remote-endpoint =
+ 							<&cluster1_etf_out>;
++						coresight,hwid = <1>;
+ 					};
+ 				};
+ 			};
+@@ -569,8 +598,10 @@
  
  			port {
- 				tpiu_in_port: endpoint {
--					slave-mode;
-+					direction = <0>;
- 					remote-endpoint = <&replicator_out_port1>;
+ 				etm0_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster0_funnel_in_port0>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -584,8 +615,10 @@
+ 
+ 			port {
+ 				etm1_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster0_funnel_in_port1>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -599,8 +632,10 @@
+ 
+ 			port {
+ 				etm2_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster0_funnel_in_port2>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -614,8 +649,10 @@
+ 
+ 			port {
+ 				etm3_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster0_funnel_in_port3>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -629,8 +666,10 @@
+ 
+ 			port {
+ 				etm4_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster1_funnel_in_port0>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -644,8 +683,10 @@
+ 
+ 			port {
+ 				etm5_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster1_funnel_in_port1>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -659,8 +700,10 @@
+ 
+ 			port {
+ 				etm6_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster1_funnel_in_port2>;
++					coresight,hwid = <0>;
+ 				};
+ 			};
+ 		};
+@@ -674,8 +717,10 @@
+ 
+ 			port {
+ 				etm7_out: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 						<&cluster1_funnel_in_port3>;
 +					coresight,hwid = <0>;
  				};
  			};
