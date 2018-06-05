@@ -1,72 +1,85 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 5 Jun 2018 18:12:30 +0200
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 5 Jun 2018 17:18:45 +0100
 Subject: [PATCH v2 2/3] ACPI / PPTT: fix build when CONFIG_ACPI_PPTT is
  not enabled
-In-Reply-To: <83b1b038-c4c1-0199-2cb0-fb5343f0e3f5@arm.com>
+In-Reply-To: <CAJZ5v0hrJs1Oo-uA560qisZ4no4mbgbH+2fza+5B0ErGGYPTHw@mail.gmail.com>
 References: <1528209304-3280-1-git-send-email-sudeep.holla@arm.com>
  <1528209304-3280-2-git-send-email-sudeep.holla@arm.com>
  <CAJZ5v0gqQNHCuaeduQ8oQtGNUQcZxK171nDfyMNi1VVfnVsMqQ@mail.gmail.com>
  <83b1b038-c4c1-0199-2cb0-fb5343f0e3f5@arm.com>
-Message-ID: <CAJZ5v0hrJs1Oo-uA560qisZ4no4mbgbH+2fza+5B0ErGGYPTHw@mail.gmail.com>
+ <CAJZ5v0hrJs1Oo-uA560qisZ4no4mbgbH+2fza+5B0ErGGYPTHw@mail.gmail.com>
+Message-ID: <ec94a230-2798-8001-d3c5-902ea6f1855b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 5, 2018 at 5:33 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 05/06/18 16:00, Rafael J. Wysocki wrote:
->> On Tue, Jun 5, 2018 at 4:35 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> Though CONFIG_ACPI_PPTT is selected by platforms and nor user visible,
->>> it may be useful to support the build with CONFIG_ACPI_PPTT disabled.
->>>
->>> This patch adds the missing dummy/boiler plate implementation to fix
->>> the build.
->>>
->>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>  include/linux/acpi.h      | 15 +++++++++++++++
->>>  include/linux/cacheinfo.h |  2 +-
->>>  2 files changed, 16 insertions(+), 1 deletion(-)
->>>
->>> Hi Rafael,
->>>
->>> If you are fine with this, can you provide Ack, so that we route this
->>> through ARM64 tree where most of the ACPI PPTT support is present.
->>>
->>> Regards,
->>> Sudeep
->>>
->>> v1->v2:
->>>         - removed duplicate definition for acpi_find_last_cache_level
->>>
->>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->>> index 8f2cdb0eca71..4b35a66383f9 100644
->>> --- a/include/linux/acpi.h
->>> +++ b/include/linux/acpi.h
->>> @@ -1299,8 +1299,23 @@ static inline int lpit_read_residency_count_address(u64 *address)
->>>  }
->>>  #endif
->>>
->>> +#ifdef CONFIG_ACPI_PPTT
->>>  int find_acpi_cpu_topology(unsigned int cpu, int level);
->>>  int find_acpi_cpu_topology_package(unsigned int cpu);
->>>  int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
->>> +#else
->>> +static inline int find_acpi_cpu_topology(unsigned int cpu, int level)
->>> +{
->>> +       return -EINVAL;
->>
->> Why -EINVAL?
->>
->
-> I am not sure either. I used to return -ENOTSUPP, but IIRC someone
-> suggested to use it only for syscalls. Also I just based it on other
-> existing functions in acpi.h
->
-> I am open for any alternatives if you think that is better here.
 
-It would be good to make it consistent with the error codes returned
-by the functions when they are present.
 
-Anyway, it's fine by me if that's consistent with the other acpi.h stubs.
+On 05/06/18 17:12, Rafael J. Wysocki wrote:
+> On Tue, Jun 5, 2018 at 5:33 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 05/06/18 16:00, Rafael J. Wysocki wrote:
+>>> On Tue, Jun 5, 2018 at 4:35 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>> Though CONFIG_ACPI_PPTT is selected by platforms and nor user visible,
+>>>> it may be useful to support the build with CONFIG_ACPI_PPTT disabled.
+>>>>
+>>>> This patch adds the missing dummy/boiler plate implementation to fix
+>>>> the build.
+>>>>
+>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>>  include/linux/acpi.h      | 15 +++++++++++++++
+>>>>  include/linux/cacheinfo.h |  2 +-
+>>>>  2 files changed, 16 insertions(+), 1 deletion(-)
+>>>>
+>>>> Hi Rafael,
+>>>>
+>>>> If you are fine with this, can you provide Ack, so that we route this
+>>>> through ARM64 tree where most of the ACPI PPTT support is present.
+>>>>
+>>>> Regards,
+>>>> Sudeep
+>>>>
+>>>> v1->v2:
+>>>>         - removed duplicate definition for acpi_find_last_cache_level
+>>>>
+>>>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>>>> index 8f2cdb0eca71..4b35a66383f9 100644
+>>>> --- a/include/linux/acpi.h
+>>>> +++ b/include/linux/acpi.h
+>>>> @@ -1299,8 +1299,23 @@ static inline int lpit_read_residency_count_address(u64 *address)
+>>>>  }
+>>>>  #endif
+>>>>
+>>>> +#ifdef CONFIG_ACPI_PPTT
+>>>>  int find_acpi_cpu_topology(unsigned int cpu, int level);
+>>>>  int find_acpi_cpu_topology_package(unsigned int cpu);
+>>>>  int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
+>>>> +#else
+>>>> +static inline int find_acpi_cpu_topology(unsigned int cpu, int level)
+>>>> +{
+>>>> +       return -EINVAL;
+>>>
+>>> Why -EINVAL?
+>>>
+>>
+>> I am not sure either. I used to return -ENOTSUPP, but IIRC someone
+>> suggested to use it only for syscalls. Also I just based it on other
+>> existing functions in acpi.h
+>>
+>> I am open for any alternatives if you think that is better here.
+> 
+> It would be good to make it consistent with the error codes returned
+> by the functions when they are present.
+> 
+> Anyway, it's fine by me if that's consistent with the other acpi.h stubs.
+> 
+
+Thanks, indeed I copied it from existing stubs.
+
+Can I take this as official Ack ?
+
+-- 
+Regards,
+Sudeep
