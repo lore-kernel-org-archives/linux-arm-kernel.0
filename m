@@ -1,52 +1,30 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 5 Jun 2018 21:09:09 +0200
-Subject: [PATCH] ARM64: dts: meson-gxl-s905x-p212: Add phy-supply for usb0
-In-Reply-To: <1528188743-12798-1-git-send-email-narmstrong@baylibre.com>
-References: <1528188743-12798-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAFBinCCF7v40PrtL3HVf9X-fEVx7P2uOVePa5wQ_y6s7uLKmnw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 5 Jun 2018 13:41:24 -0600
+Subject: [PATCH v4 1/6] Documentation: DT: Consolidate SP805 binding docs
+In-Reply-To: <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
+References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
+ <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
+Message-ID: <20180605194124.GA26885@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 5, 2018 at 10:52 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> Like LibreTech-CC, the USB0 needs the 5V regulator to be enabled to power the
-> devices on the P212 Reference Design based boards.
->
-> Fixes: b9f07cb4f41f ("ARM64: dts: meson-gxl-s905x-p212: enable the USB controller")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-
-out of curiosity: I guess you tested this using u-boot?
-if anyone else is interested: the only other way to test this is by
-ensuring that the hdmi_5v regulator is turned off by Linux (by
-removing it from the HDMI nodes) and then plugging in a USB device ->
-if it doesn't get VBUS then the hdmi_5v regulator is the cause (and
-needs to be kept/turned on by the USB code, just like Neil's patch
-does)
-
+On Mon, May 28, 2018 at 11:01:32AM -0700, Ray Jui wrote:
+> Consolidate two SP805 binding documents "arm,sp805.txt" and
+> "sp805-wdt.txt" into "arm,sp805.txt" that matches the naming of the
+> desired compatible string to be used
+> 
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-> index 0cfd701..a1b3101 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-> @@ -189,3 +189,10 @@
->  &usb0 {
->         status = "okay";
->  };
-> +
-> +&usb2_phy0 {
-> +       /*
-> +        * HDMI_5V is also used as supply for the USB VBUS.
-> +        */
-> +       phy-supply = <&hdmi_5v>;
-> +};
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+>  .../devicetree/bindings/watchdog/arm,sp805.txt     | 27 ++++++++++++++-----
+>  .../devicetree/bindings/watchdog/sp805-wdt.txt     | 31 ----------------------
+>  2 files changed, 20 insertions(+), 38 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+
+Would be good to get a ACK from FSL/NXP person on this. It looks to me 
+like the driver fetches the wrong clock as it gets the first one and the 
+driver really wants 'wdog_clk'. In any case, their dts files should be 
+updated.
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+Rob
