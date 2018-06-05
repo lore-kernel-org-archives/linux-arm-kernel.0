@@ -1,37 +1,37 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Tue,  5 Jun 2018 12:28:48 +0100
-Subject: [PATCH v4 3/3] ARM: dts: Renesas R9A06G032 SMP enable method
-In-Reply-To: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1528198148-23308-4-git-send-email-michel.pollet@bp.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  5 Jun 2018 13:43:34 +0200
+Subject: [PATCH] irqchip/stm32: fix non-SMP build warning
+Message-ID: <20180605114347.1347128-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a special enable method for the second CA7 of the R9A06G032
-as well as the default value for the "cpu-release-addr" property.
+Without CONFIG_SMP, we get a harmless compile-time warning:
 
-Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+drivers/irqchip/irq-stm32-exti.c:495:12: error: 'stm32_exti_h_set_affinity' defined but not used [-Werror=unused-function]
+
+The #ifdef is inconsistent here, and it's better to use an IS_ENABLED() check
+that lets the compiler silently drop that function.
+
+Fixes: 927abfc4461e ("irqchip/stm32: Add stm32mp1 support with hierarchy domain")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/r9a06g032.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/irqchip/irq-stm32-exti.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-index 40827bb..9d7e74a 100644
---- a/arch/arm/boot/dts/r9a06g032.dtsi
-+++ b/arch/arm/boot/dts/r9a06g032.dtsi
-@@ -1,3 +1,4 @@
-+
- // SPDX-License-Identifier: GPL-2.0
- /*
-  * Base Device Tree Source for the Renesas RZ/N1D (R9A06G032)
-@@ -30,6 +31,8 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <1>;
- 			clocks = <&sysctrl R9A06G032_CLK_A7MP>;
-+			enable-method = "renesas,r9a06g032-smp";
-+			cpu-release-addr = <0x4000c204>;
- 		};
- 	};
+diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+index 5089c1e2838d..3a7e8905a97e 100644
+--- a/drivers/irqchip/irq-stm32-exti.c
++++ b/drivers/irqchip/irq-stm32-exti.c
+@@ -552,9 +552,7 @@ static struct irq_chip stm32_exti_h_chip = {
+ 	.irq_set_type		= stm32_exti_h_set_type,
+ 	.irq_set_wake		= stm32_exti_h_set_wake,
+ 	.flags			= IRQCHIP_MASK_ON_SUSPEND,
+-#ifdef CONFIG_SMP
+-	.irq_set_affinity	= stm32_exti_h_set_affinity,
+-#endif
++	.irq_set_affinity	= IS_ENABLED(CONFIG_SMP) ? stm32_exti_h_set_affinity : NULL,
+ };
  
+ static int stm32_exti_h_domain_alloc(struct irq_domain *dm,
 -- 
-2.7.4
+2.9.0
