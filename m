@@ -1,40 +1,52 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:16:29 -0500
-Subject: [RFC PATCH 8/8] arm64: dts: ti: k3-am6: Add Secure Proxy instance
+Date: Tue, 5 Jun 2018 01:16:22 -0500
+Subject: [RFC PATCH 1/8] mailbox: ti-msgmgr: Get rid of unused structure
+ members
 In-Reply-To: <20180605061629.4759-1-nm@ti.com>
 References: <20180605061629.4759-1-nm@ti.com>
-Message-ID: <20180605061629.4759-9-nm@ti.com>
+Message-ID: <20180605061629.4759-2-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Secure Proxy instances in AM6 family of SoCs.
+Though q_proxies and q_slices do describe the hardware configuration,
+they are not necessary for operation given that the values are
+always default. Hence drop the same.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm64/boot/dts/ti/k3-am6.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/mailbox/ti-msgmgr.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/ti/k3-am6.dtsi b/arch/arm64/boot/dts/ti/k3-am6.dtsi
-index cdfa12173aac..07e9cc05519c 100644
---- a/arch/arm64/boot/dts/ti/k3-am6.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am6.dtsi
-@@ -86,6 +86,17 @@
- 			};
- 		};
- 
-+		secure_proxy: secure_proxy at 32c00000 {
-+			compatible = "ti,am654-secure-proxy";
-+			#mbox-cells = <1>;
-+			reg-names = "target_data", "rt", "scfg";
-+			reg = <0x0 0x32c00000 0x0 0x100000>,
-+			      <0x0 0x32400000 0x0 0x100000>,
-+			      <0x0 0x32800000 0x0 0x100000>;
-+			interrupt-names = "rx_011";
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		wkup_uart0: serial at 42300000 {
- 			compatible = "ti,am654-uart", "ti,omap4-uart", "ns16550a";
- 			reg = <0x0 0x42300000 0x0 0x100>;
+diff --git a/drivers/mailbox/ti-msgmgr.c b/drivers/mailbox/ti-msgmgr.c
+index 78753a87ba4d..7cd5f9c9c97f 100644
+--- a/drivers/mailbox/ti-msgmgr.c
++++ b/drivers/mailbox/ti-msgmgr.c
+@@ -42,8 +42,6 @@ struct ti_msgmgr_valid_queue_desc {
+  * @queue_count:	Number of Queues
+  * @max_message_size:	Message size in bytes
+  * @max_messages:	Number of messages
+- * @q_slices:		Number of queue engines
+- * @q_proxies:		Number of queue proxies per page
+  * @data_first_reg:	First data register for proxy data region
+  * @data_last_reg:	Last data register for proxy data region
+  * @tx_polled:		Do I need to use polled mechanism for tx
+@@ -58,8 +56,6 @@ struct ti_msgmgr_desc {
+ 	u8 queue_count;
+ 	u8 max_message_size;
+ 	u8 max_messages;
+-	u8 q_slices;
+-	u8 q_proxies;
+ 	u8 data_first_reg;
+ 	u8 data_last_reg;
+ 	bool tx_polled;
+@@ -494,8 +490,6 @@ static const struct ti_msgmgr_desc k2g_desc = {
+ 	.queue_count = 64,
+ 	.max_message_size = 64,
+ 	.max_messages = 128,
+-	.q_slices = 1,
+-	.q_proxies = 1,
+ 	.data_first_reg = 16,
+ 	.data_last_reg = 31,
+ 	.tx_polled = false,
 -- 
 2.15.1
