@@ -1,35 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 05 Jun 2018 09:36:26 +0100
-Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F31014@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
- <86d0xhaucm.wl-marc.zyngier@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
- <31bede40-dbc5-0a88-d12c-5fc79ea02391@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69F30297@G01JPEXMBKW03>
- <8898674D84E3B24BA3A2D289B872026A69F31014@G01JPEXMBKW03>
-Message-ID: <86efhlaaut.wl-marc.zyngier@arm.com>
+From: changbin.du@intel.com (changbin.du at intel.com)
+Date: Tue,  5 Jun 2018 16:13:38 +0800
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to disable
+ compiler auto-inline optimizations
+In-Reply-To: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
+References: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
+Message-ID: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Jun 2018 00:58:47 +0100,
-Zhang, Lei wrote:
-> 
-> Hi Marc
-> 
-> Please let me know is there any plan to push your patch to v4.18.
+From: Changbin Du <changbin.du@intel.com>
 
-None at the moment.
+This patch add a new kernel hacking option NO_AUTO_INLINE. Selecting
+this option will prevent the compiler from optimizing the kernel by
+auto-inlining functions not marked with the inline keyword.
 
-We're in the merge window, and no new changes will get queued unless
-they fix a regression. This patch needs thorough review and testing,
-as it changes a fundamental aspect of the driver. Also, it is pretty
-useless on its own, as no bus supported in mainline actually make use
-of the new allocator.
+With this option, only functions explicitly marked with "inline" will
+be inlined. This will allow the function tracer to trace more functions
+because it only traces functions that the compiler has not inlined.
 
-Thanks,
+Signed-off-by: Changbin Du <changbin.du@intel.com>
+Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 
-	M.
+---
+v2: Some grammar updates from Steven.
+---
+ Makefile          |  6 ++++++
+ lib/Kconfig.debug | 17 +++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
+diff --git a/Makefile b/Makefile
+index d0d2652..6720c40 100644
+--- a/Makefile
++++ b/Makefile
+@@ -775,6 +775,12 @@ KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly) \
+ 		   $(call cc-option,-fno-var-tracking)
+ endif
+ 
++ifdef CONFIG_NO_AUTO_INLINE
++KBUILD_CFLAGS   += $(call cc-option, -fno-inline-functions) \
++		   $(call cc-option, -fno-inline-small-functions) \
++		   $(call cc-option, -fno-inline-functions-called-once)
++endif
++
+ ifdef CONFIG_FUNCTION_TRACER
+ ifndef CC_FLAGS_FTRACE
+ CC_FLAGS_FTRACE := -pg
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index c40c7b7..da52243 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -198,6 +198,23 @@ config GDB_SCRIPTS
+ 	  instance. See Documentation/dev-tools/gdb-kernel-debugging.rst
+ 	  for further details.
+ 
++config NO_AUTO_INLINE
++	bool "Disable compiler auto-inline optimizations"
++	help
++	  This will prevent the compiler from optimizing the kernel by
++	  auto-inlining functions not marked with the inline keyword.
++	  With this option, only functions explicitly marked with
++	  "inline" will be inlined. This will allow the function tracer
++	  to trace more functions because it only traces functions that
++	  the compiler has not inlined.
++
++	  Enabling this function can help debugging a kernel if using
++	  the function tracer. But it can also change how the kernel
++	  works, because inlining functions may change the timing,
++	  which could make it difficult while debugging race conditions.
++
++	  If unsure, select N.
++
+ config ENABLE_WARN_DEPRECATED
+ 	bool "Enable __deprecated logic"
+ 	default y
 -- 
-Jazz is not dead, it just smell funny.
+2.7.4
