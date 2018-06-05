@@ -1,150 +1,112 @@
-From: yaojun8558363@gmail.com (Jun Yao)
-Date: Tue,  5 Jun 2018 17:33:50 +0800
-Subject: [PATCH v2 3/3] arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
-In-Reply-To: <20180605093350.24504-1-yaojun8558363@gmail.com>
-References: <20180605093350.24504-1-yaojun8558363@gmail.com>
-Message-ID: <20180605093350.24504-4-yaojun8558363@gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 05 Jun 2018 11:37:33 +0200
+Subject: [reset-control] How to initialize hardware state with the
+ shared reset line?
+In-Reply-To: <CAK7LNAQ56ND=6=7swD3ioKwNsGJCxN1SibkH==n24xPX6SdBBQ@mail.gmail.com>
+References: <CAK7LNATZgJ4MxOFLUCNARWv3Zz=gpL-jGReDnBnArquiaXRWoQ@mail.gmail.com>
+ <CAFBinCADQsXoc6CUKabH6VX3ZBYb5apo-xBbe1w0BiO8wBAsPw@mail.gmail.com>
+ <CAK7LNAR1b_F_eLEWAdQc3L=daGz=ttKq0mQP78BkjzTOssaXvw@mail.gmail.com>
+ <CAFBinCBTTmPqD0UP8zzMBjsjzP9fJx9_pmhGz0_Vy-V+wmhLXQ@mail.gmail.com>
+ <1526997879.3671.27.camel@pengutronix.de>
+ <CAFBinCBAoRebScz+DTSKSgiU5DjeSHS1F3=2vt8KM-yCv+2A8g@mail.gmail.com>
+ <CAK7LNAQ56ND=6=7swD3ioKwNsGJCxN1SibkH==n24xPX6SdBBQ@mail.gmail.com>
+Message-ID: <1528191453.4074.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate swapper_pg_dir and tramp_pg_dir. And their virtual addresses
-do not correlate with kernel's address.
+Hi Masahiro,
 
-Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
----
- arch/arm64/mm/mmu.c | 75 ++++++++++++++++++++++++++++-----------------
- 1 file changed, 47 insertions(+), 28 deletions(-)
+On Wed, 2018-05-30 at 14:57 +0900, Masahiro Yamada wrote:
+> One more thing.
+> 
+> I want to remove reset_control_reset() entirely.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index fcb425b0fcab..3ffcff2d7dcd 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -58,6 +58,9 @@ EXPORT_SYMBOL(kimage_voffset);
- volatile phys_addr_t __section(".mmuoff.data.read")
- __pa_swapper_pg_dir;
- pgd_t *new_swapper_pg_dir = swapper_pg_dir;
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+pgd_t *new_tramp_pg_dir;
-+#endif
- 
- /*
-  * Empty_zero_page is a special page that is used for zero-initialized data
-@@ -81,19 +84,14 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- }
- EXPORT_SYMBOL(phys_mem_access_prot);
- 
--static phys_addr_t __init early_pgtable_alloc(void)
-+static void __init clear_page_phys(phys_addr_t phys)
- {
--	phys_addr_t phys;
--	void *ptr;
--
--	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
--
- 	/*
- 	 * The FIX_{PGD,PUD,PMD} slots may be in active use, but the FIX_PTE
- 	 * slot will be free, so we can (ab)use the FIX_PTE slot to initialise
- 	 * any level of table.
- 	 */
--	ptr = pte_set_fixmap(phys);
-+	void *ptr = pte_set_fixmap(phys);
- 
- 	memset(ptr, 0, PAGE_SIZE);
- 
-@@ -102,6 +100,14 @@ static phys_addr_t __init early_pgtable_alloc(void)
- 	 * table walker
- 	 */
- 	pte_clear_fixmap();
-+}
-+
-+static phys_addr_t __init early_pgtable_alloc(void)
-+{
-+	phys_addr_t phys;
-+
-+	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
-+	clear_page_phys(phys);
- 
- 	return phys;
- }
-@@ -555,6 +561,10 @@ static int __init map_entry_trampoline(void)
- 	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
- 			     prot, pgd_pgtable_alloc, 0);
- 
-+	memcpy(new_tramp_pg_dir, tramp_pg_dir, PGD_SIZE);
-+	memblock_free(__pa_symbol(tramp_pg_dir),
-+		__pa_symbol(swapper_pg_dir) - __pa_symbol(tramp_pg_dir));
-+
- 	/* Map both the text and data into the kernel page table */
- 	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-@@ -632,38 +642,47 @@ static void __init map_kernel(pgd_t *pgdp)
-  */
- void __init paging_init(void)
- {
--	phys_addr_t pgd_phys = early_pgtable_alloc();
--	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
-+	phys_addr_t pgd_phys;
-+	pgd_t *pgdp;
-+	phys_addr_t mem_size;
-+
-+	mem_size = __pa_symbol(swapper_pg_dir) + PAGE_SIZE
-+			- (__pa_symbol(idmap_pg_dir) + IDMAP_DIR_SIZE);
-+
-+	if (mem_size == PAGE_SIZE) {
-+		pgd_phys = early_pgtable_alloc();
-+		__pa_swapper_pg_dir = pgd_phys;
-+	} else {
-+		phys_addr_t p;
-+
-+		pgd_phys = memblock_alloc(mem_size, PAGE_SIZE);
-+
-+		for (p = pgd_phys; p < pgd_phys + mem_size; p += PAGE_SIZE)
-+			clear_page_phys(p);
-+
-+		#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+		new_tramp_pg_dir = __va(pgd_phys);
-+		#endif
-+		__pa_swapper_pg_dir = pgd_phys + mem_size - PAGE_SIZE;
-+	}
- 
--	__pa_swapper_pg_dir = __pa_symbol(swapper_pg_dir);
- 	__flush_dcache_area((void *)&__pa_swapper_pg_dir,
- 			    sizeof(__pa_swapper_pg_dir));
- 
-+	new_swapper_pg_dir = __va(__pa_swapper_pg_dir);
-+
-+	pgdp = pgd_set_fixmap(__pa_swapper_pg_dir);
-+
- 	map_kernel(pgdp);
- 	map_mem(pgdp);
- 
--	/*
--	 * We want to reuse the original swapper_pg_dir so we don't have to
--	 * communicate the new address to non-coherent secondaries in
--	 * secondary_entry, and so cpu_switch_mm can generate the address with
--	 * adrp+add rather than a load from some global variable.
--	 *
--	 * To do this we need to go via a temporary pgd.
--	 */
--	cpu_replace_ttbr1(pgd_phys);
--	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
- 	cpu_replace_ttbr1(__pa_swapper_pg_dir);
-+	init_mm.pgd = new_swapper_pg_dir;
- 
- 	pgd_clear_fixmap();
--	memblock_free(pgd_phys, PAGE_SIZE);
- 
--	/*
--	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
--	 * allocated with it.
--	 */
--	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
--		      __pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir)
--		      - PAGE_SIZE);
-+	memblock_free(__pa_symbol(swapper_pg_dir),
-+		__pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir));
- }
- 
- /*
--- 
-2.17.0
+reset_control_reset is for those cases where "the reset controller
+knows" how to reset us. There are hardware reset controllers that can
+control a bunch of actual reset signals in the right order and with the
+right timings necessary for the connected IP cores?by triggering a
+single bit.
+In that case it wouldn't make much sense to do assert / delay / deassert
+in the driver, as the information about the delay is contained in the
+reset controller hardware.
+
+> [1] Some reset consumers (e.g. drivers/ata/sata_gemini.c)
+>     use reset_control_reset() to reset the HW.
+> 
+> [2] Some reset consumers (e.g. drivers/input/keyboard/tegra-kbc.c)
+>     use the combination of reset_control_assert() and reset_control_deassert()
+>     to reset the HW.
+> 
+> [1] is the only way if the reset controller only supports the pulse reset.
+> 
+> [2] is the only way if the reset controller only supports the level reset.
+> 
+> So, this is another strangeness because
+> the implementation of reset controller
+> affects reset consumers.
+> 
+> We do not need [1].
+> 
+> [2] is more flexible than [1] because hardware usually specifies
+> how long the reset line should be kept asserted.
+
+This is not always the case.
+
+> For all reset consumers,
+> replace
+>   reset_control_reset();
+> with
+>   reset_control_assert();
+>   reset_control_deassert();
+
+To be honest, it doesn't make sense to me. If the intention in the
+driver is just to reset our internal state,?and we have a system reset
+controller that can reset us by writing a single bit, I'd prefer to call
+a reset function over two assert/deassert functions, one of which ends
+up doing nothing.
+
+How about moving in the other direction, and allowing to replace
+
+	reset_control_assert(rstc);
+	udelay(delay);
+	reset_control_deassert(rstc);
+
+and variants with calls like
+
+	reset_control_reset_udelay(rstc, delay);
+
+? If the reset controller knows better, or can't change the delay in
+hardware, it may ignore the delay parameter.
+
+> and deprecate reset_control_reset().
+>
+> I think this is the right thing to do.
+
+I don't think this helps the API, as with that change we have to remove
+a guarantee it currently makes: This either only works for shared resets
+or we have to accept that reset_control_assert for exclusive resets does
+not guarantee to return with the reset line asserted anymore.
+Also, for drivers that do deassert in probe and assert in remove, we
+would have to issue the reset in deassert and let assert be the no-op,
+instead of the other way around.
+
+> The reset controller side should be implemented like this:
+> 
+> If your reset controller only supports the pulse reset,
+>    .deassert hook should be no-op.
+>    .assert hook should pulse the reset
+> 
+> Then .reset hook should be removed.
+
+There is hardware where assert, deassert, and reset are three different
+operations. See for example the tegra/reset-bpmp.c driver. Both assert /
+deassert and module reset messages are part of the firmware ABI.
+
+> Or, we can keep the reset drivers as they are.
+> drivers/reset/core.c can take care of the proper fallback logic.
+
+I prefer to keep assert, deassert and reset separate for those cases
+where the hardware actually supports both variants.
+
+regards
+Philipp
