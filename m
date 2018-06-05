@@ -1,49 +1,99 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:01:22 -0500
-Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
- controller
+Date: Tue, 5 Jun 2018 01:01:20 -0500
+Subject: [RFC PATCH 1/6] Documentation: arm: ti: Add bindings for AM654 SoC
 In-Reply-To: <20180605060125.9518-1-nm@ti.com>
 References: <20180605060125.9518-1-nm@ti.com>
-Message-ID: <20180605060125.9518-4-nm@ti.com>
+Message-ID: <20180605060125.9518-2-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM654 uses a UART controller that is compatible (partially) with
-existing 8250 UART, however, has a few differences with respect to DMA
-support and control paths. Introduce a base definition that allows us
-to build up the differences in follow on patches.
+The AM654 SoC is a lead device of the K3 Multicore SoC architecture
+platform, targeted for broad market and industrial control with aim to
+meet the complex processing needs of modern embedded products.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Vignesh R <vigneshr@ti.com>
+Some highlights of this SoC are:
+* Quad ARMv8 A53 cores split over two clusters
+* GICv3 compliant GIC500
+* Configurable L3 Cache and IO-coherent architecture
+* Dual lock-step capable R5F uC for safety-critical applications
+* High data throughput capable distributed DMA architecture under NAVSS
+* Three Gigabit Industrial Communication Subsystems (ICSSG), each with dual
+  PRUs and dual RTUs
+* Hardware accelerator block containing AES/DES/SHA/MD5 called SA2UL
+* Centralized System Controller for Security, Power, and Resource
+  management.
+* Dual ADCSS, eQEP/eCAP, eHRPWM, dual CAN-FD
+* Flash subystem with OSPI and Hyperbus interfaces
+* Multimedia capability with CAL, DSS7-UL, SGX544, McASP
+* Peripheral connectivity including USB3, PCIE, MMC/SD, GPMC, I2C, SPI,
+  GPIO
+
+See AM65x Technical Reference Manual (SPRUID7, April 2018)
+for further details: http://www.ti.com/lit/pdf/spruid7
+
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
- drivers/tty/serial/8250/8250_omap.c                      | 1 +
- 2 files changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/ti/k3.txt | 33 +++++++++++++++++++++++++
+ MAINTAINERS                                     |  7 ++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
 
-diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
-index 4b0f05adb228..c35d5ece1156 100644
---- a/Documentation/devicetree/bindings/serial/omap_serial.txt
-+++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
-@@ -1,6 +1,7 @@
- OMAP UART controller
+diff --git a/Documentation/devicetree/bindings/arm/ti/k3.txt b/Documentation/devicetree/bindings/arm/ti/k3.txt
+new file mode 100644
+index 000000000000..cbabb1b89f6f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/ti/k3.txt
+@@ -0,0 +1,33 @@
++Texas Instruments K3 Multicore SoC architecture device tree bindings
++--------------------------------------------------------------------
++
++Boards based on K3 Multicore SoC architecture shall have the following property:
++- compatible: Every hardware block introduced in K3 Multicore SoC
++  architecture shall be of the form:
++  "ti,XXX-YYY", where:
++     'XXX' represents the specific SoC part for which the support is added.
++     'YYY' represents the corresponding peripheral in SoC being supported.
++
++  NOTE: Generic devices such as GIC or legacy devices shall use the specified
++  compatible for those devices.
++
++  Example:
++    compatible = "ti,am654-i2c";
++
++SoCs
++-------------------------------------------
++
++Each device tree root node must specify which exact SoC in K3 Multicore SoC
++architecture it uses, using one of the following compatible values:
++
++- AM654
++  compatible = "ti,am654";
++
++Boards
++-------------------------------------------
++
++In addition, each device tree root node must specify which one or more
++of the following board-specific compatible values:
++
++- AM654 EVM
++  compatible = "ti,am654-evm", "ti,am654";
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f39a8de1bbd7..cfb35b252ac7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2086,6 +2086,13 @@ L:	linux-kernel at vger.kernel.org
+ S:	Maintained
+ F:	drivers/memory/*emif*
  
- Required properties:
-+- compatible : should be "ti,am654-uart" for AM654 controllers
- - compatible : should be "ti,omap2-uart" for OMAP2 controllers
- - compatible : should be "ti,omap3-uart" for OMAP3 controllers
- - compatible : should be "ti,omap4-uart" for OMAP4 controllers
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index 1b337fee07ed..a019286f8bb6 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -1115,6 +1115,7 @@ static const u8 am3352_habit = OMAP_DMA_TX_KICK | UART_ERRATA_CLOCK_DISABLE;
- static const u8 dra742_habit = UART_ERRATA_CLOCK_DISABLE;
- 
- static const struct of_device_id omap8250_dt_ids[] = {
-+	{ .compatible = "ti,am654-uart" },
- 	{ .compatible = "ti,omap2-uart" },
- 	{ .compatible = "ti,omap3-uart" },
- 	{ .compatible = "ti,omap4-uart", .data = &omap4_habit, },
++ARM/TEXAS INSTRUMENTS K3 ARCHITECTURE
++M:	Tero Kristo <t-kristo@ti.com>
++M:	Nishanth Menon <nm@ti.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Supported
++F:	Documentation/devicetree/bindings/arm/ti/k3.txt
++
+ ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
+ M:	Santosh Shilimkar <ssantosh@kernel.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 2.15.1
