@@ -1,37 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 5 Jun 2018 08:49:44 +0200
-Subject: [PATCH] arm: cntvoff: Add a function definition when !SMP
-In-Reply-To: <20180604162603.j3rtfbg3hqhast6p@flea>
-References: <20180528084016.9271-1-maxime.ripard@bootlin.com>
- <20180604162603.j3rtfbg3hqhast6p@flea>
-Message-ID: <20180605064944.524bblnhhkwhr34i@verge.net.au>
+From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
+Date: Tue, 5 Jun 2018 09:07:00 +0200
+Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
+In-Reply-To: <20180523042953.kcp2h5xtwjrjponn@vireshk-i7>
+References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
+ <20180523042953.kcp2h5xtwjrjponn@vireshk-i7>
+Message-ID: <717f24e1-3846-7685-b440-0754da883c2a@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 06:26:03PM +0200, Maxime Ripard wrote:
-> On Mon, May 28, 2018 at 10:40:16AM +0200, Maxime Ripard wrote:
-> > The secure_cntvoff_init function is only compiled if CONFIG_SMP is set to
-> > true. However, that will lead to linking errors if one uses this function
-> > without an ifdef CONFIG_SMP guard, which isn't ideal.
-> > 
-> > Provide a dumb implementation when CONFIG_SMP is false so that we don't end
-> > up with a compilation error on our hands.
+On 05/23/2018 06:29 AM, Viresh Kumar wrote:
+> On 22-05-18, 08:28, S?bastien Szymanski wrote:
+>> Check the max speed supported from the fuses for i.MX6ULL and update the
+>> operating points table accordingly.
+>>
+>> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+>> ---
+>>
+>> Changes for v3:
+>>  - none
+> 
+> @Sascha and Shawn: Can you guys please Ack this series if there is
+> nothing wrong with it ?
+> 
 
-What are the errors that this patch fixes?
+ping...
 
-> > 
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Cc: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > Cc: Simon Horman <horms@verge.net.au>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Fixes: cad160ed0a94 ("ARM: shmobile: Convert file to use cntvoff")
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> 
-> Ping?
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+-- 
+S?bastien Szymanski
+Software engineer, Armadeus Systems
+Tel: +33 (0)9 72 29 41 44
+Fax: +33 (0)9 72 28 79 26
