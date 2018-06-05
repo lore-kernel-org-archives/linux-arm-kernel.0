@@ -1,42 +1,62 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:26:37 -0500
-Subject: [RFC PATCH 0/3] firmware: Add K3 Support for TISCI driver
-Message-ID: <20180605062640.3356-1-nm@ti.com>
+Date: Tue, 5 Jun 2018 01:26:40 -0500
+Subject: [RFC PATCH 3/3] arm64: dts: ti: k3-am6: Add Device Management
+ Security Controller support
+In-Reply-To: <20180605062640.3356-1-nm@ti.com>
+References: <20180605062640.3356-1-nm@ti.com>
+Message-ID: <20180605062640.3356-4-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add TISCI compatible System controller for AM6 SoCs.
 
-The following series enables TI System Control Interface(TISCI) support for
-the newest addition in TI's SoC portfolio - AM654 SoC.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm64/boot/dts/ti/k3-am6.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-The series is an RFC based off next-20180604 and will post formally once
-v4.18-rc1 is available.
-
-The series (part 4 of 4) is available here:
-https://github.com/nmenon/linux-2.6-playground/commits/upstream/next-20180604/k3-4-am6-tisci
-
-Full Boot log is available here: https://pastebin.ubuntu.com/p/vWCzMKtBCW/
-
-The Linux development follows closely the 66AK2G SoC model in aarch64 with a
-few additions to handle the flexibility of firmware.
-
-The architecture and dts support depends on part 1 of the series:
-https://marc.info/?l=linux-arm-kernel&m=152817866312732&w=2
-
-See AM65x Technical Reference Manual (SPRUID7, April 2018)
-for further details: http://www.ti.com/lit/pdf/spruid7
-
-Nishanth Menon (3):
-  Documentation: dt: keystone: ti-sci: Add optional host-id parameter
-  firmware: ti_sci: Provide host-id as an optional dt parameter
-  arm64: dts: ti: k3-am6: Add Device Management Security Controller
-    support
-
- .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 +++
- arch/arm64/boot/dts/ti/k3-am6.dtsi                 | 32 ++++++++++++++++++++++
- drivers/firmware/ti_sci.c                          | 24 +++++++++++++---
- 3 files changed, 56 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/ti/k3-am6.dtsi b/arch/arm64/boot/dts/ti/k3-am6.dtsi
+index 07e9cc05519c..898422e24b27 100644
+--- a/arch/arm64/boot/dts/ti/k3-am6.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am6.dtsi
+@@ -97,6 +97,38 @@
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		dmsc: dmsc {
++			compatible = "ti,k2g-sci";
++			ti,host-id = <12>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++			/*
++			 * In case of rare platforms that does not use am6 as
++			 * system master, use /delete-property/
++			 */
++			ti,system-reboot-controller;
++			mbox-names = "rx", "tx";
++
++			mboxes= <&secure_proxy 11>,
++				<&secure_proxy 13>;
++
++			k3_pds: power-controller {
++				compatible = "ti,sci-pm-domain";
++				#power-domain-cells = <1>;
++			};
++
++			k3_clks: clocks {
++				compatible = "ti,k2g-sci-clk";
++				#clock-cells = <2>;
++			};
++
++			k3_reset: reset-controller {
++				compatible = "ti,sci-reset";
++				#reset-cells = <2>;
++			};
++		};
++
+ 		wkup_uart0: serial at 42300000 {
+ 			compatible = "ti,am654-uart", "ti,omap4-uart", "ns16550a";
+ 			reg = <0x0 0x42300000 0x0 0x100>;
 -- 
 2.15.1
