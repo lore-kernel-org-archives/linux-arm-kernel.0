@@ -1,42 +1,72 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 5 Jun 2018 10:06:37 -0600
-Subject: [PATCH] coresight: include vmalloc.h for vmap/vunmap
-In-Reply-To: <20180605114856.1558554-1-arnd@arndb.de>
-References: <20180605114856.1558554-1-arnd@arndb.de>
-Message-ID: <CANLsYkzoJ5bvsYB8PzLouWoaVPzOkVcY17vVX5dFu6vO+F5zCA@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 5 Jun 2018 18:12:30 +0200
+Subject: [PATCH v2 2/3] ACPI / PPTT: fix build when CONFIG_ACPI_PPTT is
+ not enabled
+In-Reply-To: <83b1b038-c4c1-0199-2cb0-fb5343f0e3f5@arm.com>
+References: <1528209304-3280-1-git-send-email-sudeep.holla@arm.com>
+ <1528209304-3280-2-git-send-email-sudeep.holla@arm.com>
+ <CAJZ5v0gqQNHCuaeduQ8oQtGNUQcZxK171nDfyMNi1VVfnVsMqQ@mail.gmail.com>
+ <83b1b038-c4c1-0199-2cb0-fb5343f0e3f5@arm.com>
+Message-ID: <CAJZ5v0hrJs1Oo-uA560qisZ4no4mbgbH+2fza+5B0ErGGYPTHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2018 at 05:48, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly introduced code fails to build in some configurations
-> unless we include the right headers:
+On Tue, Jun 5, 2018 at 5:33 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
-> drivers/hwtracing/coresight/coresight-tmc-etr.c: In function 'tmc_free_table_pages':
-> drivers/hwtracing/coresight/coresight-tmc-etr.c:206:3: error: implicit declaration of function 'vunmap'; did you mean 'iounmap'? [-Werror=implicit-function-declaration]
 >
-> Fixes: 79613ae8715a ("coresight: Add generic TMC sg table framework")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 1 +
->  1 file changed, 1 insertion(+)
+> On 05/06/18 16:00, Rafael J. Wysocki wrote:
+>> On Tue, Jun 5, 2018 at 4:35 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> Though CONFIG_ACPI_PPTT is selected by platforms and nor user visible,
+>>> it may be useful to support the build with CONFIG_ACPI_PPTT disabled.
+>>>
+>>> This patch adds the missing dummy/boiler plate implementation to fix
+>>> the build.
+>>>
+>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> ---
+>>>  include/linux/acpi.h      | 15 +++++++++++++++
+>>>  include/linux/cacheinfo.h |  2 +-
+>>>  2 files changed, 16 insertions(+), 1 deletion(-)
+>>>
+>>> Hi Rafael,
+>>>
+>>> If you are fine with this, can you provide Ack, so that we route this
+>>> through ARM64 tree where most of the ACPI PPTT support is present.
+>>>
+>>> Regards,
+>>> Sudeep
+>>>
+>>> v1->v2:
+>>>         - removed duplicate definition for acpi_find_last_cache_level
+>>>
+>>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>>> index 8f2cdb0eca71..4b35a66383f9 100644
+>>> --- a/include/linux/acpi.h
+>>> +++ b/include/linux/acpi.h
+>>> @@ -1299,8 +1299,23 @@ static inline int lpit_read_residency_count_address(u64 *address)
+>>>  }
+>>>  #endif
+>>>
+>>> +#ifdef CONFIG_ACPI_PPTT
+>>>  int find_acpi_cpu_topology(unsigned int cpu, int level);
+>>>  int find_acpi_cpu_topology_package(unsigned int cpu);
+>>>  int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
+>>> +#else
+>>> +static inline int find_acpi_cpu_topology(unsigned int cpu, int level)
+>>> +{
+>>> +       return -EINVAL;
+>>
+>> Why -EINVAL?
+>>
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 6164eed0b5fe..3556d9a849e9 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -8,6 +8,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/iommu.h>
->  #include <linux/slab.h>
-> +#include <linux/vmalloc.h>
->  #include "coresight-priv.h"
->  #include "coresight-tmc.h"
+> I am not sure either. I used to return -ENOTSUPP, but IIRC someone
+> suggested to use it only for syscalls. Also I just based it on other
+> existing functions in acpi.h
 >
+> I am open for any alternatives if you think that is better here.
 
-Thank you for that - I have picked it up for 4.18-rc1.
+It would be good to make it consistent with the error codes returned
+by the functions when they are present.
 
-Mathieu
-
-> --
-> 2.9.0
->
+Anyway, it's fine by me if that's consistent with the other acpi.h stubs.
