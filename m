@@ -1,193 +1,177 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  5 Jun 2018 22:43:13 +0100
-Subject: [PATCH 02/20] coresight: of: Fix refcounting for graph nodes
-In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1528235011-30691-3-git-send-email-suzuki.poulose@arm.com>
+Date: Tue,  5 Jun 2018 22:43:11 +0100
+Subject: [PATCH 00/20] coresight: Update device tree bindings
+Message-ID: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coresight driver doesn't drop the references on the
-remote endpoint/port nodes. Add the missing of_node_put()
-calls. To make it easier to handle different corner cases
-cleanly, move the parsing of an endpoint to separate
-function.
+Coresight uses DT graph bindings to describe the connections of the
+components. However we have some undocumented usage of the bindings
+to describe some of the properties of the connections.
 
-Reported-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/of_coresight.c | 139 +++++++++++++++++------------
- 1 file changed, 84 insertions(+), 55 deletions(-)
+The coresight driver needs to know the hardware ports invovled
+in the connection and the direction of data flow to effectively
+manage the trace sessions. So far we have relied on the "port"
+address (as described by the generic graph bindings) to represent
+the hardware port of the component for a connection.
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index a33a92e..8a23c63 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -111,17 +111,80 @@ int of_coresight_get_cpu(const struct device_node *node)
- }
- EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
- 
-+/*
-+ * of_coresight_parse_endpoint : Parse the given output endpoint @ep
-+ * and fill the connection information in @pdata[*@i].
-+ *
-+ * Parses the local port, remote device name and the remote port. Also
-+ * updates *@i to point to the next index, when an entry is added.
-+ *
-+ * Returns :
-+ *	 0	- If the parsing completed without any fatal errors.
-+ *	-Errno	- Fatal error, abort the scanning.
-+ */
-+static int of_coresight_parse_endpoint(struct device_node *ep,
-+				       struct coresight_platform_data *pdata,
-+				       int *i)
-+{
-+	int ret = 0;
-+	struct of_endpoint endpoint, rendpoint;
-+	struct device_node *rparent = NULL;
-+	struct device_node *rport = NULL;
-+	struct device *rdev = NULL;
-+
-+	do {
-+		/*
-+		 * No need to deal with input ports, processing for as
-+		 * processing for output ports will deal with them.
-+		 */
-+		if (of_find_property(ep, "slave-mode", NULL))
-+			break;
-+
-+		/* Parse the local port details */
-+		if (of_graph_parse_endpoint(ep, &endpoint))
-+			break;
-+		/*
-+		 * Get a handle on the remote port and parent
-+		 * attached to it.
-+		 */
-+		rparent = of_graph_get_remote_port_parent(ep);
-+		if (!rparent)
-+			break;
-+		rport = of_graph_get_remote_port(ep);
-+		if (!rport)
-+			break;
-+		if (of_graph_parse_endpoint(rport, &rendpoint))
-+			break;
-+
-+		/* If the remote device is not available, defer probing */
-+		rdev = of_coresight_get_endpoint_device(rparent);
-+		if (!rdev) {
-+			ret = -EPROBE_DEFER;
-+			break;
-+		}
-+
-+		pdata->outports[*i] = endpoint.port;
-+		pdata->child_names[*i] = dev_name(rdev);
-+		pdata->child_ports[*i] = rendpoint.id;
-+		/* Move the index */
-+		(*i)++;
-+	} while (0);
-+
-+	if (rparent)
-+		of_node_put(rparent);
-+	if (rport)
-+		of_node_put(rport);
-+
-+	return ret;
-+}
-+
- struct coresight_platform_data *
- of_get_coresight_platform_data(struct device *dev,
- 			       const struct device_node *node)
- {
- 	int i = 0, ret = 0;
- 	struct coresight_platform_data *pdata;
--	struct of_endpoint endpoint, rendpoint;
--	struct device *rdev;
- 	struct device_node *ep = NULL;
--	struct device_node *rparent = NULL;
--	struct device_node *rport = NULL;
- 
- 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata)
-@@ -129,63 +192,29 @@ of_get_coresight_platform_data(struct device *dev,
- 
- 	/* Use device name as sysfs handle */
- 	pdata->name = dev_name(dev);
-+	pdata->cpu = of_coresight_get_cpu(node);
- 
- 	/* Get the number of input and output port for this component */
- 	of_coresight_get_ports(node, &pdata->nr_inport, &pdata->nr_outport);
- 
--	if (pdata->nr_outport) {
--		ret = of_coresight_alloc_memory(dev, pdata);
-+	/* If there are not output connections, we are done */
-+	if (!pdata->nr_outport)
-+		return pdata;
-+
-+	ret = of_coresight_alloc_memory(dev, pdata);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	/* Iterate through each port to discover topology */
-+	do {
-+		/* Get a handle on a port */
-+		ep = of_graph_get_next_endpoint(node, ep);
-+		if (!ep)
-+			break;
-+		ret = of_coresight_parse_endpoint(ep, pdata, &i);
- 		if (ret)
- 			return ERR_PTR(ret);
--
--		/* Iterate through each port to discover topology */
--		do {
--			/* Get a handle on a port */
--			ep = of_graph_get_next_endpoint(node, ep);
--			if (!ep)
--				break;
--
--			/*
--			 * No need to deal with input ports, processing for as
--			 * processing for output ports will deal with them.
--			 */
--			if (of_find_property(ep, "slave-mode", NULL))
--				continue;
--
--			/* Get a handle on the local endpoint */
--			ret = of_graph_parse_endpoint(ep, &endpoint);
--
--			if (ret)
--				continue;
--
--			/* The local out port number */
--			pdata->outports[i] = endpoint.port;
--
--			/*
--			 * Get a handle on the remote port and parent
--			 * attached to it.
--			 */
--			rparent = of_graph_get_remote_port_parent(ep);
--			rport = of_graph_get_remote_port(ep);
--
--			if (!rparent || !rport)
--				continue;
--
--			if (of_graph_parse_endpoint(rport, &rendpoint))
--				continue;
--
--			rdev = of_coresight_get_endpoint_device(rparent);
--			if (!rdev)
--				return ERR_PTR(-EPROBE_DEFER);
--
--			pdata->child_names[i] = dev_name(rdev);
--			pdata->child_ports[i] = rendpoint.id;
--
--			i++;
--		} while (ep);
--	}
--
--	pdata->cpu = of_coresight_get_cpu(node);
-+	} while (ep);
- 
- 	return pdata;
- }
+The hardware uses separate numbering scheme for input and output
+ports, which implies, we could have two different (input and output)
+ports with the same port number. This could create problems in the
+graph bindings where the label of the port wouldn't match the address.
+
+e.g, with the existing bindings we get :
+
+	port at 0{				// Output port 0
+		reg = <0>;
+		...
+	};
+
+	port at 1{
+		reg = <0>;		// Input port 0
+		endpoint {
+			slave-mode;
+			...
+		};
+	};
+
+With the new enforcement in the DT rules, mismatches in label and address
+are not allowed (as see in the case for port at 1). So, we need a new mechanism
+to describe the hardware port number reliably.
+
+Also, we relied on an undocumented "slave-mode" property (see the above
+example) to indicate if the port is an input port. Let us formalise and
+switch to a new property to describe the direction of data flow.
+
+There were three options considered for the hardware port number scheme:
+
+ 1) Use natural ordering in the DT to infer the hardware port number.
+  i.e, Mandate that the all ports are listed in the DT and in the ascending
+  order for each class (input and output respectively).
+   Pros :
+      - We don't need new properties and if the existing DTS list them in
+        order (which most of them do), they work out of the box.
+   Cons :
+      - We must list all the ports even if the system cannot/shouldn't use
+        it.
+      - It is prone to human errors (if the order is not kept).
+
+ 2) Use an explicit property to list both the direction and the hw port
+    number and direction. Define "coresight,hwid" as 2 member array of u32,
+    where the members are port number and the direction respectively.
+	e.g
+
+	port at 0{
+		reg = <0>;
+		endpoint {
+			coresight,hwid = <0 1>;	// Port # 0, Output
+		}
+	};
+
+	port at 1{
+		reg = <1>;
+		endpoint {
+			coresight,hwid = <0 0>;	// Port # 0, Input
+		};
+	};
+
+	Pros:
+	  - The bindings are formal but not so reader friendly and could potentially
+	    lead to human errors.
+	Cons:
+	  - Backward compatiblity is lost.
+ 3) Use explicit properties (implemented in the series) for the hardware
+    port id and direction. We define a new property "coresight,hwid" for
+    each endpoint in coresight devices to specify the hardware port number
+    explicitly. Also use a separate property "direction" to specify the
+    direction of the data flow.
+
+	e.g,
+
+	port at 0{
+		reg = <0>;
+		endpoint {
+			direction = <1>;	// Output
+			coresight,hwid = <0>;	// Port # 0
+		}
+	};
+
+	port at 1{
+		reg = <1>;
+		endpoint {
+			direction = <0>;	// Input
+			coresight,hwid = <0>;	// Port # 0
+		};
+	};
+
+    Pros:
+       - The bindings are formal and reader friendly, and less prone to errors.
+    Cons:
+       - Backward compatibility is lost.
+
+
+This series implements Option (3) listed above and falls back to the old
+bindings if the new bindings are not available. This allows the systems
+with old bindings work with the new driver. The driver now issues a warning
+(once) when it encounters the old bindings.
+
+It also cleans up the platform parsing code to reduce the memory usage by
+reusing the platform description.
+
+I am not sure what is the best route to push these DTS changes. Thoughts ?
+
+Changes since RFC [0] :
+ - Fixed style issues
+ - Fix an existing memory leak coresight_register (Found in code update)
+ - Fix missing of_node_put() in the existing driver (Reported-by Mathieu)
+ - Update the existing dts in kernel tree.
+ - Rename new helper functions for consistency
+
+
+Suzuki K Poulose (20):
+  coresight: Fix memory leak in coresight_register
+  coresight: of: Fix refcounting for graph nodes
+  coresight: Fix remote endpoint parsing
+  coresight: Cleanup platform description data
+  coresight: platform: Cleanup coresight connection handling
+  coresight: Handle errors in finding input/output ports
+  coresight: dts: Document usage of graph bindings
+  coresight: dts: Cleanup device tree graph bindings
+  coresight: dts: Define new bindings for direction of data flow
+  dts: juno: Update coresight bindings for hw port
+  dts: hisilicon: Update coresight bindings for hw ports
+  dts: spreadtrum: Update coresight bindings for hw ports
+  dts: qcom: Update coresight bindings for hw ports
+  dts: arm: hisilicon: Update coresight bindings for hardware port
+  dts: arm: imx7{d,s}: Update coresight binding for hardware ports
+  dts: arm: omap: Update coresight bindings for hardware ports
+  dts: arm: qcom: Update coresight bindings for hardware ports
+  dts: sama5d2: Update coresight bindings for hardware ports
+  dts: ste-dbx5x0: Update coresight bindings for hardware port
+  dts: tc2: Update coresight bindings for hardware ports
+
+ .../devicetree/bindings/arm/coresight.txt          |  76 +++++--
+ arch/arm/boot/dts/hip04.dtsi                       | 195 +++++++++++++-----
+ arch/arm/boot/dts/imx7d.dtsi                       |   5 +-
+ arch/arm/boot/dts/imx7s.dtsi                       |  41 ++--
+ arch/arm/boot/dts/omap3-beagle-xm.dts              |   5 +-
+ arch/arm/boot/dts/omap3-beagle.dts                 |   5 +-
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |  37 +++-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  60 ++++--
+ arch/arm/boot/dts/sama5d2.dtsi                     |   5 +-
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                  |  31 ++-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  48 +++--
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  82 +++++---
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi          |  26 ++-
+ arch/arm64/boot/dts/arm/juno.dts                   |   5 +-
+ .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi |  89 ++++++---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  55 ++++--
+ arch/arm64/boot/dts/sprd/sc9836.dtsi               |  40 ++--
+ arch/arm64/boot/dts/sprd/sc9860.dtsi               | 101 +++++++---
+ drivers/hwtracing/coresight/coresight.c            |  30 +--
+ drivers/hwtracing/coresight/of_coresight.c         | 219 +++++++++++++--------
+ include/linux/coresight.h                          |  11 +-
+ 21 files changed, 818 insertions(+), 348 deletions(-)
+
 -- 
 2.7.4
