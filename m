@@ -1,52 +1,42 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:26:38 -0500
-Subject: [RFC PATCH 1/3] Documentation: dt: keystone: ti-sci: Add optional
- host-id parameter
-In-Reply-To: <20180605062640.3356-1-nm@ti.com>
-References: <20180605062640.3356-1-nm@ti.com>
-Message-ID: <20180605062640.3356-2-nm@ti.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 5 Jun 2018 09:11:39 +0200
+Subject: [PATCH V2 2/2] arm: dts: sunxi: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <a313ec0be4104494de319e8318e05614fb97b2fd.1528173943.git.viresh.kumar@linaro.org>
+References: <20180601151701.sshwfdbflic6mybv@flea>
+ <d894f425b7c32bce4dc4a982db8f4dface2db31d.1528173943.git.viresh.kumar@linaro.org>
+ <a313ec0be4104494de319e8318e05614fb97b2fd.1528173943.git.viresh.kumar@linaro.org>
+Message-ID: <20180605071139.osu2pgpg3ychdxln@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instrument's System Control Interface (TISCI) permits the
-ability for Operating Systems to running in virtual machines to be
-able to independently communicate with the firmware without the need
-going through an hypervisor.
+On Tue, Jun 05, 2018 at 10:17:49AM +0530, Viresh Kumar wrote:
+> The cooling device properties, like "#cooling-cells" and
+> "dynamic-power-coefficient", should either be present for all the CPUs
+> of a cluster or none. If these are present only for a subset of CPUs of
+> a cluster then things will start falling apart as soon as the CPUs are
+> brought online in a different order. For example, this will happen
+> because the operating system looks for such properties in the CPU node
+> it is trying to bring up, so that it can register a cooling device.
+> 
+> Add such missing properties.
+> 
+> Fix other missing properties (clocks, OPP, clock latency) as well to
+> make it all work.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The "host-id" in effect is the hardware representation of the
-host (example: VMs locked to a core) as identified to the System
-Controller.
+Applied both, thanks!
+Maxime
 
-This is introduced as an optional parameter to maintain consistency
-with legacy device tree blobs.
-
-We call this with a vendor prefix to prevent any possible confusion
-with SCSI ID (m68k) kernel option.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- Documentation/devicetree/bindings/arm/keystone/ti,sci.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-index 31f5f9a104cc..b56a02c10ae6 100644
---- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-@@ -45,11 +45,15 @@ Optional Properties:
- 	debug_messages - Map the Debug message region
- - reg:  register space corresponding to the debug_messages
- - ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
-+- ti,host-id: Integer value corresponding to the host ID assigned by Firmware
-+	for identification of host processing entities such as virtual
-+	machines
- 
- Example (K2G):
- -------------
- 	pmmc: pmmc {
- 		compatible = "ti,k2g-sci";
-+		ti,host-id = <2>;
- 		mbox-names = "rx", "tx";
- 		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
- 			<&msgmgr &msgmgr_proxy_pmmc_tx>;
 -- 
-2.15.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/15dccabc/attachment.sig>
