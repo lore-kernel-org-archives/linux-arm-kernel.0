@@ -1,32 +1,56 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Tue, 5 Jun 2018 09:07:00 +0200
-Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
-In-Reply-To: <20180523042953.kcp2h5xtwjrjponn@vireshk-i7>
-References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
- <20180523042953.kcp2h5xtwjrjponn@vireshk-i7>
-Message-ID: <717f24e1-3846-7685-b440-0754da883c2a@armadeus.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 5 Jun 2018 14:56:34 +0800
+Subject: [PATCH] ARM64: dts: meson-axg: fix register ranges for SD/eMMC
+In-Reply-To: <20180604222706.36167-1-khilman@baylibre.com>
+References: <20180604222706.36167-1-khilman@baylibre.com>
+Message-ID: <8b1a25e1-2447-40b7-1394-d10ff200a4ec@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2018 06:29 AM, Viresh Kumar wrote:
-> On 22-05-18, 08:28, S?bastien Szymanski wrote:
->> Check the max speed supported from the fuses for i.MX6ULL and update the
->> operating points table accordingly.
->>
->> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
->> ---
->>
->> Changes for v3:
->>  - none
+Hi Kevin
+
+On 06/05/18 06:27, Kevin Hilman wrote:
+> Based on updated information from Amlogic, correct the register
+> range for the SD/eMMC blocks to the right size.
 > 
-> @Sascha and Shawn: Can you guys please Ack this series if there is
-> nothing wrong with it ?
+> Reported-by: Yixun Lan <yixun.lan@amlogic.com>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+> Yixun, please test and confirm this still works on AXG boards.
+> 
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index fee87737a201..67d7115e4eff 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -132,7 +132,7 @@
+>  
+>  			sd_emmc_b: sd at 5000 {
+>  				compatible = "amlogic,meson-axg-mmc";
+> -				reg = <0x0 0x5000 0x0 0x2000>;
+> +				reg = <0x0 0x5000 0x0 0x800>;
+>  				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
+>  				status = "disabled";
+>  				clocks = <&clkc CLKID_SD_EMMC_B>,
+> @@ -144,7 +144,7 @@
+>  
+>  			sd_emmc_c: mmc at 7000 {
+>  				compatible = "amlogic,meson-axg-mmc";
+> -				reg = <0x0 0x7000 0x0 0x2000>;
+> +				reg = <0x0 0x7000 0x0 0x800>;
+>  				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
+>  				status = "disabled";
+>  				clocks = <&clkc CLKID_SD_EMMC_C>,
 > 
 
-ping...
+Starting from GXBB series, the SD/eMMC register range is changed to
+0x800, so arch/arm64/boot/dts/amlogic/meson-gx.dtsi also need to be adjusted
 
--- 
-S?bastien Szymanski
-Software engineer, Armadeus Systems
-Tel: +33 (0)9 72 29 41 44
-Fax: +33 (0)9 72 28 79 26
+Also, test passed on boards: GXBB(p200), GXL(p212, p230), AXG(s400)
+
+Thanks for bringing up this, and fix them.
+
+
+Yixun
