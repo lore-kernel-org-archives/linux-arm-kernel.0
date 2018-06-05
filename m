@@ -1,35 +1,42 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 6 Jun 2018 00:02:20 +0800
-Subject: [PATCH V2 2/2] arm: dts: sunxi: Add missing cooling device
- properties for CPUs
-In-Reply-To: <20180605071139.osu2pgpg3ychdxln@flea>
-References: <20180601151701.sshwfdbflic6mybv@flea>
- <d894f425b7c32bce4dc4a982db8f4dface2db31d.1528173943.git.viresh.kumar@linaro.org>
- <a313ec0be4104494de319e8318e05614fb97b2fd.1528173943.git.viresh.kumar@linaro.org>
- <20180605071139.osu2pgpg3ychdxln@flea>
-Message-ID: <CAGb2v65EX2RwKjxPw+EK4i6rkfgOJoCU2amuFkF-tHQT40isxw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 5 Jun 2018 10:06:37 -0600
+Subject: [PATCH] coresight: include vmalloc.h for vmap/vunmap
+In-Reply-To: <20180605114856.1558554-1-arnd@arndb.de>
+References: <20180605114856.1558554-1-arnd@arndb.de>
+Message-ID: <CANLsYkzoJ5bvsYB8PzLouWoaVPzOkVcY17vVX5dFu6vO+F5zCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 5, 2018 at 3:11 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Tue, Jun 05, 2018 at 10:17:49AM +0530, Viresh Kumar wrote:
->> The cooling device properties, like "#cooling-cells" and
->> "dynamic-power-coefficient", should either be present for all the CPUs
->> of a cluster or none. If these are present only for a subset of CPUs of
->> a cluster then things will start falling apart as soon as the CPUs are
->> brought online in a different order. For example, this will happen
->> because the operating system looks for such properties in the CPU node
->> it is trying to bring up, so that it can register a cooling device.
->>
->> Add such missing properties.
->>
->> Fix other missing properties (clocks, OPP, clock latency) as well to
->> make it all work.
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On 5 June 2018 at 05:48, Arnd Bergmann <arnd@arndb.de> wrote:
+> The newly introduced code fails to build in some configurations
+> unless we include the right headers:
 >
-> Applied both, thanks!
+> drivers/hwtracing/coresight/coresight-tmc-etr.c: In function 'tmc_free_table_pages':
+> drivers/hwtracing/coresight/coresight-tmc-etr.c:206:3: error: implicit declaration of function 'vunmap'; did you mean 'iounmap'? [-Werror=implicit-function-declaration]
+>
+> Fixes: 79613ae8715a ("coresight: Add generic TMC sg table framework")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index 6164eed0b5fe..3556d9a849e9 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -8,6 +8,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/iommu.h>
+>  #include <linux/slab.h>
+> +#include <linux/vmalloc.h>
+>  #include "coresight-priv.h"
+>  #include "coresight-tmc.h"
+>
 
-Please fix the "ARM" prefix when applying. :)
+Thank you for that - I have picked it up for 4.18-rc1.
 
-ChenYu
+Mathieu
+
+> --
+> 2.9.0
+>
