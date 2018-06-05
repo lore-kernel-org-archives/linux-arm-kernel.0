@@ -1,17 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 5 Jun 2018 08:01:47 -0300
-Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
-In-Reply-To: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
-References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
-Message-ID: <CAOMZO5CsX-oiUXGicL1P61PcT67S9mhTTO5ibuXsQNd+UGt-Kg@mail.gmail.com>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Tue,  5 Jun 2018 12:28:46 +0100
+Subject: [PATCH v4 1/3] dt-bindings: cpu: Add Renesas R9A06G032 SMP enable
+ method.
+In-Reply-To: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <1528198148-23308-2-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 3:28 AM, S?bastien Szymanski
-<sebastien.szymanski@armadeus.com> wrote:
-> Check the max speed supported from the fuses for i.MX6ULL and update the
-> operating points table accordingly.
->
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+Add a special enable method for second CA7 of the R9A06G032
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 29e1dc5..b395d107 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -219,6 +219,7 @@ described below.
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
+ 			    "renesas,apmu"
++			    "renesas,r9a06g032-smp"
+ 			    "rockchip,rk3036-smp"
+ 			    "rockchip,rk3066-smp"
+ 			    "ste,dbx500-smp"
+-- 
+2.7.4
