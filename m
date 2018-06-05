@@ -1,71 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 5 Jun 2018 11:21:51 +0200
-Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <20180605080727.ygh25rmjsrs3dmlq@verge.net.au>
-References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
- <20180605080727.ygh25rmjsrs3dmlq@verge.net.au>
-Message-ID: <20180605092151.57ezynjgf23yunkf@ninjato>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Tue,  5 Jun 2018 17:33:47 +0800
+Subject: [PATCH v2 0/3] arm64/mm: migrate swapper_pg_dir
+Message-ID: <20180605093350.24504-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Version 2 changes:
+	* Move __pa_swapper_pg_dir to mmuoff.data.read section[1]
+	* Fix problem with CONFIG_ARM64_SW_TTBR0_PAN[2]
+	* Update comment about __enable_mmu()
 
-On Tue, Jun 05, 2018 at 10:07:28AM +0200, Simon Horman wrote:
-> On Mon, Jun 04, 2018 at 07:59:11PM +0200, Marek Vasut wrote:
-> > Rather than hard-coding the quirk topology, which stopped scaling,
-> > parse the information from DT. The code looks for all compatible
-> > PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
-> > to the same pin. If so, the code sends a matching sequence to the
-> > PMIC to deassert the IRQ.
-> > 
-> > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+[v1] https://www.spinics.net/lists/kernel/msg2819351.html
 
->From an I2C point of view:
+[1] https://www.spinics.net/lists/kernel/msg2819594.html
+[2] https://www.spinics.net/lists/kernel/msg2819455.html
 
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Jun Yao (3):
+  arm64/mm: pass swapper_pg_dir as an argument to __enable_mmu()
+  arm64/mm: introduce variable to save new swapper_pg_dir address
+  arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
 
-Minor nits:
+ arch/arm64/include/asm/mmu_context.h |  6 +-
+ arch/arm64/include/asm/pgtable.h     |  2 +
+ arch/arm64/kernel/cpufeature.c       |  2 +-
+ arch/arm64/kernel/head.S             |  6 +-
+ arch/arm64/kernel/hibernate.c        |  2 +-
+ arch/arm64/kernel/sleep.S            |  1 +
+ arch/arm64/mm/kasan_init.c           |  6 +-
+ arch/arm64/mm/mmu.c                  | 83 ++++++++++++++++++----------
+ 8 files changed, 69 insertions(+), 39 deletions(-)
 
-> > @@ -122,7 +143,13 @@ static struct notifier_block regulator_quirk_nb = {
-> >  
-> >  static int __init rcar_gen2_regulator_quirk(void)
-> >  {
-> > -	u32 mon;
-> > +	struct device_node *np;
-> > +	const struct of_device_id *id;
-> > +	struct regulator_quirk *quirk;
-> > +	struct regulator_quirk *pos;
-
-Merge the last two lines into one?
-
-> > +	struct of_phandle_args *argsa, *argsb;
-> > +	u32 mon, addr;
-> > +	int ret;
-> >  
-> >  	if (!of_machine_is_compatible("renesas,koelsch") &&
-> >  	    !of_machine_is_compatible("renesas,lager") &&
-> > @@ -130,6 +157,45 @@ static int __init rcar_gen2_regulator_quirk(void)
-> >  	    !of_machine_is_compatible("renesas,gose"))
-> >  		return -ENODEV;
-> >  
-> > +	for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
-> > +		if (!np || !of_device_is_available(np))
-
-Can '!np' actually happen? This is the exit condition of the for-loop,
-or am I overlooking something?
-
-Regards,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/35898b42/attachment.sig>
+-- 
+2.17.0
