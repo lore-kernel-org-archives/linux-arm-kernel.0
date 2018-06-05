@@ -1,66 +1,35 @@
-From: changbin.du@intel.com (changbin.du at intel.com)
-Date: Tue,  5 Jun 2018 16:13:37 +0800
-Subject: [PATCH v5 1/4] x86/mm: surround level4_kernel_pgt with #ifdef
- CONFIG_X86_5LEVEL...#endif
-In-Reply-To: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
-References: <1528186420-6615-1-git-send-email-changbin.du@intel.com>
-Message-ID: <1528186420-6615-2-git-send-email-changbin.du@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 05 Jun 2018 09:36:26 +0100
+Subject: [PATCH v2]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F31014@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A69F1300F@G01JPEXMBKW03>
+ <86d0xhaucm.wl-marc.zyngier@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69F3004A@G01JPEXMBKW03>
+ <31bede40-dbc5-0a88-d12c-5fc79ea02391@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69F30297@G01JPEXMBKW03>
+ <8898674D84E3B24BA3A2D289B872026A69F31014@G01JPEXMBKW03>
+Message-ID: <86efhlaaut.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changbin Du <changbin.du@intel.com>
+On Tue, 05 Jun 2018 00:58:47 +0100,
+Zhang, Lei wrote:
+> 
+> Hi Marc
+> 
+> Please let me know is there any plan to push your patch to v4.18.
 
-The level4_kernel_pgt is only defined when X86_5LEVEL is enabled. So
-surround level4_kernel_pgt with #ifdef CONFIG_X86_5LEVEL...#endif to
-make code correct.
+None at the moment.
 
-Signed-off-by: Changbin Du <changbin.du@intel.com>
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
----
- arch/x86/include/asm/pgtable_64.h |  2 ++
- arch/x86/kernel/head64.c          | 13 ++++++-------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+We're in the merge window, and no new changes will get queued unless
+they fix a regression. This patch needs thorough review and testing,
+as it changes a fundamental aspect of the driver. Also, it is pretty
+useless on its own, as no bus supported in mainline actually make use
+of the new allocator.
 
-diff --git a/arch/x86/include/asm/pgtable_64.h b/arch/x86/include/asm/pgtable_64.h
-index 877bc27..9e7f667 100644
---- a/arch/x86/include/asm/pgtable_64.h
-+++ b/arch/x86/include/asm/pgtable_64.h
-@@ -15,7 +15,9 @@
- #include <linux/bitops.h>
- #include <linux/threads.h>
- 
-+#ifdef CONFIG_X86_5LEVEL
- extern p4d_t level4_kernel_pgt[512];
-+#endif
- extern p4d_t level4_ident_pgt[512];
- extern pud_t level3_kernel_pgt[512];
- extern pud_t level3_ident_pgt[512];
-diff --git a/arch/x86/kernel/head64.c b/arch/x86/kernel/head64.c
-index 0c408f8..775d7a6 100644
---- a/arch/x86/kernel/head64.c
-+++ b/arch/x86/kernel/head64.c
-@@ -143,16 +143,15 @@ unsigned long __head __startup_64(unsigned long physaddr,
- 
- 	pgd = fixup_pointer(&early_top_pgt, physaddr);
- 	p = pgd + pgd_index(__START_KERNEL_map);
--	if (la57)
--		*p = (unsigned long)level4_kernel_pgt;
--	else
--		*p = (unsigned long)level3_kernel_pgt;
--	*p += _PAGE_TABLE_NOENC - __START_KERNEL_map + load_delta;
--
-+#ifdef CONFIG_X86_5LEVEL
- 	if (la57) {
-+		*p = (unsigned long)level4_kernel_pgt;
- 		p4d = fixup_pointer(&level4_kernel_pgt, physaddr);
- 		p4d[511] += load_delta;
--	}
-+	} else
-+#endif
-+		*p = (unsigned long)level3_kernel_pgt;
-+	*p += _PAGE_TABLE_NOENC - __START_KERNEL_map + load_delta;
- 
- 	pud = fixup_pointer(&level3_kernel_pgt, physaddr);
- 	pud[510] += load_delta;
+Thanks,
+
+	M.
+
 -- 
-2.7.4
+Jazz is not dead, it just smell funny.
