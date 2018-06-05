@@ -1,219 +1,84 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 5 Jun 2018 10:07:28 +0200
-Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
-References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180605080727.ygh25rmjsrs3dmlq@verge.net.au>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Tue, 5 Jun 2018 10:12:22 +0200
+Subject: [PATCH v3 8/8] ARM: dts: rcar-gen2: Remove unused VIN properties
+In-Reply-To: <20180605074938.mljwmgpjlplvkp2v@verge.net.au>
+References: <1527606359-19261-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1527606359-19261-9-git-send-email-jacopo+renesas@jmondi.org>
+ <20180604122325.GH19674@bigcity.dyn.berto.se>
+ <20180605074938.mljwmgpjlplvkp2v@verge.net.au>
+Message-ID: <20180605081222.GL10472@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 07:59:11PM +0200, Marek Vasut wrote:
-> Rather than hard-coding the quirk topology, which stopped scaling,
-> parse the information from DT. The code looks for all compatible
-> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
-> to the same pin. If so, the code sends a matching sequence to the
-> PMIC to deassert the IRQ.
-> 
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Cc: linux-renesas-soc at vger.kernel.org
-> ---
-> V2: - Replace the DT shared IRQ check loop with memcmp()
->     - Send the I2C message to deassert the IRQ line to all PMICs
->       in the list with shared IRQ line instead of just one
->     - Add comment that this works only in case all the PMICs are
->       on the same I2C bus
-> V3: - Drop the addr = 0x00 init
->     - Drop reinit of argsa in rcar_gen2_regulator_quirk
-> ---
->  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 114 ++++++++++++++++-----
->  1 file changed, 90 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> index 93f628acfd94..b919073aa27e 100644
-> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> @@ -31,8 +31,10 @@
->  #include <linux/i2c.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/list.h>
->  #include <linux/notifier.h>
->  #include <linux/of.h>
-> +#include <linux/of_irq.h>
->  #include <linux/mfd/da9063/registers.h>
->  
->  
-> @@ -44,34 +46,45 @@
->  /* start of DA9210 System Control and Event Registers */
->  #define DA9210_REG_MASK_A		0x54
->  
-> +struct regulator_quirk {
-> +	struct list_head		list;
-> +	const struct of_device_id	*id;
-> +	struct of_phandle_args		irq_args;
-> +	struct i2c_msg			i2c_msg;
-> +	bool				shared;	/* IRQ line is shared */
-> +};
-> +
-> +static LIST_HEAD(quirk_list);
->  static void __iomem *irqc;
->  
->  /* first byte sets the memory pointer, following are consecutive reg values */
->  static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
->  static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
->  
-> -static struct i2c_msg da9xxx_msgs[3] = {
-> -	{
-> -		.addr = 0x58,
-> -		.len = ARRAY_SIZE(da9063_irq_clr),
-> -		.buf = da9063_irq_clr,
-> -	}, {
-> -		.addr = 0x68,
-> -		.len = ARRAY_SIZE(da9210_irq_clr),
-> -		.buf = da9210_irq_clr,
-> -	}, {
-> -		.addr = 0x70,
-> -		.len = ARRAY_SIZE(da9210_irq_clr),
-> -		.buf = da9210_irq_clr,
-> -	},
-> +static struct i2c_msg da9063_msgs = {
-> +	.len = ARRAY_SIZE(da9063_irq_clr),
-> +	.buf = da9063_irq_clr,
-> +};
-> +
-> +static struct i2c_msg da9210_msgs = {
-> +	.len = ARRAY_SIZE(da9210_irq_clr),
-> +	.buf = da9210_irq_clr,
-> +};
-> +
-> +static const struct of_device_id rcar_gen2_quirk_match[] = {
-> +	{ .compatible = "dlg,da9063", .data = &da9063_msgs },
-> +	{ .compatible = "dlg,da9210", .data = &da9210_msgs },
-> +	{},
->  };
->  
->  static int regulator_quirk_notify(struct notifier_block *nb,
->  				  unsigned long action, void *data)
->  {
-> +	struct regulator_quirk *pos, *tmp;
->  	struct device *dev = data;
->  	struct i2c_client *client;
->  	static bool done;
-> +	int ret;
->  	u32 mon;
->  
->  	if (done)
-> @@ -88,17 +101,20 @@ static int regulator_quirk_notify(struct notifier_block *nb,
->  	client = to_i2c_client(dev);
->  	dev_dbg(dev, "Detected %s\n", client->name);
->  
-> -	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
-> -	    (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
-> -	    (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
-> -		int ret, len;
-> +	/*
-> +	 * Send message to all PMICs that share an IRQ line to deassert it.
-> +	 *
-> +	 * WARNING: This works only if all the PMICs are on the same I2C bus.
-> +	 */
-> +	list_for_each_entry(pos, &quirk_list, list) {
-> +		if (!pos->shared)
-> +			continue;
->  
-> -		/* There are two DA9210 on Stout, one on the other boards. */
-> -		len = of_machine_is_compatible("renesas,stout") ? 3 : 2;
-> +		dev_info(&client->dev, "clearing %s at 0x%02x interrupts\n",
-> +			 pos->id->compatible, pos->i2c_msg.addr);
->  
-> -		dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
-> -		ret = i2c_transfer(client->adapter, da9xxx_msgs, len);
-> -		if (ret != len)
-> +		ret = i2c_transfer(client->adapter, &pos->i2c_msg, 1);
-> +		if (ret != 1)
->  			dev_err(&client->dev, "i2c error %d\n", ret);
->  	}
->  
-> @@ -111,6 +127,11 @@ static int regulator_quirk_notify(struct notifier_block *nb,
->  remove:
->  	dev_info(dev, "IRQ2 is not asserted, removing quirk\n");
->  
-> +	list_for_each_entry_safe(pos, tmp, &quirk_list, list) {
-> +		list_del(&pos->list);
-> +		kfree(pos);
-> +	}
-> +
->  	done = true;
->  	iounmap(irqc);
->  	return 0;
-> @@ -122,7 +143,13 @@ static struct notifier_block regulator_quirk_nb = {
->  
->  static int __init rcar_gen2_regulator_quirk(void)
->  {
-> -	u32 mon;
-> +	struct device_node *np;
-> +	const struct of_device_id *id;
-> +	struct regulator_quirk *quirk;
-> +	struct regulator_quirk *pos;
-> +	struct of_phandle_args *argsa, *argsb;
-> +	u32 mon, addr;
-> +	int ret;
->  
->  	if (!of_machine_is_compatible("renesas,koelsch") &&
->  	    !of_machine_is_compatible("renesas,lager") &&
-> @@ -130,6 +157,45 @@ static int __init rcar_gen2_regulator_quirk(void)
->  	    !of_machine_is_compatible("renesas,gose"))
->  		return -ENODEV;
->  
-> +	for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
-> +		if (!np || !of_device_is_available(np))
-> +			break;
-> +
-> +		quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
-> +
-> +		argsa = &quirk->irq_args;
-> +		memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
-> +
-> +		ret = of_property_read_u32(np, "reg", &addr);
-> +		if (ret)
-> +			return ret;
-> +
-> +		quirk->id = id;
-> +		quirk->i2c_msg.addr = addr;
-> +		quirk->shared = false;
-> +
-> +		ret = of_irq_parse_one(np, 0, &quirk->irq_args);
+Hi Simon,
 
-As per my comment on v2,
-&quirk->irq_args is assigned to argsa above and used directly here.
+On Tue, Jun 05, 2018 at 09:49:38AM +0200, Simon Horman wrote:
+> On Mon, Jun 04, 2018 at 02:23:25PM +0200, Niklas S?derlund wrote:
+> > Hi Jacopo,
+> >
+> > Thanks for your work.
+> >
+> > On 2018-05-29 17:05:59 +0200, Jacopo Mondi wrote:
+> > > The 'bus-width' and 'pclk-sample' properties are not parsed by the VIN
+> > > driver and only confuse users. Remove them in all Gen2 SoC that use
+> > > them.
+> > >
+> > > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >
+> > The more I think about this the more I lean towards that this patch
+> > should be dropped. The properties accurately describes the hardware and
+> > I think there is value in that. That the driver currently don't parse or
+> > make use of them don't in my view reduce there value. Maybe you should
+> > break out this patch to a separate series?
+>
+> I also think there is value in describing the hardware not the state of the
+> driver at this time.  Is there any missmatch between these properties and
+> the bindings?
 
-> +		if (ret)
-> +			return ret;
-> +
-> +		list_for_each_entry(pos, &quirk_list, list) {
-> +			argsb = &pos->irq_args;
-> +
-> +			if (argsa->args_count != argsb->args_count)
-> +				continue;
-> +
-> +			ret = memcmp(argsa->args, argsb->args,
-> +				     argsa->args_count *
-> +				     sizeof(argsa->args[0]));
-> +			if (!ret) {
-> +				pos->shared = true;
-> +				quirk->shared = true;
-> +			}
-> +		}
-> +
-> +		list_add_tail(&quirk->list, &quirk_list);
-> +	}
-> +
->  	irqc = ioremap(IRQC_BASE, PAGE_SIZE);
->  	if (!irqc)
->  		return -ENOMEM;
-> -- 
-> 2.16.2
-> 
+Niklas and I discussed a bit offline on this yesterday. My main
+concern, and sorry for being pedant on this, is that changing those
+properties value does not change the interface behaviour, and this
+could cause troubles when integrating image sensor not known to be
+working on the VIN interface.
+
+This said, the documentation of those (and all other) properties is in the
+generic "video-interfaces.txt" file and it is my understanding, but I think
+Laurent and Rob agree on this as well from their replies to my previous series,
+that each driver should list which properties it actually supports, as
+some aspects are very implementation specific, like default values and
+what happens if the property is not specified [1]. Nonetheless, all
+properties describing hardware features and documented in the generic
+file should be accepted in DTS, as those aims to be OS-independent and
+even independent from the single driver implementation.
+
+A possible middle-ground would be documenting in the VIN device tree
+bindings description properties whose values actually affect the VIN
+interface configuration and state in bindings that all generic properties
+described in 'video-interfaces.txt' are valid ones but if not
+explicitly listed there their value won't affect the interface
+configuration. Niklas suggested this, and I quite like the fact it
+makes clear that, say, changing the 'pclk-sample' property won't
+change how the VIN interface would sample data but at the same time
+allows for extensive description of the hardware.
+
+Would something like this work in your opinion?
+
+As a consequence, this patch should be dropped as Niklas and you
+suggested.
+
+Thanks
+   j
+
+[1] Ie. An interface that supports BT.656 encoding will use it if
+'hsync-active' and 'vsync-active' are not specified. One that does not
+support embedded synchronization would instead use defaults for those
+two properties. This is specific to the single interface (or even the
+single driver implementation actually) and should be listed in the single
+driver's bindings description imo.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180605/5a7706b3/attachment.sig>
