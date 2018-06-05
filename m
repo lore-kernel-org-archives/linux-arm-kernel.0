@@ -1,61 +1,69 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Jun 2018 01:01:19 -0500
-Subject: [RFC PATCH 0/6] arm64: Initial support Texas Instrument's AM654
- Platform
-Message-ID: <20180605060125.9518-1-nm@ti.com>
+Date: Tue, 5 Jun 2018 01:16:25 -0500
+Subject: [RFC PATCH 4/8] mailbox: ti-msgmgr: Move the memory region name to
+ descriptor
+In-Reply-To: <20180605061629.4759-1-nm@ti.com>
+References: <20180605061629.4759-1-nm@ti.com>
+Message-ID: <20180605061629.4759-5-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For newer generation of the hardware, the naming of the region is
+decided at integration level and there could be additional regions
+as well. Hence move the region naming to be described from compatible
+descriptor.
 
-The following series enables support for newest addition in TI's SoC
-portfolio - AM654 SoC.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/mailbox/ti-msgmgr.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-The series is an RFC based off next-20180604 and will post formally once
-v4.18-rc1 is available.
-
-The series (part 1 of 4) is available here:
-https://github.com/nmenon/linux-2.6-playground/commits/upstream/next-20180604/k3-1-am6-base
-
-Full Boot log is available here: https://pastebin.ubuntu.com/p/vWCzMKtBCW/
-
-The AM654 SoC is a lead device of the K3 Multicore SoC architecture
-platform, targeted for broad market and industrial control with aim to
-meet the complex processing needs of modern embedded products.
-
-The Linux development follows closely the 66AK2G SoC model in aarch64.
-
-See AM65x Technical Reference Manual (SPRUID7, April 2018)
-for further details: http://www.ti.com/lit/pdf/spruid7
-
-Lokesh Vutla (1):
-  serial: 8250_omap: Make 8250_omap driver driver depend on ARCH_K3
-
-Nishanth Menon (5):
-  Documentation: arm: ti: Add bindings for AM654 SoC
-  arm64: Add support for TI's K3 Multicore SoC architecture
-  serial: 8250_omap: Add support for AM654 UART controller
-  arm64: dts: ti: Add Support for AM654 SoC
-  arm64: dts: ti: Add support for AM654 EVM base board
-
- Documentation/devicetree/bindings/arm/ti/k3.txt    |  33 +++++
- .../devicetree/bindings/serial/omap_serial.txt     |   1 +
- MAINTAINERS                                        |   9 ++
- arch/arm64/Kconfig.platforms                       |   7 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/ti/Makefile                    |   9 ++
- arch/arm64/boot/dts/ti/k3-am6.dtsi                 | 144 +++++++++++++++++++++
- arch/arm64/boot/dts/ti/k3-am654-base-board.dts     |  40 ++++++
- arch/arm64/boot/dts/ti/k3-am654.dtsi               | 117 +++++++++++++++++
- drivers/soc/ti/Kconfig                             |  14 ++
- drivers/tty/serial/8250/8250_omap.c                |   1 +
- drivers/tty/serial/8250/Kconfig                    |   2 +-
- 12 files changed, 377 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
- create mode 100644 arch/arm64/boot/dts/ti/Makefile
- create mode 100644 arch/arm64/boot/dts/ti/k3-am6.dtsi
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654.dtsi
-
+diff --git a/drivers/mailbox/ti-msgmgr.c b/drivers/mailbox/ti-msgmgr.c
+index 2952339a8446..a37d6a4b392f 100644
+--- a/drivers/mailbox/ti-msgmgr.c
++++ b/drivers/mailbox/ti-msgmgr.c
+@@ -48,6 +48,8 @@ struct ti_msgmgr_valid_queue_desc {
+  * @tx_polled:		Do I need to use polled mechanism for tx
+  * @tx_poll_timeout_ms: Timeout in ms if polled
+  * @valid_queues:	List of Valid queues that the processor can access
++ * @data_region_name:	Name of the proxy data region
++ * @status_region_name:	Name of the proxy status region
+  * @num_valid_queues:	Number of valid queues
+  *
+  * This structure is used in of match data to describe how integration
+@@ -63,6 +65,8 @@ struct ti_msgmgr_desc {
+ 	bool tx_polled;
+ 	int tx_poll_timeout_ms;
+ 	const struct ti_msgmgr_valid_queue_desc *valid_queues;
++	const char *data_region_name;
++	const char *status_region_name;
+ 	int num_valid_queues;
+ };
+ 
+@@ -531,6 +535,8 @@ static const struct ti_msgmgr_desc k2g_desc = {
+ 	.queue_count = 64,
+ 	.max_message_size = 64,
+ 	.max_messages = 128,
++	.data_region_name = "queue_proxy_region",
++	.status_region_name = "queue_state_debug_region",
+ 	.data_first_reg = 16,
+ 	.data_last_reg = 31,
+ 	.status_cnt_mask = Q_STATE_ENTRY_COUNT_MASK,
+@@ -582,13 +588,13 @@ static int ti_msgmgr_probe(struct platform_device *pdev)
+ 	inst->desc = desc;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-					   "queue_proxy_region");
++					   desc->data_region_name);
+ 	inst->queue_proxy_region = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(inst->queue_proxy_region))
+ 		return PTR_ERR(inst->queue_proxy_region);
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-					   "queue_state_debug_region");
++					   desc->status_region_name);
+ 	inst->queue_state_debug_region = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(inst->queue_state_debug_region))
+ 		return PTR_ERR(inst->queue_state_debug_region);
 -- 
 2.15.1
