@@ -1,24 +1,16 @@
 From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue,  5 Jun 2018 16:07:10 -0500
-Subject: [PATCH v4 14/14] coresight: allow the coresight core driver to be
- built as a module
+Date: Tue,  5 Jun 2018 16:07:06 -0500
+Subject: [PATCH v4 10/14] coresight: allow etb to be built as a module
 In-Reply-To: <20180605210710.22227-1-kim.phillips@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
-Message-ID: <20180605210710.22227-15-kim.phillips@arm.com>
+Message-ID: <20180605210710.22227-11-kim.phillips@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow to build coresight as a module.  This enhances
-coresight developer efficiency by allowing the development to
-take place exclusively on the target, and without needing to
-reboot in between changes.
+Allow to build coresight-etb10 as a module, for ease of development.
 
 - Kconfig becomes a tristate, to allow =m
-- append -core to source file name to allow module to
-  be called coresight by the Makefile
-- modules can have only one init/exit, so we add the core bus
-  register/unregister function calls to the etm_perf init/exit
-  functions, since coresight.c does not have etm_pmu defined.
+- add an etb_remove function, for module unload
 - add a MODULE_DEVICE_TABLE for autoloading on boot
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
@@ -30,105 +22,75 @@ Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 ---
- drivers/hwtracing/coresight/Kconfig             |  5 ++++-
- drivers/hwtracing/coresight/Makefile            |  7 +++++--
- .../coresight/{coresight.c => coresight-core.c} |  6 ------
- .../hwtracing/coresight/coresight-etm-perf.c    | 17 ++++++++++++++++-
- 4 files changed, 25 insertions(+), 10 deletions(-)
- rename drivers/hwtracing/coresight/{coresight.c => coresight-core.c} (99%)
+ drivers/hwtracing/coresight/Kconfig           |  5 ++++-
+ drivers/hwtracing/coresight/coresight-etb10.c | 20 ++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-index 181a44ea2d61..c05b265f7731 100644
+index c32673f9177a..3c3256425a7f 100644
 --- a/drivers/hwtracing/coresight/Kconfig
 +++ b/drivers/hwtracing/coresight/Kconfig
-@@ -2,7 +2,7 @@
- # Coresight configuration
- #
- menuconfig CORESIGHT
--	bool "CoreSight Tracing Support"
-+	tristate "CoreSight Tracing Support"
- 	select ARM_AMBA
- 	select PERF_EVENTS
+@@ -43,13 +43,16 @@ config CORESIGHT_SINK_TPIU
+ 	  the on-board coresight memory can handle.
+ 
+ config CORESIGHT_SINK_ETBV10
+-	bool "Coresight ETBv1.0 driver"
++	tristate "Coresight ETBv1.0 driver"
+ 	depends on CORESIGHT_LINKS_AND_SINKS
  	help
-@@ -12,6 +12,9 @@ menuconfig CORESIGHT
- 	  specification and configure the right series of components when a
- 	  trace source gets enabled.
+ 	  This enables support for the Embedded Trace Buffer version 1.0 driver
+ 	  that complies with the generic implementation of the component without
+ 	  special enhancement or added features.
  
 +	  To compile this driver as a module, choose M here: the
-+	  module will be called coresight.
++	  module will be called coresight-etb10.
 +
- if CORESIGHT
- config CORESIGHT_LINKS_AND_SINKS
- 	tristate "CoreSight Link and Sink drivers"
-diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-index 45d7a0f34170..ed2d4bcb017b 100644
---- a/drivers/hwtracing/coresight/Makefile
-+++ b/drivers/hwtracing/coresight/Makefile
-@@ -2,8 +2,11 @@
- #
- # Makefile for CoreSight drivers.
- #
--obj-$(CONFIG_CORESIGHT) += coresight.o coresight-etm-perf.o
--obj-$(CONFIG_OF) += of_coresight.o
-+obj-$(CONFIG_CORESIGHT) += coresight.o
-+coresight-objs := coresight-core.o  coresight-etm-perf.o
-+ifeq ($(CONFIG_OF), y)
-+coresight-objs += of_coresight.o
-+endif
- obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
- coresight-tmc-objs := coresight-tmc-core.o coresight-tmc-etf.o \
- 		      coresight-tmc-etr.o
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight-core.c
-similarity index 99%
-rename from drivers/hwtracing/coresight/coresight.c
-rename to drivers/hwtracing/coresight/coresight-core.c
-index 1c941351f1d1..f96258de1e9b 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight-core.c
-@@ -948,12 +948,6 @@ struct bus_type coresight_bustype = {
- 	.name	= "coresight",
- };
- 
--static int __init coresight_init(void)
--{
--	return bus_register(&coresight_bustype);
--}
--postcore_initcall(coresight_init);
--
- struct coresight_device *coresight_register(struct coresight_desc *desc)
- {
- 	int i;
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 0fe7e43ea1c4..ceac9aee4a82 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -472,6 +472,10 @@ static int __init etm_perf_init(void)
- {
- 	int ret;
- 
-+	ret = bus_register(&coresight_bustype);
-+	if (ret)
-+		return ret;
-+
- 	etm_pmu.capabilities		= PERF_PMU_CAP_EXCLUSIVE;
- 
- 	etm_pmu.attr_groups		= etm_pmu_attr_groups;
-@@ -494,4 +498,15 @@ static int __init etm_perf_init(void)
- 
+ config CORESIGHT_SOURCE_ETM3X
+ 	tristate "CoreSight Embedded Trace Macrocell 3.x driver"
+ 	depends on !ARM64
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 78e71bf728fc..5b9d264e35be 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -708,6 +708,16 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
  	return ret;
  }
--device_initcall(etm_perf_init);
-+postcore_initcall(etm_perf_init);
-+
-+static void __exit etm_perf_exit(void)
+ 
++static int __exit etb_remove(struct amba_device *adev)
 +{
-+	perf_pmu_unregister(&etm_pmu);
-+	bus_unregister(&coresight_bustype);
-+}
-+module_exit(etm_perf_exit);
++	struct etb_drvdata *drvdata = dev_get_drvdata(&adev->dev);
 +
++	misc_deregister(&drvdata->miscdev);
++	coresight_unregister(drvdata->csdev);
++
++	return 0;
++}
++
+ #ifdef CONFIG_PM
+ static int etb_runtime_suspend(struct device *dev)
+ {
+@@ -742,6 +752,8 @@ static const struct amba_id etb_ids[] = {
+ 	{ 0, 0},
+ };
+ 
++MODULE_DEVICE_TABLE(amba, etb_ids);
++
+ static struct amba_driver etb_driver = {
+ 	.drv = {
+ 		.name	= "coresight-etb10",
+@@ -751,6 +763,12 @@ static struct amba_driver etb_driver = {
+ 
+ 	},
+ 	.probe		= etb_probe,
++	.remove		= etb_remove,
+ 	.id_table	= etb_ids,
+ };
+-builtin_amba_driver(etb_driver);
++module_amba_driver(etb_driver);
++
++MODULE_AUTHOR("Pratik Patel <pratikp@codeaurora.org>");
 +MODULE_AUTHOR("Mathieu Poirier <mathieu.poirier@linaro.org>");
-+MODULE_DESCRIPTION("Arm CoreSight tracer driver");
++MODULE_DESCRIPTION("Arm CoreSight Embedded Trace Buffer driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.17.0
