@@ -1,46 +1,87 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 5 Jun 2018 18:23:57 +0530
-Subject: [linux-sunxi] Re: [PATCH v2 00/26] arm64: allwinner: Add A64 DE2
- HDMI support
-In-Reply-To: <20180518095913.nzl3sr5wn6cg4ra5@flea>
-References: <20180518094536.17201-1-jagan@amarulasolutions.com>
- <20180518095913.nzl3sr5wn6cg4ra5@flea>
-Message-ID: <CAMty3ZC13J+bCWK_=9816Lu-5ctC0UfF4-XR3yNSpHdH8q8Faw@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 5 Jun 2018 15:56:37 +0300
+Subject: [PATCH v2] DMA: OMAP: fix OMAP1510 incorrect residue_granularity
+In-Reply-To: <20180602152719.28464-1-jmkrzyszt@gmail.com>
+References: <20180602152719.28464-1-jmkrzyszt@gmail.com>
+Message-ID: <3b6b4771-8d51-1305-8d72-1899d5e9f895@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 3:29 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Fri, May 18, 2018 at 03:15:10PM +0530, Jagan Teki wrote:
->> Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
->>
->> A64 behaviour similar to Allwinner A83T where
->> Mixer0 => TCON0 => LVDS/RGB/MIPI-DSI
->> Mixer1 => TCON1 => HDMI
->> as per Display System Block DiagramAllwinner_A64_User_Manual_V1.1.pdf
->>
->> This is second patch-set followed with previous RFC[1] and first series[2]
->> and merely concentrated on HDMI pipeline through TCON1 and rest will add eventually.
->>
->> This series fixed previous version comments
->> - about documenting fallback compatibles
->> - adding new compatible for mixer1
->> - support for multiple DW HDMI PHY clock parents (thanks, to Jernej)
->>
->> Note:
->> Pine64 boards are unable to get edid by default like other A64 boards,
->> but forcing 'video=HDMI-A-1:1920x1080 at 60D' kernel command line can
->> create edid with display on penel.
->
-> There's no point in trying to push this without the SRAM issue being
-> solved. It is required, and won't be merged unless this is addressed.
+On 06/02/2018 06:27 PM, Janusz Krzysztofik wrote:
+> Commit 0198d7bb8a0c ("ASoC: omap-mcbsp: Convert to use the sdma-pcm
+> instead of omap-pcm") resulted in broken audio playback on OMAP1510
+> (discovered on Amstrad Delta).
 
-is SRAM issue resolved? if so may be I will try to test it on top.
+Good catch.
 
-Jagan.
+can you fix up the subject:
+dmaengine: ti: omap-dma: Fix OMAP1510...
+
+
+Otherwise:
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> When running on OMAP1510, omap-pcm used to obtain DMA offset from
+> snd_dmaengine_pcm_pointer_no_residue() based on DMA interrupt triggered
+> software calculations instead of snd_dmaengine_pcm_pointer() which
+> depended on residue value calculated from omap_dma_get_src_pos().
+> Similar code path is still available in now used
+> sound/soc/soc-generic-dmaengine-pcm.c but it is not triggered.
+> 
+> It was verified already before that omap_get_dma_src_pos() from
+> arch/arm/plat-omap/dma.c didn't work correctly for OMAP1510 - see
+> commit 1bdd7419910c ("ASoC: OMAP: fix OMAP1510 broken PCM pointer
+> callback") for details.  Apparently the same applies to its successor,
+> omap_dma_get_src_pos() from drivers/dma/ti/omap-dma.c.
+> 
+> On the other hand, snd_dmaengine_pcm_pointer_no_residue() is described
+> as depreciated and discouraged for use in new drivers because of its
+> unreliable accuracy.  However, it seems the only working option for
+> OPAM1510 now, as long as a software calculated residue is not
+> implemented as OMAP1510 fallback in omap-dma.
+> 
+> Using snd_dmaengine_pcm_pointer_no_residue() code path instead of
+> snd_dmaengine_pcm_pointer() in sound/soc/soc-generic-dmaengine-pcm.c
+> can be triggered in two ways:
+> - by passing pcm->flags |= SND_DMAENGINE_PCM_FLAG_NO_RESIDUE from
+>   sound/soc/omap/sdma-pcm.c,
+> - by passing dma_caps.residue_granularity =
+>   DMA_RESIDUE_GRANULARITY_DESCRIPTOR from DMA engine.
+> 
+> Let's do the latter.
+> 
+> Created and tested against next-20180531 tag from linux-next tree.
+> 
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> ---
+> Changelog:
+> v2: apply the patch against omap-dma.c moved to drivers/dma/ti/
+> 
+>  drivers/dma/ti/omap-dma.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/ti/omap-dma.c b/drivers/dma/ti/omap-dma.c
+> index b73fb51fbc81..96b5096c26dd 100644
+> --- a/drivers/dma/ti/omap-dma.c
+> +++ b/drivers/dma/ti/omap-dma.c
+> @@ -1485,7 +1485,11 @@ static int omap_dma_probe(struct platform_device *pdev)
+>  	od->ddev.src_addr_widths = OMAP_DMA_BUSWIDTHS;
+>  	od->ddev.dst_addr_widths = OMAP_DMA_BUSWIDTHS;
+>  	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+> -	od->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+> +	if (__dma_omap15xx(od->plat->dma_attr))
+> +		od->ddev.residue_granularity =
+> +				DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
+> +	else
+> +		od->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+>  	od->ddev.max_burst = SZ_16M - 1; /* CCEN: 24bit unsigned */
+>  	od->ddev.dev = &pdev->dev;
+>  	INIT_LIST_HEAD(&od->ddev.channels);
+> 
+
 
 -- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
