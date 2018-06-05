@@ -1,16 +1,17 @@
 From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue,  5 Jun 2018 16:06:58 -0500
-Subject: [PATCH v4 02/14] coresight: use IS_ENABLED for CONFIGs that may be
- modules
+Date: Tue,  5 Jun 2018 16:07:02 -0500
+Subject: [PATCH v4 06/14] coresight: allow stm to be built as a module
 In-Reply-To: <20180605210710.22227-1-kim.phillips@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
-Message-ID: <20180605210710.22227-3-kim.phillips@arm.com>
+Message-ID: <20180605210710.22227-7-kim.phillips@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Checking for ifdef CONFIG_x fails if CONFIG_x=m.  Use IS_ENABLED
-that is true for both built-ins and modules, instead.  Required
-when building coresight components as modules.
+Allow to build coresight-stm as a module, for ease of development.
+
+- Kconfig becomes a tristate, to allow =m
+- add a stm_remove function, for module unload
+- add a MODULE_DEVICE_TABLE for autoloading on boot
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: Leo Yan <leo.yan@linaro.org>
@@ -21,49 +22,78 @@ Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.h | 2 +-
- drivers/hwtracing/coresight/coresight-priv.h     | 2 +-
- include/linux/coresight.h                        | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/Kconfig         |  5 ++++-
+ drivers/hwtracing/coresight/coresight-stm.c | 20 +++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
-index 4197df4faf5e..539b250df455 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.h
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
-@@ -43,7 +43,7 @@ struct etm_filters {
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index d1209f5acf76..8c5e5407b7dd 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -79,8 +79,8 @@ config CORESIGHT_DYNAMIC_REPLICATOR
+ 	  trace data based on the traceid.
+ 
+ config CORESIGHT_STM
+-	bool "CoreSight System Trace Macrocell driver"
+ 	depends on (ARM && !(CPU_32v3 || CPU_32v4 || CPU_32v4T)) || ARM64
++	tristate "CoreSight System Trace Macrocell driver"
+ 	select CORESIGHT_LINKS_AND_SINKS
+ 	select STM
+ 	help
+@@ -89,6 +89,9 @@ config CORESIGHT_STM
+ 	  logging useful software events or data coming from various entities
+ 	  in the system, possibly running different OSs
+ 
++	  To compile this driver as a module, choose M here: the
++	  module will be called coresight-stm.
++
+ config CORESIGHT_CPU_DEBUG
+ 	tristate "CoreSight CPU Debug driver"
+ 	depends on ARM || ARM64
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index c46c70aec1d5..c465e6bc66c8 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -882,6 +882,17 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	return ret;
+ }
+ 
++static int __exit stm_remove(struct amba_device *adev)
++{
++	struct stm_drvdata *drvdata = dev_get_drvdata(&adev->dev);
++
++	coresight_unregister(drvdata->csdev);
++
++	stm_unregister_device(&drvdata->stm);
++
++	return 0;
++}
++
+ #ifdef CONFIG_PM
+ static int stm_runtime_suspend(struct device *dev)
+ {
+@@ -922,6 +933,8 @@ static const struct amba_id stm_ids[] = {
+ 	{ 0, 0},
  };
  
- 
--#ifdef CONFIG_CORESIGHT
-+#if IS_ENABLED(CONFIG_CORESIGHT)
- int etm_perf_symlink(struct coresight_device *csdev, bool link);
- 
- #else
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 1a6cf3589866..158c720119dd 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -144,7 +144,7 @@ struct list_head *coresight_build_path(struct coresight_device *csdev,
- 				       struct coresight_device *sink);
- void coresight_release_path(struct list_head *path);
- 
--#ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
-+#if IS_ENABLED(CONFIG_CORESIGHT_SOURCE_ETM3X)
- extern int etm_readl_cp14(u32 off, unsigned int *val);
- extern int etm_writel_cp14(u32 off, u32 val);
- #else
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index e5421b83e4e6..548fa56b29bd 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -236,7 +236,7 @@ struct coresight_ops {
- 	const struct coresight_ops_source *source_ops;
++MODULE_DEVICE_TABLE(amba, stm_ids);
++
+ static struct amba_driver stm_driver = {
+ 	.drv = {
+ 		.name   = "coresight-stm",
+@@ -930,7 +943,12 @@ static struct amba_driver stm_driver = {
+ 		.suppress_bind_attrs = true,
+ 	},
+ 	.probe          = stm_probe,
++	.remove         = stm_remove,
+ 	.id_table	= stm_ids,
  };
  
--#ifdef CONFIG_CORESIGHT
-+#if IS_ENABLED(CONFIG_CORESIGHT)
- extern struct coresight_device *
- coresight_register(struct coresight_desc *desc);
- extern void coresight_unregister(struct coresight_device *csdev);
+-builtin_amba_driver(stm_driver);
++module_amba_driver(stm_driver);
++
++MODULE_AUTHOR("Pratik Patel <pratikp@codeaurora.org>");
++MODULE_DESCRIPTION("Arm CoreSight System Trace Macrocell driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.17.0
