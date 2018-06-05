@@ -1,222 +1,206 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  5 Jun 2018 22:43:16 +0100
-Subject: [PATCH 05/20] coresight: platform: Cleanup coresight connection
- handling
+Date: Tue,  5 Jun 2018 22:43:20 +0100
+Subject: [PATCH 09/20] coresight: dts: Define new bindings for direction of
+ data flow
 In-Reply-To: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
 References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1528235011-30691-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1528235011-30691-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform code parses the component connections and populates
-a platform-description of the output connections in arrays of fields
-(which is never freed). This is later copied in the coresight_register
-to a newly allocated area, represented by coresight_connection(s).
+So far we have relied on an undocumented property "slave-mode",
+to indicate if the given port is input or not. Since we are
+redefining the coresight bindings, define new property for the
+"direction" of data flow for a given connection endpoint in the
+device.
 
-This patch cleans up the code dealing with connections by making
-use of the "coresight_connection" structure right at the platform
-code and lets the generic driver simply re-use information provided
-by the platform.
+Each endpoint must define the following property.
 
-Thus making it reader friendly as well as avoiding the wastage of
-unused memory.
+ - "direction" : 0 => Port is input
+		 1 => Port is output
 
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Rob Herring <robh@kernel.org>
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight.c    | 21 +-----------
- drivers/hwtracing/coresight/of_coresight.c | 51 ++++++++++++------------------
- include/linux/coresight.h                  |  9 ++----
- 3 files changed, 23 insertions(+), 58 deletions(-)
+ .../devicetree/bindings/arm/coresight.txt          | 24 ++++++++++++++--------
+ drivers/hwtracing/coresight/of_coresight.c         | 22 ++++++++++++++++----
+ 2 files changed, 34 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 2893cfe..69e9136 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -953,13 +953,11 @@ postcore_initcall(coresight_init);
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index bf75ab3..ff382bc 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -103,9 +103,11 @@ with a specific direction of data flow, each connection must define the
+ following properties to uniquely identify the connection details.
  
- struct coresight_device *coresight_register(struct coresight_desc *desc)
- {
--	int i;
- 	int ret;
- 	int link_subtype;
- 	int nr_refcnts = 1;
- 	atomic_t *refcnts = NULL;
- 	struct coresight_device *csdev;
--	struct coresight_connection *conns = NULL;
+  * Direction of the data flow w.r.t the component :
+-   Each input port must have the following property defined at the "endpoint"
++   Each hardware port must have the following property defined at the "endpoint"
+    for the port.
+-	"slave-mode"
++	"direction" - 32bit integer, whose values are defined as follows :
++		0 => the endpoint is an Input port
++		1 => the endpoint is an Output port.
  
- 	csdev = kzalloc(sizeof(*csdev), GFP_KERNEL);
- 	if (!csdev) {
-@@ -988,22 +986,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
- 	csdev->nr_inport = desc->pdata->nr_inport;
- 	csdev->nr_outport = desc->pdata->nr_outport;
- 
--	/* Initialise connections if there is at least one outport */
--	if (csdev->nr_outport) {
--		conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
--		if (!conns) {
--			ret = -ENOMEM;
--			goto err_kzalloc_conns;
--		}
--
--		for (i = 0; i < csdev->nr_outport; i++) {
--			conns[i].outport = desc->pdata->outports[i];
--			conns[i].child_name = desc->pdata->child_names[i];
--			conns[i].child_port = desc->pdata->child_ports[i];
--		}
--	}
--
--	csdev->conns = conns;
-+	csdev->conns = desc->pdata->conns;
- 
- 	csdev->type = desc->type;
- 	csdev->subtype = desc->subtype;
-@@ -1032,8 +1015,6 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
- 
- 	return csdev;
- 
--err_kzalloc_conns:
--	kfree(refcnts);
- err_kzalloc_refcnts:
- 	kfree(csdev);
- err_kzalloc_csdev:
+  * Hardware Port number at the component:
+      - Each "endpoint" must define the hardware port of the local end of the
+@@ -129,7 +131,7 @@ Example:
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			etb_in_port: endpoint at 0 {
+-				slave-mode;
++				direction = <0>;
+ 				remote-endpoint = <&replicator_out_port0>;
+ 				coresight,hwid = <0>;
+ 			};
+@@ -144,7 +146,7 @@ Example:
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			tpiu_in_port: endpoint at 0 {
+-				slave-mode;
++				direction = <0>;
+ 				remote-endpoint = <&replicator_out_port1>;
+ 				coresight,hwid = <0>;
+ 			};
+@@ -166,6 +168,7 @@ Example:
+ 			port at 0 {
+ 				reg = <0>;
+ 				replicator_out_port0: endpoint {
++					direction = <1>;
+ 					remote-endpoint = <&etb_in_port>;
+ 					coresight,hwid = <0>;
+ 				};
+@@ -174,6 +177,7 @@ Example:
+ 			port at 1 {
+ 				reg = <1>;
+ 				replicator_out_port1: endpoint {
++					direction = <1>;
+ 					remote-endpoint = <&tpiu_in_port>;
+ 					coresight,hwid = <1>;
+ 				};
+@@ -183,7 +187,7 @@ Example:
+ 			port at 2 {
+ 				reg = <1>;
+ 				replicator_in_port0: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&funnel_out_port0>;
+ 					coresight,hwid = <0>;
+ 				};
+@@ -205,6 +209,7 @@ Example:
+ 			port at 0 {
+ 				reg = <0>;
+ 				funnel_out_port0: endpoint {
++					direction = <1>;
+ 					remote-endpoint =
+ 							<&replicator_in_port0>;
+ 					coresight,hwid = <0>;
+@@ -215,7 +220,7 @@ Example:
+ 			port at 1 {
+ 				reg = <1>;
+ 				funnel_in_port0: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&ptm0_out_port>;
+ 					coresight,hwid = <0>;
+ 				};
+@@ -224,7 +229,7 @@ Example:
+ 			port at 2 {
+ 				reg = <2>;
+ 				funnel_in_port1: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&ptm1_out_port>;
+ 					coresight,hwid = <1>;
+ 				};
+@@ -233,7 +238,7 @@ Example:
+ 			port at 3 {
+ 				reg = <3>;
+ 				funnel_in_port2: endpoint {
+-					slave-mode;
++					direction = <0>;
+ 					remote-endpoint = <&etm0_out_port>;
+ 					coresight,hwid = <2>;
+ 				};
+@@ -252,6 +257,7 @@ Example:
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			ptm0_out_port: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port0>;
+ 				coresight,hwid = <0>;
+ 			};
+@@ -267,6 +273,7 @@ Example:
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			ptm1_out_port: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&funnel_in_port1>;
+ 				coresight,hwid = <0>;
+ 			};
+@@ -284,6 +291,7 @@ Example:
+ 		clock-names = "apb_pclk";
+ 		port {
+ 			stm_out_port: endpoint {
++				direction = <1>;
+ 				remote-endpoint = <&main_funnel_in_port2>;
+ 				coresight,hwid = <0>;
+ 			};
 diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index ada4f07..d01a9ce 100644
+index d23d7dd..0d6e6a9 100644
 --- a/drivers/hwtracing/coresight/of_coresight.c
 +++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -70,26 +70,13 @@ static void of_coresight_get_ports(const struct device_node *node,
- static int of_coresight_alloc_memory(struct device *dev,
- 			struct coresight_platform_data *pdata)
- {
--	/* List of output port on this component */
--	pdata->outports = devm_kzalloc(dev, pdata->nr_outport *
--				       sizeof(*pdata->outports),
--				       GFP_KERNEL);
--	if (!pdata->outports)
--		return -ENOMEM;
--
--	/* Children connected to this component via @outports */
--	pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
--					  sizeof(*pdata->child_names),
--					  GFP_KERNEL);
--	if (!pdata->child_names)
--		return -ENOMEM;
--
--	/* Port number on the child this component is connected to */
--	pdata->child_ports = devm_kzalloc(dev, pdata->nr_outport *
--					  sizeof(*pdata->child_ports),
--					  GFP_KERNEL);
--	if (!pdata->child_ports)
--		return -ENOMEM;
-+	if (pdata->nr_outport) {
-+		pdata->conns = devm_kzalloc(dev, pdata->nr_outport *
-+					    sizeof(*pdata->conns),
-+					    GFP_KERNEL);
-+		if (!pdata->conns)
-+			return -ENOMEM;
-+	}
- 
- 	return 0;
+@@ -45,7 +45,20 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
+ 			       endpoint, of_dev_node_match);
  }
-@@ -113,24 +100,24 @@ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
  
- /*
-  * of_coresight_parse_endpoint : Parse the given output endpoint @ep
-- * and fill the connection information in @pdata[*@i].
-+ * and fill the connection information in *@pconn.
-  *
-  * Parses the local port, remote device name and the remote port. Also
-- * updates *@i to point to the next index, when an entry is added.
-+ * updates *@pconn to point to the next record, when an entry is added.
-  *
-  * Returns :
-  *	 0	- If the parsing completed without any fatal errors.
-  *	-Errno	- Fatal error, abort the scanning.
-  */
- static int of_coresight_parse_endpoint(struct device_node *ep,
--				       struct coresight_platform_data *pdata,
--				       int *i)
-+				       struct coresight_connection **pconn)
+-static void of_coresight_get_ports(const struct device_node *node,
++static bool of_coresight_endpoint_is_input(struct device *dev,
++					   struct device_node *ep_node)
++{
++	u32 dir;
++
++	if (!of_property_read_u32(ep_node, "direction", &dir))
++		return dir == 0;
++
++	dev_warn_once(dev, "Missing mandatory \"direction\" property!\n");
++	return of_property_read_bool(ep_node, "slave-mode");
++}
++
++static void of_coresight_get_ports(struct device *dev,
++				   const struct device_node *node,
+ 				   int *nr_inport, int *nr_outport)
  {
- 	int ret = 0;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device_node *rparent = NULL;
- 	struct device_node *rep = NULL;
- 	struct device *rdev = NULL;
-+	struct coresight_connection *conn = *pconn;
- 
- 	do {
- 		/*
-@@ -163,11 +150,11 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
- 			break;
- 		}
- 
--		pdata->outports[*i] = endpoint.port;
--		pdata->child_names[*i] = dev_name(rdev);
--		pdata->child_ports[*i] = rendpoint.port;
--		/* Move the index */
--		(*i)++;
-+		conn->outport = endpoint.port;
-+		conn->child_name = dev_name(rdev);
-+		conn->child_port = rendpoint.port;
-+		/* Move the connection record */
-+		(*pconn)++;
- 	} while (0);
- 
- 	if (rparent)
-@@ -182,8 +169,9 @@ struct coresight_platform_data *
- of_get_coresight_platform_data(struct device *dev,
- 			       const struct device_node *node)
- {
--	int i = 0, ret = 0;
-+	int ret = 0;
- 	struct coresight_platform_data *pdata;
-+	struct coresight_connection *conn;
  	struct device_node *ep = NULL;
- 
- 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-@@ -205,13 +193,14 @@ of_get_coresight_platform_data(struct device *dev,
- 	if (ret)
- 		return ERR_PTR(ret);
- 
-+	conn = pdata->conns;
- 	/* Iterate through each port to discover topology */
- 	do {
- 		/* Get a handle on a port */
- 		ep = of_graph_get_next_endpoint(node, ep);
+@@ -56,7 +69,7 @@ static void of_coresight_get_ports(const struct device_node *node,
  		if (!ep)
  			break;
--		ret = of_coresight_parse_endpoint(ep, pdata, &i);
-+		ret = of_coresight_parse_endpoint(ep, &conn);
- 		if (ret)
- 			return ERR_PTR(ret);
- 	} while (ep);
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 69a5c9f..2a75a15 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -82,20 +82,15 @@ struct coresight_dev_subtype {
-  * @cpu:	the CPU a source belongs to. Only applicable for ETM/PTMs.
-  * @name:	name of the component as shown under sysfs.
-  * @nr_inport:	number of input ports for this component.
-- * @outports:	list of remote endpoint port number.
-- * @child_names:name of all child components connected to this device.
-- * @child_ports:child component port number the current component is
--		connected  to.
-  * @nr_outport:	number of output ports for this component.
-+ * @conns:	Array of nr_outport connections from this component
-  */
- struct coresight_platform_data {
- 	int cpu;
- 	const char *name;
- 	int nr_inport;
--	int *outports;
--	const char **child_names;
--	int *child_ports;
- 	int nr_outport;
-+	struct coresight_connection *conns;
- };
  
- /**
+-		if (of_property_read_bool(ep, "slave-mode"))
++		if (of_coresight_endpoint_is_input(dev, ep))
+ 			in++;
+ 		else
+ 			out++;
+@@ -149,7 +162,7 @@ static int of_coresight_parse_endpoint(struct device *dev,
+ 		 * No need to deal with input ports, processing for as
+ 		 * processing for output ports will deal with them.
+ 		 */
+-		if (of_find_property(ep, "slave-mode", NULL))
++		if (of_coresight_endpoint_is_input(dev, ep))
+ 			break;
+ 
+ 		/* Parse the local port details */
+@@ -212,7 +225,8 @@ of_get_coresight_platform_data(struct device *dev,
+ 	pdata->cpu = of_coresight_get_cpu(node);
+ 
+ 	/* Get the number of input and output port for this component */
+-	of_coresight_get_ports(node, &pdata->nr_inport, &pdata->nr_outport);
++	of_coresight_get_ports(dev, node,
++			       &pdata->nr_inport, &pdata->nr_outport);
+ 
+ 	/* If there are not output connections, we are done */
+ 	if (!pdata->nr_outport)
 -- 
 2.7.4
