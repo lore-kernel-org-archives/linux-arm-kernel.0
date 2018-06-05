@@ -1,84 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 5 Jun 2018 14:51:21 -0600
-Subject: [PATCH v2 13/16] dt-bindings/interrupt-controller: add
- documentation for Marvell SEI controller
-In-Reply-To: <20180522094042.24770-14-miquel.raynal@bootlin.com>
-References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
- <20180522094042.24770-14-miquel.raynal@bootlin.com>
-Message-ID: <20180605205121.GA19249@rob-hp-laptop>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue,  5 Jun 2018 16:07:00 -0500
+Subject: [PATCH v4 04/14] coresight: export coresight_timeout and
+ etm_perf_symlink
+In-Reply-To: <20180605210710.22227-1-kim.phillips@arm.com>
+References: <20180605210710.22227-1-kim.phillips@arm.com>
+Message-ID: <20180605210710.22227-5-kim.phillips@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 11:40:39AM +0200, Miquel Raynal wrote:
-> Describe the System Error Interrupt (SEI) controller. It aggregates two
-> types of interrupts, wired and MSIs from respectively the AP and the
-> CPs, into a single SPI interrupt.
-> 
-> Suggested-by: Haim Boot <hayim@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  .../bindings/interrupt-controller/marvell,sei.txt  | 50 ++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
-> new file mode 100644
-> index 000000000000..689981036c30
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
-> @@ -0,0 +1,50 @@
-> +Marvell SEI (System Error Interrupt) Controller
-> +-----------------------------------------------
-> +
-> +Marvell SEI (System Error Interrupt) controller is an interrupt
-> +aggregator. It receives interrupts from several sources and aggregates
-> +them to a single interrupt line (an SPI) on the parent interrupt
-> +controller.
-> +
-> +This interrupt controller can handle up to 64 SEIs, a set comes from the
-> +AP and is wired while a second set comes from the CPs by the mean of
-> +MSIs. Each 'domain' is represented as a subnode.
-> +
-> +Required properties:
-> +
-> +- compatible: should be "marvell,armada-8k-sei".
-> +- reg: SEI registers location and length.
-> +- interrupts: identifies the parent IRQ that will be triggered.
-> +
-> +Child node 'sei-wired-controller' required properties:
-> +
-> +- marvell,sei-ranges: ranges of wired interrupts.
-> +- #interrupt-cells: number of cells to define an SEI wired interrupt
-> +                    coming from the AP, should be 1. The cell is the IRQ
-> +                    number.
-> +- interrupt-controller: identifies the node as an interrupt controller.
-> +
-> +Child node 'sei-msi-controller' required properties:
-> +
-> +- marvell,sei-ranges: ranges of non-wired interrupts triggered by way of
-> +                      MSIs.
-> +- msi-controller: identifies the node as an MSI controller.
-> +
-> +Example:
-> +
-> +        sei: sei at 3f0200 {
-> +               compatible = "marvell,armada-8k-sei";
-> +               reg = <0x3f0200 0x40>;
-> +               interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +               sei_wired_controller: sei-wired-controller at 0 {
-> +                       marvell,sei-ranges = <0 21>;
-> +                       #interrupt-cells = <1>;
-> +                       interrupt-controller;
-> +               };
-> +
-> +               sei_msi_controller: sei-msi-controller at 21 {
-> +                       marvell,sei-ranges = <21 43>;
-> +                       msi-controller;
-> +               };
+Export these symbols for use by other coresight components,
+so they can be built as modules.
 
-I still think this should just be all one node. There's several examples 
-in the tree of nodes which are both interrupt-controller and 
-msi-controller. Marvell MPIC is one example.
+coresight_timeout is used by the coresight stm, etm4x, tmc,
+tpiu, and etb10 modules, and etm_perf_symlink is needed by
+the etm3x/4x modules.
 
-Rob
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Leo Yan <leo.yan@linaro.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
+ drivers/hwtracing/coresight/coresight.c          | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 677695635211..0fe7e43ea1c4 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -466,6 +466,7 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(etm_perf_symlink);
+ 
+ static int __init etm_perf_init(void)
+ {
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 0cbc2948defc..338f1719641c 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -933,6 +933,7 @@ int coresight_timeout(void __iomem *addr, u32 offset, int position, int value)
+ 
+ 	return -EAGAIN;
+ }
++EXPORT_SYMBOL_GPL(coresight_timeout);
+ 
+ struct bus_type coresight_bustype = {
+ 	.name	= "coresight",
+-- 
+2.17.0
