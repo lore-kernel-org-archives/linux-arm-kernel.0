@@ -1,65 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 5 Jun 2018 10:07:13 +0530
-Subject: [PATCH 1/6] arm64: dts: amlogic: Add missing cooling device
- properties for CPUs
-In-Reply-To: <20180602081418.jcl2vjc6saoj3z3d@localhost>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <2a2eb28da9fecf129f6bc0ab3d3748d9f4d25a29.1527225682.git.viresh.kumar@linaro.org>
- <20180525211025.c73zdcdtyuvlewng@localhost>
- <20180528111358.meyle364fy6wuruf@vireshk-i7>
- <20180602081418.jcl2vjc6saoj3z3d@localhost>
-Message-ID: <20180605043713.p7wxdccniowvbsi3@vireshk-i7>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Jun 2018 21:45:54 -0700
+Subject: Regression in Linux next again
+In-Reply-To: <1528120764-14316-1-git-send-email-m.purski@samsung.com>
+References: <20180530144505.GB5705@atomide.com>
+ <CGME20180604135952eucas1p292f7bcec405e6a1a6261031df36cad32@eucas1p2.samsung.com>
+ <1528120764-14316-1-git-send-email-m.purski@samsung.com>
+Message-ID: <20180605044554.GC5738@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-06-18, 01:14, Olof Johansson wrote:
-> And what I am saying is that it sounds like a broken binding if you don't allow
-> that, especially since it'll be a super common case that all CPUs will specify
-> the same cooling-device specifier.
+Hi,
 
-I am fine with allowing the #cooling-cells property in the cpus node if the DT
-maintainers are fine with it.
+* Maciej Purski <m.purski@samsung.com> [180604 14:02]:
+> Tony, please apply this patchset and test it on your Beaglebone. It'd be
+> great if you could try to find out, which patch causes failure. They should
+> be appliable on the current next.
 
-@Rob: comments ?
+It seems beagle-x15 boots for me except with the last patch in the
+series with compile issue fixed. With that applied after modules
+get loaded it just hangs with:
 
-@Olof: What about other properties which are still going to be duplicated for
-the most common cases today, like: clocks, supply information, cache
-information, cpu-idle-states and others. When we can duplicate these properties,
-why not keep following the same for #cpu-cooling property ?
+[   25.925607] regulator_resolve_supply: 1608
+[   25.930620] regulator_resolve_supply: 1608
+[   26.098449] lib80211: common routines for IEEE802.11 drivers
+[   26.446713] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[   26.514834] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[   26.525311] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
+[   26.534250] cfg80211: failed to load regulatory.db
+[   26.998736] regulator_set_voltage: 3381
+[   27.007662] _regulator_do_set_voltage: 2913
+[   27.012593] regulator_set_voltage: 3381
+[   27.016969] _regulator_do_set_voltage: 2913
+[   27.022847] regulator_set_voltage: 3381
 
-Note that the OPP table doesn't really need to get duplicated (for new
-platforms) as the platforms use the v2 bindings now which just duplicates a
-phandle assignment for all CPUs. Its a mess with older platforms which use the
-earlier version of OPP table.
+Not sure what module gets loaded at that point, I'll test again
+with initcall_debug once you post a compiling version of your last
+patch.
 
-> > This property is required to declare a device as a cooling-device and
-> > the device here is CPU. We use it as a cooling device by limiting its
-> > higher range of frequencies, so that it doesn't generate too much
-> > heat.
-> > 
-> > It is already there for CPU0 and CPU4, but it should really be there
-> > for all the CPUs, like we have clock, supply, caches, etc.
-> 
-> You have #cooling-cells in the cpu node, but the actual data is in the
-> thermal-zones nodes. Why isn't #cooling-cells under thermal-zones, next to
-> cooling-maps?
+Regards,
 
-Actually I thought about that when I worked on these patches initially and this
-is why I felt convinced that the CPU nodes are the right place for this.
-
-We add #interrupt-cells to an Interrupt controller's DT node, #gpio-cells to a
-GPIO controller's DT node, #clock-cells to a clock controller's DT node and
-that's exactly why we should (and we do) add #cooling-cells property to a
-cooling device's DT node. This information is used in two ways, first it enables
-the OS to know that the device is capable of being a cooling device and second
-it tells us how many arguments will be required with a phandle of this device.
-
-And so the cooling-maps always contain two arguments with the cooling device's
-phandle (which is mostly a CPU or a gpio fan) as the #cooling-cells currently
-is fixed to 2.
-
-And so I am not really sure if thermal-zones is the right place to define this
-thing. Is my understanding correct ?
-
--- 
-viresh
+Tony
