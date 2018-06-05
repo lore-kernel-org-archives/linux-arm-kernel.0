@@ -1,355 +1,215 @@
-From: dennis@ausil.us (Dennis Gilmore)
-Date: Mon,  4 Jun 2018 20:13:43 -0500
-Subject: [PATCH] ARM: dts: armada388-helios4
-Message-ID: <20180605011343.14999-1-dennis@ausil.us>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon,  4 Jun 2018 22:16:09 -0400
+Subject: [PATCH V4] PCI: move early dump functionality from x86 arch into the
+ common code
+Message-ID: <1528164985-14099-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The helios4 is a Armada388 based nas board designed by SolidRun and
-based on their SOM. It is sold by kobol.io the dts file came from
-https://raw.githubusercontent.com/armbian/build/master/patch/kernel/mvebu-default/95-helios4-device-tree.patch
-I added a SPDX license line to match the clearfog it says it was based
-on and a compatible line for "solidrun,helios4"
+Move early dump functionality into common code so that it is available for
+all archtiectures. No need to carry arch specific reads around as the read
+hooks are already initialized by the time pci_setup_device() is getting
+called during scan.
 
-Signed-off-by: Dennis Gilmore <dennis@ausil.us>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/armada-388-helios4.dts | 315 +++++++++++++++++++++++
- 2 files changed, 316 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-388-helios4.dts
+ Documentation/admin-guide/kernel-parameters.txt |  2 +-
+ arch/x86/include/asm/pci-direct.h               |  4 ---
+ arch/x86/kernel/setup.c                         |  5 ---
+ arch/x86/pci/common.c                           |  4 ---
+ arch/x86/pci/early.c                            | 44 -------------------------
+ drivers/pci/pci.c                               |  5 +++
+ drivers/pci/pci.h                               |  1 +
+ drivers/pci/probe.c                             | 19 +++++++++++
+ 8 files changed, 26 insertions(+), 58 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e2424957809..490bfd586198 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1123,6 +1123,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
- 	armada-388-clearfog-pro.dtb \
- 	armada-388-db.dtb \
- 	armada-388-gp.dtb \
-+	armada-388-helios4.dtb \
- 	armada-388-rd.dtb
- dtb-$(CONFIG_MACH_ARMADA_39X) += \
- 	armada-398-db.dtb
-diff --git a/arch/arm/boot/dts/armada-388-helios4.dts b/arch/arm/boot/dts/armada-388-helios4.dts
-new file mode 100644
-index 000000000000..a6d6996e1378
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-388-helios4.dts
-@@ -0,0 +1,315 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Device Tree file for Helios4
-+ * based on SolidRun Clearfog revision A1 rev 2.0 (88F6828)
-+ *
-+ *  Copyright (C) 2017
-+ *
-+ */
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index e490902..e64f1d8 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -2995,7 +2995,7 @@
+ 			See also Documentation/blockdev/paride.txt.
+ 
+ 	pci=option[,option...]	[PCI] various PCI subsystem options:
+-		earlydump	[X86] dump PCI config space before the kernel
++		earlydump	dump PCI config space before the kernel
+ 				changes anything
+ 		off		[X86] don't probe for the PCI bus
+ 		bios		[X86-32] force use of PCI BIOS, don't access
+diff --git a/arch/x86/include/asm/pci-direct.h b/arch/x86/include/asm/pci-direct.h
+index e1084f7..94597a3 100644
+--- a/arch/x86/include/asm/pci-direct.h
++++ b/arch/x86/include/asm/pci-direct.h
+@@ -15,8 +15,4 @@ extern void write_pci_config_byte(u8 bus, u8 slot, u8 func, u8 offset, u8 val);
+ extern void write_pci_config_16(u8 bus, u8 slot, u8 func, u8 offset, u16 val);
+ 
+ extern int early_pci_allowed(void);
+-
+-extern unsigned int pci_early_dump_regs;
+-extern void early_dump_pci_device(u8 bus, u8 slot, u8 func);
+-extern void early_dump_pci_devices(void);
+ #endif /* _ASM_X86_PCI_DIRECT_H */
+diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+index 2f86d88..480f250 100644
+--- a/arch/x86/kernel/setup.c
++++ b/arch/x86/kernel/setup.c
+@@ -991,11 +991,6 @@ void __init setup_arch(char **cmdline_p)
+ 		setup_clear_cpu_cap(X86_FEATURE_APIC);
+ 	}
+ 
+-#ifdef CONFIG_PCI
+-	if (pci_early_dump_regs)
+-		early_dump_pci_devices();
+-#endif
+-
+ 	e820__reserve_setup_data();
+ 	e820__finish_early_params();
+ 
+diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+index 563049c..d4ec117 100644
+--- a/arch/x86/pci/common.c
++++ b/arch/x86/pci/common.c
+@@ -22,7 +22,6 @@
+ unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 |
+ 				PCI_PROBE_MMCONF;
+ 
+-unsigned int pci_early_dump_regs;
+ static int pci_bf_sort;
+ int pci_routeirq;
+ int noioapicquirk;
+@@ -599,9 +598,6 @@ char *__init pcibios_setup(char *str)
+ 		pci_probe |= PCI_BIG_ROOT_WINDOW;
+ 		return NULL;
+ #endif
+-	} else if (!strcmp(str, "earlydump")) {
+-		pci_early_dump_regs = 1;
+-		return NULL;
+ 	} else if (!strcmp(str, "routeirq")) {
+ 		pci_routeirq = 1;
+ 		return NULL;
+diff --git a/arch/x86/pci/early.c b/arch/x86/pci/early.c
+index e5f753c..f5fc953 100644
+--- a/arch/x86/pci/early.c
++++ b/arch/x86/pci/early.c
+@@ -57,47 +57,3 @@ int early_pci_allowed(void)
+ 			PCI_PROBE_CONF1;
+ }
+ 
+-void early_dump_pci_device(u8 bus, u8 slot, u8 func)
+-{
+-	u32 value[256 / 4];
+-	int i;
+-
+-	pr_info("pci 0000:%02x:%02x.%d config space:\n", bus, slot, func);
+-
+-	for (i = 0; i < 256; i += 4)
+-		value[i / 4] = read_pci_config(bus, slot, func, i);
+-
+-	print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1, value, 256, false);
+-}
+-
+-void early_dump_pci_devices(void)
+-{
+-	unsigned bus, slot, func;
+-
+-	if (!early_pci_allowed())
+-		return;
+-
+-	for (bus = 0; bus < 256; bus++) {
+-		for (slot = 0; slot < 32; slot++) {
+-			for (func = 0; func < 8; func++) {
+-				u32 class;
+-				u8 type;
+-
+-				class = read_pci_config(bus, slot, func,
+-							PCI_CLASS_REVISION);
+-				if (class == 0xffffffff)
+-					continue;
+-
+-				early_dump_pci_device(bus, slot, func);
+-
+-				if (func == 0) {
+-					type = read_pci_config_byte(bus, slot,
+-								    func,
+-							       PCI_HEADER_TYPE);
+-					if (!(type & 0x80))
+-						break;
+-				}
+-			}
+-		}
+-	}
+-}
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 97acba7..04052dc 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -115,6 +115,9 @@ static bool pcie_ari_disabled;
+ /* If set, the PCIe ATS capability will not be used. */
+ static bool pcie_ats_disabled;
+ 
++/* If set, the PCI config space of each device is printed during boot. */
++bool pci_early_dump;
 +
-+/dts-v1/;
-+#include "armada-388.dtsi"
-+#include "armada-38x-solidrun-microsom.dtsi"
+ bool pci_ats_disabled(void)
+ {
+ 	return pcie_ats_disabled;
+@@ -5805,6 +5808,8 @@ static int __init pci_setup(char *str)
+ 				pcie_ats_disabled = true;
+ 			} else if (!strcmp(str, "noaer")) {
+ 				pci_no_aer();
++			} else if (!strcmp(str, "earlydump")) {
++				pci_early_dump = true;
+ 			} else if (!strncmp(str, "realloc=", 8)) {
+ 				pci_realloc_get_opt(str + 8);
+ 			} else if (!strncmp(str, "realloc", 7)) {
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index c358e7a0..c33265e 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -7,6 +7,7 @@
+ #define PCI_VSEC_ID_INTEL_TBT	0x1234	/* Thunderbolt */
+ 
+ extern const unsigned char pcie_link_speed[];
++extern bool pci_early_dump;
+ 
+ bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
+ 
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 56771f3..3678f0a 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1545,6 +1545,23 @@ static int pci_intx_mask_broken(struct pci_dev *dev)
+ 	return 0;
+ }
+ 
++static void early_dump_pci_device(struct pci_dev *pdev)
++{
++	u32 value[256 / 4];
++	int i;
 +
-+/ {
-+	model = "Helios4";
-+	compatible = "solidrun,helios4", "marvell,armada388",
-+		"marvell,armada385", "marvell,armada380";
++	if (!pci_early_dump)
++		return;
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x80000000>; /* 2 GB */
-+	};
++	pci_info(pdev, "config space:\n");
 +
-+	aliases {
-+		/* So that mvebu u-boot can update the MAC addresses */
-+		ethernet1 = &eth0;
-+	};
++	for (i = 0; i < 256; i += 4)
++		pci_read_config_dword(pdev, i, &value[i / 4]);
 +
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
++	print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1, value,
++		       256, false);
++}
 +
-+	reg_12v: regulator-12v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "power_brick_12V";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+		regulator-always-on;
-+	};
+ /**
+  * pci_setup_device - Fill in class and map information of a device
+  * @dev: the device structure to fill
+@@ -1594,6 +1611,8 @@ int pci_setup_device(struct pci_dev *dev)
+ 	pci_printk(KERN_DEBUG, dev, "[%04x:%04x] type %02x class %#08x\n",
+ 		   dev->vendor, dev->device, dev->hdr_type, dev->class);
+ 
++	early_dump_pci_device(dev);
 +
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_12v>;
-+	};
-+
-+	reg_5p0v_hdd: regulator-5v-hdd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "5V_HDD";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_12v>;
-+	};
-+
-+	reg_5p0v_usb: regulator-5v-usb {
-+		compatible = "regulator-fixed";
-+		regulator-name = "USB-PWR";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+		enable-active-high;
-+		gpio = <&expander0 6 GPIO_ACTIVE_HIGH>;
-+		vin-supply = <&reg_12v>;
-+	};
-+
-+	system-leds {
-+		compatible = "gpio-leds";
-+		status-led {
-+			label = "helios4:green:status";
-+			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "on";
-+		};
-+
-+		fault-led {
-+			label = "helios4:red:fault";
-+			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
-+		};
-+	};
-+
-+	io-leds {
-+		compatible = "gpio-leds";
-+		sata1-led {
-+			label = "helios4:green:ata1";
-+			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "ata1";
-+			default-state = "off";
-+		};
-+		sata2-led {
-+			label = "helios4:green:ata2";
-+			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "ata2";
-+			default-state = "off";
-+		};
-+		sata3-led {
-+			label = "helios4:green:ata3";
-+			gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "ata3";
-+			default-state = "off";
-+		};
-+		sata4-led {
-+			label = "helios4:green:ata4";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "ata4";
-+			default-state = "off";
-+		};
-+		usb-led {
-+			label = "helios4:green:usb";
-+			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "usb-host";
-+			default-state = "off";
-+		};
-+	};
-+
-+	fan1: j10-pwm {
-+		compatible = "pwm-fan";
-+		pwms = <&gpio1 9 40000>;	/* Target freq:25 kHz */
-+	};
-+
-+	fan2: j17-pwm {
-+		compatible = "pwm-fan";
-+		pwms = <&gpio1 23 40000>;	/* Target freq:25 kHz */
-+	};
-+
-+	usb2_phy: usb2-phy {
-+		compatible = "usb-nop-xceiv";
-+		vbus-regulator = <&reg_5p0v_usb>;
-+	};
-+
-+	usb3_phy: usb3-phy {
-+		compatible = "usb-nop-xceiv";
-+		//vbus-regulator = <&reg_5p0v_usb>;
-+	};
-+
-+	soc {
-+		internal-regs {
-+			i2c at 11000 {
-+				clock-frequency = <400000>;
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+
-+				/*
-+				 * PCA9655 GPIO expander, up to 1MHz clock.
-+				 *  0-Board Revision bit 0 #
-+				 *  1-Board Revision bit 1 #
-+				 *  5-USB3 overcurrent
-+				 *  6-USB3 power
-+				 */
-+				expander0: gpio-expander at 20 {
-+					/*
-+					 * This is how it should be:
-+					 * compatible = "onnn,pca9655",
-+					 *	 "nxp,pca9555";
-+					 * but you can't do this because of
-+					 * the way I2C works.
-+					 */
-+					compatible = "nxp,pca9555";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					reg = <0x20>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pca0_pins>;
-+					interrupt-parent = <&gpio0>;
-+					interrupts = <23 IRQ_TYPE_EDGE_FALLING>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+
-+					board_rev_bit_0 {
-+						gpio-hog;
-+						gpios = <0 GPIO_ACTIVE_LOW>;
-+						input;
-+						line-name = "board-rev-0";
-+					};
-+					board_rev_bit_1 {
-+						gpio-hog;
-+						gpios = <1 GPIO_ACTIVE_LOW>;
-+						input;
-+						line-name = "board-rev-1";
-+					};
-+					usb3_ilimit {
-+						gpio-hog;
-+						gpios = <5 GPIO_ACTIVE_HIGH>;
-+						input;
-+						line-name = "usb-overcurrent-status";
-+					};
-+				};
-+
-+				temp_sensor: temp at 4c {
-+					compatible = "ti,lm75";
-+					reg = <0x4c>;
-+					vcc-supply = <&reg_3p3v>;
-+				};
-+			};
-+
-+			i2c at 11100 {
-+				/*
-+				 * External I2C Bus for user peripheral
-+				 */
-+				clock-frequency = <400000>;
-+				pinctrl-0 = <&helios_i2c1_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+			};
-+
-+			sata at a8000 {
-+				status = "okay";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				sata0: sata-port at 0 {
-+					reg = <0>;
-+				};
-+
-+				sata1: sata-port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+
-+			sata at e0000 {
-+				status = "okay";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				sata2: sata-port at 0 {
-+					reg = <0>;
-+				};
-+
-+				sata3: sata-port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+
-+			spi at 10680 {
-+				pinctrl-0 = <&spi1_pins
-+					     &microsom_spi1_cs_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+			};
-+
-+			sdhci at d8000 {
-+				bus-width = <4>;
-+				cd-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
-+				no-1-8-v;
-+				pinctrl-0 = <&helios_sdhci_pins
-+					     &helios_sdhci_cd_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				vmmc = <&reg_3p3v>;
-+				wp-inverted;
-+			};
-+
-+			usb at 58000 {
-+				//vcc-supply = <&reg_5p0v_usb>;
-+				usb-phy = <&usb2_phy>;
-+				status = "okay";
-+			};
-+
-+			usb3 at f0000 {
-+				status = "okay";
-+			};
-+
-+			usb3 at f8000 {
-+				status = "okay";
-+			};
-+
-+			pinctrl at 18000 {
-+				pca0_pins: pca0-pins {
-+					marvell,pins = "mpp23";
-+					marvell,function = "gpio";
-+				};
-+				microsom_phy0_int_pins: microsom-phy0-int-pins {
-+					marvell,pins = "mpp18";
-+					marvell,function = "gpio";
-+				};
-+				helios_i2c1_pins: i2c1-pins {
-+					marvell,pins = "mpp26", "mpp27";
-+					marvell,function = "i2c1";
-+				};
-+				helios_sdhci_cd_pins: helios-sdhci-cd-pins {
-+					marvell,pins = "mpp20";
-+					marvell,function = "gpio";
-+				};
-+				helios_sdhci_pins: helios-sdhci-pins {
-+					marvell,pins = "mpp21", "mpp28",
-+						       "mpp37", "mpp38",
-+						       "mpp39", "mpp40";
-+					marvell,function = "sd0";
-+				};
-+				helios_led_pins: helios-led-pins {
-+					marvell,pins = "mpp24", "mpp25",
-+						       "mpp49", "mpp50",
-+						       "mpp52", "mpp53",
-+						       "mpp54";
-+					marvell,function = "gpio";
-+				};
-+				helios_fan_pins: helios-fan-pins {
-+					marvell,pins = "mpp41", "mpp43",
-+						       "mpp48", "mpp55";
-+					marvell,function = "gpio";
-+				};
-+				microsom_spi1_cs_pins: spi1-cs-pins {
-+					marvell,pins = "mpp59";
-+					marvell,function = "spi1";
-+				};
-+			};
-+		};
-+	};
-+};
+ 	/* Need to have dev->class ready */
+ 	dev->cfg_size = pci_cfg_space_size(dev);
+ 
 -- 
-2.17.1
+2.7.4
