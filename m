@@ -1,69 +1,40 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed,  6 Jun 2018 11:38:46 -0500
-Subject: [PATCH v2] arm64: topology: Avoid checking numa mask for scheduler MC
- selection
-Message-ID: <20180606163846.495725-1-jeremy.linton@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 6 Jun 2018 09:47:12 -0700
+Subject: [PATCH] ARM: dts: cygnus: Add HWRNG node
+In-Reply-To: <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
+References: <20180606093441.16483-1-peron.clem@gmail.com>
+ <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
+Message-ID: <c7990001-00e6-d828-bafd-3d472fcfee20@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The numa mask subset check can often lead to system hang or crash during
-CPU hotplug and system suspend operation if NUMA is disabled. This is
-mostly observed on HMP systems where the CPU compute capacities are
-different and ends up in different scheduler domains. Since
-cpumask_of_node is returned instead core_sibling, the scheduler is
-confused with incorrect cpumasks(e.g. one CPU in two different sched
-domains at the same time) on CPU hotplug.
+On 06/06/2018 09:03 AM, Scott Branden wrote:
+> Hi Clement,
+> 
+> 
+> On 18-06-06 02:34 AM, Cl?ment P?ron wrote:
+>> From: Cl?ment Peron <clement.peron@devialet.com>
+>>
+>> There is a HWRNG in Broadcom Cygnus SoC, so enable it.
+>>
+>> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> Thanks for upstreaming some missing Cygnus components.
+> 
+> But, the problem is the tarball release from Broadcom you are extracting
+> these changes from does not contain git history; so, you are missing the
+> original authors and signed-off's.
+> I checked our internal git repository and for this commit the author is:
+> Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
+> 
+> Please adjust author and signed-off appropriately.? If there are other
+> changes you are extracting from the source tarballs you have please
+> contact me so we can construct patch appropriately.
 
-Lets disable the NUMA siblings checks for the time being, as NUMA in
-socket machines have LLC's that will assure that the scheduler topology
-isn't "borken".
+If you want the original author's Signed-off-by to be preserved, why
+don't you extract it from your internal git tree and submit the patch on
+Mohamed's behalf?
 
-The NUMA check exists to assure that if a LLC within a socket crosses
-NUMA nodes/chiplets the scheduler domains remain consistent. This code will
-likely have to be re-enabled in the near future once the NUMA mask story
-is sorted.  At the moment its not necessary because the NUMA in socket
-machines LLC's are contained within the NUMA domains.
-
-Further, as a defensive mechanism during hot-plug, lets assure that the
-LLC siblings are also masked.
-
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/kernel/topology.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 7415c166281f..f845a8617812 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -215,13 +215,8 @@ EXPORT_SYMBOL_GPL(cpu_topology);
- 
- const struct cpumask *cpu_coregroup_mask(int cpu)
- {
--	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
-+	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
- 
--	/* Find the smaller of NUMA, core or LLC siblings */
--	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
--		/* not numa in package, lets use the package siblings */
--		core_mask = &cpu_topology[cpu].core_sibling;
--	}
- 	if (cpu_topology[cpu].llc_id != -1) {
- 		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
- 			core_mask = &cpu_topology[cpu].llc_siblings;
-@@ -239,8 +234,10 @@ static void update_siblings_masks(unsigned int cpuid)
- 	for_each_possible_cpu(cpu) {
- 		cpu_topo = &cpu_topology[cpu];
- 
--		if (cpuid_topo->llc_id == cpu_topo->llc_id)
-+		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
- 			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
-+			cpumask_set_cpu(cpuid, &cpu_topo->llc_siblings);
-+		}
- 
- 		if (cpuid_topo->package_id != cpu_topo->package_id)
- 			continue;
+AFAICT what Clement is doing here is permissible given the Linux
+developer certificate of origin though I am not a lawyer of course.
 -- 
-2.14.3
+Florian
