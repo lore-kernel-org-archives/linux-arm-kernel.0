@@ -1,42 +1,208 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Wed, 6 Jun 2018 16:07:45 +0100
-Subject: [PATCH] arm64: topology: Avoid checking numa mask for scheduler
- MC selection
-In-Reply-To: <be5f7066-0b44-ff11-37e9-87512df2294f@arm.com>
-References: <20180605190837.493505-1-jeremy.linton@arm.com>
- <20180606144444.GB8461@e105550-lin.cambridge.arm.com>
- <be5f7066-0b44-ff11-37e9-87512df2294f@arm.com>
-Message-ID: <20180606150745.GC8461@e105550-lin.cambridge.arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 6 Jun 2018 18:08:19 +0300
+Subject: [PATCH v4 1/7] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <CAHLCerNmBAbu4UcQ+uksXN8z-o-kxLct9ryfy5qBY0Z2jDNRGg@mail.gmail.com>
+References: <20180309210958.16672-1-georgi.djakov@linaro.org>
+ <20180309210958.16672-2-georgi.djakov@linaro.org>
+ <CAHLCerNmBAbu4UcQ+uksXN8z-o-kxLct9ryfy5qBY0Z2jDNRGg@mail.gmail.com>
+Message-ID: <3f0e5606-c28d-6bd9-387e-23be1d0185fc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 09:53:39AM -0500, Jeremy Linton wrote:
-> On 06/06/2018 09:44 AM, Morten Rasmussen wrote:
-> >On Tue, Jun 05, 2018 at 02:08:37PM -0500, Jeremy Linton wrote:
-> >>The numa mask subset check has problems if !CONFIG_NUMA, over hotplug
-> >>operations or during early boot. Lets disable the NUMA siblings checks
-> >>for the time being, as NUMA in socket machines have LLC's that will
-> >>assure that the scheduler topology isn't "borken".
-> >
-> >Could we add an explanation why the numa node mask check is needed in
-> >the first place. >
-> >IIUC, we have the check in case the LLC is shared across numa nodes as
-> >this would cause core_siblings > cpumask_of_node() which breaks the
-> >scheduler topology.
-> 
-> Yes, that sounds like a good idea, my comments probably assume that the
-> reader has been part of these conversations.
-> 
-> >
-> >While sharing LLC across numa nodes seems quite unusual, I think it is
-> >allowed by ACPI. Those systems might already be broken before, so might
-> >not change anything. It is just worth noting why the check should be
-> >added back later.
-> 
-> Right, there isn't anything in ACPI that dictates a system topology
-> restriction like this. Given that other architectures have built machines
-> with large directory caches that span numa nodes the check was a safety
-> measure.
+Hi Amit,
 
-Agreed, it seems that another architecture has recently merged support
-for that: 1340ccfa9a9a
+On 25.05.18 ?. 11:26, Amit Kucheria wrote:
+> On Fri, Mar 9, 2018 at 11:09 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>> This patch introduce a new API to get requirements and configure the
+>> interconnect buses across the entire chipset to fit with the current
+>> demand.
+>>
+>> The API is using a consumer/provider-based model, where the providers are
+>> the interconnect buses and the consumers could be various drivers.
+>> The consumers request interconnect resources (path) between endpoints and
+>> set the desired constraints on this data flow path. The providers receive
+>> requests from consumers and aggregate these requests for all master-slave
+>> pairs on that path. Then the providers configure each participating in the
+>> topology node according to the requested data flow path, physical links and
+>> constraints. The topology could be complicated and multi-tiered and is SoC
+>> specific.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+[..]
+
+>> +Interconnect consumers
+>> +----------------------
+>> +
+>> +Interconnect consumers are the clients which use the interconnect APIs to
+>> +get paths between endpoints and set their bandwidth/latency/QoS requirements
+>> +for these interconnect paths.
+>> +
+> 
+> This document is missing a section on the locking semantics of the
+> framework. Does the core ensure that the entire path is locked for
+> set() to propagate?
+
+Yes, the core will ensure that the path is locked. Will add this to the
+function description.
+
+[..]
+
+>> +
+>> +static int path_init(struct icc_path *path)
+>> +{
+>> +       struct icc_node *node;
+>> +       size_t i;
+>> +
+>> +       for (i = 0; i < path->num_nodes; i++) {
+>> +               node = path->reqs[i].node;
+>> +
+>> +               mutex_lock(&node->provider->lock);
+>> +               node->provider->users++;
+>> +               mutex_unlock(&node->provider->lock);
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+> 
+> Consider adding some comments for node_aggregate and
+> provider_aggregate's aggregation algorithm
+> 
+> "We want the path to honor all bandwidth requests, so the average
+> bandwidth requirements from each consumer are aggregated at each node
+> and provider level. The peak bandwidth requirements will then be the
+> highest of all the peak bw requests"
+> 
+> or something to the effect that.
+
+Ok, thanks.
+
+>> +static void node_aggregate(struct icc_node *node)
+>> +{
+>> +       struct icc_req *r;
+>> +       u32 agg_avg = 0;
+>> +       u32 agg_peak = 0;
+>> +
+>> +       hlist_for_each_entry(r, &node->req_list, req_node) {
+>> +               /* sum(averages) and max(peaks) */
+>> +               agg_avg += r->avg_bw;
+>> +               agg_peak = max(agg_peak, r->peak_bw);
+>> +       }
+>> +
+>> +       node->avg_bw = agg_avg;
+>> +       node->peak_bw = agg_peak;
+>> +}
+>> +
+>> +static void provider_aggregate(struct icc_provider *provider, u32 *avg_bw,
+>> +                              u32 *peak_bw)
+>> +{
+>> +       struct icc_node *n;
+>> +       u32 agg_avg = 0;
+>> +       u32 agg_peak = 0;
+>> +
+>> +       /* aggregate for the interconnect provider */
+> 
+> You could get rid of this, the function name says as much.
+
+Ok.
+
+>> +       list_for_each_entry(n, &provider->nodes, node_list) {
+>> +               /* sum the average and max the peak */
+>> +               agg_avg += n->avg_bw;
+>> +               agg_peak = max(agg_peak, n->peak_bw);
+>> +       }
+>> +
+>> +       *avg_bw = agg_avg;
+>> +       *peak_bw = agg_peak;
+>> +}
+>> +
+>> +static int constraints_apply(struct icc_path *path)
+>> +{
+>> +       struct icc_node *next, *prev = NULL;
+>> +       int i;
+>> +
+>> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
+>> +               struct icc_provider *provider;
+>> +               u32 avg_bw = 0;
+>> +               u32 peak_bw = 0;
+>> +               int ret;
+>> +
+>> +               next = path->reqs[i].node;
+>> +               /*
+>> +                * Both endpoints should be valid master-slave pairs of the
+>> +                * same interconnect provider that will be configured.
+>> +                */
+>> +               if (!next || !prev)
+>> +                       continue;
+>> +
+>> +               if (next->provider != prev->provider)
+>> +                       continue;
+>> +
+>> +               provider = next->provider;
+>> +               mutex_lock(&provider->lock);
+>> +
+>> +               /* aggregate requests for the provider */
+> 
+> Get rid of comment.
+
+Ok.
+
+>> +               provider_aggregate(provider, &avg_bw, &peak_bw);
+>> +
+>> +               if (provider->set) {
+>> +                       /* set the constraints */
+>> +                       ret = provider->set(prev, next, avg_bw, peak_bw);
+>> +               }
+>> +
+>> +               mutex_unlock(&provider->lock);
+>> +
+>> +               if (ret)
+>> +                       return ret;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/**
+>> + * icc_set() - set constraints on an interconnect path between two endpoints
+>> + * @path: reference to the path returned by icc_get()
+>> + * @avg_bw: average bandwidth in kbps
+>> + * @peak_bw: peak bandwidth in kbps
+>> + *
+>> + * This function is used by an interconnect consumer to express its own needs
+>> + * in term of bandwidth and QoS for a previously requested path between two
+>> + * endpoints. The requests are aggregated and each node is updated accordingly.
+>> + *
+>> + * Returns 0 on success, or an approproate error code otherwise.
+> 
+> *appropriate*
+
+Ok.
+
+[..]
+>> +/**
+>> + * struct icc_node - entity that is part of the interconnect topology
+>> + *
+>> + * @id: platform specific node id
+>> + * @name: node name used in debugfs
+>> + * @links: a list of targets where we can go next when traversing
+>> + * @num_links: number of links to other interconnect nodes
+>> + * @provider: points to the interconnect provider of this node
+>> + * @node_list: list of interconnect nodes associated with @provider
+>> + * @search_list: list used when walking the nodes graph
+>> + * @reverse: pointer to previous node when walking the nodes graph
+>> + * @is_traversed: flag that is used when walking the nodes graph
+>> + * @req_list: a list of QoS constraint requests associated with this node
+> 
+> 
+>> + * @avg_bw: aggregated value of average bandwidth
+>> + * @peak_bw: aggregated value of peak bandwidth
+> 
+> Consider changing to "aggregated value of {average|peak} bandwidth
+> requests from all consumers"
+
+Ok, will clarify.
+
+Thanks,
+Georgi
