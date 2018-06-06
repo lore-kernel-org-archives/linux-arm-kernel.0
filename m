@@ -1,40 +1,38 @@
-From: ptesarik@suse.cz (Petr Tesarik)
-Date: Wed, 6 Jun 2018 10:00:24 +0200
-Subject: panic kexec broken on ARM64?
-In-Reply-To: <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
-References: <20180605100151.7fd54381@ezekiel.suse.cz>
- <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
- <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
-Message-ID: <20180606100024.50be6b75@ezekiel.suse.cz>
+From: colin.king@canonical.com (Colin King)
+Date: Wed,  6 Jun 2018 09:06:00 +0100
+Subject: [PATCH][next] staging: vc04_services: make a couple of pointers static
+Message-ID: <20180606080600.29042-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jun 2018 09:02:04 +0200
-Stefan Wahren <stefan.wahren@i2se.com> wrote:
+From: Colin Ian King <colin.king@canonical.com>
 
-> Hi Petr,
-> 
-> Am 05.06.2018 um 19:46 schrieb James Morse:
-> > Hi Petr,
-> >
-> > (CC: +Akashi, Marc)
-> >
-> > On 05/06/18 09:01, Petr Tesarik wrote:  
-> >> I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
-> >> when a panic kernel is loaded.  
-> > kdump is a best-effort thing, it looks like this is a case where the
-> > crashed-kernel can't tear itself down.
-> >
-> > Do you have the rest of the stack trace? Was it handling an irq when it decided
-> > to panic?:
-> > https://lkml.org/lkml/2018/3/13/1134  
-> 
-> the Raspberry Pi 3 B+ support is very fresh (linux-next). Since i didn't 
-> see a version, i need to doublecheck.
-> 
-> You are actually using linux-next and not the downstream kernel?
+The pointers vchiq_dbg_dir and vchiq_dbg_clients are local to the
+source and do not need to be in global scope, so make them static.
 
-Very good point. I'll try again with linux-next.
+Cleans up sparse warnings:
+warning: symbol 'vchiq_dbg_dir' was not declared. Should it be static?
+warning: symbol 'vchiq_dbg_clients' was not declared. Should it be static?
 
-Stay tuned,
-Petr T
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ .../staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+index 38805504d462..6a9e71a61142 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_debugfs.c
+@@ -52,8 +52,8 @@
+ #define VCHIQ_LOG_TRACE_STR   "trace"
+ 
+ /* Global 'vchiq' debugfs and clients entry used by all instances */
+-struct dentry *vchiq_dbg_dir;
+-struct dentry *vchiq_dbg_clients;
++static struct dentry *vchiq_dbg_dir;
++static struct dentry *vchiq_dbg_clients;
+ 
+ /* Log category debugfs entries */
+ struct vchiq_debugfs_log_entry {
+-- 
+2.17.0
