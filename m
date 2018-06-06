@@ -1,49 +1,33 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Wed, 6 Jun 2018 10:40:24 +0800
-Subject: [PATCH v2] irqchip/gic-v3-its: fix ITS queue timeout
-Message-ID: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Wed,  6 Jun 2018 12:39:18 +0800
+Subject: [PATCH v3 0/3] arm64/mm: migrate swapper_pg_dir
+Message-ID: <20180606043921.19851-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel booted with maxcpus=x, 'x' is smaller
-than actual cpu numbers, the TAs of offline cpus won't
-be set to its->collection.
+Version 3 changes:
+	* Fix memory leak problem with CONFIG_ARM64_SW_TTBR0_PAN
+	* add comment explaining why the flush is needed and also why
+	  __pa_swapper_pg_dir gets placed in the .mmuoff.data.read
+	  section.
 
-If LPI is bind to offline cpu, sync cmd will use zero TA,
-it leads to ITS queue timeout.  Fix this by choosing a
-online cpu, if there is no online cpu in cpu_mask.
+[v2] https://www.spinics.net/lists/arm-kernel/msg657549.html
+[v1] https://www.spinics.net/lists/kernel/msg2819351.html
 
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Jun Yao (3):
+  arm64/mm: pass swapper_pg_dir as an argument to __enable_mmu()
+  arm64/mm: introduce variable to save new swapper_pg_dir address
+  arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5416f2b..d8b9539 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2309,7 +2309,9 @@ static int its_irq_domain_activate(struct irq_domain *domain,
- 		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 
- 	/* Bind the LPI to the first possible CPU */
--	cpu = cpumask_first(cpu_mask);
-+	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
-+	if (cpu >= nr_cpu_ids)
-+		cpu = cpumask_first(cpu_online_mask);
- 	its_dev->event_map.col_map[event] = cpu;
- 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
- 
-@@ -2466,7 +2468,10 @@ static int its_vpe_set_affinity(struct irq_data *d,
- 				bool force)
- {
- 	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
--	int cpu = cpumask_first(mask_val);
-+	int cpu = cpumask_first_and(mask_val, cpu_online_mask);
-+
-+	if (cpu >= nr_cpu_ids)
-+		cpu = cpumask_first(cpu_online_mask);
- 
- 	/*
- 	 * Changing affinity is mega expensive, so let's be as lazy as
+ arch/arm64/include/asm/mmu_context.h |  6 +-
+ arch/arm64/include/asm/pgtable.h     |  3 +
+ arch/arm64/kernel/cpufeature.c       |  2 +-
+ arch/arm64/kernel/head.S             |  6 +-
+ arch/arm64/kernel/hibernate.c        |  2 +-
+ arch/arm64/kernel/sleep.S            |  1 +
+ arch/arm64/mm/kasan_init.c           |  6 +-
+ arch/arm64/mm/mmu.c                  | 97 ++++++++++++++++++++--------
+ 8 files changed, 84 insertions(+), 39 deletions(-)
+
 -- 
-1.8.3
+2.17.0
