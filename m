@@ -1,48 +1,52 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 6 Jun 2018 09:19:19 -0700
-Subject: [PATCH v4 1/6] Documentation: DT: Consolidate SP805 binding docs
-In-Reply-To: <20180605194124.GA26885@rob-hp-laptop>
-References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
- <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
- <20180605194124.GA26885@rob-hp-laptop>
-Message-ID: <e91c75f3-f7a4-6f51-9911-7e22d5d05084@roeck-us.net>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 6 Jun 2018 09:03:55 -0700
+Subject: [PATCH] ARM: dts: cygnus: Add HWRNG node
+In-Reply-To: <20180606093441.16483-1-peron.clem@gmail.com>
+References: <20180606093441.16483-1-peron.clem@gmail.com>
+Message-ID: <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2018 12:41 PM, Rob Herring wrote:
-> On Mon, May 28, 2018 at 11:01:32AM -0700, Ray Jui wrote:
->> Consolidate two SP805 binding documents "arm,sp805.txt" and
->> "sp805-wdt.txt" into "arm,sp805.txt" that matches the naming of the
->> desired compatible string to be used
->>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> ---
->>   .../devicetree/bindings/watchdog/arm,sp805.txt     | 27 ++++++++++++++-----
->>   .../devicetree/bindings/watchdog/sp805-wdt.txt     | 31 ----------------------
->>   2 files changed, 20 insertions(+), 38 deletions(-)
->>   delete mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> 
-> Would be good to get a ACK from FSL/NXP person on this. It looks to me
-> like the driver fetches the wrong clock as it gets the first one and the
-> driver really wants 'wdog_clk'. In any case, their dts files should be
-> updated.
+Hi Clement,
+
+
+On 18-06-06 02:34 AM, Cl?ment P?ron wrote:
+> From: Cl?ment Peron <clement.peron@devialet.com>
 >
+> There is a HWRNG in Broadcom Cygnus SoC, so enable it.
+>
+> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+Thanks for upstreaming some missing Cygnus components.
 
-This is really confusing, since he deleted file lists apb_pclk first.
-Does the watchdog driver need apb_pclk or wdog_clk ? That isn't clear to me.
-arch/arm64/boot/dts/hisilicon/hi3660.dtsi only provides apb_pclk, or at least
-it says so. The fsl dts files all have apb_pclk first.
+But, the problem is the tarball release from Broadcom you are extracting 
+these changes from does not contain git history; so, you are missing the 
+original authors and signed-off's.
+I checked our internal git repository and for this commit the author is:
+Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
 
-Either case, why are two clocks asked for in the first place ? Are there
-situations where the second clock is actually used/useful ?
+Please adjust author and signed-off appropriately.? If there are other 
+changes you are extracting from the source tarballs you have please 
+contact me so we can construct patch appropriately.
 
-Guenter
-
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> 
-> Rob
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards,
+Scott
+> ---
+>   arch/arm/boot/dts/bcm-cygnus.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index 1cee40ac4613..b7178e84d56d 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -452,6 +452,11 @@
+>   			status = "disabled";
+>   		};
+>   
+> +		hwrng: hwrng at 18032000 {
+> +			compatible = "brcm,iproc-rng200";
+> +			reg = <0x18032000 0x28>;
+> +		};
+> +
+>   		sdhci0: sdhci at 18041000 {
+>   			compatible = "brcm,sdhci-iproc-cygnus";
+>   			reg = <0x18041000 0x100>;
