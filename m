@@ -1,45 +1,182 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 6 Jun 2018 12:29:06 -0700
-Subject: [PATCH v4 0/6] Enhance support for the SP805 WDT
-In-Reply-To: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
-References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <e3f657f1-bd7e-cadb-9cfe-dee6cf8c1668@gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 6 Jun 2018 12:30:10 -0700
+Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
+In-Reply-To: <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
+ <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
+ <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+Message-ID: <bbbd287c-437e-d7bd-d40f-6bb914d96860@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2018 11:01 AM, Ray Jui wrote:
-> This patch series enhances the support for the SP805 watchdog timer.
-> First of all, 'timeout-sec' devicetree property is added. In addition,
-> support is also added to allow the driver to reset the watchdog if it
-> has been detected that watchdot has been started in the bootloader. In
-> this case, the driver will initiate the ping service from the kernel
-> watchdog subsystem, before a user mode daemon takes over. This series
-> also enables SP805 in the default ARM64 defconfig
-> 
-> This patch series is based off v4.17-rc5 and is available on GIHUB:
-> repo: https://github.com/Broadcom/arm64-linux.git
-> branch: sp805-wdt-v4
-> 
-> Changes since v3:
->  - Improve description of 'timeout-sec' in the binding document, per
-> recommendation from Guenter Roeck
-> 
-> Changes since v2:
->  - Fix indent and format to make them consistent within arm,sp805.txt
-> 
-> Changes since v1:
->  - Consolidate two duplicated SP805 binding documents into one
->  - Slight change of the wdt_is_running implementation per discussion
-> 
-> Ray Jui (6):
->   Documentation: DT: Consolidate SP805 binding docs
->   Documentation: DT: Add optional 'timeout-sec' property for sp805
->   watchdog: sp805: add 'timeout-sec' DT property support
->   watchdog: sp805: set WDOG_HW_RUNNING when appropriate
->   arm64: dt: set initial SR watchdog timeout to 60 seconds
->   arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
+Hi Michel,
 
-I can take the last two patches and Guenter would take the first 4 or
-would you want to proceed differently?
--- 
-Florian
+On 06/05/18 23:36, Michel Pollet wrote:
+> Hi Frank,
+> 
+> On 05 June 2018 18:34, Frank wrote:
+>> On 06/05/18 04:28, Michel Pollet wrote:
+>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time,
+>>> it requires a special enable method to get it started.
+>>>
+>>> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+>>> ---
+>>>  arch/arm/mach-shmobile/Makefile        |  1 +
+>>>  arch/arm/mach-shmobile/smp-r9a06g032.c | 79
+>>> ++++++++++++++++++++++++++++++++++
+>>>  2 files changed, 80 insertions(+)
+>>>  create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+>>>
+>>> diff --git a/arch/arm/mach-shmobile/Makefile
+>>> b/arch/arm/mach-shmobile/Makefile index 1939f52..d7fc98f 100644
+>>> --- a/arch/arm/mach-shmobile/Makefile
+>>> +++ b/arch/arm/mach-shmobile/Makefile
+>>> @@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)+= smp-sh73a0.o
+>> headsmp-scu.o platsmp-scu.o
+>>>  smp-$(CONFIG_ARCH_R8A7779)+= smp-r8a7779.o headsmp-scu.o
+>> platsmp-scu.o
+>>>  smp-$(CONFIG_ARCH_R8A7790)+= smp-r8a7790.o
+>>>  smp-$(CONFIG_ARCH_R8A7791)+= smp-r8a7791.o
+>>> +smp-$(CONFIG_ARCH_R9A06G032)+= smp-r9a06g032.o
+>>>  smp-$(CONFIG_ARCH_EMEV2)+= smp-emev2.o headsmp-scu.o
+>> platsmp-scu.o
+>>>
+>>>  # PM objects
+>>> diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c
+>>> b/arch/arm/mach-shmobile/smp-r9a06g032.c
+>>> new file mode 100644
+>>> index 0000000..cd40e6e
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
+>>> @@ -0,0 +1,79 @@
+>>> +// SPDX-License-Identifier: GPL-2.0
+>>> +/*
+>>> + * R9A06G032 Second CA7 enabler.
+>>> + *
+>>> + * Copyright (C) 2018 Renesas Electronics Europe Limited
+>>> + *
+>>> + * Michel Pollet <michel.pollet@bp.renesas.com>,
+>> <buserror@gmail.com>
+>>> + * Derived from action,s500-smp
+>>> + */
+>>> +
+>>> +#include <linux/io.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/smp.h>
+>>> +
+>>> +/*
+>>> + * The second CPU is parked in ROM at boot time. It requires waking
+>>> +it after
+>>> + * writing an address into the BOOTADDR register of sysctrl.
+>>> + *
+>>> + * So the default value of the "cpu-release-addr" corresponds to
+>> BOOTADDR...
+>>> + *
+>>> + * *However* the BOOTADDR register is not available when the kernel
+>>> + * starts in NONSEC mode.
+>>> + *
+>>> + * So for NONSEC mode, the bootloader re-parks the second CPU into a
+>>> +pen
+>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to a
+>>> +SRAM address,
+>>> + * which is not restricted.
+>>
+>> The binding document for cpu-release-addr does not have a definition for 32
+>> bit arm.  The existing definition is only 64 bit arm.  Please add the definition
+>> for 32 bit arm to patch 1.
+> 
+> Hmmm I do find a definition in
+> Documentation/devicetree/bindings/arm/cpus.txt -- just under where I
+> added my 'enable-method' -- And it is already used as 32 bits in at least
+> arch/arm/boot/dts/stih407-family.dtsi.
+
+>From cpus.txt:
+
+        - cpu-release-addr
+                Usage: required for systems that have an "enable-method"
+                       property value of "spin-table".
+                Value type: <prop-encoded-array>
+                Definition:
+                        # On ARM v8 64-bit systems must be a two cell
+                          property identifying a 64-bit zero-initialised
+                          memory location.
+
+The definition specifies a two cell property for 64-bit systems.
+
+Please add to the definition that cpu-release-addr is a one cell property
+for 32-bit systems.
+
+-Frank
+
+> 
+> What do you want me to add to this exactly? Do you want me to just
+> change "required for systems that have an "enable-method" property
+> value of "spin-table" to also specify renesas,r9a06g032 ?
+> 
+> Thanks!
+> Michel
+> 
+>>
+>> -Frank
+>>
+>>
+>>> + */
+>>> +
+>>> +static void __iomem *cpu_bootaddr;
+>>> +
+>>> +static DEFINE_SPINLOCK(cpu_lock);
+>>> +
+>>> +static int r9a06g032_smp_boot_secondary(unsigned int cpu, struct
+>>> +task_struct *idle) {
+>>> +if (!cpu_bootaddr)
+>>> +return -ENODEV;
+>>> +
+>>> +spin_lock(&cpu_lock);
+>>> +
+>>> +writel(__pa_symbol(secondary_startup), cpu_bootaddr);
+>>> +arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+>>> +
+>>> +spin_unlock(&cpu_lock);
+>>> +
+>>> +return 0;
+>>> +}
+>>> +
+>>> +static void __init r9a06g032_smp_prepare_cpus(unsigned int max_cpus)
+>>> +{
+>>> +struct device_node *dn;
+>>> +int ret;
+>>> +u32 bootaddr;
+>>> +
+>>> +dn = of_get_cpu_node(1, NULL);
+>>> +if (!dn) {
+>>> +pr_err("CPU#1: missing device tree node\n");
+>>> +return;
+>>> +}
+>>> +/*
+>>> + * Determine the address from which the CPU is polling.
+>>> + * The bootloader *does* change this property
+>>> + */
+>>> +ret = of_property_read_u32(dn, "cpu-release-addr", &bootaddr);
+>>> +of_node_put(dn);
+>>> +if (ret) {
+>>> +pr_err("CPU#1: invalid cpu-release-addr property\n");
+>>> +return;
+>>> +}
+>>> +pr_info("CPU#1: cpu-release-addr %08x\n", bootaddr);
+>>> +
+>>> +cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr)); }
+>>> +
+>>> +static const struct smp_operations r9a06g032_smp_ops __initconst = {
+>>> +.smp_prepare_cpus = r9a06g032_smp_prepare_cpus,
+>>> +.smp_boot_secondary = r9a06g032_smp_boot_secondary, };
+>>> +CPU_METHOD_OF_DECLARE(r9a06g032_smp, "renesas,r9a06g032-smp",
+>>> +&r9a06g032_smp_ops);
+>>>
+> 
+> 
+> 
+> 
+> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+> 
