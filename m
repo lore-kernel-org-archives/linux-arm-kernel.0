@@ -1,25 +1,16 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 6 Jun 2018 10:24:22 +0200
-Subject: [PATCH v4 05/14] coresight: get/put module in
- coresight_build/release_path
-In-Reply-To: <20180605210710.22227-6-kim.phillips@arm.com>
+Date: Wed, 6 Jun 2018 10:25:31 +0200
+Subject: [PATCH v4 01/14] coresight: cpu_debug: minor module fixups
+In-Reply-To: <20180605210710.22227-2-kim.phillips@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-6-kim.phillips@arm.com>
-Message-ID: <20180606082422.GB19727@kroah.com>
+ <20180605210710.22227-2-kim.phillips@arm.com>
+Message-ID: <20180606082531.GC19727@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
-> Increment the refcnt for driver modules in current use by calling
-> module_get in coresight_build_path and module_put in release_path.
-> 
-> This prevents driver modules from being unloaded when they are in use,
-> either in sysfs or perf mode.
-
-Why does it matter?  Shouldn't you be allowed to remove any module at
-any point in time, much like a networking driver?
-
-
+On Tue, Jun 05, 2018 at 04:06:57PM -0500, Kim Phillips wrote:
+>  - provide the name of the module in the Kconfig help section
+>  - define a MODULE_DEVICE_TABLE in order to be autoloaded on boot
 > 
 > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 > Cc: Leo Yan <leo.yan@linaro.org>
@@ -30,23 +21,38 @@ any point in time, much like a networking driver?
 > Cc: Russell King <linux@armlinux.org.uk>
 > Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 > ---
->  drivers/hwtracing/coresight/coresight.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  drivers/hwtracing/coresight/Kconfig               | 3 +++
+>  drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 ++
+>  2 files changed, 5 insertions(+)
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index 338f1719641c..1c941351f1d1 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -465,6 +465,12 @@ static int _coresight_build_path(struct coresight_device *csdev,
+> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> index ef9cb3c164e1..d1209f5acf76 100644
+> --- a/drivers/hwtracing/coresight/Kconfig
+> +++ b/drivers/hwtracing/coresight/Kconfig
+> @@ -103,4 +103,7 @@ config CORESIGHT_CPU_DEBUG
+>  	  properly, please refer Documentation/trace/coresight-cpu-debug.txt
+>  	  for detailed description and the example for usage.
 >  
->  	node->csdev = csdev;
->  	list_add(&node->link, path);
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called coresight-cpu-debug.
 > +
-> +	if (!try_module_get(csdev->dev.parent->driver->owner)) {
+>  endif
+> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> index 45b2460f3166..1efe9626eb6c 100644
+> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> @@ -671,6 +671,8 @@ static const struct amba_id debug_ids[] = {
+>  	{ 0, 0 },
+>  };
+>  
+> +MODULE_DEVICE_TABLE(amba, debug_ids);
+> +
+>  static struct amba_driver debug_driver = {
+>  	.drv = {
+>  		.name   = "coresight-cpu-debug",
 
-What is to keep parent->driver from going away right here?  What keeps
-parent around?  This feels very fragile to me, I don't see any locking
-anywhere around this code path to try to keep things in place.
+
+This should be 2 patches as you are doing two different things here.
 
 thanks,
 
