@@ -1,70 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 Jun 2018 11:33:04 -0500
-Subject: [PATCH v4 1/6] Documentation: DT: Consolidate SP805 binding docs
-In-Reply-To: <e91c75f3-f7a4-6f51-9911-7e22d5d05084@roeck-us.net>
-References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
- <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
- <20180605194124.GA26885@rob-hp-laptop>
- <e91c75f3-f7a4-6f51-9911-7e22d5d05084@roeck-us.net>
-Message-ID: <CABGGisxEvWDy16SKE2RG-vhUHBZHSCCHyfwJsPY16B1fQS-=cA@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed,  6 Jun 2018 11:38:46 -0500
+Subject: [PATCH v2] arm64: topology: Avoid checking numa mask for scheduler MC
+ selection
+Message-ID: <20180606163846.495725-1-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2018 at 11:19 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 06/05/2018 12:41 PM, Rob Herring wrote:
->>
->> On Mon, May 28, 2018 at 11:01:32AM -0700, Ray Jui wrote:
->>>
->>> Consolidate two SP805 binding documents "arm,sp805.txt" and
->>> "sp805-wdt.txt" into "arm,sp805.txt" that matches the naming of the
->>> desired compatible string to be used
->>>
->>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->>> ---
->>>   .../devicetree/bindings/watchdog/arm,sp805.txt     | 27
->>> ++++++++++++++-----
->>>   .../devicetree/bindings/watchdog/sp805-wdt.txt     | 31
->>> ----------------------
->>>   2 files changed, 20 insertions(+), 38 deletions(-)
->>>   delete mode 100644
->>> Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->>
->>
->> Would be good to get a ACK from FSL/NXP person on this. It looks to me
->> like the driver fetches the wrong clock as it gets the first one and the
->> driver really wants 'wdog_clk'. In any case, their dts files should be
->> updated.
->>
->
-> This is really confusing, since he deleted file lists apb_pclk first.
-> Does the watchdog driver need apb_pclk or wdog_clk ? That isn't clear to me.
-> arch/arm64/boot/dts/hisilicon/hi3660.dtsi only provides apb_pclk, or at
-> least
-> it says so.
+The numa mask subset check can often lead to system hang or crash during
+CPU hotplug and system suspend operation if NUMA is disabled. This is
+mostly observed on HMP systems where the CPU compute capacities are
+different and ends up in different scheduler domains. Since
+cpumask_of_node is returned instead core_sibling, the scheduler is
+confused with incorrect cpumasks(e.g. one CPU in two different sched
+domains at the same time) on CPU hotplug.
 
-Note that that clock source is 32KHz. That is obviously a mistake
-because no one clocks their bus/register interface at 32KHz. Someone
-just filled in something that happened to work.
+Lets disable the NUMA siblings checks for the time being, as NUMA in
+socket machines have LLC's that will assure that the scheduler topology
+isn't "borken".
 
-> The fsl dts files all have apb_pclk first.
+The NUMA check exists to assure that if a LLC within a socket crosses
+NUMA nodes/chiplets the scheduler domains remain consistent. This code will
+likely have to be re-enabled in the near future once the NUMA mask story
+is sorted.  At the moment its not necessary because the NUMA in socket
+machines LLC's are contained within the NUMA domains.
 
-It's all kind of a mess, but fortunately one we should be able to clean-up.
+Further, as a defensive mechanism during hot-plug, lets assure that the
+LLC siblings are also masked.
 
-The compatible string changes too, but AMBA bus devices don't actually
-use the compatible string as they use the ID registers to match. I
-suppose some other OS could do things differently. Worth the risk to
-clean-up IMO.
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/kernel/topology.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
->
-> Either case, why are two clocks asked for in the first place ? Are there
-> situations where the second clock is actually used/useful ?
-
-For clocks, the bus needs "apb_pclk" and the driver just gets the
-first clock. The driver is obviously going to want the functional
-clock that determines the counter rate. That should
-
-Primecell peripherals are about the only ones that have clear specs
-WRT clock inputs. Yet we've still managed to screw them up. There are
-2 clocks in the spec, so the DT has (or should have) 2 clocks.
-
-Rob
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 7415c166281f..f845a8617812 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -215,13 +215,8 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+ 
+ const struct cpumask *cpu_coregroup_mask(int cpu)
+ {
+-	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
++	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
+ 
+-	/* Find the smaller of NUMA, core or LLC siblings */
+-	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
+-		/* not numa in package, lets use the package siblings */
+-		core_mask = &cpu_topology[cpu].core_sibling;
+-	}
+ 	if (cpu_topology[cpu].llc_id != -1) {
+ 		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
+ 			core_mask = &cpu_topology[cpu].llc_siblings;
+@@ -239,8 +234,10 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	for_each_possible_cpu(cpu) {
+ 		cpu_topo = &cpu_topology[cpu];
+ 
+-		if (cpuid_topo->llc_id == cpu_topo->llc_id)
++		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
+ 			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
++			cpumask_set_cpu(cpuid, &cpu_topo->llc_siblings);
++		}
+ 
+ 		if (cpuid_topo->package_id != cpu_topo->package_id)
+ 			continue;
+-- 
+2.14.3
