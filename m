@@ -1,81 +1,212 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 6 Jun 2018 10:32:50 -0700
-Subject: [PATCH] ARM: dts: cygnus: Add HWRNG node
-In-Reply-To: <676106a4-d763-725c-2342-f8d215fbd169@broadcom.com>
-References: <20180606093441.16483-1-peron.clem@gmail.com>
- <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
- <c7990001-00e6-d828-bafd-3d472fcfee20@gmail.com>
- <676106a4-d763-725c-2342-f8d215fbd169@broadcom.com>
-Message-ID: <d2d81ba8-5e25-0b23-339a-fd079daa120c@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Jun 2018 19:01:20 +0100
+Subject: [PATCH v2 5/5] arm64: perf: Add support for chaining event
+ counters
+In-Reply-To: <1527591356-10934-6-git-send-email-suzuki.poulose@arm.com>
+References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
+ <1527591356-10934-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180606180119.4ofhges6codarbmk@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2018 10:14 AM, Scott Branden wrote:
+On Tue, May 29, 2018 at 11:55:56AM +0100, Suzuki K Poulose wrote:
+> Add support for 64bit event by using chained event counters
+> and 64bit cycle counters.
 > 
-> 
-> On 18-06-06 09:47 AM, Florian Fainelli wrote:
->> On 06/06/2018 09:03 AM, Scott Branden wrote:
->>> Hi Clement,
->>>
->>>
->>> On 18-06-06 02:34 AM, Cl?ment P?ron wrote:
->>>> From: Cl?ment Peron <clement.peron@devialet.com>
->>>>
->>>> There is a HWRNG in Broadcom Cygnus SoC, so enable it.
->>>>
->>>> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
->>> Thanks for upstreaming some missing Cygnus components.
->>>
->>> But, the problem is the tarball release from Broadcom you are extracting
->>> these changes from does not contain git history; so, you are missing the
->>> original authors and signed-off's.
->>> I checked our internal git repository and for this commit the author is:
->>> Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
->>>
->>> Please adjust author and signed-off appropriately.? If there are other
->>> changes you are extracting from the source tarballs you have please
->>> contact me so we can construct patch appropriately.
->> If you want the original author's Signed-off-by to be preserved, why
->> don't you extract it from your internal git tree and submit the patch on
->> Mohamed's behalf?
-> Sure, I can submit the original patch to keep things simple and avoid
-> finding a lawyer right now.
->>
->> AFAICT what Clement is doing here is permissible given the Linux
->> developer certificate of origin though I am not a lawyer of course.
-> But, It would be great to get some guidance and clarification on this
-> for sure.
-> I'm reading:
-> https://www.kernel.org/doc/html/v4.16/process/submitting-patches.html
-> 
-> The change was created entirely by Broadcom, so seems difficult for
-> somebody else to upstream change without appropriate authorship and
-> signed off from copyright holder.
+> Arm v8 PMUv3 allows chaining a pair of adjacent PMU counters
+> (with the lower counter number being always "even"). The low
+> counter is programmed to count the event of interest and the
+> high counter(odd numbered) is programmed with a special event
+> code (0x1e - Chain).
 
-Indeed, but it is effectively Broadcom's fault for not providing a git
-tree for the customer to pull from in order to preserve the original
-authorship, if what was distributed is a tarball of changes against a
-vanilla kernel (which is likely to be the case), then all author
-attributions are lost.
+I found this a little difficult to read. How about:
 
-Not suggesting you change how you deliver code to customers, we have the
-same issue in the STB/CM group, except maybe customers care less about
-upstreaming so we can do it ourselves at our own pace and using our own
-attributions.
+PMUv3 allows chaining a pair of adjacent 32-bit counters, effectively
+forming a 64-bit counter. The low/even counter is programmed to count
+the event of interest, and the high/odd counter is programmed to count
+the CHAIN event, taken when the low/even counter overflows.
 
-> Point a) and b) are not met in
-> Developer's Certificate of Origin while point c) is being attempted
-> (without a or b being certified).
+> Thus we need special allocation schemes
+> to make the full use of available counters. So, we allocate the
+> counters from either ends. i.e, chained counters are allocated
+> from the lower end in pairs of two and the normal counters are
+> allocated from the higher number. Also makes necessary changes to
+> handle the chained events as a single event with 2 counters.
 
-I would think that point a) and b) are met by the very fact that the
-Cygnus kernel port is GPLv2 code, being a derivative work of the Linux
-kernel, and that should be enough.
+Why do we need to allocate in this way? 
 
-This is kind of well established things, this has happened for many
-Broadcom product lines unfortunately because not everyone is active like
-you in getting things upstreamed. Those contributions were still
-entirely valid and acceptable for the kernel community.
+I can see this might make allocating a pair of counters more likely in
+some cases, but there are still others where it wouldn't be possible
+(and we'd rely on the rotation logic to repack the counters for us).
 
-Maybe we do need a lawyer, Saul Goodman, are you here?
--- 
-Florian
+[...]
+
+> +static inline u32 armv8pmu_read_evcntr(int idx)
+> +{
+> +	return (armv8pmu_select_counter(idx) == idx) ?
+> +	       read_sysreg(pmxevcntr_el0) : 0;
+> +}
+
+Given armv8pmu_select_counter() always returns the idx passed to it, I
+don't think we need to check anything here. We can clean that up to be
+void, and remove the existing checks.
+
+[...]
+
+> +static inline u64 armv8pmu_read_chain_counter(int idx)
+> +{
+> +	u64 prev_hi, hi, lo;
+> +
+> +	hi = armv8pmu_read_evcntr(idx);
+> +	do {
+> +		prev_hi = hi;
+> +		isb();
+> +		lo = armv8pmu_read_evcntr(idx - 1);
+> +		isb();
+> +		hi = armv8pmu_read_evcntr(idx);
+> +	} while (prev_hi != hi);
+> +
+> +	return (hi << 32) | lo;
+> +}
+
+> +static inline void armv8pmu_write_chain_counter(int idx, u64 value)
+> +{
+> +	armv8pmu_write_evcntr(idx, value >> 32);
+> +	isb();
+> +	armv8pmu_write_evcntr(idx - 1, value);
+> +}
+
+Can we use upper_32_bits() and lower_32_bits() here?
+
+As a more general thing, I think we need to clean up the way we
+read/write counters, because I don't think that it's right that we poke
+them while they're running -- that means you get some arbitrary skew on
+counter groups.
+
+It looks like the only case we do that is the IRQ handler, so we should
+be able to stop/start the PMU there.
+
+With that, we can get rid of the ISB here, and likewise in
+read_chain_counter, which wouldn't need to be a loop.
+
+> +
+> +static inline void armv8pmu_write_hw_counter(struct perf_event *event,
+> +					     u64 value)
+> +{
+> +	int idx = event->hw.idx;
+> +
+> +	if (armv8pmu_event_is_chained(event))
+> +		armv8pmu_write_chain_counter(idx, value);
+> +	else
+> +		armv8pmu_write_evcntr(idx, value);
+> +}
+> +
+>  static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
+>  {
+>  	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+> @@ -541,14 +612,14 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
+>  			smp_processor_id(), idx);
+>  	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
+>  		/*
+> -		 * Set the upper 32bits as this is a 64bit counter but we only
+> -		 * count using the lower 32bits and we want an interrupt when
+> -		 * it overflows.
+> +		 * Set the upper 32bits if we are counting this in
+> +		 * 32bit mode, as this is a 64bit counter.
+>  		 */
+
+It would be good to keep the explaination as to why.
+
+> -		value |= 0xffffffff00000000ULL;
+> +		if (!armv8pmu_event_is_64bit(event))
+> +			value |= 0xffffffff00000000ULL;
+>  		write_sysreg(value, pmccntr_el0);
+> -	} else if (armv8pmu_select_counter(idx) == idx)
+> -		write_sysreg(value, pmxevcntr_el0);
+> +	} else
+> +		armv8pmu_write_hw_counter(event, value);
+>  }
+
+> +static inline void armv8pmu_write_event_type(struct perf_event *event)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	int idx = hwc->idx;
+> +
+> +	/*
+> +	 * For chained events, write the the low counter event type
+> +	 * followed by the high counter. The high counter is programmed
+> +	 * with CHAIN event code with filters set to count at all ELs.
+> +	 */
+> +	if (armv8pmu_event_is_chained(event)) {
+> +		u32 chain_evt = ARMV8_PMUV3_PERFCTR_CHAIN |
+> +				ARMV8_PMU_INCLUDE_EL2;
+> +
+> +		armv8pmu_write_evtype(idx - 1, hwc->config_base);
+> +		isb();
+> +		armv8pmu_write_evtype(idx, chain_evt);
+
+The ISB isn't necessary here, AFAICT. We only do this while the PMU is
+disabled; no?
+
+> +	} else
+> +		armv8pmu_write_evtype(idx, hwc->config_base);
+> +}
+
+[...]
+
+> +static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> +{
+> +	int idx = event->hw.idx;
+> +
+> +	/*
+> +	 * For chained events, we enable the high counter followed by
+> +	 * the low counter.
+> +	 */
+> +	armv8pmu_enable_counter(idx);
+> +	if (armv8pmu_event_is_chained(event)) {
+> +		isb();
+> +		armv8pmu_enable_counter(idx - 1);
+> +	}
+> +}
+
+If we fix up the IRQ handler, this would only happen with the PMU as a
+whole disabled, and we wouldn't care about ordering of enable/disable of
+each event.
+
+[...]
+
+> +static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	int idx = hwc->idx;
+> +
+> +	/*
+> +	 * Disable the low counter followed by the high counter
+> +	 * for chained events.
+> +	 */
+> +	if (armv8pmu_event_is_chained(event)) {
+> +		armv8pmu_disable_counter(idx - 1);
+> +		isb();
+> +	}
+> +
+> +	armv8pmu_disable_counter(idx);
+> +}
+
+... likewise.
+
+> @@ -679,6 +679,12 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
+>  			continue;
+>  
+>  		event = hw_events->events[idx];
+> +		/*
+> +		 * If there is no event at this idx (e.g, an idx used
+> +		 * by a chained event in Arm v8 PMUv3), skip it.
+> +		 */
+> +		if (!event)
+> +			continue;
+
+We may as well lose the used_mask test if we're looking at the event
+regardless.
+
+Thanks,
+Mark.
