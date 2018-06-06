@@ -1,32 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Jun 2018 10:18:37 +0200
-Subject: [PATCH 3/3] arm64: dts: renesas: v3hsk: specify GEther PHY IRQ
-In-Reply-To: <9e6c40eb-71d0-d35b-1cf7-9179e093ed10@cogentembedded.com>
-References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
- <9e6c40eb-71d0-d35b-1cf7-9179e093ed10@cogentembedded.com>
-Message-ID: <CAMuHMdVf7Og6uBXN7KFQD1u+1xXORCuDC=-ahPpT_xSdmj9CxQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 6 Jun 2018 10:24:22 +0200
+Subject: [PATCH v4 05/14] coresight: get/put module in
+ coresight_build/release_path
+In-Reply-To: <20180605210710.22227-6-kim.phillips@arm.com>
+References: <20180605210710.22227-1-kim.phillips@arm.com>
+ <20180605210710.22227-6-kim.phillips@arm.com>
+Message-ID: <20180606082422.GB19727@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 1, 2018 at 10:47 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Specify GEther PHY IRQ in the V3H Starter Kit board's device tree, now
-> that we have the GPIO support (previously phylib had to resort to polling).
->
-> Based on the original (and large) patch by Vladimir Barinov.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
+> Increment the refcnt for driver modules in current use by calling
+> module_get in coresight_build_path and module_put in release_path.
+> 
+> This prevents driver modules from being unloaded when they are in use,
+> either in sysfs or perf mode.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Why does it matter?  Shouldn't you be allowed to remove any module at
+any point in time, much like a networking driver?
 
-Gr{oetje,eeting}s,
 
-                        Geert
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Leo Yan <leo.yan@linaro.org>
+> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> index 338f1719641c..1c941351f1d1 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight.c
+> @@ -465,6 +465,12 @@ static int _coresight_build_path(struct coresight_device *csdev,
+>  
+>  	node->csdev = csdev;
+>  	list_add(&node->link, path);
+> +
+> +	if (!try_module_get(csdev->dev.parent->driver->owner)) {
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+What is to keep parent->driver from going away right here?  What keeps
+parent around?  This feels very fragile to me, I don't see any locking
+anywhere around this code path to try to keep things in place.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+thanks,
+
+greg k-h
