@@ -1,63 +1,86 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 6 Jun 2018 22:49:17 +0530
-Subject: [GIT PULL] Mailbox changes for v4.18
-Message-ID: <CABb+yY2MLfH4a+AKQfQw6fm2_Ej7F-m64RJTBb813o=_R5cxuQ@mail.gmail.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 6 Jun 2018 10:31:19 -0700
+Subject: [PATCH] ARM: dts: cygnus: Add HWRNG node
+In-Reply-To: <CAJiuCcdfmrdHf10JkVOGQXD77JN=_FUv2ysEGTzyvwON31HX_A@mail.gmail.com>
+References: <20180606093441.16483-1-peron.clem@gmail.com>
+ <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
+ <c7990001-00e6-d828-bafd-3d472fcfee20@gmail.com>
+ <CAJiuCcdfmrdHf10JkVOGQXD77JN=_FUv2ysEGTzyvwON31HX_A@mail.gmail.com>
+Message-ID: <c3c49a49-f2c9-f4bb-bd97-f2010f1d4a0c@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-The following changes since commit 7fbb6157630f2ba6ee355689061f9596b84373ef:
 
-  Merge tag 'armsoc-fixes' of
-git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2018-05-26
-14:05:16 -0700)
-
-are available in the Git repository at:
-
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-tags/mailbox-v4.18
-
-for you to fetch changes up to f83d1cfc8bcddf93bb6f55940fd59f5b047863e5:
-
-  mailbox/drivers/hisi: Consolidate the Kconfig for the MAILBOX
-(2018-06-06 22:21:59 +0530)
-
-----------------------------------------------------------------
-- Remove HAS_DMA config dependencies
-- New STMicroelectronics STM32 IPCC driver
-- Enable QCom driver to run more controllers
-- Fixed return code from null to ptr-err for Brcm driver
-- Fix kconfig dependencies for the HiSilicon driver
-
-----------------------------------------------------------------
-Bjorn Andersson (1):
-      mailbox: qcom: Add msm8998 hmss compatible
-
-Daniel Lezcano (1):
-      mailbox/drivers/hisi: Consolidate the Kconfig for the MAILBOX
-
-Fabien Dessenne (2):
-      dt-bindings: mailbox: add STMicroelectronics STM32 IPCC binding
-      mailbox: add STMicroelectronics STM32 IPCC driver
-
-Geert Uytterhoeven (1):
-      mailbox: Remove depends on HAS_DMA in case of platform dependency
-
-Sibi Sankar (2):
-      dt-bindings: mailbox: Add APSS shared binding for SDM845 SoCs
-      mailbox: Add support for Qualcomm SDM845 SoCs
-
-Stefan Wahren (1):
-      mailbox: bcm2835: Fix of_xlate return value
-
- .../bindings/mailbox/qcom,apcs-kpss-global.txt     |   2 +
- .../devicetree/bindings/mailbox/stm32-ipcc.txt     |  47 +++
- drivers/mailbox/Kconfig                            |  22 +-
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/bcm2835-mailbox.c                  |   2 +-
- drivers/mailbox/qcom-apcs-ipc-mailbox.c            |   2 +
- drivers/mailbox/stm32-ipcc.c                       | 402 +++++++++++++++++++++
- 7 files changed, 472 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
- create mode 100644 drivers/mailbox/stm32-ipcc.c
+On 18-06-06 10:06 AM, Cl?ment P?ron wrote:
+> Hi Scott, Florian,
+>
+> On Wed, 6 Jun 2018 at 18:47, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 06/06/201 8 09:03 AM, Scott Branden wrote:
+>>> Hi Clement,
+>>>
+>>>
+>>> On 18-06-06 02:34 AM, Cl?ment P?ron wrote:
+>>>> From: Cl?ment Peron <clement.peron@devialet.com>
+>>>>
+>>>> There is a HWRNG in Broadcom Cygnus SoC, so enable it.
+>>>>
+>>>> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+>>> Thanks for upstreaming some missing Cygnus components.
+>>>
+>>> But, the problem is the tarball release from Broadcom you are extracting
+>>> these changes from does not contain git history; so, you are missing the
+>>> original authors and signed-off's.
+>>> I checked our internal git repository and for this commit the author is:
+>>> Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
+>>>
+>>> Please adjust author and signed-off appropriately.  If there are other
+>>> changes you are extracting from the source tarballs you have please
+>>> contact me so we can construct patch appropriately.
+>> If you want the original author's Signed-off-by to be preserved, why
+>> don't you extract it from your internal git tree and submit the patch on
+>> Mohamed's behalf?
+>>
+>> AFAICT what Clement is doing here is permissible given the Linux
+>> developer certificate of origin though I am not a lawyer of course.
+>> --
+>> Florian
+> Totally not my goal to steal the author and agree to keep track of the
+> original author
+> as soon as it's possible. I didn't though it was important for this
+> patch as the same
+> code is available in the dt-bindings documentation.
+>
+> Actually there are still some buggy components like DSA (Arun proposed
+> a patch this morning)
+> the PWM (config and delay aren't correct) and I2C. These are mainlined
+> but can't be used
+> and need a minimal effort to correctly work on Cygnus.
+We have internal versions of most everything.? It's a matter of getting 
+people to push the appropriate patches out for upstream version to work.
+Please contact the bcm-kernel-feedback list with issues and we can work 
+through common solution (or, likely already have a solution just not 
+upstreamed).
+>
+> Also there are some important components like USB Phy or Mailbox that
+> were proposed and
+> almost made it, but just need a small modification to be accepted.
+Again - we may have internal solution already.? Yes, mailbox was 
+submitted upstream a long time ago and I think got stalled being 
+accepted upstream.? We can work through upstream solution by starting 
+with sending to bcm-kernel-feedback-list to discuss details.
+>
+> My idea was just to submit small patches that are trivial to review.
+> In order to avoid keeping
+> lots of patches in our kernel and also have something functional when
+> building a mainline kernel.
+I understand the difficulty you would have if you're trying to work with 
+a different kernel version in our release.? If you send me a list 
+directly of the drivers you use in Cygnus that will help me get those 
+changes prioritized to be pushed upstream.? And/or we can work together 
+on that.
+>
+> Regards,
+> Clement
+Thanks,
+ ?Scott
