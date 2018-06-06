@@ -1,50 +1,39 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  6 Jun 2018 11:25:16 +0200
-Subject: [PATCH v2] ARM: Always build secure_cntvoff.S on ARM V7 to fix
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jun 2018 10:27:25 +0100
+Subject: [PATCH] ARM: Build secure_cntvoff.S unconditionally to fix
  shmobile !SMP build
-Message-ID: <1528277116-14533-1-git-send-email-geert+renesas@glider.be>
+In-Reply-To: <CAMuHMdVq0Mwui6jrnX4sd2=L+p3Ta4qM2PxQ2HLQ0btajTV6hw@mail.gmail.com>
+References: <1528275154-5164-1-git-send-email-geert+renesas@glider.be>
+ <20180606090953.GW17671@n2100.armlinux.org.uk>
+ <CAMuHMdVq0Mwui6jrnX4sd2=L+p3Ta4qM2PxQ2HLQ0btajTV6hw@mail.gmail.com>
+Message-ID: <20180606092725.GX17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_SMP=n, building a kernel for R-Car Gen2 fails with:
+On Wed, Jun 06, 2018 at 11:22:41AM +0200, Geert Uytterhoeven wrote:
+> Hi Russell,
+> 
+> On Wed, Jun 6, 2018 at 11:09 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> >> Fixes: cad160ed0a94927e ("ARM: shmobile: Convert file to use cntvoff")
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > This doesn't look right to me, but I don't have secure_cntvoff in any
+> > tree here that I can look at to check.  What if secure_cntvoff contains
+> > instructions only available on ARMv7 CPUs, and not ARMv4?
+> 
+> Compiled != called.
 
-    arch/arm/mach-shmobile/setup-rcar-gen2.o: In function `rcar_gen2_timer_init':
-    setup-rcar-gen2.c:(.init.text+0x30): undefined reference to `secure_cntvoff_init'
+That makes little difference when the assembler validates that the
+instructions are possible on the target architecture and errors out
+if not.
 
-Indeed, on R-Car Gen2 SoCs, secure_cntvoff_init() is not only needed for
-secondary CPUs, but also for the boot CPU.  This is most visible on SoCs
-with Cortex A7 cores (e.g. R-Car E2, cfr. commit 9ce3fa6816c2fb59 ("ARM:
-shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794")),
-but Cortex A15 is affected, too.
+That's why I qualified my reply by saying that I didn't have the
+contents of secure_cntvoff to reference - there's no clue whether
+it's a .c or .S file from just this patch, and there's no visibility
+what it contains.
 
-Fix this by always providing secure_cntvoff_init() when building for ARM
-V7.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 7c607944bc657616 ("ARM: smp: Add initialization of CNTVOFF")
-Fixes: cad160ed0a94927e ("ARM: shmobile: Convert file to use cntvoff")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
-v2:
-  - Add Reviewed-by,
-  - Add a dependency on CPU_V7.
----
- arch/arm/common/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index 1e9f7af8f70ff6ba..3157be413297e5d2 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -10,7 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
- obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
- obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
- obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
--obj-$(CONFIG_SMP)		+= secure_cntvoff.o
-+obj-$(CONFIG_CPU_V7)		+= secure_cntvoff.o
- obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
- obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
- CFLAGS_REMOVE_mcpm_entry.o	= -pg
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
