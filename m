@@ -1,71 +1,56 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  6 Jun 2018 14:41:37 +0200
-Subject: [RFC PATCH v2 4/6] serial: uartps: Move alias reading higher in
- probe()
-In-Reply-To: <cover.1528288895.git.michal.simek@xilinx.com>
-References: <cover.1528288895.git.michal.simek@xilinx.com>
-Message-ID: <c287db5a4da13c0e3b85e3f99540a836dacd017a.1528288895.git.michal.simek@xilinx.com>
+Date: Wed,  6 Jun 2018 14:41:33 +0200
+Subject: [RFC PATCH v2 0/6] serial: uartps: Add run time support for more IPs
+ than hardcoded 2
+Message-ID: <cover.1528288895.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This cosmetic change is done only for having next patch much easier to
-read. Moving id setup higher in probe is not affecting any usage of this
-driver and it also simplify error path.
+Hi,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+this series is trying to address discussion I had with Alan in past
+https://patchwork.kernel.org/patch/9738445/ and also with Rob in v1
+https://lkml.org/lkml/2018/4/26/551.
+
+The first 5 patches are preparation patches to have the last patch as
+small as possible to focus on changes there.
+
+Cases without DT aliases are not solved in this series but one function
+was shared in RFC v1.
+The purpose of this series to get feedback on solution where every
+driver instance allocate at run time own uart_driver.
+
+For example this is how it works.
+uart0 on higher alias
+serial0 = &uart1;
+serial100 = &uart0;
+
+~# ls -la /dev/ttyPS*
+crw-------    1 root     root      252,   0 Jun  6 12:19 /dev/ttyPS0
+crw--w----    1 root     root      253, 100 Jan  1  1970 /dev/ttyPS100
+
+Thanks,
+Michal
+
 
 Changes in v2:
 - new patch - it can be sent separately too
+- Remove nr field logic
+- new patch - it can be sent separately too
+- new patch - it can be sent separately too
+- new patch - it can be sent separately too
+- Register one uart_driver with unique minor at probe time
 
- drivers/tty/serial/xilinx_uartps.c | 21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+Michal Simek (6):
+  serial: uartps: Do not initialize field to zero again
+  serial: uartps: Move register to probe based on run time detection
+  serial: uartps: Do not use static struct uart_driver out of probe()
+  serial: uartps: Move alias reading higher in probe()
+  serial: uartps: Fill struct uart_driver in probe()
+  serial: uartps: Remove CDNS_UART_NR_PORTS macro
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index fe96fd950d3a..b47d7ccbc38d 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1440,6 +1440,16 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	if (!port)
- 		return -ENOMEM;
- 
-+	/* Look for a serialN alias */
-+	id = of_alias_get_id(pdev->dev.of_node, "serial");
-+	if (id < 0)
-+		id = 0;
-+
-+	if (id >= CDNS_UART_NR_PORTS) {
-+		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
-+		return -ENODEV;
-+	}
-+
- 	if (!cdns_uart_uart_driver.state) {
- 		rc = uart_register_driver(&cdns_uart_uart_driver);
- 		if (rc < 0) {
-@@ -1509,16 +1519,6 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 				&cdns_uart_data->clk_rate_change_nb))
- 		dev_warn(&pdev->dev, "Unable to register clock notifier.\n");
- #endif
--	/* Look for a serialN alias */
--	id = of_alias_get_id(pdev->dev.of_node, "serial");
--	if (id < 0)
--		id = 0;
--
--	if (id >= CDNS_UART_NR_PORTS) {
--		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
--		rc = -ENODEV;
--		goto err_out_notif_unreg;
--	}
- 
- 	/* At this point, we've got an empty uart_port struct, initialize it */
- 	spin_lock_init(&port->lock);
-@@ -1577,7 +1577,6 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 	pm_runtime_set_suspended(&pdev->dev);
- 	pm_runtime_dont_use_autosuspend(&pdev->dev);
--err_out_notif_unreg:
- #ifdef CONFIG_COMMON_CLK
- 	clk_notifier_unregister(cdns_uart_data->uartclk,
- 			&cdns_uart_data->clk_rate_change_nb);
+ drivers/tty/serial/xilinx_uartps.c | 126 ++++++++++++++++++++-----------------
+ 1 file changed, 68 insertions(+), 58 deletions(-)
+
 -- 
 1.9.1
