@@ -1,58 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Jun 2018 16:44:38 +0100
-Subject: [PATCH v13 1/3] ioremap: Update pgtable free interfaces with addr
-In-Reply-To: <1528268481-19299-2-git-send-email-cpandya@codeaurora.org>
-References: <1528268481-19299-1-git-send-email-cpandya@codeaurora.org>
- <1528268481-19299-2-git-send-email-cpandya@codeaurora.org>
-Message-ID: <20180606154437.GE6631@arm.com>
+Date: Wed, 6 Jun 2018 16:44:56 +0100
+Subject: [PATCH] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <1528218506299.33619@nvidia.com>
+References: <1527617488-5693-1-git-send-email-rokhanna@nvidia.com>
+ <20180530090044.GA2452@arm.com> <1527788750049.85185@nvidia.com>
+ <20180604091609.GD9482@arm.com> <1528140881044.41145@nvidia.com>
+ <20180605165511.GB2193@arm.com> <1528218506299.33619@nvidia.com>
+Message-ID: <20180606154455.GH6631@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 12:31:19PM +0530, Chintan Pandya wrote:
-> From: Chintan Pandya <cpandya@codeaurora.org>
+On Tue, Jun 05, 2018 at 05:07:54PM +0000, Alexander Van Brunt wrote:
+> > 1. Boot. This happens once, and we end up putting *all* secondary cores into
+> >    a tight loop anyway, so I don't see that the performance of
+> >    __flush_icache_all is relevant
 > 
-> The following kernel panic was observed on ARM64 platform due to a stale
-> TLB entry.
+> Native boot happens once. But, each VM that boots will slow down all of
+> the other VM's on the system. A VM boot can happen thousands of times.
 > 
->  1. ioremap with 4K size, a valid pte page table is set.
->  2. iounmap it, its pte entry is set to 0.
->  3. ioremap the same address with 2M size, update its pmd entry with
->     a new value.
->  4. CPU may hit an exception because the old pmd entry is still in TLB,
->     which leads to a kernel panic.
-> 
-> Commit b6bdb7517c3d ("mm/vmalloc: add interfaces to free unmapped page
-> table") has addressed this panic by falling to pte mappings in the above
-> case on ARM64.
-> 
-> To support pmd mappings in all cases, TLB purge needs to be performed
-> in this case on ARM64.
-> 
-> Add a new arg, 'addr', to pud_free_pmd_page() and pmd_free_pte_page()
-> so that TLB purge can be added later in seprate patches.
-> 
-> [toshi at hpe.com: merge changes, rewrite patch description]
-> Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
-> Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Michal Hocko <mhocko@suse.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: <stable@vger.kernel.org>
-> 
-> ---
->  arch/arm64/mm/mmu.c           | 4 ++--
->  arch/x86/mm/pgtable.c         | 8 +++++---
->  include/asm-generic/pgtable.h | 8 ++++----
->  lib/ioremap.c                 | 4 ++--
->  4 files changed, 13 insertions(+), 11 deletions(-)
+> I really don't want to cause the whole system to hiccup for a millisecond
+> or more when there are only a few cache lines that need to be invalidated.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+You know we already do this on boot, right? If it's a real issue, I'd argue
+that it's the hypervisor's problem to solve.
 
-Thanks,
+Anyway, please can you back this up with some real numbers that show the
+impact on a real use-case? It feels like we've quickly getting into
+hypothetical territory here because you have a instinctive dislike for full
+I-cache invalidation.
 
 Will
