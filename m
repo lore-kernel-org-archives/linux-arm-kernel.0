@@ -1,368 +1,107 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 5 Jun 2018 22:23:37 -0700
-Subject: [PATCH v2 3/3] arm64: dts: allwinner: add support for Pinebook
-In-Reply-To: <6FB4B99D-5A98-4E6F-B7F5-09063DAAF4A2@aosc.io>
-References: <20180606051702.6478-1-anarsoul@gmail.com>
- <20180606051702.6478-4-anarsoul@gmail.com>
- <6FB4B99D-5A98-4E6F-B7F5-09063DAAF4A2@aosc.io>
-Message-ID: <CA+E=qVeBWBsDtp1N0+jb81XyFHi+C=W_48FVPpn5khJh_4iVCg@mail.gmail.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Wed, 6 Jun 2018 11:06:28 +0530
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <20180605100151.7fd54381@ezekiel.suse.cz>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+Message-ID: <CACi5LpMJ9whXxpMvQDw4_4kRNaATGGq4fWt7nRRJTMrdN_q_nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, will do.
+Hello Petr,
 
-On Tue, Jun 5, 2018 at 10:20 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Tue, Jun 5, 2018 at 1:31 PM, Petr Tesarik <ptesarik@suse.cz> wrote:
+> Hi all,
 >
+> I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
+> when a panic kernel is loaded. I attached a hardware debugger and found
+> out that all CPU cores were stopped except one which was stuck in the
+> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+> definitely not safe after a kernel panic.
+
+Normally we limit the number of cpus in the crash kernel to 1 (via
+maxcpus=1) in distributions like fedora. Can you please share the
+command-line/bootargs which you use to invoke the crash kernel.
+
+Also do you get any console output from the crash kernel (you can try
+passing earlycon to the crash kernel to see if it crashes early
+enough)? If yes, can you please share the same.
+
+> If I'm right, then this is broken in general, but I have only ever seen
+> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+> be more subtle. FWIW the code for 32-bit ARM seems to work just fine
+> without this code in machine_kexec_mask_interrupts():
 >
-> ? 2018?6?6? GMT+08:00 ??1:17:02, Vasily Khoruzhick <anarsoul@gmail.com> ??:
->>From: Icenowy Zheng <icenowy@aosc.xyz>
+>                 /*
+>                  * First try to remove the active state. If this
+>                  * fails, try to EOI the interrupt.
+>                  */
+>                 ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
 >
-> Could you change all the mail address to @aosc.io ?
+> I wonder what breaks if this call to irq_set_irqchip_state() is removed.
 >
->>
->>Pinebook is a A64-based laptop produced by Pine64, with the following
->>peripherals:
->>
->>USB:
->>- Two external USB ports (one is directly connected to A64's OTG
->>controller, the other is under a internal hub connected to the
->>host-only
->>controller.)
->>- USB HID keyboard and touchpad connected to the internal hub.
->>- USB UVC camera connected to the internal hub.
->>
->>Power-related:
->>- A DC IN jack connected to AXP803's DCIN pin.
->>- A Li-Polymer battery connected to AXP803's battery pins.
->>
->>Storage:
->>- An eMMC by Foresee on the main board (in the product revision of the
->>main board it's designed to be switchable).
->>- An external MicroSD card slot.
->>
->>Display:
->>- An eDP LCD panel (1366x768) connected via an ANX6345 RGB-eDP bridge.
->>- A mini HDMI port.
->>
->>Misc:
->>- A Hall sensor designed to detect the status of lid, connected to GPIO
->>PL12.
->>- A headphone jack connected to the SoC's internal codec.
->>- A debug UART port muxed with headphone jack.
->>
->>This commit adds basical support for it.
->>
->>[vasily: squashed several commits into one, added simplefb node, added
->>usbphy
->>        to ehci0 and ohci0 nodes and other cosmetic changes to dts]
->>
->>Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->>---
->> arch/arm64/boot/dts/allwinner/Makefile        |   1 +
->> .../dts/allwinner/sun50i-a64-pinebook.dts     | 280 ++++++++++++++++++
->> 2 files changed, 281 insertions(+)
->>create mode 100644
->>arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->>
->>diff --git a/arch/arm64/boot/dts/allwinner/Makefile
->>b/arch/arm64/boot/dts/allwinner/Makefile
->>index 8bebe7da5ed9..a8c6d0c6f2c5 100644
->>--- a/arch/arm64/boot/dts/allwinner/Makefile
->>+++ b/arch/arm64/boot/dts/allwinner/Makefile
->>@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
->> dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
->> dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
->>dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb
->>sun50i-a64-pine64.dtb
->>+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
->> dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
->> dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
->> dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
->>diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->>b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->>new file mode 100644
->>index 000000000000..58253d6f9be1
->>--- /dev/null
->>+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->>@@ -0,0 +1,280 @@
->>+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->>+/*
->>+ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
->>+ * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
->>+ *
->>+ */
->>+
->>+/dts-v1/;
->>+
->>+#include "sun50i-a64.dtsi"
->>+
->>+#include <dt-bindings/gpio/gpio.h>
->>+#include <dt-bindings/input/input.h>
->>+#include <dt-bindings/pwm/pwm.h>
->>+
->>+/ {
->>+      model = "Pinebook";
->>+      compatible = "pine64,pinebook", "allwinner,sun50i-a64";
->>+
->>+      aliases {
->>+              serial0 = &uart0;
->>+              ethernet0 = &rtl8723cs;
->>+      };
->>+
->>+      backlight: backlight {
->>+              compatible = "pwm-backlight";
->>+              pwms = <&pwm 0 50000 0>;
->>+              brightness-levels = <0 5 10 15 20 30 40 55 70 85 100>;
->>+              default-brightness-level = <2>;
->>+              enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 */
->>+      };
->>+
->>+      chosen {
->>+              stdout-path = "serial0:115200n8";
->>+
->>+              framebuffer-lcd {
->>+                      panel-supply = <&reg_dc1sw>;
->>+                      dvdd25-supply = <&reg_dldo2>;
->>+                      dvdd12-supply = <&reg_fldo1>;
->>+              };
->>+      };
->>+
->>+      gpio_keys {
->>+              compatible = "gpio-keys";
->>+
->>+              lid_switch {
->>+                      label = "Lid Switch";
->>+                      gpios = <&r_pio 0 12 GPIO_ACTIVE_LOW>; /* PL12 */
->>+                      linux,input-type = <EV_SW>;
->>+                      linux,code = <SW_LID>;
->>+                      linux,can-disable;
->>+              };
->>+      };
->>+
->>+      reg_vcc3v3: vcc3v3 {
->>+              compatible = "regulator-fixed";
->>+              regulator-name = "vcc3v3";
->>+              regulator-min-microvolt = <3300000>;
->>+              regulator-max-microvolt = <3300000>;
->>+      };
->>+
->>+      wifi_pwrseq: wifi_pwrseq {
->>+              compatible = "mmc-pwrseq-simple";
->>+              reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->>+      };
->>+};
->>+
->>+&ehci0 {
->>+      phys = <&usbphy 0>;
->>+      phy-names = "usb";
->>+      status = "okay";
->>+};
->>+
->>+&ehci1 {
->>+      status = "okay";
->>+};
->>+
->>+&mmc0 {
->>+      pinctrl-names = "default";
->>+      pinctrl-0 = <&mmc0_pins>;
->>+      vmmc-supply = <&reg_dcdc1>;
->>+      cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
->>+      cd-inverted;
->>+      disable-wp;
->>+      bus-width = <4>;
->>+      status = "okay";
->>+};
->>+
->>+&mmc1 {
->>+      pinctrl-names = "default";
->>+      pinctrl-0 = <&mmc1_pins>;
->>+      vmmc-supply = <&reg_dldo4>;
->>+      vqmmc-supply = <&reg_eldo1>;
->>+      mmc-pwrseq = <&wifi_pwrseq>;
->>+      bus-width = <4>;
->>+      non-removable;
->>+      status = "okay";
->>+
->>+      rtl8723cs: wifi at 1 {
->>+              reg = <1>;
->>+      };
->>+};
->>+
->>+&mmc2 {
->>+      pinctrl-names = "default";
->>+      pinctrl-0 = <&mmc2_pins>;
->>+      vmmc-supply = <&reg_dcdc1>;
->>+      vqmmc-supply = <&reg_eldo1>;
->>+      bus-width = <8>;
->>+      non-removable;
->>+      cap-mmc-hw-reset;
->>+      mmc-hs200-1_8v;
->>+      status = "okay";
->>+};
->>+
->>+&ohci0 {
->>+      phys = <&usbphy 0>;
->>+      phy-names = "usb";
->>+      status = "okay";
->>+};
->>+
->>+&ohci1 {
->>+      status = "okay";
->>+};
->>+
->>+&pwm {
->>+      status = "okay";
->>+};
->>+
->>+&r_rsb {
->>+      status = "okay";
->>+
->>+      axp803: pmic at 3a3 {
->>+              compatible = "x-powers,axp803";
->>+              reg = <0x3a3>;
->>+              interrupt-parent = <&r_intc>;
->>+              interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>+      };
->>+};
->>+
->>+/* The ANX6345 eDP-bridge is on r_i2c */
->>+&r_i2c {
->>+      clock-frequency = <100000>;
->>+      pinctrl-names = "default";
->>+      pinctrl-0 = <&r_i2c_pins_a>;
->>+      status = "okay";
->>+};
->>+
->>+#include "axp803.dtsi"
->>+
->>+&reg_aldo1 {
->>+      regulator-min-microvolt = <2800000>;
->>+      regulator-max-microvolt = <2800000>;
->>+      regulator-name = "vcc-csi";
->>+};
->>+
->>+&reg_aldo2 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <1800000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "vcc-pl";
->>+};
->>+
->>+&reg_aldo3 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <2700000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "vcc-pll-avcc";
->>+};
->>+
->>+&reg_dc1sw {
->>+      regulator-name = "vcc-lcd";
->>+};
->>+
->>+&reg_dcdc1 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <3300000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "vcc-3v3";
->>+};
->>+
->>+&reg_dcdc2 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <1000000>;
->>+      regulator-max-microvolt = <1300000>;
->>+      regulator-name = "vdd-cpux";
->>+};
->>+
->>+/* DCDC3 is polyphased with DCDC2 */
->>+
->>+&reg_dcdc5 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <1200000>;
->>+      regulator-max-microvolt = <1200000>;
->>+      regulator-name = "vcc-dram";
->>+};
->>+
->>+&reg_dcdc6 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <1100000>;
->>+      regulator-max-microvolt = <1100000>;
->>+      regulator-name = "vdd-sys";
->>+};
->>+
->>+&reg_dldo1 {
->>+      regulator-min-microvolt = <3300000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "vcc-hdmi";
->>+};
->>+
->>+&reg_dldo2 {
->>+      regulator-min-microvolt = <2500000>;
->>+      regulator-max-microvolt = <2500000>;
->>+      regulator-name = "vcc-edp";
->>+};
->>+
->>+&reg_dldo3 {
->>+      regulator-min-microvolt = <3300000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "avdd-csi";
->>+};
->>+
->>+&reg_dldo4 {
->>+      regulator-min-microvolt = <3300000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "vcc-wifi";
->>+};
->>+
->>+&reg_eldo1 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <1800000>;
->>+      regulator-max-microvolt = <1800000>;
->>+      regulator-name = "cpvdd";
->>+};
->>+
->>+&reg_eldo3 {
->>+      regulator-min-microvolt = <1800000>;
->>+      regulator-max-microvolt = <1800000>;
->>+      regulator-name = "vdd-1v8-csi";
->>+};
->>+
->>+&reg_fldo1 {
->>+      regulator-min-microvolt = <1200000>;
->>+      regulator-max-microvolt = <1200000>;
->>+      regulator-name = "vcc-1v2-hsic";
->>+};
->>+
->>+&reg_fldo2 {
->>+      regulator-always-on;
->>+      regulator-min-microvolt = <1100000>;
->>+      regulator-max-microvolt = <1100000>;
->>+      regulator-name = "vdd-cpus";
->>+};
->>+
->>+&reg_ldo_io0 {
->>+      regulator-min-microvolt = <3300000>;
->>+      regulator-max-microvolt = <3300000>;
->>+      regulator-name = "vcc-usb";
->>+      status = "okay";
->>+};
->>+
->>+&reg_rtc_ldo {
->>+      regulator-name = "vcc-rtc";
->>+};
->>+
->>+&uart0 {
->>+      pinctrl-names = "default";
->>+      pinctrl-0 = <&uart0_pins_a>;
->>+      status = "okay";
->>+};
->>+
->>+&usb_otg {
->>+      dr_mode = "host";
->>+};
->>+
->>+&usbphy {
->>+      usb0_vbus-supply = <&reg_ldo_io0>;
->>+      usb1_vbus-supply = <&reg_ldo_io0>;
->>+      status = "okay";
->>+};
+> For reference, here is a stack trace of the process which originally
+> triggered the panic:
+>
+> #0  __switch_to (prev=0xffff000008e62a00 <init_task>, next=0xffff80002b796080) at ../arch/arm64/kernel/process.c:355
+> #1  0xffff0000088f584c in context_switch (rf=<optimized out>, next=<optimized out>, prev=<optimized out>, rq=<optimized out>) at ../kernel/sched/core.c:2896
+> #2  __schedule (preempt=false) at ../kernel/sched/core.c:3457
+> #3  0xffff0000088f5eac in schedule () at ../kernel/sched/core.c:3516
+> #4  0xffff0000088f9448 in schedule_timeout (timeout=<optimized out>) at ../kernel/time/timer.c:1743
+> #5  0xffff0000088f6afc in do_wait_for_common (state=<optimized out>, timeout=500, action=<optimized out>, x=<optimized out>) at ../kernel/sched/completion.c:77
+> #6  __wait_for_common (state=<optimized out>, timeout=<optimized out>, action=<optimized out>, x=<optimized out>) at ../kernel/sched/completion.c:96
+> #7  wait_for_common (x=0xffff000008e53848 <init_thread_union+14408>, timeout=500, state=<optimized out>) at ../kernel/sched/completion.c:104
+> #8  0xffff0000088f6c1c in wait_for_completion_timeout (x=0xffff000008e53848 <init_thread_union+14408>, timeout=500) at ../kernel/sched/completion.c:144
+> #9  0xffff000000a19f1c in usb_start_wait_urb (urb=0xffff80002c1cd700, timeout=5000, actual_length=0xffff000008e538dc <init_thread_union+14556>)
+>     at ../drivers/usb/core/message.c:61
+> #10 0xffff000000a1a05c in usb_internal_control_msg (timeout=<optimized out>, len=<optimized out>, data=<optimized out>, cmd=<optimized out>, pipe=<optimized out>,
+>     usb_dev=<optimized out>) at ../drivers/usb/core/message.c:100
+> #11 usb_control_msg (dev=0xffff80002c348000, pipe=2147484800, request=161 '\241', requesttype=192 '\300', value=0, index=152, data=0xffff80002b6fa080, size=4,
+>     timeout=5000) at ../drivers/usb/core/message.c:151
+> #12 0xffff000001001cd0 in lan78xx_read_reg (index=152, data=0xffff000008e5396c <init_thread_union+14700>, dev=<optimized out>, dev=<optimized out>)
+>     at ../drivers/net/usb/lan78xx.c:425
+
+Hmmm, this seems a bit misplaced, but are you using a usb-ethernet
+adapter which causes a URB submission to timeout?
+
+> #13 0xffff00000100365c in lan78xx_irq_bus_sync_unlock (irqd=<optimized out>) at ../drivers/net/usb/lan78xx.c:1909
+> #14 0xffff00000813e590 in chip_bus_sync_unlock (desc=<optimized out>) at ../kernel/irq/internals.h:129
+> #15 __irq_put_desc_unlock (desc=0xffff80002c361c00, flags=128, bus=true) at ../kernel/irq/irqdesc.c:804
+> #16 0xffff00000813f604 in irq_put_desc_busunlock (flags=<optimized out>, desc=<optimized out>) at ../kernel/irq/internals.h:155
+> #17 irq_set_irqchip_state (irq=<optimized out>, which=<optimized out>, val=false) at ../kernel/irq/manage.c:2136
+> #18 0xffff00000809b7d4 in machine_kexec_mask_interrupts () at ../arch/arm64/kernel/machine_kexec.c:233
+> #19 machine_crash_shutdown (regs=<optimized out>) at ../arch/arm64/kernel/machine_kexec.c:259
+> #20 0xffff000008180fd4 in __crash_kexec (regs=0xffff000008e53d70 <init_thread_union+15728>) at ../kernel/kexec_core.c:943
+> #21 0xffff0000081810e4 in crash_kexec (regs=0xffff000008e53d70 <init_thread_union+15728>) at ../kernel/kexec_core.c:965
+> #22 0xffff00000808ab58 in die (str=<optimized out>, regs=0xffff000008e53d70 <init_thread_union+15728>, err=-2046820348) at ../arch/arm64/kernel/traps.c:266
+> #23 0xffff0000080a1c14 in __do_kernel_fault (mm=0x0, addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:226
+> #24 0xffff0000088fc8dc in do_page_fault (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:476
+> #25 0xffff0000088fccdc in do_translation_fault (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:502
+> #26 0xffff000008081478 in do_mem_abort (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:657
+> #27 0xffff000008082dd0 in el1_sync () at ../arch/arm64/kernel/entry.S:548
+
+The ESR value from the logs (2248146948) indicates the following about
+the panic causes (see ARMv8 Architecture Reference Manual for more
+details):
+
+EC -> 100001, Instruction Abort taken without a change in Exception
+level (Used for MMU faults generated by instruction accesses and
+Synchronous external aborts, including synchronous parity or ECC
+errors. Not used for debug related exceptions.)
+FnV -> 0, FAR is valid
+IFSC -> 000100, Translation fault, level 0
+
+So in brief an Instruction Abort was taken at exception level EL1(?)
+which was caused by a translation fault at level 0 and the FAR
+register holds the faulting Virtual Address.
+
+So, since you have the hardware debugger, can you try and see the
+values of FAR (Fault Address Register) and ELR registers at this point
+via the debugger and see if they can indicate the Faulty Address from
+which the exception was taken and debug using the same.
+
+If you can share the earlycon messages from the crashkernel and the
+values of the above registers, can help you further with debugging the
+issue which you are seeing.
+
+Thanks,
+Bhupesh
