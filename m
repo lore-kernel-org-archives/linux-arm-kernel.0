@@ -1,30 +1,85 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 6 Jun 2018 10:57:41 +0100
-Subject: [PATCH v4 14/14] coresight: allow the coresight core driver to be
- built as a module
-In-Reply-To: <20180605210710.22227-15-kim.phillips@arm.com>
-References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-15-kim.phillips@arm.com>
-Message-ID: <46a026b2-0140-c1c0-2205-f5750233b152@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 6 Jun 2018 11:05:40 +0100
+Subject: [PATCH] arm64: topology: Avoid checking numa mask for scheduler
+ MC selection
+In-Reply-To: <20180605190837.493505-1-jeremy.linton@arm.com>
+References: <20180605190837.493505-1-jeremy.linton@arm.com>
+Message-ID: <3c8a541d-78a1-389a-112c-494f7c1a543d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2018 10:07 PM, Kim Phillips wrote:
-> Allow to build coresight as a module.  This enhances
-> coresight developer efficiency by allowing the development to
-> take place exclusively on the target, and without needing to
-> reboot in between changes.
+
+
+On 05/06/18 20:08, Jeremy Linton wrote:
+> The numa mask subset check has problems if !CONFIG_NUMA, over hotplug
+> operations or during early boot. Lets disable the NUMA siblings checks
+> for the time being, as NUMA in socket machines have LLC's that will
+> assure that the scheduler topology isn't "borken".
 > 
-> - Kconfig becomes a tristate, to allow =m
-> - append -core to source file name to allow module to
->    be called coresight by the Makefile
-> - modules can have only one init/exit, so we add the core bus
->    register/unregister function calls to the etm_perf init/exit
->    functions, since coresight.c does not have etm_pmu defined.
 
-It feels a bit weird to move the coresight core specific steps to
-etm_perf_init. Why not call etm_perf_init from coresight init routine
-and keep everything core specific in the coresight-core.c ?
+^ broken ? (not sure if usage of borken is intentional :))
 
+> Futher, as a defensive mechanism during hotplug, lets assure that the
 
-Suzuki
+^ Further
+
+> LLC siblings are also masked.
+>
+
+Also add the symptoms of the issue we say as Geert suggested me.
+Something like:
+" This often leads to system hang or crash during CPU hotplug and system
+suspend operation. This is mostly observed on HMP systems where the
+CPU compute capacities are different and ends up in different scheduler
+domains. Since cpumask_of_node is returned instead core_sibling, the
+scheduler is confused with incorrect cpumasks(e.g. one CPU in two
+different sched domains at the same time) on CPU hotplug."
+
+You can add Reported-by: Geert... ?
+
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/topology.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 7415c166281f..f845a8617812 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -215,13 +215,8 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+>  
+>  const struct cpumask *cpu_coregroup_mask(int cpu)
+>  {
+> -	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
+> +	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
+>  
+> -	/* Find the smaller of NUMA, core or LLC siblings */
+> -	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
+> -		/* not numa in package, lets use the package siblings */
+> -		core_mask = &cpu_topology[cpu].core_sibling;
+> -	}
+>  	if (cpu_topology[cpu].llc_id != -1) {
+>  		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
+>  			core_mask = &cpu_topology[cpu].llc_siblings;
+> @@ -239,8 +234,10 @@ static void update_siblings_masks(unsigned int cpuid)
+>  	for_each_possible_cpu(cpu) {
+>  		cpu_topo = &cpu_topology[cpu];
+>  
+> -		if (cpuid_topo->llc_id == cpu_topo->llc_id)
+> +		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
+>  			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
+> +			cpumask_set_cpu(cpuid, &cpu_topo->llc_siblings);
+> +		}
+>  
+>  		if (cpuid_topo->package_id != cpu_topo->package_id)
+>  			continue;
+> 
+
+Looks good to me for now. I might need to tweek it a bit when I add the
+support to update topology on hotplug. But that's for latter. For now,
+
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
+
+-- 
+Regards,
+Sudeep
