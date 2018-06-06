@@ -1,73 +1,31 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Wed, 6 Jun 2018 00:48:13 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjEwIDAvNV0gc2NzaTogdWZzOiBhZGQgdWZzIGRy?=
- =?utf-8?Q?iver_code_for_Hisilicon_Hi3660_SoC?=
-In-Reply-To: <f9cde7df-2d4d-3d7e-5269-ef879211b2ee@arm.com>
-References: <20180525091712.37227-1-liwei213@huawei.com>
- <f9cde7df-2d4d-3d7e-5269-ef879211b2ee@arm.com>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA70129@DGGEMM506-MBX.china.huawei.com>
+From: martin.petersen@oracle.com (Martin K. Petersen)
+Date: Tue, 05 Jun 2018 21:19:57 -0400
+Subject: [PATCH V5] scsi: hpsa: disable device during shutdown
+In-Reply-To: <1527913733-16492-1-git-send-email-okaya@codeaurora.org> (Sinan
+ Kaya's message of "Sat, 2 Jun 2018 00:28:53 -0400")
+References: <1527913733-16492-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <yq1d0x4g18i.fsf@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Valentin
 
-Thank you for your attention and work.
+Sinan,
 
-Thanks!
+> 'Commit cc27b735ad3a ("PCI/portdrv: Turn off PCIe services during
+> shutdown")' has been added to kernel to shutdown pending PCIe port
+> service interrupts during reboot so that a newly started kexec kernel
+> wouldn't observe pending interrupts.
+>
+> pcie_port_device_remove() is disabling the root port and switches by
+> calling pci_disable_device() after all PCIe service drivers are shutdown.
+>
+> This has been found to cause crashes on HP DL360 Gen9 machines during
+> reboot due to hpsa driver not clearing the bus master bit during the
+> shutdown procedure by calling pci_disable_device().
+>
+> Disable device as part of the shutdown sequence.
 
------????-----
-???: Valentin Schneider [mailto:valentin.schneider at arm.com] 
-????: 2018?6?5? 22:59
-???: liwei (CM); robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org
-??: zangleigang; Gengjianfeng; guodong.xu at linaro.org; Chenfeng (puck); john.stultz at linaro.org; Fengbaopeng (kevin, Kirin Solution Dept)
-??: Re: [PATCH v10 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660 SoC
+Applied to 4.18/scsi-fixes. Thanks!
 
-Hi,
-
-On 25/05/18 10:17, Li Wei wrote:
-> This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
-> 
-> Li Wei (5):
->   scsi: ufs: add Hisilicon ufs driver code
->   dt-bindings: scsi: ufs: add document for hisi-ufs
->   arm64: dts: add ufs dts node
->   arm64: defconfig: enable configs for Hisilicon ufs
->   arm64: defconfig: enable f2fs and squashfs
-> 
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
->  .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
->  arch/arm64/configs/defconfig                       |  11 +
->  drivers/scsi/ufs/Kconfig                           |   9 +
->  drivers/scsi/ufs/Makefile                          |   1 +
->  drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
->  drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
->  8 files changed, 821 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
->  create mode 100644 drivers/scsi/ufs/ufs-hisi.c
->  create mode 100644 drivers/scsi/ufs/ufs-hisi.h
-> 
-> Major changes in v10:
->  - solve review comments from Rob Herring.
->    *Modify the "reset-names" describe in ufs-hisi.txt binding file.
->    *List clocks in ufs-hisi.txt binding file.
->    *remove the "arst" and keep only "rst" in the binging files.
->    *remove the "arst" member from both dts and c code. 
-> Major changes in v9:
->  - solve review comments from Rob Herring.
->    *remove freq-table-hz in ufs-hisi.txt binding file.
->    *Move the rst to the ufshcd_pltfm.txt common binding file.
->    *Modify the member "assert" of UFS host structure to "arst".
-> Major changes in v8:
->  - solve review comments from zhangfei.
->    *Add Version history.
->  - solve review comments from Rob Herring.
->    *remove freq-table-hz.
->  -  solve review comments from Riku Voipio.
->    *Add MODULE_DEVICE_TABLE for ufs driver.
-> 
-
-Tested on top of linux-next (4.17.0-next-20180605), I can reliably load
-my debian userspace flashed on the 'system' fastboot partition.
-
-Tested-by: Valentin Schneider <valentin.schneider@arm.com>
+-- 
+Martin K. Petersen	Oracle Linux Engineering
