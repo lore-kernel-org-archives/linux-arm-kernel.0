@@ -1,36 +1,30 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Wed, 6 Jun 2018 13:42:58 +0900
-Subject: [RFC PATCH -tip v5 06/27] arm64: kprobes: Remove jprobe
- implementation
-In-Reply-To: <20180605153420.GA26352@arm.com>
-References: <152812730943.10068.5166429445118734697.stgit@devbox>
- <152812748464.10068.10380156315388629319.stgit@devbox>
- <20180605153420.GA26352@arm.com>
-Message-ID: <20180606134258.9f75aab9fa4bfd50d0cca96d@kernel.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue,  5 Jun 2018 22:16:59 -0700
+Subject: [PATCH v2 0/3] arm64: allwinner: a64: Add initial support for Pinebook
+Message-ID: <20180606051702.6478-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jun 2018 16:34:21 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+This series adds dts for Pinebook with few prerequisites - PWM and R_I2C
+devices nodes.
 
-> On Tue, Jun 05, 2018 at 12:51:24AM +0900, Masami Hiramatsu wrote:
-> > Remove arch dependent setjump/longjump functions
-> > and unused fields in kprobe_ctlblk for jprobes
-> > from arch/arm64.
-> > 
-> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  arch/arm64/include/asm/kprobes.h   |    1 -
-> >  arch/arm64/kernel/probes/kprobes.c |   68 ------------------------------------
-> >  2 files changed, 69 deletions(-)
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+v2: - add my signoff
+    - add default pinmux option for PWM
+    - add alternate pinmux option for R_I2C controller
+    - add A64 compatible for R_I2C controller
 
-Thank you Will!
+Andre Przywara (1):
+  arm64: dts: allwinner: a64: Add PWM controllers
 
+Icenowy Zheng (2):
+  arm64: dts: allwinner: a64: add R_I2C controller
+  arm64: dts: allwinner: add support for Pinebook
+
+ arch/arm64/boot/dts/allwinner/Makefile        |   1 +
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 280 ++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  56 ++++
+ 3 files changed, 337 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
 
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+2.17.1
