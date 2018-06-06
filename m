@@ -1,52 +1,72 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 6 Jun 2018 09:02:04 +0200
-Subject: panic kexec broken on ARM64?
-In-Reply-To: <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
-References: <20180605100151.7fd54381@ezekiel.suse.cz>
- <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
-Message-ID: <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 6 Jun 2018 09:46:30 +0200
+Subject: [PATCH 2/2] arm64: dts: renesas: condor: add I2C0 support
+In-Reply-To: <61f6f4a4-e55c-06e0-cba1-7d90a556950a@cogentembedded.com>
+References: <e9c94553-be9d-0eec-a1ee-1713bb97fbab@cogentembedded.com>
+ <61f6f4a4-e55c-06e0-cba1-7d90a556950a@cogentembedded.com>
+Message-ID: <CAMuHMdVRTCOmVz2wkq5SnqEUH4PAdAEp8PVj06JxgC2zLs=wow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Petr,
+Hi Sergei,
 
-Am 05.06.2018 um 19:46 schrieb James Morse:
-> Hi Petr,
+On Mon, May 28, 2018 at 10:14 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the Condor board dependent part of the I2C0 device node.
 >
-> (CC: +Akashi, Marc)
+> The I2C0 bus is populated by 2 ON Semiconductor PCA9654 I/O expanders
+> and Analog Devices  ADV7511W HDMI transmitter (but we're only describing
+> the former chips now).
 >
-> On 05/06/18 09:01, Petr Tesarik wrote:
->> I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
->> when a panic kernel is loaded.
-> kdump is a best-effort thing, it looks like this is a case where the
-> crashed-kernel can't tear itself down.
->
-> Do you have the rest of the stack trace? Was it handling an irq when it decided
-> to panic?:
-> https://lkml.org/lkml/2018/3/13/1134
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-the Raspberry Pi 3 B+ support is very fresh (linux-next). Since i didn't 
-see a version, i need to doublecheck.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-You are actually using linux-next and not the downstream kernel?
+Suggestion for future improvement below.
 
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> @@ -80,6 +80,28 @@
+>         clock-frequency = <32768>;
+>  };
 >
->> I attached a hardware debugger and found
->> out that all CPU cores were stopped except one which was stuck in the
->> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
->> definitely not safe after a kernel panic.
-> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
-> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
-> around in mmio registers, this should all be safe unless you re-entered the same
-> code.
->
->
->> If I'm right, then this is broken in general, but I have only ever seen
->> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
->> be more subtle.
-> Is there a hardware difference around the interrupt controller on these?
-@James:
-No, but the RPi 3 B has a different USB network chip on board (smsc95xx, 
-Fast ethernet) instead of lan78xx (Gigabit ethernet).
+> +&i2c0 {
+> +       pinctrl-0 = <&i2c0_pins>;
+> +       pinctrl-names = "default";
+> +
+> +       status = "okay";
+> +       clock-frequency = <400000>;
+> +
+> +       io_expander0: gpio at 20 {
+> +               compatible = "onnn,pca9654";
+> +               reg = <0x20>;
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
 
-Stefan
+The bindings don't mention this (the example does have it) the optional
+interrupts prototype. As this is wired to INTC-EX IRQ4, you may want to
+add that. Perhaps later, as r8a77980.dtsi doesn't have INTC-EX yet.
+
+> +       };
+> +
+> +       io_expander1: gpio at 21 {
+> +               compatible = "onnn,pca9654";
+> +               reg = <0x21>;
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
+
+Same for IRQ5.
+
+> +       };
+> +};
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
