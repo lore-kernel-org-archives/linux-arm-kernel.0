@@ -1,41 +1,40 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 6 Jun 2018 19:56:11 +0300
-Subject: [PATCH 3/5] arm64: dts: renesas: r8a77980: add DU support
+Date: Wed, 6 Jun 2018 19:57:29 +0300
+Subject: [PATCH 4/5] arm64: dts: renesas: r8a77980: add LVDS support
 In-Reply-To: <4fbd0895-c1ec-41fc-912d-8306dd933997@cogentembedded.com>
 References: <4fbd0895-c1ec-41fc-912d-8306dd933997@cogentembedded.com>
-Message-ID: <6ccb3998-f964-5e19-53dd-f567e4ed05bf@cogentembedded.com>
+Message-ID: <2f71d619-d463-bb67-585b-2c08d3791bfb@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A77980 part of the DU device node.
+Define the generic R8A77980 part of the LVDS device node.
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
 Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
 ===================================================================
 --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
 +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -671,6 +671,36 @@
- 			resets = <&cpg 603>;
- 		};
- 
-+		du: display at feb00000 {
-+			compatible = "renesas,du-r8a77980",
-+				     "renesas,du-r8a77970";
-+			reg = <0 0xfeb00000 0 0x80000>;
-+			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 724>;
-+			clock-names = "du.0";
+@@ -696,6 +696,35 @@
+ 				port at 1 {
+ 					reg = <1>;
+ 					du_out_lvds0: endpoint {
++						remote-endpoint = <&lvds0_in>;
++					};
++				};
++			};
++		};
++
++		lvds0: lvds-encoder at feb90000 {
++			compatible = "renesas,r8a77980-lvds";
++			reg = <0 0xfeb90000 0 0x14>;
++			clocks = <&cpg CPG_MOD 727>;
 +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 724>;
-+			vsps = <&vspd0>;
++			resets = <&cpg 727>;
 +			status = "disabled";
 +
 +			ports {
@@ -44,18 +43,15 @@ Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
 +
 +				port at 0 {
 +					reg = <0>;
-+					du_out_rgb: endpoint {
++					lvds0_in: endpoint {
++						remote-endpoint =
++							<&du_out_lvds0>;
 +					};
 +				};
 +
 +				port at 1 {
 +					reg = <1>;
-+					du_out_lvds0: endpoint {
-+					};
-+				};
-+			};
-+		};
-+
- 		prr: chipid at fff00044 {
- 			compatible = "renesas,prr";
- 			reg = <0 0xfff00044 0 4>;
++					lvds0_out: endpoint {
+ 					};
+ 				};
+ 			};
