@@ -1,216 +1,93 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 6 Jun 2018 18:03:21 +0300
-Subject: [PATCH v4 5/7] interconnect: qcom: Add msm8916 interconnect
- provider driver
-In-Reply-To: <CAE=gft4LT_JSGytuiSx5uwzfeGc0DK140+D4c_J8FVUHioHdcg@mail.gmail.com>
-References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-6-georgi.djakov@linaro.org>
- <CAE=gft4LT_JSGytuiSx5uwzfeGc0DK140+D4c_J8FVUHioHdcg@mail.gmail.com>
-Message-ID: <21c5adcc-dc18-73a1-e07a-d84f2e6ae534@linaro.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 6 Jun 2018 09:36:27 -0500
+Subject: [PATCH] arm64: topology: Avoid checking numa mask for scheduler
+ MC selection
+In-Reply-To: <3c8a541d-78a1-389a-112c-494f7c1a543d@arm.com>
+References: <20180605190837.493505-1-jeremy.linton@arm.com>
+ <3c8a541d-78a1-389a-112c-494f7c1a543d@arm.com>
+Message-ID: <120c2793-8826-4a7c-cf5c-cb6661602b5a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Evan,
+On 06/06/2018 05:05 AM, Sudeep Holla wrote:
+> 
+> 
+> On 05/06/18 20:08, Jeremy Linton wrote:
+>> The numa mask subset check has problems if !CONFIG_NUMA, over hotplug
+>> operations or during early boot. Lets disable the NUMA siblings checks
+>> for the time being, as NUMA in socket machines have LLC's that will
+>> assure that the scheduler topology isn't "borken".
+>>
+> 
+> ^ broken ? (not sure if usage of borken is intentional :))
 
-On 12.05.18 ?. 0:29, Evan Green wrote:
-> Hi Georgi,
+Well that is what the scheduler says when it doesn't like the topology.
+
 > 
-> On Fri, Mar 9, 2018 at 1:11 PM Georgi Djakov <georgi.djakov@linaro.org>
-> wrote:
+>> Futher, as a defensive mechanism during hotplug, lets assure that the
 > 
->> Add driver for the Qualcomm interconnect buses found in msm8916 based
->> platforms.
+> ^ Further
+
+Sure.
+
 > 
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> LLC siblings are also masked.
+>>
+> 
+> Also add the symptoms of the issue we say as Geert suggested me.
+> Something like:
+> " This often leads to system hang or crash during CPU hotplug and system
+> suspend operation. This is mostly observed on HMP systems where the
+> CPU compute capacities are different and ends up in different scheduler
+> domains. Since cpumask_of_node is returned instead core_sibling, the
+> scheduler is confused with incorrect cpumasks(e.g. one CPU in two
+> different sched domains at the same time) on CPU hotplug."
+> 
+> You can add Reported-by: Geert... ?
+
+ok.
+
+> 
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 >> ---
->>    drivers/interconnect/Kconfig        |   5 +
->>    drivers/interconnect/Makefile       |   1 +
->>    drivers/interconnect/qcom/Kconfig   |  11 +
->>    drivers/interconnect/qcom/Makefile  |   2 +
->>    drivers/interconnect/qcom/msm8916.c | 482
-> ++++++++++++++++++++++++++++++++++++
->>    include/linux/interconnect/qcom.h   | 350 ++++++++++++++++++++++++++
->>    6 files changed, 851 insertions(+)
->>    create mode 100644 drivers/interconnect/qcom/Kconfig
->>    create mode 100644 drivers/interconnect/qcom/msm8916.c
->>    create mode 100644 include/linux/interconnect/qcom.h
-> ...
->> diff --git a/drivers/interconnect/qcom/msm8916.c
-> b/drivers/interconnect/qcom/msm8916.c
->> new file mode 100644
->> index 000000000000..d5b54f8261c8
->> --- /dev/null
->> +++ b/drivers/interconnect/qcom/msm8916.c
-> ...
->> +static int qnoc_probe(struct platform_device *pdev)
->> +{
->> +       const struct qcom_icc_desc *desc;
->> +       struct qcom_icc_node **qnodes;
->> +       struct qcom_icc_provider *qp;
->> +       struct resource *res;
->> +       struct icc_provider *provider;
->> +       size_t num_nodes, i;
->> +       int ret;
->> +
->> +       /* wait for RPM */
->> +       if (!qcom_icc_rpm_smd_available())
->> +               return -EPROBE_DEFER;
->> +
->> +       desc = of_device_get_match_data(&pdev->dev);
->> +       if (!desc)
->> +               return -EINVAL;
->> +
->> +       qnodes = desc->nodes;
->> +       num_nodes = desc->num_nodes;
->> +
->> +       qp = devm_kzalloc(&pdev->dev, sizeof(*qp), GFP_KERNEL);
->> +       if (!qp)
->> +               return -ENOMEM;
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       qp->base = devm_ioremap_resource(&pdev->dev, res);
->> +       if (IS_ERR(qp->base))
->> +               return PTR_ERR(qp->base);
->> +
->> +       qp->bus_clk = devm_clk_get(&pdev->dev, "bus_clk");
->> +       if (IS_ERR(qp->bus_clk))
->> +               return PTR_ERR(qp->bus_clk);
->> +
->> +       qp->bus_a_clk = devm_clk_get(&pdev->dev, "bus_a_clk");
->> +       if (IS_ERR(qp->bus_a_clk))
->> +               return PTR_ERR(qp->bus_a_clk);
->> +
->> +       provider = &qp->provider;
->> +       provider->dev = &pdev->dev;
->> +       provider->set = &qcom_icc_set;
->> +       INIT_LIST_HEAD(&provider->nodes);
->> +       provider->data = qp;
->> +
->> +       ret = icc_add_provider(provider);
->> +       if (ret) {
->> +               dev_err(&pdev->dev, "error adding interconnect
-> provider\n");
->> +               return ret;
->> +       }
->> +
->> +       for (i = 0; i < num_nodes; i++) {
->> +               struct icc_node *node;
->> +               int ret;
->> +               size_t j;
->> +
->> +               node = icc_node_create(qnodes[i]->id);
->> +               if (IS_ERR(node)) {
->> +                       ret = PTR_ERR(node);
->> +                       goto err;
->> +               }
->> +
->> +               node->name = qnodes[i]->name;
->> +               node->data = qnodes[i];
->> +               icc_node_add(node, provider);
->> +
->> +               dev_dbg(&pdev->dev, "registered node %p %s %d\n", node,
->> +                       qnodes[i]->name, node->id);
->> +
->> +               /* populate links */
->> +               for (j = 0; j < qnodes[i]->num_links; j++)
->> +                       if (qnodes[i]->links[j])
->> +                               icc_link_create(node,
-> qnodes[i]->links[j]);
->> +
->> +               ret = qcom_icc_init(node);
->> +               if (ret)
->> +                       dev_err(&pdev->dev, "%s init error (%d)\n",
-> node->name,
->> +                               ret);
+>>   arch/arm64/kernel/topology.c | 11 ++++-------
+>>   1 file changed, 4 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 7415c166281f..f845a8617812 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -215,13 +215,8 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+>>   
+>>   const struct cpumask *cpu_coregroup_mask(int cpu)
+>>   {
+>> -	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
+>> +	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
+>>   
+>> -	/* Find the smaller of NUMA, core or LLC siblings */
+>> -	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
+>> -		/* not numa in package, lets use the package siblings */
+>> -		core_mask = &cpu_topology[cpu].core_sibling;
+>> -	}
+>>   	if (cpu_topology[cpu].llc_id != -1) {
+>>   		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
+>>   			core_mask = &cpu_topology[cpu].llc_siblings;
+>> @@ -239,8 +234,10 @@ static void update_siblings_masks(unsigned int cpuid)
+>>   	for_each_possible_cpu(cpu) {
+>>   		cpu_topo = &cpu_topology[cpu];
+>>   
+>> -		if (cpuid_topo->llc_id == cpu_topo->llc_id)
+>> +		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
+>>   			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
+>> +			cpumask_set_cpu(cpuid, &cpu_topo->llc_siblings);
+>> +		}
+>>   
+>>   		if (cpuid_topo->package_id != cpu_topo->package_id)
+>>   			continue;
+>>
 > 
-> Don't you want to call qcom_icc_init before icc_link_create? As soon as
-> icc_link_create is called, the node is connected to the graph, and
-> qcom_icc_set can be called.
+> Looks good to me for now. I might need to tweek it a bit when I add the
+> support to update topology on hotplug. But that's for latter. For now,
 > 
-
-I agree.
-
->> +       }
->> +
->> +       platform_set_drvdata(pdev, provider);
->> +
->> +       return ret;
->> +err:
->> +       icc_del_provider(provider);
->> +       return ret;
->> +}
->> +
->> +static int qnoc_remove(struct platform_device *pdev)
->> +{
->> +       struct icc_provider *provider = platform_get_drvdata(pdev);
->> +
->> +       icc_del_provider(provider);
+> Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 > 
-> Presumably in the framework nodes and links ought to get cleaned up
-> somewhere too, right? As it is now, the devm code frees provider when this
-> device is removed, even though provider is still very connected in the
-> graph via the nodes and links.
-
-Sorry, this part is incomplete. Will implement the rest of the cleanup code.
-
->> +
->> +       return 0;
->> +}
->> +
->> +static const struct of_device_id qnoc_of_match[] = {
->> +       { .compatible = "qcom,msm8916-pnoc", .data = &msm8916_pnoc },
->> +       { .compatible = "qcom,msm8916-snoc", .data = &msm8916_snoc },
->> +       { .compatible = "qcom,msm8916-bimc", .data = &msm8916_bimc },
->> +       { },
->> +};
->> +MODULE_DEVICE_TABLE(of, qnoc_of_match);
->> +
->> +static struct platform_driver qnoc_driver = {
->> +       .probe = qnoc_probe,
->> +       .remove = qnoc_remove,
->> +       .driver = {
->> +               .name = "qnoc-msm8916",
->> +               .of_match_table = qnoc_of_match,
->> +       },
->> +};
->> +module_platform_driver(qnoc_driver);
->> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org>");
->> +MODULE_DESCRIPTION("Qualcomm msm8916 NoC driver");
->> +MODULE_LICENSE("GPL v2");
->> diff --git a/include/linux/interconnect/qcom.h
-> b/include/linux/interconnect/qcom.h
->> new file mode 100644
->> index 000000000000..2cd378d2f575
->> --- /dev/null
->> +++ b/include/linux/interconnect/qcom.h
->> @@ -0,0 +1,350 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +/*
->> + * Qualcomm interconnect IDs
->> + *
->> + * Copyright (c) 2018, Linaro Ltd.
->> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
->> + */
->> +
->> +#ifndef __QCOM_INTERCONNECT_IDS_H
->> +#define __QCOM_INTERCONNECT_IDS_H
->> +
->> +#define FAB_BIMC 0
->> +#define FAB_SYS_NOC 1024
->> +#define FAB_MMSS_NOC 2048
->> +#define FAB_OCMEM_NOC 3072
->> +#define FAB_PERIPH_NOC 4096
->> +#define FAB_CONFIG_NOC 5120
->> +#define FAB_OCMEM_VNOC 6144
-> 
-> Looks like you're still following that downstream convention of NoCs being
-> divisible by 1024, masters in 1-512, and slaves in 512-1023, then I don't
-> know about the 10000s. This was documented somewhere downstream, can you
-> add that documentation somewhere in here?
-
-Yes, i am currently following the existing IDs. The 10000s are the nodes
-used for the interconnects between the NoCs. I don't think it's worth
-documenting this, as the plan is to switch to arbitrary numbers.
-
-Thanks,
-Georgi
