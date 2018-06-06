@@ -1,129 +1,56 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 6 Jun 2018 14:35:08 -0500
-Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <bbbd287c-437e-d7bd-d40f-6bb914d96860@gmail.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
- <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
- <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
- <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
- <bbbd287c-437e-d7bd-d40f-6bb914d96860@gmail.com>
-Message-ID: <CAL_JsqJCkP_c_wKGRc7Qzkiw8sZLRf6MGz-WgVsLjnQfqK8r6Q@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 6 Jun 2018 21:37:01 +0200
+Subject: [PATCH v2 3/3] arm64: dts: allwinner: add support for Pinebook
+In-Reply-To: <20180606051702.6478-4-anarsoul@gmail.com>
+References: <20180606051702.6478-1-anarsoul@gmail.com>
+ <20180606051702.6478-4-anarsoul@gmail.com>
+Message-ID: <20180606193701.seerxyy6g3nx3flk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2018 at 2:30 PM, Frank Rowand <frowand.list@gmail.com> wrote:
-> Hi Michel,
->
-> On 06/05/18 23:36, Michel Pollet wrote:
->> Hi Frank,
->>
->> On 05 June 2018 18:34, Frank wrote:
->>> On 06/05/18 04:28, Michel Pollet wrote:
->>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time,
->>>> it requires a special enable method to get it started.
->>>>
->>>> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
->>>> ---
->>>>  arch/arm/mach-shmobile/Makefile        |  1 +
->>>>  arch/arm/mach-shmobile/smp-r9a06g032.c | 79
->>>> ++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 80 insertions(+)
->>>>  create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
->>>>
->>>> diff --git a/arch/arm/mach-shmobile/Makefile
->>>> b/arch/arm/mach-shmobile/Makefile index 1939f52..d7fc98f 100644
->>>> --- a/arch/arm/mach-shmobile/Makefile
->>>> +++ b/arch/arm/mach-shmobile/Makefile
->>>> @@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)+= smp-sh73a0.o
->>> headsmp-scu.o platsmp-scu.o
->>>>  smp-$(CONFIG_ARCH_R8A7779)+= smp-r8a7779.o headsmp-scu.o
->>> platsmp-scu.o
->>>>  smp-$(CONFIG_ARCH_R8A7790)+= smp-r8a7790.o
->>>>  smp-$(CONFIG_ARCH_R8A7791)+= smp-r8a7791.o
->>>> +smp-$(CONFIG_ARCH_R9A06G032)+= smp-r9a06g032.o
->>>>  smp-$(CONFIG_ARCH_EMEV2)+= smp-emev2.o headsmp-scu.o
->>> platsmp-scu.o
->>>>
->>>>  # PM objects
->>>> diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c
->>>> b/arch/arm/mach-shmobile/smp-r9a06g032.c
->>>> new file mode 100644
->>>> index 0000000..cd40e6e
->>>> --- /dev/null
->>>> +++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
->>>> @@ -0,0 +1,79 @@
->>>> +// SPDX-License-Identifier: GPL-2.0
->>>> +/*
->>>> + * R9A06G032 Second CA7 enabler.
->>>> + *
->>>> + * Copyright (C) 2018 Renesas Electronics Europe Limited
->>>> + *
->>>> + * Michel Pollet <michel.pollet@bp.renesas.com>,
->>> <buserror@gmail.com>
->>>> + * Derived from action,s500-smp
->>>> + */
->>>> +
->>>> +#include <linux/io.h>
->>>> +#include <linux/of.h>
->>>> +#include <linux/of_address.h>
->>>> +#include <linux/smp.h>
->>>> +
->>>> +/*
->>>> + * The second CPU is parked in ROM at boot time. It requires waking
->>>> +it after
->>>> + * writing an address into the BOOTADDR register of sysctrl.
->>>> + *
->>>> + * So the default value of the "cpu-release-addr" corresponds to
->>> BOOTADDR...
->>>> + *
->>>> + * *However* the BOOTADDR register is not available when the kernel
->>>> + * starts in NONSEC mode.
->>>> + *
->>>> + * So for NONSEC mode, the bootloader re-parks the second CPU into a
->>>> +pen
->>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to a
->>>> +SRAM address,
->>>> + * which is not restricted.
->>>
->>> The binding document for cpu-release-addr does not have a definition for 32
->>> bit arm.  The existing definition is only 64 bit arm.  Please add the definition
->>> for 32 bit arm to patch 1.
->>
->> Hmmm I do find a definition in
->> Documentation/devicetree/bindings/arm/cpus.txt -- just under where I
->> added my 'enable-method' -- And it is already used as 32 bits in at least
->> arch/arm/boot/dts/stih407-family.dtsi.
->
-> From cpus.txt:
->
->         - cpu-release-addr
->                 Usage: required for systems that have an "enable-method"
->                        property value of "spin-table".
->                 Value type: <prop-encoded-array>
->                 Definition:
->                         # On ARM v8 64-bit systems must be a two cell
->                           property identifying a 64-bit zero-initialised
->                           memory location.
->
-> The definition specifies a two cell property for 64-bit systems.
->
-> Please add to the definition that cpu-release-addr is a one cell property
-> for 32-bit systems.
+On Tue, Jun 05, 2018 at 10:17:02PM -0700, Vasily Khoruzhick wrote:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
+> 
+> Pinebook is a A64-based laptop produced by Pine64, with the following
+> peripherals:
+> 
+> USB:
+> - Two external USB ports (one is directly connected to A64's OTG
+> controller, the other is under a internal hub connected to the host-only
+> controller.)
+> - USB HID keyboard and touchpad connected to the internal hub.
+> - USB UVC camera connected to the internal hub.
+> 
+> Power-related:
+> - A DC IN jack connected to AXP803's DCIN pin.
+> - A Li-Polymer battery connected to AXP803's battery pins.
+> 
+> Storage:
+> - An eMMC by Foresee on the main board (in the product revision of the
+> main board it's designed to be switchable).
+> - An external MicroSD card slot.
+> 
+> Display:
+> - An eDP LCD panel (1366x768) connected via an ANX6345 RGB-eDP bridge.
+> - A mini HDMI port.
+> 
+> Misc:
+> - A Hall sensor designed to detect the status of lid, connected to GPIO PL12.
+> - A headphone jack connected to the SoC's internal codec.
+> - A debug UART port muxed with headphone jack.
+> 
+> This commit adds basical support for it.
+> 
+> [vasily: squashed several commits into one, added simplefb node, added usbphy
+> 	 to ehci0 and ohci0 nodes and other cosmetic changes to dts]
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Actually, this is all already documented in the DT spec and it is
-always 2 cells[1]. We should perhaps just remove whatever is
-duplicated from the spec.
+I've updated Icenowy's domain and applied, thanks!
+Maxime
 
-Rob
-
-[1]
-   ``cpu-release-addr``   | SD  | ``<u64>``        The
-cpu-release-addr property is required for
-                                                   cpu nodes that have
-an enable-method property
-                                                   value of
-``"spin-table"``. The value specifies the
-                                                   physical address of
-a spin table entry that
-                                                   releases a
-secondary CPU from its spin loop.
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
