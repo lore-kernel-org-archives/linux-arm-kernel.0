@@ -1,155 +1,211 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 6 Jun 2018 10:28:36 +0000
-Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <AM0PR04MB4211FCC9F3902F14EBD28313806E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
- <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
- <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
- <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
- <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180503124030.jkc7oox2vyjblk2y@pengutronix.de>
- <AM0PR04MB421169E44830A17D8A52D3F4806A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211FCC9F3902F14EBD28313806E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211F52A9447CF27EC78AFB780650@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 6 Jun 2018 13:02:21 +0200
+Subject: [PATCH v5 6/6] tty/serial: atmel: changed the driver to work
+ under at91-usart mfd
+In-Reply-To: <20180604165943.31381-7-radu.pirea@microchip.com>
+References: <20180604165943.31381-1-radu.pirea@microchip.com>
+ <20180604165943.31381-7-radu.pirea@microchip.com>
+Message-ID: <91db9d80-d530-9a00-3b40-80e335869ff4@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Typo in the subject:
+changed->change
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Monday, May 28, 2018 5:25 PM
-> To: 'Sascha Hauer' <s.hauer@pengutronix.de>
-> Cc: 'linux-arm-kernel at lists.infradead.org' <linux-arm-
-> kernel at lists.infradead.org>; 'dongas86 at gmail.com' <dongas86@gmail.com>;
-> dl-linux-imx <linux-imx@nxp.com>; 'kernel at pengutronix.de'
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>;
-> 'shawnguo at kernel.org' <shawnguo@kernel.org>
-> Subject: RE: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+
+On 04/06/2018 18:59, Radu Pirea wrote:
+> This patch modifies the place where resources and device tree properties
+> are searched.
 > 
-...
-
-> > > > > We discussed this internally and came to the conclusion that the
-> > > > > SCU is not a generic user of a MU. The MU is designed to work
-> > > > > together with a piece of SRAM to form a mailbox system. Instead
-> > > > > of working as designed the SCU morses the messages through the
-> > > > > doorbell (what the MU really is). For anything that uses the MU
-> > > > > in the way it is designed I would suggest using the mailbox
-> > > > > interface from drivers/mailbox/ along with the binding from
-> > > Documentation/devicetree/bindings/mailbox/mailbox.txt.
-> > > > >
-> > > > > In the way I suggest there is no need for any MU ID.
-> > > > >
-> > > >
-> > > > So you're suggesting switch to use mailbox instead of private MU
-> > > > library function calls?
-> > > > Something like:
-> > > >         scu {
-> > > >                 compatible = "nxp,imx8qxp-scu", "simple-bus";
-> > > >                 mboxes = <&mailbox 0>;
-> > > >         }
-> > > > Then IPC is implemented based on mailbox?
-> > > >
-> > > > As I replied Oleksij Rempel in another mail in this thread, we've
-> > > > tried mailbox but got performance regression issue and need more
-> > > > time to investigate whether it's really quite suitable for i.MX
-> > > > SCU firmware as SCU handling message quite fast in micro seconds.
-> > > > (Mailbox polling method has much more latency than current MU
-> > > > sample polling we
-> > > > used) and we want to avoid the SCU firmware API changes.
-> > >
-> > > I am not suggesting to do mailboxing (using shared memory) for the SCU.
-> > > I am also not suggesting any API update for the SCU communication.
-> > > I am just mentioning that doing mailboxing is the way the MU was
-> > > originally designed for. Looking at the reference manual I see many
-> > > MUs on
-> > the i.MX8.
-> > > I guess most of them are for communication between the different
-> > > cores on the system. For these it's probably worth writing some
-> > > generic MU
-> > driver.
-> > > The way the MU is used for communication with the SCU though is so
-> > > special that it's not worth writing a generic driver, so just
-> > > integrate the MU access functions in the SCU code.
-> > >
-> >
-> > I understand it.
-> >
-> > One problem of the way you suggested may be that:
-> > If we doing like below, we may lose flexibility to change the MU used
-> > for SCU firmware communication.
-> > 	scu at 5d1b0000 {
-> > 		compatible = "fsl,imx8qxp-scu";
-> > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
-> > 	};
-> >
-> > And current design is that the system supports multiple MU channels
-> > used by various users at the same time, e.g. SCU, Power Domain, Clock and
-> others.
-> > User can flexibly change it under their nodes: And each MU channel is
-> > protected by their private lock and not affect each others.
-> >
-> > e.g.
-> >         scu {
-> >                 compatible = "nxp,imx8qxp-scu", "simple-bus";
-> >                 fsl,mu = <&lsio_mu0>;
-> >
-> >                 clk: clk {
-> >                         compatible = "fsl,imx8qxp-clk";
-> >                         #clock-cells = <1>;
-> >                 };
-> >
-> >                 iomuxc: iomuxc {
-> >                         compatible = "fsl,imx8qxp-iomuxc";
-> >                         fsl,mu = <&lsio_mu3>;
-> >                 };
-> >
-> >                 imx8qx-pm {
-> >                         #address-cells = <1>;
-> >                         #size-cells = <0>;
-> >                         fsl,mu = <&lsio_mu4>;
-> > 	.............
-> >         }
-> >
-> > The default code only uses MU0 which is used by SCU.
-> >
-> > The change may affect this design. Any ideas?
-> > Do you think we can keep the current way?
-> >
+> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+> ---
+>  drivers/tty/serial/Kconfig        |  1 +
+>  drivers/tty/serial/atmel_serial.c | 41 ++++++++++++++++++-------------
+>  2 files changed, 25 insertions(+), 17 deletions(-)
 > 
-> Any comments about this?
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 3682fd3e960c..25e55332f8b1 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -119,6 +119,7 @@ config SERIAL_ATMEL
+>  	depends on ARCH_AT91 || COMPILE_TEST
+>  	select SERIAL_CORE
+>  	select SERIAL_MCTRL_GPIO if GPIOLIB
+> +	select MFD_AT91_USART
+>  	help
+>  	  This enables the driver for the on-chip UARTs of the Atmel
+>  	  AT91 processors.
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index df46a9e88c34..5c74e03396ef 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -193,8 +193,8 @@ static struct console atmel_console;
+>  
+>  #if defined(CONFIG_OF)
+>  static const struct of_device_id atmel_serial_dt_ids[] = {
+> -	{ .compatible = "atmel,at91rm9200-usart" },
+> -	{ .compatible = "atmel,at91sam9260-usart" },
+> +	{ .compatible = "atmel,at91rm9200-usart-serial" },
+> +	{ .compatible = "atmel,at91sam9260-usart-serial" },
+Sorry, I didn't catch that before, but we can drop "atmel,at91sam9260-usart-serial" don't we ?
+Only "atmel,at91rm9200-usart-serial" is used in the MFD driver.
+
+>  	{ /* sentinel */ }
+>  };
+>  #endif
+> @@ -915,6 +915,7 @@ static void atmel_tx_dma(struct uart_port *port)
+>  static int atmel_prepare_tx_dma(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	struct device *mfd_dev = port->dev->parent;
+>  	dma_cap_mask_t		mask;
+>  	struct dma_slave_config config;
+>  	int ret, nent;
+> @@ -922,7 +923,7 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -	atmel_port->chan_tx = dma_request_slave_channel(port->dev, "tx");
+> +	atmel_port->chan_tx = dma_request_slave_channel(mfd_dev, "tx");
+>  	if (atmel_port->chan_tx == NULL)
+>  		goto chan_err;
+>  	dev_info(port->dev, "using %s for tx DMA transfers\n",
+> @@ -1093,6 +1094,7 @@ static void atmel_rx_from_dma(struct uart_port *port)
+>  static int atmel_prepare_rx_dma(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	struct device *mfd_dev = port->dev->parent;
+>  	struct dma_async_tx_descriptor *desc;
+>  	dma_cap_mask_t		mask;
+>  	struct dma_slave_config config;
+> @@ -1104,7 +1106,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_CYCLIC, mask);
+>  
+> -	atmel_port->chan_rx = dma_request_slave_channel(port->dev, "rx");
+> +	atmel_port->chan_rx = dma_request_slave_channel(mfd_dev, "rx");
+>  	if (atmel_port->chan_rx == NULL)
+>  		goto chan_err;
+>  	dev_info(port->dev, "using %s for rx DMA transfers\n",
+> @@ -1631,7 +1633,7 @@ static void atmel_tasklet_tx_func(unsigned long data)
+>  static void atmel_init_property(struct atmel_uart_port *atmel_port,
+>  				struct platform_device *pdev)
+>  {
+> -	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *np = pdev->dev.parent->of_node;
+I think this is not needed anymore (cf atmel_probe())
+
+>  
+>  	/* DMA/PDC usage specification */
+>  	if (of_property_read_bool(np, "atmel,use-dma-rx")) {
+> @@ -2222,8 +2224,8 @@ static const char *atmel_type(struct uart_port *port)
+>   */
+>  static void atmel_release_port(struct uart_port *port)
+>  {
+> -	struct platform_device *pdev = to_platform_device(port->dev);
+> -	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
+> +	struct platform_device *mpdev = to_platform_device(port->dev->parent);
+> +	int size = resource_size(mpdev->resource);
+>  
+>  	release_mem_region(port->mapbase, size);
+>  
+> @@ -2238,8 +2240,8 @@ static void atmel_release_port(struct uart_port *port)
+>   */
+>  static int atmel_request_port(struct uart_port *port)
+>  {
+> -	struct platform_device *pdev = to_platform_device(port->dev);
+> -	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
+> +	struct platform_device *mpdev = to_platform_device(port->dev->parent);
+> +	int size = resource_size(mpdev->resource);
+>  
+>  	if (!request_mem_region(port->mapbase, size, "atmel_serial"))
+>  		return -EBUSY;
+> @@ -2341,27 +2343,28 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
+>  {
+>  	int ret;
+>  	struct uart_port *port = &atmel_port->uart;
+> +	struct platform_device *mpdev = to_platform_device(pdev->dev.parent);
+>  
+>  	atmel_init_property(atmel_port, pdev);
+>  	atmel_set_ops(port);
+>  
+> -	uart_get_rs485_mode(&pdev->dev, &port->rs485);
+> +	uart_get_rs485_mode(&mpdev->dev, &port->rs485);
+>  
+>  	port->iotype		= UPIO_MEM;
+>  	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
+>  	port->ops		= &atmel_pops;
+>  	port->fifosize		= 1;
+>  	port->dev		= &pdev->dev;
+> -	port->mapbase	= pdev->resource[0].start;
+> -	port->irq	= pdev->resource[1].start;
+> +	port->mapbase		= mpdev->resource[0].start;
+> +	port->irq		= mpdev->resource[1].start;
+>  	port->rs485_config	= atmel_config_rs485;
+> -	port->membase	= NULL;
+> +	port->membase		= NULL;
+>  
+>  	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
+>  
+>  	/* for console, the clock could already be configured */
+>  	if (!atmel_port->clk) {
+> -		atmel_port->clk = clk_get(&pdev->dev, "usart");
+> +		atmel_port->clk = clk_get(&mpdev->dev, "usart");
+>  		if (IS_ERR(atmel_port->clk)) {
+>  			ret = PTR_ERR(atmel_port->clk);
+>  			atmel_port->clk = NULL;
+> @@ -2652,11 +2655,13 @@ static int atmel_serial_resume(struct platform_device *pdev)
+>  static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
+>  				     struct platform_device *pdev)
+>  {
+> +	struct device *dev = pdev->dev.parent;
+> +
+Ditto
+
+>  	atmel_port->fifo_size = 0;
+>  	atmel_port->rts_low = 0;
+>  	atmel_port->rts_high = 0;
+>  
+> -	if (of_property_read_u32(pdev->dev.of_node,
+> +	if (of_property_read_u32(dev->of_node,
+Ditto
+>  				 "atmel,fifo-size",
+>  				 &atmel_port->fifo_size))
+>  		return;
+> @@ -2694,13 +2699,15 @@ static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
+>  static int atmel_serial_probe(struct platform_device *pdev)
+>  {
+>  	struct atmel_uart_port *atmel_port;
+> -	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *np = pdev->dev.parent->of_node;
+>  	void *data;
+>  	int ret = -ENODEV;
+>  	bool rs485_enabled;
+>  
+>  	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
+>  
+> +	pdev->dev.of_node = np;
+> +
+As atmel_serial device's of_node is now the parent node, the changes
+in atmel_init_property() and atmel_serial_probe_fifos() are not needed anymore.
+And maybe add a comment to explain that this is part of a MFD and all
+the attributes are in the parent node, so we're using the MFD device node
+instead of this device node.
+
+>  	ret = of_alias_get_id(np, "serial");
+>  	if (ret < 0)
+>  		/* port id not found in platform data nor device-tree aliases:
+> @@ -2845,7 +2852,7 @@ static struct platform_driver atmel_serial_driver = {
+>  	.suspend	= atmel_serial_suspend,
+>  	.resume		= atmel_serial_resume,
+>  	.driver		= {
+> -		.name			= "atmel_usart",
+> +		.name			= "atmel_usart_serial",
+>  		.of_match_table		= of_match_ptr(atmel_serial_dt_ids),
+>  	},
+>  };
 > 
 
-Have you got a chance to help look at it?
-We need identify the direction to go next.
+Thanks !
 
-Regards
-Dong Aisheng
-
-> Regards
-> Dong Aisheng
-> 
-> > Regards
-> > Dong Aisheng
-> >
-> > > Sascha
-> > >
-> > > --
-> > > Pengutronix e.K.                           |                             |
-> > > Industrial Linux Solutions                 |
-> > >
-> >
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
-> > >
-> >
-> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7C266
-> > >
-> 24a5c38e5488a80b708d5b0f3107b%7C686ea1d3bc2b4c6fa92cd99c5c301635%
-> > >
-> >
-> 7C0%7C0%7C636609480354404338&sdata=XP%2BYdt9I7zURrQun2jRbempLhC
-> > > XrYtMVMb3dEWrZuro%3D&reserved=0  |
-> > > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> > > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Richard.
