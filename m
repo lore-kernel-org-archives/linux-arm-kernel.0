@@ -1,21 +1,21 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Jun 2018 21:42:59 +0200
+Date: Wed, 6 Jun 2018 21:46:21 +0200
 Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <CAL_JsqJCkP_c_wKGRc7Qzkiw8sZLRf6MGz-WgVsLjnQfqK8r6Q@mail.gmail.com>
+In-Reply-To: <7e49c265-e332-29c5-5d91-4b5d5da6cb37@gmail.com>
 References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
  <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
  <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
  <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
  <bbbd287c-437e-d7bd-d40f-6bb914d96860@gmail.com>
- <CAL_JsqJCkP_c_wKGRc7Qzkiw8sZLRf6MGz-WgVsLjnQfqK8r6Q@mail.gmail.com>
-Message-ID: <CAMuHMdXv2UXTx_ttCqytH2TePoJ-Pw4gJ-PaSOmUL969ac1BMw@mail.gmail.com>
+ <7e49c265-e332-29c5-5d91-4b5d5da6cb37@gmail.com>
+Message-ID: <CAMuHMdXxAjaGA3OoD2+FEEixJjA39MtGD6zXbSJZd6RbQ-6Few@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Florian,
 
-On Wed, Jun 6, 2018 at 9:35 PM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Wed, Jun 6, 2018 at 2:30 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+On Wed, Jun 6, 2018 at 9:37 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 06/06/2018 12:30 PM, Frank Rowand wrote:
 >> On 06/05/18 23:36, Michel Pollet wrote:
 >>> On 05 June 2018 18:34, Frank wrote:
 >>>> On 06/05/18 04:28, Michel Pollet wrote:
@@ -69,29 +69,12 @@ On Wed, Jun 6, 2018 at 9:35 PM, Rob Herring <robh+dt@kernel.org> wrote:
 >> Please add to the definition that cpu-release-addr is a one cell property
 >> for 32-bit systems.
 >
-> Actually, this is all already documented in the DT spec and it is
-> always 2 cells[1]. We should perhaps just remove whatever is
-> duplicated from the spec.
->
-> Rob
->
-> [1]
->    ``cpu-release-addr``   | SD  | ``<u64>``        The
-> cpu-release-addr property is required for
->                                                    cpu nodes that have
-> an enable-method property
->                                                    value of
-> ``"spin-table"``. The value specifies the
->                                                    physical address of
-> a spin table entry that
->                                                    releases a
-> secondary CPU from its spin loop.
+> Or maybe phrase it such that the number of cells encoded in
+> cpu-release-addr must exactly match the CPU node's #address-cells size?
 
-Interesting. But why is this <u64>, and not just following #address-cells?
-Due to the ePAPR-spec being 64-bit Power System-centric?
-
-There's also "initial-mapped-area", which must use 64-bit values for effective
-and physical addresses, according to ePAPR.
+The CPU node's #address-cells size is unrelated.
+You need the #address-cells value from the SoC bus (typically the root
+node, not considering heterogeneous systems with multiple CPUs ;-).
 
 Gr{oetje,eeting}s,
 
