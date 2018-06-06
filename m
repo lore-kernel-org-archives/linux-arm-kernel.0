@@ -1,40 +1,67 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 6 Jun 2018 09:47:12 -0700
-Subject: [PATCH] ARM: dts: cygnus: Add HWRNG node
-In-Reply-To: <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
-References: <20180606093441.16483-1-peron.clem@gmail.com>
- <c8836130-1d96-b813-4e87-5011db679ba8@broadcom.com>
-Message-ID: <c7990001-00e6-d828-bafd-3d472fcfee20@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Jun 2018 17:48:39 +0100
+Subject: [PATCH v2 3/5] arm_pmu: Add support for 64bit event counters
+In-Reply-To: <1527591356-10934-4-git-send-email-suzuki.poulose@arm.com>
+References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
+ <1527591356-10934-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180606164838.zeuygsp4teq64zor@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2018 09:03 AM, Scott Branden wrote:
-> Hi Clement,
+On Tue, May 29, 2018 at 11:55:54AM +0100, Suzuki K Poulose wrote:
+> Each PMU has a set of 32bit event counters. But in some
+> special cases, the events could be counted using counters
+> which are effectively 64bit wide.
 > 
+> e.g, Arm V8 PMUv3 has a 64 bit cycle counter which can count
+> only the CPU cycles. Also, the PMU can chain the event counters
+> to effectively count as a 64bit counter.
 > 
-> On 18-06-06 02:34 AM, Cl?ment P?ron wrote:
->> From: Cl?ment Peron <clement.peron@devialet.com>
->>
->> There is a HWRNG in Broadcom Cygnus SoC, so enable it.
->>
->> Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
-> Thanks for upstreaming some missing Cygnus components.
+> Add support for tracking the events that uses 64bit counters.
+> This only affects the periods set for each counter in the core
+> driver.
 > 
-> But, the problem is the tarball release from Broadcom you are extracting
-> these changes from does not contain git history; so, you are missing the
-> original authors and signed-off's.
-> I checked our internal git repository and for this commit the author is:
-> Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v1:
+>  - Rename ARMPMU_EVT_LONG => ARMPMU_EVT_64BIT
+> ---
+>  drivers/perf/arm_pmu.c       | 14 ++++++++------
+>  include/linux/perf/arm_pmu.h |  6 ++++++
+>  2 files changed, 14 insertions(+), 6 deletions(-)
 > 
-> Please adjust author and signed-off appropriately.? If there are other
-> changes you are extracting from the source tarballs you have please
-> contact me so we can construct patch appropriately.
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 8962d26..ff858e6 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -28,9 +28,10 @@
+>  static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
+>  static DEFINE_PER_CPU(int, cpu_irq);
+>  
+> -static inline u64 arm_pmu_max_period(void)
+> +static inline u64 arm_pmu_event_max_period(struct perf_event *event)
+>  {
+> -	return (1ULL << 32) - 1;
+> +	return (event->hw.flags & ARMPMU_EVT_64BIT) ?
+> +		~0ULL : (1ULL << 32) - 1;
+>  }
 
-If you want the original author's Signed-off-by to be preserved, why
-don't you extract it from your internal git tree and submit the patch on
-Mohamed's behalf?
+Could we please have:
 
-AFAICT what Clement is doing here is permissible given the Linux
-developer certificate of origin though I am not a lawyer of course.
--- 
-Florian
+static inline u64 arm_pmu_event_max_period(struct perf_event *event)
+{
+	if (event->hw.flags & ARMPMU_EVT_64BIT)
+		return GENMASK_ULL(63, 0);
+	else
+		return GENMASK_ULL(31, 0);
+}
+
+... since that's obviously balanced, with both values generated in the
+same way.
+
+Otherwise this looks good to me.
+
+Thanks,
+Mark.
