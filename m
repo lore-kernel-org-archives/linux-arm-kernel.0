@@ -1,72 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Jun 2018 09:46:30 +0200
-Subject: [PATCH 2/2] arm64: dts: renesas: condor: add I2C0 support
-In-Reply-To: <61f6f4a4-e55c-06e0-cba1-7d90a556950a@cogentembedded.com>
-References: <e9c94553-be9d-0eec-a1ee-1713bb97fbab@cogentembedded.com>
- <61f6f4a4-e55c-06e0-cba1-7d90a556950a@cogentembedded.com>
-Message-ID: <CAMuHMdVRTCOmVz2wkq5SnqEUH4PAdAEp8PVj06JxgC2zLs=wow@mail.gmail.com>
+From: ptesarik@suse.cz (Petr Tesarik)
+Date: Wed, 6 Jun 2018 09:58:58 +0200
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <CACi5LpMJ9whXxpMvQDw4_4kRNaATGGq4fWt7nRRJTMrdN_q_nQ@mail.gmail.com>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <CACi5LpMJ9whXxpMvQDw4_4kRNaATGGq4fWt7nRRJTMrdN_q_nQ@mail.gmail.com>
+Message-ID: <20180606095858.04b800a0@ezekiel.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Wed, 6 Jun 2018 11:06:28 +0530
+Bhupesh Sharma <bhsharma@redhat.com> wrote:
 
-On Mon, May 28, 2018 at 10:14 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the Condor board dependent part of the I2C0 device node.
->
-> The I2C0 bus is populated by 2 ON Semiconductor PCA9654 I/O expanders
-> and Analog Devices  ADV7511W HDMI transmitter (but we're only describing
-> the former chips now).
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Hello Petr,
+> 
+> On Tue, Jun 5, 2018 at 1:31 PM, Petr Tesarik <ptesarik@suse.cz> wrote:
+> > Hi all,
+> >
+> > I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
+> > when a panic kernel is loaded. I attached a hardware debugger and found
+> > out that all CPU cores were stopped except one which was stuck in the
+> > idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+> > definitely not safe after a kernel panic.  
+>[...]
+> Also do you get any console output from the crash kernel (you can try
+> passing earlycon to the crash kernel to see if it crashes early
+> enough)? If yes, can you please share the same.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Maybe I wasn't clear enough. The crashed kernel does not even get to
+the kexec's purgatory code, so there cannot be any output from the
+crash kernel.
 
-Suggestion for future improvement below.
+>[...]
+> > #12 0xffff000001001cd0 in lan78xx_read_reg (index=152, data=0xffff000008e5396c <init_thread_union+14700>, dev=<optimized out>, dev=<optimized out>)
+> >     at ../drivers/net/usb/lan78xx.c:425  
+> 
+> Hmmm, this seems a bit misplaced, but are you using a usb-ethernet
+> adapter which causes a URB submission to timeout?
 
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> @@ -80,6 +80,28 @@
->         clock-frequency = <32768>;
->  };
->
-> +&i2c0 {
-> +       pinctrl-0 = <&i2c0_pins>;
-> +       pinctrl-names = "default";
-> +
-> +       status = "okay";
-> +       clock-frequency = <400000>;
-> +
-> +       io_expander0: gpio at 20 {
-> +               compatible = "onnn,pca9654";
-> +               reg = <0x20>;
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
+Yes, RPi 3 B+ contains an on-board Microchip LAN7515, which is indeed a
+USB device.
 
-The bindings don't mention this (the example does have it) the optional
-interrupts prototype. As this is wired to INTC-EX IRQ4, you may want to
-add that. Perhaps later, as r8a77980.dtsi doesn't have INTC-EX yet.
+>[...]
+> > #26 0xffff000008081478 in do_mem_abort (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:657
+> > #27 0xffff000008082dd0 in el1_sync () at ../arch/arm64/kernel/entry.S:548  
+> 
+> The ESR value from the logs (2248146948) indicates the following about
+> the panic causes (see ARMv8 Architecture Reference Manual for more
+> details):
 
-> +       };
-> +
-> +       io_expander1: gpio at 21 {
-> +               compatible = "onnn,pca9654";
-> +               reg = <0x21>;
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
+Thank you for all the detailx, but that's not relevant here. I am
+crashing my system intentionally to debug the kexec/kdump
+infrastructure...
 
-Same for IRQ5.
-
-> +       };
-> +};
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Petr T
