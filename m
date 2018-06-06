@@ -1,60 +1,175 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 6 Jun 2018 18:23:00 +0300
-Subject: [PATCH v4 2/7] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <7723f351-2460-7378-411a-cfcdf4138d8f@baylibre.com>
-References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-3-georgi.djakov@linaro.org>
- <7723f351-2460-7378-411a-cfcdf4138d8f@baylibre.com>
-Message-ID: <8fd1092a-40cd-b2a4-b153-df67e16bb4b3@linaro.org>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed,  6 Jun 2018 17:24:59 +0200
+Subject: [PATCH 1/2] ARM: dts: igep: Relicense the IGEP boards under GPLv2/X11
+Message-ID: <20180606152500.14034-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+The current GPLv2 only licensing on IGEP boards makes it very impractical
+for other software components licensed under another license.
 
-Apologies for the delayed response.
+In order to make it easier for them to reuse our device trees, relicense
+all boards under a GPLv2/X11 dual-license. Also switch to use the SPDX
+identifiers and remove the boiler plate license text.
 
-On 12.04.18 ?. 16:15, Neil Armstrong wrote:
-> On 09/03/2018 22:09, Georgi Djakov wrote:
->> This binding is intended to represent the interconnect hardware present
->> in some of the modern SoCs. Currently it consists only of a binding for
->> the interconnect hardware devices (provider).
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  .../bindings/interconnect/interconnect.txt         | 47 ++++++++++++++++++++++
->>  1 file changed, 47 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
->>
->> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> new file mode 100644
->> index 000000000000..70612bb201e4
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> @@ -0,0 +1,47 @@
->> +Interconnect Provider Device Tree Bindings
->> +=========================================
->> +
->> +The purpose of this document is to define a common set of generic interconnect
->> +providers/consumers properties.
->> +
->> +
->> += interconnect providers =
->> +
->> +The interconnect provider binding is intended to represent the interconnect
->> +controllers in the system. Each provider registers a set of interconnect
->> +nodes, which expose the interconnect related capabilities of the interconnect
->> +to consumer drivers. These capabilities can be throughput, latency, priority
->> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
->> +depending on the usecase. Interconnect providers can also be interconnect
->> +consumers, such as in the case where two network-on-chip fabrics interface
->> +directly
-> 
-> Hi,
-> 
-> Can't we specify the number of cells for the phandle ? It should be aligned with other consumer/provider bindings.
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
-Yes, that's the plan. Will align it!
+ arch/arm/boot/dts/am335x-igep0033.dtsi       | 7 ++-----
+ arch/arm/boot/dts/omap3-igep.dtsi            | 6 ++----
+ arch/arm/boot/dts/omap3-igep0020-common.dtsi | 5 +----
+ arch/arm/boot/dts/omap3-igep0020-rev-f.dts   | 5 +----
+ arch/arm/boot/dts/omap3-igep0020.dts         | 5 +----
+ arch/arm/boot/dts/omap3-igep0030-common.dtsi | 5 +----
+ arch/arm/boot/dts/omap3-igep0030-rev-g.dts   | 5 +----
+ arch/arm/boot/dts/omap3-igep0030.dts         | 5 +----
+ 8 files changed, 10 insertions(+), 33 deletions(-)
 
-Thanks,
-Georgi
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index a5769a8f5fc8..c79066df4e0c 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -1,11 +1,8 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+- * am335x-igep0033.dtsi - Device Tree file for IGEP COM AQUILA AM335x
++ * Device Tree file for IGEP COM AQUILA AM335x
+  *
+  * Copyright (C) 2013 ISEE 2007 SL - http://www.isee.biz
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index f33cc80c9dbc..9c02942a58a7 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -1,13 +1,11 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Common device tree for IGEP boards based on AM/DM37x
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
++
+ /dts-v1/;
+ 
+ #include "omap36xx.dtsi"
+diff --git a/arch/arm/boot/dts/omap3-igep0020-common.dtsi b/arch/arm/boot/dts/omap3-igep0020-common.dtsi
+index ecbec23af49f..9675ce2cf069 100644
+--- a/arch/arm/boot/dts/omap3-igep0020-common.dtsi
++++ b/arch/arm/boot/dts/omap3-igep0020-common.dtsi
+@@ -1,12 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Common Device Tree Source for IGEPv2
+  *
+  * Copyright (C) 2014 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2014 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "omap3-igep.dtsi"
+diff --git a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
+index 321c2b7a4e9f..8b8959930d19 100644
+--- a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
++++ b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
+@@ -1,12 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree Source for IGEPv2 Rev. F (TI OMAP AM/DM37x)
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "omap3-igep0020-common.dtsi"
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index 33d6b4ead092..770b69f13c9e 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -1,12 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree Source for IGEPv2 Rev. C (TI OMAP AM/DM37x)
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "omap3-igep0020-common.dtsi"
+diff --git a/arch/arm/boot/dts/omap3-igep0030-common.dtsi b/arch/arm/boot/dts/omap3-igep0030-common.dtsi
+index 443f71707437..9cd3e427ae22 100644
+--- a/arch/arm/boot/dts/omap3-igep0030-common.dtsi
++++ b/arch/arm/boot/dts/omap3-igep0030-common.dtsi
+@@ -1,12 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Common Device Tree Source for IGEP COM MODULE
+  *
+  * Copyright (C) 2014 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2014 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "omap3-igep.dtsi"
+diff --git a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
+index 76dc08868bfb..8b2d01e7996b 100644
+--- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
++++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
+@@ -1,12 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree Source for IGEP COM MODULE Rev. G (TI OMAP AM/DM37x)
+  *
+  * Copyright (C) 2014 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2014 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "omap3-igep0030-common.dtsi"
+diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+index 55b0cc4f5ee5..22329ae502c5 100644
+--- a/arch/arm/boot/dts/omap3-igep0030.dts
++++ b/arch/arm/boot/dts/omap3-igep0030.dts
+@@ -1,12 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree Source for IGEP COM MODULE Rev. E (TI OMAP AM/DM37x)
+  *
+  * Copyright (C) 2012 Javier Martinez Canillas <javier@osg.samsung.com>
+  * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "omap3-igep0030-common.dtsi"
+-- 
+2.17.1
