@@ -1,40 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 6 Jun 2018 10:18:27 +0200
-Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE
- disabled
-In-Reply-To: <20180525210843.1821071-1-arnd@arndb.de>
-References: <20180525210843.1821071-1-arnd@arndb.de>
-Message-ID: <20180606081827.GD11810@ulmo>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 6 Jun 2018 10:18:37 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: v3hsk: specify GEther PHY IRQ
+In-Reply-To: <9e6c40eb-71d0-d35b-1cf7-9179e093ed10@cogentembedded.com>
+References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
+ <9e6c40eb-71d0-d35b-1cf7-9179e093ed10@cogentembedded.com>
+Message-ID: <CAMuHMdVf7Og6uBXN7KFQD1u+1xXORCuDC=-ahPpT_xSdmj9CxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 11:08:30PM +0200, Arnd Bergmann wrote:
-> Without dmaengine support, we get a harmless warning about an
-> unused function:
-> 
-> drivers/pwm/pwm-stm32.c:166:12: error: 'stm32_pwm_capture' defined but not used [-Werror=unused-function]
-> 
-> Changing the #ifdef to an IS_ENABLED() check shuts up that warning
-> and is slightly nicer to read.
-> 
-> Fixes: 53e38fe73f94 ("pwm: stm32: Add capture support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/pwm/pwm-stm32.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+On Fri, Jun 1, 2018 at 10:47 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Specify GEther PHY IRQ in the V3H Starter Kit board's device tree, now
+> that we have the GPIO support (previously phylib had to resort to polling).
+>
+> Based on the original (and large) patch by Vladimir Barinov.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Applied, thanks.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Lee, I applied this on top of your immutable MFD/PWM branch because it
-depends on the capture support that you applied. I wasn't sure what your
-PR timing was going to be, so I thought I'd do it this way since I'm
-pulling in some last minute fixes for v4.18.
+Gr{oetje,eeting}s,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180606/e5ca7938/attachment-0001.sig>
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
