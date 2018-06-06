@@ -1,54 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Jun 2018 16:45:06 +0100
-Subject: [PATCH][RFC] PCI: rcar: Add bus notifier so we can limit the DMA
- range
-In-Reply-To: <20180604223048.GC30381@bhelgaas-glaptop.roam.corp.google.com>
-References: <20180521220514.30256-1-marek.vasut+renesas@gmail.com>
- <CAK8P3a1PZ_MfgEcvWdUbN-eCcs5Xo38LQ54imLc4kNtSKO9Txw@mail.gmail.com>
- <c2897d82-fe33-52cd-5aa6-3bddb478cb9f@gmail.com>
- <20180604223048.GC30381@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180606154505.GJ6631@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 6 Jun 2018 19:02:03 +0300
+Subject: [PATCH][next] pinctrl: pinctrl-single: add allocation failure
+ checking of saved_vals
+In-Reply-To: <20180606134338.4645-1-colin.king@canonical.com>
+References: <20180606134338.4645-1-colin.king@canonical.com>
+Message-ID: <CAHp75Vd0Djw+nDN7u=-CLEfdDGA5QTsMueOb9EZLNnCDgso5fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 05:30:48PM -0500, Bjorn Helgaas wrote:
-> [+cc ARM64 folks, linux-kernel]
-> 
-> The original patch under discussion is:
-> https://lkml.kernel.org/r/20180521220514.30256-1-marek.vasut+renesas at gmail.com
-> 
-> On Tue, May 22, 2018 at 11:52:21AM +0200, Marek Vasut wrote:
-> > On 05/22/2018 10:10 AM, Arnd Bergmann wrote:
-> > > On Tue, May 22, 2018 at 12:05 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > >> From: Phil Edworthy <phil.edworthy@renesas.com>
-> > >>
-> > >> The PCIe DMA controller on RCar Gen2 and earlier is on 32bit bus,
-> > >> so limit the DMA range to 32bit.
-> > >>
-> > >> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> > >> Cc: Arnd Bergmann <arnd@arndb.de>
-> > >> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > >> Cc: Simon Horman <horms+renesas@verge.net.au>
-> > >> Cc: Wolfram Sang <wsa@the-dreams.de>
-> > >> Cc: linux-renesas-soc at vger.kernel.org
-> > >> To: linux-pci at vger.kernel.org
-> > >> ---
-> > >> NOTE: I'm aware of https://patchwork.kernel.org/patch/9495895/ , but the
-> > >>       discussion seems to have gone way off, so I'm sending this as a
-> > >>       RFC. Any feedback on how to do this limiting properly would be nice.
-> > > 
-> > > Doing it in the driver is clearly not appropriate, we must do this in
-> > > common code. If I remember correctly, it's specifically ARM64 that is
-> > > broken here, it incorrectly allows setting a DMA mask to 64 bit
-> > > when that is not available.
-> > 
-> > Yep, that's correct. ARM64 with devices mapping tremendous amounts of
-> > memory. So did anything change since that discussion references in the NOTE?
+On Wed, Jun 6, 2018 at 4:43 PM, Colin King <colin.king@canonical.com> wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> Currently saved_vals is being allocated and there is no check for
+> failed allocation (which is more likely than normal when using
+> GFP_ATOMIC).  Fix this by checking for a failed allocation and
+> propagating this error return down the the caller chain.
+>
+> Detected by CoverityScan, CID#1469841 ("Dereference null return value")
+>
+> Fixes: 88a1dbdec682 ("pinctrl: pinctrl-single: Add functions to save and restore pinctrl context")
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/pinctrl/pinctrl-single.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index 9c3c00515aa0..0905ee002041 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -1588,8 +1588,11 @@ static int pcs_save_context(struct pcs_device *pcs)
+>
+>         mux_bytes = pcs->width / BITS_PER_BYTE;
+>
+> -       if (!pcs->saved_vals)
+> +       if (!pcs->saved_vals) {
+>                 pcs->saved_vals = devm_kzalloc(pcs->dev, pcs->size, GFP_ATOMIC);
 
-Is it specifically arm64 that's broken here? If so, why and how do other
-archs (e.g. riscv) handle this? I thought all of this behaviour was driven
-by the DMA ops, and we're just using generic code for that afaict.
+> +               if (!pcs->saved_vals)
+> +                       return -ENOMEM;
 
-Will
+Wouldn't make sense to move it out of the first condition?
+
+Something like
+
+if (!foo)
+ foo = ...malloc(...);
+if (!foo)
+ return ...
+
+
+> +       }
+>
+>         switch (pcs->width) {
+>         case 64:
+> @@ -1649,8 +1652,13 @@ static int pinctrl_single_suspend(struct platform_device *pdev,
+>         if (!pcs)
+>                 return -EINVAL;
+>
+> -       if (pcs->flags & PCS_CONTEXT_LOSS_OFF)
+> -               pcs_save_context(pcs);
+> +       if (pcs->flags & PCS_CONTEXT_LOSS_OFF) {
+> +               int ret;
+> +
+> +               ret = pcs_save_context(pcs);
+> +               if (ret < 0)
+> +                       return ret;
+> +       }
+>
+>         return pinctrl_force_sleep(pcs->pctl);
+>  }
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
