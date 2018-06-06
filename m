@@ -1,45 +1,53 @@
 From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Wed, 6 Jun 2018 11:38:22 +0530
-Subject: [PATCH v3 2/6] clk: ti: dra7: Add clkctrl clock data for the mcan
- clocks
+Date: Wed, 6 Jun 2018 11:38:25 +0530
+Subject: [PATCH v3 5/6] ARM: dts: Add generic interconnect target module node
+ for MCAN
 In-Reply-To: <20180606060826.14671-1-faiz_abbas@ti.com>
 References: <20180606060826.14671-1-faiz_abbas@ti.com>
-Message-ID: <20180606060826.14671-3-faiz_abbas@ti.com>
+Message-ID: <20180606060826.14671-6-faiz_abbas@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clkctrl data for the m_can clocks and register it within the
-clkctrl driver
+The ti-sysc driver provides support for manipulating the idle modes
+and interconnect level resets.
 
-CC: Tero Kristo <t-kristo@ti.com>
+Add the generic interconnect target module node for MCAN to support
+the same.
+
+CC: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
 ---
- drivers/clk/ti/clk-7xx.c         | 1 +
- include/dt-bindings/clock/dra7.h | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/dra76x.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index fb249a1637a5..71a122b2dc67 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -708,6 +708,7 @@ static const struct omap_clkctrl_reg_data dra7_wkupaon_clkctrl_regs[] __initcons
- 	{ DRA7_COUNTER_32K_CLKCTRL, NULL, 0, "wkupaon_iclk_mux" },
- 	{ DRA7_UART10_CLKCTRL, dra7_uart10_bit_data, CLKF_SW_SUP, "wkupaon_cm:clk:0060:24" },
- 	{ DRA7_DCAN1_CLKCTRL, dra7_dcan1_bit_data, CLKF_SW_SUP, "wkupaon_cm:clk:0068:24" },
-+	{ DRA7_ADC_CLKCTRL, NULL, CLKF_SW_SUP, "mcan_clk"},
- 	{ 0 },
+diff --git a/arch/arm/boot/dts/dra76x.dtsi b/arch/arm/boot/dts/dra76x.dtsi
+index bfc82636999c..5157cc431574 100644
+--- a/arch/arm/boot/dts/dra76x.dtsi
++++ b/arch/arm/boot/dts/dra76x.dtsi
+@@ -11,6 +11,24 @@
+ / {
+ 	compatible = "ti,dra762", "ti,dra7";
+ 
++	ocp {
++		target-module at 42c01900 {
++			compatible = "ti,sysc-dra7-mcan", "ti,sysc";
++			ranges = <0x0 0x42c00000 0x2000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x42c01900 0x4>,
++			      <0x42c01904 0x4>,
++			      <0x42c01908 0x4>;
++			reg-names = "rev", "sysc", "syss";
++			ti,sysc-mask = <(SYSC_OMAP4_SOFTRESET |
++					 SYSC_DRA7_MCAN_ENAWAKEUP)>;
++			ti,syss-mask = <1>;
++			clocks = <&wkupaon_clkctrl DRA7_ADC_CLKCTRL 0>;
++			clock-names = "fck";
++		};
++	};
++
  };
  
-diff --git a/include/dt-bindings/clock/dra7.h b/include/dt-bindings/clock/dra7.h
-index 5e1061b15aed..d7549c57cac3 100644
---- a/include/dt-bindings/clock/dra7.h
-+++ b/include/dt-bindings/clock/dra7.h
-@@ -168,5 +168,6 @@
- #define DRA7_COUNTER_32K_CLKCTRL	DRA7_CLKCTRL_INDEX(0x50)
- #define DRA7_UART10_CLKCTRL	DRA7_CLKCTRL_INDEX(0x80)
- #define DRA7_DCAN1_CLKCTRL	DRA7_CLKCTRL_INDEX(0x88)
-+#define DRA7_ADC_CLKCTRL	DRA7_CLKCTRL_INDEX(0xa0)
- 
- #endif
+ /* MCAN interrupts are hard-wired to irqs 67, 68 */
 -- 
 2.17.0
