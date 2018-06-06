@@ -1,56 +1,44 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  6 Jun 2018 14:41:33 +0200
-Subject: [RFC PATCH v2 0/6] serial: uartps: Add run time support for more IPs
- than hardcoded 2
-Message-ID: <cover.1528288895.git.michal.simek@xilinx.com>
+Date: Wed,  6 Jun 2018 14:41:34 +0200
+Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to zero
+ again
+In-Reply-To: <cover.1528288895.git.michal.simek@xilinx.com>
+References: <cover.1528288895.git.michal.simek@xilinx.com>
+Message-ID: <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Writing zero and NULLs to already initialized fields is not needed.
+Remove this additional writes.
 
-this series is trying to address discussion I had with Alan in past
-https://patchwork.kernel.org/patch/9738445/ and also with Rob in v1
-https://lkml.org/lkml/2018/4/26/551.
-
-The first 5 patches are preparation patches to have the last patch as
-small as possible to focus on changes there.
-
-Cases without DT aliases are not solved in this series but one function
-was shared in RFC v1.
-The purpose of this series to get feedback on solution where every
-driver instance allocate at run time own uart_driver.
-
-For example this is how it works.
-uart0 on higher alias
-serial0 = &uart1;
-serial100 = &uart0;
-
-~# ls -la /dev/ttyPS*
-crw-------    1 root     root      252,   0 Jun  6 12:19 /dev/ttyPS0
-crw--w----    1 root     root      253, 100 Jan  1  1970 /dev/ttyPS100
-
-Thanks,
-Michal
-
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
 Changes in v2:
 - new patch - it can be sent separately too
-- Remove nr field logic
-- new patch - it can be sent separately too
-- new patch - it can be sent separately too
-- new patch - it can be sent separately too
-- Register one uart_driver with unique minor at probe time
 
-Michal Simek (6):
-  serial: uartps: Do not initialize field to zero again
-  serial: uartps: Move register to probe based on run time detection
-  serial: uartps: Do not use static struct uart_driver out of probe()
-  serial: uartps: Move alias reading higher in probe()
-  serial: uartps: Fill struct uart_driver in probe()
-  serial: uartps: Remove CDNS_UART_NR_PORTS macro
+ drivers/tty/serial/xilinx_uartps.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
- drivers/tty/serial/xilinx_uartps.c | 126 ++++++++++++++++++++-----------------
- 1 file changed, 68 insertions(+), 58 deletions(-)
-
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 8a3e34234e98..5f116f3ecd4a 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 
+ 	/* At this point, we've got an empty uart_port struct, initialize it */
+ 	spin_lock_init(&port->lock);
+-	port->membase	= NULL;
+-	port->irq	= 0;
+ 	port->type	= PORT_UNKNOWN;
+ 	port->iotype	= UPIO_MEM32;
+ 	port->flags	= UPF_BOOT_AUTOCONF;
+ 	port->ops	= &cdns_uart_ops;
+ 	port->fifosize	= CDNS_UART_FIFO_SIZE;
+ 	port->line	= id;
+-	port->dev	= NULL;
+ 
+ 	/*
+ 	 * Register the port.
 -- 
 1.9.1
