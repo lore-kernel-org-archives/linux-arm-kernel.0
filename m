@@ -1,25 +1,49 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 6 Jun 2018 14:26:22 -0400
-Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
- disable compiler auto-inline optimizations
-In-Reply-To: <20180606142600.GN13775@localhost>
-References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
- <201806060501.btF3aJMZ%fengguang.wu@intel.com>
- <20180606095714.1d3c2def@vmware.local.home>
- <20180606142600.GN13775@localhost>
-Message-ID: <20180606142622.2338abf6@vmware.local.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 6 Jun 2018 13:10:29 -0600
+Subject: [PATCH] coresight: Fix check in
+ coresight_tmc_etr_buf_insert_barrier_packet
+In-Reply-To: <1527851302-5843-1-git-send-email-suzuki.poulose@arm.com>
+References: <1527851302-5843-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkyhJFrNtc7PDY0XNQoiHW8sHW+kJiaUPoWqPwCZM-R_Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jun 2018 16:26:00 +0200
-Johan Hovold <johan@kernel.org> wrote:
+On 1 June 2018 at 05:08, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> We request for "CORESIGHT_BARRIER_PKT_SIZE" length and we should
+> be happy when we get that size.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>
+> Mathieu,
+>
+> Please could you pull this patch, if you are happy with it ?
+> This fixes a problem in the ETR buf series, which I just
+> noticed while testing the part2 of the series.
 
-> Looks like the greybus code above is working as intended by checking for
-> unterminated string after the strncpy, even if this does now triggers
-> the truncation warning.
+I will pick up the change - you will see it being queued when the
+first rc comes out.
 
-Ah, yes I now see that. Thanks for pointing it out. But perhaps it
-should also add the "- 1" to the strncpy() so that gcc doesn't think
-it's a mistake.
-
--- Steve
+>
+> Suzuki
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index e2bcef3..c736250 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -862,7 +862,7 @@ tmc_etr_buf_insert_barrier_packet(struct etr_buf *etr_buf, u64 offset)
+>
+>         len = tmc_etr_buf_get_data(etr_buf, offset,
+>                                    CORESIGHT_BARRIER_PKT_SIZE, &bufp);
+> -       if (WARN_ON(len <= CORESIGHT_BARRIER_PKT_SIZE))
+> +       if (WARN_ON(len < CORESIGHT_BARRIER_PKT_SIZE))
+>                 return -EINVAL;
+>         coresight_insert_barrier_packet(bufp);
+>         return offset + CORESIGHT_BARRIER_PKT_SIZE;
+> --
+> 2.7.4
+>
