@@ -1,51 +1,95 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 6 Jun 2018 08:58:11 +0200
-Subject: [PATCH V2 2/2] arm: dts: sunxi: Add missing cooling device
- properties for CPUs
-In-Reply-To: <CAGb2v65EX2RwKjxPw+EK4i6rkfgOJoCU2amuFkF-tHQT40isxw@mail.gmail.com>
-References: <20180601151701.sshwfdbflic6mybv@flea>
- <d894f425b7c32bce4dc4a982db8f4dface2db31d.1528173943.git.viresh.kumar@linaro.org>
- <a313ec0be4104494de319e8318e05614fb97b2fd.1528173943.git.viresh.kumar@linaro.org>
- <20180605071139.osu2pgpg3ychdxln@flea>
- <CAGb2v65EX2RwKjxPw+EK4i6rkfgOJoCU2amuFkF-tHQT40isxw@mail.gmail.com>
-Message-ID: <20180606065811.moklm4pbrhleasly@flea>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Wed,  6 Jun 2018 12:31:18 +0530
+Subject: [PATCH v13 0/3] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1528268481-19299-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 12:02:20AM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jun 5, 2018 at 3:11 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Jun 05, 2018 at 10:17:49AM +0530, Viresh Kumar wrote:
-> >> The cooling device properties, like "#cooling-cells" and
-> >> "dynamic-power-coefficient", should either be present for all the CPUs
-> >> of a cluster or none. If these are present only for a subset of CPUs of
-> >> a cluster then things will start falling apart as soon as the CPUs are
-> >> brought online in a different order. For example, this will happen
-> >> because the operating system looks for such properties in the CPU node
-> >> it is trying to bring up, so that it can register a cooling device.
-> >>
-> >> Add such missing properties.
-> >>
-> >> Fix other missing properties (clocks, OPP, clock latency) as well to
-> >> make it all work.
-> >>
-> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >
-> > Applied both, thanks!
-> 
-> Please fix the "ARM" prefix when applying. :)
+This series of patches re-bring huge vmap back for arm64.
 
-Done, thanks for the reminder :)
+Patch 1/3 has been taken by Toshi in his series of patches
+by name "[PATCH v3 0/3] fix free pmd/pte page handlings on x86"
+to avoid merge conflict with this series.
 
-Maxime
+These patches are tested on 4.16 kernel with Cortex-A75 based SoC.
+
+The test used for verifying these patches is a stress test on
+ioremap/unmap which tries to re-use same io-address but changes
+size of mapping randomly i.e. 4K to 2M to 1G etc. The same test
+used to reproduce 3rd level translation fault without these fixes
+(and also of course with Revert "arm64: Enforce BBM for huge IO/VMAP
+mappings" being part of the tree).
+
+These patches can also go into '-stable' branch (if accepted)
+for 4.6 onwards.
+
+>From V12->V13:
+ - Dropped v12 3/5 and v12 5/5
+ - Using existing APIs like pte_offset_kernel and pmd_offset
+   instead of pmd_page_vaddr & pud_page_vaddr
+ - Updated commit log message for 3/3
+ - Some other cosmetic corrections in 3/3
+
+>From V11->V12:
+ - Introduced p*d_page_vaddr helper macros and using them
+ - Rebased over current tip
+
+>From V10->V11:
+ - Updated pud_free_pmd_page & pmd_free_pte_page to use consistent
+   conding style
+ - Fixed few bugs by using pmd_page_paddr & pud_page_paddr
+
+>From V9->V10:
+ - Updated commit log for patch 1/4 by Toshi
+ - Addressed review comments by Will on patch 3/4
+
+>From V8->V9:
+ - Used __TLBI_VADDR macros in new TLB flush API
+
+>From V7->V8:
+ - Properly fixed compilation issue in x86 file
+
+>From V6->V7:
+ - Fixed compilation issue in x86 case
+ - V6 patches were not properly enumarated
+
+>From V5->V6:
+ - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+   "bool tlb_inv" based variance as it is not need now
+ - Re-naming for consistency
+
+>From V4->V5:
+ - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+   for kernel addresses
+
+>From V3->V4:
+ - Add header for 'addr' in x86 implementation
+ - Re-order pmd/pud clear and table free
+ - Avoid redundant TLB invalidatation in one perticular case
+
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
+
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
+
+
+Chintan Pandya (3):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+  arm64: Implement page table free interfaces
+
+ arch/arm64/include/asm/tlbflush.h |  7 ++++++
+ arch/arm64/mm/mmu.c               | 48 +++++++++++++++++++++++++++++++++++----
+ arch/x86/mm/pgtable.c             |  8 ++++---
+ include/asm-generic/pgtable.h     |  8 +++----
+ lib/ioremap.c                     |  4 ++--
+ 5 files changed, 62 insertions(+), 13 deletions(-)
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180606/7503a1f4/attachment-0001.sig>
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
