@@ -1,51 +1,36 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 6 Jun 2018 21:09:24 +0300
-Subject: [PATCH v4 1/7] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <43fedb5b-f4a5-8362-d0a2-534b85473bc1@linaro.org>
-References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-2-georgi.djakov@linaro.org>
- <CAE=gft76VpU1mXgNPK9-XTj6WoLHj-_SxAGuV-bUSNYVpfSn6w@mail.gmail.com>
- <43fedb5b-f4a5-8362-d0a2-534b85473bc1@linaro.org>
-Message-ID: <c98d2ee2-c4fa-eb35-e6ae-f6d9c91ffe6c@linaro.org>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed,  6 Jun 2018 11:21:31 -0700
+Subject: [PATCH v2 1/1] ARM: dts: cygnus: enable iproc-hwrng
+Message-ID: <1528309291-25579-1-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Evan,
+From: Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
 
-On 06/06/2018 05:59 PM, Georgi Djakov wrote:
->>> +
->>> +/**
->>> + * icc_node_create() - create a node
->>> + * @id: node id
->>> + *
->>> + * Return: icc_node pointer on success, or ERR_PTR() on error
->>> + */
->>> +struct icc_node *icc_node_create(int id)
->>> +{
->>> +       struct icc_node *node;
->>> +
->>> +       /* check if node already exists */
->>> +       node = node_find(id);
->>> +       if (node)
->>> +               return node;
->>
->> This is probably going to do more harm than good once icc_node_delete comes
->> in, since it almost certainly indicates a programmer error or ID collision,
->> and will likely result in a double free. We should probably fail with
->> EEXIST instead.
-> 
-> In the current approach we create the nodes one by one, and the linked
-> nodes are created when they are referenced. The other way around would
-> be to create first all the nodes and then populate the links to avoid
-> the "chicken and egg" problem.
-> 
+Enable the HW rng driver "iproc-rng200" for all cygnus platforms.
 
-Just to elaborate a bit more on that: We can't actually register all the
-nodes in advance, as we might have multiple interconnect providers
-probing in different order. Each provider may have nodes linking to
-nodes belonging to other providers (not probed yet). That's why we
-create the nodes on the first reference and then, when the actual
-provider driver is probed, the rest of the node data is filled.
+Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <mohamed-ismail.abdul@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+---
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks,
-Georgi
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 9fe4f5a..b0e38fa 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -417,6 +417,11 @@
+ 			status = "disabled";
+ 		};
+ 
++		rng: rng at 18032000 {
++			compatible = "brcm,iproc-rng200";
++			reg = <0x18032000 0x28>;
++		};
++
+ 		sdhci0: sdhci at 18041000 {
+ 			compatible = "brcm,sdhci-iproc-cygnus";
+ 			reg = <0x18041000 0x100>;
+-- 
+2.5.0
