@@ -1,53 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Jun 2018 11:28:51 +0200
-Subject: [PATCH] ARM: Build secure_cntvoff.S unconditionally to fix
- shmobile !SMP build
-In-Reply-To: <20180606092725.GX17671@n2100.armlinux.org.uk>
-References: <1528275154-5164-1-git-send-email-geert+renesas@glider.be>
- <20180606090953.GW17671@n2100.armlinux.org.uk>
- <CAMuHMdVq0Mwui6jrnX4sd2=L+p3Ta4qM2PxQ2HLQ0btajTV6hw@mail.gmail.com>
- <20180606092725.GX17671@n2100.armlinux.org.uk>
-Message-ID: <CAMuHMdUC-B9KLjioUvANzd0U0fMiy+48+zBHvZg=nX+o69RvEw@mail.gmail.com>
+From: pp@emlix.com (Philipp Puschmann)
+Date: Wed,  6 Jun 2018 11:29:28 +0200
+Subject: [PATCH] clk: imx6: fix video_27m parent for IMX6SX_CLK_CKO1_SEL
+Message-ID: <20180606092928.11724-1-pp@emlix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+q/dl datasheets list the 5th selection value for ck01_sel as
+video_27M_clk_root.
 
-On Wed, Jun 6, 2018 at 11:27 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jun 06, 2018 at 11:22:41AM +0200, Geert Uytterhoeven wrote:
->> On Wed, Jun 6, 2018 at 11:09 AM, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> >> Fixes: cad160ed0a94927e ("ARM: shmobile: Convert file to use cntvoff")
->> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >
->> > This doesn't look right to me, but I don't have secure_cntvoff in any
->> > tree here that I can look at to check.  What if secure_cntvoff contains
->> > instructions only available on ARMv7 CPUs, and not ARMv4?
->>
->> Compiled != called.
->
-> That makes little difference when the assembler validates that the
-> instructions are possible on the target architecture and errors out
-> if not.
+By replacing the dummy value we then can set IMX6QDL_CLK_VIDEO_27M
+as parent for IMX6QDL_CLK_CKO1_SEL.
 
-The file does have ".arch armv7-a".
+Signed-off-by: Philipp Puschmann <pp@emlix.com>
+---
+ drivers/clk/imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> That's why I qualified my reply by saying that I didn't have the
-> contents of secure_cntvoff to reference - there's no clue whether
-> it's a .c or .S file from just this patch, and there's no visibility
-> what it contains.
-
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?id=7c607944bc657616
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?id=cad160ed0a94927e
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index 8d518ad5dc13..7e6a8f079634 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -65,7 +65,7 @@ static const char *ipg_per_sels[] = { "ipg", "osc", };
+ static const char *ecspi_sels[] = { "pll3_60m", "osc", };
+ static const char *can_sels[] = { "pll3_60m", "osc", "pll3_80m", };
+ static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
+-				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
++				    "video_27m", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
+ 				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_audio_div", };
+ static const char *cko2_sels[] = {
+ 	"mmdc_ch0_axi", "mmdc_ch1_axi", "usdhc4", "usdhc1",
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.17.0
