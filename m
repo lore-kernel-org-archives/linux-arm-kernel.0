@@ -1,40 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 6 Jun 2018 18:18:12 +0100
-Subject: [PATCH v2] arm64: topology: Avoid checking numa mask for
- scheduler MC selection
-In-Reply-To: <20180606163846.495725-1-jeremy.linton@arm.com>
-References: <20180606163846.495725-1-jeremy.linton@arm.com>
-Message-ID: <20180606171811.lro2u3g6rawxvskm@armageddon.cambridge.arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 6 Jun 2018 22:49:17 +0530
+Subject: [GIT PULL] Mailbox changes for v4.18
+Message-ID: <CABb+yY2MLfH4a+AKQfQw6fm2_Ej7F-m64RJTBb813o=_R5cxuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 11:38:46AM -0500, Jeremy Linton wrote:
-> The numa mask subset check can often lead to system hang or crash during
-> CPU hotplug and system suspend operation if NUMA is disabled. This is
-> mostly observed on HMP systems where the CPU compute capacities are
-> different and ends up in different scheduler domains. Since
-> cpumask_of_node is returned instead core_sibling, the scheduler is
-> confused with incorrect cpumasks(e.g. one CPU in two different sched
-> domains at the same time) on CPU hotplug.
-> 
-> Lets disable the NUMA siblings checks for the time being, as NUMA in
-> socket machines have LLC's that will assure that the scheduler topology
-> isn't "borken".
-> 
-> The NUMA check exists to assure that if a LLC within a socket crosses
-> NUMA nodes/chiplets the scheduler domains remain consistent. This code will
-> likely have to be re-enabled in the near future once the NUMA mask story
-> is sorted.  At the moment its not necessary because the NUMA in socket
-> machines LLC's are contained within the NUMA domains.
-> 
-> Further, as a defensive mechanism during hot-plug, lets assure that the
-> LLC siblings are also masked.
-> 
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Hi Linus,
 
-Thanks for this. I queued it for this merging window.
+The following changes since commit 7fbb6157630f2ba6ee355689061f9596b84373ef:
 
--- 
-Catalin
+  Merge tag 'armsoc-fixes' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2018-05-26
+14:05:16 -0700)
+
+are available in the Git repository at:
+
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+tags/mailbox-v4.18
+
+for you to fetch changes up to f83d1cfc8bcddf93bb6f55940fd59f5b047863e5:
+
+  mailbox/drivers/hisi: Consolidate the Kconfig for the MAILBOX
+(2018-06-06 22:21:59 +0530)
+
+----------------------------------------------------------------
+- Remove HAS_DMA config dependencies
+- New STMicroelectronics STM32 IPCC driver
+- Enable QCom driver to run more controllers
+- Fixed return code from null to ptr-err for Brcm driver
+- Fix kconfig dependencies for the HiSilicon driver
+
+----------------------------------------------------------------
+Bjorn Andersson (1):
+      mailbox: qcom: Add msm8998 hmss compatible
+
+Daniel Lezcano (1):
+      mailbox/drivers/hisi: Consolidate the Kconfig for the MAILBOX
+
+Fabien Dessenne (2):
+      dt-bindings: mailbox: add STMicroelectronics STM32 IPCC binding
+      mailbox: add STMicroelectronics STM32 IPCC driver
+
+Geert Uytterhoeven (1):
+      mailbox: Remove depends on HAS_DMA in case of platform dependency
+
+Sibi Sankar (2):
+      dt-bindings: mailbox: Add APSS shared binding for SDM845 SoCs
+      mailbox: Add support for Qualcomm SDM845 SoCs
+
+Stefan Wahren (1):
+      mailbox: bcm2835: Fix of_xlate return value
+
+ .../bindings/mailbox/qcom,apcs-kpss-global.txt     |   2 +
+ .../devicetree/bindings/mailbox/stm32-ipcc.txt     |  47 +++
+ drivers/mailbox/Kconfig                            |  22 +-
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/bcm2835-mailbox.c                  |   2 +-
+ drivers/mailbox/qcom-apcs-ipc-mailbox.c            |   2 +
+ drivers/mailbox/stm32-ipcc.c                       | 402 +++++++++++++++++++++
+ 7 files changed, 472 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
+ create mode 100644 drivers/mailbox/stm32-ipcc.c
