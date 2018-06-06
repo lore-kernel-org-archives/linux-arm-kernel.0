@@ -1,29 +1,40 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 6 Jun 2018 15:59:02 -0700
-Subject: [PATCH v6 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <38cb1906c96504f74517018ca4e0aed63bb77356.1528138319.git.collinsd@codeaurora.org>
-References: <cover.1528138319.git.collinsd@codeaurora.org>
- <38cb1906c96504f74517018ca4e0aed63bb77356.1528138319.git.collinsd@codeaurora.org>
-Message-ID: <CAD=FV=X_b0nuGzccTg03WOaNQ81nCtJ2=98btoVf7AQ1W-mkMA@mail.gmail.com>
+From: rokhanna@nvidia.com (Rohit Khanna)
+Date: Wed, 6 Jun 2018 16:29:03 -0700
+Subject: [PATCH V6] arm64: alternative:flush cache with unpatched code
+Message-ID: <1528327743-29263-1-git-send-email-rokhanna@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In the current implementation,  __apply_alternatives patches
+flush_icache_range and then executes it without invalidating the icache.
+Thus, icache can contain some of the old instructions for
+flush_icache_range. This can cause unpredictable behavior as during
+execution we can get a mix of old and new instructions for
+flush_icache_range.
 
-On Mon, Jun 4, 2018 at 12:15 PM, David Collins <collinsd@codeaurora.org> wrote:
-> Introduce bindings for RPMh regulator devices found on some
-> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
-> processor within the SoC to make PMIC regulator requests which
-> are aggregated within the RPMh hardware block along with requests
-> from other processors in the SoC to determine the final PMIC
-> regulator hardware state.
->
-> Signed-off-by: David Collins <collinsd@codeaurora.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
->  .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++++++++++++++++++
->  .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +++++
->  2 files changed, 196 insertions(+)
+This patch modifies __apply_alternatives so that it uses non hot-patched
+__flush_icache_all after applying all the alternatives.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Rohit Khanna <rokhanna@nvidia.com>
+---
+ arch/arm64/kernel/alternative.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 5c4bce4ac381..047139f570ac 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -154,10 +154,8 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 			alt_cb  = ALT_REPL_PTR(alt);
+ 
+ 		alt_cb(alt, origptr, updptr, nr_inst);
+-
+-		flush_icache_range((uintptr_t)origptr,
+-				   (uintptr_t)(origptr + nr_inst));
+ 	}
++	__flush_icache_all();
+ }
+ 
+ /*
+-- 
+2.1.4
