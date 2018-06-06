@@ -1,55 +1,40 @@
 From: ptesarik@suse.cz (Petr Tesarik)
-Date: Wed, 6 Jun 2018 09:58:58 +0200
+Date: Wed, 6 Jun 2018 10:00:24 +0200
 Subject: panic kexec broken on ARM64?
-In-Reply-To: <CACi5LpMJ9whXxpMvQDw4_4kRNaATGGq4fWt7nRRJTMrdN_q_nQ@mail.gmail.com>
+In-Reply-To: <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
 References: <20180605100151.7fd54381@ezekiel.suse.cz>
- <CACi5LpMJ9whXxpMvQDw4_4kRNaATGGq4fWt7nRRJTMrdN_q_nQ@mail.gmail.com>
-Message-ID: <20180606095858.04b800a0@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+Message-ID: <20180606100024.50be6b75@ezekiel.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jun 2018 11:06:28 +0530
-Bhupesh Sharma <bhsharma@redhat.com> wrote:
+On Wed, 6 Jun 2018 09:02:04 +0200
+Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-> Hello Petr,
+> Hi Petr,
 > 
-> On Tue, Jun 5, 2018 at 1:31 PM, Petr Tesarik <ptesarik@suse.cz> wrote:
-> > Hi all,
+> Am 05.06.2018 um 19:46 schrieb James Morse:
+> > Hi Petr,
 > >
-> > I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
-> > when a panic kernel is loaded. I attached a hardware debugger and found
-> > out that all CPU cores were stopped except one which was stuck in the
-> > idle thread. It seems that irq_set_irqchip_state() may sleep, which is
-> > definitely not safe after a kernel panic.  
->[...]
-> Also do you get any console output from the crash kernel (you can try
-> passing earlycon to the crash kernel to see if it crashes early
-> enough)? If yes, can you please share the same.
-
-Maybe I wasn't clear enough. The crashed kernel does not even get to
-the kexec's purgatory code, so there cannot be any output from the
-crash kernel.
-
->[...]
-> > #12 0xffff000001001cd0 in lan78xx_read_reg (index=152, data=0xffff000008e5396c <init_thread_union+14700>, dev=<optimized out>, dev=<optimized out>)
-> >     at ../drivers/net/usb/lan78xx.c:425  
+> > (CC: +Akashi, Marc)
+> >
+> > On 05/06/18 09:01, Petr Tesarik wrote:  
+> >> I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
+> >> when a panic kernel is loaded.  
+> > kdump is a best-effort thing, it looks like this is a case where the
+> > crashed-kernel can't tear itself down.
+> >
+> > Do you have the rest of the stack trace? Was it handling an irq when it decided
+> > to panic?:
+> > https://lkml.org/lkml/2018/3/13/1134  
 > 
-> Hmmm, this seems a bit misplaced, but are you using a usb-ethernet
-> adapter which causes a URB submission to timeout?
-
-Yes, RPi 3 B+ contains an on-board Microchip LAN7515, which is indeed a
-USB device.
-
->[...]
-> > #26 0xffff000008081478 in do_mem_abort (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:657
-> > #27 0xffff000008082dd0 in el1_sync () at ../arch/arm64/kernel/entry.S:548  
+> the Raspberry Pi 3 B+ support is very fresh (linux-next). Since i didn't 
+> see a version, i need to doublecheck.
 > 
-> The ESR value from the logs (2248146948) indicates the following about
-> the panic causes (see ARMv8 Architecture Reference Manual for more
-> details):
+> You are actually using linux-next and not the downstream kernel?
 
-Thank you for all the detailx, but that's not relevant here. I am
-crashing my system intentionally to debug the kexec/kdump
-infrastructure...
+Very good point. I'll try again with linux-next.
 
+Stay tuned,
 Petr T
