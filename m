@@ -1,62 +1,56 @@
 From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Wed, 6 Jun 2018 11:38:26 +0530
-Subject: [PATCH v3 6/6] ARM: dts: dra76x: Add MCAN node
-In-Reply-To: <20180606060826.14671-1-faiz_abbas@ti.com>
-References: <20180606060826.14671-1-faiz_abbas@ti.com>
-Message-ID: <20180606060826.14671-7-faiz_abbas@ti.com>
+Date: Wed, 6 Jun 2018 11:38:20 +0530
+Subject: [PATCH v3 0/6] Add MCAN Support for dra76x
+Message-ID: <20180606060826.14671-1-faiz_abbas@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Franklin S Cooper Jr <fcooper@ti.com>
+The following patches add dts and sysconfig support
+for MCAN on TI's dra76 SOCs
 
-Add support for the MCAN peripheral which supports both classic
-CAN messages along with the new CAN-FD message.
+The patches depend on the following series:
+https://patchwork.kernel.org/patch/10221105/
 
-Add MCAN node to evm and enable it with a maximum datarate of 5 mbps
+Changes in v3:
+ 1. Added reset functionality to the ti-sysc
+    driver. This enables me to drop the hwmod
+    data patch as everything is being done in dt.
 
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
----
- arch/arm/boot/dts/dra76-evm.dts |  6 ++++++
- arch/arm/boot/dts/dra76x.dtsi   | 13 +++++++++++++
- 2 files changed, 19 insertions(+)
+ 2. Dropped ti,hwmods from the dts nodes
 
-diff --git a/arch/arm/boot/dts/dra76-evm.dts b/arch/arm/boot/dts/dra76-evm.dts
-index 2deb96405d06..b6ac2b6ffc6e 100644
---- a/arch/arm/boot/dts/dra76-evm.dts
-+++ b/arch/arm/boot/dts/dra76-evm.dts
-@@ -404,3 +404,9 @@
- 	phys = <&pcie1_phy>, <&pcie2_phy>;
- 	phy-names = "pcie-phy0", "pcie-phy1";
- };
-+
-+&m_can0 {
-+	can-transceiver {
-+		max-bitrate = <5000000>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/dra76x.dtsi b/arch/arm/boot/dts/dra76x.dtsi
-index 5157cc431574..613e4dc0ed3e 100644
---- a/arch/arm/boot/dts/dra76x.dtsi
-+++ b/arch/arm/boot/dts/dra76x.dtsi
-@@ -26,6 +26,19 @@
- 			ti,syss-mask = <1>;
- 			clocks = <&wkupaon_clkctrl DRA7_ADC_CLKCTRL 0>;
- 			clock-names = "fck";
-+
-+			m_can0: mcan at 1a00 {
-+				compatible = "bosch,m_can";
-+				reg = <0x1a00 0x4000>, <0x0 0x18FC>;
-+				reg-names = "m_can", "message_ram";
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "int0", "int1";
-+				clocks = <&mcan_clk>, <&l3_iclk_div>;
-+				clock-names = "cclk", "hclk";
-+				bosch,mram-cfg = <0x0 0 0 32 0 0 1 1>;
-+			};
- 		};
- 	};
- 
+ 3. Fixed the unit address of target-module
+    and mcan
+
+ 4. Removed the status="disabled" in dtsi
+    followed by status="okay" in dts.
+
+Changes in v2:
+ 1. Added Support for mcan in the ti-sysc driver
+    Also added the target-module node for the same
+
+ 2. Added clkctrl data for mcan clocks
+
+Faiz Abbas (4):
+  clk: ti: dra7: Add clkctrl clock data for the mcan clocks
+  bus: ti-sysc: Add support for using ti-sysc for MCAN on dra76x
+  bus: ti-sysc: Add support for software reset
+  ARM: dts: Add generic interconnect target module node for MCAN
+
+Franklin S Cooper Jr (1):
+  ARM: dts: dra76x: Add MCAN node
+
+Lokesh Vutla (1):
+  ARM: dts: dra762: Add MCAN clock support
+
+ .../devicetree/bindings/bus/ti-sysc.txt       |  1 +
+ arch/arm/boot/dts/dra76-evm.dts               |  6 ++
+ arch/arm/boot/dts/dra76x.dtsi                 | 65 +++++++++++++++++++
+ drivers/bus/ti-sysc.c                         | 58 +++++++++++++++++
+ drivers/clk/ti/clk-7xx.c                      |  1 +
+ include/dt-bindings/bus/ti-sysc.h             |  2 +
+ include/dt-bindings/clock/dra7.h              |  1 +
+ include/linux/platform_data/ti-sysc.h         |  1 +
+ 8 files changed, 135 insertions(+)
+
 -- 
 2.17.0
