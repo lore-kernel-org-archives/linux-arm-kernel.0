@@ -1,203 +1,358 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 6 Jun 2018 14:52:44 -0700
-Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
- <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
- <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
- <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
- <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
-Message-ID: <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 07 Jun 2018 00:30:24 +0200
+Subject: [PATCH 06/15] drm/sun4i: tcon: Add support for tcon-top
+In-Reply-To: <20180604162357.rige4rcsiowdl725@flea>
+References: <20180519183127.2718-1-jernej.skrabec@siol.net>
+ <8937075.mEvrCV6laa@jernej-laptop> <20180604162357.rige4rcsiowdl725@flea>
+Message-ID: <1557047.0h10P8OJYS@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/18 14:48, Frank Rowand wrote:
-> On 06/05/18 23:36, Michel Pollet wrote:
->> Hi Frank,
->>
->> On 05 June 2018 18:34, Frank wrote:
->>> On 06/05/18 04:28, Michel Pollet wrote:
->>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time,
->>>> it requires a special enable method to get it started.
->>>>
->>>> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
->>>> ---
->>>>  arch/arm/mach-shmobile/Makefile        |  1 +
->>>>  arch/arm/mach-shmobile/smp-r9a06g032.c | 79
->>>> ++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 80 insertions(+)
->>>>  create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
->>>>
->>>> diff --git a/arch/arm/mach-shmobile/Makefile
->>>> b/arch/arm/mach-shmobile/Makefile index 1939f52..d7fc98f 100644
->>>> --- a/arch/arm/mach-shmobile/Makefile
->>>> +++ b/arch/arm/mach-shmobile/Makefile
->>>> @@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)+= smp-sh73a0.o
->>> headsmp-scu.o platsmp-scu.o
->>>>  smp-$(CONFIG_ARCH_R8A7779)+= smp-r8a7779.o headsmp-scu.o
->>> platsmp-scu.o
->>>>  smp-$(CONFIG_ARCH_R8A7790)+= smp-r8a7790.o
->>>>  smp-$(CONFIG_ARCH_R8A7791)+= smp-r8a7791.o
->>>> +smp-$(CONFIG_ARCH_R9A06G032)+= smp-r9a06g032.o
->>>>  smp-$(CONFIG_ARCH_EMEV2)+= smp-emev2.o headsmp-scu.o
->>> platsmp-scu.o
->>>>
->>>>  # PM objects
->>>> diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c
->>>> b/arch/arm/mach-shmobile/smp-r9a06g032.c
->>>> new file mode 100644
->>>> index 0000000..cd40e6e
->>>> --- /dev/null
->>>> +++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
->>>> @@ -0,0 +1,79 @@
->>>> +// SPDX-License-Identifier: GPL-2.0
->>>> +/*
->>>> + * R9A06G032 Second CA7 enabler.
->>>> + *
->>>> + * Copyright (C) 2018 Renesas Electronics Europe Limited
->>>> + *
->>>> + * Michel Pollet <michel.pollet@bp.renesas.com>,
->>> <buserror@gmail.com>
->>>> + * Derived from action,s500-smp
->>>> + */
->>>> +
->>>> +#include <linux/io.h>
->>>> +#include <linux/of.h>
->>>> +#include <linux/of_address.h>
->>>> +#include <linux/smp.h>
->>>> +
->>>> +/*
->>>> + * The second CPU is parked in ROM at boot time. It requires waking
->>>> +it after
->>>> + * writing an address into the BOOTADDR register of sysctrl.
->>>> + *
->>>> + * So the default value of the "cpu-release-addr" corresponds to
->>> BOOTADDR...
->>>> + *
->>>> + * *However* the BOOTADDR register is not available when the kernel
->>>> + * starts in NONSEC mode.
->>>> + *
->>>> + * So for NONSEC mode, the bootloader re-parks the second CPU into a
->>>> +pen
->>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to a
->>>> +SRAM address,
->>>> + * which is not restricted.
->>>
->>> The binding document for cpu-release-addr does not have a definition for 32
->>> bit arm.  The existing definition is only 64 bit arm.  Please add the definition
->>> for 32 bit arm to patch 1.
->>
->> Hmmm I do find a definition in
->> Documentation/devicetree/bindings/arm/cpus.txt -- just under where I
->> added my 'enable-method' -- And it is already used as 32 bits in at least
->> arch/arm/boot/dts/stih407-family.dtsi.
-> 
-> If the correct answer is for cpu-release-addr to be 64 bits in certain
-> cases (that discussion is ongoing further downthread) then one approach
-> to maintain compatibility _and_ to fix the devicetree source files is
-> to change the source code that currently gets cpu-release-addr as a
-> 32 bit object to check the size of the property and get it as either
-> a 32 bit or 64 bit object, based on the actual size of the property
-> in the device tree and then change the value in the devicetree source
-> files to be two cells.  BUT this does not consider the bootloader
-> complication.  arch/arm/boot/dts/axm5516-cpus.dtsi has a note
-> "// Fixed by the boot loader", so the boot loader also has to be
-> modified to be able to handle the possibility that the property
-> could be either 32 bits or 64 bits.  I don't know how to maintain
-> compatibility with the boot loader since we can't force it to
-> change synchronously with changes in the kernel.
-> 
-> You can consider this comment to be a drive-by observation.  I think
-> Rob and Geert and people like that are likely to be more helpful with
-> what to actually do, and you can treat my comment more as pointing out
-> the issue than as providing the perfect solution.
+Dne ponedeljek, 04. junij 2018 ob 18:23:57 CEST je Maxime Ripard napisal(a):
+> On Mon, Jun 04, 2018 at 05:09:56PM +0200, Jernej ?krabec wrote:
+> > Dne ponedeljek, 04. junij 2018 ob 13:50:34 CEST je Maxime Ripard 
+napisal(a):
+> > > On Fri, Jun 01, 2018 at 09:19:43AM -0700, Chen-Yu Tsai wrote:
+> > > > On Fri, Jun 1, 2018 at 8:29 AM, Maxime Ripard
+> > > > <maxime.ripard@bootlin.com>
+> > 
+> > wrote:
+> > > > > On Thu, May 31, 2018 at 07:54:08PM +0200, Jernej ?krabec wrote:
+> > > > >> Dne ?etrtek, 31. maj 2018 ob 11:21:33 CEST je Maxime Ripard 
+napisal(a):
+> > > > >> > On Thu, May 24, 2018 at 03:01:09PM -0700, Chen-Yu Tsai wrote:
+> > > > >> > > >> > > + if (tcon->quirks->needs_tcon_top) {
+> > > > >> > > >> > > +         struct device_node *np;
+> > > > >> > > >> > > +
+> > > > >> > > >> > > +         np = of_parse_phandle(dev->of_node,
+> > > > >> > > >> > > "allwinner,tcon-top",
+> > > > >> > > >> > > 0);
+> > > > >> > > >> > > +         if (np) {
+> > > > >> > > >> > > +                 struct platform_device *pdev;
+> > > > >> > > >> > > +
+> > > > >> > > >> > > +                 pdev = of_find_device_by_node(np);
+> > > > >> > > >> > > +                 if (pdev)
+> > > > >> > > >> > > +                         tcon->tcon_top =
+> > > > >> > > >> > > platform_get_drvdata(pdev);
+> > > > >> > > >> > > +                 of_node_put(np);
+> > > > >> > > >> > > +
+> > > > >> > > >> > > +                 if (!tcon->tcon_top)
+> > > > >> > > >> > > +                         return -EPROBE_DEFER;
+> > > > >> > > >> > > +         }
+> > > > >> > > >> > > + }
+> > > > >> > > >> > > +
+> > > > >> > > >> > 
+> > > > >> > > >> > I might have missed it, but I've not seen the bindings
+> > > > >> > > >> > additions for
+> > > > >> > > >> > that property. This shouldn't really be done that way
+> > > > >> > > >> > anyway,
+> > > > >> > > >> > instead
+> > > > >> > > >> > of using a direct phandle, you should be using the
+> > > > >> > > >> > of-graph,
+> > > > >> > > >> > with the
+> > > > >> > > >> > TCON-top sitting where it belongs in the flow of data.
+> > > > >> > > >> 
+> > > > >> > > >> Just to answer to the first question, it did describe it in
+> > > > >> > > >> "[PATCH
+> > > > >> > > >> 07/15] dt- bindings: display: sun4i-drm: Add R40 HDMI
+> > > > >> > > >> pipeline".
+> > > > >> > > >> 
+> > > > >> > > >> As why I designed it that way - HW representation could be
+> > > > >> > > >> described
+> > > > >> > > >> that way> >>
+> > > > >> > > >> 
+> > > > >> > > >> (ASCII art makes sense when fixed width font is used to view
+> > 
+> > it):
+> > > > >> > > >>                             / LCD0/LVDS0
+> > > > >> > > >>                 
+> > > > >> > > >>                 / TCON-LCD0
+> > > > >> > > >>                 
+> > > > >> > > >>                 |           \ MIPI DSI
+> > > > >> > > >> 
+> > > > >> > > >> mixer0          |
+> > > > >> > > >> 
+> > > > >> > > >>        \        / TCON-LCD1 - LCD1/LVDS1
+> > > > >> > > >>        
+> > > > >> > > >>         TCON-TOP
+> > > > >> > > >>        
+> > > > >> > > >>        /        \ TCON-TV0 - TVE0/RGB
+> > > > >> > > >> 
+> > > > >> > > >> mixer1          |          \
+> > > > >> > > >> 
+> > > > >> > > >>                 |           TCON-TOP - HDMI
+> > > > >> > > >>                 |          
+> > > > >> > > >>                 |          /
+> > > > >> > > >>                 
+> > > > >> > > >>                 \ TCON-TV1 - TVE1/RGB
+> > > > >> > > >> 
+> > > > >> > > >> This is a bit simplified, since there is also TVE-TOP, which
+> > > > >> > > >> is
+> > > > >> > > >> responsible
+> > > > >> > > >> for sharing 4 DACs between both TVE encoders. You can have
+> > > > >> > > >> two
+> > > > >> > > >> TV outs
+> > > > >> > > >> (PAL/ NTSC) or TVE0 as TV out and TVE1 as RGB or vice versa.
+> > > > >> > > >> It
+> > > > >> > > >> even
+> > > > >> > > >> seems that you can arbitrarly choose which DAC is
+> > > > >> > > >> responsible
+> > > > >> > > >> for
+> > > > >> > > >> which signal, so there is a ton of possible end
+> > > > >> > > >> combinations,
+> > > > >> > > >> but I'm
+> > > > >> > > >> not 100% sure.
+> > > > >> > > >> 
+> > > > >> > > >> Even though I wrote TCON-TOP twice, this is same unit in HW.
+> > > > >> > > >> R40
+> > > > >> > > >> manual
+> > > > >> > > >> suggest more possibilities, although some of them seem
+> > > > >> > > >> wrong,
+> > > > >> > > >> like RGB
+> > > > >> > > >> feeding from LCD TCON. That is confirmed to be wrong when
+> > > > >> > > >> checking BSP
+> > > > >> > > >> code.
+> > > > >> > > >> 
+> > > > >> > > >> Additionally, TCON-TOP comes in the middle of TVE0 and LCD0,
+> > > > >> > > >> TVE1 and
+> > > > >> > > >> LCD1 for pin muxing, although I'm not sure why is that
+> > > > >> > > >> needed at
+> > > > >> > > >> all,
+> > > > >> > > >> since according to R40 datasheet, TVE0 and TVE1 pins are
+> > > > >> > > >> dedicated and
+> > > > >> > > >> not on PORT D and PORT H, respectively, as TCON-TOP
+> > > > >> > > >> documentation
+> > > > >> > > >> suggest. However, HSYNC and PSYNC lines might be shared
+> > > > >> > > >> between
+> > > > >> > > >> TVE
+> > > > >> > > >> (when it works in RGB mode) and LCD. But that is just my
+> > > > >> > > >> guess
+> > > > >> > > >> since
+> > > > >> > > >> I'm not really familiar with RGB and LCD interfaces.
+> > > > >> > > >> 
+> > > > >> > > >> I'm really not sure what would be the best representation in
+> > > > >> > > >> OF-graph.
+> > > > >> > > >> Can you suggest one?
+> > > > >> > > > 
+> > > > >> > > > Rob might disagree on this one, but I don't see anything
+> > > > >> > > > wrong
+> > > > >> > > > with
+> > > > >> > > > having loops in the graph. If the TCON-TOP can be both the
+> > > > >> > > > input
+> > > > >> > > > and
+> > > > >> > > > output of the TCONs, then so be it, and have it described
+> > > > >> > > > that
+> > > > >> > > > way in
+> > > > >> > > > the graph.
+> > > > >> > > > 
+> > > > >> > > > The code is already able to filter out nodes that have
+> > > > >> > > > already
+> > > > >> > > > been
+> > > > >> > > > added to the list of devices we need to wait for in the
+> > > > >> > > > component
+> > > > >> > > > framework, so that should work as well.
+> > > > >> > > > 
+> > > > >> > > > And we'd need to describe TVE-TOP as well, even though we
+> > > > >> > > > don't
+> > > > >> > > > have a
+> > > > >> > > > driver for it yet. That will simplify the backward
+> > > > >> > > > compatibility
+> > > > >> > > > later
+> > > > >> > > > on.
+> > > > >> > > 
+> > > > >> > > I'm getting the feeling that TCON-TOP / TVE-TOP is the glue
+> > > > >> > > layer
+> > > > >> > > that
+> > > > >> > > binds everything together, and provides signal routing, kind of
+> > > > >> > > like
+> > > > >> > > DE-TOP on A64. So the signal mux controls that were originally
+> > > > >> > > found
+> > > > >> > > in TCON0 and TVE0 were moved out.
+> > > > >> > > 
+> > > > >> > > The driver needs to know about that, but the graph about
+> > > > >> > > doesn't
+> > > > >> > > make
+> > > > >> > > much sense directly. Without looking at the manual, I
+> > > > >> > > understand it
+> > > > >> > > to
+> > > > >> > > likely be one mux between the mixers and TCONs, and one between
+> > > > >> > > the
+> > > > >> > > TCON-TVs and HDMI. Would it make more sense to just have the
+> > > > >> > > graph
+> > > > >> > > connections between the muxed components, and remove TCON-TOP
+> > > > >> > > from
+> > > > >> > > it, like we had in the past? A phandle could be used to
+> > > > >> > > reference
+> > > > >> > > the TCON-TOP for mux controls, in addition to the clocks and
+> > > > >> > > resets.
+> > > > >> > > 
+> > > > >> > > For TVE, we would need something to represent each of the
+> > > > >> > > output
+> > > > >> > > pins,
+> > > > >> > > so the device tree can actually describe what kind of signal,
+> > > > >> > > be it
+> > > > >> > > each component of RGB/YUV or composite video, is wanted on each
+> > > > >> > > pin,
+> > > > >> > > if any. This is also needed on the A20 for the Cubietruck, so
+> > > > >> > > we
+> > > > >> > > can
+> > > > >> > > describe which pins are tied to the VGA connector, and which
+> > > > >> > > one
+> > > > >> > > does
+> > > > >> > > R, G, or B.
+> > > > >> > 
+> > > > >> > I guess we'll see how the DT maintainers feel about this, but my
+> > > > >> > impression is that the OF graph should model the flow of data
+> > > > >> > between
+> > > > >> > the devices. If there's a mux somewhere, then the data is
+> > > > >> > definitely
+> > > > >> > going through it, and as such it should be part of the graph.
+> > > > >> 
+> > > > >> I concur, but I spent few days thinking how to represent this
+> > > > >> sanely in
+> > > > >> graph, but I didn't find any good solution. I'll represent here my
+> > > > >> idea and please tell your opinion before I start implementing it.
+> > > > >> 
+> > > > >> First, let me be clear that mixer0 and mixer1 don't have same
+> > > > >> capabilities
+> > > > >> (different number of planes, mixer0 supports writeback, mixer1 does
+> > > > >> not,
+> > > > >> etc.). Thus, it does matter which mixer is connected to which
+> > > > >> TCON/encoder.
+> > > > >> mixer0 is meant to be connected to main display and mixer1 to
+> > > > >> auxiliary. That obviously depends on end system.
+> > > > >> 
+> > > > >> So, TCON TOP has 3 muxes, which have to be represented in graph.
+> > > > >> Two of
+> > > > >> them are for mixer/TCON relationship (each of them 1 input and 4
+> > > > >> possible outputs) and one for TV TCON/HDMI pair selection (2
+> > > > >> possible
+> > > > >> inputs, 1 output).
+> > > > >> 
+> > > > >> According to current practice in sun4i-drm driver, graph has to
+> > > > >> have
+> > > > >> port 0, representing input and port 1, representing output. This
+> > > > >> would
+> > > > >> mean that graph looks something like that:
+> > > > >> 
+> > > > >> tcon_top: tcon-top at 1c70000 {
+> > > > >> 
+> > > > >>       compatible = "allwinner,sun8i-r40-tcon-top";
+> > > > >>       ...
+> > > > >>       ports {
+> > > > >>       
+> > > > >>               #address-cells = <1>;
+> > > > >>               #size-cells = <0>;
+> > > > >>               
+> > > > >>               tcon_top_in: port at 0 {
+> > > > >>               
+> > > > >>                       #address-cells = <1>;
+> > > > >>                       #size-cells = <0>;
+> > > > >>                       reg = <0>;
+> > > > >>                       
+> > > > >>                       tcon_top_in_mixer0: endpoint at 0 {
+> > > > >>                       
+> > > > >>                               reg = <0>;
+> > > > >>                               remote-endpoint =
+> > > > >>                               <&mixer0_out_tcon_top>;
+> > > > >>                       
+> > > > >>                       };
+> > > > >>                       
+> > > > >>                       tcon_top_in_mixer1: endpoint at 1 {
+> > > > >>                       
+> > > > >>                               reg = <1>;
+> > > > >>                               remote-endpoint =
+> > > > >>                               <&mixer1_out_tcon_top>;
+> > > > >>                       
+> > > > >>                       };
+> > > > >>                       
+> > > > >>                       tcon_top_in_tcon_tv: endpoint at 2 {
+> > > > >>                       
+> > > > >>                               reg = <2>;
+> > > > >>                               // here is HDMI input connection,
+> > > > >>                               part of
+> > > > >>                               board DTS
+> > > > >>                               remote-endpoint = <board specific
+> > > > >>                               phandle
+> > > > >>                               to TV TCON output>;
+> > > > >>                       
+> > > > >>                       };
+> > > > >>               
+> > > > >>               };
+> > > > >>               
+> > > > >>               tcon_top_out: port at 1 {
+> > > > >>               
+> > > > >>                       #address-cells = <1>;
+> > > > >>                       #size-cells = <0>;
+> > > > >>                       reg = <1>;
+> > > > >>                       
+> > > > >>                       tcon_top_out_tcon0: endpoint at 0 {
+> > > > >>                       
+> > > > >>                               reg = <0>;
+> > > > >>                               // here is mixer0 output connection,
+> > > > >>                               part
+> > > > >>                               of board DTS
+> > > > >>                               remote-endpoint = <board specific
+> > > > >>                               phandle
+> > > > >>                               to TCON>;
+> > > > >>                       
+> > > > >>                       };
+> > > > >>                       
+> > > > >>                       tcon_top_out_tcon1: endpoint at 1 {
+> > > > >>                       
+> > > > >>                               reg = <1>;
+> > > > >>                               // here is mixer1 output connection,
+> > > > >>                               part
+> > > > >>                               of board DTS
+> > > > >>                               remote-endpoint = <board specific
+> > > > >>                               phandle
+> > > > >>                               to TCON>;
+> > > > >>                       
+> > > > >>                       };
+> > > > >>                       
+> > > > >>                       tcon_top_out_hdmi: endpoint at 2 {
+> > > > >>                       
+> > > > >>                               reg = <2>;
+> > > > >>                               remote-endpoint =
+> > > > >>                               <&hdmi_in_tcon_top>;
+> > > > >>                       
+> > > > >>                       };
+> > > > >>               
+> > > > >>               };
+> > > > >>       
+> > > > >>       };
+> > > > >> 
+> > > > >> };
+> > > > > 
+> > > > > IIRC, each port is supposed to be one route for the data, so we
+> > > > > would
+> > > > > have multiple ports, one for the mixers in input and for the tcon in
+> > > > > output, and one for the TCON in input and for the HDMI/TV in
+> > > > > output. Rob might correct me here.
+> > 
+> > Ok, that seems more clean approach. I'll have to extend graph traversing
+> > algorithm in sun4i_drv.c, but that's no problem.
+> > 
+> > Just to be clear, you have in mind 3 pairs of ports (0/1 for mixer0 mux,
+> > 2/3 for mixer1 and 4/5 for HDMI input), right? That way each mux is
+> > represented with one pair of ports, even numbered for input and odd
+> > numbered for output.
+> Yep, unless Rob feels otherwise.
 
-Darn it, hit <send> too quickly.
+I found an issue with this concept.
 
-I meant to mention that there are several devicetree source files that
-have a single cell value for cpu-release-addr, and thus potentially
-face the same situation, depending on what the final decision is on
-the proper size for cpu-release-addr. As of v4.17, a git grep shows
-one cell values in:
+HDMI driver (sun8i_dw_hdmi.c) uses drm_of_find_possible_crtcs() to find 
+connected crtcs (TCONs) to HDMI. This function assumes that crtc and encoder 
+are directly connected through of_graph, but that is not the case with TCON 
+TOP HDMI mux anymore. 
+I could give TCON TOP node as an input to this function, but that won't work, 
+since TCON TOP can have connections to other crtcs, not only that of HDMI and 
+they will also be picked up by drm_of_find_possible_crtcs().
 
-  arch/arm/boot/dts/axm5516-cpus.dtsi
-  arch/arm/boot/dts/stih407-family.dtsi
-  arch/arm/boot/dts/stih418.dtsi
+Any suggestion how to solve this nicely? I think creating my own version of 
+drm_of_find_possible_crtcs() which considers that case is one way, but not 
+very nice solution. Alternatively, we can fix possible_crtcs to BIT(0), since 
+it always has only one input. This is done in meson_dw_hdmi.c for example. 
 
--Frank
-
-> -Frnak
-> 
-> 
->>
->> What do you want me to add to this exactly? Do you want me to just
->> change "required for systems that have an "enable-method" property
->> value of "spin-table" to also specify renesas,r9a06g032 ?
->>
->> Thanks!
->> Michel
->>
->>>
->>> -Frank
->>>
->>>
->>>> + */
->>>> +
->>>> +static void __iomem *cpu_bootaddr;
->>>> +
->>>> +static DEFINE_SPINLOCK(cpu_lock);
->>>> +
->>>> +static int r9a06g032_smp_boot_secondary(unsigned int cpu, struct
->>>> +task_struct *idle) {
->>>> +if (!cpu_bootaddr)
->>>> +return -ENODEV;
->>>> +
->>>> +spin_lock(&cpu_lock);
->>>> +
->>>> +writel(__pa_symbol(secondary_startup), cpu_bootaddr);
->>>> +arch_send_wakeup_ipi_mask(cpumask_of(cpu));
->>>> +
->>>> +spin_unlock(&cpu_lock);
->>>> +
->>>> +return 0;
->>>> +}
->>>> +
->>>> +static void __init r9a06g032_smp_prepare_cpus(unsigned int max_cpus)
->>>> +{
->>>> +struct device_node *dn;
->>>> +int ret;
->>>> +u32 bootaddr;
->>>> +
->>>> +dn = of_get_cpu_node(1, NULL);
->>>> +if (!dn) {
->>>> +pr_err("CPU#1: missing device tree node\n");
->>>> +return;
->>>> +}
->>>> +/*
->>>> + * Determine the address from which the CPU is polling.
->>>> + * The bootloader *does* change this property
->>>> + */
->>>> +ret = of_property_read_u32(dn, "cpu-release-addr", &bootaddr);
->>>> +of_node_put(dn);
->>>> +if (ret) {
->>>> +pr_err("CPU#1: invalid cpu-release-addr property\n");
->>>> +return;
->>>> +}
->>>> +pr_info("CPU#1: cpu-release-addr %08x\n", bootaddr);
->>>> +
->>>> +cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr)); }
->>>> +
->>>> +static const struct smp_operations r9a06g032_smp_ops __initconst = {
->>>> +.smp_prepare_cpus = r9a06g032_smp_prepare_cpus,
->>>> +.smp_boot_secondary = r9a06g032_smp_boot_secondary, };
->>>> +CPU_METHOD_OF_DECLARE(r9a06g032_smp, "renesas,r9a06g032-smp",
->>>> +&r9a06g032_smp_ops);
->>>>
->>
->>
->>
->>
->> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
->>
-> 
-> 
+Best regards,
+Jernej
