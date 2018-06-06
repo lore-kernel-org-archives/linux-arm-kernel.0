@@ -1,49 +1,45 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 6 Jun 2018 13:10:29 -0600
-Subject: [PATCH] coresight: Fix check in
- coresight_tmc_etr_buf_insert_barrier_packet
-In-Reply-To: <1527851302-5843-1-git-send-email-suzuki.poulose@arm.com>
-References: <1527851302-5843-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkyhJFrNtc7PDY0XNQoiHW8sHW+kJiaUPoWqPwCZM-R_Tw@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 6 Jun 2018 12:29:06 -0700
+Subject: [PATCH v4 0/6] Enhance support for the SP805 WDT
+In-Reply-To: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
+References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <e3f657f1-bd7e-cadb-9cfe-dee6cf8c1668@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2018 at 05:08, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> We request for "CORESIGHT_BARRIER_PKT_SIZE" length and we should
-> be happy when we get that size.
->
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->
-> Mathieu,
->
-> Please could you pull this patch, if you are happy with it ?
-> This fixes a problem in the ETR buf series, which I just
-> noticed while testing the part2 of the series.
+On 05/28/2018 11:01 AM, Ray Jui wrote:
+> This patch series enhances the support for the SP805 watchdog timer.
+> First of all, 'timeout-sec' devicetree property is added. In addition,
+> support is also added to allow the driver to reset the watchdog if it
+> has been detected that watchdot has been started in the bootloader. In
+> this case, the driver will initiate the ping service from the kernel
+> watchdog subsystem, before a user mode daemon takes over. This series
+> also enables SP805 in the default ARM64 defconfig
+> 
+> This patch series is based off v4.17-rc5 and is available on GIHUB:
+> repo: https://github.com/Broadcom/arm64-linux.git
+> branch: sp805-wdt-v4
+> 
+> Changes since v3:
+>  - Improve description of 'timeout-sec' in the binding document, per
+> recommendation from Guenter Roeck
+> 
+> Changes since v2:
+>  - Fix indent and format to make them consistent within arm,sp805.txt
+> 
+> Changes since v1:
+>  - Consolidate two duplicated SP805 binding documents into one
+>  - Slight change of the wdt_is_running implementation per discussion
+> 
+> Ray Jui (6):
+>   Documentation: DT: Consolidate SP805 binding docs
+>   Documentation: DT: Add optional 'timeout-sec' property for sp805
+>   watchdog: sp805: add 'timeout-sec' DT property support
+>   watchdog: sp805: set WDOG_HW_RUNNING when appropriate
+>   arm64: dt: set initial SR watchdog timeout to 60 seconds
+>   arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
 
-I will pick up the change - you will see it being queued when the
-first rc comes out.
-
->
-> Suzuki
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index e2bcef3..c736250 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -862,7 +862,7 @@ tmc_etr_buf_insert_barrier_packet(struct etr_buf *etr_buf, u64 offset)
->
->         len = tmc_etr_buf_get_data(etr_buf, offset,
->                                    CORESIGHT_BARRIER_PKT_SIZE, &bufp);
-> -       if (WARN_ON(len <= CORESIGHT_BARRIER_PKT_SIZE))
-> +       if (WARN_ON(len < CORESIGHT_BARRIER_PKT_SIZE))
->                 return -EINVAL;
->         coresight_insert_barrier_packet(bufp);
->         return offset + CORESIGHT_BARRIER_PKT_SIZE;
-> --
-> 2.7.4
->
+I can take the last two patches and Guenter would take the first 4 or
+would you want to proceed differently?
+-- 
+Florian
