@@ -1,40 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Jun 2018 16:44:42 +0100
-Subject: [PATCH v13 2/3] arm64: tlbflush: Introduce
- __flush_tlb_kernel_pgtable
-In-Reply-To: <1528268481-19299-3-git-send-email-cpandya@codeaurora.org>
-References: <1528268481-19299-1-git-send-email-cpandya@codeaurora.org>
- <1528268481-19299-3-git-send-email-cpandya@codeaurora.org>
-Message-ID: <20180606154442.GF6631@arm.com>
+Date: Wed, 6 Jun 2018 16:45:06 +0100
+Subject: [PATCH][RFC] PCI: rcar: Add bus notifier so we can limit the DMA
+ range
+In-Reply-To: <20180604223048.GC30381@bhelgaas-glaptop.roam.corp.google.com>
+References: <20180521220514.30256-1-marek.vasut+renesas@gmail.com>
+ <CAK8P3a1PZ_MfgEcvWdUbN-eCcs5Xo38LQ54imLc4kNtSKO9Txw@mail.gmail.com>
+ <c2897d82-fe33-52cd-5aa6-3bddb478cb9f@gmail.com>
+ <20180604223048.GC30381@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180606154505.GJ6631@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 12:31:20PM +0530, Chintan Pandya wrote:
-> Add an interface to invalidate intermediate page tables
-> from TLB for kernel.
+On Mon, Jun 04, 2018 at 05:30:48PM -0500, Bjorn Helgaas wrote:
+> [+cc ARM64 folks, linux-kernel]
 > 
-> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
-> ---
->  arch/arm64/include/asm/tlbflush.h | 7 +++++++
->  1 file changed, 7 insertions(+)
+> The original patch under discussion is:
+> https://lkml.kernel.org/r/20180521220514.30256-1-marek.vasut+renesas at gmail.com
 > 
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index dfc61d7..a4a1901 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -218,6 +218,13 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
->  	dsb(ish);
->  }
->  
-> +static inline void __flush_tlb_kernel_pgtable(unsigned long kaddr)
-> +{
-> +	unsigned long addr = __TLBI_VADDR(kaddr, 0);
-> +
-> +	__tlbi(vaae1is, addr);
-> +	dsb(ish);
-> +}
->  #endif
+> On Tue, May 22, 2018 at 11:52:21AM +0200, Marek Vasut wrote:
+> > On 05/22/2018 10:10 AM, Arnd Bergmann wrote:
+> > > On Tue, May 22, 2018 at 12:05 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > >> From: Phil Edworthy <phil.edworthy@renesas.com>
+> > >>
+> > >> The PCIe DMA controller on RCar Gen2 and earlier is on 32bit bus,
+> > >> so limit the DMA range to 32bit.
+> > >>
+> > >> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > >> Cc: Arnd Bergmann <arnd@arndb.de>
+> > >> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> > >> Cc: Simon Horman <horms+renesas@verge.net.au>
+> > >> Cc: Wolfram Sang <wsa@the-dreams.de>
+> > >> Cc: linux-renesas-soc at vger.kernel.org
+> > >> To: linux-pci at vger.kernel.org
+> > >> ---
+> > >> NOTE: I'm aware of https://patchwork.kernel.org/patch/9495895/ , but the
+> > >>       discussion seems to have gone way off, so I'm sending this as a
+> > >>       RFC. Any feedback on how to do this limiting properly would be nice.
+> > > 
+> > > Doing it in the driver is clearly not appropriate, we must do this in
+> > > common code. If I remember correctly, it's specifically ARM64 that is
+> > > broken here, it incorrectly allows setting a DMA mask to 64 bit
+> > > when that is not available.
+> > 
+> > Yep, that's correct. ARM64 with devices mapping tremendous amounts of
+> > memory. So did anything change since that discussion references in the NOTE?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Is it specifically arm64 that's broken here? If so, why and how do other
+archs (e.g. riscv) handle this? I thought all of this behaviour was driven
+by the DMA ops, and we're just using generic code for that afaict.
 
 Will
