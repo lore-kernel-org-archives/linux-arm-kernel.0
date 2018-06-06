@@ -1,65 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 06 Jun 2018 10:13:44 +0100
-Subject: [PATCH v2] irqchip/gic-v3-its: fix ITS queue timeout
-In-Reply-To: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
-References: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <86a7s89t13.wl-marc.zyngier@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 6 Jun 2018 11:22:41 +0200
+Subject: [PATCH] ARM: Build secure_cntvoff.S unconditionally to fix
+ shmobile !SMP build
+In-Reply-To: <20180606090953.GW17671@n2100.armlinux.org.uk>
+References: <1528275154-5164-1-git-send-email-geert+renesas@glider.be>
+ <20180606090953.GW17671@n2100.armlinux.org.uk>
+Message-ID: <CAMuHMdVq0Mwui6jrnX4sd2=L+p3Ta4qM2PxQ2HLQ0btajTV6hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Jun 2018 03:40:24 +0100,
-Yang Yingliang wrote:
+Hi Russell,
 
-[I'm travelling, so please do not expect any quick answer...]
+On Wed, Jun 6, 2018 at 11:09 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Jun 06, 2018 at 10:52:34AM +0200, Geert Uytterhoeven wrote:
+>> If CONFIG_SMP=n, building a kernel for R-Car Gen2 fails with:
+>>
+>>     arch/arm/mach-shmobile/setup-rcar-gen2.o: In function `rcar_gen2_timer_init':
+>>     setup-rcar-gen2.c:(.init.text+0x30): undefined reference to `secure_cntvoff_init'
+>>
+>> Indeed, on R-Car Gen2 SoCs, secure_cntvoff_init() is not only needed for
+>> secondary CPUs, but also for the boot CPU.  This is most visible on SoCs
+>> with Cortex A7 cores (e.g. R-Car E2, cfr. commit 9ce3fa6816c2fb59 ("ARM:
+>> shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794")),
+>> but Cortex A15 is affected, too.
+>>
+>> Fix this by always providing secure_cntvoff_init().
+>>
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: 7c607944bc657616 ("ARM: smp: Add initialization of CNTVOFF")
 
-> 
-> When the kernel booted with maxcpus=x, 'x' is smaller
-> than actual cpu numbers, the TAs of offline cpus won't
+Interestingly, the commit description says:
 
-TA? Target Address? Target Affinity? Timing Advance? Terrible Acronym?
+   "It should be done by the bootloader but it is currently not the case,
+    even for boot CPU because this SoC is booting in secure mode."
+    ^^^^^^^^^^^^^^^^^
 
-> be set to its->collection.
-> 
-> If LPI is bind to offline cpu, sync cmd will use zero TA,
-> it leads to ITS queue timeout.  Fix this by choosing a
-> online cpu, if there is no online cpu in cpu_mask.
+So it should be called for !SMP on sunxi, too?
 
-So instead of fixing the emission of a sync command on a non-mapped
-collection, you hack set_affinity? It doesn't feel like the right
-thing to do.
+>> Fixes: cad160ed0a94927e ("ARM: shmobile: Convert file to use cntvoff")
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> This doesn't look right to me, but I don't have secure_cntvoff in any
+> tree here that I can look at to check.  What if secure_cntvoff contains
+> instructions only available on ARMv7 CPUs, and not ARMv4?
 
-It is also worth noticing that mapping an LPI to a collection that is
-not mapped yet is perfectly legal.
+Compiled != called.
 
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 5416f2b..d8b9539 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -2309,7 +2309,9 @@ static int its_irq_domain_activate(struct irq_domain *domain,
->  		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
->  
->  	/* Bind the LPI to the first possible CPU */
-> -	cpu = cpumask_first(cpu_mask);
-> +	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
-> +	if (cpu >= nr_cpu_ids)
-> +		cpu = cpumask_first(cpu_online_mask);
+> It makes no sense (to me) to always build this.
 
-Now you're completely ignoring cpu_mask which constraints the NUMA
-affinity. On some systems, this ends up with a deadlock (Cavium TX1,
-if I remember well).
+But you're right, making it depend on CPU_V7 is better.
+Thanks!
 
-Wouldn't it be better to just return that the affinity setting request
-is impossible to satisfy? And more to the point, how comes we end-up
-in such a case?
+Gr{oetje,eeting}s,
 
-Thanks,
-
-	M.
+                        Geert
 
 -- 
-Jazz is not dead, it just smell funny.
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
