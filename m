@@ -1,107 +1,64 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Wed, 6 Jun 2018 11:06:28 +0530
-Subject: panic kexec broken on ARM64?
-In-Reply-To: <20180605100151.7fd54381@ezekiel.suse.cz>
-References: <20180605100151.7fd54381@ezekiel.suse.cz>
-Message-ID: <CACi5LpMJ9whXxpMvQDw4_4kRNaATGGq4fWt7nRRJTMrdN_q_nQ@mail.gmail.com>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Wed, 6 Jun 2018 11:38:21 +0530
+Subject: [PATCH v3 1/6] ARM: dts: dra762: Add MCAN clock support
+In-Reply-To: <20180606060826.14671-1-faiz_abbas@ti.com>
+References: <20180606060826.14671-1-faiz_abbas@ti.com>
+Message-ID: <20180606060826.14671-2-faiz_abbas@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Petr,
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-On Tue, Jun 5, 2018 at 1:31 PM, Petr Tesarik <ptesarik@suse.cz> wrote:
-> Hi all,
->
-> I have observed hangs after crash on a Raspberry Pi 3 Model B+ board
-> when a panic kernel is loaded. I attached a hardware debugger and found
-> out that all CPU cores were stopped except one which was stuck in the
-> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
-> definitely not safe after a kernel panic.
+MCAN is clocked by H14 divider of DPLL_GMAC. Unlike other
+DPLL dividers this DPLL_GMAC H14 divider is controlled by
+control module. Adding support for these clocks.
 
-Normally we limit the number of cpus in the crash kernel to 1 (via
-maxcpus=1) in distributions like fedora. Can you please share the
-command-line/bootargs which you use to invoke the crash kernel.
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+---
+ arch/arm/boot/dts/dra76x.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-Also do you get any console output from the crash kernel (you can try
-passing earlycon to the crash kernel to see if it crashes early
-enough)? If yes, can you please share the same.
-
-> If I'm right, then this is broken in general, but I have only ever seen
-> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
-> be more subtle. FWIW the code for 32-bit ARM seems to work just fine
-> without this code in machine_kexec_mask_interrupts():
->
->                 /*
->                  * First try to remove the active state. If this
->                  * fails, try to EOI the interrupt.
->                  */
->                 ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
->
-> I wonder what breaks if this call to irq_set_irqchip_state() is removed.
->
-> For reference, here is a stack trace of the process which originally
-> triggered the panic:
->
-> #0  __switch_to (prev=0xffff000008e62a00 <init_task>, next=0xffff80002b796080) at ../arch/arm64/kernel/process.c:355
-> #1  0xffff0000088f584c in context_switch (rf=<optimized out>, next=<optimized out>, prev=<optimized out>, rq=<optimized out>) at ../kernel/sched/core.c:2896
-> #2  __schedule (preempt=false) at ../kernel/sched/core.c:3457
-> #3  0xffff0000088f5eac in schedule () at ../kernel/sched/core.c:3516
-> #4  0xffff0000088f9448 in schedule_timeout (timeout=<optimized out>) at ../kernel/time/timer.c:1743
-> #5  0xffff0000088f6afc in do_wait_for_common (state=<optimized out>, timeout=500, action=<optimized out>, x=<optimized out>) at ../kernel/sched/completion.c:77
-> #6  __wait_for_common (state=<optimized out>, timeout=<optimized out>, action=<optimized out>, x=<optimized out>) at ../kernel/sched/completion.c:96
-> #7  wait_for_common (x=0xffff000008e53848 <init_thread_union+14408>, timeout=500, state=<optimized out>) at ../kernel/sched/completion.c:104
-> #8  0xffff0000088f6c1c in wait_for_completion_timeout (x=0xffff000008e53848 <init_thread_union+14408>, timeout=500) at ../kernel/sched/completion.c:144
-> #9  0xffff000000a19f1c in usb_start_wait_urb (urb=0xffff80002c1cd700, timeout=5000, actual_length=0xffff000008e538dc <init_thread_union+14556>)
->     at ../drivers/usb/core/message.c:61
-> #10 0xffff000000a1a05c in usb_internal_control_msg (timeout=<optimized out>, len=<optimized out>, data=<optimized out>, cmd=<optimized out>, pipe=<optimized out>,
->     usb_dev=<optimized out>) at ../drivers/usb/core/message.c:100
-> #11 usb_control_msg (dev=0xffff80002c348000, pipe=2147484800, request=161 '\241', requesttype=192 '\300', value=0, index=152, data=0xffff80002b6fa080, size=4,
->     timeout=5000) at ../drivers/usb/core/message.c:151
-> #12 0xffff000001001cd0 in lan78xx_read_reg (index=152, data=0xffff000008e5396c <init_thread_union+14700>, dev=<optimized out>, dev=<optimized out>)
->     at ../drivers/net/usb/lan78xx.c:425
-
-Hmmm, this seems a bit misplaced, but are you using a usb-ethernet
-adapter which causes a URB submission to timeout?
-
-> #13 0xffff00000100365c in lan78xx_irq_bus_sync_unlock (irqd=<optimized out>) at ../drivers/net/usb/lan78xx.c:1909
-> #14 0xffff00000813e590 in chip_bus_sync_unlock (desc=<optimized out>) at ../kernel/irq/internals.h:129
-> #15 __irq_put_desc_unlock (desc=0xffff80002c361c00, flags=128, bus=true) at ../kernel/irq/irqdesc.c:804
-> #16 0xffff00000813f604 in irq_put_desc_busunlock (flags=<optimized out>, desc=<optimized out>) at ../kernel/irq/internals.h:155
-> #17 irq_set_irqchip_state (irq=<optimized out>, which=<optimized out>, val=false) at ../kernel/irq/manage.c:2136
-> #18 0xffff00000809b7d4 in machine_kexec_mask_interrupts () at ../arch/arm64/kernel/machine_kexec.c:233
-> #19 machine_crash_shutdown (regs=<optimized out>) at ../arch/arm64/kernel/machine_kexec.c:259
-> #20 0xffff000008180fd4 in __crash_kexec (regs=0xffff000008e53d70 <init_thread_union+15728>) at ../kernel/kexec_core.c:943
-> #21 0xffff0000081810e4 in crash_kexec (regs=0xffff000008e53d70 <init_thread_union+15728>) at ../kernel/kexec_core.c:965
-> #22 0xffff00000808ab58 in die (str=<optimized out>, regs=0xffff000008e53d70 <init_thread_union+15728>, err=-2046820348) at ../arch/arm64/kernel/traps.c:266
-> #23 0xffff0000080a1c14 in __do_kernel_fault (mm=0x0, addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:226
-> #24 0xffff0000088fc8dc in do_page_fault (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:476
-> #25 0xffff0000088fccdc in do_translation_fault (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:502
-> #26 0xffff000008081478 in do_mem_abort (addr=0, esr=2248146948, regs=0xffff000008e53d70 <init_thread_union+15728>) at ../arch/arm64/mm/fault.c:657
-> #27 0xffff000008082dd0 in el1_sync () at ../arch/arm64/kernel/entry.S:548
-
-The ESR value from the logs (2248146948) indicates the following about
-the panic causes (see ARMv8 Architecture Reference Manual for more
-details):
-
-EC -> 100001, Instruction Abort taken without a change in Exception
-level (Used for MMU faults generated by instruction accesses and
-Synchronous external aborts, including synchronous parity or ECC
-errors. Not used for debug related exceptions.)
-FnV -> 0, FAR is valid
-IFSC -> 000100, Translation fault, level 0
-
-So in brief an Instruction Abort was taken at exception level EL1(?)
-which was caused by a translation fault at level 0 and the FAR
-register holds the faulting Virtual Address.
-
-So, since you have the hardware debugger, can you try and see the
-values of FAR (Fault Address Register) and ELR registers at this point
-via the debugger and see if they can indicate the Faulty Address from
-which the exception was taken and debug using the same.
-
-If you can share the earlycon messages from the crashkernel and the
-values of the above registers, can help you further with debugging the
-issue which you are seeing.
-
-Thanks,
-Bhupesh
+diff --git a/arch/arm/boot/dts/dra76x.dtsi b/arch/arm/boot/dts/dra76x.dtsi
+index 1c88c581ff18..bfc82636999c 100644
+--- a/arch/arm/boot/dts/dra76x.dtsi
++++ b/arch/arm/boot/dts/dra76x.dtsi
+@@ -17,3 +17,36 @@
+ &crossbar_mpu {
+ 	ti,irqs-skip = <10 67 68 133 139 140>;
+ };
++
++&scm_conf_clocks {
++	dpll_gmac_h14x2_ctrl_ck: dpll_gmac_h14x2_ctrl_ck at 3fc {
++		#clock-cells = <0>;
++		compatible = "ti,divider-clock";
++		clocks = <&dpll_gmac_x2_ck>;
++		ti,max-div = <63>;
++		reg = <0x03fc>;
++		ti,bit-shift=<20>;
++		ti,latch-bit=<26>;
++		assigned-clocks = <&dpll_gmac_h14x2_ctrl_ck>;
++		assigned-clock-rates = <80000000>;
++	};
++
++	dpll_gmac_h14x2_ctrl_mux_ck: dpll_gmac_h14x2_ctrl_mux_ck at 3fc {
++		#clock-cells = <0>;
++		compatible = "ti,mux-clock";
++		clocks = <&dpll_gmac_ck>, <&dpll_gmac_h14x2_ctrl_ck>;
++		reg = <0x3fc>;
++		ti,bit-shift = <29>;
++		ti,latch-bit=<26>;
++		assigned-clocks = <&dpll_gmac_h14x2_ctrl_mux_ck>;
++		assigned-clock-parents = <&dpll_gmac_h14x2_ctrl_ck>;
++	};
++
++	mcan_clk: mcan_clk at 3fc {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&dpll_gmac_h14x2_ctrl_mux_ck>;
++		ti,bit-shift = <27>;
++		reg = <0x3fc>;
++	};
++};
+-- 
+2.17.0
