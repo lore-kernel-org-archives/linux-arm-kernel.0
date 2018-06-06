@@ -1,11 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 6 Jun 2018 19:51:55 +0300
-Subject: [PATCH 0/5] Add R8A77970/V3MSK LVDS/HDMI support
-Message-ID: <9c092022-dcdd-1320-499c-00c5b2d9db3b@cogentembedded.com>
+Date: Wed, 6 Jun 2018 19:53:31 +0300
+Subject: [PATCH 0/5] Add R8A77980/Condor LVDS/HDMI support
+Message-ID: <4fbd0895-c1ec-41fc-912d-8306dd933997@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello!
+
+Reposting with the correct subject... Sorry! :-]
 
 Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
 'renesas-devel-20180604-v4.17-rc7' tag. We're adding the R8A77980 FCPVD/VSPD/
