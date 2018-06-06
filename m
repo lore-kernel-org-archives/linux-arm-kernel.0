@@ -1,74 +1,36 @@
-From: yaojun8558363@gmail.com (Jun Yao)
-Date: Wed,  6 Jun 2018 12:39:20 +0800
-Subject: [PATCH v3 2/3] arm64/mm: introduce variable to save new
- swapper_pg_dir address
-In-Reply-To: <20180606043921.19851-1-yaojun8558363@gmail.com>
-References: <20180606043921.19851-1-yaojun8558363@gmail.com>
-Message-ID: <20180606043921.19851-3-yaojun8558363@gmail.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Wed, 6 Jun 2018 13:42:58 +0900
+Subject: [RFC PATCH -tip v5 06/27] arm64: kprobes: Remove jprobe
+ implementation
+In-Reply-To: <20180605153420.GA26352@arm.com>
+References: <152812730943.10068.5166429445118734697.stgit@devbox>
+ <152812748464.10068.10380156315388629319.stgit@devbox>
+ <20180605153420.GA26352@arm.com>
+Message-ID: <20180606134258.9f75aab9fa4bfd50d0cca96d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for migrating swapper_pg_dir, introduce new_swapper_pg_dir
-to save virtual address of swapper_pg_dir.
+On Tue, 5 Jun 2018 16:34:21 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
----
- arch/arm64/include/asm/mmu_context.h | 2 +-
- arch/arm64/include/asm/pgtable.h     | 1 +
- arch/arm64/mm/kasan_init.c           | 2 +-
- arch/arm64/mm/mmu.c                  | 2 ++
- 4 files changed, 5 insertions(+), 2 deletions(-)
+> On Tue, Jun 05, 2018 at 12:51:24AM +0900, Masami Hiramatsu wrote:
+> > Remove arch dependent setjump/longjump functions
+> > and unused fields in kprobe_ctlblk for jprobes
+> > from arch/arm64.
+> > 
+> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > ---
+> >  arch/arm64/include/asm/kprobes.h   |    1 -
+> >  arch/arm64/kernel/probes/kprobes.c |   68 ------------------------------------
+> >  2 files changed, 69 deletions(-)
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3eddb871f251..481c2d16adeb 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -57,7 +57,7 @@ static inline void cpu_set_reserved_ttbr0(void)
- 
- static inline void cpu_switch_mm(pgd_t *pgd, struct mm_struct *mm)
- {
--	BUG_ON(pgd == swapper_pg_dir);
-+	BUG_ON(pgd == new_swapper_pg_dir);
- 	cpu_set_reserved_ttbr0();
- 	cpu_do_switch_mm(virt_to_phys(pgd),mm);
- }
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 519ab5581b08..2bda899dcf22 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -723,6 +723,7 @@ extern pgd_t swapper_pg_end[];
- extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
- extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
- extern volatile phys_addr_t __pa_swapper_pg_dir;
-+extern pgd_t *new_swapper_pg_dir;
- 
- /*
-  * Encode and decode a swap entry:
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index dd4f28c19165..08bcaae4725e 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -197,7 +197,7 @@ void __init kasan_init(void)
- 	 * tmp_pg_dir used to keep early shadow mapped until full shadow
- 	 * setup will be finished.
- 	 */
--	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
-+	memcpy(tmp_pg_dir, new_swapper_pg_dir, sizeof(tmp_pg_dir));
- 	dsb(ishst);
- 	cpu_replace_ttbr1(__pa_symbol(tmp_pg_dir));
- 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index d518e27792ef..94056e064c6f 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -62,6 +62,8 @@ EXPORT_SYMBOL(kimage_voffset);
- volatile phys_addr_t __section(".mmuoff.data.read")
- __pa_swapper_pg_dir;
- 
-+pgd_t *new_swapper_pg_dir = swapper_pg_dir;
-+
- /*
-  * Empty_zero_page is a special page that is used for zero-initialized data
-  * and COW.
+Thank you Will!
+
+
 -- 
-2.17.0
+Masami Hiramatsu <mhiramat@kernel.org>
