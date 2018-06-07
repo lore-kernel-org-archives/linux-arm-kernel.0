@@ -1,34 +1,60 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu,  7 Jun 2018 11:22:54 +0800
-Subject: [v2, 08/10] fsl/fman: define frame description command UPD
+Date: Thu,  7 Jun 2018 11:22:53 +0800
+Subject: [v2, 07/10] fsl/fman_port: support getting timestamp field
 In-Reply-To: <20180607032256.39802-1-yangbo.lu@nxp.com>
 References: <20180607032256.39802-1-yangbo.lu@nxp.com>
-Message-ID: <20180607032256.39802-9-yangbo.lu@nxp.com>
+Message-ID: <20180607032256.39802-8-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defined frame description command FM_FD_CMD_UPD for
-prepended data updating.
+This patch is to add fman_port_get_tstamp_field() interface
+to get timestamp field data.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
 Changes for v2:
 	- None.
 ---
- drivers/net/ethernet/freescale/fman/fman.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/net/ethernet/freescale/fman/fman_port.c |   12 ++++++++++++
+ drivers/net/ethernet/freescale/fman/fman_port.h |    3 +++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fman/fman.h b/drivers/net/ethernet/freescale/fman/fman.h
-index bfa02e0..935c317 100644
---- a/drivers/net/ethernet/freescale/fman/fman.h
-+++ b/drivers/net/ethernet/freescale/fman/fman.h
-@@ -41,6 +41,7 @@
- /* Frame queue Context Override */
- #define FM_FD_CMD_FCO                   0x80000000
- #define FM_FD_CMD_RPD                   0x40000000  /* Read Prepended Data */
-+#define FM_FD_CMD_UPD			0x20000000  /* Update Prepended Data */
- #define FM_FD_CMD_DTC                   0x10000000  /* Do L4 Checksum */
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
+index ce6e24c..86f0094 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.c
++++ b/drivers/net/ethernet/freescale/fman/fman_port.c
+@@ -1731,6 +1731,18 @@ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
+ }
+ EXPORT_SYMBOL(fman_port_get_hash_result_offset);
  
- /* TX-Port: Unsupported Format */
++int fman_port_get_tstamp_field(struct fman_port *port, const void *data,
++			       u64 *tstamp)
++{
++	if (port->buffer_offsets.time_stamp_offset == ILLEGAL_BASE)
++		return -EINVAL;
++
++	*tstamp = *(u64 *)(data + port->buffer_offsets.time_stamp_offset);
++
++	return 0;
++}
++EXPORT_SYMBOL(fman_port_get_tstamp_field);
++
+ static int fman_port_probe(struct platform_device *of_dev)
+ {
+ 	struct fman_port *port;
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
+index e86ca6a..d10e48d 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.h
++++ b/drivers/net/ethernet/freescale/fman/fman_port.h
+@@ -153,6 +153,9 @@ int fman_port_cfg_buf_prefix_content(struct fman_port *port,
+ 
+ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset);
+ 
++int fman_port_get_tstamp_field(struct fman_port *port, const void *data,
++			       u64 *tstamp);
++
+ struct fman_port *fman_port_bind(struct device *dev);
+ 
+ #endif /* __FMAN_PORT_H */
 -- 
 1.7.1
