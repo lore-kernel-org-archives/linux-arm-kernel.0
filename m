@@ -1,99 +1,52 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu,  7 Jun 2018 11:22:49 +0800
-Subject: [v2, 03/10] dt-binding: ptp_qoriq: add DPAA FMan support
-In-Reply-To: <20180607032256.39802-1-yangbo.lu@nxp.com>
-References: <20180607032256.39802-1-yangbo.lu@nxp.com>
-Message-ID: <20180607032256.39802-4-yangbo.lu@nxp.com>
+Date: Thu,  7 Jun 2018 11:22:46 +0800
+Subject: [v2, 00/10] Support DPAA PTP clock and timestamping
+Message-ID: <20180607032256.39802-1-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add bindings description for DPAA
-FMan 1588 timer, and also remove its description in
-fsl-fman dt-bindings document.
+This patchset is to support DPAA FMAN PTP clock and HW timestamping.
+- The patch #1 to patch #5 are to support DPAA FMAN 1588 timer in
+  ptp_qoriq driver.
+- The patch #6 to patch #10 are to add HW timestamping support in
+  DPAA ethernet driver.
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- None.
----
- Documentation/devicetree/bindings/net/fsl-fman.txt |   25 +-------------------
- .../devicetree/bindings/ptp/ptp-qoriq.txt          |   15 +++++++++--
- 2 files changed, 13 insertions(+), 27 deletions(-)
+Yangbo Lu (10):
+  fsl/fman: share the event interrupt
+  ptp: support DPAA FMan 1588 timer in ptp_qoriq
+  dt-binding: ptp_qoriq: add DPAA FMan support
+  powerpc/mpc85xx: move ptp timer out of fman in dts
+  arm64: dts: fsl: move ptp timer out of fman
+  fsl/fman: add set_tstamp interface
+  fsl/fman_port: support getting timestamp field
+  fsl/fman: define frame description command UPD
+  dpaa_eth: add support for hardware timestamping
+  dpaa_eth: add the get_ts_info interface for ethtool
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fman.txt b/Documentation/devicetree/bindings/net/fsl-fman.txt
-index df873d1..74603dd 100644
---- a/Documentation/devicetree/bindings/net/fsl-fman.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-fman.txt
-@@ -356,30 +356,7 @@ ethernet at e0000 {
- ============================================================================
- FMan IEEE 1588 Node
- 
--DESCRIPTION
--
--The FMan interface to support IEEE 1588
--
--
--PROPERTIES
--
--- compatible
--		Usage: required
--		Value type: <stringlist>
--		Definition: A standard property.
--		Must include "fsl,fman-ptp-timer".
--
--- reg
--		Usage: required
--		Value type: <prop-encoded-array>
--		Definition: A standard property.
--
--EXAMPLE
--
--ptp-timer at fe000 {
--	compatible = "fsl,fman-ptp-timer";
--	reg = <0xfe000 0x1000>;
--};
-+Refer to Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
- 
- =============================================================================
- FMan MDIO Node
-diff --git a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-index 0f569d8..c5d0e79 100644
---- a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-+++ b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-@@ -2,7 +2,8 @@
- 
- General Properties:
- 
--  - compatible   Should be "fsl,etsec-ptp"
-+  - compatible   Should be "fsl,etsec-ptp" for eTSEC
-+                 Should be "fsl,fman-ptp-timer" for DPAA FMan
-   - reg          Offset and length of the register set for the device
-   - interrupts   There should be at least two interrupts. Some devices
-                  have as many as four PTP related interrupts.
-@@ -43,14 +44,22 @@ Clock Properties:
-   value, which will be directly written in those bits, that is why,
-   according to reference manual, the next clock sources can be used:
- 
-+  For eTSEC,
-   <0> - external high precision timer reference clock (TSEC_TMR_CLK
-         input is used for this purpose);
-   <1> - eTSEC system clock;
-   <2> - eTSEC1 transmit clock;
-   <3> - RTC clock input.
- 
--  When this attribute is not used, eTSEC system clock will serve as
--  IEEE 1588 timer reference clock.
-+  For DPAA FMan,
-+  <0> - external high precision timer reference clock (TMR_1588_CLK)
-+  <1> - MAC system clock (1/2 FMan clock)
-+  <2> - reserved
-+  <3> - RTC clock oscillator
-+
-+  When this attribute is not used, the IEEE 1588 timer reference clock
-+  will use the eTSEC system clock (for Gianfar) or the MAC system
-+  clock (for DPAA).
- 
- Example:
- 
--- 
-1.7.1
+ Documentation/devicetree/bindings/net/fsl-fman.txt |   25 +-----
+ .../devicetree/bindings/ptp/ptp-qoriq.txt          |   15 +++-
+ arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi   |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi        |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi        |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi       |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi       |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi      |   14 ++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c     |  101 ++++++++++++++++++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.h     |    3 +
+ drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |   39 ++++++++
+ drivers/net/ethernet/freescale/fman/fman.c         |    3 +-
+ drivers/net/ethernet/freescale/fman/fman.h         |    1 +
+ drivers/net/ethernet/freescale/fman/fman_dtsec.c   |   27 +++++
+ drivers/net/ethernet/freescale/fman/fman_dtsec.h   |    1 +
+ drivers/net/ethernet/freescale/fman/fman_memac.c   |    5 +
+ drivers/net/ethernet/freescale/fman/fman_memac.h   |    1 +
+ drivers/net/ethernet/freescale/fman/fman_port.c    |   12 +++
+ drivers/net/ethernet/freescale/fman/fman_port.h    |    3 +
+ drivers/net/ethernet/freescale/fman/fman_tgec.c    |   21 ++++
+ drivers/net/ethernet/freescale/fman/fman_tgec.h    |    1 +
+ drivers/net/ethernet/freescale/fman/mac.c          |    3 +
+ drivers/net/ethernet/freescale/fman/mac.h          |    1 +
+ drivers/ptp/Kconfig                                |    2 +-
+ drivers/ptp/ptp_qoriq.c                            |  104 ++++++++++++-------
+ include/linux/fsl/ptp_qoriq.h                      |   38 ++++++--
+ 26 files changed, 375 insertions(+), 115 deletions(-)
