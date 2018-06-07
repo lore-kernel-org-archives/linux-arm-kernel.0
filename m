@@ -1,93 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Jun 2018 13:47:43 +0100
-Subject: [RFC PATCH 2/3] dt: bindings: Add SD tap value properties details
-In-Reply-To: <1528373500-24663-2-git-send-email-manish.narani@xilinx.com>
-References: <1528373500-24663-1-git-send-email-manish.narani@xilinx.com>
- <1528373500-24663-2-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180607124743.fqo7f7nxonn2k3b5@lakrids.cambridge.arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 7 Jun 2018 16:18:02 +0300
+Subject: [PATCH v6 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180607110020.20565-1-radu.pirea@microchip.com>
+References: <20180607110020.20565-1-radu.pirea@microchip.com>
+Message-ID: <CAHp75Vf=CC=UximfkB5a0-PHLiT6ugR4jH3NKdU3w=k=-kPnSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 05:41:39PM +0530, Manish Narani wrote:
-> This patch adds details of SD tap value properties in device tree.
-> 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  .../devicetree/bindings/mmc/arasan,sdhci.txt       | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index 60481bf..0e08877 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -15,6 +15,8 @@ Required Properties:
->      - "arasan,sdhci-5.1": generic Arasan SDHCI 5.1 PHY
->      - "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1": rk3399 eMMC PHY
->        For this device it is strongly suggested to include arasan,soc-ctl-syscon.
-> +    - "xlnx,zynqmp-8.9a": Xilinx ZynqMP Arasan SDHCI 8.9a PHY
-> +      For this device it is strongly suggested to include arasan,soc-ctl-syscon.
->    - reg: From mmc bindings: Register location and length.
->    - clocks: From clock bindings: Handles to clock inputs.
->    - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
-> @@ -26,6 +28,30 @@ Required Properties for "arasan,sdhci-5.1":
->    - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
->    - phy-names:  MUST be "phy_arasan".
-> 
-> +Required Properties for "xlnx,zynqmp-8.9a":
-> +  - xlnx,mio_bank: The value will be 0/1/2 depending on MIO bank selection.
+On Thu, Jun 7, 2018 at 2:00 PM, Radu Pirea <radu.pirea@microchip.com> wrote:
+> Hello,
+>
+> This is the second version of driver. I added a mfd driver which by
+> default probes atmel_serial driver and if in dt is specified to probe
+> the spi driver, then the spi-at91-usart driver will be probed. The
+> compatible for atmel_serial is now the compatible for at91-usart mfd
+> driver and compatilbe for atmel_serial driver was changed in order to
+> keep the bindings for serial as they are.
+>
 
-For all of these properties, please s/_/-/, folowing the usual property
-name conventions.
+FWIW,
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-It's not clear to me why you need this property. The code in patch 3
-only seems to use this to determine which properties to read, choosing
-between <prop>_b0 or <prop>_b2. I don't see why you dont have the base
-<prop> alone...
+for patches 3, 5, 6 only.
 
-Is this a HW detail, or configuration that you prefer?
-
-> +  - xlnx,device_id: Unique Id of the device, value will be 0/1.
-
-What's this used for?
-
-> +  - xlnx,itap_delay_sd_hsd: Input Tap Delay for SD HS.
-
-What unit at hese delays in?
-
-Please follow the conventions in
-Documentation/devicetree/bindings/property-units.txt.
-
-> +  - xlnx,itap_delay_sdr25: Input Tap Delay for SDR25.
-> +  - xlnx,itap_delay_sdr50: Input Tap Delay for SDR50.
-> +  - xlnx,itap_delay_sdr104_b0: Input Tap Delay for SDR104.
-> +  - xlnx,itap_delay_sdr104_b2: Input Tap Delay for SDR104.
-
-As above, Given you have to specify the bank, I don't see why you need
-multiple properties.
-
-Thanks,
-Mark.
-
-> +  - xlnx,itap_delay_sd_ddr50: Input Tap Delay for SD DDR50.
-> +  - xlnx,itap_delay_mmc_hsd: Input Tap Delay for MMC HS.
-> +  - xlnx,itap_delay_mmc_ddr50: Input Tap Delay for MMC DDR50.
-> +  - xlnx,itap_delay_mmc_hs200_b0: Input Tap Delay for MMC HS200.
-> +  - xlnx,itap_delay_mmc_hs200_b2: Input Tap Delay for MMC HS200.
-> +  - xlnx,otap_delay_sd_hsd: Output Tap Delay for SD HS.
-> +  - xlnx,otap_delay_sdr25: Output Tap Delay for SDR25.
-> +  - xlnx,otap_delay_sdr50: Output Tap Delay for SDR50.
-> +  - xlnx,otap_delay_sdr104_b0: Output Tap Delay for SDR104.
-> +  - xlnx,otap_delay_sdr104_b2: Output Tap Delay for SDR104.
-> +  - xlnx,otap_delay_sd_ddr50: Output Tap Delay for DDR50.
-> +  - xlnx,otap_delay_mmc_hsd: Output Tap Delay for MMC HS.
-> +  - xlnx,otap_delay_mmc_ddr50: Output Tap Delay for MMC DDR50.
-> +  - xlnx,otap_delay_mmc_hs200_b0: Output Tap Delay for MMC HS200.
-> +  - xlnx,otap_delay_mmc_hs200_b2: Output Tap Delay for MMC HS200.
-> +
->  Optional Properties:
->    - arasan,soc-ctl-syscon: A phandle to a syscon device (see ../mfd/syscon.txt)
->      used to access core corecfg registers.  Offsets of registers in this
+> Changes in v1:
+> - added spi-at91-usart driver
+>
+> Changes in v2:
+> - added at91-usart mfd driver
+> - modified spi-at91-usart driver to work as mfd driver child
+> - modified atmel_serial driver to work as mfd driver child
+>
+> Changes in v3:
+> - fixed spi slaves probing
+>
+> Changes in v4:
+> - modified the spi driver to use cs gpio support form spi subsystem
+> - fixed dma transfers for serial driver
+> - squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+>
+> Changes in v5:
+> - fixed usage of stdout-path property with atmel_serial driver
+>
+> Changes in v6:
+> - removed unused compatible strings from serial and spi drivers
+>
+> Radu Pirea (6):
+>   MAINTAINERS: add at91 usart mfd driver
+>   dt-bindings: add binding for atmel-usart in SPI mode
+>   mfd: at91-usart: added mfd driver for usart
+>   MAINTAINERS: add at91 usart spi driver
+>   spi: at91-usart: add driver for at91-usart as spi
+>   tty/serial: atmel: change the driver to work under at91-usart mfd
+>
+>  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+>  MAINTAINERS                                   |  16 +
+>  drivers/mfd/Kconfig                           |   9 +
+>  drivers/mfd/Makefile                          |   1 +
+>  drivers/mfd/at91-usart.c                      |  68 +++
+>  drivers/spi/Kconfig                           |   9 +
+>  drivers/spi/Makefile                          |   1 +
+>  drivers/spi/spi-at91-usart.c                  | 434 ++++++++++++++++++
+>  drivers/tty/serial/Kconfig                    |   1 +
+>  drivers/tty/serial/atmel_serial.c             |  42 +-
+>  include/dt-bindings/mfd/at91-usart.h          |  17 +
+>  11 files changed, 606 insertions(+), 17 deletions(-)
+>  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+>  create mode 100644 drivers/mfd/at91-usart.c
+>  create mode 100644 drivers/spi/spi-at91-usart.c
+>  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+>
 > --
-> 2.7.4
-> 
-> This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+> 2.17.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
