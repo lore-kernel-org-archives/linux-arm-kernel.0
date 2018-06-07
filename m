@@ -1,46 +1,23 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Thu,  7 Jun 2018 19:52:34 +0000
-Subject: [PATCH] spi: clps711x: remove unused header
-Message-ID: <1528401154-37592-1-git-send-email-clabbe@baylibre.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 7 Jun 2018 23:17:03 +0300
+Subject: [PATCH v2 0/5] Add R8A77980/Condor/V3HSK LVDS/HDMI support
+Message-ID: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include/linux/platform_data/spi-clps711x.h is unused since 6acaadc852f1
-("spi: clps711x: Driver refactor")
-Let's remove it.
+Hello!
 
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
----
- include/linux/platform_data/spi-clps711x.h | 21 ---------------------
- 1 file changed, 21 deletions(-)
- delete mode 100644 include/linux/platform_data/spi-clps711x.h
+Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20180604-v4.17' tag. We're adding the R8A77980 FCPVD/VSPD/
+DU/LVDS device nodes and then describing the LVDS decoder and HDMI encoder
+connected to the LVDS output. These patches depend on the Thine THC63LVD1024
+driver and the R8A77980 LVDS support patch in order to work, and R8A77980 GPIO
+DT patches in order to apply/compile...
 
-diff --git a/include/linux/platform_data/spi-clps711x.h b/include/linux/platform_data/spi-clps711x.h
-deleted file mode 100644
-index 301956e63143..000000000000
---- a/include/linux/platform_data/spi-clps711x.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- *  CLPS711X SPI bus driver definitions
-- *
-- *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef ____LINUX_PLATFORM_DATA_SPI_CLPS711X_H
--#define ____LINUX_PLATFORM_DATA_SPI_CLPS711X_H
--
--/* Board specific platform_data */
--struct spi_clps711x_pdata {
--	int *chipselect;	/* Array of GPIO-numbers */
--	int num_chipselect;	/* Total count of GPIOs */
--};
--
--#endif
--- 
-2.16.4
+[1/5] arm64: dts: renesas: r8a77980: add FCPVD support
+[2/5] arm64: dts: renesas: r8a77980: add VSPD support
+[3/5] arm64: dts: renesas: r8a77980: add DU support
+[4/5] arm64: dts: renesas: r8a77980: add LVDS support
+[5/5] arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI support
+
+WBR, Sergei
