@@ -1,85 +1,88 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 7 Jun 2018 16:18:02 +0300
-Subject: [PATCH v6 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <20180607110020.20565-1-radu.pirea@microchip.com>
-References: <20180607110020.20565-1-radu.pirea@microchip.com>
-Message-ID: <CAHp75Vf=CC=UximfkB5a0-PHLiT6ugR4jH3NKdU3w=k=-kPnSA@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  7 Jun 2018 14:24:34 +0200
+Subject: [PATCH] pinctrl: pinctrl-single: Avoid divisions in context
+ save/restore
+Message-ID: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2018 at 2:00 PM, Radu Pirea <radu.pirea@microchip.com> wrote:
-> Hello,
->
-> This is the second version of driver. I added a mfd driver which by
-> default probes atmel_serial driver and if in dt is specified to probe
-> the spi driver, then the spi-at91-usart driver will be probed. The
-> compatible for atmel_serial is now the compatible for at91-usart mfd
-> driver and compatilbe for atmel_serial driver was changed in order to
-> keep the bindings for serial as they are.
->
+The divisions (and multiplications) can be avoided by changing the loops
+to use increments of mux_bytes instead of 1.
+While at it, remove the unneeded casts when assigning void pointers.
 
-FWIW,
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+This saves +100 bytes of kernel size on arm32/arm64.
 
-for patches 3, 5, 6 only.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Compile-tested only.
 
-> Changes in v1:
-> - added spi-at91-usart driver
->
-> Changes in v2:
-> - added at91-usart mfd driver
-> - modified spi-at91-usart driver to work as mfd driver child
-> - modified atmel_serial driver to work as mfd driver child
->
-> Changes in v3:
-> - fixed spi slaves probing
->
-> Changes in v4:
-> - modified the spi driver to use cs gpio support form spi subsystem
-> - fixed dma transfers for serial driver
-> - squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
->
-> Changes in v5:
-> - fixed usage of stdout-path property with atmel_serial driver
->
-> Changes in v6:
-> - removed unused compatible strings from serial and spi drivers
->
-> Radu Pirea (6):
->   MAINTAINERS: add at91 usart mfd driver
->   dt-bindings: add binding for atmel-usart in SPI mode
->   mfd: at91-usart: added mfd driver for usart
->   MAINTAINERS: add at91 usart spi driver
->   spi: at91-usart: add driver for at91-usart as spi
->   tty/serial: atmel: change the driver to work under at91-usart mfd
->
->  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
->  MAINTAINERS                                   |  16 +
->  drivers/mfd/Kconfig                           |   9 +
->  drivers/mfd/Makefile                          |   1 +
->  drivers/mfd/at91-usart.c                      |  68 +++
->  drivers/spi/Kconfig                           |   9 +
->  drivers/spi/Makefile                          |   1 +
->  drivers/spi/spi-at91-usart.c                  | 434 ++++++++++++++++++
->  drivers/tty/serial/Kconfig                    |   1 +
->  drivers/tty/serial/atmel_serial.c             |  42 +-
->  include/dt-bindings/mfd/at91-usart.h          |  17 +
->  11 files changed, 606 insertions(+), 17 deletions(-)
->  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
->  create mode 100644 drivers/mfd/at91-usart.c
->  create mode 100644 drivers/spi/spi-at91-usart.c
->  create mode 100644 include/dt-bindings/mfd/at91-usart.h
->
-> --
-> 2.17.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+As the loops are now identical, the code could be made even smaller by
+moving the switch() inside the loop, at the expense of readability.
+---
+ drivers/pinctrl/pinctrl-single.c | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-
-
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 9c3c00515aa0fe20..5de5dedb804928eb 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1593,19 +1593,19 @@ static int pcs_save_context(struct pcs_device *pcs)
+ 
+ 	switch (pcs->width) {
+ 	case 64:
+-		regsl = (u64 *)pcs->saved_vals;
+-		for (i = 0; i < pcs->size / mux_bytes; i++)
+-			regsl[i] = pcs->read(pcs->base + i * mux_bytes);
++		regsl = pcs->saved_vals;
++		for (i = 0; i < pcs->size; i += mux_bytes)
++			*regsl++ = pcs->read(pcs->base + i);
+ 		break;
+ 	case 32:
+-		regsw = (u32 *)pcs->saved_vals;
+-		for (i = 0; i < pcs->size / mux_bytes; i++)
+-			regsw[i] = pcs->read(pcs->base + i * mux_bytes);
++		regsw = pcs->saved_vals;
++		for (i = 0; i < pcs->size; i += mux_bytes)
++			*regsw++ = pcs->read(pcs->base + i);
+ 		break;
+ 	case 16:
+-		regshw = (u16 *)pcs->saved_vals;
+-		for (i = 0; i < pcs->size / mux_bytes; i++)
+-			regshw[i] = pcs->read(pcs->base + i * mux_bytes);
++		regshw = pcs->saved_vals;
++		for (i = 0; i < pcs->size; i += mux_bytes)
++			*regshw++ = pcs->read(pcs->base + i);
+ 		break;
+ 	}
+ 
+@@ -1623,19 +1623,19 @@ static void pcs_restore_context(struct pcs_device *pcs)
+ 
+ 	switch (pcs->width) {
+ 	case 64:
+-		regsl = (u64 *)pcs->saved_vals;
+-		for (i = 0; i < pcs->size / mux_bytes; i++)
+-			pcs->write(regsl[i], pcs->base + i * mux_bytes);
++		regsl = pcs->saved_vals;
++		for (i = 0; i < pcs->size; i += mux_bytes)
++			pcs->write(*regsl++, pcs->base + i);
+ 		break;
+ 	case 32:
+-		regsw = (u32 *)pcs->saved_vals;
+-		for (i = 0; i < pcs->size / mux_bytes; i++)
+-			pcs->write(regsw[i], pcs->base + i * mux_bytes);
++		regsw = pcs->saved_vals;
++		for (i = 0; i < pcs->size; i += mux_bytes)
++			pcs->write(*regsw++, pcs->base + i);
+ 		break;
+ 	case 16:
+-		regshw = (u16 *)pcs->saved_vals;
+-		for (i = 0; i < pcs->size / mux_bytes; i++)
+-			pcs->write(regshw[i], pcs->base + i * mux_bytes);
++		regshw = pcs->saved_vals;
++		for (i = 0; i < pcs->size; i += mux_bytes)
++			pcs->write(*regshw++, pcs->base + i);
+ 		break;
+ 	}
+ }
 -- 
-With Best Regards,
-Andy Shevchenko
+2.7.4
