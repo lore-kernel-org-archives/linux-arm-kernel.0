@@ -1,72 +1,143 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Fri, 8 Jun 2018 04:03:52 +0800
-Subject: [PATCH v4 1/2] arm64: KVM: export the capability to set guest SError
- syndrome
-In-Reply-To: <1528401833-29963-1-git-send-email-gengdongjiu@huawei.com>
-References: <1528401833-29963-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1528401833-29963-2-git-send-email-gengdongjiu@huawei.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 7 Jun 2018 19:55:53 +0800
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <20180607105514.GA13139@dhcp22.suse.cz>
+References: <1527768879-88161-1-git-send-email-xiexiuqi@huawei.com>
+ <1527768879-88161-2-git-send-email-xiexiuqi@huawei.com>
+ <20180606154516.GL6631@arm.com>
+ <CAErSpo6S0qtR42tjGZrFu4aMFFyThx1hkHTSowTt6t3XerpHnA@mail.gmail.com>
+ <20180607105514.GA13139@dhcp22.suse.cz>
+Message-ID: <5ed798a0-6c9c-086e-e5e8-906f593ca33e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the arm64 RAS Extension, user space can inject a virtual-SError
-with specified ESR. So user space needs to know whether KVM support
-to inject such SError, this interface adds this query for this capability.
+On 2018/6/7 18:55, Michal Hocko wrote:
+> On Wed 06-06-18 15:39:34, Bjorn Helgaas wrote:
+>> [+cc akpm, linux-mm, linux-pci]
+>>
+>> On Wed, Jun 6, 2018 at 10:44 AM Will Deacon <will.deacon@arm.com> wrote:
+>>>
+>>> On Thu, May 31, 2018 at 08:14:38PM +0800, Xie XiuQi wrote:
+>>>> A numa system may return node which is not online.
+>>>> For example, a numa node:
+>>>> 1) without memory
+>>>> 2) NR_CPUS is very small, and the cpus on the node are not brought up
+>>>>
+>>>> In this situation, we use NUMA_NO_NODE to avoid oops.
+>>>>
+>>>> [   25.732905] Unable to handle kernel NULL pointer dereference at virtual address 00001988
+>>>> [   25.740982] Mem abort info:
+>>>> [   25.743762]   ESR = 0x96000005
+>>>> [   25.746803]   Exception class = DABT (current EL), IL = 32 bits
+>>>> [   25.752711]   SET = 0, FnV = 0
+>>>> [   25.755751]   EA = 0, S1PTW = 0
+>>>> [   25.758878] Data abort info:
+>>>> [   25.761745]   ISV = 0, ISS = 0x00000005
+>>>> [   25.765568]   CM = 0, WnR = 0
+>>>> [   25.768521] [0000000000001988] user address but active_mm is swapper
+>>>> [   25.774861] Internal error: Oops: 96000005 [#1] SMP
+>>>> [   25.779724] Modules linked in:
+>>>> [   25.782768] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.17.0-rc6-mpam+ #115
+>>>> [   25.789714] Hardware name: Huawei D06/D06, BIOS Hisilicon D06 EC UEFI Nemo 2.0 RC0 - B305 05/28/2018
+>>>> [   25.798831] pstate: 80c00009 (Nzcv daif +PAN +UAO)
+>>>> [   25.803612] pc : __alloc_pages_nodemask+0xf0/0xe70
+>>>> [   25.808389] lr : __alloc_pages_nodemask+0x184/0xe70
+>>>> [   25.813252] sp : ffff00000996f660
+>>>> [   25.816553] x29: ffff00000996f660 x28: 0000000000000000
+>>>> [   25.821852] x27: 00000000014012c0 x26: 0000000000000000
+>>>> [   25.827150] x25: 0000000000000003 x24: ffff000008099eac
+>>>> [   25.832449] x23: 0000000000400000 x22: 0000000000000000
+>>>> [   25.837747] x21: 0000000000000001 x20: 0000000000000000
+>>>> [   25.843045] x19: 0000000000400000 x18: 0000000000010e00
+>>>> [   25.848343] x17: 000000000437f790 x16: 0000000000000020
+>>>> [   25.853641] x15: 0000000000000000 x14: 6549435020524541
+>>>> [   25.858939] x13: 20454d502067756c x12: 0000000000000000
+>>>> [   25.864237] x11: ffff00000996f6f0 x10: 0000000000000006
+>>>> [   25.869536] x9 : 00000000000012a4 x8 : ffff8023c000ff90
+>>>> [   25.874834] x7 : 0000000000000000 x6 : ffff000008d73c08
+>>>> [   25.880132] x5 : 0000000000000000 x4 : 0000000000000081
+>>>> [   25.885430] x3 : 0000000000000000 x2 : 0000000000000000
+>>>> [   25.890728] x1 : 0000000000000001 x0 : 0000000000001980
+>>>> [   25.896027] Process swapper/0 (pid: 1, stack limit = 0x        (ptrval))
+>>>> [   25.902712] Call trace:
+>>>> [   25.905146]  __alloc_pages_nodemask+0xf0/0xe70
+>>>> [   25.909577]  allocate_slab+0x94/0x590
+>>>> [   25.913225]  new_slab+0x68/0xc8
+>>>> [   25.916353]  ___slab_alloc+0x444/0x4f8
+>>>> [   25.920088]  __slab_alloc+0x50/0x68
+>>>> [   25.923562]  kmem_cache_alloc_node_trace+0xe8/0x230
+>>>> [   25.928426]  pci_acpi_scan_root+0x94/0x278
+>>>> [   25.932510]  acpi_pci_root_add+0x228/0x4b0
+>>>> [   25.936593]  acpi_bus_attach+0x10c/0x218
+>>>> [   25.940501]  acpi_bus_attach+0xac/0x218
+>>>> [   25.944323]  acpi_bus_attach+0xac/0x218
+>>>> [   25.948144]  acpi_bus_scan+0x5c/0xc0
+>>>> [   25.951708]  acpi_scan_init+0xf8/0x254
+>>>> [   25.955443]  acpi_init+0x310/0x37c
+>>>> [   25.958831]  do_one_initcall+0x54/0x208
+>>>> [   25.962653]  kernel_init_freeable+0x244/0x340
+>>>> [   25.966999]  kernel_init+0x18/0x118
+>>>> [   25.970474]  ret_from_fork+0x10/0x1c
+>>>> [   25.974036] Code: 7100047f 321902a4 1a950095 b5000602 (b9400803)
+>>>> [   25.980162] ---[ end trace 64f0893eb21ec283 ]---
+>>>> [   25.984765] Kernel panic - not syncing: Fatal exception
+>>>>
+>>>> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+>>>> Tested-by: Huiqiang Wang <wanghuiqiang@huawei.com>
+>>>> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> Cc: Tomasz Nowicki <Tomasz.Nowicki@caviumnetworks.com>
+>>>> Cc: Xishi Qiu <qiuxishi@huawei.com>
+>>>> ---
+>>>>  arch/arm64/kernel/pci.c | 3 +++
+>>>>  1 file changed, 3 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>>>> index 0e2ea1c..e17cc45 100644
+>>>> --- a/arch/arm64/kernel/pci.c
+>>>> +++ b/arch/arm64/kernel/pci.c
+>>>> @@ -170,6 +170,9 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>>>       struct pci_bus *bus, *child;
+>>>>       struct acpi_pci_root_ops *root_ops;
+>>>>
+>>>> +     if (node != NUMA_NO_NODE && !node_online(node))
+>>>> +             node = NUMA_NO_NODE;
+>>>> +
+>>>
+>>> This really feels like a bodge, but it does appear to be what other
+>>> architectures do, so:
+>>>
+>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>
+>> I agree, this doesn't feel like something we should be avoiding in the
+>> caller of kzalloc_node().
+>>
+>> I would not expect kzalloc_node() to return memory that's offline, no
+>> matter what node we told it to allocate from.  I could imagine it
+>> returning failure, or returning memory from a node that *is* online,
+>> but returning a pointer to offline memory seems broken.
+>>
+>> Are we putting memory that's offline in the free list?  I don't know
+>> where to look to figure this out.
+> 
+> I am not sure I have the full context but pci_acpi_scan_root calls
+> kzalloc_node(sizeof(*info), GFP_KERNEL, node)
+> and that should fall back to whatever node that is online. Offline node
+> shouldn't keep any pages behind. So there must be something else going
+> on here and the patch is not the right way to handle it. What does
+> faddr2line __alloc_pages_nodemask+0xf0 tells on this kernel?
 
-KVM will check whether system support RAS Extension, if supported, KVM
-returns true to user space, otherwise returns false.
+The whole context is:
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Reviewed-by: James Morse <james.morse@arm.com>
----
- Documentation/virtual/kvm/api.txt | 11 +++++++++++
- arch/arm64/kvm/reset.c            |  3 +++
- include/uapi/linux/kvm.h          |  1 +
- 3 files changed, 15 insertions(+)
+The system is booted with a NUMA node has no memory attaching to it
+(memory-less NUMA node), also with NR_CPUS less than CPUs presented
+in MADT, so CPUs on this memory-less node are not brought up, and
+this NUMA node will not be online (but SRAT presents this NUMA node);
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 758bf40..fdac969 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -4603,3 +4603,14 @@ Architectures: s390
- This capability indicates that kvm will implement the interfaces to handle
- reset, migration and nested KVM for branch prediction blocking. The stfle
- facility 82 should not be provided to the guest without this capability.
-+
-+8.14 KVM_CAP_ARM_SET_SERROR_ESR
-+
-+Architectures: arm, arm64
-+
-+This capability indicates that userspace can specify the syndrome value reported
-+to the guest OS when guest takes a virtual SError interrupt exception.
-+If KVM has this capability, userspace can only specify the ISS field for the ESR
-+syndrome, it can not specify the EC field which is not under control by KVM.
-+If this virtual SError is taken to EL1 using AArch64, this value will be reported
-+in ISS filed of ESR_EL1.
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 3256b92..38c8a64 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PMU_V3:
- 		r = kvm_arm_support_pmu_v3();
- 		break;
-+	case KVM_CAP_ARM_INJECT_SERROR_ESR:
-+		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 		r = 1;
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index b02c41e..e88f976 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -948,6 +948,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_S390_BPB 152
- #define KVM_CAP_GET_MSR_FEATURES 153
- #define KVM_CAP_HYPERV_EVENTFD 154
-+#define KVM_CAP_ARM_INJECT_SERROR_ESR 155
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
--- 
-2.7.4
+Devices attaching to this NUMA node such as PCI host bridge still
+return the valid NUMA node via _PXM, but actually that valid NUMA node
+is not online which lead to this issue.
+
+Thanks
+Hanjun
+
+> 
