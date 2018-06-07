@@ -1,37 +1,68 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 07 Jun 2018 09:56:58 +0200
-Subject: [PATCH v1 2/4] clk: rockchip: add dt-binding header for px30
-In-Reply-To: <1528340786-462-3-git-send-email-zhangqing@rock-chips.com>
-References: <1528340786-462-1-git-send-email-zhangqing@rock-chips.com>
- <1528340786-462-3-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <2233320.o0OUWNYjTa@diego>
+From: changbin.du@intel.com (Du, Changbin)
+Date: Thu, 7 Jun 2018 15:46:29 +0800
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
+ disable compiler auto-inline optimizations
+In-Reply-To: <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
+References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
+ <201806060501.btF3aJMZ%fengguang.wu@intel.com>
+ <20180606095714.1d3c2def@vmware.local.home>
+ <20180606142600.GN13775@localhost>
+ <20180606142622.2338abf6@vmware.local.home>
+ <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
+Message-ID: <20180607074628.kd3iyxevwj3ypzbr@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 7. Juni 2018, 05:06:24 CEST schrieb Elaine Zhang:
-> Add the dt-bindings header for the px30, that gets shared between
-> the clock controller and the clock references in the dts.
-> Add softreset ID for px30.
+Hi,
+On Thu, Jun 07, 2018 at 09:47:18AM +0530, Viresh Kumar wrote:
+> +Greg/Alex,
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  include/dt-bindings/clock/px30-cru.h | 402
-> +++++++++++++++++++++++++++++++++++ 1 file changed, 402 insertions(+)
->  create mode 100644 include/dt-bindings/clock/px30-cru.h
+> @Fegguang/build-bot: I do see mention of Greg and /me in your initial email's
+> body saying TO: Viresh, CC: Greg, but I don't see any of us getting cc'd in your
+> email. Bug ?
 > 
-> diff --git a/include/dt-bindings/clock/px30-cru.h
-> b/include/dt-bindings/clock/px30-cru.h new file mode 100644
-> index 000000000000..db9fc2a0bb21
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/px30-cru.h
-> @@ -0,0 +1,402 @@
-> +/*
-> + * Copyright (c) 2017 Rockchip Electronics Co. Ltd.
-> + * Author: Elaine <zhangqing@rock-chips.com>
+> On 06-06-18, 14:26, Steven Rostedt wrote:
+> > On Wed, 6 Jun 2018 16:26:00 +0200
+> > Johan Hovold <johan@kernel.org> wrote:
+> > 
+> > > Looks like the greybus code above is working as intended by checking for
+> > > unterminated string after the strncpy, even if this does now triggers
+> > > the truncation warning.
+> 
+> So why exactly are we generating a warning here ? Is it because it is possible
+> that the first n bytes of src may not have the null terminating byte and the
+> dest may not be null terminated eventually ?
+> 
+> Maybe I should just use memcpy here then ?
+> 
+I think if the destination is not a null terminated string (If I understand your
+description below), memcpy can be used to get rid of such warning. The warning
+makes sense in general as explained in mannual. Thanks!
 
-				^^ full name maybe?
+> But AFAIR, I used strncpy() specifically because it also sets all the remaining
+> bytes after the null terminating byte with the null terminating byte. And so it
+> is pretty easy for me to check if the final string is null terminated by
+> checking [max - 1] byte against '\0', which the code is doing right now.
+> 
+> I am not sure what would the best way to get around this incorrect-warning.
+> 
+> And I am wondering on why buildbot reported the warning only for two instances
+> in that file, while I have done the same thing at 4 places.
+> 
+> > Ah, yes I now see that. Thanks for pointing it out. But perhaps it
+> > should also add the "- 1" to the strncpy() so that gcc doesn't think
+> > it's a mistake.
+> 
+> The src string is passed on from a firmware entity and we need to make sure the
+> protocol (greybus) is implemented properly by the other end. For example, in the
+> current case if the firmware sends "HELLOWORLD", its an error as it should have
+> sent "HELLWORLD\0". But with what you are saying we will forcefully make dest as
+> "HELLWORLD\0", which wouldn't be the right thing to do as we will miss the bug
+> present in firmware.
+> 
+> -- 
+> viresh
 
-Otherwise looks good.
-
-
-Heiko
+-- 
+Thanks,
+Changbin Du
