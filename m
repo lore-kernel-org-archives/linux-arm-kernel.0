@@ -1,103 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Jun 2018 11:53:22 +0200
-Subject: [PATCH v4 05/14] coresight: get/put module in
- coresight_build/release_path
-In-Reply-To: <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
-References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-6-kim.phillips@arm.com>
- <20180606082422.GB19727@kroah.com>
- <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
- <20180606155501.704583e1412996a1a2c6fa61@arm.com>
- <20180607083401.GE16651@kroah.com>
- <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
- <20180607091353.GA20438@kroah.com>
- <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
-Message-ID: <20180607095322.GA26174@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Jun 2018 11:01:40 +0100
+Subject: [PATCH V6] arm64: alternative:flush cache with unpatched code
+In-Reply-To: <1528327743-29263-1-git-send-email-rokhanna@nvidia.com>
+References: <1528327743-29263-1-git-send-email-rokhanna@nvidia.com>
+Message-ID: <20180607100140.GG9938@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 10:32:21AM +0100, Suzuki K Poulose wrote:
-> On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
-> > On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
-> > > Hi Greg,
-> > > 
-> > > On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
-> > > > On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
-> > > > > On Wed, 6 Jun 2018 10:46:36 +0100
-> > > > > Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> > > > > 
-> > > > > > On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
-> > > > > > > On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
-> > > > > > > > Increment the refcnt for driver modules in current use by calling
-> > > > > > > > module_get in coresight_build_path and module_put in release_path.
-> > > > > > > > 
-> > > > > > > > This prevents driver modules from being unloaded when they are in use,
-> > > > > > > > either in sysfs or perf mode.
-> > > > > > > 
-> > > > > > > Why does it matter?  Shouldn't you be allowed to remove any module at
-> > > > > > > any point in time, much like a networking driver?
-> > > 
-> > > The user doesn't have an explicit refcount on the individual components
-> > > in a trace session. So, when a trace session is in progress, it is as
-> > > good as having a "file" open on each component that is part of the
-> > > active trace session. So, we don't want the driver to be removed when
-> > > the component is being used in the trace collection.
-> > 
-> > Why not?  What's wrong with that happening and then the trace collection
-> > starts failing with -ENODEV or something?
+On Wed, Jun 06, 2018 at 04:29:03PM -0700, Rohit Khanna wrote:
+> In the current implementation,  __apply_alternatives patches
+> flush_icache_range and then executes it without invalidating the icache.
+> Thus, icache can contain some of the old instructions for
+> flush_icache_range. This can cause unpredictable behavior as during
+> execution we can get a mix of old and new instructions for
+> flush_icache_range.
 > 
-> May be I am missing something here. Can we allow the driver to be removed
-> when one of its device is "turned ON" and we need the same
-> driver to "turn it OFF" when the session ends ? To make a better
-> comparison :
-> 
-> Can we unload a usb_mass_storage module when a USB disk(which uses the
-> module driver) is mounted and is being used ? I believe, the module
-> will eventually get unloaded when we unmount the disk, if someone did
-> a unload.
+> This patch modifies __apply_alternatives so that it uses non hot-patched
+> __flush_icache_all after applying all the alternatives.
 
-No, mount causes the module count to be incrememted.  Mount and
-"open/close" are the old-school way of doing module reference counting.
+Please can you try the diff I posted the other day? [1]
 
-Look at how network drivers work today, you can unload any network
-driver even if there is a valid network connection "up and running"
-attached to it.  It just gets torn down when that request happens.
+Will
 
-> We have a similar situation here. The only difference is the driver is
-> referenced only when one of its device is in a trace session.
+--->8
 
-I understand, I'm saying that you have to be very careful when messing
-around with module reference counts to get it correct and perhaps you
-should just change your design to not care about module reference counts
-at all, like networking did 15+ years ago.
-
-Let's learn from the good examples in our past (like networking), and
-not like the older bad examples (like mount/files).
-
-> > Remember, removing a kernel module is something that only happens very
-> > rarely, and is an explicit choice by someone with root permissions.  If
-> > you want to remove that module, it should be able to go, as you know
-> > what you are doing at that point in time.
-> 
-> Right, but when a device is "in use" can we do that ? I thought the user
-> will get a module is in use or busy, error.
-
-Try it on networking today :)
-
-> > Don't try to "protect the user from themselves" here, they want to shoot
-> > their foot, make it hurt if they are aiming it there :)
-> > 
-> 
-> The module_get/put added here are only triggered when we start a trace
-> session, where we build a path for the current session from the configured
-> "source" to the configured "sink" and the path is destroyed
-> at the end of the trace session. i.e, the path is not a permanent thing.
-> It is constructed per session. So it is perfectly possible to remove a
-> device in between trace sessions.
-
-That's fine, but again, just be careful to get this correct.  The patch
-I reviewed did not seem to do that.
-
-thanks,
-
-greg k-h
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582861.html
