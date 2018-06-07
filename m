@@ -1,65 +1,62 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu, 7 Jun 2018 16:43:59 +0200 (CEST)
-Subject: [PATCH 3/3] rtc: ftrtc010: let the core handle range
-In-Reply-To: <20180604141528.15635-3-alexandre.belloni@bootlin.com>
-References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
- <20180604141528.15635-3-alexandre.belloni@bootlin.com>
-Message-ID: <alpine.LNX.2.00.1806071643490.3181@T420s>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 7 Jun 2018 17:36:46 +0200
+Subject: "media: ov5640: Add horizontal and vertical totals" regression
+ issue on i.MX6QDL
+In-Reply-To: <CAMty3ZCjNHUeHAJCDjoTHh_w1nNkUFTLjbp1=sYuF2DRiz-E-g@mail.gmail.com>
+References: <CAMty3ZCjNHUeHAJCDjoTHh_w1nNkUFTLjbp1=sYuF2DRiz-E-g@mail.gmail.com>
+Message-ID: <20180607153646.jlif4hukbyfkvjfx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jun 2018, Alexandre Belloni wrote:
+On Thu, Jun 07, 2018 at 08:02:28PM +0530, Jagan Teki wrote:
+> Hi,
+> 
+> ov5640 camera is breaking with below commit on i.MXQDL platform.
+> 
+>     commit 476dec012f4c6545b0b7599cd9adba2ed819ad3b
+>     Author: Maxime Ripard <maxime.ripard@bootlin.com>
+>     Date:   Mon Apr 16 08:36:55 2018 -0400
+> 
+>     media: ov5640: Add horizontal and vertical totals
+> 
+>     All the initialization arrays are changing the horizontal and vertical
+>     totals for some value.
+> 
+>     In order to clean up the driver, and since we're going to need that value
+>     later on, let's introduce in the ov5640_mode_info structure the horizontal
+>     and vertical total sizes, and move these out of the bytes array.
+> 
+>     Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+>     Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+>     Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> 
+> We have reproduced as below [1] and along with ipu1_csi0 pipeline. I
+> haven't debug further please let us know how to move further.
+> 
+> media-ctl --links "'ov5640 2-003c':0->'imx6-mipi-csi2':0[1]"
+> media-ctl --links "'imx6-mipi-csi2':1->'ipu1_csi0_mux':0[1]"
+> media-ctl --links "'ipu1_csi0_mux':2->'ipu1_csi0':0[1]"
+> media-ctl --links "'ipu1_csi0':2->'ipu1_csi0 capture':0[1]"
+> 
+> media-ctl --set-v4l2 "'ov5640 2-003c':0[fmt:UYVY2X8/640x480 field:none]"
+> media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/640x480 field:none]"
+> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/640x480 field:none]"
+> media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:AYUV32/640x480 field:none]"
+> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/640x480 field:none]"
+> 
+> [1] https://lkml.org/lkml/2018/5/31/543
 
-> The current range handling is highly suspicious. Anyway, let the core
-> handle it.
-> The RTC has a 32 bit counter on top of days + hh:mm:ss registers.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> ---
->  drivers/rtc/rtc-ftrtc010.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-ftrtc010.c b/drivers/rtc/rtc-ftrtc010.c
-> index 2cdc78ffeb17..61f798c6101f 100644
-> --- a/drivers/rtc/rtc-ftrtc010.c
-> +++ b/drivers/rtc/rtc-ftrtc010.c
-> @@ -95,9 +95,6 @@ static int ftrtc010_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  	u32 sec, min, hour, day, offset;
->  	timeu64_t time;
->  
-> -	if (tm->tm_year >= 2148)	/* EPOCH Year + 179 */
-> -		return -EINVAL;
-> -
->  	time = rtc_tm_to_time64(tm);
->  
->  	sec = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
-> @@ -120,6 +117,7 @@ static const struct rtc_class_ops ftrtc010_rtc_ops = {
->  
->  static int ftrtc010_rtc_probe(struct platform_device *pdev)
->  {
-> +	u32 days, hour, min, sec;
->  	struct ftrtc010_rtc *rtc;
->  	struct device *dev = &pdev->dev;
->  	struct resource *res;
-> @@ -172,6 +170,15 @@ static int ftrtc010_rtc_probe(struct platform_device *pdev)
->  
->  	rtc->rtc_dev->ops = &ftrtc010_rtc_ops;
->  
-> +	sec  = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
-> +	min  = readl(rtc->rtc_base + FTRTC010_RTC_MINUTE);
-> +	hour = readl(rtc->rtc_base + FTRTC010_RTC_HOUR);
-> +	days = readl(rtc->rtc_base + FTRTC010_RTC_DAYS);
-> +
-> +	rtc->rtc_dev->range_min = (u64)days * 86400 + hour * 3600 +
-> +				  min * 60 + sec;
-> +	rtc->rtc_dev->range_max = U32_MAX + rtc->rtc_dev->range_min;
-> +
->  	ret = devm_request_irq(dev, rtc->rtc_irq, ftrtc010_rtc_interrupt,
->  			       IRQF_SHARED, pdev->name, dev);
->  	if (unlikely(ret))
-> -- 
-> 2.17.1
-> 
-> 
+Yeah, this has already been reported as part as this serie:
+https://www.mail-archive.com/linux-media at vger.kernel.org/msg131655.html
 
-Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+and some suggestions have been done here:
+https://www.mail-archive.com/linux-media at vger.kernel.org/msg132570.html
+
+Feel free to help debug this.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
