@@ -1,216 +1,142 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 7 Jun 2018 15:40:43 -0600
-Subject: [PATCH v4 05/14] coresight: get/put module in
- coresight_build/release_path
-In-Reply-To: <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
+Date: Thu, 7 Jun 2018 15:46:53 -0600
+Subject: [PATCH v4 14/14] coresight: allow the coresight core driver to be
+ built as a module
+In-Reply-To: <20180605210710.22227-15-kim.phillips@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-6-kim.phillips@arm.com>
- <20180606082422.GB19727@kroah.com>
- <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
- <20180606155501.704583e1412996a1a2c6fa61@arm.com>
- <20180607083401.GE16651@kroah.com>
- <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
- <20180607091353.GA20438@kroah.com>
- <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
- <20180607095322.GA26174@kroah.com>
- <adbabdb0-df2c-be74-3cde-cda4f6bce579@arm.com>
- <20180607121304.017d1d6804466050dd5c0af2@arm.com>
- <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
-Message-ID: <CANLsYkwEh9H9cP7ihw2iNzne-+=nZ2KE8OMXV3oN1L1WLKhrpA@mail.gmail.com>
+ <20180605210710.22227-15-kim.phillips@arm.com>
+Message-ID: <CANLsYkwMmNFHUnJ-Qo9cGxbVG=1zT=26G9Jq+modve5s3shueg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2018 at 15:10, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> On 06/07/2018 06:13 PM, Kim Phillips wrote:
->>
->> On Thu, 7 Jun 2018 11:07:15 +0100
->> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->>
->>> On 06/07/2018 10:53 AM, Greg Kroah-Hartman wrote:
->>>>
->>>> On Thu, Jun 07, 2018 at 10:32:21AM +0100, Suzuki K Poulose wrote:
->>>>>
->>>>> On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
->>>>>>
->>>>>> On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
->>>>>>>
->>>>>>> Hi Greg,
->>>>>>>
->>>>>>> On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
->>>>>>>>
->>>>>>>> On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
->>>>>>>>>
->>>>>>>>> On Wed, 6 Jun 2018 10:46:36 +0100
->>>>>>>>> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->>>>>>>>>
->>>>>>>>>> On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
->>>>>>>>>>>
->>>>>>>>>>> On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
->>>>>>>>>>>>
->>>>>>>>>>>> Increment the refcnt for driver modules in current use by
->>>>>>>>>>>> calling
->>>>>>>>>>>> module_get in coresight_build_path and module_put in
->>>>>>>>>>>> release_path.
->>>>>>>>>>>>
->>>>>>>>>>>> This prevents driver modules from being unloaded when they are
->>>>>>>>>>>> in use,
->>>>>>>>>>>> either in sysfs or perf mode.
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> Why does it matter?  Shouldn't you be allowed to remove any
->>>>>>>>>>> module at
->>>>>>>>>>> any point in time, much like a networking driver?
->>>>>>>
->>>>>>>
->>>>>>> The user doesn't have an explicit refcount on the individual
->>>>>>> components
->>>>>>> in a trace session. So, when a trace session is in progress, it is as
->>>>>>> good as having a "file" open on each component that is part of the
->>>>>>> active trace session. So, we don't want the driver to be removed when
->>>>>>> the component is being used in the trace collection.
->>>>>>
->>>>>>
->>>>>> Why not?  What's wrong with that happening and then the trace
->>>>>> collection
->>>>>> starts failing with -ENODEV or something?
->>>>>
->>>>>
->>>>> May be I am missing something here. Can we allow the driver to be
->>>>> removed
->>>>> when one of its device is "turned ON" and we need the same
->>>>> driver to "turn it OFF" when the session ends ? To make a better
->>>>> comparison :
->>>>>
->>>>> Can we unload a usb_mass_storage module when a USB disk(which uses the
->>>>> module driver) is mounted and is being used ? I believe, the module
->>>>> will eventually get unloaded when we unmount the disk, if someone did
->>>>> a unload.
->>>>
->>>>
->>>> No, mount causes the module count to be incrememted.  Mount and
->>>> "open/close" are the old-school way of doing module reference counting.
->>>>
->>>> Look at how network drivers work today, you can unload any network
->>>> driver even if there is a valid network connection "up and running"
->>>> attached to it.  It just gets torn down when that request happens.
->>>
->>>
->>> Ok, that makes more sense now. Thanks for the hints. However, it doesn't
->>> look that easy from the coresight point due to the way the devices are
->>> used in an interconnected manner which could be part of multiple trace
->>> sessions.
->>>
->>> e.g, a funnel could be part of two independent trace sessions with
->>> different sets of sources/sinks. Tearing down the trace sessions is
->>> going to be a difficult task unless we make drastic changes to the PMU
->>> framework itself. But will see, what best we can do to make it modern
->>> :-)
->>>>
->>>>
->>>>> We have a similar situation here. The only difference is the driver is
->>>>> referenced only when one of its device is in a trace session.
->>>>
->>>>
->>>> I understand, I'm saying that you have to be very careful when messing
->>>> around with module reference counts to get it correct and perhaps you
->>>> should just change your design to not care about module reference counts
->>>> at all, like networking did 15+ years ago.
->>>>
->>>> Let's learn from the good examples in our past (like networking), and
->>>> not like the older bad examples (like mount/files).
->>>>
->>>>>> Remember, removing a kernel module is something that only happens very
->>>>>> rarely, and is an explicit choice by someone with root permissions.
->>>>>> If
->>>>>> you want to remove that module, it should be able to go, as you know
->>>>>> what you are doing at that point in time.
->>>>>
->>>>>
->>>>> Right, but when a device is "in use" can we do that ? I thought the
->>>>> user
->>>>> will get a module is in use or busy, error.
->>>>
->>>>
->>>> Try it on networking today :)
->>>>
->>>>>> Don't try to "protect the user from themselves" here, they want to
->>>>>> shoot
->>>>>> their foot, make it hurt if they are aiming it there :)
->>>>>>
->>>>>
->>>>> The module_get/put added here are only triggered when we start a trace
->>>>> session, where we build a path for the current session from the
->>>>> configured
->>>>> "source" to the configured "sink" and the path is destroyed
->>>>> at the end of the trace session. i.e, the path is not a permanent
->>>>> thing.
->>>>> It is constructed per session. So it is perfectly possible to remove a
->>>>> device in between trace sessions.
->>>>
->>>>
->>>> That's fine, but again, just be careful to get this correct.  The patch
->>>> I reviewed did not seem to do that.
->>>
->>>
->>> Thanks for the useful suggestions, we will explore this more.
+On 5 June 2018 at 15:07, Kim Phillips <kim.phillips@arm.com> wrote:
+> Allow to build coresight as a module.  This enhances
+> coresight developer efficiency by allowing the development to
+> take place exclusively on the target, and without needing to
+> reboot in between changes.
 >
+> - Kconfig becomes a tristate, to allow =m
+> - append -core to source file name to allow module to
+>   be called coresight by the Makefile
+> - modules can have only one init/exit, so we add the core bus
+>   register/unregister function calls to the etm_perf init/exit
+>   functions, since coresight.c does not have etm_pmu defined.
+> - add a MODULE_DEVICE_TABLE for autoloading on boot
 >
-> Kim,
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Leo Yan <leo.yan@linaro.org>
+> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> ---
+>  drivers/hwtracing/coresight/Kconfig             |  5 ++++-
+>  drivers/hwtracing/coresight/Makefile            |  7 +++++--
+>  .../coresight/{coresight.c => coresight-core.c} |  6 ------
+>  .../hwtracing/coresight/coresight-etm-perf.c    | 17 ++++++++++++++++-
+>  4 files changed, 25 insertions(+), 10 deletions(-)
+>  rename drivers/hwtracing/coresight/{coresight.c => coresight-core.c} (99%)
 >
->>
->> I'm going to assume the series is still valid after this discussion,
->> since technically just this patch can get dropped, and the user is able
->> to shoot themselves in the foot.
+> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> index 181a44ea2d61..c05b265f7731 100644
+> --- a/drivers/hwtracing/coresight/Kconfig
+> +++ b/drivers/hwtracing/coresight/Kconfig
+> @@ -2,7 +2,7 @@
+>  # Coresight configuration
+>  #
+>  menuconfig CORESIGHT
+> -       bool "CoreSight Tracing Support"
+> +       tristate "CoreSight Tracing Support"
+>         select ARM_AMBA
+>         select PERF_EVENTS
+>         help
+> @@ -12,6 +12,9 @@ menuconfig CORESIGHT
+>           specification and configure the right series of components when a
+>           trace source gets enabled.
 >
+> +         To compile this driver as a module, choose M here: the
+> +         module will be called coresight.
+> +
+>  if CORESIGHT
+>  config CORESIGHT_LINKS_AND_SINKS
+>         tristate "CoreSight Link and Sink drivers"
+> diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+> index 45d7a0f34170..ed2d4bcb017b 100644
+> --- a/drivers/hwtracing/coresight/Makefile
+> +++ b/drivers/hwtracing/coresight/Makefile
+> @@ -2,8 +2,11 @@
+>  #
+>  # Makefile for CoreSight drivers.
+>  #
+> -obj-$(CONFIG_CORESIGHT) += coresight.o coresight-etm-perf.o
+> -obj-$(CONFIG_OF) += of_coresight.o
+> +obj-$(CONFIG_CORESIGHT) += coresight.o
+> +coresight-objs := coresight-core.o  coresight-etm-perf.o
+> +ifeq ($(CONFIG_OF), y)
+> +coresight-objs += of_coresight.o
+> +endif
+>  obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
+>  coresight-tmc-objs := coresight-tmc-core.o coresight-tmc-etf.o \
+>                       coresight-tmc-etr.o
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight-core.c
+> similarity index 99%
+> rename from drivers/hwtracing/coresight/coresight.c
+> rename to drivers/hwtracing/coresight/coresight-core.c
+> index 1c941351f1d1..f96258de1e9b 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight-core.c
+> @@ -948,12 +948,6 @@ struct bus_type coresight_bustype = {
+>         .name   = "coresight",
+>  };
 >
-> That doesn't mean the kernel can panic() if the user decided to unload the
-> module while the trace session is in progress. It only means that
-> the trace session could be stopped in between in the worst case. But
-> nothing more harmful to the system.
+> -static int __init coresight_init(void)
+> -{
+> -       return bus_register(&coresight_bustype);
+> -}
+> -postcore_initcall(coresight_init);
+> -
+>  struct coresight_device *coresight_register(struct coresight_desc *desc)
+>  {
+>         int i;
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 0fe7e43ea1c4..ceac9aee4a82 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -472,6 +472,10 @@ static int __init etm_perf_init(void)
+>  {
+>         int ret;
 >
->>  This series is for development  purposes, after all.
+> +       ret = bus_register(&coresight_bustype);
+> +       if (ret)
+> +               return ret;
+> +
+>         etm_pmu.capabilities            = PERF_PMU_CAP_EXCLUSIVE;
 >
+>         etm_pmu.attr_groups             = etm_pmu_attr_groups;
+> @@ -494,4 +498,15 @@ static int __init etm_perf_init(void)
 >
-> Do you mean that this series is for internal development purposes and not
-> upstream ? Making the drivers modular are always helpful, especially for
-> something related to tracing, that allows the module to be unloaded after
-> use. So, it would be good to have this series in, but in a manner which is
-> usable and doesn't cause harm to the overall system usage.
+>         return ret;
+>  }
+> -device_initcall(etm_perf_init);
+> +postcore_initcall(etm_perf_init);
+> +
+> +static void __exit etm_perf_exit(void)
+> +{
+> +       perf_pmu_unregister(&etm_pmu);
+> +       bus_unregister(&coresight_bustype);
+> +}
+> +module_exit(etm_perf_exit);
 
-Correct, we can't have a patchset that generates a kernel panic.
+I see the perf functionality as an accessory to the core rather than
+the other way around.  Initialisation in the core code should be
+driving the PMU registration.
 
->
-> I think the summary of the discussion is that we need more robust code
-> to handle the situation, which also allows unloading the modules without
-> any trouble.
-
-The tricky part is the "unloading without any trouble".  The first
-thing to so is if the driver is being used, the _remove() functions
-need to go through the same process as it would under normal
-condition.  That will allow to reinsert the module and have a fairly
-good level of assurance that things will work properly.
-
-Looking at things a little closer all the interconnection dependencies
-in the core are done using a csdev and a lot of the current code is
-already checking for a NULL condition (more checks may be needed with
-the introduction of this set).  The real problem is with the "path"
-used to keep track of the devices taking part in active sessions.
-Those can be accessed when a process is swapped in and out, mandating
-something fast and efficient.  One thing we could do is in a path,
-keep track of a reference on csdev rather than make a copy of their
-addresses.  That way the _remove() functions could simply set those to
-NULL, making it easy to deal with.
-
->
-> Cheers
->
-> Suzuki
->
->>
->> Let me know if I'm missing something.
->>
->> Thanks,
->>
->> Kim
->>
+> +
+> +MODULE_AUTHOR("Mathieu Poirier <mathieu.poirier@linaro.org>");
+> +MODULE_DESCRIPTION("Arm CoreSight tracer driver");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.17.0
 >
