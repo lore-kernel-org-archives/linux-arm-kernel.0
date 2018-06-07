@@ -1,8 +1,8 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 7 Jun 2018 22:10:07 +0100
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 7 Jun 2018 15:40:43 -0600
 Subject: [PATCH v4 05/14] coresight: get/put module in
  coresight_build/release_path
-In-Reply-To: <20180607121304.017d1d6804466050dd5c0af2@arm.com>
+In-Reply-To: <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
  <20180605210710.22227-6-kim.phillips@arm.com>
  <20180606082422.GB19727@kroah.com>
@@ -15,142 +15,202 @@ References: <20180605210710.22227-1-kim.phillips@arm.com>
  <20180607095322.GA26174@kroah.com>
  <adbabdb0-df2c-be74-3cde-cda4f6bce579@arm.com>
  <20180607121304.017d1d6804466050dd5c0af2@arm.com>
-Message-ID: <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
+ <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
+Message-ID: <CANLsYkwEh9H9cP7ihw2iNzne-+=nZ2KE8OMXV3oN1L1WLKhrpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2018 06:13 PM, Kim Phillips wrote:
-> On Thu, 7 Jun 2018 11:07:15 +0100
-> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> 
->> On 06/07/2018 10:53 AM, Greg Kroah-Hartman wrote:
->>> On Thu, Jun 07, 2018 at 10:32:21AM +0100, Suzuki K Poulose wrote:
->>>> On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
->>>>> On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
->>>>>> Hi Greg,
+On 7 June 2018 at 15:10, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> On 06/07/2018 06:13 PM, Kim Phillips wrote:
+>>
+>> On Thu, 7 Jun 2018 11:07:15 +0100
+>> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>>
+>>> On 06/07/2018 10:53 AM, Greg Kroah-Hartman wrote:
+>>>>
+>>>> On Thu, Jun 07, 2018 at 10:32:21AM +0100, Suzuki K Poulose wrote:
+>>>>>
+>>>>> On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
 >>>>>>
->>>>>> On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
->>>>>>> On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
->>>>>>>> On Wed, 6 Jun 2018 10:46:36 +0100
->>>>>>>> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>>>>>> On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
+>>>>>>>
+>>>>>>> Hi Greg,
+>>>>>>>
+>>>>>>> On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
 >>>>>>>>
->>>>>>>>> On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
->>>>>>>>>> On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
->>>>>>>>>>> Increment the refcnt for driver modules in current use by calling
->>>>>>>>>>> module_get in coresight_build_path and module_put in release_path.
+>>>>>>>> On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
+>>>>>>>>>
+>>>>>>>>> On Wed, 6 Jun 2018 10:46:36 +0100
+>>>>>>>>> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>>>>>>>>>
+>>>>>>>>>> On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
 >>>>>>>>>>>
->>>>>>>>>>> This prevents driver modules from being unloaded when they are in use,
->>>>>>>>>>> either in sysfs or perf mode.
->>>>>>>>>>
->>>>>>>>>> Why does it matter?  Shouldn't you be allowed to remove any module at
->>>>>>>>>> any point in time, much like a networking driver?
+>>>>>>>>>>> On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
+>>>>>>>>>>>>
+>>>>>>>>>>>> Increment the refcnt for driver modules in current use by
+>>>>>>>>>>>> calling
+>>>>>>>>>>>> module_get in coresight_build_path and module_put in
+>>>>>>>>>>>> release_path.
+>>>>>>>>>>>>
+>>>>>>>>>>>> This prevents driver modules from being unloaded when they are
+>>>>>>>>>>>> in use,
+>>>>>>>>>>>> either in sysfs or perf mode.
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> Why does it matter?  Shouldn't you be allowed to remove any
+>>>>>>>>>>> module at
+>>>>>>>>>>> any point in time, much like a networking driver?
+>>>>>>>
+>>>>>>>
+>>>>>>> The user doesn't have an explicit refcount on the individual
+>>>>>>> components
+>>>>>>> in a trace session. So, when a trace session is in progress, it is as
+>>>>>>> good as having a "file" open on each component that is part of the
+>>>>>>> active trace session. So, we don't want the driver to be removed when
+>>>>>>> the component is being used in the trace collection.
 >>>>>>
->>>>>> The user doesn't have an explicit refcount on the individual components
->>>>>> in a trace session. So, when a trace session is in progress, it is as
->>>>>> good as having a "file" open on each component that is part of the
->>>>>> active trace session. So, we don't want the driver to be removed when
->>>>>> the component is being used in the trace collection.
+>>>>>>
+>>>>>> Why not?  What's wrong with that happening and then the trace
+>>>>>> collection
+>>>>>> starts failing with -ENODEV or something?
 >>>>>
->>>>> Why not?  What's wrong with that happening and then the trace collection
->>>>> starts failing with -ENODEV or something?
->>>>
->>>> May be I am missing something here. Can we allow the driver to be removed
->>>> when one of its device is "turned ON" and we need the same
->>>> driver to "turn it OFF" when the session ends ? To make a better
->>>> comparison :
->>>>
->>>> Can we unload a usb_mass_storage module when a USB disk(which uses the
->>>> module driver) is mounted and is being used ? I believe, the module
->>>> will eventually get unloaded when we unmount the disk, if someone did
->>>> a unload.
->>>
->>> No, mount causes the module count to be incrememted.  Mount and
->>> "open/close" are the old-school way of doing module reference counting.
->>>
->>> Look at how network drivers work today, you can unload any network
->>> driver even if there is a valid network connection "up and running"
->>> attached to it.  It just gets torn down when that request happens.
->>
->> Ok, that makes more sense now. Thanks for the hints. However, it doesn't
->> look that easy from the coresight point due to the way the devices are
->> used in an interconnected manner which could be part of multiple trace
->> sessions.
->>
->> e.g, a funnel could be part of two independent trace sessions with
->> different sets of sources/sinks. Tearing down the trace sessions is
->> going to be a difficult task unless we make drastic changes to the PMU
->> framework itself. But will see, what best we can do to make it modern
->> :-)
->>>
->>>> We have a similar situation here. The only difference is the driver is
->>>> referenced only when one of its device is in a trace session.
->>>
->>> I understand, I'm saying that you have to be very careful when messing
->>> around with module reference counts to get it correct and perhaps you
->>> should just change your design to not care about module reference counts
->>> at all, like networking did 15+ years ago.
->>>
->>> Let's learn from the good examples in our past (like networking), and
->>> not like the older bad examples (like mount/files).
->>>
->>>>> Remember, removing a kernel module is something that only happens very
->>>>> rarely, and is an explicit choice by someone with root permissions.  If
->>>>> you want to remove that module, it should be able to go, as you know
->>>>> what you are doing at that point in time.
->>>>
->>>> Right, but when a device is "in use" can we do that ? I thought the user
->>>> will get a module is in use or busy, error.
->>>
->>> Try it on networking today :)
->>>
->>>>> Don't try to "protect the user from themselves" here, they want to shoot
->>>>> their foot, make it hurt if they are aiming it there :)
 >>>>>
+>>>>> May be I am missing something here. Can we allow the driver to be
+>>>>> removed
+>>>>> when one of its device is "turned ON" and we need the same
+>>>>> driver to "turn it OFF" when the session ends ? To make a better
+>>>>> comparison :
+>>>>>
+>>>>> Can we unload a usb_mass_storage module when a USB disk(which uses the
+>>>>> module driver) is mounted and is being used ? I believe, the module
+>>>>> will eventually get unloaded when we unmount the disk, if someone did
+>>>>> a unload.
 >>>>
->>>> The module_get/put added here are only triggered when we start a trace
->>>> session, where we build a path for the current session from the configured
->>>> "source" to the configured "sink" and the path is destroyed
->>>> at the end of the trace session. i.e, the path is not a permanent thing.
->>>> It is constructed per session. So it is perfectly possible to remove a
->>>> device in between trace sessions.
+>>>>
+>>>> No, mount causes the module count to be incrememted.  Mount and
+>>>> "open/close" are the old-school way of doing module reference counting.
+>>>>
+>>>> Look at how network drivers work today, you can unload any network
+>>>> driver even if there is a valid network connection "up and running"
+>>>> attached to it.  It just gets torn down when that request happens.
 >>>
->>> That's fine, but again, just be careful to get this correct.  The patch
->>> I reviewed did not seem to do that.
+>>>
+>>> Ok, that makes more sense now. Thanks for the hints. However, it doesn't
+>>> look that easy from the coresight point due to the way the devices are
+>>> used in an interconnected manner which could be part of multiple trace
+>>> sessions.
+>>>
+>>> e.g, a funnel could be part of two independent trace sessions with
+>>> different sets of sources/sinks. Tearing down the trace sessions is
+>>> going to be a difficult task unless we make drastic changes to the PMU
+>>> framework itself. But will see, what best we can do to make it modern
+>>> :-)
+>>>>
+>>>>
+>>>>> We have a similar situation here. The only difference is the driver is
+>>>>> referenced only when one of its device is in a trace session.
+>>>>
+>>>>
+>>>> I understand, I'm saying that you have to be very careful when messing
+>>>> around with module reference counts to get it correct and perhaps you
+>>>> should just change your design to not care about module reference counts
+>>>> at all, like networking did 15+ years ago.
+>>>>
+>>>> Let's learn from the good examples in our past (like networking), and
+>>>> not like the older bad examples (like mount/files).
+>>>>
+>>>>>> Remember, removing a kernel module is something that only happens very
+>>>>>> rarely, and is an explicit choice by someone with root permissions.
+>>>>>> If
+>>>>>> you want to remove that module, it should be able to go, as you know
+>>>>>> what you are doing at that point in time.
+>>>>>
+>>>>>
+>>>>> Right, but when a device is "in use" can we do that ? I thought the
+>>>>> user
+>>>>> will get a module is in use or busy, error.
+>>>>
+>>>>
+>>>> Try it on networking today :)
+>>>>
+>>>>>> Don't try to "protect the user from themselves" here, they want to
+>>>>>> shoot
+>>>>>> their foot, make it hurt if they are aiming it there :)
+>>>>>>
+>>>>>
+>>>>> The module_get/put added here are only triggered when we start a trace
+>>>>> session, where we build a path for the current session from the
+>>>>> configured
+>>>>> "source" to the configured "sink" and the path is destroyed
+>>>>> at the end of the trace session. i.e, the path is not a permanent
+>>>>> thing.
+>>>>> It is constructed per session. So it is perfectly possible to remove a
+>>>>> device in between trace sessions.
+>>>>
+>>>>
+>>>> That's fine, but again, just be careful to get this correct.  The patch
+>>>> I reviewed did not seem to do that.
+>>>
+>>>
+>>> Thanks for the useful suggestions, we will explore this more.
+>
+>
+> Kim,
+>
 >>
->> Thanks for the useful suggestions, we will explore this more.
+>> I'm going to assume the series is still valid after this discussion,
+>> since technically just this patch can get dropped, and the user is able
+>> to shoot themselves in the foot.
+>
+>
+> That doesn't mean the kernel can panic() if the user decided to unload the
+> module while the trace session is in progress. It only means that
+> the trace session could be stopped in between in the worst case. But
+> nothing more harmful to the system.
+>
+>>  This series is for development  purposes, after all.
+>
+>
+> Do you mean that this series is for internal development purposes and not
+> upstream ? Making the drivers modular are always helpful, especially for
+> something related to tracing, that allows the module to be unloaded after
+> use. So, it would be good to have this series in, but in a manner which is
+> usable and doesn't cause harm to the overall system usage.
 
-Kim,
+Correct, we can't have a patchset that generates a kernel panic.
 
-> 
-> I'm going to assume the series is still valid after this discussion,
-> since technically just this patch can get dropped, and the user is able
-> to shoot themselves in the foot.
+>
+> I think the summary of the discussion is that we need more robust code
+> to handle the situation, which also allows unloading the modules without
+> any trouble.
 
-That doesn't mean the kernel can panic() if the user decided to unload 
-the module while the trace session is in progress. It only means that
-the trace session could be stopped in between in the worst case. But
-nothing more harmful to the system.
+The tricky part is the "unloading without any trouble".  The first
+thing to so is if the driver is being used, the _remove() functions
+need to go through the same process as it would under normal
+condition.  That will allow to reinsert the module and have a fairly
+good level of assurance that things will work properly.
 
->  This series is for development  purposes, after all.
+Looking at things a little closer all the interconnection dependencies
+in the core are done using a csdev and a lot of the current code is
+already checking for a NULL condition (more checks may be needed with
+the introduction of this set).  The real problem is with the "path"
+used to keep track of the devices taking part in active sessions.
+Those can be accessed when a process is swapped in and out, mandating
+something fast and efficient.  One thing we could do is in a path,
+keep track of a reference on csdev rather than make a copy of their
+addresses.  That way the _remove() functions could simply set those to
+NULL, making it easy to deal with.
 
-Do you mean that this series is for internal development purposes and 
-not upstream ? Making the drivers modular are always helpful, especially 
-for something related to tracing, that allows the module to be unloaded 
-after use. So, it would be good to have this series in, but in a manner 
-which is usable and doesn't cause harm to the overall system usage.
-
-I think the summary of the discussion is that we need more robust code
-to handle the situation, which also allows unloading the modules without
-any trouble.
-
-Cheers
-
-Suzuki
-
-> 
-> Let me know if I'm missing something.
-> 
-> Thanks,
-> 
-> Kim
-> 
+>
+> Cheers
+>
+> Suzuki
+>
+>>
+>> Let me know if I'm missing something.
+>>
+>> Thanks,
+>>
+>> Kim
+>>
+>
