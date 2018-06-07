@@ -1,73 +1,87 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu,  7 Jun 2018 12:32:05 +0100
-Subject: [PATCH] arm64: Fix syscall restarting around signal suppressed by
- tracer
-Message-ID: <1528371125-24505-1-git-send-email-Dave.Martin@arm.com>
+From: naveen.n.rao@linux.vnet.ibm.com (Naveen N. Rao)
+Date: Thu, 07 Jun 2018 17:12:18 +0530
+Subject: [RFC PATCH -tip v5 24/27] bpf: error-inject: kprobes: Clear
+ current_kprobe and enable preempt in kprobe
+In-Reply-To: <152812800822.10068.3306094708706993432.stgit@devbox>
+References: <152812730943.10068.5166429445118734697.stgit@devbox>
+ <152812800822.10068.3306094708706993432.stgit@devbox>
+Message-ID: <1528371714.iz71qgzxv3.naveen@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 17c2895 ("arm64: Abstract syscallno manipulation") abstracts
-out the pt_regs.syscallno value for a syscall cancelled by a tracer
-as NO_SYSCALL, and provides helpers to set and check for this
-condition.  However, the way this was implemented has the
-unintended side-effect of disabling part of the syscall restart
-logic.
+Masami Hiramatsu wrote:
+> Clear current_kprobe and enable preemption in kprobe
+> even if pre_handler returns !0.
+> 
+> This simplifies function override using kprobes.
+> 
+> Jprobe used to require to keep the preemption disabled and
+> keep current_kprobe until it returned to original function
+> entry. For this reason kprobe_int3_handler() and similar
+> arch dependent kprobe handers checks pre_handler result
+> and exit without enabling preemption if the result is !0.
+> 
+> After removing the jprobe, Kprobes does not need to
+> keep preempt disabled even if user handler returns !0
+> anymore.
+> 
+> But since the function override handler in error-inject
+> and bpf is also returns !0 if it overrides a function,
+> to balancing the preempt count, it enables preemption
+> and reset current kprobe by itself.
+> 
+> That is a bad design that is very buggy. This fixes
+> such unbalanced preempt-count and current_kprobes setting
+> in kprobes, bpf and error-inject.
+> 
+> Note: for powerpc and x86, this removes all preempt_disable
+> from kprobe_ftrace_handler because ftrace callbacks are
+> called under preempt disabled.
+> 
+> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: James Hogan <jhogan@kernel.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: "Naveen N. Rao" <naveen.n.rao@linux.vnet.ibm.com>
+> Cc: Josef Bacik <jbacik@fb.com>
+> Cc: Alexei Starovoitov <ast@kernel.org>
+> Cc: x86 at kernel.org
+> Cc: linux-snps-arc at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-ia64 at vger.kernel.org
+> Cc: linux-mips at linux-mips.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-s390 at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
+> Cc: sparclinux at vger.kernel.org
+> ---
+>  Changes in v5:
+>   - Fix kprobe_ftrace_handler in arch/powerpc too.
+> ---
+>  arch/arc/kernel/kprobes.c            |    5 +++--
+>  arch/arm/probes/kprobes/core.c       |   10 +++++-----
+>  arch/arm64/kernel/probes/kprobes.c   |   10 +++++-----
+>  arch/ia64/kernel/kprobes.c           |   13 ++++---------
+>  arch/mips/kernel/kprobes.c           |    4 ++--
+>  arch/powerpc/kernel/kprobes-ftrace.c |   15 ++++++---------
+>  arch/powerpc/kernel/kprobes.c        |    7 +++++--
 
-This comes about because the second in_syscall() check in
-do_signal() re-evaluates the "in a syscall" condition based on the
-updated pt_regs instead of the original pt_regs.  forget_syscall()
-is explicitly called prior to the second check in order to prevent
-restart logic in the ret_to_user path being spuriously triggered,
-which means that the second in_syscall() check always yields false.
+For the powerpc bits:
+Acked-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
 
-This triggers a failure in
-tools/testing/selftests/seccomp/seccomp_bpf.c, when using ptrace to
-suppress a signal that interrups a nanosleep() syscall.
-
-Misbehaviour of this type is only expected in the case where a
-tracer suppresses a signal and the target process is either being
-single-stepped or the interrupted syscall attempts to restart via
--ERESTARTBLOCK.
-
-This patch restores the old behaviour by performing the
-in_syscall() check only once at the start of the function.
-
-Fixes: 17c289586009 ("arm64: Abstract syscallno manipulation")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reported-by: Sumit Semwal <sumit.semwal@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: <stable@vger.kernel.org> # 4.14.x-
----
- arch/arm64/kernel/signal.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 154b7d3..f212090 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -830,11 +830,12 @@ static void do_signal(struct pt_regs *regs)
- 	unsigned long continue_addr = 0, restart_addr = 0;
- 	int retval = 0;
- 	struct ksignal ksig;
-+	bool syscall = in_syscall(regs);
- 
- 	/*
- 	 * If we were from a system call, check for system call restarting...
- 	 */
--	if (in_syscall(regs)) {
-+	if (syscall) {
- 		continue_addr = regs->pc;
- 		restart_addr = continue_addr - (compat_thumb_mode(regs) ? 2 : 4);
- 		retval = regs->regs[0];
-@@ -886,7 +887,7 @@ static void do_signal(struct pt_regs *regs)
- 	 * Handle restarting a different system call. As above, if a debugger
- 	 * has chosen to restart at a different PC, ignore the restart.
- 	 */
--	if (in_syscall(regs) && regs->pc == restart_addr) {
-+	if (syscall && regs->pc == restart_addr) {
- 		if (retval == -ERESTART_RESTARTBLOCK)
- 			setup_restart_syscall(regs);
- 		user_rewind_single_step(current);
--- 
-2.1.4
+Thanks,
+Naveen
