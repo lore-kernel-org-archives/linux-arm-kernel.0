@@ -1,86 +1,97 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu,  7 Jun 2018 17:20:50 +0800
-Subject: [v3, 10/10] dpaa_eth: add the get_ts_info interface for ethtool
-In-Reply-To: <20180607092050.46128-1-yangbo.lu@nxp.com>
-References: <20180607092050.46128-1-yangbo.lu@nxp.com>
-Message-ID: <20180607092050.46128-11-yangbo.lu@nxp.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 7 Jun 2018 10:32:21 +0100
+Subject: [PATCH v4 05/14] coresight: get/put module in
+ coresight_build/release_path
+In-Reply-To: <20180607091353.GA20438@kroah.com>
+References: <20180605210710.22227-1-kim.phillips@arm.com>
+ <20180605210710.22227-6-kim.phillips@arm.com>
+ <20180606082422.GB19727@kroah.com>
+ <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
+ <20180606155501.704583e1412996a1a2c6fa61@arm.com>
+ <20180607083401.GE16651@kroah.com>
+ <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
+ <20180607091353.GA20438@kroah.com>
+Message-ID: <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added the get_ts_info interface for ethtool to check
-the timestamping capability.
+On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
+> On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
+>> Hi Greg,
+>>
+>> On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
+>>> On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
+>>>> On Wed, 6 Jun 2018 10:46:36 +0100
+>>>> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>>>>
+>>>>> On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
+>>>>>> On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
+>>>>>>> Increment the refcnt for driver modules in current use by calling
+>>>>>>> module_get in coresight_build_path and module_put in release_path.
+>>>>>>>
+>>>>>>> This prevents driver modules from being unloaded when they are in use,
+>>>>>>> either in sysfs or perf mode.
+>>>>>>
+>>>>>> Why does it matter?  Shouldn't you be allowed to remove any module at
+>>>>>> any point in time, much like a networking driver?
+>>
+>> The user doesn't have an explicit refcount on the individual components
+>> in a trace session. So, when a trace session is in progress, it is as
+>> good as having a "file" open on each component that is part of the
+>> active trace session. So, we don't want the driver to be removed when
+>> the component is being used in the trace collection.
+> 
+> Why not?  What's wrong with that happening and then the trace collection
+> starts failing with -ENODEV or something?
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- Removed ifdef for hw timestamp.
-Changes for v3:
-	- None.
----
- drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |   39 ++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
+May be I am missing something here. Can we allow the driver to be 
+removed when one of its device is "turned ON" and we need the same
+driver to "turn it OFF" when the session ends ? To make a better
+comparison :
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-index 2f933b6..3184c8f 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-@@ -32,6 +32,9 @@
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/string.h>
-+#include <linux/of_platform.h>
-+#include <linux/net_tstamp.h>
-+#include <linux/fsl/ptp_qoriq.h>
- 
- #include "dpaa_eth.h"
- #include "mac.h"
-@@ -515,6 +518,41 @@ static int dpaa_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
- 	return ret;
- }
- 
-+static int dpaa_get_ts_info(struct net_device *net_dev,
-+			    struct ethtool_ts_info *info)
-+{
-+	struct device *dev = net_dev->dev.parent;
-+	struct device_node *mac_node = dev->of_node;
-+	struct device_node *fman_node = NULL, *ptp_node = NULL;
-+	struct platform_device *ptp_dev = NULL;
-+	struct qoriq_ptp *ptp = NULL;
-+
-+	info->phc_index = -1;
-+
-+	fman_node = of_get_parent(mac_node);
-+	if (fman_node)
-+		ptp_node = of_parse_phandle(fman_node, "ptimer-handle", 0);
-+
-+	if (ptp_node)
-+		ptp_dev = of_find_device_by_node(ptp_node);
-+
-+	if (ptp_dev)
-+		ptp = platform_get_drvdata(ptp_dev);
-+
-+	if (ptp)
-+		info->phc_index = ptp->phc_index;
-+
-+	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
-+				SOF_TIMESTAMPING_RX_HARDWARE |
-+				SOF_TIMESTAMPING_RAW_HARDWARE;
-+	info->tx_types = (1 << HWTSTAMP_TX_OFF) |
-+			 (1 << HWTSTAMP_TX_ON);
-+	info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
-+			   (1 << HWTSTAMP_FILTER_ALL);
-+
-+	return 0;
-+}
-+
- const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_drvinfo = dpaa_get_drvinfo,
- 	.get_msglevel = dpaa_get_msglevel,
-@@ -530,4 +568,5 @@ static int dpaa_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
- 	.set_link_ksettings = dpaa_set_link_ksettings,
- 	.get_rxnfc = dpaa_get_rxnfc,
- 	.set_rxnfc = dpaa_set_rxnfc,
-+	.get_ts_info = dpaa_get_ts_info,
- };
--- 
-1.7.1
+Can we unload a usb_mass_storage module when a USB disk(which uses the 
+module driver) is mounted and is being used ? I believe, the module
+will eventually get unloaded when we unmount the disk, if someone did
+a unload.
+
+We have a similar situation here. The only difference is the driver is
+referenced only when one of its device is in a trace session.
+
+> 
+> Remember, removing a kernel module is something that only happens very
+> rarely, and is an explicit choice by someone with root permissions.  If
+> you want to remove that module, it should be able to go, as you know
+> what you are doing at that point in time.
+
+Right, but when a device is "in use" can we do that ? I thought the user
+will get a module is in use or busy, error.
+
+
+> 
+> Don't try to "protect the user from themselves" here, they want to shoot
+> their foot, make it hurt if they are aiming it there :)
+> 
+
+The module_get/put added here are only triggered when we start a trace 
+session, where we build a path for the current session from the 
+configured "source" to the configured "sink" and the path is destroyed
+at the end of the trace session. i.e, the path is not a permanent thing.
+It is constructed per session. So it is perfectly possible to remove a
+device in between trace sessions.
+
+>> This will be
+>> released as soon as the session is ended. It is just like a PMU driver
+>> where the module refcount is held to ensure the module stays until the
+>> session is over. In this case, we have multiple components, each with
+>> its own driver invisible to the PMU driver. Hence the coresight driver
+>> must hold the reference.
+> 
+> Again, please think this through and don't add extra complexity to the
+> normal path, and get it right if you do it (the existing patch is not
+> right as I pointed out.)  Personally, I feel the code should just be
+> able to be unloaded whenever they want, user beware...
+
+Sure, will explore more to refine the code. Thanks for the trigger.
+
+Cheers
+Suzuki
