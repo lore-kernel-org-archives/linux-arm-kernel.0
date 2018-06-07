@@ -1,91 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 7 Jun 2018 16:25:47 +0200
-Subject: [PATCH v2] arm64: topology: Avoid checking numa mask for
- scheduler MC selection
-In-Reply-To: <20180606163846.495725-1-jeremy.linton@arm.com>
-References: <20180606163846.495725-1-jeremy.linton@arm.com>
-Message-ID: <CAMuHMdXW4M5CNS3wvb1R8v7ioGX7Q3ODcfgcdn2Ok3FRedTMZA@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Thu, 07 Jun 2018 15:05:21 +0100
+Subject: [PATCH 3.16 267/410] arm64: do not use print_symbol()
+In-Reply-To: <lsq.1528380320.647747352@decadent.org.uk>
+Message-ID: <lsq.1528380321.214381661@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+3.16.57-rc1 review patch.  If anyone has any objections, please let me know.
 
-On Wed, Jun 6, 2018 at 6:38 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> The numa mask subset check can often lead to system hang or crash during
-> CPU hotplug and system suspend operation if NUMA is disabled. This is
+------------------
 
-Also during boot, if CONFIG_ARM_PSCI_CHECKER=y.
+From: Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>
 
-> mostly observed on HMP systems where the CPU compute capacities are
-> different and ends up in different scheduler domains. Since
-> cpumask_of_node is returned instead core_sibling, the scheduler is
-> confused with incorrect cpumasks(e.g. one CPU in two different sched
-> domains at the same time) on CPU hotplug.
->
-> Lets disable the NUMA siblings checks for the time being, as NUMA in
-> socket machines have LLC's that will assure that the scheduler topology
-> isn't "borken".
->
-> The NUMA check exists to assure that if a LLC within a socket crosses
-> NUMA nodes/chiplets the scheduler domains remain consistent. This code will
-> likely have to be re-enabled in the near future once the NUMA mask story
-> is sorted.  At the moment its not necessary because the NUMA in socket
-> machines LLC's are contained within the NUMA domains.
->
-> Further, as a defensive mechanism during hot-plug, lets assure that the
-> LLC siblings are also masked.
->
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+commit 4ef7963843d3243260aa335dfb9cb2fede06aacf upstream.
 
-Thanks!
+print_symbol() is a very old API that has been obsoleted by %pS format
+specifier in a normal printk() call.
 
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Replace print_symbol() with a direct printk("%pS") call.
 
-> ---
->  arch/arm64/kernel/topology.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 7415c166281f..f845a8617812 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -215,13 +215,8 @@ EXPORT_SYMBOL_GPL(cpu_topology);
->
->  const struct cpumask *cpu_coregroup_mask(int cpu)
->  {
-> -       const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
-> +       const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
->
-> -       /* Find the smaller of NUMA, core or LLC siblings */
-> -       if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
-> -               /* not numa in package, lets use the package siblings */
-> -               core_mask = &cpu_topology[cpu].core_sibling;
-> -       }
->         if (cpu_topology[cpu].llc_id != -1) {
->                 if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
->                         core_mask = &cpu_topology[cpu].llc_siblings;
-> @@ -239,8 +234,10 @@ static void update_siblings_masks(unsigned int cpuid)
->         for_each_possible_cpu(cpu) {
->                 cpu_topo = &cpu_topology[cpu];
->
-> -               if (cpuid_topo->llc_id == cpu_topo->llc_id)
-> +               if (cpuid_topo->llc_id == cpu_topo->llc_id) {
->                         cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
-> +                       cpumask_set_cpu(cpuid, &cpu_topo->llc_siblings);
-> +               }
->
->                 if (cpuid_topo->package_id != cpu_topo->package_id)
->                         continue;
+Link: http://lkml.kernel.org/r/20171211125025.2270-3-sergey.senozhatsky at gmail.com
+To: Andrew Morton <akpm@linux-foundation.org>
+To: Russell King <linux@armlinux.org.uk>
+To: Catalin Marinas <catalin.marinas@arm.com>
+To: Mark Salter <msalter@redhat.com>
+To: Tony Luck <tony.luck@intel.com>
+To: David Howells <dhowells@redhat.com>
+To: Yoshinori Sato <ysato@users.sourceforge.jp>
+To: Guan Xuetao <gxt@mprc.pku.edu.cn>
+To: Borislav Petkov <bp@alien8.de>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Thomas Gleixner <tglx@linutronix.de>
+To: Peter Zijlstra <peterz@infradead.org>
+To: Vineet Gupta <vgupta@synopsys.com>
+To: Fengguang Wu <fengguang.wu@intel.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Petr Mladek <pmladek@suse.com>
+Cc: LKML <linux-kernel@vger.kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-c6x-dev at linux-c6x.org
+Cc: linux-ia64 at vger.kernel.org
+Cc: linux-am33-list at redhat.com
+Cc: linux-sh at vger.kernel.org
+Cc: linux-edac at vger.kernel.org
+Cc: x86 at kernel.org
+Cc: linux-snps-arc at lists.infradead.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+[pmladek at suse.com: updated commit message]
+Signed-off-by: Petr Mladek <pmladek@suse.com>
+[bwh: Backported to 3.16: adjust context]
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+---
+ arch/arm64/kernel/process.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -31,7 +31,6 @@
+ #include <linux/delay.h>
+ #include <linux/reboot.h>
+ #include <linux/interrupt.h>
+-#include <linux/kallsyms.h>
+ #include <linux/init.h>
+ #include <linux/cpu.h>
+ #include <linux/elfcore.h>
+@@ -198,8 +197,8 @@ void __show_regs(struct pt_regs *regs)
+ 	}
+ 
+ 	show_regs_print_info(KERN_DEFAULT);
+-	print_symbol("pc : %s\n", regs->pc);
+-	print_symbol("lr : %s\n", lr);
++	printk("pc : %pS\n", (void *)regs->pc);
++	printk("lr : %pS\n", (void *)lr);
+ 	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
+ 	for (i = top_reg; i >= 0; i--) {
+ 		printk("x%-2d: %016llx ", i, regs->regs[i]);
