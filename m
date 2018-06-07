@@ -1,42 +1,217 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 7 Jun 2018 06:06:52 +0100
-Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE
- disabled
-In-Reply-To: <20180606081827.GD11810@ulmo>
-References: <20180525210843.1821071-1-arnd@arndb.de>
- <20180606081827.GD11810@ulmo>
-Message-ID: <20180607050652.GC21163@dell>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Thu, 7 Jun 2018 06:59:10 +0000
+Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
+In-Reply-To: <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
+References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
+ <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
+ <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+ <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
+ <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
+Message-ID: <OSBPR01MB205442B483C792125E6A6AF7D2640@OSBPR01MB2054.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Jun 2018, Thierry Reding wrote:
+On 06 June 2018 22:53, Frank wrote:
+> On 06/06/18 14:48, Frank Rowand wrote:
+> > On 06/05/18 23:36, Michel Pollet wrote:
+> >> Hi Frank,
+> >>
+> >> On 05 June 2018 18:34, Frank wrote:
+> >>> On 06/05/18 04:28, Michel Pollet wrote:
+> >>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot
+> >>>> time, it requires a special enable method to get it started.
+> >>>>
+> >>>> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> >>>> ---
+> >>>>  arch/arm/mach-shmobile/Makefile        |  1 +
+> >>>>  arch/arm/mach-shmobile/smp-r9a06g032.c | 79
+> >>>> ++++++++++++++++++++++++++++++++++
+> >>>>  2 files changed, 80 insertions(+)
+> >>>>  create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+> >>>>
+> >>>> diff --git a/arch/arm/mach-shmobile/Makefile
+> >>>> b/arch/arm/mach-shmobile/Makefile index 1939f52..d7fc98f 100644
+> >>>> --- a/arch/arm/mach-shmobile/Makefile
+> >>>> +++ b/arch/arm/mach-shmobile/Makefile
+> >>>> @@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)+= smp-sh73a0.o
+> >>> headsmp-scu.o platsmp-scu.o
+> >>>>  smp-$(CONFIG_ARCH_R8A7779)+= smp-r8a7779.o headsmp-scu.o
+> >>> platsmp-scu.o
+> >>>>  smp-$(CONFIG_ARCH_R8A7790)+= smp-r8a7790.o
+> >>>> smp-$(CONFIG_ARCH_R8A7791)+= smp-r8a7791.o
+> >>>> +smp-$(CONFIG_ARCH_R9A06G032)+= smp-r9a06g032.o
+> >>>>  smp-$(CONFIG_ARCH_EMEV2)+= smp-emev2.o headsmp-scu.o
+> >>> platsmp-scu.o
+> >>>>
+> >>>>  # PM objects
+> >>>> diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c
+> >>>> b/arch/arm/mach-shmobile/smp-r9a06g032.c
+> >>>> new file mode 100644
+> >>>> index 0000000..cd40e6e
+> >>>> --- /dev/null
+> >>>> +++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
+> >>>> @@ -0,0 +1,79 @@
+> >>>> +// SPDX-License-Identifier: GPL-2.0
+> >>>> +/*
+> >>>> + * R9A06G032 Second CA7 enabler.
+> >>>> + *
+> >>>> + * Copyright (C) 2018 Renesas Electronics Europe Limited
+> >>>> + *
+> >>>> + * Michel Pollet <michel.pollet@bp.renesas.com>,
+> >>> <buserror@gmail.com>
+> >>>> + * Derived from action,s500-smp
+> >>>> + */
+> >>>> +
+> >>>> +#include <linux/io.h>
+> >>>> +#include <linux/of.h>
+> >>>> +#include <linux/of_address.h>
+> >>>> +#include <linux/smp.h>
+> >>>> +
+> >>>> +/*
+> >>>> + * The second CPU is parked in ROM at boot time. It requires
+> >>>> +waking it after
+> >>>> + * writing an address into the BOOTADDR register of sysctrl.
+> >>>> + *
+> >>>> + * So the default value of the "cpu-release-addr" corresponds to
+> >>> BOOTADDR...
+> >>>> + *
+> >>>> + * *However* the BOOTADDR register is not available when the
+> >>>> +kernel
+> >>>> + * starts in NONSEC mode.
+> >>>> + *
+> >>>> + * So for NONSEC mode, the bootloader re-parks the second CPU into
+> >>>> +a pen
+> >>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to a
+> >>>> +SRAM address,
+> >>>> + * which is not restricted.
+> >>>
+> >>> The binding document for cpu-release-addr does not have a definition
+> >>> for 32 bit arm.  The existing definition is only 64 bit arm.  Please
+> >>> add the definition for 32 bit arm to patch 1.
+> >>
+> >> Hmmm I do find a definition in
+> >> Documentation/devicetree/bindings/arm/cpus.txt -- just under where I
+> >> added my 'enable-method' -- And it is already used as 32 bits in at
+> >> least arch/arm/boot/dts/stih407-family.dtsi.
+> >
+> > If the correct answer is for cpu-release-addr to be 64 bits in certain
+> > cases (that discussion is ongoing further downthread) then one
+> > approach to maintain compatibility _and_ to fix the devicetree source
+> > files is to change the source code that currently gets
+> > cpu-release-addr as a
+> > 32 bit object to check the size of the property and get it as either a
+> > 32 bit or 64 bit object, based on the actual size of the property in
+> > the device tree and then change the value in the devicetree source
+> > files to be two cells.  BUT this does not consider the bootloader
+> > complication.  arch/arm/boot/dts/axm5516-cpus.dtsi has a note "//
+> > Fixed by the boot loader", so the boot loader also has to be modified
+> > to be able to handle the possibility that the property could be either
+> > 32 bits or 64 bits.  I don't know how to maintain compatibility with
+> > the boot loader since we can't force it to change synchronously with
+> > changes in the kernel.
+> >
+> > You can consider this comment to be a drive-by observation.  I think
+> > Rob and Geert and people like that are likely to be more helpful with
+> > what to actually do, and you can treat my comment more as pointing out
+> > the issue than as providing the perfect solution.
+>
+> Darn it, hit <send> too quickly.
+>
+> I meant to mention that there are several devicetree source files that have a
+> single cell value for cpu-release-addr, and thus potentially face the same
+> situation, depending on what the final decision is on the proper size for cpu-
+> release-addr. As of v4.17, a git grep shows one cell values in:
+>
+>   arch/arm/boot/dts/axm5516-cpus.dtsi
+>   arch/arm/boot/dts/stih407-family.dtsi
+>   arch/arm/boot/dts/stih418.dtsi
 
-> On Fri, May 25, 2018 at 11:08:30PM +0200, Arnd Bergmann wrote:
-> > Without dmaengine support, we get a harmless warning about an
-> > unused function:
-> > 
-> > drivers/pwm/pwm-stm32.c:166:12: error: 'stm32_pwm_capture' defined but not used [-Werror=unused-function]
-> > 
-> > Changing the #ifdef to an IS_ENABLED() check shuts up that warning
-> > and is slightly nicer to read.
-> > 
-> > Fixes: 53e38fe73f94 ("pwm: stm32: Add capture support")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/pwm/pwm-stm32.c | 4 +---
-> >  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> Applied, thanks.
-> 
-> Lee, I applied this on top of your immutable MFD/PWM branch because it
-> depends on the capture support that you applied. I wasn't sure what your
-> PR timing was going to be, so I thought I'd do it this way since I'm
-> pulling in some last minute fixes for v4.18.
+Yes, I had grepped before I used 32 bits on mine...
 
-I don't see a problem with that.
+Now, what is the decision here? Our bootloader is already modified to set it to 32 bits, so I propose that
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
++ I change the driver to handle 32 and 64 bits properties
++ I add this to the cpu.txt, as a separate patch:
+# On other systems, the property can be either
+  32 bits or 64 bits, it is the driver's responsibility
+  to deal with either sizes.
+
+Michel
+
+>
+> -Frank
+>
+> > -Frnak
+> >
+> >
+> >>
+> >> What do you want me to add to this exactly? Do you want me to just
+> >> change "required for systems that have an "enable-method" property
+> >> value of "spin-table" to also specify renesas,r9a06g032 ?
+> >>
+> >> Thanks!
+> >> Michel
+> >>
+> >>>
+> >>> -Frank
+> >>>
+> >>>
+> >>>> + */
+> >>>> +
+> >>>> +static void __iomem *cpu_bootaddr;
+> >>>> +
+> >>>> +static DEFINE_SPINLOCK(cpu_lock);
+> >>>> +
+> >>>> +static int r9a06g032_smp_boot_secondary(unsigned int cpu, struct
+> >>>> +task_struct *idle) { if (!cpu_bootaddr) return -ENODEV;
+> >>>> +
+> >>>> +spin_lock(&cpu_lock);
+> >>>> +
+> >>>> +writel(__pa_symbol(secondary_startup), cpu_bootaddr);
+> >>>> +arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+> >>>> +
+> >>>> +spin_unlock(&cpu_lock);
+> >>>> +
+> >>>> +return 0;
+> >>>> +}
+> >>>> +
+> >>>> +static void __init r9a06g032_smp_prepare_cpus(unsigned int
+> >>>> +max_cpus) { struct device_node *dn; int ret;
+> >>>> +u32 bootaddr;
+> >>>> +
+> >>>> +dn = of_get_cpu_node(1, NULL);
+> >>>> +if (!dn) {
+> >>>> +pr_err("CPU#1: missing device tree node\n"); return; }
+> >>>> +/*
+> >>>> + * Determine the address from which the CPU is polling.
+> >>>> + * The bootloader *does* change this property  */ ret =
+> >>>> +of_property_read_u32(dn, "cpu-release-addr", &bootaddr);
+> >>>> +of_node_put(dn); if (ret) {
+> >>>> +pr_err("CPU#1: invalid cpu-release-addr property\n"); return; }
+> >>>> +pr_info("CPU#1: cpu-release-addr %08x\n", bootaddr);
+> >>>> +
+> >>>> +cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr)); }
+> >>>> +
+> >>>> +static const struct smp_operations r9a06g032_smp_ops __initconst =
+> >>>> +{ .smp_prepare_cpus = r9a06g032_smp_prepare_cpus,
+> >>>> +.smp_boot_secondary = r9a06g032_smp_boot_secondary, };
+> >>>> +CPU_METHOD_OF_DECLARE(r9a06g032_smp, "renesas,r9a06g032-
+> smp",
+> >>>> +&r9a06g032_smp_ops);
+> >>>>
+> >>
+> >>
+> >>
+> >>
+> >> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne
+> End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under
+> Registered No. 04586709.
+> >>
+> >
+> >
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
