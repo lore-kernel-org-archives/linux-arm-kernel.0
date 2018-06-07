@@ -1,142 +1,77 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 7 Jun 2018 15:46:53 -0600
-Subject: [PATCH v4 14/14] coresight: allow the coresight core driver to be
- built as a module
-In-Reply-To: <20180605210710.22227-15-kim.phillips@arm.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 7 Jun 2018 16:47:47 -0500
+Subject: [PATCH v4 05/14] coresight: get/put module in
+ coresight_build/release_path
+In-Reply-To: <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-15-kim.phillips@arm.com>
-Message-ID: <CANLsYkwMmNFHUnJ-Qo9cGxbVG=1zT=26G9Jq+modve5s3shueg@mail.gmail.com>
+ <20180605210710.22227-6-kim.phillips@arm.com>
+ <20180606082422.GB19727@kroah.com>
+ <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
+ <20180606155501.704583e1412996a1a2c6fa61@arm.com>
+ <20180607083401.GE16651@kroah.com>
+ <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
+ <20180607091353.GA20438@kroah.com>
+ <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
+ <20180607095322.GA26174@kroah.com>
+ <adbabdb0-df2c-be74-3cde-cda4f6bce579@arm.com>
+ <20180607121304.017d1d6804466050dd5c0af2@arm.com>
+ <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
+Message-ID: <20180607164747.7e4bb30f69a1fb4c160b6ef1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2018 at 15:07, Kim Phillips <kim.phillips@arm.com> wrote:
-> Allow to build coresight as a module.  This enhances
-> coresight developer efficiency by allowing the development to
-> take place exclusively on the target, and without needing to
-> reboot in between changes.
->
-> - Kconfig becomes a tristate, to allow =m
-> - append -core to source file name to allow module to
->   be called coresight by the Makefile
-> - modules can have only one init/exit, so we add the core bus
->   register/unregister function calls to the etm_perf init/exit
->   functions, since coresight.c does not have etm_pmu defined.
-> - add a MODULE_DEVICE_TABLE for autoloading on boot
->
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Leo Yan <leo.yan@linaro.org>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> ---
->  drivers/hwtracing/coresight/Kconfig             |  5 ++++-
->  drivers/hwtracing/coresight/Makefile            |  7 +++++--
->  .../coresight/{coresight.c => coresight-core.c} |  6 ------
->  .../hwtracing/coresight/coresight-etm-perf.c    | 17 ++++++++++++++++-
->  4 files changed, 25 insertions(+), 10 deletions(-)
->  rename drivers/hwtracing/coresight/{coresight.c => coresight-core.c} (99%)
->
-> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> index 181a44ea2d61..c05b265f7731 100644
-> --- a/drivers/hwtracing/coresight/Kconfig
-> +++ b/drivers/hwtracing/coresight/Kconfig
-> @@ -2,7 +2,7 @@
->  # Coresight configuration
->  #
->  menuconfig CORESIGHT
-> -       bool "CoreSight Tracing Support"
-> +       tristate "CoreSight Tracing Support"
->         select ARM_AMBA
->         select PERF_EVENTS
->         help
-> @@ -12,6 +12,9 @@ menuconfig CORESIGHT
->           specification and configure the right series of components when a
->           trace source gets enabled.
->
-> +         To compile this driver as a module, choose M here: the
-> +         module will be called coresight.
-> +
->  if CORESIGHT
->  config CORESIGHT_LINKS_AND_SINKS
->         tristate "CoreSight Link and Sink drivers"
-> diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-> index 45d7a0f34170..ed2d4bcb017b 100644
-> --- a/drivers/hwtracing/coresight/Makefile
-> +++ b/drivers/hwtracing/coresight/Makefile
-> @@ -2,8 +2,11 @@
->  #
->  # Makefile for CoreSight drivers.
->  #
-> -obj-$(CONFIG_CORESIGHT) += coresight.o coresight-etm-perf.o
-> -obj-$(CONFIG_OF) += of_coresight.o
-> +obj-$(CONFIG_CORESIGHT) += coresight.o
-> +coresight-objs := coresight-core.o  coresight-etm-perf.o
-> +ifeq ($(CONFIG_OF), y)
-> +coresight-objs += of_coresight.o
-> +endif
->  obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
->  coresight-tmc-objs := coresight-tmc-core.o coresight-tmc-etf.o \
->                       coresight-tmc-etr.o
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight-core.c
-> similarity index 99%
-> rename from drivers/hwtracing/coresight/coresight.c
-> rename to drivers/hwtracing/coresight/coresight-core.c
-> index 1c941351f1d1..f96258de1e9b 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight-core.c
-> @@ -948,12 +948,6 @@ struct bus_type coresight_bustype = {
->         .name   = "coresight",
->  };
->
-> -static int __init coresight_init(void)
-> -{
-> -       return bus_register(&coresight_bustype);
-> -}
-> -postcore_initcall(coresight_init);
-> -
->  struct coresight_device *coresight_register(struct coresight_desc *desc)
->  {
->         int i;
-> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> index 0fe7e43ea1c4..ceac9aee4a82 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> @@ -472,6 +472,10 @@ static int __init etm_perf_init(void)
->  {
->         int ret;
->
-> +       ret = bus_register(&coresight_bustype);
-> +       if (ret)
-> +               return ret;
-> +
->         etm_pmu.capabilities            = PERF_PMU_CAP_EXCLUSIVE;
->
->         etm_pmu.attr_groups             = etm_pmu_attr_groups;
-> @@ -494,4 +498,15 @@ static int __init etm_perf_init(void)
->
->         return ret;
->  }
-> -device_initcall(etm_perf_init);
-> +postcore_initcall(etm_perf_init);
-> +
-> +static void __exit etm_perf_exit(void)
-> +{
-> +       perf_pmu_unregister(&etm_pmu);
-> +       bus_unregister(&coresight_bustype);
-> +}
-> +module_exit(etm_perf_exit);
+On Thu, 7 Jun 2018 22:10:07 +0100
+Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
 
-I see the perf functionality as an accessory to the core rather than
-the other way around.  Initialisation in the core code should be
-driving the PMU registration.
+> On 06/07/2018 06:13 PM, Kim Phillips wrote:
+> > I'm going to assume the series is still valid after this discussion,
+> > since technically just this patch can get dropped, and the user is able
+> > to shoot themselves in the foot.
+> 
+> That doesn't mean the kernel can panic() if the user decided to unload 
+> the module while the trace session is in progress. It only means that
+> the trace session could be stopped in between in the worst case. But
+> nothing more harmful to the system.
 
-> +
-> +MODULE_AUTHOR("Mathieu Poirier <mathieu.poirier@linaro.org>");
-> +MODULE_DESCRIPTION("Arm CoreSight tracer driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.17.0
->
+FWIW, I didn't see the kernel panic in my basic tests; just some bad
+accesses: the new remove functions take care of cleaning up most items,
+and most drivers still depend on the links and sinks (funnel,
+replicator) drivers, so they can't be upset too bad.
+
+> >  This series is for development  purposes, after all.
+> 
+> Do you mean that this series is for internal development purposes and 
+> not upstream ? Making the drivers modular are always helpful, especially 
+
+no, I'm posting them for upstream review because I'd like them upstream.
+
+> for something related to tracing, that allows the module to be unloaded 
+> after use. So, it would be good to have this series in, but in a manner 
+> which is usable and doesn't cause harm to the overall system usage.
+> 
+> I think the summary of the discussion is that we need more robust code
+> to handle the situation, which also allows unloading the modules without
+> any trouble.
+
+Trouble's relative.  My point was since the series is going to be used
+mainly by developers testing their code, they already prepare for, and
+expect badness to occur anyway.  Greg's point isn't lost here, and in
+my interpretation, his review of this patch was that it was in the
+wrong direction of safety: it made things unnecessarily too safe, up
+front, and that items relative to the perf core should strive to adhere
+to the higher standards set in place by the networking subsystem.  So,
+this patch doesn't get his ack.
+
+I compiled a new v5 series that omits this patch, and overwrote the v4
+series here:
+
+git://linux-arm.org/linux-kp.git, coresight-modules branch
+
+but I'll hold of submitting a v5 for now.
+
+I don't know how the perf core handles AUXTRACE drivers hanging up on
+it.  I see intel-pt record support can't be built as a module.  I'm
+guessing more testing for actual panics when using perf or sysfs is
+what's being sought here?
+
+Kim
