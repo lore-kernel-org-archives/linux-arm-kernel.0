@@ -1,62 +1,112 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 7 Jun 2018 17:36:46 +0200
-Subject: "media: ov5640: Add horizontal and vertical totals" regression
- issue on i.MX6QDL
-In-Reply-To: <CAMty3ZCjNHUeHAJCDjoTHh_w1nNkUFTLjbp1=sYuF2DRiz-E-g@mail.gmail.com>
-References: <CAMty3ZCjNHUeHAJCDjoTHh_w1nNkUFTLjbp1=sYuF2DRiz-E-g@mail.gmail.com>
-Message-ID: <20180607153646.jlif4hukbyfkvjfx@flea>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 7 Jun 2018 10:54:52 -0500
+Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
+In-Reply-To: <OSBPR01MB205442B483C792125E6A6AF7D2640@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
+ <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
+ <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+ <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
+ <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
+ <OSBPR01MB205442B483C792125E6A6AF7D2640@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+Message-ID: <CAL_JsqLn+x0JCkjwABU7XkPsgvyVdiCRq=gZTfUBbbR4-c+1bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 08:02:28PM +0530, Jagan Teki wrote:
-> Hi,
-> 
-> ov5640 camera is breaking with below commit on i.MXQDL platform.
-> 
->     commit 476dec012f4c6545b0b7599cd9adba2ed819ad3b
->     Author: Maxime Ripard <maxime.ripard@bootlin.com>
->     Date:   Mon Apr 16 08:36:55 2018 -0400
-> 
->     media: ov5640: Add horizontal and vertical totals
-> 
->     All the initialization arrays are changing the horizontal and vertical
->     totals for some value.
-> 
->     In order to clean up the driver, and since we're going to need that value
->     later on, let's introduce in the ov5640_mode_info structure the horizontal
->     and vertical total sizes, and move these out of the bytes array.
-> 
->     Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->     Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
->     Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-> 
-> We have reproduced as below [1] and along with ipu1_csi0 pipeline. I
-> haven't debug further please let us know how to move further.
-> 
-> media-ctl --links "'ov5640 2-003c':0->'imx6-mipi-csi2':0[1]"
-> media-ctl --links "'imx6-mipi-csi2':1->'ipu1_csi0_mux':0[1]"
-> media-ctl --links "'ipu1_csi0_mux':2->'ipu1_csi0':0[1]"
-> media-ctl --links "'ipu1_csi0':2->'ipu1_csi0 capture':0[1]"
-> 
-> media-ctl --set-v4l2 "'ov5640 2-003c':0[fmt:UYVY2X8/640x480 field:none]"
-> media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/640x480 field:none]"
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/640x480 field:none]"
-> media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:AYUV32/640x480 field:none]"
-> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/640x480 field:none]"
-> 
-> [1] https://lkml.org/lkml/2018/5/31/543
+On Thu, Jun 7, 2018 at 1:59 AM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> On 06 June 2018 22:53, Frank wrote:
+>> On 06/06/18 14:48, Frank Rowand wrote:
+>> > On 06/05/18 23:36, Michel Pollet wrote:
+>> >> Hi Frank,
+>> >>
+>> >> On 05 June 2018 18:34, Frank wrote:
+>> >>> On 06/05/18 04:28, Michel Pollet wrote:
+>> >>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot
+>> >>>> time, it requires a special enable method to get it started.
 
-Yeah, this has already been reported as part as this serie:
-https://www.mail-archive.com/linux-media at vger.kernel.org/msg131655.html
+[...]
 
-and some suggestions have been done here:
-https://www.mail-archive.com/linux-media at vger.kernel.org/msg132570.html
+>> >>>> + * The second CPU is parked in ROM at boot time. It requires
+>> >>>> +waking it after
+>> >>>> + * writing an address into the BOOTADDR register of sysctrl.
+>> >>>> + *
+>> >>>> + * So the default value of the "cpu-release-addr" corresponds to
+>> >>> BOOTADDR...
+>> >>>> + *
+>> >>>> + * *However* the BOOTADDR register is not available when the
+>> >>>> +kernel
+>> >>>> + * starts in NONSEC mode.
+>> >>>> + *
+>> >>>> + * So for NONSEC mode, the bootloader re-parks the second CPU into
+>> >>>> +a pen
+>> >>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to a
+>> >>>> +SRAM address,
+>> >>>> + * which is not restricted.
+>> >>>
+>> >>> The binding document for cpu-release-addr does not have a definition
+>> >>> for 32 bit arm.  The existing definition is only 64 bit arm.  Please
+>> >>> add the definition for 32 bit arm to patch 1.
+>> >>
+>> >> Hmmm I do find a definition in
+>> >> Documentation/devicetree/bindings/arm/cpus.txt -- just under where I
+>> >> added my 'enable-method' -- And it is already used as 32 bits in at
+>> >> least arch/arm/boot/dts/stih407-family.dtsi.
+>> >
+>> > If the correct answer is for cpu-release-addr to be 64 bits in certain
+>> > cases (that discussion is ongoing further downthread) then one
+>> > approach to maintain compatibility _and_ to fix the devicetree source
+>> > files is to change the source code that currently gets
+>> > cpu-release-addr as a
+>> > 32 bit object to check the size of the property and get it as either a
+>> > 32 bit or 64 bit object, based on the actual size of the property in
+>> > the device tree and then change the value in the devicetree source
+>> > files to be two cells.  BUT this does not consider the bootloader
+>> > complication.  arch/arm/boot/dts/axm5516-cpus.dtsi has a note "//
+>> > Fixed by the boot loader", so the boot loader also has to be modified
+>> > to be able to handle the possibility that the property could be either
+>> > 32 bits or 64 bits.  I don't know how to maintain compatibility with
+>> > the boot loader since we can't force it to change synchronously with
+>> > changes in the kernel.
+>> >
+>> > You can consider this comment to be a drive-by observation.  I think
+>> > Rob and Geert and people like that are likely to be more helpful with
+>> > what to actually do, and you can treat my comment more as pointing out
+>> > the issue than as providing the perfect solution.
+>>
+>> Darn it, hit <send> too quickly.
+>>
+>> I meant to mention that there are several devicetree source files that have a
+>> single cell value for cpu-release-addr, and thus potentially face the same
+>> situation, depending on what the final decision is on the proper size for cpu-
+>> release-addr. As of v4.17, a git grep shows one cell values in:
+>>
+>>   arch/arm/boot/dts/axm5516-cpus.dtsi
+>>   arch/arm/boot/dts/stih407-family.dtsi
+>>   arch/arm/boot/dts/stih418.dtsi
+>
+> Yes, I had grepped before I used 32 bits on mine...
+>
+> Now, what is the decision here? Our bootloader is already modified to set it to 32 bits, so I propose that
 
-Feel free to help debug this.
+And too late to fix the bootloader?
 
-Maxime
+>
+> + I change the driver to handle 32 and 64 bits properties
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+That's fine if you can't fix the bootloader.
+
+> + I add this to the cpu.txt, as a separate patch:
+> # On other systems, the property can be either
+>   32 bits or 64 bits, it is the driver's responsibility
+>   to deal with either sizes.
+
+That is definitely not what we want to say. Use of 32-bit should be
+considered out of spec. Yes, we have a few platforms in that category,
+but they already handle that themselves. Would be nice to fix them,
+but at least the STi platforms don't seem too active.
+
+IMO, we should delete whatever text we can here and at most just refer
+to the spec.
+
+Rob
