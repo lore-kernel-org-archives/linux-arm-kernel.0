@@ -1,64 +1,62 @@
 From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu, 7 Jun 2018 16:43:45 +0200 (CEST)
-Subject: [PATCH 2/3] rtc: ftrtc010: handle dates after 2106
-In-Reply-To: <20180604141528.15635-2-alexandre.belloni@bootlin.com>
+Date: Thu, 7 Jun 2018 16:43:59 +0200 (CEST)
+Subject: [PATCH 3/3] rtc: ftrtc010: let the core handle range
+In-Reply-To: <20180604141528.15635-3-alexandre.belloni@bootlin.com>
 References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
- <20180604141528.15635-2-alexandre.belloni@bootlin.com>
-Message-ID: <alpine.LNX.2.00.1806071643370.3181@T420s>
+ <20180604141528.15635-3-alexandre.belloni@bootlin.com>
+Message-ID: <alpine.LNX.2.00.1806071643490.3181@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 4 Jun 2018, Alexandre Belloni wrote:
 
-> Use correct types for offset and time and use
-> rtc_time64_to_tm/rtc_tm_to_time64 to handle dates after 2106 properly.
+> The current range handling is highly suspicious. Anyway, let the core
+> handle it.
+> The RTC has a 32 bit counter on top of days + hh:mm:ss registers.
 > 
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 > ---
->  drivers/rtc/rtc-ftrtc010.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+>  drivers/rtc/rtc-ftrtc010.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/rtc/rtc-ftrtc010.c b/drivers/rtc/rtc-ftrtc010.c
-> index 165d0b62db00..2cdc78ffeb17 100644
+> index 2cdc78ffeb17..61f798c6101f 100644
 > --- a/drivers/rtc/rtc-ftrtc010.c
 > +++ b/drivers/rtc/rtc-ftrtc010.c
-> @@ -73,8 +73,8 @@ static int ftrtc010_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  {
->  	struct ftrtc010_rtc *rtc = dev_get_drvdata(dev);
+> @@ -95,9 +95,6 @@ static int ftrtc010_rtc_set_time(struct device *dev, struct rtc_time *tm)
+>  	u32 sec, min, hour, day, offset;
+>  	timeu64_t time;
 >  
-> -	unsigned int  days, hour, min, sec;
-> -	unsigned long offset, time;
-> +	u32 days, hour, min, sec, offset;
-> +	timeu64_t time;
->  
->  	sec  = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
->  	min  = readl(rtc->rtc_base + FTRTC010_RTC_MINUTE);
-> @@ -84,7 +84,7 @@ static int ftrtc010_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  
->  	time = offset + days * 86400 + hour * 3600 + min * 60 + sec;
->  
-> -	rtc_time_to_tm(time, tm);
-> +	rtc_time64_to_tm(time, tm);
->  
->  	return 0;
->  }
-> @@ -92,13 +92,13 @@ static int ftrtc010_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  static int ftrtc010_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  {
->  	struct ftrtc010_rtc *rtc = dev_get_drvdata(dev);
-> -	unsigned int sec, min, hour, day;
-> -	unsigned long offset, time;
-> +	u32 sec, min, hour, day, offset;
-> +	timeu64_t time;
->  
->  	if (tm->tm_year >= 2148)	/* EPOCH Year + 179 */
->  		return -EINVAL;
->  
-> -	rtc_tm_to_time(tm, &time);
-> +	time = rtc_tm_to_time64(tm);
+> -	if (tm->tm_year >= 2148)	/* EPOCH Year + 179 */
+> -		return -EINVAL;
+> -
+>  	time = rtc_tm_to_time64(tm);
 >  
 >  	sec = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
->  	min = readl(rtc->rtc_base + FTRTC010_RTC_MINUTE);
+> @@ -120,6 +117,7 @@ static const struct rtc_class_ops ftrtc010_rtc_ops = {
+>  
+>  static int ftrtc010_rtc_probe(struct platform_device *pdev)
+>  {
+> +	u32 days, hour, min, sec;
+>  	struct ftrtc010_rtc *rtc;
+>  	struct device *dev = &pdev->dev;
+>  	struct resource *res;
+> @@ -172,6 +170,15 @@ static int ftrtc010_rtc_probe(struct platform_device *pdev)
+>  
+>  	rtc->rtc_dev->ops = &ftrtc010_rtc_ops;
+>  
+> +	sec  = readl(rtc->rtc_base + FTRTC010_RTC_SECOND);
+> +	min  = readl(rtc->rtc_base + FTRTC010_RTC_MINUTE);
+> +	hour = readl(rtc->rtc_base + FTRTC010_RTC_HOUR);
+> +	days = readl(rtc->rtc_base + FTRTC010_RTC_DAYS);
+> +
+> +	rtc->rtc_dev->range_min = (u64)days * 86400 + hour * 3600 +
+> +				  min * 60 + sec;
+> +	rtc->rtc_dev->range_max = U32_MAX + rtc->rtc_dev->range_min;
+> +
+>  	ret = devm_request_irq(dev, rtc->rtc_irq, ftrtc010_rtc_interrupt,
+>  			       IRQF_SHARED, pdev->name, dev);
+>  	if (unlikely(ret))
 > -- 
 > 2.17.1
 > 
