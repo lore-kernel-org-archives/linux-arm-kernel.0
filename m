@@ -1,84 +1,57 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu,  7 Jun 2018 11:22:56 +0800
-Subject: [v2, 10/10] dpaa_eth: add the get_ts_info interface for ethtool
-In-Reply-To: <20180607032256.39802-1-yangbo.lu@nxp.com>
-References: <20180607032256.39802-1-yangbo.lu@nxp.com>
-Message-ID: <20180607032256.39802-11-yangbo.lu@nxp.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 7 Jun 2018 09:47:18 +0530
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
+ disable compiler auto-inline optimizations
+In-Reply-To: <20180606142622.2338abf6@vmware.local.home>
+References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
+ <201806060501.btF3aJMZ%fengguang.wu@intel.com>
+ <20180606095714.1d3c2def@vmware.local.home>
+ <20180606142600.GN13775@localhost>
+ <20180606142622.2338abf6@vmware.local.home>
+Message-ID: <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added the get_ts_info interface for ethtool to check
-the timestamping capability.
++Greg/Alex,
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- Removed ifdef for hw timestamp.
----
- drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |   39 ++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
+@Fegguang/build-bot: I do see mention of Greg and /me in your initial email's
+body saying TO: Viresh, CC: Greg, but I don't see any of us getting cc'd in your
+email. Bug ?
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-index 2f933b6..3184c8f 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-@@ -32,6 +32,9 @@
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/string.h>
-+#include <linux/of_platform.h>
-+#include <linux/net_tstamp.h>
-+#include <linux/fsl/ptp_qoriq.h>
- 
- #include "dpaa_eth.h"
- #include "mac.h"
-@@ -515,6 +518,41 @@ static int dpaa_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
- 	return ret;
- }
- 
-+static int dpaa_get_ts_info(struct net_device *net_dev,
-+			    struct ethtool_ts_info *info)
-+{
-+	struct device *dev = net_dev->dev.parent;
-+	struct device_node *mac_node = dev->of_node;
-+	struct device_node *fman_node = NULL, *ptp_node = NULL;
-+	struct platform_device *ptp_dev = NULL;
-+	struct qoriq_ptp *ptp = NULL;
-+
-+	info->phc_index = -1;
-+
-+	fman_node = of_get_parent(mac_node);
-+	if (fman_node)
-+		ptp_node = of_parse_phandle(fman_node, "ptimer-handle", 0);
-+
-+	if (ptp_node)
-+		ptp_dev = of_find_device_by_node(ptp_node);
-+
-+	if (ptp_dev)
-+		ptp = platform_get_drvdata(ptp_dev);
-+
-+	if (ptp)
-+		info->phc_index = ptp->phc_index;
-+
-+	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
-+				SOF_TIMESTAMPING_RX_HARDWARE |
-+				SOF_TIMESTAMPING_RAW_HARDWARE;
-+	info->tx_types = (1 << HWTSTAMP_TX_OFF) |
-+			 (1 << HWTSTAMP_TX_ON);
-+	info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
-+			   (1 << HWTSTAMP_FILTER_ALL);
-+
-+	return 0;
-+}
-+
- const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_drvinfo = dpaa_get_drvinfo,
- 	.get_msglevel = dpaa_get_msglevel,
-@@ -530,4 +568,5 @@ static int dpaa_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
- 	.set_link_ksettings = dpaa_set_link_ksettings,
- 	.get_rxnfc = dpaa_get_rxnfc,
- 	.set_rxnfc = dpaa_set_rxnfc,
-+	.get_ts_info = dpaa_get_ts_info,
- };
+On 06-06-18, 14:26, Steven Rostedt wrote:
+> On Wed, 6 Jun 2018 16:26:00 +0200
+> Johan Hovold <johan@kernel.org> wrote:
+> 
+> > Looks like the greybus code above is working as intended by checking for
+> > unterminated string after the strncpy, even if this does now triggers
+> > the truncation warning.
+
+So why exactly are we generating a warning here ? Is it because it is possible
+that the first n bytes of src may not have the null terminating byte and the
+dest may not be null terminated eventually ?
+
+Maybe I should just use memcpy here then ?
+
+But AFAIR, I used strncpy() specifically because it also sets all the remaining
+bytes after the null terminating byte with the null terminating byte. And so it
+is pretty easy for me to check if the final string is null terminated by
+checking [max - 1] byte against '\0', which the code is doing right now.
+
+I am not sure what would the best way to get around this incorrect-warning.
+
+And I am wondering on why buildbot reported the warning only for two instances
+in that file, while I have done the same thing at 4 places.
+
+> Ah, yes I now see that. Thanks for pointing it out. But perhaps it
+> should also add the "- 1" to the strncpy() so that gcc doesn't think
+> it's a mistake.
+
+The src string is passed on from a firmware entity and we need to make sure the
+protocol (greybus) is implemented properly by the other end. For example, in the
+current case if the firmware sends "HELLOWORLD", its an error as it should have
+sent "HELLWORLD\0". But with what you are saying we will forcefully make dest as
+"HELLWORLD\0", which wouldn't be the right thing to do as we will miss the bug
+present in firmware.
+
 -- 
-1.7.1
+viresh
