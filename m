@@ -1,72 +1,69 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Thu, 7 Jun 2018 09:29:32 +0200
-Subject: [PATCH][next] pinctrl: pinctrl-single: add allocation failure
- checking of saved_vals
-In-Reply-To: <20180606134338.4645-1-colin.king@canonical.com>
-References: <20180606134338.4645-1-colin.king@canonical.com>
-Message-ID: <20180607072932.GO13775@localhost>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 7 Jun 2018 08:34:40 +0100
+Subject: [PATCH v2 3/5] arm_pmu: Add support for 64bit event counters
+In-Reply-To: <20180606164838.zeuygsp4teq64zor@lakrids.cambridge.arm.com>
+References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
+ <1527591356-10934-4-git-send-email-suzuki.poulose@arm.com>
+ <20180606164838.zeuygsp4teq64zor@lakrids.cambridge.arm.com>
+Message-ID: <9d76ba06-921f-142b-5ab2-c30985558205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 02:43:38PM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+On 06/06/2018 05:48 PM, Mark Rutland wrote:
+> On Tue, May 29, 2018 at 11:55:54AM +0100, Suzuki K Poulose wrote:
+>> Each PMU has a set of 32bit event counters. But in some
+>> special cases, the events could be counted using counters
+>> which are effectively 64bit wide.
+>>
+>> e.g, Arm V8 PMUv3 has a 64 bit cycle counter which can count
+>> only the CPU cycles. Also, the PMU can chain the event counters
+>> to effectively count as a 64bit counter.
+>>
+>> Add support for tracking the events that uses 64bit counters.
+>> This only affects the periods set for each counter in the core
+>> driver.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since v1:
+>>   - Rename ARMPMU_EVT_LONG => ARMPMU_EVT_64BIT
+>> ---
+>>   drivers/perf/arm_pmu.c       | 14 ++++++++------
+>>   include/linux/perf/arm_pmu.h |  6 ++++++
+>>   2 files changed, 14 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+>> index 8962d26..ff858e6 100644
+>> --- a/drivers/perf/arm_pmu.c
+>> +++ b/drivers/perf/arm_pmu.c
+>> @@ -28,9 +28,10 @@
+>>   static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
+>>   static DEFINE_PER_CPU(int, cpu_irq);
+>>   
+>> -static inline u64 arm_pmu_max_period(void)
+>> +static inline u64 arm_pmu_event_max_period(struct perf_event *event)
+>>   {
+>> -	return (1ULL << 32) - 1;
+>> +	return (event->hw.flags & ARMPMU_EVT_64BIT) ?
+>> +		~0ULL : (1ULL << 32) - 1;
+>>   }
 > 
-> Currently saved_vals is being allocated and there is no check for
-> failed allocation (which is more likely than normal when using
-> GFP_ATOMIC).  Fix this by checking for a failed allocation and
-> propagating this error return down the the caller chain.
+> Could we please have:
 > 
-> Detected by CoverityScan, CID#1469841 ("Dereference null return value")
-> Fixes: 88a1dbdec682 ("pinctrl: pinctrl-single: Add functions to save and restore pinctrl context")
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/pinctrl/pinctrl-single.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+> static inline u64 arm_pmu_event_max_period(struct perf_event *event)
+> {
+> 	if (event->hw.flags & ARMPMU_EVT_64BIT)
+> 		return GENMASK_ULL(63, 0);
+> 	else
+> 		return GENMASK_ULL(31, 0);
+> }
 > 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index 9c3c00515aa0..0905ee002041 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -1588,8 +1588,11 @@ static int pcs_save_context(struct pcs_device *pcs)
->  
->  	mux_bytes = pcs->width / BITS_PER_BYTE;
->  
-> -	if (!pcs->saved_vals)
-> +	if (!pcs->saved_vals) {
->  		pcs->saved_vals = devm_kzalloc(pcs->dev, pcs->size, GFP_ATOMIC);
-> +		if (!pcs->saved_vals)
-> +			return -ENOMEM;
-> +	}
->  
->  	switch (pcs->width) {
->  	case 64:
-> @@ -1649,8 +1652,13 @@ static int pinctrl_single_suspend(struct platform_device *pdev,
->  	if (!pcs)
->  		return -EINVAL;
->  
-> -	if (pcs->flags & PCS_CONTEXT_LOSS_OFF)
-> -		pcs_save_context(pcs);
-> +	if (pcs->flags & PCS_CONTEXT_LOSS_OFF) {
-> +		int ret;
-> +
-> +		ret = pcs_save_context(pcs);
-> +		if (ret < 0)
-> +			return ret;
-> +	}
+> ... since that's obviously balanced, with both values generated in the
+> same way.
+> 
 
-This appears to be the right fix (along the lines of what the author may
-have intended by having the helper return an int), but as a follow-up
-patch, why not move the allocation to probe() instead?
+Sure, will do
 
-Also this doesn't look like something that requires atomic allocation in
-the first place, GFP_KERNEL should do for the legacy suspend callback.
-
->  	return pinctrl_force_sleep(pcs->pctl);
->  }
-
-But for this fix, feel free to add:
-
-Reviewed-by: Johan Hovold <johan@kernel.org>
-
-Thanks,
-Johan
+Suzuki
