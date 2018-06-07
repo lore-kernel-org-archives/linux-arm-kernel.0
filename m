@@ -1,65 +1,98 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Thu, 7 Jun 2018 12:27:01 +0200
-Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
- disable compiler auto-inline optimizations
-In-Reply-To: <314bb2b3-186e-d7b0-d800-f77a42fd80fa@linaro.org>
-References: <20180606142600.GN13775@localhost>
- <20180606142622.2338abf6@vmware.local.home>
- <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
- <20180607074628.kd3iyxevwj3ypzbr@intel.com>
- <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
- <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
- <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
- <20180607091816.GT13775@localhost>
- <20180607091923.n5q5uzsxuymy3vov@vireshk-i7>
- <314bb2b3-186e-d7b0-d800-f77a42fd80fa@linaro.org>
-Message-ID: <20180607102701.GU13775@localhost>
+From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
+Date: Thu, 7 Jun 2018 13:30:14 +0300
+Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <CAL_JsqJu6=ORfutZ5tAyNp2q2rH6P+fgJMRKw750RyFy=ptjPw@mail.gmail.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
+ <20180531005827.GA17203@rob-hp-laptop>
+ <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
+ <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
+ <152778070837.144038.4555982304713569160@swboyd.mtv.corp.google.com>
+ <CAL_JsqJu6=ORfutZ5tAyNp2q2rH6P+fgJMRKw750RyFy=ptjPw@mail.gmail.com>
+Message-ID: <18f6871e-794d-3ea2-487e-32399a8b89b4@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 05:12:51AM -0500, Alex Elder wrote:
-> On 06/07/2018 04:19 AM, Viresh Kumar wrote:
-> > On 07-06-18, 11:18, Johan Hovold wrote:
-> >> If you want to work around the warning and think you can do it in some
-> >> non-contrived way, then go for it.
-> >>
-> >> Clearing the request buffer, checking for termination using strnlen, and
-> >> then using memcpy might not be too bad.
-> >>
-> >> But after all, it is a false positive, so leaving things as they stand
-> >> is fine too.
-> > 
-> > Leave it then :)
-> > 
+On 31.05.2018 18:56, Rob Herring wrote:
+> On Thu, May 31, 2018 at 10:31 AM, Stephen Boyd <sboyd@kernel.org> wrote:
+>> Quoting Rob Herring (2018-05-31 07:20:57)
+>>> On Thu, May 31, 2018 at 5:25 AM, Codrin Ciubotariu
+>>> <codrin.ciubotariu@microchip.com> wrote:
+>>>> On 31.05.2018 03:58, Rob Herring wrote:
+>>>>>
+>>>>> On Fri, May 25, 2018 at 03:34:22PM +0300, Codrin Ciubotariu wrote:
+>>>>>>
+>>>>>> The I2S mux clock can be used to select the I2S input clock. The
+>>>>>> available parents are the peripheral and the generated clocks.
+>>>>>>
+>>>>>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+>>>>>> ---
+>>>>>>    .../devicetree/bindings/clock/at91-clock.txt       | 34
+>>>>>> ++++++++++++++++++++++
+>>>>>>    1 file changed, 34 insertions(+)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt
+>>>>>> b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>>>>>> index 51c259a..1c46b3c 100644
+>>>>>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>>>>>> @@ -90,6 +90,8 @@ Required properties:
+>>>>>>          "atmel,sama5d2-clk-audio-pll-pmc"
+>>>>>>                  at91 audio pll output on AUDIOPLLCLK that feeds the PMC
+>>>>>>                  and can be used by peripheral clock or generic clock
+>>>>>> +       "atmel,sama5d2-clk-i2s-mux":
+>>>>>> +               at91 I2S clock source selection
+>>>>>
+>>>>>
+>>>>> Is this boolean or takes some values. If latter, what are valid values?
+>>>>
+>>>>
+>>>> This is the compatible string of the clock driver.
+>>>
+>>> Ah, now I remember. AT91 uses fine grained clock nodes in DT. Is there
+>>> still a plan to fix this?
+>>
+>> I'm also interested in a plan.
+>>
+>>>>>
+>>>>>> +               compatible = "atmel,sama5d2-clk-i2s-mux";
+>>>>>> +               #address-cells = <1>;
+>>>>>> +               #size-cells = <0>;
+>>>>>
+>>>>>
+>>>>> How do you address this block? My guess is you don't because it is just
+>>>>> part of some other block and you are just creating this node to
+>>>>> instantiate a driver. Just make the node for the actual h/w block a
+>>>>> clock provider and define the clock ids (0 and 1).
+>>>>
+>>>>
+>>>> This block is not addressed, but its children are. The register we access in
+>>>> this driver is not part of other block. It's a SFR register, accessed
+>>>> through syscon and it has nothing to do with the I2S IP (see SAMA5D2 DS,
+>>>> page 1256, fig. 44-1: I2SC Block Diagram) that is the consumer of this
+>>>> clock. Adding a clock-id property in the I2S node would be just like v3 of
+>>>> this series, with the difference that we use clock-id instead of alias id to
+>>>> set the clock parent, which is not how you suggested back then.
+>>>
+>>> I wasn't suggesting a clock-id property, but a clock specifier (i.e.
+>>> make #clock-cells 1).
+>>>
+>>> But AT91 clocks are all a mess, so I don't know what to tell you.
+>>>
+>>
+>> If #clock-cells of 1 works then we should go with that. It's still weird
+>> that we need random nodes to add more clks, but I guess that's how it's
+>> going to be for each at91 clk driver until it changes to be one big
+>> provider node.
 > 
-> It's interesting that the warning isn't reported for this in
-> fw_mgmt_interface_fw_version_operation().  The difference there is
-> that you actually put a zero byte at that last position before
-> returning.  I'm mildly impressed if gcc is distinguishing that.
+> Seems to me that clock additions could use a new binding and we start
+> with a new driver that handles these few clocks initially. But I
+> haven't looked whether both can coexist.
 
-Found a redhat blog post claiming it does check for some cases like
-that:
+Mark already applied to broonie/sound.git the I2S bindings that have a 
+phandle to this clock. If I am to change #clock-cells to 1, I will have 
+to change the bindings to include the clock-id.
+Which approach should I take now?
 
-	https://developers.redhat.com/blog/2018/05/24/detecting-string-truncation-with-gcc-8/
-
-> You *are* returning the fw_info->firmware_tag array newly filled
-> with a non-null-terminated string in one of the two cases that
-> get warnings in "fw-management.c".
-
-No, there's no warning for that one (line 250), and there fw_info is
-used as the source, not the destination, so no unterminated string is
-returned there either.
-
-> But the other one is only
-> updating a buffer in a local/automatic variable.
-
-All three cases, except the one that is explicitly terminated.
-
-> Weird.  I wish there were a non-clumsy way of marking false positives
-> like this as A-OK.
-
-The gcc docs mentions an attribute for that but it seems a bit overkill
-here.
-
-Thanks,
-Johan
+Thanks and best regards,
+Codrin
