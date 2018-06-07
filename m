@@ -1,107 +1,108 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu,  7 Jun 2018 19:16:48 +0530
-Subject: [PATCH v2 1/4] drm/panel: simple: Add support for Rocktech
- RK070ER9427 LCD panel
-Message-ID: <20180607134648.2902-1-jagan@amarulasolutions.com>
+Date: Thu,  7 Jun 2018 19:17:47 +0530
+Subject: [PATCH v2 3/4] ARM: dts: i.MX6: imx6dl-mamoj: Add Wifi support
+In-Reply-To: <20180607134748.2970-1-jagan@amarulasolutions.com>
+References: <20180607134748.2970-1-jagan@amarulasolutions.com>
+Message-ID: <20180607134748.2970-2-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Rocktech Display Ltd. RK070ER9427
-800(RGB)x480 TFT LCD panel, which can be supported by the
-simple panel driver.
+Add TI WL18XX Wifi for BTicino i.MX6DL board.
 
+Signed-off-by: Simone CIANNI <simone.cianni@bticino.it>
+Signed-off-by: Raffaele RECALCATI <raffaele.recalcati@bticino.it>
+Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 Changes for v2:
-- collect Rob r-w-b tag
+- collect Fabio r-w-b tag
 
- .../display/panel/rocktech,rk070er9427.txt         | 25 ++++++++++++++++
- drivers/gpu/drm/panel/panel-simple.c               | 33 ++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
+ arch/arm/boot/dts/imx6dl-mamoj.dts | 53 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt b/Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
-new file mode 100644
-index 000000000000..eb1fb9f8d1f4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
-@@ -0,0 +1,25 @@
-+Rocktech Display Ltd. RK070ER9427 800(RGB)x480 TFT LCD panel
+diff --git a/arch/arm/boot/dts/imx6dl-mamoj.dts b/arch/arm/boot/dts/imx6dl-mamoj.dts
+index ed9050c5dbcc..5034b086035f 100644
+--- a/arch/arm/boot/dts/imx6dl-mamoj.dts
++++ b/arch/arm/boot/dts/imx6dl-mamoj.dts
+@@ -133,6 +133,18 @@
+ 		enable-active-high;
+ 		vin-supply = <&reg_lcd_vgl>;
+ 	};
 +
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-+
-+Required properties:
-+- compatible: should be "rocktech,rk070er9427"
-+
-+Optional properties:
-+- backlight: phandle of the backlight device attached to the panel
-+
-+Optional nodes:
-+- Video port for LCD panel input.
-+
-+Example:
-+	panel {
-+		compatible = "rocktech,rk070er9427";
-+		backlight = <&backlight_lcd>;
-+
-+		port {
-+			lcd_panel_in: endpoint {
-+				remote-endpoint = <&lcd_display_out>;
-+			};
-+		};
++	reg_wl18xx_vmmc:  regulator-wl18xx-vmcc {
++		compatible = "regulator-fixed";
++		regulator-name = "vwl1807";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_wlan>;
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio6 21 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <70000>;
++		enable-active-high;
 +	};
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index cbf1ab404ee7..a6c633fd0559 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -745,6 +745,36 @@ static const struct panel_desc avic_tm070ddh03 = {
- 	},
  };
  
-+static const struct display_timing rocktech_rk070er9427_timing = {
-+	.pixelclock = { 26400000, 33300000, 46800000 },
-+	.hactive = { 800, 800, 800 },
-+	.hfront_porch = { 16, 210, 354 },
-+	.hback_porch = { 46, 46, 46 },
-+	.hsync_len = { 1, 1, 1 },
-+	.vactive = { 480, 480, 480 },
-+	.vfront_porch = { 7, 22, 147 },
-+	.vback_porch = { 23, 23, 23 },
-+	.vsync_len = { 1, 1, 1 },
-+	.flags = DISPLAY_FLAGS_DE_HIGH,
+ &fec {
+@@ -285,6 +297,30 @@
+ 	status = "okay";
+ };
+ 
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	bus-width = <4>;
++	vmmc-supply = <&reg_wl18xx_vmmc>;
++	no-1-8-v;
++	non-removable;
++	wakeup-source;
++	keep-power-in-suspend;
++	cap-power-off-card;
++	max-frequency = <25000000>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	wlcore: wlcore at 2 {
++		compatible = "ti,wl1837";
++		reg = <2>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
++		tcxo-clock-frequency = <26000000>;
++	};
 +};
 +
-+static const struct panel_desc rocktech_rk070er9427 = {
-+	.timings = &rocktech_rk070er9427_timing,
-+	.num_timings = 1,
-+	.bpc = 6,
-+	.size = {
-+		.width = 154,
-+		.height = 86,
-+	},
-+	.delay = {
-+		.prepare = 41,
-+		.enable = 50,
-+		.unprepare = 41,
-+		.disable = 50,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-+};
+ &usdhc3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc3>;
+@@ -392,6 +428,17 @@
+ 		>;
+ 	};
+ 
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17069
++			MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10079
++			MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17069
++			MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17069
++			MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17069
++			MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17069
++		>;
++	};
 +
- static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
- 	{
- 		.clock = 71900,
-@@ -2226,6 +2256,9 @@ static const struct of_device_id platform_of_match[] = {
- 	}, {
- 		.compatible = "qiaodian,qd43003c0-40",
- 		.data = &qd43003c0_40,
-+	}, {
-+		.compatible = "rocktech,rk070er9427",
-+		.data = &rocktech_rk070er9427,
- 	}, {
- 		.compatible = "samsung,lsn122dl01-c01",
- 		.data = &samsung_lsn122dl01_c01,
+ 	pinctrl_usdhc3: usdhc3grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
+@@ -406,4 +453,10 @@
+ 			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x17059
+ 		>;
+ 	};
++
++	pinctrl_wlan: wlan {
++		fsl,pins = <
++			MX6QDL_PAD_RGMII_TD1__GPIO6_IO21	0x4001b0b0
++		>;
++	};
+ };
 -- 
 2.14.3
