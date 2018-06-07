@@ -1,52 +1,59 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 7 Jun 2018 20:02:28 +0530
-Subject: "media: ov5640: Add horizontal and vertical totals" regression issue
- on i.MX6QDL
-Message-ID: <CAMty3ZCjNHUeHAJCDjoTHh_w1nNkUFTLjbp1=sYuF2DRiz-E-g@mail.gmail.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Thu, 7 Jun 2018 16:43:31 +0200 (CEST)
+Subject: [PATCH 1/3] rtc: ftrtc010: switch to devm_rtc_allocate_device
+In-Reply-To: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
+References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
+Message-ID: <alpine.LNX.2.00.1806071643190.3181@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 4 Jun 2018, Alexandre Belloni wrote:
 
-ov5640 camera is breaking with below commit on i.MXQDL platform.
+> Switch to devm_rtc_allocate_device/rtc_register_device. This allow or
+> further improvement and simplifies ftrtc010_rtc_remove().
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> ---
+>  drivers/rtc/rtc-ftrtc010.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-ftrtc010.c b/drivers/rtc/rtc-ftrtc010.c
+> index af8d6beae20c..165d0b62db00 100644
+> --- a/drivers/rtc/rtc-ftrtc010.c
+> +++ b/drivers/rtc/rtc-ftrtc010.c
+> @@ -166,14 +166,18 @@ static int ftrtc010_rtc_probe(struct platform_device *pdev)
+>  	if (!rtc->rtc_base)
+>  		return -ENOMEM;
+>  
+> +	rtc->rtc_dev = devm_rtc_allocate_device(dev);
+> +	if (IS_ERR(rtc->rtc_dev))
+> +		return PTR_ERR(rtc->rtc_dev);
+> +
+> +	rtc->rtc_dev->ops = &ftrtc010_rtc_ops;
+> +
+>  	ret = devm_request_irq(dev, rtc->rtc_irq, ftrtc010_rtc_interrupt,
+>  			       IRQF_SHARED, pdev->name, dev);
+>  	if (unlikely(ret))
+>  		return ret;
+>  
+> -	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
+> -					   &ftrtc010_rtc_ops, THIS_MODULE);
+> -	return PTR_ERR_OR_ZERO(rtc->rtc_dev);
+> +	return rtc_register_device(rtc->rtc_dev);
+>  }
+>  
+>  static int ftrtc010_rtc_remove(struct platform_device *pdev)
+> @@ -184,7 +188,6 @@ static int ftrtc010_rtc_remove(struct platform_device *pdev)
+>  		clk_disable_unprepare(rtc->extclk);
+>  	if (!IS_ERR(rtc->pclk))
+>  		clk_disable_unprepare(rtc->pclk);
+> -	rtc_device_unregister(rtc->rtc_dev);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.17.1
+> 
+> 
 
-    commit 476dec012f4c6545b0b7599cd9adba2ed819ad3b
-    Author: Maxime Ripard <maxime.ripard@bootlin.com>
-    Date:   Mon Apr 16 08:36:55 2018 -0400
-
-    media: ov5640: Add horizontal and vertical totals
-
-    All the initialization arrays are changing the horizontal and vertical
-    totals for some value.
-
-    In order to clean up the driver, and since we're going to need that value
-    later on, let's introduce in the ov5640_mode_info structure the horizontal
-    and vertical total sizes, and move these out of the bytes array.
-
-    Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-    Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-    Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-
-We have reproduced as below [1] and along with ipu1_csi0 pipeline. I
-haven't debug further please let us know how to move further.
-
-media-ctl --links "'ov5640 2-003c':0->'imx6-mipi-csi2':0[1]"
-media-ctl --links "'imx6-mipi-csi2':1->'ipu1_csi0_mux':0[1]"
-media-ctl --links "'ipu1_csi0_mux':2->'ipu1_csi0':0[1]"
-media-ctl --links "'ipu1_csi0':2->'ipu1_csi0 capture':0[1]"
-
-media-ctl --set-v4l2 "'ov5640 2-003c':0[fmt:UYVY2X8/640x480 field:none]"
-media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/640x480 field:none]"
-media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/640x480 field:none]"
-media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:AYUV32/640x480 field:none]"
-media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/640x480 field:none]"
-
-[1] https://lkml.org/lkml/2018/5/31/543
-
-Jagan.
-
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
