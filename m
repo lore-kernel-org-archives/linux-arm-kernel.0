@@ -1,217 +1,156 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Thu, 7 Jun 2018 06:59:10 +0000
-Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
- <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
- <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
- <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
- <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
- <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
-Message-ID: <OSBPR01MB205442B483C792125E6A6AF7D2640@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 7 Jun 2018 09:08:35 +0200
+Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <AM0PR04MB4211E378DCBB769AB2C06BCF80640@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
+ <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
+ <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
+ <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
+ <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503124030.jkc7oox2vyjblk2y@pengutronix.de>
+ <AM0PR04MB421169E44830A17D8A52D3F4806A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180606141501.6prypkkxgsk3e7ee@pengutronix.de>
+ <AM0PR04MB4211E378DCBB769AB2C06BCF80640@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180607070835.ebqsj7qurcdvcubz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06 June 2018 22:53, Frank wrote:
-> On 06/06/18 14:48, Frank Rowand wrote:
-> > On 06/05/18 23:36, Michel Pollet wrote:
-> >> Hi Frank,
-> >>
-> >> On 05 June 2018 18:34, Frank wrote:
-> >>> On 06/05/18 04:28, Michel Pollet wrote:
-> >>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot
-> >>>> time, it requires a special enable method to get it started.
-> >>>>
-> >>>> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-> >>>> ---
-> >>>>  arch/arm/mach-shmobile/Makefile        |  1 +
-> >>>>  arch/arm/mach-shmobile/smp-r9a06g032.c | 79
-> >>>> ++++++++++++++++++++++++++++++++++
-> >>>>  2 files changed, 80 insertions(+)
-> >>>>  create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
-> >>>>
-> >>>> diff --git a/arch/arm/mach-shmobile/Makefile
-> >>>> b/arch/arm/mach-shmobile/Makefile index 1939f52..d7fc98f 100644
-> >>>> --- a/arch/arm/mach-shmobile/Makefile
-> >>>> +++ b/arch/arm/mach-shmobile/Makefile
-> >>>> @@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)+= smp-sh73a0.o
-> >>> headsmp-scu.o platsmp-scu.o
-> >>>>  smp-$(CONFIG_ARCH_R8A7779)+= smp-r8a7779.o headsmp-scu.o
-> >>> platsmp-scu.o
-> >>>>  smp-$(CONFIG_ARCH_R8A7790)+= smp-r8a7790.o
-> >>>> smp-$(CONFIG_ARCH_R8A7791)+= smp-r8a7791.o
-> >>>> +smp-$(CONFIG_ARCH_R9A06G032)+= smp-r9a06g032.o
-> >>>>  smp-$(CONFIG_ARCH_EMEV2)+= smp-emev2.o headsmp-scu.o
-> >>> platsmp-scu.o
-> >>>>
-> >>>>  # PM objects
-> >>>> diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c
-> >>>> b/arch/arm/mach-shmobile/smp-r9a06g032.c
-> >>>> new file mode 100644
-> >>>> index 0000000..cd40e6e
-> >>>> --- /dev/null
-> >>>> +++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
-> >>>> @@ -0,0 +1,79 @@
-> >>>> +// SPDX-License-Identifier: GPL-2.0
-> >>>> +/*
-> >>>> + * R9A06G032 Second CA7 enabler.
-> >>>> + *
-> >>>> + * Copyright (C) 2018 Renesas Electronics Europe Limited
-> >>>> + *
-> >>>> + * Michel Pollet <michel.pollet@bp.renesas.com>,
-> >>> <buserror@gmail.com>
-> >>>> + * Derived from action,s500-smp
-> >>>> + */
-> >>>> +
-> >>>> +#include <linux/io.h>
-> >>>> +#include <linux/of.h>
-> >>>> +#include <linux/of_address.h>
-> >>>> +#include <linux/smp.h>
-> >>>> +
-> >>>> +/*
-> >>>> + * The second CPU is parked in ROM at boot time. It requires
-> >>>> +waking it after
-> >>>> + * writing an address into the BOOTADDR register of sysctrl.
-> >>>> + *
-> >>>> + * So the default value of the "cpu-release-addr" corresponds to
-> >>> BOOTADDR...
-> >>>> + *
-> >>>> + * *However* the BOOTADDR register is not available when the
-> >>>> +kernel
-> >>>> + * starts in NONSEC mode.
-> >>>> + *
-> >>>> + * So for NONSEC mode, the bootloader re-parks the second CPU into
-> >>>> +a pen
-> >>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to a
-> >>>> +SRAM address,
-> >>>> + * which is not restricted.
-> >>>
-> >>> The binding document for cpu-release-addr does not have a definition
-> >>> for 32 bit arm.  The existing definition is only 64 bit arm.  Please
-> >>> add the definition for 32 bit arm to patch 1.
-> >>
-> >> Hmmm I do find a definition in
-> >> Documentation/devicetree/bindings/arm/cpus.txt -- just under where I
-> >> added my 'enable-method' -- And it is already used as 32 bits in at
-> >> least arch/arm/boot/dts/stih407-family.dtsi.
-> >
-> > If the correct answer is for cpu-release-addr to be 64 bits in certain
-> > cases (that discussion is ongoing further downthread) then one
-> > approach to maintain compatibility _and_ to fix the devicetree source
-> > files is to change the source code that currently gets
-> > cpu-release-addr as a
-> > 32 bit object to check the size of the property and get it as either a
-> > 32 bit or 64 bit object, based on the actual size of the property in
-> > the device tree and then change the value in the devicetree source
-> > files to be two cells.  BUT this does not consider the bootloader
-> > complication.  arch/arm/boot/dts/axm5516-cpus.dtsi has a note "//
-> > Fixed by the boot loader", so the boot loader also has to be modified
-> > to be able to handle the possibility that the property could be either
-> > 32 bits or 64 bits.  I don't know how to maintain compatibility with
-> > the boot loader since we can't force it to change synchronously with
-> > changes in the kernel.
-> >
-> > You can consider this comment to be a drive-by observation.  I think
-> > Rob and Geert and people like that are likely to be more helpful with
-> > what to actually do, and you can treat my comment more as pointing out
-> > the issue than as providing the perfect solution.
->
-> Darn it, hit <send> too quickly.
->
-> I meant to mention that there are several devicetree source files that have a
-> single cell value for cpu-release-addr, and thus potentially face the same
-> situation, depending on what the final decision is on the proper size for cpu-
-> release-addr. As of v4.17, a git grep shows one cell values in:
->
->   arch/arm/boot/dts/axm5516-cpus.dtsi
->   arch/arm/boot/dts/stih407-family.dtsi
->   arch/arm/boot/dts/stih418.dtsi
+On Thu, Jun 07, 2018 at 04:18:54AM +0000, A.s. Dong wrote:
+> Hi Sascha,
+> 
+> > > One problem of the way you suggested may be that:
+> > > If we doing like below, we may lose flexibility to change the MU used
+> > > for SCU firmware communication.
+> > > 	scu at 5d1b0000 {
+> > > 		compatible = "fsl,imx8qxp-scu";
+> > > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > > 	};
+> > >
+> > > And current design is that the system supports multiple MU channels
+> > > used by various users at the same time, e.g. SCU, Power Domain, Clock and
+> > others.
+> > > User can flexibly change it under their nodes: And each MU channel is
+> > > protected by their private lock and not affect each others.
+> > >
+> > > e.g.
+> > >         scu {
+> > >                 compatible = "nxp,imx8qxp-scu", "simple-bus";
+> > >                 fsl,mu = <&lsio_mu0>;
+> > >
+> > >                 clk: clk {
+> > >                         compatible = "fsl,imx8qxp-clk";
+> > >                         #clock-cells = <1>;
+> > >                 };
+> > >
+> > >                 iomuxc: iomuxc {
+> > >                         compatible = "fsl,imx8qxp-iomuxc";
+> > >                         fsl,mu = <&lsio_mu3>;
+> > >                 };
+> > >
+> > >                 imx8qx-pm {
+> > >                         #address-cells = <1>;
+> > >                         #size-cells = <0>;
+> > >                         fsl,mu = <&lsio_mu4>;
+> > > 	.............
+> > >         }
+> > >
+> > > The default code only uses MU0 which is used by SCU.
+> > >
+> > > The change may affect this design. Any ideas?
+> > 
+> > Sorry for the delay.
+> > 
+> > You can add the child nodes to the mu nodes they should use:
+> > 
+> > 	scu1 {
+> >         	compatible = "nxp,imx8qxp-scu";
+> > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > 
+> > 		clk: clk {
+> > 			compatible = "fsl,imx8qxp-clk";
+> > 			#clock-cells = <1>;
+> > 		};
+> > 
+> > 		...
+> > 	};
+> > 
+> > 	scu2 {
+> > 		compatible = "nxp,imx8qxp-scu";
+> > 		reg = <0x0 someothermu 0x0 0x10000>;
+> > 
+> > 		iomuxc: iomuxc {
+> > 			compatible = "fsl,imx8qxp-iomuxc";
+> > 		};
+> > 
+> > 		...
+> > 	};
+> > 
+> > So instead of adding all possible children to a single mu and phandle to other
+> > mu's, just add the right children to each mu.
+> > 
+> 
+> I got your point now. But sorry i'm still a bit hestitate to it....
+> 
+> This way increases complexity and looks more like a per-channel binding.
+> But we normally have only one (abstract) SCU firmware node in a system which may
+> use different channels to implement different functions like clk, pd and etc.
+> Multiple faked SCU nodes make people a bit confusing.
 
-Yes, I had grepped before I used 32 bits on mine...
+They are not faked, indeed that's the MU units that physically exist.
 
-Now, what is the decision here? Our bootloader is already modified to set it to 32 bits, so I propose that
+> Furthermore, it's still lose the flexibility for user to changing a MU to use.
+> 
+> Looking at all exist users in kernel, seems no one to use like this.
+> See:
+> Documentation/devicetree/bindings/arm/arm,scpi.txt
+> Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> 
+> All are similar like:
+> xxx: protocol-node {
+>                 compatible = "xxx-protocal";
+> 	  channel = ...
+>                 ...
+> 
+>                 clk_node: clk_node {
+>                         ...
+>                 };
+> 
+>                 pd_node: pd_node {
+>                         ...
+>                 };
+> };
+> The protocol node work is selecting the correct channel, do necessary initialization
+> and populate the all child function device nodes.
+> 
+> IMHO I'm still a bit like to this common way used in kernel if no stronger objection.
+> Do you think we can choose this way to go step forward?
 
-+ I change the driver to handle 32 and 64 bits properties
-+ I add this to the cpu.txt, as a separate patch:
-# On other systems, the property can be either
-  32 bits or 64 bits, it is the driver's responsibility
-  to deal with either sizes.
+I'm not convinced, but go ahead if you think this is the better way to
+proceed.
 
-Michel
+I think my original point that led to this discussion is the muddled way
+the MUs are handled in the code.
 
->
-> -Frank
->
-> > -Frnak
-> >
-> >
-> >>
-> >> What do you want me to add to this exactly? Do you want me to just
-> >> change "required for systems that have an "enable-method" property
-> >> value of "spin-table" to also specify renesas,r9a06g032 ?
-> >>
-> >> Thanks!
-> >> Michel
-> >>
-> >>>
-> >>> -Frank
-> >>>
-> >>>
-> >>>> + */
-> >>>> +
-> >>>> +static void __iomem *cpu_bootaddr;
-> >>>> +
-> >>>> +static DEFINE_SPINLOCK(cpu_lock);
-> >>>> +
-> >>>> +static int r9a06g032_smp_boot_secondary(unsigned int cpu, struct
-> >>>> +task_struct *idle) { if (!cpu_bootaddr) return -ENODEV;
-> >>>> +
-> >>>> +spin_lock(&cpu_lock);
-> >>>> +
-> >>>> +writel(__pa_symbol(secondary_startup), cpu_bootaddr);
-> >>>> +arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> >>>> +
-> >>>> +spin_unlock(&cpu_lock);
-> >>>> +
-> >>>> +return 0;
-> >>>> +}
-> >>>> +
-> >>>> +static void __init r9a06g032_smp_prepare_cpus(unsigned int
-> >>>> +max_cpus) { struct device_node *dn; int ret;
-> >>>> +u32 bootaddr;
-> >>>> +
-> >>>> +dn = of_get_cpu_node(1, NULL);
-> >>>> +if (!dn) {
-> >>>> +pr_err("CPU#1: missing device tree node\n"); return; }
-> >>>> +/*
-> >>>> + * Determine the address from which the CPU is polling.
-> >>>> + * The bootloader *does* change this property  */ ret =
-> >>>> +of_property_read_u32(dn, "cpu-release-addr", &bootaddr);
-> >>>> +of_node_put(dn); if (ret) {
-> >>>> +pr_err("CPU#1: invalid cpu-release-addr property\n"); return; }
-> >>>> +pr_info("CPU#1: cpu-release-addr %08x\n", bootaddr);
-> >>>> +
-> >>>> +cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr)); }
-> >>>> +
-> >>>> +static const struct smp_operations r9a06g032_smp_ops __initconst =
-> >>>> +{ .smp_prepare_cpus = r9a06g032_smp_prepare_cpus,
-> >>>> +.smp_boot_secondary = r9a06g032_smp_boot_secondary, };
-> >>>> +CPU_METHOD_OF_DECLARE(r9a06g032_smp, "renesas,r9a06g032-
-> smp",
-> >>>> +&r9a06g032_smp_ops);
-> >>>>
-> >>
-> >>
-> >>
-> >>
-> >> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne
-> End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under
-> Registered No. 04586709.
-> >>
-> >
-> >
+To start with in the system controller code you ioremap the physical
+address of the MU and later on pass this address as a reference to
+the MU library code. There's no way for the MU code to ever create a
+private data. It would be much better if you would pass mu_init a
+pointer to the device node it shall initialize, let mu_init allocate
+a private data struct, ioremap the base and put it in the private data
+struct, and return the private data struct.
 
+Then there is this sc_ipc_get_handle() thing that your consumers shall
+use to get a handle to the SCU. Instead of returning a struct sc_ipc *
+there you return a ida which you first have to search for each time
+a consumer wants to do something on the SCU. Please just return a
+pointer there (which can be a cookie, i.e. the struct definition is
+unknown to the consumer but privately to the SCU code).
 
+Sascha
 
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
