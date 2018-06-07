@@ -1,87 +1,36 @@
-From: naveen.n.rao@linux.vnet.ibm.com (Naveen N. Rao)
-Date: Thu, 07 Jun 2018 17:12:18 +0530
-Subject: [RFC PATCH -tip v5 24/27] bpf: error-inject: kprobes: Clear
- current_kprobe and enable preempt in kprobe
-In-Reply-To: <152812800822.10068.3306094708706993432.stgit@devbox>
-References: <152812730943.10068.5166429445118734697.stgit@devbox>
- <152812800822.10068.3306094708706993432.stgit@devbox>
-Message-ID: <1528371714.iz71qgzxv3.naveen@linux.ibm.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Fri, 8 Jun 2018 04:03:51 +0800
+Subject: [PATCH v4 0/2] support exception state migration and set VSESR_EL2 by
+ user space
+Message-ID: <1528401833-29963-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Masami Hiramatsu wrote:
-> Clear current_kprobe and enable preemption in kprobe
-> even if pre_handler returns !0.
-> 
-> This simplifies function override using kprobes.
-> 
-> Jprobe used to require to keep the preemption disabled and
-> keep current_kprobe until it returned to original function
-> entry. For this reason kprobe_int3_handler() and similar
-> arch dependent kprobe handers checks pre_handler result
-> and exit without enabling preemption if the result is !0.
-> 
-> After removing the jprobe, Kprobes does not need to
-> keep preempt disabled even if user handler returns !0
-> anymore.
-> 
-> But since the function override handler in error-inject
-> and bpf is also returns !0 if it overrides a function,
-> to balancing the preempt count, it enables preemption
-> and reset current kprobe by itself.
-> 
-> That is a bad design that is very buggy. This fixes
-> such unbalanced preempt-count and current_kprobes setting
-> in kprobes, bpf and error-inject.
-> 
-> Note: for powerpc and x86, this removes all preempt_disable
-> from kprobe_ftrace_handler because ftrace callbacks are
-> called under preempt disabled.
-> 
-> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: James Hogan <jhogan@kernel.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Rich Felker <dalias@libc.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: "Naveen N. Rao" <naveen.n.rao@linux.vnet.ibm.com>
-> Cc: Josef Bacik <jbacik@fb.com>
-> Cc: Alexei Starovoitov <ast@kernel.org>
-> Cc: x86 at kernel.org
-> Cc: linux-snps-arc at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-ia64 at vger.kernel.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-s390 at vger.kernel.org
-> Cc: linux-sh at vger.kernel.org
-> Cc: sparclinux at vger.kernel.org
-> ---
->  Changes in v5:
->   - Fix kprobe_ftrace_handler in arch/powerpc too.
-> ---
->  arch/arc/kernel/kprobes.c            |    5 +++--
->  arch/arm/probes/kprobes/core.c       |   10 +++++-----
->  arch/arm64/kernel/probes/kprobes.c   |   10 +++++-----
->  arch/ia64/kernel/kprobes.c           |   13 ++++---------
->  arch/mips/kernel/kprobes.c           |    4 ++--
->  arch/powerpc/kernel/kprobes-ftrace.c |   15 ++++++---------
->  arch/powerpc/kernel/kprobes.c        |    7 +++++--
+This series patch is separated from https://www.spinics.net/lists/kvm/msg168917.html
 
-For the powerpc bits:
-Acked-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
+1. Detect whether KVM can set set guest SError syndrome
+2. Support to Set VSESR_EL2 and inject SError by user space.
+3. Support live migration to keep SError pending state and VSESR_EL2 value
 
-Thanks,
-Naveen
+The user space patch is here: https://lists.gnu.org/archive/html/qemu-devel/2018-05/msg06965.html
+
+Dongjiu Geng (2):
+  arm64: KVM: export the capability to set guest SError syndrome
+  arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+
+ Documentation/virtual/kvm/api.txt    | 42 +++++++++++++++++++++++++++++++++---
+ arch/arm/include/asm/kvm_host.h      |  6 ++++++
+ arch/arm/include/uapi/asm/kvm.h      | 12 +++++++++++
+ arch/arm/kvm/guest.c                 | 12 +++++++++++
+ arch/arm64/include/asm/kvm_emulate.h |  5 +++++
+ arch/arm64/include/asm/kvm_host.h    |  7 ++++++
+ arch/arm64/include/uapi/asm/kvm.h    | 13 +++++++++++
+ arch/arm64/kvm/guest.c               | 36 +++++++++++++++++++++++++++++++
+ arch/arm64/kvm/inject_fault.c        |  6 +++---
+ arch/arm64/kvm/reset.c               |  4 ++++
+ include/uapi/linux/kvm.h             |  1 +
+ virt/kvm/arm/arm.c                   | 19 ++++++++++++++++
+ 12 files changed, 157 insertions(+), 6 deletions(-)
+
+-- 
+2.7.4
