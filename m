@@ -1,77 +1,209 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 07 Jun 2018 15:57:16 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.17 (#2)
-In-Reply-To: <20180602082431.lahocepns6vub6uq@localhost> (Olof Johansson's
- message of "Sat, 2 Jun 2018 01:24:31 -0700")
-References: <871sdvyfxj.fsf@bootlin.com>
- <20180602082431.lahocepns6vub6uq@localhost>
-Message-ID: <87k1ra66o3.fsf@bootlin.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 7 Jun 2018 13:59:26 +0000
+Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <20180607070835.ebqsj7qurcdvcubz@pengutronix.de>
+References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
+ <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
+ <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
+ <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
+ <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503124030.jkc7oox2vyjblk2y@pengutronix.de>
+ <AM0PR04MB421169E44830A17D8A52D3F4806A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180606141501.6prypkkxgsk3e7ee@pengutronix.de>
+ <AM0PR04MB4211E378DCBB769AB2C06BCF80640@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180607070835.ebqsj7qurcdvcubz@pengutronix.de>
+Message-ID: <AM0PR04MB42119006042C993F410D6CB080640@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
- 
- On sam., juin 02 2018, Olof Johansson <olof@lixom.net> wrote:
+Hi Sascha,
 
-> On Mon, May 28, 2018 at 05:10:16PM +0200, Gregory CLEMENT wrote:
->> Hi,
->> 
->> Here is the second pull request for fixes for mvebu for v4.17.
->> Nothing really critical but it needs to be fixed.
->> 
->> Gregory
->> 
->> The following changes since commit f43194c1447c9536efb0859c2f3f46f6bf2b9154:
->> 
->>   ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node (2018-04-27 17:47:24 +0200)
->> 
->> are available in the Git repository at:
->> 
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.17-2
->> 
->> for you to fetch changes up to ac62cc9d9cd6fa4c79e171c13dc8d58c3862b678:
->> 
->>   arm: dts: armada: Fix "#cooling-cells" property's name (2018-05-28 16:54:44 +0200)
->> 
->> ----------------------------------------------------------------
->> mvebu fixes for 4.17 (part 2)
->> 
->>  - Use correct size for ICU nodes (irq controller) on Armada 7K/8K
->>  - Fix "#cooling-cells" property's name on Synology DS116 (Armada 385)
->> 
->> ----------------------------------------------------------------
->> Miquel Raynal (1):
->>       arm64: dts: marvell: fix CP110 ICU node size
->> 
->> Viresh Kumar (1):
->>       arm: dts: armada: Fix "#cooling-cells" property's name
->
-> Subject here should be 'ARM: dts: ...'
->
-> The latter is definitely not 4.17 material by now. It's unclear on the ICU
-> patch whether it's causing a real problem in reality, i.e. if it's an urgent
-> regression fix or if it's just fixing up the register range to be correct per
-> documentation.  Let me know if it's a real issue and I can either cherry-pick
-> it or send a separate pull request with just that fix.
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Thursday, June 7, 2018 3:09 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: dongas86 at gmail.com; dl-linux-imx <linux-imx@nxp.com>;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+> 
+> On Thu, Jun 07, 2018 at 04:18:54AM +0000, A.s. Dong wrote:
+> > Hi Sascha,
+> >
+> > > > One problem of the way you suggested may be that:
+> > > > If we doing like below, we may lose flexibility to change the MU
+> > > > used for SCU firmware communication.
+> > > > 	scu at 5d1b0000 {
+> > > > 		compatible = "fsl,imx8qxp-scu";
+> > > > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > > > 	};
+> > > >
+> > > > And current design is that the system supports multiple MU
+> > > > channels used by various users at the same time, e.g. SCU, Power
+> > > > Domain, Clock and
+> > > others.
+> > > > User can flexibly change it under their nodes: And each MU channel
+> > > > is protected by their private lock and not affect each others.
+> > > >
+> > > > e.g.
+> > > >         scu {
+> > > >                 compatible = "nxp,imx8qxp-scu", "simple-bus";
+> > > >                 fsl,mu = <&lsio_mu0>;
+> > > >
+> > > >                 clk: clk {
+> > > >                         compatible = "fsl,imx8qxp-clk";
+> > > >                         #clock-cells = <1>;
+> > > >                 };
+> > > >
+> > > >                 iomuxc: iomuxc {
+> > > >                         compatible = "fsl,imx8qxp-iomuxc";
+> > > >                         fsl,mu = <&lsio_mu3>;
+> > > >                 };
+> > > >
+> > > >                 imx8qx-pm {
+> > > >                         #address-cells = <1>;
+> > > >                         #size-cells = <0>;
+> > > >                         fsl,mu = <&lsio_mu4>;
+> > > > 	.............
+> > > >         }
+> > > >
+> > > > The default code only uses MU0 which is used by SCU.
+> > > >
+> > > > The change may affect this design. Any ideas?
+> > >
+> > > Sorry for the delay.
+> > >
+> > > You can add the child nodes to the mu nodes they should use:
+> > >
+> > > 	scu1 {
+> > >         	compatible = "nxp,imx8qxp-scu";
+> > > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > >
+> > > 		clk: clk {
+> > > 			compatible = "fsl,imx8qxp-clk";
+> > > 			#clock-cells = <1>;
+> > > 		};
+> > >
+> > > 		...
+> > > 	};
+> > >
+> > > 	scu2 {
+> > > 		compatible = "nxp,imx8qxp-scu";
+> > > 		reg = <0x0 someothermu 0x0 0x10000>;
+> > >
+> > > 		iomuxc: iomuxc {
+> > > 			compatible = "fsl,imx8qxp-iomuxc";
+> > > 		};
+> > >
+> > > 		...
+> > > 	};
+> > >
+> > > So instead of adding all possible children to a single mu and
+> > > phandle to other mu's, just add the right children to each mu.
+> > >
+> >
+> > I got your point now. But sorry i'm still a bit hestitate to it....
+> >
+> > This way increases complexity and looks more like a per-channel binding.
+> > But we normally have only one (abstract) SCU firmware node in a system
+> > which may use different channels to implement different functions like clk,
+> pd and etc.
+> > Multiple faked SCU nodes make people a bit confusing.
+> 
+> They are not faked, indeed that's the MU units that physically exist.
+> 
+> > Furthermore, it's still lose the flexibility for user to changing a MU to use.
+> >
+> > Looking at all exist users in kernel, seems no one to use like this.
+> > See:
+> > Documentation/devicetree/bindings/arm/arm,scpi.txt
+> > Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> >
+> > All are similar like:
+> > xxx: protocol-node {
+> >                 compatible = "xxx-protocal";
+> > 	  channel = ...
+> >                 ...
+> >
+> >                 clk_node: clk_node {
+> >                         ...
+> >                 };
+> >
+> >                 pd_node: pd_node {
+> >                         ...
+> >                 };
+> > };
+> > The protocol node work is selecting the correct channel, do necessary
+> > initialization and populate the all child function device nodes.
+> >
+> > IMHO I'm still a bit like to this common way used in kernel if no stronger
+> objection.
+> > Do you think we can choose this way to go step forward?
+> 
+> I'm not convinced, but go ahead if you think this is the better way to proceed.
+> 
+> I think my original point that led to this discussion is the muddled way the
+> MUs are handled in the code.
+> 
+> To start with in the system controller code you ioremap the physical address
+> of the MU and later on pass this address as a reference to the MU library
+> code. There's no way for the MU code to ever create a private data. It would
+> be much better if you would pass mu_init a pointer to the device node it shall
+> initialize, let mu_init allocate a private data struct, ioremap the base and put
+> it in the private data struct, and return the private data struct.
+> 
 
-Even the first patch did not fix a regression. But it is more just than
-just fixing the documentation as the extension of the size of the
-register set is needed to support more feature provided by ICU (it is
-part of series already submitted).
+Actually I have tried that way initially, but ....
 
-It's not a problem for me that this PR was not merged in 4.17, but could
-you add it for 4.18 in the current merge window?
+> Then there is this sc_ipc_get_handle() thing that your consumers shall use to
+> get a handle to the SCU. Instead of returning a struct sc_ipc * there you
+> return a ida which you first have to search for each time a consumer wants to
+> do something on the SCU. Please just return a pointer there (which can be a
+> cookie, i.e. the struct definition is unknown to the consumer but privately to
+> the SCU code).
+> 
 
-Thanks,
+The problem is that sc_ipc_t is defined as uint32_t.
+/*
+ * This type is used to declare a handle for an IPC communication
+ * channel. Its meaning is specific to the IPC implementation.
+ */
+typedef uint32_t sc_ipc_t;
 
-Gregory
+which is referenced by the standard rpc call:
+void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp)
 
->
->
-> -Olof
->
+I can't return a pointer which is 64bit on ARMv8 platform and used it
+for sc_call_rpc directly.
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+That why I need a way to convert struct sc_ipc_t to struct sc_ipc 
+(done by sc_ipc_get(ipc)).
+
+But you're right, that means we have to search for each time a consumer
+wants to do something on the SCU.
+
+If we want to void it,  one possible way may be changing the prototype of
+both ipc handle sc_ipc_t  and IPC channel ID sc_ipc_id_t to unsigned long,
+then we can directly pass them the address pointer.
+
+Although I initially don't want to changing SCU API prototype, but if we
+have to, I will do it.
+
+Sounds good to you?
+
+Regards
+Dong Aisheng
+
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7Cda4
+> 4ef30db214900616308d5cc457d56%7C686ea1d3bc2b4c6fa92cd99c5c301635%7
+> C0%7C0%7C636639521186927654&sdata=hBYUnrXnHQnaqS0Ovd9mYuUALU2
+> OpEH%2BseZxE6BgvJw%3D&reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
