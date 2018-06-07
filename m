@@ -1,80 +1,71 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu,  7 Jun 2018 19:17:48 +0530
-Subject: [PATCH v2 4/4] ARM: dts: i.MX6: imx6dl-mamoj: Add usb host and device
- support
-In-Reply-To: <20180607134748.2970-1-jagan@amarulasolutions.com>
-References: <20180607134748.2970-1-jagan@amarulasolutions.com>
-Message-ID: <20180607134748.2970-3-jagan@amarulasolutions.com>
+Date: Thu,  7 Jun 2018 19:21:31 +0530
+Subject: [PATCH 1/3] ARM: dts: imx6dl: Add Engicam i.CoreM6 1.5 Quad/Dual MIPI
+ starter kit support
+Message-ID: <20180607135133.3104-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Trimarchi <michael@amarulasolutions.com>
+i.CoreM6 1.5 is an another i.CoreM6 QDL cpu modules which can be connected
+to EDIMM starter kit design with eMMC and MIPI-CSI interfaces suitable for
+Android and video capture application.
 
-Add USB host and device support for BTicino i.MX6DL Mamoj board.
+notable features:
+CPU                 NXP i.MX6 S/DL/D/Q, Up to 4 x Cortex-A9 at 800MHz
+Memory              Up to 2 GB DDR3-1066
+Video Interfaces    Up to 1 Parallel Up to 2 LVDS HDMI 1.4
+                    port 8 bit CSI INPUT MIPI-CSI INPUT
+1 x 10/100 Ethernet interface, 2 x USB, 1 x PCIe, 1 x I2S etc
 
-Signed-off-by: Simone CIANNI <simone.cianni@bticino.it>
-Signed-off-by: Raffaele RECALCATI <raffaele.recalcati@bticino.it>
-Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-Changes for v2:
-- collect Fabio r-w-b tag
+ arch/arm/boot/dts/Makefile              |  1 +
+ arch/arm/boot/dts/imx6dl-icore-mipi.dts | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-icore-mipi.dts
 
- arch/arm/boot/dts/imx6dl-mamoj.dts | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6dl-mamoj.dts b/arch/arm/boot/dts/imx6dl-mamoj.dts
-index 5034b086035f..a727e1471006 100644
---- a/arch/arm/boot/dts/imx6dl-mamoj.dts
-+++ b/arch/arm/boot/dts/imx6dl-mamoj.dts
-@@ -134,6 +134,17 @@
- 		vin-supply = <&reg_lcd_vgl>;
- 	};
- 
-+	reg_usb_host: regulator-usb-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usbhost-vbus";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbhost>;
-+		regulator-min-microvolt = <50000000>;
-+		regulator-max-microvolt = <50000000>;
-+		gpio = <&gpio6 6 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 37a3de760d40..2dead792ba9d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -400,6 +400,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-hummingboard2-emmc-som-v15.dtb \
+ 	imx6dl-hummingboard2-som-v15.dtb \
+ 	imx6dl-icore.dtb \
++	imx6dl-icore-mipi.dtb \
+ 	imx6dl-icore-rqs.dtb \
+ 	imx6dl-mamoj.dtb \
+ 	imx6dl-nit6xlite.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-icore-mipi.dts b/arch/arm/boot/dts/imx6dl-icore-mipi.dts
+new file mode 100644
+index 000000000000..bf53f0552aa1
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-icore-mipi.dts
+@@ -0,0 +1,25 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2018 Engicam S.r.l.
++ * Copyright (C) 2018 Amarula Solutions B.V.
++ * Author: Jagan Teki <jagan@amarulasolutions.com>
++ */
 +
- 	reg_wl18xx_vmmc:  regulator-wl18xx-vmcc {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vwl1807";
-@@ -297,6 +308,16 @@
- 	status = "okay";
- };
- 
-+&usbh1 {
-+	vbus-supply = <&reg_usb_host>;
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-icore.dtsi"
++
++/ {
++	model = "Engicam i.CoreM6 DualLite/Solo MIPI Starter Kit";
++	compatible = "engicam,imx6-icore", "fsl,imx6dl";
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
 +	status = "okay";
 +};
 +
-+&usbotg {
-+	dr_mode = "peripheral";
++&usdhc3 {
 +	status = "okay";
 +};
-+
- &usdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1>;
-@@ -428,6 +449,12 @@
- 		>;
- 	};
- 
-+	pinctrl_usbhost: usbhost {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_A23__GPIO6_IO06		0x4001b0b0
-+		>;
-+	};
-+
- 	pinctrl_usdhc1: usdhc1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17069
 -- 
 2.14.3
