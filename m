@@ -1,39 +1,65 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 7 Jun 2018 12:26:07 +0200
-Subject: Common config for N900 and D4
-In-Reply-To: <20180605042627.GB5738@atomide.com>
-References: <20180603104839.GA21197@amd> <20180603165336.GA26995@amd>
- <20180603210115.GA7438@amd> <20180605042627.GB5738@atomide.com>
-Message-ID: <20180607102607.GA4372@localhost>
+From: johan@kernel.org (Johan Hovold)
+Date: Thu, 7 Jun 2018 12:27:01 +0200
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
+ disable compiler auto-inline optimizations
+In-Reply-To: <314bb2b3-186e-d7b0-d800-f77a42fd80fa@linaro.org>
+References: <20180606142600.GN13775@localhost>
+ <20180606142622.2338abf6@vmware.local.home>
+ <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
+ <20180607074628.kd3iyxevwj3ypzbr@intel.com>
+ <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
+ <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
+ <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
+ <20180607091816.GT13775@localhost>
+ <20180607091923.n5q5uzsxuymy3vov@vireshk-i7>
+ <314bb2b3-186e-d7b0-d800-f77a42fd80fa@linaro.org>
+Message-ID: <20180607102701.GU13775@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > > [    0.000000] L2C-310 erratum 727915 enabled
-> > > > [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-> > > > [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-> > > 
-> > > I tried disabling outer cache to get rid of this. That got me further
-> > > in boot, but not to working system:
+On Thu, Jun 07, 2018 at 05:12:51AM -0500, Alex Elder wrote:
+> On 06/07/2018 04:19 AM, Viresh Kumar wrote:
+> > On 07-06-18, 11:18, Johan Hovold wrote:
+> >> If you want to work around the warning and think you can do it in some
+> >> non-contrived way, then go for it.
+> >>
+> >> Clearing the request buffer, checking for termination using strnlen, and
+> >> then using memcpy might not be too bad.
+> >>
+> >> But after all, it is a false positive, so leaving things as they stand
+> >> is fine too.
 > > 
-> > I now have config that works.
+> > Leave it then :)
 > > 
-> > My kernels were probably grossly misconfigured (OMAP4 not enabled on
-> > droid4)... still I'd expect some kind of panic explaining board is not
-> > compatible with kernel, not a random oops...
 > 
-> Like "clk-provider not found" error? :) I agree it's not very
-> descriptive and I think we could easily print something from
-> after the SoC detection for missing pdata.
+> It's interesting that the warning isn't reported for this in
+> fw_mgmt_interface_fw_version_operation().  The difference there is
+> that you actually put a zero byte at that last position before
+> returning.  I'm mildly impressed if gcc is distinguishing that.
 
-If you had patch for testing, or pointer where such check would
-belong, that would be nice. I might try to do something, but now it
-boots so it is not too high priority for me.
+Found a redhat blog post claiming it does check for some cases like
+that:
+
+	https://developers.redhat.com/blog/2018/05/24/detecting-string-truncation-with-gcc-8/
+
+> You *are* returning the fw_info->firmware_tag array newly filled
+> with a non-null-terminated string in one of the two cases that
+> get warnings in "fw-management.c".
+
+No, there's no warning for that one (line 250), and there fw_info is
+used as the source, not the destination, so no unterminated string is
+returned there either.
+
+> But the other one is only
+> updating a buffer in a local/automatic variable.
+
+All three cases, except the one that is explicitly terminated.
+
+> Weird.  I wish there were a non-clumsy way of marking false positives
+> like this as A-OK.
+
+The gcc docs mentions an attribute for that but it seems a bit overkill
+here.
 
 Thanks,
-							Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Johan
