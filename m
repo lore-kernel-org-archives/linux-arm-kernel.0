@@ -1,45 +1,77 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Thu,  7 Jun 2018 09:56:45 -0400
-Subject: [RFC V2 0/3] arm_pmu: acpi: variant support and QCOM Falkor extensions
-Message-ID: <1528379808-27970-1-git-send-email-agustinv@codeaurora.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 07 Jun 2018 15:57:16 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.17 (#2)
+In-Reply-To: <20180602082431.lahocepns6vub6uq@localhost> (Olof Johansson's
+ message of "Sat, 2 Jun 2018 01:24:31 -0700")
+References: <871sdvyfxj.fsf@bootlin.com>
+ <20180602082431.lahocepns6vub6uq@localhost>
+Message-ID: <87k1ra66o3.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is a complete re-design of V1 of the QCOM Falkor extensions [1],
-it introduces a probe table based on the HID of a device nested under the CPU
-device to allow variant detection and arm_pmu customization.
+Hi Olof,
+ 
+ On sam., juin 02 2018, Olof Johansson <olof@lixom.net> wrote:
 
-The first patch adds an additional section at the end of each ACPI probe table.
-This allows probe tables to be sentinel-delimited and better accommodate some
-APIs that require such tables.
+> On Mon, May 28, 2018 at 05:10:16PM +0200, Gregory CLEMENT wrote:
+>> Hi,
+>> 
+>> Here is the second pull request for fixes for mvebu for v4.17.
+>> Nothing really critical but it needs to be fixed.
+>> 
+>> Gregory
+>> 
+>> The following changes since commit f43194c1447c9536efb0859c2f3f46f6bf2b9154:
+>> 
+>>   ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node (2018-04-27 17:47:24 +0200)
+>> 
+>> are available in the Git repository at:
+>> 
+>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.17-2
+>> 
+>> for you to fetch changes up to ac62cc9d9cd6fa4c79e171c13dc8d58c3862b678:
+>> 
+>>   arm: dts: armada: Fix "#cooling-cells" property's name (2018-05-28 16:54:44 +0200)
+>> 
+>> ----------------------------------------------------------------
+>> mvebu fixes for 4.17 (part 2)
+>> 
+>>  - Use correct size for ICU nodes (irq controller) on Armada 7K/8K
+>>  - Fix "#cooling-cells" property's name on Synology DS116 (Armada 385)
+>> 
+>> ----------------------------------------------------------------
+>> Miquel Raynal (1):
+>>       arm64: dts: marvell: fix CP110 ICU node size
+>> 
+>> Viresh Kumar (1):
+>>       arm: dts: armada: Fix "#cooling-cells" property's name
+>
+> Subject here should be 'ARM: dts: ...'
+>
+> The latter is definitely not 4.17 material by now. It's unclear on the ICU
+> patch whether it's causing a real problem in reality, i.e. if it's an urgent
+> regression fix or if it's just fixing up the register range to be correct per
+> documentation.  Let me know if it's a real issue and I can either cherry-pick
+> it or send a separate pull request with just that fix.
 
-The second patch adds the PMUv3 ACPI probe table and plumbing to allow drivers
-to plug into the ACPI PMUv3 probe sequence.
+Even the first patch did not fix a regression. But it is more just than
+just fixing the documentation as the extension of the size of the
+register set is needed to support more feature provided by ICU (it is
+part of series already submitted).
 
-The third patch adds the QCOM Falkor extensions using the new probe table.
+It's not a problem for me that this PR was not merged in 4.17, but could
+you add it for 4.18 in the current merge window?
 
-If this found to be a reasonable extension approach other patches will be
-added to the series to build on the base QCOM extensions.
+Thanks,
 
-[1] https://lkml.org/lkml/2017/3/1/540
+Gregory
 
-Changes since V1:
-- Redesign as a separate module by adding variant detection support.
+>
+>
+> -Olof
+>
 
-Agustin Vega-Frias (3):
-  ACPI: add support for sentinel-delimited probe tables
-  arm_pmu: acpi: add support for CPU PMU variant detection
-  perf: qcom: Add Falkor CPU PMU IMPLEMENTATION DEFINED event support
-
- drivers/perf/Makefile             |   2 +-
- drivers/perf/arm_pmu_acpi.c       |  27 ++++
- drivers/perf/qcom_arm_pmu.c       | 310 ++++++++++++++++++++++++++++++++++++++
- include/asm-generic/vmlinux.lds.h |   4 +-
- include/linux/acpi.h              |  11 ++
- include/linux/perf/arm_pmu.h      |   1 +
- 6 files changed, 353 insertions(+), 2 deletions(-)
- create mode 100644 drivers/perf/qcom_arm_pmu.c
-
---
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
