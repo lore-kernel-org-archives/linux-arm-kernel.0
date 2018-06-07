@@ -1,67 +1,48 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Jun 2018 11:13:53 +0200
-Subject: [PATCH v4 05/14] coresight: get/put module in
- coresight_build/release_path
-In-Reply-To: <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
-References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-6-kim.phillips@arm.com>
- <20180606082422.GB19727@kroah.com>
- <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
- <20180606155501.704583e1412996a1a2c6fa61@arm.com>
- <20180607083401.GE16651@kroah.com>
- <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
-Message-ID: <20180607091353.GA20438@kroah.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Thu, 7 Jun 2018 11:18:16 +0200
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
+ disable compiler auto-inline optimizations
+In-Reply-To: <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
+References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
+ <201806060501.btF3aJMZ%fengguang.wu@intel.com>
+ <20180606095714.1d3c2def@vmware.local.home>
+ <20180606142600.GN13775@localhost>
+ <20180606142622.2338abf6@vmware.local.home>
+ <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
+ <20180607074628.kd3iyxevwj3ypzbr@intel.com>
+ <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
+ <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
+ <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
+Message-ID: <20180607091816.GT13775@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
-> Hi Greg,
-> 
-> On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
-> > On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
-> > > On Wed, 6 Jun 2018 10:46:36 +0100
-> > > Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+On Thu, Jun 07, 2018 at 02:40:25PM +0530, Viresh Kumar wrote:
+> On 07-06-18, 11:03, Bernd Petrovitsch wrote:
+> > On Thu, 2018-06-07 at 14:08 +0530, Viresh Kumar wrote:
+> > > On 07-06-18, 15:46, Du, Changbin wrote:
+> > > > I think if the destination is not a null terminated string (If I understand your
+> > > > description below), memcpy can be used to get rid of such warning. The warning
+> > > > makes sense in general as explained in mannual. Thanks!
 > > > 
-> > > > On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
-> > > > > On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
-> > > > > > Increment the refcnt for driver modules in current use by calling
-> > > > > > module_get in coresight_build_path and module_put in release_path.
-> > > > > > 
-> > > > > > This prevents driver modules from being unloaded when they are in use,
-> > > > > > either in sysfs or perf mode.
-> > > > > 
-> > > > > Why does it matter?  Shouldn't you be allowed to remove any module at
-> > > > > any point in time, much like a networking driver?
+> > > The destination should be a null terminated string eventually, but we first need
+> > > to make sure src is a null terminated string.
+> > 
+> > Is there strnlen() or memchr() in the kernel?
+> > Then check the source before copying it.
 > 
-> The user doesn't have an explicit refcount on the individual components
-> in a trace session. So, when a trace session is in progress, it is as
-> good as having a "file" open on each component that is part of the
-> active trace session. So, we don't want the driver to be removed when
-> the component is being used in the trace collection.
+> It would be extra work, but memchr can be used to work around this I believe.
+> 
+> @Johan ??
 
-Why not?  What's wrong with that happening and then the trace collection
-starts failing with -ENODEV or something?
+If you want to work around the warning and think you can do it in some
+non-contrived way, then go for it.
 
-Remember, removing a kernel module is something that only happens very
-rarely, and is an explicit choice by someone with root permissions.  If
-you want to remove that module, it should be able to go, as you know
-what you are doing at that point in time.
+Clearing the request buffer, checking for termination using strnlen, and
+then using memcpy might not be too bad.
 
-Don't try to "protect the user from themselves" here, they want to shoot
-their foot, make it hurt if they are aiming it there :)
+But after all, it is a false positive, so leaving things as they stand
+is fine too.
 
-> This will be
-> released as soon as the session is ended. It is just like a PMU driver
-> where the module refcount is held to ensure the module stays until the
-> session is over. In this case, we have multiple components, each with
-> its own driver invisible to the PMU driver. Hence the coresight driver
-> must hold the reference.
-
-Again, please think this through and don't add extra complexity to the
-normal path, and get it right if you do it (the existing patch is not
-right as I pointed out.)  Personally, I feel the code should just be
-able to be unloaded whenever they want, user beware...
-
-thanks,
-
-greg k-h
+Thanks,
+Johan
