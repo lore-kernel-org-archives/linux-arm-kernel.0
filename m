@@ -1,55 +1,55 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 6 Jun 2018 16:40:29 -0700
-Subject: [PATCH v4 0/6] Enhance support for the SP805 WDT
-In-Reply-To: <e3f657f1-bd7e-cadb-9cfe-dee6cf8c1668@gmail.com>
-References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
- <e3f657f1-bd7e-cadb-9cfe-dee6cf8c1668@gmail.com>
-Message-ID: <79188fe9-1da3-94d2-ee1f-0c04d3aa9225@broadcom.com>
+From: evgreen@chromium.org (Evan Green)
+Date: Wed, 6 Jun 2018 18:06:05 -0700
+Subject: [PATCH v4 1/7] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <c98d2ee2-c4fa-eb35-e6ae-f6d9c91ffe6c@linaro.org>
+References: <20180309210958.16672-1-georgi.djakov@linaro.org>
+ <20180309210958.16672-2-georgi.djakov@linaro.org>
+ <CAE=gft76VpU1mXgNPK9-XTj6WoLHj-_SxAGuV-bUSNYVpfSn6w@mail.gmail.com>
+ <43fedb5b-f4a5-8362-d0a2-534b85473bc1@linaro.org>
+ <c98d2ee2-c4fa-eb35-e6ae-f6d9c91ffe6c@linaro.org>
+Message-ID: <CAE=gft71Y+0dcYtJmq6nxG99--yRGUXf+B9_+GWPTTrin+TBjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Wed, Jun 6, 2018 at 11:09 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>
+> Hi Evan,
+>
+> On 06/06/2018 05:59 PM, Georgi Djakov wrote:
+> >>> +
+> >>> +/**
+> >>> + * icc_node_create() - create a node
+> >>> + * @id: node id
+> >>> + *
+> >>> + * Return: icc_node pointer on success, or ERR_PTR() on error
+> >>> + */
+> >>> +struct icc_node *icc_node_create(int id)
+> >>> +{
+> >>> +       struct icc_node *node;
+> >>> +
+> >>> +       /* check if node already exists */
+> >>> +       node = node_find(id);
+> >>> +       if (node)
+> >>> +               return node;
+> >>
+> >> This is probably going to do more harm than good once icc_node_delete comes
+> >> in, since it almost certainly indicates a programmer error or ID collision,
+> >> and will likely result in a double free. We should probably fail with
+> >> EEXIST instead.
+> >
+> > In the current approach we create the nodes one by one, and the linked
+> > nodes are created when they are referenced. The other way around would
+> > be to create first all the nodes and then populate the links to avoid
+> > the "chicken and egg" problem.
+> >
+>
+> Just to elaborate a bit more on that: We can't actually register all the
+> nodes in advance, as we might have multiple interconnect providers
+> probing in different order. Each provider may have nodes linking to
+> nodes belonging to other providers (not probed yet). That's why we
+> create the nodes on the first reference and then, when the actual
+> provider driver is probed, the rest of the node data is filled.
+>
 
-On 6/6/2018 12:29 PM, Florian Fainelli wrote:
-> On 05/28/2018 11:01 AM, Ray Jui wrote:
->> This patch series enhances the support for the SP805 watchdog timer.
->> First of all, 'timeout-sec' devicetree property is added. In addition,
->> support is also added to allow the driver to reset the watchdog if it
->> has been detected that watchdot has been started in the bootloader. In
->> this case, the driver will initiate the ping service from the kernel
->> watchdog subsystem, before a user mode daemon takes over. This series
->> also enables SP805 in the default ARM64 defconfig
->>
->> This patch series is based off v4.17-rc5 and is available on GIHUB:
->> repo: https://github.com/Broadcom/arm64-linux.git
->> branch: sp805-wdt-v4
->>
->> Changes since v3:
->>   - Improve description of 'timeout-sec' in the binding document, per
->> recommendation from Guenter Roeck
->>
->> Changes since v2:
->>   - Fix indent and format to make them consistent within arm,sp805.txt
->>
->> Changes since v1:
->>   - Consolidate two duplicated SP805 binding documents into one
->>   - Slight change of the wdt_is_running implementation per discussion
->>
->> Ray Jui (6):
->>    Documentation: DT: Consolidate SP805 binding docs
->>    Documentation: DT: Add optional 'timeout-sec' property for sp805
->>    watchdog: sp805: add 'timeout-sec' DT property support
->>    watchdog: sp805: set WDOG_HW_RUNNING when appropriate
->>    arm64: dt: set initial SR watchdog timeout to 60 seconds
->>    arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
-> 
-> I can take the last two patches and Guenter would take the first 4 or
-> would you want to proceed differently?
-> 
-
-It looks like we still need to figure out how to proceed based on 
-discussions with Rob and Guenter on 1/6?
-
-Thanks,
-
-Ray
+Ah ok, the extra explanation helped a lot. This makes sense to me. Thanks.
+-Evan
