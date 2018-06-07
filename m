@@ -1,52 +1,103 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 7 Jun 2018 10:43:26 +0100
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 7 Jun 2018 11:53:22 +0200
 Subject: [PATCH v4 05/14] coresight: get/put module in
  coresight_build/release_path
-In-Reply-To: <20180606155501.704583e1412996a1a2c6fa61@arm.com>
+In-Reply-To: <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
 References: <20180605210710.22227-1-kim.phillips@arm.com>
  <20180605210710.22227-6-kim.phillips@arm.com>
  <20180606082422.GB19727@kroah.com>
  <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
  <20180606155501.704583e1412996a1a2c6fa61@arm.com>
-Message-ID: <30e98462-237f-df2f-39d9-f0414f52b950@arm.com>
+ <20180607083401.GE16651@kroah.com>
+ <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
+ <20180607091353.GA20438@kroah.com>
+ <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
+Message-ID: <20180607095322.GA26174@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2018 09:55 PM, Kim Phillips wrote:
-> On Wed, 6 Jun 2018 10:46:36 +0100
-> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-
+On Thu, Jun 07, 2018 at 10:32:21AM +0100, Suzuki K Poulose wrote:
+> On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
+> > On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
+> > > Hi Greg,
+> > > 
+> > > On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
+> > > > On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
+> > > > > On Wed, 6 Jun 2018 10:46:36 +0100
+> > > > > Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> > > > > 
+> > > > > > On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
+> > > > > > > On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
+> > > > > > > > Increment the refcnt for driver modules in current use by calling
+> > > > > > > > module_get in coresight_build_path and module_put in release_path.
+> > > > > > > > 
+> > > > > > > > This prevents driver modules from being unloaded when they are in use,
+> > > > > > > > either in sysfs or perf mode.
+> > > > > > > 
+> > > > > > > Why does it matter?  Shouldn't you be allowed to remove any module at
+> > > > > > > any point in time, much like a networking driver?
+> > > 
+> > > The user doesn't have an explicit refcount on the individual components
+> > > in a trace session. So, when a trace session is in progress, it is as
+> > > good as having a "file" open on each component that is part of the
+> > > active trace session. So, we don't want the driver to be removed when
+> > > the component is being used in the trace collection.
+> > 
+> > Why not?  What's wrong with that happening and then the trace collection
+> > starts failing with -ENODEV or something?
 > 
->> And while we are at this, I also realised that we hold references to the
->> parent devices for each connection (via bus_find_device() from
->> of_coresight_get_endpoint_device()), while parsing the platform data,
->> which is never released.
+> May be I am missing something here. Can we allow the driver to be removed
+> when one of its device is "turned ON" and we need the same
+> driver to "turn it OFF" when the session ends ? To make a better
+> comparison :
 > 
-> Would this fix that?:
+> Can we unload a usb_mass_storage module when a USB disk(which uses the
+> module driver) is mounted and is being used ? I believe, the module
+> will eventually get unloaded when we unmount the disk, if someone did
+> a unload.
 
-Not completely. We store the dev_name() as a reference, which itself can 
-be free'd, when the device is gone. I have a fix for this in my next
-version of the DT clean up series [0], where I clean up most of the
-platform parsing code.
+No, mount causes the module count to be incrememted.  Mount and
+"open/close" are the old-school way of doing module reference counting.
 
+Look at how network drivers work today, you can unload any network
+driver even if there is a valid network connection "up and running"
+attached to it.  It just gets torn down when that request happens.
 
-[0] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582904.html
+> We have a similar situation here. The only difference is the driver is
+> referenced only when one of its device is in a trace session.
 
-Cheers
-Suzuki
+I understand, I'm saying that you have to be very careful when messing
+around with module reference counts to get it correct and perhaps you
+should just change your design to not care about module reference counts
+at all, like networking did 15+ years ago.
 
+Let's learn from the good examples in our past (like networking), and
+not like the older bad examples (like mount/files).
+
+> > Remember, removing a kernel module is something that only happens very
+> > rarely, and is an explicit choice by someone with root permissions.  If
+> > you want to remove that module, it should be able to go, as you know
+> > what you are doing at that point in time.
 > 
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index a33a92ebe74b..a43ab078c85e 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -181,6 +181,8 @@ of_get_coresight_platform_data(struct device *dev,
->                          pdata->child_names[i] = dev_name(rdev);
->                          pdata->child_ports[i] = rendpoint.id;
->   
-> +                       put_device(rdev);
-> +
->                          i++;
->                  } while (ep);
->          }
+> Right, but when a device is "in use" can we do that ? I thought the user
+> will get a module is in use or busy, error.
+
+Try it on networking today :)
+
+> > Don't try to "protect the user from themselves" here, they want to shoot
+> > their foot, make it hurt if they are aiming it there :)
+> > 
+> 
+> The module_get/put added here are only triggered when we start a trace
+> session, where we build a path for the current session from the configured
+> "source" to the configured "sink" and the path is destroyed
+> at the end of the trace session. i.e, the path is not a permanent thing.
+> It is constructed per session. So it is perfectly possible to remove a
+> device in between trace sessions.
+
+That's fine, but again, just be careful to get this correct.  The patch
+I reviewed did not seem to do that.
+
+thanks,
+
+greg k-h
