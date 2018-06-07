@@ -1,69 +1,41 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 7 Jun 2018 08:34:40 +0100
-Subject: [PATCH v2 3/5] arm_pmu: Add support for 64bit event counters
-In-Reply-To: <20180606164838.zeuygsp4teq64zor@lakrids.cambridge.arm.com>
-References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
- <1527591356-10934-4-git-send-email-suzuki.poulose@arm.com>
- <20180606164838.zeuygsp4teq64zor@lakrids.cambridge.arm.com>
-Message-ID: <9d76ba06-921f-142b-5ab2-c30985558205@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jun 2018 00:35:30 -0700
+Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
+In-Reply-To: <20180606060826.14671-5-faiz_abbas@ti.com>
+References: <20180606060826.14671-1-faiz_abbas@ti.com>
+ <20180606060826.14671-5-faiz_abbas@ti.com>
+Message-ID: <20180607073530.GH5738@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2018 05:48 PM, Mark Rutland wrote:
-> On Tue, May 29, 2018 at 11:55:54AM +0100, Suzuki K Poulose wrote:
->> Each PMU has a set of 32bit event counters. But in some
->> special cases, the events could be counted using counters
->> which are effectively 64bit wide.
->>
->> e.g, Arm V8 PMUv3 has a 64 bit cycle counter which can count
->> only the CPU cycles. Also, the PMU can chain the event counters
->> to effectively count as a 64bit counter.
->>
->> Add support for tracking the events that uses 64bit counters.
->> This only affects the periods set for each counter in the core
->> driver.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->> Changes since v1:
->>   - Rename ARMPMU_EVT_LONG => ARMPMU_EVT_64BIT
->> ---
->>   drivers/perf/arm_pmu.c       | 14 ++++++++------
->>   include/linux/perf/arm_pmu.h |  6 ++++++
->>   2 files changed, 14 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
->> index 8962d26..ff858e6 100644
->> --- a/drivers/perf/arm_pmu.c
->> +++ b/drivers/perf/arm_pmu.c
->> @@ -28,9 +28,10 @@
->>   static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
->>   static DEFINE_PER_CPU(int, cpu_irq);
->>   
->> -static inline u64 arm_pmu_max_period(void)
->> +static inline u64 arm_pmu_event_max_period(struct perf_event *event)
->>   {
->> -	return (1ULL << 32) - 1;
->> +	return (event->hw.flags & ARMPMU_EVT_64BIT) ?
->> +		~0ULL : (1ULL << 32) - 1;
->>   }
-> 
-> Could we please have:
-> 
-> static inline u64 arm_pmu_event_max_period(struct perf_event *event)
-> {
-> 	if (event->hw.flags & ARMPMU_EVT_64BIT)
-> 		return GENMASK_ULL(63, 0);
-> 	else
-> 		return GENMASK_ULL(31, 0);
-> }
-> 
-> ... since that's obviously balanced, with both values generated in the
-> same way.
-> 
+* Faiz Abbas <faiz_abbas@ti.com> [180606 06:14]:
+> +static int sysc_reset(struct sysc *ddata)
+> +{
+> +	int offset = ddata->offsets[SYSC_SYSCONFIG];
+> +	int val = sysc_read(ddata, offset);
+> +
+> +	val |= (0x1 << ddata->cap->regbits->srst_shift);
+> +	sysc_write(ddata, offset, val);
+> +
+> +	/* Poll on reset status */
+> +	if (ddata->cfg.quirks & SYSC_QUIRK_RESET_STATUS) {
+> +		offset = ddata->offsets[SYSC_SYSSTATUS];
+> +
+> +		return readl_poll_timeout(ddata->module_va + offset, val,
+> +				(val & ddata->cfg.syss_mask) == 0x0,
+> +				100, MAX_MODULE_SOFTRESET_WAIT);
+> +	}
+> +
+> +	return 0;
+> +}
 
-Sure, will do
+I wonder if we should also add SYSS_QUIRK_RESET_STATUS in
+addition to SYSC_QUIRK_RESET status to make it easy to
+read the right register?
 
-Suzuki
+Then we can add support for SYSC_QUIRK_RESET_STATUS later on
+when tested and return error for now.
+
+Regards,
+
+Tony
