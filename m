@@ -1,129 +1,342 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Thu, 7 Jun 2018 12:13:04 -0500
-Subject: [PATCH v4 05/14] coresight: get/put module in
- coresight_build/release_path
-In-Reply-To: <adbabdb0-df2c-be74-3cde-cda4f6bce579@arm.com>
-References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-6-kim.phillips@arm.com>
- <20180606082422.GB19727@kroah.com>
- <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
- <20180606155501.704583e1412996a1a2c6fa61@arm.com>
- <20180607083401.GE16651@kroah.com>
- <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
- <20180607091353.GA20438@kroah.com>
- <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
- <20180607095322.GA26174@kroah.com>
- <adbabdb0-df2c-be74-3cde-cda4f6bce579@arm.com>
-Message-ID: <20180607121304.017d1d6804466050dd5c0af2@arm.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 7 Jun 2018 11:53:13 -0700
+Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
+ sata ports
+In-Reply-To: <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
+References: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
+ <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
+Message-ID: <395f1fe8-76f1-8310-d09e-63e25bca23d2@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jun 2018 11:07:15 +0100
-Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+Hi Rob,
 
-> On 06/07/2018 10:53 AM, Greg Kroah-Hartman wrote:
-> > On Thu, Jun 07, 2018 at 10:32:21AM +0100, Suzuki K Poulose wrote:
-> >> On 06/07/2018 10:13 AM, Greg Kroah-Hartman wrote:
-> >>> On Thu, Jun 07, 2018 at 10:04:33AM +0100, Suzuki K Poulose wrote:
-> >>>> Hi Greg,
-> >>>>
-> >>>> On 06/07/2018 09:34 AM, Greg Kroah-Hartman wrote:
-> >>>>> On Wed, Jun 06, 2018 at 03:55:01PM -0500, Kim Phillips wrote:
-> >>>>>> On Wed, 6 Jun 2018 10:46:36 +0100
-> >>>>>> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> >>>>>>
-> >>>>>>> On 06/06/2018 09:24 AM, Greg Kroah-Hartman wrote:
-> >>>>>>>> On Tue, Jun 05, 2018 at 04:07:01PM -0500, Kim Phillips wrote:
-> >>>>>>>>> Increment the refcnt for driver modules in current use by calling
-> >>>>>>>>> module_get in coresight_build_path and module_put in release_path.
-> >>>>>>>>>
-> >>>>>>>>> This prevents driver modules from being unloaded when they are in use,
-> >>>>>>>>> either in sysfs or perf mode.
-> >>>>>>>>
-> >>>>>>>> Why does it matter?  Shouldn't you be allowed to remove any module at
-> >>>>>>>> any point in time, much like a networking driver?
-> >>>>
-> >>>> The user doesn't have an explicit refcount on the individual components
-> >>>> in a trace session. So, when a trace session is in progress, it is as
-> >>>> good as having a "file" open on each component that is part of the
-> >>>> active trace session. So, we don't want the driver to be removed when
-> >>>> the component is being used in the trace collection.
-> >>>
-> >>> Why not?  What's wrong with that happening and then the trace collection
-> >>> starts failing with -ENODEV or something?
-> >>
-> >> May be I am missing something here. Can we allow the driver to be removed
-> >> when one of its device is "turned ON" and we need the same
-> >> driver to "turn it OFF" when the session ends ? To make a better
-> >> comparison :
-> >>
-> >> Can we unload a usb_mass_storage module when a USB disk(which uses the
-> >> module driver) is mounted and is being used ? I believe, the module
-> >> will eventually get unloaded when we unmount the disk, if someone did
-> >> a unload.
-> > 
-> > No, mount causes the module count to be incrememted.  Mount and
-> > "open/close" are the old-school way of doing module reference counting.
-> > 
-> > Look at how network drivers work today, you can unload any network
-> > driver even if there is a valid network connection "up and running"
-> > attached to it.  It just gets torn down when that request happens.
-> 
-> Ok, that makes more sense now. Thanks for the hints. However, it doesn't
-> look that easy from the coresight point due to the way the devices are
-> used in an interconnected manner which could be part of multiple trace
-> sessions.
-> 
-> e.g, a funnel could be part of two independent trace sessions with
-> different sets of sources/sinks. Tearing down the trace sessions is
-> going to be a difficult task unless we make drastic changes to the PMU
-> framework itself. But will see, what best we can do to make it modern
-> :-)
-> > 
-> >> We have a similar situation here. The only difference is the driver is
-> >> referenced only when one of its device is in a trace session.
-> > 
-> > I understand, I'm saying that you have to be very careful when messing
-> > around with module reference counts to get it correct and perhaps you
-> > should just change your design to not care about module reference counts
-> > at all, like networking did 15+ years ago.
-> > 
-> > Let's learn from the good examples in our past (like networking), and
-> > not like the older bad examples (like mount/files).
-> > 
-> >>> Remember, removing a kernel module is something that only happens very
-> >>> rarely, and is an explicit choice by someone with root permissions.  If
-> >>> you want to remove that module, it should be able to go, as you know
-> >>> what you are doing at that point in time.
-> >>
-> >> Right, but when a device is "in use" can we do that ? I thought the user
-> >> will get a module is in use or busy, error.
-> > 
-> > Try it on networking today :)
-> > 
-> >>> Don't try to "protect the user from themselves" here, they want to shoot
-> >>> their foot, make it hurt if they are aiming it there :)
-> >>>
-> >>
-> >> The module_get/put added here are only triggered when we start a trace
-> >> session, where we build a path for the current session from the configured
-> >> "source" to the configured "sink" and the path is destroyed
-> >> at the end of the trace session. i.e, the path is not a permanent thing.
-> >> It is constructed per session. So it is perfectly possible to remove a
-> >> device in between trace sessions.
-> > 
-> > That's fine, but again, just be careful to get this correct.  The patch
-> > I reviewed did not seem to do that.
-> 
-> Thanks for the useful suggestions, we will explore this more.
+Could you please kindly comment on change below.
 
-I'm going to assume the series is still valid after this discussion,
-since technically just this patch can get dropped, and the user is able
-to shoot themselves in the foot.  This series is for development
-purposes, after all.
+It allows board variants to be added easily via a simple define for 
+different number of SATA ports.
 
-Let me know if I'm missing something.
 
-Thanks,
-
-Kim
+On 18-06-04 09:22 AM, Florian Fainelli wrote:
+> On 05/18/2018 11:34 AM, Scott Branden wrote:
+>> Move remaining sata configuration to stingray-sata.dtsi and enable
+>> ports based on NUM_SATA defined.
+>> Now, all that needs to be done is define NUM_SATA per board.
+> Rob could you review this and let us know if this approach is okay or
+> not? Thank you!
+>
+>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>> ---
+>>   .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 64 --------------------
+>>   .../boot/dts/broadcom/stingray/bcm958742k.dts      |  2 +
+>>   .../boot/dts/broadcom/stingray/bcm958742t.dts      |  2 +
+>>   .../boot/dts/broadcom/stingray/stingray-sata.dtsi  | 68 ++++++++++++++++++++++
+>>   4 files changed, 72 insertions(+), 64 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+>> index 8862ec9..cacc25e 100644
+>> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+>> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+>> @@ -72,70 +72,6 @@
+>>   	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
+>>   };
+>>   
+>> -&sata0 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy0{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata1 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy1{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata2 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy2{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata3 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy3{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata4 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy4{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata5 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy5{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata6 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy6{
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata7 {
+>> -	status = "okay";
+>> -};
+>> -
+>> -&sata_phy7{
+>> -	status = "okay";
+>> -};
+>> -
+>>   &mdio_mux_iproc {
+>>   	mdio at 10 {
+>>   		gphy0: eth-phy at 10 {
+>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+>> index 77efa28..a515346 100644
+>> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+>> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+>> @@ -32,6 +32,8 @@
+>>   
+>>   /dts-v1/;
+>>   
+>> +#define NUM_SATA	8
+>> +
+>>   #include "bcm958742-base.dtsi"
+>>   
+>>   / {
+>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+>> index 5084b03..6a4d19e 100644
+>> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+>> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+>> @@ -32,6 +32,8 @@
+>>   
+>>   /dts-v1/;
+>>   
+>> +#define NUM_SATA	8
+>> +
+>>   #include "bcm958742-base.dtsi"
+>>   
+>>   / {
+>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>> index 8c68e0c..7f6d176 100644
+>> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>> @@ -43,7 +43,11 @@
+>>   			interrupts = <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 0)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata0_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -58,7 +62,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 0)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata0_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -73,7 +81,11 @@
+>>   			interrupts = <GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 1)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata1_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -88,7 +100,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 1)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata1_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -103,7 +119,11 @@
+>>   			interrupts = <GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 2)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata2_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -118,7 +138,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 2)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata2_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -133,7 +157,11 @@
+>>   			interrupts = <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 3)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata3_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -148,7 +176,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 3)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata3_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -163,7 +195,11 @@
+>>   			interrupts = <GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 4)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata4_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -178,7 +214,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 4)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata4_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -193,7 +233,11 @@
+>>   			interrupts = <GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 5)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata5_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -208,7 +252,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 5)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata5_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -223,7 +271,11 @@
+>>   			interrupts = <GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 6)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata6_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -238,7 +290,11 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 6)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata6_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>> @@ -253,7 +309,11 @@
+>>   			interrupts = <GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH>;
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 7)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata7_port0: sata-port at 0 {
+>>   				reg = <0>;
+>> @@ -268,11 +328,19 @@
+>>   			reg-names = "phy";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>> +#if (NUM_SATA > 7)
+>> +			status = "okay";
+>> +#else
+>>   			status = "disabled";
+>> +#endif
+>>   
+>>   			sata7_phy0: sata-phy at 0 {
+>>   				reg = <0>;
+>>   				#phy-cells = <0>;
+>>   			};
+>>   		};
+>> +
+>> +#if (NUM_SATA > 8)
+>> +#error "NUM_SATA > 8"
+>> +#endif
+>>   	};
+>>
+>
