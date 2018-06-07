@@ -1,160 +1,51 @@
 From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Thu,  7 Jun 2018 16:05:44 +0200
-Subject: [PATCH v6 5/5] ARM: dts: imx: add missing compatible and clock
- properties for EPIT
+Date: Thu,  7 Jun 2018 16:05:40 +0200
+Subject: [PATCH v6 1/5] clk: imx6: add EPIT clock support
 In-Reply-To: <20180607140544.22268-1-peron.clem@gmail.com>
 References: <20180607140544.22268-1-peron.clem@gmail.com>
-Message-ID: <20180607140544.22268-6-peron.clem@gmail.com>
+Message-ID: <20180607140544.22268-2-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Didier <colin.didier@devialet.com>
 
-Add missing compatible and clock properties for EPIT node.
+Please ignore this commit.
 
-Signed-off-by: Colin Didier <colin.didier@devialet.com>
-Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+It has already been merged in clk-next.
+
+Leave it here to avoid error with automatic CI.
+
 ---
- arch/arm/boot/dts/imx25.dtsi   |  8 ++++++--
- arch/arm/boot/dts/imx6qdl.dtsi | 10 ++++++++--
- arch/arm/boot/dts/imx6sl.dtsi  | 10 ++++++++--
- arch/arm/boot/dts/imx6sx.dtsi  | 10 ++++++++--
- arch/arm/boot/dts/imx6ul.dtsi  | 10 ++++++++--
- 5 files changed, 38 insertions(+), 10 deletions(-)
+ drivers/clk/imx/clk-imx6q.c               | 2 ++
+ include/dt-bindings/clock/imx6qdl-clock.h | 4 +++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index cf70df20b19c..15fd4308dad8 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -396,15 +396,19 @@
- 			};
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index 8d518ad5dc13..b9ea7037e193 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -753,6 +753,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	else
+ 		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+ 	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
++	clk[IMX6QDL_CLK_EPIT1]        = imx_clk_gate2("epit1",         "ipg",               base + 0x6c, 12);
++	clk[IMX6QDL_CLK_EPIT2]        = imx_clk_gate2("epit2",         "ipg",               base + 0x6c, 14);
+ 	clk[IMX6QDL_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal",   "esai_podf",   base + 0x6c, 16, &share_count_esai);
+ 	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ahb",           base + 0x6c, 16, &share_count_esai);
+ 	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
+diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
+index da59fd9cdb5e..7ad171b8f3bf 100644
+--- a/include/dt-bindings/clock/imx6qdl-clock.h
++++ b/include/dt-bindings/clock/imx6qdl-clock.h
+@@ -271,6 +271,8 @@
+ #define IMX6QDL_CLK_PRE_AXI			258
+ #define IMX6QDL_CLK_MLB_SEL			259
+ #define IMX6QDL_CLK_MLB_PODF			260
+-#define IMX6QDL_CLK_END				261
++#define IMX6QDL_CLK_EPIT1			261
++#define IMX6QDL_CLK_EPIT2			262
++#define IMX6QDL_CLK_END				263
  
- 			epit1: timer at 53f94000 {
--				compatible = "fsl,imx25-epit";
-+				compatible = "fsl,imx25-epit", "fsl,imx31-epit";
- 				reg = <0x53f94000 0x4000>;
- 				interrupts = <28>;
-+				clocks = <&clks 83>;
-+				status = "disabled";
- 			};
- 
- 			epit2: timer at 53f98000 {
--				compatible = "fsl,imx25-epit";
-+				compatible = "fsl,imx25-epit", "fsl,imx31-epit";
- 				reg = <0x53f98000 0x4000>;
- 				interrupts = <27>;
-+				clocks = <&clks 84>;
-+				status = "disabled";
- 			};
- 
- 			gpio4: gpio at 53f9c000 {
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index c003e62bf290..65c4ee07454c 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -843,14 +843,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 { /* EPIT1 */
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6qdl-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6QDL_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 { /* EPIT2 */
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6qdl-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6QDL_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ab6a7e2e7e8f..d63f8ebbc8a1 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -671,14 +671,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 {
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6sl-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SL_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 {
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6sl-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SL_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 49c7205b8db8..2b30559d3270 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -736,14 +736,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 {
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6sx-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SX_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 {
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6sx-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SX_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 1241972b16ba..d5f765da1ee2 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -658,14 +658,20 @@
- 				};
- 			};
- 
--			epit1: epit at 20d0000 {
-+			epit1: timer at 20d0000 {
-+				compatible = "fsl,imx6ul-epit", "fsl,imx31-epit";
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_EPIT1>;
-+				status = "disabled";
- 			};
- 
--			epit2: epit at 20d4000 {
-+			epit2: timer at 20d4000 {
-+				compatible = "fsl,imx6ul-epit", "fsl,imx31-epit";
- 				reg = <0x020d4000 0x4000>;
- 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_EPIT2>;
-+				status = "disabled";
- 			};
- 
- 			src: src at 20d8000 {
+ #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
 -- 
 2.17.1
