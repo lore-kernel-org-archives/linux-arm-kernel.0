@@ -1,88 +1,80 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Thu,  7 Jun 2018 21:11:34 +0900
-Subject: [PATCH/RFT 2/2] arm64: dts: renesas: r8a77965: Add PCIe device nodes
-In-Reply-To: <1528373494-18503-1-git-send-email-ykaneko0929@gmail.com>
-References: <1528373494-18503-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <1528373494-18503-3-git-send-email-ykaneko0929@gmail.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Thu, 7 Jun 2018 17:41:38 +0530
+Subject: [RFC PATCH 1/3] arm64: zynqmp: dt: Add support for setting SD tap
+ delays
+Message-ID: <1528373500-24663-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+This patch adds support for setting SD tap delays from Device Tree.
+Earlier, these tap values were made static via macros in the driver.
+So changing the tap values in the device tree makes the driver free
+from handling different tap values inside it.
 
-This patch adds PCIe{0,1} device nodes to R8A77965 SoC.
-
-Based on a similar patches of the R8A7796 device tree
-by Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>.
-
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 48 +++++++++++++++++++++++++++++--
- 1 file changed, 46 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 40 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index d740c79..0d39a31 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -1433,13 +1433,57 @@
- 		};
- 
- 		pciec0: pcie at fe000000 {
-+			compatible = "renesas,pcie-r8a77965",
-+				     "renesas,pcie-rcar-gen3";
- 			reg = <0 0xfe000000 0 0x80000>;
--			/* placeholder */
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			bus-range = <0x00 0xff>;
-+			device_type = "pci";
-+			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
-+				0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
-+				0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
-+				0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-+			/* Map all possible DDR as inbound ranges */
-+			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
-+			clock-names = "pcie", "pcie_bus";
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
-+			resets = <&cpg 319>;
-+			status = "disabled";
- 		};
- 
- 		pciec1: pcie at ee800000 {
-+			compatible = "renesas,pcie-r8a77965",
-+				     "renesas,pcie-rcar-gen3";
- 			reg = <0 0xee800000 0 0x80000>;
--			/* placeholder */
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			bus-range = <0x00 0xff>;
-+			device_type = "pci";
-+			ranges = <0x01000000 0 0x00000000 0 0xee900000 0 0x00100000
-+				0x02000000 0 0xeea00000 0 0xeea00000 0 0x00200000
-+				0x02000000 0 0xc0000000 0 0xc0000000 0 0x08000000
-+				0x42000000 0 0xc8000000 0 0xc8000000 0 0x08000000>;
-+			/* Map all possible DDR as inbound ranges */
-+			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 318>, <&pcie_bus_clk>;
-+			clock-names = "pcie", "pcie_bus";
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
-+			resets = <&cpg 318>;
-+			status = "disabled";
- 		};
- 
- 		fcpf0: fcp at fe950000 {
--- 
-1.9.1
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index a091e6f..696aac8 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -491,6 +491,26 @@
+                        interrupts = <0 48 4>;
+                        reg = <0x0 0xff160000 0x0 0x1000>;
+                        clock-names = "clk_xin", "clk_ahb";
++                       xlnx,itap_delay_sd_hsd = <0x15>;
++                       xlnx,otap_delay_sd_hsd = <0x5>;
++                       xlnx,itap_delay_sdr25 = <0x15>;
++                       xlnx,otap_delay_sdr25 = <0x5>;
++                       xlnx,itap_delay_sdr50 = <0>;
++                       xlnx,otap_delay_sdr50 = <0x3>;
++                       xlnx,itap_delay_sd_ddr50 = <0x3D>;
++                       xlnx,otap_delay_sd_ddr50 = <0x4>;
++                       xlnx,itap_delay_mmc_hsd = <0x15>;
++                       xlnx,otap_delay_mmc_hsd = <0x6>;
++                       xlnx,itap_delay_mmc_ddr50 = <0x12>;
++                       xlnx,otap_delay_mmc_ddr50 = <0x6>;
++                       xlnx,itap_delay_sdr104_b0 = <0>;
++                       xlnx,otap_delay_sdr104_b0 = <0x3>;
++                       xlnx,itap_delay_sdr104_b2 = <0>;
++                       xlnx,otap_delay_sdr104_b2 = <0x2>;
++                       xlnx,itap_delay_mmc_hs200_b0 = <0>;
++                       xlnx,otap_delay_mmc_hs200_b0 = <0x3>;
++                       xlnx,itap_delay_mmc_hs200_b2 = <0>;
++                       xlnx,otap_delay_mmc_hs200_b2 = <0x2>;
+                };
+
+                sdhci1: sdhci at ff170000 {
+@@ -500,6 +520,26 @@
+                        interrupts = <0 49 4>;
+                        reg = <0x0 0xff170000 0x0 0x1000>;
+                        clock-names = "clk_xin", "clk_ahb";
++                       xlnx,itap_delay_sd_hsd = <0x15>;
++                       xlnx,otap_delay_sd_hsd = <0x5>;
++                       xlnx,itap_delay_sdr25 = <0x15>;
++                       xlnx,otap_delay_sdr25 = <0x5>;
++                       xlnx,itap_delay_sdr50 = <0>;
++                       xlnx,otap_delay_sdr50 = <0x3>;
++                       xlnx,itap_delay_sd_ddr50 = <0x3D>;
++                       xlnx,otap_delay_sd_ddr50 = <0x4>;
++                       xlnx,itap_delay_mmc_hsd = <0x15>;
++                       xlnx,otap_delay_mmc_hsd = <0x6>;
++                       xlnx,itap_delay_mmc_ddr50 = <0x12>;
++                       xlnx,otap_delay_mmc_ddr50 = <0x6>;
++                       xlnx,itap_delay_sdr104_b0 = <0>;
++                       xlnx,otap_delay_sdr104_b0 = <0x3>;
++                       xlnx,itap_delay_sdr104_b2 = <0>;
++                       xlnx,otap_delay_sdr104_b2 = <0x2>;
++                       xlnx,itap_delay_mmc_hs200_b0 = <0>;
++                       xlnx,otap_delay_mmc_hs200_b0 = <0x3>;
++                       xlnx,itap_delay_mmc_hs200_b2 = <0>;
++                       xlnx,otap_delay_mmc_hs200_b2 = <0x2>;
+                };
+
+                smmu: smmu at fd800000 {
+--
+2.7.4
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
