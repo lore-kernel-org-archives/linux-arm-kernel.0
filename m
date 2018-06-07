@@ -1,57 +1,304 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 7 Jun 2018 23:23:06 +0300
-Subject: [PATCH v2 4/5] arm64: dts: renesas: r8a77980: add LVDS support
+Date: Thu, 7 Jun 2018 23:24:09 +0300
+Subject: [PATCH v2 5/5] arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI
+ support
 In-Reply-To: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
 References: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
-Message-ID: <3e46c70c-c6be-d019-95a9-bf09c888c9c0@cogentembedded.com>
+Message-ID: <b72e7fde-0b04-b9dd-586d-cb1f8c5577a6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A77980 part of the LVDS device node.
+Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
+nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
+Analog Devices ADV7511W HDMI transmitter...
 
+Based on the original (and large) patch by Vladimir Barinov.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+Changes in version 2:
+- added the V3HSK DT update, reworded the description, renamed the patch;
+- added a space between the HDMI node name and a brace.
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+ arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++++++
+ 2 files changed, 226 insertions(+)
+
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
 ===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -696,6 +696,35 @@
- 				port at 1 {
- 					reg = <1>;
- 					du_out_lvds0: endpoint {
-+						remote-endpoint = <&lvds0_in>;
-+					};
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
++++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+@@ -45,6 +45,56 @@
+ 		regulator-boot-on;
+ 		regulator-always-on;
+ 	};
++
++	d1_8v: regulator-2 {
++		compatible = "regulator-fixed";
++		regulator-name = "D1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
++		};
++	};
++
++	lvds-decoder {
++		compatible = "thine,thc63lvd1024";
++		vcc-supply = <&d3_3v>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				thc63lvd1024_in: endpoint {
++					remote-endpoint = <&lvds0_out>;
++				};
++			};
++
++			port at 2 {
++				reg = <2>;
++				thc63lvd1024_out: endpoint {
++					remote-endpoint = <&adv7511_in>;
 +				};
 +			};
 +		};
++	};
 +
-+		lvds0: lvds-encoder at feb90000 {
-+			compatible = "renesas,r8a77980-lvds";
-+			reg = <0 0xfeb90000 0 0x14>;
-+			clocks = <&cpg CPG_MOD 727>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 727>;
-+			status = "disabled";
++	x1_clk: x1-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <148500000>;
++	};
+ };
+ 
+ &avb {
+@@ -74,6 +124,13 @@
+ 	};
+ };
+ 
++&du {
++	clocks = <&cpg CPG_MOD 724>,
++		 <&x1_clk>;
++	clock-names = "du.0", "dclkin.0";
++	status = "okay";
++};
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
+@@ -102,6 +159,55 @@
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
+ 	};
 +
-+				port at 0 {
-+					reg = <0>;
-+					lvds0_in: endpoint {
-+						remote-endpoint =
-+							<&du_out_lvds0>;
-+					};
++	hdmi at 39 {
++		compatible = "adi,adv7511w";
++		reg = <0x39>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
++		avdd-supply = <&d1_8v>;
++		dvdd-supply = <&d1_8v>;
++		pvdd-supply = <&d1_8v>;
++		bgvdd-supply = <&d1_8v>;
++		dvdd-3v-supply = <&d3_3v>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&thc63lvd1024_out>;
 +				};
++			};
 +
-+				port at 1 {
-+					reg = <1>;
-+					lvds0_out: endpoint {
- 					};
- 				};
- 			};
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con>;
++				};
++			};
++		};
++	};
++};
++
++&lvds0 {
++	status = "okay";
++
++	ports {
++		port at 1 {
++			lvds0_out: endpoint {
++				remote-endpoint = <&thc63lvd1024_in>;
++			};
++		};
++	};
+ };
+ 
+ &mmc0 {
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
++++ renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
+@@ -27,6 +27,63 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0 0x48000000 0 0x78000000>;
+ 	};
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
++		};
++	};
++
++	lvds-decoder {
++		compatible = "thine,thc63lvd1024";
++		vcc-supply = <&vcc3v3_d5>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				thc63lvd1024_in: endpoint {
++					remote-endpoint = <&lvds0_out>;
++				};
++			};
++
++			port at 2 {
++				reg = <2>;
++				thc63lvd1024_out: endpoint {
++					remote-endpoint = <&adv7511_in>;
++				};
++			};
++		};
++	};
++
++	vcc1v8_d4: regulator-0 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC1V8_D4";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	vcc3v3_d5: regulator-1 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC3V3_D5";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&du {
++	status = "okay";
+ };
+ 
+ &extal_clk {
+@@ -53,6 +110,64 @@
+ 	};
+ };
+ 
++&lvds0 {
++	status = "okay";
++
++	ports {
++		port at 1 {
++			lvds0_out: endpoint {
++				remote-endpoint = <&thc63lvd1024_in>;
++			};
++		};
++	};
++};
++
++&i2c0 {
++	pinctrl-0 = <&i2c0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	hdmi at 39 {
++		compatible = "adi,adv7511w";
++		#sound-dai-cells = <0>;
++		reg = <0x39>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
++		avdd-supply = <&vcc1v8_d4>;
++		dvdd-supply = <&vcc1v8_d4>;
++		pvdd-supply = <&vcc1v8_d4>;
++		bgvdd-supply = <&vcc1v8_d4>;
++		dvdd-3v-supply = <&vcc3v3_d5>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&thc63lvd1024_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con>;
++				};
++			};
++		};
++	};
++};
++
+ &pfc {
+ 	gether_pins: gether {
+ 		groups = "gether_mdio_a", "gether_rgmii",
+@@ -60,6 +175,11 @@
+ 		function = "gether";
+ 	};
+ 
++	i2c0_pins: i2c0 {
++		groups = "i2c0";
++		function = "i2c0";
++	};
++
+ 	scif0_pins: scif0 {
+ 		groups = "scif0_data";
+ 		function = "scif0";
