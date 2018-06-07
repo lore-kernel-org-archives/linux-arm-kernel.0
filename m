@@ -1,88 +1,189 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  7 Jun 2018 14:24:34 +0200
-Subject: [PATCH] pinctrl: pinctrl-single: Avoid divisions in context
- save/restore
-Message-ID: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 7 Jun 2018 15:42:21 +0200
+Subject: [PATCH v6 6/6] tty/serial: atmel: change the driver to work under
+ at91-usart mfd
+In-Reply-To: <20180607110020.20565-7-radu.pirea@microchip.com>
+References: <20180607110020.20565-1-radu.pirea@microchip.com>
+ <20180607110020.20565-7-radu.pirea@microchip.com>
+Message-ID: <42c20ca1-6d27-71c2-83cf-2e5f113e8dc9@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The divisions (and multiplications) can be avoided by changing the loops
-to use increments of mux_bytes instead of 1.
-While at it, remove the unneeded casts when assigning void pointers.
+On 07/06/2018 13:00, Radu Pirea wrote:
+> This patch modifies the place where resources and device tree properties
+> are searched.
+> 
+> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+> ---
+>  drivers/tty/serial/Kconfig        |  1 +
+>  drivers/tty/serial/atmel_serial.c | 42 ++++++++++++++++++++-----------
+>  2 files changed, 28 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 3682fd3e960c..25e55332f8b1 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -119,6 +119,7 @@ config SERIAL_ATMEL
+>  	depends on ARCH_AT91 || COMPILE_TEST
+>  	select SERIAL_CORE
+>  	select SERIAL_MCTRL_GPIO if GPIOLIB
+> +	select MFD_AT91_USART
+>  	help
+>  	  This enables the driver for the on-chip UARTs of the Atmel
+>  	  AT91 processors.
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index df46a9e88c34..5ef8a6a6fe17 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -193,8 +193,7 @@ static struct console atmel_console;
+>  
+>  #if defined(CONFIG_OF)
+>  static const struct of_device_id atmel_serial_dt_ids[] = {
+> -	{ .compatible = "atmel,at91rm9200-usart" },
+> -	{ .compatible = "atmel,at91sam9260-usart" },
+> +	{ .compatible = "atmel,at91rm9200-usart-serial" },
+>  	{ /* sentinel */ }
+>  };
+>  #endif
+> @@ -915,6 +914,7 @@ static void atmel_tx_dma(struct uart_port *port)
+>  static int atmel_prepare_tx_dma(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	struct device *mfd_dev = port->dev->parent;
+>  	dma_cap_mask_t		mask;
+>  	struct dma_slave_config config;
+>  	int ret, nent;
+> @@ -922,7 +922,7 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -	atmel_port->chan_tx = dma_request_slave_channel(port->dev, "tx");
+> +	atmel_port->chan_tx = dma_request_slave_channel(mfd_dev, "tx");
+>  	if (atmel_port->chan_tx == NULL)
+>  		goto chan_err;
+>  	dev_info(port->dev, "using %s for tx DMA transfers\n",
+> @@ -1093,6 +1093,7 @@ static void atmel_rx_from_dma(struct uart_port *port)
+>  static int atmel_prepare_rx_dma(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	struct device *mfd_dev = port->dev->parent;
+>  	struct dma_async_tx_descriptor *desc;
+>  	dma_cap_mask_t		mask;
+>  	struct dma_slave_config config;
+> @@ -1104,7 +1105,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_CYCLIC, mask);
+>  
+> -	atmel_port->chan_rx = dma_request_slave_channel(port->dev, "rx");
+> +	atmel_port->chan_rx = dma_request_slave_channel(mfd_dev, "rx");
+>  	if (atmel_port->chan_rx == NULL)
+>  		goto chan_err;
+>  	dev_info(port->dev, "using %s for rx DMA transfers\n",
+> @@ -2222,8 +2223,8 @@ static const char *atmel_type(struct uart_port *port)
+>   */
+>  static void atmel_release_port(struct uart_port *port)
+>  {
+> -	struct platform_device *pdev = to_platform_device(port->dev);
+> -	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
+> +	struct platform_device *mpdev = to_platform_device(port->dev->parent);
+> +	int size = resource_size(mpdev->resource);
+>  
+>  	release_mem_region(port->mapbase, size);
+>  
+> @@ -2238,8 +2239,8 @@ static void atmel_release_port(struct uart_port *port)
+>   */
+>  static int atmel_request_port(struct uart_port *port)
+>  {
+> -	struct platform_device *pdev = to_platform_device(port->dev);
+> -	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
+> +	struct platform_device *mpdev = to_platform_device(port->dev->parent);
+> +	int size = resource_size(mpdev->resource);
+>  
+>  	if (!request_mem_region(port->mapbase, size, "atmel_serial"))
+>  		return -EBUSY;
+> @@ -2341,27 +2342,28 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
+>  {
+>  	int ret;
+>  	struct uart_port *port = &atmel_port->uart;
+> +	struct platform_device *mpdev = to_platform_device(pdev->dev.parent);
+>  
+>  	atmel_init_property(atmel_port, pdev);
+>  	atmel_set_ops(port);
+>  
+> -	uart_get_rs485_mode(&pdev->dev, &port->rs485);
+> +	uart_get_rs485_mode(&mpdev->dev, &port->rs485);
+>  
+>  	port->iotype		= UPIO_MEM;
+>  	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
+>  	port->ops		= &atmel_pops;
+>  	port->fifosize		= 1;
+>  	port->dev		= &pdev->dev;
+> -	port->mapbase	= pdev->resource[0].start;
+> -	port->irq	= pdev->resource[1].start;
+> +	port->mapbase		= mpdev->resource[0].start;
+> +	port->irq		= mpdev->resource[1].start;
+>  	port->rs485_config	= atmel_config_rs485;
+> -	port->membase	= NULL;
+> +	port->membase		= NULL;
+>  
+>  	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
+>  
+>  	/* for console, the clock could already be configured */
+>  	if (!atmel_port->clk) {
+> -		atmel_port->clk = clk_get(&pdev->dev, "usart");
+> +		atmel_port->clk = clk_get(&mpdev->dev, "usart");
+>  		if (IS_ERR(atmel_port->clk)) {
+>  			ret = PTR_ERR(atmel_port->clk);
+>  			atmel_port->clk = NULL;
+> @@ -2694,13 +2696,22 @@ static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
+>  static int atmel_serial_probe(struct platform_device *pdev)
+>  {
+>  	struct atmel_uart_port *atmel_port;
+> -	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *np = pdev->dev.parent->of_node;
+>  	void *data;
+>  	int ret = -ENODEV;
+>  	bool rs485_enabled;
+>  
+>  	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
+>  
+> +	/*
+> +	 * In device tree is no node with "atmel,at91rm9200-usart-serial"
+I think you meant :
+In device tree *there* is no...
 
-This saves +100 bytes of kernel size on arm32/arm64.
+With that,
+Acked-by: Richard Genoud <richard.genoud@gmail.com>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Compile-tested only.
+> +	 * as compatible string. This driver is probed by at91-usart mfd driver
+> +	 * which is just a wrapper over the atmel_serial driver and
+> +	 * spi-at91-usart driver. All attributes needed by this driver are
+> +	 * found in of_node of parent.
+> +	 */
+> +	pdev->dev.of_node = np;
+> +
+>  	ret = of_alias_get_id(np, "serial");
+>  	if (ret < 0)
+>  		/* port id not found in platform data nor device-tree aliases:
+> @@ -2835,6 +2846,7 @@ static int atmel_serial_remove(struct platform_device *pdev)
+>  
+>  	clk_put(atmel_port->clk);
+>  	atmel_port->clk = NULL;
+> +	pdev->dev.of_node = NULL;
+>  
+>  	return ret;
+>  }
+> @@ -2845,7 +2857,7 @@ static struct platform_driver atmel_serial_driver = {
+>  	.suspend	= atmel_serial_suspend,
+>  	.resume		= atmel_serial_resume,
+>  	.driver		= {
+> -		.name			= "atmel_usart",
+> +		.name			= "atmel_usart_serial",
+>  		.of_match_table		= of_match_ptr(atmel_serial_dt_ids),
+>  	},
+>  };
+> 
 
-As the loops are now identical, the code could be made even smaller by
-moving the switch() inside the loop, at the expense of readability.
----
- drivers/pinctrl/pinctrl-single.c | 36 ++++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+Thanks !
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 9c3c00515aa0fe20..5de5dedb804928eb 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -1593,19 +1593,19 @@ static int pcs_save_context(struct pcs_device *pcs)
- 
- 	switch (pcs->width) {
- 	case 64:
--		regsl = (u64 *)pcs->saved_vals;
--		for (i = 0; i < pcs->size / mux_bytes; i++)
--			regsl[i] = pcs->read(pcs->base + i * mux_bytes);
-+		regsl = pcs->saved_vals;
-+		for (i = 0; i < pcs->size; i += mux_bytes)
-+			*regsl++ = pcs->read(pcs->base + i);
- 		break;
- 	case 32:
--		regsw = (u32 *)pcs->saved_vals;
--		for (i = 0; i < pcs->size / mux_bytes; i++)
--			regsw[i] = pcs->read(pcs->base + i * mux_bytes);
-+		regsw = pcs->saved_vals;
-+		for (i = 0; i < pcs->size; i += mux_bytes)
-+			*regsw++ = pcs->read(pcs->base + i);
- 		break;
- 	case 16:
--		regshw = (u16 *)pcs->saved_vals;
--		for (i = 0; i < pcs->size / mux_bytes; i++)
--			regshw[i] = pcs->read(pcs->base + i * mux_bytes);
-+		regshw = pcs->saved_vals;
-+		for (i = 0; i < pcs->size; i += mux_bytes)
-+			*regshw++ = pcs->read(pcs->base + i);
- 		break;
- 	}
- 
-@@ -1623,19 +1623,19 @@ static void pcs_restore_context(struct pcs_device *pcs)
- 
- 	switch (pcs->width) {
- 	case 64:
--		regsl = (u64 *)pcs->saved_vals;
--		for (i = 0; i < pcs->size / mux_bytes; i++)
--			pcs->write(regsl[i], pcs->base + i * mux_bytes);
-+		regsl = pcs->saved_vals;
-+		for (i = 0; i < pcs->size; i += mux_bytes)
-+			pcs->write(*regsl++, pcs->base + i);
- 		break;
- 	case 32:
--		regsw = (u32 *)pcs->saved_vals;
--		for (i = 0; i < pcs->size / mux_bytes; i++)
--			pcs->write(regsw[i], pcs->base + i * mux_bytes);
-+		regsw = pcs->saved_vals;
-+		for (i = 0; i < pcs->size; i += mux_bytes)
-+			pcs->write(*regsw++, pcs->base + i);
- 		break;
- 	case 16:
--		regshw = (u16 *)pcs->saved_vals;
--		for (i = 0; i < pcs->size / mux_bytes; i++)
--			pcs->write(regshw[i], pcs->base + i * mux_bytes);
-+		regshw = pcs->saved_vals;
-+		for (i = 0; i < pcs->size; i += mux_bytes)
-+			pcs->write(*regshw++, pcs->base + i);
- 		break;
- 	}
- }
--- 
-2.7.4
+Richard.
