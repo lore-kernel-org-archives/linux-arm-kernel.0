@@ -1,47 +1,70 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 08 Jun 2018 16:23:52 +0200
-Subject: [PATCH 1/2] reset: imx7: Fix always writing bits as 0
-In-Reply-To: <c441872d7dd355ae09e945447441389e93e3b888.1527621510.git.leonard.crestez@nxp.com>
-References: <cover.1527621510.git.leonard.crestez@nxp.com>
- <c441872d7dd355ae09e945447441389e93e3b888.1527621510.git.leonard.crestez@nxp.com>
-Message-ID: <1528467832.26356.18.camel@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 08 Jun 2018 17:24:24 +0300
+Subject: [PATCH v2 4/5] arm64: dts: renesas: r8a77980: add LVDS support
+In-Reply-To: <3e46c70c-c6be-d019-95a9-bf09c888c9c0@cogentembedded.com>
+References: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
+ <3e46c70c-c6be-d019-95a9-bf09c888c9c0@cogentembedded.com>
+Message-ID: <9345530.G21j7jBrXu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
-> Right now the only user of reset-imx7 is pci-imx6 and the
-> reset_control_assert and deassert calls on pciephy_reset don't toggle
-> the PCIEPHY_BTN and PCIEPHY_G_RST bits as expected. Fix this by writing
-> 1 or 0 respectively.
-> 
-> The reference manual is not very clear regarding SRC_PCIEPHY_RCR but for
-> other registers like MIPIPHY and HSICPHY the bits are explicitly
-> documented as "1 means assert, 0 means deassert".
-> 
-> The values are still reversed for IMX7_RESET_PCIE_CTRL_APPS_EN.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Hi Sergei,
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Thank you for the patch.
+
+On Thursday, 7 June 2018 23:23:06 EEST Sergei Shtylyov wrote:
+> Define the generic R8A77980 part of the LVDS device node.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 > ---
-> ?drivers/reset/reset-imx7.c | 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |   29 ++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 > 
-> diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-> index 4db177bc89bc..fdeac1946429 100644
-> --- a/drivers/reset/reset-imx7.c
-> +++ b/drivers/reset/reset-imx7.c
-> @@ -78,11 +78,11 @@ static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
-> ?static int imx7_reset_set(struct reset_controller_dev *rcdev,
-> > ?			??unsigned long id, bool assert)
-> ?{
-> > ?	struct imx7_src *imx7src = to_imx7_src(rcdev);
-> > ?	const struct imx7_src_signal *signal = &imx7_src_signals[id];
-> > -	unsigned int value = 0;
-> > +	unsigned int value = assert ? signal->bit : 0;
-> ?
-> > ?	switch (id) {
-> > ?	case IMX7_RESET_PCIEPHY:
-> > ?		/*
-> > ?		?* wait for more than 10us to release phy g_rst and
+> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> @@ -696,6 +696,35 @@
+>  				port at 1 {
+>  					reg = <1>;
+>  					du_out_lvds0: endpoint {
+> +						remote-endpoint = <&lvds0_in>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		lvds0: lvds-encoder at feb90000 {
+> +			compatible = "renesas,r8a77980-lvds";
+> +			reg = <0 0xfeb90000 0 0x14>;
+> +			clocks = <&cpg CPG_MOD 727>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 727>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+> +					reg = <0>;
+> +					lvds0_in: endpoint {
+> +						remote-endpoint =
+> +							<&du_out_lvds0>;
+> +					};
+> +				};
+> +
+> +				port at 1 {
+> +					reg = <1>;
+> +					lvds0_out: endpoint {
+>  					};
+>  				};
+>  			};
+
+-- 
+Regards,
+
+Laurent Pinchart
