@@ -1,19 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2018 23:23:32 -0700
-Subject: [PATCH][next] pinctrl: pinctrl-single: add allocation failure
- checking of saved_vals
-In-Reply-To: <20180607072932.GO13775@localhost>
-References: <20180606134338.4645-1-colin.king@canonical.com>
- <20180607072932.GO13775@localhost>
-Message-ID: <20180608062332.GJ5738@atomide.com>
+Date: Thu, 7 Jun 2018 23:26:02 -0700
+Subject: [PATCH] pinctrl: pinctrl-single: Avoid divisions in context
+ save/restore
+In-Reply-To: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
+References: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180608062602.GK5738@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Johan Hovold <johan@kernel.org> [180607 07:32]:
-> On Wed, Jun 06, 2018 at 02:43:38PM +0100, Colin King wrote:
+* Geert Uytterhoeven <geert+renesas@glider.be> [180607 13:40]:
+> The divisions (and multiplications) can be avoided by changing the loops
+> to use increments of mux_bytes instead of 1.
+> While at it, remove the unneeded casts when assigning void pointers.
 > 
-> But for this fix, feel free to add:
+> This saves +100 bytes of kernel size on arm32/arm64.
 > 
-> Reviewed-by: Johan Hovold <johan@kernel.org>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Compile-tested only.
+
+Makes sense to me:
 
 Acked-by: Tony Lindgren <tony@atomide.com>
+
+Keerthy can you please test?
+
+Regards,
+
+Tony
