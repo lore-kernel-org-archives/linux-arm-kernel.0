@@ -1,28 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 8 Jun 2018 10:12:34 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a7796: Add PCIe device nodes
-In-Reply-To: <20180605080336.5xt64komcjbqbt7k@verge.net.au>
-References: <1528134548-17492-1-git-send-email-ykaneko0929@gmail.com>
- <20180605080336.5xt64komcjbqbt7k@verge.net.au>
-Message-ID: <20180608081233.c3uryznsgkf3hayf@verge.net.au>
+Date: Fri, 8 Jun 2018 10:21:25 +0200
+Subject: [PATCH v2 0/5] Add R8A77980/Condor/V3HSK LVDS/HDMI support
+In-Reply-To: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
+References: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
+Message-ID: <20180608082125.tjnd6jayecv26csv@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 10:03:37AM +0200, Simon Horman wrote:
-> On Tue, Jun 05, 2018 at 02:49:08AM +0900, Yoshihiro Kaneko wrote:
-> > From: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
-> > 
-> > This patch adds PCIe{0,1} device nodes for R8A7796 SoC.
-> > 
-> > Signed-off-by: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
-> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+On Thu, Jun 07, 2018 at 11:17:03PM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> Hi,
+> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180604-v4.17' tag. We're adding the R8A77980 FCPVD/VSPD/
+> DU/LVDS device nodes and then describing the LVDS decoder and HDMI encoder
+> connected to the LVDS output. These patches depend on the Thine THC63LVD1024
+> driver and the R8A77980 LVDS support patch in order to work, and R8A77980 GPIO
+> DT patches in order to apply/compile...
 > 
-> This looks fine to me but I will wait to see if there are other reviews
-> before applying.
-> 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> [1/5] arm64: dts: renesas: r8a77980: add FCPVD support
+> [2/5] arm64: dts: renesas: r8a77980: add VSPD support
+> [3/5] arm64: dts: renesas: r8a77980: add DU support
+> [4/5] arm64: dts: renesas: r8a77980: add LVDS support
+> [5/5] arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI support
 
-Thanks Kaneko-san, applied.
+Sergei,
+
+what are the changes in this series between v1 and v2?
