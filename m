@@ -1,36 +1,48 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 9 Jun 2018 03:48:38 +0800
-Subject: [PATCH RESEND v4 0/2] support exception state migration and set
- VSESR_EL2 by user space
-Message-ID: <1528487320-2873-1-git-send-email-gengdongjiu@huawei.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 8 Jun 2018 13:22:02 +0100
+Subject: [PATCH] arm64: Fix syscall restarting around signal suppressed
+ by tracer
+In-Reply-To: <1528371125-24505-1-git-send-email-Dave.Martin@arm.com>
+References: <1528371125-24505-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180608122201.7h52jstqik6zs22i@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patch is separated from https://www.spinics.net/lists/kvm/msg168917.html
+On Thu, Jun 07, 2018 at 12:32:05PM +0100, Dave P Martin wrote:
+> Commit 17c2895 ("arm64: Abstract syscallno manipulation") abstracts
+> out the pt_regs.syscallno value for a syscall cancelled by a tracer
+> as NO_SYSCALL, and provides helpers to set and check for this
+> condition.  However, the way this was implemented has the
+> unintended side-effect of disabling part of the syscall restart
+> logic.
+> 
+> This comes about because the second in_syscall() check in
+> do_signal() re-evaluates the "in a syscall" condition based on the
+> updated pt_regs instead of the original pt_regs.  forget_syscall()
+> is explicitly called prior to the second check in order to prevent
+> restart logic in the ret_to_user path being spuriously triggered,
+> which means that the second in_syscall() check always yields false.
+> 
+> This triggers a failure in
+> tools/testing/selftests/seccomp/seccomp_bpf.c, when using ptrace to
+> suppress a signal that interrups a nanosleep() syscall.
+> 
+> Misbehaviour of this type is only expected in the case where a
+> tracer suppresses a signal and the target process is either being
+> single-stepped or the interrupted syscall attempts to restart via
+> -ERESTARTBLOCK.
+> 
+> This patch restores the old behaviour by performing the
+> in_syscall() check only once at the start of the function.
+> 
+> Fixes: 17c289586009 ("arm64: Abstract syscallno manipulation")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reported-by: Sumit Semwal <sumit.semwal@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: <stable@vger.kernel.org> # 4.14.x-
 
-1. Detect whether KVM can set set guest SError syndrome
-2. Support to Set VSESR_EL2 and inject SError by user space.
-3. Support live migration to keep SError pending state and VSESR_EL2 value
-
-The user space patch is here: https://www.mail-archive.com/qemu-devel at nongnu.org/msg539534.html
-
-Dongjiu Geng (2):
-  arm64: KVM: export the capability to set guest SError syndrome
-  arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-
- Documentation/virtual/kvm/api.txt    | 42 +++++++++++++++++++++++++++++++++---
- arch/arm/include/asm/kvm_host.h      |  6 ++++++
- arch/arm/include/uapi/asm/kvm.h      | 12 +++++++++++
- arch/arm/kvm/guest.c                 | 12 +++++++++++
- arch/arm64/include/asm/kvm_emulate.h |  5 +++++
- arch/arm64/include/asm/kvm_host.h    |  7 ++++++
- arch/arm64/include/uapi/asm/kvm.h    | 13 +++++++++++
- arch/arm64/kvm/guest.c               | 36 +++++++++++++++++++++++++++++++
- arch/arm64/kvm/inject_fault.c        |  6 +++---
- arch/arm64/kvm/reset.c               |  4 ++++
- include/uapi/linux/kvm.h             |  1 +
- virt/kvm/arm/arm.c                   | 19 ++++++++++++++++
- 12 files changed, 157 insertions(+), 6 deletions(-)
+Applied. Thanks.
 
 -- 
-2.7.4
+Catalin
