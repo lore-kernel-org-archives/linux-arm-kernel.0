@@ -1,190 +1,430 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 8 Jun 2018 11:40:21 +0200
-Subject: [PATCH v2 1/2] media: v4l2-ctrl: Add control for VP9 profile
-In-Reply-To: <CAAFQd5B8W0KqnPXs3yo8-ndKTE2n5yYmNEjbCWq6yR6iQYjouA@mail.gmail.com>
-References: <20180530071613.125768-1-keiichiw@chromium.org>
- <20180530071613.125768-2-keiichiw@chromium.org>
- <a16dca32-4198-72c1-cf22-83f18a8cfcb6@xs4all.nl>
- <CAAFQd5B8W0KqnPXs3yo8-ndKTE2n5yYmNEjbCWq6yR6iQYjouA@mail.gmail.com>
-Message-ID: <2dabdd75-1351-ae71-7d40-8d836ec05308@xs4all.nl>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Fri, 8 Jun 2018 09:43:20 +0000
+Subject: [PATCH v2 0/5] add virt-dma support for imx-sdma
+In-Reply-To: <20180608084310.bzxeazqht5u6mgdw@pengutronix.de>
+References: <1528465490-19684-1-git-send-email-yibin.gong@nxp.com>
+ <20180608084310.bzxeazqht5u6mgdw@pengutronix.de>
+Message-ID: <DB6PR04MB322390939AB726C02740C379897B0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2018 11:31 AM, Tomasz Figa wrote:
-> Hi Hans,
+Thanks Sacha, I'll intergrate it into v3.
+
+-----Original Message-----
+From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+Sent: 2018?6?8? 16:43
+To: Robin Gong <yibin.gong@nxp.com>
+Cc: vkoul at kernel.org; dan.j.williams at intel.com; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>
+Subject: Re: [PATCH v2 0/5] add virt-dma support for imx-sdma
+
+On Fri, Jun 08, 2018 at 09:44:45PM +0800, Robin Gong wrote:
+> The legacy sdma driver has below limitations or drawbacks:
+>   1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
+>      one page size for one channel regardless of only few BDs needed
+>      most time. But in few cases, the max PAGE_SIZE maybe not enough.
+>   2. One SDMA channel can't stop immediatley once channel disabled which
+>      means SDMA interrupt may come in after this channel terminated.There
+>      are some patches for this corner case such as commit "2746e2c389f9",
+>      but not cover non-cyclic.
 > 
-> On Fri, Jun 8, 2018 at 6:29 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
->>
->> On 05/30/2018 09:16 AM, Keiichi Watanabe wrote:
->>> Add a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE for selecting desired
->>> profile for VP9 encoder and querying for supported profiles by VP9 encoder
->>> or decoder.
->>>
->>> An existing control V4L2_CID_MPEG_VIDEO_VPX_PROFILE cannot be
->>> used for querying since it is not a menu control but an integer
->>> control, which cannot return an arbitrary set of supported profiles.
->>>
->>> The new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE is a menu control as
->>> with controls for other codec profiles. (e.g. H264)
->>
->> Please ignore my reply to patch 2/2. I looked at this a bit more and what you
->> should do is to change the type of V4L2_CID_MPEG_VIDEO_VPX_PROFILE to enum.
+> The common virt-dma overcomes the above limitations. It can alloc bd 
+> dynamically and free bd once this tx transfer done. No memory wasted 
+> or maximum limititation here, only depends on how many memory can be 
+> requested from kernel. For No.2, such issue can be workaround by 
+> checking if there is available descript("sdmac->desc") now once the 
+> unwanted interrupt coming. At last the common virt-dma is easier for sdma driver maintain.
 > 
-> Note that we still need a way to query VP8 and VP9 separately, since
-> the supported profiles will differ. (Most of hardware we have today
-> support all 4 profiles of VP8 and only profile 0 of VP9.)
-
-Urgh. So V4L2_CID_MPEG_VIDEO_VPX_PROFILE is really just for VP8?
-
-In that case I would suggest that we rename V4L2_CID_MPEG_VIDEO_VPX_PROFILE to
-V4L2_CID_MPEG_VIDEO_VP8_PROFILE and change it to an enum. Also add this line
-to v4l2-controls.h:
-
-#define V4L2_CID_MPEG_VIDEO_VPX_PROFILE V4L2_CID_MPEG_VIDEO_VP8_PROFILE
-
-And add a new V4L2_CID_MPEG_VIDEO_VP9_PROFILE (basically this patch).
-
-Would that work?
-
-This standardizes on enums for all profile controls (except s5p-mfc, which
-makes its own int control, up to samsung to decide whether or not to change
-that), and you have VP8 and VP9 specific profiles.
-
-Regards,
-
-	Hans
-
+> Change from v1:
+>   1. split v1 patch into 5 patches.
+>   2. remove some unnecessary condition check.
+>   3. remove unneccessary 'pending' list.
 > 
-> Best regards,
-> Tomasz
+> Robin Gong (5):
+>   dmaengine: imx-sdma: add virt-dma support
+>   Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
+>     during interrupt"
+>   dmaengine: imx-sdma: remove usless lock
+>   dmaengine: imx-sdma: remove the maximum limation for bd numbers
+>   dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
 > 
->>
->> All other codec profile controls are all enums, so the fact that VPX_PROFILE
->> isn't is a bug. Changing the type should not cause any problems since the same
->> control value is used when you set the control.
->>
->> Sylwester: I see that s5p-mfc uses this control, but it is explicitly added
->> as an integer type control, so the s5p-mfc driver should not be affected by
->> changing the type of this control.
->>
->> Stanimir: this will slightly change the venus driver, but since it is a very
->> recent driver I think we can get away with changing the core type of the
->> VPX_PROFILE control. I think that's better than ending up with two controls
->> that do the same thing.
->>
->> Regards,
->>
->>         Hans
->>
->>>
->>> Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
->>> ---
->>>  .../media/uapi/v4l/extended-controls.rst      | 26 +++++++++++++++++++
->>>  drivers/media/v4l2-core/v4l2-ctrls.c          | 12 +++++++++
->>>  include/uapi/linux/v4l2-controls.h            |  8 ++++++
->>>  3 files changed, 46 insertions(+)
->>>
->>> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
->>> index 03931f9b1285..4f7f128a4998 100644
->>> --- a/Documentation/media/uapi/v4l/extended-controls.rst
->>> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
->>> @@ -1959,6 +1959,32 @@ enum v4l2_vp8_golden_frame_sel -
->>>      Select the desired profile for VPx encoder. Acceptable values are 0,
->>>      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
->>>
->>> +.. _v4l2-mpeg-video-vp9-profile:
->>> +
->>> +``V4L2_CID_MPEG_VIDEO_VP9_PROFILE``
->>> +    (enum)
->>> +
->>> +enum v4l2_mpeg_video_vp9_profile -
->>> +    This control allows to select the profile for VP9 encoder.
->>> +    This is also used to enumerate supported profiles by VP9 encoder or decoder.
->>> +    Possible values are:
->>> +
->>> +
->>> +
->>> +.. flat-table::
->>> +    :header-rows:  0
->>> +    :stub-columns: 0
->>> +
->>> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_0``
->>> +      - Profile 0
->>> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_1``
->>> +      - Profile 1
->>> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_2``
->>> +      - Profile 2
->>> +    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_3``
->>> +      - Profile 3
->>> +
->>> +
->>>
->>>  High Efficiency Video Coding (HEVC/H.265) Control Reference
->>>  -----------------------------------------------------------
->>> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
->>> index d29e45516eb7..401ce21c2e63 100644
->>> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
->>> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
->>> @@ -431,6 +431,13 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
->>>               "Use Previous Specific Frame",
->>>               NULL,
->>>       };
->>> +     static const char * const vp9_profile[] = {
->>> +             "0",
->>> +             "1",
->>> +             "2",
->>> +             "3",
->>> +             NULL,
->>> +     };
->>>
->>>       static const char * const flash_led_mode[] = {
->>>               "Off",
->>> @@ -614,6 +621,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
->>>               return mpeg4_profile;
->>>       case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
->>>               return vpx_golden_frame_sel;
->>> +     case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
->>> +             return vp9_profile;
->>>       case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
->>>               return jpeg_chroma_subsampling;
->>>       case V4L2_CID_DV_TX_MODE:
->>> @@ -841,6 +850,8 @@ const char *v4l2_ctrl_get_name(u32 id)
->>>       case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:                return "VPX P-Frame QP Value";
->>>       case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:                   return "VPX Profile";
->>>
->>> +     case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:                   return "VP9 Profile";
->>> +
->>>       /* HEVC controls */
->>>       case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:               return "HEVC I-Frame QP Value";
->>>       case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:               return "HEVC P-Frame QP Value";
->>> @@ -1180,6 +1191,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
->>>       case V4L2_CID_DEINTERLACING_MODE:
->>>       case V4L2_CID_TUNE_DEEMPHASIS:
->>>       case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
->>> +     case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
->>>       case V4L2_CID_DETECT_MD_MODE:
->>>       case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
->>>       case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
->>> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
->>> index 8d473c979b61..56203b7b715c 100644
->>> --- a/include/uapi/linux/v4l2-controls.h
->>> +++ b/include/uapi/linux/v4l2-controls.h
->>> @@ -589,6 +589,14 @@ enum v4l2_vp8_golden_frame_sel {
->>>  #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP           (V4L2_CID_MPEG_BASE+510)
->>>  #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE                      (V4L2_CID_MPEG_BASE+511)
->>>
->>> +#define V4L2_CID_MPEG_VIDEO_VP9_PROFILE                      (V4L2_CID_MPEG_BASE+512)
->>> +enum v4l2_mpeg_video_vp9_profile {
->>> +     V4L2_MPEG_VIDEO_VP9_PROFILE_0                           = 0,
->>> +     V4L2_MPEG_VIDEO_VP9_PROFILE_1                           = 1,
->>> +     V4L2_MPEG_VIDEO_VP9_PROFILE_2                           = 2,
->>> +     V4L2_MPEG_VIDEO_VP9_PROFILE_3                           = 3,
->>> +};
->>> +
->>>  /* CIDs for HEVC encoding. */
->>>
->>>  #define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP              (V4L2_CID_MPEG_BASE + 600)
->>> --
->>> 2.17.0.921.gf22659ad46-goog
->>>
->>
+>  drivers/dma/Kconfig    |   1 +
+>  drivers/dma/imx-sdma.c | 392 
+> ++++++++++++++++++++++++++++---------------------
+>  2 files changed, 227 insertions(+), 166 deletions(-)
+
+Please put the attached patch in front of your series. It makes the virt-dma support patch smaller and thus easier to review.
+
+Sascha
+
+--------------------------------8<----------------------------------
+
+>From a70ccdf780cc6fcddd2d06c4a3eb0123d4aba443 Mon Sep 17 00:00:00 2001
+From: Sascha Hauer <s.hauer@pengutronix.de>
+Date: Fri, 8 Jun 2018 10:20:18 +0200
+Subject: [PATCH 1/2] dmaengine: imx-sdma: factor out a struct sdma_desc from  struct sdma_channel
+
+This is a preparation step to make the adding of virt-dma easier.
+We create a struct sdma_desc, move some fields from struct sdma_channel there and add a pointer from the former to the latter. For now we allocate the data statically in struct sdma_channel, but with virt-dma support it will be dynamically allocated.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/dma/imx-sdma.c | 137 +++++++++++++++++++++++++----------------
+ 1 file changed, 83 insertions(+), 54 deletions(-)
+
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c index ccd03c3cedfe..556d08712f4a 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -295,6 +295,30 @@ struct sdma_context_data {
+ 
+ struct sdma_engine;
+ 
++/**
++ * struct sdma_desc - descriptor structor for one transfer
++ * @vd			descriptor for virt dma
++ * @num_bd		max NUM_BD. number of descriptors currently handling
++ * @buf_tail		ID of the buffer that was processed
++ * @buf_ptail		ID of the previous buffer that was processed
++ * @period_len		period length, used in cyclic.
++ * @chn_real_count	the real count updated from bd->mode.count
++ * @chn_count		the transfer count setuped
++ * @sdmac		sdma_channel pointer
++ * @bd			pointer of alloced bd
++ */
++struct sdma_desc {
++	unsigned int		num_bd;
++	dma_addr_t		bd_phys;
++	unsigned int		buf_tail;
++	unsigned int		buf_ptail;
++	unsigned int		period_len;
++	unsigned int		chn_real_count;
++	unsigned int		chn_count;
++	struct sdma_channel	*sdmac;
++	struct sdma_buffer_descriptor *bd;
++};
++
+ /**
+  * struct sdma_channel - housekeeping for a SDMA channel
+  *
+@@ -305,11 +329,10 @@ struct sdma_engine;
+  * @event_id0		aka dma request line
+  * @event_id1		for channels that use 2 events
+  * @word_size		peripheral access size
+- * @buf_tail		ID of the buffer that was processed
+- * @buf_ptail		ID of the previous buffer that was processed
+- * @num_bd		max NUM_BD. number of descriptors currently handling
+  */
+ struct sdma_channel {
++	struct sdma_desc		*desc;
++	struct sdma_desc		_desc;
+ 	struct sdma_engine		*sdma;
+ 	unsigned int			channel;
+ 	enum dma_transfer_direction		direction;
+@@ -317,12 +340,6 @@ struct sdma_channel {
+ 	unsigned int			event_id0;
+ 	unsigned int			event_id1;
+ 	enum dma_slave_buswidth		word_size;
+-	unsigned int			buf_tail;
+-	unsigned int			buf_ptail;
+-	unsigned int			num_bd;
+-	unsigned int			period_len;
+-	struct sdma_buffer_descriptor	*bd;
+-	dma_addr_t			bd_phys;
+ 	unsigned int			pc_from_device, pc_to_device;
+ 	unsigned int			device_to_device;
+ 	unsigned long			flags;
+@@ -332,10 +349,8 @@ struct sdma_channel {
+ 	u32				shp_addr, per_addr;
+ 	struct dma_chan			chan;
+ 	spinlock_t			lock;
+-	struct dma_async_tx_descriptor	desc;
++	struct dma_async_tx_descriptor	txdesc;
+ 	enum dma_status			status;
+-	unsigned int			chn_count;
+-	unsigned int			chn_real_count;
+ 	struct tasklet_struct		tasklet;
+ 	struct imx_dma_data		data;
+ 	bool				enabled;
+@@ -398,6 +413,8 @@ struct sdma_engine {
+ 	u32				spba_start_addr;
+ 	u32				spba_end_addr;
+ 	unsigned int			irq;
++	dma_addr_t			bd0_phys;
++	struct sdma_buffer_descriptor	*bd0;
+ };
+ 
+ static struct sdma_driver_data sdma_imx31 = { @@ -632,7 +649,7 @@ static int sdma_run_channel0(struct sdma_engine *sdma)  static int sdma_load_script(struct sdma_engine *sdma, void *buf, int size,
+ 		u32 address)
+ {
+-	struct sdma_buffer_descriptor *bd0 = sdma->channel[0].bd;
++	struct sdma_buffer_descriptor *bd0 = sdma->bd0;
+ 	void *buf_virt;
+ 	dma_addr_t buf_phys;
+ 	int ret;
+@@ -707,7 +724,9 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
+ 	 * call callback function.
+ 	 */
+ 	while (1) {
+-		bd = &sdmac->bd[sdmac->buf_tail];
++		struct sdma_desc *desc = sdmac->desc;
++
++		bd = &desc->bd[desc->buf_tail];
+ 
+ 		if (bd->mode.status & BD_DONE)
+ 			break;
+@@ -723,11 +742,11 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
+ 		* the number of bytes present in the current buffer descriptor.
+ 		*/
+ 
+-		sdmac->chn_real_count = bd->mode.count;
++		desc->chn_real_count = bd->mode.count;
+ 		bd->mode.status |= BD_DONE;
+-		bd->mode.count = sdmac->period_len;
+-		sdmac->buf_ptail = sdmac->buf_tail;
+-		sdmac->buf_tail = (sdmac->buf_tail + 1) % sdmac->num_bd;
++		bd->mode.count = desc->period_len;
++		desc->buf_ptail = desc->buf_tail;
++		desc->buf_tail = (desc->buf_tail + 1) % desc->num_bd;
+ 
+ 		/*
+ 		 * The callback is called from the interrupt context in order @@ -736,7 +755,7 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
+ 		 * executed.
+ 		 */
+ 
+-		dmaengine_desc_get_callback_invoke(&sdmac->desc, NULL);
++		dmaengine_desc_get_callback_invoke(&sdmac->txdesc, NULL);
+ 
+ 		if (error)
+ 			sdmac->status = old_status;
+@@ -749,17 +768,17 @@ static void mxc_sdma_handle_channel_normal(unsigned long data)
+ 	struct sdma_buffer_descriptor *bd;
+ 	int i, error = 0;
+ 
+-	sdmac->chn_real_count = 0;
++	sdmac->desc->chn_real_count = 0;
+ 	/*
+ 	 * non loop mode. Iterate over all descriptors, collect
+ 	 * errors and call callback function
+ 	 */
+-	for (i = 0; i < sdmac->num_bd; i++) {
+-		bd = &sdmac->bd[i];
++	for (i = 0; i < sdmac->desc->num_bd; i++) {
++		bd = &sdmac->desc->bd[i];
+ 
+ 		 if (bd->mode.status & (BD_DONE | BD_RROR))
+ 			error = -EIO;
+-		 sdmac->chn_real_count += bd->mode.count;
++		 sdmac->desc->chn_real_count += bd->mode.count;
+ 	}
+ 
+ 	if (error)
+@@ -767,9 +786,9 @@ static void mxc_sdma_handle_channel_normal(unsigned long data)
+ 	else
+ 		sdmac->status = DMA_COMPLETE;
+ 
+-	dma_cookie_complete(&sdmac->desc);
++	dma_cookie_complete(&sdmac->txdesc);
+ 
+-	dmaengine_desc_get_callback_invoke(&sdmac->desc, NULL);
++	dmaengine_desc_get_callback_invoke(&sdmac->txdesc, NULL);
+ }
+ 
+ static irqreturn_t sdma_int_handler(int irq, void *dev_id) @@ -897,7 +916,7 @@ static int sdma_load_context(struct sdma_channel *sdmac)
+ 	int channel = sdmac->channel;
+ 	int load_address;
+ 	struct sdma_context_data *context = sdma->context;
+-	struct sdma_buffer_descriptor *bd0 = sdma->channel[0].bd;
++	struct sdma_buffer_descriptor *bd0 = sdma->bd0;
+ 	int ret;
+ 	unsigned long flags;
+ 
+@@ -1100,18 +1119,22 @@ static int sdma_set_channel_priority(struct sdma_channel *sdmac,  static int sdma_request_channel(struct sdma_channel *sdmac)  {
+ 	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_desc *desc;
+ 	int channel = sdmac->channel;
+ 	int ret = -EBUSY;
+ 
+-	sdmac->bd = dma_zalloc_coherent(NULL, PAGE_SIZE, &sdmac->bd_phys,
++	sdmac->desc = &sdmac->_desc;
++	desc = sdmac->desc;
++
++	desc->bd = dma_zalloc_coherent(NULL, PAGE_SIZE, &desc->bd_phys,
+ 					GFP_KERNEL);
+-	if (!sdmac->bd) {
++	if (!desc->bd) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 
+-	sdma->channel_control[channel].base_bd_ptr = sdmac->bd_phys;
+-	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
++	sdma->channel_control[channel].base_bd_ptr = desc->bd_phys;
++	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
+ 
+ 	sdma_set_channel_priority(sdmac, MXC_SDMA_DEFAULT_PRIORITY);
+ 	return 0;
+@@ -1176,10 +1199,10 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ 	if (ret)
+ 		goto disable_clk_ahb;
+ 
+-	dma_async_tx_descriptor_init(&sdmac->desc, chan);
+-	sdmac->desc.tx_submit = sdma_tx_submit;
++	dma_async_tx_descriptor_init(&sdmac->txdesc, chan);
++	sdmac->txdesc.tx_submit = sdma_tx_submit;
+ 	/* txd.flags will be overwritten in prep funcs */
+-	sdmac->desc.flags = DMA_CTRL_ACK;
++	sdmac->txdesc.flags = DMA_CTRL_ACK;
+ 
+ 	return 0;
+ 
+@@ -1194,6 +1217,7 @@ static void sdma_free_chan_resources(struct dma_chan *chan)  {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+ 	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_desc *desc = sdmac->desc;
+ 
+ 	sdma_disable_channel(chan);
+ 
+@@ -1207,7 +1231,7 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
+ 
+ 	sdma_set_channel_priority(sdmac, 0);
+ 
+-	dma_free_coherent(NULL, PAGE_SIZE, sdmac->bd, sdmac->bd_phys);
++	dma_free_coherent(NULL, PAGE_SIZE, desc->bd, desc->bd_phys);
+ 
+ 	clk_disable(sdma->clk_ipg);
+ 	clk_disable(sdma->clk_ahb);
+@@ -1223,6 +1247,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 	int ret, i, count;
+ 	int channel = sdmac->channel;
+ 	struct scatterlist *sg;
++	struct sdma_desc *desc = sdmac->desc;
+ 
+ 	if (sdmac->status == DMA_IN_PROGRESS)
+ 		return NULL;
+@@ -1230,9 +1255,9 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 
+ 	sdmac->flags = 0;
+ 
+-	sdmac->buf_tail = 0;
+-	sdmac->buf_ptail = 0;
+-	sdmac->chn_real_count = 0;
++	desc->buf_tail = 0;
++	desc->buf_ptail = 0;
++	desc->chn_real_count = 0;
+ 
+ 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
+ 			sg_len, channel);
+@@ -1249,9 +1274,9 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		goto err_out;
+ 	}
+ 
+-	sdmac->chn_count = 0;
++	desc->chn_count = 0;
+ 	for_each_sg(sgl, sg, sg_len, i) {
+-		struct sdma_buffer_descriptor *bd = &sdmac->bd[i];
++		struct sdma_buffer_descriptor *bd = &desc->bd[i];
+ 		int param;
+ 
+ 		bd->buffer_addr = sg->dma_address;
+@@ -1266,7 +1291,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		}
+ 
+ 		bd->mode.count = count;
+-		sdmac->chn_count += count;
++		desc->chn_count += count;
+ 
+ 		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES) {
+ 			ret =  -EINVAL;
+@@ -1307,10 +1332,10 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		bd->mode.status = param;
+ 	}
+ 
+-	sdmac->num_bd = sg_len;
+-	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
++	desc->num_bd = sg_len;
++	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
+ 
+-	return &sdmac->desc;
++	return &sdmac->txdesc;
+ err_out:
+ 	sdmac->status = DMA_ERROR;
+ 	return NULL;
+@@ -1326,6 +1351,7 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 	int num_periods = buf_len / period_len;
+ 	int channel = sdmac->channel;
+ 	int ret, i = 0, buf = 0;
++	struct sdma_desc *desc = sdmac->desc;
+ 
+ 	dev_dbg(sdma->dev, "%s channel: %d\n", __func__, channel);
+ 
+@@ -1334,10 +1360,10 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 
+ 	sdmac->status = DMA_IN_PROGRESS;
+ 
+-	sdmac->buf_tail = 0;
+-	sdmac->buf_ptail = 0;
+-	sdmac->chn_real_count = 0;
+-	sdmac->period_len = period_len;
++	desc->buf_tail = 0;
++	desc->buf_ptail = 0;
++	desc->chn_real_count = 0;
++	desc->period_len = period_len;
+ 
+ 	sdmac->flags |= IMX_DMA_SG_LOOP;
+ 	sdmac->direction = direction;
+@@ -1358,7 +1384,7 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 	}
+ 
+ 	while (buf < buf_len) {
+-		struct sdma_buffer_descriptor *bd = &sdmac->bd[i];
++		struct sdma_buffer_descriptor *bd = &desc->bd[i];
+ 		int param;
+ 
+ 		bd->buffer_addr = dma_addr;
+@@ -1389,10 +1415,10 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 		i++;
+ 	}
+ 
+-	sdmac->num_bd = num_periods;
+-	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
++	desc->num_bd = num_periods;
++	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
+ 
+-	return &sdmac->desc;
++	return &sdmac->txdesc;
+ err_out:
+ 	sdmac->status = DMA_ERROR;
+ 	return NULL;
+@@ -1431,13 +1457,14 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
+ 				      struct dma_tx_state *txstate)  {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
++	struct sdma_desc *desc = sdmac->desc;
+ 	u32 residue;
+ 
+ 	if (sdmac->flags & IMX_DMA_SG_LOOP)
+-		residue = (sdmac->num_bd - sdmac->buf_ptail) *
+-			   sdmac->period_len - sdmac->chn_real_count;
++		residue = (desc->num_bd - desc->buf_ptail) *
++			   desc->period_len - desc->chn_real_count;
+ 	else
+-		residue = sdmac->chn_count - sdmac->chn_real_count;
++		residue = desc->chn_count - desc->chn_real_count;
+ 
+ 	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
+ 			 residue);
+@@ -1661,6 +1688,8 @@ static int sdma_init(struct sdma_engine *sdma)
+ 	if (ret)
+ 		goto err_dma_alloc;
+ 
++	sdma->bd0 = sdma->channel[0].desc->bd;
++
+ 	sdma_config_ownership(&sdma->channel[0], false, true, false);
+ 
+ 	/* Set Command Channel (Channel Zero) */
+--
+2.17.1
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.pengutronix.de%2F&data=02%7C01%7Cyibin.gong%40nxp.com%7Cf4671adfeaa947506e2b08d5cd1be23d%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636640442016947893&sdata=6FkizxBudOfDkWUrj28qYaycOz%2Br0bwf7DJJ8vZgaKg%3D&reserved=0  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
