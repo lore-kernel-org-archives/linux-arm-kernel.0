@@ -1,30 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 8 Jun 2018 10:00:55 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Enable watchdog
- timer
-In-Reply-To: <20180606090359.zi46cq5ddftdaps7@verge.net.au>
-References: <1528219234-29348-1-git-send-email-geert+renesas@glider.be>
- <20180606090359.zi46cq5ddftdaps7@verge.net.au>
-Message-ID: <20180608080055.2gvrvnjpxkfy2men@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Jun 2018 10:06:26 +0200
+Subject: [PATCH -next] pinctrl: mediatek: remove redundant return value
+ check of platform_get_resource()
+In-Reply-To: <1527766782-72315-1-git-send-email-weiyongjun1@huawei.com>
+References: <1527766782-72315-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <CACRpkdY3YOAbsXHYu3m-0LUSf0FnXS6vO4+M3+=xUS_YuaydjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 11:04:00AM +0200, Simon Horman wrote:
-> On Tue, Jun 05, 2018 at 07:20:34PM +0200, Geert Uytterhoeven wrote:
-> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > 
-> > Add a device node for the Watchdog Timer (WDT) controller on the
-> > R8A77990 SoC, and enable the watchdog on the Ebisu board.
-> > 
-> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > [geert: Squashed 2 commits]
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Hi,
-> 
-> This looks fine to me but I will wait to see if there are other reviews
-> before applying.
-> 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+On Thu, May 31, 2018 at 1:39 PM, Wei Yongjun <weiyongjun1@huawei.com> wrote:
 
-Thanks Geert, applied
+> Remove unneeded error handling on the result of a call
+> to platform_get_resource() when the value is passed to
+> devm_ioremap_resource().
+>
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+
+Patch applied for fixes.
+
+Yours,
+Linus Walleij
