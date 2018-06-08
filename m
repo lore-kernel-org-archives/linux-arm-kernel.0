@@ -1,100 +1,51 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Fri, 8 Jun 2018 14:11:32 +0100
-Subject: [PATCHv4 06/10] arm64: add basic pointer authentication support
-In-Reply-To: <20180503132031.25705-7-mark.rutland@arm.com>
-References: <20180503132031.25705-1-mark.rutland@arm.com>
- <20180503132031.25705-7-mark.rutland@arm.com>
-Message-ID: <e4630a08-db4e-7c4d-5d92-393ad99a629e@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 8 Jun 2018 15:54:56 +0200
+Subject: [PATCH v2 2/5] arm64: dts: renesas: r8a77980: add VSPD support
+In-Reply-To: <5f151ec5-bec7-ed06-cb94-4f0cfe8e43dc@cogentembedded.com>
+References: <390fabf0-4caf-1600-3780-1893207d94f7@cogentembedded.com>
+ <5f151ec5-bec7-ed06-cb94-4f0cfe8e43dc@cogentembedded.com>
+Message-ID: <20180608135456.cathgcuyp24csbwx@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+[CC Laurent, Geert]
 
-On 03/05/18 14:20, Mark Rutland wrote:
-> This patch adds basic support for pointer authentication, allowing
-> userspace to make use of APIAKey. The kernel maintains an APIAKey value
-> for each process (shared by all threads within), which is initialised to
-> a random value at exec() time.
+On Thu, Jun 07, 2018 at 11:20:47PM +0300, Sergei Shtylyov wrote:
+> Describe VSPD0 in the R8A77980 device tree; it will be used by DU in
+> the next patch...
 > 
-> To describe that address authentication instructions are available, the
-> ID_AA64ISAR0.{APA,API} fields are exposed to userspace. A new hwcap,
-> APIA, is added to describe that the kernel manages APIAKey.
+> Based on the original (and large) patch by Vladimir Barinov.
 > 
-> Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
-> and will behave as NOPs. These may be made use of in future patches.
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> No support is added for the generic key (APGAKey), though this cannot be
-> trapped or made to behave as a NOP. Its presence is not advertised with
-> a hwcap.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/include/asm/mmu.h          |  5 +++
->  arch/arm64/include/asm/mmu_context.h  | 11 ++++-
->  arch/arm64/include/asm/pointer_auth.h | 75 +++++++++++++++++++++++++++++++++++
->  arch/arm64/include/uapi/asm/hwcap.h   |  1 +
->  arch/arm64/kernel/cpufeature.c        |  9 +++++
->  arch/arm64/kernel/cpuinfo.c           |  1 +
->  6 files changed, 101 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/include/asm/pointer_auth.h
+>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index dd320df0d026..f6480ea7b0d5 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -25,10 +25,15 @@
+> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> @@ -653,6 +653,16 @@
+>  			resets = <&cpg 408>;
+>  		};
 >  
->  #ifndef __ASSEMBLY__
->  
-> +#include <asm/pointer_auth.h>
-> +
->  typedef struct {
->  	atomic64_t	id;
->  	void		*vdso;
->  	unsigned long	flags;
-> +#ifdef CONFIG_ARM64_PTR_AUTH
-> +	struct ptrauth_keys	ptrauth_keys;
-> +#endif
->  } mm_context_t;
->  
->  /*
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 39ec0b8a689e..83eadbc6b946 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -168,7 +168,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
->  #define destroy_context(mm)		do { } while(0)
->  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
->  
-> -#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
-> +static inline int init_new_context(struct task_struct *tsk,
-> +				   struct mm_struct *mm)
-> +{
-> +	atomic64_set(&mm->context.id, 0);
-> +	mm_ctx_ptrauth_init(&mm->context);
-> +
-> +	return 0;
-> +}>
->  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
->  static inline void update_saved_ttbr0(struct task_struct *tsk,
-> @@ -216,6 +223,8 @@ static inline void __switch_mm(struct mm_struct *next)
->  		return;
->  	}
->  
-> +	mm_ctx_ptrauth_switch(&next->context);
-> +
->  	check_and_switch_context(next, cpu);
->  }
+> +		vspd0: vsp at fea20000 {
+> +			compatible = "renesas,vsp2";
+> +			reg = <0 0xfea20000 0 0x4000>;
 
-It seems you've removed arch_dup_mmap here (as Catalin suggested [1]),
-but forgotten to move the key initialization from init_new_context to
-arch_bprm_mm_init. In my tests I'm seeing child processes get different
-keys than the parent after a fork().
+As per "[PATCH] arm64: dts: renesas: Fix VSPD registers range"
+I think the width of the range should be 0x5000.
 
-Kristina
-
-[1] https://lkml.org/lkml/2018/4/25/506
+> +			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 623>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 623>;
+> +			renesas,fcp = <&fcpvd0>;
+> +		};
+> +
+>  		fcpvd0: fcp at fea27000 {
+>  			compatible = "renesas,fcpv";
+>  			reg = <0 0xfea27000 0 0x200>;
+> 
