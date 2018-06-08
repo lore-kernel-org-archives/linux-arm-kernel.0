@@ -1,194 +1,103 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 08 Jun 2018 16:33:42 +0200
-Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
-References: <cover.1527621510.git.leonard.crestez@nxp.com>
- <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
-Message-ID: <1528468422.26356.20.camel@pengutronix.de>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 8 Jun 2018 16:46:23 +0200
+Subject: [PATCH v2 13/16] dt-bindings/interrupt-controller: add
+ documentation for Marvell SEI controller
+In-Reply-To: <20180605205121.GA19249@rob-hp-laptop>
+References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
+ <20180522094042.24770-14-miquel.raynal@bootlin.com>
+ <20180605205121.GA19249@rob-hp-laptop>
+Message-ID: <20180608164623.0175fc05@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
-> On imx7d the phy is turned off in suspend and must be reset on resume.
-> Right now lspci -v fails after a suspend/resume cycle, fix this by
-> adding minimal suspend/resume code from the nxp vendor tree.
+Hi Rob, Marc,
+
+On Tue, 5 Jun 2018 14:51:21 -0600, Rob Herring <robh@kernel.org> wrote:
+
+> On Tue, May 22, 2018 at 11:40:39AM +0200, Miquel Raynal wrote:
+> > Describe the System Error Interrupt (SEI) controller. It aggregates two
+> > types of interrupts, wired and MSIs from respectively the AP and the
+> > CPs, into a single SPI interrupt.
+> > 
+> > Suggested-by: Haim Boot <hayim@marvell.com>
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  .../bindings/interrupt-controller/marvell,sei.txt  | 50 ++++++++++++++++++++++
+> >  1 file changed, 50 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+> > new file mode 100644
+> > index 000000000000..689981036c30
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+> > @@ -0,0 +1,50 @@
+> > +Marvell SEI (System Error Interrupt) Controller
+> > +-----------------------------------------------
+> > +
+> > +Marvell SEI (System Error Interrupt) controller is an interrupt
+> > +aggregator. It receives interrupts from several sources and aggregates
+> > +them to a single interrupt line (an SPI) on the parent interrupt
+> > +controller.
+> > +
+> > +This interrupt controller can handle up to 64 SEIs, a set comes from the
+> > +AP and is wired while a second set comes from the CPs by the mean of
+> > +MSIs. Each 'domain' is represented as a subnode.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: should be "marvell,armada-8k-sei".
+> > +- reg: SEI registers location and length.
+> > +- interrupts: identifies the parent IRQ that will be triggered.
+> > +
+> > +Child node 'sei-wired-controller' required properties:
+> > +
+> > +- marvell,sei-ranges: ranges of wired interrupts.
+> > +- #interrupt-cells: number of cells to define an SEI wired interrupt
+> > +                    coming from the AP, should be 1. The cell is the IRQ
+> > +                    number.
+> > +- interrupt-controller: identifies the node as an interrupt controller.
+> > +
+> > +Child node 'sei-msi-controller' required properties:
+> > +
+> > +- marvell,sei-ranges: ranges of non-wired interrupts triggered by way of
+> > +                      MSIs.
+> > +- msi-controller: identifies the node as an MSI controller.
+> > +
+> > +Example:
+> > +
+> > +        sei: sei at 3f0200 {
+> > +               compatible = "marvell,armada-8k-sei";
+> > +               reg = <0x3f0200 0x40>;
+> > +               interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> > +
+> > +               sei_wired_controller: sei-wired-controller at 0 {
+> > +                       marvell,sei-ranges = <0 21>;
+> > +                       #interrupt-cells = <1>;
+> > +                       interrupt-controller;
+> > +               };
+> > +
+> > +               sei_msi_controller: sei-msi-controller at 21 {
+> > +                       marvell,sei-ranges = <21 43>;
+> > +                       msi-controller;
+> > +               };  
 > 
-> This is currently only enabled for imx7 but the same sequence can be
-> applied to other imx pcie variants.
-> 
-> Tested on imx7d-sabresd with an Intel 5622ANHMW wireless pcie adapter.
-> 
-> > The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
-> patch adjusts the code to the upstream imx7d implemention using reset
-> controls and power domains.
-> 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> ---
-> ?drivers/pci/dwc/pci-imx6.c | 94 ++++++++++++++++++++++++++++++++++++--
-> ?1 file changed, 89 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> index 4818ef875f8a..ff6077eeb387 100644
-> --- a/drivers/pci/dwc/pci-imx6.c
-> +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -540,10 +540,27 @@ static int imx6_pcie_wait_for_speed_change(struct imx6_pcie *imx6_pcie)
-> ?
-> > ?	dev_err(dev, "Speed change timeout\n");
-> > ?	return -EINVAL;
-> ?}
-> ?
-> +static void imx6_pcie_ltssm_enable(struct device *dev)
-> +{
-> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> +
-> > +	switch (imx6_pcie->variant) {
-> > +	case IMX6Q:
-> > +	case IMX6SX:
-> > +	case IMX6QP:
-> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > +				???IMX6Q_GPR12_PCIE_CTL_2,
-> > +				???IMX6Q_GPR12_PCIE_CTL_2);
-> > +		break;
-> > +	case IMX7D:
-> > +		reset_control_deassert(imx6_pcie->apps_reset);
-> > +	}
-> +}
-> +
-> ?static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
-> ?{
-> > ?	struct dw_pcie *pci = imx6_pcie->pci;
-> > ?	struct device *dev = pci->dev;
-> > ?	u32 tmp;
-> @@ -558,15 +575,11 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
-> > ?	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > ?	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > ?	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> ?
-> > ?	/* Start LTSSM. */
-> > -	if (imx6_pcie->variant == IMX7D)
-> > -		reset_control_deassert(imx6_pcie->apps_reset);
-> > -	else
-> > -		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > -				???IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
-> > +	imx6_pcie_ltssm_enable(dev);
-> ?
-> > ?	ret = imx6_pcie_wait_for_link(imx6_pcie);
-> > ?	if (ret)
-> > ?		goto err_reset_phy;
-> ?
-> @@ -681,10 +694,80 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
-> ?
-> ?static const struct dw_pcie_ops dw_pcie_ops = {
-> > ?	.link_up = imx6_pcie_link_up,
-> ?};
-> ?
-> +#ifdef CONFIG_PM_SLEEP
-> +static int imx6_pcie_suspend_noirq(struct device *dev)
-> +{
-> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> +
-> +	if (imx6_pcie->variant == IMX7D) {
+> I still think this should just be all one node. There's several examples 
+> in the tree of nodes which are both interrupt-controller and 
+> msi-controller. Marvell MPIC is one example.
 
-Instead of this large indented block, please just have an early return
-at the start of this function, like:
+I checked Marvell MPIC example (armada 370 XP), it does not use
+hierarchy domains, so I totally understand your point but I'm not sure
+how I could get inspired by this driver (I'm looking for others).
 
-if (imx6_pcie->variant != IMX7D)
-	return 0;
+Here I'm stuck. I know from a pure DT point of view the following is
+not a valid argument. But from Linux, there is no easy way to handle
+this situation without two different device nodes due to the internals
+of the irqchip subsystem. There is simply no easy solution and having
+only one node would require consequent changes in the core.
 
-Same for the resume function.
-
-> +		/* Disable clks */
-> > +		clk_disable_unprepare(imx6_pcie->pcie);
-> > +		clk_disable_unprepare(imx6_pcie->pcie_phy);
-> > +		clk_disable_unprepare(imx6_pcie->pcie_bus);
-> > +		/* turn off external osc input */
-> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > +				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
-> > +				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
-> > +	}
-> +
-> > +	return 0;
-> +}
-> +
-> +static void imx6_pcie_ltssm_disable(struct device *dev)
-> +{
-> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> +
-> > +	switch (imx6_pcie->variant) {
-> > +	case IMX6Q:
-> > +	case IMX6SX:
-> > +	case IMX6QP:
-> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > +				???IMX6Q_GPR12_PCIE_CTL_2, 0);
-> > +		break;
-> > +	case IMX7D:
-> > +		reset_control_assert(imx6_pcie->apps_reset);
-> > +		break;
-> > +	}
-> +}
-> +
-> +static int imx6_pcie_resume_noirq(struct device *dev)
-> +{
-> > +	int ret = 0;
-> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
-> +
-> > +	if (imx6_pcie->variant == IMX7D) {
-> > +		imx6_pcie_ltssm_disable(dev);
-
-The LTSSM disable seems misplaced here. I would have expected it to be
-in the suspend function.
-
-> +		imx6_pcie_assert_core_reset(imx6_pcie);
-> > +		imx6_pcie_init_phy(imx6_pcie);
-> > +		imx6_pcie_deassert_core_reset(imx6_pcie);
-> +
-> > +		/*
-> > +		?* controller maybe turn off, re-configure again
-> > +		?*/
-> > +		dw_pcie_setup_rc(pp);
-> +
-> > +		imx6_pcie_ltssm_enable(dev);
-> +
-> > +		ret = imx6_pcie_wait_for_link(imx6_pcie);
-> > +		if (ret < 0)
-> +			pr_info("pcie link is down after resume.\n");
-
-If the PHY has been powered down and LTSSM stopped I guess we need to
-do the full imx6_pcie_establish_link() dance again here to reliably re-
-establish the link. The above seems unsafe.
-
-> +	}
-> +
-> > +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops imx6_pcie_pm_ops = {
-> > +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
-> > +				??????imx6_pcie_resume_noirq)
-> +};
-> +#endif
-
-This structure must be outside of the ifdef, or you'll break the build
-on !CONFIG_PM_SLEEP.
-
-> ?static int imx6_pcie_probe(struct platform_device *pdev)
-> ?{
-> > ?	struct device *dev = &pdev->dev;
-> > ?	struct dw_pcie *pci;
-> > ?	struct imx6_pcie *imx6_pcie;
-> @@ -847,10 +930,11 @@ static const struct of_device_id imx6_pcie_of_match[] = {
-> ?static struct platform_driver imx6_pcie_driver = {
-> > ?	.driver = {
-> > > ?		.name	= "imx6q-pcie",
-> > ?		.of_match_table = imx6_pcie_of_match,
-> > ?		.suppress_bind_attrs = true,
-> > +		.pm = &imx6_pcie_pm_ops,
-> > ?	},
-> > ?	.probe????= imx6_pcie_probe,
-> > ?	.shutdown = imx6_pcie_shutdown,
-> ?};
-> ?
+Maybe Marc will have an idea, but I think we already gave up on this
+topic :/
 
 Regards,
-Lucas
+Miqu?l
