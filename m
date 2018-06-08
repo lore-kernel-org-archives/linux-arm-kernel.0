@@ -1,103 +1,174 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 8 Jun 2018 10:22:34 +0100
-Subject: [PATCH v4 05/14] coresight: get/put module in
- coresight_build/release_path
-In-Reply-To: <20180607164747.7e4bb30f69a1fb4c160b6ef1@arm.com>
-References: <20180605210710.22227-1-kim.phillips@arm.com>
- <20180605210710.22227-6-kim.phillips@arm.com>
- <20180606082422.GB19727@kroah.com>
- <a457594c-b391-23e1-6ab5-d115073cac5a@arm.com>
- <20180606155501.704583e1412996a1a2c6fa61@arm.com>
- <20180607083401.GE16651@kroah.com>
- <3219276b-2703-bc30-92e1-bae80cdc5901@arm.com>
- <20180607091353.GA20438@kroah.com>
- <2f8d233e-8847-ce3d-3a5b-06b175e3944b@arm.com>
- <20180607095322.GA26174@kroah.com>
- <adbabdb0-df2c-be74-3cde-cda4f6bce579@arm.com>
- <20180607121304.017d1d6804466050dd5c0af2@arm.com>
- <39d1089f-585d-bc19-2ecd-c9c9c812f85f@arm.com>
- <20180607164747.7e4bb30f69a1fb4c160b6ef1@arm.com>
-Message-ID: <a637db36-4b82-d744-677e-0b4555201a80@arm.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Fri,  8 Jun 2018 02:27:59 -0700
+Subject: [PATCH] net: thunderx: prevent concurrent data re-writing by
+ nicvf_set_rx_mode
+Message-ID: <20180608092759.28059-1-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2018 10:47 PM, Kim Phillips wrote:
-> On Thu, 7 Jun 2018 22:10:07 +0100
-> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> 
->> On 06/07/2018 06:13 PM, Kim Phillips wrote:
->>> I'm going to assume the series is still valid after this discussion,
->>> since technically just this patch can get dropped, and the user is able
->>> to shoot themselves in the foot.
->>
->> That doesn't mean the kernel can panic() if the user decided to unload
->> the module while the trace session is in progress. It only means that
->> the trace session could be stopped in between in the worst case. But
->> nothing more harmful to the system.
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-Kim,
+For each network interface linux network stack issue ndo_set_rx_mode call
+in order to configure MAC address filters (e.g. for multicast filtering).
+Currently ThunderX NICVF driver has only one ordered workqueue to process
+such requests for all VFs.
 
-> 
-> FWIW, I didn't see the kernel panic in my basic tests; just some bad
-> accesses: the new remove functions take care of cleaning up most items,
-> and most drivers still depend on the links and sinks (funnel,
-> replicator) drivers, so they can't be upset too bad.
+And because of that it is possible that subsequent call to
+ndo_set_rx_mode would corrupt data which is currently in use
+by nicvf_set_rx_mode_task. Which in turn could cause following issue:
+[...]
+[   48.978341] Unable to handle kernel paging request at virtual address 1fffff0000000000
+[   48.986275] Mem abort info:
+[   48.989058]   Exception class = DABT (current EL), IL = 32 bits
+[   48.994965]   SET = 0, FnV = 0
+[   48.998020]   EA = 0, S1PTW = 0
+[   49.001152] Data abort info:
+[   49.004022]   ISV = 0, ISS = 0x00000004
+[   49.007869]   CM = 0, WnR = 0
+[   49.010826] [1fffff0000000000] address between user and kernel address ranges
+[   49.017963] Internal error: Oops: 96000004 [#1] SMP
+[...]
+[   49.072138] task: ffff800fdd675400 task.stack: ffff000026440000
+[   49.078051] PC is at prefetch_freepointer.isra.37+0x28/0x3c
+[   49.083613] LR is at kmem_cache_alloc_trace+0xc8/0x1fc
+[...]
+[   49.272684] [<ffff0000082738f0>] prefetch_freepointer.isra.37+0x28/0x3c
+[   49.279286] [<ffff000008276bc8>] kmem_cache_alloc_trace+0xc8/0x1fc
+[   49.285455] [<ffff0000082c0c0c>] alloc_fdtable+0x78/0x134
+[   49.290841] [<ffff0000082c15c0>] dup_fd+0x254/0x2f4
+[   49.295709] [<ffff0000080d1954>] copy_process.isra.38.part.39+0x64c/0x1168
+[   49.302572] [<ffff0000080d264c>] _do_fork+0xfc/0x3b0
+[   49.307524] [<ffff0000080d29e8>] SyS_clone+0x44/0x50
+[...]
 
-Bad accesses are still bad. The bad access could trigger an Oops for 
-e.g, or could even corrupt the other parts of the kernel if we try
-to access a memory that is free'd (and reallocated to somebody else).
-So, the point is there are issues with the series which we know for
-sure from code analysis. It may take different forms to show up at
-runtime.
+This patch is to prevent such concurrent data write with spinlock.
 
-> 
->>>   This series is for development  purposes, after all.
->>
->> Do you mean that this series is for internal development purposes and
->> not upstream ? Making the drivers modular are always helpful, especially
-> 
-> no, I'm posting them for upstream review because I'd like them upstream.
-> 
->> for something related to tracing, that allows the module to be unloaded
->> after use. So, it would be good to have this series in, but in a manner
->> which is usable and doesn't cause harm to the overall system usage.
->>
->> I think the summary of the discussion is that we need more robust code
->> to handle the situation, which also allows unloading the modules without
->> any trouble.
-> 
-> Trouble's relative.  My point was since the series is going to be used
-> mainly by developers testing their code, they already prepare for, and
-> expect badness to occur anyway.  Greg's point isn't lost here, and in
+Reported-by: Dean Nelson <dnelson@redhat.com>
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic.h        |  2 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 50 +++++++++++++++++-------
+ 2 files changed, 38 insertions(+), 14 deletions(-)
 
-
-Making something modular is not really just for the use of developers.
-There are and will be other users for a device driver as a module and
-it is a fundamental feature people expect (especially in the enterprise
-world, where there is one kernel which builds most of the stuff as
-module to let the users pick the individual drivers as they need).
-So, at the kernel driver you can't really be sure, if the user is
-actually aware of the "developer" only mode and he knows that we can
-crash the kernel.
-
-> my interpretation, his review of this patch was that it was in the
-> wrong direction of safety: it made things unnecessarily too safe, up
-> front, and that items relative to the perf core should strive to adhere
-
-One of the areas of improvement towards the "modern" behavior is failing
-the activation of the trace schedule, when a component in the path has
-been removed when we go through coresight_enable_path(). Right now, we 
-create a path and then we do enable_path() and disable_path() around the
-trace schedules and the path is destroyed only at pmu->free_aux(). With
-the current patch, we hold the reference to the device/driver throughout
-the duration of the life time of the tracing, even when the tracing
-may be disabled in between.
-
-I think, if we get to that point, we should be at the best we can reach
-towards the expected behavior. But having said that, it is indeed tricky
-to get that. May be we could play a little bit with the refcounting on
-csdev and check if the refcount is only held by the number of paths this
-component is part of (needs more thought).
-
-
-Suzuki
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 448d1fafc827..f4d81765221e 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -325,6 +325,8 @@ struct nicvf {
+ 	struct tasklet_struct	qs_err_task;
+ 	struct work_struct	reset_task;
+ 	struct nicvf_work       rx_mode_work;
++	/* spinlock to protect workqueue arguments from concurrent access */
++	spinlock_t              rx_mode_wq_lock;
+ 
+ 	/* PTP timestamp */
+ 	struct cavium_ptp	*ptp_clock;
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 7135db45927e..135766c4296b 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -1923,17 +1923,12 @@ static int nicvf_ioctl(struct net_device *netdev, struct ifreq *req, int cmd)
+ 	}
+ }
+ 
+-static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
++static void __nicvf_set_rx_mode_task(u8 mode, struct xcast_addr_list *mc_addrs,
++				     struct nicvf *nic)
+ {
+-	struct nicvf_work *vf_work = container_of(work_arg, struct nicvf_work,
+-						  work.work);
+-	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
+ 	union nic_mbx mbx = {};
+ 	int idx;
+ 
+-	if (!vf_work)
+-		return;
+-
+ 	/* From the inside of VM code flow we have only 128 bits memory
+ 	 * available to send message to host's PF, so send all mc addrs
+ 	 * one by one, starting from flush command in case if kernel
+@@ -1944,7 +1939,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 	mbx.xcast.msg = NIC_MBOX_MSG_RESET_XCAST;
+ 	nicvf_send_msg_to_pf(nic, &mbx);
+ 
+-	if (vf_work->mode & BGX_XCAST_MCAST_FILTER) {
++	if (mode & BGX_XCAST_MCAST_FILTER) {
+ 		/* once enabling filtering, we need to signal to PF to add
+ 		 * its' own LMAC to the filter to accept packets for it.
+ 		 */
+@@ -1954,23 +1949,46 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 	}
+ 
+ 	/* check if we have any specific MACs to be added to PF DMAC filter */
+-	if (vf_work->mc) {
++	if (mc_addrs) {
+ 		/* now go through kernel list of MACs and add them one by one */
+-		for (idx = 0; idx < vf_work->mc->count; idx++) {
++		for (idx = 0; idx < mc_addrs->count; idx++) {
+ 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-			mbx.xcast.data.mac = vf_work->mc->mc[idx];
++			mbx.xcast.data.mac = mc_addrs->mc[idx];
+ 			nicvf_send_msg_to_pf(nic, &mbx);
+ 		}
+-		kfree(vf_work->mc);
++		kfree(mc_addrs);
+ 	}
+ 
+ 	/* and finally set rx mode for PF accordingly */
+ 	mbx.xcast.msg = NIC_MBOX_MSG_SET_XCAST;
+-	mbx.xcast.data.mode = vf_work->mode;
++	mbx.xcast.data.mode = mode;
+ 
+ 	nicvf_send_msg_to_pf(nic, &mbx);
+ }
+ 
++static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
++{
++	struct nicvf_work *vf_work = container_of(work_arg, struct nicvf_work,
++						  work.work);
++	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
++	u8 mode;
++	struct xcast_addr_list *mc;
++
++	if (!vf_work)
++		return;
++
++	/* Save message data locally to prevent them from
++	 * being overwritten by next ndo_set_rx_mode call().
++	 */
++	spin_lock(&nic->rx_mode_wq_lock);
++	mode = vf_work->mode;
++	mc = vf_work->mc;
++	vf_work->mc = NULL;
++	spin_unlock(&nic->rx_mode_wq_lock);
++
++	__nicvf_set_rx_mode_task(mode, mc, nic);
++}
++
+ static void nicvf_set_rx_mode(struct net_device *netdev)
+ {
+ 	struct nicvf *nic = netdev_priv(netdev);
+@@ -2004,9 +2022,12 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
+ 			}
+ 		}
+ 	}
++	spin_lock(&nic->rx_mode_wq_lock);
++	kfree(nic->rx_mode_work.mc);
+ 	nic->rx_mode_work.mc = mc_list;
+ 	nic->rx_mode_work.mode = mode;
+-	queue_delayed_work(nicvf_rx_mode_wq, &nic->rx_mode_work.work, 2 * HZ);
++	queue_delayed_work(nicvf_rx_mode_wq, &nic->rx_mode_work.work, 0);
++	spin_unlock(&nic->rx_mode_wq_lock);
+ }
+ 
+ static const struct net_device_ops nicvf_netdev_ops = {
+@@ -2163,6 +2184,7 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	INIT_WORK(&nic->reset_task, nicvf_reset_task);
+ 
+ 	INIT_DELAYED_WORK(&nic->rx_mode_work.work, nicvf_set_rx_mode_task);
++	spin_lock_init(&nic->rx_mode_wq_lock);
+ 
+ 	err = register_netdev(netdev);
+ 	if (err) {
+-- 
+2.14.4
