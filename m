@@ -1,69 +1,182 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 8 Jun 2018 10:34:14 +0200
-Subject: [PATCH v2 2/2] KVM: arm/arm64: harden unmap_stage2_ptes in case
- end is not PAGE_SIZE aligned
-In-Reply-To: <50c98169-1606-48bf-0489-124adefd2a54@gmail.com>
-References: <1526635630-18917-1-git-send-email-hejianet@gmail.com>
- <1526635630-18917-2-git-send-email-hejianet@gmail.com>
- <2185a61e-c157-e177-9bad-83b6f27fd784@arm.com>
- <50c98169-1606-48bf-0489-124adefd2a54@gmail.com>
-Message-ID: <20180608083414.GA5097@C02W217FHV2R.local>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Fri, 8 Jun 2018 16:38:18 +0800
+Subject: [PATCH v4 9/9] drm/mediatek: Add support for mediatek SOC MT2712
+In-Reply-To: <1527494014.24367.14.camel@mtksdaap41>
+References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
+ <1527489507-24453-10-git-send-email-stu.hsieh@mediatek.com>
+ <1527494014.24367.14.camel@mtksdaap41>
+Message-ID: <1528447098.11190.26.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 09:04:40PM +0800, Jia He wrote:
+Hi, CK:
+
+
+On Mon, 2018-05-28 at 15:53 +0800, CK Hu wrote:
+> Hi, Stu:
 > 
+> Two inline comment.
 > 
-> On 5/18/2018 5:48 PM, Marc Zyngier Wrote:
-> > On 18/05/18 10:27, Jia He wrote:
-> >> If it passes addr=0x202920000,size=0xfe00 to unmap_stage2_range->
-> >> ...->unmap_stage2_ptes, unmap_stage2_ptes will get addr=0x202920000,
-> >> end=0x20292fe00. After first while loop addr=0x202930000, end=0x20292fe00,
-> >> then addr!=end. Thus it will touch another pages by put_pages() in the
-> >> 2nd loop.
-> >>
-> >> This patch fixes it by hardening the break condition of while loop.
-> >>
-> >> Signed-off-by: jia.he at hxt-semitech.com
-> >> ---
-> >> v2: newly added
-> >>
-> >>  virt/kvm/arm/mmu.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> >> index 8dac311..45cd040 100644
-> >> --- a/virt/kvm/arm/mmu.c
-> >> +++ b/virt/kvm/arm/mmu.c
-> >> @@ -217,7 +217,7 @@ static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
-> >>  
-> >>  			put_page(virt_to_page(pte));
-> >>  		}
-> >> -	} while (pte++, addr += PAGE_SIZE, addr != end);
-> >> +	} while (pte++, addr += PAGE_SIZE, addr < end);
-> >>  
-> >>  	if (stage2_pte_table_empty(start_pte))
-> >>  		clear_stage2_pmd_entry(kvm, pmd, start_addr);
-> >>
+> On Mon, 2018-05-28 at 14:38 +0800, Stu Hsieh wrote:
+> > This patch add support for the Mediatek MT2712 DISP subsystem.
+> > There are two OVL engine and three disp output in MT2712.
 > > 
-> > I don't think this change is the right thing to do. You get that failure
-> > because you're being passed a size that is not a multiple of PAGE_SIZE.
-> > That's the mistake.
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 39 ++++++++++++++++++++++++++++++++++
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 38 +++++++++++++++++++++++++++++++++
+> >  2 files changed, 77 insertions(+)
 > > 
-> > You should ensure that this never happens, rather than changing the page
-> > table walkers (which are consistent with the way this kind of code is
-> > written in other places of the kernel). As you mentioned in your first
-> > patch, the real issue is that KSM is broken, and this is what should be
-> > fixed.
-> > 
-> Got it, thanks
-> Should I resend the patch 1/2 without any changes after droping patch 2/2?
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > index 8bfc0debd2c2..3b22b48a6022 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > @@ -61,6 +61,24 @@
+> >  #define MT8173_MUTEX_MOD_DISP_PWM1		24
+> >  #define MT8173_MUTEX_MOD_DISP_OD		25
+> >  
+> > +#define MT2712_MUTEX_MOD_DISP_PWM2		10
+> > +#define MT2712_MUTEX_MOD_DISP_OVL0		11
+> > +#define MT2712_MUTEX_MOD_DISP_OVL1		12
+> > +#define MT2712_MUTEX_MOD_DISP_RDMA0		13
+> > +#define MT2712_MUTEX_MOD_DISP_RDMA1		14
+> > +#define MT2712_MUTEX_MOD_DISP_RDMA2		15
+> > +#define MT2712_MUTEX_MOD_DISP_WDMA0		16
+> > +#define MT2712_MUTEX_MOD_DISP_WDMA1		17
+> > +#define MT2712_MUTEX_MOD_DISP_COLOR0		18
+> > +#define MT2712_MUTEX_MOD_DISP_COLOR1		19
+> > +#define MT2712_MUTEX_MOD_DISP_AAL0		20
+> > +#define MT2712_MUTEX_MOD_DISP_UFOE		22
+> > +#define MT2712_MUTEX_MOD_DISP_PWM0		23
+> > +#define MT2712_MUTEX_MOD_DISP_PWM1		24
+> > +#define MT2712_MUTEX_MOD_DISP_OD0		25
+> > +#define MT2712_MUTEX_MOD2_DISP_AAL1		33
+> > +#define MT2712_MUTEX_MOD2_DISP_OD1		34
+> > +
+> >  #define MT2701_MUTEX_MOD_DISP_OVL		3
+> >  #define MT2701_MUTEX_MOD_DISP_WDMA		6
+> >  #define MT2701_MUTEX_MOD_DISP_COLOR		7
+> > @@ -110,6 +128,26 @@ static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> >  	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
+> >  };
+> >  
+> > +static const unsigned int mt2712_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> > +	[DDP_COMPONENT_AAL0] = MT2712_MUTEX_MOD_DISP_AAL0,
+> > +	[DDP_COMPONENT_AAL1] = MT2712_MUTEX_MOD2_DISP_AAL1,
+> > +	[DDP_COMPONENT_COLOR0] = MT2712_MUTEX_MOD_DISP_COLOR0,
+> > +	[DDP_COMPONENT_COLOR1] = MT2712_MUTEX_MOD_DISP_COLOR1,
+> > +	[DDP_COMPONENT_OD0] = MT2712_MUTEX_MOD_DISP_OD0,
+> > +	[DDP_COMPONENT_OD1] = MT2712_MUTEX_MOD2_DISP_OD1,
+> > +	[DDP_COMPONENT_OVL0] = MT2712_MUTEX_MOD_DISP_OVL0,
+> > +	[DDP_COMPONENT_OVL1] = MT2712_MUTEX_MOD_DISP_OVL1,
+> > +	[DDP_COMPONENT_PWM0] = MT2712_MUTEX_MOD_DISP_PWM0,
+> > +	[DDP_COMPONENT_PWM1] = MT2712_MUTEX_MOD_DISP_PWM1,
+> > +	[DDP_COMPONENT_PWM2] = MT2712_MUTEX_MOD_DISP_PWM2,
+> > +	[DDP_COMPONENT_RDMA0] = MT2712_MUTEX_MOD_DISP_RDMA0,
+> > +	[DDP_COMPONENT_RDMA1] = MT2712_MUTEX_MOD_DISP_RDMA1,
+> > +	[DDP_COMPONENT_RDMA2] = MT2712_MUTEX_MOD_DISP_RDMA2,
+> > +	[DDP_COMPONENT_UFOE] = MT2712_MUTEX_MOD_DISP_UFOE,
+> > +	[DDP_COMPONENT_WDMA0] = MT2712_MUTEX_MOD_DISP_WDMA0,
+> > +	[DDP_COMPONENT_WDMA1] = MT2712_MUTEX_MOD_DISP_WDMA1,
+> > +};
+> > +
+> >  static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+> >  	[DDP_COMPONENT_AAL0] = MT8173_MUTEX_MOD_DISP_AAL,
+> >  	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
+> > @@ -430,6 +468,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
+> >  
+> >  static const struct of_device_id ddp_driver_dt_match[] = {
+> >  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
+> > +	{ .compatible = "mediatek,mt2712-disp-mutex", .data = mt2712_mutex_mod},
+> >  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
+> >  	{},
+> >  };
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > index 3d279a299383..3a866e1d6af4 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > @@ -146,6 +146,32 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
+> >  	DDP_COMPONENT_DPI0,
+> >  };
+> >  
+> > +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_main[] = {
+> > +	DDP_COMPONENT_OVL0,
+> > +	DDP_COMPONENT_COLOR0,
+> > +	DDP_COMPONENT_AAL0,
+> > +	DDP_COMPONENT_OD0,
+> > +	DDP_COMPONENT_RDMA0,
+> > +	DDP_COMPONENT_DPI0,
+> > +	DDP_COMPONENT_PWM0,
+> > +};
+> > +
+> > +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_ext[] = {
+> > +	DDP_COMPONENT_OVL1,
+> > +	DDP_COMPONENT_COLOR1,
+> > +	DDP_COMPONENT_AAL1,
+> > +	DDP_COMPONENT_OD1,
+> > +	DDP_COMPONENT_RDMA1,
+> > +	DDP_COMPONENT_DPI1,
+> 
+> Where do you define DDP_COMPONENT_DPI1?
+> 
+> > +	DDP_COMPONENT_PWM1,
+> > +};
+> > +
+> > +static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
+> > +	DDP_COMPONENT_RDMA2,
+> > +	DDP_COMPONENT_DSI2,
+> 
+> Where do you define DDP_COMPONENT_DSI2?
 > 
 
-That's fine if you trim the commit message to make it look nicer.
+I would add another patch for these component in next version patch
+series.And add some connection patch from RDMAx to
+DPI0/DPI1/DSI1/DSI2/DSI3.
 
-Also, in the future, please include a cover letter if you send more than
-one patch to the list.
+Regards,
+Stu
 
-Thanks,
--Christoffer
+> Regards,
+> CK
+> 
+> > +	DDP_COMPONENT_PWM2,
+> > +};
+> > +
+> >  static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+> >  	DDP_COMPONENT_OVL0,
+> >  	DDP_COMPONENT_COLOR0,
+> > @@ -173,6 +199,15 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
+> >  	.shadow_register = true,
+> >  };
+> >  
+> > +static const struct mtk_mmsys_driver_data mt2712_mmsys_driver_data = {
+> > +	.main_path = mt2712_mtk_ddp_main,
+> > +	.main_len = ARRAY_SIZE(mt2712_mtk_ddp_main),
+> > +	.ext_path = mt2712_mtk_ddp_ext,
+> > +	.ext_len = ARRAY_SIZE(mt2712_mtk_ddp_ext),
+> > +	.third_path = mt2712_mtk_ddp_third,
+> > +	.third_len = ARRAY_SIZE(mt2712_mtk_ddp_third),
+> > +};
+> > +
+> >  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> >  	.main_path = mt8173_mtk_ddp_main,
+> >  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
+> > @@ -379,6 +414,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+> >  	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
+> >  	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
+> >  	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> > +	{ .compatible = "mediatek,mt2712-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> >  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+> >  	{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void *)MTK_DISP_BLS },
+> >  	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
+> > @@ -557,6 +593,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
+> >  static const struct of_device_id mtk_drm_of_ids[] = {
+> >  	{ .compatible = "mediatek,mt2701-mmsys",
+> >  	  .data = &mt2701_mmsys_driver_data},
+> > +	{ .compatible = "mediatek,mt2712-mmsys",
+> > +	  .data = &mt2712_mmsys_driver_data},
+> >  	{ .compatible = "mediatek,mt8173-mmsys",
+> >  	  .data = &mt8173_mmsys_driver_data},
+> >  	{ }
+> 
+> 
