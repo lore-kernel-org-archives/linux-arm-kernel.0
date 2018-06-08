@@ -1,30 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2018 23:26:02 -0700
-Subject: [PATCH] pinctrl: pinctrl-single: Avoid divisions in context
- save/restore
-In-Reply-To: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
-References: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180608062602.GK5738@atomide.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Fri,  8 Jun 2018 14:31:55 +0800
+Subject: [PATCH v2 0/4] clk: rockchip: support clock controller for px30 SoC
+Message-ID: <1528439519-30135-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Geert Uytterhoeven <geert+renesas@glider.be> [180607 13:40]:
-> The divisions (and multiplications) can be avoided by changing the loops
-> to use increments of mux_bytes instead of 1.
-> While at it, remove the unneeded casts when assigning void pointers.
-> 
-> This saves +100 bytes of kernel size on arm32/arm64.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Compile-tested only.
+Change in V2:
+[PATCH v2 2/4]: modify the Author name
+[PATCH v2 3/4]: provide a bit more explanation for commit message
 
-Makes sense to me:
+Elaine Zhang (4):
+  dt-bindings: add bindings for px30 clock controller
+  clk: rockchip: add dt-binding header for px30
+  clk: rockchip: add support for half divider
+  clk: rockchip: add clock controller for px30
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+ .../bindings/clock/rockchip,px30-cru.txt           |   67 ++
+ drivers/clk/rockchip/Makefile                      |    2 +
+ drivers/clk/rockchip/clk-half-divider.c            |  235 +++++
+ drivers/clk/rockchip/clk-px30.c                    | 1080 ++++++++++++++++++++
+ drivers/clk/rockchip/clk.c                         |   10 +
+ drivers/clk/rockchip/clk.h                         |   86 +-
+ include/dt-bindings/clock/px30-cru.h               |  402 ++++++++
+ 7 files changed, 1881 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,px30-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-half-divider.c
+ create mode 100644 drivers/clk/rockchip/clk-px30.c
+ create mode 100644 include/dt-bindings/clock/px30-cru.h
 
-Keerthy can you please test?
-
-Regards,
-
-Tony
+-- 
+1.9.1
