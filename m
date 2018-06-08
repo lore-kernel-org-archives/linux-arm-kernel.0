@@ -1,33 +1,31 @@
 From: pp@emlix.com (Philipp Puschmann)
-Date: Fri,  8 Jun 2018 12:19:24 +0200
-Subject: [PATCH] clk: imx6: fix video_27m parent for IMX6QDL_CLK_CKO1_SEL
-Message-ID: <20180608101924.31195-1-pp@emlix.com>
+Date: Fri, 8 Jun 2018 12:21:56 +0200
+Subject: [PATCH] clk: imx6: fix video_27m parent for IMX6SX_CLK_CKO1_SEL
+In-Reply-To: <CAOMZO5B-T2UWdv-tf5vsCuRQ6f_o1gw1pAn-b6h9zfmi5ng4Ug@mail.gmail.com>
+References: <20180606092928.11724-1-pp@emlix.com>
+ <CAOMZO5B-T2UWdv-tf5vsCuRQ6f_o1gw1pAn-b6h9zfmi5ng4Ug@mail.gmail.com>
+Message-ID: <5cd0f6eb-9c90-f89c-7fc4-7b2bfae99809@emlix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-q/dl datasheets list the 5th selection value for ck01_sel as
-video_27M_clk_root.
+I screwed up the title: IMX6SX_CLK_CKO1_SEL instead of IMX6QDL_CLK_CKO1_SEL
 
-By replacing the dummy value we then can set IMX6QDL_CLK_VIDEO_27M
-as parent for IMX6QDL_CLK_CKO1_SEL.
+I have resent the patch with correct title. Sorry for the inconvenience.
 
-Signed-off-by: Philipp Puschmann <pp@emlix.com>
----
- drivers/clk/imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index 8d518ad5dc13..7e6a8f079634 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -65,7 +65,7 @@ static const char *ipg_per_sels[] = { "ipg", "osc", };
- static const char *ecspi_sels[] = { "pll3_60m", "osc", };
- static const char *can_sels[] = { "pll3_60m", "osc", "pll3_80m", };
- static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
--				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
-+				    "video_27m", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
- 				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_audio_div", };
- static const char *cko2_sels[] = {
- 	"mmdc_ch0_axi", "mmdc_ch1_axi", "usdhc4", "usdhc1",
--- 
-2.17.0
+Am 06.06.2018 um 15:07 schrieb Fabio Estevam:
+> On Wed, Jun 6, 2018 at 6:29 AM, Philipp Puschmann <pp@emlix.com> wrote:
+>> q/dl datasheets list the 5th selection value for ck01_sel as
+>> video_27M_clk_root.
+>>
+>> By replacing the dummy value we then can set IMX6QDL_CLK_VIDEO_27M
+>> as parent for IMX6QDL_CLK_CKO1_SEL.
+>>
+>> Signed-off-by: Philipp Puschmann <pp@emlix.com>
+> 
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
