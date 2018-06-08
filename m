@@ -1,174 +1,75 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri,  8 Jun 2018 02:27:59 -0700
-Subject: [PATCH] net: thunderx: prevent concurrent data re-writing by
- nicvf_set_rx_mode
-Message-ID: <20180608092759.28059-1-Vadim.Lomovtsev@caviumnetworks.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 8 Jun 2018 11:29:29 +0200
+Subject: [PATCH 11/17] arm64: dts: r8a77965: Add VSP instances
+In-Reply-To: <1787243.JuNJAuBqMb@avalon>
+References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180426165346.494-12-kieran.bingham+renesas@ideasonboard.com>
+ <1787243.JuNJAuBqMb@avalon>
+Message-ID: <CAMuHMdU7OyUvgNqbkjtHyb0LPjgTdPp_BBcGNbjiqfQUgCdMuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+Hi Laurent,
 
-For each network interface linux network stack issue ndo_set_rx_mode call
-in order to configure MAC address filters (e.g. for multicast filtering).
-Currently ThunderX NICVF driver has only one ordered workqueue to process
-such requests for all VFs.
+CC Sergei (for V3H/V3M)
 
-And because of that it is possible that subsequent call to
-ndo_set_rx_mode would corrupt data which is currently in use
-by nicvf_set_rx_mode_task. Which in turn could cause following issue:
-[...]
-[   48.978341] Unable to handle kernel paging request at virtual address 1fffff0000000000
-[   48.986275] Mem abort info:
-[   48.989058]   Exception class = DABT (current EL), IL = 32 bits
-[   48.994965]   SET = 0, FnV = 0
-[   48.998020]   EA = 0, S1PTW = 0
-[   49.001152] Data abort info:
-[   49.004022]   ISV = 0, ISS = 0x00000004
-[   49.007869]   CM = 0, WnR = 0
-[   49.010826] [1fffff0000000000] address between user and kernel address ranges
-[   49.017963] Internal error: Oops: 96000004 [#1] SMP
-[...]
-[   49.072138] task: ffff800fdd675400 task.stack: ffff000026440000
-[   49.078051] PC is at prefetch_freepointer.isra.37+0x28/0x3c
-[   49.083613] LR is at kmem_cache_alloc_trace+0xc8/0x1fc
-[...]
-[   49.272684] [<ffff0000082738f0>] prefetch_freepointer.isra.37+0x28/0x3c
-[   49.279286] [<ffff000008276bc8>] kmem_cache_alloc_trace+0xc8/0x1fc
-[   49.285455] [<ffff0000082c0c0c>] alloc_fdtable+0x78/0x134
-[   49.290841] [<ffff0000082c15c0>] dup_fd+0x254/0x2f4
-[   49.295709] [<ffff0000080d1954>] copy_process.isra.38.part.39+0x64c/0x1168
-[   49.302572] [<ffff0000080d264c>] _do_fork+0xfc/0x3b0
-[   49.307524] [<ffff0000080d29e8>] SyS_clone+0x44/0x50
-[...]
+On Thu, Apr 26, 2018 at 11:11 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Thursday, 26 April 2018 19:53:40 EEST Kieran Bingham wrote:
+>> The r8a77965 has 4 VSP instances.
+>>
+>> Based on a similar patch of the R8A7796 device tree
+>> by Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
+>>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> [Kieran: Rebased to top of tree, fixed sort orders]
+>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>> ---
+>>  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++
+>>  1 file changed, 44 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>> b/arch/arm64/boot/dts/renesas/r8a77965.dtsi index
+>> 1f44ed7c1b1c..e92e6b03333a 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 
-This patch is to prevent such concurrent data write with spinlock.
+>> @@ -1025,6 +1047,17 @@
+>>                       resets = <&cpg 611>;
+>>               };
+>>
+>> +             vspd0: vsp at fea20000 {
+>> +                     compatible = "renesas,vsp2";
+>> +                     reg = <0 0xfea20000 0 0x4000>;
+>
+> RFP2 has a CLUT so the register range needs to be extended. I'd recommend
+> covering the entire space (0x8000) even if no LUT or CLU module is present.
 
-Reported-by: Dean Nelson <dnelson@redhat.com>
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h        |  2 +
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 50 +++++++++++++++++-------
- 2 files changed, 38 insertions(+), 14 deletions(-)
+Even on V3H/V3M, which have some part of the CLUT, and could do
+with 0x5000?
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 448d1fafc827..f4d81765221e 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -325,6 +325,8 @@ struct nicvf {
- 	struct tasklet_struct	qs_err_task;
- 	struct work_struct	reset_task;
- 	struct nicvf_work       rx_mode_work;
-+	/* spinlock to protect workqueue arguments from concurrent access */
-+	spinlock_t              rx_mode_wq_lock;
- 
- 	/* PTP timestamp */
- 	struct cavium_ptp	*ptp_clock;
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 7135db45927e..135766c4296b 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1923,17 +1923,12 @@ static int nicvf_ioctl(struct net_device *netdev, struct ifreq *req, int cmd)
- 	}
- }
- 
--static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
-+static void __nicvf_set_rx_mode_task(u8 mode, struct xcast_addr_list *mc_addrs,
-+				     struct nicvf *nic)
- {
--	struct nicvf_work *vf_work = container_of(work_arg, struct nicvf_work,
--						  work.work);
--	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
- 	union nic_mbx mbx = {};
- 	int idx;
- 
--	if (!vf_work)
--		return;
--
- 	/* From the inside of VM code flow we have only 128 bits memory
- 	 * available to send message to host's PF, so send all mc addrs
- 	 * one by one, starting from flush command in case if kernel
-@@ -1944,7 +1939,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- 	mbx.xcast.msg = NIC_MBOX_MSG_RESET_XCAST;
- 	nicvf_send_msg_to_pf(nic, &mbx);
- 
--	if (vf_work->mode & BGX_XCAST_MCAST_FILTER) {
-+	if (mode & BGX_XCAST_MCAST_FILTER) {
- 		/* once enabling filtering, we need to signal to PF to add
- 		 * its' own LMAC to the filter to accept packets for it.
- 		 */
-@@ -1954,23 +1949,46 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- 	}
- 
- 	/* check if we have any specific MACs to be added to PF DMAC filter */
--	if (vf_work->mc) {
-+	if (mc_addrs) {
- 		/* now go through kernel list of MACs and add them one by one */
--		for (idx = 0; idx < vf_work->mc->count; idx++) {
-+		for (idx = 0; idx < mc_addrs->count; idx++) {
- 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
--			mbx.xcast.data.mac = vf_work->mc->mc[idx];
-+			mbx.xcast.data.mac = mc_addrs->mc[idx];
- 			nicvf_send_msg_to_pf(nic, &mbx);
- 		}
--		kfree(vf_work->mc);
-+		kfree(mc_addrs);
- 	}
- 
- 	/* and finally set rx mode for PF accordingly */
- 	mbx.xcast.msg = NIC_MBOX_MSG_SET_XCAST;
--	mbx.xcast.data.mode = vf_work->mode;
-+	mbx.xcast.data.mode = mode;
- 
- 	nicvf_send_msg_to_pf(nic, &mbx);
- }
- 
-+static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
-+{
-+	struct nicvf_work *vf_work = container_of(work_arg, struct nicvf_work,
-+						  work.work);
-+	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
-+	u8 mode;
-+	struct xcast_addr_list *mc;
-+
-+	if (!vf_work)
-+		return;
-+
-+	/* Save message data locally to prevent them from
-+	 * being overwritten by next ndo_set_rx_mode call().
-+	 */
-+	spin_lock(&nic->rx_mode_wq_lock);
-+	mode = vf_work->mode;
-+	mc = vf_work->mc;
-+	vf_work->mc = NULL;
-+	spin_unlock(&nic->rx_mode_wq_lock);
-+
-+	__nicvf_set_rx_mode_task(mode, mc, nic);
-+}
-+
- static void nicvf_set_rx_mode(struct net_device *netdev)
- {
- 	struct nicvf *nic = netdev_priv(netdev);
-@@ -2004,9 +2022,12 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
- 			}
- 		}
- 	}
-+	spin_lock(&nic->rx_mode_wq_lock);
-+	kfree(nic->rx_mode_work.mc);
- 	nic->rx_mode_work.mc = mc_list;
- 	nic->rx_mode_work.mode = mode;
--	queue_delayed_work(nicvf_rx_mode_wq, &nic->rx_mode_work.work, 2 * HZ);
-+	queue_delayed_work(nicvf_rx_mode_wq, &nic->rx_mode_work.work, 0);
-+	spin_unlock(&nic->rx_mode_wq_lock);
- }
- 
- static const struct net_device_ops nicvf_netdev_ops = {
-@@ -2163,6 +2184,7 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 	INIT_WORK(&nic->reset_task, nicvf_reset_task);
- 
- 	INIT_DELAYED_WORK(&nic->rx_mode_work.work, nicvf_set_rx_mode_task);
-+	spin_lock_init(&nic->rx_mode_wq_lock);
- 
- 	err = register_netdev(netdev);
- 	if (err) {
+Note that this makes it overlap with fcpvd0 on all R-Car Gen3 SoCs,
+as mentioned by Simon on IRC.
+
+>> +                     interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     clocks = <&cpg CPG_MOD 623>;
+>> +                     power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+>> +                     resets = <&cpg 623>;
+>> +
+>> +                     renesas,fcp = <&fcpvd0>;
+>> +             };
+>> +
+>>               fcpvd0: fcp at fea27000 {
+>>                       compatible = "renesas,fcpv";
+>>                       reg = <0 0xfea27000 0 0x200>;
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.14.4
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
