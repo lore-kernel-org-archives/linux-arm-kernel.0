@@ -1,156 +1,100 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 8 Jun 2018 15:08:08 +0200
-Subject: [PATCH v2 11/16] irqchip/irq-mvebu-icu: add support for System
- Error Interrupts (SEI)
-In-Reply-To: <cd000f57-e01f-e5b9-77f6-baf4e8f45551@arm.com>
-References: <20180522094042.24770-1-miquel.raynal@bootlin.com>
- <20180522094042.24770-12-miquel.raynal@bootlin.com>
- <cd000f57-e01f-e5b9-77f6-baf4e8f45551@arm.com>
-Message-ID: <20180608150808.7af98f18@xps13>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Fri, 8 Jun 2018 14:11:32 +0100
+Subject: [PATCHv4 06/10] arm64: add basic pointer authentication support
+In-Reply-To: <20180503132031.25705-7-mark.rutland@arm.com>
+References: <20180503132031.25705-1-mark.rutland@arm.com>
+ <20180503132031.25705-7-mark.rutland@arm.com>
+Message-ID: <e4630a08-db4e-7c4d-5d92-393ad99a629e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Mark,
 
-Thank you for the review.
-
-On Wed, 23 May 2018 15:23:48 +0100, Marc Zyngier <marc.zyngier@arm.com>
-wrote:
-
-> On 22/05/18 10:40, Miquel Raynal wrote:
-> > An SEI driver provides an MSI domain through which it is possible to
-> > raise SEIs.
-> > 
-> > Handle the NSR probe function in a more generic way to support other
-> > type of interrupts (ie. the SEIs).
-> > 
-> > For clarity we do not use tree IRQ domains for now but linear ones
-> > instead, allocating the 207 ICU lines for each interrupt group.  
+On 03/05/18 14:20, Mark Rutland wrote:
+> This patch adds basic support for pointer authentication, allowing
+> userspace to make use of APIAKey. The kernel maintains an APIAKey value
+> for each process (shared by all threads within), which is initialised to
+> a random value at exec() time.
 > 
-> What's the rational for not using trees? Because that's effectively a
-> 100% overhead...
-
-There is none.
-
-I had a look at how to do it.
-
-In the ICU driver I would like to just drop the nvec parameter (number
-of interrupts in the domain) when calling
-platform_msi_create_device_domain().
-
-The above function would call irq_domain_create_hierarchy() which would
-create a tree domain instead of a linear one because of nvec being 0.
-
-However, there is a check in platform_msi_alloc_priv_data() (also
-called by platform_msi_create_device_domain()) that will error out if
-nvec is null.
-
-I'm not 100% sure this is safe but I don't see the point of
-prohibiting nvec to be null here. So would you accept this
-change?
-
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev,
-unsigned int nvec,
-         * accordingly (which would impact the max number of MSI
-         * capable devices).
-         */
--       if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
-+       if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
-                return ERR_PTR(-EINVAL);
- 
-        if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
-
+> To describe that address authentication instructions are available, the
+> ID_AA64ISAR0.{APA,API} fields are exposed to userspace. A new hwcap,
+> APIA, is added to describe that the kernel manages APIAKey.
 > 
-> > Reallocating an ICU slot is prevented by the use of an ICU-wide bitmap.
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > ---
-
-[...]
-
-> > @@ -131,7 +160,8 @@ static int
-> >  mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
-> >  			       unsigned long *hwirq, unsigned int *type)
-> >  {
-> > -	struct mvebu_icu *icu = platform_msi_get_host_data(d);
-> > +	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(d);
-> > +	struct mvebu_icu *icu = msi_data->icu;
-> >  	unsigned int param_count = icu->legacy_bindings ? 3 : 2;
-> >  
-> >  	/* Check the count of the parameters in dt */
-> > @@ -172,7 +202,9 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> >  	int err;
-> >  	unsigned long hwirq;
-> >  	struct irq_fwspec *fwspec = args;
-> > -	struct mvebu_icu *icu = platform_msi_get_host_data(domain);
-> > +	struct mvebu_icu_msi_data *msi_data =
-> > +		platform_msi_get_host_data(domain);
-> > +	struct mvebu_icu *icu = msi_data->icu;
-> >  	struct mvebu_icu_irq_data *icu_irqd;
-> >  
-> >  	icu_irqd = kmalloc(sizeof(*icu_irqd), GFP_KERNEL);
-> > @@ -186,16 +218,22 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> >  		goto free_irqd;
-> >  	}
-> >  
-> > +	spin_lock(&icu->msi_lock);
-> > +	err = bitmap_allocate_region(icu->msi_bitmap, hwirq, 0);
-> > +	spin_unlock(&icu->msi_lock);  
+> Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
+> and will behave as NOPs. These may be made use of in future patches.
 > 
-> This (and the freeing counterpart) could deserve a couple of helpers.
-
-Sure.
-
+> No support is added for the generic key (APGAKey), though this cannot be
+> trapped or made to behave as a NOP. Its presence is not advertised with
+> a hwcap.
 > 
-> > +	if (err < 0)
-> > +		goto free_irqd;
-> > +
-> >  	if (icu->legacy_bindings)
-> >  		icu_irqd->icu_group = fwspec->param[0];
-> >  	else
-> > -		icu_irqd->icu_group = ICU_GRP_NSR;
-> > +		icu_irqd->icu_group = msi_data->subset_data->icu_group;
-> >  	icu_irqd->icu = icu;
-> >  
-> >  	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-> >  	if (err) {
-> >  		dev_err(icu->dev, "failed to allocate ICU interrupt in parent domain\n");
-> > -		goto free_irqd;
-> > +		goto free_bitmap;
-> >  	}
-> >  
-> >  	/* Make sure there is no interrupt left pending by the firmware */
-
-[...]
-
-> > @@ -268,9 +332,30 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > +static const struct mvebu_icu_subset_data mvebu_icu_nsr_subset_data = {
-> > +	.icu_group = ICU_GRP_NSR,
-> > +	.offset_set_ah = ICU_SETSPI_NSR_AH,
-> > +	.offset_set_al = ICU_SETSPI_NSR_AL,
-> > +	.offset_clr_ah = ICU_CLRSPI_NSR_AH,
-> > +	.offset_clr_al = ICU_CLRSPI_NSR_AL,
-> > +};
-> > +
-> > +static const struct mvebu_icu_subset_data mvebu_icu_sei_subset_data = {
-> > +	.icu_group = ICU_GRP_SEI,
-> > +	.offset_set_ah = ICU_SET_SEI_AH,
-> > +	.offset_set_al = ICU_SET_SEI_AL,
-> > +	.offset_clr_ah = ICU_CLR_SEI_AH,
-> > +	.offset_clr_al = ICU_CLR_SEI_AL,  
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/mmu.h          |  5 +++
+>  arch/arm64/include/asm/mmu_context.h  | 11 ++++-
+>  arch/arm64/include/asm/pointer_auth.h | 75 +++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/uapi/asm/hwcap.h   |  1 +
+>  arch/arm64/kernel/cpufeature.c        |  9 +++++
+>  arch/arm64/kernel/cpuinfo.c           |  1 +
+>  6 files changed, 101 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/include/asm/pointer_auth.h
 > 
-> I thought SEI was edge only, given what you do in mvebu_icu_init.
-> Confused...
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index dd320df0d026..f6480ea7b0d5 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -25,10 +25,15 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <asm/pointer_auth.h>
+> +
+>  typedef struct {
+>  	atomic64_t	id;
+>  	void		*vdso;
+>  	unsigned long	flags;
+> +#ifdef CONFIG_ARM64_PTR_AUTH
+> +	struct ptrauth_keys	ptrauth_keys;
+> +#endif
+>  } mm_context_t;
+>  
+>  /*
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index 39ec0b8a689e..83eadbc6b946 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -168,7 +168,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+>  #define destroy_context(mm)		do { } while(0)
+>  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
+>  
+> -#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+> +static inline int init_new_context(struct task_struct *tsk,
+> +				   struct mm_struct *mm)
+> +{
+> +	atomic64_set(&mm->context.id, 0);
+> +	mm_ctx_ptrauth_init(&mm->context);
+> +
+> +	return 0;
+> +}>
+>  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+>  static inline void update_saved_ttbr0(struct task_struct *tsk,
+> @@ -216,6 +223,8 @@ static inline void __switch_mm(struct mm_struct *next)
+>  		return;
+>  	}
+>  
+> +	mm_ctx_ptrauth_switch(&next->context);
+> +
+>  	check_and_switch_context(next, cpu);
+>  }
 
-AFAIK, the ICU can produce both level and edge MSI. Currently,
-when it comes to SEI, we don't use the .offset_clr_a[hl] entries
-because the SEI block expects edge-MSIs, but I thought useful to fill
-them anyway. I will remove them both to avoid the confusion.
+It seems you've removed arch_dup_mmap here (as Catalin suggested [1]),
+but forgotten to move the key initialization from init_new_context to
+arch_bprm_mm_init. In my tests I'm seeing child processes get different
+keys than the parent after a fork().
 
-Thanks,
-Miqu?l
+Kristina
+
+[1] https://lkml.org/lkml/2018/4/25/506
