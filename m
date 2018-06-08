@@ -1,42 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 8 Jun 2018 18:32:07 +0100
-Subject: [PATCH 04/24] 32-bit userspace ABI: introduce ARCH_32BIT_OFF_T
- config option
-In-Reply-To: <20180516081910.10067-5-ynorov@caviumnetworks.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180516081910.10067-5-ynorov@caviumnetworks.com>
-Message-ID: <20180608173207.nwoi25jee52gpdwy@armageddon.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 8 Jun 2018 18:44:05 +0100
+Subject: [PATCH v4 2/3] arm64: KVM: Enable Common Not Private translations
+In-Reply-To: <1526638022-4137-3-git-send-email-vladimir.murzin@arm.com>
+References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
+ <1526638022-4137-3-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <7129ef7f-1e79-612a-4b41-7c6bba327026@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 11:18:49AM +0300, Yury Norov wrote:
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 76c0b54443b1..ee079244dc3c 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -264,6 +264,21 @@ config ARCH_THREAD_STACK_ALLOCATOR
->  config ARCH_WANTS_DYNAMIC_TASK_STRUCT
->  	bool
->  
-> +config ARCH_32BIT_OFF_T
-> +	bool
-> +	depends on !64BIT
-> +	help
-> +	  All new 32-bit architectures should have 64-bit off_t type on
-> +	  userspace side which corresponds to the loff_t kernel type. This
-> +	  is the requirement for modern ABIs. Some existing architectures
-> +	  already have 32-bit off_t. This option is enabled for all such
-> +	  architectures explicitly. Namely: arc, arm, blackfin, cris, frv,
-> +	  h8300, hexagon, m32r, m68k, metag, microblaze, mips32, mn10300,
-> +	  nios2, openrisc, parisc32, powerpc32, score, sh, sparc, tile32,
-> +	  unicore32, x86_32 and xtensa. This is the complete list. Any
-> +	  new 32-bit architecture should declare 64-bit off_t type on user
-> +	  side and so should not enable this option.
+Hi Vladimir,
 
-Do you know if this is the case for riscv and nds32, merged in the
-meantime? If not, I suggest you drop this patch altogether and just
-define force_o_largefile() for arm64/ilp32 as we don't seem to stick to
-"all new 32-bit architectures should have 64-bit off_t".
+On 18/05/18 11:07, Vladimir Murzin wrote:
+> We rely on cpufeature framework to detect and enable CNP so for KVM we
+> need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
+> 
+> For the guest we encode CNP bit while building vttbr, so we don't need
+> to bother with that in a world switch.
 
--- 
-Catalin
+With the bare-constant fix suggested by Catalin,
+
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
