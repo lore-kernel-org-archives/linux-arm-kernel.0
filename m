@@ -1,67 +1,205 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 8 Jun 2018 11:20:47 +0800
-Subject: [PATCH v4 2/2] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-In-Reply-To: <1528401833-29963-3-git-send-email-gengdongjiu@huawei.com>
-References: <1528401833-29963-3-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <201806081136.UoSCbcD1%fengguang.wu@intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 Jun 2018 06:13:26 +0200
+Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <AM0PR04MB42119006042C993F410D6CB080640@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
+ <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
+ <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503124030.jkc7oox2vyjblk2y@pengutronix.de>
+ <AM0PR04MB421169E44830A17D8A52D3F4806A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180606141501.6prypkkxgsk3e7ee@pengutronix.de>
+ <AM0PR04MB4211E378DCBB769AB2C06BCF80640@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180607070835.ebqsj7qurcdvcubz@pengutronix.de>
+ <AM0PR04MB42119006042C993F410D6CB080640@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180608041326.4jmk2et73o2clz25@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu,
+On Thu, Jun 07, 2018 at 01:59:26PM +0000, A.s. Dong wrote:
+> Hi Sascha,
+> 
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Thursday, June 7, 2018 3:09 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: dongas86 at gmail.com; dl-linux-imx <linux-imx@nxp.com>;
+> > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> > shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+> > 
+> > On Thu, Jun 07, 2018 at 04:18:54AM +0000, A.s. Dong wrote:
+> > > Hi Sascha,
+> > >
+> > > > > One problem of the way you suggested may be that:
+> > > > > If we doing like below, we may lose flexibility to change the MU
+> > > > > used for SCU firmware communication.
+> > > > > 	scu at 5d1b0000 {
+> > > > > 		compatible = "fsl,imx8qxp-scu";
+> > > > > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > > > > 	};
+> > > > >
+> > > > > And current design is that the system supports multiple MU
+> > > > > channels used by various users at the same time, e.g. SCU, Power
+> > > > > Domain, Clock and
+> > > > others.
+> > > > > User can flexibly change it under their nodes: And each MU channel
+> > > > > is protected by their private lock and not affect each others.
+> > > > >
+> > > > > e.g.
+> > > > >         scu {
+> > > > >                 compatible = "nxp,imx8qxp-scu", "simple-bus";
+> > > > >                 fsl,mu = <&lsio_mu0>;
+> > > > >
+> > > > >                 clk: clk {
+> > > > >                         compatible = "fsl,imx8qxp-clk";
+> > > > >                         #clock-cells = <1>;
+> > > > >                 };
+> > > > >
+> > > > >                 iomuxc: iomuxc {
+> > > > >                         compatible = "fsl,imx8qxp-iomuxc";
+> > > > >                         fsl,mu = <&lsio_mu3>;
+> > > > >                 };
+> > > > >
+> > > > >                 imx8qx-pm {
+> > > > >                         #address-cells = <1>;
+> > > > >                         #size-cells = <0>;
+> > > > >                         fsl,mu = <&lsio_mu4>;
+> > > > > 	.............
+> > > > >         }
+> > > > >
+> > > > > The default code only uses MU0 which is used by SCU.
+> > > > >
+> > > > > The change may affect this design. Any ideas?
+> > > >
+> > > > Sorry for the delay.
+> > > >
+> > > > You can add the child nodes to the mu nodes they should use:
+> > > >
+> > > > 	scu1 {
+> > > >         	compatible = "nxp,imx8qxp-scu";
+> > > > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > > >
+> > > > 		clk: clk {
+> > > > 			compatible = "fsl,imx8qxp-clk";
+> > > > 			#clock-cells = <1>;
+> > > > 		};
+> > > >
+> > > > 		...
+> > > > 	};
+> > > >
+> > > > 	scu2 {
+> > > > 		compatible = "nxp,imx8qxp-scu";
+> > > > 		reg = <0x0 someothermu 0x0 0x10000>;
+> > > >
+> > > > 		iomuxc: iomuxc {
+> > > > 			compatible = "fsl,imx8qxp-iomuxc";
+> > > > 		};
+> > > >
+> > > > 		...
+> > > > 	};
+> > > >
+> > > > So instead of adding all possible children to a single mu and
+> > > > phandle to other mu's, just add the right children to each mu.
+> > > >
+> > >
+> > > I got your point now. But sorry i'm still a bit hestitate to it....
+> > >
+> > > This way increases complexity and looks more like a per-channel binding.
+> > > But we normally have only one (abstract) SCU firmware node in a system
+> > > which may use different channels to implement different functions like clk,
+> > pd and etc.
+> > > Multiple faked SCU nodes make people a bit confusing.
+> > 
+> > They are not faked, indeed that's the MU units that physically exist.
+> > 
+> > > Furthermore, it's still lose the flexibility for user to changing a MU to use.
+> > >
+> > > Looking at all exist users in kernel, seems no one to use like this.
+> > > See:
+> > > Documentation/devicetree/bindings/arm/arm,scpi.txt
+> > > Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> > >
+> > > All are similar like:
+> > > xxx: protocol-node {
+> > >                 compatible = "xxx-protocal";
+> > > 	  channel = ...
+> > >                 ...
+> > >
+> > >                 clk_node: clk_node {
+> > >                         ...
+> > >                 };
+> > >
+> > >                 pd_node: pd_node {
+> > >                         ...
+> > >                 };
+> > > };
+> > > The protocol node work is selecting the correct channel, do necessary
+> > > initialization and populate the all child function device nodes.
+> > >
+> > > IMHO I'm still a bit like to this common way used in kernel if no stronger
+> > objection.
+> > > Do you think we can choose this way to go step forward?
+> > 
+> > I'm not convinced, but go ahead if you think this is the better way to proceed.
+> > 
+> > I think my original point that led to this discussion is the muddled way the
+> > MUs are handled in the code.
+> > 
+> > To start with in the system controller code you ioremap the physical address
+> > of the MU and later on pass this address as a reference to the MU library
+> > code. There's no way for the MU code to ever create a private data. It would
+> > be much better if you would pass mu_init a pointer to the device node it shall
+> > initialize, let mu_init allocate a private data struct, ioremap the base and put
+> > it in the private data struct, and return the private data struct.
+> > 
+> 
+> Actually I have tried that way initially, but ....
+> 
+> > Then there is this sc_ipc_get_handle() thing that your consumers shall use to
+> > get a handle to the SCU. Instead of returning a struct sc_ipc * there you
+> > return a ida which you first have to search for each time a consumer wants to
+> > do something on the SCU. Please just return a pointer there (which can be a
+> > cookie, i.e. the struct definition is unknown to the consumer but privately to
+> > the SCU code).
+> > 
+> 
+> The problem is that sc_ipc_t is defined as uint32_t.
+> /*
+>  * This type is used to declare a handle for an IPC communication
+>  * channel. Its meaning is specific to the IPC implementation.
+>  */
+> typedef uint32_t sc_ipc_t;
+> 
+> which is referenced by the standard rpc call:
+> void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp)
+> 
+> I can't return a pointer which is 64bit on ARMv8 platform and used it
+> for sc_call_rpc directly.
+> 
+> That why I need a way to convert struct sc_ipc_t to struct sc_ipc 
+> (done by sc_ipc_get(ipc)).
+> 
+> But you're right, that means we have to search for each time a consumer
+> wants to do something on the SCU.
+> 
+> If we want to void it,  one possible way may be changing the prototype of
+> both ipc handle sc_ipc_t  and IPC channel ID sc_ipc_id_t to unsigned long,
+> then we can directly pass them the address pointer.
+> 
+> Although I initially don't want to changing SCU API prototype, but if we
+> have to, I will do it.
 
-Thank you for the patch! Perhaps something to improve:
+Don't try to push crappy code just because you use the same crappy code
+internally elsewhere. Everything you post for the Kernel is subject for
+discussion, review and change. If we would follow the
+it's-in-sync-with-internal-company-code argument the Kernel would loook
+differently now and surely not better.
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.17]
-[cannot apply to next-20180607]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Sascha
 
-url:    https://github.com/0day-ci/linux/commits/Dongjiu-Geng/support-exception-state-migration-and-set-VSESR_EL2-by-user-space/20180608-063827
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All warnings (new ones prefixed by >>):
-
-   arch/arm64/kvm/guest.c: In function 'kvm_arm_vcpu_get_events':
->> arch/arm64/kvm/guest.c:295:26: warning: argument to 'sizeof' in 'memset' call is the same expression as the destination; did you mean to dereference it? [-Wsizeof-pointer-memaccess]
-     memset(events, 0, sizeof(events));
-                             ^
-
-vim +295 arch/arm64/kvm/guest.c
-
-   291	
-   292	int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-   293				struct kvm_vcpu_events *events)
-   294	{
- > 295		memset(events, 0, sizeof(events));
-   296	
-   297		events->exception.serror_pending = !!(vcpu->arch.hcr_el2 & HCR_VSE);
-   298		events->exception.serror_has_esr =
-   299						cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-   300	
-   301		if (events->exception.serror_pending &&
-   302			events->exception.serror_has_esr)
-   303			events->exception.serror_esr = vcpu_get_vsesr(vcpu);
-   304		else
-   305			events->exception.serror_esr = 0;
-   306	
-   307		return 0;
-   308	}
-   309	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37498 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180608/69ebaa7b/attachment-0001.gz>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
