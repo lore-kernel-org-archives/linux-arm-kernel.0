@@ -1,42 +1,80 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Fri,  8 Jun 2018 21:44:45 +0800
-Subject: [PATCH v2 0/5] add virt-dma support for imx-sdma
-Message-ID: <1528465490-19684-1-git-send-email-yibin.gong@nxp.com>
+Date: Fri,  8 Jun 2018 21:44:47 +0800
+Subject: [PATCH v2 2/5] Revert "dmaengine: imx-sdma: fix pagefault when
+ channel is disabled during interrupt"
+In-Reply-To: <1528465490-19684-1-git-send-email-yibin.gong@nxp.com>
+References: <1528465490-19684-1-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1528465490-19684-3-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy sdma driver has below limitations or drawbacks:
-  1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
-     one page size for one channel regardless of only few BDs needed
-     most time. But in few cases, the max PAGE_SIZE maybe not enough.
-  2. One SDMA channel can't stop immediatley once channel disabled which
-     means SDMA interrupt may come in after this channel terminated.There
-     are some patches for this corner case such as commit "2746e2c389f9",
-     but not cover non-cyclic.
+This reverts commit 2746e2c389f9d50043d21e2204270403efb9d62f.
 
-The common virt-dma overcomes the above limitations. It can alloc bd
-dynamically and free bd once this tx transfer done. No memory wasted or
-maximum limititation here, only depends on how many memory can be requested
-from kernel. For No.2, such issue can be workaround by checking if there
-is available descript("sdmac->desc") now once the unwanted interrupt
-coming. At last the common virt-dma is easier for sdma driver maintain.
+Don't need this patch anymore,since we can easily check 'sdmac->desc' to avoid
+handling dma interrupt after channel disabled if virt-dma used.
 
-Change from v1:
-  1. split v1 patch into 5 patches.
-  2. remove some unnecessary condition check.
-  3. remove unneccessary 'pending' list.
+Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+---
+ drivers/dma/imx-sdma.c | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-Robin Gong (5):
-  dmaengine: imx-sdma: add virt-dma support
-  Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
-    during interrupt"
-  dmaengine: imx-sdma: remove usless lock
-  dmaengine: imx-sdma: remove the maximum limation for bd numbers
-  dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
-
- drivers/dma/Kconfig    |   1 +
- drivers/dma/imx-sdma.c | 392 ++++++++++++++++++++++++++++---------------------
- 2 files changed, 227 insertions(+), 166 deletions(-)
-
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 8d0c1fd..d93b58f 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -354,7 +354,6 @@ struct sdma_channel {
+ 	unsigned int			chn_count;
+ 	unsigned int			chn_real_count;
+ 	struct imx_dma_data		data;
+-	bool				enabled;
+ };
+ 
+ #define IMX_DMA_SG_LOOP		BIT(0)
+@@ -615,14 +614,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
+ 
+ static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
+ {
+-	unsigned long flags;
+-	struct sdma_channel *sdmac = &sdma->channel[channel];
+-
+ 	writel(BIT(channel), sdma->regs + SDMA_H_START);
+-
+-	spin_lock_irqsave(&sdmac->lock, flags);
+-	sdmac->enabled = true;
+-	spin_unlock_irqrestore(&sdmac->lock, flags);
+ }
+ 
+ /*
+@@ -740,14 +732,6 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
+ 	struct sdma_buffer_descriptor *bd;
+ 	int error = 0;
+ 	enum dma_status	old_status = sdmac->status;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&sdmac->lock, flags);
+-	if (!sdmac->enabled) {
+-		spin_unlock_irqrestore(&sdmac->lock, flags);
+-		return;
+-	}
+-	spin_unlock_irqrestore(&sdmac->lock, flags);
+ 
+ 	/*
+ 	 * loop mode. Iterate over descriptors, re-setup them and
+@@ -1008,15 +992,10 @@ static int sdma_disable_channel(struct dma_chan *chan)
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+ 	struct sdma_engine *sdma = sdmac->sdma;
+ 	int channel = sdmac->channel;
+-	unsigned long flags;
+ 
+ 	writel_relaxed(BIT(channel), sdma->regs + SDMA_H_STATSTOP);
+ 	sdmac->status = DMA_ERROR;
+ 
+-	spin_lock_irqsave(&sdmac->lock, flags);
+-	sdmac->enabled = false;
+-	spin_unlock_irqrestore(&sdmac->lock, flags);
+-
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
