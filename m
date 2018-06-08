@@ -1,96 +1,69 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Fri, 8 Jun 2018 16:31:24 +0800
-Subject: [PATCH v4 8/9] drm/mediatek: add third ddp path
-In-Reply-To: <1527493677.24367.10.camel@mtksdaap41>
-References: <1527489507-24453-1-git-send-email-stu.hsieh@mediatek.com>
- <1527489507-24453-9-git-send-email-stu.hsieh@mediatek.com>
- <1527493677.24367.10.camel@mtksdaap41>
-Message-ID: <1528446684.11190.22.camel@mtksdccf07>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri, 8 Jun 2018 10:34:14 +0200
+Subject: [PATCH v2 2/2] KVM: arm/arm64: harden unmap_stage2_ptes in case
+ end is not PAGE_SIZE aligned
+In-Reply-To: <50c98169-1606-48bf-0489-124adefd2a54@gmail.com>
+References: <1526635630-18917-1-git-send-email-hejianet@gmail.com>
+ <1526635630-18917-2-git-send-email-hejianet@gmail.com>
+ <2185a61e-c157-e177-9bad-83b6f27fd784@arm.com>
+ <50c98169-1606-48bf-0489-124adefd2a54@gmail.com>
+Message-ID: <20180608083414.GA5097@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-05-28 at 15:47 +0800, CK Hu wrote:
-> Hi, Stu:
+On Fri, May 18, 2018 at 09:04:40PM +0800, Jia He wrote:
 > 
-> One inline comment.
 > 
-> On Mon, 2018-05-28 at 14:38 +0800, Stu Hsieh wrote:
-> > This patch create third crtc by third ddp path
+> On 5/18/2018 5:48 PM, Marc Zyngier Wrote:
+> > On 18/05/18 10:27, Jia He wrote:
+> >> If it passes addr=0x202920000,size=0xfe00 to unmap_stage2_range->
+> >> ...->unmap_stage2_ptes, unmap_stage2_ptes will get addr=0x202920000,
+> >> end=0x20292fe00. After first while loop addr=0x202930000, end=0x20292fe00,
+> >> then addr!=end. Thus it will touch another pages by put_pages() in the
+> >> 2nd loop.
+> >>
+> >> This patch fixes it by hardening the break condition of while loop.
+> >>
+> >> Signed-off-by: jia.he at hxt-semitech.com
+> >> ---
+> >> v2: newly added
+> >>
+> >>  virt/kvm/arm/mmu.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> >> index 8dac311..45cd040 100644
+> >> --- a/virt/kvm/arm/mmu.c
+> >> +++ b/virt/kvm/arm/mmu.c
+> >> @@ -217,7 +217,7 @@ static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
+> >>  
+> >>  			put_page(virt_to_page(pte));
+> >>  		}
+> >> -	} while (pte++, addr += PAGE_SIZE, addr != end);
+> >> +	} while (pte++, addr += PAGE_SIZE, addr < end);
+> >>  
+> >>  	if (stage2_pte_table_empty(start_pte))
+> >>  		clear_stage2_pmd_entry(kvm, pmd, start_addr);
+> >>
 > > 
-> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 3 +++
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 5 +++++
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h  | 7 +++++--
-> >  3 files changed, 13 insertions(+), 2 deletions(-)
+> > I don't think this change is the right thing to do. You get that failure
+> > because you're being passed a size that is not a multiple of PAGE_SIZE.
+> > That's the mistake.
 > > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > index 658b8dd45b83..2d6aa150a9ff 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > @@ -539,6 +539,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
-> >  	int ret;
-> >  	int i;
-> >  
-> > +	if (!path)
-> > +		return 0;
-> > +
-> >  	for (i = 0; i < path_len; i++) {
-> >  		enum mtk_ddp_comp_id comp_id = path[i];
-> >  		struct device_node *node;
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > index 08d5d0b47bfe..3d279a299383 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > @@ -232,6 +232,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
-> >  	if (ret < 0)
-> >  		goto err_component_unbind;
-> >  
-> > +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
-> > +				  private->data->third_len);
-> > +	if (ret < 0)
-> > +		goto err_component_unbind;
-> > +
-> >  	/* Use OVL device for all DMA memory allocations */
-> >  	np = private->comp_node[private->data->main_path[0]] ?:
-> >  	     private->comp_node[private->data->ext_path[0]];
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > index c3378c452c0a..d867e2683923 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > @@ -17,8 +17,8 @@
-> >  #include <linux/io.h>
-> >  #include "mtk_drm_ddp_comp.h"
-> >  
-> > -#define MAX_CRTC	2
-> > -#define MAX_CONNECTOR	2
-> > +#define MAX_CRTC	3
-> > +#define MAX_CONNECTOR	3
+> > You should ensure that this never happens, rather than changing the page
+> > table walkers (which are consistent with the way this kind of code is
+> > written in other places of the kernel). As you mentioned in your first
+> > patch, the real issue is that KSM is broken, and this is what should be
+> > fixed.
+> > 
+> Got it, thanks
+> Should I resend the patch 1/2 without any changes after droping patch 2/2?
 > 
-> MAX_CONNECTOR is useless, maybe we just need to remove it in a clean up
-> patch. Or you could keep its value.
-ok
-For this patch, I would keep its value.
 
-Regards,
-Stu
+That's fine if you trim the commit message to make it look nicer.
 
-> 
-> Regards,
-> CK
-> 
-> >  
-> >  struct device;
-> >  struct device_node;
-> > @@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
-> >  	unsigned int main_len;
-> >  	const enum mtk_ddp_comp_id *ext_path;
-> >  	unsigned int ext_len;
-> > +	const enum mtk_ddp_comp_id *third_path;
-> > +	unsigned int third_len;
-> > +
-> >  	bool shadow_register;
-> >  };
-> >  
-> 
-> 
+Also, in the future, please include a cover letter if you send more than
+one patch to the list.
+
+Thanks,
+-Christoffer
