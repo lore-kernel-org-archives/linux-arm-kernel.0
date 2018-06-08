@@ -1,16 +1,14 @@
-From: hejianet@gmail.com (Jia He)
-Date: Fri, 8 Jun 2018 15:16:58 +0800
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Jun 2018 09:27:34 +0200
 Subject: [PATCH] crypto: arm64/aes-blk - fix and move skcipher_walk_done
- out of kernel_neon_begin,_end
+ out of kernel_neon_begin, _end
 In-Reply-To: <1528441502-26425-1-git-send-email-hejianet@gmail.com>
 References: <1528441502-26425-1-git-send-email-hejianet@gmail.com>
-Message-ID: <ed457db3-2e3b-3f2d-7302-df6d70432e58@gmail.com>
+Message-ID: <CAKv+Gu-pjaMX2jNDgnf7yEsTaLk5YTpbgt4tSxaDT0VRJCJTpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Ard Biesheuvel]
-
-On 6/8/2018 3:05 PM, Jia He Wrote:
+On 8 June 2018 at 09:05, Jia He <hejianet@gmail.com> wrote:
 > In a arm64 server(QDF2400),I met a similar might-sleep warning as [1]:
 > [    7.019116] BUG: sleeping function called from invalid context at
 > ./include/crypto/algapi.h:416
@@ -40,34 +38,45 @@ On 6/8/2018 3:05 PM, Jia He Wrote:
 > [    7.128044]  cryptomgr_test+0x50/0x58
 > [    7.131708]  kthread+0x134/0x138
 > [    7.134936]  ret_from_fork+0x10/0x1c
-> 
+>
 > Seems there is a bug in Ard Biesheuvel's commit.
 > Fixes: 683381747270 ("crypto: arm64/aes-blk - move kernel mode neon
 > en/disable into loop")
-> 
+>
 > [1] https://www.spinics.net/lists/linux-crypto/msg33103.html
-> 
+>
 > Signed-off-by: jia.he at hxt-semitech.com
+
+Yes, that is a bug. My bad.
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Please tag for stable (v4.17)
+
+
 > ---
 >  arch/arm64/crypto/aes-glue.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
+>
 > diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
 > index 253188f..e3e5095 100644
 > --- a/arch/arm64/crypto/aes-glue.c
 > +++ b/arch/arm64/crypto/aes-glue.c
 > @@ -223,8 +223,8 @@ static int ctr_encrypt(struct skcipher_request *req)
->  		kernel_neon_begin();
->  		aes_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
->  				(u8 *)ctx->key_enc, rounds, blocks, walk.iv);
-> -		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
->  		kernel_neon_end();
-> +		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
->  	}
->  	if (walk.nbytes) {
->  		u8 __aligned(8) tail[AES_BLOCK_SIZE];
-> 
-
--- 
-Cheers,
-Jia
+>                 kernel_neon_begin();
+>                 aes_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+>                                 (u8 *)ctx->key_enc, rounds, blocks, walk.iv);
+> -               err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+>                 kernel_neon_end();
+> +               err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+>         }
+>         if (walk.nbytes) {
+>                 u8 __aligned(8) tail[AES_BLOCK_SIZE];
+> --
+> 1.8.3.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
