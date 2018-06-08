@@ -1,387 +1,46 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 8 Jun 2018 15:52:58 -0600
-Subject: [PATCH 10/20] dts: juno: Update coresight bindings for hw port
-In-Reply-To: <20180608214946.GI30587@xps15>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-11-git-send-email-suzuki.poulose@arm.com>
- <20180608214946.GI30587@xps15>
-Message-ID: <CANLsYkxNakRGCWT6O0JRKz+N1OTU3-XreC_FiB8Fiv+jEoPEbQ@mail.gmail.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Fri, 08 Jun 2018 15:33:51 -0700 (PDT)
+Subject: [PATCH 04/24] 32-bit userspace ABI: introduce ARCH_32BIT_OFF_T
+ config option
+In-Reply-To: <20180608173207.nwoi25jee52gpdwy@armageddon.cambridge.arm.com>
+Message-ID: <mhng-e1922456-a05b-46f9-8644-d45ad70a55e5@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2018 at 15:49, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> On Tue, Jun 05, 2018 at 10:43:21PM +0100, Suzuki K Poulose wrote:
->> Switch to updated coresight bindings for hw ports.
+On Fri, 08 Jun 2018 10:32:07 PDT (-0700), catalin.marinas at arm.com wrote:
+> On Wed, May 16, 2018 at 11:18:49AM +0300, Yury Norov wrote:
+>> diff --git a/arch/Kconfig b/arch/Kconfig
+>> index 76c0b54443b1..ee079244dc3c 100644
+>> --- a/arch/Kconfig
+>> +++ b/arch/Kconfig
+>> @@ -264,6 +264,21 @@ config ARCH_THREAD_STACK_ALLOCATOR
+>>  config ARCH_WANTS_DYNAMIC_TASK_STRUCT
+>>  	bool
 >>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Liviu Dudau <liviu.dudau@arm.com>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->> Changes since V1:
->>   - Add support Juno for r1 & r2.
->> ---
+>> +config ARCH_32BIT_OFF_T
+>> +	bool
+>> +	depends on !64BIT
+>> +	help
+>> +	  All new 32-bit architectures should have 64-bit off_t type on
+>> +	  userspace side which corresponds to the loff_t kernel type. This
+>> +	  is the requirement for modern ABIs. Some existing architectures
+>> +	  already have 32-bit off_t. This option is enabled for all such
+>> +	  architectures explicitly. Namely: arc, arm, blackfin, cris, frv,
+>> +	  h8300, hexagon, m32r, m68k, metag, microblaze, mips32, mn10300,
+>> +	  nios2, openrisc, parisc32, powerpc32, score, sh, sparc, tile32,
+>> +	  unicore32, x86_32 and xtensa. This is the complete list. Any
+>> +	  new 32-bit architecture should declare 64-bit off_t type on user
+>> +	  side and so should not enable this option.
 >
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Do you know if this is the case for riscv and nds32, merged in the
+> meantime? If not, I suggest you drop this patch altogether and just
+> define force_o_largefile() for arm64/ilp32 as we don't seem to stick to
+> "all new 32-bit architectures should have 64-bit off_t".
 
-Sudeep please hold on before applying this as there is more work to be
-done on this set.
+We (RISC-V) don't have support for rv32i in glibc yet, so there really isn't a 
+fixed ABI there yet.  From my understanding the rv32i port as it currently 
+stands has a 32-bit off_t (via __kernel_off_t being defined as long), so this 
+change would technically be a kernel ABI break.
 
->
->>  arch/arm64/boot/dts/arm/juno-base.dtsi    | 82 ++++++++++++++++++++++---------
->>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 26 +++++++---
->>  arch/arm64/boot/dts/arm/juno.dts          |  5 +-
->>  3 files changed, 81 insertions(+), 32 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
->> index eb749c5..33b41ba 100644
->> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
->> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
->> @@ -122,15 +122,18 @@
->>                       port at 0 {
->>                               reg = <0>;
->>                               etf0_in_port: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&main_funnel_out_port>;
->> +                                     coresight,hwid = <0>;
->>                               };
->>                       };
->>
->>                       /* output port */
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               etf0_out_port: endpoint {
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                               };
->>                       };
->>               };
->> @@ -145,8 +148,9 @@
->>               power-domains = <&scpi_devpd 0>;
->>               port {
->>                       tpiu_in_port: endpoint {
->> -                             slave-mode;
->> +                             direction = <0>;
->>                               remote-endpoint = <&replicator_out_port0>;
->> +                             coresight,hwid = <0>;
->>                       };
->>               };
->>       };
->> @@ -168,23 +172,27 @@
->>                               reg = <0>;
->>                               main_funnel_out_port: endpoint {
->>                                       remote-endpoint = <&etf0_in_port>;
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                               };
->>                       };
->>
->>                       /* input ports */
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               main_funnel_in_port0: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster0_funnel_out_port>;
->> +                                     coresight,hwid = <0>;
->>                               };
->>                       };
->>
->>                       port at 2 {
->> -                             reg = <1>;
->> +                             reg = <2>;
->>                               main_funnel_in_port1: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster1_funnel_out_port>;
->> +                                     coresight,hwid = <1>;
->>                               };
->>                       };
->>               };
->> @@ -200,8 +208,9 @@
->>               power-domains = <&scpi_devpd 0>;
->>               port {
->>                       etr_in_port: endpoint {
->> -                             slave-mode;
->> +                             direction = <0>;
->>                               remote-endpoint = <&replicator_out_port1>;
->> +                             coresight,hwid = <0>;
->>                       };
->>               };
->>       };
->> @@ -217,6 +226,8 @@
->>               power-domains = <&scpi_devpd 0>;
->>               port {
->>                       stm_out_port: endpoint {
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -240,6 +251,8 @@
->>               port {
->>                       cluster0_etm0_out_port: endpoint {
->>                               remote-endpoint = <&cluster0_funnel_in_port0>;
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -259,22 +272,26 @@
->>                               reg = <0>;
->>                               cluster0_funnel_out_port: endpoint {
->>                                       remote-endpoint = <&main_funnel_in_port0>;
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                               };
->>                       };
->>
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               cluster0_funnel_in_port0: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster0_etm0_out_port>;
->> +                                     coresight,hwid = <0>;
->>                               };
->>                       };
->>
->>                       port at 2 {
->> -                             reg = <1>;
->> +                             reg = <2>;
->>                               cluster0_funnel_in_port1: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster0_etm1_out_port>;
->> +                                     coresight,hwid = <1>;
->>                               };
->>                       };
->>               };
->> @@ -299,6 +316,8 @@
->>               port {
->>                       cluster0_etm1_out_port: endpoint {
->>                               remote-endpoint = <&cluster0_funnel_in_port1>;
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -322,6 +341,8 @@
->>               port {
->>                       cluster1_etm0_out_port: endpoint {
->>                               remote-endpoint = <&cluster1_funnel_in_port0>;
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -341,36 +362,42 @@
->>                               reg = <0>;
->>                               cluster1_funnel_out_port: endpoint {
->>                                       remote-endpoint = <&main_funnel_in_port1>;
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                               };
->>                       };
->>
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               cluster1_funnel_in_port0: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster1_etm0_out_port>;
->> +                                     coresight,hwid = <0>;
->>                               };
->>                       };
->>
->>                       port at 2 {
->> -                             reg = <1>;
->> +                             reg = <2>;
->>                               cluster1_funnel_in_port1: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster1_etm1_out_port>;
->> +                                     coresight,hwid = <1>;
->>                               };
->>                       };
->>                       port at 3 {
->> -                             reg = <2>;
->> +                             reg = <3>;
->>                               cluster1_funnel_in_port2: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster1_etm2_out_port>;
->> +                                     coresight,hwid = <2>;
->>                               };
->>                       };
->>                       port at 4 {
->> -                             reg = <3>;
->> +                             reg = <4>;
->>                               cluster1_funnel_in_port3: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->>                                       remote-endpoint = <&cluster1_etm3_out_port>;
->> +                                     coresight,hwid = <3>;
->>                               };
->>                       };
->>               };
->> @@ -395,6 +422,8 @@
->>               port {
->>                       cluster1_etm1_out_port: endpoint {
->>                               remote-endpoint = <&cluster1_funnel_in_port1>;
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -418,6 +447,8 @@
->>               port {
->>                       cluster1_etm2_out_port: endpoint {
->>                               remote-endpoint = <&cluster1_funnel_in_port2>;
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -441,6 +472,8 @@
->>               port {
->>                       cluster1_etm3_out_port: endpoint {
->>                               remote-endpoint = <&cluster1_funnel_in_port3>;
->> +                             coresight,hwid = <0>;
->> +                             direction = <1>;
->>                       };
->>               };
->>       };
->> @@ -462,6 +495,8 @@
->>                               reg = <0>;
->>                               replicator_out_port0: endpoint {
->>                                       remote-endpoint = <&tpiu_in_port>;
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                               };
->>                       };
->>
->> @@ -469,14 +504,17 @@
->>                               reg = <1>;
->>                               replicator_out_port1: endpoint {
->>                                       remote-endpoint = <&etr_in_port>;
->> +                                     coresight,hwid = <1>;
->> +                                     direction = <1>;
->>                               };
->>                       };
->>
->>                       /* replicator input port */
->>                       port at 2 {
->> -                             reg = <0>;
->> +                             reg = <2>;
->>                               replicator_in_port0: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->> +                                     coresight,hwid = <0>;
->>                               };
->>                       };
->>               };
->> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> index 0c43fb3..146a5d9 100644
->> --- a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> @@ -15,15 +15,18 @@
->>                       port at 0 {
->>                               reg = <0>;
->>                               csys1_funnel_out_port: endpoint {
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                                       remote-endpoint = <&etf1_in_port>;
->>                               };
->>                       };
->>
->>                       /* input port */
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               csys1_funnel_in_port0: endpoint {
->> -                                     slave-mode;
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <0>;
->>                               };
->>                       };
->>
->> @@ -45,15 +48,18 @@
->>                       port at 0 {
->>                               reg = <0>;
->>                               etf1_in_port: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->> +                                     coresight,hwid = <0>;
->>                                       remote-endpoint = <&csys1_funnel_out_port>;
->>                               };
->>                       };
->>
->>                       /* output port */
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               etf1_out_port: endpoint {
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                                       remote-endpoint = <&csys2_funnel_in_port1>;
->>                               };
->>                       };
->> @@ -75,23 +81,27 @@
->>                       port at 0 {
->>                               reg = <0>;
->>                               csys2_funnel_out_port: endpoint {
->> +                                     coresight,hwid = <0>;
->> +                                     direction = <1>;
->>                                       remote-endpoint = <&replicator_in_port0>;
->>                               };
->>                       };
->>
->>                       /* input ports */
->>                       port at 1 {
->> -                             reg = <0>;
->> +                             reg = <1>;
->>                               csys2_funnel_in_port0: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->> +                                     coresight,hwid = <0>;
->>                                       remote-endpoint = <&etf0_out_port>;
->>                               };
->>                       };
->>
->>                       port at 2 {
->> -                             reg = <1>;
->> +                             reg = <2>;
->>                               csys2_funnel_in_port1: endpoint {
->> -                                     slave-mode;
->> +                                     direction = <0>;
->> +                                     coresight,hwid = <1>;
->>                                       remote-endpoint = <&etf1_out_port>;
->>                               };
->>                       };
->> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
->> index c9236c4..27b8036 100644
->> --- a/arch/arm64/boot/dts/arm/juno.dts
->> +++ b/arch/arm64/boot/dts/arm/juno.dts
->> @@ -260,10 +260,11 @@
->>  &main_funnel {
->>       ports {
->>               port at 3 {
->> -                     reg = <2>;
->> +                     reg = <3>;
->>                       main_funnel_in_port2: endpoint {
->> -                             slave-mode;
->> +                             direction = <0>;
->>                               remote-endpoint = <&stm_out_port>;
->> +                             coresight,hwid = <2>;
->>                       };
->>               };
->>       };
->> --
->> 2.7.4
->>
+Since we don't have rv32i glibc yet I'm not fundamentally opposed to an ABI 
+break.  Is there a concrete advantage to this?
