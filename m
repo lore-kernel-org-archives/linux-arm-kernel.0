@@ -1,145 +1,48 @@
-From: hejianet@gmail.com (Jia He)
-Date: Fri, 8 Jun 2018 17:00:17 +0800
-Subject: [PATCH v3] KVM: arm/arm64: add WARN_ON if size is not PAGE_SIZE
- aligned in unmap_stage2_range
-In-Reply-To: <1526871930-1231-1-git-send-email-hejianet@gmail.com>
-References: <1526871930-1231-1-git-send-email-hejianet@gmail.com>
-Message-ID: <2c3a60f9-fb75-46bf-e917-005aa85b952c@gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 8 Jun 2018 11:14:01 +0200
+Subject: [PATCH v2 2/2] media: mtk-vcodec: Support VP9 profile in decoder
+In-Reply-To: <20180530071613.125768-3-keiichiw@chromium.org>
+References: <20180530071613.125768-1-keiichiw@chromium.org>
+ <20180530071613.125768-3-keiichiw@chromium.org>
+Message-ID: <a631f7f4-3405-5c1a-2932-106e4481ae5a@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping
-
-Cheers,
-Jia
-
-On 5/21/2018 11:05 AM, Jia He Wrote:
-> There is a panic in armv8a server(QDF2400) under memory pressure tests
-> (start 20 guests and run memhog in the host).
+On 05/30/2018 09:16 AM, Keiichi Watanabe wrote:
+> Add V4L2_CID_MPEG_VIDEO_VP9_PROFILE control in MediaTek decoder's
+> driver.
+> MediaTek decoder only supports profile 0 for now.
 > 
-> ---------------------------------begin--------------------------------
-> [35380.800950] BUG: Bad page state in process qemu-kvm  pfn:dd0b6
-> [35380.805825] page:ffff7fe003742d80 count:-4871 mapcount:-2126053375
-> mapping:          (null) index:0x0
-> [35380.815024] flags: 0x1fffc00000000000()
-> [35380.818845] raw: 1fffc00000000000 0000000000000000 0000000000000000
-> ffffecf981470000
-> [35380.826569] raw: dead000000000100 dead000000000200 ffff8017c001c000
-> 0000000000000000
-> [35380.805825] page:ffff7fe003742d80 count:-4871 mapcount:-2126053375
-> mapping:          (null) index:0x0
-> [35380.815024] flags: 0x1fffc00000000000()
-> [35380.818845] raw: 1fffc00000000000 0000000000000000 0000000000000000
-> ffffecf981470000
-> [35380.826569] raw: dead000000000100 dead000000000200 ffff8017c001c000
-> 0000000000000000
-> [35380.834294] page dumped because: nonzero _refcount
-> [35380.839069] Modules linked in: vhost_net vhost tap ebtable_filter
-> ebtables ip6table_filter ip6_tables iptable_filter fcoe libfcoe libfc
-> 8021q garp mrp stp llc scsi_transport_fc openvswitch nf_conntrack_ipv6
-> nf_nat_ipv6 nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_defrag_ipv6
-> nf_nat nf_conntrack vfat fat rpcrdma ib_isert iscsi_target_mod ib_iser
-> libiscsi scsi_transport_iscsi ib_srpt target_core_mod ib_srp
-> scsi_transport_srp ib_ipoib rdma_ucm ib_ucm ib_uverbs ib_umad rdma_cm
-> ib_cm iw_cm mlx5_ib ib_core crc32_ce ipmi_ssif tpm_tis tpm_tis_core sg
-> nfsd auth_rpcgss nfs_acl lockd grace sunrpc dm_multipath ip_tables xfs
-> libcrc32c mlx5_core mlxfw devlink ahci_platform libahci_platform libahci
-> qcom_emac sdhci_acpi sdhci hdma mmc_core hdma_mgmt i2c_qup dm_mirror
-> dm_region_hash dm_log dm_mod
-> [35380.908341] CPU: 29 PID: 18323 Comm: qemu-kvm Tainted: G W
-> 4.14.15-5.hxt.aarch64 #1
-> [35380.917107] Hardware name: <snip for confidential issues>
-> [35380.930909] Call trace:
-> [35380.933345] [<ffff000008088f00>] dump_backtrace+0x0/0x22c
-> [35380.938723] [<ffff000008089150>] show_stack+0x24/0x2c
-> [35380.943759] [<ffff00000893c078>] dump_stack+0x8c/0xb0
-> [35380.948794] [<ffff00000820ab50>] bad_page+0xf4/0x154
-> [35380.953740] [<ffff000008211ce8>] free_pages_check_bad+0x90/0x9c
-> [35380.959642] [<ffff00000820c430>] free_pcppages_bulk+0x464/0x518
-> [35380.965545] [<ffff00000820db98>] free_hot_cold_page+0x22c/0x300
-> [35380.971448] [<ffff0000082176fc>] __put_page+0x54/0x60
-> [35380.976484] [<ffff0000080b1164>] unmap_stage2_range+0x170/0x2b4
-> [35380.982385] [<ffff0000080b12d8>] kvm_unmap_hva_handler+0x30/0x40
-> [35380.988375] [<ffff0000080b0104>] handle_hva_to_gpa+0xb0/0xec
-> [35380.994016] [<ffff0000080b2644>] kvm_unmap_hva_range+0x5c/0xd0
-> [35380.999833] [<ffff0000080a8054>]
-> kvm_mmu_notifier_invalidate_range_start+0x60/0xb0
-> [35381.007387] [<ffff000008271f44>]
-> __mmu_notifier_invalidate_range_start+0x64/0x8c
-> [35381.014765] [<ffff0000082547c8>] try_to_unmap_one+0x78c/0x7a4
-> [35381.020493] [<ffff000008276d04>] rmap_walk_ksm+0x124/0x1a0
-> [35381.025961] [<ffff0000082551b4>] rmap_walk+0x94/0x98
-> [35381.030909] [<ffff0000082555e4>] try_to_unmap+0x100/0x124
-> [35381.036293] [<ffff00000828243c>] unmap_and_move+0x480/0x6fc
-> [35381.041847] [<ffff000008282b6c>] migrate_pages+0x10c/0x288
-> [35381.047318] [<ffff00000823c164>] compact_zone+0x238/0x954
-> [35381.052697] [<ffff00000823c944>] compact_zone_order+0xc4/0xe8
-> [35381.058427] [<ffff00000823d25c>] try_to_compact_pages+0x160/0x294
-> [35381.064503] [<ffff00000820f074>]
-> __alloc_pages_direct_compact+0x68/0x194
-> [35381.071187] [<ffff000008210138>] __alloc_pages_nodemask+0xc20/0xf7c
-> [35381.077437] [<ffff0000082709e4>] alloc_pages_vma+0x1a4/0x1c0
-> [35381.083080] [<ffff000008285b68>]
-> do_huge_pmd_anonymous_page+0x128/0x324
-> [35381.089677] [<ffff000008248a24>] __handle_mm_fault+0x71c/0x7e8
-> [35381.095492] [<ffff000008248be8>] handle_mm_fault+0xf8/0x194
-> [35381.101049] [<ffff000008240dcc>] __get_user_pages+0x124/0x34c
-> [35381.106777] [<ffff000008241870>] populate_vma_page_range+0x90/0x9c
-> [35381.112941] [<ffff000008241940>] __mm_populate+0xc4/0x15c
-> [35381.118322] [<ffff00000824b294>] SyS_mlockall+0x100/0x164
-> [35381.123705] Exception stack(0xffff800dce5f3ec0 to 0xffff800dce5f4000)
-> [35381.130128] 3ec0: 0000000000000003 d6e6024cc9b87e00 0000aaaabe94f000
-> 0000000000000000
-> [35381.137940] 3ee0: 0000000000000002 0000000000000000 0000000000000000
-> 0000aaaacf6fc3c0
-> [35381.145753] 3f00: 00000000000000e6 0000aaaacf6fc490 0000ffffeeeab0f0
-> d6e6024cc9b87e00
-> [35381.153565] 3f20: 0000000000000000 0000aaaabe81b3c0 0000000000000020
-> 00009e53eff806b5
-> [35381.161379] 3f40: 0000aaaabe94de48 0000ffffa7c269b0 0000000000000011
-> 0000ffffeeeabf68
-> [35381.169190] 3f60: 0000aaaaceacfe60 0000aaaabe94f000 0000aaaabe9ba358
-> 0000aaaabe7ffb80
-> [35381.177003] 3f80: 0000aaaabe9ba000 0000aaaabe959f64 0000000000000000
-> 0000aaaabe94f000
-> [35381.184815] 3fa0: 0000000000000000 0000ffffeeeabdb0 0000aaaabe5f3bf8
-> 0000ffffeeeabdb0
-> [35381.192628] 3fc0: 0000ffffa7c269b8 0000000060000000 0000000000000003
-> 00000000000000e6
-> [35381.200440] 3fe0: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [35381.208254] [<ffff00000808339c>] __sys_trace_return+0x0/0x4
-> [35381.213809] Disabling lock debugging due to kernel taint
-> --------------------------------end--------------------------------------
-> 
-> The root cause might be what I fixed at [1]. But from arm kvm points of
-> view, it would be better we caught the exception earlier and clearer.
-> 
-> If the size is not PAGE_SIZE aligned, unmap_stage2_range might unmap the
-> wrong(more or less) page range. Hence it caused the "BUG: Bad page
-> state"
-> 
-> [1] https://lkml.org/lkml/2018/5/3/1042
-> 
-> Signed-off-by: jia.he at hxt-semitech.com
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
 > ---
-> v3: resend after dropping patch 2/2 of the series
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
->  virt/kvm/arm/mmu.c | 2 ++
->  1 file changed, 2 insertions(+)
+> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> index 86f0a7134365..f9393504356d 100644
+> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> @@ -1400,6 +1400,12 @@ int mtk_vcodec_dec_ctrls_setup(struct mtk_vcodec_ctx *ctx)
+>  				V4L2_CID_MIN_BUFFERS_FOR_CAPTURE,
+>  				0, 32, 1, 1);
+>  	ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+> +	v4l2_ctrl_new_std_menu(&ctx->ctrl_hdl,
+> +				&mtk_vcodec_dec_ctrl_ops,
+> +				V4L2_CID_MPEG_VIDEO_VP9_PROFILE,
+> +				V4L2_MPEG_VIDEO_VP9_PROFILE_3,
+
+It makes no sense to set max to PROFILE_3 if PROFILE_0 is the only choice.
+Just set max to PROFILE_0 as well.
+
+> +				~(1U << V4L2_MPEG_VIDEO_VP9_PROFILE_0),
+> +				V4L2_MPEG_VIDEO_VP9_PROFILE_0);
 > 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 7f6a944..8dac311 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -297,6 +297,8 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->  	phys_addr_t next;
->  
->  	assert_spin_locked(&kvm->mmu_lock);
-> +	WARN_ON(size & ~PAGE_MASK);
-> +
->  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->  	do {
->  		/*
+>  	if (ctx->ctrl_hdl.error) {
+>  		mtk_v4l2_err("Adding control failed %d",
+> --
+> 2.17.0.921.gf22659ad46-goog
 > 
+
+Regards,
+
+	Hans
