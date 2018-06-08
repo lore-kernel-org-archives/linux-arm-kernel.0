@@ -1,65 +1,95 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 8 Jun 2018 16:03:55 -0400
-Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
- disable compiler auto-inline optimizations
-In-Reply-To: <20180607091816.GT13775@localhost>
-References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
- <201806060501.btF3aJMZ%fengguang.wu@intel.com>
- <20180606095714.1d3c2def@vmware.local.home>
- <20180606142600.GN13775@localhost>
- <20180606142622.2338abf6@vmware.local.home>
- <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
- <20180607074628.kd3iyxevwj3ypzbr@intel.com>
- <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
- <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
- <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
- <20180607091816.GT13775@localhost>
-Message-ID: <20180608160355.67712eb8@vmware.local.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 8 Jun 2018 14:05:03 -0600
+Subject: [PATCH 03/20] coresight: Fix remote endpoint parsing
+In-Reply-To: <1528235011-30691-4-git-send-email-suzuki.poulose@arm.com>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+ <1528235011-30691-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180608200503.GC30587@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jun 2018 11:18:16 +0200
-Johan Hovold <johan@kernel.org> wrote:
-
-
-> If you want to work around the warning and think you can do it in some
-> non-contrived way, then go for it.
+On Tue, Jun 05, 2018 at 10:43:14PM +0100, Suzuki K Poulose wrote:
+> When parsing the remote endpoint of an output port, we do :
+>      rport = of_graph_get_remote_port(ep);
+>      rparent = of_graph_get_remote_port_parent(ep);
 > 
-> Clearing the request buffer, checking for termination using strnlen, and
-> then using memcpy might not be too bad.
+> and then parse the "remote_port" as if it was the remote endpoint,
+> which is wrong. The code worked fine because we used endpoint number
+> as the port number. Let us fix it and optimise a bit as:
 > 
-> But after all, it is a false positive, so leaving things as they stand
-> is fine too.
+>      remote_ep = of_graph_get_remote_endpoint(ep);
+>      if (remote_ep)
+>         remote_parent = of_graph_get_port_parent(remote_ep);
+> 
+> and then, parse the remote_ep for the port/endpoint details.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/of_coresight.c | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+> index 8a23c63..ada4f07 100644
+> --- a/drivers/hwtracing/coresight/of_coresight.c
+> +++ b/drivers/hwtracing/coresight/of_coresight.c
+> @@ -129,7 +129,7 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+>  	int ret = 0;
+>  	struct of_endpoint endpoint, rendpoint;
+>  	struct device_node *rparent = NULL;
+> -	struct device_node *rport = NULL;
+> +	struct device_node *rep = NULL;
+>  	struct device *rdev = NULL;
+>  
+>  	do {
+> @@ -144,16 +144,16 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+>  		if (of_graph_parse_endpoint(ep, &endpoint))
+>  			break;
+>  		/*
+> -		 * Get a handle on the remote port and parent
+> -		 * attached to it.
+> +		 * Get a handle on the remote endpoint and the device it is
+> +		 * attached to.
+>  		 */
+> -		rparent = of_graph_get_remote_port_parent(ep);
+> +		rep = of_graph_get_remote_endpoint(ep);
+> +		if (!rep)
+> +			break;
+> +		rparent = of_graph_get_port_parent(rep);
+>  		if (!rparent)
+>  			break;
+> -		rport = of_graph_get_remote_port(ep);
+> -		if (!rport)
+> -			break;
+> -		if (of_graph_parse_endpoint(rport, &rendpoint))
+> +		if (of_graph_parse_endpoint(rep, &rendpoint))
+>  			break;
+>  
+>  		/* If the remote device is not available, defer probing */
+> @@ -165,15 +165,15 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+>  
+>  		pdata->outports[*i] = endpoint.port;
+>  		pdata->child_names[*i] = dev_name(rdev);
+> -		pdata->child_ports[*i] = rendpoint.id;
+> +		pdata->child_ports[*i] = rendpoint.port;
+>  		/* Move the index */
+>  		(*i)++;
+>  	} while (0);
+>  
+>  	if (rparent)
+>  		of_node_put(rparent);
+> -	if (rport)
+> -		of_node_put(rport);
+> +	if (rep)
+> +		of_node_put(rep);
+>  
+>  	return ret;
+>  }
 
-Not sure how contrived you think this is, but it solves the warning
-without adding extra work in the normal case.
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
--- Steve
+(Please add to the next iteration so that I don't have to review again)
 
-diff --git a/drivers/staging/greybus/fw-management.c b/drivers/staging/greybus/fw-management.c
-index 71aec14f8181..4fb9f1dff47d 100644
---- a/drivers/staging/greybus/fw-management.c
-+++ b/drivers/staging/greybus/fw-management.c
-@@ -150,15 +150,18 @@ static int fw_mgmt_load_and_validate_operation(struct fw_mgmt *fw_mgmt,
- 	}
- 
- 	request.load_method = load_method;
--	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
-+	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE - 1);
- 
- 	/*
- 	 * The firmware-tag should be NULL terminated, otherwise throw error and
- 	 * fail.
- 	 */
--	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
--		dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
--		return -EINVAL;
-+	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 2] != '\0') {
-+		if (tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
-+			dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
-+			return -EINVAL;
-+		}
-+		request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] = '\0';
- 	}
- 
- 	/* Allocate ids from 1 to 255 (u8-max), 0 is an invalid id */
+> -- 
+> 2.7.4
+> 
