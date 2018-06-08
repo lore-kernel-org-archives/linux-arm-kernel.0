@@ -1,150 +1,135 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 8 Jun 2018 18:44:01 +0100
-Subject: [PATCH v4 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <1526638022-4137-2-git-send-email-vladimir.murzin@arm.com>
-References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
- <1526638022-4137-2-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <0fe34377-4277-0de6-2cc7-ebb6c0aaf889@arm.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Fri, 8 Jun 2018 11:05:53 -0700
+Subject: [PATCH v6 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180608002653.GD88063@google.com>
+References: <cover.1528138319.git.collinsd@codeaurora.org>
+ <6d7abf248493cf81d62eb17ecb5030783aa85f72.1528138319.git.collinsd@codeaurora.org>
+ <20180608002653.GD88063@google.com>
+Message-ID: <a062ede9-20de-22e3-24a5-1aba8cf3740d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Hello Matthias,
 
-On 18/05/18 11:07, Vladimir Murzin wrote:
-> Common Not Private (CNP) is a feature of ARMv8.2 extension which
-> allows translation table entries to be shared between different PEs in
-> the same inner shareable domain, so the hardware can use this fact to
-> optimise the caching of such entries in the TLB.
+On 06/07/2018 05:26 PM, Matthias Kaehlcke wrote:
+> On Mon, Jun 04, 2018 at 12:15:12PM -0700, David Collins wrote:
+>> static int rpmh_regulator_send_request(struct rpmh_vreg *vreg,
+>> +                       struct tcs_cmd *cmd, int count, bool wait_for_ack)
+>>
 > 
-> CNP occupies one bit in TTBRx_ELy and VTTBR_EL2, which advertises to
-> the hardware that the translation table entries pointed to by this
-> TTBR are the same as every PE in the same inner shareable domain for
-> which the equivalent TTBR also has CNP bit set. In case CNP bit is set
-> but TTBR does not point at the same translation table entries for a
-> given ASID and VMID, then the system is mis-configured, so the results
-> of translations are UNPREDICTABLE.
+> nit: as of now this is only called with a single command. If you
+> anticipate that this is unlikely to change consider removing 'count',
+> not having it in the calls slightly improves readability.
+
+The count parameter was needed in the original version of the patch.  That
+need is no longer present after removing features in subsequent versions.
+
+I'll remove this parameter.
+
+
+>> +static int _rpmh_regulator_vrm_set_voltage_sel(struct regulator_dev *rdev,
+>> +				unsigned int selector, bool wait_for_ack)
+>> +{
+>> +	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+>> +	struct tcs_cmd cmd = {
+>> +		.addr = vreg->addr + RPMH_REGULATOR_REG_VRM_VOLTAGE,
+>> +	};
+>> +	int ret;
+>> +
+>> +	/* VRM voltage control register is set with voltage in millivolts. */
+>> +	cmd.data = DIV_ROUND_UP(regulator_list_voltage_linear_range(rdev,
+>> +							selector), 1000);
+>> +
+>> +	ret = rpmh_regulator_send_request(vreg, &cmd, 1, wait_for_ack);
+>> +	if (!ret)
+>> +		vreg->voltage_selector = selector;
+>> +
+>> +	return 0;
 > 
-> For EL1 we postpone setting CNP till all cpus are up and rely on
-> cpufeature framework to 1) patch the code which is sensitive to CNP
-> and 2) update TTBR1_EL1 with CNP bit set. TTBR1_EL1 can be
-> reprogrammed as result of hibernation or cpuidle (via __enable_mmu).
-> cpuidle's path has been changed to restore CnP and for hibernation the
-> code has been changed to save raw TTBR1_EL1 and blindly restore it on
-> resume.
+> Shouldn't this return 'ret'?
+
+Yes; good catch.  I'll fix it.
+
+
+>> +static int rpmh_regulator_enable(struct regulator_dev *rdev)
+>> +{
+>> +	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+>> +	struct tcs_cmd cmd = {
+>> +		.addr = vreg->addr + RPMH_REGULATOR_REG_ENABLE,
+>> +		.data = 1,
+>> +	};
+>> +	int ret;
+>> +
+>> +	if (vreg->enabled == -EINVAL &&
+>> +	    vreg->voltage_selector != -ENOTRECOVERABLE) {
+>> +		ret = _rpmh_regulator_vrm_set_voltage_sel(rdev,
+>> +						vreg->voltage_selector, true);
+>> +		if (ret < 0)
+>> +			return ret;
+>> +	}
+>> +
+>> +	ret = rpmh_regulator_send_request(vreg, &cmd, 1, true);
+>> +	if (!ret)
+>> +		vreg->enabled = true;
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int rpmh_regulator_disable(struct regulator_dev *rdev)
+>> +{
+>> +	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+>> +	struct tcs_cmd cmd = {
+>> +		.addr = vreg->addr + RPMH_REGULATOR_REG_ENABLE,
+>> +		.data = 0,
+>> +	};
+>> +	int ret;
+>> +
+>> +	if (vreg->enabled == -EINVAL &&
+>> +	    vreg->voltage_selector != -ENOTRECOVERABLE) {
+>> +		ret = _rpmh_regulator_vrm_set_voltage_sel(rdev,
+>> +						vreg->voltage_selector, true);
+>> +		if (ret < 0)
+>> +			return ret;
+>> +	}
+>> +
+>> +	ret = rpmh_regulator_send_request(vreg, &cmd, 1, false);
+>> +	if (!ret)
+>> +		vreg->enabled = false;
+>> +
+>> +	return ret;
+>> +}
 > 
-> For EL0 there are a few cases we need to care of changes in
-> TTBR0_EL1:
->   - a switch to idmap
->   - software emulated PAN
+> nit: rpmh_regulator_enable() and rpmh_regulator_disable() are
+> essentially the same code, consider introducing a helper like
+> _rpmh_regulator_enable(struct regulator_dev *rdev, bool enable).
 
-(Nit: I don't think this has anything to do with EL0, its just the low half of
-the VA space in TTBR0...)
-
-> we rule out latter via Kconfig options and for the former we make
-> sure that CNP is set for non-zero ASIDs only.
-
-Reviewed-by: James Morse <james.morse@arm.com>
+Sure, I'll add a helper function.
 
 
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 39ec0b8..4f9e3ea 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
->  
->  	phys_addr_t pgd_phys = virt_to_phys(pgdp);
->  
-> +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
-> +		/*
-> +		 * cpu_replace_ttbr1() is used when there's a boot CPU
-> +		 * up (i.e. cpufeature framework is not up yet) and
-> +		 * latter only when we enable CNP via cpufeature's
-> +		 * enable() callback.
-> +                 * Also we rely on the cpu_hwcap bit being set before
+>> +static int rpmh_regulator_init_vreg(struct rpmh_vreg *vreg, struct device *dev,
+>> +				struct device_node *node, const char *pmic_id,
+>> +				const struct rpmh_vreg_init_data *rpmh_data)
+>> +{
+>> +	struct regulator_config reg_config = {};
+>> +	char rpmh_resource_name[20] = "";
+>> +	struct regulator_dev *rdev;
+>> +	struct regulator_init_data *init_data;
+>> +	int ret;
+>> +
+>> +	vreg->dev = dev;
+>> +
+>> +	for (; rpmh_data->name; rpmh_data++)
+>> +		if (!strcmp(rpmh_data->name, node->name))
+>> +			break;
+> 
+> nit: it's a bit odd to use the parameter itself for iteration, but I
+> guess it's a matter of preferences.
 
-(Nit: stray whitespace)
-
-
-> +		 * calling the enable() function.
-> +		 */
-> +		pgd_phys |= TTBR_CNP_BIT;
-> +	}
-> +
->  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
->  
->  	cpu_install_idmap();
-
-
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 9d1b06d..199e9dd 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -858,6 +860,16 @@ static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
->  	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
->  }
->  
-> +static bool __maybe_unused
-> +has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
-> +{
-> +#ifdef CONFIG_CRASH_DUMP
-> +	if (elfcorehdr_size)
-> +		return false;
-> +#endif
-
-It might be worth a comment why kdump is relevant, (here or in the commit
-message). Kdump isn't guaranteed to power-off all secondary CPUs, CNP may share
-TLB entries with a CPU stuck in the crashed kernel.
-
-I don't think we can't trust it even if we bring all CPUs into the new kernel as
-the DT may not reflect all the CPUs the crashed-kernel had. (kexec doesn't have
-this problem as it always powers-off secondaries before kexec-ing)
-
-
-> +	return has_cpuid_feature(entry, scope);
-> +}
-> +
->  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
->  static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
->  
-> @@ -1642,6 +1667,11 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
->  	return (cpus_have_const_cap(ARM64_HAS_PAN) && !cpus_have_const_cap(ARM64_HAS_UAO));
->  }
->  
-> +static void __maybe_unused cpu_enable_cnp (struct arm64_cpu_capabilities const *cap)
-
-Nit: stray space between cpu_enable_cnp and the parameters.
-
-
-> +{
-> +	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
-> +}
-> +
->  /*
->   * We emulate only the following system register space.
->   * Op0 = 0x3, CRn = 0x0, Op1 = 0x0, CRm = [0, 4 - 7]
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 1ec5f28..ea27121 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -125,7 +125,7 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
->  		return -EOVERFLOW;
->  
->  	arch_hdr_invariants(&hdr->invariants);
-> -	hdr->ttbr1_el1		= __pa_symbol(swapper_pg_dir);
-> +	hdr->ttbr1_el1		= read_sysreg(ttbr1_el1);
->  	hdr->reenter_kernel	= _cpu_resume;
->  
->  	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
-
-We also run__cpu_suspend_exit() from hibernate's restore, which will restore CNP
-so this isn't strictly necessary.
-
-There is some future-cleanup we can do here, if hibernate set the idmap when
-calling __cpu_suspend_exit(), that function could do the replace_ttbr1() without
-an extra install/uninstall of the idmap.
-
-
+I'll change this to add a specific iterator so that it is less surprising.
 
 Thanks,
+David
 
-James
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
