@@ -1,213 +1,381 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 8 Jun 2018 15:39:25 -0600
-Subject: [PATCH 09/20] coresight: dts: Define new bindings for direction
- of data flow
-In-Reply-To: <1528235011-30691-10-git-send-email-suzuki.poulose@arm.com>
+Date: Fri, 8 Jun 2018 15:49:46 -0600
+Subject: [PATCH 10/20] dts: juno: Update coresight bindings for hw port
+In-Reply-To: <1528235011-30691-11-git-send-email-suzuki.poulose@arm.com>
 References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180608213925.GH30587@xps15>
+ <1528235011-30691-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180608214946.GI30587@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 10:43:20PM +0100, Suzuki K Poulose wrote:
-> So far we have relied on an undocumented property "slave-mode",
-> to indicate if the given port is input or not. Since we are
-> redefining the coresight bindings, define new property for the
-> "direction" of data flow for a given connection endpoint in the
-> device.
-> 
-> Each endpoint must define the following property.
-> 
->  - "direction" : 0 => Port is input
-> 		 1 => Port is output
+On Tue, Jun 05, 2018 at 10:43:21PM +0100, Suzuki K Poulose wrote:
+> Switch to updated coresight bindings for hw ports.
 > 
 > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Rob Herring <robh@kernel.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
 > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  .../devicetree/bindings/arm/coresight.txt          | 24 ++++++++++++++--------
->  drivers/hwtracing/coresight/of_coresight.c         | 22 ++++++++++++++++----
->  2 files changed, 34 insertions(+), 12 deletions(-)
+> Changes since V1:
+>   - Add support Juno for r1 & r2.
+> ---
+
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+
+>  arch/arm64/boot/dts/arm/juno-base.dtsi    | 82 ++++++++++++++++++++++---------
+>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 26 +++++++---
+>  arch/arm64/boot/dts/arm/juno.dts          |  5 +-
+>  3 files changed, 81 insertions(+), 32 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index bf75ab3..ff382bc 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -103,9 +103,11 @@ with a specific direction of data flow, each connection must define the
->  following properties to uniquely identify the connection details.
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index eb749c5..33b41ba 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -122,15 +122,18 @@
+>  			port at 0 {
+>  				reg = <0>;
+>  				etf0_in_port: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&main_funnel_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
 >  
->   * Direction of the data flow w.r.t the component :
-> -   Each input port must have the following property defined at the "endpoint"
-> +   Each hardware port must have the following property defined at the "endpoint"
->     for the port.
-> -	"slave-mode"
-> +	"direction" - 32bit integer, whose values are defined as follows :
-> +		0 => the endpoint is an Input port
-> +		1 => the endpoint is an Output port.
->  
->   * Hardware Port number at the component:
->       - Each "endpoint" must define the hardware port of the local end of the
-> @@ -129,7 +131,7 @@ Example:
->  		clock-names = "apb_pclk";
+>  			/* output port */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				etf0_out_port: endpoint {
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  		};
+> @@ -145,8 +148,9 @@
+>  		power-domains = <&scpi_devpd 0>;
 >  		port {
->  			etb_in_port: endpoint at 0 {
+>  			tpiu_in_port: endpoint {
 > -				slave-mode;
 > +				direction = <0>;
 >  				remote-endpoint = <&replicator_out_port0>;
->  				coresight,hwid = <0>;
+> +				coresight,hwid = <0>;
 >  			};
-> @@ -144,7 +146,7 @@ Example:
->  		clock-names = "apb_pclk";
+>  		};
+>  	};
+> @@ -168,23 +172,27 @@
+>  				reg = <0>;
+>  				main_funnel_out_port: endpoint {
+>  					remote-endpoint = <&etf0_in_port>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			/* input ports */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				main_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster0_funnel_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				main_funnel_in_port1: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_funnel_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  		};
+> @@ -200,8 +208,9 @@
+>  		power-domains = <&scpi_devpd 0>;
 >  		port {
->  			tpiu_in_port: endpoint at 0 {
+>  			etr_in_port: endpoint {
 > -				slave-mode;
 > +				direction = <0>;
 >  				remote-endpoint = <&replicator_out_port1>;
->  				coresight,hwid = <0>;
+> +				coresight,hwid = <0>;
 >  			};
-> @@ -166,6 +168,7 @@ Example:
->  			port at 0 {
+>  		};
+>  	};
+> @@ -217,6 +226,8 @@
+>  		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			stm_out_port: endpoint {
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -240,6 +251,8 @@
+>  		port {
+>  			cluster0_etm0_out_port: endpoint {
+>  				remote-endpoint = <&cluster0_funnel_in_port0>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -259,22 +272,26 @@
+>  				reg = <0>;
+>  				cluster0_funnel_out_port: endpoint {
+>  					remote-endpoint = <&main_funnel_in_port0>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				cluster0_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster0_etm0_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				cluster0_funnel_in_port1: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster0_etm1_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  		};
+> @@ -299,6 +316,8 @@
+>  		port {
+>  			cluster0_etm1_out_port: endpoint {
+>  				remote-endpoint = <&cluster0_funnel_in_port1>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -322,6 +341,8 @@
+>  		port {
+>  			cluster1_etm0_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port0>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -341,36 +362,42 @@
+>  				reg = <0>;
+>  				cluster1_funnel_out_port: endpoint {
+>  					remote-endpoint = <&main_funnel_in_port1>;
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  				};
+>  			};
+>  
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				cluster1_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm0_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				cluster1_funnel_in_port1: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm1_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  			port at 3 {
+> -				reg = <2>;
+> +				reg = <3>;
+>  				cluster1_funnel_in_port2: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm2_out_port>;
+> +					coresight,hwid = <2>;
+>  				};
+>  			};
+>  			port at 4 {
+> -				reg = <3>;
+> +				reg = <4>;
+>  				cluster1_funnel_in_port3: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&cluster1_etm3_out_port>;
+> +					coresight,hwid = <3>;
+>  				};
+>  			};
+>  		};
+> @@ -395,6 +422,8 @@
+>  		port {
+>  			cluster1_etm1_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port1>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -418,6 +447,8 @@
+>  		port {
+>  			cluster1_etm2_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port2>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -441,6 +472,8 @@
+>  		port {
+>  			cluster1_etm3_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port3>;
+> +				coresight,hwid = <0>;
+> +				direction = <1>;
+>  			};
+>  		};
+>  	};
+> @@ -462,6 +495,8 @@
 >  				reg = <0>;
 >  				replicator_out_port0: endpoint {
+>  					remote-endpoint = <&tpiu_in_port>;
+> +					coresight,hwid = <0>;
 > +					direction = <1>;
->  					remote-endpoint = <&etb_in_port>;
->  					coresight,hwid = <0>;
 >  				};
-> @@ -174,6 +177,7 @@ Example:
->  			port at 1 {
+>  			};
+>  
+> @@ -469,14 +504,17 @@
 >  				reg = <1>;
 >  				replicator_out_port1: endpoint {
+>  					remote-endpoint = <&etr_in_port>;
+> +					coresight,hwid = <1>;
 > +					direction = <1>;
->  					remote-endpoint = <&tpiu_in_port>;
->  					coresight,hwid = <1>;
 >  				};
-> @@ -183,7 +187,7 @@ Example:
+>  			};
+>  
+>  			/* replicator input port */
 >  			port at 2 {
->  				reg = <1>;
+> -				reg = <0>;
+> +				reg = <2>;
 >  				replicator_in_port0: endpoint {
 > -					slave-mode;
 > +					direction = <0>;
->  					remote-endpoint = <&funnel_out_port0>;
->  					coresight,hwid = <0>;
+> +					coresight,hwid = <0>;
 >  				};
-> @@ -205,6 +209,7 @@ Example:
+>  			};
+>  		};
+> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> index 0c43fb3..146a5d9 100644
+> --- a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> @@ -15,15 +15,18 @@
 >  			port at 0 {
 >  				reg = <0>;
->  				funnel_out_port0: endpoint {
+>  				csys1_funnel_out_port: endpoint {
+> +					coresight,hwid = <0>;
 > +					direction = <1>;
->  					remote-endpoint =
->  							<&replicator_in_port0>;
->  					coresight,hwid = <0>;
-> @@ -215,7 +220,7 @@ Example:
+>  					remote-endpoint = <&etf1_in_port>;
+>  				};
+>  			};
+>  
+>  			/* input port */
 >  			port at 1 {
->  				reg = <1>;
->  				funnel_in_port0: endpoint {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				csys1_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					coresight,hwid = <0>;
+> +					direction = <0>;
+>  				};
+>  			};
+>  
+> @@ -45,15 +48,18 @@
+>  			port at 0 {
+>  				reg = <0>;
+>  				etf1_in_port: endpoint {
 > -					slave-mode;
 > +					direction = <0>;
->  					remote-endpoint = <&ptm0_out_port>;
->  					coresight,hwid = <0>;
+> +					coresight,hwid = <0>;
+>  					remote-endpoint = <&csys1_funnel_out_port>;
 >  				};
-> @@ -224,7 +229,7 @@ Example:
+>  			};
+>  
+>  			/* output port */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				etf1_out_port: endpoint {
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  					remote-endpoint = <&csys2_funnel_in_port1>;
+>  				};
+>  			};
+> @@ -75,23 +81,27 @@
+>  			port at 0 {
+>  				reg = <0>;
+>  				csys2_funnel_out_port: endpoint {
+> +					coresight,hwid = <0>;
+> +					direction = <1>;
+>  					remote-endpoint = <&replicator_in_port0>;
+>  				};
+>  			};
+>  
+>  			/* input ports */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				csys2_funnel_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+> +					coresight,hwid = <0>;
+>  					remote-endpoint = <&etf0_out_port>;
+>  				};
+>  			};
+>  
 >  			port at 2 {
->  				reg = <2>;
->  				funnel_in_port1: endpoint {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				csys2_funnel_in_port1: endpoint {
 > -					slave-mode;
 > +					direction = <0>;
->  					remote-endpoint = <&ptm1_out_port>;
->  					coresight,hwid = <1>;
+> +					coresight,hwid = <1>;
+>  					remote-endpoint = <&etf1_out_port>;
 >  				};
-> @@ -233,7 +238,7 @@ Example:
->  			port at 3 {
->  				reg = <3>;
->  				funnel_in_port2: endpoint {
-> -					slave-mode;
-> +					direction = <0>;
->  					remote-endpoint = <&etm0_out_port>;
->  					coresight,hwid = <2>;
->  				};
-> @@ -252,6 +257,7 @@ Example:
->  		clock-names = "apb_pclk";
->  		port {
->  			ptm0_out_port: endpoint {
-> +				direction = <1>;
->  				remote-endpoint = <&funnel_in_port0>;
->  				coresight,hwid = <0>;
 >  			};
-> @@ -267,6 +273,7 @@ Example:
->  		clock-names = "apb_pclk";
->  		port {
->  			ptm1_out_port: endpoint {
-> +				direction = <1>;
->  				remote-endpoint = <&funnel_in_port1>;
->  				coresight,hwid = <0>;
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index c9236c4..27b8036 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -260,10 +260,11 @@
+>  &main_funnel {
+>  	ports {
+>  		port at 3 {
+> -			reg = <2>;
+> +			reg = <3>;
+>  			main_funnel_in_port2: endpoint {
+> -				slave-mode;
+> +				direction = <0>;
+>  				remote-endpoint = <&stm_out_port>;
+> +				coresight,hwid = <2>;
 >  			};
-> @@ -284,6 +291,7 @@ Example:
->  		clock-names = "apb_pclk";
->  		port {
->  			stm_out_port: endpoint {
-> +				direction = <1>;
->  				remote-endpoint = <&main_funnel_in_port2>;
->  				coresight,hwid = <0>;
->  			};
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index d23d7dd..0d6e6a9 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -45,7 +45,20 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
->  			       endpoint, of_dev_node_match);
->  }
->  
-> -static void of_coresight_get_ports(const struct device_node *node,
-> +static bool of_coresight_endpoint_is_input(struct device *dev,
-> +					   struct device_node *ep_node)
-> +{
-> +	u32 dir;
-> +
-> +	if (!of_property_read_u32(ep_node, "direction", &dir))
-> +		return dir == 0;
-> +
-> +	dev_warn_once(dev, "Missing mandatory \"direction\" property!\n");
-> +	return of_property_read_bool(ep_node, "slave-mode");
-> +}
-> +
-> +static void of_coresight_get_ports(struct device *dev,
-> +				   const struct device_node *node,
->  				   int *nr_inport, int *nr_outport)
->  {
->  	struct device_node *ep = NULL;
-> @@ -56,7 +69,7 @@ static void of_coresight_get_ports(const struct device_node *node,
->  		if (!ep)
->  			break;
->  
-> -		if (of_property_read_bool(ep, "slave-mode"))
-> +		if (of_coresight_endpoint_is_input(dev, ep))
->  			in++;
->  		else
->  			out++;
-> @@ -149,7 +162,7 @@ static int of_coresight_parse_endpoint(struct device *dev,
->  		 * No need to deal with input ports, processing for as
->  		 * processing for output ports will deal with them.
->  		 */
-> -		if (of_find_property(ep, "slave-mode", NULL))
-> +		if (of_coresight_endpoint_is_input(dev, ep))
->  			break;
->  
->  		/* Parse the local port details */
-> @@ -212,7 +225,8 @@ of_get_coresight_platform_data(struct device *dev,
->  	pdata->cpu = of_coresight_get_cpu(node);
->  
->  	/* Get the number of input and output port for this component */
-> -	of_coresight_get_ports(node, &pdata->nr_inport, &pdata->nr_outport);
-> +	of_coresight_get_ports(dev, node,
-> +			       &pdata->nr_inport, &pdata->nr_outport);
->  
->  	/* If there are not output connections, we are done */
->  	if (!pdata->nr_outport)
-
-For both the binding and the code:
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
+>  		};
+>  	};
 > -- 
 > 2.7.4
 > 
