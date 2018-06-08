@@ -1,152 +1,263 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 8 Jun 2018 14:41:14 -0600
-Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <CAMuHMdUOqLhmb8kXOxriQ5mt_4rDQJbUqGsQiJBSkq5J5FWG7w@mail.gmail.com>
-References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
- <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
- <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
- <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
- <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
- <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
- <OSBPR01MB205442B483C792125E6A6AF7D2640@OSBPR01MB2054.jpnprd01.prod.outlook.com>
- <CAL_JsqLn+x0JCkjwABU7XkPsgvyVdiCRq=gZTfUBbbR4-c+1bQ@mail.gmail.com>
- <OSBPR01MB2054A701CF65784FAB947692D27B0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
- <CAMuHMdUOqLhmb8kXOxriQ5mt_4rDQJbUqGsQiJBSkq5J5FWG7w@mail.gmail.com>
-Message-ID: <CAL_JsqK6Pb5ZbqAATpQNK-C=iVNA655H__5RERMmPTUOrX3Few@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 8 Jun 2018 15:22:11 -0600
+Subject: [PATCH 08/20] coresight: dts: Cleanup device tree graph bindings
+In-Reply-To: <1528235011-30691-9-git-send-email-suzuki.poulose@arm.com>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+ <1528235011-30691-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180608212211.GG30587@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 8, 2018 at 2:47 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Fri, Jun 8, 2018 at 8:50 AM, Michel Pollet
-> <michel.pollet@bp.renesas.com> wrote:
->> On 07 June 2018 16:55, Rob wrote:
->>> On Thu, Jun 7, 2018 at 1:59 AM, Michel Pollet
->>> <michel.pollet@bp.renesas.com> wrote:
->>> > On 06 June 2018 22:53, Frank wrote:
->>> >> On 06/06/18 14:48, Frank Rowand wrote:
->>> >> > On 06/05/18 23:36, Michel Pollet wrote:
->>> >> >> On 05 June 2018 18:34, Frank wrote:
->>> >> >>> On 06/05/18 04:28, Michel Pollet wrote:
->>> >> >>>> The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot
->>> >> >>>> time, it requires a special enable method to get it started.
->>>
->>> [...]
->>>
->>> >> >>>> + * The second CPU is parked in ROM at boot time. It requires
->>> >> >>>> +waking it after
->>> >> >>>> + * writing an address into the BOOTADDR register of sysctrl.
->>> >> >>>> + *
->>> >> >>>> + * So the default value of the "cpu-release-addr" corresponds
->>> >> >>>> +to
->>> >> >>> BOOTADDR...
->>> >> >>>> + *
->>> >> >>>> + * *However* the BOOTADDR register is not available when the
->>> >> >>>> +kernel
->>> >> >>>> + * starts in NONSEC mode.
->>> >> >>>> + *
->>> >> >>>> + * So for NONSEC mode, the bootloader re-parks the second CPU
->>> >> >>>> +into a pen
->>> >> >>>> + * in SRAM, and changes the "cpu-release-addr" of linux's DT to
->>> >> >>>> +a SRAM address,
->>> >> >>>> + * which is not restricted.
->>> >> >>>
->>> >> >>> The binding document for cpu-release-addr does not have a
->>> >> >>> definition for 32 bit arm.  The existing definition is only 64
->>> >> >>> bit arm.  Please add the definition for 32 bit arm to patch 1.
->>> >> >>
->>> >> >> Hmmm I do find a definition in
->>> >> >> Documentation/devicetree/bindings/arm/cpus.txt -- just under where
->>> >> >> I added my 'enable-method' -- And it is already used as 32 bits in
->>> >> >> at least arch/arm/boot/dts/stih407-family.dtsi.
->>> >> >
->>> >> > If the correct answer is for cpu-release-addr to be 64 bits in
->>> >> > certain cases (that discussion is ongoing further downthread) then
->>> >> > one approach to maintain compatibility _and_ to fix the devicetree
->>> >> > source files is to change the source code that currently gets
->>> >> > cpu-release-addr as a
->>> >> > 32 bit object to check the size of the property and get it as
->>> >> > either a
->>> >> > 32 bit or 64 bit object, based on the actual size of the property
->>> >> > in the device tree and then change the value in the devicetree
->>> >> > source files to be two cells.  BUT this does not consider the
->>> >> > bootloader complication.  arch/arm/boot/dts/axm5516-cpus.dtsi has a
->>> >> > note "// Fixed by the boot loader", so the boot loader also has to
->>> >> > be modified to be able to handle the possibility that the property
->>> >> > could be either
->>> >> > 32 bits or 64 bits.  I don't know how to maintain compatibility
->>> >> > with the boot loader since we can't force it to change
->>> >> > synchronously with changes in the kernel.
->>> >> >
->>> >> > You can consider this comment to be a drive-by observation.  I
->>> >> > think Rob and Geert and people like that are likely to be more
->>> >> > helpful with what to actually do, and you can treat my comment more
->>> >> > as pointing out the issue than as providing the perfect solution.
->>> >>
->>> >> Darn it, hit <send> too quickly.
->>> >>
->>> >> I meant to mention that there are several devicetree source files
->>> >> that have a single cell value for cpu-release-addr, and thus
->>> >> potentially face the same situation, depending on what the final
->>> >> decision is on the proper size for cpu- release-addr. As of v4.17, a git grep
->>> shows one cell values in:
->>> >>
->>> >>   arch/arm/boot/dts/axm5516-cpus.dtsi
->>> >>   arch/arm/boot/dts/stih407-family.dtsi
->>> >>   arch/arm/boot/dts/stih418.dtsi
->>> >
->>> > Yes, I had grepped before I used 32 bits on mine...
->>> >
->>> > Now, what is the decision here? Our bootloader is already modified to
->>> > set it to 32 bits, so I propose that
->>>
->>> And too late to fix the bootloader?
->>
->>
->> Well not too late, but read further on...
->>
->>>
->>> >
->>> > + I change the driver to handle 32 and 64 bits properties
->>>
->>> That's fine if you can't fix the bootloader.
->>>
->>> > + I add this to the cpu.txt, as a separate patch:
->>> > # On other systems, the property can be either
->>> >   32 bits or 64 bits, it is the driver's responsibility
->>> >   to deal with either sizes.
->>>
->>> That is definitely not what we want to say. Use of 32-bit should be
->>> considered out of spec. Yes, we have a few platforms in that category, but
->>> they already handle that themselves. Would be nice to fix them, but at least
->>> the STi platforms don't seem too active.
->>>
->>> IMO, we should delete whatever text we can here and at most just refer to
->>> the spec.
->>
->> So actually I didn't use 32 bits by plain chance, I read the cpu.txt file which says
->> that 64 bits systems use 64 bits property, concluded that in my case I ought to
->> use 32 bits, then grepped around and found other systems using 32 bits, therefore
->> I went forward and used it..
->>
->> Nothing said here that it should be 64 bits everywhere -- So the documentation
->> needs fixing somehow. Right now it certainly led me wrong.
->
-> Perhaps we should add to Documentation/devicetree/bindings/ the standard
-> bindings from ePAPR and successors, too?
+On Tue, Jun 05, 2018 at 10:43:19PM +0100, Suzuki K Poulose wrote:
+> The coresight drivers relied on default bindings for graph
+> in DT, while reusing the "reg" field of the "ports" to indicate
+> the actual hardware port number for the connections. However,
+> with the rules getting stricter w.r.t to the address mismatch
+> with the label, it is no longer possible to use the port address
+> field for the hardware port number. Hence, we add an explicit
+> property to denote the hardware port number, "coresight,hwid"
+> which must be specified for each "endpoint".
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  .../devicetree/bindings/arm/coresight.txt          | 29 ++++++++++---
+>  drivers/hwtracing/coresight/of_coresight.c         | 49 +++++++++++++++++-----
+>  2 files changed, 62 insertions(+), 16 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+> index ed6b555..bf75ab3 100644
+> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+> @@ -108,8 +108,13 @@ following properties to uniquely identify the connection details.
+>  	"slave-mode"
+>  
+>   * Hardware Port number at the component:
+> -     -  The hardware port number is assumed to be the address of the "port"
+> -         component.
+> +     - Each "endpoint" must define the hardware port of the local end of the
+> +       connection using the following property :
+> +
+> +	"coresight,hwid" - 32bit integer, local hardware port.
+> +
+> +     - [ ** Obsolete ** ] The hardware port number is assumed to be the address
+> +       of the "port" component.
+>  
+>  
+>  
+> @@ -126,6 +131,7 @@ Example:
+>  			etb_in_port: endpoint at 0 {
+>  				slave-mode;
+>  				remote-endpoint = <&replicator_out_port0>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -140,6 +146,7 @@ Example:
+>  			tpiu_in_port: endpoint at 0 {
+>  				slave-mode;
+>  				remote-endpoint = <&replicator_out_port1>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -160,6 +167,7 @@ Example:
+>  				reg = <0>;
+>  				replicator_out_port0: endpoint {
+>  					remote-endpoint = <&etb_in_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+> @@ -167,15 +175,17 @@ Example:
+>  				reg = <1>;
+>  				replicator_out_port1: endpoint {
+>  					remote-endpoint = <&tpiu_in_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  
+>  			/* replicator input port */
+>  			port at 2 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				replicator_in_port0: endpoint {
+>  					slave-mode;
+>  					remote-endpoint = <&funnel_out_port0>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> @@ -197,31 +207,35 @@ Example:
+>  				funnel_out_port0: endpoint {
+>  					remote-endpoint =
+>  							<&replicator_in_port0>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			/* funnel input ports */
+>  			port at 1 {
+> -				reg = <0>;
+> +				reg = <1>;
+>  				funnel_in_port0: endpoint {
+>  					slave-mode;
+>  					remote-endpoint = <&ptm0_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 2 {
+> -				reg = <1>;
+> +				reg = <2>;
+>  				funnel_in_port1: endpoint {
+>  					slave-mode;
+>  					remote-endpoint = <&ptm1_out_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  
+>  			port at 3 {
+> -				reg = <2>;
+> +				reg = <3>;
+>  				funnel_in_port2: endpoint {
+>  					slave-mode;
+>  					remote-endpoint = <&etm0_out_port>;
+> +					coresight,hwid = <2>;
+>  				};
+>  			};
+>  
+> @@ -239,6 +253,7 @@ Example:
+>  		port {
+>  			ptm0_out_port: endpoint {
+>  				remote-endpoint = <&funnel_in_port0>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -253,6 +268,7 @@ Example:
+>  		port {
+>  			ptm1_out_port: endpoint {
+>  				remote-endpoint = <&funnel_in_port1>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -269,6 +285,7 @@ Example:
+>  		port {
+>  			stm_out_port: endpoint {
+>  				remote-endpoint = <&main_funnel_in_port2>;
+> +				coresight,hwid = <0>;
+>  			};
+>  		};
+>  	};
 
-I hope you mean *reference* here, not duplicate the bindings here. We
-want to move in the other direction and move the common bindings out
-of the kernel and into the spec.
+For the binding part:
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-The real solution here is validation which I'm working on. I had
-already converted cpus.txt. Here's an example of the results of the
-validation:
+> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+> index d01a9ce..d23d7dd 100644
+> --- a/drivers/hwtracing/coresight/of_coresight.c
+> +++ b/drivers/hwtracing/coresight/of_coresight.c
+> @@ -99,6 +99,31 @@ int of_coresight_get_cpu(const struct device_node *node)
+>  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+>  
+>  /*
+> + * of_coresight_endpoint_get_port_id : Get the hardware port number for the
+> + * given endpoint device node. Prefer the explicit "coresight,hwid" property
+> + * over the endpoint register id (obsolete bindings).
+> + */
+> +static int of_coresight_endpoint_get_port_id(struct device *dev,
+> +					     struct device_node *ep_node)
+> +{
+> +	struct of_endpoint ep;
+> +	int rc, port_id;
+> +
+> +
+> +	if (!of_property_read_u32(ep_node, "coresight,hwid", &port_id))
+> +		return port_id;
+> +
+> +	rc = of_graph_parse_endpoint(ep_node, &ep);
+> +	if (rc)
+> +		return rc;
+> +	dev_warn_once(dev,
+> +		      "ep%d: Mandatory \"coresight,hwid\" property missing.\n",
+> +		      ep.port);
+> +	dev_warn_once(dev, "DT uses obsolete coresight bindings\n");
+> +	return ep.port;
+> +}
+> +
+> +/*
+>   * of_coresight_parse_endpoint : Parse the given output endpoint @ep
+>   * and fill the connection information in *@pconn.
+>   *
+> @@ -109,11 +134,11 @@ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+>   *	 0	- If the parsing completed without any fatal errors.
+>   *	-Errno	- Fatal error, abort the scanning.
+>   */
+> -static int of_coresight_parse_endpoint(struct device_node *ep,
+> +static int of_coresight_parse_endpoint(struct device *dev,
+> +				       struct device_node *ep,
+>  				       struct coresight_connection **pconn)
+>  {
+> -	int ret = 0;
+> -	struct of_endpoint endpoint, rendpoint;
+> +	int ret = 0, local_port, child_port;
+>  	struct device_node *rparent = NULL;
+>  	struct device_node *rep = NULL;
+>  	struct device *rdev = NULL;
+> @@ -128,7 +153,8 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+>  			break;
+>  
+>  		/* Parse the local port details */
+> -		if (of_graph_parse_endpoint(ep, &endpoint))
+> +		local_port = of_coresight_endpoint_get_port_id(dev, ep);
+> +		if (local_port < 0)
+>  			break;
+>  		/*
+>  		 * Get a handle on the remote endpoint and the device it is
+> @@ -140,9 +166,6 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+>  		rparent = of_graph_get_port_parent(rep);
+>  		if (!rparent)
+>  			break;
+> -		if (of_graph_parse_endpoint(rep, &rendpoint))
+> -			break;
+> -
+>  		/* If the remote device is not available, defer probing */
+>  		rdev = of_coresight_get_endpoint_device(rparent);
+>  		if (!rdev) {
+> @@ -150,9 +173,15 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
+>  			break;
+>  		}
+>  
+> -		conn->outport = endpoint.port;
+> +		child_port = of_coresight_endpoint_get_port_id(rdev, rep);
+> +		if (child_port < 0) {
+> +			ret = 0;
 
-arch/arm/boot/dts/stih410-b2120.dt.yaml:1962:7: cpu at 0: 'enable-method'
-is a dependency of 'cpu-release-addr'
-arch/arm/boot/dts/stih410-b2120.dt.yaml:1965:26:
-cpu at 0:cpu-release-addr: [155254948] is too short
+Why returning '0' on an error condition?  Same for 'local_port' above.
 
-The schema is up on my yaml-bindings branch. Will send out more details soon.
-
-Rob
+> +			break;
+> +		}
+> +
+> +		conn->outport = local_port;
+>  		conn->child_name = dev_name(rdev);
+> -		conn->child_port = rendpoint.port;
+> +		conn->child_port = child_port;
+>  		/* Move the connection record */
+>  		(*pconn)++;
+>  	} while (0);
+> @@ -200,7 +229,7 @@ of_get_coresight_platform_data(struct device *dev,
+>  		ep = of_graph_get_next_endpoint(node, ep);
+>  		if (!ep)
+>  			break;
+> -		ret = of_coresight_parse_endpoint(ep, &conn);
+> +		ret = of_coresight_parse_endpoint(dev, ep, &conn);
+>  		if (ret)
+>  			return ERR_PTR(ret);
+>  	} while (ep);
+> -- 
+> 2.7.4
+> 
