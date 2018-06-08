@@ -1,48 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 8 Jun 2018 13:22:02 +0100
-Subject: [PATCH] arm64: Fix syscall restarting around signal suppressed
- by tracer
-In-Reply-To: <1528371125-24505-1-git-send-email-Dave.Martin@arm.com>
-References: <1528371125-24505-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180608122201.7h52jstqik6zs22i@armageddon.cambridge.arm.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Fri, 8 Jun 2018 15:56:03 +0300
+Subject: [PATCH v2 1/2] media: v4l2-ctrl: Add control for VP9 profile
+In-Reply-To: <a16dca32-4198-72c1-cf22-83f18a8cfcb6@xs4all.nl>
+References: <20180530071613.125768-1-keiichiw@chromium.org>
+ <20180530071613.125768-2-keiichiw@chromium.org>
+ <a16dca32-4198-72c1-cf22-83f18a8cfcb6@xs4all.nl>
+Message-ID: <bd56e330-91d2-dfde-4cfb-40b466953dad@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 12:32:05PM +0100, Dave P Martin wrote:
-> Commit 17c2895 ("arm64: Abstract syscallno manipulation") abstracts
-> out the pt_regs.syscallno value for a syscall cancelled by a tracer
-> as NO_SYSCALL, and provides helpers to set and check for this
-> condition.  However, the way this was implemented has the
-> unintended side-effect of disabling part of the syscall restart
-> logic.
-> 
-> This comes about because the second in_syscall() check in
-> do_signal() re-evaluates the "in a syscall" condition based on the
-> updated pt_regs instead of the original pt_regs.  forget_syscall()
-> is explicitly called prior to the second check in order to prevent
-> restart logic in the ret_to_user path being spuriously triggered,
-> which means that the second in_syscall() check always yields false.
-> 
-> This triggers a failure in
-> tools/testing/selftests/seccomp/seccomp_bpf.c, when using ptrace to
-> suppress a signal that interrups a nanosleep() syscall.
-> 
-> Misbehaviour of this type is only expected in the case where a
-> tracer suppresses a signal and the target process is either being
-> single-stepped or the interrupted syscall attempts to restart via
-> -ERESTARTBLOCK.
-> 
-> This patch restores the old behaviour by performing the
-> in_syscall() check only once at the start of the function.
-> 
-> Fixes: 17c289586009 ("arm64: Abstract syscallno manipulation")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reported-by: Sumit Semwal <sumit.semwal@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: <stable@vger.kernel.org> # 4.14.x-
+Hi Hans,
 
-Applied. Thanks.
+On 06/08/2018 12:29 PM, Hans Verkuil wrote:
+> On 05/30/2018 09:16 AM, Keiichi Watanabe wrote:
+>> Add a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE for selecting desired
+>> profile for VP9 encoder and querying for supported profiles by VP9 encoder
+>> or decoder.
+>>
+>> An existing control V4L2_CID_MPEG_VIDEO_VPX_PROFILE cannot be
+>> used for querying since it is not a menu control but an integer
+>> control, which cannot return an arbitrary set of supported profiles.
+>>
+>> The new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE is a menu control as
+>> with controls for other codec profiles. (e.g. H264)
+> 
+> Please ignore my reply to patch 2/2. I looked at this a bit more and what you
+> should do is to change the type of V4L2_CID_MPEG_VIDEO_VPX_PROFILE to enum.
+> 
+> All other codec profile controls are all enums, so the fact that VPX_PROFILE
+> isn't is a bug. Changing the type should not cause any problems since the same
+> control value is used when you set the control.
+> 
+> Sylwester: I see that s5p-mfc uses this control, but it is explicitly added
+> as an integer type control, so the s5p-mfc driver should not be affected by
+> changing the type of this control.
+> 
+> Stanimir: this will slightly change the venus driver, but since it is a very
+> recent driver I think we can get away with changing the core type of the
+> VPX_PROFILE control. I think that's better than ending up with two controls
+> that do the same thing.
+
+I agree. Actually the changes shouldn't be so much in venus driver.
 
 -- 
-Catalin
+regards,
+Stan
