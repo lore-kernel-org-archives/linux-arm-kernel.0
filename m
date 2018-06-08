@@ -1,208 +1,65 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 8 Jun 2018 13:55:30 -0600
-Subject: [PATCH 02/20] coresight: of: Fix refcounting for graph nodes
-In-Reply-To: <1528235011-30691-3-git-send-email-suzuki.poulose@arm.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180608195530.GB30587@xps15>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 8 Jun 2018 16:03:55 -0400
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
+ disable compiler auto-inline optimizations
+In-Reply-To: <20180607091816.GT13775@localhost>
+References: <1528186420-6615-3-git-send-email-changbin.du@intel.com>
+ <201806060501.btF3aJMZ%fengguang.wu@intel.com>
+ <20180606095714.1d3c2def@vmware.local.home>
+ <20180606142600.GN13775@localhost>
+ <20180606142622.2338abf6@vmware.local.home>
+ <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
+ <20180607074628.kd3iyxevwj3ypzbr@intel.com>
+ <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
+ <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
+ <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
+ <20180607091816.GT13775@localhost>
+Message-ID: <20180608160355.67712eb8@vmware.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 10:43:13PM +0100, Suzuki K Poulose wrote:
-> The coresight driver doesn't drop the references on the
-> remote endpoint/port nodes. Add the missing of_node_put()
-> calls. To make it easier to handle different corner cases
-> cleanly, move the parsing of an endpoint to separate
-> function.
+On Thu, 7 Jun 2018 11:18:16 +0200
+Johan Hovold <johan@kernel.org> wrote:
 
-Please split this as those are two different things.
 
+> If you want to work around the warning and think you can do it in some
+> non-contrived way, then go for it.
 > 
-> Reported-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/of_coresight.c | 139 +++++++++++++++++------------
->  1 file changed, 84 insertions(+), 55 deletions(-)
+> Clearing the request buffer, checking for termination using strnlen, and
+> then using memcpy might not be too bad.
 > 
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index a33a92e..8a23c63 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -111,17 +111,80 @@ int of_coresight_get_cpu(const struct device_node *node)
->  }
->  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
->  
-> +/*
-> + * of_coresight_parse_endpoint : Parse the given output endpoint @ep
-> + * and fill the connection information in @pdata[*@i].
-> + *
-> + * Parses the local port, remote device name and the remote port. Also
-> + * updates *@i to point to the next index, when an entry is added.
-> + *
-> + * Returns :
-> + *	 0	- If the parsing completed without any fatal errors.
-> + *	-Errno	- Fatal error, abort the scanning.
-> + */
-> +static int of_coresight_parse_endpoint(struct device_node *ep,
-> +				       struct coresight_platform_data *pdata,
-> +				       int *i)
-> +{
-> +	int ret = 0;
-> +	struct of_endpoint endpoint, rendpoint;
-> +	struct device_node *rparent = NULL;
-> +	struct device_node *rport = NULL;
-> +	struct device *rdev = NULL;
-> +
-> +	do {
-> +		/*
-> +		 * No need to deal with input ports, processing for as
-> +		 * processing for output ports will deal with them.
-> +		 */
-> +		if (of_find_property(ep, "slave-mode", NULL))
-> +			break;
-> +
-> +		/* Parse the local port details */
-> +		if (of_graph_parse_endpoint(ep, &endpoint))
-> +			break;
-> +		/*
-> +		 * Get a handle on the remote port and parent
-> +		 * attached to it.
-> +		 */
-> +		rparent = of_graph_get_remote_port_parent(ep);
-> +		if (!rparent)
-> +			break;
-> +		rport = of_graph_get_remote_port(ep);
-> +		if (!rport)
-> +			break;
-> +		if (of_graph_parse_endpoint(rport, &rendpoint))
-> +			break;
-> +
-> +		/* If the remote device is not available, defer probing */
-> +		rdev = of_coresight_get_endpoint_device(rparent);
-> +		if (!rdev) {
-> +			ret = -EPROBE_DEFER;
-> +			break;
-> +		}
-> +
-> +		pdata->outports[*i] = endpoint.port;
-> +		pdata->child_names[*i] = dev_name(rdev);
-> +		pdata->child_ports[*i] = rendpoint.id;
-> +		/* Move the index */
-> +		(*i)++;
-> +	} while (0);
+> But after all, it is a false positive, so leaving things as they stand
+> is fine too.
 
-That's a clever way of coding a classic 'goto' block.
+Not sure how contrived you think this is, but it solves the warning
+without adding extra work in the normal case.
 
-> +
-> +	if (rparent)
-> +		of_node_put(rparent);
-> +	if (rport)
-> +		of_node_put(rport);
+-- Steve
 
-Perfect - thank you for that.
-
-> +
-> +	return ret;
-> +}
-> +
->  struct coresight_platform_data *
->  of_get_coresight_platform_data(struct device *dev,
->  			       const struct device_node *node)
->  {
->  	int i = 0, ret = 0;
->  	struct coresight_platform_data *pdata;
-> -	struct of_endpoint endpoint, rendpoint;
-> -	struct device *rdev;
->  	struct device_node *ep = NULL;
-> -	struct device_node *rparent = NULL;
-> -	struct device_node *rport = NULL;
->  
->  	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
->  	if (!pdata)
-> @@ -129,63 +192,29 @@ of_get_coresight_platform_data(struct device *dev,
->  
->  	/* Use device name as sysfs handle */
->  	pdata->name = dev_name(dev);
-> +	pdata->cpu = of_coresight_get_cpu(node);
->  
->  	/* Get the number of input and output port for this component */
->  	of_coresight_get_ports(node, &pdata->nr_inport, &pdata->nr_outport);
->  
-> -	if (pdata->nr_outport) {
-> -		ret = of_coresight_alloc_memory(dev, pdata);
-> +	/* If there are not output connections, we are done */
-
-/not/no
-
-> +	if (!pdata->nr_outport)
-> +		return pdata;
-> +
-> +	ret = of_coresight_alloc_memory(dev, pdata);
-> +	if (ret)
-> +		return ERR_PTR(ret);
-> +
-> +	/* Iterate through each port to discover topology */
-> +	do {
-> +		/* Get a handle on a port */
-> +		ep = of_graph_get_next_endpoint(node, ep);
-> +		if (!ep)
-> +			break;
-> +		ret = of_coresight_parse_endpoint(ep, pdata, &i);
->  		if (ret)
->  			return ERR_PTR(ret);
-> -
-> -		/* Iterate through each port to discover topology */
-> -		do {
-> -			/* Get a handle on a port */
-> -			ep = of_graph_get_next_endpoint(node, ep);
-> -			if (!ep)
-> -				break;
-> -
-> -			/*
-> -			 * No need to deal with input ports, processing for as
-> -			 * processing for output ports will deal with them.
-> -			 */
-> -			if (of_find_property(ep, "slave-mode", NULL))
-> -				continue;
-> -
-> -			/* Get a handle on the local endpoint */
-> -			ret = of_graph_parse_endpoint(ep, &endpoint);
-> -
-> -			if (ret)
-> -				continue;
-> -
-> -			/* The local out port number */
-> -			pdata->outports[i] = endpoint.port;
-> -
-> -			/*
-> -			 * Get a handle on the remote port and parent
-> -			 * attached to it.
-> -			 */
-> -			rparent = of_graph_get_remote_port_parent(ep);
-> -			rport = of_graph_get_remote_port(ep);
-> -
-> -			if (!rparent || !rport)
-> -				continue;
-> -
-> -			if (of_graph_parse_endpoint(rport, &rendpoint))
-> -				continue;
-> -
-> -			rdev = of_coresight_get_endpoint_device(rparent);
-> -			if (!rdev)
-> -				return ERR_PTR(-EPROBE_DEFER);
-> -
-> -			pdata->child_names[i] = dev_name(rdev);
-> -			pdata->child_ports[i] = rendpoint.id;
-> -
-> -			i++;
-> -		} while (ep);
-> -	}
-> -
-> -	pdata->cpu = of_coresight_get_cpu(node);
-> +	} while (ep);
->  
->  	return pdata;
->  }
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/staging/greybus/fw-management.c b/drivers/staging/greybus/fw-management.c
+index 71aec14f8181..4fb9f1dff47d 100644
+--- a/drivers/staging/greybus/fw-management.c
++++ b/drivers/staging/greybus/fw-management.c
+@@ -150,15 +150,18 @@ static int fw_mgmt_load_and_validate_operation(struct fw_mgmt *fw_mgmt,
+ 	}
+ 
+ 	request.load_method = load_method;
+-	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
++	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE - 1);
+ 
+ 	/*
+ 	 * The firmware-tag should be NULL terminated, otherwise throw error and
+ 	 * fail.
+ 	 */
+-	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
+-		dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
+-		return -EINVAL;
++	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 2] != '\0') {
++		if (tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
++			dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
++			return -EINVAL;
++		}
++		request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] = '\0';
+ 	}
+ 
+ 	/* Allocate ids from 1 to 255 (u8-max), 0 is an invalid id */
