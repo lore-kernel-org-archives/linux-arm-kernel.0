@@ -1,80 +1,68 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 9 Jun 2018 20:58:16 +0200
-Subject: [PATCH] KVM: arm/arm64: drop resource size check for GICV window
-In-Reply-To: <86602s9n5v.wl-marc.zyngier@arm.com>
-References: <20180601150628.10111-1-ard.biesheuvel@linaro.org>
- <20180609100657.GI5097@C02W217FHV2R.local>
- <86602s9n5v.wl-marc.zyngier@arm.com>
-Message-ID: <20180609185816.GM5097@C02W217FHV2R.local>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Sat, 9 Jun 2018 22:15:41 +0300
+Subject: [PATCH v4 1/7] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <ffd493a7-8c01-3f6b-074f-b4b67707dc83@baylibre.com>
+References: <20180309210958.16672-1-georgi.djakov@linaro.org>
+ <20180309210958.16672-2-georgi.djakov@linaro.org>
+ <ffd493a7-8c01-3f6b-074f-b4b67707dc83@baylibre.com>
+Message-ID: <625a529a-ae01-8615-e89b-409a20596806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 09, 2018 at 01:09:32PM +0100, Marc Zyngier wrote:
-> On Sat, 09 Jun 2018 11:06:57 +0100,
-> Christoffer Dall wrote:
-> > 
-> > On Fri, Jun 01, 2018 at 05:06:28PM +0200, Ard Biesheuvel wrote:
-> > > When booting a 64 KB pages kernel on a ACPI GICv3 system that
-> > > implements support for v2 emulation, the following warning is
-> > > produced
-> > > 
-> > >   GICV size 0x2000 not a multiple of page size 0x10000
-> > > 
-> > > and support for v2 emulation is disabled, preventing GICv2 VMs
-> > > from being able to run on such hosts.
-> > > 
-> > > The reason is that vgic_v3_probe() performs a sanity check on the
-> > > size of the window (it should be a multiple of the page size),
-> > > while the ACPI MADT parsing code hardcodes the size of the window
-> > > to 8 KB. This makes sense, considering that ACPI does not bother
-> > > to describe the size in the first place, under the assumption that
-> > > platforms implementing ACPI will follow the architecture and not
-> > > put anything else in the same 64 KB window.
-> > 
-> > Does the architecture actually say that anywhere?
-> 
-> It implies it in section 8.14 of the GICv3 spec:
-> 
-> <quote>
-> To enable use of 64KB pages, the GICV_* memory map must ensure that:
-> 
-> * The base address of the GICV_* registers is 64KB aligned.
-> 
-> * An alias of the GICV_* registers is provided starting at offset
->   0xF000 from the start of the page such that a second copy of
->   GICV_DIR exists at the start of the next 64KB page.  This provides
->   support for both 4KB and 64KB pages.
-> </quote>
-> 
-> > > So let's just drop the sanity check altogether, and assume that
-> > > the window is at least 64 KB in size.
-> > 
-> > This could obviously be dangerous if broken systems actually exist.
-> > Marc may know more about that than me.  An alternative would be to
-> > modify the ACPI code to assume max(8 KB, page size) instead, and/or a
-> > command line parameter to override this check.
-> 
-> While the above is in effect very similar to the corresponding GICv2
-> requirements with the ARMv8 architecture (described in SBSA, which
-> everybody and their dog are unfortunately making a point in ignoring),
-> this is implemented in the CPU, meaning that integrators do not have
-> the opportunity to fsck it up. Hooray!
-> 
-> And as far as I know, this is only implemented on A35, A53, A57, A72
-> and A73 (all the other ARMv8 CPUs are purely GICv3, and no other
-> architectural licensee ever shipped a system with the compat
-> interface).
-> 
-> > That said, I'm not directly opposed to this patch, but I'll let Marc
-> > have a look as well.
-> 
-> My take on this is that we should play it as per the architecture, and
-> only add more checks if we're presented with a non-compliant
-> implementation.
-> 
+Hi Alexandre,
 
-I had some faint memory that we had actually seen that, but I'm clearly
-mixing things up.
+On 8.06.18 ?. 18:57, Alexandre Bailon wrote:
+> On 03/09/2018 10:09 PM, Georgi Djakov wrote:
+>> This patch introduce a new API to get requirements and configure the
+>> interconnect buses across the entire chipset to fit with the current
+>> demand.
+>>
+>> The API is using a consumer/provider-based model, where the providers are
+>> the interconnect buses and the consumers could be various drivers.
+>> The consumers request interconnect resources (path) between endpoints and
+>> set the desired constraints on this data flow path. The providers receive
+>> requests from consumers and aggregate these requests for all master-slave
+>> pairs on that path. Then the providers configure each participating in the
+>> topology node according to the requested data flow path, physical links and
+>> constraints. The topology could be complicated and multi-tiered and is SoC
+>> specific.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  Documentation/interconnect/interconnect.rst |  96 ++++++
+>>  drivers/Kconfig                             |   2 +
+>>  drivers/Makefile                            |   1 +
+>>  drivers/interconnect/Kconfig                |  10 +
+>>  drivers/interconnect/Makefile               |   1 +
+>>  drivers/interconnect/core.c                 | 489 ++++++++++++++++++++++++++++
+>>  include/linux/interconnect-provider.h       | 109 +++++++
+>>  include/linux/interconnect.h                |  40 +++
+>>  8 files changed, 748 insertions(+)
+>>  create mode 100644 Documentation/interconnect/interconnect.rst
+>>  create mode 100644 drivers/interconnect/Kconfig
+>>  create mode 100644 drivers/interconnect/Makefile
+>>  create mode 100644 drivers/interconnect/core.c
+>>  create mode 100644 include/linux/interconnect-provider.h
+>>  create mode 100644 include/linux/interconnect.h
+>>
 
-Thanks for the extended explanation.
--Christoffer
+[..]
+
+>> +
+>> +/**
+>> + * icc_link_create() - create a link between two nodes
+>> + * @src_id: source node id
+> I guess src_id has become node and is not an id anymore,
+> so it should be updated.
+
+Yes, absolutely!
+
+>> + * @dst_id: destination node id
+>> + *
+>> + * Return: 0 on success, or an error code otherwise
+>> + */
+>> +int icc_link_create(struct icc_node *node, const int dst_id)
+>> +{
+
+Thanks,
+Georgi
