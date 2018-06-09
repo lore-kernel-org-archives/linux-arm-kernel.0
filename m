@@ -1,45 +1,197 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 09 Jun 2018 15:06:41 +0100
-Subject: [PATCH v2 00/16] arm64: Add SMCCC v1.1 support and CVE-2017-5715
- (Spectre variant 2) mitigation
-In-Reply-To: <f6da84f8-b01e-f8cd-521b-6f2348b963be@jonmasters.org>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <f6da84f8-b01e-f8cd-521b-6f2348b963be@jonmasters.org>
-Message-ID: <86sh5w8366.wl-marc.zyngier@arm.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Sat,  9 Jun 2018 16:02:23 +0200
+Subject: [PATCH 09/10] Input: ams_delta_serio: use IRQ resource
+In-Reply-To: <20180609140224.32606-1-jmkrzyszt@gmail.com>
+References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
+Message-ID: <20180609140224.32606-9-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+The driver still obtains IRQ number from a hardcoded GPIO.  Use IRQ
+resource instead.
 
-On Sat, 09 Jun 2018 14:22:27 +0100,
-Jon Masters wrote:
-> 
-> Hi Marc,
-> 
-> On 01/29/2018 12:45 PM, Marc Zyngier wrote:
-> 
-> > ARM has recently published a SMC Calling Convention (SMCCC)
-> > specification update[1] that provides an optimised calling convention
-> > and optional, discoverable support for mitigating CVE-2017-5715. ARM
-> > Trusted Firmware (ATF) has already gained such an implementation[2].
-> 
-> Some questions:
-> 
-> 1). What's the plan to implement the boot time on/off control for
-> spectre_v2 mitigations?
+For this to work on Amstrad Delta, add the IRQ resource to
+ams-delta-serio platform device structure.  Obtain the IRQ number
+assigned to "keyboard_clk" GPIO pin from FIQ initialization routine.
 
-None so far. It can only be disabled at compile time.
+As a benefit, the driver no longer needs to include
+<mach/board-ams-delta.h>.
 
-> 2). What's the plan to handle live migration of VMs?
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+---
+ arch/arm/mach-omap1/ams-delta-fiq.c   |  8 +++++++-
+ arch/arm/mach-omap1/ams-delta-fiq.h   |  3 ++-
+ arch/arm/mach-omap1/board-ams-delta.c | 17 ++++++++++++++++-
+ drivers/input/serio/ams_delta_serio.c | 28 ++++++++++------------------
+ 4 files changed, 35 insertions(+), 21 deletions(-)
 
-[I assume that by "migration of VMs, you actually mean migration of
-the mitigation state]
-
-As I mentioned in response to your comment on the variant-4 series,
-this is a work in progress, and is mentioned in the cover letter of
-that series. Hopefully I'll find time to work on it next week.
-
-	M.
-
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
+index e72935034d42..e9d350117240 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq.c
++++ b/arch/arm/mach-omap1/ams-delta-fiq.c
+@@ -20,6 +20,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/platform_data/ams-delta-fiq.h>
++#include <linux/platform_device.h>
+ 
+ #include <mach/board-ams-delta.h>
+ 
+@@ -84,7 +85,8 @@ static irqreturn_t deferred_fiq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-void __init ams_delta_init_fiq(struct gpio_chip *chip)
++void __init ams_delta_init_fiq(struct gpio_chip *chip,
++			       struct platform_device *serio)
+ {
+ 	struct gpio_desc *gpiod, *data = NULL, *clk = NULL;
+ 	void *fiqhandler_start;
+@@ -201,6 +203,10 @@ void __init ams_delta_init_fiq(struct gpio_chip *chip)
+ 	val = omap_readl(OMAP_IH1_BASE + offset) | 1;
+ 	omap_writel(val, OMAP_IH1_BASE + offset);
+ 
++	/* Initialize serio device IRQ resource */
++	serio->resource[0].start = gpiod_to_irq(clk);
++	serio->resource[0].end = serio->resource[0].start;
++
+ 	return;
+ 
+ out_gpio:
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq.h b/arch/arm/mach-omap1/ams-delta-fiq.h
+index 3f691d68aa62..fd76df3cce37 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq.h
++++ b/arch/arm/mach-omap1/ams-delta-fiq.h
+@@ -35,7 +35,8 @@
+ #ifndef __ASSEMBLER__
+ extern unsigned char qwerty_fiqin_start, qwerty_fiqin_end;
+ 
+-extern void __init ams_delta_init_fiq(struct gpio_chip *chip);
++extern void __init ams_delta_init_fiq(struct gpio_chip *chip,
++				      struct platform_device *pdev);
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index fe9a3e7cbfeb..84177ba3e39a 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -504,9 +504,24 @@ static struct platform_device cx20442_codec_device = {
+ 	.id     = -1,
+ };
+ 
++static struct resource ams_delta_serio_resources[] = {
++	{
++		.flags	= IORESOURCE_IRQ,
++		/*
++		 * Initialize IRQ resource with invalid IRQ number.
++		 * It will be replaced with dynamically allocated GPIO IRQ
++		 * obtained from GPIO chip as soon as the chip is available.
++		 */
++		.start	= -EINVAL,
++		.end	= -EINVAL,
++	},
++};
++
+ static struct platform_device ams_delta_serio_device = {
+ 	.name		= "ams-delta-serio",
+ 	.id		= PLATFORM_DEVID_NONE,
++	.num_resources	= ARRAY_SIZE(ams_delta_serio_resources),
++	.resource	= ams_delta_serio_resources,
+ };
+ 
+ static struct regulator_consumer_supply keybrd_pwr_consumers[] = {
+@@ -615,7 +630,7 @@ static void __init omap_gpio_deps_init(void)
+ 		return;
+ 	}
+ 
+-	ams_delta_init_fiq(chip);
++	ams_delta_init_fiq(chip, &ams_delta_serio_device);
+ }
+ 
+ static void __init ams_delta_init(void)
+diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+index 5d0bd2005648..03640b171516 100644
+--- a/drivers/input/serio/ams_delta_serio.c
++++ b/drivers/input/serio/ams_delta_serio.c
+@@ -20,7 +20,6 @@
+  * However, when used with the E3 mailboard that producecs non-standard
+  * scancodes, a custom key table must be prepared and loaded from userspace.
+  */
+-#include <linux/gpio.h>
+ #include <linux/irq.h>
+ #include <linux/platform_data/ams-delta-fiq.h>
+ #include <linux/platform_device.h>
+@@ -29,8 +28,6 @@
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ 
+-#include <mach/board-ams-delta.h>
+-
+ #define DRIVER_NAME	"ams-delta-serio"
+ 
+ MODULE_AUTHOR("Matt Callow");
+@@ -113,7 +110,7 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ {
+ 	struct ams_delta_serio *priv;
+ 	struct serio *serio;
+-	int err;
++	int irq, err;
+ 
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+@@ -129,9 +126,12 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+-			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
+-			DRIVER_NAME, priv);
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return -ENXIO;
++
++	err = devm_request_irq(&pdev->dev, irq, ams_delta_serio_interrupt,
++			       IRQ_TYPE_EDGE_RISING, DRIVER_NAME, priv);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "IRQ request failed (%d)\n", err);
+ 		return err;
+@@ -141,14 +141,11 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ 	 * at FIQ level, switch back from edge to simple interrupt handler
+ 	 * to avoid bad interaction.
+ 	 */
+-	irq_set_handler(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+-			handle_simple_irq);
++	irq_set_handler(irq, handle_simple_irq);
+ 
+ 	serio = kzalloc(sizeof(*serio), GFP_KERNEL);
+-	if (!serio) {
+-		err = -ENOMEM;
+-		goto irq;
+-	}
++	if (!serio)
++		return -ENOMEM;
+ 
+ 	priv->serio = serio;
+ 
+@@ -167,10 +164,6 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ 	dev_info(&serio->dev, "%s\n", serio->name);
+ 
+ 	return 0;
+-
+-irq:
+-	free_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), priv);
+-	return err;
+ }
+ 
+ static int ams_delta_serio_exit(struct platform_device *pdev)
+@@ -178,7 +171,6 @@ static int ams_delta_serio_exit(struct platform_device *pdev)
+ 	struct ams_delta_serio *priv = platform_get_drvdata(pdev);
+ 
+ 	serio_unregister_port(priv->serio);
+-	free_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
+ 
+ 	return 0;
+ }
 -- 
-Jazz is not dead, it just smell funny.
+2.16.1
