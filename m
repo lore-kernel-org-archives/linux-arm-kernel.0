@@ -1,61 +1,69 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat, 9 Jun 2018 10:43:28 +0300
-Subject: [PATCH 04/24] 32-bit userspace ABI: introduce ARCH_32BIT_OFF_T
- config option
-In-Reply-To: <mhng-e1922456-a05b-46f9-8644-d45ad70a55e5@palmer-si-x1c4>
-References: <20180608173207.nwoi25jee52gpdwy@armageddon.cambridge.arm.com>
- <mhng-e1922456-a05b-46f9-8644-d45ad70a55e5@palmer-si-x1c4>
-Message-ID: <20180609074327.GA32578@yury-thinkpad>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Sat, 9 Jun 2018 11:26:40 +0200
+Subject: [PATCH v2 2/6] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is
+ present
+In-Reply-To: <20180530124706.25284-3-marc.zyngier@arm.com>
+References: <20180530124706.25284-1-marc.zyngier@arm.com>
+ <20180530124706.25284-3-marc.zyngier@arm.com>
+Message-ID: <20180609092640.GD5097@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2018 at 03:33:51PM -0700, Palmer Dabbelt wrote:
-> On Fri, 08 Jun 2018 10:32:07 PDT (-0700), catalin.marinas at arm.com wrote:
-> > On Wed, May 16, 2018 at 11:18:49AM +0300, Yury Norov wrote:
-> > > diff --git a/arch/Kconfig b/arch/Kconfig
-> > > index 76c0b54443b1..ee079244dc3c 100644
-> > > --- a/arch/Kconfig
-> > > +++ b/arch/Kconfig
-> > > @@ -264,6 +264,21 @@ config ARCH_THREAD_STACK_ALLOCATOR
-> > >  config ARCH_WANTS_DYNAMIC_TASK_STRUCT
-> > >  	bool
-> > > 
-> > > +config ARCH_32BIT_OFF_T
-> > > +	bool
-> > > +	depends on !64BIT
-> > > +	help
-> > > +	  All new 32-bit architectures should have 64-bit off_t type on
-> > > +	  userspace side which corresponds to the loff_t kernel type. This
-> > > +	  is the requirement for modern ABIs. Some existing architectures
-> > > +	  already have 32-bit off_t. This option is enabled for all such
-> > > +	  architectures explicitly. Namely: arc, arm, blackfin, cris, frv,
-> > > +	  h8300, hexagon, m32r, m68k, metag, microblaze, mips32, mn10300,
-> > > +	  nios2, openrisc, parisc32, powerpc32, score, sh, sparc, tile32,
-> > > +	  unicore32, x86_32 and xtensa. This is the complete list. Any
-> > > +	  new 32-bit architecture should declare 64-bit off_t type on user
-> > > +	  side and so should not enable this option.
-> > 
-> > Do you know if this is the case for riscv and nds32, merged in the
-> > meantime? If not, I suggest you drop this patch altogether and just
-> > define force_o_largefile() for arm64/ilp32 as we don't seem to stick to
-> > "all new 32-bit architectures should have 64-bit off_t".
+On Wed, May 30, 2018 at 01:47:02PM +0100, Marc Zyngier wrote:
+> Set/Way handling is one of the ugliest corners of KVM. We shouldn't
+> have to handle that, but better safe than sorry.
 > 
-> We (RISC-V) don't have support for rv32i in glibc yet, so there really isn't
-> a fixed ABI there yet.  From my understanding the rv32i port as it currently
-> stands has a 32-bit off_t (via __kernel_off_t being defined as long), so
-> this change would technically be a kernel ABI break.
+> Thankfully, FWB fixes this for us by not requiering any maintenance
+> whatsoever, which means we don't have to emulate S/W CMOs, and don't
+> have to track VM ops either.
+
+I tiny bit of rationale here would have been nice.  As I understand it,
+if we're presenting the guest with a fully coherent system, there should
+never be a need to invalidate anything, because the guest will always
+see the most recent value no matter how it sings and dances, right?
+
 > 
-> Since we don't have rv32i glibc yet I'm not fundamentally opposed to an ABI
-> break.  Is there a concrete advantage to this?
+> We still have to trap S/W though, if only to prevent the guest from
+> doing something bad.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 6e3b969391fd..9a740f159245 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -195,7 +195,13 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+>  	if (!p->is_write)
+>  		return read_from_write_only(vcpu, p, r);
+>  
+> -	kvm_set_way_flush(vcpu);
+> +	/*
+> +	 * Only track S/W ops if we don't have FWB. It still indicates
+> +	 * that the guest is a bit broken...
+> +	 */
 
-One obvious advantage is manipulating large files - if file is greater than
-2G, you cannot easily mmap(), lseek() etc with 32-bit offset.
+Is it strictly true that the guest is broken if it does any form of S/W
+ops?  Does the guest actually know that it's running on a fully coherent
+system, or is the argument that no software, ever, should do S/W, even
+for reboot etc.?
 
-Another point is unification of layuots for structures like struct
-stat between 32- and 64-bit worlds.
+I think this should have slightly more info, or that part of the comment
+should just be dropped, to avoid misleading future readers who don't
+have the full picture.
 
-On glibc side it helps to unify 32-bit and 64-bit versions of syscalls.
-Refer, for example this commit:
-3c7f1f59cd161 (Consolidate lseek/lseek64/llseek implementations).
+> +	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
+> +		kvm_set_way_flush(vcpu);
+> +
+>  	return true;
+>  }
+>  
+> -- 
+> 2.17.1
+> 
 
-Yury
+Besides the usual nits on commentary:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
