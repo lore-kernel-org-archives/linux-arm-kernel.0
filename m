@@ -1,32 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 09 Jun 2018 14:21:47 +0100
-Subject: [PATCH v2 12/17] arm64: KVM: Add ARCH_WORKAROUND_2 support for
- guests
-In-Reply-To: <98318e6c-adcd-ddb8-ad92-e7c1fa771c84@jonmasters.org>
-References: <20180529121121.24927-1-marc.zyngier@arm.com>
- <20180529121121.24927-13-marc.zyngier@arm.com>
- <98318e6c-adcd-ddb8-ad92-e7c1fa771c84@jonmasters.org>
-Message-ID: <86tvqc8590.wl-marc.zyngier@arm.com>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Sat, 9 Jun 2018 09:22:27 -0400
+Subject: [PATCH v2 00/16] arm64: Add SMCCC v1.1 support and CVE-2017-5715
+ (Spectre variant 2) mitigation
+In-Reply-To: <20180129174559.1866-1-marc.zyngier@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+Message-ID: <f6da84f8-b01e-f8cd-521b-6f2348b963be@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 09 Jun 2018 14:09:35 +0100,
-Jon Masters wrote:
-> 
-> On 05/29/2018 08:11 AM, Marc Zyngier wrote:
-> > In order to offer ARCH_WORKAROUND_2 support to guests, we need
-> > a bit of infrastructure.
-> > 
-> > Let's add a flag indicating whether or not the guest uses
-> > SSBD mitigation. Depending on the state of this flag, allow
-> > KVM to disable ARCH_WORKAROUND_2 before entering the guest,
-> > and enable it when exiting it.
-> 
-> ...Live migration?
+Hi Marc,
 
-Work in progress.
+On 01/29/2018 12:45 PM, Marc Zyngier wrote:
 
-	M.
+> ARM has recently published a SMC Calling Convention (SMCCC)
+> specification update[1] that provides an optimised calling convention
+> and optional, discoverable support for mitigating CVE-2017-5715. ARM
+> Trusted Firmware (ATF) has already gained such an implementation[2].
 
--- 
-Jazz is not dead, it just smell funny.
+Some questions:
+
+1). What's the plan to implement the boot time on/off control for
+spectre_v2 mitigations?
+
+2). What's the plan to handle live migration of VMs?
+
+Jon.
