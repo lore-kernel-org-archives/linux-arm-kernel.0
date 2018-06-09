@@ -1,78 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 09 Jun 2018 13:09:32 +0100
-Subject: [PATCH] KVM: arm/arm64: drop resource size check for GICV window
-In-Reply-To: <20180609100657.GI5097@C02W217FHV2R.local>
-References: <20180601150628.10111-1-ard.biesheuvel@linaro.org>
- <20180609100657.GI5097@C02W217FHV2R.local>
-Message-ID: <86602s9n5v.wl-marc.zyngier@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 9 Jun 2018 14:10:06 +0200
+Subject: [PATCH v4 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
+In-Reply-To: <CAL_JsqK6Pb5ZbqAATpQNK-C=iVNA655H__5RERMmPTUOrX3Few@mail.gmail.com>
+References: <1528198148-23308-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1528198148-23308-3-git-send-email-michel.pollet@bp.renesas.com>
+ <0481173f-6384-98d6-707c-89dc5ef103f0@gmail.com>
+ <OSBPR01MB2054E3A1E383495F3534B551D2650@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+ <9cef7124-3020-5741-f3a2-6925a6c8f0f3@gmail.com>
+ <79c0899e-7df1-1fe7-9681-ad3bd51feda7@gmail.com>
+ <OSBPR01MB205442B483C792125E6A6AF7D2640@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+ <CAL_JsqLn+x0JCkjwABU7XkPsgvyVdiCRq=gZTfUBbbR4-c+1bQ@mail.gmail.com>
+ <OSBPR01MB2054A701CF65784FAB947692D27B0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+ <CAMuHMdUOqLhmb8kXOxriQ5mt_4rDQJbUqGsQiJBSkq5J5FWG7w@mail.gmail.com>
+ <CAL_JsqK6Pb5ZbqAATpQNK-C=iVNA655H__5RERMmPTUOrX3Few@mail.gmail.com>
+Message-ID: <CAMuHMdX2gsTJttum6_KPLcM7LTpSj3weHB7OwvBmuc4AjdfpuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 09 Jun 2018 11:06:57 +0100,
-Christoffer Dall wrote:
-> 
-> On Fri, Jun 01, 2018 at 05:06:28PM +0200, Ard Biesheuvel wrote:
-> > When booting a 64 KB pages kernel on a ACPI GICv3 system that
-> > implements support for v2 emulation, the following warning is
-> > produced
-> > 
-> >   GICV size 0x2000 not a multiple of page size 0x10000
-> > 
-> > and support for v2 emulation is disabled, preventing GICv2 VMs
-> > from being able to run on such hosts.
-> > 
-> > The reason is that vgic_v3_probe() performs a sanity check on the
-> > size of the window (it should be a multiple of the page size),
-> > while the ACPI MADT parsing code hardcodes the size of the window
-> > to 8 KB. This makes sense, considering that ACPI does not bother
-> > to describe the size in the first place, under the assumption that
-> > platforms implementing ACPI will follow the architecture and not
-> > put anything else in the same 64 KB window.
-> 
-> Does the architecture actually say that anywhere?
+Hi Rob,
 
-It implies it in section 8.14 of the GICv3 spec:
+On Fri, Jun 8, 2018 at 10:41 PM Rob Herring <robh+dt@kernel.org> wrote:
+> On Fri, Jun 8, 2018 at 2:47 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > On Fri, Jun 8, 2018 at 8:50 AM, Michel Pollet
+> > <michel.pollet@bp.renesas.com> wrote:
+> >>> > + I add this to the cpu.txt, as a separate patch:
+> >>> > # On other systems, the property can be either
+> >>> >   32 bits or 64 bits, it is the driver's responsibility
+> >>> >   to deal with either sizes.
+> >>>
+> >>> That is definitely not what we want to say. Use of 32-bit should be
+> >>> considered out of spec. Yes, we have a few platforms in that category, but
+> >>> they already handle that themselves. Would be nice to fix them, but at least
+> >>> the STi platforms don't seem too active.
+> >>>
+> >>> IMO, we should delete whatever text we can here and at most just refer to
+> >>> the spec.
+> >>
+> >> So actually I didn't use 32 bits by plain chance, I read the cpu.txt file which says
+> >> that 64 bits systems use 64 bits property, concluded that in my case I ought to
+> >> use 32 bits, then grepped around and found other systems using 32 bits, therefore
+> >> I went forward and used it..
+> >>
+> >> Nothing said here that it should be 64 bits everywhere -- So the documentation
+> >> needs fixing somehow. Right now it certainly led me wrong.
+> >
+> > Perhaps we should add to Documentation/devicetree/bindings/ the standard
+> > bindings from ePAPR and successors, too?
+>
+> I hope you mean *reference* here, not duplicate the bindings here. We
+> want to move in the other direction and move the common bindings out
+> of the kernel and into the spec.
 
-<quote>
-To enable use of 64KB pages, the GICV_* memory map must ensure that:
+I did mean copy... I usually grep in Documentation/devicetree/bindings/,
+and fall back to the spec only rarely, mostly because the spec usually
+doesn't cover what I need.
 
-* The base address of the GICV_* registers is 64KB aligned.
+I am aware of the ongoing work on updating the spec. I guess it's a
+chicken-and-egg problem...
 
-* An alias of the GICV_* registers is provided starting at offset
-  0xF000 from the start of the page such that a second copy of
-  GICV_DIR exists at the start of the next 64KB page.  This provides
-  support for both 4KB and 64KB pages.
-</quote>
+A list of standardized properties under Documentation/devicetree/bindings/,
+referring to the spec may be a good interim solution. So at least it would show
+it with git grep.
 
-> > So let's just drop the sanity check altogether, and assume that
-> > the window is at least 64 KB in size.
-> 
-> This could obviously be dangerous if broken systems actually exist.
-> Marc may know more about that than me.  An alternative would be to
-> modify the ACPI code to assume max(8 KB, page size) instead, and/or a
-> command line parameter to override this check.
+> The real solution here is validation which I'm working on. I had
+> already converted cpus.txt. Here's an example of the results of the
+> validation:
+>
+> arch/arm/boot/dts/stih410-b2120.dt.yaml:1962:7: cpu at 0: 'enable-method'
+> is a dependency of 'cpu-release-addr'
+> arch/arm/boot/dts/stih410-b2120.dt.yaml:1965:26:
+> cpu at 0:cpu-release-addr: [155254948] is too short
 
-While the above is in effect very similar to the corresponding GICv2
-requirements with the ARMv8 architecture (described in SBSA, which
-everybody and their dog are unfortunately making a point in ignoring),
-this is implemented in the CPU, meaning that integrators do not have
-the opportunity to fsck it up. Hooray!
+Thanks, nice!
 
-And as far as I know, this is only implemented on A35, A53, A57, A72
-and A73 (all the other ARMv8 CPUs are purely GICv3, and no other
-architectural licensee ever shipped a system with the compat
-interface).
+Gr{oetje,eeting}s,
 
-> That said, I'm not directly opposed to this patch, but I'll let Marc
-> have a look as well.
-
-My take on this is that we should play it as per the architecture, and
-only add more checks if we're presented with a non-compliant
-implementation.
-
-Thanks,
-
-	M.
+                        Geert
 
 -- 
-Jazz is not dead, it just smell funny.
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
