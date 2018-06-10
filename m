@@ -1,105 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 10 Jun 2018 18:44:39 +0800
-Subject: [PATCH v5 4/4] kernel hacking: new config
- CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og optimization
-In-Reply-To: <1528186420-6615-5-git-send-email-changbin.du@intel.com>
-References: <1528186420-6615-5-git-send-email-changbin.du@intel.com>
-Message-ID: <201806101827.lxH5Jvzl%fengguang.wu@intel.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Sun, 10 Jun 2018 19:13:13 +0800
+Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
+In-Reply-To: <5B10ECBB.209@huawei.com>
+References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
+ <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
+ <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
+ <92b240f5-596e-87a9-863a-b18475042cce@arm.com> <5B10ECBB.209@huawei.com>
+Message-ID: <5B1D07C9.6090507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Changbin,
 
-Thank you for the patch! Perhaps something to improve:
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.17 next-20180608]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 2018/6/1 14:50, Leizhen (ThunderTown) wrote:
+> 
+> 
+> On 2018/5/31 22:25, Robin Murphy wrote:
+>> On 31/05/18 14:49, Hanjun Guo wrote:
+>>> Hi Robin,
+>>>
+>>> On 2018/5/31 19:24, Robin Murphy wrote:
+>>>> On 31/05/18 08:42, Zhen Lei wrote:
+>>>>> In common, a IOMMU unmap operation follow the below steps:
+>>>>> 1. remove the mapping in page table of the specified iova range
+>>>>> 2. execute tlbi command to invalid the mapping which is cached in TLB
+>>>>> 3. wait for the above tlbi operation to be finished
+>>>>> 4. free the IOVA resource
+>>>>> 5. free the physical memory resource
+>>>>>
+>>>>> This maybe a problem when unmap is very frequently, the combination of tlbi
+>>>>> and wait operation will consume a lot of time. A feasible method is put off
+>>>>> tlbi and iova-free operation, when accumulating to a certain number or
+>>>>> reaching a specified time, execute only one tlbi_all command to clean up
+>>>>> TLB, then free the backup IOVAs. Mark as non-strict mode.
+>>>>>
+>>>>> But it must be noted that, although the mapping has already been removed in
+>>>>> the page table, it maybe still exist in TLB. And the freed physical memory
+>>>>> may also be reused for others. So a attacker can persistent access to memory
+>>>>> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
+>>>>> the VFIO should always choose the strict mode.
+>>>>>
+>>>>> Some may consider put off physical memory free also, that will still follow
+>>>>> strict mode. But for the map_sg cases, the memory allocation is not controlled
+>>>>> by IOMMU APIs, so it is not enforceable.
+>>>>>
+>>>>> Fortunately, Intel and AMD have already applied the non-strict mode, and put
+>>>>> queue_iova() operation into the common file dma-iommu.c., and my work is based
+>>>>> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
+>>>>> unmap, but Intel and AMD IOMMU drivers are not.
+>>>>>
+>>>>> Below is the performance data of strict vs non-strict for NVMe device:
+>>>>> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
+>>>>> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
+>>>>
+>>>> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
+> I will try your patch to see how much it can improve. I think the best way
+Hi Robin,
 
-url:    https://github.com/0day-ci/linux/commits/changbin-du-intel-com/kernel-hacking-GCC-optimization-for-better-debug-experience-Og/20180606-001415
-config: i386-randconfig-x079-06101602 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+I applied your patch and got below improvemnet.
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+Randomly Read  IOPS: 146K --> 214K
+Randomly Write IOPS: 143K --> 212K
 
-All warnings (new ones prefixed by >>):
+> to resovle the globally-blocking sync is that the hardware provide 64bits
+> CONS regitster, so that it can never be wrapped, and the spinlock can also
+> be removed.
+> 
+>>>
+>>> The hardware is the new D06 which the SMMU with MSIs,
+>>
+>> Cool! Now that profiling is fairly useful since we got rid of most of the locks, are you able to get an idea of how the overhead in the normal case is distributed between arm_smmu_cmdq_insert_cmd() and __arm_smmu_sync_poll_msi()? We're always trying to improve our understanding of where command-queue-related overheads turn out to be in practice, and there's still potentially room to do nicer things than TLBI_NH_ALL ;)
+> Even if the software has no overhead, there may still be a problem, because
+> the smmu need to execute the commands in sequence, especially before
+> globally-blocking sync has been removed. Base on the actually execute time
+> of single tlbi and sync, we can get the upper limit in theory.
+> 
+> BTW, I will reply the reset of mail next week. I'm busy with other things now.
+> 
+>>
+>> Robin.
+>>
+>>> it's not D05 :)
+>>>
+>>> Thanks
+>>> Hanjun
+>>>
+>>
+>> .
+>>
+> 
 
-   In file included from arch/x86/include/asm/page_32.h:35:0,
-                    from arch/x86/include/asm/page.h:14,
-                    from arch/x86/include/asm/thread_info.h:12,
-                    from include/linux/thread_info.h:38,
-                    from arch/x86/include/asm/preempt.h:7,
-                    from include/linux/preempt.h:81,
-                    from include/linux/spinlock.h:51,
-                    from include/linux/seqlock.h:36,
-                    from include/linux/time.h:6,
-                    from include/linux/stat.h:19,
-                    from include/linux/module.h:10,
-                    from net//bluetooth/mgmt.c:27:
-   net//bluetooth/mgmt.c: In function 'read_local_oob_ext_data_complete':
->> include/linux/string.h:345:9: warning: 'r256' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     return __builtin_memcpy(p, q, size);
-            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   net//bluetooth/mgmt.c:5669:27: note: 'r256' was declared here
-     u8 *h192, *r192, *h256, *r256;
-                              ^~~~
---
-   In file included from arch/x86/include/asm/page_32.h:35:0,
-                    from arch/x86/include/asm/page.h:14,
-                    from arch/x86/include/asm/thread_info.h:12,
-                    from include/linux/thread_info.h:38,
-                    from arch/x86/include/asm/preempt.h:7,
-                    from include/linux/preempt.h:81,
-                    from include/linux/spinlock.h:51,
-                    from include/linux/seqlock.h:36,
-                    from include/linux/time.h:6,
-                    from include/linux/stat.h:19,
-                    from include/linux/module.h:10,
-                    from net/bluetooth/mgmt.c:27:
-   net/bluetooth/mgmt.c: In function 'read_local_oob_ext_data_complete':
->> include/linux/string.h:345:9: warning: 'r256' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     return __builtin_memcpy(p, q, size);
-            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   net/bluetooth/mgmt.c:5669:27: note: 'r256' was declared here
-     u8 *h192, *r192, *h256, *r256;
-                              ^~~~
-
-vim +/r256 +345 include/linux/string.h
-
-6974f0c4 Daniel Micay 2017-07-12  332  
-6974f0c4 Daniel Micay 2017-07-12  333  __FORTIFY_INLINE void *memcpy(void *p, const void *q, __kernel_size_t size)
-6974f0c4 Daniel Micay 2017-07-12  334  {
-6974f0c4 Daniel Micay 2017-07-12  335  	size_t p_size = __builtin_object_size(p, 0);
-6974f0c4 Daniel Micay 2017-07-12  336  	size_t q_size = __builtin_object_size(q, 0);
-6974f0c4 Daniel Micay 2017-07-12  337  	if (__builtin_constant_p(size)) {
-6974f0c4 Daniel Micay 2017-07-12  338  		if (p_size < size)
-6974f0c4 Daniel Micay 2017-07-12  339  			__write_overflow();
-6974f0c4 Daniel Micay 2017-07-12  340  		if (q_size < size)
-6974f0c4 Daniel Micay 2017-07-12  341  			__read_overflow2();
-6974f0c4 Daniel Micay 2017-07-12  342  	}
-6974f0c4 Daniel Micay 2017-07-12  343  	if (p_size < size || q_size < size)
-6974f0c4 Daniel Micay 2017-07-12  344  		fortify_panic(__func__);
-6974f0c4 Daniel Micay 2017-07-12 @345  	return __builtin_memcpy(p, q, size);
-6974f0c4 Daniel Micay 2017-07-12  346  }
-6974f0c4 Daniel Micay 2017-07-12  347  
-
-:::::: The code at line 345 was first introduced by commit
-:::::: 6974f0c4555e285ab217cee58b6e874f776ff409 include/linux/string.h: add the option of fortified string.h functions
-
-:::::: TO: Daniel Micay <danielmicay@gmail.com>
-:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25414 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180610/4961cb0f/attachment-0001.gz>
+-- 
+Thanks!
+BestRegards
