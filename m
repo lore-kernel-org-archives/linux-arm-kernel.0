@@ -1,35 +1,33 @@
-From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Sun, 10 Jun 2018 16:15:49 +0200
-Subject: [PATCH 1/1] ARM: dts: s5pv210: Add missing interrupt-controller
- property to gph2
-Message-ID: <1528640149-2195-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun, 10 Jun 2018 16:24:15 +0200
+Subject: [PATCH] clocksource/drivers/stm32: fix error return code
+Message-ID: <1528640655-18948-3-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds missing interrupt-controller property to gph2 block,
-to silence following warnings during build
-  /soc/pinctrl at e0200000/gph2: Missing interrupt-controller or interrupt-map property
+Return an error code on failure.
 
-Observed on not yet mainlined, an S5PV210 based
-Samsung Galaxy S (i9000) phone.
+Problem found using Coccinelle.
 
-Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
 ---
- arch/arm/boot/dts/s5pv210-pinctrl.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clocksource/timer-stm32.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-index 3a79feab11c3..7f0c9d447871 100644
---- a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-@@ -258,6 +258,8 @@
- 	gph2: gph2 {
- 		gpio-controller;
- 		#gpio-cells = <2>;
-+
-+		interrupt-controller;
- 		#interrupt-cells = <2>;
- 	};
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index e5cdc3a..2717f88 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -304,8 +304,10 @@ static int __init stm32_timer_init(struct device_node *node)
  
--- 
-2.7.4
+ 	to->private_data = kzalloc(sizeof(struct stm32_timer_private),
+ 				   GFP_KERNEL);
+-	if (!to->private_data)
++	if (!to->private_data) {
++		ret = -ENOMEM;
+ 		goto deinit;
++	}
+ 
+ 	rstc = of_reset_control_get(node, NULL);
+ 	if (!IS_ERR(rstc)) {
