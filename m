@@ -1,85 +1,53 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 10 Jun 2018 13:34:03 +0100
-Subject: [PATCH v7 7/9] dt-bindings: iio: adc: at91-sama5d2_adc: add
- channel specific consumer info
-In-Reply-To: <20180522122319.GN22971@rfolt0960.corp.atmel.com>
+Date: Sun, 10 Jun 2018 13:36:04 +0100
+Subject: [PATCH v7 9/9] ARM: dts: at91: sama5d2: Add resistive touch device
+In-Reply-To: <1526975559-18966-10-git-send-email-eugen.hristev@microchip.com>
 References: <1526975559-18966-1-git-send-email-eugen.hristev@microchip.com>
- <1526975559-18966-8-git-send-email-eugen.hristev@microchip.com>
- <20180522122319.GN22971@rfolt0960.corp.atmel.com>
-Message-ID: <20180610133403.533cfe38@archlinux>
+ <1526975559-18966-10-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180610133604.71421803@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 May 2018 14:23:19 +0200
-Ludovic Desroches <ludovic.desroches@microchip.com> wrote:
+On Tue, 22 May 2018 10:52:39 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-> On Tue, May 22, 2018 at 10:52:37AM +0300, Eugen Hristev wrote:
-> > Added defines for channel consumer device-tree binding
-> > 
-> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> > Reviewed-by: Rob Herring <robh@kernel.org>  
-> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Applied to the togreg branch of iio.git and pushed out as testing for
-the autobuilders to play with it.
+> Add generic resistive touch device which is connected to ADC block
+> inside the SAMA5D2 SoC
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+As with the previous patch, the driver side of things is working it's
+way through the IIO tree, but will be the next merge window, not the
+current one.
 
 Thanks,
 
 Jonathan
 
+> ---
+> Changes in v5:
+>  - renamed touchscreen-threshold-pressure to touchscreen-min-pressure
 > 
-> > ---
-> >  .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt     |  9 +++++++++
-> >  include/dt-bindings/iio/adc/at91-sama5d2_adc.h           | 16 ++++++++++++++++
-> >  2 files changed, 25 insertions(+)
-> >  create mode 100644 include/dt-bindings/iio/adc/at91-sama5d2_adc.h
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> > index 6469a4c..4a3c1d4 100644
-> > --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> > +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
-> > @@ -21,6 +21,14 @@ Optional properties:
-> >    - dmas: Phandle to dma channel for the ADC.
-> >    - dma-names: Must be "rx" when dmas property is being used.
-> >    See ../../dma/dma.txt for details.
-> > +  - #io-channel-cells: in case consumer drivers are attached, this must be 1.
-> > +  See <Documentation/devicetree/bindings/iio/iio-bindings.txt> for details.
-> > +
-> > +Properties for consumer drivers:
-> > +  - Consumer drivers can be connected to this producer device, as specified
-> > +  in <Documentation/devicetree/bindings/iio/iio-bindings.txt>
-> > +  - Channels exposed are specified in:
-> > +  <dt-bindings/iio/adc/at91-sama5d2_adc.txt>
-> >  
-> >  Example:
-> >  
-> > @@ -38,4 +46,5 @@ adc: adc at fc030000 {
-> >  	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
-> >  	dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
-> >  	dma-names = "rx";
-> > +	#io-channel-cells = <1>;
-> >  }
-> > diff --git a/include/dt-bindings/iio/adc/at91-sama5d2_adc.h b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
-> > new file mode 100644
-> > index 0000000..70f99db
-> > --- /dev/null
-> > +++ b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
-> > @@ -0,0 +1,16 @@
-> > +/* SPDX-License-Identifier: GPL-2.0 */
-> > +/*
-> > + * This header provides constants for configuring the AT91 SAMA5D2 ADC
-> > + */
-> > +
-> > +#ifndef _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
-> > +#define _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
-> > +
-> > +/* X relative position channel index */
-> > +#define AT91_SAMA5D2_ADC_X_CHANNEL		24
-> > +/* Y relative position channel index */
-> > +#define AT91_SAMA5D2_ADC_Y_CHANNEL		25
-> > +/* pressure channel index */
-> > +#define AT91_SAMA5D2_ADC_P_CHANNEL		26
-> > +
-> > +#endif
-> > -- 
-> > 2.7.4
-> >   
+>  arch/arm/boot/dts/sama5d2.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index f06ba99..a44f325 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -1442,6 +1442,16 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			resistive_touch: resistive-touch {
+> +				compatible = "resistive-adc-touch";
+> +				io-channels = <&adc AT91_SAMA5D2_ADC_X_CHANNEL>,
+> +					      <&adc AT91_SAMA5D2_ADC_Y_CHANNEL>,
+> +					      <&adc AT91_SAMA5D2_ADC_P_CHANNEL>;
+> +				io-channel-names = "x", "y", "pressure";
+> +				touchscreen-min-pressure = <50000>;
+> +				status = "disabled";
+> +			};
+> +
+>  			pioA: pinctrl at fc038000 {
+>  				compatible = "atmel,sama5d2-pinctrl";
+>  				reg = <0xfc038000 0x600>;
