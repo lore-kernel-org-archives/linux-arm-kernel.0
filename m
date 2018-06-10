@@ -1,45 +1,35 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 10 Jun 2018 13:31:31 +0100
-Subject: [PATCH v7 3/9] dt-bindings: input: touchscreen: add minimum
- pressure touchscreen property
-In-Reply-To: <1526975559-18966-4-git-send-email-eugen.hristev@microchip.com>
-References: <1526975559-18966-1-git-send-email-eugen.hristev@microchip.com>
- <1526975559-18966-4-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180610133131.2ec1ddae@archlinux>
+From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
+Date: Sun, 10 Jun 2018 16:15:49 +0200
+Subject: [PATCH 1/1] ARM: dts: s5pv210: Add missing interrupt-controller
+ property to gph2
+Message-ID: <1528640149-2195-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 May 2018 10:52:33 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+This commit adds missing interrupt-controller property to gph2 block,
+to silence following warnings during build
+  /soc/pinctrl at e0200000/gph2: Missing interrupt-controller or interrupt-map property
 
-> Add a common touchscreen optional property that will specify
-> the minimum pressure applied to the screen that is needed
-> such that the driver will report the touch event.
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-Applied, Thanks,
+Observed on not yet mainlined, an S5PV210 based
+Samsung Galaxy S (i9000) phone.
 
-Jonathan
-> ---
-> Changes in v5:
->  - Modified property name to touchscreen-min-pressure from
-> touchscreen-threshold-property
-> 
->  Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
-> index 537643e..d092d5d 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
-> @@ -7,6 +7,9 @@ Optional properties for Touchscreens:
->  				  (in pixels)
->   - touchscreen-max-pressure	: maximum reported pressure (arbitrary range
->  				  dependent on the controller)
-> + - touchscreen-min-pressure	: minimum pressure on the touchscreen to be
-> +				  achieved in order for the touchscreen
-> +				  driver to report a touch event.
->   - touchscreen-fuzz-x		: horizontal noise value of the absolute input
->  				  device (in pixels)
->   - touchscreen-fuzz-y		: vertical noise value of the absolute input
+Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+---
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+index 3a79feab11c3..7f0c9d447871 100644
+--- a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
++++ b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+@@ -258,6 +258,8 @@
+ 	gph2: gph2 {
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
+ 
+-- 
+2.7.4
