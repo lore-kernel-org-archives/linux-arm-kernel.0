@@ -1,95 +1,86 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Sun, 10 Jun 2018 19:13:13 +0800
-Subject: [PATCH 0/7] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <5B10ECBB.209@huawei.com>
-References: <1527752569-18020-1-git-send-email-thunder.leizhen@huawei.com>
- <d65f87a4-db61-3cd2-1a6f-0322025840a8@arm.com>
- <96cc25b9-b21f-6067-384d-f52e6b8b25e7@huawei.com>
- <92b240f5-596e-87a9-863a-b18475042cce@arm.com> <5B10ECBB.209@huawei.com>
-Message-ID: <5B1D07C9.6090507@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 10 Jun 2018 13:24:17 +0100
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+ <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+Message-ID: <86lgbm96dq.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 06 Jun 2018 12:37:02 +0100,
+James Morse wrote:
+> 
+> Hi Stefan,
+> 
+> On 06/06/18 08:02, Stefan Wahren wrote:
+> > Am 05.06.2018 um 19:46 schrieb James Morse:
+> >> On 05/06/18 09:01, Petr Tesarik wrote:
+> >>> I attached a hardware debugger and found
+> >>> out that all CPU cores were stopped except one which was stuck in the
+> >>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+> >>> definitely not safe after a kernel panic.
+> 
+> >> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
+> >> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
+> >> around in mmio registers, this should all be safe unless you re-entered the same
+> >> code.
+> 
+> >>> If I'm right, then this is broken in general, but I have only ever seen
+> >>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+> >>> be more subtle.
+> 
+> >> Is there a hardware difference around the interrupt controller on these?
+> 
+> > No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
+> > ethernet) instead of lan78xx (Gigabit ethernet).
+> 
+> Bingo: its the lan78xx driver that is sleeping from the irqchip
+> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
+> is why the RPi-3-B doesn't do this.
+> 
+> It may be valid for kdump to only teardown the 'root irqdomain' (if
+> that even means anything). I assume these secondary irqchip's would
+> have a summary-interrupt that goes to another irqchip. But I can't
+> see a way to tell them apart..,
 
+There is none. A cascaded irqchip is just like a root irqchip, just
+that its output line is connected to another irqchip. But we have no
+easy way to identify the parent. Also, this particular driver looks
+quite creative (it reinvents the wheel for chained interrupts -- see
+intr_complete and lan78xx_status), meaning that even if we could have
+a magic way of identify a chained irqchip, we'd miss that one. Broken.
 
-On 2018/6/1 14:50, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2018/5/31 22:25, Robin Murphy wrote:
->> On 31/05/18 14:49, Hanjun Guo wrote:
->>> Hi Robin,
->>>
->>> On 2018/5/31 19:24, Robin Murphy wrote:
->>>> On 31/05/18 08:42, Zhen Lei wrote:
->>>>> In common, a IOMMU unmap operation follow the below steps:
->>>>> 1. remove the mapping in page table of the specified iova range
->>>>> 2. execute tlbi command to invalid the mapping which is cached in TLB
->>>>> 3. wait for the above tlbi operation to be finished
->>>>> 4. free the IOVA resource
->>>>> 5. free the physical memory resource
->>>>>
->>>>> This maybe a problem when unmap is very frequently, the combination of tlbi
->>>>> and wait operation will consume a lot of time. A feasible method is put off
->>>>> tlbi and iova-free operation, when accumulating to a certain number or
->>>>> reaching a specified time, execute only one tlbi_all command to clean up
->>>>> TLB, then free the backup IOVAs. Mark as non-strict mode.
->>>>>
->>>>> But it must be noted that, although the mapping has already been removed in
->>>>> the page table, it maybe still exist in TLB. And the freed physical memory
->>>>> may also be reused for others. So a attacker can persistent access to memory
->>>>> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
->>>>> the VFIO should always choose the strict mode.
->>>>>
->>>>> Some may consider put off physical memory free also, that will still follow
->>>>> strict mode. But for the map_sg cases, the memory allocation is not controlled
->>>>> by IOMMU APIs, so it is not enforceable.
->>>>>
->>>>> Fortunately, Intel and AMD have already applied the non-strict mode, and put
->>>>> queue_iova() operation into the common file dma-iommu.c., and my work is based
->>>>> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
->>>>> unmap, but Intel and AMD IOMMU drivers are not.
->>>>>
->>>>> Below is the performance data of strict vs non-strict for NVMe device:
->>>>> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
->>>>> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
->>>>
->>>> What hardware is this on? If it's SMMUv3 without MSIs (e.g. D05), then you'll still be using the rubbish globally-blocking sync implementation. If that is the case, I'd be very interested to see how much there is to gain from just improving that - I've had a patch kicking around for a while[1] (also on a rebased branch at [2]), but don't have the means for serious performance testing.
-> I will try your patch to see how much it can improve. I think the best way
-Hi Robin,
+> I think we need to wait until after the merge window for Marc's
+> wisdom on this!
 
-I applied your patch and got below improvemnet.
+Overall, I can't think of an easy fix. We have a few options, but none
+of them involve a centralised change:
 
-Randomly Read  IOPS: 146K --> 214K
-Randomly Write IOPS: 143K --> 212K
+1) We provide a reset infrastructure for irqchips, with an opt-in
+   mechanism. This involves changing the way we teardown irqs at
+   crash-time, and we'd then need some notion of reset ordering (think
+   of the layered ITS and GICv3, for example).
 
-> to resovle the globally-blocking sync is that the hardware provide 64bits
-> CONS regitster, so that it can never be wrapped, and the spinlock can also
-> be removed.
-> 
->>>
->>> The hardware is the new D06 which the SMMU with MSIs,
->>
->> Cool! Now that profiling is fairly useful since we got rid of most of the locks, are you able to get an idea of how the overhead in the normal case is distributed between arm_smmu_cmdq_insert_cmd() and __arm_smmu_sync_poll_msi()? We're always trying to improve our understanding of where command-queue-related overheads turn out to be in practice, and there's still potentially room to do nicer things than TLBI_NH_ALL ;)
-> Even if the software has no overhead, there may still be a problem, because
-> the smmu need to execute the commands in sequence, especially before
-> globally-blocking sync has been removed. Base on the actually execute time
-> of single tlbi and sync, we can get the upper limit in theory.
-> 
-> BTW, I will reply the reset of mail next week. I'm busy with other things now.
-> 
->>
->> Robin.
->>
->>> it's not D05 :)
->>>
->>> Thanks
->>> Hanjun
->>>
->>
->> .
->>
-> 
+2) We provide a way to identify interrupts that are ultimately backed
+   by a root controller, which implies walking down the hierarchy for
+   each one of them. Fairly expensive, but minimal in way of changes
+   in the crash code. Requires a per-irqchip flag, but ordering comes
+   in for free.
+
+3) We do the same as (2), but at the irqdomain level. Not sure that's
+   any better, and it may be even more complicated and bring back some
+   ordering issues.
+
+I'm currently angling for (2), with (1) as a final hammer option once
+we have nuked all the individual interrupts (useful for the GICv3
+redistributor case).
+
+Thoughts?
+
+	M.
 
 -- 
-Thanks!
-BestRegards
+Jazz is not dead, it just smell funny.
