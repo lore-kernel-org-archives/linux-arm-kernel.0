@@ -1,73 +1,48 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 11 Jun 2018 11:26:19 +0800
-Subject: [PATCH 27/28] drm/mediatek: add third ddp path
+Date: Mon, 11 Jun 2018 11:26:16 +0800
+Subject: [PATCH 24/28] drm/mediatek: add DSI2 support for mutex
 In-Reply-To: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528687580-549-28-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528687580-549-25-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch create third crtc by third ddp path
+This patch add the DSI2 support for mutex
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 3 +++
- drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 5 +++++
- drivers/gpu/drm/mediatek/mtk_drm_drv.h  | 5 ++++-
- 3 files changed, 12 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 658b8dd45b83..2d6aa150a9ff 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -539,6 +539,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
- 	int ret;
- 	int i;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 5916fc11693a..1e7e3872eccc 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -77,6 +77,7 @@
+ #define MUTEX_SOF_DSI1			2
+ #define MUTEX_SOF_DPI0			3
+ #define MUTEX_SOF_DPI1			4
++#define MUTEX_SOF_DSI2			5
  
-+	if (!path)
-+		return 0;
-+
- 	for (i = 0; i < path_len; i++) {
- 		enum mtk_ddp_comp_id comp_id = path[i];
- 		struct device_node *node;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 08d5d0b47bfe..3d279a299383 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -232,6 +232,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 	if (ret < 0)
- 		goto err_component_unbind;
- 
-+	ret = mtk_drm_crtc_create(drm, private->data->third_path,
-+				  private->data->third_len);
-+	if (ret < 0)
-+		goto err_component_unbind;
-+
- 	/* Use OVL device for all DMA memory allocations */
- 	np = private->comp_node[private->data->main_path[0]] ?:
- 	     private->comp_node[private->data->ext_path[0]];
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index c3378c452c0a..ecc00ca3221d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -17,7 +17,7 @@
- #include <linux/io.h>
- #include "mtk_drm_ddp_comp.h"
- 
--#define MAX_CRTC	2
-+#define MAX_CRTC	3
- #define MAX_CONNECTOR	2
- 
- struct device;
-@@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
- 	unsigned int main_len;
- 	const enum mtk_ddp_comp_id *ext_path;
- 	unsigned int ext_len;
-+	const enum mtk_ddp_comp_id *third_path;
-+	unsigned int third_len;
-+
- 	bool shadow_register;
- };
- 
+ #define OVL0_MOUT_EN_COLOR0		0x1
+ #define OD_MOUT_EN_RDMA0		0x1
+@@ -383,6 +384,9 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
+ 	case DDP_COMPONENT_DSI1:
+ 		reg = MUTEX_SOF_DSI0;
+ 		break;
++	case DDP_COMPONENT_DSI2:
++		reg = MUTEX_SOF_DSI2;
++		break;
+ 	case DDP_COMPONENT_DPI0:
+ 		reg = MUTEX_SOF_DPI0;
+ 		break;
+@@ -420,6 +424,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+ 	switch (id) {
+ 	case DDP_COMPONENT_DSI0:
+ 	case DDP_COMPONENT_DSI1:
++	case DDP_COMPONENT_DSI2:
+ 	case DDP_COMPONENT_DPI0:
+ 	case DDP_COMPONENT_DPI1:
+ 		writel_relaxed(MUTEX_SOF_SINGLE_MODE,
 -- 
 2.12.5
