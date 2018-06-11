@@ -1,137 +1,64 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 11 Jun 2018 11:25:54 +0800
-Subject: [PATCH 02/28] drm/mediatek: support maximum 64 mutex mod
+Date: Mon, 11 Jun 2018 11:26:08 +0800
+Subject: [PATCH 16/28] drm/mediatek: add connection from RDMA1 to DSI2
 In-Reply-To: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528687580-549-3-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528687580-549-17-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch support that if modules more than 32,
-add index more than 31 when using DISP_REG_MUTEX_MOD2 bit
+This patch add the connection from RDMA1 to DSI2
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 75 +++++++++++++++++++++-------------
- 1 file changed, 47 insertions(+), 28 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 8130f3dab661..47ffa240bd25 100644
+index 7e4ad5580cf6..c3e647b04ffd 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -41,31 +41,32 @@
- #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
- #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
- #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
-+#define DISP_REG_MUTEX_MOD2(n)	(0x34 + 0x20 * (n))
+@@ -28,6 +28,7 @@
+ #define DISP_REG_CONFIG_DISP_UFOE_MOUT_EN	0x050
+ #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+ #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
++#define DISP_REG_CONFIG_DSIE_SEL_IN		0x0a4
+ #define DISP_REG_CONFIG_DSIO_SEL_IN		0x0a8
+ #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+ #define DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN	0x0c4
+@@ -86,11 +87,13 @@
+ #define RDMA0_MOUT_DSI2			0x4
+ #define RDMA0_MOUT_DSI3			0x5
+ #define RDMA1_MOUT_DSI1			0x1
++#define RDMA1_MOUT_DSI2			0x4
+ #define RDMA1_MOUT_DPI0			0x2
+ #define RDMA1_MOUT_DPI1			0x3
+ #define DPI0_SEL_IN_RDMA1		0x1
+ #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+ #define DSI1_SEL_IN_RDMA1		0x1
++#define DSI2_SEL_IN_RDMA1		(0x1 << 16)
+ #define COLOR1_SEL_IN_OVL1		0x1
  
- #define INT_MUTEX				BIT(1)
- 
--#define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
--#define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
--#define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
--#define MT8173_MUTEX_MOD_DISP_RDMA1		BIT(14)
--#define MT8173_MUTEX_MOD_DISP_RDMA2		BIT(15)
--#define MT8173_MUTEX_MOD_DISP_WDMA0		BIT(16)
--#define MT8173_MUTEX_MOD_DISP_WDMA1		BIT(17)
--#define MT8173_MUTEX_MOD_DISP_COLOR0		BIT(18)
--#define MT8173_MUTEX_MOD_DISP_COLOR1		BIT(19)
--#define MT8173_MUTEX_MOD_DISP_AAL		BIT(20)
--#define MT8173_MUTEX_MOD_DISP_GAMMA		BIT(21)
--#define MT8173_MUTEX_MOD_DISP_UFOE		BIT(22)
--#define MT8173_MUTEX_MOD_DISP_PWM0		BIT(23)
--#define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
--#define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
--
--#define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
--#define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
--#define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
--#define MT2701_MUTEX_MOD_DISP_BLS		BIT(9)
--#define MT2701_MUTEX_MOD_DISP_RDMA0		BIT(10)
--#define MT2701_MUTEX_MOD_DISP_RDMA1		BIT(12)
-+#define MT8173_MUTEX_MOD_DISP_OVL0		11
-+#define MT8173_MUTEX_MOD_DISP_OVL1		12
-+#define MT8173_MUTEX_MOD_DISP_RDMA0		13
-+#define MT8173_MUTEX_MOD_DISP_RDMA1		14
-+#define MT8173_MUTEX_MOD_DISP_RDMA2		15
-+#define MT8173_MUTEX_MOD_DISP_WDMA0		16
-+#define MT8173_MUTEX_MOD_DISP_WDMA1		17
-+#define MT8173_MUTEX_MOD_DISP_COLOR0		18
-+#define MT8173_MUTEX_MOD_DISP_COLOR1		19
-+#define MT8173_MUTEX_MOD_DISP_AAL		20
-+#define MT8173_MUTEX_MOD_DISP_GAMMA		21
-+#define MT8173_MUTEX_MOD_DISP_UFOE		22
-+#define MT8173_MUTEX_MOD_DISP_PWM0		23
-+#define MT8173_MUTEX_MOD_DISP_PWM1		24
-+#define MT8173_MUTEX_MOD_DISP_OD		25
-+
-+#define MT2701_MUTEX_MOD_DISP_OVL		3
-+#define MT2701_MUTEX_MOD_DISP_WDMA		6
-+#define MT2701_MUTEX_MOD_DISP_COLOR		7
-+#define MT2701_MUTEX_MOD_DISP_BLS		9
-+#define MT2701_MUTEX_MOD_DISP_RDMA0		10
-+#define MT2701_MUTEX_MOD_DISP_RDMA1		12
- 
- #define MUTEX_SOF_SINGLE_MODE		0
- #define MUTEX_SOF_DSI0			1
-@@ -278,6 +279,7 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
- 	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
- 					   mutex[mutex->id]);
- 	unsigned int reg;
-+	unsigned int offset;
- 
- 	WARN_ON(&ddp->mutex[mutex->id] != mutex);
- 
-@@ -292,9 +294,17 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
- 		reg = MUTEX_SOF_DPI0;
- 		break;
- 	default:
--		reg = readl_relaxed(ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
--		reg |= ddp->mutex_mod[id];
--		writel_relaxed(reg, ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
-+		if (ddp->mutex_mod[id] < 32) {
-+			offset = DISP_REG_MUTEX_MOD(mutex->id);
-+			reg = readl_relaxed(ddp->regs + offset);
-+			reg |= 1 << ddp->mutex_mod[id];
-+			writel_relaxed(reg, ddp->regs + offset);
-+		} else {
-+			offset = DISP_REG_MUTEX_MOD2(mutex->id);
-+			reg = readl_relaxed(ddp->regs + offset);
-+			reg |= 1 << (ddp->mutex_mod[id] - 32);
-+			writel_relaxed(reg, ddp->regs + offset);
-+		}
- 		return;
- 	}
- 
-@@ -307,6 +317,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
- 	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
- 					   mutex[mutex->id]);
- 	unsigned int reg;
-+	unsigned int offset;
- 
- 	WARN_ON(&ddp->mutex[mutex->id] != mutex);
- 
-@@ -318,9 +329,17 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
- 			       ddp->regs + DISP_REG_MUTEX_SOF(mutex->id));
- 		break;
- 	default:
--		reg = readl_relaxed(ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
--		reg &= ~(ddp->mutex_mod[id]);
--		writel_relaxed(reg, ddp->regs + DISP_REG_MUTEX_MOD(mutex->id));
-+		if (ddp->mutex_mod[id] < 32) {
-+			offset = DISP_REG_MUTEX_MOD(mutex->id);
-+			reg = readl_relaxed(ddp->regs + offset);
-+			reg &= ~(1 << ddp->mutex_mod[id]);
-+			writel_relaxed(reg, ddp->regs + offset);
-+		} else {
-+			offset = DISP_REG_MUTEX_MOD2(mutex->id);
-+			reg = readl_relaxed(ddp->regs + offset);
-+			reg &= ~(1 << (ddp->mutex_mod[id] - 32));
-+			writel_relaxed(reg, ddp->regs + offset);
-+		}
- 		break;
- 	}
- }
+ #define OVL_MOUT_EN_RDMA		0x1
+@@ -176,6 +179,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI1) {
+ 		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+ 		value = RDMA1_MOUT_DSI1;
++	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI2) {
++		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
++		value = RDMA1_MOUT_DSI2;
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+ 		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+ 		value = RDMA1_MOUT_DPI0;
+@@ -207,6 +213,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI1) {
+ 		*addr = DISP_REG_CONFIG_DSIO_SEL_IN;
+ 		value = DSI1_SEL_IN_RDMA1;
++	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI2) {
++		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
++		value = DSI2_SEL_IN_RDMA1;
+ 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+ 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+ 		value = COLOR1_SEL_IN_OVL1;
 -- 
 2.12.5
