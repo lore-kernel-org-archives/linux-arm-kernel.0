@@ -1,215 +1,88 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 11 Jun 2018 14:36:38 +0100
-Subject: [PATCH RESEND v4 2/2] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-In-Reply-To: <1528487320-2873-3-git-send-email-gengdongjiu@huawei.com>
-References: <1528487320-2873-1-git-send-email-gengdongjiu@huawei.com>
- <1528487320-2873-3-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <45e94aae-ed9f-1fb7-f10e-d95c2f969ddd@arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 11 Jun 2018 15:35:34 +0200
+Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
+References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
+ <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
+ <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
+Message-ID: <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu Geng,
+On 06/11/2018 03:03 PM, Geert Uytterhoeven wrote:
+> Hi Marek,
 
-Please only put 'RESEND' in the subject if the patch content is identical.
-This patch is not the same as v4.
+Hi,
 
-On 08/06/18 20:48, Dongjiu Geng wrote:
-> For the migrating VMs, user space may need to know the exception
-> state. For example, in the machine A, KVM make an SError pending,
-> when migrate to B, KVM also needs to pend an SError.
+> On Mon, Jun 11, 2018 at 2:15 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>> On 06/11/2018 11:56 AM, Geert Uytterhoeven wrote:
+>>> On Mon, Jun 4, 2018 at 7:59 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>> Rather than hard-coding the quirk topology, which stopped scaling,
+>>>> parse the information from DT. The code looks for all compatible
+>>>> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
+>>>
+>>> da9063
+>>>
+>>>> to the same pin. If so, the code sends a matching sequence to the
+>>>> PMIC to deassert the IRQ.
 > 
-> This new IOCTL exports user-invisible states related to SError.
-> Together with appropriate user space changes, user space can get/set
-> the SError exception state to do migrate/snapshot/suspend.
+>>>> @@ -122,7 +143,13 @@ static struct notifier_block regulator_quirk_nb = {
+>>>>
+>>>>  static int __init rcar_gen2_regulator_quirk(void)
+>>>>  {
+>>>> -       u32 mon;
+>>>> +       struct device_node *np;
+>>>> +       const struct of_device_id *id;
+>>>> +       struct regulator_quirk *quirk;
+>>>> +       struct regulator_quirk *pos;
+>>>> +       struct of_phandle_args *argsa, *argsb;
+>>>> +       u32 mon, addr;
+>>>> +       int ret;
+>>>
+>>> Some people prefer "Reverse Christmas Tree Ordering", i.e. longest line first.
+>>>
+>>>>
+>>>>         if (!of_machine_is_compatible("renesas,koelsch") &&
+>>>>             !of_machine_is_compatible("renesas,lager") &&
+>>>> @@ -130,6 +157,45 @@ static int __init rcar_gen2_regulator_quirk(void)
+>>>>             !of_machine_is_compatible("renesas,gose"))
+>>>>                 return -ENODEV;
+>>>
+>>> I think the board checks above can be removed. That will auto-enable the
+>>> fix on e.g. Porter (once its regulators have ended up in DTS, of course).
+>>
+>> Removing the check would also enable it on boards where we don't want
+>> this enabled, so I'd prefer to keep the check to avoid strange surprises.
+> 
+> Like, Porter? ;-)
 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index fdac969..8896737 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -835,11 +835,13 @@ struct kvm_clock_data {
->  
->  Capability: KVM_CAP_VCPU_EVENTS
->  Extended by: KVM_CAP_INTR_SHADOW
-> -Architectures: x86
-> +Architectures: x86, arm, arm64
->  Type: vm ioctl
+I'm adding Porter in a separate patch.
 
-Isn't this actually a per-vcpu ioctl? Can we fix the documentation?
+>>>> +               ret = of_property_read_u32(np, "reg", &addr);
+>>>> +               if (ret)
+>>>> +                       return ret;
+>>>
+>>> I think it's safer to skip this entry and continue, after calling
+>>> kfree(quirk), of course.
+>>>
+>>>> +
+>>>> +               quirk->id = id;
+>>>> +               quirk->i2c_msg.addr = addr;
+>>>> +               quirk->shared = false;
+>>>> +
+>>>> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
+>>>> +               if (ret)
+>>>> +                       return ret;
+>>>
+>>> kfree(quirk) and continue...
+>>
+>> I wonder if it shouldn't rather free the entire list and abort ?
+> 
+> "Be strict when sending, be liberal when receiving."
 
+Meaning ? I think "the language barrier is protecting me" (TM)
 
->  Parameters: struct kvm_vcpu_event (out)
->  Returns: 0 on success, -1 on error
->  
-> +X86:
-> +
->  Gets currently pending exceptions, interrupts, and NMIs as well as related
->  states of the vcpu.
->  
-> @@ -881,15 +883,32 @@ Only two fields are defined in the flags field:
->  - KVM_VCPUEVENT_VALID_SMM may be set in the flags field to signal that
->    smi contains a valid state.
->  
-> +ARM, ARM64:
-> +
-> +Gets currently pending SError exceptions as well as related states of the vcpu.
-> +
-> +struct kvm_vcpu_events {
-> +	struct {
-> +		__u8 serror_pending;
-> +		__u8 serror_has_esr;
-> +		/* Align it to 8 bytes */
-> +		__u8 pad[6];
-> +		__u64 serror_esr;
-> +	} exception;
-> +	__u32 reserved[12];
-> +};
-> +
->  4.32 KVM_SET_VCPU_EVENTS
->  
-> -Capability: KVM_CAP_VCPU_EVENTS
-> +Capebility: KVM_CAP_VCPU_EVENTS
-
-(please fix this)
-
-
->  Extended by: KVM_CAP_INTR_SHADOW
-> -Architectures: x86
-> +Architectures: x86, arm, arm64
->  Type: vm ioctl
-
-(this is also a vcpu ioctl)
-
-
->  Parameters: struct kvm_vcpu_event (in)
->  Returns: 0 on success, -1 on error
->  
-> +X86:
-> +
->  Set pending exceptions, interrupts, and NMIs as well as related states of the
->  vcpu.
->  
-> @@ -910,6 +929,12 @@ shall be written into the VCPU.
->  
->  KVM_VCPUEVENT_VALID_SMM can only be set if KVM_CAP_X86_SMM is available.
->  
-> +ARM, ARM64:
-> +
-> +Set pending SError exceptions as well as related states of the vcpu.
-
-There are some deliberate choices here I think we should document:
-| This API can't be used to clear a pending SError.
-
-If there already was an SError pending, this API just overwrites it with the new
-one. The architecture has some rules about merging multiple SError. (details in
-2.5.3 Multiple SError interrupts of [0])
-
-I don't think KVM needs to enforce these, as they are implementation-defined if
-one of the ESR is implementation-defined... the part that matters is reporting
-the 'most severe' RAS ESR if there are multiple pending. As only user-space ever
-sets these, let's make it user-spaces problem to do.
-
-I think we should recommend user-space always reads the pending values and
-applies its merging-multiple-SError logic. (I assume your Qemu patches do this).
-
-Something like:
-| User-space should first use KVM_GET_VCPU_EVENTS in case KVM has made an SError
-| pending as part of its device emulation. When both values are architected RAS
-| SError ESR values, the new ESR should reflect the combined effect of both
-| errors.
-
-
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index caae484..c3e6975 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -124,6 +124,18 @@ struct kvm_sync_regs {
->  struct kvm_arch_memory_slot {
->  };
->  
-> +/* for KVM_GET/SET_VCPU_EVENTS */
-> +struct kvm_vcpu_events {
-> +	struct {
-> +		__u8 serror_pending;
-> +		__u8 serror_has_esr;
-> +		/* Align it to 8 bytes */
-> +		__u8 pad[6];
-> +		__u64 serror_esr;
-> +	} exception;
-> +	__u32 reserved[12];
-> +};
-> +
-
-You haven't defined __KVM_HAVE_VCPU_EVENTS for 32bit, so presumably this struct
-will never be used. Why is it here?
-
-(I agree if we ever provide it on 32bit, the struct layout should be the same.
-Is this only here to force that to happen?)
-
-[...]
-
-
-> +int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-> +			struct kvm_vcpu_events *events)
-> +{
-> +	bool serror_pending = events->exception.serror_pending;
-> +	bool has_esr = events->exception.serror_has_esr;
-> +
-> +	if (serror_pending && has_esr) {
-> +		if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-> +			return -EINVAL;
-> +
-> +		kvm_set_sei_esr(vcpu, events->exception.serror_esr);
-
-kvm_set_sei_esr() will silently discard the top 40 bits of serror_esr, (which is
-correct, we shouldn't copy them into hardware without know what they do).
-
-Could we please force user-space to zero these bits, we can advertise extra CAPs
-if new features turn up in that space, instead of user-space passing <something>
-and relying on the kernel to remove it.
-
-(Background: VSESR is a 64bit register that holds the value to go in a 32bit
-register. I suspect the top-half could get re-used for control values or
-something we don't want to give user-space)
-
-
-> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-> index d8e7165..a55e91d 100644
-> --- a/arch/arm64/kvm/inject_fault.c
-> +++ b/arch/arm64/kvm/inject_fault.c
-> @@ -164,9 +164,9 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->  		inject_undef64(vcpu);
->  }
->  
-> -static void pend_guest_serror(struct kvm_vcpu *vcpu, u64 esr)
-> +void kvm_set_sei_esr(struct kvm_vcpu *vcpu, u64 esr)
->  {
-> -	vcpu_set_vsesr(vcpu, esr);
-> +	vcpu_set_vsesr(vcpu, esr & ESR_ELx_ISS_MASK);
->  	*vcpu_hcr(vcpu) |= HCR_VSE;
->  }
->  
-
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index a4c1b76..79ecba9 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1107,6 +1107,25 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-
-> +	case KVM_SET_VCPU_EVENTS: {
-> +		struct kvm_vcpu_events events;
-> +
-> +		if (copy_from_user(&events, argp, sizeof(events)))
-> +			return -EFAULT;
-> +
-> +		return kvm_arm_vcpu_set_events(vcpu, &events);
-> +	}
-
-Please check the padding[] and reserved[] are zero, otherwise we can't re-use these.
-
-
-Thanks,
-
-James
-
-[0]
-https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+-- 
+Best regards,
+Marek Vasut
