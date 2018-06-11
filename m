@@ -1,54 +1,28 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 11 Jun 2018 16:24:13 +0800
-Subject: [PATCH v7 2/2] ARM: dts: imx: Add basic dts support for imx6sll
- EVK board
-In-Reply-To: <1527234127-11991-2-git-send-email-ping.bai@nxp.com>
-References: <1527234127-11991-1-git-send-email-ping.bai@nxp.com>
- <1527234127-11991-2-git-send-email-ping.bai@nxp.com>
-Message-ID: <20180611082411.GH16091@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 11 Jun 2018 10:28:22 +0200
+Subject: [PATCH/RFT 2/2] arm64: dts: renesas: r8a77965: Add PCIe device
+ nodes
+In-Reply-To: <1528373494-18503-3-git-send-email-ykaneko0929@gmail.com>
+References: <1528373494-18503-1-git-send-email-ykaneko0929@gmail.com>
+ <1528373494-18503-3-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20180611082819.rnoiou2t7l6dynju@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 03:42:07PM +0800, Bai Ping wrote:
-> Add dts file support for imx6sll EVK board.
+On Thu, Jun 07, 2018 at 09:11:34PM +0900, Yoshihiro Kaneko wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Acked-by: Dong Aisheng <Aisheng.dong@nxp.com>
-> ---
->  change v3->v4
->  - update the license indentifier
->  - remove leading zero of node
->  - remove unused pin from hog group
->  change v4->v5
->  - use generic name for device node
->  - remove unnecessary hog pin group
->  change v5->v6
->  - no
->  change v6->v7
->  - move the iomuxc node to the end of dts file
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
->  arch/arm/boot/dts/Makefile                    |   2 +
->  arch/arm/boot/dts/imx6sll-evk.dts             | 317 ++++++++++++++++++++++++++
->  3 files changed, 323 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6sll-evk.dts
+> This patch adds PCIe{0,1} device nodes to R8A77965 SoC.
+> 
+> Based on a similar patches of the R8A7796 device tree
+> by Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>.
+> 
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-<snip>
+Hi,
 
-> +	pinctrl_i2c1: i2c1grp {
-> +		fsl,pins = <
-> +			MX6SLL_PAD_I2C1_SCL__I2C1_SCL	 0x4001b8b1
-> +			MX6SLL_PAD_I2C1_SDA__I2C1_SDA	 0x4001b8b1
-> +		>;
-> +	};
-> +};
-> +
-> +
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
 
-The new blank line at EOF should be dropped.
-
-
-I fixed it up and applied both patches.
-
-Shawn
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
