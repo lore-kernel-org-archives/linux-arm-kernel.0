@@ -1,44 +1,40 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 11 Jun 2018 11:25:58 +0800
-Subject: [PATCH 06/28] drm/mediatek: add ddp component PWM2
+Date: Mon, 11 Jun 2018 11:26:04 +0800
+Subject: [PATCH 12/28] drm/mediatek: add connection from RDMA0 to DSI2
 In-Reply-To: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528687580-549-7-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528687580-549-13-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add component PWM2
+This patch add the connection from RDMA0 to DSI2
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index a5c7ac2d162d..86e8c9e5df41 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -233,6 +233,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
- 	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
- 	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
- 	[DDP_COMPONENT_PWM1]	= { MTK_DISP_PWM,	1, NULL },
-+	[DDP_COMPONENT_PWM2]	= { MTK_DISP_PWM,	2, NULL },
- 	[DDP_COMPONENT_RDMA0]	= { MTK_DISP_RDMA,	0, NULL },
- 	[DDP_COMPONENT_RDMA1]	= { MTK_DISP_RDMA,	1, NULL },
- 	[DDP_COMPONENT_RDMA2]	= { MTK_DISP_RDMA,	2, NULL },
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 9b19fc4423f1..e00c2e798abd 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -56,6 +56,7 @@ enum mtk_ddp_comp_id {
- 	DDP_COMPONENT_OVL1,
- 	DDP_COMPONENT_PWM0,
- 	DDP_COMPONENT_PWM1,
-+	DDP_COMPONENT_PWM2,
- 	DDP_COMPONENT_RDMA0,
- 	DDP_COMPONENT_RDMA1,
- 	DDP_COMPONENT_RDMA2,
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index d7953f2f6a36..c08aed8dae44 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -82,6 +82,7 @@
+ #define OVL1_MOUT_EN_COLOR1		0x1
+ #define GAMMA_MOUT_EN_RDMA1		0x1
+ #define RDMA0_MOUT_DPI0			0x2
++#define RDMA0_MOUT_DSI2			0x4
+ #define RDMA1_MOUT_DPI0			0x2
+ #define DPI0_SEL_IN_RDMA1		0x1
+ #define COLOR1_SEL_IN_OVL1		0x1
+@@ -160,6 +161,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
+ 		*addr = DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN;
+ 		value = RDMA0_MOUT_DPI0;
++	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI2) {
++		*addr = DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN;
++		value = RDMA0_MOUT_DSI2;
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+ 		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+ 		value = RDMA1_MOUT_DPI0;
 -- 
 2.12.5
