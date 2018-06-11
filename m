@@ -1,128 +1,74 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 11 Jun 2018 15:51:11 -0600
-Subject: [PATCH 08/20] coresight: dts: Cleanup device tree graph bindings
-In-Reply-To: <0a213578-c7d7-0ed3-ffc1-afc97d8d1516@arm.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-9-git-send-email-suzuki.poulose@arm.com>
- <20180608212211.GG30587@xps15> <f616c825-b459-397d-3e61-70c1f1790f4f@arm.com>
- <CANLsYkwGmUpHKRZYJ=pGbEKOAGT6O=+u0_mpAJOyoONuqpXO4g@mail.gmail.com>
- <0a213578-c7d7-0ed3-ffc1-afc97d8d1516@arm.com>
-Message-ID: <CANLsYkyuLVkRWtnVCej2ovDx9RJiA_hADy1XVD+tStFmq0fNrQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 11 Jun 2018 15:36:43 -0700
+Subject: [PATCH 3/6] arm: dts: Change PCIe INTx mapping for Cygnus
+In-Reply-To: <1527631130-20045-4-git-send-email-ray.jui@broadcom.com>
+References: <1527631130-20045-1-git-send-email-ray.jui@broadcom.com>
+ <1527631130-20045-4-git-send-email-ray.jui@broadcom.com>
+Message-ID: <f5aa804e-3174-affd-1117-31b0a5b59fc5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 June 2018 at 10:55, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 11/06/18 17:52, Mathieu Poirier wrote:
->>
->> On 11 June 2018 at 03:22, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->>>
->>> On 08/06/18 22:22, Mathieu Poirier wrote:
->>>>
->>>>
->>>> On Tue, Jun 05, 2018 at 10:43:19PM +0100, Suzuki K Poulose wrote:
->>>>>
->>>>>
->>>>> The coresight drivers relied on default bindings for graph
->>>>> in DT, while reusing the "reg" field of the "ports" to indicate
->>>>> the actual hardware port number for the connections. However,
->>>>> with the rules getting stricter w.r.t to the address mismatch
->>>>> with the label, it is no longer possible to use the port address
->>>>> field for the hardware port number. Hence, we add an explicit
->>>>> property to denote the hardware port number, "coresight,hwid"
->>>>> which must be specified for each "endpoint".
->>>>>
->>>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>>> Cc: Sudeep Holla <sudeep.holla@arm.com>
->>>>> Cc: Rob Herring <robh@kernel.org>
->>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>>> ---
->>>>>    .../devicetree/bindings/arm/coresight.txt          | 29
->>>>> ++++++++++---
->>>>>    drivers/hwtracing/coresight/of_coresight.c         | 49
->>>>> +++++++++++++++++-----
->>>>>    2 files changed, 62 insertions(+), 16 deletions(-)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> b/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> index ed6b555..bf75ab3 100644
->>>>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> @@ -108,8 +108,13 @@ following properties to uniquely identify the
->>>>> connection details.
->>>>>          "slave-mode"
->>>
->>>
->>>
->>>
->>>>>          };
->>>>
->>>>
->>>>
->>>> For the binding part:
->>>> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->
->
-> ...
->
->>>>> @@ -140,9 +166,6 @@ static int of_coresight_parse_endpoint(struct
->>>>> device_node *ep,
->>>>>                  rparent = of_graph_get_port_parent(rep);
->>>>>                  if (!rparent)
->>>>>                          break;
->>>>> -               if (of_graph_parse_endpoint(rep, &rendpoint))
->>>>> -                       break;
->>>>> -
->>>>>                  /* If the remote device is not available, defer
->>>>> probing
->>>>> */
->>>>>                  rdev = of_coresight_get_endpoint_device(rparent);
->>>>>                  if (!rdev) {
->>>>> @@ -150,9 +173,15 @@ static int of_coresight_parse_endpoint(struct
->>>>> device_node *ep,
->>>>>                          break;
->>>>>                  }
->>>>>    -             conn->outport = endpoint.port;
->>>>> +               child_port = of_coresight_endpoint_get_port_id(rdev,
->>>>> rep);
->>>>> +               if (child_port < 0) {
->>>>> +                       ret = 0;
->>>>
->>>>
->>>>
->>>> Why returning '0' on an error condition?  Same for 'local_port' above.
->>>>
->>>
->>> If we are unable to parse a port, we can simply ignore the port and
->>> continue, which
->>> is what we have today with the existing code. I didn't change it and
->>> still
->>> think
->>> it is the best effort thing. We could spit a warning for such cases, if
->>> really needed.
->>> Also, the parsing code almost never fails at the moment. If it fails to
->>> find
->>> "reg" field,
->>> it is assumed to be '0'. Either way ignoring it seems harmless. That said
->>> I
->>> am open
->>> to suggestions.
->>
->>
->> Looking at the original code I remember not mandating enpoints to be
->> valid for debugging purposes.  That certainly helps when building up a
->> device tree file but also has the side effect of silently overlooking
->> specification problems.  Fortunately the revamping you did on that
->> part of the code makes it very easy to change that, something I think
->> we should take advantage of (it can only lead to positive scenarios
->> where defective specifications get pointed out).
->>
->> That being said and because the original behaviour is just as
->> permissive, you can leave as is.
->
->
-> Thanks. So can I assume the Reviewed-by applies for the code now ?
+On 05/29/2018 02:58 PM, Ray Jui wrote:
+> Change the PCIe INTx mapping to model the 4 INTx interrupts in the
+> IRQ domain of the iProc PCIe controller itself
+> 
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> ---
+>  arch/arm/boot/dts/bcm-cygnus.dtsi | 18 ++++++++++++++----
+>  1 file changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index 699fdf9..6de21ef 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -254,9 +254,14 @@
+>  			compatible = "brcm,iproc-pcie";
+>  			reg = <0x18012000 0x1000>;
+>  
+> +			interrupt-controller;
+>  			#interrupt-cells = <1>;
+> -			interrupt-map-mask = <0 0 0 0>;
+> -			interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0 0 0 1 &pcie0 1>,
+> +					<0 0 0 2 &pcie0 2>,
+> +					<0 0 0 3 &pcie0 3>,
+> +					<0 0 0 4 &pcie0 4>;
+> +			interrupts = <GIC_SPI 100 IRQ_TYPE_NONE>;
 
-Yes
+You would want to fix those IRQ_TYPE_NONE values as well because since
+commit 83a86fbb5b56b5eed8a476cc3fe214077d7c4f49 ("irqchip/gic: Loudly
+complain about the use of IRQ_TYPE_NONE") this is going to create some
+nice warnings on boot.
 
->
-> Suzuki
+I am about to send fixes for NSP and HR2 since that's what I have access
+to at the moment, but it would be good if you could send updates to the
+Cygnus and NS2 DTS files?
+
+Thanks
+
+>  
+>  			linux,pci-domain = <0>;
+>  
+> @@ -289,9 +294,14 @@
+>  			compatible = "brcm,iproc-pcie";
+>  			reg = <0x18013000 0x1000>;
+>  
+> +			interrupt-controller;
+>  			#interrupt-cells = <1>;
+> -			interrupt-map-mask = <0 0 0 0>;
+> -			interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0 0 0 1 &pcie1 1>,
+> +					<0 0 0 2 &pcie1 2>,
+> +					<0 0 0 3 &pcie1 3>,
+> +					<0 0 0 4 &pcie1 4>;
+> +			interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+>  
+>  			linux,pci-domain = <1>;
+>  
+> 
+
+
+-- 
+Florian
