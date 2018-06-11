@@ -1,76 +1,92 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 11 Jun 2018 13:01:17 +0200
-Subject: [PATCH v3 0/6] add virt-dma support for imx-sdma
-In-Reply-To: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
-References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1528714877.2842.3.camel@pengutronix.de>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Mon, 11 Jun 2018 11:52:17 +0200
+Subject: [PATCH] media: stm32-dcmi: revisit stop streaming ops
+Message-ID: <1528710737-8946-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Do not wait for interrupt completion when stopping streaming,
+stopping sensor and disabling interruptions are enough.
 
-this series breaks serial DMA for me. I wasn't able to dig in deeper
-yet. Please let me know if you can test/reproduce at your side, if not
-I'll try to find some time to collect some more debug info.
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+---
+ drivers/media/platform/stm32/stm32-dcmi.c | 29 +----------------------------
+ 1 file changed, 1 insertion(+), 28 deletions(-)
 
-Regards,
-Lucas
-
-Am Montag, den 11.06.2018, 22:59 +0800 schrieb Robin Gong:
-> The legacy sdma driver has below limitations or drawbacks:
-> ? 1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
-> ?????one page size for one channel regardless of only few BDs needed
-> ?????most time. But in few cases, the max PAGE_SIZE maybe not enough.
-> ? 2. One SDMA channel can't stop immediatley once channel disabled which
-> ?????means SDMA interrupt may come in after this channel terminated.There
-> ?????are some patches for this corner case such as commit "2746e2c389f9",
-> ?????but not cover non-cyclic.
-> 
-> The common virt-dma overcomes the above limitations. It can alloc bd
-> dynamically and free bd once this tx transfer done. No memory wasted or
-> maximum limititation here, only depends on how many memory can be requested
-> from kernel. For No.2, such issue can be workaround by checking if there
-> is available descript("sdmac->desc") now once the unwanted interrupt
-> coming. At last the common virt-dma is easier for sdma driver maintain.
-> 
-> Change from v2:
-> ? 1. include Sascha's patch to make the main patch easier to review.
-> ?????Thanks Sacha.
-> ? 2. remove useless 'desc'/'chan' in struct sdma_channe.
-> 
-> Change from v1:
-> ? 1. split v1 patch into 5 patches.
-> ? 2. remove some unnecessary condition check.
-> ? 3. remove unnecessary 'pending' list.
-> 
-> Robin Gong (5):
-> ? dmaengine: imx-sdma: add virt-dma support
-> ? Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
-> ????during interrupt"
-> ? dmaengine: imx-sdma: remove usless lock
-> ? dmaengine: imx-sdma: remove the maximum limation for bd numbers
-> ? dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
-> 
-> ?drivers/dma/Kconfig????|???1 +
-> ?drivers/dma/imx-sdma.c | 392 ++++++++++++++++++++++++++++---------------------
-> ?2 files changed, 227 insertions(+), 166 deletions(-)
-> 
-> --?
-> 2.7.4
-> 
-> Robin Gong (5):
-> ? dmaengine: imx-sdma: add virt-dma support
-> ? Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
-> ????during interrupt"
-> ? dmaengine: imx-sdma: remove usless lock
-> ? dmaengine: imx-sdma: remove the maximum limation for bd numbers
-> ? dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
-> 
-> Sascha Hauer (1):
-> ? dmaengine: imx-sdma: factor out a struct sdma_desc from struct
-> ????sdma_channel
-> 
-> ?drivers/dma/Kconfig????|???1 +
-> ?drivers/dma/imx-sdma.c | 391 ++++++++++++++++++++++++++++---------------------
-> ?2 files changed, 226 insertions(+), 166 deletions(-)
-> 
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 581ded0..f0134a6 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -87,7 +87,6 @@ enum state {
+ 	STOPPED = 0,
+ 	WAIT_FOR_BUFFER,
+ 	RUNNING,
+-	STOPPING,
+ };
+ 
+ #define MIN_WIDTH	16U
+@@ -432,18 +431,6 @@ static irqreturn_t dcmi_irq_thread(int irq, void *arg)
+ 
+ 	spin_lock_irq(&dcmi->irqlock);
+ 
+-	/* Stop capture is required */
+-	if (dcmi->state == STOPPING) {
+-		reg_clear(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
+-
+-		dcmi->state = STOPPED;
+-
+-		complete(&dcmi->complete);
+-
+-		spin_unlock_irq(&dcmi->irqlock);
+-		return IRQ_HANDLED;
+-	}
+-
+ 	if ((dcmi->misr & IT_OVR) || (dcmi->misr & IT_ERR)) {
+ 		dcmi->errors_count++;
+ 		if (dcmi->misr & IT_OVR)
+@@ -701,8 +688,6 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ {
+ 	struct stm32_dcmi *dcmi = vb2_get_drv_priv(vq);
+ 	struct dcmi_buf *buf, *node;
+-	unsigned long time_ms = msecs_to_jiffies(TIMEOUT_MS);
+-	long timeout;
+ 	int ret;
+ 
+ 	/* Disable stream on the sub device */
+@@ -712,13 +697,6 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ 			__func__, ret);
+ 
+ 	spin_lock_irq(&dcmi->irqlock);
+-	dcmi->state = STOPPING;
+-	spin_unlock_irq(&dcmi->irqlock);
+-
+-	timeout = wait_for_completion_interruptible_timeout(&dcmi->complete,
+-							    time_ms);
+-
+-	spin_lock_irq(&dcmi->irqlock);
+ 
+ 	/* Disable interruptions */
+ 	reg_clear(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
+@@ -726,12 +704,6 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ 	/* Disable DCMI */
+ 	reg_clear(dcmi->regs, DCMI_CR, CR_ENABLE);
+ 
+-	if (!timeout) {
+-		dev_err(dcmi->dev, "%s: Timeout during stop streaming\n",
+-			__func__);
+-		dcmi->state = STOPPED;
+-	}
+-
+ 	/* Return all queued buffers to vb2 in ERROR state */
+ 	list_for_each_entry_safe(buf, node, &dcmi->buffers, list) {
+ 		list_del_init(&buf->list);
+@@ -739,6 +711,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ 	}
+ 
+ 	dcmi->active = NULL;
++	dcmi->state = STOPPED;
+ 
+ 	spin_unlock_irq(&dcmi->irqlock);
+ 
+-- 
+1.9.1
