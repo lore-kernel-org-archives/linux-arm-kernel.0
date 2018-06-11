@@ -1,92 +1,54 @@
-From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Mon, 11 Jun 2018 11:52:17 +0200
-Subject: [PATCH] media: stm32-dcmi: revisit stop streaming ops
-Message-ID: <1528710737-8946-1-git-send-email-hugues.fruchet@st.com>
+From: dnelson@redhat.com (Dean Nelson)
+Date: Mon, 11 Jun 2018 06:22:14 -0500
+Subject: [PATCH] net: thunderx: prevent concurrent data re-writing by
+ nicvf_set_rx_mode
+In-Reply-To: <20180610.123551.885190586229525170.davem@davemloft.net>
+References: <20180608092759.28059-1-Vadim.Lomovtsev@caviumnetworks.com>
+ <20180610.123551.885190586229525170.davem@davemloft.net>
+Message-ID: <036618ae-887f-44b5-2b39-451b81191cc1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not wait for interrupt completion when stopping streaming,
-stopping sensor and disabling interruptions are enough.
+On 06/10/2018 02:35 PM, David Miller wrote:
+> From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> Date: Fri,  8 Jun 2018 02:27:59 -0700
+> 
+>> +	/* Save message data locally to prevent them from
+>> +	 * being overwritten by next ndo_set_rx_mode call().
+>> +	 */
+>> +	spin_lock(&nic->rx_mode_wq_lock);
+>> +	mode = vf_work->mode;
+>> +	mc = vf_work->mc;
+>> +	vf_work->mc = NULL;
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 29 +----------------------------
- 1 file changed, 1 insertion(+), 28 deletions(-)
+If I'm reading this code correctly, I believe nic->rx_mode_work.mc will
+have been set to NULL before the lock is dropped by
+nicvf_set_rx_mode_task() and acquired by nicvf_set_rx_mode().
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 581ded0..f0134a6 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -87,7 +87,6 @@ enum state {
- 	STOPPED = 0,
- 	WAIT_FOR_BUFFER,
- 	RUNNING,
--	STOPPING,
- };
- 
- #define MIN_WIDTH	16U
-@@ -432,18 +431,6 @@ static irqreturn_t dcmi_irq_thread(int irq, void *arg)
- 
- 	spin_lock_irq(&dcmi->irqlock);
- 
--	/* Stop capture is required */
--	if (dcmi->state == STOPPING) {
--		reg_clear(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
--
--		dcmi->state = STOPPED;
--
--		complete(&dcmi->complete);
--
--		spin_unlock_irq(&dcmi->irqlock);
--		return IRQ_HANDLED;
--	}
--
- 	if ((dcmi->misr & IT_OVR) || (dcmi->misr & IT_ERR)) {
- 		dcmi->errors_count++;
- 		if (dcmi->misr & IT_OVR)
-@@ -701,8 +688,6 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- {
- 	struct stm32_dcmi *dcmi = vb2_get_drv_priv(vq);
- 	struct dcmi_buf *buf, *node;
--	unsigned long time_ms = msecs_to_jiffies(TIMEOUT_MS);
--	long timeout;
- 	int ret;
- 
- 	/* Disable stream on the sub device */
-@@ -712,13 +697,6 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 			__func__, ret);
- 
- 	spin_lock_irq(&dcmi->irqlock);
--	dcmi->state = STOPPING;
--	spin_unlock_irq(&dcmi->irqlock);
--
--	timeout = wait_for_completion_interruptible_timeout(&dcmi->complete,
--							    time_ms);
--
--	spin_lock_irq(&dcmi->irqlock);
- 
- 	/* Disable interruptions */
- 	reg_clear(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
-@@ -726,12 +704,6 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 	/* Disable DCMI */
- 	reg_clear(dcmi->regs, DCMI_CR, CR_ENABLE);
- 
--	if (!timeout) {
--		dev_err(dcmi->dev, "%s: Timeout during stop streaming\n",
--			__func__);
--		dcmi->state = STOPPED;
--	}
--
- 	/* Return all queued buffers to vb2 in ERROR state */
- 	list_for_each_entry_safe(buf, node, &dcmi->buffers, list) {
- 		list_del_init(&buf->list);
-@@ -739,6 +711,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 	}
- 
- 	dcmi->active = NULL;
-+	dcmi->state = STOPPED;
- 
- 	spin_unlock_irq(&dcmi->irqlock);
- 
--- 
-1.9.1
+
+>> +	spin_unlock(&nic->rx_mode_wq_lock);
+> 
+> At the moment you drop this lock, the memory behind 'mc' can be
+> freed up by:
+> 
+>> +	spin_lock(&nic->rx_mode_wq_lock);
+>> +	kfree(nic->rx_mode_work.mc);
+
+So the kfree() will be called with a NULL pointer and quickly return.
+
+
+> 
+> And you'll crash when you dereference it above via
+> __nicvf_set_rx_mode_task().
+> 
+
+I believe the call to kfree() in nicvf_set_rx_mode() is there to free
+up a mc_list that has been allocated by nicvf_set_rx_mode() during a
+previous callback to the function, one that has not yet been processed
+by nicvf_set_rx_mode_task().
+
+In this way only the last 'unprocessed' callback to nicvf_set_rx_mode()
+gets processed should there be multiple callbacks occurring between the
+times the nicvf_set_rx_mode_task() runs.
+
+In my testing with this patch, this is what I see happening.
