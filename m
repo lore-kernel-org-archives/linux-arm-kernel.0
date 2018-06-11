@@ -1,100 +1,183 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Jun 2018 10:31:44 +0100
-Subject: [PATCH v2] irqchip/gic-v3-its: fix ITS queue timeout
-In-Reply-To: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
-References: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <0ebd8eef-1a86-3c7e-cd3b-f9580c497b5c@arm.com>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Mon, 11 Jun 2018 11:33:17 +0200
+Subject: [PATCH] media: stm32-dcmi: add power saving support
+Message-ID: <1528709597-7734-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/18 03:40, Yang Yingliang wrote:
-> When the kernel booted with maxcpus=x, 'x' is smaller
-> than actual cpu numbers, the TAs of offline cpus won't
-> be set to its->collection.
-> 
-> If LPI is bind to offline cpu, sync cmd will use zero TA,
-> it leads to ITS queue timeout.  Fix this by choosing a
-> online cpu, if there is no online cpu in cpu_mask.
-> 
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 5416f2b..d8b9539 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -2309,7 +2309,9 @@ static int its_irq_domain_activate(struct irq_domain *domain,
->  		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
->  
->  	/* Bind the LPI to the first possible CPU */
-> -	cpu = cpumask_first(cpu_mask);
-> +	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
-> +	if (cpu >= nr_cpu_ids)
-> +		cpu = cpumask_first(cpu_online_mask);
+Implements runtime & system sleep power management ops.
 
-I've thought about this one a bit more, and apart from breaking TX1
-in a very bad way, I think it is actually correct. It is just that
-the commit message doesn't make much sense.
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+---
+ drivers/media/platform/stm32/stm32-dcmi.c | 80 ++++++++++++++++++++++++-------
+ 1 file changed, 64 insertions(+), 16 deletions(-)
 
-The way I understand it is:
-- this is a NUMA system, with at least one node not online
-- the SRAT table indicates that this ITS is local to an offline node
-
-In that case, we need to pick an online CPU, and any will do (again,
-ignoring the silly Cavium erratum). Explained like this, the above
-hunk is sensible, and just needs to handle the TX1 quirk. Something like:
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5416f2b2ac21..21b7b5151177 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2309,7 +2309,13 @@ static int its_irq_domain_activate(struct irq_domain *domain,
- 		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 2e1933d..68da9ec 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -22,6 +22,7 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ #include <linux/videodev2.h>
+@@ -578,9 +579,9 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	u32 val = 0;
+ 	int ret;
  
- 	/* Bind the LPI to the first possible CPU */
--	cpu = cpumask_first(cpu_mask);
-+	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
-+	if (cpu >= nr_cpu_idx) {
-+		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144)
-+			return -EINVAL;
+-	ret = clk_enable(dcmi->mclk);
++	ret = pm_runtime_get_sync(dcmi->dev);
+ 	if (ret) {
+-		dev_err(dcmi->dev, "%s: Failed to start streaming, cannot enable clock\n",
++		dev_err(dcmi->dev, "%s: Failed to start streaming, cannot get sync\n",
+ 			__func__);
+ 		goto err_release_buffers;
+ 	}
+@@ -590,7 +591,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	if (ret && ret != -ENOIOCTLCMD) {
+ 		dev_err(dcmi->dev, "%s: Failed to start streaming, subdev streamon error",
+ 			__func__);
+-		goto err_disable_clock;
++		goto err_pm_put;
+ 	}
+ 
+ 	spin_lock_irq(&dcmi->irqlock);
+@@ -675,8 +676,8 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ err_subdev_streamoff:
+ 	v4l2_subdev_call(dcmi->entity.subdev, video, s_stream, 0);
+ 
+-err_disable_clock:
+-	clk_disable(dcmi->mclk);
++err_pm_put:
++	pm_runtime_put(dcmi->dev);
+ 
+ err_release_buffers:
+ 	spin_lock_irq(&dcmi->irqlock);
+@@ -749,7 +750,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ 	/* Stop all pending DMA operations */
+ 	dmaengine_terminate_all(dcmi->dma_chan);
+ 
+-	clk_disable(dcmi->mclk);
++	pm_runtime_put(dcmi->dev);
+ 
+ 	if (dcmi->errors_count)
+ 		dev_warn(dcmi->dev, "Some errors found while streaming: errors=%d (overrun=%d), buffers=%d\n",
+@@ -1751,12 +1752,6 @@ static int dcmi_probe(struct platform_device *pdev)
+ 		return -EPROBE_DEFER;
+ 	}
+ 
+-	ret = clk_prepare(mclk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Unable to prepare mclk %p\n", mclk);
+-		goto err_dma_release;
+-	}
+-
+ 	spin_lock_init(&dcmi->irqlock);
+ 	mutex_init(&dcmi->lock);
+ 	init_completion(&dcmi->complete);
+@@ -1772,7 +1767,7 @@ static int dcmi_probe(struct platform_device *pdev)
+ 	/* Initialize the top-level structure */
+ 	ret = v4l2_device_register(&pdev->dev, &dcmi->v4l2_dev);
+ 	if (ret)
+-		goto err_clk_unprepare;
++		goto err_dma_release;
+ 
+ 	dcmi->vdev = video_device_alloc();
+ 	if (!dcmi->vdev) {
+@@ -1832,14 +1827,15 @@ static int dcmi_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "Probe done\n");
+ 
+ 	platform_set_drvdata(pdev, dcmi);
 +
-+		cpu = cpumask_first(cpu_online_mask);
-+	}
- 	its_dev->event_map.col_map[event] = cpu;
- 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
++	pm_runtime_enable(&pdev->dev);
++
+ 	return 0;
  
-
->  	its_dev->event_map.col_map[event] = cpu;
->  	irq_data_update_effective_affinity(d, cpumask_of(cpu));
->  
-> @@ -2466,7 +2468,10 @@ static int its_vpe_set_affinity(struct irq_data *d,
->  				bool force)
->  {
->  	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-> -	int cpu = cpumask_first(mask_val);
-> +	int cpu = cpumask_first_and(mask_val, cpu_online_mask);
-> +
-> +	if (cpu >= nr_cpu_ids)
-> +		cpu = cpumask_first(cpu_online_mask);
->  
->  	/*
->  	 * Changing affinity is mega expensive, so let's be as lazy as
-> 
-
-This hunk, on the other hand, is completely useless. Look how this is
-called from vgic_v4_flush_hwstate():
-
-	err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
-
-The mask is always that of the CPU we run on, and we're in a non-premptible
-section. So no way we can be targeting an offline CPU.
-
-If you quickly respin this patch with a decent commit log, I'll take it.
-
-Thanks,
-
-	M.
+ err_device_release:
+ 	video_device_release(dcmi->vdev);
+ err_device_unregister:
+ 	v4l2_device_unregister(&dcmi->v4l2_dev);
+-err_clk_unprepare:
+-	clk_unprepare(dcmi->mclk);
+ err_dma_release:
+ 	dma_release_channel(dcmi->dma_chan);
+ 
+@@ -1850,20 +1846,72 @@ static int dcmi_remove(struct platform_device *pdev)
+ {
+ 	struct stm32_dcmi *dcmi = platform_get_drvdata(pdev);
+ 
++	pm_runtime_disable(&pdev->dev);
++
+ 	v4l2_async_notifier_unregister(&dcmi->notifier);
+ 	v4l2_device_unregister(&dcmi->v4l2_dev);
+-	clk_unprepare(dcmi->mclk);
++
+ 	dma_release_channel(dcmi->dma_chan);
+ 
+ 	return 0;
+ }
+ 
++static __maybe_unused int dcmi_runtime_suspend(struct device *dev)
++{
++	struct stm32_dcmi *dcmi = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(dcmi->mclk);
++
++	return 0;
++}
++
++static __maybe_unused int dcmi_runtime_resume(struct device *dev)
++{
++	struct stm32_dcmi *dcmi = dev_get_drvdata(dev);
++	int ret;
++
++	ret = clk_prepare_enable(dcmi->mclk);
++	if (ret)
++		dev_err(dev, "%s: Failed to prepare_enable clock\n", __func__);
++
++	return ret;
++}
++
++static __maybe_unused int dcmi_suspend(struct device *dev)
++{
++	/* disable clock */
++	pm_runtime_force_suspend(dev);
++
++	/* change pinctrl state */
++	pinctrl_pm_select_sleep_state(dev);
++
++	return 0;
++}
++
++static __maybe_unused int dcmi_resume(struct device *dev)
++{
++	/* restore pinctl default state */
++	pinctrl_pm_select_default_state(dev);
++
++	/* clock enable */
++	pm_runtime_force_resume(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops dcmi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(dcmi_suspend, dcmi_resume)
++	SET_RUNTIME_PM_OPS(dcmi_runtime_suspend,
++			   dcmi_runtime_resume, NULL)
++};
++
+ static struct platform_driver stm32_dcmi_driver = {
+ 	.probe		= dcmi_probe,
+ 	.remove		= dcmi_remove,
+ 	.driver		= {
+ 		.name = DRV_NAME,
+ 		.of_match_table = of_match_ptr(stm32_dcmi_of_match),
++		.pm = &dcmi_pm_ops,
+ 	},
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
