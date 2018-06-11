@@ -1,114 +1,100 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 11 Jun 2018 10:22:43 +0100
-Subject: [PATCH 08/20] coresight: dts: Cleanup device tree graph bindings
-In-Reply-To: <20180608212211.GG30587@xps15>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-9-git-send-email-suzuki.poulose@arm.com>
- <20180608212211.GG30587@xps15>
-Message-ID: <f616c825-b459-397d-3e61-70c1f1790f4f@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Jun 2018 10:31:44 +0100
+Subject: [PATCH v2] irqchip/gic-v3-its: fix ITS queue timeout
+In-Reply-To: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
+References: <1528252824-15144-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <0ebd8eef-1a86-3c7e-cd3b-f9580c497b5c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/18 22:22, Mathieu Poirier wrote:
-> On Tue, Jun 05, 2018 at 10:43:19PM +0100, Suzuki K Poulose wrote:
->> The coresight drivers relied on default bindings for graph
->> in DT, while reusing the "reg" field of the "ports" to indicate
->> the actual hardware port number for the connections. However,
->> with the rules getting stricter w.r.t to the address mismatch
->> with the label, it is no longer possible to use the port address
->> field for the hardware port number. Hence, we add an explicit
->> property to denote the hardware port number, "coresight,hwid"
->> which must be specified for each "endpoint".
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Rob Herring <robh@kernel.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   .../devicetree/bindings/arm/coresight.txt          | 29 ++++++++++---
->>   drivers/hwtracing/coresight/of_coresight.c         | 49 +++++++++++++++++-----
->>   2 files changed, 62 insertions(+), 16 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
->> index ed6b555..bf75ab3 100644
->> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->> @@ -108,8 +108,13 @@ following properties to uniquely identify the connection details.
->>   	"slave-mode"
-
-
->>   	};
+On 06/06/18 03:40, Yang Yingliang wrote:
+> When the kernel booted with maxcpus=x, 'x' is smaller
+> than actual cpu numbers, the TAs of offline cpus won't
+> be set to its->collection.
 > 
-> For the binding part:
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> If LPI is bind to offline cpu, sync cmd will use zero TA,
+> it leads to ITS queue timeout.  Fix this by choosing a
+> online cpu, if there is no online cpu in cpu_mask.
 > 
->> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
->> index d01a9ce..d23d7dd 100644
->> --- a/drivers/hwtracing/coresight/of_coresight.c
->> +++ b/drivers/hwtracing/coresight/of_coresight.c
-
-...
-
->> +/*
->>    * of_coresight_parse_endpoint : Parse the given output endpoint @ep
->>    * and fill the connection information in *@pconn.
->>    *
->> @@ -109,11 +134,11 @@ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
->>    *	 0	- If the parsing completed without any fatal errors.
-
-Please note the return value description here. Further comments below.
-
->>    *	-Errno	- Fatal error, abort the scanning.
->>    */
->> -static int of_coresight_parse_endpoint(struct device_node *ep,
->> +static int of_coresight_parse_endpoint(struct device *dev,
->> +				       struct device_node *ep,
->>   				       struct coresight_connection **pconn)
->>   {
->> -	int ret = 0;
->> -	struct of_endpoint endpoint, rendpoint;
->> +	int ret = 0, local_port, child_port;
->>   	struct device_node *rparent = NULL;
->>   	struct device_node *rep = NULL;
->>   	struct device *rdev = NULL;
->> @@ -128,7 +153,8 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
->>   			break;
->>   
->>   		/* Parse the local port details */
->> -		if (of_graph_parse_endpoint(ep, &endpoint))
->> +		local_port = of_coresight_endpoint_get_port_id(dev, ep);
->> +		if (local_port < 0)
->>   			break;
->>   		/*
->>   		 * Get a handle on the remote endpoint and the device it is
->> @@ -140,9 +166,6 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
->>   		rparent = of_graph_get_port_parent(rep);
->>   		if (!rparent)
->>   			break;
->> -		if (of_graph_parse_endpoint(rep, &rendpoint))
->> -			break;
->> -
->>   		/* If the remote device is not available, defer probing */
->>   		rdev = of_coresight_get_endpoint_device(rparent);
->>   		if (!rdev) {
->> @@ -150,9 +173,15 @@ static int of_coresight_parse_endpoint(struct device_node *ep,
->>   			break;
->>   		}
->>   
->> -		conn->outport = endpoint.port;
->> +		child_port = of_coresight_endpoint_get_port_id(rdev, rep);
->> +		if (child_port < 0) {
->> +			ret = 0;
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> Why returning '0' on an error condition?  Same for 'local_port' above.
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 5416f2b..d8b9539 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -2309,7 +2309,9 @@ static int its_irq_domain_activate(struct irq_domain *domain,
+>  		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+>  
+>  	/* Bind the LPI to the first possible CPU */
+> -	cpu = cpumask_first(cpu_mask);
+> +	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
+> +	if (cpu >= nr_cpu_ids)
+> +		cpu = cpumask_first(cpu_online_mask);
+
+I've thought about this one a bit more, and apart from breaking TX1
+in a very bad way, I think it is actually correct. It is just that
+the commit message doesn't make much sense.
+
+The way I understand it is:
+- this is a NUMA system, with at least one node not online
+- the SRAT table indicates that this ITS is local to an offline node
+
+In that case, we need to pick an online CPU, and any will do (again,
+ignoring the silly Cavium erratum). Explained like this, the above
+hunk is sensible, and just needs to handle the TX1 quirk. Something like:
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 5416f2b2ac21..21b7b5151177 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -2309,7 +2309,13 @@ static int its_irq_domain_activate(struct irq_domain *domain,
+ 		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+ 
+ 	/* Bind the LPI to the first possible CPU */
+-	cpu = cpumask_first(cpu_mask);
++	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
++	if (cpu >= nr_cpu_idx) {
++		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144)
++			return -EINVAL;
++
++		cpu = cpumask_first(cpu_online_mask);
++	}
+ 	its_dev->event_map.col_map[event] = cpu;
+ 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
+ 
+
+>  	its_dev->event_map.col_map[event] = cpu;
+>  	irq_data_update_effective_affinity(d, cpumask_of(cpu));
+>  
+> @@ -2466,7 +2468,10 @@ static int its_vpe_set_affinity(struct irq_data *d,
+>  				bool force)
+>  {
+>  	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
+> -	int cpu = cpumask_first(mask_val);
+> +	int cpu = cpumask_first_and(mask_val, cpu_online_mask);
+> +
+> +	if (cpu >= nr_cpu_ids)
+> +		cpu = cpumask_first(cpu_online_mask);
+>  
+>  	/*
+>  	 * Changing affinity is mega expensive, so let's be as lazy as
 > 
 
-If we are unable to parse a port, we can simply ignore the port and continue, which
-is what we have today with the existing code. I didn't change it and still think
-it is the best effort thing. We could spit a warning for such cases, if really needed.
-Also, the parsing code almost never fails at the moment. If it fails to find "reg" field,
-it is assumed to be '0'. Either way ignoring it seems harmless. That said I am open
-to suggestions.
+This hunk, on the other hand, is completely useless. Look how this is
+called from vgic_v4_flush_hwstate():
 
-Cheers
-Suzuki
+	err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
+
+The mask is always that of the CPU we run on, and we're in a non-premptible
+section. So no way we can be targeting an offline CPU.
+
+If you quickly respin this patch with a decent commit log, I'll take it.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
