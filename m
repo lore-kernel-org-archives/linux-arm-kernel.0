@@ -1,40 +1,42 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Mon, 11 Jun 2018 20:25:09 +0800
-Subject: [PATCH v3] irqchip/gic-v3-its: fix ITS queue timeout
-Message-ID: <1528719909-16572-1-git-send-email-yangyingliang@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Jun 2018 13:31:04 +0100
+Subject: [PATCH] arm64: dma-mapping: clear buffers allocated with
+ FORCE_CONTIGUOUS flag
+In-Reply-To: <CAMuHMdV8PTBArnaoXMXsuTqxLcizAZe4YO59TkZ6Wj-F4M6Sbg@mail.gmail.com>
+References: <CGME20180611051352eucas1p1f256a2a303da85a1e0923f012d709e39@eucas1p1.samsung.com>
+ <20180611051340.9024-1-m.szyprowski@samsung.com>
+ <CAMuHMdV8PTBArnaoXMXsuTqxLcizAZe4YO59TkZ6Wj-F4M6Sbg@mail.gmail.com>
+Message-ID: <20180611123104.GD1050@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a NUMA system, if an ITS is local to an offline
-node, the ITS driver may pick an offline CPU to bind
-the LPI. In this case, we need to pick an online CPU.
-But on some systems, binding LPI to non-local node
-CPU will cause deadlock. In this case, we don't
-bind the LPI to any online CPU and return an error code.
+On Mon, Jun 11, 2018 at 09:55:54AM +0200, Geert Uytterhoeven wrote:
+> Hi Marek,
+> 
+> Thanks for your patch!
+> 
+> On Mon, Jun 11, 2018 at 7:14 AM Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > dma_alloc_*() buffers might be exposed to userspace via mmap() call, so
+> > they should be cleared on allocation. In case of IOMMU-based dma-mapping
+> > implementation such buffer clearing was missing in the code path for
+> > DMA_ATTR_FORCE_CONTIGUOUS flag handling. This patch fixes this issue. For
+> 
+> Is it? The memory is allocated using dma_alloc_from_contiguous(..., gfp),
+> and __iommu_alloc_attrs() has
+> 
+>         /*
+>          * Some drivers rely on this, and we probably don't want the
+>          * possibility of stale kernel data being read by devices anyway.
+>          */
+>         gfp |= __GFP_ZERO;
+> 
+> at the top, before the allocation.
+> 
+> If cma_alloc() (called from dma_alloc_from_contiguous()) doesn't honor
+> __GFP_ZERO, I think cma_alloc() should be fixed instead.
 
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Agreed. We tried to fix this in 7132813c3845 ("arm64: Honor __GFP_ZERO in
+dma allocations"). Has something broken that?
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5416f2b..137c433 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2309,7 +2309,13 @@ static int its_irq_domain_activate(struct irq_domain *domain,
- 		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 
- 	/* Bind the LPI to the first possible CPU */
--	cpu = cpumask_first(cpu_mask);
-+	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
-+	if (cpu >= nr_cpu_ids) {
-+		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144)
-+			return -EINVAL;
-+
-+		cpu = cpumask_first(cpu_online_mask);
-+	}
- 	its_dev->event_map.col_map[event] = cpu;
- 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
- 
--- 
-1.8.3
+Will
