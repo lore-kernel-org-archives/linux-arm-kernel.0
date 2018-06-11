@@ -1,38 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 11 Jun 2018 14:01:58 +0200
-Subject: handling voice calls in ALSA soc (on Droid 4)
-In-Reply-To: <20180611111011.GA11580@sirena.org.uk>
-References: <20180611102529.GA1272@amd> <20180611111011.GA11580@sirena.org.uk>
-Message-ID: <20180611120158.GA21745@amd>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Mon, 11 Jun 2018 12:09:22 +0000
+Subject: [PATCH v3 0/6] add virt-dma support for imx-sdma
+In-Reply-To: <1528714877.2842.3.camel@pengutronix.de>
+References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>,
+ <1528714877.2842.3.camel@pengutronix.de>
+Message-ID: <8C06065A-DC99-4DA8-BF97-0C3BFE95C080@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2018-06-11 12:10:11, Mark Brown wrote:
-> On Mon, Jun 11, 2018 at 12:25:30PM +0200, Pavel Machek wrote:
+
+Hi Lucas,
+    Thank for your report, I tested it only on SPI, will update to you after try on uart tomorrow.
+
+> ? 2018?6?11????7:01?Lucas Stach <l.stach@pengutronix.de> ???
 > 
-> > ...and also. What is right interface for this? Mixer component that
-> > says if voice call is active or not?
+> Hi Robin,
 > 
-> Your modem should be represented as a component in the system and have
-> an input and an output representing the input and output on the cell
-> network.  See speyside for an example of how this can look in software
-> though there's a bunch of different ways modems can appear so you might
-> not have a fully digital link like that.
-
-Thanks for the pointer.
-
-With setup like that, how does userland tell kernel that the baseband
-<-> microphone/speaker connection should be activated?
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180611/43c03f41/attachment.sig>
+> this series breaks serial DMA for me. I wasn't able to dig in deeper
+> yet. Please let me know if you can test/reproduce at your side, if not
+> I'll try to find some time to collect some more debug info.
+> 
+> Regards,
+> Lucas
+> 
+> Am Montag, den 11.06.2018, 22:59 +0800 schrieb Robin Gong:
+>> The legacy sdma driver has below limitations or drawbacks:
+>>   1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
+>>      one page size for one channel regardless of only few BDs needed
+>>      most time. But in few cases, the max PAGE_SIZE maybe not enough.
+>>   2. One SDMA channel can't stop immediatley once channel disabled which
+>>      means SDMA interrupt may come in after this channel terminated.There
+>>      are some patches for this corner case such as commit "2746e2c389f9",
+>>      but not cover non-cyclic.
+>> 
+>> The common virt-dma overcomes the above limitations. It can alloc bd
+>> dynamically and free bd once this tx transfer done. No memory wasted or
+>> maximum limititation here, only depends on how many memory can be requested
+>> from kernel. For No.2, such issue can be workaround by checking if there
+>> is available descript("sdmac->desc") now once the unwanted interrupt
+>> coming. At last the common virt-dma is easier for sdma driver maintain.
+>> 
+>> Change from v2:
+>>   1. include Sascha's patch to make the main patch easier to review.
+>>      Thanks Sacha.
+>>   2. remove useless 'desc'/'chan' in struct sdma_channe.
+>> 
+>> Change from v1:
+>>   1. split v1 patch into 5 patches.
+>>   2. remove some unnecessary condition check.
+>>   3. remove unnecessary 'pending' list.
+>> 
+>> Robin Gong (5):
+>>   dmaengine: imx-sdma: add virt-dma support
+>>   Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
+>>     during interrupt"
+>>   dmaengine: imx-sdma: remove usless lock
+>>   dmaengine: imx-sdma: remove the maximum limation for bd numbers
+>>   dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
+>> 
+>>  drivers/dma/Kconfig    |   1 +
+>>  drivers/dma/imx-sdma.c | 392 ++++++++++++++++++++++++++++---------------------
+>>  2 files changed, 227 insertions(+), 166 deletions(-)
+>> 
+>> -- 
+>> 2.7.4
+>> 
+>> Robin Gong (5):
+>>   dmaengine: imx-sdma: add virt-dma support
+>>   Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
+>>     during interrupt"
+>>   dmaengine: imx-sdma: remove usless lock
+>>   dmaengine: imx-sdma: remove the maximum limation for bd numbers
+>>   dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
+>> 
+>> Sascha Hauer (1):
+>>   dmaengine: imx-sdma: factor out a struct sdma_desc from struct
+>>     sdma_channel
+>> 
+>>  drivers/dma/Kconfig    |   1 +
+>>  drivers/dma/imx-sdma.c | 391 ++++++++++++++++++++++++++++---------------------
+>>  2 files changed, 226 insertions(+), 166 deletions(-)
+>> 
