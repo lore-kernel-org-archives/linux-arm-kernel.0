@@ -1,88 +1,95 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 11 Jun 2018 15:47:14 -0700
-Subject: [PATCH 3/3] ARM: dts: HR2: Fix interrupt types for i2c and PCIe
+Date: Mon, 11 Jun 2018 15:47:13 -0700
+Subject: [PATCH 2/3] ARM: dts: NSP: Fix PCIe controllers interrupt types
 In-Reply-To: <20180611224714.7007-1-f.fainelli@gmail.com>
 References: <20180611224714.7007-1-f.fainelli@gmail.com>
-Message-ID: <20180611224714.7007-4-f.fainelli@gmail.com>
+Message-ID: <20180611224714.7007-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c and PCIe controllers had an incorrect type which should have
-been set to IRQ_TYPE_LEVEL_HIGH, fix that.
+The interrupts for the PCIe controllers should all be of type
+IRQ_TYPE_LEVEL_HIGH instead of IRQ_TYPE_NONE.
 
-Fixes: b9099ec754b5 ("ARM: dts: Add Broadcom Hurricane 2 DTS include file")
+Fixes: d71eb9412088 ("ARM: dts: NSP: Add MSI support on PCI")
+Fixes: 522199029fdc ("ARM: dts: NSP: Fix PCIE DT issue")
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/bcm-hr2.dtsi | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/bcm-nsp.dtsi | 30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm-hr2.dtsi b/arch/arm/boot/dts/bcm-hr2.dtsi
-index 3f9cedd8011f..3084a7c95733 100644
---- a/arch/arm/boot/dts/bcm-hr2.dtsi
-+++ b/arch/arm/boot/dts/bcm-hr2.dtsi
-@@ -264,7 +264,7 @@
- 			reg = <0x38000 0x50>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			interrupts = <GIC_SPI 95 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-frequency = <100000>;
- 		};
- 
-@@ -279,7 +279,7 @@
- 			reg = <0x3b000 0x50>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			interrupts = <GIC_SPI 96 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-frequency = <100000>;
- 		};
- 	};
-@@ -300,7 +300,7 @@
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index c6aa62386941..09ba85046322 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -496,7 +496,7 @@
  
  		#interrupt-cells = <1>;
  		interrupt-map-mask = <0 0 0 0>;
--		interrupt-map = <0 0 0 0 &gic GIC_SPI 186 IRQ_TYPE_NONE>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-map = <0 0 0 0 &gic GIC_SPI 131 IRQ_TYPE_NONE>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
  
  		linux,pci-domain = <0>;
  
-@@ -322,10 +322,10 @@
+@@ -519,10 +519,10 @@
  			compatible = "brcm,iproc-msi";
  			msi-controller;
  			interrupt-parent = <&gic>;
--			interrupts = <GIC_SPI 182 IRQ_TYPE_NONE>,
--				     <GIC_SPI 183 IRQ_TYPE_NONE>,
--				     <GIC_SPI 184 IRQ_TYPE_NONE>,
--				     <GIC_SPI 185 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupts = <GIC_SPI 127 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 128 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 129 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 130 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
  			brcm,pcie-msi-inten;
  		};
  	};
-@@ -336,7 +336,7 @@
+@@ -533,7 +533,7 @@
  
  		#interrupt-cells = <1>;
  		interrupt-map-mask = <0 0 0 0>;
--		interrupt-map = <0 0 0 0 &gic GIC_SPI 192 IRQ_TYPE_NONE>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-map = <0 0 0 0 &gic GIC_SPI 137 IRQ_TYPE_NONE>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
  
  		linux,pci-domain = <1>;
  
-@@ -358,10 +358,10 @@
+@@ -556,10 +556,10 @@
  			compatible = "brcm,iproc-msi";
  			msi-controller;
  			interrupt-parent = <&gic>;
--			interrupts = <GIC_SPI 188 IRQ_TYPE_NONE>,
--				     <GIC_SPI 189 IRQ_TYPE_NONE>,
--				     <GIC_SPI 190 IRQ_TYPE_NONE>,
--				     <GIC_SPI 191 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupts = <GIC_SPI 133 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 134 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 135 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 136 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
+ 			brcm,pcie-msi-inten;
+ 		};
+ 	};
+@@ -570,7 +570,7 @@
+ 
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0 0 0 0 &gic GIC_SPI 143 IRQ_TYPE_NONE>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		linux,pci-domain = <2>;
+ 
+@@ -593,10 +593,10 @@
+ 			compatible = "brcm,iproc-msi";
+ 			msi-controller;
+ 			interrupt-parent = <&gic>;
+-			interrupts = <GIC_SPI 139 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 140 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 141 IRQ_TYPE_NONE>,
+-				     <GIC_SPI 142 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
  			brcm,pcie-msi-inten;
  		};
  	};
