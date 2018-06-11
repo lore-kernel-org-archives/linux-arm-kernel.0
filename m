@@ -1,81 +1,96 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 11 Jun 2018 11:00:28 +0900
-Subject: [GIT PULL] Allwinner clock changes for 4.18
-In-Reply-To: <20180521115947.wqrnv2hczate65lz@flea>
-References: <20180521115947.wqrnv2hczate65lz@flea>
-Message-ID: <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Mon, 11 Jun 2018 11:14:29 +0900
+Subject: [PATCH] ASoC: audio-graph-card: add hp and mic detect gpios same
+ as simple-card
+In-Reply-To: <87h8makxt7.wl-kuninori.morimoto.gx@renesas.com>
+References: <20180608080843.11097-1-suzuki.katsuhiro@socionext.com>
+ <87h8makxt7.wl-kuninori.morimoto.gx@renesas.com>
+Message-ID: <007301d40129$ee1c8380$ca558a80$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hello Morimoto-san,
+
+Thank you for your reviewing.
+
+> -----Original Message-----
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Sent: Monday, June 11, 2018 8:53 AM
+> To: Suzuki, Katsuhiro <suzuki.katsuhiro@socionext.com>
+> Cc: Mark Brown <broonie@kernel.org>; alsa-devel at alsa-project.org; Masami
+Hiramatsu
+> <masami.hiramatsu@linaro.org>; Jassi Brar <jaswinder.singh@linaro.org>;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH] ASoC: audio-graph-card: add hp and mic detect gpios same
+as
+> simple-card
+> 
+> 
+> Hi Katsuhiro-san
+> 
+> Thank you for your patch
+> 
+> > This patch adds headphone and microphone jack detection gpios as same
+> > as simple-card driver. This feature move into simple-card-utils from
+> > simple-card to avoid the duplicating code.
+> >
+> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> > ---
+> 
+> I think it can be 2 patches ?
+>  1. move function from simple-card to simple-card-utils
+>  2. use it from audio-graph-card
+> 
+
+OK, I'll split this patch.
 
 
-2018-05-21 20:59 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
-> Hi Mike, Stephen,
->
-> Please merge the following changes for the next merge window, thanks!
->
-> Maxime
->
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
->
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
->
-> are available in the Git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.18
->
-> for you to fetch changes up to 17de4c857b1f74b90967f7e7fd5ff81be61dc044:
->
->   clk: sunxi-ng: r40: export a regmap to access the GMAC register (2018-05-17 14:02:07 +0800)
->
-> ----------------------------------------------------------------
-> Allwinner clock changes for 4.18
->
-> Not a lot of changes for this release, but two quite important features
-> were added: the H6 PRCM clock support, and the needed changes to the R40
-> clock driver to allow for the EMAC to operate.
->
-> ----------------------------------------------------------------
-> Icenowy Zheng (3):
->       clk: sunxi-ng: add support for H6 PRCM CCU
->       clk: sunxi-ng: r40: rewrite init code to a platform driver
->       clk: sunxi-ng: r40: export a regmap to access the GMAC register
->
+> > +static int asoc_graph_soc_card_probe(struct snd_soc_card *card)
+> > +{
+> > +	struct graph_card_data *priv = snd_soc_card_get_drvdata(card);
+> > +	int ret;
+> > +
+> > +	ret = asoc_simple_card_init_hp(card, &priv->hp_jack, NULL);
+> > +	if (ret < 0)
+> > +		return ret;
+> > +
+> > +	ret = asoc_simple_card_init_mic(card, &priv->mic_jack, NULL);
+> > +	if (ret < 0)
+> > +		return ret;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  static int asoc_graph_card_probe(struct platform_device *pdev)
+> >  {
+> >  	struct graph_card_data *priv;
+> > @@ -319,6 +336,7 @@ static int asoc_graph_card_probe(struct platform_device
+> *pdev)
+> >  	card->num_links	= num;
+> >  	card->dapm_widgets = asoc_graph_card_dapm_widgets;
+> >  	card->num_dapm_widgets = ARRAY_SIZE(asoc_graph_card_dapm_widgets);
+> > +	card->probe	= asoc_graph_soc_card_probe;
+> 
+> Current simple-card is calling init_hp/init_mic from
+> asoc_simple_card_dai_init(), and audio-graph-card has
+> asoc_graph_card_dai_init().
+> simple/audio card are doing samethings in different style.
+> Thus, I want to synchronized whole simple/audio card.
+> 
+
+Indeed. I need to add more one patch.
+
+  1. move function from simple-card to simple-card-utils
+  2. change calling init_hp/mic from soc_dai_link.init() to
+     soc_card.probe()
+  3. use it from audio-graph-card
 
 
-
-Why was my patch "clk: sunxi-ng: replace lib-y with obj-y"
-not included in the pull request?
-
-
-You said "I've picked it up"
-https://patchwork.kernel.org/patch/10348031/
+Regards,
+--
+Katsuhiro Suzuki
 
 
-
-
->  .../devicetree/bindings/clock/sunxi-ccu.txt        |   3 +-
->  drivers/clk/sunxi-ng/Kconfig                       |   5 +
->  drivers/clk/sunxi-ng/Makefile                      |   1 +
->  drivers/clk/sunxi-ng/ccu-sun50i-h6-r.c             | 207 +++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu-sun50i-h6-r.h             |  19 ++
->  drivers/clk/sunxi-ng/ccu-sun8i-r40.c               |  72 +++++--
->  include/dt-bindings/clock/sun50i-h6-r-ccu.h        |  24 +++
->  include/dt-bindings/reset/sun50i-h6-r-ccu.h        |  17 ++
->  8 files changed, 336 insertions(+), 12 deletions(-)
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6-r.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6-r.h
->  create mode 100644 include/dt-bindings/clock/sun50i-h6-r-ccu.h
->  create mode 100644 include/dt-bindings/reset/sun50i-h6-r-ccu.h
->
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> Best regards
+> ---
+> Kuninori Morimoto
