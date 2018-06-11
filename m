@@ -1,76 +1,51 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 11 Jun 2018 21:14:32 +0800
-Subject: [PATCH] media: stm32-dcmi: add power saving support
-In-Reply-To: <1528709597-7734-1-git-send-email-hugues.fruchet@st.com>
-References: <1528709597-7734-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <201806112037.iiIK0YgK%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Jun 2018 14:21:56 +0100
+Subject: [PATCH v3] irqchip/gic-v3-its: fix ITS queue timeout
+In-Reply-To: <1528719909-16572-1-git-send-email-yangyingliang@huawei.com>
+References: <1528719909-16572-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <ee543de9-8a9c-877f-2070-8009da35b3a8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
+On 11/06/18 13:25, Yang Yingliang wrote:
+> On a NUMA system, if an ITS is local to an offline
+> node, the ITS driver may pick an offline CPU to bind
+> the LPI. In this case, we need to pick an online CPU.
+> But on some systems, binding LPI to non-local node
+> CPU will cause deadlock. In this case, we don't
+> bind the LPI to any online CPU and return an error code.
+> 
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 5416f2b..137c433 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -2309,7 +2309,13 @@ static int its_irq_domain_activate(struct irq_domain *domain,
+>  		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+>  
+>  	/* Bind the LPI to the first possible CPU */
+> -	cpu = cpumask_first(cpu_mask);
+> +	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
+> +	if (cpu >= nr_cpu_ids) {
+> +		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144)
+> +			return -EINVAL;
+> +
+> +		cpu = cpumask_first(cpu_online_mask);
+> +	}
+>  	its_dev->event_map.col_map[event] = cpu;
+>  	irq_data_update_effective_affinity(d, cpumask_of(cpu));
+>  
+> 
 
-I love your patch! Yet something to improve:
+Queued as a fix for 4.18 with a slightly updated change-log and a cc to
+stable.
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.17 next-20180608]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks,
 
-url:    https://github.com/0day-ci/linux/commits/Hugues-Fruchet/media-stm32-dcmi-add-power-saving-support/20180611-174016
-base:   git://linuxtv.org/media_tree.git master
-config: sparc64-allyesconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
-
-All errors (new ones prefixed by >>):
-
-   drivers/media//platform/stm32/stm32-dcmi.c: In function 'dcmi_suspend':
-   drivers/media//platform/stm32/stm32-dcmi.c:1886:2: error: implicit declaration of function 'pinctrl_pm_select_sleep_state' [-Werror=implicit-function-declaration]
-     pinctrl_pm_select_sleep_state(dev);
-     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/media//platform/stm32/stm32-dcmi.c: In function 'dcmi_resume':
->> drivers/media//platform/stm32/stm32-dcmi.c:1894:2: error: implicit declaration of function 'pinctrl_pm_select_default_state'; did you mean 'irq_set_default_host'? [-Werror=implicit-function-declaration]
-     pinctrl_pm_select_default_state(dev);
-     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     irq_set_default_host
-   cc1: some warnings being treated as errors
-
-vim +1894 drivers/media//platform/stm32/stm32-dcmi.c
-
-  1879	
-  1880	static __maybe_unused int dcmi_suspend(struct device *dev)
-  1881	{
-  1882		/* disable clock */
-  1883		pm_runtime_force_suspend(dev);
-  1884	
-  1885		/* change pinctrl state */
-> 1886		pinctrl_pm_select_sleep_state(dev);
-  1887	
-  1888		return 0;
-  1889	}
-  1890	
-  1891	static __maybe_unused int dcmi_resume(struct device *dev)
-  1892	{
-  1893		/* restore pinctl default state */
-> 1894		pinctrl_pm_select_default_state(dev);
-  1895	
-  1896		/* clock enable */
-  1897		pm_runtime_force_resume(dev);
-  1898	
-  1899		return 0;
-  1900	}
-  1901	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 53703 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180611/742b4bf3/attachment-0001.gz>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
