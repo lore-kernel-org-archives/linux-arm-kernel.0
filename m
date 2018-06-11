@@ -1,67 +1,103 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 11 Jun 2018 17:18:58 +0100
-Subject: [PATCH v2 5/5] arm64: perf: Add support for chaining event
- counters
-In-Reply-To: <20180611142431.4svc26y27scgzfcg@lakrids.cambridge.arm.com>
-References: <1527591356-10934-1-git-send-email-suzuki.poulose@arm.com>
- <1527591356-10934-6-git-send-email-suzuki.poulose@arm.com>
- <20180606180119.4ofhges6codarbmk@lakrids.cambridge.arm.com>
- <4a5b5e7f-fc0b-84e3-fc65-b9f860029207@arm.com>
- <847dfe5c-665c-6398-f87f-3ca56e73f5aa@arm.com>
- <20180611142431.4svc26y27scgzfcg@lakrids.cambridge.arm.com>
-Message-ID: <31b8ddfa-d1e3-030f-e929-edd727deb2f2@arm.com>
+From: liguozhu@hisilicon.com (Kenneth Lee)
+Date: Tue, 12 Jun 2018 00:32:10 +0800
+Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
+In-Reply-To: <20180525093959.000040a7@huawei.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-4-jean-philippe.brucker@arm.com>
+ <20180516163117.622693ea@jacob-builder>
+ <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
+ <20180522094334.71f0e36b@jacob-builder>
+ <f73b4a0e-669e-8483-88d7-1b2c8a2b9934@arm.com>
+ <20180524115039.GA10260@apalos>
+ <19e82a74-429a-3f86-119e-32b12082d0ff@arm.com>
+ <20180525063311.GA11605@apalos>
+ <20180525093959.000040a7@huawei.com>
+Message-ID: <20180611163210.GA55075@Turing-Arch-b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/18 15:24, Mark Rutland wrote:
-> On Mon, Jun 11, 2018 at 02:54:16PM +0100, Suzuki K Poulose wrote:
->> On 08/06/18 15:46, Suzuki K Poulose wrote:
->>> On 06/06/2018 07:01 PM, Mark Rutland wrote:
->>>> On Tue, May 29, 2018 at 11:55:56AM +0100, Suzuki K Poulose wrote:
->>
->>>>> -??????? value |= 0xffffffff00000000ULL;
->>>>> +??????? if (!armv8pmu_event_is_64bit(event))
->>>>> +??????????? value |= 0xffffffff00000000ULL;
->>>>>  ????????? write_sysreg(value, pmccntr_el0);
->>>>> -??? } else if (armv8pmu_select_counter(idx) == idx)
->>>>> -??????? write_sysreg(value, pmxevcntr_el0);
->>>>> +??? } else
->>>>> +??????? armv8pmu_write_hw_counter(event, value);
->>>>>  ? }
->>>>
->>>>> +static inline void armv8pmu_write_event_type(struct perf_event *event)
->>>>> +{
->>>>> +??? struct hw_perf_event *hwc = &event->hw;
->>>>> +??? int idx = hwc->idx;
->>>>> +
->>>>> +??? /*
->>>>> +???? * For chained events, write the the low counter event type
->>>>> +???? * followed by the high counter. The high counter is programmed
->>>>> +???? * with CHAIN event code with filters set to count at all ELs.
->>>>> +???? */
->>>>> +??? if (armv8pmu_event_is_chained(event)) {
->>>>> +??????? u32 chain_evt = ARMV8_PMUV3_PERFCTR_CHAIN |
->>>>> +??????????????? ARMV8_PMU_INCLUDE_EL2;
->>>>> +
->>>>> +??????? armv8pmu_write_evtype(idx - 1, hwc->config_base);
->>>>> +??????? isb();
->>>>> +??????? armv8pmu_write_evtype(idx, chain_evt);
->>>>
->>>> The ISB isn't necessary here, AFAICT. We only do this while the PMU is
->>>> disabled; no?
->>>
->>> You're right. I was just following the ARM ARM.
->>
->> Taking another look, it is not clear about the semantics of "pmu->enable()"
->> and pmu->disable() callbacks.
+On Fri, May 25, 2018 at 09:39:59AM +0100, Jonathan Cameron wrote:
+> Date: Fri, 25 May 2018 09:39:59 +0100
+> From: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+> To: Ilias Apalodimas <ilias.apalodimas@linaro.org>
+> CC: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>,
+>  "xieyisheng1 at huawei.com" <xieyisheng1@huawei.com>, "kvm at vger.kernel.org"
+>  <kvm@vger.kernel.org>, "linux-pci at vger.kernel.org"
+>  <linux-pci@vger.kernel.org>, "xuzaibo at huawei.com" <xuzaibo@huawei.com>,
+>  Will Deacon <Will.Deacon@arm.com>, "okaya at codeaurora.org"
+>  <okaya@codeaurora.org>, "linux-mm at kvack.org" <linux-mm@kvack.org>,
+>  "yi.l.liu at intel.com" <yi.l.liu@intel.com>, "ashok.raj at intel.com"
+>  <ashok.raj@intel.com>, "tn at semihalf.com" <tn@semihalf.com>,
+>  "joro at 8bytes.org" <joro@8bytes.org>, "robdclark at gmail.com"
+>  <robdclark@gmail.com>, "bharatku at xilinx.com" <bharatku@xilinx.com>,
+>  "linux-acpi at vger.kernel.org" <linux-acpi@vger.kernel.org>,
+>  "liudongdong3 at huawei.com" <liudongdong3@huawei.com>, "rfranz at cavium.com"
+>  <rfranz@cavium.com>, "devicetree at vger.kernel.org"
+>  <devicetree@vger.kernel.org>, "kevin.tian at intel.com"
+>  <kevin.tian@intel.com>, Jacob Pan <jacob.jun.pan@linux.intel.com>,
+>  "alex.williamson at redhat.com" <alex.williamson@redhat.com>,
+>  "rgummal at xilinx.com" <rgummal@xilinx.com>, "thunder.leizhen at huawei.com"
+>  <thunder.leizhen@huawei.com>, "linux-arm-kernel at lists.infradead.org"
+>  <linux-arm-kernel@lists.infradead.org>, "shunyong.yang at hxt-semitech.com"
+>  <shunyong.yang@hxt-semitech.com>, "dwmw2 at infradead.org"
+>  <dwmw2@infradead.org>, "liubo95 at huawei.com" <liubo95@huawei.com>,
+>  "jcrouse at codeaurora.org" <jcrouse@codeaurora.org>,
+>  "iommu at lists.linux-foundation.org" <iommu@lists.linux-foundation.org>,
+>  Robin Murphy <Robin.Murphy@arm.com>, "christian.koenig at amd.com"
+>  <christian.koenig@amd.com>, "nwatters at codeaurora.org"
+>  <nwatters@codeaurora.org>, "baolu.lu at linux.intel.com"
+>  <baolu.lu@linux.intel.com>, liguozhu at hisilicon.com,
+>  kenneth-lee-2012 at foxmail.com
+> Subject: Re: [PATCH v2 03/40] iommu/sva: Manage process address spaces
+> Message-ID: <20180525093959.000040a7@huawei.com>
+> Organization: Huawei
+> X-Mailer: Claws Mail 3.15.0 (GTK+ 2.24.31; x86_64-w64-mingw32)
 > 
-> I was talking about pmu::{pmu_disable,pmu_enable}(), so I'm not sure I
-> follow how arm_pmu::{enable,disable}() are relevant here.> 
-> The arm_pmu::{enable,disable}() callbacks enable or disable individual
-> counters. For example, leaving unused counters disabled may save power,
-> even if the PMU as a whole is enabled.
+> +CC Kenneth Lee
+> 
+> On Fri, 25 May 2018 09:33:11 +0300
+> Ilias Apalodimas <ilias.apalodimas@linaro.org> wrote:
+> 
+> > On Thu, May 24, 2018 at 04:04:39PM +0100, Jean-Philippe Brucker wrote:
+> > > On 24/05/18 12:50, Ilias Apalodimas wrote:  
+> > > >> Interesting, I hadn't thought about this use-case before. At first I
+> > > >> thought you were talking about mdev devices assigned to VMs, but I think
+> > > >> you're referring to mdevs assigned to userspace drivers instead? Out of
+> > > >> curiosity, is it only theoretical or does someone actually need this?  
+> > > > 
+> > > > There has been some non upstreamed efforts to have mdev and produce userspace
+> > > > drivers. Huawei is using it on what they call "wrapdrive" for crypto devices and
+> > > > we did a proof of concept for ethernet interfaces. At the time we choose not to
+> > > > involve the IOMMU for the reason you mentioned, but having it there would be
+> > > > good.  
+> > > 
+> > > I'm guessing there were good reasons to do it that way but I wonder, is
+> > > it not simpler to just have the kernel driver create a /dev/foo, with a
+> > > standard ioctl/mmap/poll interface? Here VFIO adds a layer of
+> > > indirection, and since the mediating driver has to implement these
+> > > operations already, what is gained?  
+> > The best reason i can come up with is "common code". You already have one API
+> > doing that for you so we replicate it in a /dev file?
+> > The mdev approach still needs extentions to support what we tried to do (i.e
+> > mdev bus might need yo have access on iommu_ops), but as far as i undestand it's
+> > a possible case.
 
-Ah, I mistook cpu_pmu->enable/disable for the core pmu ops. My bad.
-Sorry about the noise.
+Hi, Jean, Please allow me to share my understanding here:
+https://zhuanlan.zhihu.com/p/35489035
 
-Suzuki
+The reason we do not use the /dev/foo scheme is that the devices to be
+shared are programmable accelerators. We cannot fix up the kernel driver for
+them.
+
+> > > 
+> > > Thanks,
+> > > Jean  
+> 
+> 
+
+(p.s. I sent this mail on May 26 from my public email count. But it
+seems the email server is blocked. I resent it from my company count until my
+colleague told me just now. Sorry for inconvenience)
+
+-- 
+			-Kenneth(Hisilicon)
