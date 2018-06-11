@@ -1,44 +1,45 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 11 Jun 2018 13:26:09 +0800
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: add rave-sp subdevices
-In-Reply-To: <20180517191923.16212-1-nikita.yoush@cogentembedded.com>
-References: <20180517191923.16212-1-nikita.yoush@cogentembedded.com>
-Message-ID: <20180611052608.GB16091@dragon>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 11 Jun 2018 05:27:11 +0000
+Subject: [PATCH v2 2/3] ASoC: simple-card: move hp and mic detection to
+ soc_card probe
+In-Reply-To: <20180611051559.18082-2-suzuki.katsuhiro@socionext.com>
+References: <20180611051559.18082-1-suzuki.katsuhiro@socionext.com>
+ <20180611051559.18082-2-suzuki.katsuhiro@socionext.com>
+Message-ID: <87tvq96gnm.wl-kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 10:19:23PM +0300, Nikita Yushchenko wrote:
-> This adds rave-sp powerbutton and backlight devices to RDU1 device tree.
+
+Hi Katsuhiro-san
+
+> This patch moves headphone and microphone detection to probe() of
+> snd_soc_card from init() of snd_soc_dai_link. This is because init()
+> is called (and an input device /dev/input/eventX is created too)
+> twice or above if simple card has two or more DAI links.
 > 
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> ---
->  arch/arm/boot/dts/imx51-zii-rdu1.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> index 0c99ac04ad08..98cc107098e0 100644
-> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> @@ -581,6 +581,14 @@
->  		watchdog {
->  			compatible = "zii,rave-sp-watchdog";
->  		};
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+
+or above ?
+
+> -	ret = asoc_simple_card_init_hp(rtd->card, &priv->hp_jack, PREFIX);
+> -	if (ret < 0)
+> -		return ret;
+> -
+> -	ret = asoc_simple_card_init_mic(rtd->card, &priv->mic_jack, PREFIX);
+> -	if (ret < 0)
+> -		return ret;
+(snip)
+> +	ret = asoc_simple_card_init_hp(card, &priv->hp_jack, NULL);
+> +	if (ret < 0)
+> +		return ret;
 > +
-> +		backlight {
-> +			compatible = "zii,rave-sp-backlight";
-> +		};
-> +
-> +		pwrbutton {
-> +			compatible = "zii,rave-sp-pwrbutton";
-> +		};
+> +	ret = asoc_simple_card_init_mic(card, &priv->mic_jack, NULL);
+> +	if (ret < 0)
+> +		return ret;
 
-Where are these compatibles documented?
+I think we want to keep "PREFIX" ?
 
-Shawn
 
->  	};
->  };
->  
-> -- 
-> 2.11.0
-> 
+Best regards
+---
+Kuninori Morimoto
