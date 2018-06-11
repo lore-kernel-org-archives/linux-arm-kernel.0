@@ -1,144 +1,48 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Mon, 11 Jun 2018 22:59:33 +0800
-Subject: [PATCH v3 6/6] dmaengine: imx-sdma: add sdma_transfer_init to
- decrease code overlap
-In-Reply-To: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
-References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1528729173-28684-7-git-send-email-yibin.gong@nxp.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jun 2018 00:03:32 -0700
+Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
+In-Reply-To: <89d55b0b-fe9e-793b-2694-25755ac2bc15@ti.com>
+References: <20180606060826.14671-1-faiz_abbas@ti.com>
+ <20180606060826.14671-5-faiz_abbas@ti.com>
+ <20180607073530.GH5738@atomide.com>
+ <a169ba7f-53f2-cf9a-a9ee-daffd6b53279@ti.com>
+ <20180608062158.GI5738@atomide.com>
+ <acdfef83-8778-e8f4-e423-ed04a9a8a649@ti.com>
+ <20180611060957.GN5738@atomide.com>
+ <f460481f-85a9-2a41-a894-6f25122dee8a@ti.com>
+ <20180611062904.GO5738@atomide.com>
+ <89d55b0b-fe9e-793b-2694-25755ac2bc15@ti.com>
+Message-ID: <20180611070332.GP5738@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are lot of codes overlap between prep_sg and prep_cyclic function.
-Add sdma_transfer_init() function to elimated the code overlap.
+* Faiz Abbas <faiz_abbas@ti.com> [180611 06:48]:
+> Hi,
+> 
+> On Monday 11 June 2018 11:59 AM, Tony Lindgren wrote:
+> > * Faiz Abbas <faiz_abbas@ti.com> [180611 06:28]:
+> >> Great. I thought I completely misunderstood you. But I don't see what
+> >> adding another function will accomplish. A QUIRK flag used in the same
+> >> function would work well enough>
+> > Fine with me as long as the function stays simple for both
+> > syss and sysc reset.
+> >
+> 
+> 
+> In general a reset status bit being in sysstatus is the norm and it
+> being in sysconfig should be the "quirk" for which a flag needs to be
+> added. What do you think?
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- drivers/dma/imx-sdma.c | 83 ++++++++++++++++++++++----------------------------
- 1 file changed, 37 insertions(+), 46 deletions(-)
+Sure makes sense to me.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 0b0588d2..486ebfe 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1254,6 +1254,40 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
- 	clk_disable(sdma->clk_ahb);
- }
- 
-+static struct sdma_desc *sdma_transfer_init(struct sdma_channel *sdmac,
-+				enum dma_transfer_direction direction, u32 bds)
-+{
-+	struct sdma_desc *desc;
-+
-+	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
-+	if (!desc)
-+		goto err_out;
-+
-+	sdmac->status = DMA_IN_PROGRESS;
-+	sdmac->direction = direction;
-+	sdmac->flags = 0;
-+
-+	desc->chn_count = 0;
-+	desc->chn_real_count = 0;
-+	desc->buf_tail = 0;
-+	desc->buf_ptail = 0;
-+	desc->sdmac = sdmac;
-+	desc->num_bd = bds;
-+
-+	if (sdma_alloc_bd(desc))
-+		goto err_desc_out;
-+
-+	if (sdma_load_context(sdmac))
-+		goto err_desc_out;
-+
-+	return desc;
-+
-+err_desc_out:
-+	kfree(desc);
-+err_out:
-+	return NULL;
-+}
-+
- static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 		struct dma_chan *chan, struct scatterlist *sgl,
- 		unsigned int sg_len, enum dma_transfer_direction direction,
-@@ -1266,36 +1300,13 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 	struct scatterlist *sg;
- 	struct sdma_desc *desc;
- 
--	if (sdmac->status == DMA_IN_PROGRESS)
--		return NULL;
--	sdmac->status = DMA_IN_PROGRESS;
--
--	sdmac->flags = 0;
--
--	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
-+	desc = sdma_transfer_init(sdmac, direction, sg_len);
- 	if (!desc)
- 		goto err_out;
- 
--	desc->buf_tail = 0;
--	desc->buf_ptail = 0;
--	desc->sdmac = sdmac;
--	desc->num_bd = sg_len;
--	desc->chn_real_count = 0;
--
--	if (sdma_alloc_bd(desc)) {
--		kfree(desc);
--		goto err_out;
--	}
--
- 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
- 			sg_len, channel);
- 
--	sdmac->direction = direction;
--	ret = sdma_load_context(sdmac);
--	if (ret)
--		goto err_bd_out;
--
--	desc->chn_count = 0;
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct sdma_buffer_descriptor *bd = &desc->bd[i];
- 		int param;
-@@ -1371,38 +1382,18 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 	struct sdma_engine *sdma = sdmac->sdma;
- 	int num_periods = buf_len / period_len;
- 	int channel = sdmac->channel;
--	int ret, i = 0, buf = 0;
-+	int i = 0, buf = 0;
- 	struct sdma_desc *desc;
- 
- 	dev_dbg(sdma->dev, "%s channel: %d\n", __func__, channel);
- 
--	if (sdmac->status == DMA_IN_PROGRESS)
--		return NULL;
--
--	sdmac->status = DMA_IN_PROGRESS;
--
--	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
-+	desc = sdma_transfer_init(sdmac, direction, num_periods);
- 	if (!desc)
- 		goto err_out;
- 
--	desc->buf_tail = 0;
--	desc->buf_ptail = 0;
--	desc->sdmac = sdmac;
--	desc->num_bd = num_periods;
--	desc->chn_real_count = 0;
- 	desc->period_len = period_len;
- 
- 	sdmac->flags |= IMX_DMA_SG_LOOP;
--	sdmac->direction = direction;
--
--	if (sdma_alloc_bd(desc)) {
--		kfree(desc);
--		goto err_bd_out;
--	}
--
--	ret = sdma_load_context(sdmac);
--	if (ret)
--		goto err_bd_out;
- 
- 	if (period_len > 0xffff) {
- 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
--- 
-2.7.4
+> As an aside, naming bitshifts by the name of the platform they were
+> originally added in seems weird. There should be some generic mask
+> saying "soft reset is the 0th bit". Currently I am using
+> SYSC_OMAP4_SOFTRESET for a dra76x module. I guess it depends on how many
+> different sysconfig types we have.
+
+Sure we could have a macro for that.
+
+Regards,
+
+Tony
