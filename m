@@ -1,42 +1,33 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Mon, 11 Jun 2018 11:50:24 +0200
-Subject: [PATCH 1/4] media: stm32-dcmi: do not fall into error on buffer
- starvation
+Date: Mon, 11 Jun 2018 11:50:25 +0200
+Subject: [PATCH 2/4] media: stm32-dcmi: return buffer in error state on dma
+ error
 In-Reply-To: <1528710627-8566-1-git-send-email-hugues.fruchet@st.com>
 References: <1528710627-8566-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1528710627-8566-2-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1528710627-8566-3-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return silently instead of falling into error when running
-out of available buffers when restarting capture.
-Capture will be restarted when new buffers will be
-provided by V4L2 client.
+Return buffer to V4L2 in error state if DMA error occurs.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- drivers/media/platform/stm32/stm32-dcmi.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/media/platform/stm32/stm32-dcmi.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index b796334..a3fbfac 100644
+index a3fbfac..6ccf195 100644
 --- a/drivers/media/platform/stm32/stm32-dcmi.c
 +++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -228,13 +228,10 @@ static int dcmi_restart_capture(struct stm32_dcmi *dcmi)
- 
- 	/* Restart a new DMA transfer with next buffer */
- 	if (list_empty(&dcmi->buffers)) {
--		dev_err(dcmi->dev, "%s: No more buffer queued, cannot capture buffer\n",
--			__func__);
--		dcmi->errors_count++;
-+		dev_dbg(dcmi->dev, "Capture restart is deferred to next buffer queueing\n");
- 		dcmi->active = NULL;
--
- 		spin_unlock_irq(&dcmi->irqlock);
--		return -EINVAL;
-+		return 0;
- 	}
- 
- 	dcmi->active = list_entry(dcmi->buffers.next,
+@@ -262,6 +262,9 @@ static void dcmi_dma_callback(void *param)
+ 		break;
+ 	case DMA_ERROR:
+ 		dev_err(dcmi->dev, "%s: Received DMA_ERROR\n", __func__);
++
++		/* Return buffer to V4L2 in error state */
++		dcmi_buffer_done(dcmi, buf, 0, -EIO);
+ 		break;
+ 	case DMA_COMPLETE:
+ 		dev_dbg(dcmi->dev, "%s: Received DMA_COMPLETE\n", __func__);
 -- 
 1.9.1
