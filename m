@@ -1,25 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Jun 2018 12:22:43 -0600
-Subject: [PATCH v3 2/6] clk: ti: dra7: Add clkctrl clock data for the
- mcan clocks
-In-Reply-To: <20180606060826.14671-3-faiz_abbas@ti.com>
-References: <20180606060826.14671-1-faiz_abbas@ti.com>
- <20180606060826.14671-3-faiz_abbas@ti.com>
-Message-ID: <20180611182243.GA12727@rob-hp-laptop>
+Date: Mon, 11 Jun 2018 12:25:27 -0600
+Subject: [v3, 03/10] dt-binding: ptp_qoriq: add DPAA FMan support
+In-Reply-To: <20180607092050.46128-4-yangbo.lu@nxp.com>
+References: <20180607092050.46128-1-yangbo.lu@nxp.com>
+ <20180607092050.46128-4-yangbo.lu@nxp.com>
+Message-ID: <20180611182527.GA13639@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 06, 2018 at 11:38:22AM +0530, Faiz Abbas wrote:
-> Add clkctrl data for the m_can clocks and register it within the
-> clkctrl driver
+On Thu, Jun 07, 2018 at 05:20:43PM +0800, Yangbo Lu wrote:
+> This patch is to add bindings description for DPAA
+> FMan 1588 timer, and also remove its description in
+> fsl-fman dt-bindings document.
 > 
-> CC: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 > ---
->  drivers/clk/ti/clk-7xx.c         | 1 +
->  include/dt-bindings/clock/dra7.h | 1 +
+> Changes for v2:
+> 	- None.
+> Changes for v3:
+> 	- None.
+> ---
+>  Documentation/devicetree/bindings/net/fsl-fman.txt |   25 +-------------------
+>  .../devicetree/bindings/ptp/ptp-qoriq.txt          |   15 +++++++++--
+>  2 files changed, 13 insertions(+), 27 deletions(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
-
->  2 files changed, 2 insertions(+)
-> 
+Reviewed-by: Rob Herring <robh@kernel.org>
