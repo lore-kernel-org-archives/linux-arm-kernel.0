@@ -1,72 +1,183 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 11 Jun 2018 14:27:36 +0300
-Subject: [PATCH 04/24] 32-bit userspace ABI: introduce ARCH_32BIT_OFF_T
- config option
-In-Reply-To: <CAK8P3a16ByPtCwKbdLQRDRni3qV9DXLNYZ9QJUH6uHaZYHr34g@mail.gmail.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180516081910.10067-5-ynorov@caviumnetworks.com>
- <20180608173207.nwoi25jee52gpdwy@armageddon.cambridge.arm.com>
- <20180609074227.GA6810@yury-thinkpad>
- <CAK8P3a16ByPtCwKbdLQRDRni3qV9DXLNYZ9QJUH6uHaZYHr34g@mail.gmail.com>
-Message-ID: <20180611112736.GA19952@yury-thinkpad>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 11 Jun 2018 13:48:47 +0200
+Subject: [PATCH v1] ARM: imx: add imx7d-m4
+In-Reply-To: <1528706126.2842.1.camel@pengutronix.de>
+References: <20180405115134.8036-1-o.rempel@pengutronix.de>
+ <93e7b7ef-1bc0-2871-da2c-65ab3f070c07@pengutronix.de>
+ <20180611082022.GG16091@dragon> <1528706126.2842.1.camel@pengutronix.de>
+Message-ID: <3fa291a7da6978545cd21fdcf78c483e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2018 at 09:48:02AM +0200, Arnd Bergmann wrote:
-> On Sat, Jun 9, 2018 at 9:42 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > On Fri, Jun 08, 2018 at 06:32:07PM +0100, Catalin Marinas wrote:
-> >> On Wed, May 16, 2018 at 11:18:49AM +0300, Yury Norov wrote:
-> >> > diff --git a/arch/Kconfig b/arch/Kconfig
-> >> > index 76c0b54443b1..ee079244dc3c 100644
-> >> > --- a/arch/Kconfig
-> >> > +++ b/arch/Kconfig
-> >> > @@ -264,6 +264,21 @@ config ARCH_THREAD_STACK_ALLOCATOR
-> >> >  config ARCH_WANTS_DYNAMIC_TASK_STRUCT
-> >> >     bool
-> >> >
-> >> > +config ARCH_32BIT_OFF_T
-> >> > +   bool
-> >> > +   depends on !64BIT
-> >> > +   help
-> >> > +     All new 32-bit architectures should have 64-bit off_t type on
-> >> > +     userspace side which corresponds to the loff_t kernel type. This
-> >> > +     is the requirement for modern ABIs. Some existing architectures
-> >> > +     already have 32-bit off_t. This option is enabled for all such
-> >> > +     architectures explicitly. Namely: arc, arm, blackfin, cris, frv,
-> >> > +     h8300, hexagon, m32r, m68k, metag, microblaze, mips32, mn10300,
-> >> > +     nios2, openrisc, parisc32, powerpc32, score, sh, sparc, tile32,
-> >> > +     unicore32, x86_32 and xtensa. This is the complete list. Any
-> >> > +     new 32-bit architecture should declare 64-bit off_t type on user
-> >> > +     side and so should not enable this option.
-> >>
-> >> Do you know if this is the case for riscv and nds32, merged in the
-> >> meantime? If not, I suggest you drop this patch altogether and just
-> >> define force_o_largefile() for arm64/ilp32 as we don't seem to stick to
-> >> "all new 32-bit architectures should have 64-bit off_t".
-> >
-> > I wrote this patch at request of Arnd Bergmann. This is actually his
-> > words that all new 32-bit architectures should have 64-bit off_t. So
-> > I was surprized when riscv was merged with 32-bit off_t (and I didn't
-> > follow nds32).
-> >
-> > If this rule is still in force, we'd better add new exceptions to this
-> > patch. Otherwise, we can drop it.
-> >
-> > Arnd, could you please comment it?
+On 11.06.2018 10:35, Lucas Stach wrote:
+> Hi Shawn,
 > 
-> I completely forgot about it and had assumed that it was merged long
-> ago, sorry about that.
+> Am Montag, den 11.06.2018, 16:20 +0800 schrieb Shawn Guo:
+>> On Mon, Jun 11, 2018 at 10:02:53AM +0200, Oleksij Rempel wrote:
+>> > Hi all,
+>> >
+>> > this patch was send 05.04.2018. Any comments?
+>> >
+>> > @Shawn, can you please take it?
+>>
+>> Honestly I'm not sure how useful it will be.??If we can have some i.MX
+>> developers ACK on it, I will be more comfortable to take it.
+> 
+> This is all highly experimental and in PoC stage, but we see some value
+> in running a second Linux system on the M4 coprocessor. There are lots
+> of things that still need to be figured out, but we are working on this
+> from time to time when there are some hours to spare.
+> 
+> This patch seems like a good step in the right direction and IMHO the
+> amount of code and changes is small enough to carry it upstream without
+> impacting anything else. I would be happy if this could be pulled in.
 
-Hi Arnd,
+I agree with Lucas here, this is rather minimal and not invasive.
 
-There are 3 patches like this in ILP32 series that change ABI for new
-targets. I've submitted them in separated series:
-https://lkml.org/lkml/2017/9/25/574
 
-They all seems to be acked by you. If you ready to upstream the
-series, I can rebase it and add riscv32 and nds32 exceptions.
+Out of interest, on what memory region do you run Linux? Do you use
+caches? In some experiments a while ago I noticed that only 2MiB/(or
+4MiB) of DDR memory can use caches, which is somewhat tight to run Linux
+on.
 
-If Palmer and riscv people will decide to follow new rules, we can
-easily drop the exception.
+https://blog.printk.io/2017/05/i-mx-7-cortex-m4-memory-locations-and-performance/
 
-Yury
+--
+Stefan
+
+
+>> >
+>> > On 05.04.2018 13:51, Oleksij Rempel wrote:
+>> > > Provide basic support for Cortex-M4 located on NXP iMX7D.
+>> > > This code was tested in combination with imx-rproc driver
+>> > > which will upload with specially formatted ELF image containing
+>> > > kernel, device and CPIO rootfs.
+>> > >
+>> > > > > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> > > ---
+>> > > ?arch/arm/boot/dts/Makefile?????????|??2 +-
+>> > > ?arch/arm/mach-imx/Kconfig??????????| 33 +++++++++++++++++++++------------
+>> > > ?arch/arm/mach-imx/Makefile?????????|??3 ++-
+>> > > ?arch/arm/mach-imx/mach-imx7d-cm4.c | 21 +++++++++++++++++++++
+>> > > ?4 files changed, 45 insertions(+), 14 deletions(-)
+>> > > ?create mode 100644 arch/arm/mach-imx/mach-imx7d-cm4.c
+>> > >
+>> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> > > index 852452515bea..d49bb9a58aee 100644
+>> > > --- a/arch/arm/boot/dts/Makefile
+>> > > +++ b/arch/arm/boot/dts/Makefile
+>> > > @@ -527,7 +527,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+>> > > > > > ?	imx6ul-tx6ul-0011.dtb \
+>> > > > > > ?	imx6ul-tx6ul-mainboard.dtb \
+>> > > > > > ?	imx6ull-14x14-evk.dtb
+>> > > -dtb-$(CONFIG_SOC_IMX7D) += \
+>> > > +dtb-$(CONFIG_SOC_IMX7D_CA7) += \
+>> > > > > > ?	imx7d-cl-som-imx7.dtb \
+>> > > > > > ?	imx7d-colibri-emmc-eval-v3.dtb \
+>> > > > > > ?	imx7d-colibri-eval-v3.dtb \
+>> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> > > index 782699e67600..101c8599d952 100644
+>> > > --- a/arch/arm/mach-imx/Kconfig
+>> > > +++ b/arch/arm/mach-imx/Kconfig
+>> > > @@ -528,18 +528,6 @@ config SOC_IMX6UL
+>> > > > > > ?	help
+>> > > > > > ?	??This enables support for Freescale i.MX6 UltraLite processor.
+>> > > ?
+>> > > -config SOC_IMX7D
+>> > > > > > -	bool "i.MX7 Dual support"
+>> > > > > > -	select PINCTRL_IMX7D
+>> > > > > > -	select ARM_GIC
+>> > > > > > -	select HAVE_ARM_ARCH_TIMER
+>> > > > > > -	select HAVE_IMX_ANATOP
+>> > > > > > -	select HAVE_IMX_MMDC
+>> > > > > > -	select HAVE_IMX_SRC
+>> > > > > > -	select IMX_GPCV2
+>> > > > > > -	help
+>> > > > > > -		This enables support for Freescale i.MX7 Dual processor.
+>> > > -
+>> > > ?config SOC_LS1021A
+>> > > > > > ?	bool "Freescale LS1021A support"
+>> > > > > > ?	select ARM_GIC
+>> > > @@ -554,6 +542,27 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+>> > > ?
+>> > > ?if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+>> > > ?
+>> > > +config SOC_IMX7D_CA7
+>> > > > > > +	bool
+>> > > > > > +	select ARM_GIC
+>> > > > > > +	select HAVE_ARM_ARCH_TIMER
+>> > > > > > +	select HAVE_IMX_ANATOP
+>> > > > > > +	select HAVE_IMX_MMDC
+>> > > > > > +	select HAVE_IMX_SRC
+>> > > > > > +	select IMX_GPCV2
+>> > > +
+>> > > +config SOC_IMX7D_CM4
+>> > > > > > +	bool
+>> > > > > > +	select ARMV7M_SYSTICK
+>> > > +
+>> > > +config SOC_IMX7D
+>> > > > > > +	bool "i.MX7 Dual support"
+>> > > > > > +	select PINCTRL_IMX7D
+>> > > > > > +	select SOC_IMX7D_CA7 if ARCH_MULTI_V7
+>> > > > > > +	select SOC_IMX7D_CM4 if ARM_SINGLE_ARMV7M
+>> > > > > > +	help
+>> > > > > > +		This enables support for Freescale i.MX7 Dual processor.
+>> > > +
+>> > > ?config SOC_VF610
+>> > > > > > ?	bool "Vybrid Family VF610 support"
+>> > > > > > ?	select ARM_GIC if ARCH_MULTI_V7
+>> > > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+>> > > index 8ff71058207d..68640f100ef3 100644
+>> > > --- a/arch/arm/mach-imx/Makefile
+>> > > +++ b/arch/arm/mach-imx/Makefile
+>> > > @@ -80,7 +80,8 @@ obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
+>> > > ?obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+>> > > ?obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+>> > > ?obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+>> > > -obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+>> > > +obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
+>> > > +obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
+>> > > ?
+>> > > ?ifeq ($(CONFIG_SUSPEND),y)
+>> > > ?AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+>> > > diff --git a/arch/arm/mach-imx/mach-imx7d-cm4.c b/arch/arm/mach-imx/mach-imx7d-cm4.c
+>> > > new file mode 100644
+>> > > index 000000000000..c36dea79aeb8
+>> > > --- /dev/null
+>> > > +++ b/arch/arm/mach-imx/mach-imx7d-cm4.c
+>> > > @@ -0,0 +1,21 @@
+>> > > +/*
+>> > > + * Copyright 2017 Pengutronix
+>> > > + *
+>> > > + * This program is free software; you can redistribute it and/or modify
+>> > > + * it under the terms of the GNU General Public License version 2 as
+>> > > + * published by the Free Software Foundation.
+>> > > + */
+>> > > +
+>> > > +#include <linux/kernel.h>
+>> > > +#include <asm/v7m.h>
+>> > > +#include <asm/mach/arch.h>
+>> > > +
+>> > > +static const char * const imx7d_cm4_dt_compat[] __initconst = {
+>> > > > > > +	"fsl,imx7d-cm4",
+>> > > > > > +	NULL,
+>> > > +};
+>> > > +
+>> > > +DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual Cortex-M4 (Device Tree)")
+>> > > > > > +	.dt_compat = imx7d_cm4_dt_compat,
+>> > > > > > +	.restart = armv7m_restart,
+>> > > +MACHINE_END
+>> > >
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
