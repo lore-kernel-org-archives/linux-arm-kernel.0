@@ -1,39 +1,144 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Mon, 11 Jun 2018 22:59:31 +0800
-Subject: [PATCH v3 4/6] dmaengine: imx-sdma: remove usless lock
+Date: Mon, 11 Jun 2018 22:59:33 +0800
+Subject: [PATCH v3 6/6] dmaengine: imx-sdma: add sdma_transfer_init to
+ decrease code overlap
 In-Reply-To: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
 References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1528729173-28684-5-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1528729173-28684-7-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need anymore for 'lock' now since virtual dma will provide
-the common lock instead.
+There are lot of codes overlap between prep_sg and prep_cyclic function.
+Add sdma_transfer_init() function to elimated the code overlap.
 
 Signed-off-by: Robin Gong <yibin.gong@nxp.com>
 ---
- drivers/dma/imx-sdma.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/dma/imx-sdma.c | 83 ++++++++++++++++++++++----------------------------
+ 1 file changed, 37 insertions(+), 46 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index e0af8ee..f150b38 100644
+index 0b0588d2..486ebfe 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -349,7 +349,6 @@ struct sdma_channel {
- 	unsigned long			event_mask[2];
- 	unsigned long			watermark_level;
- 	u32				shp_addr, per_addr;
--	spinlock_t			lock;
- 	enum dma_status			status;
- 	struct imx_dma_data		data;
- };
-@@ -1907,7 +1906,6 @@ static int sdma_probe(struct platform_device *pdev)
- 		struct sdma_channel *sdmac = &sdma->channel[i];
+@@ -1254,6 +1254,40 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
+ 	clk_disable(sdma->clk_ahb);
+ }
  
- 		sdmac->sdma = sdma;
--		spin_lock_init(&sdmac->lock);
++static struct sdma_desc *sdma_transfer_init(struct sdma_channel *sdmac,
++				enum dma_transfer_direction direction, u32 bds)
++{
++	struct sdma_desc *desc;
++
++	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
++	if (!desc)
++		goto err_out;
++
++	sdmac->status = DMA_IN_PROGRESS;
++	sdmac->direction = direction;
++	sdmac->flags = 0;
++
++	desc->chn_count = 0;
++	desc->chn_real_count = 0;
++	desc->buf_tail = 0;
++	desc->buf_ptail = 0;
++	desc->sdmac = sdmac;
++	desc->num_bd = bds;
++
++	if (sdma_alloc_bd(desc))
++		goto err_desc_out;
++
++	if (sdma_load_context(sdmac))
++		goto err_desc_out;
++
++	return desc;
++
++err_desc_out:
++	kfree(desc);
++err_out:
++	return NULL;
++}
++
+ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		struct dma_chan *chan, struct scatterlist *sgl,
+ 		unsigned int sg_len, enum dma_transfer_direction direction,
+@@ -1266,36 +1300,13 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 	struct scatterlist *sg;
+ 	struct sdma_desc *desc;
  
- 		sdmac->channel = i;
- 		sdmac->vc.desc_free = sdma_desc_free;
+-	if (sdmac->status == DMA_IN_PROGRESS)
+-		return NULL;
+-	sdmac->status = DMA_IN_PROGRESS;
+-
+-	sdmac->flags = 0;
+-
+-	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
++	desc = sdma_transfer_init(sdmac, direction, sg_len);
+ 	if (!desc)
+ 		goto err_out;
+ 
+-	desc->buf_tail = 0;
+-	desc->buf_ptail = 0;
+-	desc->sdmac = sdmac;
+-	desc->num_bd = sg_len;
+-	desc->chn_real_count = 0;
+-
+-	if (sdma_alloc_bd(desc)) {
+-		kfree(desc);
+-		goto err_out;
+-	}
+-
+ 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
+ 			sg_len, channel);
+ 
+-	sdmac->direction = direction;
+-	ret = sdma_load_context(sdmac);
+-	if (ret)
+-		goto err_bd_out;
+-
+-	desc->chn_count = 0;
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		struct sdma_buffer_descriptor *bd = &desc->bd[i];
+ 		int param;
+@@ -1371,38 +1382,18 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 	struct sdma_engine *sdma = sdmac->sdma;
+ 	int num_periods = buf_len / period_len;
+ 	int channel = sdmac->channel;
+-	int ret, i = 0, buf = 0;
++	int i = 0, buf = 0;
+ 	struct sdma_desc *desc;
+ 
+ 	dev_dbg(sdma->dev, "%s channel: %d\n", __func__, channel);
+ 
+-	if (sdmac->status == DMA_IN_PROGRESS)
+-		return NULL;
+-
+-	sdmac->status = DMA_IN_PROGRESS;
+-
+-	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
++	desc = sdma_transfer_init(sdmac, direction, num_periods);
+ 	if (!desc)
+ 		goto err_out;
+ 
+-	desc->buf_tail = 0;
+-	desc->buf_ptail = 0;
+-	desc->sdmac = sdmac;
+-	desc->num_bd = num_periods;
+-	desc->chn_real_count = 0;
+ 	desc->period_len = period_len;
+ 
+ 	sdmac->flags |= IMX_DMA_SG_LOOP;
+-	sdmac->direction = direction;
+-
+-	if (sdma_alloc_bd(desc)) {
+-		kfree(desc);
+-		goto err_bd_out;
+-	}
+-
+-	ret = sdma_load_context(sdmac);
+-	if (ret)
+-		goto err_bd_out;
+ 
+ 	if (period_len > 0xffff) {
+ 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
 -- 
 2.7.4
