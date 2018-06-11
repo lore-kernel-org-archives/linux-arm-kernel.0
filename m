@@ -1,60 +1,68 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 10 Jun 2018 23:52:59 +0000
-Subject: [PATCH] ASoC: audio-graph-card: add hp and mic detect gpios same
- as simple-card
-In-Reply-To: <20180608080843.11097-1-suzuki.katsuhiro@socionext.com>
-References: <20180608080843.11097-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <87h8makxt7.wl-kuninori.morimoto.gx@renesas.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 11 Jun 2018 00:48:16 +0000
+Subject: arm: mach-mvebu: dts: enable-method is always overwritten
+References: <a2d4701e-28b3-07ee-6b2f-588b2e9a75c4@online.net>
+ <20180608155858.GB19702@lunn.ch>
+Message-ID: <c26a750dbd25440bb9c3f669f757c491@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Yves,
 
-Hi Katsuhiro-san
-
-Thank you for your patch
-
-> This patch adds headphone and microphone jack detection gpios as same
-> as simple-card driver. This feature move into simple-card-utils from
-> simple-card to avoid the duplicating code.
+On 09/06/18 03:59, Andrew Lunn wrote:
+> On Fri, Jun 08, 2018 at 05:43:11PM +0200, Yves Lefloch wrote:
+>> Hello everybody,
 > 
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
+> Adding Chris Packham. He did some work in this area.
+> 
+>         Andrew
+> 
+>>
+>> I'm facing an issue that I believe to be a conflict between device-tree and
+>> machine_desc.
+>>
+>> My platform is arm/mach-mvebu. I have a DT based on "armada-xp-db-dxbc2.dts"
+>> (I just included it and added a few okays), my CPU is a Marvell Bobcat2
+>> switching chip. My kernel is a vanilla 4.16.
+>>
+>> Everything works fine except that my second core won't boot: `CPU1: failed
+>> to come online'.
+>> I tracked down the problem to arch/arm/mach-mvebu/platsmp.c: in this file is
+>> defined a machine_desc that hardcodes the SMP ops to `marvell,armada-xp-smp'
+>> whereas my device tree (by including armada-xp-98dx3236.dtsi) attempts to
+>> set the ops to `marvell,98dx3236-smp' through enable-method. In setup_arch()
+>> the machine_desc's ops overwrites the enable-method's ops, causing the wrong
+>> smp_boot_secondary() call to be issued.
+>>
+>> Now there is a note from 2014 saying that this machine_desc's `smp' field is
+>> hardcoded like that because of "old Device Trees that were not specifying
+>> the cpus enable-method property". As far as I can tell, this is still the
+>> case, for instance "armada-370-db.dts" doesn't have any enable-method
+>> property.
+>>
+>> I have worked around this by commenting out `armada_xp_smp_ops.smp' but
+>> obviously I would prefer to keep a vanilla kernel.
+>>
+>> So I propose to:
+>> - Add `enable-method = "marvell,armada-xp-smp"' to armada-370-xp.dtsi,
+>> because it seems that all Armada 370/XP include it;
+>> - Remove the `smp' field of `armada_xp_smp_ops'.
+>>
+>> If you agree with the diagnosis and the proposed fix I will write a patch.
 
-I think it can be 2 patches ?
- 1. move function from simple-card to simple-card-utils
- 2. use it from audio-graph-card
+Personally my preferred option is to not set .smp at all and let the 
+device tree do it's thing.
 
-> +static int asoc_graph_soc_card_probe(struct snd_soc_card *card)
-> +{
-> +	struct graph_card_data *priv = snd_soc_card_get_drvdata(card);
-> +	int ret;
-> +
-> +	ret = asoc_simple_card_init_hp(card, &priv->hp_jack, NULL);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = asoc_simple_card_init_mic(card, &priv->mic_jack, NULL);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
->  static int asoc_graph_card_probe(struct platform_device *pdev)
->  {
->  	struct graph_card_data *priv;
-> @@ -319,6 +336,7 @@ static int asoc_graph_card_probe(struct platform_device *pdev)
->  	card->num_links	= num;
->  	card->dapm_widgets = asoc_graph_card_dapm_widgets;
->  	card->num_dapm_widgets = ARRAY_SIZE(asoc_graph_card_dapm_widgets);
-> +	card->probe	= asoc_graph_soc_card_probe;
+I'm not sure if things have changed w.r.t. backwards compatibility in 
+the 3.5 years since I initially suggested that, assuming that we still 
+want backwards compatibility with these older device trees this patch 
+might help
 
-Current simple-card is calling init_hp/init_mic from
-asoc_simple_card_dai_init(), and audio-graph-card has
-asoc_graph_card_dai_init().
-simple/audio card are doing samethings in different style.
-Thus, I want to synchronized whole simple/audio card.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
 
-Best regards
----
-Kuninori Morimoto
+I was pretty happy with that approach at the time but I obviously never 
+followed up to get that delivered. If someone has some spare cycles to 
+spend on it I wouldn't object to it being taken over.
+
+I'll see if I can find some time to resurrect it myself. I don't have an 
+Armada-370 board but I can test BC2 and A38x.
