@@ -1,77 +1,51 @@
 From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Mon, 11 Jun 2018 17:49:56 +0200
-Subject: [PATCH v7 0/5] Reintroduce i.MX EPIT Timer
-Message-ID: <20180611155001.3506-1-peron.clem@gmail.com>
+Date: Mon, 11 Jun 2018 17:49:57 +0200
+Subject: [PATCH v7 1/5] clk: imx6: add EPIT clock support
+In-Reply-To: <20180611155001.3506-1-peron.clem@gmail.com>
+References: <20180611155001.3506-1-peron.clem@gmail.com>
+Message-ID: <20180611155001.3506-2-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cl?ment Peron <clement.peron@devialet.com>
+From: Colin Didier <colin.didier@devialet.com>
 
-As suggested in the commit message we have added the device tree support,
-proper bindings and we moved the driver into the correct folder.
+Ignore this Patch, already merged in clk-next
 
-Moreover we made some changes like use of relaxed IO accesor,
-implement sched_clock, delay_timer and reduce the clockevents min_delta.
+Signed-off-by: Colin Didier <colin.didier@devialet.com>
+Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ drivers/clk/imx/clk-imx6q.c               | 2 ++
+ include/dt-bindings/clock/imx6qdl-clock.h | 4 +++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-Changes since v6:
--fix indent
-
-Changes since v5:
-- change epit to timer in doc example
-- fix typo in imx6sl.dtsi
-
-Changes since v4:
-- removed ipg clk
-- change in dt epit to timer
-- add introduction in doc
-- add all compatibles in doc
-- update epit entry for other i.MX device-trees
-
-Changes since v3:
-- Clean Kconfig
-- Rename imx6q-epit to imx31-epit
-- Update doc and bindings
-- Indent and fix
-
-Changes since v2 (Thanks Fabio Estevam):
-- Removed unused ckil clock
-- Add out_iounmap
-- Check and handle if clk_prepare_enable failed
-- Fix comment typo
-
-Changes since v1 (Thanks Vladimir Zapolskiy):
-- Add OF dependency in Kconfig
-- Sort header
-- Use BIT macro
-- Remove useless comments
-- Fix incorrect indent
-- Fix memory leak
-- Add check and handle possible returned error
-
-Cl?ment Peron (2):
-  ARM: imx: remove inexistant EPIT timer init
-  dt-bindings: timer: add i.MX EPIT timer binding
-
-Colin Didier (3):
-  clk: imx6: add EPIT clock support
-  clocksource: add driver for i.MX EPIT timer
-  ARM: dts: imx: add missing compatible and clock properties for EPIT
-
- .../devicetree/bindings/timer/fsl,imxepit.txt |  21 ++
- arch/arm/boot/dts/imx25.dtsi                  |   8 +-
- arch/arm/boot/dts/imx6qdl.dtsi                |  10 +-
- arch/arm/boot/dts/imx6sl.dtsi                 |  10 +-
- arch/arm/boot/dts/imx6sx.dtsi                 |  10 +-
- arch/arm/boot/dts/imx6ul.dtsi                 |  10 +-
- arch/arm/mach-imx/common.h                    |   1 -
- drivers/clk/imx/clk-imx6q.c                   |   2 +
- drivers/clocksource/Kconfig                   |  11 +
- drivers/clocksource/Makefile                  |   1 +
- drivers/clocksource/timer-imx-epit.c          | 265 ++++++++++++++++++
- include/dt-bindings/clock/imx6qdl-clock.h     |   4 +-
- 12 files changed, 341 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxepit.txt
- create mode 100644 drivers/clocksource/timer-imx-epit.c
-
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index 8d518ad5dc13..b9ea7037e193 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -753,6 +753,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	else
+ 		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+ 	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
++	clk[IMX6QDL_CLK_EPIT1]        = imx_clk_gate2("epit1",         "ipg",               base + 0x6c, 12);
++	clk[IMX6QDL_CLK_EPIT2]        = imx_clk_gate2("epit2",         "ipg",               base + 0x6c, 14);
+ 	clk[IMX6QDL_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal",   "esai_podf",   base + 0x6c, 16, &share_count_esai);
+ 	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ahb",           base + 0x6c, 16, &share_count_esai);
+ 	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
+diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
+index da59fd9cdb5e..7ad171b8f3bf 100644
+--- a/include/dt-bindings/clock/imx6qdl-clock.h
++++ b/include/dt-bindings/clock/imx6qdl-clock.h
+@@ -271,6 +271,8 @@
+ #define IMX6QDL_CLK_PRE_AXI			258
+ #define IMX6QDL_CLK_MLB_SEL			259
+ #define IMX6QDL_CLK_MLB_PODF			260
+-#define IMX6QDL_CLK_END				261
++#define IMX6QDL_CLK_EPIT1			261
++#define IMX6QDL_CLK_EPIT2			262
++#define IMX6QDL_CLK_END				263
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
 -- 
 2.17.1
