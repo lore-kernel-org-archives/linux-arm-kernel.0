@@ -1,97 +1,30 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 11 Jun 2018 15:47:13 -0700
-Subject: [PATCH 2/3] ARM: dts: NSP: Fix PCIe controllers interrupt types
-In-Reply-To: <20180611224714.7007-1-f.fainelli@gmail.com>
-References: <20180611224714.7007-1-f.fainelli@gmail.com>
-Message-ID: <20180611224714.7007-3-f.fainelli@gmail.com>
+Date: Mon, 11 Jun 2018 15:53:40 -0700
+Subject: [PATCH] ARM: dts: BCM5301x: Fix i2c controller interrupt type
+Message-ID: <20180611225340.12733-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interrupts for the PCIe controllers should all be of type
-IRQ_TYPE_LEVEL_HIGH instead of IRQ_TYPE_NONE.
+The i2c controller should be using IRQ_TYPE_LEVEL_HIGH, fix that.
 
-Fixes: d71eb9412088 ("ARM: dts: NSP: Add MSI support on PCI")
-Fixes: 522199029fdc ("ARM: dts: NSP: Fix PCIE DT issue")
+Fixes: bb097e3e0045 ("ARM: dts: BCM5301X: Add I2C support to the DT")
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/bcm-nsp.dtsi | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/bcm5301x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index c6aa62386941..09ba85046322 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -496,7 +496,7 @@
- 
- 		#interrupt-cells = <1>;
- 		interrupt-map-mask = <0 0 0 0>;
--		interrupt-map = <0 0 0 0 &gic GIC_SPI 131 IRQ_TYPE_NONE>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
- 
- 		linux,pci-domain = <0>;
- 
-@@ -519,10 +519,10 @@
- 			compatible = "brcm,iproc-msi";
- 			msi-controller;
- 			interrupt-parent = <&gic>;
--			interrupts = <GIC_SPI 127 IRQ_TYPE_NONE>,
--				     <GIC_SPI 128 IRQ_TYPE_NONE>,
--				     <GIC_SPI 129 IRQ_TYPE_NONE>,
--				     <GIC_SPI 130 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
- 			brcm,pcie-msi-inten;
- 		};
- 	};
-@@ -533,7 +533,7 @@
- 
- 		#interrupt-cells = <1>;
- 		interrupt-map-mask = <0 0 0 0>;
--		interrupt-map = <0 0 0 0 &gic GIC_SPI 137 IRQ_TYPE_NONE>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
- 
- 		linux,pci-domain = <1>;
- 
-@@ -556,10 +556,10 @@
- 			compatible = "brcm,iproc-msi";
- 			msi-controller;
- 			interrupt-parent = <&gic>;
--			interrupts = <GIC_SPI 133 IRQ_TYPE_NONE>,
--				     <GIC_SPI 134 IRQ_TYPE_NONE>,
--				     <GIC_SPI 135 IRQ_TYPE_NONE>,
--				     <GIC_SPI 136 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
- 			brcm,pcie-msi-inten;
- 		};
- 	};
-@@ -570,7 +570,7 @@
- 
- 		#interrupt-cells = <1>;
- 		interrupt-map-mask = <0 0 0 0>;
--		interrupt-map = <0 0 0 0 &gic GIC_SPI 143 IRQ_TYPE_NONE>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
- 
- 		linux,pci-domain = <2>;
- 
-@@ -593,10 +593,10 @@
- 			compatible = "brcm,iproc-msi";
- 			msi-controller;
- 			interrupt-parent = <&gic>;
--			interrupts = <GIC_SPI 139 IRQ_TYPE_NONE>,
--				     <GIC_SPI 140 IRQ_TYPE_NONE>,
--				     <GIC_SPI 141 IRQ_TYPE_NONE>,
--				     <GIC_SPI 142 IRQ_TYPE_NONE>;
-+			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
- 			brcm,pcie-msi-inten;
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 9a076c409f4e..ef995e50ee12 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -365,7 +365,7 @@
+ 	i2c0: i2c at 18009000 {
+ 		compatible = "brcm,iproc-i2c";
+ 		reg = <0x18009000 0x50>;
+-		interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
++		interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		clock-frequency = <100000>;
 -- 
 2.14.1
