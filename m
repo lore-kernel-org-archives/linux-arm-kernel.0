@@ -1,45 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Jun 2018 09:01:15 -0300
-Subject: [PATCH v1] ARM: imx: add imx7d-m4
-In-Reply-To: <3fa291a7da6978545cd21fdcf78c483e@agner.ch>
-References: <20180405115134.8036-1-o.rempel@pengutronix.de>
- <93e7b7ef-1bc0-2871-da2c-65ab3f070c07@pengutronix.de>
- <20180611082022.GG16091@dragon>
- <1528706126.2842.1.camel@pengutronix.de>
- <3fa291a7da6978545cd21fdcf78c483e@agner.ch>
-Message-ID: <CAOMZO5CDqioBvQb919FZ79NUGBBB0gWgaMe0ueUu1BUxZS7D6A@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 11 Jun 2018 14:01:58 +0200
+Subject: handling voice calls in ALSA soc (on Droid 4)
+In-Reply-To: <20180611111011.GA11580@sirena.org.uk>
+References: <20180611102529.GA1272@amd> <20180611111011.GA11580@sirena.org.uk>
+Message-ID: <20180611120158.GA21745@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2018 at 8:48 AM, Stefan Agner <stefan@agner.ch> wrote:
-> On 11.06.2018 10:35, Lucas Stach wrote:
->> Hi Shawn,
->>
->> Am Montag, den 11.06.2018, 16:20 +0800 schrieb Shawn Guo:
->>> On Mon, Jun 11, 2018 at 10:02:53AM +0200, Oleksij Rempel wrote:
->>> > Hi all,
->>> >
->>> > this patch was send 05.04.2018. Any comments?
->>> >
->>> > @Shawn, can you please take it?
->>>
->>> Honestly I'm not sure how useful it will be.  If we can have some i.MX
->>> developers ACK on it, I will be more comfortable to take it.
->>
->> This is all highly experimental and in PoC stage, but we see some value
->> in running a second Linux system on the M4 coprocessor. There are lots
->> of things that still need to be figured out, but we are working on this
->> from time to time when there are some hours to spare.
->>
->> This patch seems like a good step in the right direction and IMHO the
->> amount of code and changes is small enough to carry it upstream without
->> impacting anything else. I would be happy if this could be pulled in.
->
-> I agree with Lucas here, this is rather minimal and not invasive.
+On Mon 2018-06-11 12:10:11, Mark Brown wrote:
+> On Mon, Jun 11, 2018 at 12:25:30PM +0200, Pavel Machek wrote:
+> 
+> > ...and also. What is right interface for this? Mixer component that
+> > says if voice call is active or not?
+> 
+> Your modem should be represented as a component in the system and have
+> an input and an output representing the input and output on the cell
+> network.  See speyside for an example of how this can look in software
+> though there's a bunch of different ways modems can appear so you might
+> not have a fully digital link like that.
 
-Agreed here as well.
+Thanks for the pointer.
 
-It would be nice if we could start improving the CortexM4 support in
-general with mainline.
+With setup like that, how does userland tell kernel that the baseband
+<-> microphone/speaker connection should be activated?
 
-Thanks
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180611/43c03f41/attachment.sig>
