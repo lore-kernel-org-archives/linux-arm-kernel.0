@@ -1,27 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Jun 2018 12:25:27 -0600
-Subject: [v3, 03/10] dt-binding: ptp_qoriq: add DPAA FMan support
-In-Reply-To: <20180607092050.46128-4-yangbo.lu@nxp.com>
-References: <20180607092050.46128-1-yangbo.lu@nxp.com>
- <20180607092050.46128-4-yangbo.lu@nxp.com>
-Message-ID: <20180611182527.GA13639@rob-hp-laptop>
+From: pawel.mikolaj.chmiel@gmail.com (=?utf-8?B?UGF3ZcWC?= Chmiel)
+Date: Mon, 11 Jun 2018 20:57:39 +0200
+Subject: [PATCH 1/1] ARM: dts: s5pv210: Add missing interrupt-controller
+ property to gph2
+In-Reply-To: <CAJKOXPcVqaeYoU=tht5GSyEunnboG-+Mxo96LCDewbqDjCfy-A@mail.gmail.com>
+References: <1528640149-2195-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <CAJKOXPcVqaeYoU=tht5GSyEunnboG-+Mxo96LCDewbqDjCfy-A@mail.gmail.com>
+Message-ID: <4072275.4u7YMACK2s@acerlaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 05:20:43PM +0800, Yangbo Lu wrote:
-> This patch is to add bindings description for DPAA
-> FMan 1588 timer, and also remove its description in
-> fsl-fman dt-bindings document.
+On Monday, June 11, 2018 2:43:59 PM CEST Krzysztof Kozlowski wrote:
+> On Sun, Jun 10, 2018 at 4:15 PM, Pawe? Chmiel
+> <pawel.mikolaj.chmiel@gmail.com> wrote:
+> > This commit adds missing interrupt-controller property to gph2 block,
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> ---
-> Changes for v2:
-> 	- None.
-> Changes for v3:
-> 	- None.
-> ---
->  Documentation/devicetree/bindings/net/fsl-fman.txt |   25 +-------------------
->  .../devicetree/bindings/ptp/ptp-qoriq.txt          |   15 +++++++++--
->  2 files changed, 13 insertions(+), 27 deletions(-)
+> Just "Add missing". See:
+> https://elixir.bootlin.com/linux/latest/source/Documentation/process/submitting-patches.rst#L151
+> 
+> > to silence following warnings during build
+> >   /soc/pinctrl at e0200000/gph2: Missing interrupt-controller or interrupt-map property
+> >
+> > Observed on not yet mainlined, an S5PV210 based
+> > Samsung Galaxy S (i9000) phone.
+> 
+> The warning is not reproduceable (as you mentioned board is not
+> present in mainline) thus please skip it. Instead, either describe
+> existing reason for this change (e.g. because bindings require it for
+> node of every bank of pins supporting GPIO interrupts) or include this
+> in series mainlining new board (where the reason will be - it will be
+> used by new board etc).
+> 
+> Best regards,
+> Krzysztof
+> 
+Ok, I'll send this patch (fixed) with other patches adding new board.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks
