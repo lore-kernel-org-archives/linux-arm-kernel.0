@@ -1,89 +1,31 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 11 Jun 2018 17:26:09 +0200
-Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
-References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
- <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
- <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
- <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
- <CAMuHMdVJ+ad-kr0iYuoaH3chJ49_g6yjEb8PHmTpwjFdYcG4=Q@mail.gmail.com>
- <47e87deb-a7a8-4780-53b5-4e4ed6e1bac3@gmail.com>
- <CAMuHMdXJEC8HbuB5+YHMLjZy9GfCYyXmGTk0TXkoAxLhxTOJyA@mail.gmail.com>
- <6864ed2c-39ac-615d-f38e-b28c3647e451@gmail.com>
- <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
-Message-ID: <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon, 11 Jun 2018 17:36:32 +0200
+Subject: [PATCH v6 3/6] mfd: at91-usart: added mfd driver for usart
+In-Reply-To: <20180607110020.20565-4-radu.pirea@microchip.com>
+References: <20180607110020.20565-1-radu.pirea@microchip.com>
+ <20180607110020.20565-4-radu.pirea@microchip.com>
+Message-ID: <20180611153632.GG10521@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2018 04:30 PM, Geert Uytterhoeven wrote:
-> Hi Marek,
-> 
-> On Mon, Jun 11, 2018 at 4:19 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->> On 06/11/2018 04:10 PM, Geert Uytterhoeven wrote:
->>> On Mon, Jun 11, 2018 at 4:04 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>>> On 06/11/2018 03:49 PM, Geert Uytterhoeven wrote:
->>>>> On Mon, Jun 11, 2018 at 3:39 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>>> On 06/11/2018 03:03 PM, Geert Uytterhoeven wrote:
->>>>>>> On Mon, Jun 11, 2018 at 2:15 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>>>>> On 06/11/2018 11:56 AM, Geert Uytterhoeven wrote:
->>>>>>>>> On Mon, Jun 4, 2018 at 7:59 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>>>>>>> Rather than hard-coding the quirk topology, which stopped scaling,
->>>>>>>>>> parse the information from DT. The code looks for all compatible
->>>>>>>>>> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
->>>>>>>>>> to the same pin. If so, the code sends a matching sequence to the
->>>>>>>>>> PMIC to deassert the IRQ.
->>>>>
->>>>>>>>>> +               ret = of_property_read_u32(np, "reg", &addr);
->>>>>>>>>> +               if (ret)
->>>>>>>>>> +                       return ret;
->>>>>>>>>
->>>>>>>>> I think it's safer to skip this entry and continue, after calling
->>>>>>>>> kfree(quirk), of course.
->>>>>>>>>
->>>>>>>>>> +
->>>>>>>>>> +               quirk->id = id;
->>>>>>>>>> +               quirk->i2c_msg.addr = addr;
->>>>>>>>>> +               quirk->shared = false;
->>>>>>>>>> +
->>>>>>>>>> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
->>>>>>>>>> +               if (ret)
->>>>>>>>>> +                       return ret;
->>>>>>>>>
->>>>>>>>> kfree(quirk) and continue...
->>>>>>>>
->>>>>>>> I wonder if it shouldn't rather free the entire list and abort ?
->>>>>>>
->>>>>>> "Be strict when sending, be liberal when receiving."
->>>>>>
->>>>>> Meaning ? I think "the language barrier is protecting me" (TM)
->>>>>
->>>>> Do the best you can, given the buggy DT you received.
->>>>> I.e. don't fail completely, just ignore the bad device node, and continue.
->>>>
->>>> But if you ignore node, you might as well ignore one which is shared and
->>>> then the system crashes due to IRQ storm anyway. So hum, what can we do ?
->>>
->>> Correct. If it's a critical node, it will crash regardless.
->>> If it's a non-critical node, you have the choice between aborting and crashing,
->>> or ignoring and keeping the system alive. Your call.
->>
->> But wait, since we control which machines this code runs on , can't we
->> assure they have valid DTs ? This situation with invalid DT starts to
->> look a bit hypothetical to me.
-> 
-> That assumes you keep the list of machines to check, and don't want to fix the
-> issue automatically when detected (on any R-Car Gen2 or RZ/G1 platform, so
-> you still need to check for r8a779[0-4] and r8a774[23457]).
+On 07/06/2018 14:00:17+0300, Radu Pirea wrote:
+> +static int at91_usart_mode_probe(struct platform_device *pdev)
+> +{
+> +	struct mfd_cell cell;
+> +	u32 opmode;
 
-Yes, I want to keep a list of machines to check, to be _sure_ some
-machine doesn't randomly blow up.
+This has to be initialized to AT91_USART_MODE_SERIAL...
 
-> Anyway, as we care about booting old DTBs on new kernels (for a while), we
-> have a few more release cycles to bikeshed ;-)
+> +	int err;
+> +
+> +	err = device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
+> +
 
-I was about to ask if this patch then makes any sense or not.
+because if the property is not present, then opmode will not be modified
+which means it could hold the value of AT91_USART_MODE_SPI.
+
 
 -- 
-Best regards,
-Marek Vasut
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
