@@ -1,48 +1,36 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 11 Jun 2018 11:26:16 +0800
-Subject: [PATCH 24/28] drm/mediatek: add DSI2 support for mutex
+Date: Mon, 11 Jun 2018 11:26:18 +0800
+Subject: [PATCH 26/28] drm/mediatek: add DPI1/DSI1/DSI2/DSI3 in comp_init
 In-Reply-To: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528687580-549-25-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528687580-549-27-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the DSI2 support for mutex
+This patch add components DPI1/DSI1/DSI2/DSI3 in comp_init.
+Because the some parameter for these components initialized
+in their driver.
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 5916fc11693a..1e7e3872eccc 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -77,6 +77,7 @@
- #define MUTEX_SOF_DSI1			2
- #define MUTEX_SOF_DPI0			3
- #define MUTEX_SOF_DPI1			4
-+#define MUTEX_SOF_DSI2			5
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 22f4c72fa785..ff974d82a4a6 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -278,7 +278,11 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
  
- #define OVL0_MOUT_EN_COLOR0		0x1
- #define OD_MOUT_EN_RDMA0		0x1
-@@ -383,6 +384,9 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
- 	case DDP_COMPONENT_DSI1:
- 		reg = MUTEX_SOF_DSI0;
- 		break;
-+	case DDP_COMPONENT_DSI2:
-+		reg = MUTEX_SOF_DSI2;
-+		break;
- 	case DDP_COMPONENT_DPI0:
- 		reg = MUTEX_SOF_DPI0;
- 		break;
-@@ -420,6 +424,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
- 	switch (id) {
- 	case DDP_COMPONENT_DSI0:
- 	case DDP_COMPONENT_DSI1:
-+	case DDP_COMPONENT_DSI2:
- 	case DDP_COMPONENT_DPI0:
- 	case DDP_COMPONENT_DPI1:
- 		writel_relaxed(MUTEX_SOF_SINGLE_MODE,
+ 	if (comp_id == DDP_COMPONENT_BLS ||
+ 	    comp_id == DDP_COMPONENT_DPI0 ||
++	    comp_id == DDP_COMPONENT_DPI1 ||
+ 	    comp_id == DDP_COMPONENT_DSI0 ||
++	    comp_id == DDP_COMPONENT_DSI1 ||
++	    comp_id == DDP_COMPONENT_DSI2 ||
++	    comp_id == DDP_COMPONENT_DSI3 ||
+ 	    comp_id == DDP_COMPONENT_PWM0) {
+ 		comp->regs = NULL;
+ 		comp->clk = NULL;
 -- 
 2.12.5
