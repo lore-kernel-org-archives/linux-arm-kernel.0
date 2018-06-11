@@ -1,45 +1,77 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Mon, 11 Jun 2018 17:37:58 +0200
-Subject: [PATCH v6 2/6] dt-bindings: add binding for atmel-usart in SPI
- mode
-In-Reply-To: <20180607110020.20565-3-radu.pirea@microchip.com>
-References: <20180607110020.20565-1-radu.pirea@microchip.com>
- <20180607110020.20565-3-radu.pirea@microchip.com>
-Message-ID: <20180611153758.GH10521@piout.net>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 11 Jun 2018 17:46:33 +0200
+Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
+ disable compiler auto-inline optimizations
+In-Reply-To: <20180608160355.67712eb8@vmware.local.home>
+References: <20180606095714.1d3c2def@vmware.local.home>
+ <20180606142600.GN13775@localhost>
+ <20180606142622.2338abf6@vmware.local.home>
+ <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
+ <20180607074628.kd3iyxevwj3ypzbr@intel.com>
+ <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
+ <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
+ <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
+ <20180607091816.GT13775@localhost>
+ <20180608160355.67712eb8@vmware.local.home>
+Message-ID: <20180611154633.GC13775@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 08, 2018 at 04:03:55PM -0400, Steven Rostedt wrote:
+> On Thu, 7 Jun 2018 11:18:16 +0200
+> Johan Hovold <johan@kernel.org> wrote:
+> 
+> 
+> > If you want to work around the warning and think you can do it in some
+> > non-contrived way, then go for it.
+> > 
+> > Clearing the request buffer, checking for termination using strnlen, and
+> > then using memcpy might not be too bad.
+> > 
+> > But after all, it is a false positive, so leaving things as they stand
+> > is fine too.
+> 
+> Not sure how contrived you think this is, but it solves the warning
+> without adding extra work in the normal case.
+> 
+> -- Steve
+> 
+> diff --git a/drivers/staging/greybus/fw-management.c b/drivers/staging/greybus/fw-management.c
+> index 71aec14f8181..4fb9f1dff47d 100644
+> --- a/drivers/staging/greybus/fw-management.c
+> +++ b/drivers/staging/greybus/fw-management.c
+> @@ -150,15 +150,18 @@ static int fw_mgmt_load_and_validate_operation(struct fw_mgmt *fw_mgmt,
+>  	}
+>  
+>  	request.load_method = load_method;
+> -	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
+> +	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE - 1);
+>  
+>  	/*
+>  	 * The firmware-tag should be NULL terminated, otherwise throw error and
+>  	 * fail.
+>  	 */
+> -	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
+> -		dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
+> -		return -EINVAL;
+> +	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 2] != '\0') {
+> +		if (tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
+> +			dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
+> +			return -EINVAL;
+> +		}
+> +		request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] = '\0';
+>  	}
 
-On 07/06/2018 14:00:16+0300, Radu Pirea wrote:
-> diff --git a/include/dt-bindings/mfd/at91-usart.h b/include/dt-bindings/mfd/at91-usart.h
-> new file mode 100644
-> index 000000000000..ac811628a42d
-> --- /dev/null
-> +++ b/include/dt-bindings/mfd/at91-usart.h
-> @@ -0,0 +1,17 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * This header provides macros for AT91 USART DT bindings.
-> + *
-> + * Copyright (C) 2018 Microchip Technology
-> + *
-> + * Author: Radu Pirea <radu.pirea@microchip.com>
-> + *
-> + */
-> +
-> +#ifndef __DT_BINDINGS_AT91_USART_H__
-> +#define __DT_BINDINGS_AT91_USART_H__
-> +
-> +#define AT91_USART_MODE_SERIAL	1
-> +#define AT91_USART_MODE_SPI	2
-> +
+Well, I think it's quite far from obvious what is going on above, and
+not least why things are being done this way (which a comment may help
+with).
 
-Nitpick, I'd make that 0 and 1 instead of 1 and 2. That would feel more
-natural to me regarding the default value.
+And just NUL-terminating the (automatic) buffer before returning wasn't
+enough? Then it may be better to do away with strncpy completely.
 
+But should we really be working around gcc this way? If the
+implementation of this new warning isn't smart enough yet, should it not
+just be disabled instead?
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Thanks,
+Johan
