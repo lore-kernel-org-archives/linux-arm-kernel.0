@@ -1,68 +1,81 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 11 Jun 2018 00:48:16 +0000
-Subject: arm: mach-mvebu: dts: enable-method is always overwritten
-References: <a2d4701e-28b3-07ee-6b2f-588b2e9a75c4@online.net>
- <20180608155858.GB19702@lunn.ch>
-Message-ID: <c26a750dbd25440bb9c3f669f757c491@svr-chch-ex1.atlnz.lc>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 11 Jun 2018 11:00:28 +0900
+Subject: [GIT PULL] Allwinner clock changes for 4.18
+In-Reply-To: <20180521115947.wqrnv2hczate65lz@flea>
+References: <20180521115947.wqrnv2hczate65lz@flea>
+Message-ID: <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yves,
+Hi Maxime,
 
-On 09/06/18 03:59, Andrew Lunn wrote:
-> On Fri, Jun 08, 2018 at 05:43:11PM +0200, Yves Lefloch wrote:
->> Hello everybody,
-> 
-> Adding Chris Packham. He did some work in this area.
-> 
->         Andrew
-> 
->>
->> I'm facing an issue that I believe to be a conflict between device-tree and
->> machine_desc.
->>
->> My platform is arm/mach-mvebu. I have a DT based on "armada-xp-db-dxbc2.dts"
->> (I just included it and added a few okays), my CPU is a Marvell Bobcat2
->> switching chip. My kernel is a vanilla 4.16.
->>
->> Everything works fine except that my second core won't boot: `CPU1: failed
->> to come online'.
->> I tracked down the problem to arch/arm/mach-mvebu/platsmp.c: in this file is
->> defined a machine_desc that hardcodes the SMP ops to `marvell,armada-xp-smp'
->> whereas my device tree (by including armada-xp-98dx3236.dtsi) attempts to
->> set the ops to `marvell,98dx3236-smp' through enable-method. In setup_arch()
->> the machine_desc's ops overwrites the enable-method's ops, causing the wrong
->> smp_boot_secondary() call to be issued.
->>
->> Now there is a note from 2014 saying that this machine_desc's `smp' field is
->> hardcoded like that because of "old Device Trees that were not specifying
->> the cpus enable-method property". As far as I can tell, this is still the
->> case, for instance "armada-370-db.dts" doesn't have any enable-method
->> property.
->>
->> I have worked around this by commenting out `armada_xp_smp_ops.smp' but
->> obviously I would prefer to keep a vanilla kernel.
->>
->> So I propose to:
->> - Add `enable-method = "marvell,armada-xp-smp"' to armada-370-xp.dtsi,
->> because it seems that all Armada 370/XP include it;
->> - Remove the `smp' field of `armada_xp_smp_ops'.
->>
->> If you agree with the diagnosis and the proposed fix I will write a patch.
 
-Personally my preferred option is to not set .smp at all and let the 
-device tree do it's thing.
+2018-05-21 20:59 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+> Hi Mike, Stephen,
+>
+> Please merge the following changes for the next merge window, thanks!
+>
+> Maxime
+>
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+>
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>
+> are available in the Git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.18
+>
+> for you to fetch changes up to 17de4c857b1f74b90967f7e7fd5ff81be61dc044:
+>
+>   clk: sunxi-ng: r40: export a regmap to access the GMAC register (2018-05-17 14:02:07 +0800)
+>
+> ----------------------------------------------------------------
+> Allwinner clock changes for 4.18
+>
+> Not a lot of changes for this release, but two quite important features
+> were added: the H6 PRCM clock support, and the needed changes to the R40
+> clock driver to allow for the EMAC to operate.
+>
+> ----------------------------------------------------------------
+> Icenowy Zheng (3):
+>       clk: sunxi-ng: add support for H6 PRCM CCU
+>       clk: sunxi-ng: r40: rewrite init code to a platform driver
+>       clk: sunxi-ng: r40: export a regmap to access the GMAC register
+>
 
-I'm not sure if things have changed w.r.t. backwards compatibility in 
-the 3.5 years since I initially suggested that, assuming that we still 
-want backwards compatibility with these older device trees this patch 
-might help
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
 
-I was pretty happy with that approach at the time but I obviously never 
-followed up to get that delivered. If someone has some spare cycles to 
-spend on it I wouldn't object to it being taken over.
+Why was my patch "clk: sunxi-ng: replace lib-y with obj-y"
+not included in the pull request?
 
-I'll see if I can find some time to resurrect it myself. I don't have an 
-Armada-370 board but I can test BC2 and A38x.
+
+You said "I've picked it up"
+https://patchwork.kernel.org/patch/10348031/
+
+
+
+
+>  .../devicetree/bindings/clock/sunxi-ccu.txt        |   3 +-
+>  drivers/clk/sunxi-ng/Kconfig                       |   5 +
+>  drivers/clk/sunxi-ng/Makefile                      |   1 +
+>  drivers/clk/sunxi-ng/ccu-sun50i-h6-r.c             | 207 +++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun50i-h6-r.h             |  19 ++
+>  drivers/clk/sunxi-ng/ccu-sun8i-r40.c               |  72 +++++--
+>  include/dt-bindings/clock/sun50i-h6-r-ccu.h        |  24 +++
+>  include/dt-bindings/reset/sun50i-h6-r-ccu.h        |  17 ++
+>  8 files changed, 336 insertions(+), 12 deletions(-)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6-r.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6-r.h
+>  create mode 100644 include/dt-bindings/clock/sun50i-h6-r-ccu.h
+>  create mode 100644 include/dt-bindings/reset/sun50i-h6-r-ccu.h
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
