@@ -1,44 +1,77 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 11 Jun 2018 21:54:12 +0200
-Subject: [RESEND v2] dmaengine: pxa: add a default requestor policy
-In-Reply-To: <20180611042125.GD2452@vkoul-mobl> (Vinod Koul's message of "Mon,
- 11 Jun 2018 09:51:25 +0530")
-References: <20180530201249.26972-1-robert.jarzmik@free.fr>
- <878t7oruya.fsf@belgarion.home> <20180611042125.GD2452@vkoul-mobl>
-Message-ID: <8736xtrtej.fsf@belgarion.home>
+Date: Mon, 11 Jun 2018 22:22:11 +0200
+Subject: [PATCH 2/2] ASoC: pxa: add devicetree support
+In-Reply-To: <20180611202211.15501-1-robert.jarzmik@free.fr>
+References: <20180611202211.15501-1-robert.jarzmik@free.fr>
+Message-ID: <20180611202211.15501-2-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@linaro.org> writes:
+Add the devicetree support, so that the driver can be used in a
+devictree platform.
 
-> On 09-06-18, 14:43, Robert Jarzmik wrote:
->> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->> 
->> > As what former drcmr -1 value meant, add a this as a default to each
->> > channel, ie. that by default no requestor line is used.
->> >
->> > This is specifically used for network drivers smc91x and smc911x, and
->> > needed for their port to slave maps.
->> >
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->> > ---
->> > Since v1: changed -1 to U32_MAX
->> Hi Vinod,
->> 
->> Could I have your ack on this so that I add this one to the dma slave map serie
->> after the merge window is closed please ?
->
-> Sorry I was thinking it would go thru dmaengine tree, please do
-> indicate if that is not the case. Nevertheless
->
-> Acked-by: Vinod Koul <vkoul@kernel.org>
-Thanks.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ sound/arm/pxa2xx-ac97-lib.c | 11 +++++++++++
+ sound/soc/pxa/pxa2xx-ac97.c | 10 ++++++++++
+ 2 files changed, 21 insertions(+)
 
-As this is a dependency to the serie, I'd rather take it, unless you insist, in
-which case I'll rely on the fact that it will hit 4.19 cycle.
-
-Cheers.
-
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 5950a9e218d9..17c3f26b92b9 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -19,6 +19,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
+ 
+ #include <sound/pxa2xx-lib.h>
+ 
+@@ -337,6 +338,16 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+ 			dev_err(&dev->dev, "Invalid reset GPIO %d\n",
+ 				pdata->reset_gpio);
+ 		}
++	} else if (!pdata && dev->dev.of_node) {
++		pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++		pdata->reset_gpio = of_get_named_gpio(dev->dev.of_node,
++						      "reset-gpio", 0);
++		if (pdata->reset_gpio == -ENOENT)
++			pdata->reset_gpio = -1;
++		else if (pdata->reset_gpio < 0)
++			return pdata->reset_gpio;
+ 	} else {
+ 		if (cpu_is_pxa27x())
+ 			reset_gpio = 113;
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index bd36578ceb86..8fda29262ef1 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -231,6 +231,15 @@ static const struct snd_soc_component_driver pxa_ac97_component = {
+ 	.name		= "pxa-ac97",
+ };
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id pxa2xx_ac97_dt_ids[] = {
++	{ .compatible = "marvell,pxa2xx-ac97", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, pxa2xx_ac97_dt_ids);
++
++#endif
++
+ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -298,6 +307,7 @@ static struct platform_driver pxa2xx_ac97_driver = {
+ #ifdef CONFIG_PM_SLEEP
+ 		.pm	= &pxa2xx_ac97_pm_ops,
+ #endif
++		.of_match_table = of_match_ptr(pxa2xx_ac97_dt_ids),
+ 	},
+ };
+ 
 -- 
-Robert
+2.11.0
