@@ -1,83 +1,256 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Mon, 11 Jun 2018 12:09:22 +0000
-Subject: [PATCH v3 0/6] add virt-dma support for imx-sdma
-In-Reply-To: <1528714877.2842.3.camel@pengutronix.de>
-References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>,
- <1528714877.2842.3.camel@pengutronix.de>
-Message-ID: <8C06065A-DC99-4DA8-BF97-0C3BFE95C080@nxp.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 11 Jun 2018 14:15:13 +0200
+Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
+Message-ID: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Rather than hard-coding the quirk topology, which stopped scaling,
+parse the information from DT. The code looks for all compatible
+PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
+to the same pin. If so, the code sends a matching sequence to the
+PMIC to deassert the IRQ.
 
-Hi Lucas,
-    Thank for your report, I tested it only on SPI, will update to you after try on uart tomorrow.
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cc: linux-renesas-soc at vger.kernel.org
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
+---
+V2: - Replace the DT shared IRQ check loop with memcmp()
+    - Send the I2C message to deassert the IRQ line to all PMICs
+      in the list with shared IRQ line instead of just one
+    - Add comment that this works only in case all the PMICs are
+      on the same I2C bus
+V3: - Drop the addr = 0x00 init
+    - Drop reinit of argsa in rcar_gen2_regulator_quirk
+V4: - Squash regulator_quirk on single line
+    - Drop !np check in for_each_matching_node_and_match()
+    - Use argsa in of_irq_parse_one
+V5: - Check kzalloc failure
+    - Rename da...._msgs to da...._msg
+    - Don't reinit quirk->shared
+---
+ arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 137 ++++++++++++++++-----
+ 1 file changed, 108 insertions(+), 29 deletions(-)
 
-> ? 2018?6?11????7:01?Lucas Stach <l.stach@pengutronix.de> ???
-> 
-> Hi Robin,
-> 
-> this series breaks serial DMA for me. I wasn't able to dig in deeper
-> yet. Please let me know if you can test/reproduce at your side, if not
-> I'll try to find some time to collect some more debug info.
-> 
-> Regards,
-> Lucas
-> 
-> Am Montag, den 11.06.2018, 22:59 +0800 schrieb Robin Gong:
->> The legacy sdma driver has below limitations or drawbacks:
->>   1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
->>      one page size for one channel regardless of only few BDs needed
->>      most time. But in few cases, the max PAGE_SIZE maybe not enough.
->>   2. One SDMA channel can't stop immediatley once channel disabled which
->>      means SDMA interrupt may come in after this channel terminated.There
->>      are some patches for this corner case such as commit "2746e2c389f9",
->>      but not cover non-cyclic.
->> 
->> The common virt-dma overcomes the above limitations. It can alloc bd
->> dynamically and free bd once this tx transfer done. No memory wasted or
->> maximum limititation here, only depends on how many memory can be requested
->> from kernel. For No.2, such issue can be workaround by checking if there
->> is available descript("sdmac->desc") now once the unwanted interrupt
->> coming. At last the common virt-dma is easier for sdma driver maintain.
->> 
->> Change from v2:
->>   1. include Sascha's patch to make the main patch easier to review.
->>      Thanks Sacha.
->>   2. remove useless 'desc'/'chan' in struct sdma_channe.
->> 
->> Change from v1:
->>   1. split v1 patch into 5 patches.
->>   2. remove some unnecessary condition check.
->>   3. remove unnecessary 'pending' list.
->> 
->> Robin Gong (5):
->>   dmaengine: imx-sdma: add virt-dma support
->>   Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
->>     during interrupt"
->>   dmaengine: imx-sdma: remove usless lock
->>   dmaengine: imx-sdma: remove the maximum limation for bd numbers
->>   dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
->> 
->>  drivers/dma/Kconfig    |   1 +
->>  drivers/dma/imx-sdma.c | 392 ++++++++++++++++++++++++++++---------------------
->>  2 files changed, 227 insertions(+), 166 deletions(-)
->> 
->> -- 
->> 2.7.4
->> 
->> Robin Gong (5):
->>   dmaengine: imx-sdma: add virt-dma support
->>   Revert "dmaengine: imx-sdma: fix pagefault when channel is disabled
->>     during interrupt"
->>   dmaengine: imx-sdma: remove usless lock
->>   dmaengine: imx-sdma: remove the maximum limation for bd numbers
->>   dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
->> 
->> Sascha Hauer (1):
->>   dmaengine: imx-sdma: factor out a struct sdma_desc from struct
->>     sdma_channel
->> 
->>  drivers/dma/Kconfig    |   1 +
->>  drivers/dma/imx-sdma.c | 391 ++++++++++++++++++++++++++++---------------------
->>  2 files changed, 226 insertions(+), 166 deletions(-)
->> 
+diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+index 93f628acfd94..cf4d260882cf 100644
+--- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+@@ -31,11 +31,12 @@
+ #include <linux/i2c.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/list.h>
+ #include <linux/notifier.h>
+ #include <linux/of.h>
++#include <linux/of_irq.h>
+ #include <linux/mfd/da9063/registers.h>
+ 
+-
+ #define IRQC_BASE		0xe61c0000
+ #define IRQC_MONITOR		0x104	/* IRQn Signal Level Monitor Register */
+ 
+@@ -44,34 +45,45 @@
+ /* start of DA9210 System Control and Event Registers */
+ #define DA9210_REG_MASK_A		0x54
+ 
++struct regulator_quirk {
++	struct list_head		list;
++	const struct of_device_id	*id;
++	struct of_phandle_args		irq_args;
++	struct i2c_msg			i2c_msg;
++	bool				shared;	/* IRQ line is shared */
++};
++
++static LIST_HEAD(quirk_list);
+ static void __iomem *irqc;
+ 
+ /* first byte sets the memory pointer, following are consecutive reg values */
+ static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
+ static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
+ 
+-static struct i2c_msg da9xxx_msgs[3] = {
+-	{
+-		.addr = 0x58,
+-		.len = ARRAY_SIZE(da9063_irq_clr),
+-		.buf = da9063_irq_clr,
+-	}, {
+-		.addr = 0x68,
+-		.len = ARRAY_SIZE(da9210_irq_clr),
+-		.buf = da9210_irq_clr,
+-	}, {
+-		.addr = 0x70,
+-		.len = ARRAY_SIZE(da9210_irq_clr),
+-		.buf = da9210_irq_clr,
+-	},
++static struct i2c_msg da9063_msg = {
++	.len = ARRAY_SIZE(da9063_irq_clr),
++	.buf = da9063_irq_clr,
++};
++
++static struct i2c_msg da9210_msg = {
++	.len = ARRAY_SIZE(da9210_irq_clr),
++	.buf = da9210_irq_clr,
++};
++
++static const struct of_device_id rcar_gen2_quirk_match[] = {
++	{ .compatible = "dlg,da9063", .data = &da9063_msg },
++	{ .compatible = "dlg,da9210", .data = &da9210_msg },
++	{},
+ };
+ 
+ static int regulator_quirk_notify(struct notifier_block *nb,
+ 				  unsigned long action, void *data)
+ {
++	struct regulator_quirk *pos, *tmp;
+ 	struct device *dev = data;
+ 	struct i2c_client *client;
+ 	static bool done;
++	int ret;
+ 	u32 mon;
+ 
+ 	if (done)
+@@ -88,17 +100,20 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+ 	client = to_i2c_client(dev);
+ 	dev_dbg(dev, "Detected %s\n", client->name);
+ 
+-	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
+-	    (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
+-	    (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
+-		int ret, len;
++	/*
++	 * Send message to all PMICs that share an IRQ line to deassert it.
++	 *
++	 * WARNING: This works only if all the PMICs are on the same I2C bus.
++	 */
++	list_for_each_entry(pos, &quirk_list, list) {
++		if (!pos->shared)
++			continue;
+ 
+-		/* There are two DA9210 on Stout, one on the other boards. */
+-		len = of_machine_is_compatible("renesas,stout") ? 3 : 2;
++		dev_info(&client->dev, "clearing %s at 0x%02x interrupts\n",
++			 pos->id->compatible, pos->i2c_msg.addr);
+ 
+-		dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
+-		ret = i2c_transfer(client->adapter, da9xxx_msgs, len);
+-		if (ret != len)
++		ret = i2c_transfer(client->adapter, &pos->i2c_msg, 1);
++		if (ret != 1)
+ 			dev_err(&client->dev, "i2c error %d\n", ret);
+ 	}
+ 
+@@ -111,6 +126,11 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+ remove:
+ 	dev_info(dev, "IRQ2 is not asserted, removing quirk\n");
+ 
++	list_for_each_entry_safe(pos, tmp, &quirk_list, list) {
++		list_del(&pos->list);
++		kfree(pos);
++	}
++
+ 	done = true;
+ 	iounmap(irqc);
+ 	return 0;
+@@ -122,7 +142,12 @@ static struct notifier_block regulator_quirk_nb = {
+ 
+ static int __init rcar_gen2_regulator_quirk(void)
+ {
+-	u32 mon;
++	struct regulator_quirk *quirk, *pos, *tmp;
++	struct of_phandle_args *argsa, *argsb;
++	const struct of_device_id *id;
++	struct device_node *np;
++	u32 mon, addr;
++	int ret;
+ 
+ 	if (!of_machine_is_compatible("renesas,koelsch") &&
+ 	    !of_machine_is_compatible("renesas,lager") &&
+@@ -130,22 +155,76 @@ static int __init rcar_gen2_regulator_quirk(void)
+ 	    !of_machine_is_compatible("renesas,gose"))
+ 		return -ENODEV;
+ 
++	for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
++		if (!of_device_is_available(np))
++			break;
++
++		quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
++		if (!quirk) {
++			ret = -ENOMEM;
++			goto err_mem;
++		}
++
++		argsa = &quirk->irq_args;
++		memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
++
++		ret = of_property_read_u32(np, "reg", &addr);
++		if (ret)
++			return ret;
++
++		quirk->id = id;
++		quirk->i2c_msg.addr = addr;
++
++		ret = of_irq_parse_one(np, 0, argsa);
++		if (ret)
++			return ret;
++
++		list_for_each_entry(pos, &quirk_list, list) {
++			argsb = &pos->irq_args;
++
++			if (argsa->args_count != argsb->args_count)
++				continue;
++
++			ret = memcmp(argsa->args, argsb->args,
++				     argsa->args_count *
++				     sizeof(argsa->args[0]));
++			if (!ret) {
++				pos->shared = true;
++				quirk->shared = true;
++			}
++		}
++
++		list_add_tail(&quirk->list, &quirk_list);
++	}
++
+ 	irqc = ioremap(IRQC_BASE, PAGE_SIZE);
+-	if (!irqc)
+-		return -ENOMEM;
++	if (!irqc) {
++		ret = -ENOMEM;
++		goto err_mem;
++	}
+ 
+ 	mon = ioread32(irqc + IRQC_MONITOR);
+ 	if (mon & REGULATOR_IRQ_MASK) {
+ 		pr_debug("%s: IRQ2 is not asserted, not installing quirk\n",
+ 			 __func__);
+-		iounmap(irqc);
+-		return 0;
++		ret = 0;
++		goto err_free;
+ 	}
+ 
+ 	pr_info("IRQ2 is asserted, installing da9063/da9210 regulator quirk\n");
+ 
+ 	bus_register_notifier(&i2c_bus_type, &regulator_quirk_nb);
+ 	return 0;
++
++err_free:
++	iounmap(irqc);
++err_mem:
++	list_for_each_entry_safe(pos, tmp, &quirk_list, list) {
++		list_del(&pos->list);
++		kfree(pos);
++	}
++
++	return ret;
+ }
+ 
+ arch_initcall(rcar_gen2_regulator_quirk);
+-- 
+2.16.2
