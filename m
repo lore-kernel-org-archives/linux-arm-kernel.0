@@ -1,221 +1,169 @@
-From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Mon, 11 Jun 2018 11:50:27 +0200
-Subject: [PATCH 4/4] media: stm32-dcmi: revisit buffer list management
-In-Reply-To: <1528710627-8566-1-git-send-email-hugues.fruchet@st.com>
-References: <1528710627-8566-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1528710627-8566-5-git-send-email-hugues.fruchet@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 11 Jun 2018 11:56:14 +0200
+Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
+References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup "active" field usage and enhance list management
-to avoid exceptions when releasing buffers on error or
-stopping streaming.
+Hi Marek,
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 65 +++++++++++++++----------------
- 1 file changed, 31 insertions(+), 34 deletions(-)
+On Mon, Jun 4, 2018 at 7:59 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> Rather than hard-coding the quirk topology, which stopped scaling,
+> parse the information from DT. The code looks for all compatible
+> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 93bb03a..581ded0 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -191,7 +191,7 @@ static inline void reg_clear(void __iomem *base, u32 reg, u32 mask)
- 	reg_write(base, reg, reg_read(base, reg) & ~mask);
- }
- 
--static int dcmi_start_capture(struct stm32_dcmi *dcmi);
-+static int dcmi_start_capture(struct stm32_dcmi *dcmi, struct dcmi_buf *buf);
- 
- static void dcmi_buffer_done(struct stm32_dcmi *dcmi,
- 			     struct dcmi_buf *buf,
-@@ -203,6 +203,8 @@ static void dcmi_buffer_done(struct stm32_dcmi *dcmi,
- 	if (!buf)
- 		return;
- 
-+	list_del_init(&buf->list);
-+
- 	vbuf = &buf->vb;
- 
- 	vbuf->sequence = dcmi->sequence++;
-@@ -220,6 +222,8 @@ static void dcmi_buffer_done(struct stm32_dcmi *dcmi,
- 
- static int dcmi_restart_capture(struct stm32_dcmi *dcmi)
- {
-+	struct dcmi_buf *buf;
-+
- 	spin_lock_irq(&dcmi->irqlock);
- 
- 	if (dcmi->state != RUNNING) {
-@@ -230,19 +234,16 @@ static int dcmi_restart_capture(struct stm32_dcmi *dcmi)
- 	/* Restart a new DMA transfer with next buffer */
- 	if (list_empty(&dcmi->buffers)) {
- 		dev_dbg(dcmi->dev, "Capture restart is deferred to next buffer queueing\n");
--		dcmi->active = NULL;
- 		dcmi->state = WAIT_FOR_BUFFER;
- 		spin_unlock_irq(&dcmi->irqlock);
- 		return 0;
- 	}
--
--	dcmi->active = list_entry(dcmi->buffers.next,
--				  struct dcmi_buf, list);
--	list_del_init(&dcmi->active->list);
-+	buf = list_entry(dcmi->buffers.next, struct dcmi_buf, list);
-+	dcmi->active = buf;
- 
- 	spin_unlock_irq(&dcmi->irqlock);
- 
--	return dcmi_start_capture(dcmi);
-+	return dcmi_start_capture(dcmi, buf);
- }
- 
- static void dcmi_dma_callback(void *param)
-@@ -252,6 +253,8 @@ static void dcmi_dma_callback(void *param)
- 	enum dma_status status;
- 	struct dcmi_buf *buf = dcmi->active;
- 
-+	spin_lock_irq(&dcmi->irqlock);
-+
- 	/* Check DMA status */
- 	status = dmaengine_tx_status(dcmi->dma_chan, dcmi->dma_cookie, &state);
- 
-@@ -274,15 +277,19 @@ static void dcmi_dma_callback(void *param)
- 		/* Return buffer to V4L2 */
- 		dcmi_buffer_done(dcmi, buf, buf->size, 0);
- 
-+		spin_unlock_irq(&dcmi->irqlock);
-+
- 		/* Restart capture */
- 		if (dcmi_restart_capture(dcmi))
- 			dev_err(dcmi->dev, "%s: Cannot restart capture on DMA complete\n",
- 				__func__);
--		break;
-+		return;
- 	default:
- 		dev_err(dcmi->dev, "%s: Received unknown status\n", __func__);
- 		break;
- 	}
-+
-+	spin_unlock_irq(&dcmi->irqlock);
- }
- 
- static int dcmi_start_dma(struct stm32_dcmi *dcmi,
-@@ -334,10 +341,9 @@ static int dcmi_start_dma(struct stm32_dcmi *dcmi,
- 	return 0;
- }
- 
--static int dcmi_start_capture(struct stm32_dcmi *dcmi)
-+static int dcmi_start_capture(struct stm32_dcmi *dcmi, struct dcmi_buf *buf)
- {
- 	int ret;
--	struct dcmi_buf *buf = dcmi->active;
- 
- 	if (!buf)
- 		return -EINVAL;
-@@ -491,8 +497,6 @@ static int dcmi_queue_setup(struct vb2_queue *vq,
- 	*nplanes = 1;
- 	sizes[0] = size;
- 
--	dcmi->active = NULL;
--
- 	dev_dbg(dcmi->dev, "Setup queue, count=%d, size=%d\n",
- 		*nbuffers, size);
- 
-@@ -550,23 +554,24 @@ static void dcmi_buf_queue(struct vb2_buffer *vb)
- 
- 	spin_lock_irq(&dcmi->irqlock);
- 
--		dcmi->active = buf;
-+	/* Enqueue to video buffers list */
-+	list_add_tail(&buf->list, &dcmi->buffers);
- 
- 	if (dcmi->state == WAIT_FOR_BUFFER) {
- 		dcmi->state = RUNNING;
-+		dcmi->active = buf;
- 
- 		dev_dbg(dcmi->dev, "Starting capture on buffer[%d] queued\n",
- 			buf->vb.vb2_buf.index);
- 
- 		spin_unlock_irq(&dcmi->irqlock);
--		if (dcmi_start_capture(dcmi))
-+		if (dcmi_start_capture(dcmi, buf))
- 			dev_err(dcmi->dev, "%s: Cannot restart capture on overflow or error\n",
- 				__func__);
--	} else {
--		/* Enqueue to video buffers list */
--		list_add_tail(&buf->list, &dcmi->buffers);
--		spin_unlock_irq(&dcmi->irqlock);
-+		return;
- 	}
-+
-+	spin_unlock_irq(&dcmi->irqlock);
- }
- 
- static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
-@@ -638,7 +643,6 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 	dcmi->errors_count = 0;
- 	dcmi->overrun_count = 0;
- 	dcmi->buffers_count = 0;
--	dcmi->active = NULL;
- 
- 	/*
- 	 * Start transfer if at least one buffer has been queued,
-@@ -651,15 +655,15 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 		return 0;
- 	}
- 
--	dcmi->active = list_entry(dcmi->buffers.next, struct dcmi_buf, list);
--	list_del_init(&dcmi->active->list);
--
--	dev_dbg(dcmi->dev, "Start streaming, starting capture\n");
-+	buf = list_entry(dcmi->buffers.next, struct dcmi_buf, list);
-+	dcmi->active = buf;
- 
- 	dcmi->state = RUNNING;
- 
-+	dev_dbg(dcmi->dev, "Start streaming, starting capture\n");
-+
- 	spin_unlock_irq(&dcmi->irqlock);
--	ret = dcmi_start_capture(dcmi);
-+	ret = dcmi_start_capture(dcmi, buf);
- 	if (ret) {
- 		dev_err(dcmi->dev, "%s: Start streaming failed, cannot start capture\n",
- 			__func__);
-@@ -683,15 +687,11 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 	 * Return all buffers to vb2 in QUEUED state.
- 	 * This will give ownership back to userspace
- 	 */
--	if (dcmi->active) {
--		buf = dcmi->active;
--		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_QUEUED);
--		dcmi->active = NULL;
--	}
- 	list_for_each_entry_safe(buf, node, &dcmi->buffers, list) {
- 		list_del_init(&buf->list);
- 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_QUEUED);
- 	}
-+	dcmi->active = NULL;
- 	spin_unlock_irq(&dcmi->irqlock);
- 
- 	return ret;
-@@ -733,16 +733,13 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 	}
- 
- 	/* Return all queued buffers to vb2 in ERROR state */
--	if (dcmi->active) {
--		buf = dcmi->active;
--		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
--		dcmi->active = NULL;
--	}
- 	list_for_each_entry_safe(buf, node, &dcmi->buffers, list) {
- 		list_del_init(&buf->list);
- 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
- 	}
- 
-+	dcmi->active = NULL;
-+
- 	spin_unlock_irq(&dcmi->irqlock);
- 
- 	/* Stop all pending DMA operations */
--- 
-1.9.1
+da9063
+
+> to the same pin. If so, the code sends a matching sequence to the
+> PMIC to deassert the IRQ.
+
+Note that not all R-Car Gen2 boards have all regulators described in DT yet.
+E.g. gose lacks da9210. So that has to be fixed first.
+
+>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Cc: linux-renesas-soc at vger.kernel.org
+> ---
+> V2: - Replace the DT shared IRQ check loop with memcmp()
+>     - Send the I2C message to deassert the IRQ line to all PMICs
+>       in the list with shared IRQ line instead of just one
+>     - Add comment that this works only in case all the PMICs are
+>       on the same I2C bus
+> V3: - Drop the addr = 0x00 init
+>     - Drop reinit of argsa in rcar_gen2_regulator_quirk
+
+Thanks for the update!
+
+> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+
+> @@ -44,34 +46,45 @@
+>  /* start of DA9210 System Control and Event Registers */
+>  #define DA9210_REG_MASK_A              0x54
+>
+> +struct regulator_quirk {
+> +       struct list_head                list;
+> +       const struct of_device_id       *id;
+> +       struct of_phandle_args          irq_args;
+> +       struct i2c_msg                  i2c_msg;
+> +       bool                            shared; /* IRQ line is shared */
+> +};
+> +
+> +static LIST_HEAD(quirk_list);
+>  static void __iomem *irqc;
+>
+>  /* first byte sets the memory pointer, following are consecutive reg values */
+>  static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
+>  static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
+>
+> -static struct i2c_msg da9xxx_msgs[3] = {
+> -       {
+> -               .addr = 0x58,
+> -               .len = ARRAY_SIZE(da9063_irq_clr),
+> -               .buf = da9063_irq_clr,
+> -       }, {
+> -               .addr = 0x68,
+> -               .len = ARRAY_SIZE(da9210_irq_clr),
+> -               .buf = da9210_irq_clr,
+> -       }, {
+> -               .addr = 0x70,
+> -               .len = ARRAY_SIZE(da9210_irq_clr),
+> -               .buf = da9210_irq_clr,
+> -       },
+> +static struct i2c_msg da9063_msgs = {
+
+da9063_msg? (it's a single message)
+
+> +       .len = ARRAY_SIZE(da9063_irq_clr),
+> +       .buf = da9063_irq_clr,
+> +};
+> +
+> +static struct i2c_msg da9210_msgs = {
+
+da9210_msg?
+
+> +       .len = ARRAY_SIZE(da9210_irq_clr),
+> +       .buf = da9210_irq_clr,
+> +};
+
+> @@ -122,7 +143,13 @@ static struct notifier_block regulator_quirk_nb = {
+>
+>  static int __init rcar_gen2_regulator_quirk(void)
+>  {
+> -       u32 mon;
+> +       struct device_node *np;
+> +       const struct of_device_id *id;
+> +       struct regulator_quirk *quirk;
+> +       struct regulator_quirk *pos;
+> +       struct of_phandle_args *argsa, *argsb;
+> +       u32 mon, addr;
+> +       int ret;
+
+Some people prefer "Reverse Christmas Tree Ordering", i.e. longest line first.
+
+>
+>         if (!of_machine_is_compatible("renesas,koelsch") &&
+>             !of_machine_is_compatible("renesas,lager") &&
+> @@ -130,6 +157,45 @@ static int __init rcar_gen2_regulator_quirk(void)
+>             !of_machine_is_compatible("renesas,gose"))
+>                 return -ENODEV;
+
+I think the board checks above can be removed. That will auto-enable the
+fix on e.g. Porter (once its regulators have ended up in DTS, of course).
+
+>
+> +       for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
+> +               if (!np || !of_device_is_available(np))
+
+!np cannot happen
+
+> +                       break;
+> +
+> +               quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
+
+Missing NULL check
+
+> +
+> +               argsa = &quirk->irq_args;
+> +               memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
+> +
+> +               ret = of_property_read_u32(np, "reg", &addr);
+> +               if (ret)
+> +                       return ret;
+
+I think it's safer to skip this entry and continue, after calling
+kfree(quirk), of course.
+
+> +
+> +               quirk->id = id;
+> +               quirk->i2c_msg.addr = addr;
+> +               quirk->shared = false;
+
+No need to clear shared, it was cleared by kzalloc().
+
+> +
+> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
+> +               if (ret)
+> +                       return ret;
+
+kfree(quirk) and continue...
+
+Works fine on Koelsch, so
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
