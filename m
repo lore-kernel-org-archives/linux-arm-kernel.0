@@ -1,35 +1,19 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 11 Jun 2018 10:19:22 -0700
-Subject: [PATCH v7 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <36e91ad9edeeee2adfe7a4d92675a1d6950f5002.1528498807.git.collinsd@codeaurora.org>
-References: <cover.1528498807.git.collinsd@codeaurora.org>
- <36e91ad9edeeee2adfe7a4d92675a1d6950f5002.1528498807.git.collinsd@codeaurora.org>
-Message-ID: <20180611171922.GG88063@google.com>
+From: joe.dougherty@gecoinc.com (Joe Dougherty)
+Date: Mon, 11 Jun 2018 10:21:59 -0700
+Subject: A72 access to cache syndrome registers (arm64)
+Message-ID: <CAPfxgkbKbEP-GgkX36cqLKxb0UW2GuGdpT4F9Fe4gkhn9d1zJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2018 at 04:44:15PM -0700, David Collins wrote:
-> Add the QCOM RPMh regulator driver to manage PMIC regulators
-> which are controlled via RPMh on some Qualcomm Technologies, Inc.
-> SoCs.  RPMh is a hardware block which contains several
-> accelerators which are used to manage various hardware resources
-> that are shared between the processors of the SoC.  The final
-> hardware state of a regulator is determined within RPMh by
-> performing max aggregation of the requests made by all of the
-> processors.
-> 
-> Add support for PMIC regulator control via the voltage regulator
-> manager (VRM) and oscillator buffer (XOB) RPMh accelerators.
-> VRM supports manipulation of enable state, voltage, and mode.
-> XOB supports manipulation of enable state.
-> 
-> Signed-off-by: David Collins <collinsd@codeaurora.org>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> ---
->  drivers/regulator/Kconfig               |   9 +
->  drivers/regulator/Makefile              |   1 +
->  drivers/regulator/qcom-rpmh-regulator.c | 753 ++++++++++++++++++++++++++++++++
->  3 files changed, 763 insertions(+)
->  create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
+Hello -
+Is there any current support for reading "CPU Memory Error Syndrome"
+and L2 Memory Error Syndrome" registers from userspace? I am
+monitoring for particular cache related events.  I'm trying to avoid
+writing a kernel module but it looks like  that may be my only option
+as I am not seeing support for access to these registers. Would a perf
+driver be more appropriate? Any advice/input  appreciated.
 
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+My Linux kernel is 4.14 but I could adjust is support is available elsewhere.
+
+Thanks,
+Joe
