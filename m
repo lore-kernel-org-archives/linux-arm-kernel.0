@@ -1,76 +1,62 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Mon, 11 Jun 2018 14:39:50 +0900
-Subject: [PATCH v2 2/3] ASoC: simple-card: move hp and mic detection to
- soc_card probe
-In-Reply-To: <87tvq96gnm.wl-kuninori.morimoto.gx@renesas.com>
-References: <20180611051559.18082-1-suzuki.katsuhiro@socionext.com>	<20180611051559.18082-2-suzuki.katsuhiro@socionext.com>
- <87tvq96gnm.wl-kuninori.morimoto.gx@renesas.com>
-Message-ID: <007401d40146$9ddaaec0$d9900c40$@socionext.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Mon, 11 Jun 2018 07:42:04 +0200
+Subject: [PATCH] arm: Initialize hrtimer-based broadcast clockevent
+In-Reply-To: <35966a15-8312-5ba9-ef76-33a6cfda1f32@siemens.com>
+References: <86a7e675-11bd-3b8b-22a0-8f440db96293@siemens.com>
+ <8f2fd3b9-416a-992e-5ca6-fc83aad5700d@siemens.com>
+ <35966a15-8312-5ba9-ef76-33a6cfda1f32@siemens.com>
+Message-ID: <e24a907f-d016-5587-a62e-0046f60d9536@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Morimoto-san,
-
-> -----Original Message-----
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Sent: Monday, June 11, 2018 2:27 PM
-> To: Suzuki, Katsuhiro <suzuki.katsuhiro@socionext.com>
-> Cc: Mark Brown <broonie@kernel.org>; alsa-devel at alsa-project.org; Masami
-Hiramatsu
-> <masami.hiramatsu@linaro.org>; Jassi Brar <jaswinder.singh@linaro.org>;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v2 2/3] ASoC: simple-card: move hp and mic detection to
-soc_card
-> probe
+On 2018-04-04 17:54, Jan Kiszka wrote:
+> On 2018-03-01 07:04, Jan Kiszka wrote:
+>> On 2018-01-22 07:06, Jan Kiszka wrote:
+>>> Analogously to 9358d755bd5c, this registers a broadcast clockevent in
+>>> case no hardware broadcast timer is available and the per-CPU timers can
+>>> be stopped in deep power states.
+>>>
+>>> Partitions of the Jailhouse hypervisor fall in this category.
+>>> Registering the workaround timer allows to enter high-resolution mode in
+>>> that case.
+>>>
+>>> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+>>> ---
+>>>  arch/arm/kernel/time.c | 3 +++
+>>>  1 file changed, 3 insertions(+)
+>>>
+>>> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+>>> index 629f8e9981f1..0a45d861ef8e 100644
+>>> --- a/arch/arm/kernel/time.c
+>>> +++ b/arch/arm/kernel/time.c
+>>> @@ -12,6 +12,7 @@
+>>>   *  reading the RTC at bootup, etc...
+>>>   */
+>>>  #include <linux/clk-provider.h>
+>>> +#include <linux/clockchips.h>
+>>>  #include <linux/clocksource.h>
+>>>  #include <linux/errno.h>
+>>>  #include <linux/export.h>
+>>> @@ -121,5 +122,7 @@ void __init time_init(void)
+>>>  		of_clk_init(NULL);
+>>>  #endif
+>>>  		timer_probe();
+>>> +
+>>> +		tick_setup_hrtimer_broadcast();
+>>>  	}
+>>>  }
+>>>
+>>
+>> Gentle ping, just to avoid that this falls through the cracks because
+>> it's so small.
+>>
 > 
-> 
-> Hi Katsuhiro-san
-> 
-> > This patch moves headphone and microphone detection to probe() of
-> > snd_soc_card from init() of snd_soc_dai_link. This is because init()
-> > is called (and an input device /dev/input/eventX is created too)
-> > twice or above if simple card has two or more DAI links.
-> >
-> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> 
-> or above ?
-> 
-
-It seems if simple card has multiple DAI links, it creates multiple input 
-devices.
-
-For example simple card has 3-links, 3 input devices /dev/input/event0,
-event1, event2 are created. Is it correct?
-
-
-> > -	ret = asoc_simple_card_init_hp(rtd->card, &priv->hp_jack, PREFIX);
-> > -	if (ret < 0)
-> > -		return ret;
-> > -
-> > -	ret = asoc_simple_card_init_mic(rtd->card, &priv->mic_jack, PREFIX);
-> > -	if (ret < 0)
-> > -		return ret;
-> (snip)
-> > +	ret = asoc_simple_card_init_hp(card, &priv->hp_jack, NULL);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	ret = asoc_simple_card_init_mic(card, &priv->mic_jack, NULL);
-> > +	if (ret < 0)
-> > +		return ret;
-> 
-> I think we want to keep "PREFIX" ?
+> 2nd ping. Should this patch be routed via ARM or rather some tip/timers
+> tree?
 > 
 
-Oops... Thank you. I'll fix it.
+3rd try: Could someone have a look at this and merge it - or at least
+ack it in order to move forward?
 
-
-Regards,
---
-Katsuhiro Suzuki
-
-
-> 
-> Best regards
-> ---
-> Kuninori Morimoto
+Thanks,
+Jan
