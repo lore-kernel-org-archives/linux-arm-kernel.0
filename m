@@ -1,265 +1,89 @@
-From: olivier.moysan@st.com (Olivier Moysan)
-Date: Mon, 11 Jun 2018 17:13:59 +0200
-Subject: [PATCH v2 1/1] ASoC: stm32: sai: add iec958 controls support
-In-Reply-To: <1528730039-15757-1-git-send-email-olivier.moysan@st.com>
-References: <1528730039-15757-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1528730039-15757-2-git-send-email-olivier.moysan@st.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 11 Jun 2018 17:26:09 +0200
+Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
+References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
+ <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
+ <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
+ <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
+ <CAMuHMdVJ+ad-kr0iYuoaH3chJ49_g6yjEb8PHmTpwjFdYcG4=Q@mail.gmail.com>
+ <47e87deb-a7a8-4780-53b5-4e4ed6e1bac3@gmail.com>
+ <CAMuHMdXJEC8HbuB5+YHMLjZy9GfCYyXmGTk0TXkoAxLhxTOJyA@mail.gmail.com>
+ <6864ed2c-39ac-615d-f38e-b28c3647e451@gmail.com>
+ <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
+Message-ID: <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support of iec958 controls for STM32 SAI.
+On 06/11/2018 04:30 PM, Geert Uytterhoeven wrote:
+> Hi Marek,
+> 
+> On Mon, Jun 11, 2018 at 4:19 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>> On 06/11/2018 04:10 PM, Geert Uytterhoeven wrote:
+>>> On Mon, Jun 11, 2018 at 4:04 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>> On 06/11/2018 03:49 PM, Geert Uytterhoeven wrote:
+>>>>> On Mon, Jun 11, 2018 at 3:39 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>>>> On 06/11/2018 03:03 PM, Geert Uytterhoeven wrote:
+>>>>>>> On Mon, Jun 11, 2018 at 2:15 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>>>>>> On 06/11/2018 11:56 AM, Geert Uytterhoeven wrote:
+>>>>>>>>> On Mon, Jun 4, 2018 at 7:59 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>>>>>>>> Rather than hard-coding the quirk topology, which stopped scaling,
+>>>>>>>>>> parse the information from DT. The code looks for all compatible
+>>>>>>>>>> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
+>>>>>>>>>> to the same pin. If so, the code sends a matching sequence to the
+>>>>>>>>>> PMIC to deassert the IRQ.
+>>>>>
+>>>>>>>>>> +               ret = of_property_read_u32(np, "reg", &addr);
+>>>>>>>>>> +               if (ret)
+>>>>>>>>>> +                       return ret;
+>>>>>>>>>
+>>>>>>>>> I think it's safer to skip this entry and continue, after calling
+>>>>>>>>> kfree(quirk), of course.
+>>>>>>>>>
+>>>>>>>>>> +
+>>>>>>>>>> +               quirk->id = id;
+>>>>>>>>>> +               quirk->i2c_msg.addr = addr;
+>>>>>>>>>> +               quirk->shared = false;
+>>>>>>>>>> +
+>>>>>>>>>> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
+>>>>>>>>>> +               if (ret)
+>>>>>>>>>> +                       return ret;
+>>>>>>>>>
+>>>>>>>>> kfree(quirk) and continue...
+>>>>>>>>
+>>>>>>>> I wonder if it shouldn't rather free the entire list and abort ?
+>>>>>>>
+>>>>>>> "Be strict when sending, be liberal when receiving."
+>>>>>>
+>>>>>> Meaning ? I think "the language barrier is protecting me" (TM)
+>>>>>
+>>>>> Do the best you can, given the buggy DT you received.
+>>>>> I.e. don't fail completely, just ignore the bad device node, and continue.
+>>>>
+>>>> But if you ignore node, you might as well ignore one which is shared and
+>>>> then the system crashes due to IRQ storm anyway. So hum, what can we do ?
+>>>
+>>> Correct. If it's a critical node, it will crash regardless.
+>>> If it's a non-critical node, you have the choice between aborting and crashing,
+>>> or ignoring and keeping the system alive. Your call.
+>>
+>> But wait, since we control which machines this code runs on , can't we
+>> assure they have valid DTs ? This situation with invalid DT starts to
+>> look a bit hypothetical to me.
+> 
+> That assumes you keep the list of machines to check, and don't want to fix the
+> issue automatically when detected (on any R-Car Gen2 or RZ/G1 platform, so
+> you still need to check for r8a779[0-4] and r8a774[23457]).
 
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
----
- sound/soc/stm/Kconfig         |   1 +
- sound/soc/stm/stm32_sai_sub.c | 139 ++++++++++++++++++++++++++++++++++++++----
- 2 files changed, 128 insertions(+), 12 deletions(-)
+Yes, I want to keep a list of machines to check, to be _sure_ some
+machine doesn't randomly blow up.
 
-diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
-index 48f9ddd94016..9b2681397dba 100644
---- a/sound/soc/stm/Kconfig
-+++ b/sound/soc/stm/Kconfig
-@@ -6,6 +6,7 @@ config SND_SOC_STM32_SAI
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-+	select SND_PCM_IEC958
- 	help
- 	  Say Y if you want to enable SAI for STM32
- 
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index cfeb219e1d78..c4f15ea14197 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -96,7 +96,8 @@
-  * @slot_mask: rx or tx active slots mask. set at init or at runtime
-  * @data_size: PCM data width. corresponds to PCM substream width.
-  * @spdif_frm_cnt: S/PDIF playback frame counter
-- * @spdif_status_bits: S/PDIF status bits
-+ * @snd_aes_iec958: iec958 data
-+ * @ctrl_lock: control lock
-  */
- struct stm32_sai_sub_data {
- 	struct platform_device *pdev;
-@@ -125,7 +126,8 @@ struct stm32_sai_sub_data {
- 	int slot_mask;
- 	int data_size;
- 	unsigned int spdif_frm_cnt;
--	unsigned char spdif_status_bits[SAI_IEC60958_STATUS_BYTES];
-+	struct snd_aes_iec958 iec958;
-+	struct mutex ctrl_lock; /* protect resources accessed by controls */
- };
- 
- enum stm32_sai_fifo_th {
-@@ -184,10 +186,6 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
- 	}
- }
- 
--static const unsigned char default_status_bits[SAI_IEC60958_STATUS_BYTES] = {
--	0, 0, 0, IEC958_AES3_CON_FS_48000,
--};
--
- static const struct regmap_config stm32_sai_sub_regmap_config_f4 = {
- 	.reg_bits = 32,
- 	.reg_stride = 4,
-@@ -210,6 +208,49 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
- 	.fast_io = true,
- };
- 
-+static int snd_pcm_iec958_info(struct snd_kcontrol *kcontrol,
-+			       struct snd_ctl_elem_info *uinfo)
-+{
-+	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
-+	uinfo->count = 1;
-+
-+	return 0;
-+}
-+
-+static int snd_pcm_iec958_get(struct snd_kcontrol *kcontrol,
-+			      struct snd_ctl_elem_value *uctl)
-+{
-+	struct stm32_sai_sub_data *sai = snd_kcontrol_chip(kcontrol);
-+
-+	mutex_lock(&sai->ctrl_lock);
-+	memcpy(uctl->value.iec958.status, sai->iec958.status, 4);
-+	mutex_unlock(&sai->ctrl_lock);
-+
-+	return 0;
-+}
-+
-+static int snd_pcm_iec958_put(struct snd_kcontrol *kcontrol,
-+			      struct snd_ctl_elem_value *uctl)
-+{
-+	struct stm32_sai_sub_data *sai = snd_kcontrol_chip(kcontrol);
-+
-+	mutex_lock(&sai->ctrl_lock);
-+	memcpy(sai->iec958.status, uctl->value.iec958.status, 4);
-+	mutex_unlock(&sai->ctrl_lock);
-+
-+	return 0;
-+}
-+
-+static const struct snd_kcontrol_new iec958_ctls = {
-+	.access = (SNDRV_CTL_ELEM_ACCESS_READWRITE |
-+			SNDRV_CTL_ELEM_ACCESS_VOLATILE),
-+	.iface = SNDRV_CTL_ELEM_IFACE_PCM,
-+	.name = SNDRV_CTL_NAME_IEC958("", PLAYBACK, DEFAULT),
-+	.info = snd_pcm_iec958_info,
-+	.get = snd_pcm_iec958_get,
-+	.put = snd_pcm_iec958_put,
-+};
-+
- static irqreturn_t stm32_sai_isr(int irq, void *devid)
- {
- 	struct stm32_sai_sub_data *sai = (struct stm32_sai_sub_data *)devid;
-@@ -619,6 +660,59 @@ static void stm32_sai_set_frame(struct snd_soc_dai *cpu_dai)
- 	}
- }
- 
-+static void stm32_sai_init_iec958_status(struct stm32_sai_sub_data *sai)
-+{
-+	unsigned char *cs = sai->iec958.status;
-+
-+	cs[0] = IEC958_AES0_CON_NOT_COPYRIGHT | IEC958_AES0_CON_EMPHASIS_NONE;
-+	cs[1] = IEC958_AES1_CON_GENERAL;
-+	cs[2] = IEC958_AES2_CON_SOURCE_UNSPEC | IEC958_AES2_CON_CHANNEL_UNSPEC;
-+	cs[3] = IEC958_AES3_CON_CLOCK_1000PPM | IEC958_AES3_CON_FS_NOTID;
-+}
-+
-+static void stm32_sai_set_iec958_status(struct stm32_sai_sub_data *sai,
-+					struct snd_pcm_runtime *runtime)
-+{
-+	if (!runtime)
-+		return;
-+
-+	/* Force the sample rate according to runtime rate */
-+	mutex_lock(&sai->ctrl_lock);
-+	switch (runtime->rate) {
-+	case 22050:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_22050;
-+		break;
-+	case 44100:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_44100;
-+		break;
-+	case 88200:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_88200;
-+		break;
-+	case 176400:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_176400;
-+		break;
-+	case 24000:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_24000;
-+		break;
-+	case 48000:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_48000;
-+		break;
-+	case 96000:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_96000;
-+		break;
-+	case 192000:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_192000;
-+		break;
-+	case 32000:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_32000;
-+		break;
-+	default:
-+		sai->iec958.status[3] = IEC958_AES3_CON_FS_NOTID;
-+		break;
-+	}
-+	mutex_unlock(&sai->ctrl_lock);
-+}
-+
- static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
- 				     struct snd_pcm_hw_params *params)
- {
-@@ -709,7 +803,11 @@ static int stm32_sai_hw_params(struct snd_pcm_substream *substream,
- 
- 	sai->data_size = params_width(params);
- 
--	if (!STM_SAI_PROTOCOL_IS_SPDIF(sai)) {
-+	if (STM_SAI_PROTOCOL_IS_SPDIF(sai)) {
-+		/* Rate not already set in runtime structure */
-+		substream->runtime->rate = params_rate(params);
-+		stm32_sai_set_iec958_status(sai, substream->runtime);
-+	} else {
- 		ret = stm32_sai_set_slots(cpu_dai);
- 		if (ret < 0)
- 			return ret;
-@@ -789,6 +887,20 @@ static void stm32_sai_shutdown(struct snd_pcm_substream *substream,
- 	sai->substream = NULL;
- }
- 
-+static int stm32_sai_pcm_new(struct snd_soc_pcm_runtime *rtd,
-+			     struct snd_soc_dai *cpu_dai)
-+{
-+	struct stm32_sai_sub_data *sai = dev_get_drvdata(cpu_dai->dev);
-+
-+	if (STM_SAI_PROTOCOL_IS_SPDIF(sai)) {
-+		dev_dbg(&sai->pdev->dev, "%s: register iec controls", __func__);
-+		return snd_ctl_add(rtd->pcm->card,
-+				   snd_ctl_new1(&iec958_ctls, sai));
-+	}
-+
-+	return 0;
-+}
-+
- static int stm32_sai_dai_probe(struct snd_soc_dai *cpu_dai)
- {
- 	struct stm32_sai_sub_data *sai = dev_get_drvdata(cpu_dai->dev);
-@@ -809,6 +921,10 @@ static int stm32_sai_dai_probe(struct snd_soc_dai *cpu_dai)
- 	else
- 		snd_soc_dai_init_dma_data(cpu_dai, NULL, &sai->dma_params);
- 
-+	/* Next settings are not relevant for spdif mode */
-+	if (STM_SAI_PROTOCOL_IS_SPDIF(sai))
-+		return 0;
-+
- 	cr1_mask = SAI_XCR1_RX_TX;
- 	if (STM_SAI_IS_CAPTURE(sai))
- 		cr1 |= SAI_XCR1_RX_TX;
-@@ -820,10 +936,6 @@ static int stm32_sai_dai_probe(struct snd_soc_dai *cpu_dai)
- 				     sai->synco, sai->synci);
- 	}
- 
--	if (STM_SAI_PROTOCOL_IS_SPDIF(sai))
--		memcpy(sai->spdif_status_bits, default_status_bits,
--		       sizeof(default_status_bits));
--
- 	cr1_mask |= SAI_XCR1_SYNCEN_MASK;
- 	cr1 |= SAI_XCR1_SYNCEN_SET(sai->sync);
- 
-@@ -861,7 +973,7 @@ static int stm32_sai_pcm_process_spdif(struct snd_pcm_substream *substream,
- 		/* Set channel status bit */
- 		byte = frm_cnt >> 3;
- 		mask = 1 << (frm_cnt - (byte << 3));
--		if (sai->spdif_status_bits[byte] & mask)
-+		if (sai->iec958.status[byte] & mask)
- 			*ptr |= 0x04000000;
- 		ptr++;
- 
-@@ -888,6 +1000,7 @@ static int stm32_sai_pcm_process_spdif(struct snd_pcm_substream *substream,
- static struct snd_soc_dai_driver stm32_sai_playback_dai[] = {
- {
- 		.probe = stm32_sai_dai_probe,
-+		.pcm_new = stm32_sai_pcm_new,
- 		.id = 1, /* avoid call to fmt_single_name() */
- 		.playback = {
- 			.channels_min = 1,
-@@ -998,6 +1111,7 @@ static int stm32_sai_sub_parse_of(struct platform_device *pdev,
- 			dev_err(&pdev->dev, "S/PDIF IEC60958 not supported\n");
- 			return -EINVAL;
- 		}
-+		stm32_sai_init_iec958_status(sai);
- 		sai->spdif = true;
- 		sai->master = true;
- 	}
-@@ -1114,6 +1228,7 @@ static int stm32_sai_sub_probe(struct platform_device *pdev)
- 	sai->id = (uintptr_t)of_id->data;
- 
- 	sai->pdev = pdev;
-+	mutex_init(&sai->ctrl_lock);
- 	platform_set_drvdata(pdev, sai);
- 
- 	sai->pdata = dev_get_drvdata(pdev->dev.parent);
+> Anyway, as we care about booting old DTBs on new kernels (for a while), we
+> have a few more release cycles to bikeshed ;-)
+
+I was about to ask if this patch then makes any sense or not.
+
 -- 
-1.9.1
+Best regards,
+Marek Vasut
