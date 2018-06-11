@@ -1,33 +1,67 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 11 Jun 2018 05:43:14 +0000
-Subject: [PATCH v2 2/3] ASoC: simple-card: move hp and mic detection to
- soc_card probe
-In-Reply-To: <007401d40146$9ddaaec0$d9900c40$@socionext.com>
-References: <20180611051559.18082-1-suzuki.katsuhiro@socionext.com>
- <20180611051559.18082-2-suzuki.katsuhiro@socionext.com>
- <87tvq96gnm.wl-kuninori.morimoto.gx@renesas.com>
- <007401d40146$9ddaaec0$d9900c40$@socionext.com>
-Message-ID: <87sh5t6fwv.wl-kuninori.morimoto.gx@renesas.com>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Mon, 11 Jun 2018 11:38:44 +0530
+Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
+In-Reply-To: <20180608062158.GI5738@atomide.com>
+References: <20180606060826.14671-1-faiz_abbas@ti.com>
+ <20180606060826.14671-5-faiz_abbas@ti.com>
+ <20180607073530.GH5738@atomide.com>
+ <a169ba7f-53f2-cf9a-a9ee-daffd6b53279@ti.com>
+ <20180608062158.GI5738@atomide.com>
+Message-ID: <acdfef83-8778-e8f4-e423-ed04a9a8a649@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-Hi Katsuhiro
-
-> > > This patch moves headphone and microphone detection to probe() of
-> > > snd_soc_card from init() of snd_soc_dai_link. This is because init()
-> > > is called (and an input device /dev/input/eventX is created too)
-> > > twice or above if simple card has two or more DAI links.
-(snip)
-> It seems if simple card has multiple DAI links, it creates multiple input 
-> devices.
+On Friday 08 June 2018 11:51 AM, Tony Lindgren wrote:
+> * Faiz Abbas <faiz_abbas@ti.com> [180607 10:24]:
+>> Hi,
+>>
+>> On Thursday 07 June 2018 01:05 PM, Tony Lindgren wrote:
+>>> * Faiz Abbas <faiz_abbas@ti.com> [180606 06:14]:
+>>>> +static int sysc_reset(struct sysc *ddata)
+>>>> +{
+>>>> +	int offset = ddata->offsets[SYSC_SYSCONFIG];
+>>>> +	int val = sysc_read(ddata, offset);
+>>>> +
+>>>> +	val |= (0x1 << ddata->cap->regbits->srst_shift);
+>>>> +	sysc_write(ddata, offset, val);
+>>>> +
+>>>> +	/* Poll on reset status */
+>>>> +	if (ddata->cfg.quirks & SYSC_QUIRK_RESET_STATUS) {
+>>>> +		offset = ddata->offsets[SYSC_SYSSTATUS];
+>>>> +
+>>>> +		return readl_poll_timeout(ddata->module_va + offset, val,
+>>>> +				(val & ddata->cfg.syss_mask) == 0x0,
+>>>> +				100, MAX_MODULE_SOFTRESET_WAIT);
+>>>> +	}
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>>
+>>> I wonder if we should also add SYSS_QUIRK_RESET_STATUS in
+>>> addition to SYSC_QUIRK_RESET status to make it easy to
+>>> read the right register?
+>>
+>> I assumed SYSC_QUIRK is the prefix to indicate the ti-sysc driver not
+>> the register. Are there layouts in which the reset status bit is in the
+>> sysconfig register rather than the sysstatus register?
 > 
-> For example simple card has 3-links, 3 input devices /dev/input/event0,
-> event1, event2 are created. Is it correct?
+> Yes we can have reset status bit in either syss or syssconfig register.
 
-Oh, I see, fair enough.
-I'm sorry, it was my English skill error.
+You mean sysstatus and sysconfig right?
 
-Best regards
----
-Kuninori Morimoto
+> We detect that in sysc_init_syss_mask() but we should also set something
+> at that point to make it clear which reset to use. But as we don't need
+> the quirk flag, it's probably set a function pointer after the detection.
+> So how about let's have two functions sysc_reset() and sysc_syss_reset()
+> and then we can implement sysc_syss_reset() in a separate patch after
+> testing it when we have a non-platform data using example for
+> sysc_syss_reset().
+> 
+
+Shouldn't the function I add be called sysc_syss_reset()? The reset
+status bit is in the sysstatus.
+
+Thanks,
+Faiz
