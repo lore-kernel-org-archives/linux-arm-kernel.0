@@ -1,77 +1,77 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 11 Jun 2018 17:46:33 +0200
-Subject: [PATCH v5 2/4] kernel hacking: new config NO_AUTO_INLINE to
- disable compiler auto-inline optimizations
-In-Reply-To: <20180608160355.67712eb8@vmware.local.home>
-References: <20180606095714.1d3c2def@vmware.local.home>
- <20180606142600.GN13775@localhost>
- <20180606142622.2338abf6@vmware.local.home>
- <20180607041718.qpqucjzlvcm5h3gn@vireshk-i7>
- <20180607074628.kd3iyxevwj3ypzbr@intel.com>
- <20180607083856.ealw62v3wx43zeqz@vireshk-i7>
- <1303b1abf9f9229a8d3ccbb68a3e413266b360d7.camel@petrovitsch.priv.at>
- <20180607091025.m7dfix3e2xbwx4cs@vireshk-i7>
- <20180607091816.GT13775@localhost>
- <20180608160355.67712eb8@vmware.local.home>
-Message-ID: <20180611154633.GC13775@localhost>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Mon, 11 Jun 2018 17:49:56 +0200
+Subject: [PATCH v7 0/5] Reintroduce i.MX EPIT Timer
+Message-ID: <20180611155001.3506-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2018 at 04:03:55PM -0400, Steven Rostedt wrote:
-> On Thu, 7 Jun 2018 11:18:16 +0200
-> Johan Hovold <johan@kernel.org> wrote:
-> 
-> 
-> > If you want to work around the warning and think you can do it in some
-> > non-contrived way, then go for it.
-> > 
-> > Clearing the request buffer, checking for termination using strnlen, and
-> > then using memcpy might not be too bad.
-> > 
-> > But after all, it is a false positive, so leaving things as they stand
-> > is fine too.
-> 
-> Not sure how contrived you think this is, but it solves the warning
-> without adding extra work in the normal case.
-> 
-> -- Steve
-> 
-> diff --git a/drivers/staging/greybus/fw-management.c b/drivers/staging/greybus/fw-management.c
-> index 71aec14f8181..4fb9f1dff47d 100644
-> --- a/drivers/staging/greybus/fw-management.c
-> +++ b/drivers/staging/greybus/fw-management.c
-> @@ -150,15 +150,18 @@ static int fw_mgmt_load_and_validate_operation(struct fw_mgmt *fw_mgmt,
->  	}
->  
->  	request.load_method = load_method;
-> -	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
-> +	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE - 1);
->  
->  	/*
->  	 * The firmware-tag should be NULL terminated, otherwise throw error and
->  	 * fail.
->  	 */
-> -	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
-> -		dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
-> -		return -EINVAL;
-> +	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 2] != '\0') {
-> +		if (tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
-> +			dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
-> +			return -EINVAL;
-> +		}
-> +		request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] = '\0';
->  	}
+From: Cl?ment Peron <clement.peron@devialet.com>
 
-Well, I think it's quite far from obvious what is going on above, and
-not least why things are being done this way (which a comment may help
-with).
+As suggested in the commit message we have added the device tree support,
+proper bindings and we moved the driver into the correct folder.
 
-And just NUL-terminating the (automatic) buffer before returning wasn't
-enough? Then it may be better to do away with strncpy completely.
+Moreover we made some changes like use of relaxed IO accesor,
+implement sched_clock, delay_timer and reduce the clockevents min_delta.
 
-But should we really be working around gcc this way? If the
-implementation of this new warning isn't smart enough yet, should it not
-just be disabled instead?
+Changes since v6:
+-fix indent
 
-Thanks,
-Johan
+Changes since v5:
+- change epit to timer in doc example
+- fix typo in imx6sl.dtsi
+
+Changes since v4:
+- removed ipg clk
+- change in dt epit to timer
+- add introduction in doc
+- add all compatibles in doc
+- update epit entry for other i.MX device-trees
+
+Changes since v3:
+- Clean Kconfig
+- Rename imx6q-epit to imx31-epit
+- Update doc and bindings
+- Indent and fix
+
+Changes since v2 (Thanks Fabio Estevam):
+- Removed unused ckil clock
+- Add out_iounmap
+- Check and handle if clk_prepare_enable failed
+- Fix comment typo
+
+Changes since v1 (Thanks Vladimir Zapolskiy):
+- Add OF dependency in Kconfig
+- Sort header
+- Use BIT macro
+- Remove useless comments
+- Fix incorrect indent
+- Fix memory leak
+- Add check and handle possible returned error
+
+Cl?ment Peron (2):
+  ARM: imx: remove inexistant EPIT timer init
+  dt-bindings: timer: add i.MX EPIT timer binding
+
+Colin Didier (3):
+  clk: imx6: add EPIT clock support
+  clocksource: add driver for i.MX EPIT timer
+  ARM: dts: imx: add missing compatible and clock properties for EPIT
+
+ .../devicetree/bindings/timer/fsl,imxepit.txt |  21 ++
+ arch/arm/boot/dts/imx25.dtsi                  |   8 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                |  10 +-
+ arch/arm/boot/dts/imx6sl.dtsi                 |  10 +-
+ arch/arm/boot/dts/imx6sx.dtsi                 |  10 +-
+ arch/arm/boot/dts/imx6ul.dtsi                 |  10 +-
+ arch/arm/mach-imx/common.h                    |   1 -
+ drivers/clk/imx/clk-imx6q.c                   |   2 +
+ drivers/clocksource/Kconfig                   |  11 +
+ drivers/clocksource/Makefile                  |   1 +
+ drivers/clocksource/timer-imx-epit.c          | 265 ++++++++++++++++++
+ include/dt-bindings/clock/imx6qdl-clock.h     |   4 +-
+ 12 files changed, 341 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+ create mode 100644 drivers/clocksource/timer-imx-epit.c
+
+-- 
+2.17.1
