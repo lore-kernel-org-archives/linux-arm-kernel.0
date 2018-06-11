@@ -1,27 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 10 Jun 2018 23:29:04 -0700
-Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
-In-Reply-To: <f460481f-85a9-2a41-a894-6f25122dee8a@ti.com>
-References: <20180606060826.14671-1-faiz_abbas@ti.com>
- <20180606060826.14671-5-faiz_abbas@ti.com>
- <20180607073530.GH5738@atomide.com>
- <a169ba7f-53f2-cf9a-a9ee-daffd6b53279@ti.com>
- <20180608062158.GI5738@atomide.com>
- <acdfef83-8778-e8f4-e423-ed04a9a8a649@ti.com>
- <20180611060957.GN5738@atomide.com>
- <f460481f-85a9-2a41-a894-6f25122dee8a@ti.com>
-Message-ID: <20180611062904.GO5738@atomide.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 11 Jun 2018 14:41:06 +0800
+Subject: [PATCH] ARM: dts: imx6q: Use correct SDMA script for SPI5 core
+In-Reply-To: <20180522174509.18154-1-sean.nyekjaer@prevas.dk>
+References: <20180522174509.18154-1-sean.nyekjaer@prevas.dk>
+Message-ID: <20180611064104.GD16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Faiz Abbas <faiz_abbas@ti.com> [180611 06:28]:
-> Great. I thought I completely misunderstood you. But I don't see what
-> adding another function will accomplish. A QUIRK flag used in the same
-> function would work well enough.
+On Tue, May 22, 2018 at 07:45:09PM +0200, Sean Nyekjaer wrote:
+> According to the reference manual the shp_2_mcu / mcu_2_shp
+> scripts must be used for devices connected through the SPBA.
+> 
+> This fixes an issue we saw with DMA transfers.
+> Sometimes the SPI controller RX FIFO was not empty after a DMA
+> transfer and the driver got stuck in the next PIO transfer when
+> it read one word more than expected.
+> 
+> commit dd4b487b32a35 ("ARM: dts: imx6: Use correct SDMA script
+> for SPI cores") is fixing the same issue but only for SPI1 - 4.
+> 
+> Fixes: 677940258dd8e ("ARM: dts: imx6q: enable dma for ecspi5")
+> Signed-off-by: Sean Nyekjaer <sean.nyekjaer@prevas.dk>
 
-Fine with me as long as the function stays simple for both
-syss and sysc reset.
-
-Regards,
-
-Tony
+Applied, thanks.
