@@ -1,73 +1,195 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:20 +0200
-Subject: [PATCH v2 11/27] drm/sun4i: tcon: Add support for tcon-top gate
+Date: Tue, 12 Jun 2018 22:00:31 +0200
+Subject: [PATCH v2 22/27] drm/sun4i: Add support for second clock parent to DW
+ HDMI PHY clk driver
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-12-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-23-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TV TCONs connected to TCON TOP have to enable additional gate in order
-to work.
-
-Add support for such TCONs.
+Expand HDMI PHY clock driver to support second clock parent.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
- 2 files changed, 15 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h      |  4 +-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c     |  3 +-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c | 90 ++++++++++++++++------
+ 3 files changed, 73 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 08747fc3ee71..0afb5a94a414 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device *dev,
- 		dev_err(dev, "Couldn't get the TCON bus clock\n");
- 		return PTR_ERR(tcon->clk);
- 	}
-+
-+	if (tcon->quirks->has_tcon_top_gate) {
-+		tcon->top_clk = devm_clk_get(dev, "tcon-top");
-+		if (IS_ERR(tcon->top_clk)) {
-+			dev_err(dev, "Couldn't get the TCON TOP bus clock\n");
-+			return PTR_ERR(tcon->top_clk);
-+		}
-+		clk_prepare_enable(tcon->top_clk);
-+	}
-+
- 	clk_prepare_enable(tcon->clk);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index 46a3aa6a53a9..aadbe0a10b0c 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -99,6 +99,7 @@
+ #define SUN8I_HDMI_PHY_PLL_CFG1_LDO1_EN		BIT(28)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_HV_IS_33	BIT(27)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK	BIT(26)
++#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT	26
+ #define SUN8I_HDMI_PHY_PLL_CFG1_PLLEN		BIT(25)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_LDO_VSET(x)	((x) << 22)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_UNKNOWN(x)	((x) << 20)
+@@ -190,6 +191,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi);
+ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy);
+ const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void);
  
- 	if (tcon->quirks->has_channel_0) {
-@@ -712,6 +722,7 @@ static int sun4i_tcon_init_clocks(struct device *dev,
- static void sun4i_tcon_free_clocks(struct sun4i_tcon *tcon)
+-int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev);
++int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
++			 bool second_parent);
+ 
+ #endif /* _SUN8I_DW_HDMI_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index f50072ae054a..e1b7196d4587 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -491,7 +491,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 			}
+ 		}
+ 
+-		ret = sun8i_phy_clk_create(phy, dev);
++		ret = sun8i_phy_clk_create(phy, dev,
++					   phy->variant->has_second_pll);
+ 		if (ret) {
+ 			dev_err(dev, "Couldn't create the PHY clock\n");
+ 			goto err_put_clk_pll1;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
+index faea449812f8..a4d31fe3abff 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
+@@ -22,35 +22,45 @@ static int sun8i_phy_clk_determine_rate(struct clk_hw *hw,
  {
- 	clk_disable_unprepare(tcon->clk);
-+	clk_disable_unprepare(tcon->top_clk);
+ 	unsigned long rate = req->rate;
+ 	unsigned long best_rate = 0;
++	struct clk_hw *best_parent = NULL;
+ 	struct clk_hw *parent;
+ 	int best_div = 1;
+-	int i;
++	int i, p;
+ 
+-	parent = clk_hw_get_parent(hw);
+-
+-	for (i = 1; i <= 16; i++) {
+-		unsigned long ideal = rate * i;
+-		unsigned long rounded;
+-
+-		rounded = clk_hw_round_rate(parent, ideal);
++	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
++		parent = clk_hw_get_parent_by_index(hw, p);
++		if (!parent)
++			continue;
+ 
+-		if (rounded == ideal) {
+-			best_rate = rounded;
+-			best_div = i;
+-			break;
++		for (i = 1; i <= 16; i++) {
++			unsigned long ideal = rate * i;
++			unsigned long rounded;
++
++			rounded = clk_hw_round_rate(parent, ideal);
++
++			if (rounded == ideal) {
++				best_rate = rounded;
++				best_div = i;
++				best_parent = parent;
++				break;
++			}
++
++			if (!best_rate ||
++			    abs(rate - rounded / i) <
++			    abs(rate - best_rate / best_div)) {
++				best_rate = rounded;
++				best_div = i;
++				best_parent = parent;
++			}
+ 		}
+ 
+-		if (!best_rate ||
+-		    abs(rate - rounded / i) <
+-		    abs(rate - best_rate / best_div)) {
+-			best_rate = rounded;
+-			best_div = i;
+-		}
++		if (best_rate / best_div == rate)
++			break;
+ 	}
+ 
+ 	req->rate = best_rate / best_div;
+ 	req->best_parent_rate = best_rate;
+-	req->best_parent_hw = parent;
++	req->best_parent_hw = best_parent;
+ 
+ 	return 0;
+ }
+@@ -95,22 +105,58 @@ static int sun8i_phy_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return 0;
  }
  
- static int sun4i_tcon_init_irq(struct device *dev,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index f6a071cd5a6f..652d5c37d7b4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -224,6 +224,7 @@ struct sun4i_tcon_quirks {
- 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
- 	bool    needs_edp_reset; /* a80 edp reset needed for tcon0 access */
- 	bool	supports_lvds;   /* Does the TCON support an LVDS output? */
-+	bool	has_tcon_top_gate;  /* TCON TOP holds additional gate to enable */
- 
- 	/* callback to handle tcon muxing options */
- 	int	(*set_mux)(struct sun4i_tcon *, const struct drm_encoder *);
-@@ -249,6 +250,9 @@ struct sun4i_tcon {
- 	u8				dclk_max_div;
- 	u8				dclk_min_div;
- 
-+	/* TCON TOP clock */
-+	struct clk			*top_clk;
++static u8 sun8i_phy_clk_get_parent(struct clk_hw *hw)
++{
++	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
++	u32 reg;
 +
- 	/* Reset control */
- 	struct reset_control		*lcd_rst;
- 	struct reset_control		*lvds_rst;
++	regmap_read(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, &reg);
++	reg = (reg & SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK) >>
++	      SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT;
++
++	return reg;
++}
++
++static int sun8i_phy_clk_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
++
++	if (index > 1)
++		return -EINVAL;
++
++	regmap_update_bits(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
++			   SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
++			   index << SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT);
++
++	return 0;
++}
++
+ static const struct clk_ops sun8i_phy_clk_ops = {
+ 	.determine_rate	= sun8i_phy_clk_determine_rate,
+ 	.recalc_rate	= sun8i_phy_clk_recalc_rate,
+ 	.set_rate	= sun8i_phy_clk_set_rate,
++
++	.get_parent	= sun8i_phy_clk_get_parent,
++	.set_parent	= sun8i_phy_clk_set_parent,
+ };
+ 
+-int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
++int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
++			 bool second_parent)
+ {
+ 	struct clk_init_data init;
+ 	struct sun8i_phy_clk *priv;
+-	const char *parents[1];
++	const char *parents[2];
+ 
+ 	parents[0] = __clk_get_name(phy->clk_pll0);
+ 	if (!parents[0])
+ 		return -ENODEV;
+ 
++	if (second_parent) {
++		parents[1] = __clk_get_name(phy->clk_pll1);
++		if (!parents[1])
++			return -ENODEV;
++	}
++
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
+@@ -118,7 +164,7 @@ int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
+ 	init.name = "hdmi-phy-clk";
+ 	init.ops = &sun8i_phy_clk_ops;
+ 	init.parent_names = parents;
+-	init.num_parents = 1;
++	init.num_parents = second_parent ? 2 : 1;
+ 	init.flags = CLK_SET_RATE_PARENT;
+ 
+ 	priv->phy = phy;
 -- 
 2.17.1
