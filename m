@@ -1,46 +1,31 @@
-From: vinod.koul@linaro.org (Vinod Koul)
-Date: Tue, 12 Jun 2018 09:32:35 +0530
-Subject: [RESEND v2] dmaengine: pxa: add a default requestor policy
-In-Reply-To: <8736xtrtej.fsf@belgarion.home>
-References: <20180530201249.26972-1-robert.jarzmik@free.fr>
- <878t7oruya.fsf@belgarion.home> <20180611042125.GD2452@vkoul-mobl>
- <8736xtrtej.fsf@belgarion.home>
-Message-ID: <20180612040235.GJ2452@vkoul-mobl>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 12 Jun 2018 14:29:36 +1000
+Subject: [PATCH] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE dependency
+In-Reply-To: <87o9gxcono.fsf@linux.intel.com>
+References: <20180525160729.92026-1-arnd@arndb.de>
+ <87o9gxcono.fsf@linux.intel.com>
+Message-ID: <71cfc192be06d07e79bfdfe43a566d3260e19cd6.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-06-18, 21:54, Robert Jarzmik wrote:
-> Vinod Koul <vinod.koul@linaro.org> writes:
+On Wed, 2018-05-30 at 15:29 +0300, Felipe Balbi wrote:
+> Hi,
 > 
-> > On 09-06-18, 14:43, Robert Jarzmik wrote:
-> >> Robert Jarzmik <robert.jarzmik@free.fr> writes:
-> >> 
-> >> > As what former drcmr -1 value meant, add a this as a default to each
-> >> > channel, ie. that by default no requestor line is used.
-> >> >
-> >> > This is specifically used for network drivers smc91x and smc911x, and
-> >> > needed for their port to slave maps.
-> >> >
-> >> > Cc: Arnd Bergmann <arnd@arndb.de>
-> >> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> >> > ---
-> >> > Since v1: changed -1 to U32_MAX
-> >> Hi Vinod,
-> >> 
-> >> Could I have your ack on this so that I add this one to the dma slave map serie
-> >> after the merge window is closed please ?
-> >
-> > Sorry I was thinking it would go thru dmaengine tree, please do
-> > indicate if that is not the case. Nevertheless
-> >
-> > Acked-by: Vinod Koul <vkoul@kernel.org>
-> Thanks.
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > Without that option, we run into a link failure:
+> > 
+> > drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
+> > hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
+> > 
+> > Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> As this is a dependency to the serie, I'd rather take it, unless you insist, in
-> which case I'll rely on the fact that it will hit 4.19 cycle.
+> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
 
-It fine if you take, just that it helps to indicate the route to take
-for a patch :)
+Greg, can you send this to Linus asap ? Some people are hitting build
+breakages upstream because of this.
 
--- 
-~Vinod
+Thanks !
+
+Cheers,
+Ben,
