@@ -1,28 +1,44 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 12 Jun 2018 13:21:26 -0700
-Subject: [PATCH 0/5] Fix Cygnus, NS2, Stingray interrupt type
-Message-ID: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+Date: Tue, 12 Jun 2018 13:21:30 -0700
+Subject: [PATCH 4/5] ARM64: dts: ns2: Fix PCIe controller interrupt type
+In-Reply-To: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+References: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1528834891-17807-5-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes incorrect interrupt types for I2C and PCIe in DT
-for Broadcom Cygnus, NS2, and Stingray SoCs
+Fix PCIe controller interrupt to use IRQ_TYPE_LEVEL_HIGH for
+Broadcom NS2 SoC
 
-This patch series is based off v4.17 and is available on GIHUB:
-repo: https://github.com/Broadcom/arm64-linux.git
-branch: cygnus-ns2-dt-irq-type-fix-v1
+Fixes: fd5e5dd56a2f ("arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2")
+Fixes: 63a913c157f5 ("arm64: dts: move ns2 into northstar2 directory")
 
-Ray Jui (5):
-  ARM: dts: cygnus: Fix I2C controller interrupt type
-  ARM: dts: cygnus: Fix PCIe controller interrupt type
-  ARM64: dts: ns2: Fix I2C controller interrupt type
-  ARM64: dts: ns2: Fix PCIe controller interrupt type
-  ARM64: dts: Stingray: Fix I2C controller interrupt type
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+---
+ arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/boot/dts/bcm-cygnus.dtsi                  | 24 +++++++++++-----------
- arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi   |  8 ++++----
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |  4 ++--
- 3 files changed, 18 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+index c0e4896..4057197 100644
+--- a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+@@ -118,7 +118,7 @@
+ 
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 281 IRQ_TYPE_NONE>;
++		interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		linux,pci-domain = <0>;
+ 
+@@ -149,7 +149,7 @@
+ 
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 305 IRQ_TYPE_NONE>;
++		interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		linux,pci-domain = <4>;
+ 
 -- 
 2.1.4
