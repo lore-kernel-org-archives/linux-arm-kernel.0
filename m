@@ -1,94 +1,440 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 14:13:38 -0500
-Subject: [U-Boot] [RFC PATCH 0/2] ARM: v7: Enable basic framework for
- supporting bits for CVE-2017-5715
-In-Reply-To: <CAOMZO5CcEf=EhFWknKmCXXLJPOgx=65jLH+X1OAGkg5VxBGVew@mail.gmail.com>
-References: <20180125214559.27570-1-nm@ti.com>
- <CAOMZO5CcEf=EhFWknKmCXXLJPOgx=65jLH+X1OAGkg5VxBGVew@mail.gmail.com>
-Message-ID: <CAGo_u6qyf1Z+zSG-17TYRDPzG8V_0_-nk1F15HB4tPyT9rbUYQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Jun 2018 13:13:43 -0600
+Subject: [PATCH v2 2/4] clk: rockchip: add dt-binding header for px30
+In-Reply-To: <1528439519-30135-3-git-send-email-zhangqing@rock-chips.com>
+References: <1528439519-30135-1-git-send-email-zhangqing@rock-chips.com>
+ <1528439519-30135-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20180612191343.GA30373@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2018 at 9:05 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Jan 25, 2018 at 7:45 PM, Nishanth Menon <nm@ti.com> wrote:
->> Hi Folks,
->>
->> This is a follow through on the discussion we have had in [1].
->> This itself is'nt a complete solution and is based on recommendation
->> This from Arm[2] for variant 2 CVE-2017-5715
->>
->> The Linux kernel discussions are spread out in [3], ATF and OPTEE
->> status are available in [4].
->>
->> This is just an RFC series (build tested at this point) to check if
->> the direction is fine and should follow the final solution once kernel
->> patches get to upstream, IMHO.
->>
->> NOTE: As per ARM recommendations[2], and discussions in list[1] ARM
->> Cortex-A9/12/17 do not need additional steps in u-boot to enable the
->> OS level workarounds.
->>
->> Nishanth Menon (2):
->>   ARM: Introduce ability to enable ACR::IBE on Cortex-A8 for
->>     CVE-2017-5715
->>   ARM: Introduce ability to enable invalidate of BTB on Cortex-A15 for
->>     CVE-2017-5715
->
+On Fri, Jun 08, 2018 at 02:31:57PM +0800, Elaine Zhang wrote:
+> Add the dt-bindings header for the px30, that gets shared between
+> the clock controller and the clock references in the dts.
+> Add softreset ID for px30.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  include/dt-bindings/clock/px30-cru.h | 402 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 402 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/px30-cru.h
+> 
+> diff --git a/include/dt-bindings/clock/px30-cru.h b/include/dt-bindings/clock/px30-cru.h
+> new file mode 100644
+> index 000000000000..6b0b9507597a
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/px30-cru.h
+> @@ -0,0 +1,402 @@
+> +/*
+> + * Copyright (c) 2018 Rockchip Electronics Co. Ltd.
+> + * Author: Elaine Zhang<zhangqing@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 
-I started respinning the series, while there is definitely a use of
-implementing in u-boot,
-I am starting to wonder if we should also be doing this in kernel. ->
-following is an example:
-for OMAP5uEVM (dual A15) with  next-20180612 -> Uboot does setup the
-IBE bit, so the
-CPU0 ICIALLU does get activated however, that is not true for CPU1.
-Further if we enter low power states, we'd also start loosing the
-context, wont we?
+Use an SPDX tag instead.
 
-Log:
+Otherwise,
 
-[    0.001484] Calibrating delay loop (skipped), value calculated
-using timer frequency.. 12.28 BogoMIPS (lpj=61440)
-[    0.001510] pid_max: default: 32768 minimum: 301
-[    0.001804] Security Framework initialized
-[    0.001907] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.001928] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.004144] CPU: Testing write buffer coherency: ok
-[    0.004258] CPU0: Spectre v2: using ICIALLU workaround
-[    0.005130] /cpus/cpu at 0 missing clock-frequency property
-[    0.005159] /cpus/cpu at 1 missing clock-frequency property
-[    0.005178] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.006660] Setting up static identity map for 0x80100000 - 0x80100078
-[    0.007036] rcu: Hierarchical SRCU implementation.
-[    0.008424] smp: Bringing up secondary CPUs ...
-[    0.010557] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[    0.010566] CPU1: Spectre v2: firmware did not set auxiliary
-control register IBE bit, system vulnerable
-[    0.011162] smp: Brought up 1 node, 2 CPUs
-[    0.011181] SMP: Total of 2 processors activated (24.57 BogoMIPS).
-[    0.011197] CPU: All CPU(s) started in HYP mode.
-[    0.011211] CPU: Virtualization extensions available.
-[    0.013729] devtmpfs: initialized
-[    0.044497] VFP support v0.3: implementor 41 architecture 4 part 30
-variant f rev 0
-[    0.046160] clocksource: jiffies: mask: 0xffffffff max_cycles:
-0xffffffff, max_idle_ns: 19112604462750000 ns
-[    0.046201] futex hash table entries: 512 (order: 3, 32768 bytes)
-[    0.046942] pinctrl core: initialized pinctrl subsystem
-[    0.050282] NET: Registered protocol family 16
-[    0.054624] DMA: preallocated 256 KiB pool for atomic coherent allocations
-[    0.055930] omap_hwmod: l3_main_3 using broken dt data from ocp
-[    0.057244] omap_hwmod: l3_main_2 using broken dt data from ocp
-[    0.167706] audit: initializing netlink subsys (disabled)
-[    0.168044] audit: type=2000 audit(0.160:1): state=initialized
-audit_enabled=0 res=1
-[    0.168979] (NULL device *): Failed to create dummy-scm_conf at 0
-debugfs directory
-[    0.169566] cpuidle: using governor menu
-[    0.184644] OMAP GPIO hardware version 0.1
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-
--- 
----
-Regards,
-Nishanth Menon
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_ROCKCHIP_PX30_H
+> +#define _DT_BINDINGS_CLK_ROCKCHIP_PX30_H
+> +
+> +/* core clocks */
+> +#define PLL_APLL		1
+> +#define PLL_DPLL		2
+> +#define PLL_CPLL		3
+> +#define PLL_NPLL		4
+> +#define APLL_BOOST_H		5
+> +#define APLL_BOOST_L		6
+> +#define ARMCLK			7
+> +
+> +/* sclk gates (special clocks) */
+> +#define USB480M			14
+> +#define SCLK_PDM		15
+> +#define SCLK_I2S0_TX		16
+> +#define SCLK_I2S0_TX_OUT	17
+> +#define SCLK_I2S0_RX		18
+> +#define SCLK_I2S0_RX_OUT	19
+> +#define SCLK_I2S1		20
+> +#define SCLK_I2S1_OUT		21
+> +#define SCLK_I2S2		22
+> +#define SCLK_I2S2_OUT		23
+> +#define SCLK_UART1		24
+> +#define SCLK_UART2		25
+> +#define SCLK_UART3		26
+> +#define SCLK_UART4		27
+> +#define SCLK_UART5		28
+> +#define SCLK_I2C0		29
+> +#define SCLK_I2C1		30
+> +#define SCLK_I2C2		31
+> +#define SCLK_I2C3		32
+> +#define SCLK_I2C4		33
+> +#define SCLK_PWM0		34
+> +#define SCLK_PWM1		35
+> +#define SCLK_SPI0		36
+> +#define SCLK_SPI1		37
+> +#define SCLK_TIMER0		38
+> +#define SCLK_TIMER1		39
+> +#define SCLK_TIMER2		40
+> +#define SCLK_TIMER3		41
+> +#define SCLK_TIMER4		42
+> +#define SCLK_TIMER5		43
+> +#define SCLK_TSADC		44
+> +#define SCLK_SARADC		45
+> +#define SCLK_OTP		46
+> +#define SCLK_OTP_USR		47
+> +#define SCLK_CRYPTO		48
+> +#define SCLK_CRYPTO_APK		49
+> +#define SCLK_DDRC		50
+> +#define SCLK_ISP		51
+> +#define SCLK_CIF_OUT		52
+> +#define SCLK_RGA_CORE		53
+> +#define SCLK_VOPB_PWM		54
+> +#define SCLK_NANDC		55
+> +#define SCLK_SDIO		56
+> +#define SCLK_EMMC		57
+> +#define SCLK_SFC		58
+> +#define SCLK_SDMMC		59
+> +#define SCLK_OTG_ADP		60
+> +#define SCLK_GMAC_SRC		61
+> +#define SCLK_GMAC		62
+> +#define SCLK_GMAC_RX_TX		63
+> +#define SCLK_MAC_REF		64
+> +#define SCLK_MAC_REFOUT		65
+> +#define SCLK_MAC_OUT		66
+> +#define SCLK_SDMMC_DRV		67
+> +#define SCLK_SDMMC_SAMPLE	68
+> +#define SCLK_SDIO_DRV		69
+> +#define SCLK_SDIO_SAMPLE	70
+> +#define SCLK_EMMC_DRV		71
+> +#define SCLK_EMMC_SAMPLE	72
+> +#define SCLK_GPU		73
+> +#define SCLK_PVTM		74
+> +#define SCLK_CORE_VPU		75
+> +#define SCLK_GMAC_RMII		76
+> +#define SCLK_UART2_SRC		77
+> +#define SCLK_NANDC_DIV		78
+> +#define SCLK_NANDC_DIV50	79
+> +#define SCLK_SDIO_DIV		80
+> +#define SCLK_SDIO_DIV50		81
+> +#define SCLK_EMMC_DIV		82
+> +#define SCLK_EMMC_DIV50		83
+> +#define SCLK_DDRCLK		84
+> +#define SCLK_UART1_SRC		85
+> +
+> +/* dclk gates */
+> +#define DCLK_VOPB		150
+> +#define DCLK_VOPL		151
+> +
+> +/* aclk gates */
+> +#define ACLK_GPU		170
+> +#define ACLK_BUS_PRE		171
+> +#define ACLK_CRYPTO		172
+> +#define ACLK_VI_PRE		173
+> +#define ACLK_VO_PRE		174
+> +#define ACLK_VPU		175
+> +#define ACLK_PERI_PRE		176
+> +#define ACLK_GMAC		178
+> +#define ACLK_CIF		179
+> +#define ACLK_ISP		180
+> +#define ACLK_VOPB		181
+> +#define ACLK_VOPL		182
+> +#define ACLK_RGA		183
+> +#define ACLK_GIC		184
+> +#define ACLK_DCF		186
+> +#define ACLK_DMAC		187
+> +#define ACLK_BUS_SRC		188
+> +#define ACLK_PERI_SRC		189
+> +
+> +/* hclk gates */
+> +#define HCLK_BUS_PRE		240
+> +#define HCLK_CRYPTO		241
+> +#define HCLK_VI_PRE		242
+> +#define HCLK_VO_PRE		243
+> +#define HCLK_VPU		244
+> +#define HCLK_PERI_PRE		245
+> +#define HCLK_MMC_NAND		246
+> +#define HCLK_SDMMC		247
+> +#define HCLK_USB		248
+> +#define HCLK_CIF		249
+> +#define HCLK_ISP		250
+> +#define HCLK_VOPB		251
+> +#define HCLK_VOPL		252
+> +#define HCLK_RGA		253
+> +#define HCLK_NANDC		254
+> +#define HCLK_SDIO		255
+> +#define HCLK_EMMC		256
+> +#define HCLK_SFC		257
+> +#define HCLK_OTG		258
+> +#define HCLK_HOST		259
+> +#define HCLK_HOST_ARB		260
+> +#define HCLK_PDM		261
+> +#define HCLK_I2S0		262
+> +#define HCLK_I2S1		263
+> +#define HCLK_I2S2		264
+> +
+> +/* pclk gates */
+> +#define PCLK_BUS_PRE		320
+> +#define PCLK_DDR		321
+> +#define PCLK_VO_PRE		322
+> +#define PCLK_GMAC		323
+> +#define PCLK_MIPI_DSI		324
+> +#define PCLK_MIPIDSIPHY		325
+> +#define PCLK_MIPICSIPHY		326
+> +#define PCLK_USB_GRF		327
+> +#define PCLK_DCF		328
+> +#define PCLK_UART1		329
+> +#define PCLK_UART2		330
+> +#define PCLK_UART3		331
+> +#define PCLK_UART4		332
+> +#define PCLK_UART5		333
+> +#define PCLK_I2C0		334
+> +#define PCLK_I2C1		335
+> +#define PCLK_I2C2		336
+> +#define PCLK_I2C3		337
+> +#define PCLK_I2C4		338
+> +#define PCLK_PWM0		339
+> +#define PCLK_PWM1		340
+> +#define PCLK_SPI0		341
+> +#define PCLK_SPI1		342
+> +#define PCLK_SARADC		343
+> +#define PCLK_TSADC		344
+> +#define PCLK_TIMER		345
+> +#define PCLK_OTP_NS		346
+> +#define PCLK_WDT_NS		347
+> +#define PCLK_GPIO1		348
+> +#define PCLK_GPIO2		349
+> +#define PCLK_GPIO3		350
+> +#define PCLK_ISP		351
+> +#define PCLK_CIF		352
+> +#define PCLK_OTP_PHY		353
+> +
+> +#define CLK_NR_CLKS		(PCLK_OTP_PHY + 1)
+> +
+> +/* pmu-clocks indices */
+> +
+> +#define PLL_GPLL		1
+> +
+> +#define SCLK_RTC32K_PMU		4
+> +#define SCLK_WIFI_PMU		5
+> +#define SCLK_UART0_PMU		6
+> +#define SCLK_PVTM_PMU		7
+> +#define PCLK_PMU_PRE		8
+> +#define SCLK_REF24M_PMU		9
+> +#define SCLK_USBPHY_REF		10
+> +#define SCLK_MIPIDSIPHY_REF	11
+> +
+> +#define XIN24M_DIV		12
+> +
+> +#define PCLK_GPIO0_PMU		20
+> +#define PCLK_UART0_PMU		21
+> +
+> +#define CLKPMU_NR_CLKS		(PCLK_UART0_PMU + 1)
+> +
+> +/* soft-reset indices */
+> +#define SRST_CORE0_PO		0
+> +#define SRST_CORE1_PO		1
+> +#define SRST_CORE2_PO		2
+> +#define SRST_CORE3_PO		3
+> +#define SRST_CORE0		4
+> +#define SRST_CORE1		5
+> +#define SRST_CORE2		6
+> +#define SRST_CORE3		7
+> +#define SRST_CORE0_DBG		8
+> +#define SRST_CORE1_DBG		9
+> +#define SRST_CORE2_DBG		10
+> +#define SRST_CORE3_DBG		11
+> +#define SRST_TOPDBG		12
+> +#define SRST_CORE_NOC		13
+> +#define SRST_STRC_A		14
+> +#define SRST_L2C		15
+> +
+> +#define SRST_DAP		16
+> +#define SRST_CORE_PVTM		17
+> +#define SRST_GPU		18
+> +#define SRST_GPU_NIU		19
+> +#define SRST_UPCTL2		20
+> +#define SRST_UPCTL2_A		21
+> +#define SRST_UPCTL2_P		22
+> +#define SRST_MSCH		23
+> +#define SRST_MSCH_P		24
+> +#define SRST_DDRMON_P		25
+> +#define SRST_DDRSTDBY_P		26
+> +#define SRST_DDRSTDBY		27
+> +#define SRST_DDRGRF_p		28
+> +#define SRST_AXI_SPLIT_A	29
+> +#define SRST_AXI_CMD_A		30
+> +#define SRST_AXI_CMD_P		31
+> +
+> +#define SRST_DDRPHY		32
+> +#define SRST_DDRPHYDIV		33
+> +#define SRST_DDRPHY_P		34
+> +#define SRST_VPU_A		36
+> +#define SRST_VPU_NIU_A		37
+> +#define SRST_VPU_H		38
+> +#define SRST_VPU_NIU_H		39
+> +#define SRST_VI_NIU_A		40
+> +#define SRST_VI_NIU_H		41
+> +#define SRST_ISP_H		42
+> +#define SRST_ISP		43
+> +#define SRST_CIF_A		44
+> +#define SRST_CIF_H		45
+> +#define SRST_CIF_PCLKIN		46
+> +#define SRST_MIPICSIPHY_P	47
+> +
+> +#define SRST_VO_NIU_A		48
+> +#define SRST_VO_NIU_H		49
+> +#define SRST_VO_NIU_P		50
+> +#define SRST_VOPB_A		51
+> +#define SRST_VOPB_H		52
+> +#define SRST_VOPB		53
+> +#define SRST_PWM_VOPB		54
+> +#define SRST_VOPL_A		55
+> +#define SRST_VOPL_H		56
+> +#define SRST_VOPL		57
+> +#define SRST_RGA_A		58
+> +#define SRST_RGA_H		59
+> +#define SRST_RGA		60
+> +#define SRST_MIPIDSI_HOST_P	61
+> +#define SRST_MIPIDSIPHY_P	62
+> +#define SRST_VPU_CORE		63
+> +
+> +#define SRST_PERI_NIU_A		64
+> +#define SRST_USB_NIU_H		65
+> +#define SRST_USB2OTG_H		66
+> +#define SRST_USB2OTG		67
+> +#define SRST_USB2OTG_ADP	68
+> +#define SRST_USB2HOST_H		69
+> +#define SRST_USB2HOST_ARB_H	70
+> +#define SRST_USB2HOST_AUX_H	71
+> +#define SRST_USB2HOST_EHCI	72
+> +#define SRST_USB2HOST		73
+> +#define SRST_USBPHYPOR		74
+> +#define SRST_USBPHY_OTG_PORT	75
+> +#define SRST_USBPHY_HOST_PORT	76
+> +#define SRST_USBPHY_GRF		77
+> +#define SRST_CPU_BOOST_P	78
+> +#define SRST_CPU_BOOST		79
+> +
+> +#define SRST_MMC_NAND_NIU_H	80
+> +#define SRST_SDIO_H		81
+> +#define SRST_EMMC_H		82
+> +#define SRST_SFC_H		83
+> +#define SRST_SFC		84
+> +#define SRST_SDCARD_NIU_H	85
+> +#define SRST_SDMMC_H		86
+> +#define SRST_NANDC_H		89
+> +#define SRST_NANDC		90
+> +#define SRST_GMAC_NIU_A		92
+> +#define SRST_GMAC_NIU_P		93
+> +#define SRST_GMAC_A		94
+> +
+> +#define SRST_PMU_NIU_P		96
+> +#define SRST_PMU_SGRF_P		97
+> +#define SRST_PMU_GRF_P		98
+> +#define SRST_PMU		99
+> +#define SRST_PMU_MEM_P		100
+> +#define SRST_PMU_GPIO0_P	101
+> +#define SRST_PMU_UART0_P	102
+> +#define SRST_PMU_CRU_P		103
+> +#define SRST_PMU_PVTM		104
+> +#define SRST_PMU_UART		105
+> +#define SRST_PMU_NIU_H		106
+> +#define SRST_PMU_DDR_FAIL_SAVE	107
+> +#define SRST_PMU_CORE_PERF_A	108
+> +#define SRST_PMU_CORE_GRF_P	109
+> +#define SRST_PMU_GPU_PERF_A	110
+> +#define SRST_PMU_GPU_GRF_P	111
+> +
+> +#define SRST_CRYPTO_NIU_A	112
+> +#define SRST_CRYPTO_NIU_H	113
+> +#define SRST_CRYPTO_A		114
+> +#define SRST_CRYPTO_H		115
+> +#define SRST_CRYPTO		116
+> +#define SRST_CRYPTO_APK		117
+> +#define SRST_BUS_NIU_H		120
+> +#define SRST_USB_NIU_P		121
+> +#define SRST_BUS_TOP_NIU_P	122
+> +#define SRST_INTMEM_A		123
+> +#define SRST_GIC_A		124
+> +#define SRST_ROM_H		126
+> +#define SRST_DCF_A		127
+> +
+> +#define SRST_DCF_P		128
+> +#define SRST_PDM_H		129
+> +#define SRST_PDM		130
+> +#define SRST_I2S0_H		131
+> +#define SRST_I2S0_TX		132
+> +#define SRST_I2S1_H		133
+> +#define SRST_I2S1		134
+> +#define SRST_I2S2_H		135
+> +#define SRST_I2S2		136
+> +#define SRST_UART1_P		137
+> +#define SRST_UART1		138
+> +#define SRST_UART2_P		139
+> +#define SRST_UART2		140
+> +#define SRST_UART3_P		141
+> +#define SRST_UART3		142
+> +#define SRST_UART4_P		143
+> +
+> +#define SRST_UART4		144
+> +#define SRST_UART5_P		145
+> +#define SRST_UART5		146
+> +#define SRST_I2C0_P		147
+> +#define SRST_I2C0		148
+> +#define SRST_I2C1_P		149
+> +#define SRST_I2C1		150
+> +#define SRST_I2C2_P		151
+> +#define SRST_I2C2		152
+> +#define SRST_I2C3_P		153
+> +#define SRST_I2C3		154
+> +#define SRST_PWM0_P		157
+> +#define SRST_PWM0		158
+> +#define SRST_PWM1_P		159
+> +
+> +#define SRST_PWM1		160
+> +#define SRST_SPI0_P		161
+> +#define SRST_SPI0		162
+> +#define SRST_SPI1_P		163
+> +#define SRST_SPI1		164
+> +#define SRST_SARADC_P		165
+> +#define SRST_SARADC		166
+> +#define SRST_TSADC_P		167
+> +#define SRST_TSADC		168
+> +#define SRST_TIMER_P		169
+> +#define SRST_TIMER0		170
+> +#define SRST_TIMER1		171
+> +#define SRST_TIMER2		172
+> +#define SRST_TIMER3		173
+> +#define SRST_TIMER4		174
+> +#define SRST_TIMER5		175
+> +
+> +#define SRST_OTP_NS_P		176
+> +#define SRST_OTP_NS_SBPI	177
+> +#define SRST_OTP_NS_USR		178
+> +#define SRST_OTP_PHY_P		179
+> +#define SRST_OTP_PHY		180
+> +#define SRST_WDT_NS_P		181
+> +#define SRST_GPIO1_P		182
+> +#define SRST_GPIO2_P		183
+> +#define SRST_GPIO3_P		184
+> +#define SRST_SGRF_P		185
+> +#define SRST_GRF_P		186
+> +#define SRST_I2S0_RX		191
+> +
+> +#endif
+> -- 
+> 1.9.1
+> 
+> 
