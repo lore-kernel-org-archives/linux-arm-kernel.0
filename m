@@ -1,41 +1,58 @@
 From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 12 Jun 2018 13:54:52 +0300
-Subject: [PATCH v2 0/5] thermal: tsens: Prepare for version 2 of TSENS IP
-Message-ID: <cover.1528799892.git.amit.kucheria@linaro.org>
+Date: Tue, 12 Jun 2018 13:54:54 +0300
+Subject: [PATCH v2 2/5] dt: qcom: 8996: thermal: Move to DT initialisation
+In-Reply-To: <cover.1528799892.git.amit.kucheria@linaro.org>
+References: <cover.1528799892.git.amit.kucheria@linaro.org>
+Message-ID: <683ceb9a7d283bcad47fc6e8e4fcfbd7e76c1018.1528799892.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is a mixed bag: Some code moves to deal with version 2 of the
-TSENS IP in common functions, new platform support (sdm845), a cleanup
-patch and a DT change to have a common way to deal with the SROT and TM
-registers despite slightly different features across the IP family and
-different register offsets.
+We also split up the regmap address space into two, one for the TM
+registers, the other for the SROT registers. This was required to deal with
+different address offsets for the TM and SROT registers across different
+SoC families.
 
-I can merge the tsens-8996.c and tsens-sdm845.c files into a tsens-v2.c if
-desired.
+Since tsens-common.c/init_common() currently only registers one address space, the order is important (TM before SROT).This is OK since the code doesn't really use the SROT functionality yet.
 
-Changes since v1:
-- Move get_temp() from tsens-8996 to tsens-common and rename
-- Change 8996 DT entry to allow init_common() to work across sdm845 and
-  8996 due to different offsets
+Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
+ drivers/thermal/qcom/tsens-8996.c     |  1 -
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-Amit Kucheria (5):
-  thermal: tsens: Get rid of unused fields in structure
-  dt: qcom: 8996: thermal: Move to DT initialisation
-  thermal: tsens: Move 8996 get_temp() to common code for reuse
-  thermal: tsens: Add support for SDM845
-  thermal: tsens: Check if we have valid data before reading
-
- .../devicetree/bindings/thermal/qcom-tsens.txt     |  1 +
- arch/arm64/boot/dts/qcom/msm8996.dtsi              | 12 +++-
- drivers/thermal/qcom/Makefile                      |  2 +-
- drivers/thermal/qcom/tsens-8996.c                  | 74 +-------------------
- drivers/thermal/qcom/tsens-common.c                | 78 +++++++++++++++++++---
- drivers/thermal/qcom/tsens-sdm845.c                | 15 +++++
- drivers/thermal/qcom/tsens.c                       |  3 +
- drivers/thermal/qcom/tsens.h                       |  8 ++-
- 8 files changed, 107 insertions(+), 86 deletions(-)
- create mode 100644 drivers/thermal/qcom/tsens-sdm845.c
-
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 410ae78..b4aab18 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -451,7 +451,17 @@
+ 
+ 		tsens0: thermal-sensor at 4a8000 {
+ 			compatible = "qcom,msm8996-tsens";
+-			reg = <0x4a8000 0x2000>;
++			reg = <0x4a9000 0x1000>, /* TM */
++			      <0x4a8000 0x1000>; /* SROT */
++			#qcom,sensors = <13>;
++			#thermal-sensor-cells = <1>;
++		};
++
++		tsens1: thermal-sensor at 4ac000 {
++			compatible = "qcom,msm8996-tsens";
++			reg = <0x4ad000 0x1000>, /* TM */
++			      <0x4ac000 0x1000>; /* SROT */
++			#qcom,sensors = <8>;
+ 			#thermal-sensor-cells = <1>;
+ 		};
+ 
+diff --git a/drivers/thermal/qcom/tsens-8996.c b/drivers/thermal/qcom/tsens-8996.c
+index e1f7781..6e59078 100644
+--- a/drivers/thermal/qcom/tsens-8996.c
++++ b/drivers/thermal/qcom/tsens-8996.c
+@@ -79,6 +79,5 @@ static const struct tsens_ops ops_8996 = {
+ };
+ 
+ const struct tsens_data data_8996 = {
+-	.num_sensors	= 13,
+ 	.ops		= &ops_8996,
+ };
 -- 
 2.7.4
