@@ -1,88 +1,58 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 12 Jun 2018 16:33:05 +0200
-Subject: [PATCH v7 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <daba73df-037c-2583-3a08-f3f27c4129d1@pengutronix.de>
-References: <20180517055014.6607-1-o.rempel@pengutronix.de>
- <20180517055014.6607-4-o.rempel@pengutronix.de>
- <daba73df-037c-2583-3a08-f3f27c4129d1@pengutronix.de>
-Message-ID: <2307533.g32PyNi9fl@aspire.rjw.lan>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 12 Jun 2018 16:34:49 +0200
+Subject: [PATCH] drm/meson: Fix an un-handled error path in
+ 'meson_drv_bind_master()'
+In-Reply-To: <20180611165335.24542-1-christophe.jaillet@wanadoo.fr>
+References: <20180611165335.24542-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <b25b05d0-b192-1cf8-0c25-38b8bdb53b92@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 12, 2018 2:42:12 PM CEST Oleksij Rempel wrote:
->  This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
-> --Sj2PRcQlY7eZybdA0sq9wWzJEO8fKS924
-> Content-Type: multipart/mixed; boundary="d6BZYFRi4L3iCmOh3nm6wjii3dWC9QFDg";
->  protected-headers="v1"
-> From: Oleksij Rempel <o.rempel@pengutronix.de>
-> To: Shawn Guo <shawnguo@kernel.org>, Mark Brown <broonie@kernel.org>,
->  "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
-> Cc: kernel at pengutronix.de, devicetree at vger.kernel.org,
->  linux-arm-kernel at lists.infradead.org, linux-clk at vger.kernel.org,
->  linux-kernel at vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
->  Liam Girdwood <lgirdwood@gmail.com>,
->  Leonard Crestez <leonard.crestez@nxp.com>, Rob Herring <robh+dt@kernel.org>,
->  Mark Rutland <mark.rutland@arm.com>,
->  Michael Turquette <mturquette@baylibre.com>,
->  Stephen Boyd <sboyd@codeaurora.org>, Fabio Estevam <fabio.estevam@nxp.com>,
->  Russell King <linux@armlinux.org.uk>
-> Message-ID: <daba73df-037c-2583-3a08-f3f27c4129d1@pengutronix.de>
-> Subject: Re: [PATCH v7 3/6] kernel/reboot.c: export pm_power_off_prepare
-> References: <20180517055014.6607-1-o.rempel@pengutronix.de>
->  <20180517055014.6607-4-o.rempel@pengutronix.de>
-> In-Reply-To: <20180517055014.6607-4-o.rempel@pengutronix.de>
+On 11/06/2018 18:53, Christophe JAILLET wrote:
+> If 'platform_get_resource_byname()' fails, we should release some resources
+> before leaving, as already done in the other error handling path of the
+> function.
 > 
-> --d6BZYFRi4L3iCmOh3nm6wjii3dWC9QFDg
-> Content-Type: text/plain; charset=utf-8
-> Content-Language: en-US
-> Content-Transfer-Encoding: quoted-printable
+> Fixes: acaa3f13b8dd ("drm/meson: Fix potential NULL dereference in meson_drv_bind_master()")
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+>  drivers/gpu/drm/meson/meson_drv.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
 > 
-> Hi Rafael,
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index 32b1a6cdecfc..d3443125e661 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -197,8 +197,10 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	priv->io_base = regs;
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
+> -	if (!res)
+> -		return -EINVAL;
+> +	if (!res) {
+> +		ret = -EINVAL;
+> +		goto free_drm;
+> +	}
+>  	/* Simply ioremap since it may be a shared register zone */
+>  	regs = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!regs) {
+> @@ -215,8 +217,10 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	}
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
+> -	if (!res)
+> -		return -EINVAL;
+> +	if (!res) {
+> +		ret = -EINVAL;
+> +		goto free_drm;
+> +	}
+>  	/* Simply ioremap since it may be a shared register zone */
+>  	regs = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!regs) {
 > 
-> Last version of this patch was send at 17.05.2018. No other comment was
-> provided and this patch is a blocker for other patches in this serie.
-> Can you please give some feedback on it.
 
-I would have done that had I not missed the patch.
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Which probably wouldn't have happened had you CCed it to linux-pm.
+I'll push it when rc1 is tagged.
 
-Anyway, I have no particular problems with exporting pm_power_off_prepare via
-EXPORT_SYMBOL_GPL().
-
-> 
-> On 17.05.2018 07:50, Oleksij Rempel wrote:
-> > Export pm_power_off_prepare. It is needed to implement power off on
-> > Freescale/NXP iMX6 based boards with external power management
-> > integrated circuit (PMIC).
-> >=20
-> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > ---
-> >  kernel/reboot.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >=20
-> > diff --git a/kernel/reboot.c b/kernel/reboot.c
-> > index e4ced883d8de..83810d726f3e 100644
-> > --- a/kernel/reboot.c
-> > +++ b/kernel/reboot.c
-> > @@ -49,6 +49,7 @@ int reboot_force;
-> >   */
-> > =20
-> >  void (*pm_power_off_prepare)(void);
-> > +EXPORT_SYMBOL_GPL(pm_power_off_prepare);
-> > =20
-> >  /**
-> >   *	emergency_restart - reboot the system
-> >=20
-> 
-> 
-> --d6BZYFRi4L3iCmOh3nm6wjii3dWC9QFDg--
-> 
-> --Sj2PRcQlY7eZybdA0sq9wWzJEO8fKS924
-> Content-Type: application/pgp-signature; name="signature.asc"
-> Content-Description: OpenPGP digital signature
-> Content-Disposition: attachment; filename="signature.asc"
-> 
-> 
-> --Sj2PRcQlY7eZybdA0sq9wWzJEO8fKS924--
-> 
+Neil
