@@ -1,60 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 12 Jun 2018 19:15:06 +0300
-Subject: [PATCH v4 6/6] dt-bindings: media: rcar-vin: Clarify optional
- props
-In-Reply-To: <20180612154553.kgqnqkwv3y6srivg@kekkonen.localdomain>
-References: <1528813566-17927-1-git-send-email-jacopo+renesas@jmondi.org>
- <1528813566-17927-7-git-send-email-jacopo+renesas@jmondi.org>
- <20180612154553.kgqnqkwv3y6srivg@kekkonen.localdomain>
-Message-ID: <2802458.0ZPzlQSr2q@avalon>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 12 Jun 2018 09:33:24 -0700
+Subject: [PATCH v4 2/7] clk: at91: add I2S clock mux driver
+In-Reply-To: <d2558674-9aee-8b08-293f-34754fd2b185@microchip.com>
+References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
+ <1527251668-31396-3-git-send-email-codrin.ciubotariu@microchip.com>
+ <152778039660.144038.4743783065942615925@swboyd.mtv.corp.google.com>
+ <d2558674-9aee-8b08-293f-34754fd2b185@microchip.com>
+Message-ID: <152882120419.16708.16947882037246176868@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, 12 June 2018 18:45:53 EEST Sakari Ailus wrote:
-> On Tue, Jun 12, 2018 at 04:26:06PM +0200, Jacopo Mondi wrote:
-> > Add a note to the R-Car VIN interface bindings to clarify that all
-> > properties listed as generic properties in video-interfaces.txt can
-> > be included in port at 0 endpoint, but if not explicitly listed in the
-> > interface bindings documentation, they do not modify it behaviour.
+Quoting Codrin Ciubotariu (2018-06-04 01:20:29)
+> On 31.05.2018 18:26, Stephen Boyd wrote:
+> > Quoting Codrin Ciubotariu (2018-05-25 05:34:23)
 > > 
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > ---
+> >> +       .get_parent = clk_i2s_mux_get_parent,
+> >> +       .set_parent = clk_i2s_mux_set_parent,
+> >> +       .determine_rate = __clk_mux_determine_rate,
+> >> +};
+> >> +
+> >> +static struct clk_hw * __init
+> >> +at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
+> >> +                         const char * const *parent_names,
+> >> +                         unsigned int num_parents, u32 bus_id)
+> >> +{
+> >> +       struct clk_init_data init = {};
+> >> +       struct clk_i2s_mux *i2s_ck;
+> >> +       int ret;
+> >> +
+> >> +       i2s_ck = kzalloc(sizeof(*i2s_ck), GFP_KERNEL);
+> >> +       if (!i2s_ck)
+> >> +               return ERR_PTR(-ENOMEM);
+> >> +
+> >> +       init.name = name;
+> >> +       init.ops = &clk_i2s_mux_ops;
+> >> +       init.parent_names = parent_names;
+> >> +       init.num_parents = num_parents;
+> >> +       init.flags = CLK_IGNORE_UNUSED;
 > > 
-> >  Documentation/devicetree/bindings/media/rcar_vin.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> > b/Documentation/devicetree/bindings/media/rcar_vin.txt index
-> > 8130849..03544c7 100644
-> > --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> > +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> > @@ -55,6 +55,12 @@ from local SoC CSI-2 receivers (port1) depending on
-> > SoC.
-> > 
-> >        instances that are connected to external pins should have port 0.
-> > 
-> >        - Optional properties for endpoint nodes of port at 0:
-> > +
-> > +        All properties described in [1] and which apply to the selected
-> > +        media bus type could be optionally listed here to better describe
-> > +        the current hardware configuration, but only the following ones
-> > do
-> > +        actually modify the VIN interface behaviour:
-> > +
+> > Really? Why?
 > 
-> I don't think this should be needed. You should only have properties that
-> describe the hardware configuration in a given system.
+> I am thinking that there is no need to gate this clock, since there is 
+> no way to gate this clock in HW.
 
-I agree. Please list explicitly all properties that are applicable for this 
-device, and don't tell which one(s) are used by the driver.
-
-> >          - hsync-active: see [1] for description. Default is active high.
-> >          - vsync-active: see [1] for description. Default is active high.
-> >          - data-enable-active: polarity of CLKENB signal, see [1] for
-
--- 
-Regards,
-
-Laurent Pinchart
+This flag is not necessary if the clk can't be gated via hardware
+control registers. Please remove the flag.
