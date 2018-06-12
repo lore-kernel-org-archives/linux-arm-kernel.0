@@ -1,74 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 12 Jun 2018 09:36:20 +0200
-Subject: [PATCH] arm64: dma-mapping: clear buffers allocated with
- FORCE_CONTIGUOUS flag
-In-Reply-To: <20180612073124eucas1p18fd911ee122fea0939df7ef1c88b127c~3WTVvPusx0398003980eucas1p1H@eucas1p1.samsung.com>
-References: <CGME20180611051352eucas1p1f256a2a303da85a1e0923f012d709e39@eucas1p1.samsung.com>
- <20180611051340.9024-1-m.szyprowski@samsung.com>
- <CAMuHMdV8PTBArnaoXMXsuTqxLcizAZe4YO59TkZ6Wj-F4M6Sbg@mail.gmail.com>
- <20180611123104.GD1050@arm.com>
- <20180612073124eucas1p18fd911ee122fea0939df7ef1c88b127c~3WTVvPusx0398003980eucas1p1H@eucas1p1.samsung.com>
-Message-ID: <CAMuHMdWDoZGSYZqp=mowufNT2PSK82xdS9pUYtdu8tGhXS5ccQ@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 12 Jun 2018 01:00:01 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.18
+In-Reply-To: <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
+References: <20180521115947.wqrnv2hczate65lz@flea>
+ <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
+ <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
+Message-ID: <152879040155.16708.9862482085365718831@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Tue, Jun 12, 2018 at 9:31 AM Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> On 2018-06-11 14:31, Will Deacon wrote:
-> > On Mon, Jun 11, 2018 at 09:55:54AM +0200, Geert Uytterhoeven wrote:
-> >> On Mon, Jun 11, 2018 at 7:14 AM Marek Szyprowski
-> >> <m.szyprowski@samsung.com> wrote:
-> >>> dma_alloc_*() buffers might be exposed to userspace via mmap() call, so
-> >>> they should be cleared on allocation. In case of IOMMU-based dma-mapping
-> >>> implementation such buffer clearing was missing in the code path for
-> >>> DMA_ATTR_FORCE_CONTIGUOUS flag handling. This patch fixes this issue. For
-> >> Is it? The memory is allocated using dma_alloc_from_contiguous(..., gfp),
-> >> and __iommu_alloc_attrs() has
+Quoting Chen-Yu Tsai (2018-06-11 00:53:41)
+> Hi,
+> 
+> On Mon, Jun 11, 2018 at 10:00 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+> > Hi Maxime,
+> >
+> >
+> > 2018-05-21 20:59 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+> >> Hi Mike, Stephen,
 > >>
-> >>          /*
-> >>           * Some drivers rely on this, and we probably don't want the
-> >>           * possibility of stale kernel data being read by devices anyway.
-> >>           */
-> >>          gfp |= __GFP_ZERO;
+> >> Please merge the following changes for the next merge window, thanks!
 > >>
-> >> at the top, before the allocation.
+> >> Maxime
 > >>
-> >> If cma_alloc() (called from dma_alloc_from_contiguous()) doesn't honor
-> >> __GFP_ZERO, I think cma_alloc() should be fixed instead.
-> > Agreed. We tried to fix this in 7132813c3845 ("arm64: Honor __GFP_ZERO in
-> > dma allocations"). Has something broken that?
->
-> The code for handling DMA_ATTR_FORCE_CONTIGUOUS flag in arm64
-> dma-mapping/iommu
-> implementation has been added later and assumed that __GFP_ZERO flag is
-> handled by dma_alloc_from_contiguous(). This is sadly not true, so the
-> buffer
-> allocated this way is not cleared.
->
-> In case of ARM (32bit) the newly allocated buffer is always cleared directly
-> after calling dma_alloc_from_contiguous() function.
+> >> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> >>
+> >>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> >>
+> >> are available in the Git repository at:
+> >>
+> >>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.18
+> >>
+> >> for you to fetch changes up to 17de4c857b1f74b90967f7e7fd5ff81be61dc044:
+> >>
+> >>   clk: sunxi-ng: r40: export a regmap to access the GMAC register (2018-05-17 14:02:07 +0800)
+> >>
+> >> ----------------------------------------------------------------
+> >> Allwinner clock changes for 4.18
+> >>
+> >> Not a lot of changes for this release, but two quite important features
+> >> were added: the H6 PRCM clock support, and the needed changes to the R40
+> >> clock driver to allow for the EMAC to operate.
+> >>
+> >> ----------------------------------------------------------------
+> >> Icenowy Zheng (3):
+> >>       clk: sunxi-ng: add support for H6 PRCM CCU
+> >>       clk: sunxi-ng: r40: rewrite init code to a platform driver
+> >>       clk: sunxi-ng: r40: export a regmap to access the GMAC register
+> >>
+> >
+> >
+> >
+> > Why was my patch "clk: sunxi-ng: replace lib-y with obj-y"
+> > not included in the pull request?
+> >
+> >
+> > You said "I've picked it up"
+> > https://patchwork.kernel.org/patch/10348031/
+> 
+> It looks like it was accidentally dropped after a rebase.
+> Not quite sure what happened there. Maxime?
+> 
 
-JFTR, mips and generic dma_direct_alloc() also do that, extensa does not.
-
-> I agree that adding handling of __GFP_ZERO flag to
-> dma_alloc_from_contiguous()
-> or rather cma_alloc() is a better idea, but might have some side effects, so
-> such change is not a good candidate for -rc cycle. I will prepare such
-> patch,
-> but for now this one is imho a bit less invasive approach.
-
-OK, fine for me.
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I can directly pick and send as fix for clk-fixes targeting rc2.
