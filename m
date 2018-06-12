@@ -1,72 +1,77 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 12 Jun 2018 12:35:07 -0700
-Subject: [PATCH v2 2/5] dt: qcom: 8996: thermal: Move to DT initialisation
-In-Reply-To: <683ceb9a7d283bcad47fc6e8e4fcfbd7e76c1018.1528799892.git.amit.kucheria@linaro.org>
-References: <cover.1528799892.git.amit.kucheria@linaro.org>
- <683ceb9a7d283bcad47fc6e8e4fcfbd7e76c1018.1528799892.git.amit.kucheria@linaro.org>
-Message-ID: <20180612193507.GO14924@minitux>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Jun 2018 13:41:42 -0600
+Subject: [PATCH v1 2/4] dt-bindings: mailbox: provide imx-mailbox
+ documentation
+In-Reply-To: <20180601065821.28234-3-o.rempel@pengutronix.de>
+References: <20180601065821.28234-1-o.rempel@pengutronix.de>
+ <20180601065821.28234-3-o.rempel@pengutronix.de>
+Message-ID: <20180612194142.GA16521@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 12 Jun 03:54 PDT 2018, Amit Kucheria wrote:
-
-> We also split up the regmap address space into two, one for the TM
-> registers, the other for the SROT registers. This was required to deal with
-> different address offsets for the TM and SROT registers across different
-> SoC families.
-> 
-> Since tsens-common.c/init_common() currently only registers one address space, the order is important (TM before SROT).This is OK since the code doesn't really use the SROT functionality yet.
-
-Please line wrap this.
-
-> 
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+On Fri, Jun 01, 2018 at 08:58:19AM +0200, Oleksij Rempel wrote:
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
->  drivers/thermal/qcom/tsens-8996.c     |  1 -
->  2 files changed, 11 insertions(+), 2 deletions(-)
+>  .../bindings/mailbox/imx-mailbox.txt          | 35 +++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index 410ae78..b4aab18 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -451,7 +451,17 @@
->  
->  		tsens0: thermal-sensor at 4a8000 {
->  			compatible = "qcom,msm8996-tsens";
-> -			reg = <0x4a8000 0x2000>;
-> +			reg = <0x4a9000 0x1000>, /* TM */
-> +			      <0x4a8000 0x1000>; /* SROT */
-> +			#qcom,sensors = <13>;
-> +			#thermal-sensor-cells = <1>;
-> +		};
+> diff --git a/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+> new file mode 100644
+> index 000000000000..a45604b33039
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+> @@ -0,0 +1,35 @@
+> +i.MX Messaging Unit
+> +===================
 > +
-> +		tsens1: thermal-sensor at 4ac000 {
-> +			compatible = "qcom,msm8996-tsens";
-> +			reg = <0x4ad000 0x1000>, /* TM */
-> +			      <0x4ac000 0x1000>; /* SROT */
-> +			#qcom,sensors = <8>;
->  			#thermal-sensor-cells = <1>;
->  		};
->  
-> diff --git a/drivers/thermal/qcom/tsens-8996.c b/drivers/thermal/qcom/tsens-8996.c
-> index e1f7781..6e59078 100644
-> --- a/drivers/thermal/qcom/tsens-8996.c
-> +++ b/drivers/thermal/qcom/tsens-8996.c
-> @@ -79,6 +79,5 @@ static const struct tsens_ops ops_8996 = {
->  };
->  
->  const struct tsens_data data_8996 = {
-> -	.num_sensors	= 13,
+> +The i.MX Messaging Unit (MU) contains two register sets: "A" and "B". In most cases
+> +they are accessible from all Processor Units. On one hand, at least for mailbox functionality,
+> +it makes no difference which application or processor is using which set of the MU. On
 
-This will cause the current 8996 dts to fail probing the tsens. I think
-you should just leave this as is, because specifying qcom,sensors in dts
-will overwrite this number regardless.
+Please wrap lines correctly (<80).
 
-It also would make this change dts specific, which is convenient as it
-breaks the interdependency between the different subsystems.
+> +other hand, the register sets for each of the MU parts are not identical.
+> +
+> +Required properties:
+> +- compatible :	Shell be one of:
+> +                    "fsl,imx7s-mu-a" and "fsl,imx7s-mu-b" for i.MX7S or i.MX7D
+> +- reg : 	physical base address of the mailbox and length of
 
->  	.ops		= &ops_8996,
+Mix of space and tab.
 
-Regards,
-Bjorn
+> +		memory mapped region.
+> +- #mbox-cells:	Common mailbox binding property to identify the number
+> +		of cells required for the mailbox specifier. Should be 1.
+> +- interrupts :	interrupt number. The interrupt specifier format
+> +		depends on the interrupt controller parent.
+
+Just need to say how many interrupts and what they are if more than 1.
+
+> +- clocks     :  phandle to the input clock.
+> +
+> +Example:
+> +	mu0a: mu at 30aa0000 {
+
+mailbox at ...
+
+> +		compatible = "fsl,imx7s-mu-a";
+> +		reg = <0x30aa0000 0x28>;
+> +		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks IMX7D_MU_ROOT_CLK>;
+> +		#mbox-cells = <1>;
+> +	};
+> +
+> +	mu0b: mu at 30ab0000 {
+
+mailbox at ...
+
+> +		compatible = "fsl,imx7s-mu-b";
+> +		reg = <0x30ab0000 0x28>;
+> +		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks IMX7D_MU_ROOT_CLK>;
+> +		#mbox-cells = <1>;
+> +	};
+> -- 
+> 2.17.1
+> 
