@@ -1,145 +1,54 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 12 Jun 2018 10:06:34 -0700
-Subject: [PATCH 2/6] PCI: iproc: Add INTx support with better modeling
-In-Reply-To: <3ecc33ebe3db1f010f5c8938dfb87677@codeaurora.org>
-References: <1527631130-20045-1-git-send-email-ray.jui@broadcom.com>
- <1527631130-20045-3-git-send-email-ray.jui@broadcom.com>
- <3ecc33ebe3db1f010f5c8938dfb87677@codeaurora.org>
-Message-ID: <89adfced-75d6-9ad2-0a39-1fbdf9a33cb0@broadcom.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 12 Jun 2018 10:19:29 -0700
+Subject: [v2,4/6] ARM: drop no-thumb-interwork in EABI mode
+In-Reply-To: <20180325180959.28008-5-stefan@agner.ch>
+References: <20180325180959.28008-5-stefan@agner.ch>
+Message-ID: <20180612171929.GA7829@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Mar 25, 2018 at 08:09:57PM +0200, Stefan Agner wrote:
+> According to GCC documentation -m(no-)thumb-interwork is
+> meaningless in AAPCS configurations. Also clang does not
 
+It appears that this is only correct for recent versions of gcc.
 
-On 6/12/2018 1:52 AM, poza at codeaurora.org wrote:
-> On 2018-05-30 03:28, Ray Jui wrote:
->> Add PCIe legacy interrupt INTx support to the iProc PCIe driver by
->> modeling it with its own IRQ domain. All 4 interrupts INTA, INTB, INTC,
->> INTD share the same interrupt line connected to the GIC in the system,
->> while the status of each INTx can be obtained through the INTX CSR
->> register
->>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> ---
->> ?drivers/pci/host/pcie-iproc-platform.c |? 2 +
->> ?drivers/pci/host/pcie-iproc.c????????? | 95 
->> +++++++++++++++++++++++++++++++++-
->> ?drivers/pci/host/pcie-iproc.h????????? |? 6 +++
->> ?3 files changed, 101 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pci/host/pcie-iproc-platform.c
->> b/drivers/pci/host/pcie-iproc-platform.c
->> index e764a2a..7a51e6c 100644
->> --- a/drivers/pci/host/pcie-iproc-platform.c
->> +++ b/drivers/pci/host/pcie-iproc-platform.c
->> @@ -70,6 +70,8 @@ static int iproc_pcie_pltfm_probe(struct
->> platform_device *pdev)
->> ???? }
->> ???? pcie->base_addr = reg.start;
->>
->> +??? pcie->irq = platform_get_irq(pdev, 0);
->> +
->> ???? if (of_property_read_bool(np, "brcm,pcie-ob")) {
->> ???????? u32 val;
->>
->> diff --git a/drivers/pci/host/pcie-iproc.c 
->> b/drivers/pci/host/pcie-iproc.c
->> index 14f374d..0bd2c14 100644
->> --- a/drivers/pci/host/pcie-iproc.c
->> +++ b/drivers/pci/host/pcie-iproc.c
->> @@ -14,6 +14,7 @@
->> ?#include <linux/delay.h>
->> ?#include <linux/interrupt.h>
->> ?#include <linux/irqchip/arm-gic-v3.h>
->> +#include <linux/irqchip/chained_irq.h>
->> ?#include <linux/platform_device.h>
->> ?#include <linux/of_address.h>
->> ?#include <linux/of_pci.h>
->> @@ -264,6 +265,7 @@ enum iproc_pcie_reg {
->>
->> ???? /* enable INTx */
->> ???? IPROC_PCIE_INTX_EN,
->> +??? IPROC_PCIE_INTX_CSR,
->>
->> ???? /* outbound address mapping */
->> ???? IPROC_PCIE_OARR0,
->> @@ -305,6 +307,7 @@ static const u16 iproc_pcie_reg_paxb_bcma[] = {
->> ???? [IPROC_PCIE_CFG_ADDR]??????? = 0x1f8,
->> ???? [IPROC_PCIE_CFG_DATA]??????? = 0x1fc,
->> ???? [IPROC_PCIE_INTX_EN]??????? = 0x330,
->> +??? [IPROC_PCIE_INTX_CSR]??????? = 0x334,
->> ???? [IPROC_PCIE_LINK_STATUS]??? = 0xf0c,
->> ?};
->>
->> @@ -316,6 +319,7 @@ static const u16 iproc_pcie_reg_paxb[] = {
->> ???? [IPROC_PCIE_CFG_ADDR]??????? = 0x1f8,
->> ???? [IPROC_PCIE_CFG_DATA]??????? = 0x1fc,
->> ???? [IPROC_PCIE_INTX_EN]??????? = 0x330,
->> +??? [IPROC_PCIE_INTX_CSR]??????? = 0x334,
->> ???? [IPROC_PCIE_OARR0]??????? = 0xd20,
->> ???? [IPROC_PCIE_OMAP0]??????? = 0xd40,
->> ???? [IPROC_PCIE_OARR1]??????? = 0xd28,
->> @@ -332,6 +336,7 @@ static const u16 iproc_pcie_reg_paxb_v2[] = {
->> ???? [IPROC_PCIE_CFG_ADDR]??????? = 0x1f8,
->> ???? [IPROC_PCIE_CFG_DATA]??????? = 0x1fc,
->> ???? [IPROC_PCIE_INTX_EN]??????? = 0x330,
->> +??? [IPROC_PCIE_INTX_CSR]??????? = 0x334,
->> ???? [IPROC_PCIE_OARR0]??????? = 0xd20,
->> ???? [IPROC_PCIE_OMAP0]??????? = 0xd40,
->> ???? [IPROC_PCIE_OARR1]??????? = 0xd28,
->> @@ -782,9 +787,90 @@ static int iproc_pcie_check_link(struct 
->> iproc_pcie *pcie)
->> ???? return link_is_active ? 0 : -ENODEV;
->> ?}
->>
->> -static void iproc_pcie_enable(struct iproc_pcie *pcie)
->> +static int iproc_pcie_intx_map(struct irq_domain *domain, unsigned 
->> int irq,
->> +?????????????????? irq_hw_number_t hwirq)
->> ?{
->> +??? irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
->> +??? irq_set_chip_data(irq, domain->host_data);
->> +
->> +??? return 0;
->> +}
->> +
->> +static const struct irq_domain_ops intx_domain_ops = {
->> +??? .map = iproc_pcie_intx_map,
->> +};
->> +
->> +static void iproc_pcie_isr(struct irq_desc *desc)
->> +{
->> +??? struct irq_chip *chip = irq_desc_get_chip(desc);
->> +??? struct iproc_pcie *pcie;
->> +??? struct device *dev;
->> +??? unsigned long status;
->> +??? u32 bit, virq;
->> +
->> +??? chained_irq_enter(chip, desc);
->> +??? pcie = irq_desc_get_handler_data(desc);
->> +??? dev = pcie->dev;
->> +
->> +??? /* go through INTx A, B, C, D until all interrupts are handled */
->> +??? while ((status = iproc_pcie_read_reg(pcie, IPROC_PCIE_INTX_CSR) &
->> +??????? SYS_RC_INTX_MASK) != 0) {
->> +??????? for_each_set_bit(bit, &status, PCI_NUM_INTX) {
->> +??????????? virq = irq_find_mapping(pcie->irq_domain, bit + 1);
->> +??????????? if (virq)
->> +??????????????? generic_handle_irq(virq);
->> +??????????? else
->> +??????????????? dev_err(dev, "unexpected INTx%u\n", bit);
->> +??????? }
->> +??? }
->> +
+With gcc 4.9.2, this patch causes the qemu collie emulation
+to fail with collie_defconfig+CONFIG_AEABI.
+
+qemu-system-arm: Trying to execute code outside RAM or ROM at 0x02000000
+This usually means one of the following happened:
+...
+
+With gcc 7.3.0, the emulation works as expected. Reverting the patch
+fixes the problem with gcc 4.9.2. Not that it matters much to me - I can
+and will switch to gcc 7.3.0 for my testing - but effectively this means
+that older versions of gcc are no longer supported for all configurations.
+
+Maybe $(call cc-option,-mno-thumb-interwork,) would have been safer ?
+
+Guenter
+
+> support the flag:
+>   clang-5.0: error: unknown argument: '-mno-thumb-interwork'
 > 
-> Are these level or edge interrupts ? although I see DT says: IRQ_TYPE_NONE
-
-DT entries should be fixed to trigger on level HIGH like Florian and I 
-discussed on the mailing list yesterday. It looks like you are missing a 
-lot of discussions on the mailing list. Could you please help to make 
-sure you read all the existing discussions when commenting on a patch?
-
-> do you not need to clear interrupt status bits in IPROC_PCIE_INTX_CSR ?
+> Just drop -mno-thumb-interwork in AEABI configuration.
 > 
-
-RO
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index e83f5161fdd8..e9e3fde3c657 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -106,7 +106,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+>  tune-y := $(tune-y)
+>  
+>  ifeq ($(CONFIG_AEABI),y)
+> -CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
+> +CFLAGS_ABI	:=-mabi=aapcs-linux -mfpu=vfp
+>  else
+>  CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
+>  endif
