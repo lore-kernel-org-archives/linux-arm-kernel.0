@@ -1,97 +1,44 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:36 +0200
-Subject: [PATCH v2 27/27] ARM: dts: sun8i: r40: Enable HDMI output on BananaPi
- M2 Ultra
+Date: Tue, 12 Jun 2018 22:00:27 +0200
+Subject: [PATCH v2 18/27] dt-bindings: display: sun4i-drm: Add description of
+ A64 HDMI PHY
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-28-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-19-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since HDMI can be considered as main output, most capable mixer is
-connected to it (mixer0).
+A64 HDMI PHY is similar to H3 HDMI PHY except it has two possible PLL
+clock parents. It is compatible to other HDMI PHYs, like that found in
+R40.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 45 +++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 27d9ccd0ef2f..0ebc2f9a980e 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -58,6 +58,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index d84df6d808c2..6fb45c7a9ac8 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -101,6 +101,7 @@ DWC HDMI PHY
  
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun50i-a64-hdmi-phy
+     * allwinner,sun8i-a83t-hdmi-phy
+     * allwinner,sun8i-h3-hdmi-phy
+   - reg: base address and size of memory-mapped region
+@@ -111,8 +112,9 @@ Required properties:
+   - resets: phandle to the reset controller driving the PHY
+   - reset-names: must be "phy"
  
-@@ -93,6 +104,10 @@
- 	};
- };
+-H3 HDMI PHY requires additional clock:
++H3 and A64 HDMI PHY require additional clocks:
+   - pll-0: parent of phy clock
++  - pll-1: second possible phy clock parent (A64 only)
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -101,6 +116,16 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- 
-@@ -195,6 +220,26 @@
- 	status = "okay";
- };
- 
-+&tcon_top_hdmi_in_tcon_tv0 {
-+	remote-endpoint = <&tcon_tv0_out_tcon_top>;
-+};
-+
-+&tcon_top_mixer0_out_tcon_tv0 {
-+	remote-endpoint = <&tcon_tv0_in_tcon_top>;
-+};
-+
-+&tcon_tv0_in {
-+	tcon_tv0_in_tcon_top: endpoint {
-+		remote-endpoint = <&tcon_top_mixer0_out_tcon_tv0>;
-+	};
-+};
-+
-+&tcon_tv0_out {
-+	tcon_tv0_out_tcon_top: endpoint {
-+		remote-endpoint = <&tcon_top_hdmi_in_tcon_tv0>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+ TV Encoder
+ ----------
 -- 
 2.17.1
