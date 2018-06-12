@@ -1,71 +1,60 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 16:36:11 -0500
-Subject: [PATCH] ARM: DRA7/OMAP5: Enable ACTLR[0] (Enable invalidates of BTB)
- for secondary cores
-Message-ID: <20180612213611.2484-1-nm@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Jun 2018 15:39:22 -0600
+Subject: [RFC PATCH 1/3] Documentation: dt: keystone: ti-sci: Add
+ optional host-id parameter
+In-Reply-To: <20180605062640.3356-2-nm@ti.com>
+References: <20180605062640.3356-1-nm@ti.com> <20180605062640.3356-2-nm@ti.com>
+Message-ID: <20180612213922.GA26791@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call secure services to enable ACTLR[0] (Enable invalidates of BTB with
-ICIALLU) when branch hardening is enabled for kernel.
+On Tue, Jun 05, 2018 at 01:26:38AM -0500, Nishanth Menon wrote:
+> Texas Instrument's System Control Interface (TISCI) permits the
+> ability for Operating Systems to running in virtual machines to be
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+...for OSs running in virtual...
 
-Based on: next-20180612 +
-Uboot series posted:  https://marc.info/?l=u-boot&m=152883522011042&w=2
+> able to independently communicate with the firmware without the need
+> going through an hypervisor.
+> 
+> The "host-id" in effect is the hardware representation of the
+> host (example: VMs locked to a core) as identified to the System
+> Controller.
 
-With Just u-boot changes alone: OMAP5-uevm: https://pastebin.ubuntu.com/p/9yDM22bJ6n/
-with kernel changes added on: https://pastebin.ubuntu.com/p/gXPBGGYRPX/
+So the hypervisor will fill in host-id's for each VM instance?
 
- arch/arm/mach-omap2/omap-smp.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 69df3620eca5..28fc80ea675b 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -109,6 +109,32 @@ void omap5_erratum_workaround_801819(void)
- static inline void omap5_erratum_workaround_801819(void) { }
- #endif
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+static void omap5_harden_predictor(void)
-+{
-+	u32 acr, acr_mask;
-+
-+	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
-+
-+	/*
-+	 * BIT(0) - Disables streaming. All write-allocate lines allocate in
-+	 */
-+	acr_mask = BIT(0);
-+
-+	/* do we already have it done.. if yes, skip expensive smc */
-+	if ((acr & acr_mask) == acr_mask)
-+		return;
-+
-+	acr |= acr_mask;
-+	omap_smc1(OMAP5_DRA7_MON_SET_ACR_INDEX, acr);
-+
-+	pr_debug("%s: ARM ACR setup for CVE_2017_5715 applied on CPU%d\n",
-+		 __func__, smp_processor_id());
-+}
-+#else
-+static inline void omap5_harden_predictor(void) { }
-+#endif
-+
- static void omap4_secondary_init(unsigned int cpu)
- {
- 	/*
-@@ -131,6 +157,8 @@ static void omap4_secondary_init(unsigned int cpu)
- 		set_cntfreq();
- 		/* Configure ACR to disable streaming WA for 801819 */
- 		omap5_erratum_workaround_801819();
-+		/* Enable ACR to allow for ICUALLU workaround */
-+		omap5_harden_predictor();
- 	}
- 
- 	/*
--- 
-2.15.1
+> 
+> This is introduced as an optional parameter to maintain consistency
+> with legacy device tree blobs.
+> 
+> We call this with a vendor prefix to prevent any possible confusion
+> with SCSI ID (m68k) kernel option.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  Documentation/devicetree/bindings/arm/keystone/ti,sci.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> index 31f5f9a104cc..b56a02c10ae6 100644
+> --- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> +++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> @@ -45,11 +45,15 @@ Optional Properties:
+>  	debug_messages - Map the Debug message region
+>  - reg:  register space corresponding to the debug_messages
+>  - ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
+> +- ti,host-id: Integer value corresponding to the host ID assigned by Firmware
+> +	for identification of host processing entities such as virtual
+> +	machines
+>  
+>  Example (K2G):
+>  -------------
+>  	pmmc: pmmc {
+>  		compatible = "ti,k2g-sci";
+> +		ti,host-id = <2>;
+>  		mbox-names = "rx", "tx";
+>  		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
+>  			<&msgmgr &msgmgr_proxy_pmmc_tx>;
+> -- 
+> 2.15.1
+> 
