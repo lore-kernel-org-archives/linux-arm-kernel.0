@@ -1,94 +1,55 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 15:24:08 -0500
-Subject: [PATCH 1/4] ARM: Introduce ability to enable ACR::IBE on Cortex-A8
- for CVE-2017-5715
-In-Reply-To: <20180612202411.29798-1-nm@ti.com>
-References: <20180612202411.29798-1-nm@ti.com>
-Message-ID: <20180612202411.29798-2-nm@ti.com>
+Date: Tue, 12 Jun 2018 15:24:07 -0500
+Subject: [PATCH 0/4] ARM: Provide workaround setup bits for CVE-2017-5715
+ (A8/A15)
+Message-ID: <20180612202411.29798-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As recommended by Arm in [1], IBE[2] has to be enabled unconditionally
-for BPIALL to be functional on Cortex-A8 processors. Provide a config
-option for platforms to enable this option based on impact analysis
-for products.
+Hi,
 
-NOTE: This patch in itself is NOT the final solution, this requires:
-a) Implementation of v7_arch_cp15_set_acr on SoCs which may not
-   provide direct access to ACR register.
-b) Operating Systems such as Linux to provide adequate workaround in the right
-   locations.
-c) This workaround applies to only the boot processor. It is important
-   to apply workaround as necessary (context-save-restore) around low
-   power context loss OR additional processors as necessary in either
-   firmware support OR elsewhere in OS.
+This is a follow on from https://marc.info/?l=u-boot&m=151691688828176&w=2 (RFC)
 
-[1] https://developer.arm.com/support/security-update
-[2] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0344k/Bgbffjhh.html
+NOTE:
+* As per ARM recommendations[2], and discussions in list[1] ARM
+  Cortex-A9/12/17 do not need additional steps in u-boot to enable the
+  OS level workarounds.
+* This itself is'nt a complete solution and is based on recommendation
+  This from Arm[2] for variant 2 CVE-2017-5715 -> Kernel changes can be seen on
+  linux next (next-20180612) or on linux master (upcoming v4.18-rc1 tag).
+* I think it is necessary on older SoCs without firmware support
+  (such as older OMAPs and AM*) to have kernel support mirroring what we do in
+  u-boot to support additional cores AND/OR low power states where contexts are
+  lost (assuming ACR states are'nt saved). just my 2 cents.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Andre Przywara <Andre.Przywara@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Tom Rini <trini@konsulko.com>
-Cc: Michael Nazzareno Trimarchi <michael@amarulasolutions.com>
+Few of the tests (with linux next-20180612):
+AM571-IDK: https://pastebin.ubuntu.com/p/sr5X6sN3Tr/ (single core A15)
+OMAP5-uEVM: https://pastebin.ubuntu.com/p/9yDM22bJ6n/ (dual core A15)
+OMAP3-beagle-xm: https://pastebin.ubuntu.com/p/9DfDkpyxym/ (Single A8)
+AM335x-Beaglebone-black: https://pastebin.ubuntu.com/p/DczT9jPMwb/ (Single A8)
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/Kconfig           | 5 +++++
- arch/arm/cpu/armv7/start.S | 7 +++++--
- 2 files changed, 10 insertions(+), 2 deletions(-)
+Nishanth Menon (4):
+  ARM: Introduce ability to enable ACR::IBE on Cortex-A8 for
+    CVE-2017-5715
+  ARM: Introduce ability to enable invalidate of BTB with ICIALLU on
+    Cortex-A15 for CVE-2017-5715
+  ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable invalidates of
+    BTB) to facilitate CVE_2017-5715 WA in OS
+  ARM: mach-omap2: omap3/am335x: Enable ACR::IBE on Cortex-A8 SoCs for
+    CVE-2017-5715
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index dde422bc5d53..9e32d5b43cb0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -108,6 +108,8 @@ config SYS_ARM_MPU
- # CONFIG_ARM_ERRATA_621766
- # CONFIG_ARM_ERRATA_798870
- # CONFIG_ARM_ERRATA_801819
-+# CONFIG_ARM_CORTEX_A8_CVE_2017_5715
-+
- config ARM_ERRATA_430973
- 	bool
- 
-@@ -177,6 +179,9 @@ config ARM_ERRATA_852423
- config ARM_ERRATA_855873
- 	bool
- 
-+config ARM_CORTEX_A8_CVE_2017_5715
-+	bool
-+
- config CPU_ARM720T
- 	bool
- 	select SYS_CACHE_SHIFT_5
-diff --git a/arch/arm/cpu/armv7/start.S b/arch/arm/cpu/armv7/start.S
-index c996525f861e..3beaf5a93d81 100644
---- a/arch/arm/cpu/armv7/start.S
-+++ b/arch/arm/cpu/armv7/start.S
-@@ -252,12 +252,15 @@ skip_errata_801819:
- 	pop	{r1-r5}			@ Restore the cpu info - fall through
- #endif
- 
--#ifdef CONFIG_ARM_ERRATA_430973
-+#if defined(CONFIG_ARM_ERRATA_430973) || defined (CONFIG_ARM_CORTEX_A8_CVE_2017_5715)
- 	mrc	p15, 0, r0, c1, c0, 1	@ Read ACR
- 
-+#ifdef CONFIG_ARM_CORTEX_A8_CVE_2017_5715
-+	orr	r0, r0, #(0x1 << 6)	@ Set IBE bit always to enable OS WA
-+#else
- 	cmp	r2, #0x21		@ Only on < r2p1
- 	orrlt	r0, r0, #(0x1 << 6)	@ Set IBE bit
--
-+#endif
- 	push	{r1-r5}			@ Save the cpu info registers
- 	bl	v7_arch_cp15_set_acr
- 	pop	{r1-r5}			@ Restore the cpu info - fall through
+ arch/arm/Kconfig            |  9 +++++++++
+ arch/arm/cpu/armv7/start.S  | 15 +++++++++++++--
+ arch/arm/mach-omap2/Kconfig |  3 +++
+ 3 files changed, 25 insertions(+), 2 deletions(-)
+
+[1] https://marc.info/?t=151639906500002&r=1&w=2
+[2] https://developer.arm.com/support/security-update
+[3] https://marc.info/?t=151543790400007&r=1&w=2 and the latest in:
+	https://marc.info/?l=linux-arm-kernel&m=151689379521082&w=2
+[4]
+	https://github.com/ARM-software/arm-trusted-firmware/wiki/ARM-Trusted-Firmware-Security-Advisory-TFV-6
+	https://www.op-tee.org/security-advisories/
+	https://www.linaro.org/blog/meltdown-spectre/
 -- 
 2.15.1
