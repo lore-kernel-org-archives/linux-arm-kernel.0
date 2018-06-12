@@ -1,134 +1,93 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 12 Jun 2018 15:14:28 +0200
-Subject: [PATCH 07/19] mmc: mmci: add variant property to define dpsm bit
+Date: Tue, 12 Jun 2018 15:14:33 +0200
+Subject: [PATCH 12/19] mmc: mmci: add variant property to request a reset
 In-Reply-To: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
 References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1528809280-31116-8-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1528809280-31116-13-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds datactrl variant property to define
-dpsm enable bit. Needed to support the STM32 variant
-(STM32 has no dpsm enable bit).
+Some variants could require a reset.
+STM32 sdmmc variant needs to reset hardware block
+during the power cycle procedure (for re-initialization)
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 15 ++++++++++++---
- drivers/mmc/host/mmci.h |  2 ++
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/mmc/mmci.txt | 2 ++
+ drivers/mmc/host/mmci.c                        | 9 +++++++++
+ drivers/mmc/host/mmci.h                        | 4 ++++
+ 3 files changed, 15 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+index 03796cf..e952707 100644
+--- a/Documentation/devicetree/bindings/mmc/mmci.txt
++++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+@@ -11,6 +11,8 @@ Required properties:
+ - compatible             : contains "arm,pl18x", "arm,primecell".
+ - vmmc-supply            : phandle to the regulator device tree node, mentioned
+                            as the VCC/VDD supply in the eMMC/SD specs.
++depend of variant:
++- resets                 : phandle to internal reset line.
+ 
+ Optional properties:
+ - arm,primecell-periphid : contains the PrimeCell Peripheral ID, it overrides
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 52562fc..1f44c61 100644
+index 9c00804..87724e1 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -57,6 +57,7 @@ static struct variant_data variant_arm = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.reversed_irq_handling	= true,
-@@ -75,6 +76,7 @@ static struct variant_data variant_arm_extended_fifo = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
-@@ -93,6 +95,7 @@ static struct variant_data variant_arm_extended_fifo_hwfc = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
-@@ -112,6 +115,7 @@ static struct variant_data variant_u300 = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
- 	.st_sdio			= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
-@@ -136,6 +140,7 @@ static struct variant_data variant_nomadik = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
- 	.st_sdio		= true,
- 	.st_clkdiv		= true,
-@@ -163,6 +168,7 @@ static struct variant_data variant_ux500 = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
- 	.st_sdio		= true,
- 	.st_clkdiv		= true,
-@@ -195,6 +201,7 @@ static struct variant_data variant_ux500v2 = {
- 	.datactrl_mask_ddrmode	= MCI_DPSM_ST_DDRMODE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
- 	.st_sdio		= true,
- 	.st_clkdiv		= true,
-@@ -227,6 +234,7 @@ static struct variant_data variant_stm32 = {
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
- 	.st_sdio		= true,
- 	.st_clkdiv		= true,
-@@ -253,6 +261,7 @@ static struct variant_data variant_qcom = {
- 	.blksz_datactrl4	= true,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
-+	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 208000000,
- 	.explicit_mclk_control	= true,
-@@ -564,11 +573,11 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	BUG_ON(1 << blksz_bits != data->blksz);
+@@ -37,6 +37,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/reset.h>
  
- 	if (variant->blksz_datactrl16)
--		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
-+		datactrl = variant->datactrl_dpsm_enable | (data->blksz << 16);
- 	else if (variant->blksz_datactrl4)
--		datactrl = MCI_DPSM_ENABLE | (data->blksz << 4);
-+		datactrl = variant->datactrl_dpsm_enable | (data->blksz << 4);
- 	else
--		datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
-+		datactrl = variant->datactrl_dpsm_enable | blksz_bits << 4;
+ #include <asm/div64.h>
+ #include <asm/io.h>
+@@ -1445,6 +1446,14 @@ static int mmci_probe(struct amba_device *dev,
  
- 	if (data->flags & MMC_DATA_READ)
- 		datactrl |= MCI_DPSM_DIRECTION;
+ 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+ 
++	if (variant->reset) {
++		host->rst = devm_reset_control_get_exclusive(&dev->dev, NULL);
++		if (IS_ERR(host->rst)) {
++			ret = PTR_ERR(host->rst);
++			goto clk_disable;
++		}
++	}
++
+ 	/* Get regulators and the supported OCR mask */
+ 	ret = mmc_regulator_get_supply(mmc);
+ 	if (ret)
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index e173305..a2bf8bc 100644
+index 30d3f53..2d7e901 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -258,6 +258,7 @@ struct mmci_host;
-  *		     register
-  * @datactrl_mask_sdio: SDIO enable mask in datactrl register
-  * @datactrl_blksz: block size in power of two
-+ * @datactrl_dpsm_enable: enable value for DPSM
-  * @pwrreg_powerup: power up value for MMCIPOWER register
-  * @f_max: maximum clk frequency supported by the controller.
-  * @signal_direction: input/out direction of bus signals can be indicated
-@@ -297,6 +298,7 @@ struct variant_data {
- 	unsigned int		datactrl_mask_ddrmode;
- 	unsigned int		datactrl_mask_sdio;
- 	unsigned int		datactrl_blocksz;
-+	unsigned int		datactrl_dpsm_enable;
- 	bool			st_sdio;
- 	bool			st_clkdiv;
- 	bool			blksz_datactrl16;
+@@ -284,6 +284,7 @@ struct mmci_host;
+  *	       register.
+  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
+  * @mmci_dma: Pointer to platform-specific DMA callbacks.
++ * @reset: true if variant has need reset signal.
+  * @validate_data: if hardware block has specific constraint on validate data
+  * @set_clk_ios: if clock procedure of variant is specific
+  * @set_pwr_ios: if power procedure of variant is specific
+@@ -329,6 +330,7 @@ struct variant_data {
+ 	u32			start_err;
+ 	u32			opendrain;
+ 	struct mmci_dma_ops	*mmci_dma;
++	bool			reset;
+ 	int (*validate_data)(struct mmci_host *host, struct mmc_data *data);
+ 	void (*set_clkreg)(struct mmci_host *host, unsigned int desired);
+ 	void (*set_pwrreg)(struct mmci_host *host, unsigned char power_mode,
+@@ -345,6 +347,8 @@ struct mmci_host {
+ 	struct clk		*clk;
+ 	bool			singleirq;
+ 
++	struct reset_control	*rst;
++
+ 	spinlock_t		lock;
+ 
+ 	unsigned int		mclk;
 -- 
 2.7.4
