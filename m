@@ -1,54 +1,55 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Jun 2018 15:06:41 -0600
-Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
- controller
-In-Reply-To: <20180605060125.9518-4-nm@ti.com>
-References: <20180605060125.9518-1-nm@ti.com> <20180605060125.9518-4-nm@ti.com>
-Message-ID: <20180612210640.GA20728@rob-hp-laptop>
+Date: Tue, 12 Jun 2018 15:11:28 -0600
+Subject: [RFC PATCH 5/8] dt-bindings: mailbox: ti,message-manager: Add
+ support for secure proxy threads
+In-Reply-To: <20180605061629.4759-6-nm@ti.com>
+References: <20180605061629.4759-1-nm@ti.com> <20180605061629.4759-6-nm@ti.com>
+Message-ID: <20180612211128.GA22038@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2018 at 01:01:22AM -0500, Nishanth Menon wrote:
-> AM654 uses a UART controller that is compatible (partially) with
-> existing 8250 UART, however, has a few differences with respect to DMA
-> support and control paths. Introduce a base definition that allows us
-> to build up the differences in follow on patches.
+On Tue, Jun 05, 2018 at 01:16:26AM -0500, Nishanth Menon wrote:
+> Secure Proxy is another communication scheme in Texas Instrument's
+> devices intended to provide an unique communication path from various
+> processors in the System on Chip(SoC) to a central System Controller.
 > 
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Vignesh R <vigneshr@ti.com>
+> Secure proxy is, in effect, an evolution of current generation Message
+> Manager hardware block found in K2G devices. However the following
+> changes have taken place:
+> 
+> Secure Proxy instance exposes "threads" or "proxies" which is
+> primary representation of "a" communication channel. Each thread is
+> preconfigured by System controller configuration based on SoC usage
+> requirements. Secure proxy by itself represents a single "queue" of
+> communication but allows the proxies to be independently operated.
+> 
+> Each Secure proxy thread can uniquely have their own error and threshold
+> interrupts allowing for more fine control of IRQ handling.
+> 
+> Provide an hardware description of the same for device tree
+> representation.
+> 
+> See AM65x Technical Reference Manual (SPRUID7, April 2018)
+> for further details: http://www.ti.com/lit/pdf/spruid7
+> 
 > Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
->  Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
->  drivers/tty/serial/8250/8250_omap.c                      | 1 +
->  2 files changed, 2 insertions(+)
+>  .../bindings/mailbox/ti,message-manager.txt        | 58 +++++++++++++++++++---
+>  1 file changed, 50 insertions(+), 8 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
-> index 4b0f05adb228..c35d5ece1156 100644
-> --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
-> +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
-> @@ -1,6 +1,7 @@
->  OMAP UART controller
+> diff --git a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+> index ebf0e3710cee..de796e90cac6 100644
+> --- a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+> +++ b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+> @@ -7,22 +7,40 @@ manager is broken up into queues in different address regions that are called
+>  "proxies" - each instance is unidirectional and is instantiated at SoC
+>  integration level to indicate receive or transmit path.
 >  
->  Required properties:
-> +- compatible : should be "ti,am654-uart" for AM654 controllers
+> +This can also be used to describe Texas Instrument's Secure Proxy
+> +controller that allows for individually configurable "threads" or
+> +"proxies" which allow for independent communication scheme.
 
-Not compatible with any existing TI 8250 UARTs?
+There seems to be very little re-use here. I think I would make this 
+its own doc.
 
->  - compatible : should be "ti,omap2-uart" for OMAP2 controllers
->  - compatible : should be "ti,omap3-uart" for OMAP3 controllers
->  - compatible : should be "ti,omap4-uart" for OMAP4 controllers
-> diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-> index 1b337fee07ed..a019286f8bb6 100644
-> --- a/drivers/tty/serial/8250/8250_omap.c
-> +++ b/drivers/tty/serial/8250/8250_omap.c
-> @@ -1115,6 +1115,7 @@ static const u8 am3352_habit = OMAP_DMA_TX_KICK | UART_ERRATA_CLOCK_DISABLE;
->  static const u8 dra742_habit = UART_ERRATA_CLOCK_DISABLE;
->  
->  static const struct of_device_id omap8250_dt_ids[] = {
-> +	{ .compatible = "ti,am654-uart" },
->  	{ .compatible = "ti,omap2-uart" },
->  	{ .compatible = "ti,omap3-uart" },
->  	{ .compatible = "ti,omap4-uart", .data = &omap4_habit, },
-> -- 
-> 2.15.1
-> 
+Rob
