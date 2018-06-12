@@ -1,70 +1,127 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 12 Jun 2018 15:14:40 +0200
-Subject: [PATCH 19/19] mmc: mmci: add stm32 sdmmc variant
+Date: Tue, 12 Jun 2018 15:14:36 +0200
+Subject: [PATCH 15/19] mmc: mmci: add stm32 sdmmc registers
 In-Reply-To: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
 References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1528809280-31116-20-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1528809280-31116-16-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds a stm32 sdmmc variant, rev 1.1.
-Introduces a new Manufacturer id "0x53, ascii 'S' to define
-new stm32 sdmmc familly with clean range of amba
-revision/configurations bits (corresponding to sdmmc_ver
-register with major/minor fields).
+This patch adds stm32 sdmmc specific registers.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/mmc/host/mmci.h | 56 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index af27a0a..bed671d 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -267,6 +267,29 @@ static struct variant_data variant_stm32 = {
- 	.mmci_dma		= &dmaengine,
- };
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 227927e..c2ad724 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -23,6 +23,14 @@
+ #define MCI_ST_DATA31DIREN	(1 << 5)
+ #define MCI_ST_FBCLKEN		(1 << 7)
+ #define MCI_ST_DATA74DIREN	(1 << 8)
++/*
++ * The STM32 sdmmc does not have PWR_UP/OD/ROD
++ * and uses the power register for
++ */
++#define MCI_STM32_PWR_CYC	0x02
++#define MCI_STM32_VSWITCH	BIT(2)
++#define MCI_STM32_VSWITCHEN	BIT(3)
++#define MCI_STM32_DIRPOL	BIT(4)
  
-+static struct variant_data variant_stm32_sdmmc = {
-+	.fifosize		= 16 * 4,
-+	.fifohalfsize		= 8 * 4,
-+	.f_max			= 208000000,
-+	.stm32_clkdiv		= true,
-+	.reset			= true,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_STM32_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_STM32_LRSP_CRC,
-+	.cmdreg_srsp_crc	= MCI_CPSM_STM32_SRSP_CRC,
-+	.cmdreg_srsp		= MCI_CPSM_STM32_SRSP,
-+	.cmdreg_stop		= MCI_CPSM_STM32_CMDSTOP,
-+	.data_cmd_enable	= MCI_CPSM_STM32_CMDTRANS,
-+	.irq_pio_mask		= MCI_IRQ_PIO_STM32_MASK,
-+	.datactrl_first		= true,
-+	.datalength_bits	= 25,
-+	.datactrl_blocksz	= 14,
-+	.mmci_dma		= &sdmmc_idma,
-+	.stm32_idmabsize_mask	= GENMASK(12, 5),
-+	.validate_data		= sdmmc_idma_validate_data,
-+	.set_clkreg		= mmci_sdmmc_set_clkreg,
-+	.set_pwrreg		= mmci_sdmmc_set_pwrreg,
-+};
+ #define MMCICLOCK		0x004
+ #define MCI_CLK_ENABLE		(1 << 8)
+@@ -50,6 +58,19 @@
+ #define MCI_QCOM_CLK_SELECT_IN_FBCLK	BIT(15)
+ #define MCI_QCOM_CLK_SELECT_IN_DDR_MODE	(BIT(14) | BIT(15))
+ 
++/* Modified on STM32 sdmmc */
++#define MCI_STM32_CLK_CLKDIV_MSK	GENMASK(9, 0)
++#define MCI_STM32_CLK_WIDEBUS_4		BIT(14)
++#define MCI_STM32_CLK_WIDEBUS_8		BIT(15)
++#define MCI_STM32_CLK_NEGEDGE		BIT(16)
++#define MCI_STM32_CLK_HWFCEN		BIT(17)
++#define MCI_STM32_CLK_DDR		BIT(18)
++#define MCI_STM32_CLK_BUSSPEED		BIT(19)
++#define MCI_STM32_CLK_SEL_MSK		GENMASK(21, 20)
++#define MCI_STM32_CLK_SELCK		(0 << 20)
++#define MCI_STM32_CLK_SELCKIN		(1 << 20)
++#define MCI_STM32_CLK_SELFBCK		(2 << 20)
 +
- static struct variant_data variant_qcom = {
- 	.fifosize		= 16 * 4,
- 	.fifohalfsize		= 8 * 4,
-@@ -1907,6 +1930,11 @@ static const struct amba_id mmci_ids[] = {
- 		.mask   = 0x00ffffff,
- 		.data	= &variant_stm32,
- 	},
-+	{
-+		.id     = 0x10153180,
-+		.mask	= 0xf0ffffff,
-+		.data	= &variant_stm32_sdmmc,
-+	},
- 	/* Qualcomm variants */
- 	{
- 		.id     = 0x00051180,
+ #define MMCIARGUMENT		0x008
+ 
+ /* The command register controls the Command Path State Machine (CPSM) */
+@@ -72,6 +93,15 @@
+ #define MCI_CPSM_QCOM_CCSDISABLE	BIT(15)
+ #define MCI_CPSM_QCOM_AUTO_CMD19	BIT(16)
+ #define MCI_CPSM_QCOM_AUTO_CMD21	BIT(21)
++/* Command register in STM32 sdmmc versions */
++#define MCI_CPSM_STM32_CMDTRANS		BIT(6)
++#define MCI_CPSM_STM32_CMDSTOP		BIT(7)
++#define MCI_CPSM_STM32_WAITRESP_MASK	GENMASK(9, 8)
++#define MCI_CPSM_STM32_NORSP		(0 << 8)
++#define MCI_CPSM_STM32_SRSP_CRC		(1 << 8)
++#define MCI_CPSM_STM32_SRSP		(2 << 8)
++#define MCI_CPSM_STM32_LRSP_CRC		(3 << 8)
++#define MCI_CPSM_STM32_ENABLE		BIT(12)
+ 
+ #define MMCIRESPCMD		0x010
+ #define MMCIRESPONSE0		0x014
+@@ -130,6 +160,8 @@
+ #define MCI_ST_SDIOIT		(1 << 22)
+ #define MCI_ST_CEATAEND		(1 << 23)
+ #define MCI_ST_CARDBUSY		(1 << 24)
++/* Extended status bits for the STM32 variants */
++#define MCI_STM32_BUSYD0	BIT(20)
+ 
+ #define MMCICLEAR		0x038
+ #define MCI_CMDCRCFAILCLR	(1 << 0)
+@@ -175,11 +207,32 @@
+ #define MCI_ST_SDIOITMASK	(1 << 22)
+ #define MCI_ST_CEATAENDMASK	(1 << 23)
+ #define MCI_ST_BUSYENDMASK	(1 << 24)
++/* Extended status bits for the STM32 variants */
++#define MCI_STM32_BUSYD0ENDMASK	BIT(21)
+ 
+ #define MMCIMASK1		0x040
+ #define MMCIFIFOCNT		0x048
+ #define MMCIFIFO		0x080 /* to 0x0bc */
+ 
++/* STM32 sdmmc registers for IDMA (Internal DMA) */
++#define MMCI_STM32_IDMACTRLR	0x050
++#define MMCI_STM32_IDMAEN	BIT(0)
++#define MMCI_STM32_IDMALLIEN	BIT(1)
++
++#define MMCI_STM32_IDMABSIZER		0x054
++#define MMCI_STM32_IDMABNDT_SHIFT	5
++#define MMCI_STM32_IDMABNDT_MASK	GENMASK(12, 5)
++
++#define MMCI_STM32_IDMABASE0R	0x058
++
++#define MMCI_STM32_IDMALAR	0x64
++#define MMCI_STM32_IDMALA_MASK	GENMASK(13, 0)
++#define MMCI_STM32_ABR		BIT(29)
++#define MMCI_STM32_ULS		BIT(30)
++#define MMCI_STM32_ULA		BIT(31)
++
++#define MMCI_STM32_IDMABAR	0x68
++
+ #define MCI_IRQENABLE	\
+ 	(MCI_CMDCRCFAILMASK | MCI_DATACRCFAILMASK | MCI_CMDTIMEOUTMASK | \
+ 	MCI_DATATIMEOUTMASK | MCI_TXUNDERRUNMASK | MCI_RXOVERRUNMASK |	\
+@@ -190,6 +243,9 @@
+ 	(MCI_RXFIFOHALFFULLMASK | MCI_RXDATAAVLBLMASK | \
+ 	 MCI_TXFIFOHALFEMPTYMASK)
+ 
++#define MCI_IRQ_PIO_STM32_MASK \
++	(MCI_RXFIFOHALFFULLMASK | MCI_TXFIFOHALFEMPTYMASK)
++
+ #define NR_SG		128
+ 
+ #define MMCI_PINCTRL_STATE_OPENDRAIN "opendrain"
 -- 
 2.7.4
