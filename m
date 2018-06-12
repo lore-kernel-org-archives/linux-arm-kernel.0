@@ -1,50 +1,49 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 12 Jun 2018 16:26:01 +0200
-Subject: [PATCH v4 1/6] dt-bindings: media: rcar-vin: Describe optional ep
- properties
+Date: Tue, 12 Jun 2018 16:26:03 +0200
+Subject: [PATCH v4 3/6] media: v4l2-fwnode: parse 'data-enable-active' prop
 In-Reply-To: <1528813566-17927-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1528813566-17927-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1528813566-17927-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1528813566-17927-4-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the optional endpoint properties for endpoint nodes of port at 0
-and port at 1 of the R-Car VIN driver device tree bindings documentation.
+Parse the newly defined 'data-enable-active' property in parallel endpoint
+parsing function.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- Documentation/devicetree/bindings/media/rcar_vin.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/media/v4l2-core/v4l2-fwnode.c | 4 ++++
+ include/media/v4l2-mediabus.h         | 2 ++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-index a19517e1..87f93ec 100644
---- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-+++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-@@ -53,6 +53,14 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
-       from external SoC pins described in video-interfaces.txt[1].
-       Describing more then one endpoint in port 0 is invalid. Only VIN
-       instances that are connected to external pins should have port 0.
-+
-+      - Optional properties for endpoint nodes of port at 0:
-+        - hsync-active: see [1] for description. Default is active high.
-+        - vsync-active: see [1] for description. Default is active high.
-+
-+        If both HSYNC and VSYNC polarities are not specified, embedded
-+        synchronization is selected.
-+
-     - port 1 - sub-nodes describing one or more endpoints connected to
-       the VIN from local SoC CSI-2 receivers. The endpoint numbers must
-       use the following schema.
-@@ -62,6 +70,8 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
-         - Endpoint 2 - sub-node describing the endpoint connected to CSI40
-         - Endpoint 3 - sub-node describing the endpoint connected to CSI41
+diff --git a/drivers/media/v4l2-core/v4l2-fwnode.c b/drivers/media/v4l2-core/v4l2-fwnode.c
+index 3f77aa3..6105191 100644
+--- a/drivers/media/v4l2-core/v4l2-fwnode.c
++++ b/drivers/media/v4l2-core/v4l2-fwnode.c
+@@ -154,6 +154,10 @@ static void v4l2_fwnode_endpoint_parse_parallel_bus(
+ 		flags |= v ? V4L2_MBUS_VIDEO_SOG_ACTIVE_HIGH :
+ 			V4L2_MBUS_VIDEO_SOG_ACTIVE_LOW;
  
-+      Endpoint nodes of port at 1 do not support any optional endpoint property.
++	if (!fwnode_property_read_u32(fwnode, "data-enable-active", &v))
++		flags |= v ? V4L2_MBUS_DATA_ENABLE_HIGH :
++			V4L2_MBUS_DATA_ENABLE_LOW;
 +
- Device node example for Gen2 platforms
- --------------------------------------
+ 	bus->flags = flags;
  
+ }
+diff --git a/include/media/v4l2-mediabus.h b/include/media/v4l2-mediabus.h
+index 4d8626c..4bbb5f3 100644
+--- a/include/media/v4l2-mediabus.h
++++ b/include/media/v4l2-mediabus.h
+@@ -45,6 +45,8 @@
+ /* Active state of Sync-on-green (SoG) signal, 0/1 for LOW/HIGH respectively. */
+ #define V4L2_MBUS_VIDEO_SOG_ACTIVE_HIGH		BIT(12)
+ #define V4L2_MBUS_VIDEO_SOG_ACTIVE_LOW		BIT(13)
++#define V4L2_MBUS_DATA_ENABLE_HIGH		BIT(14)
++#define V4L2_MBUS_DATA_ENABLE_LOW		BIT(15)
+ 
+ /* Serial flags */
+ /* How many lanes the client can use */
 -- 
 2.7.4
