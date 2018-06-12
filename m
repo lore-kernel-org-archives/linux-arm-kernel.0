@@ -1,52 +1,74 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Tue, 12 Jun 2018 18:45:53 +0300
-Subject: [PATCH v4 6/6] dt-bindings: media: rcar-vin: Clarify optional
- props
-In-Reply-To: <1528813566-17927-7-git-send-email-jacopo+renesas@jmondi.org>
-References: <1528813566-17927-1-git-send-email-jacopo+renesas@jmondi.org>
- <1528813566-17927-7-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180612154553.kgqnqkwv3y6srivg@kekkonen.localdomain>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 12 Jun 2018 23:48:16 +0800
+Subject: [PATCH RESEND v4 2/2] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+In-Reply-To: <6887237f-d252-5b9e-02cb-5a44fef27080@arm.com>
+References: <1528487320-2873-1-git-send-email-gengdongjiu@huawei.com>
+ <1528487320-2873-3-git-send-email-gengdongjiu@huawei.com>
+ <45e94aae-ed9f-1fb7-f10e-d95c2f969ddd@arm.com>
+ <f7f59176-16a1-3b24-5acc-87bf1b4c1490@huawei.com>
+ <6887237f-d252-5b9e-02cb-5a44fef27080@arm.com>
+Message-ID: <2455dc33-ae8d-79e6-e915-4181050e1e65@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
 
-On Tue, Jun 12, 2018 at 04:26:06PM +0200, Jacopo Mondi wrote:
-> Add a note to the R-Car VIN interface bindings to clarify that all
-> properties listed as generic properties in video-interfaces.txt can
-> be included in port at 0 endpoint, but if not explicitly listed in the
-> interface bindings documentation, they do not modify it behaviour.
+
+On 2018/6/12 23:29, James Morse wrote:
+> Hi gengdongjiu,
 > 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
+> On 12/06/18 15:50, gengdongjiu wrote:
+>> On 2018/6/11 21:36, James Morse wrote:
+>>> On 08/06/18 20:48, Dongjiu Geng wrote:
+>>>> For the migrating VMs, user space may need to know the exception
+>>>> state. For example, in the machine A, KVM make an SError pending,
+>>>> when migrate to B, KVM also needs to pend an SError.
+>>>>
+>>>> This new IOCTL exports user-invisible states related to SError.
+>>>> Together with appropriate user space changes, user space can get/set
+>>>> the SError exception state to do migrate/snapshot/suspend.
 > 
-> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> index 8130849..03544c7 100644
-> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> @@ -55,6 +55,12 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
->        instances that are connected to external pins should have port 0.
->  
->        - Optional properties for endpoint nodes of port at 0:
-> +
-> +        All properties described in [1] and which apply to the selected
-> +        media bus type could be optionally listed here to better describe
-> +        the current hardware configuration, but only the following ones do
-> +        actually modify the VIN interface behaviour:
-> +
-
-I don't think this should be needed. You should only have properties that
-describe the hardware configuration in a given system.
-
->          - hsync-active: see [1] for description. Default is active high.
->          - vsync-active: see [1] for description. Default is active high.
->          - data-enable-active: polarity of CLKENB signal, see [1] for
-> -- 
-> 2.7.4
 > 
+>>>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>>>> index caae484..c3e6975 100644
+>>>> --- a/arch/arm/include/uapi/asm/kvm.h
+>>>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>>>> @@ -124,6 +124,18 @@ struct kvm_sync_regs {
+>>>>  struct kvm_arch_memory_slot {
+>>>>  };
+>>>>  
+>>>> +/* for KVM_GET/SET_VCPU_EVENTS */
+>>>> +struct kvm_vcpu_events {
+>>>> +	struct {
+>>>> +		__u8 serror_pending;
+>>>> +		__u8 serror_has_esr;
+>>>> +		/* Align it to 8 bytes */
+>>>> +		__u8 pad[6];
+>>>> +		__u64 serror_esr;
+>>>> +	} exception;
+>>>> +	__u32 reserved[12];
+>>>> +};
+>>>> +
+>>>
+>>> You haven't defined __KVM_HAVE_VCPU_EVENTS for 32bit, so presumably this struct
+>>> will never be used. Why is it here?
+> 
+>>   if not add it for 32 bits. the 32 arm platform will build Fail, whether you have good
+>>    idea to avoid this Failure if not add this struct for the 32 bit?
+> 
+> How does this 32bit code build without this patch?
+> If do you provide the struct, how will that code build with older headers?
+> 
+> As far as I can see, this is what the __KVM_HAVE_VCPU_EVENTS define is for.
+> 
+> This should be both, or neither. Having just the struct is useless.
+It because the caller of kvm_arm_vcpu_get/set_events() is in "virt/kvm/arm/arm.c".
+the virt/kvm/arm/arm.c will used by both arm64 and arm.
+so It needs to add kvm_arm_vcpu_get/set_events() for the 32 bits, however, kvm_arm_vcpu_get/set_events() will directly return,
 
--- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+I attached the build erros below:
+https://lkml.org/lkml/2018/6/4/918
+https://lkml.org/lkml/2018/6/4/873
+
+
+[..]
+I will continue check below comments, thanks
