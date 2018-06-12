@@ -1,52 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 12 Jun 2018 14:18:03 +0200
-Subject: handling voice calls in ALSA soc (on Droid 4)
-In-Reply-To: <20180611121548.GB11580@sirena.org.uk>
-References: <20180611102529.GA1272@amd> <20180611111011.GA11580@sirena.org.uk>
- <20180611120158.GA21745@amd> <20180611121548.GB11580@sirena.org.uk>
-Message-ID: <20180612121803.GA9707@amd>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 12 Jun 2018 14:42:12 +0200
+Subject: [PATCH v7 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180517055014.6607-4-o.rempel@pengutronix.de>
+References: <20180517055014.6607-1-o.rempel@pengutronix.de>
+ <20180517055014.6607-4-o.rempel@pengutronix.de>
+Message-ID: <daba73df-037c-2583-3a08-f3f27c4129d1@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Rafael,
 
-Sebastian, would you have pointer to original Motorola sources you
-used for inspiration?
+Last version of this patch was send at 17.05.2018. No other comment was
+provided and this patch is a blocker for other patches in this serie.
+Can you please give some feedback on it.
 
-> > With setup like that, how does userland tell kernel that the baseband
-> > <-> microphone/speaker connection should be activated?
+On 17.05.2018 07:50, Oleksij Rempel wrote:
+> Export pm_power_off_prepare. It is needed to implement power off on
+> Freescale/NXP iMX6 based boards with external power management
+> integrated circuit (PMIC).
 > 
-> Audio routing should be done as normal, and ideally the driver for the
-> modem will be able to figure out if there's an active call or not.  If
-> userspace has to enable the input and output manually then you can set
-> up SOC_DAPM_PIN_SWITCH()es as normal.
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  kernel/reboot.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/kernel/reboot.c b/kernel/reboot.c
+> index e4ced883d8de..83810d726f3e 100644
+> --- a/kernel/reboot.c
+> +++ b/kernel/reboot.c
+> @@ -49,6 +49,7 @@ int reboot_force;
+>   */
+>  
+>  void (*pm_power_off_prepare)(void);
+> +EXPORT_SYMBOL_GPL(pm_power_off_prepare);
+>  
+>  /**
+>   *	emergency_restart - reboot the system
+> 
 
-Modem talks AT commands, so the driver is in userspace for now.
-
-I tried SOC_DAPM_PIN_SWITCH(), but it results in alsamixer oopsing, I
-guess I'm doing something wrong.
-
-Message from syslogd at devuan at Jun 12 13:51:31 ...
- kernel:[  743.678588] BUG: spinlock bad magic on CPU#1,
- alsamixer/2217
-
-Message from syslogd at devuan at Jun 12 13:51:31 ...
- kernel:[  743.684417]  lock: 0xede423a0, .magic: eee2a6a4, .owner:
- <none>/-1, .owner_cpu: -287136604
- 
-I'm trying to understand how it is supposed to work, but
-https://www.alsa-project.org/main/index.php/DAPM has TODO's at
-critical places. If there's better source of information, let me know.
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180612/2a174be2/attachment.sig>
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180612/cf8a0197/attachment.sig>
