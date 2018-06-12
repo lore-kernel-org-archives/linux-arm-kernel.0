@@ -1,44 +1,103 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Tue, 12 Jun 2018 13:50:04 -0500
-Subject: [PATCH] arm64: dts: freescale: Update to use SPDX identifiers
-In-Reply-To: <CAOMZO5C0pk-27ztxeJSENBN_-i9o+2sCoS9Cc75Q_Y=-_z_dQg@mail.gmail.com>
-References: <1528828122-9276-1-git-send-email-leoyang.li@nxp.com>
- <CAOMZO5C0pk-27ztxeJSENBN_-i9o+2sCoS9Cc75Q_Y=-_z_dQg@mail.gmail.com>
-Message-ID: <CADRPPNQCJ32KOvaO1RRPkxjep9WbXRVZm5CsdLB0k+6p4qRr+Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Jun 2018 13:12:20 -0600
+Subject: [PATCH v2 1/4] dt-bindings: add bindings for px30 clock controller
+In-Reply-To: <1528439519-30135-2-git-send-email-zhangqing@rock-chips.com>
+References: <1528439519-30135-1-git-send-email-zhangqing@rock-chips.com>
+ <1528439519-30135-2-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20180612191220.GA27984@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 1:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Li,
->
-> On Tue, Jun 12, 2018 at 3:28 PM, Li Yang <leoyang.li@nxp.com> wrote:
->
->> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
->> index 7286b1e..f90c040 100644
->> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
->> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
->> @@ -1,45 +1,9 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->
-> Here you use GPL-2.0+
->
->>  /*
->>   * Device Tree file for Freescale LS1012A Freedom Board.
->>   *
->>   * Copyright 2016 Freescale Semiconductor, Inc.
->>   *
->> - * This file is dual-licensed: you can use it either under the terms
->> - * of the GPLv2 or the X11 license, at your option. Note that this dual
->
-> ,but the original text says  GPL-2.0, not  GPL-2.0+, so there is a mismatch.
+On Fri, Jun 08, 2018 at 02:31:56PM +0800, Elaine Zhang wrote:
+> Add devicetree bindings for Rockchip cru which found on
+> Rockchip SoCs.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  .../bindings/clock/rockchip,px30-cru.txt           | 67 ++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,px30-cru.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,px30-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,px30-cru.txt
+> new file mode 100644
+> index 000000000000..af5a45b680d0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,px30-cru.txt
+> @@ -0,0 +1,67 @@
+> +* Rockchip PX30 Clock and Reset Unit
+> +
+> +The PX30 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
+> +
+> +Required Properties:
+> +
+> +- compatible: PMU for CRU should be "rockchip,px30-pmu-cru"
+> +- compatible: CRU should be "rockchip,px30-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing, pll rates are not changeable, due to the missing pll lock status.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. All available clocks are defined as
+> +preprocessor macros in the dt-bindings/clock/px30-cru.h headers and can be
+> +used in device tree sources. Similar macros exist for the reset sources in
+> +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "xin32k" - rtc clock - optional,
+> + - "i2sx_clkin" - external I2S clock - optional,
+> + - "gmac_clkin" - external GMAC clock - optional
+> +
+> +Example: Clock controller node:
+> +
+> +	pmucru: pmu-clock-controller at ff2bc000 {
 
-The original text has a conflict probably because some people didn't
-regard GPLv2+ as a license name.  But the following detailed
-explanation mentioned "you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free
-Software Foundation;either version 2 of the License, or (at your
-option) any later version."  I think we should honor the more verbosed
-text than the briefing(same way for X11 vs MIT).
+s/pmu-clock-controller/clock-controller/
 
-Regards,
-Leo
+> +		compatible = "rockchip,px30-pmucru";
+> +		reg = <0x0 0xff2bc000 0x0 0x1000>;
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +	cru: clock-controller at ff2b0000 {
+> +		compatible = "rockchip,px30-cru";
+> +		reg = <0x0 0xff2b0000 0x0 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the clock
+> +  controller:
+> +
+> +	uart0: serial at ff030000 {
+> +		compatible = "rockchip,px30-uart", "snps,dw-apb-uart";
+> +		reg = <0x0 0xff030000 0x0 0x100>;
+> +		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&pmucru SCLK_UART0_PMU>, <&pmucru PCLK_UART0_PMU>;
+> +		clock-names = "baudclk", "apb_pclk";
+> +		reg-shift = <2>;
+> +		reg-io-width = <4>;
+> +		status = "disabled";
+
+Don't show status in examples.
+
+> +	};
+> +
+> -- 
+> 1.9.1
+> 
+> 
