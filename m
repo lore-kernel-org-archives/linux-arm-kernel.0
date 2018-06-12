@@ -1,69 +1,55 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 12 Jun 2018 15:14:37 +0200
-Subject: [PATCH 16/19] mmc: mmci: add DT bindings for STM32 sdmmc
-In-Reply-To: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1528809280-31116-17-git-send-email-ludovic.Barre@st.com>
+From: marek.behun@nic.cz (Marek =?ISO-8859-1?Q?Beh=FAn?=)
+Date: Tue, 12 Jun 2018 16:09:26 +0200
+Subject: armada 37xx comphy driver DTS question
+Message-ID: <20180612160926.3300730a@dellmb.labs.office.nic.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hello,
 
-STM32 sdmmc variant has support to:
--Indicate signal directions (only one property
-for d0dir, d123dir, cmd_dir)
--Select command and data phase relation.
--Select "clock in" from an external driver.
+I am writing a driver for the comphy found on armada 37xx, basing it a
+little on the driver from linux-marvell.
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- Documentation/devicetree/bindings/mmc/mmci.txt | 9 +++++++++
- drivers/mmc/host/mmci.c                        | 6 ++++++
- 2 files changed, 15 insertions(+)
+There are 3 phy lanes on armada 37xx. In the functional specification
+these there are 3 memory areas for those (usb3_gbe1, pcie_gbe0 and
+sata_usb3), and one memory area called "South Bridge PHY Configuration
+Registers".
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-index e952707..d678933 100644
---- a/Documentation/devicetree/bindings/mmc/mmci.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -19,6 +19,7 @@ Optional properties:
-                            the ID provided by the HW
- - vqmmc-supply           : phandle to the regulator device tree node, mentioned
-                            as the VCCQ/VDD_IO supply in the eMMC/SD specs.
-+specific for ux500 variant:
- - st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
- - st,sig-dir-dat2        : bus signal direction pin used for DAT[2].
- - st,sig-dir-dat31       : bus signal direction pin used for DAT[3] and DAT[1].
-@@ -26,6 +27,14 @@ Optional properties:
- - st,sig-dir-cmd         : cmd signal direction pin used for CMD.
- - st,sig-pin-fbclk       : feedback clock signal pin used.
- 
-+specific for sdmmc variant:
-+- st,sig-dir             : signal direction polarity used for cmd, dat0 dat123.
-+- st,neg-edge            : data & command phase relation, generated on
-+                           sd clock falling edge.
-+- st,use-ckin            : use ckin pin from an external driver to sample
-+                           the receive data (example: with voltage
-+			   switch transceiver).
-+
- Deprecated properties:
- - mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
- - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index e24fd1e..86aef4f 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1328,6 +1328,12 @@ static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
- 		host->pwr_reg_add |= MCI_ST_CMDDIREN;
- 	if (of_get_property(np, "st,sig-pin-fbclk", NULL))
- 		host->pwr_reg_add |= MCI_ST_FBCLKEN;
-+	if (of_get_property(np, "st,sig-dir", NULL))
-+		host->pwr_reg_add |= MCI_STM32_DIRPOL;
-+	if (of_get_property(np, "st,neg-edge", NULL))
-+		host->clk_reg_add |= MCI_STM32_CLK_NEGEDGE;
-+	if (of_get_property(np, "st,use-ckin ", NULL))
-+		host->clk_reg_add |= MCI_STM32_CLK_SELCKIN;
- 
- 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
- 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
--- 
-2.7.4
+In linux-marvell they have written it so that in DTS, this is
+configured this way:
+
+  comphy {
+    compatible = "...";
+    reg = <PHY_CONF regs>,
+          <pcie_gbe0 regs>,
+          <usb3_gbe1 regs>,
+          <sata indirect access regs>;
+    ...
+  };
+
+Then when other node is referencing a phy, it has to do it this way:
+  phys = <&comphy LANE_ID TYPE>;
+for example
+  phys = <&comphy 1 COMPHY_PCIE0>;
+
+I was wondering whether to do this the same way in my driver.
+
+Rather I am inclined to create a separate node for each phy, and a
+syscon node for PHY_CONF regs, ie:
+
+  pcie_gbe0_comphy {
+    compatible = "...";
+    reg = <pcie_gbe0 regs>;
+    marvell,comphy_conf = <&...>;
+  };
+  usb3_gbe1_comphy {
+    compatible = "...";
+    reg = <usb3_gbe1 regs>;
+    marvell,comphy_conf = <&...>;
+  };
+
+What is your opinion?
+
+Thanks.
+
+Marek Behun
