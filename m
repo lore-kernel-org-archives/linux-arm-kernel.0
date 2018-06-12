@@ -1,32 +1,33 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 12 Jun 2018 01:06:05 -0700
-Subject: [PATCH v4 1/7] dt-bindings: clk: at91: add an I2S mux clock
-In-Reply-To: <18f6871e-794d-3ea2-487e-32399a8b89b4@microchip.com>
-References: <1527251668-31396-1-git-send-email-codrin.ciubotariu@microchip.com>
- <1527251668-31396-2-git-send-email-codrin.ciubotariu@microchip.com>
- <20180531005827.GA17203@rob-hp-laptop>
- <4f2e6e6a-df3a-b645-093c-b4467b3aa843@microchip.com>
- <CAL_JsqJ=T0p17hHg6=obtydt7T-yrAeOr7C2XAEnDFQ-c0b5XQ@mail.gmail.com>
- <152778070837.144038.4555982304713569160@swboyd.mtv.corp.google.com>
- <CAL_JsqJu6=ORfutZ5tAyNp2q2rH6P+fgJMRKw750RyFy=ptjPw@mail.gmail.com>
- <18f6871e-794d-3ea2-487e-32399a8b89b4@microchip.com>
-Message-ID: <152879076578.16708.6230985334183790836@swboyd.mtv.corp.google.com>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Tue, 12 Jun 2018 10:06:38 +0200
+Subject: [PATCH v6 3/5] dt-bindings: timer: add i.MX EPIT timer binding
+In-Reply-To: <20180611181042.GA30888@rob-hp-laptop>
+References: <20180607140544.22268-1-peron.clem@gmail.com>
+ <20180607140544.22268-4-peron.clem@gmail.com>
+ <20180611181042.GA30888@rob-hp-laptop>
+Message-ID: <CAJiuCce46jEnCy0z8=uqZMV=pgJZBd9vX0hjrTBuejMBJ5hxhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Codrin Ciubotariu (2018-06-07 03:30:14)
-> > 
-> > Seems to me that clock additions could use a new binding and we start
-> > with a new driver that handles these few clocks initially. But I
-> > haven't looked whether both can coexist.
-> 
-> Mark already applied to broonie/sound.git the I2S bindings that have a 
-> phandle to this clock. If I am to change #clock-cells to 1, I will have 
-> to change the bindings to include the clock-id.
-> Which approach should I take now?
-> 
+Hi Rob,
 
-You're talking about changing the example in the binding doc? That
-doesn't really matter. Consumer side of the provider has to match the
-cell count from the provider so it doesn't really need to be 'fixed' in
-the example at all.
+On Mon, 11 Jun 2018 at 20:10, Rob Herring <robh@kernel.org> wrote:
+>
+> On Thu, Jun 07, 2018 at 04:05:42PM +0200, Cl?ment P?ron wrote:
+> > From: Cl?ment Peron <clement.peron@devialet.com>
+> >
+> > Add devicetree binding document for NXP's i.MX SoC specific
+> > EPIT timer driver.
+> >
+> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
+> > ---
+> >  .../devicetree/bindings/timer/fsl,imxepit.txt | 21 +++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxepit.txt
+>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+
+Thanks, I posted the v7 yesterday, could you add your tag to the new release ?
+
+Regards,
+Clement
