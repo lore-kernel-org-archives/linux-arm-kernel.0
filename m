@@ -1,189 +1,213 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 12 Jun 2018 17:58:36 +0800
-Subject: [PATCH v2 4/7] Bluetooth: Add new quirk for non-persistent
- setup settings
-In-Reply-To: <DC3FE66E-C3FD-455F-8592-E927604086CD@holtmann.org>
-References: <cover.1526374087.git.sean.wang@mediatek.com>
- <1d6097f538b3182b2876ad48225ecd6e2d1b128c.1526374087.git.sean.wang@mediatek.com>
- <920B3BE9-3FE8-4AC6-8C5F-63B0E00182AC@holtmann.org>
- <1526976323.18877.47.camel@mtkswgap22> <1527057423.4607.3.camel@mtkswgap22>
- <B82BB5F4-E197-4915-A543-C5FF9A5A41F1@holtmann.org>
- <1527084544.4607.8.camel@mtkswgap22>
- <37400FCE-8F9A-433B-8E3A-DE9CBEB469D7@holtmann.org>
- <1527175805.4607.103.camel@mtkswgap22>
- <DC3FE66E-C3FD-455F-8592-E927604086CD@holtmann.org>
-Message-ID: <1528797516.21593.46.camel@mtkswgap22>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 12 Jun 2018 11:12:46 +0100
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+References: <1528785361-24477-1-git-send-email-bhsharma@redhat.com>
+ <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+Message-ID: <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-05-30 at 08:26 +0200, Marcel Holtmann wrote:
-> Hi Sean,
+Hi Bhupesh, Ard,
+
+On 12/06/18 09:25, Bhupesh Sharma wrote:
+> On Tue, Jun 12, 2018 at 12:23 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 12 June 2018 at 08:36, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+>>> The start of the linear region map on a KASLR enabled ARM64 machine -
+>>> which supports a compatible EFI firmware (with EFI_RNG_PROTOCOL
+>>> support), is no longer correctly represented by the PAGE_OFFSET macro,
+>>> since it is defined as:
+>>>
+>>>     (UL(1) << (VA_BITS - 1)) + 1)
+
+>> PAGE_OFFSET is the VA of the start of the linear map. The linear map
+>> can be sparsely populated with actual memory, regardless of whether
+>> KASLR is in effect or not. The only difference in the presence of
+>> KASLR is that there may be such a hole at the beginning, but that does
+>> not mean the linear map has moved, or that the value of PAGE_OFFSET is
+>> now wrong.
+
+>>> So taking an example of a platform with VA_BITS=48, this gives a static
+>>> value of:
+>>> PAGE_OFFSET = 0xffff800000000000
+>>>
+>>> However, for the KASLR case, we use the 'memstart_offset_seed'
+>>> to randomize the linear region - since 'memstart_addr' indicates the
+>>> start of physical RAM, we randomize the same on basis
+>>> of 'memstart_offset_seed' value.
+>>>
+>>> As the PAGE_OFFSET value is used presently by several user space
+>>> tools (for e.g. makedumpfile and crash tools) to determine the start
+>>> of linear region and hence to read addresses (like PT_NOTE fields) from
+>>> '/proc/kcore' for the non-KASLR boot cases, so it would be better to
+>>> use 'memblock_start_of_DRAM()' value (converted to virtual) as
+>>> the start of linear region for the KASLR cases and default to
+>>> the PAGE_OFFSET value for non-KASLR cases to indicate the start of
+>>> linear region.
+
+>> Userland code that assumes that the linear map cannot have a hole at
+>> the beginning should be fixed.
+
+> That is a separate case (although that needs fixing as well via a
+> kernel patch probably as the user-space tools rely on '/proc/iomem'
+> contents to determine the first System RAM/reserved range).
+
+This is for kexec-tools generating the kdump vmcore ELF headers in user-space?
+
+
+> 1. In that particular case (see [1]) the EFI firmware sets the first
+> EFI block as EfiReservedMemType:
 > 
-> >>>>>> 
-
-[ ... ]
-
-> >>> * Unknown packet (code 14 len 30)                                      0.641509
-> >>>       01 00 00 00 02 00 01 0e 00 01 00 00 00 10 62 6c  ..............bl
-> >>>       75 65 74 6f 6f 74 68 64 00 00 00 00 00 00        uetoothd......  
-> >>> * Unknown packet (code 14 len 30)                                      0.641592
-> >>>       02 00 00 00 02 00 01 0e 00 01 00 00 00 10 62 74  ..............bt
-> >>>       6d 6f 6e 00 00 00 00 00 00 00 00 00 00 00        mon...........  
-> >>> * Unknown packet (code 16 len 7)                                [hci0] 6.536771
-> >>>       01 00 00 00 05 00 01                             .......         
-> >>> = Open Index: 00:00:46:76:22:01                                 [hci0] 6.717019
-> >>> = Index Info: 00:00:46:76:22:01 (MediaTek, Inc.)                [hci0] 6.717030
-> >> 
-> >> can you try with the latest BlueZ 5.49 or git version. Seems it actually stumbles over the extra packet here. Fun fact is that I can not get a backtrace to pin-point the issue in btmon and why it crashes.
-> >> 
-> > 
-> > I had less experience updating user land BlueZ, but I can try it as possible and see whether Unknown packets still are present at newest version BlueZ. Hopefully I don't misunderstand your point here. 
+> Region1: 0x000000000000-0x000000200000 [EfiReservedMemType]
+> Region2: 0x000000200000-0x00000021fffff [EfiRuntimeServiceData]
 > 
-> please use the latest btmon and check if it can read your trace.
+> Since EFI firmware won't return the "EfiReservedMemType" memory to
+> Linux kernel, 
+
+(Its linux that makes this choice in
+drivers/firmware/efi/arm-init.c::is_usable_memory())
+
+
+> so the kernel can't get any info about the first mem
+> block, and kernel can only see region2 as below:
 > 
-
-sure, I'll have a try with the latest btmon.
-
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.741093
-> >>>       02 01 01 00 00                                   .....           
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.742088
-> >>>       02 01 01 00 00                                   .....           
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.743102
-> >>>       02 01 01 00 00                                   .....           
-
-
-[ ... ]
-
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.814708
-> >>>       02 01 01 00 00                                   .....           
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.815705
-> >>>       02 01 01 00 00                                   .....           
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.816378
-> >>>       02 01 01 00 00                                   .....           
-> >> 
-> >> Why do I see only HCI events here? Is this event conveying any useful information. It is kinda complicated that this is 0xe4 event code which is actually reserved for future use by the Bluetooth SIG. Are there any accompanying HCI commands for this and they just not make it into btmon?
-> >> 
-> > 
-> > I have made all vendor HCI commands go through BlueZ core in v2 patch. 
-> > 
-> > And for these HCI events, they are all corresponding to vendor ACL data, applied only to firmware setup packets, but they're not being sent via BlueZ core, so they are not being logged in btmon.
-> > 
-> > As for its event, where heading 0xe4 refers to a vendor event and is used on notification of that either vendor ACL data or vendor HCI command have been done.
+> efi: Processing EFI memory map:
+> efi:   0x000000200000-0x00000021ffff [Runtime Data       |RUN|  |  |
+> |  |  |  |   |WB|WT|WC|UC]
 > 
-> I would prefer if everything goes via the Bluetooth core since then we have it all properly scheduled. Sending things down the ACL data path however if kinda funky. Does your hardware accept sending command both via ACL data and as HCI command? If so, then I would prefer sending them as HCI commands since the speed improvement you think you are getting is neglectable on Linux (I have been down that path). This seems to be a pure optimization when Windows is driving the device.
+> # head -1 /proc/iomem
+> 00200000-0021ffff : reserved
 > 
-
-firmware people said the device can support firmware download as HCI commands. According to my test, this way indeed works so I will improve the part in the next version.
-
-
-> And the vendor event 0xe4 is really only received during firmware download? It is not ever received during normal operation?
+> 2a. If we add debug prints to 'arch/arm64/mm/init.c' to print the
+> kernel Virtual map we can see that the memory node is set to:
 > 
-
-0xe4 is only received during chip initialization.
-
-I also thought 0xe4 is a poor definition for vendor event and already have notified firmware people should pick 0xff as its vendor event id in the future.
-
-but for now, unfortunately, 0xe4 cannot be changed on the device, the only way is to add a workaround in RX path as below to allow btmon can recognize these bad events properly. 
-
-int mtk_btuart_hci_frame(struct hci_dev *hdev, struct sk_buff *skb)
-{
-        struct hci_event_hdr *hdr = (void *)skb->data;
-
-        /* Fix up the vendor event id with HCI_VENDOR_PKT instead of
-         * 0xe4 so that btmon can parse the kind of vendor event properly.
-         */
-        if (hdr->evt == 0xe4)
-                hdr->evt = HCI_VENDOR_PKT;
-
-        /* Each HCI event would go through the core. */
-        return hci_recv_frame(hdev, skb);
-}
-
-
-> > 
-> >> 
-> >> 
-> >>> < HCI Command: Vendor (0x3f|0x006f) plen 5                      [hci0] 6.816413
-> >>>       01 07 01 00 04                                   .....           
-> >>>> HCI Event: Unknown (0xe4) plen 5                              [hci0] 6.816536
-> >>>       02 07 01 00 00                                   .....           
-
-[ ... ]
-
-> >>>         Encapsulated PDU
-> >>>         Erroneous Data Reporting
-> >>>         Non-flushable Packet Boundary Flag
-> >>>         Link Supervision Timeout Changed Event
-> >>>         Inquiry TX Power Level
-> >>>         Enhanced Power Control
-> >>>         Extended features
-> >>> < HCI Command: Read Local Version Info.. (0x04|0x0001) plen 0  [hci0] 10.865987
-> >>>> HCI Event: Vendor (0xff) plen 9                              [hci0] 10.866259
-> >>>       29 19 09 17 20 48 07 11 00                       )... H?       
-> >> 
-> >> Is this meant to happen here?
-> >> 
-> > 
-> > If event received is not expected as the specification defines, I think it's probably incorrect.
-> > 
-> > But it requires more discussion with firmware people to make it clearer.
+> # dmesg | grep memory
+> ..........
+> memory  : 0xffff800000200000 - 0xffff801800000000
 > 
-> Please check and let them decode what this event means.
+> 2b. Now if we use kexec-tools to obtain a crash vmcore we can see that
+> if we use 'readelf' to get the last program Header from vmcore (logs
+> below are for the non-kaslr case):
 > 
-
-it's just debugging purpose information listing built-time something
-like that and will be removed in the firmware.
-
-> > 
-> >>>> HCI Event: Command Complete (0x0e) plen 12                   [hci0] 10.866372
-> >>>     Read Local Version Information (0x04|0x0001) ncmd 1
-> >>>       Status: Success (0x00)
-> >>>       HCI version: Bluetooth 4.2 (0x08) - Revision 4359 (0x1107)
-> >>>       LMP version: Bluetooth 4.2 (0x08) - Subversion 2329 (0x0919)
-> >>>       Manufacturer: MediaTek, Inc. (70)
-> >>> < HCI Command: Read BD ADDR (0x04|0x0009) plen 0               [hci0] 10.866391
-> >>>> HCI Event: Command Complete (0x0e) plen 10                   [hci0] 10.866539
-
-[ ... ]
-
-> >>>         LE Add Device To Resolving List (Octet 34 - Bit 3)
-> >>>         LE Remove Device From Resolving List (Octet 34 - Bit 4)
-> >>>         LE Clear Resolving List (Octet 34 - Bit 5)
-> >>>         LE Read Resolving List Size (Octet 34 - Bit 6)
-> >>>         LE Read Peer Resolvable Address (Octet 34 - Bit 7)
-> >>>         LE Read Local Resolvable Address (Octet 35 - Bit 0)
-> >>>         LE Set Address Resolution Enable (Octet 35 - Bit 1)
-> >>>         LE Set Resolvable Private Address Timeout (Octet 35 - Bit 2)
-> >>>         LE Read Maximum Data Length (Octet 35 - Bit 3)
-> >>>         Octet 35 - Bit 4 
-> >>>         Octet 35 - Bit 5 
-> >>>         Octet 35 - Bit 6 
-> >>>         Octet 35 - Bit 7 
-> >>>         Octet 36 - Bit 0 
-> >> 
-> >> So you support the PHY commands, but do not indicate support LE 2M or LE Coded? Also these are Bluetooth 5.0 commands.
-> >> 
-> > 
-> > To be honest. When I ported the device into Bluez core, a unexpected event for LE read local feature would cause a fail at Bluez core, so I made a hack on Bluez core  
-> > 
-> > to allow that I can keeping bring up the device without be blocked by the issue most probably from firmware.
-> > 
-> > Below code snippet is the only thing I added to avoid a fail at Bluez core to bring up the device.
-> > 
-> > @@ -927,6 +927,8 @@ static void hci_cc_le_read_local_features(struct hci_dev *hdev,
-> >                return;
-> > 
-> >        memcpy(hdev->le_features, rp->features, 8);
-> > +       hdev->le_features[0] = 0;
-> > +       hdev->le_features[1] = 0;
-> > }
+> # readelf -l vmcore
 > 
-> Send me the trace where you didn?t clear the feature bits and I check what is going on. I doubt that we have a bug, but maybe some of the commands are optional and we should add an appropriate check. Or you guys need to fix your firmware. A new btmon should decode all bits properly.
+> ELF Header:
+> ........................
 > 
+> Program Headers:
+>   Type           Offset             VirtAddr           PhysAddr
+>          FileSiz            MemSiz              Flags  Align
+> ..............................................................................................................................................................
+>   LOAD        0x0000000076d40000 0xffff80017fe00000 0x0000000180000000
+>                 0x0000001680000000 0x0000001680000000  RWE    0
+> 
+> 3. So if we do a simple calculation:
+> 
+> (VirtAddr + MemSiz) = 0xffff80017fe00000 + 0x0000001680000000 =
+> 0xFFFF8017FFE00000 != 0xffff801800000000.
+> 
+> which indicates that the end virtual memory nodes are not the same
+> between vmlinux and vmcore.
 
-okay, I'll have a follow-up.
+If I've followed this properly: the problem is that to generate the ELF headers
+in the post-kdump vmcore, at kdump-load-time kexec-tools has to guess the
+virtual addresses of the 'System RAM' regions it can see in /proc/iomem.
 
-> Regards
+The problem you are hitting is an invisible hole at the beginning of RAM,
+meaning user-space's guess_phys_to_virt() is off by the size of this hole.
+
+Isn't KASLR a special case for this? You must have to correct for that after
+kdump has happened, based on an elf-note in the vmcore. Can't we always do this?
+
+
+> This happens because the kexec-tools rely on 'proc/iomem' contents
+> while 'memstart_addr' is computed as 0 by kernel (as value of
+> memblock_start_of_DRAM() < ARM64_MEMSTART_ALIGN).
+
+> Returning back to this patch, this is a generic requirement where we
+> need the linear region start/base addresses in user-space applications
+> which is used to read addresses which lie in the linear region (for
+> e.g. when we read /proc/kcore contents).
+
+
+>>> I tested this on my qualcomm (which supports EFI_RNG_PROTOCOL)
+>>> and apm mustang (which does not support EFI_RNG_PROTOCOL) arm64 boards
+>>> and was able to use a modified user space utility (like kexec-tools and
+>>> makedumpfile) to determine the start of linear region correctly for
+>>> both the KASLR and non-KASLR boot cases.
+>>>
+>>
+>> Can you explain the nature of the changes to the userland code?
 > 
-> Marcel
-> 
+> The changes are not to rely on the fixed PAGE_OFFSET macro value for
+> determining the base address of the linear region, but rather read the
+> ' linear_reg_start_addr' symbol from kernel and use the same both in
+> case of KASLR and non-KASLR boots to determine the base of the linear
+> region (in [2], I have implemented a test change to kexec-tools to
+> read the 'linear_reg_start_addr' symbol which is available on my
+
+Don't use /dev/mem.
+
+
+> public github tree, I have a similar change available in makedumpfile
+> which I have not yet pushed to github, as it implements other features
+> as well)
+
+>>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>>> index 49d99214f43c..bfd0915ecaf8 100644
+>>> --- a/arch/arm64/include/asm/memory.h
+>>> +++ b/arch/arm64/include/asm/memory.h
+>>> @@ -178,6 +178,9 @@ extern s64                  memstart_addr;
+>>>  /* PHYS_OFFSET - the physical address of the start of memory. */
+>>>  #define PHYS_OFFSET            ({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
+>>>
+>>> +/* the virtual base of the linear region. */
+>>> +extern s64                     linear_reg_start_addr;
+>>> +
+>>>  /* the virtual base of the kernel image (minus TEXT_OFFSET) */
+>>>  extern u64                     kimage_vaddr;
+>>>
+>>> diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+>>> index d894a20b70b2..a92238ea45ff 100644
+>>> --- a/arch/arm64/kernel/arm64ksyms.c
+>>> +++ b/arch/arm64/kernel/arm64ksyms.c
+>>> @@ -42,6 +42,7 @@ EXPORT_SYMBOL(__arch_copy_in_user);
+>>>
+>>>         /* physical memory */
+>>>  EXPORT_SYMBOL(memstart_addr);
+>>> +EXPORT_SYMBOL(linear_reg_start_addr);
+>>>
+>>>         /* string / mem functions */
+>>>  EXPORT_SYMBOL(strchr);
+>>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>>> index 325cfb3b858a..29447adb0eef 100644
+>>> --- a/arch/arm64/mm/init.c
+>>> +++ b/arch/arm64/mm/init.c
+>>> @@ -60,6 +60,7 @@
+>>>   * that cannot be mistaken for a real physical address.
+>>>   */
+>>>  s64 memstart_addr __ro_after_init = -1;
+>>> +s64 linear_reg_start_addr __ro_after_init = PAGE_OFFSET;
+>>>  phys_addr_t arm64_dma_phys_limit __ro_after_init;
+>>>
+>>>  #ifdef CONFIG_BLK_DEV_INITRD
+>>> @@ -452,6 +453,8 @@ void __init arm64_memblock_init(void)
+>>>                 }
+>>>         }
+>>>
+>>> +       linear_reg_start_addr = __phys_to_virt(memblock_start_of_DRAM());
+
+This patch adds a variable that nothing uses, its going to be removed. You can't
+depend on reading this via /dev/mem.
+
+Could you add the information you need as an elf-note to the vmcore instead? You
+must already pick these up to handle kaslr. (from memory, this is where the
+kaslr-offset is described to user-space after we kdump).
+
+
+Thanks,
+
+James
