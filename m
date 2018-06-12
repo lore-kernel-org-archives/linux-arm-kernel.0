@@ -1,77 +1,94 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:21 +0200
-Subject: [PATCH v2 12/27] drm/sun4i: tcon: Generalize engine search algorithm
+Date: Tue, 12 Jun 2018 22:00:34 +0200
+Subject: [PATCH v2 25/27] drm/sun4i: DW HDMI: Expand algorithm for possible
+ crtcs
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-13-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-26-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current "old" method to find engine worked pretty well for DE2. However,
-it doesn't work when TCON TOP is between  mixer (engine) and TCON. TCON
-TOP has multiple input ports, but current engine search algorithm
-expects only one.
+drm_of_find_possible_crtcs() doesn't work when DW HDMI encoder is
+connected to TCON (crtc) through mux in TCON TOP.
 
-This can be fixed by first looking for output port id and selecting
-matching input by subtracting 1 for the next round. This work even if
-there is only one input and output.
+In that case TCON TOP HDMI mux input port has to be manually traversed
+and checked if it matches any known crtc.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 46 ++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 0afb5a94a414..5dae623968f7 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -802,12 +802,14 @@ static int sun4i_tcon_init_regmap(struct device *dev,
-  */
- static struct sunxi_engine *
- sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
--				struct device_node *node)
-+				struct device_node *node,
-+				u32 port_id)
- {
- 	struct device_node *port, *ep, *remote;
- 	struct sunxi_engine *engine = ERR_PTR(-EINVAL);
-+	u32 reg = 0;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 9f40a44b456b..d443886e055b 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -12,6 +12,7 @@
+ #include <drm/drm_crtc_helper.h>
  
--	port = of_graph_get_port_by_id(node, 0);
-+	port = of_graph_get_port_by_id(node, port_id);
- 	if (!port)
- 		return ERR_PTR(-EINVAL);
+ #include "sun8i_dw_hdmi.h"
++#include "sun8i_tcon_top.h"
  
-@@ -837,8 +839,20 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
- 		if (remote == engine->node)
- 			goto out_put_remote;
- 
-+	/*
-+	 * According to device tree binding input ports have even id
-+	 * number and output ports have odd id. Since component with
-+	 * more than one input and one output (TCON TOP) exits, correct
-+	 * remote input id has to be calculated by subtracting 1 from
-+	 * remote output id. If this for some reason can't be done, 0
-+	 * is used as input port id.
-+	 */
-+	port = of_graph_get_remote_port(ep);
-+	if (!of_property_read_u32(port, "reg", &reg) && reg > 0)
-+		reg -= 1;
-+
- 	/* keep looking through upstream ports */
--	engine = sun4i_tcon_find_engine_traverse(drv, remote);
-+	engine = sun4i_tcon_find_engine_traverse(drv, remote, reg);
- 
- out_put_remote:
- 	of_node_put(remote);
-@@ -961,7 +975,7 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
- 
- 	/* Fallback to old method by traversing input endpoints */
- 	of_node_put(port);
--	return sun4i_tcon_find_engine_traverse(drv, node);
-+	return sun4i_tcon_find_engine_traverse(drv, node, 0);
+ static void sun8i_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
+ 					   struct drm_display_mode *mode,
+@@ -41,6 +42,48 @@ sun8i_dw_hdmi_mode_valid(struct drm_connector *connector,
+ 	return MODE_OK;
  }
  
- static int sun4i_tcon_bind(struct device *dev, struct device *master,
++static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
++{
++	return !!of_match_node(sun8i_tcon_top_of_table, node);
++}
++
++static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
++					     struct device_node *node)
++{
++	struct device_node *port, *ep, *remote, *remote_port;
++	u32 crtcs = 0;
++
++	port = of_graph_get_port_by_id(node, 0);
++	if (!port)
++		return 0;
++
++	ep = of_get_next_available_child(port, NULL);
++	if (!ep)
++		return 0;
++
++	remote = of_graph_get_remote_port_parent(ep);
++	if (!remote)
++		return 0;
++
++	if (sun8i_dw_hdmi_node_is_tcon_top(remote)) {
++		port = of_graph_get_port_by_id(remote, 4);
++		if (!port)
++			return 0;
++
++		for_each_child_of_node(port, ep) {
++			remote_port = of_graph_get_remote_port(ep);
++			if (remote_port) {
++				crtcs |= drm_crtc_port_mask(drm, remote_port);
++				of_node_put(remote_port);
++			}
++		}
++	} else {
++		crtcs = drm_of_find_possible_crtcs(drm, node);
++	}
++
++	return crtcs;
++}
++
+ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 			      void *data)
+ {
+@@ -63,7 +106,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->dev = &pdev->dev;
+ 	encoder = &hdmi->encoder;
+ 
+-	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
++	encoder->possible_crtcs =
++		sun8i_dw_hdmi_find_possible_crtcs(drm, dev->of_node);
+ 	/*
+ 	 * If we failed to find the CRTC(s) which this encoder is
+ 	 * supposed to be connected to, it's because the CRTC has
 -- 
 2.17.1
