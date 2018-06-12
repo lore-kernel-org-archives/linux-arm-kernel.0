@@ -1,85 +1,102 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:10 +0200
-Subject: [PATCH v2 01/27] clk: sunxi-ng: r40: Add minimal rate for video PLLs
+Date: Tue, 12 Jun 2018 22:00:18 +0200
+Subject: [PATCH v2 09/27] drm/sun4i: Don't skip TCONs if they don't have
+ channel 0
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-2-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to documentation and experience with other similar SoCs, video
-PLLs don't work stable if their output frequency is set below 192 MHz.
+TV TCONs (channel 1 only) are always connected to TV or HDMI encoder.
+Because of that, all output endpoints on such TCON node will point to a
+encoder which is part of component framework.
 
-Because of that, set minimal rate to both R40 video PLLs to 192 MHz.
+Correct current graph traversing algorithm in such way that it doesn't
+skip output enpoints with id 0 on TV TCONs.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 46 +++++++++++++++-------------
- 1 file changed, 24 insertions(+), 22 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 52 +++++++++++++++++++++----------
+ 1 file changed, 35 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-index 933f2e68f42a..c16a62a7bdbd 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-@@ -65,17 +65,18 @@ static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
- 				   CLK_SET_RATE_UNGATE);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index e6c62c079146..6ddf4eaccb40 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -198,6 +198,22 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ 	return !!of_match_node(sun4i_tcon_of_table, node);
+ }
  
- /* TODO: The result of N/M is required to be in [8, 25] range. */
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
--					"osc24M", 0x0010,
--					8, 7,		/* N */
--					0, 4,		/* M */
--					BIT(24),	/* frac enable */
--					BIT(25),	/* frac select */
--					270000000,	/* frac rate 0 */
--					297000000,	/* frac rate 1 */
--					BIT(31),	/* gate */
--					BIT(28),	/* lock */
--					CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video0_clk, "pll-video0",
-+					    "osc24M", 0x0010,
-+					    192000000,	/* Minimum rate */
-+					    8, 7,	/* N */
-+					    0, 4,	/* M */
-+					    BIT(24),	/* frac enable */
-+					    BIT(25),	/* frac select */
-+					    270000000,	/* frac rate 0 */
-+					    297000000,	/* frac rate 1 */
-+					    BIT(31),	/* gate */
-+					    BIT(28),	/* lock */
-+					    CLK_SET_RATE_UNGATE);
++static bool sun4i_drv_node_is_tcon_with_ch0(struct device_node *node)
++{
++	const struct of_device_id *match;
++
++	match = of_match_node(sun4i_tcon_of_table, node);
++	if (match) {
++		struct sun4i_tcon_quirks *quirks;
++
++		quirks = (struct sun4i_tcon_quirks *)match->data;
++
++		return quirks->has_channel_0;
++	}
++
++	return false;
++}
++
+ static bool sun4i_drv_node_is_tcon_top(struct device_node *node)
+ {
+ 	return !!of_match_node(sun8i_tcon_top_of_table, node);
+@@ -256,14 +272,7 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
+ 			continue;
+ 		}
  
- /* TODO: The result of N/M is required to be in [8, 25] range. */
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
-@@ -151,17 +152,18 @@ static struct ccu_nk pll_periph1_clk = {
- };
+-		/*
+-		 * If the node is our TCON, the first port is used for
+-		 * panel or bridges, and will not be part of the
+-		 * component framework.
+-		 */
+ 		if (sun4i_drv_node_is_tcon(node)) {
+-			struct of_endpoint endpoint;
+-
+ 			/*
+ 			 * TCON TOP is always probed before TCON. However, TCON
+ 			 * points back to TCON TOP when it is source for HDMI.
+@@ -276,16 +285,25 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
+ 				continue;
+ 			}
  
- /* TODO: The result of N/M is required to be in [8, 25] range. */
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video1_clk, "pll-video1",
--					"osc24M", 0x030,
--					8, 7,		/* N */
--					0, 4,		/* M */
--					BIT(24),	/* frac enable */
--					BIT(25),	/* frac select */
--					270000000,	/* frac rate 0 */
--					297000000,	/* frac rate 1 */
--					BIT(31),	/* gate */
--					BIT(28),	/* lock */
--					CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video1_clk, "pll-video1",
-+					    "osc24M", 0x030,
-+					    192000000,	/* Minimum rate */
-+					    8, 7,	/* N */
-+					    0, 4,	/* M */
-+					    BIT(24),	/* frac enable */
-+					    BIT(25),	/* frac select */
-+					    270000000,	/* frac rate 0 */
-+					    297000000,	/* frac rate 1 */
-+					    BIT(31),	/* gate */
-+					    BIT(28),	/* lock */
-+					    CLK_SET_RATE_UNGATE);
+-			if (of_graph_parse_endpoint(ep, &endpoint)) {
+-				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+-				of_node_put(remote);
+-				continue;
+-			}
+-
+-			if (!endpoint.id) {
+-				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
+-				of_node_put(remote);
+-				continue;
++			/*
++			 * If the node is our TCON with channel 0, the first
++			 * port is used for panel or bridges, and will not be
++			 * part of the component framework.
++			 */
++			if (sun4i_drv_node_is_tcon_with_ch0(node)) {
++				struct of_endpoint endpoint;
++
++				if (of_graph_parse_endpoint(ep, &endpoint)) {
++					DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
++					of_node_put(remote);
++					continue;
++				}
++
++				if (!endpoint.id) {
++					DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
++					of_node_put(remote);
++					continue;
++				}
+ 			}
+ 		}
  
- static struct ccu_nkm pll_sata_clk = {
- 	.enable		= BIT(31),
 -- 
 2.17.1
