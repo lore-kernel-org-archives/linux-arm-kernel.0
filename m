@@ -1,45 +1,94 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:24 +0200
-Subject: [PATCH v2 15/27] drm/sun4i: Add support for R40 TV TCON
-In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-16-jernej.skrabec@siol.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 12 Jun 2018 15:24:08 -0500
+Subject: [PATCH 1/4] ARM: Introduce ability to enable ACR::IBE on Cortex-A8
+ for CVE-2017-5715
+In-Reply-To: <20180612202411.29798-1-nm@ti.com>
+References: <20180612202411.29798-1-nm@ti.com>
+Message-ID: <20180612202411.29798-2-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R40 TV TCON is similar to the A83T TV TCON, except that it needs
-additional gate to be enabled.
+As recommended by Arm in [1], IBE[2] has to be enabled unconditionally
+for BPIALL to be functional on Cortex-A8 processors. Provide a config
+option for platforms to enable this option based on impact analysis
+for products.
 
-Add support for it.
+NOTE: This patch in itself is NOT the final solution, this requires:
+a) Implementation of v7_arch_cp15_set_acr on SoCs which may not
+   provide direct access to ACR register.
+b) Operating Systems such as Linux to provide adequate workaround in the right
+   locations.
+c) This workaround applies to only the boot processor. It is important
+   to apply workaround as necessary (context-save-restore) around low
+   power context loss OR additional processors as necessary in either
+   firmware support OR elsewhere in OS.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+[1] https://developer.arm.com/support/security-update
+[2] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0344k/Bgbffjhh.html
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Andre Przywara <Andre.Przywara@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Tom Rini <trini@konsulko.com>
+Cc: Michael Nazzareno Trimarchi <michael@amarulasolutions.com>
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/Kconfig           | 5 +++++
+ arch/arm/cpu/armv7/start.S | 7 +++++--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c9ffa5381185..f20da2aa2165 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1326,6 +1326,11 @@ static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
- 	.has_channel_1		= true,
- };
- 
-+static const struct sun4i_tcon_quirks sun8i_r40_tv_quirks = {
-+	.has_channel_1		= true,
-+	.has_tcon_top_gate	= true,
-+};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dde422bc5d53..9e32d5b43cb0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -108,6 +108,8 @@ config SYS_ARM_MPU
+ # CONFIG_ARM_ERRATA_621766
+ # CONFIG_ARM_ERRATA_798870
+ # CONFIG_ARM_ERRATA_801819
++# CONFIG_ARM_CORTEX_A8_CVE_2017_5715
 +
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
- 	.has_channel_0		= true,
- };
-@@ -1350,6 +1355,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
-+	{ .compatible = "allwinner,sun8i-r40-tcon-tv", .data = &sun8i_r40_tv_quirks },
- 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
- 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
+ config ARM_ERRATA_430973
+ 	bool
+ 
+@@ -177,6 +179,9 @@ config ARM_ERRATA_852423
+ config ARM_ERRATA_855873
+ 	bool
+ 
++config ARM_CORTEX_A8_CVE_2017_5715
++	bool
++
+ config CPU_ARM720T
+ 	bool
+ 	select SYS_CACHE_SHIFT_5
+diff --git a/arch/arm/cpu/armv7/start.S b/arch/arm/cpu/armv7/start.S
+index c996525f861e..3beaf5a93d81 100644
+--- a/arch/arm/cpu/armv7/start.S
++++ b/arch/arm/cpu/armv7/start.S
+@@ -252,12 +252,15 @@ skip_errata_801819:
+ 	pop	{r1-r5}			@ Restore the cpu info - fall through
+ #endif
+ 
+-#ifdef CONFIG_ARM_ERRATA_430973
++#if defined(CONFIG_ARM_ERRATA_430973) || defined (CONFIG_ARM_CORTEX_A8_CVE_2017_5715)
+ 	mrc	p15, 0, r0, c1, c0, 1	@ Read ACR
+ 
++#ifdef CONFIG_ARM_CORTEX_A8_CVE_2017_5715
++	orr	r0, r0, #(0x1 << 6)	@ Set IBE bit always to enable OS WA
++#else
+ 	cmp	r2, #0x21		@ Only on < r2p1
+ 	orrlt	r0, r0, #(0x1 << 6)	@ Set IBE bit
+-
++#endif
+ 	push	{r1-r5}			@ Save the cpu info registers
+ 	bl	v7_arch_cp15_set_acr
+ 	pop	{r1-r5}			@ Restore the cpu info - fall through
 -- 
-2.17.1
+2.15.1
