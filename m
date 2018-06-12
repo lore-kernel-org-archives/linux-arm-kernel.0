@@ -1,136 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jun 2018 10:38:11 +0200
-Subject: [PATCH 3/3] pinctrl: actions: Add interrupt support for OWL S900
- SoC
-In-Reply-To: <20180602165415.30956-4-manivannan.sadhasivam@linaro.org>
-References: <20180602165415.30956-1-manivannan.sadhasivam@linaro.org>
- <20180602165415.30956-4-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdbRYQ7Wf48Ff-n-OiheW+Dv1yyJQ3NNzGdBx5dvM51YPA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 12 Jun 2018 16:38:55 +0800
+Subject: [GIT PULL] Allwinner clock changes for 4.18
+In-Reply-To: <152879040155.16708.9862482085365718831@swboyd.mtv.corp.google.com>
+References: <20180521115947.wqrnv2hczate65lz@flea>
+ <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
+ <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
+ <152879040155.16708.9862482085365718831@swboyd.mtv.corp.google.com>
+Message-ID: <CAGb2v66MkLLqL=Ei5kMb_CzpgUANpkNN3E52mSHKrZ0L7rXAog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 2, 2018 at 6:54 PM, Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
-
-> Add interrupt support for Actions Semi OWL S900 SoC.
+On Tue, Jun 12, 2018 at 4:00 PM, Stephen Boyd <sboyd@kernel.org> wrote:
+> Quoting Chen-Yu Tsai (2018-06-11 00:53:41)
+>> Hi,
+>>
+>> On Mon, Jun 11, 2018 at 10:00 AM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>> > Hi Maxime,
+>> >
+>> >
+>> > 2018-05-21 20:59 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+>> >> Hi Mike, Stephen,
+>> >>
+>> >> Please merge the following changes for the next merge window, thanks!
+>> >>
+>> >> Maxime
+>> >>
+>> >> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+>> >>
+>> >>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>> >>
+>> >> are available in the Git repository at:
+>> >>
+>> >>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.18
+>> >>
+>> >> for you to fetch changes up to 17de4c857b1f74b90967f7e7fd5ff81be61dc044:
+>> >>
+>> >>   clk: sunxi-ng: r40: export a regmap to access the GMAC register (2018-05-17 14:02:07 +0800)
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Allwinner clock changes for 4.18
+>> >>
+>> >> Not a lot of changes for this release, but two quite important features
+>> >> were added: the H6 PRCM clock support, and the needed changes to the R40
+>> >> clock driver to allow for the EMAC to operate.
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Icenowy Zheng (3):
+>> >>       clk: sunxi-ng: add support for H6 PRCM CCU
+>> >>       clk: sunxi-ng: r40: rewrite init code to a platform driver
+>> >>       clk: sunxi-ng: r40: export a regmap to access the GMAC register
+>> >>
+>> >
+>> >
+>> >
+>> > Why was my patch "clk: sunxi-ng: replace lib-y with obj-y"
+>> > not included in the pull request?
+>> >
+>> >
+>> > You said "I've picked it up"
+>> > https://patchwork.kernel.org/patch/10348031/
+>>
+>> It looks like it was accidentally dropped after a rebase.
+>> Not quite sure what happened there. Maxime?
+>>
 >
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-(...)
+> I can directly pick and send as fix for clk-fixes targeting rc2.
 
-> +++ b/drivers/pinctrl/actions/Kconfig
-> @@ -5,6 +5,7 @@ config PINCTRL_OWL
->         select PINCONF
->         select GENERIC_PINCONF
->         select GPIOLIB
-> +       select GPIOLIB_IRQCHIP
+The patch can still be found in the sunxi/for-next branch of the
+sunxi repo on kernel.org:
 
-I don't think you're really using that (certain sign: you're implementing
-.to_irq().)
+https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/commit/?h=sunxi/for-next&id=d4a1496286b0c29fcace4e10c0047cca7cc79b25
 
-GPIOLIB_IRQCHIP is nice, but can only be used when there is
-a 1-1 correspondence betweem GPIO line offsets and
-IRQ lines and they are numbered 0..n.
+Or the original on patchwork:
 
-However I think you can use it! Look below for my reference
-to the tegra186 and how you can probably cut out the custom
-irqdomain with some manouvers.
+https://patchwork.kernel.org/patch/10348027/
 
-> +       struct owl_pinctrl *pctrl = irq_data_get_irq_chip_data(data);
-> +       const struct owl_gpio_port *port;
-(...)
-> +       unsigned int gpio = data->hwirq;
-> +
-> +       port = owl_gpio_get_port(pctrl, &gpio);
-> +
-> +       gpio_base = pctrl->base + port->offset;
-
-It is all about this calculation really.
-
-> +static int owl_gpio_irq_set_type(struct irq_data *data, unsigned int type)
-> +{
-> +       struct owl_pinctrl *pctrl = irq_data_get_irq_chip_data(data);
-> +       const struct owl_gpio_port *port;
-> +       void __iomem *gpio_base;
-> +       unsigned long flags;
-> +       unsigned int gpio = data->hwirq;
-> +       unsigned int offset, value, irq_type = 0;
-> +
-> +       port = owl_gpio_get_port(pctrl, &gpio);
-> +       if (WARN_ON(port == NULL))
-> +               return -ENODEV;
-> +
-> +       gpio_base = pctrl->base + port->offset;
-> +
-> +       switch (type) {
-> +       case IRQ_TYPE_EDGE_RISING:
-> +               irq_type = OWL_GPIO_INT_EDGE_RISING;
-> +               break;
-> +
-> +       case IRQ_TYPE_EDGE_FALLING:
-> +               irq_type = OWL_GPIO_INT_EDGE_FALLING;
-> +               break;
-
-Very often things such as keys will request trigger on
-both edges. This means IRQ_TYPE_EDGE_RISING
-and IRQ_TYPE_EDGE_FALLING are both set, which
-will cause you problems here, since it is unhandled.
-
-I guess it is fine to set both?
-
-> +       offset = gpio < 16 ? 4 : 0;
-
-I think even the compiler should suggest putting he (gpio < 16)
-expression in paranthesis.
-
-> +       value = readl_relaxed(gpio_base + port->intc_type + offset);
-> +       value &= ~(OWL_GPIO_INT_MASK << ((gpio % 16) * 2));
-> +       value |= irq_type << ((gpio % 16) * 2);
-> +       writel_relaxed(value, gpio_base + port->intc_type + offset);
-> +
-> +       raw_spin_unlock_irqrestore(&pctrl->lock, flags);
-> +
-> +       if (type & IRQ_TYPE_EDGE_BOTH)
-> +               irq_set_handler_locked(data, handle_edge_irq);
-> +       else
-> +               irq_set_handler_locked(data, handle_level_irq);
-
-Here you handle both edges, but not in the switch clause.
-
-> +static void owl_gpio_irq_handler(struct irq_desc *desc)
-
-This looks fine.
-
-> +static struct irq_chip owl_gpio_irq_chip = {
-> +       .name           = "owlgpio",
-> +       .irq_mask       = owl_gpio_irq_mask,
-> +       .irq_unmask     = owl_gpio_irq_unmask,
-> +       .irq_ack        = owl_gpio_irq_ack,
-> +       .irq_set_type   = owl_gpio_irq_set_type,
-> +};
-
-If you implement your own irqchip you need to implement
-.irq_request_resources and .irq_free_resources locking the GPIO
-lines for interrupt, see other drivers that do this or the
-gpiolib core code in gpiolib.c.
-
-It would be really neat if you could instead use the
-GPIOLIB_IRQCHIP though, but I know it will be a bit tricky
-and maybe not possible.
-
-> +       for (i = 0; i < pctrl->soc->nports; i++) {
-> +               irq_set_chained_handler_and_data(pctrl->irq[i],
-> +                                               owl_gpio_irq_handler,
-> +                                               pctrl);
-> +       }
-
-If you use GPIOLIB_IRQCHIP with several parent IRQs.
-See Thierry's work in drivers/gpio/gpio-tegra186.c for the
-only example.
-
-I think that is what you want to do here.
-
-We do want to add helpers in gpiolib to do this in a more
-organized and easy-to-use fashion. Patches welcome ;)
-
-Yours,
-Linus Walleij
+Thanks
+ChenYu
