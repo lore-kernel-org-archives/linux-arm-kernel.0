@@ -1,94 +1,69 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 12 Jun 2018 14:46:38 +0100
-Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
- priority masking
-In-Reply-To: <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
- <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
- <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
- <c4e5f8ff-ecde-7b88-8a37-39e47ef22917@arm.com>
- <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
- <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
- <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
-Message-ID: <bc8bb69d-8db4-87b7-adfb-589e1dd905c0@arm.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Tue, 12 Jun 2018 15:14:37 +0200
+Subject: [PATCH 16/19] mmc: mmci: add DT bindings for STM32 sdmmc
+In-Reply-To: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1528809280-31116-17-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ludovic Barre <ludovic.barre@st.com>
 
+STM32 sdmmc variant has support to:
+-Indicate signal directions (only one property
+for d0dir, d123dir, cmd_dir)
+-Select command and data phase relation.
+-Select "clock in" from an external driver.
 
-On 25/05/18 11:48, Julien Thierry wrote:
-> 
-> 
-> On 25/05/18 11:41, Suzuki K Poulose wrote:
->> On 25/05/18 11:39, Julien Thierry wrote:
->>>
->>>
->>> On 25/05/18 11:36, Suzuki K Poulose wrote:
->>>> On 25/05/18 11:17, Julien Thierry wrote:
->>>>>
->>>>>
->>>>> On 25/05/18 11:04, Suzuki K Poulose wrote:
->>>>>> On 25/05/18 10:49, Julien Thierry wrote:
->>>>>>> Add a cpufeature indicating whether a cpu supports masking 
->>>>>>> interrupts
->>>>>>> by priority.
->>>>>>
->>>>>> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
->>>>>> the description ?
->>>>>
->>>>> More or less.
->>>>>
->>>>> It is just to have an easier condition in the rest of the series. 
->>>>> Basically the PRIO masking feature is enabled if we have a GICv3 
->>>>> CPUIF working *and* the option was selected at build time. Before 
->>>>> this meant that I was checking for the GIC_CPUIF cap inside #ifdefs 
->>>>> (and putting alternatives depending on that inside #ifdefs as well).
->>>>>
->>>>> Having this as a separate feature feels easier to manage in the 
->>>>> code. It also makes it clearer at boot time that the kernel will be 
->>>>> using irq priorities (although I admit it was not the initial 
->>>>> intention):
->>>>>
->>>>> [??? 0.000000] CPU features: detected: IRQ priority masking
->>>>>
->>>>>
->>>>> But yes that new feature will be detected only if SYSREG_GIC_CPUIF 
->>>>> gets detected as well.
->>>>
->>>> Well, you could always wrap the check like :
->>>>
->>>> static inline bool system_has_irq_priority_masking(void)
->>>> {
->>>> ?????return (IS_ENABLED(CONFIG_YOUR_CONFIG) && 
->>>> cpus_have_const_cap(HWCAP_SYSREG_GIC_CPUIF));
->>>> }
->>>>
->>>> and use it everywhere.
->>>>
->>>
->>> Yes, but I can't use that in the asm parts that use alternatives and 
->>> would need to surround them in #ifdef... :\
->>
->> I thought there is _ALTERNATIVE_CFG() to base the alternative depend 
->> on a CONFIG_xxx ?
->> Doesn't that solve the problem ?
-> 
-> Right, I didn't see that one. It should work yes.
-> 
-> I'll try that when working on the next version.
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ Documentation/devicetree/bindings/mmc/mmci.txt | 9 +++++++++
+ drivers/mmc/host/mmci.c                        | 6 ++++++
+ 2 files changed, 15 insertions(+)
 
-I've been trying to use this now, but I can't figure out how.
-
-The _ALTERNATIVE_CFG does not seem to work in assembly code (despite 
-having its own definition for __ASSEMBLY__), and the alternative_insn 
-does not seem to be suited for instructions that take operands (or more 
-than one operand)
-
-If I am mistaken, can you provide an example of how to use this in 
-assembly with instructions having more than 1 operand?
-
-Cheers,
-
+diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+index e952707..d678933 100644
+--- a/Documentation/devicetree/bindings/mmc/mmci.txt
++++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+@@ -19,6 +19,7 @@ Optional properties:
+                            the ID provided by the HW
+ - vqmmc-supply           : phandle to the regulator device tree node, mentioned
+                            as the VCCQ/VDD_IO supply in the eMMC/SD specs.
++specific for ux500 variant:
+ - st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
+ - st,sig-dir-dat2        : bus signal direction pin used for DAT[2].
+ - st,sig-dir-dat31       : bus signal direction pin used for DAT[3] and DAT[1].
+@@ -26,6 +27,14 @@ Optional properties:
+ - st,sig-dir-cmd         : cmd signal direction pin used for CMD.
+ - st,sig-pin-fbclk       : feedback clock signal pin used.
+ 
++specific for sdmmc variant:
++- st,sig-dir             : signal direction polarity used for cmd, dat0 dat123.
++- st,neg-edge            : data & command phase relation, generated on
++                           sd clock falling edge.
++- st,use-ckin            : use ckin pin from an external driver to sample
++                           the receive data (example: with voltage
++			   switch transceiver).
++
+ Deprecated properties:
+ - mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
+ - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index e24fd1e..86aef4f 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1328,6 +1328,12 @@ static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
+ 		host->pwr_reg_add |= MCI_ST_CMDDIREN;
+ 	if (of_get_property(np, "st,sig-pin-fbclk", NULL))
+ 		host->pwr_reg_add |= MCI_ST_FBCLKEN;
++	if (of_get_property(np, "st,sig-dir", NULL))
++		host->pwr_reg_add |= MCI_STM32_DIRPOL;
++	if (of_get_property(np, "st,neg-edge", NULL))
++		host->clk_reg_add |= MCI_STM32_CLK_NEGEDGE;
++	if (of_get_property(np, "st,use-ckin ", NULL))
++		host->clk_reg_add |= MCI_STM32_CLK_SELCKIN;
+ 
+ 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+ 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
 -- 
-Julien Thierry
+2.7.4
