@@ -1,40 +1,94 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Jun 2018 10:46:28 -0300
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: add rave-sp subdevices
-In-Reply-To: <20180611052608.GB16091@dragon>
-References: <20180517191923.16212-1-nikita.yoush@cogentembedded.com>
- <20180611052608.GB16091@dragon>
-Message-ID: <CAOMZO5AHbPOS_3ShrMAoiXMxRWR6M16khDZM_9V4mRxM2MbnGQ@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 12 Jun 2018 14:46:38 +0100
+Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
+ priority masking
+In-Reply-To: <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+ <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
+ <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
+ <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
+ <c4e5f8ff-ecde-7b88-8a37-39e47ef22917@arm.com>
+ <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
+ <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
+ <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
+Message-ID: <bc8bb69d-8db4-87b7-adfb-589e1dd905c0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
 
-On Mon, Jun 11, 2018 at 2:26 AM, Shawn Guo <shawnguo@kernel.org> wrote:
 
->> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
->> index 0c99ac04ad08..98cc107098e0 100644
->> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
->> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
->> @@ -581,6 +581,14 @@
->>               watchdog {
->>                       compatible = "zii,rave-sp-watchdog";
->>               };
->> +
->> +             backlight {
->> +                     compatible = "zii,rave-sp-backlight";
->> +             };
->> +
->> +             pwrbutton {
->> +                     compatible = "zii,rave-sp-pwrbutton";
->> +             };
->
-> Where are these compatibles documented?
+On 25/05/18 11:48, Julien Thierry wrote:
+> 
+> 
+> On 25/05/18 11:41, Suzuki K Poulose wrote:
+>> On 25/05/18 11:39, Julien Thierry wrote:
+>>>
+>>>
+>>> On 25/05/18 11:36, Suzuki K Poulose wrote:
+>>>> On 25/05/18 11:17, Julien Thierry wrote:
+>>>>>
+>>>>>
+>>>>> On 25/05/18 11:04, Suzuki K Poulose wrote:
+>>>>>> On 25/05/18 10:49, Julien Thierry wrote:
+>>>>>>> Add a cpufeature indicating whether a cpu supports masking 
+>>>>>>> interrupts
+>>>>>>> by priority.
+>>>>>>
+>>>>>> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
+>>>>>> the description ?
+>>>>>
+>>>>> More or less.
+>>>>>
+>>>>> It is just to have an easier condition in the rest of the series. 
+>>>>> Basically the PRIO masking feature is enabled if we have a GICv3 
+>>>>> CPUIF working *and* the option was selected at build time. Before 
+>>>>> this meant that I was checking for the GIC_CPUIF cap inside #ifdefs 
+>>>>> (and putting alternatives depending on that inside #ifdefs as well).
+>>>>>
+>>>>> Having this as a separate feature feels easier to manage in the 
+>>>>> code. It also makes it clearer at boot time that the kernel will be 
+>>>>> using irq priorities (although I admit it was not the initial 
+>>>>> intention):
+>>>>>
+>>>>> [??? 0.000000] CPU features: detected: IRQ priority masking
+>>>>>
+>>>>>
+>>>>> But yes that new feature will be detected only if SYSREG_GIC_CPUIF 
+>>>>> gets detected as well.
+>>>>
+>>>> Well, you could always wrap the check like :
+>>>>
+>>>> static inline bool system_has_irq_priority_masking(void)
+>>>> {
+>>>> ?????return (IS_ENABLED(CONFIG_YOUR_CONFIG) && 
+>>>> cpus_have_const_cap(HWCAP_SYSREG_GIC_CPUIF));
+>>>> }
+>>>>
+>>>> and use it everywhere.
+>>>>
+>>>
+>>> Yes, but I can't use that in the asm parts that use alternatives and 
+>>> would need to surround them in #ifdef... :\
+>>
+>> I thought there is _ALTERNATIVE_CFG() to base the alternative depend 
+>> on a CONFIG_xxx ?
+>> Doesn't that solve the problem ?
+> 
+> Right, I didn't see that one. It should work yes.
+> 
+> I'll try that when working on the next version.
 
-Currently they are documented in linux-next at:
+I've been trying to use this now, but I can't figure out how.
 
-Documentation/devicetree/bindings/watchdog/zii,rave-sp-wdt.txt
-Documentation/devicetree/bindings/leds/backlight/zii,rave-sp-backlight.txt
-Documentation/devicetree/bindings/input/zii,rave-sp-pwrbutton.txt
+The _ALTERNATIVE_CFG does not seem to work in assembly code (despite 
+having its own definition for __ASSEMBLY__), and the alternative_insn 
+does not seem to be suited for instructions that take operands (or more 
+than one operand)
 
-They should land in 4.18-rc1.
+If I am mistaken, can you provide an example of how to use this in 
+assembly with instructions having more than 1 operand?
+
+Cheers,
+
+-- 
+Julien Thierry
