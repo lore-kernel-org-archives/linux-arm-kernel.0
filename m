@@ -1,38 +1,29 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 16:58:34 -0500
-Subject: [U-Boot] [RFC PATCH 0/2] ARM: v7: Enable basic framework for
- supporting bits for CVE-2017-5715
-In-Reply-To: <20180612214049.GA17671@n2100.armlinux.org.uk>
-References: <20180125214559.27570-1-nm@ti.com>
- <CAOMZO5CcEf=EhFWknKmCXXLJPOgx=65jLH+X1OAGkg5VxBGVew@mail.gmail.com>
- <CAGo_u6qyf1Z+zSG-17TYRDPzG8V_0_-nk1F15HB4tPyT9rbUYQ@mail.gmail.com>
- <20180612214049.GA17671@n2100.armlinux.org.uk>
-Message-ID: <20180612215834.wrnfrb57ed3uxexa@kahuna>
+Date: Tue, 12 Jun 2018 17:01:25 -0500
+Subject: [RFC PATCH 1/6] Documentation: arm: ti: Add bindings for AM654 SoC
+In-Reply-To: <20180612210519.GA17653@rob-hp-laptop>
+References: <20180605060125.9518-1-nm@ti.com> <20180605060125.9518-2-nm@ti.com>
+ <20180612210519.GA17653@rob-hp-laptop>
+Message-ID: <20180612220125.3scgr6by62wifirp@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:40-20180612, Russell King - ARM Linux wrote:
+On 21:05-20180612, Rob Herring wrote:
+> On Tue, Jun 05, 2018 at 01:01:20AM -0500, Nishanth Menon wrote:
 [...]
-> > I started respinning the series, while there is definitely a use of
-> > implementing in u-boot,
-> > I am starting to wonder if we should also be doing this in kernel.
+> > +Boards based on K3 Multicore SoC architecture shall have the following property:
+> > +- compatible: Every hardware block introduced in K3 Multicore SoC
+> > +  architecture shall be of the form:
+> > +  "ti,XXX-YYY", where:
+> > +     'XXX' represents the specific SoC part for which the support is added.
+> > +     'YYY' represents the corresponding peripheral in SoC being supported.
 > 
-> How does the kernel set the bit when the kernel is running in non-secure
-> mode, when the ACTLR is read-only in that mode?
+> No need to explain standard DT convention here. (But I don't think we 
+> have this convention documented anywhere, so patches welcome. :))
+> 
 
-For OMAP5/DRA7 SMP systems, I just posted a patch that seems to resolve
-it:
-https://patchwork.kernel.org/patch/10461273/
-
-This'd be similar in implementation to ARM erratum 801819 workaround
-that needs two pieces (u-boot + kernel). I am not really worried about
-OMAP5/DRA7 since they should'nt loose context in Low power modes.
-Other SoCs need to be aware of the constraints.
-
-/me wishes PSCI was a standard during ARMv7, but it was'nt... So
-legacy v7 SoCs have implementations that are kind of different (even
-smc calling conventions vary).
-
+Thanks. Will drop off from my series (will skip the generic dts
+convention for now ;) ).
 -- 
 Regards,
 Nishanth Menon
