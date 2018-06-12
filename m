@@ -1,66 +1,97 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:26 +0200
-Subject: [PATCH v2 17/27] drm/sun4i: Add support for R40 mixers
+Date: Tue, 12 Jun 2018 22:00:36 +0200
+Subject: [PATCH v2 27/27] ARM: dts: sun8i: r40: Enable HDMI output on BananaPi
+ M2 Ultra
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-18-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-28-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both mixers have similar capabilities as others SoCs with DE2.
-
-First mixer has 1 VI and 3 UI planes and supports HW scaling on all
-planes.
-
-Second mixer has 1 VI and 1 UI planes and also supports HW scaling on
-all planes.
+Since HDMI can be considered as main output, most capable mixer is
+connected to it (mixer0).
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 45 +++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 126899d6f0d3..ee8febb25903 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -500,6 +500,22 @@ static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
- 	.vi_num		= 1,
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index 27d9ccd0ef2f..0ebc2f9a980e 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -58,6 +58,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -93,6 +104,10 @@
+ 	};
  };
  
-+static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
-+	.ccsc		= 0,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0xf,
-+	.ui_num		= 3,
-+	.vi_num		= 1,
++&de {
++	status = "okay";
 +};
 +
-+static const struct sun8i_mixer_cfg sun8i_r40_mixer1_cfg = {
-+	.ccsc		= 1,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0x3,
-+	.ui_num		= 1,
-+	.vi_num		= 1,
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -101,6 +116,16 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	status = "okay";
 +};
 +
- static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.vi_num = 2,
- 	.ui_num = 1,
-@@ -521,6 +537,14 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
- 		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
- 		.data = &sun8i_h3_mixer0_cfg,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-r40-de2-mixer-0",
-+		.data = &sun8i_r40_mixer0_cfg,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-r40-de2-mixer-1",
-+		.data = &sun8i_r40_mixer1_cfg,
-+	},
- 	{
- 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
- 		.data = &sun8i_v3s_mixer_cfg,
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -195,6 +220,26 @@
+ 	status = "okay";
+ };
+ 
++&tcon_top_hdmi_in_tcon_tv0 {
++	remote-endpoint = <&tcon_tv0_out_tcon_top>;
++};
++
++&tcon_top_mixer0_out_tcon_tv0 {
++	remote-endpoint = <&tcon_tv0_in_tcon_top>;
++};
++
++&tcon_tv0_in {
++	tcon_tv0_in_tcon_top: endpoint {
++		remote-endpoint = <&tcon_top_mixer0_out_tcon_tv0>;
++	};
++};
++
++&tcon_tv0_out {
++	tcon_tv0_out_tcon_top: endpoint {
++		remote-endpoint = <&tcon_top_hdmi_in_tcon_tv0>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.17.1
