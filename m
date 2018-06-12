@@ -1,50 +1,66 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:23 +0200
-Subject: [PATCH v2 14/27] drm/sun4i: Don't check for panel or bridge on TV
- TCONs
+Date: Tue, 12 Jun 2018 22:00:26 +0200
+Subject: [PATCH v2 17/27] drm/sun4i: Add support for R40 mixers
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-15-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-18-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
-sense to check if panel or bridge is connected to them.
+Both mixers have similar capabilities as others SoCs with DE2.
 
-Check if TCON has channel 0 and only then check for connected panel or
-bridges.
+First mixer has 1 VI and 3 UI planes and supports HW scaling on all
+planes.
+
+Second mixer has 1 VI and 1 UI planes and also supports HW scaling on
+all planes.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index b1205a7bc20f..c9ffa5381185 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1189,13 +1189,19 @@ static const struct component_ops sun4i_tcon_ops = {
- static int sun4i_tcon_probe(struct platform_device *pdev)
- {
- 	struct device_node *node = pdev->dev.of_node;
-+	const struct sun4i_tcon_quirks *quirks;
- 	struct drm_bridge *bridge;
- 	struct drm_panel *panel;
- 	int ret;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 126899d6f0d3..ee8febb25903 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -500,6 +500,22 @@ static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
+ 	.vi_num		= 1,
+ };
  
--	ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
--	if (ret == -EPROBE_DEFER)
--		return ret;
-+	quirks = of_device_get_match_data(&pdev->dev);
++static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
++	.ccsc		= 0,
++	.mod_rate	= 297000000,
++	.scaler_mask	= 0xf,
++	.ui_num		= 3,
++	.vi_num		= 1,
++};
 +
-+	/* panels and bridges are present only on TCONs with channel 0 */
-+	if (quirks->has_channel_0) {
-+		ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+	}
- 
- 	return component_add(&pdev->dev, &sun4i_tcon_ops);
- }
++static const struct sun8i_mixer_cfg sun8i_r40_mixer1_cfg = {
++	.ccsc		= 1,
++	.mod_rate	= 297000000,
++	.scaler_mask	= 0x3,
++	.ui_num		= 1,
++	.vi_num		= 1,
++};
++
+ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.vi_num = 2,
+ 	.ui_num = 1,
+@@ -521,6 +537,14 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
+ 		.data = &sun8i_h3_mixer0_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-r40-de2-mixer-0",
++		.data = &sun8i_r40_mixer0_cfg,
++	},
++	{
++		.compatible = "allwinner,sun8i-r40-de2-mixer-1",
++		.data = &sun8i_r40_mixer1_cfg,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
 -- 
 2.17.1
