@@ -1,61 +1,45 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:28 +0200
-Subject: [PATCH v2 19/27] drm/sun4i: Enable DW HDMI PHY clock
-In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-20-jernej.skrabec@siol.net>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 12 Jun 2018 13:21:27 -0700
+Subject: [PATCH 1/5] ARM: dts: cygnus: Fix I2C controller interrupt type
+In-Reply-To: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+References: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1528834891-17807-2-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current DW HDMI PHY code never prepares and enables PHY clock after it is
-created. It's just used as it is. This may work in some cases, but it's
-clearly wrong. Fix it by adding proper calls to enable/disable PHY
-clock.
+Fix I2C controller interrupt to use IRQ_TYPE_LEVEL_HIGH for Broadcom
+Cygnus SoC
 
-Fixes: 4f86e81748fe ("drm/sun4i: Add support for H3 HDMI PHY variant")
+Fixes: b51c05a331ff ("ARM: dts: add I2C device nodes for Broadcom Cygnus")
+Fixes: 0f0b21a83ad2 ("ARM: dts: Move all Cygnus peripherals into axi bus")
+Fixes: 9c5101f7a253 ("ARM: dts: Reorder Cygnus peripherals")
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 5a52fc489a9d..966688f04741 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -477,13 +477,15 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 			dev_err(dev, "Couldn't create the PHY clock\n");
- 			goto err_put_clk_pll0;
- 		}
-+
-+		clk_prepare_enable(phy->clk_phy);
- 	}
- 
- 	phy->rst_phy = of_reset_control_get_shared(node, "phy");
- 	if (IS_ERR(phy->rst_phy)) {
- 		dev_err(dev, "Could not get phy reset control\n");
- 		ret = PTR_ERR(phy->rst_phy);
--		goto err_put_clk_pll0;
-+		goto err_disable_clk_phy;
- 	}
- 
- 	ret = reset_control_deassert(phy->rst_phy);
-@@ -514,6 +516,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 	reset_control_assert(phy->rst_phy);
- err_put_rst_phy:
- 	reset_control_put(phy->rst_phy);
-+err_disable_clk_phy:
-+	clk_disable_unprepare(phy->clk_phy);
- err_put_clk_pll0:
- 	if (phy->variant->has_phy_clk)
- 		clk_put(phy->clk_pll0);
-@@ -531,6 +535,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
- 
- 	clk_disable_unprepare(phy->clk_mod);
- 	clk_disable_unprepare(phy->clk_bus);
-+	clk_disable_unprepare(phy->clk_phy);
- 
- 	reset_control_assert(phy->rst_phy);
- 
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 9fe4f5a..835a6f7 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -216,7 +216,7 @@
+ 			reg = <0x18008000 0x100>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+ 		};
+@@ -245,7 +245,7 @@
+ 			reg = <0x1800b000 0x100>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+ 		};
 -- 
-2.17.1
+2.1.4
