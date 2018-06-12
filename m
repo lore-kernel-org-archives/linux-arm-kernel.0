@@ -1,41 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 15:24:10 -0500
-Subject: [PATCH 3/4] ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable
- invalidates of BTB) to facilitate CVE_2017-5715 WA in OS
-In-Reply-To: <20180612202411.29798-1-nm@ti.com>
-References: <20180612202411.29798-1-nm@ti.com>
-Message-ID: <20180612202411.29798-4-nm@ti.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 12 Jun 2018 13:21:29 -0700
+Subject: [PATCH 3/5] ARM64: dts: ns2: Fix I2C controller interrupt type
+In-Reply-To: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+References: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <1528834891-17807-4-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CVE_2017_5715 and since we have our own v7_arch_cp15_set_acr
-function to setup the bits, we are able to override the settings.
+Fix I2C controller interrupt to use IRQ_TYPE_LEVEL_HIGH for
+Broadcom NS2 SoC
 
-Without this enabled, Linux kernel reports:
-CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+Fixes: 7ac674e8df7a ("arm64: dts: Add I2C nodes for NS2")
+Fixes: 63a913c157f5 ("arm64: dts: move ns2 into northstar2 directory")
 
-With this enabled, Linux kernel reports:
-CPU0: Spectre v2: using ICIALLU workaround
-
-NOTE: This by itself does not enable the workaround for CPU1 (on
-OMAP5 and DRA72/AM572 SoCs) and may require additional kernel patches.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 ---
- arch/arm/mach-omap2/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 3bb1ecb58de0..77820cc8d1e4 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -53,6 +53,7 @@ config OMAP54XX
- 	bool "OMAP54XX SoC"
- 	select ARM_ERRATA_798870
- 	select SYS_THUMB_BUILD
-+	select ARM_CORTEX_A15_CVE_2017_5715
- 	imply NAND_OMAP_ELM
- 	imply NAND_OMAP_GPMC
- 	imply SPL_DISPLAY_PRINT
+diff --git a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+index 4a2a6af..c0e4896 100644
+--- a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+@@ -566,7 +566,7 @@
+ 			reg = <0x66080000 0x100>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <GIC_SPI 394 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 394 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+ 		};
+@@ -594,7 +594,7 @@
+ 			reg = <0x660b0000 0x100>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <GIC_SPI 395 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 395 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+ 		};
 -- 
-2.15.1
+2.1.4
