@@ -1,38 +1,35 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 12 Jun 2018 11:42:21 +0100
-Subject: [PATCH 10/20] dts: juno: Update coresight bindings for hw port
-In-Reply-To: <CANLsYkxNakRGCWT6O0JRKz+N1OTU3-XreC_FiB8Fiv+jEoPEbQ@mail.gmail.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-11-git-send-email-suzuki.poulose@arm.com>
- <20180608214946.GI30587@xps15>
- <CANLsYkxNakRGCWT6O0JRKz+N1OTU3-XreC_FiB8Fiv+jEoPEbQ@mail.gmail.com>
-Message-ID: <20180612104221.GA26029@e107155-lin>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jun 2018 12:43:14 +0200
+Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE
+ disabled
+In-Reply-To: <CAMuHMdXJg0mYbs=e0QJMDb=A+bRbPsNF=TJzSumSjjOK3yJw2Q@mail.gmail.com>
+References: <20180525210843.1821071-1-arnd@arndb.de>
+ <CAMuHMdXJg0mYbs=e0QJMDb=A+bRbPsNF=TJzSumSjjOK3yJw2Q@mail.gmail.com>
+Message-ID: <CAK8P3a2=v5cazbSvdAMX8yf0x=PmCAQatQR6ZD=N0oM5-RGoUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2018 at 03:52:58PM -0600, Mathieu Poirier wrote:
-> On 8 June 2018 at 15:49, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> > On Tue, Jun 05, 2018 at 10:43:21PM +0100, Suzuki K Poulose wrote:
-> >> Switch to updated coresight bindings for hw ports.
-> >>
-> >> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> >> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >> ---
-> >> Changes since V1:
-> >>   - Add support Juno for r1 & r2.
-> >> ---
-> >
-> > Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-> Sudeep please hold on before applying this as there is more work to be
-> done on this set.
->
-Sure, I plan to apply the DT changes only after the driver changes are
-queued by you or whichever tree it's channelled through. I was already
-told the same to Suzuki.
+On Tue, Jun 12, 2018 at 9:25 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
 
---
-Regards,
-Sudeep
+>> --- a/drivers/pwm/pwm-stm32.c
+>> +++ b/drivers/pwm/pwm-stm32.c
+>> @@ -484,9 +484,7 @@ static int stm32_pwm_apply_locked(struct pwm_chip *chip, struct pwm_device *pwm,
+>>  static const struct pwm_ops stm32pwm_ops = {
+>>         .owner = THIS_MODULE,
+>>         .apply = stm32_pwm_apply_locked,
+>> -#if IS_ENABLED(CONFIG_DMA_ENGINE)
+>> -       .capture = stm32_pwm_capture,
+>> -#endif
+>> +       .capture = IS_ENABLED(CONFIG_DMA_ENGINE) ? stm32_pwm_capture : NULL,
+>
+> Cool, I didn't know IS_ENABLED() can be used in static initializers.
+> I guess it's too late/much work to use this trick in e.g. SET_*_PM_OPS(),
+> as there are lots of places protecting the functions by #ifdefs?
+
+It's one of those things I've been planning to do for a long time, but as
+you noticed, we can't just change the macro but have to come up with a
+replacement that works without those #ifdefs. Unfortunately, nobody has
+come up with a good /name/ for those macros, which is still the main blocker ;-)
+
+      Arnd
