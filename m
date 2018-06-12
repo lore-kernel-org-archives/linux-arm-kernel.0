@@ -1,35 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jun 2018 12:43:14 +0200
-Subject: [PATCH] pwm: stm32: fix build warning with CONFIG_DMA_ENGINE
- disabled
-In-Reply-To: <CAMuHMdXJg0mYbs=e0QJMDb=A+bRbPsNF=TJzSumSjjOK3yJw2Q@mail.gmail.com>
-References: <20180525210843.1821071-1-arnd@arndb.de>
- <CAMuHMdXJg0mYbs=e0QJMDb=A+bRbPsNF=TJzSumSjjOK3yJw2Q@mail.gmail.com>
-Message-ID: <CAK8P3a2=v5cazbSvdAMX8yf0x=PmCAQatQR6ZD=N0oM5-RGoUQ@mail.gmail.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 12 Jun 2018 13:54:52 +0300
+Subject: [PATCH v2 0/5] thermal: tsens: Prepare for version 2 of TSENS IP
+Message-ID: <cover.1528799892.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 9:25 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
+This series is a mixed bag: Some code moves to deal with version 2 of the
+TSENS IP in common functions, new platform support (sdm845), a cleanup
+patch and a DT change to have a common way to deal with the SROT and TM
+registers despite slightly different features across the IP family and
+different register offsets.
 
->> --- a/drivers/pwm/pwm-stm32.c
->> +++ b/drivers/pwm/pwm-stm32.c
->> @@ -484,9 +484,7 @@ static int stm32_pwm_apply_locked(struct pwm_chip *chip, struct pwm_device *pwm,
->>  static const struct pwm_ops stm32pwm_ops = {
->>         .owner = THIS_MODULE,
->>         .apply = stm32_pwm_apply_locked,
->> -#if IS_ENABLED(CONFIG_DMA_ENGINE)
->> -       .capture = stm32_pwm_capture,
->> -#endif
->> +       .capture = IS_ENABLED(CONFIG_DMA_ENGINE) ? stm32_pwm_capture : NULL,
->
-> Cool, I didn't know IS_ENABLED() can be used in static initializers.
-> I guess it's too late/much work to use this trick in e.g. SET_*_PM_OPS(),
-> as there are lots of places protecting the functions by #ifdefs?
+I can merge the tsens-8996.c and tsens-sdm845.c files into a tsens-v2.c if
+desired.
 
-It's one of those things I've been planning to do for a long time, but as
-you noticed, we can't just change the macro but have to come up with a
-replacement that works without those #ifdefs. Unfortunately, nobody has
-come up with a good /name/ for those macros, which is still the main blocker ;-)
+Changes since v1:
+- Move get_temp() from tsens-8996 to tsens-common and rename
+- Change 8996 DT entry to allow init_common() to work across sdm845 and
+  8996 due to different offsets
 
-      Arnd
+Amit Kucheria (5):
+  thermal: tsens: Get rid of unused fields in structure
+  dt: qcom: 8996: thermal: Move to DT initialisation
+  thermal: tsens: Move 8996 get_temp() to common code for reuse
+  thermal: tsens: Add support for SDM845
+  thermal: tsens: Check if we have valid data before reading
+
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  1 +
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 12 +++-
+ drivers/thermal/qcom/Makefile                      |  2 +-
+ drivers/thermal/qcom/tsens-8996.c                  | 74 +-------------------
+ drivers/thermal/qcom/tsens-common.c                | 78 +++++++++++++++++++---
+ drivers/thermal/qcom/tsens-sdm845.c                | 15 +++++
+ drivers/thermal/qcom/tsens.c                       |  3 +
+ drivers/thermal/qcom/tsens.h                       |  8 ++-
+ 8 files changed, 107 insertions(+), 86 deletions(-)
+ create mode 100644 drivers/thermal/qcom/tsens-sdm845.c
+
+-- 
+2.7.4
