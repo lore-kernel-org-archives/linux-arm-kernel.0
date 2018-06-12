@@ -1,32 +1,45 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 17:04:06 -0500
-Subject: [RFC PATCH 5/8] dt-bindings: mailbox: ti,message-manager: Add
- support for secure proxy threads
-In-Reply-To: <20180612211128.GA22038@rob-hp-laptop>
-References: <20180605061629.4759-1-nm@ti.com> <20180605061629.4759-6-nm@ti.com>
- <20180612211128.GA22038@rob-hp-laptop>
-Message-ID: <20180612220406.t4mkcht3ubwo3hej@kahuna>
+Date: Tue, 12 Jun 2018 17:09:18 -0500
+Subject: [RFC PATCH 1/3] Documentation: dt: keystone: ti-sci: Add
+ optional host-id parameter
+In-Reply-To: <20180612213922.GA26791@rob-hp-laptop>
+References: <20180605062640.3356-1-nm@ti.com> <20180605062640.3356-2-nm@ti.com>
+ <20180612213922.GA26791@rob-hp-laptop>
+Message-ID: <20180612220918.7cchihtcmmta6pm5@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:11-20180612, Rob Herring wrote:
-[...]
-> > diff --git a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
-> > index ebf0e3710cee..de796e90cac6 100644
-> > --- a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
-> > +++ b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
-> > @@ -7,22 +7,40 @@ manager is broken up into queues in different address regions that are called
-> >  "proxies" - each instance is unidirectional and is instantiated at SoC
-> >  integration level to indicate receive or transmit path.
-> >  
-> > +This can also be used to describe Texas Instrument's Secure Proxy
-> > +controller that allows for individually configurable "threads" or
-> > +"proxies" which allow for independent communication scheme.
+On 21:39-20180612, Rob Herring wrote:
+> On Tue, Jun 05, 2018 at 01:26:38AM -0500, Nishanth Menon wrote:
+> > Texas Instrument's System Control Interface (TISCI) permits the
+> > ability for Operating Systems to running in virtual machines to be
 > 
-> There seems to be very little re-use here. I think I would make this 
-> its own doc.
+> ...for OSs running in virtual...
 
-Agreed. will do the same in the formal series. Thanks.
+Ack. thanks.
+
+> 
+> > able to independently communicate with the firmware without the need
+> > going through an hypervisor.
+> > 
+> > The "host-id" in effect is the hardware representation of the
+> > host (example: VMs locked to a core) as identified to the System
+> > Controller.
+> 
+> So the hypervisor will fill in host-id's for each VM instance?
+
+Yes OR have it's own device tree blobs representation of it's own host
+IDs assigned by system firmware. This provides complete independence of
+VMs to communicate with the system controller (once the host-id is
+provided) without switching to hyp for arbitration (and yes, verified
+ability with jailhouse hypervisor and multiple linux instances operating
+simultaneously). This also has the added benefit of:
+1. The burden of hypervisor from being involved in PM functionality as each
+of the VMs can operate autonomously.
+2. In TI SoCs which are heterogeneous, the system firmware plays the role
+of system master communicating with multiple firmware(running on various
+uCs) and OSes running on bigger cores.
+
 -- 
 Regards,
 Nishanth Menon
