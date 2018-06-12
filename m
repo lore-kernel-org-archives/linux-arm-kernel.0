@@ -1,59 +1,97 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:11 +0200
-Subject: [PATCH v2 02/27] clk: sunxi-ng: r40: Allow setting parent rate to
- display related clocks
+Date: Tue, 12 Jun 2018 22:00:13 +0200
+Subject: [PATCH v2 04/27] dt-bindings: display: sunxi-drm: Add TCON TOP
+ description
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-3-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-5-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display related peripherals need precise clocks to operate correctly.
-
-Allow DE2, TCONs and HDMI to set parent clock.
+TCON TOP main purpose is to configure whole display pipeline. It
+determines relationships between mixers and TCONs, selects source TCON
+for HDMI, muxes LCD and TV encoder GPIO output, selects TV encoder
+clock source and contains additional TV TCON and DSI gates.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ .../bindings/display/sunxi/sun4i-drm.txt      | 45 +++++++++++++++++++
+ include/dt-bindings/clock/sun8i-tcon-top.h    | 11 +++++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-index c16a62a7bdbd..fa5317719684 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-@@ -655,7 +655,8 @@ static SUNXI_CCU_GATE(dram_deinterlace_clk,	"dram-deinterlace",	"dram",
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 3346c1e2a7a0..ef64c589a4b3 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -187,6 +187,51 @@ And on the A23, A31, A31s and A33, you need one more clock line:
+    - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
+                  clock, that can be used to drive the LVDS clock
  
- static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
- static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
--				 0x104, 0, 4, 24, 3, BIT(31), 0);
-+				 0x104, 0, 4, 24, 3, BIT(31),
-+				 CLK_SET_RATE_PARENT);
- static SUNXI_CCU_M_WITH_MUX_GATE(mp_clk, "mp", de_parents,
- 				 0x108, 0, 4, 24, 3, BIT(31), 0);
++TCON TOP
++--------
++
++TCON TOPs main purpose is to configure whole display pipeline. It determines
++relationships between mixers and TCONs, selects source TCON for HDMI, muxes
++LCD and TV encoder GPIO output, selects TV encoder clock source and contains
++additional TV TCON and DSI gates.
++
++It allows display pipeline to be configured in very different ways:
++
++                             / LCD0/LVDS0
++                 / TCON-LCD0
++                 |           \ MIPI DSI
++ mixer0          |
++        \        / TCON-LCD1 - LCD1/LVDS1
++         TCON-TOP
++        /        \ TCON-TV0 - TVE0/RGB
++ mixer1          |          \
++                 |           TCON-TOP - HDMI
++                 |          /
++                 \ TCON-TV1 - TVE1/RGB
++
++Note that both TCON TOP references same physical unit.
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun8i-r40-tcon-top
++  - reg: base address and size of the memory-mapped region.
++  - clocks: phandle to the clocks feeding the TCON TOP
++    * bus: TCON TOP interface clock
++  - clock-names: clock name mentioned above
++  - resets: phandle to the reset line driving the DRC
++    * rst: TCON TOP reset line
++  - reset-names: reset name mentioned above
++  - #clock-cells : must contain 1
++
++- ports: A ports node with endpoint definitions as defined in
++    Documentation/devicetree/bindings/media/video-interfaces.txt. The first port
++    should be the input for mixer0 mux. The second should be the output for that
++    mux. Third port should be input for mixer1 mux. Fourth port should be output
++    for mixer1 mux. Fifth port should be input for HDMI mux. Sixth port should
++    be output for it. All output endpoints should have reg property with the id
++    of the target TCON. All ports should have only one enpoint connected to
++    remote endpoint.
++
+ DRC
+ ---
  
-@@ -667,9 +668,11 @@ static SUNXI_CCU_MUX_WITH_GATE(tcon_lcd0_clk, "tcon-lcd0", tcon_parents,
- static SUNXI_CCU_MUX_WITH_GATE(tcon_lcd1_clk, "tcon-lcd1", tcon_parents,
- 			       0x114, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
- static SUNXI_CCU_M_WITH_MUX_GATE(tcon_tv0_clk, "tcon-tv0", tcon_parents,
--				 0x118, 0, 4, 24, 3, BIT(31), 0);
-+				 0x118, 0, 4, 24, 3, BIT(31),
-+				 CLK_SET_RATE_PARENT);
- static SUNXI_CCU_M_WITH_MUX_GATE(tcon_tv1_clk, "tcon-tv1", tcon_parents,
--				 0x11c, 0, 4, 24, 3, BIT(31), 0);
-+				 0x11c, 0, 4, 24, 3, BIT(31),
-+				 CLK_SET_RATE_PARENT);
- 
- static const char * const deinterlace_parents[] = { "pll-periph0",
- 						    "pll-periph1" };
-@@ -699,7 +702,8 @@ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
- 
- static const char * const hdmi_parents[] = { "pll-video0", "pll-video1" };
- static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
--				 0x150, 0, 4, 24, 2, BIT(31), 0);
-+				 0x150, 0, 4, 24, 2, BIT(31),
-+				 CLK_SET_RATE_PARENT);
- 
- static SUNXI_CCU_GATE(hdmi_slow_clk,	"hdmi-slow",	"osc24M",
- 		      0x154, BIT(31), 0);
+diff --git a/include/dt-bindings/clock/sun8i-tcon-top.h b/include/dt-bindings/clock/sun8i-tcon-top.h
+new file mode 100644
+index 000000000000..c05e92770402
+--- /dev/null
++++ b/include/dt-bindings/clock/sun8i-tcon-top.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
++/* Copyright (C) 2018 Jernej Skrabec <jernej.skrabec@siol.net> */
++
++#ifndef _DT_BINDINGS_CLOCK_SUN8I_TCON_TOP_H_
++#define _DT_BINDINGS_CLOCK_SUN8I_TCON_TOP_H_
++
++#define CLK_BUS_TCON_TOP_DSI	0
++#define CLK_BUS_TCON_TOP_TV0	1
++#define CLK_BUS_TCON_TOP_TV1	2
++
++#endif /* _DT_BINDINGS_CLOCK_SUN8I_TCON_TOP_H_ */
 -- 
 2.17.1
