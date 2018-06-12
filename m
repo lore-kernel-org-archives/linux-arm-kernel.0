@@ -1,58 +1,29 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 12 Jun 2018 13:54:54 +0300
-Subject: [PATCH v2 2/5] dt: qcom: 8996: thermal: Move to DT initialisation
-In-Reply-To: <cover.1528799892.git.amit.kucheria@linaro.org>
-References: <cover.1528799892.git.amit.kucheria@linaro.org>
-Message-ID: <683ceb9a7d283bcad47fc6e8e4fcfbd7e76c1018.1528799892.git.amit.kucheria@linaro.org>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Tue, 12 Jun 2018 13:58:10 +0300
+Subject: [GIT PULL 2/4] ARM: Device-tree updates
+In-Reply-To: <20180612000142.28883-3-olof@lixom.net> (Olof Johansson's message
+ of "Mon, 11 Jun 2018 17:01:40 -0700")
+References: <20180612000142.28883-1-olof@lixom.net>
+ <20180612000142.28883-3-olof@lixom.net>
+Message-ID: <87efhcb7b1.fsf@purkki.adurom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We also split up the regmap address space into two, one for the TM
-registers, the other for the SROT registers. This was required to deal with
-different address offsets for the TM and SROT registers across different
-SoC families.
+Olof Johansson <olof@lixom.net> writes:
 
-Since tsens-common.c/init_common() currently only registers one address space, the order is important (TM before SROT).This is OK since the code doesn't really use the SROT functionality yet.
+> - Qualcomm:
+> + SDM845, a.k.a Snapdragon 845, an 4+4-core Kryo 385/845
+> (Cortex-A75/A55 derivative) SoC that's one of the current high-end
+> mobile SoCs.
+>
+> It's great to see mainline support for it. So far, you
+> can't do much with it, since a lot of peripherals are not yet in the
+> DTs but driver support for USB, GPU and other pieces are starting to
+> trickle in. This might end up being a well-supported SoC upstream if
+> the momentum keeps up.
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
- drivers/thermal/qcom/tsens-8996.c     |  1 -
- 2 files changed, 11 insertions(+), 2 deletions(-)
+The wifi chip is called wcn3990 and we are working on supporting that in
+ath10k. I'm hoping to get it ready for v4.19.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 410ae78..b4aab18 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -451,7 +451,17 @@
- 
- 		tsens0: thermal-sensor at 4a8000 {
- 			compatible = "qcom,msm8996-tsens";
--			reg = <0x4a8000 0x2000>;
-+			reg = <0x4a9000 0x1000>, /* TM */
-+			      <0x4a8000 0x1000>; /* SROT */
-+			#qcom,sensors = <13>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		tsens1: thermal-sensor at 4ac000 {
-+			compatible = "qcom,msm8996-tsens";
-+			reg = <0x4ad000 0x1000>, /* TM */
-+			      <0x4ac000 0x1000>; /* SROT */
-+			#qcom,sensors = <8>;
- 			#thermal-sensor-cells = <1>;
- 		};
- 
-diff --git a/drivers/thermal/qcom/tsens-8996.c b/drivers/thermal/qcom/tsens-8996.c
-index e1f7781..6e59078 100644
---- a/drivers/thermal/qcom/tsens-8996.c
-+++ b/drivers/thermal/qcom/tsens-8996.c
-@@ -79,6 +79,5 @@ static const struct tsens_ops ops_8996 = {
- };
- 
- const struct tsens_data data_8996 = {
--	.num_sensors	= 13,
- 	.ops		= &ops_8996,
- };
 -- 
-2.7.4
+Kalle Valo
