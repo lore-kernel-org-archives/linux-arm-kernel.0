@@ -1,34 +1,32 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 17:03:33 -0500
-Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
- controller
-In-Reply-To: <20180612210640.GA20728@rob-hp-laptop>
-References: <20180605060125.9518-1-nm@ti.com> <20180605060125.9518-4-nm@ti.com>
- <20180612210640.GA20728@rob-hp-laptop>
-Message-ID: <20180612220333.4odussbccwmup26v@kahuna>
+Date: Tue, 12 Jun 2018 17:04:06 -0500
+Subject: [RFC PATCH 5/8] dt-bindings: mailbox: ti,message-manager: Add
+ support for secure proxy threads
+In-Reply-To: <20180612211128.GA22038@rob-hp-laptop>
+References: <20180605061629.4759-1-nm@ti.com> <20180605061629.4759-6-nm@ti.com>
+ <20180612211128.GA22038@rob-hp-laptop>
+Message-ID: <20180612220406.t4mkcht3ubwo3hej@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:06-20180612, Rob Herring wrote:
-> > diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
-> > index 4b0f05adb228..c35d5ece1156 100644
-> > --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
-> > +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
-> > @@ -1,6 +1,7 @@
-> >  OMAP UART controller
+On 21:11-20180612, Rob Herring wrote:
+[...]
+> > diff --git a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+> > index ebf0e3710cee..de796e90cac6 100644
+> > --- a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+> > +++ b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+> > @@ -7,22 +7,40 @@ manager is broken up into queues in different address regions that are called
+> >  "proxies" - each instance is unidirectional and is instantiated at SoC
+> >  integration level to indicate receive or transmit path.
 > >  
-> >  Required properties:
-> > +- compatible : should be "ti,am654-uart" for AM654 controllers
+> > +This can also be used to describe Texas Instrument's Secure Proxy
+> > +controller that allows for individually configurable "threads" or
+> > +"proxies" which allow for independent communication scheme.
 > 
-> Not compatible with any existing TI 8250 UARTs?
+> There seems to be very little re-use here. I think I would make this 
+> its own doc.
 
-Base is compatible, however there are differences in DMA operation and
-few additional bits. omap4-uart is sufficient for a basic PIO mode of
-operation given initialization a bootloader might do for base console.
-
-I will split the bindings off into it's own patch to keep the confusion
-to a minimum and allowing serial driver change to go in independently.
-
+Agreed. will do the same in the formal series. Thanks.
 -- 
 Regards,
 Nishanth Menon
