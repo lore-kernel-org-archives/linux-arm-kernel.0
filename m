@@ -1,68 +1,21 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 12 Jun 2018 19:27:29 +0200
-Subject: [v2,4/6] ARM: drop no-thumb-interwork in EABI mode
-In-Reply-To: <20180612171929.GA7829@roeck-us.net>
-References: <20180325180959.28008-5-stefan@agner.ch>
- <20180612171929.GA7829@roeck-us.net>
-Message-ID: <325243a63755a1f6ae578dae35154b17@agner.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Jun 2018 12:17:36 -0600
+Subject: [PATCH v2 1/2] dt-bindings: arm: mediatek: Document Mediatek X20
+ Development Board
+In-Reply-To: <20180605163442.4812-2-manivannan.sadhasivam@linaro.org>
+References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
+ <20180605163442.4812-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180612181736.GA32301@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.06.2018 19:19, Guenter Roeck wrote:
-> On Sun, Mar 25, 2018 at 08:09:57PM +0200, Stefan Agner wrote:
->> According to GCC documentation -m(no-)thumb-interwork is
->> meaningless in AAPCS configurations. Also clang does not
+On Tue, Jun 05, 2018 at 10:04:41PM +0530, Manivannan Sadhasivam wrote:
+> Document Mediatek X20 Development Board which is a 96Boards Consumer
+> Edition platform based on MT6797 SoC.
 > 
-> It appears that this is only correct for recent versions of gcc.
-> 
-> With gcc 4.9.2, this patch causes the qemu collie emulation
-> to fail with collie_defconfig+CONFIG_AEABI.
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/mediatek.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-Hm, interesting. However, even 4.9.0 claims this option is meaningless
-when using AAPCS configurations:
-https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/ARM-Options.html#ARM-Options
-
-> 
-> qemu-system-arm: Trying to execute code outside RAM or ROM at 0x02000000
-> This usually means one of the following happened:
-> ...
-> 
-> With gcc 7.3.0, the emulation works as expected. Reverting the patch
-> fixes the problem with gcc 4.9.2. Not that it matters much to me - I can
-> and will switch to gcc 7.3.0 for my testing - but effectively this means
-> that older versions of gcc are no longer supported for all configurations.
-> 
-> Maybe $(call cc-option,-mno-thumb-interwork,) would have been safer ?
-
-I used to have call cc-option in place, but I removed that when I
-realized that gcc claims it is meaningless with AAPCS configurations.
-
---
-Stefan
-
-> 
-> Guenter
-> 
->> support the flag:
->>   clang-5.0: error: unknown argument: '-mno-thumb-interwork'
->>
->> Just drop -mno-thumb-interwork in AEABI configuration.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/Makefile | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->> index e83f5161fdd8..e9e3fde3c657 100644
->> --- a/arch/arm/Makefile
->> +++ b/arch/arm/Makefile
->> @@ -106,7 +106,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
->>  tune-y := $(tune-y)
->>
->>  ifeq ($(CONFIG_AEABI),y)
->> -CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
->> +CFLAGS_ABI	:=-mabi=aapcs-linux -mfpu=vfp
->>  else
->>  CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
->>  endif
+Reviewed-by: Rob Herring <robh@kernel.org>
