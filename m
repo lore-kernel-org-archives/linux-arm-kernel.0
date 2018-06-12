@@ -1,72 +1,57 @@
 From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Tue, 12 Jun 2018 19:22:17 +0200
-Subject: [PATCH 1/2] media: stm32-dcmi: drop unnecessary while(1) loop
-Message-ID: <1528824138-19089-1-git-send-email-hofrat@osadl.org>
+Date: Tue, 12 Jun 2018 19:23:16 +0200
+Subject: [PATCH] media: stm32-dcmi: simplify of_node_put usage
+Message-ID: <1528824196-19149-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The while(1) is effectively useless as all possible paths within it
-return thus there is no way to loop.
+This does not fix any bug - this is just a code simplification. As
+np is not used after passing it to v4l2_fwnode_endpoint_parse() its
+refcount can be decremented immediately and at one location.
 
 Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
 ---
 
-This is not actually fixing any bug - the while(1){ } will not hurt here
-it is though simply unnecessary. Found during code review.
-
-The diff output is not very readable - essentially only the outer
-while(1){ } was removed.
+Issue found during code reading.
 
 Patch was compile tested with: x86_64_defconfig, MEDIA_SUPPORT=y
 MEDIA_CAMERA_SUPPORT=y, V4L_PLATFORM_DRIVERS=y, OF=y, COMPILE_TEST=y
 CONFIG_VIDEO_STM32_DCMI=y
-(There are a number of sparse warnings - not related to the changes though)
+(There are a few sparse warnings - but unrelated to the lines changed)
 
 Patch is against 4.17.0 (localversion-next is next-20180608)
 
- drivers/media/platform/stm32/stm32-dcmi.c | 28 +++++++++++++---------------
- 1 file changed, 13 insertions(+), 15 deletions(-)
+ drivers/media/platform/stm32/stm32-dcmi.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
 diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 2e1933d..70b81d2 100644
+index 2e1933d..0b61042 100644
 --- a/drivers/media/platform/stm32/stm32-dcmi.c
 +++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -1605,23 +1605,21 @@ static int dcmi_graph_parse(struct stm32_dcmi *dcmi, struct device_node *node)
- 	struct device_node *ep = NULL;
- 	struct device_node *remote;
- 
--	while (1) {
--		ep = of_graph_get_next_endpoint(node, ep);
--		if (!ep)
--			return -EINVAL;
--
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote) {
--			of_node_put(ep);
--			return -EINVAL;
--		}
-+	ep = of_graph_get_next_endpoint(node, ep);
-+	if (!ep)
-+		return -EINVAL;
- 
--		/* Remote node to connect */
--		dcmi->entity.node = remote;
--		dcmi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
--		dcmi->entity.asd.match.fwnode = of_fwnode_handle(remote);
--		return 0;
-+	remote = of_graph_get_remote_port_parent(ep);
-+	if (!remote) {
-+		of_node_put(ep);
-+		return -EINVAL;
+@@ -1696,23 +1696,20 @@ static int dcmi_probe(struct platform_device *pdev)
  	}
-+
-+	/* Remote node to connect */
-+	dcmi->entity.node = remote;
-+	dcmi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
-+	dcmi->entity.asd.match.fwnode = of_fwnode_handle(remote);
-+	return 0;
- }
  
- static int dcmi_graph_init(struct stm32_dcmi *dcmi)
+ 	ret = v4l2_fwnode_endpoint_parse(of_fwnode_handle(np), &ep);
++	of_node_put(np);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not parse the endpoint\n");
+-		of_node_put(np);
+ 		return -ENODEV;
+ 	}
+ 
+ 	if (ep.bus_type == V4L2_MBUS_CSI2) {
+ 		dev_err(&pdev->dev, "CSI bus not supported\n");
+-		of_node_put(np);
+ 		return -ENODEV;
+ 	}
+ 	dcmi->bus.flags = ep.bus.parallel.flags;
+ 	dcmi->bus.bus_width = ep.bus.parallel.bus_width;
+ 	dcmi->bus.data_shift = ep.bus.parallel.data_shift;
+ 
+-	of_node_put(np);
+-
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+ 		dev_err(&pdev->dev, "Could not get irq\n");
 -- 
 2.1.4
