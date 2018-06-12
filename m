@@ -1,47 +1,91 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 15:24:11 -0500
-Subject: [PATCH 4/4] ARM: mach-omap2: omap3/am335x: Enable ACR::IBE on
- Cortex-A8 SoCs for CVE-2017-5715
+Date: Tue, 12 Jun 2018 15:24:09 -0500
+Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB with
+ ICIALLU on Cortex-A15 for CVE-2017-5715
 In-Reply-To: <20180612202411.29798-1-nm@ti.com>
 References: <20180612202411.29798-1-nm@ti.com>
-Message-ID: <20180612202411.29798-5-nm@ti.com>
+Message-ID: <20180612202411.29798-3-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CVE-2017-5715 option to set the IBE bit. This enables kernel
-workarounds necessary for the said CVE.
+As recommended by Arm in [1], ACTLR[0] (Enable invalidates of BTB)
+needs to be set[2] for BTB to be invalidated on ICIALLU. This needs to
+be done unconditionally for Cortex-A15 processors. Provide a config
+option for platforms to enable this option based on impact analysis
+for products.
 
-With this enabled, Linux reports:
-CPU0: Spectre v2: using BPIALL workaround
+NOTE: This patch in itself is NOT the final solution, this requires:
+a) Implementation of v7_arch_cp15_set_acr on SoCs which may not
+   provide direct access to ACR register.
+b) Operating Systems such as Linux to provide adequate workaround in the
+   right locations.
+c) This workaround applies to only the boot processor. It is important
+   to apply workaround as necessary (context-save-restore) around low
+   power context loss OR additional processors as necessary in either
+   firmware support OR elsewhere in OS.
 
-This workaround may need to be re-applied in OS environment around low
-power transition resume states where context of ACR would be lost (off-mode
-etc).
+[1] https://developer.arm.com/support/security-update
+[2] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0438c/BABGHIBG.html
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Andre Przywara <Andre.Przywara@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Tom Rini <trini@konsulko.com>
+Cc: Michael Nazzareno Trimarchi <michael@amarulasolutions.com>
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/Kconfig           | 4 ++++
+ arch/arm/cpu/armv7/start.S | 8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 77820cc8d1e4..f4babc8d2600 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -10,6 +10,7 @@ config OMAP34XX
- 	select ARM_ERRATA_454179
- 	select ARM_ERRATA_621766
- 	select ARM_ERRATA_725233
-+	select ARM_CORTEX_A8_CVE_2017_5715
- 	select USE_TINY_PRINTF
- 	imply NAND_OMAP_GPMC
- 	imply SPL_EXT_SUPPORT
-@@ -116,6 +117,7 @@ config AM43XX
- config AM33XX
- 	bool "AM33XX SoC"
- 	select SPECIFY_CONSOLE_INDEX
-+	select ARM_CORTEX_A8_CVE_2017_5715
- 	imply NAND_OMAP_ELM
- 	imply NAND_OMAP_GPMC
- 	imply SPL_NAND_AM33XX_BCH
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9e32d5b43cb0..98f58fd27696 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -109,6 +109,7 @@ config SYS_ARM_MPU
+ # CONFIG_ARM_ERRATA_798870
+ # CONFIG_ARM_ERRATA_801819
+ # CONFIG_ARM_CORTEX_A8_CVE_2017_5715
++# CONFIG_ARM_CORTEX_A15_CVE_2017_5715
+ 
+ config ARM_ERRATA_430973
+ 	bool
+@@ -182,6 +183,9 @@ config ARM_ERRATA_855873
+ config ARM_CORTEX_A8_CVE_2017_5715
+ 	bool
+ 
++config ARM_CORTEX_A15_CVE_2017_5715
++	bool
++
+ config CPU_ARM720T
+ 	bool
+ 	select SYS_CACHE_SHIFT_5
+diff --git a/arch/arm/cpu/armv7/start.S b/arch/arm/cpu/armv7/start.S
+index 3beaf5a93d81..81edec01bf32 100644
+--- a/arch/arm/cpu/armv7/start.S
++++ b/arch/arm/cpu/armv7/start.S
+@@ -241,6 +241,14 @@ skip_errata_798870:
+ skip_errata_801819:
+ #endif
+ 
++#ifdef CONFIG_ARM_CORTEX_A15_CVE_2017_5715
++	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
++	orr	r0, r0, #1 << 0		@ Enable invalidates of BTB
++	push	{r1-r5}			@ Save the cpu info registers
++	bl	v7_arch_cp15_set_acr
++	pop	{r1-r5}			@ Restore the cpu info - fall through
++#endif
++
+ #ifdef CONFIG_ARM_ERRATA_454179
+ 	mrc	p15, 0, r0, c1, c0, 1	@ Read ACR
+ 
 -- 
 2.15.1
