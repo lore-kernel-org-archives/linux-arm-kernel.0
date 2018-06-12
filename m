@@ -1,44 +1,61 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 12 Jun 2018 22:00:27 +0200
-Subject: [PATCH v2 18/27] dt-bindings: display: sun4i-drm: Add description of
- A64 HDMI PHY
+Date: Tue, 12 Jun 2018 22:00:28 +0200
+Subject: [PATCH v2 19/27] drm/sun4i: Enable DW HDMI PHY clock
 In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
 References: <20180612200036.21483-1-jernej.skrabec@siol.net>
-Message-ID: <20180612200036.21483-19-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-20-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A64 HDMI PHY is similar to H3 HDMI PHY except it has two possible PLL
-clock parents. It is compatible to other HDMI PHYs, like that found in
-R40.
+Current DW HDMI PHY code never prepares and enables PHY clock after it is
+created. It's just used as it is. This may work in some cases, but it's
+clearly wrong. Fix it by adding proper calls to enable/disable PHY
+clock.
+
+Fixes: 4f86e81748fe ("drm/sun4i: Add support for H3 HDMI PHY variant")
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index d84df6d808c2..6fb45c7a9ac8 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -101,6 +101,7 @@ DWC HDMI PHY
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 5a52fc489a9d..966688f04741 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -477,13 +477,15 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 			dev_err(dev, "Couldn't create the PHY clock\n");
+ 			goto err_put_clk_pll0;
+ 		}
++
++		clk_prepare_enable(phy->clk_phy);
+ 	}
  
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun50i-a64-hdmi-phy
-     * allwinner,sun8i-a83t-hdmi-phy
-     * allwinner,sun8i-h3-hdmi-phy
-   - reg: base address and size of memory-mapped region
-@@ -111,8 +112,9 @@ Required properties:
-   - resets: phandle to the reset controller driving the PHY
-   - reset-names: must be "phy"
+ 	phy->rst_phy = of_reset_control_get_shared(node, "phy");
+ 	if (IS_ERR(phy->rst_phy)) {
+ 		dev_err(dev, "Could not get phy reset control\n");
+ 		ret = PTR_ERR(phy->rst_phy);
+-		goto err_put_clk_pll0;
++		goto err_disable_clk_phy;
+ 	}
  
--H3 HDMI PHY requires additional clock:
-+H3 and A64 HDMI PHY require additional clocks:
-   - pll-0: parent of phy clock
-+  - pll-1: second possible phy clock parent (A64 only)
+ 	ret = reset_control_deassert(phy->rst_phy);
+@@ -514,6 +516,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 	reset_control_assert(phy->rst_phy);
+ err_put_rst_phy:
+ 	reset_control_put(phy->rst_phy);
++err_disable_clk_phy:
++	clk_disable_unprepare(phy->clk_phy);
+ err_put_clk_pll0:
+ 	if (phy->variant->has_phy_clk)
+ 		clk_put(phy->clk_pll0);
+@@ -531,6 +535,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
  
- TV Encoder
- ----------
+ 	clk_disable_unprepare(phy->clk_mod);
+ 	clk_disable_unprepare(phy->clk_bus);
++	clk_disable_unprepare(phy->clk_phy);
+ 
+ 	reset_control_assert(phy->rst_phy);
+ 
 -- 
 2.17.1
