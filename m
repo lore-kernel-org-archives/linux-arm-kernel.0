@@ -1,172 +1,51 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 12 Jun 2018 16:08:03 +0100
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <20180611145330.GO13364@dhcp22.suse.cz> (Michal Hocko's message
- of "Mon, 11 Jun 2018 16:53:30 +0200")
-References: <1527768879-88161-2-git-send-email-xiexiuqi@huawei.com>
- <20180606154516.GL6631@arm.com>
- <CAErSpo6S0qtR42tjGZrFu4aMFFyThx1hkHTSowTt6t3XerpHnA@mail.gmail.com>
- <20180607105514.GA13139@dhcp22.suse.cz>
- <5ed798a0-6c9c-086e-e5e8-906f593ca33e@huawei.com>
- <20180607122152.GP32433@dhcp22.suse.cz>
- <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
- <20180611085237.GI13364@dhcp22.suse.cz>
- <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
- <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
- <20180611145330.GO13364@dhcp22.suse.cz>
-Message-ID: <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+From: michal.vokac@ysoft.com (=?UTF-8?B?TWljaGFsIFZva8OhxI0=?=)
+Date: Tue, 12 Jun 2018 17:09:30 +0200
+Subject: [RFC] Configure i.MX6 RGMII pad group control registers from
+ device tree
+In-Reply-To: <f5a01de5-fc81-52c1-c2ea-edb77ecff076@ysoft.com>
+References: <f5a01de5-fc81-52c1-c2ea-edb77ecff076@ysoft.com>
+Message-ID: <5ab5c58a-dc44-d1bc-2132-8704d05bf1de@ysoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal Hocko <mhocko@kernel.org> writes:
+On 11.6.2018 14:36, Michal Vok?? wrote:
+> Ahoj,
+> 
+> To configure individual pad's characteristics on i.MX6 SoC a
+> fsl,pins = <PIN_FUNC_ID CONFIG> property can be used. Is there any convenient
+> way to configure the pad group control registers?
+> 
+> The issue is that some bits (DDR_SEL and ODT) in the individual RGMII pad
+> control registers are read-only. To tweak those parameters (signal voltage and
+> termination resistors) one need to write to the pad group control registers for
+> the whole RGMII pad group. Namely IOMUXC_SW_PAD_CTL_GRP_DDR_TYPE_RGMII and
+> IOMUXC_SW_PAD_CTL_GRP_RGMII_TERM. The group registers in general are not
+> accessible from the list in arch/arm/boot/dts/imx6dl-pinfunc.h.
+> 
+> I could not find any other way to change the group registers than hacking-in
+> some lines into the imx6q_init_machine(void) function in
+> arch/arm/mach-imx/mach-imx6q.c source. As I work towards upstreaming my board
+> this should be done from my device tree or solved in some universal way.
+> 
+> Any hints will be much appreciated.
+> Michal
 
-> On Mon 11-06-18 08:43:03, Bjorn Helgaas wrote:
->> On Mon, Jun 11, 2018 at 08:32:10PM +0800, Xie XiuQi wrote:
->> > Hi Michal,
->> > 
->> > On 2018/6/11 16:52, Michal Hocko wrote:
->> > > On Mon 11-06-18 11:23:18, Xie XiuQi wrote:
->> > >> Hi Michal,
->> > >>
->> > >> On 2018/6/7 20:21, Michal Hocko wrote:
->> > >>> On Thu 07-06-18 19:55:53, Hanjun Guo wrote:
->> > >>>> On 2018/6/7 18:55, Michal Hocko wrote:
->> > >>> [...]
->> > >>>>> I am not sure I have the full context but pci_acpi_scan_root calls
->> > >>>>> kzalloc_node(sizeof(*info), GFP_KERNEL, node)
->> > >>>>> and that should fall back to whatever node that is online. Offline node
->> > >>>>> shouldn't keep any pages behind. So there must be something else going
->> > >>>>> on here and the patch is not the right way to handle it. What does
->> > >>>>> faddr2line __alloc_pages_nodemask+0xf0 tells on this kernel?
->> > >>>>
->> > >>>> The whole context is:
->> > >>>>
->> > >>>> The system is booted with a NUMA node has no memory attaching to it
->> > >>>> (memory-less NUMA node), also with NR_CPUS less than CPUs presented
->> > >>>> in MADT, so CPUs on this memory-less node are not brought up, and
->> > >>>> this NUMA node will not be online (but SRAT presents this NUMA node);
->> > >>>>
->> > >>>> Devices attaching to this NUMA node such as PCI host bridge still
->> > >>>> return the valid NUMA node via _PXM, but actually that valid NUMA node
->> > >>>> is not online which lead to this issue.
->> > >>>
->> > >>> But we should have other numa nodes on the zonelists so the allocator
->> > >>> should fall back to other node. If the zonelist is not intiailized
->> > >>> properly, though, then this can indeed show up as a problem. Knowing
->> > >>> which exact place has blown up would help get a better picture...
->> > >>>
->> > >>
->> > >> I specific a non-exist node to allocate memory using kzalloc_node,
->> > >> and got this following error message.
->> > >>
->> > >> And I found out there is just a VM_WARN, but it does not prevent the memory
->> > >> allocation continue.
->> > >>
->> > >> This nid would be use to access NODE_DADA(nid), so if nid is invalid,
->> > >> it would cause oops here.
->> > >>
->> > >> 459 /*
->> > >> 460  * Allocate pages, preferring the node given as nid. The node must be valid and
->> > >> 461  * online. For more general interface, see alloc_pages_node().
->> > >> 462  */
->> > >> 463 static inline struct page *
->> > >> 464 __alloc_pages_node(int nid, gfp_t gfp_mask, unsigned int order)
->> > >> 465 {
->> > >> 466         VM_BUG_ON(nid < 0 || nid >= MAX_NUMNODES);
->> > >> 467         VM_WARN_ON(!node_online(nid));
->> > >> 468
->> > >> 469         return __alloc_pages(gfp_mask, order, nid);
->> > >> 470 }
->> > >> 471
->> > >>
->> > >> (I wrote a ko, to allocate memory on a non-exist node using kzalloc_node().)
->> > > 
->> > > OK, so this is an artificialy broken code, right. You shouldn't get a
->> > > non-existent node via standard APIs AFAICS. The original report was
->> > > about an existing node which is offline AFAIU. That would be a different
->> > > case. If I am missing something and there are legitimate users that try
->> > > to allocate from non-existing nodes then we should handle that in
->> > > node_zonelist.
->> > 
->> > I think hanjun's comments may help to understood this question:
->> >  - NUMA node will be built if CPUs and (or) memory are valid on this NUMA
->> >  node;
->> > 
->> >  - But if we boot the system with memory-less node and also with
->> >  CONFIG_NR_CPUS less than CPUs in SRAT, for example, 64 CPUs total with 4
->> >  NUMA nodes, 16 CPUs on each NUMA node, if we boot with
->> >  CONFIG_NR_CPUS=48, then we will not built numa node for node 3, but with
->> >  devices on that numa node, alloc memory will be panic because NUMA node
->> >  3 is not a valid node.
->
-> Hmm, but this is not a memory-less node. It sounds like a misconfigured
-> kernel to me or the broken initialization. Each CPU should have a
-> fallback numa node to be used.
->
->> > I triggered this BUG on arm64 platform, and I found a similar bug has
->> > been fixed on x86 platform. So I sent a similar patch for this bug.
->> > 
->> > Or, could we consider to fix it in the mm subsystem?
->> 
->> The patch below (b755de8dfdfe) seems like totally the wrong direction.
->> I don't think we want every caller of kzalloc_node() to have check for
->> node_online().
->
-> absolutely.
->
->> Why would memory on an off-line node even be in the allocation pool?
->> I wouldn't expect that memory to be put in the pool until the node
->> comes online and the memory is accessible, so this sounds like some
->> kind of setup issue.
->> 
->> But I'm definitely not an mm person.
->
-> Well, the standard way to handle memory less NUMA nodes is to simply
-> fallback to the closest NUMA node. We even have an API for that
-> (numa_mem_id).
+I figured out this is more "pinctrl-imx.c" than "device-tree" related
+so I am kindly adding maintainers of that file in hope somebody will
+shed some light to it.
 
-CONFIG_HAVE_MEMORYLESS node is not enabled on arm64 which means we end
-up returning the original node in the fallback path.
+I am diving deeper into the code and it seems there really is no generic
+option to set the i.MX6 pad group control registers from device tree.
+Or am I looking at the problem from a wrong angle?
 
-Xie, does the below patch help? I can submit a proper patch if this
-fixes the issue for you.
+How should we deal with boards that need to configure some pad
+characteristics available only through the pad group control registers?
 
--- >8 --
-Subject: [PATCH] arm64/numa: Enable memoryless numa nodes
+I also raised this question at the NXP community forum [1] and get quite
+unsatisfying answer so far. I would love to find/implement a proper
+and universal solution.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- arch/arm64/Kconfig   | 4 ++++
- arch/arm64/mm/numa.c | 2 ++
- 2 files changed, 6 insertions(+)
+Thanks in advance for your time,
+Michal
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eb2cf4938f6d..5317e9aa93ab 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -756,6 +756,10 @@ config USE_PERCPU_NUMA_NODE_ID
- 	def_bool y
- 	depends on NUMA
- 
-+config HAVE_MEMORYLESS_NODES
-+       def_bool y
-+       depends on NUMA
-+
- config HAVE_SETUP_PER_CPU_AREA
- 	def_bool y
- 	depends on NUMA
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index dad128ba98bf..c699dcfe93de 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -73,6 +73,8 @@ EXPORT_SYMBOL(cpumask_of_node);
- static void map_cpu_to_node(unsigned int cpu, int nid)
- {
- 	set_cpu_numa_node(cpu, nid);
-+	set_numa_mem(local_memory_node(nid));
-+
- 	if (nid >= 0)
- 		cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
- }
--- 
-2.17.0
+[1] https://community.nxp.com/thread/477464
