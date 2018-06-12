@@ -1,147 +1,134 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 12 Jun 2018 15:14:29 +0200
-Subject: [PATCH 08/19] mmc: mmci: add variant property to define irq pio mask
+Date: Tue, 12 Jun 2018 15:14:24 +0200
+Subject: [PATCH 03/19] mmc: mmci: add datactrl block size variant property
 In-Reply-To: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
 References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1528809280-31116-9-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1528809280-31116-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch allows to define specific pio mask for variants.
-Needed to support the STM32 sdmmc variant which has some bits
-with different meaning (bits: 21,20,13,12,9)
+This patch allows to define a datactrl block size
+by variant, requested by STM32 sdmmc variant.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
  drivers/mmc/host/mmci.c | 13 +++++++++++--
- drivers/mmc/host/mmci.h |  5 ++++-
- 2 files changed, 15 insertions(+), 3 deletions(-)
+ drivers/mmc/host/mmci.h |  2 ++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1f44c61..5fd3ffb6 100644
+index 7a15afd..9b25714 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -62,6 +62,7 @@ static struct variant_data variant_arm = {
+@@ -52,6 +52,7 @@ static struct variant_data variant_arm = {
+ 	.fifosize		= 16 * 4,
+ 	.fifohalfsize		= 8 * 4,
+ 	.datalength_bits	= 16,
++	.datactrl_blocksz	= 11,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
  	.f_max			= 100000000,
  	.reversed_irq_handling	= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.mmci_dma		= &dmaengine,
-@@ -80,6 +81,7 @@ static struct variant_data variant_arm_extended_fifo = {
+@@ -65,6 +66,7 @@ static struct variant_data variant_arm_extended_fifo = {
+ 	.fifosize		= 128 * 4,
+ 	.fifohalfsize		= 64 * 4,
+ 	.datalength_bits	= 16,
++	.datactrl_blocksz	= 11,
  	.pwrreg_powerup		= MCI_PWR_UP,
  	.f_max			= 100000000,
  	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.mmci_dma		= &dmaengine,
-@@ -99,6 +101,7 @@ static struct variant_data variant_arm_extended_fifo_hwfc = {
+@@ -78,6 +80,7 @@ static struct variant_data variant_arm_extended_fifo_hwfc = {
+ 	.fifohalfsize		= 64 * 4,
+ 	.clkreg_enable		= MCI_ARM_HWFCEN,
+ 	.datalength_bits	= 16,
++	.datactrl_blocksz	= 11,
  	.pwrreg_powerup		= MCI_PWR_UP,
  	.f_max			= 100000000,
  	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.mmci_dma		= &dmaengine,
-@@ -124,6 +127,7 @@ static struct variant_data variant_u300 = {
- 	.pwrreg_clkgate		= true,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.mmci_dma		= &dmaengine,
-@@ -150,6 +154,7 @@ static struct variant_data variant_nomadik = {
- 	.pwrreg_clkgate		= true,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.mmci_dma		= &dmaengine,
-@@ -182,6 +187,7 @@ static struct variant_data variant_ux500 = {
- 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.mmci_dma		= &dmaengine,
-@@ -216,6 +222,7 @@ static struct variant_data variant_ux500v2 = {
- 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.mmci_dma		= &dmaengine,
-@@ -232,6 +239,7 @@ static struct variant_data variant_stm32 = {
- 	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
- 	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
+@@ -92,6 +95,7 @@ static struct variant_data variant_u300 = {
+ 	.clkreg_enable		= MCI_ST_U300_HWFCEN,
+ 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
+ 	.datalength_bits	= 16,
++	.datactrl_blocksz	= 11,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio			= true,
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+@@ -111,6 +115,7 @@ static struct variant_data variant_nomadik = {
+ 	.clkreg			= MCI_CLK_ENABLE,
+ 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
  	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
- 	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
-@@ -268,6 +276,7 @@ static struct variant_data variant_qcom = {
- 	.qcom_fifo		= true,
- 	.qcom_dml		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.mmci_dma		= &dmaengine,
-@@ -486,7 +495,7 @@ static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
- 	if (host->singleirq) {
- 		unsigned int mask0 = readl(base + MMCIMASK0);
++	.datactrl_blocksz	= 11,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -133,6 +138,7 @@ static struct variant_data variant_ux500 = {
+ 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
+ 	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
+ 	.datalength_bits	= 24,
++	.datactrl_blocksz	= 11,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -160,6 +166,7 @@ static struct variant_data variant_ux500v2 = {
+ 	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
+ 	.datactrl_mask_ddrmode	= MCI_DPSM_ST_DDRMODE,
+ 	.datalength_bits	= 24,
++	.datactrl_blocksz	= 11,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -187,6 +194,7 @@ static struct variant_data variant_stm32 = {
+ 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
+ 	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
+ 	.datalength_bits	= 24,
++	.datactrl_blocksz	= 11,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -208,6 +216,7 @@ static struct variant_data variant_qcom = {
+ 	.data_cmd_enable	= MCI_CPSM_QCOM_DATCMD,
+ 	.blksz_datactrl4	= true,
+ 	.datalength_bits	= 24,
++	.datactrl_blocksz	= 11,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
+ 	.f_max			= 208000000,
+ 	.explicit_mclk_control	= true,
+@@ -1399,13 +1408,13 @@ static int mmci_probe(struct amba_device *dev,
+ 	/*
+ 	 * Block size can be up to 2048 bytes, but must be a power of two.
+ 	 */
+-	mmc->max_blk_size = 1 << 11;
++	mmc->max_blk_size = 1 << variant->datactrl_blocksz;
  
--		mask0 &= ~MCI_IRQ1MASK;
-+		mask0 &= ~variant->irq_pio_mask;
- 		mask0 |= mask;
+ 	/*
+ 	 * Limit the number of blocks transferred so that we don't overflow
+ 	 * the maximum request size.
+ 	 */
+-	mmc->max_blk_count = mmc->max_req_size >> 11;
++	mmc->max_blk_count = mmc->max_req_size >> variant->datactrl_blocksz;
  
- 		writel(mask0, base + MMCIMASK0);
-@@ -1046,7 +1055,7 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- 			if (status & host->mask1_reg)
- 				mmci_pio_irq(irq, dev_id);
+ 	spin_lock_init(&host->lock);
  
--			status &= ~MCI_IRQ1MASK;
-+			status &= ~host->variant->irq_pio_mask;
- 		}
- 
- 		/*
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index a2bf8bc..b91b130 100644
+index f7cba35..27a2236 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -186,7 +186,7 @@
- 	MCI_CMDRESPENDMASK | MCI_CMDSENTMASK)
- 
- /* These interrupts are directed to IRQ1 when two IRQ lines are available */
--#define MCI_IRQ1MASK \
-+#define MCI_IRQ_PIO_MASK \
- 	(MCI_RXFIFOHALFFULLMASK | MCI_RXDATAAVLBLMASK | \
- 	 MCI_TXFIFOHALFEMPTYMASK)
- 
-@@ -275,6 +275,8 @@ struct mmci_host;
-  * @qcom_dml: enables qcom specific dma glue for dma transfers.
-  * @reversed_irq_handling: handle data irq before cmd irq.
-  * @mmcimask1: true if variant have a MMCIMASK1 register.
-+ * @irq_pio_mask: bitmask used to manage interrupt pio transfert in mmcimask
-+ *		  register
-  * @start_err: bitmask identifying the STARTBITERR bit inside MMCISTATUS
-  *	       register.
-  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
-@@ -317,6 +319,7 @@ struct variant_data {
- 	bool			qcom_dml;
- 	bool			reversed_irq_handling;
- 	bool			mmcimask1;
-+	unsigned int		irq_pio_mask;
- 	u32			start_err;
- 	u32			opendrain;
- 	struct mmci_dma_ops	*mmci_dma;
+@@ -252,6 +252,7 @@ struct dma_chan;
+  * @blksz_datactrl4: true if Block size is at b4..b16 position in datactrl
+  *		     register
+  * @datactrl_mask_sdio: SDIO enable mask in datactrl register
++ * @datactrl_blksz: block size in power of two
+  * @pwrreg_powerup: power up value for MMCIPOWER register
+  * @f_max: maximum clk frequency supported by the controller.
+  * @signal_direction: input/out direction of bus signals can be indicated
+@@ -284,6 +285,7 @@ struct variant_data {
+ 	unsigned int		data_cmd_enable;
+ 	unsigned int		datactrl_mask_ddrmode;
+ 	unsigned int		datactrl_mask_sdio;
++	unsigned int		datactrl_blocksz;
+ 	bool			st_sdio;
+ 	bool			st_clkdiv;
+ 	bool			blksz_datactrl16;
 -- 
 2.7.4
