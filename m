@@ -1,77 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Jun 2018 13:41:42 -0600
-Subject: [PATCH v1 2/4] dt-bindings: mailbox: provide imx-mailbox
- documentation
-In-Reply-To: <20180601065821.28234-3-o.rempel@pengutronix.de>
-References: <20180601065821.28234-1-o.rempel@pengutronix.de>
- <20180601065821.28234-3-o.rempel@pengutronix.de>
-Message-ID: <20180612194142.GA16521@rob-hp-laptop>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Tue, 12 Jun 2018 22:00:11 +0200
+Subject: [PATCH v2 02/27] clk: sunxi-ng: r40: Allow setting parent rate to
+ display related clocks
+In-Reply-To: <20180612200036.21483-1-jernej.skrabec@siol.net>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+Message-ID: <20180612200036.21483-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2018 at 08:58:19AM +0200, Oleksij Rempel wrote:
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  .../bindings/mailbox/imx-mailbox.txt          | 35 +++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
-> new file mode 100644
-> index 000000000000..a45604b33039
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
-> @@ -0,0 +1,35 @@
-> +i.MX Messaging Unit
-> +===================
-> +
-> +The i.MX Messaging Unit (MU) contains two register sets: "A" and "B". In most cases
-> +they are accessible from all Processor Units. On one hand, at least for mailbox functionality,
-> +it makes no difference which application or processor is using which set of the MU. On
+Display related peripherals need precise clocks to operate correctly.
 
-Please wrap lines correctly (<80).
+Allow DE2, TCONs and HDMI to set parent clock.
 
-> +other hand, the register sets for each of the MU parts are not identical.
-> +
-> +Required properties:
-> +- compatible :	Shell be one of:
-> +                    "fsl,imx7s-mu-a" and "fsl,imx7s-mu-b" for i.MX7S or i.MX7D
-> +- reg : 	physical base address of the mailbox and length of
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Mix of space and tab.
-
-> +		memory mapped region.
-> +- #mbox-cells:	Common mailbox binding property to identify the number
-> +		of cells required for the mailbox specifier. Should be 1.
-> +- interrupts :	interrupt number. The interrupt specifier format
-> +		depends on the interrupt controller parent.
-
-Just need to say how many interrupts and what they are if more than 1.
-
-> +- clocks     :  phandle to the input clock.
-> +
-> +Example:
-> +	mu0a: mu at 30aa0000 {
-
-mailbox at ...
-
-> +		compatible = "fsl,imx7s-mu-a";
-> +		reg = <0x30aa0000 0x28>;
-> +		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clks IMX7D_MU_ROOT_CLK>;
-> +		#mbox-cells = <1>;
-> +	};
-> +
-> +	mu0b: mu at 30ab0000 {
-
-mailbox at ...
-
-> +		compatible = "fsl,imx7s-mu-b";
-> +		reg = <0x30ab0000 0x28>;
-> +		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clks IMX7D_MU_ROOT_CLK>;
-> +		#mbox-cells = <1>;
-> +	};
-> -- 
-> 2.17.1
-> 
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+index c16a62a7bdbd..fa5317719684 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+@@ -655,7 +655,8 @@ static SUNXI_CCU_GATE(dram_deinterlace_clk,	"dram-deinterlace",	"dram",
+ 
+ static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
+-				 0x104, 0, 4, 24, 3, BIT(31), 0);
++				 0x104, 0, 4, 24, 3, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M_WITH_MUX_GATE(mp_clk, "mp", de_parents,
+ 				 0x108, 0, 4, 24, 3, BIT(31), 0);
+ 
+@@ -667,9 +668,11 @@ static SUNXI_CCU_MUX_WITH_GATE(tcon_lcd0_clk, "tcon-lcd0", tcon_parents,
+ static SUNXI_CCU_MUX_WITH_GATE(tcon_lcd1_clk, "tcon-lcd1", tcon_parents,
+ 			       0x114, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M_WITH_MUX_GATE(tcon_tv0_clk, "tcon-tv0", tcon_parents,
+-				 0x118, 0, 4, 24, 3, BIT(31), 0);
++				 0x118, 0, 4, 24, 3, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M_WITH_MUX_GATE(tcon_tv1_clk, "tcon-tv1", tcon_parents,
+-				 0x11c, 0, 4, 24, 3, BIT(31), 0);
++				 0x11c, 0, 4, 24, 3, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ 
+ static const char * const deinterlace_parents[] = { "pll-periph0",
+ 						    "pll-periph1" };
+@@ -699,7 +702,8 @@ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
+ 
+ static const char * const hdmi_parents[] = { "pll-video0", "pll-video1" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
+-				 0x150, 0, 4, 24, 2, BIT(31), 0);
++				 0x150, 0, 4, 24, 2, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_GATE(hdmi_slow_clk,	"hdmi-slow",	"osc24M",
+ 		      0x154, BIT(31), 0);
+-- 
+2.17.1
