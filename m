@@ -1,29 +1,34 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 Jun 2018 17:01:25 -0500
-Subject: [RFC PATCH 1/6] Documentation: arm: ti: Add bindings for AM654 SoC
-In-Reply-To: <20180612210519.GA17653@rob-hp-laptop>
-References: <20180605060125.9518-1-nm@ti.com> <20180605060125.9518-2-nm@ti.com>
- <20180612210519.GA17653@rob-hp-laptop>
-Message-ID: <20180612220125.3scgr6by62wifirp@kahuna>
+Date: Tue, 12 Jun 2018 17:03:33 -0500
+Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
+ controller
+In-Reply-To: <20180612210640.GA20728@rob-hp-laptop>
+References: <20180605060125.9518-1-nm@ti.com> <20180605060125.9518-4-nm@ti.com>
+ <20180612210640.GA20728@rob-hp-laptop>
+Message-ID: <20180612220333.4odussbccwmup26v@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:05-20180612, Rob Herring wrote:
-> On Tue, Jun 05, 2018 at 01:01:20AM -0500, Nishanth Menon wrote:
-[...]
-> > +Boards based on K3 Multicore SoC architecture shall have the following property:
-> > +- compatible: Every hardware block introduced in K3 Multicore SoC
-> > +  architecture shall be of the form:
-> > +  "ti,XXX-YYY", where:
-> > +     'XXX' represents the specific SoC part for which the support is added.
-> > +     'YYY' represents the corresponding peripheral in SoC being supported.
+On 21:06-20180612, Rob Herring wrote:
+> > diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
+> > index 4b0f05adb228..c35d5ece1156 100644
+> > --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
+> > +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
+> > @@ -1,6 +1,7 @@
+> >  OMAP UART controller
+> >  
+> >  Required properties:
+> > +- compatible : should be "ti,am654-uart" for AM654 controllers
 > 
-> No need to explain standard DT convention here. (But I don't think we 
-> have this convention documented anywhere, so patches welcome. :))
-> 
+> Not compatible with any existing TI 8250 UARTs?
 
-Thanks. Will drop off from my series (will skip the generic dts
-convention for now ;) ).
+Base is compatible, however there are differences in DMA operation and
+few additional bits. omap4-uart is sufficient for a basic PIO mode of
+operation given initialization a bootloader might do for base console.
+
+I will split the bindings off into it's own patch to keep the confusion
+to a minimum and allowing serial driver change to go in independently.
+
 -- 
 Regards,
 Nishanth Menon
