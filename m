@@ -1,57 +1,88 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 13 Jun 2018 12:49:43 -0700
-Subject: [PATCH 1/5] ARM: dts: cygnus: Fix I2C controller interrupt type
-In-Reply-To: <1528834891-17807-2-git-send-email-ray.jui@broadcom.com>
+Date: Wed, 13 Jun 2018 12:50:19 -0700
+Subject: [PATCH 2/5] ARM: dts: cygnus: Fix PCIe controller interrupt type
+In-Reply-To: <1528834891-17807-3-git-send-email-ray.jui@broadcom.com>
 References: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
- <1528834891-17807-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <8c368dbc-f654-ec52-0786-1f318156b8b5@gmail.com>
+ <1528834891-17807-3-git-send-email-ray.jui@broadcom.com>
+Message-ID: <99e3ab78-a639-5244-75a6-af39e56e7c67@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/12/2018 01:21 PM, Ray Jui wrote:
-> Fix I2C controller interrupt to use IRQ_TYPE_LEVEL_HIGH for Broadcom
+> Fix PCIe controller interrupt to use IRQ_TYPE_LEVEL_HIGH for Broadcom
 > Cygnus SoC
 > 
-> Fixes: b51c05a331ff ("ARM: dts: add I2C device nodes for Broadcom Cygnus")
+> Fixes: cd590b50a936 ("ARM: dts: enable PCIe support for Cygnus")
 
-This appears to be the only one that is truly needed here, the two
-others below probably just moved things around but the offending commit
-was already introduced in the above commit.
+This one is valid
 
-> Fixes: 0f0b21a83ad2 ("ARM: dts: Move all Cygnus peripherals into axi bus")
+> Fixes: 0f0b21a83ad2 ("ARM: dts: Move all Cygnus peripherals into axi
+> bus")
 > Fixes: 9c5101f7a253 ("ARM: dts: Reorder Cygnus peripherals")
+> Fixes: f6b889358a82 ("ARM: dts: Enable MSI support for Broadcom Cygnus")
+
+And this one too, but the two others, I would probably drop them so we
+can get the backports to be possibly applicable as far as when these two
+commits can be resolved, does that work?
+
 > 
-
-There is no need for an extra line between the last Fixes: tag and your
-Signed-off-by tag.
-
 > Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 > ---
->  arch/arm/boot/dts/bcm-cygnus.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/bcm-cygnus.dtsi | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> index 9fe4f5a..835a6f7 100644
+> index 835a6f7..2c4df2d 100644
 > --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
 > +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> @@ -216,7 +216,7 @@
->  			reg = <0x18008000 0x100>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> -			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-> +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
->  			clock-frequency = <100000>;
->  			status = "disabled";
+> @@ -256,7 +256,7 @@
+>  
+>  			#interrupt-cells = <1>;
+>  			interrupt-map-mask = <0 0 0 0>;
+> -			interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
+> +			interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+>  
+>  			linux,pci-domain = <0>;
+>  
+> @@ -278,10 +278,10 @@
+>  				compatible = "brcm,iproc-msi";
+>  				msi-controller;
+>  				interrupt-parent = <&gic>;
+> -				interrupts = <GIC_SPI 96 IRQ_TYPE_NONE>,
+> -					     <GIC_SPI 97 IRQ_TYPE_NONE>,
+> -					     <GIC_SPI 98 IRQ_TYPE_NONE>,
+> -					     <GIC_SPI 99 IRQ_TYPE_NONE>;
+> +				interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+>  			};
 >  		};
-> @@ -245,7 +245,7 @@
->  			reg = <0x1800b000 0x100>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> -			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
-> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->  			clock-frequency = <100000>;
->  			status = "disabled";
+>  
+> @@ -291,7 +291,7 @@
+>  
+>  			#interrupt-cells = <1>;
+>  			interrupt-map-mask = <0 0 0 0>;
+> -			interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
+> +			interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+>  
+>  			linux,pci-domain = <1>;
+>  
+> @@ -313,10 +313,10 @@
+>  				compatible = "brcm,iproc-msi";
+>  				msi-controller;
+>  				interrupt-parent = <&gic>;
+> -				interrupts = <GIC_SPI 102 IRQ_TYPE_NONE>,
+> -					     <GIC_SPI 103 IRQ_TYPE_NONE>,
+> -					     <GIC_SPI 104 IRQ_TYPE_NONE>,
+> -					     <GIC_SPI 105 IRQ_TYPE_NONE>;
+> +				interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+>  			};
 >  		};
+>  
 > 
 
 
