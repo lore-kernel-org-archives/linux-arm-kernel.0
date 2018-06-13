@@ -1,51 +1,51 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 Jun 2018 13:31:30 +0800
-Subject: [PATCH 09/28] drm/mediatek: add component DSI3
-In-Reply-To: <1528687580-549-10-git-send-email-stu.hsieh@mediatek.com>
+Date: Wed, 13 Jun 2018 13:38:03 +0800
+Subject: [PATCH 11/28] drm/mediatek: add connection from RDMA0 to DPI0
+In-Reply-To: <1528687580-549-12-git-send-email-stu.hsieh@mediatek.com>
 References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-10-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528867890.15127.4.camel@mtksdaap41>
+ <1528687580-549-12-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528868283.15127.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
-
 On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
-> This patch add the component DSI3
+> This patch add the connection from RDMA0 to DPI0
 > 
 > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
->  2 files changed, 2 insertions(+)
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index 192f7374d988..fe6fdc021fc7 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -228,6 +228,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
->  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
->  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
->  	[DDP_COMPONENT_DSI2]	= { MTK_DSI,		2, NULL },
-> +	[DDP_COMPONENT_DSI2]	= { MTK_DSI,		3, NULL },
-
-DDP_COMPONENT_DSI3
-
-Regards,
-CK
-
->  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
->  	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
->  	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index 8d152b337f15..7413ffeb3c9d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -51,6 +51,7 @@ enum mtk_ddp_comp_id {
->  	DDP_COMPONENT_DSI0,
->  	DDP_COMPONENT_DSI1,
->  	DDP_COMPONENT_DSI2,
-> +	DDP_COMPONENT_DSI3,
->  	DDP_COMPONENT_GAMMA,
->  	DDP_COMPONENT_OD0,
->  	DDP_COMPONENT_OD1,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 8bfc0debd2c2..d7953f2f6a36 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -29,6 +29,7 @@
+>  #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+>  #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
+>  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+> +#define DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN	0x0c4
+>  #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
+>  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+>  
+> @@ -80,6 +81,7 @@
+>  #define COLOR0_SEL_IN_OVL0		0x1
+>  #define OVL1_MOUT_EN_COLOR1		0x1
+>  #define GAMMA_MOUT_EN_RDMA1		0x1
+> +#define RDMA0_MOUT_DPI0			0x2
+>  #define RDMA1_MOUT_DPI0			0x2
+>  #define DPI0_SEL_IN_RDMA1		0x1
+>  #define COLOR1_SEL_IN_OVL1		0x1
+> @@ -155,6 +157,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
+>  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+>  		value = OD1_MOUT_EN_RDMA1;
+> +	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
+> +		*addr = DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN;
+> +		value = RDMA0_MOUT_DPI0;
+>  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+>  		value = RDMA1_MOUT_DPI0;
