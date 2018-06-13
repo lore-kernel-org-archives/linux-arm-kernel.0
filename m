@@ -1,101 +1,103 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 13 Jun 2018 23:52:55 +0200
-Subject: [PATCH] Revert "drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE"
-In-Reply-To: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
-References: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
-Message-ID: <d5357ae3-9dc1-b0ac-47bf-8742d55c4f3b@micronovasrl.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Wed, 13 Jun 2018 16:06:51 -0600
+Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
+ sata ports
+In-Reply-To: <0bf3c57c-dac8-8ece-6b8a-3b4d024140fc@broadcom.com>
+References: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
+ <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
+ <395f1fe8-76f1-8310-d09e-63e25bca23d2@broadcom.com>
+ <CAL_JsqJEFLXFf-Vq9c9XC41vBpisQwxkd06_v8Fmt6X=gp=2_g@mail.gmail.com>
+ <f20222ea-47ac-ca05-a8d3-69f28932de94@gmail.com>
+ <0bf3c57c-dac8-8ece-6b8a-3b4d024140fc@broadcom.com>
+Message-ID: <CABGGiszcTNw23e_qA7EiGb_2hc6kHfVQJq02pQjbpTnv1CNksg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jun 13, 2018 at 2:18 PM, Scott Branden
+<scott.branden@broadcom.com> wrote:
+> Hi Rob,
+>
+> Thanks for comment - reply inline.
+>
+>
+>
+> On 18-06-13 12:31 PM, Florian Fainelli wrote:
+>>
+>> On 06/12/2018 03:54 PM, Rob Herring wrote:
+>>>
+>>> On Thu, Jun 7, 2018 at 12:53 PM, Scott Branden
+>>> <scott.branden@broadcom.com> wrote:
+>>>>
+>>>> Hi Rob,
+>>>>
+>>>> Could you please kindly comment on change below.
+>>>>
+>>>> It allows board variants to be added easily via a simple define for
+>>>> different number of SATA ports.
+>>>>
+>>>>
+>>>>
+>>>> On 18-06-04 09:22 AM, Florian Fainelli wrote:
+>>>>>
+>>>>> On 05/18/2018 11:34 AM, Scott Branden wrote:
+>>>>>>
+>>>>>> Move remaining sata configuration to stingray-sata.dtsi and enable
+>>>>>> ports based on NUM_SATA defined.
+>>>>>> Now, all that needs to be done is define NUM_SATA per board.
+>>>>>
+>>>>> Rob could you review this and let us know if this approach is okay or
+>>>>> not? Thank you!
+>>>>>
+>>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>> ---
+>>>>>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>>> b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>>> index 8c68e0c..7f6d176 100644
+>>>>>> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>>> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>>> @@ -43,7 +43,11 @@
+>>>>>>                          interrupts = <GIC_SPI 321
+>>>>>> IRQ_TYPE_LEVEL_HIGH>;
+>>>>>>                          #address-cells = <1>;
+>>>>>>                          #size-cells = <0>;
+>>>>>> +#if (NUM_SATA > 0)
+>>>>>> +                       status = "okay";
+>>>>>> +#else
+>>>>>>                          status = "disabled";
+>>>>>> +#endif
+>>>
+>>> This only works if ports are contiguously enabled (0-N). You might not
+>>> care, but it is not a pattern that works in general.
+>
+> Correct - all board designs that include this dtsi file follow such
+> commonality (ie. design with SATA0 first, etc).  By having common board
+> designs it allows for commonality in dts files rather than duplicating
+> information everywhere.  If somebody designs a bizarro board they are free
+> to create their own dts file of course.
+>>>
+>>>   And I'm not a fan
+>>> of C preprocessing in DT files in general beyond just defines for
+>>> single numbers.
+>
+> The use of a define to specify the number of SATA ports in the board design
+> meets our requirements of being able to maintain many boards.  We need a
+> method to specify the number of ports in the board design rather than
+> copying and pasting the information in many dts files.  If you have an
+> alternative upstreamable mechanism to manage the configuration of many
+> boards without copy and paste that would be ideal?
 
-sorry for my ignorance.
-I don't know the right patch workflow in the case of "revert commit".
-When I fix this bug, should I have to re-submit the previous patch 
-entire plus bug-fix?
-Or do I have to submit patch with bug-fix only?
+Is this really the only problem with maintaining lots of boards? What
+about all the other nodes that are conditionally enabled? Really, I
+don't see the problem with 3 lines per node.
 
-Thanks in advance to everybody
+Does having an unused port enabled cause problems? If not, you could
+handle it all at run-time and just shutdown ports which have no link.
+You'd want to do that anyway for boards with a port, but is not
+connected to a drive (except for hotplug capable ports).
 
--- 
-Giulio Benetti
-CTO
+Maybe we could add a property in /chosen that is a list of nodes to
+enable and either the bootloader or kernel could update their
+'status'. Or It could even be done in dtc perhaps with some
+/directive/.
 
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
-Il 13/06/2018 10:16, Paul Kocialkowski ha scritto:
-> This reverts commit 2c17a4368aad2b88b68e4390c819e226cf320f70.
-> 
-> The offending commit triggers a run-time fault when accessing the panel
-> element of the sun4i_tcon structure when no such panel is attached.
-> 
-> It was apparently assumed in said commit that a panel is always used with
-> the TCON. Although it is often the case, this is not always true.
-> For instance a bridge might be used instead of a panel.
-> 
-> This issue was discovered using an A13-OLinuXino, that uses the TCON
-> in RGB mode for a simple DAC-based VGA bridge.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->   drivers/gpu/drm/sun4i/sun4i_tcon.c | 25 -------------------------
->   1 file changed, 25 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index c3d92d537240..8045871335b5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -17,7 +17,6 @@
->   #include <drm/drm_encoder.h>
->   #include <drm/drm_modes.h>
->   #include <drm/drm_of.h>
-> -#include <drm/drm_panel.h>
->   
->   #include <uapi/drm/drm_mode.h>
->   
-> @@ -350,9 +349,6 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
->   static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
->   				     const struct drm_display_mode *mode)
->   {
-> -	struct drm_panel *panel = tcon->panel;
-> -	struct drm_connector *connector = panel->connector;
-> -	struct drm_display_info display_info = connector->display_info;
->   	unsigned int bp, hsync, vsync;
->   	u8 clk_delay;
->   	u32 val = 0;
-> @@ -410,27 +406,6 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
->   	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->   		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
->   
-> -	/*
-> -	 * On A20 and similar SoCs, the only way to achieve Positive Edge
-> -	 * (Rising Edge), is setting dclk clock phase to 2/3(240?).
-> -	 * By default TCON works in Negative Edge(Falling Edge),
-> -	 * this is why phase is set to 0 in that case.
-> -	 * Unfortunately there's no way to logically invert dclk through
-> -	 * IO_POL register.
-> -	 * The only acceptable way to work, triple checked with scope,
-> -	 * is using clock phase set to 0? for Negative Edge and set to 240?
-> -	 * for Positive Edge.
-> -	 * On A33 and similar SoCs there would be a 90? phase option,
-> -	 * but it divides also dclk by 2.
-> -	 * Following code is a way to avoid quirks all around TCON
-> -	 * and DOTCLOCK drivers.
-> -	 */
-> -	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
-> -		clk_set_phase(tcon->dclk, 240);
-> -
-> -	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-> -		clk_set_phase(tcon->dclk, 0);
-> -
->   	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
->   			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
->   			   val);
-> 
+Rob
