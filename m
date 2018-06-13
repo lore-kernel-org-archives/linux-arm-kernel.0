@@ -1,66 +1,69 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 13 Jun 2018 18:20:07 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 14/27] drm/sun4i: Don't check for
- panel or bridge on TV TCONs
-In-Reply-To: <CAGb2v66QWr2CQhcfQ9BQds-0xeG=pS4MDzaNn7_HGz+q3gfkWA@mail.gmail.com>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180613074621.5phumovcyymbkfbn@flea>
- <CAGb2v66QWr2CQhcfQ9BQds-0xeG=pS4MDzaNn7_HGz+q3gfkWA@mail.gmail.com>
-Message-ID: <2662622.yHSNrIAaJ9@jernej-laptop>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Wed, 13 Jun 2018 19:36:15 +0300
+Subject: [PATCH v7 0/6] Driver for at91 usart in spi mode
+Message-ID: <20180613163621.23995-1-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne sreda, 13. junij 2018 ob 10:04:20 CEST je Chen-Yu Tsai napisal(a):
-> On Wed, Jun 13, 2018 at 3:46 PM, Maxime Ripard
-> 
-> <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Jun 12, 2018 at 10:00:23PM +0200, Jernej Skrabec wrote:
-> >> TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
-> >> sense to check if panel or bridge is connected to them.
-> >> 
-> >> Check if TCON has channel 0 and only then check for connected panel or
-> >> bridges.
-> >> 
-> >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> >> ---
-> >> 
-> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
-> >>  1 file changed, 9 insertions(+), 3 deletions(-)
-> >> 
-> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index b1205a7bc20f..c9ffa5381185
-> >> 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> @@ -1189,13 +1189,19 @@ static const struct component_ops sun4i_tcon_ops
-> >> = {>> 
-> >>  static int sun4i_tcon_probe(struct platform_device *pdev)
-> >>  {
-> >>  
-> >>       struct device_node *node = pdev->dev.of_node;
-> >> 
-> >> +     const struct sun4i_tcon_quirks *quirks;
-> >> 
-> >>       struct drm_bridge *bridge;
-> >>       struct drm_panel *panel;
-> >>       int ret;
-> >> 
-> >> -     ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
-> >> -     if (ret == -EPROBE_DEFER)
-> >> -             return ret;
-> >> +     quirks = of_device_get_match_data(&pdev->dev);
-> > 
-> > We should probably check ofr the pointer value before dereferencing it.
-> 
-> I think we've discussed this before. If the driver has data structures
-> for all the supported compatible strings, and it is device tree only,
-> then we should just let it blow up in the user's face, since they are
-> obviously doing something they shouldn't be doing to get the driver
-> to probe without a compatible string match.
+Hello,
 
-TCON can't work with no quirks specified, since that would mean that neither 
-channels are present. Additionally, sun4i_tcon_bind() also doesn't check if 
-quirks are NULL or not. So I concur with Chen-Yu here.
+This is the second version of driver. I added a mfd driver which by
+default probes atmel_serial driver and if in dt is specified to probe
+the spi driver, then the spi-at91-usart driver will be probed. The
+compatible for atmel_serial is now the compatible for at91-usart mfd
+driver and compatilbe for atmel_serial driver was changed in order to
+keep the bindings for serial as they are.
 
-Best regards,
-Jernej
+Changes in v7:
+- synced up  SPDIX license with module license
+- numbering of usart modes starts from 0 insteand of 1
+
+Changes in v6:
+- removed unused compatible strings from serial and spi drivers
+
+Changes in v5:
+- fixed usage of stdout-path property with atmel_serial driver
+
+Changes in v4:
+- modified the spi driver to use cs gpio support form spi subsystem
+- fixed dma transfers for serial driver
+- squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+
+Changes in v3:
+- fixed spi slaves probing
+
+Changes in v2:
+- added at91-usart mfd driver
+- modified spi-at91-usart driver to work as mfd driver child
+- modified atmel_serial driver to work as mfd driver child
+
+Changes in v1:
+- added spi-at91-usart driver
+
+Radu Pirea (6):
+  MAINTAINERS: add at91 usart mfd driver
+  dt-bindings: add binding for atmel-usart in SPI mode
+  mfd: at91-usart: added mfd driver for usart
+  MAINTAINERS: add at91 usart spi driver
+  spi: at91-usart: add driver for at91-usart as spi
+  tty/serial: atmel: change the driver to work under at91-usart mfd
+
+ .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+ MAINTAINERS                                   |  16 +
+ drivers/mfd/Kconfig                           |   9 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/at91-usart.c                      |  69 +++
+ drivers/spi/Kconfig                           |   9 +
+ drivers/spi/Makefile                          |   1 +
+ drivers/spi/spi-at91-usart.c                  | 434 ++++++++++++++++++
+ drivers/tty/serial/Kconfig                    |   1 +
+ drivers/tty/serial/atmel_serial.c             |  42 +-
+ include/dt-bindings/mfd/at91-usart.h          |  17 +
+ 11 files changed, 607 insertions(+), 17 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
+
+-- 
+2.17.1
