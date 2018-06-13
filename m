@@ -1,77 +1,85 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 13 Jun 2018 10:16:47 +0200
-Subject: [PATCH] Revert "drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE"
-Message-ID: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 13 Jun 2018 17:16:30 +0900
+Subject: [GIT PULL] Allwinner clock changes for 4.18
+In-Reply-To: <20180613072649.dzbusalsfqlgymew@flea>
+References: <20180521115947.wqrnv2hczate65lz@flea>
+ <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
+ <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
+ <20180613072649.dzbusalsfqlgymew@flea>
+Message-ID: <CAK7LNAR0TZEp9JfJAf3gmE1v6ig04TZ-NCiXm5_zYdpsQwhuRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 2c17a4368aad2b88b68e4390c819e226cf320f70.
+Hi.
 
-The offending commit triggers a run-time fault when accessing the panel
-element of the sun4i_tcon structure when no such panel is attached.
+2018-06-13 16:26 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+> On Mon, Jun 11, 2018 at 03:53:41PM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Mon, Jun 11, 2018 at 10:00 AM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>> > Hi Maxime,
+>> >
+>> >
+>> > 2018-05-21 20:59 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+>> >> Hi Mike, Stephen,
+>> >>
+>> >> Please merge the following changes for the next merge window, thanks!
+>> >>
+>> >> Maxime
+>> >>
+>> >> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+>> >>
+>> >>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>> >>
+>> >> are available in the Git repository at:
+>> >>
+>> >>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.18
+>> >>
+>> >> for you to fetch changes up to 17de4c857b1f74b90967f7e7fd5ff81be61dc044:
+>> >>
+>> >>   clk: sunxi-ng: r40: export a regmap to access the GMAC register (2018-05-17 14:02:07 +0800)
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Allwinner clock changes for 4.18
+>> >>
+>> >> Not a lot of changes for this release, but two quite important features
+>> >> were added: the H6 PRCM clock support, and the needed changes to the R40
+>> >> clock driver to allow for the EMAC to operate.
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Icenowy Zheng (3):
+>> >>       clk: sunxi-ng: add support for H6 PRCM CCU
+>> >>       clk: sunxi-ng: r40: rewrite init code to a platform driver
+>> >>       clk: sunxi-ng: r40: export a regmap to access the GMAC register
+>> >>
+>> >
+>> >
+>> >
+>> > Why was my patch "clk: sunxi-ng: replace lib-y with obj-y"
+>> > not included in the pull request?
+>> >
+>> >
+>> > You said "I've picked it up"
+>> > https://patchwork.kernel.org/patch/10348031/
+>>
+>> It looks like it was accidentally dropped after a rebase.
+>> Not quite sure what happened there. Maxime?
+>
+> I'm not quite sure what happened, sorry, but this should have
+> definitely been part of that PR :/
+>
 
-It was apparently assumed in said commit that a panel is always used with
-the TCON. Although it is often the case, this is not always true.
-For instance a bridge might be used instead of a panel.
+Stephen offered to pick it up directly for -rc2.
+Is that OK with you?
 
-This issue was discovered using an A13-OLinuXino, that uses the TCON
-in RGB mode for a simple DAC-based VGA bridge.
+I am fine if it is well-organized between you and Stephen.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 25 -------------------------
- 1 file changed, 25 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c3d92d537240..8045871335b5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -17,7 +17,6 @@
- #include <drm/drm_encoder.h>
- #include <drm/drm_modes.h>
- #include <drm/drm_of.h>
--#include <drm/drm_panel.h>
- 
- #include <uapi/drm/drm_mode.h>
- 
-@@ -350,9 +349,6 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
- static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 				     const struct drm_display_mode *mode)
- {
--	struct drm_panel *panel = tcon->panel;
--	struct drm_connector *connector = panel->connector;
--	struct drm_display_info display_info = connector->display_info;
- 	unsigned int bp, hsync, vsync;
- 	u8 clk_delay;
- 	u32 val = 0;
-@@ -410,27 +406,6 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
- 		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
- 
--	/*
--	 * On A20 and similar SoCs, the only way to achieve Positive Edge
--	 * (Rising Edge), is setting dclk clock phase to 2/3(240?).
--	 * By default TCON works in Negative Edge(Falling Edge),
--	 * this is why phase is set to 0 in that case.
--	 * Unfortunately there's no way to logically invert dclk through
--	 * IO_POL register.
--	 * The only acceptable way to work, triple checked with scope,
--	 * is using clock phase set to 0? for Negative Edge and set to 240?
--	 * for Positive Edge.
--	 * On A33 and similar SoCs there would be a 90? phase option,
--	 * but it divides also dclk by 2.
--	 * Following code is a way to avoid quirks all around TCON
--	 * and DOTCLOCK drivers.
--	 */
--	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
--		clk_set_phase(tcon->dclk, 240);
--
--	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
--		clk_set_phase(tcon->dclk, 0);
--
- 	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
- 			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
- 			   val);
+
+
+
+
 -- 
-2.17.0
+Best Regards
+Masahiro Yamada
