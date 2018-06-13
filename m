@@ -1,59 +1,82 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Jun 2018 18:48:37 +0200
-Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <20180613143626.rrdxq4i4guy2oryg@verge.net.au>
-References: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
- <20180613110647.ygg66nu36pcf6kpn@verge.net.au>
- <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
- <20180613143626.rrdxq4i4guy2oryg@verge.net.au>
-Message-ID: <CAMuHMdUbpfpH6m1ScdegC8ra_W1mu_vwqC5g_GDGvC+oaxmmyA@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed, 13 Jun 2018 09:53:52 -0700
+Subject: [PATCH v2 2/2] arm64: dts: qcom: sdm845: Enable debug UART and I2C10
+ on sdm845-mtp
+In-Reply-To: <20180613165352.139060-1-dianders@chromium.org>
+References: <20180613165352.139060-1-dianders@chromium.org>
+Message-ID: <20180613165352.139060-2-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+The debug UART is very useful to have.  I2C10 is enabled as an example
+of a I2C port we can talk on for now.  Eventually we'll want to put
+peripherals under it.
 
-On Wed, Jun 13, 2018 at 4:36 PM Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Jun 13, 2018 at 01:21:34PM +0200, Geert Uytterhoeven wrote:
-> > On Wed, Jun 13, 2018 at 1:06 PM Simon Horman <horms@verge.net.au> wrote:
-> > > On Mon, Jun 11, 2018 at 02:15:13PM +0200, Marek Vasut wrote:
-> > > > Rather than hard-coding the quirk topology, which stopped scaling,
-> > > > parse the information from DT. The code looks for all compatible
-> > > > PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
-> > > > to the same pin. If so, the code sends a matching sequence to the
-> > > > PMIC to deassert the IRQ.
-> > > >
-> > > > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> > > > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > > > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > > > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > > > Cc: linux-renesas-soc at vger.kernel.org
-> > > > Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > > > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
-> > >
-> > > This looks fine to me but I will wait to see if there are other reviews
-> > > before applying.
-> > >
-> > > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > Note that applying it now will break gose, as its DTS doesn't describe all
-> > regulators yet.
->
-> Ok, so old DT will break with new kernels?
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Tested-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
 
-For Lager, it will break with pre-v4.2 DTS, so I think that's not a problem.
-For Koelsch, the regulators were added even earlier.
-Stout had all regulators from the initial support in upstream.
+Changes in v2:
+- Got rid of all sleep pinctrl states for now
+- Add Bjorn's tags.
 
-So Gose is the only issue. Do we care?
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 45 +++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+index 979ab49913f1..6d651f314193 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
++++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+@@ -12,4 +12,49 @@
+ / {
+ 	model = "Qualcomm Technologies, Inc. SDM845 MTP";
+ 	compatible = "qcom,sdm845-mtp";
++
++	aliases {
++		serial0 = &uart9;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&i2c10 {
++	status = "okay";
++	clock-frequency = <400000>;
++};
++
++&qupv3_id_1 {
++	status = "okay";
++};
++
++&uart9 {
++	status = "okay";
++};
++
++/* PINCTRL - additions to nodes defined in sdm845.dtsi */
++
++&qup_i2c10_default {
++	pinconf {
++		pins = "gpio55", "gpio56";
++		drive-strength = <2>;
++		bias-disable;
++	};
++};
++
++&qup_uart9_default {
++	pinconf-tx {
++		pins = "gpio4";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	pinconf-rx {
++		pins = "gpio5";
++		drive-strength = <2>;
++		bias-pull-up;
++	};
+ };
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.18.0.rc1.244.gcf134e6275-goog
