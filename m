@@ -1,87 +1,111 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Wed, 13 Jun 2018 10:54:55 +0200
-Subject: [PATCH v4 6/6] dt-bindings: media: rcar-vin: Clarify optional
- props
-In-Reply-To: <20180612154553.kgqnqkwv3y6srivg@kekkonen.localdomain>
-References: <1528813566-17927-1-git-send-email-jacopo+renesas@jmondi.org>
- <1528813566-17927-7-git-send-email-jacopo+renesas@jmondi.org>
- <20180612154553.kgqnqkwv3y6srivg@kekkonen.localdomain>
-Message-ID: <20180613085455.GC4952@w540>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Wed, 13 Jun 2018 16:58:11 +0800
+Subject: [PATCH 19/28] drm/mediatek: add connection from RDMA2 to DPI1
+In-Reply-To: <1528877675.30263.27.camel@mtksdaap41>
+References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
+ <1528687580-549-20-git-send-email-stu.hsieh@mediatek.com>
+ <1528874037.30263.6.camel@mtksdaap41>
+ <1528876862.11190.35.camel@mtksdccf07>
+ <1528877675.30263.27.camel@mtksdaap41>
+Message-ID: <1528880291.11190.45.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+Hi, CK:
 
-On Tue, Jun 12, 2018 at 06:45:53PM +0300, Sakari Ailus wrote:
-> Hi Jacopo,
->
-> On Tue, Jun 12, 2018 at 04:26:06PM +0200, Jacopo Mondi wrote:
-> > Add a note to the R-Car VIN interface bindings to clarify that all
-> > properties listed as generic properties in video-interfaces.txt can
-> > be included in port at 0 endpoint, but if not explicitly listed in the
-> > interface bindings documentation, they do not modify it behaviour.
-> >
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > ---
-> >  Documentation/devicetree/bindings/media/rcar_vin.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> > index 8130849..03544c7 100644
-> > --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> > +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> > @@ -55,6 +55,12 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
-> >        instances that are connected to external pins should have port 0.
-> >
-> >        - Optional properties for endpoint nodes of port at 0:
-> > +
-> > +        All properties described in [1] and which apply to the selected
-> > +        media bus type could be optionally listed here to better describe
-> > +        the current hardware configuration, but only the following ones do
-> > +        actually modify the VIN interface behaviour:
-> > +
->
-> I don't think this should be needed. You should only have properties that
-> describe the hardware configuration in a given system.
->
+On Wed, 2018-06-13 at 16:14 +0800, CK Hu wrote:
+> Hi, Stu:
+> 
+> On Wed, 2018-06-13 at 16:01 +0800, Stu Hsieh wrote:
+> > Hi, CK:
+> > 
+> > 
+> > On Wed, 2018-06-13 at 15:13 +0800, CK Hu wrote:
+> > > Hi, Stu:
+> > > 
+> > > On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
+> > > > This patch add the connection from RDMA2 to DPI1
+> > > > 
+> > > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > > > ---
+> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
+> > > >  1 file changed, 8 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > > index 31a0832ef9ec..2d883815d79c 100644
+> > > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > > @@ -93,9 +93,11 @@
+> > > >  #define RDMA1_MOUT_DPI0			0x2
+> > > >  #define RDMA1_MOUT_DPI1			0x3
+> > > >  #define RDMA2_MOUT_DPI0			0x2
+> > > > +#define RDMA2_MOUT_DPI1			0x3
+> > > 
+> > > Usually, each bit of a mout register represent a output enable. Is this
+> > > value 0x3 a correct value?
+> > > 
+> > > Regards,
+> > > CK
+> > > 
+> > In HW CONFIG SPEC or MT2712_E2_MMSYS_Change_note show as following:
+> > 
+> > Bit(s)	Name			Description
+> > 2:0	DISP_RDMA2_SOUT_SEL_IN	0: output to dsi0
+> > 				1: outptu to dsi1
+> > 				2: output to dpi0
+> > 				3: output to dpi1
+> > 				4: output to dsi2
+> > 				5: output to dsi3
+> > 
+> > So, 0x3 is correct value.
+> 
+> The data sheet use the term SOUT match its function, so I think driver
+> have better change the naming to SOUT.
+> 
+> Regards,
+> CK
+> 
 
-There has been quite some debate on this, and please bear with me
-here for re-proposing it: I started by removing properties in some DT
-files for older Renesas board which listed endpoint properties not
-documented in the VIN's bindings and not parsed by the VIN driver [1]
-Niklas (but Simon and Geert seems to agree here) opposed to that
-patch, as those properties where described in 'video-interfaces.txt' and
-even if not parsed by the current driver implementation, they actually
-describe hardware. I rebated that only properties listed in the device
-bindings documentation should actually be used, and having properties
-not parsed by the driver confuses users, which may expect changing
-them modifies the interface configuration, which does not happens at
-the moment.
+The definition DISP_REG_CONFIG_DISP_RDMA2_SOUT is use term SOUT in this
+patch.
 
-This came out as a middle ground from a discussion with Niklas. As
-stated in the cover letter if this patch makes someone uncomfortable, feel
-free to drop it not to hold back the rest of the series which has been
-well received instead.
+Regard,
+Stu
 
-Thanks
-   j
-
-[1] https://www.spinics.net/lists/arm-kernel/msg656302.html
-
-> >          - hsync-active: see [1] for description. Default is active high.
-> >          - vsync-active: see [1] for description. Default is active high.
-> >          - data-enable-active: polarity of CLKENB signal, see [1] for
-> > --
-> > 2.7.4
-> >
->
-> --
-> Sakari Ailus
-> sakari.ailus at linux.intel.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/e8557938/attachment.sig>
+> > 
+> > Regard,
+> > Stu
+> > 
+> > > >  #define DPI0_SEL_IN_RDMA1		0x1
+> > > >  #define DPI0_SEL_IN_RDMA2		0x3
+> > > >  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+> > > > +#define DPI1_SEL_IN_RDMA2		(0x3 << 8)
+> > > >  #define DSI1_SEL_IN_RDMA1		0x1
+> > > >  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
+> > > >  #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
+> > > > @@ -199,6 +201,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+> > > >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
+> > > >  		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+> > > >  		value = RDMA2_MOUT_DPI0;
+> > > > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
+> > > > +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+> > > > +		value = RDMA2_MOUT_DPI1;
+> > > >  	} else {
+> > > >  		value = 0;
+> > > >  	}
+> > > > @@ -233,6 +238,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+> > > >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
+> > > >  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
+> > > >  		value = DPI0_SEL_IN_RDMA2;
+> > > > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
+> > > > +		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
+> > > > +		value = DPI1_SEL_IN_RDMA2;
+> > > >  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+> > > >  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+> > > >  		value = COLOR1_SEL_IN_OVL1;
+> > > 
+> > > 
+> > 
+> > 
+> 
+> 
