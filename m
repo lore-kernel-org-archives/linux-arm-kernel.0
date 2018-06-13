@@ -1,27 +1,21 @@
 From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 13 Jun 2018 05:52:42 -0700
+Date: Wed, 13 Jun 2018 05:55:46 -0700
 Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
-In-Reply-To: <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
+In-Reply-To: <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
 References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
  <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
-Message-ID: <20180613125242.GA32016@infradead.org>
+ <20180613122359.GA8695@bombadil.infradead.org>
+ <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
+Message-ID: <20180613125546.GB32016@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 10:58:37AM +0200, Marek Szyprowski wrote:
-> cma_alloc() function has gfp mask parameter, so users expect that it
-> honors typical memory allocation related flags. The most imporant from
-> the security point of view is handling of __GFP_ZERO flag, because memory
-> allocated by this function usually can be directly remapped to userspace
-> by device drivers as a part of multimedia processing and ignoring this
-> flag might lead to leaking some kernel structures to userspace.
-> Some callers of this function (for example arm64 dma-iommu glue code)
-> already assumed that the allocated buffers are cleared when this flag
-> is set. To avoid such issues, add simple code for clearing newly
-> allocated buffer when __GFP_ZERO flag is set. Callers will be then
-> updated to skip implicit clearing or adjust passed gfp flags.
+On Wed, Jun 13, 2018 at 02:40:00PM +0200, Marek Szyprowski wrote:
+> It is not only the matter of the spinlocks. GFP_ATOMIC is not supported 
+> by the
+> memory compaction code, which is used in alloc_contig_range(). Right, this
+> should be also noted in the documentation.
 
-dma mapping implementations need to zero all memory returned anyway
-(even if a few implementation don't do that yet).
-
-I'd rather keep the zeroing in the common callers.
+Documentation is good, asserts are better.  The code should reject any
+flag not explicitly supported, or even better have its own flags type
+with the few actually supported flags.
