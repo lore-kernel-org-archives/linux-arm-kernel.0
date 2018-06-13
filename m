@@ -1,66 +1,45 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 13 Jun 2018 22:44:08 +0800
-Subject: [PATCH] ARM64: dts: rockchip: add some pins to rk3399
-In-Reply-To: <B649911B-28E0-4466-B3F0-15875FFB9D43@theobroma-systems.com>
-References: <20180612152544.3812-1-ayaka@soulik.info>
- <B649911B-28E0-4466-B3F0-15875FFB9D43@theobroma-systems.com>
-Message-ID: <e9584bfe-a098-1b90-2660-c27f82ed513c@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 13 Jun 2018 17:06:08 +0200
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <26470c5c-55db-9dff-3794-4e4a96c8bcb6@codeaurora.org>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+ <26470c5c-55db-9dff-3794-4e4a96c8bcb6@codeaurora.org>
+Message-ID: <CAKv+Gu8UG_D0AAR8Usdi7DrucqaEs+f-JTU1voR-CcrtNY2ZEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/6/13 2:21, klaus.goger at theobroma-systems.com wrote:
-> Hi Randy,
-
------8<-------------
-
->> 		pcie {
->> +			pcie_clkreqn: pci-clkreqn {
->> +				rockchip,pins =
->> +					<2 26 RK_FUNC_2 &pcfg_pull_none>;
->> +			};
->> +
->> +			pcie_clkreqnb: pci-clkreqnb {
->> +				rockchip,pins =
->> +					<4 24 RK_FUNC_1 &pcfg_pull_none>;
->> +			};
->> +
-> 
-> I?m not sure if pci-clkreqn is functional at all. If not I?m not sure if we should add it to the dtsi.
-> Shawn may know more about it.
-
-Please refer to commit 461a00bb9d539e
-("arm64: dts: rockchip: kill pcie_clkreqn and pcie_clkreqnb for rk3399")
-
-CLKREQ# is used for PCI-PM L1.x, but it's not functional for rk3399, so
-we have to support CPM(clock power management), thus I kill them last
-year.
-
-> 
->> 			pcie_clkreqn_cpm: pci-clkreqn-cpm {
->> 				rockchip,pins =
->> -					<2 RK_PD2 RK_FUNC_GPIO &pcfg_pull_none>;
->> +					<2 26 RK_FUNC_GPIO &pcfg_pull_none>;
->> 			};
+On 13 June 2018 at 16:22, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Hi Ard,
+>
+> On 5/18/2018 10:17 AM, Sinan Kaya wrote:
+>> A host bridge is allowed to remap BAR addresses using _TRA attribute in
+>> _CRS windows.
 >>
->> 			pcie_clkreqnb_cpm: pci-clkreqnb-cpm {
->> 				rockchip,pins =
->> -					<4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
->> +					<4 24 RK_FUNC_GPIO &pcfg_pull_none>;
->> 			};
->> 		};
+>> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+>> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
 >>
->> -- 
->> 2.14.4
-> 
-> 
-> Could we actually use RK_Pxx for all new pin definitions? Would increase readability a lot.
-> 
-> Thanks,
-> Klaus
-> 
-> 
+>> When a VGA device is behind such a host bridge and the resource is
+>> translated efifb driver is trying to do ioremap against bus address
+>> rather than the resource address and is failing to probe.
+>>
+>> efifb: probing for efifb
+>> efifb: cannot reserve video memory at 0x1e000000
+>> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+>> efifb: mode is 800x600x32, linelength=3200, pages=1
+>> efifb: scrolling: redraw
+>> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+>>
+>> Use the host bridge offset information to convert bus address to
+>> resource address in the fixup.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>
+> I didn't see any messages about these getting picked up for 4.18.
+>
+> Are they queued on your own branch?
+>
 
-
--- 
-Best Regards
-Shawn Lin
+No, you never cc'ed me on them until now.
