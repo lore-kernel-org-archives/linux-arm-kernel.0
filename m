@@ -1,58 +1,61 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 Jun 2018 08:40:13 -0500
-Subject: [PATCH 3/4] ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable
- invalidates of BTB) to facilitate CVE_2017-5715 WA in OS
-In-Reply-To: <780935f6-6506-0915-dfb2-b584c074b70d@gmail.com>
-References: <20180612202411.29798-1-nm@ti.com>
- <20180612202411.29798-4-nm@ti.com>
- <780935f6-6506-0915-dfb2-b584c074b70d@gmail.com>
-Message-ID: <20180613134013.mqicb2geehv2xu2g@kahuna>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 13 Jun 2018 07:57:47 -0600
+Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
+ bindings
+In-Reply-To: <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+ <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
+ <20180612204802.GA15817@rob-hp-laptop>
+ <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
+ <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
+ <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
+Message-ID: <CAL_JsqL1xWCEYG1knOfUjmw7Y59Sx1ss5o2RyRm-fxoYXbDrJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:06-20180612, Marek Vasut wrote:
-> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
-> > Enable CVE_2017_5715 and since we have our own v7_arch_cp15_set_acr
-> > function to setup the bits, we are able to override the settings.
-> > 
-> > Without this enabled, Linux kernel reports:
-> > CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
-> > 
-> > With this enabled, Linux kernel reports:
-> > CPU0: Spectre v2: using ICIALLU workaround
-> > 
-> > NOTE: This by itself does not enable the workaround for CPU1 (on
-> > OMAP5 and DRA72/AM572 SoCs) and may require additional kernel patches.
-> > 
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > index 3bb1ecb58de0..77820cc8d1e4 100644
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -53,6 +53,7 @@ config OMAP54XX
-> >  	bool "OMAP54XX SoC"
-> >  	select ARM_ERRATA_798870
-> >  	select SYS_THUMB_BUILD
-> > +	select ARM_CORTEX_A15_CVE_2017_5715
-> >  	imply NAND_OMAP_ELM
-> >  	imply NAND_OMAP_GPMC
-> >  	imply SPL_DISPLAY_PRINT
-> > 
-> 
-> Can this be enabled for all CA15 systems somehow ? I am sure there are
-> more that are vulnerable.
+On Wed, Jun 13, 2018 at 7:35 AM, Suzuki K Poulose
+<Suzuki.Poulose@arm.com> wrote:
+> Hi Matt,
+>
+> Thanks for your comments, responses inline.
+>
+> On 13/06/18 13:49, Matt Sealey wrote:
+>>
+>> Suzuki,
+>>
+>> Why not use ?unit??
+>>
+>> I believe we had this discussion years ago about numbering serial ports
+>> and sdhci (i.e. how do you know it?s UART0 or UART1 from just the address?
+>> Some SoC?s don?t address sequentially *or* in a forward direction) - I
+>> believe it?s not exactly codified in ePAPR, not am I sure where it may be
+>> otherwise, but it exists.
+>
+>
+> We have different situation here. We need to know *the port number* as
+> understood by the
+> hardware, so that we can enable *the specific* port for a given path.
+>
+>>
+>> I agree with Rob on the slave-mode nonsense, this is an SPI controller
+>> concept weirdly stuffed into a directed graph which implicitly tells you the
+>> data direction - it?s a rooted tree (just like DT!).
 
-I just dont know how to make smc call convention generic. This is the
-reason why v7_arch_cp15_set_acr is setup as a weak function. you'd have
-to implement it specific to SoC (in many newer SoCs, you might
-potentially be able to make at least few implementations generic using
-PSCI). NOTE: this is the same trouble with erratum 801819 implementation
-as well.
+OF graph is not directional. All links must be bi-directional and in
+fact dtc checks that now. The parent node should know the numbering
+and direction of each port.
 
--- 
-Regards,
-Nishanth Menon
+> Btw, the "slave-mode" is not a standard DT graph binding. It is not part of
+> the
+> generic DT graph binding. In fact the generic bindings stay away from the
+> direction
+> aspect and explicitly mentions the same.
+
+I really don't like slave-mode nor coresight,hwid.
+
+I would prefer to see getting rid of both and splitting ports into
+"in-ports" and "out-ports" nodes instead of a single "ports" node.
+Then you don't need any of these properties and reg can be used as the
+hwid.
+
+Rob
