@@ -1,88 +1,46 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 Jun 2018 13:27:43 +0800
-Subject: [PATCH 04/28] drm/mediatek: add ddp component OD1
-In-Reply-To: <1528687580-549-5-git-send-email-stu.hsieh@mediatek.com>
+Date: Wed, 13 Jun 2018 13:29:17 +0800
+Subject: [PATCH 07/28] drm/mediatek: add component DPI1
+In-Reply-To: <1528687580-549-8-git-send-email-stu.hsieh@mediatek.com>
 References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-5-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528867663.15127.1.camel@mtksdaap41>
+ <1528687580-549-8-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528867757.15127.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 2018-06-11 at 11:25 +0800, Stu Hsieh wrote:
-> This patch add the component OD1 and
-> rename the OD to OD0
+> This patch add the component DPI1
 > 
 > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 4 ++--
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 3 ++-
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 2 +-
->  4 files changed, 7 insertions(+), 5 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 7217665f4b5d..58e44349e315 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -114,7 +114,7 @@ static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
->  	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
->  	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
->  	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
-> -	[DDP_COMPONENT_OD] = MT8173_MUTEX_MOD_DISP_OD,
-> +	[DDP_COMPONENT_OD0] = MT8173_MUTEX_MOD_DISP_OD,
->  	[DDP_COMPONENT_OVL0] = MT8173_MUTEX_MOD_DISP_OVL0,
->  	[DDP_COMPONENT_OVL1] = MT8173_MUTEX_MOD_DISP_OVL1,
->  	[DDP_COMPONENT_PWM0] = MT8173_MUTEX_MOD_DISP_PWM0,
-> @@ -139,7 +139,7 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
->  		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
->  		value = OVL_MOUT_EN_RDMA;
-> -	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
-> +	} else if (cur == DDP_COMPONENT_OD0 && next == DDP_COMPONENT_RDMA0) {
->  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
->  		value = OD_MOUT_EN_RDMA0;
->  	} else if (cur == DDP_COMPONENT_UFOE && next == DDP_COMPONENT_DSI0) {
 > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index 0919039805aa..87acf6be87f6 100644
+> index 86e8c9e5df41..4f9d81025d69 100644
 > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
 > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -227,7 +227,8 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> @@ -224,6 +224,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+>  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
+>  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+>  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
+> +	[DDP_COMPONENT_DPI1]	= { MTK_DPI,		1, NULL },
 >  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
 >  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
 >  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
-> -	[DDP_COMPONENT_OD]	= { MTK_DISP_OD,	0, &ddp_od },
-> +	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
-> +	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
->  	[DDP_COMPONENT_OVL0]	= { MTK_DISP_OVL,	0, NULL },
->  	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
->  	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
 > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index eee3c0cc2632..9b19fc4423f1 100644
+> index e00c2e798abd..54c99c169093 100644
 > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
 > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -50,7 +50,8 @@ enum mtk_ddp_comp_id {
+> @@ -47,6 +47,7 @@ enum mtk_ddp_comp_id {
+>  	DDP_COMPONENT_COLOR0,
+>  	DDP_COMPONENT_COLOR1,
+>  	DDP_COMPONENT_DPI0,
+> +	DDP_COMPONENT_DPI1,
 >  	DDP_COMPONENT_DSI0,
 >  	DDP_COMPONENT_DSI1,
 >  	DDP_COMPONENT_GAMMA,
-> -	DDP_COMPONENT_OD,
-> +	DDP_COMPONENT_OD0,
-> +	DDP_COMPONENT_OD1,
->  	DDP_COMPONENT_OVL0,
->  	DDP_COMPONENT_OVL1,
->  	DDP_COMPONENT_PWM0,
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index a415260f3d5f..08d5d0b47bfe 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -150,7 +150,7 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
->  	DDP_COMPONENT_OVL0,
->  	DDP_COMPONENT_COLOR0,
->  	DDP_COMPONENT_AAL0,
-> -	DDP_COMPONENT_OD,
-> +	DDP_COMPONENT_OD0,
->  	DDP_COMPONENT_RDMA0,
->  	DDP_COMPONENT_UFOE,
->  	DDP_COMPONENT_DSI0,
