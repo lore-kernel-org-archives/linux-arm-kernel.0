@@ -1,46 +1,26 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 Jun 2018 08:29:10 -0500
-Subject: [PATCH] ARM: DRA7/OMAP5: Enable ACTLR[0] (Enable invalidates of
- BTB) for secondary cores
-In-Reply-To: <20180613101153.GD6920@n2100.armlinux.org.uk>
-References: <20180612213611.2484-1-nm@ti.com>
- <20180613101153.GD6920@n2100.armlinux.org.uk>
-Message-ID: <20180613132910.wr7ngq4nvxlgaoqi@kahuna>
+Date: Wed, 13 Jun 2018 08:32:15 -0500
+Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB
+ with ICIALLU on Cortex-A15 for CVE-2017-5715
+In-Reply-To: <8fac2f1c-ecc4-1aa1-0620-8ac6e2efdbf1@gmail.com>
+References: <20180612202411.29798-1-nm@ti.com>
+ <20180612202411.29798-3-nm@ti.com>
+ <8fac2f1c-ecc4-1aa1-0620-8ac6e2efdbf1@gmail.com>
+Message-ID: <20180613133215.2cv7iyjb2laaha3j@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:11-20180613, Russell King - ARM Linux wrote:
-> On Tue, Jun 12, 2018 at 04:36:11PM -0500, Nishanth Menon wrote:
-> > Call secure services to enable ACTLR[0] (Enable invalidates of BTB with
-> > ICIALLU) when branch hardening is enabled for kernel.
+On 23:05-20180612, Marek Vasut wrote:
+> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
+[..]
+> > +#ifdef CONFIG_ARM_CORTEX_A15_CVE_2017_5715
+> > +	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
+> > +	orr	r0, r0, #1 << 0		@ Enable invalidates of BTB
 > 
-> As mentioned elsewhere, I don't think this is a good idea - if the secure
-> world is not implementing the Spectre workarounds, then the _system_ is
-> exploitable.
-> 
-> If the secure world is implementing the spectre workarounds, it will
-> already have enabled the IBE bit (which is r/w from secure, read only
-> from non-secure.)
-> 
-> So, basically, lack of the IBE bit being set is basically telling the
-> kernel that it's running on a vulnerable platform _even if the kernel
-> were to set it through some means_.
+> Can we use BIT() macro in the assembler code too ?
 
-On GP devices OMAP5/DRA7, there is no possibility to update secure side
-since "secure world" is ROM and there are no override mechanisms possible.
-on HS devices, I agree, appropriate PPA will do the workarounds as well.
-
-However, this patch is to enable the IBE enable on GP device for _a_
-core can only be done via SMC services that ROM provides for
-specifically the reasons you have already stated. u-boot will only
-enable the IBE for the boot core, by the time the secondary cores start
-up, u-boot is long gone.. so someone has to invoke the SMC call to
-enable the IBE bit for the secondary core.
-
-This is what the patch does.
-
-If the above explanation makes sense, I will add that to the commit log
-as well.
+Probably, but just following convention in the rest of the file. Do we
+want to change from existing code?
 
 -- 
 Regards,
