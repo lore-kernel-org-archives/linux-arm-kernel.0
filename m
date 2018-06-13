@@ -1,30 +1,42 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Wed, 13 Jun 2018 03:10:31 +0200
-Subject: [PATCH 09/10] Input: ams_delta_serio: use IRQ resource
-In-Reply-To: <20180612222104.GC38773@dtor-ws>
-References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
- <20180609140224.32606-9-jmkrzyszt@gmail.com> <20180612222104.GC38773@dtor-ws>
-Message-ID: <1688832.aCTLqTvW5e@z50>
+From: dolinux.peng@gmail.com (Peng Donglin)
+Date: Wed, 13 Jun 2018 09:11:55 +0800
+Subject: [PATCH 1/2] ARM: dump: Convert to use DEFINE_SHOW_ATTRIBUTE macro
+In-Reply-To: <cover.1528819790.git.dolinux.peng@gmail.com>
+References: <cover.1528819790.git.dolinux.peng@gmail.com>
+Message-ID: <b55024472e101a33b3d6b098aa2ce23c5b5dd6f7.1528819790.git.dolinux.peng@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 13, 2018 12:21:04 AM CEST Dmitry Torokhov wrote:
-> On Sat, Jun 09, 2018 at 04:02:23PM +0200, Janusz Krzysztofik wrote:
-> > ...
-> > @@ -141,14 +141,11 @@ static int ams_delta_serio_init(struct
-> > platform_device *pdev)> 
-> >  	 * at FIQ level, switch back from edge to simple interrupt handler
-> >  	 * to avoid bad interaction.
-> >  	 */
-> > 
-> > -	irq_set_handler(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
-> > -			handle_simple_irq);
-> > +	irq_set_handler(irq, handle_simple_irq);
-> 
-> Do we still need to do this here, or it can be moved into board file?
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-You're right, it should be possible to move it. I'll check possible options 
-and submit a follow up patch.
+Signed-off-by: Peng Donglin <dolinux.peng@gmail.com>
+---
+ arch/arm/mm/ptdump_debugfs.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-Thanks,
-Janusz
+diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
+index be8d87b..79002fe 100644
+--- a/arch/arm/mm/ptdump_debugfs.c
++++ b/arch/arm/mm/ptdump_debugfs.c
+@@ -11,18 +11,7 @@ static int ptdump_show(struct seq_file *m, void *v)
+ 	ptdump_walk_pgd(m, info);
+ 	return 0;
+ }
+-
+-static int ptdump_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, ptdump_show, inode->i_private);
+-}
+-
+-static const struct file_operations ptdump_fops = {
+-	.open		= ptdump_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-};
++DEFINE_SHOW_ATTRIBUTE(ptdump);
+ 
+ int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
+ {
+-- 
+2.7.4
