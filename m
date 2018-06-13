@@ -1,53 +1,44 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 Jun 2018 15:22:28 +0800
-Subject: [PATCH 23/28] drm/mediatek: add DPI1 support for mutex
-In-Reply-To: <1528687580-549-24-git-send-email-stu.hsieh@mediatek.com>
-References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-24-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528874548.30263.10.camel@mtksdaap41>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 13 Jun 2018 09:29:05 +0200
+Subject: [PATCH 4/4] net: emaclite: Remove xemaclite_mdio_setup return
+ check
+In-Reply-To: <1528871719-1681-5-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1528871719-1681-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1528871719-1681-5-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <20180613072905.GE24314@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
-
-On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
-> This patch add the DPI1 support for mutex
+On Wed, Jun 13, 2018 at 12:05:19PM +0530, Radhey Shyam Pandey wrote:
+> Errors are already reported in xemaclite_mdio_setup so avoid
+> reporting it again.
 > 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
+> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++++
->  1 file changed, 5 insertions(+)
+>  drivers/net/ethernet/xilinx/xilinx_emaclite.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 5a8569fa6505..5916fc11693a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -76,6 +76,7 @@
->  #define MUTEX_SOF_DSI0			1
->  #define MUTEX_SOF_DSI1			2
->  #define MUTEX_SOF_DPI0			3
-> +#define MUTEX_SOF_DPI1			4
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> index ec4608e..2a0c06e 100644
+> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> @@ -1143,9 +1143,7 @@ static int xemaclite_of_probe(struct platform_device *ofdev)
+>  	xemaclite_update_address(lp, ndev->dev_addr);
 >  
->  #define OVL0_MOUT_EN_COLOR0		0x1
->  #define OD_MOUT_EN_RDMA0		0x1
-> @@ -385,6 +386,9 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
->  	case DDP_COMPONENT_DPI0:
->  		reg = MUTEX_SOF_DPI0;
->  		break;
-> +	case DDP_COMPONENT_DPI1:
-> +		reg = MUTEX_SOF_DPI1;
-> +		break;
->  	default:
->  		if (ddp->mutex_mod[id] < 32) {
->  			offset = DISP_REG_MUTEX_MOD(mutex->id);
-> @@ -417,6 +421,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
->  	case DDP_COMPONENT_DSI0:
->  	case DDP_COMPONENT_DSI1:
->  	case DDP_COMPONENT_DPI0:
-> +	case DDP_COMPONENT_DPI1:
->  		writel_relaxed(MUTEX_SOF_SINGLE_MODE,
->  			       ddp->regs + DISP_REG_MUTEX_SOF(mutex->id));
->  		break;
+>  	lp->phy_node = of_parse_phandle(ofdev->dev.of_node, "phy-handle", 0);
+> -	rc = xemaclite_mdio_setup(lp, &ofdev->dev);
+> -	if (rc)
+> -		dev_warn(&ofdev->dev, "error registering MDIO bus\n");
+> +	xemaclite_mdio_setup(lp, &ofdev->dev);
+>  
+>  	dev_info(dev, "MAC address is now %pM\n", ndev->dev_addr);
+
+The patch itself is O.K. 
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+However, do you want to keep going if the MDIO bus fails? Maybe you
+should failed the probe?
+
+    Andrew
