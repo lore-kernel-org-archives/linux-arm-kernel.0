@@ -1,85 +1,53 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Wed, 13 Jun 2018 16:01:02 +0800
-Subject: [PATCH 19/28] drm/mediatek: add connection from RDMA2 to DPI1
-In-Reply-To: <1528874037.30263.6.camel@mtksdaap41>
-References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-20-git-send-email-stu.hsieh@mediatek.com>
- <1528874037.30263.6.camel@mtksdaap41>
-Message-ID: <1528876862.11190.35.camel@mtksdccf07>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 13 Jun 2018 16:04:20 +0800
+Subject: [PATCH v2 14/27] drm/sun4i: Don't check for panel or bridge on TV
+ TCONs
+In-Reply-To: <20180613074621.5phumovcyymbkfbn@flea>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180612200036.21483-15-jernej.skrabec@siol.net>
+ <20180613074621.5phumovcyymbkfbn@flea>
+Message-ID: <CAGb2v66QWr2CQhcfQ9BQds-0xeG=pS4MDzaNn7_HGz+q3gfkWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, CK:
+On Wed, Jun 13, 2018 at 3:46 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Jun 12, 2018 at 10:00:23PM +0200, Jernej Skrabec wrote:
+>> TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
+>> sense to check if panel or bridge is connected to them.
+>>
+>> Check if TCON has channel 0 and only then check for connected panel or
+>> bridges.
+>>
+>> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>> ---
+>>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
+>>  1 file changed, 9 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> index b1205a7bc20f..c9ffa5381185 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> @@ -1189,13 +1189,19 @@ static const struct component_ops sun4i_tcon_ops = {
+>>  static int sun4i_tcon_probe(struct platform_device *pdev)
+>>  {
+>>       struct device_node *node = pdev->dev.of_node;
+>> +     const struct sun4i_tcon_quirks *quirks;
+>>       struct drm_bridge *bridge;
+>>       struct drm_panel *panel;
+>>       int ret;
+>>
+>> -     ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
+>> -     if (ret == -EPROBE_DEFER)
+>> -             return ret;
+>> +     quirks = of_device_get_match_data(&pdev->dev);
+>
+> We should probably check ofr the pointer value before dereferencing it.
 
+I think we've discussed this before. If the driver has data structures
+for all the supported compatible strings, and it is device tree only,
+then we should just let it blow up in the user's face, since they are
+obviously doing something they shouldn't be doing to get the driver
+to probe without a compatible string match.
 
-On Wed, 2018-06-13 at 15:13 +0800, CK Hu wrote:
-> Hi, Stu:
-> 
-> On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
-> > This patch add the connection from RDMA2 to DPI1
-> > 
-> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > index 31a0832ef9ec..2d883815d79c 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > @@ -93,9 +93,11 @@
-> >  #define RDMA1_MOUT_DPI0			0x2
-> >  #define RDMA1_MOUT_DPI1			0x3
-> >  #define RDMA2_MOUT_DPI0			0x2
-> > +#define RDMA2_MOUT_DPI1			0x3
-> 
-> Usually, each bit of a mout register represent a output enable. Is this
-> value 0x3 a correct value?
-> 
-> Regards,
-> CK
-> 
-In HW CONFIG SPEC or MT2712_E2_MMSYS_Change_note show as following:
-
-Bit(s)	Name			Description
-2:0	DISP_RDMA2_SOUT_SEL_IN	0: output to dsi0
-				1: outptu to dsi1
-				2: output to dpi0
-				3: output to dpi1
-				4: output to dsi2
-				5: output to dsi3
-
-So, 0x3 is correct value.
-
-Regard,
-Stu
-
-> >  #define DPI0_SEL_IN_RDMA1		0x1
-> >  #define DPI0_SEL_IN_RDMA2		0x3
-> >  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
-> > +#define DPI1_SEL_IN_RDMA2		(0x3 << 8)
-> >  #define DSI1_SEL_IN_RDMA1		0x1
-> >  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
-> >  #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
-> > @@ -199,6 +201,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
-> >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
-> >  		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-> >  		value = RDMA2_MOUT_DPI0;
-> > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
-> > +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-> > +		value = RDMA2_MOUT_DPI1;
-> >  	} else {
-> >  		value = 0;
-> >  	}
-> > @@ -233,6 +238,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
-> >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
-> >  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
-> >  		value = DPI0_SEL_IN_RDMA2;
-> > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
-> > +		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
-> > +		value = DPI1_SEL_IN_RDMA2;
-> >  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
-> >  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
-> >  		value = COLOR1_SEL_IN_OVL1;
-> 
-> 
+ChenYu
