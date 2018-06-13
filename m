@@ -1,49 +1,76 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 13 Jun 2018 09:36:05 +0200
-Subject: [PATCH v2 24/27] drm: of: Export drm_crtc_port_mask()
-In-Reply-To: <20180612200036.21483-25-jernej.skrabec@siol.net>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-25-jernej.skrabec@siol.net>
-Message-ID: <20180613073605.gnhcwrywooxhyryj@flea>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 13 Jun 2018 15:38:37 +0800
+Subject: [PATCH 27/28] drm/mediatek: add third ddp path
+In-Reply-To: <1528687580-549-28-git-send-email-stu.hsieh@mediatek.com>
+References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
+ <1528687580-549-28-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528875517.30263.15.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 10:00:33PM +0200, Jernej Skrabec wrote:
-> Function is useful when drm_of_find_possible_crtcs() can't be used and
-> custom parsing is needed. This can happen for example when there is a
-> node with multiple muxes between crtc and encoder.
+On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
+> This patch create third crtc by third ddp path
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+
 > ---
->  drivers/gpu/drm/drm_of.c | 4 ++--
->  include/drm/drm_of.h     | 8 ++++++++
->  2 files changed, 10 insertions(+), 2 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 3 +++
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 5 +++++
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h  | 5 ++++-
+>  3 files changed, 12 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> index 1fe122461298..2e9cea3287b2 100644
-> --- a/drivers/gpu/drm/drm_of.c
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -22,8 +22,8 @@ static void drm_release_of(struct device *dev, void *data)
->   * Given a port OF node, return the possible mask of the corresponding
->   * CRTC within a device's list of CRTCs.  Returns zero if not found.
->   */
-> -static uint32_t drm_crtc_port_mask(struct drm_device *dev,
-> -				   struct device_node *port)
-> +uint32_t drm_crtc_port_mask(struct drm_device *dev,
-> +			    struct device_node *port)
-
-It should probably be exported too?
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/60f38f14/attachment.sig>
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 658b8dd45b83..2d6aa150a9ff 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -539,6 +539,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+>  	int ret;
+>  	int i;
+>  
+> +	if (!path)
+> +		return 0;
+> +
+>  	for (i = 0; i < path_len; i++) {
+>  		enum mtk_ddp_comp_id comp_id = path[i];
+>  		struct device_node *node;
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index 08d5d0b47bfe..3d279a299383 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -232,6 +232,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+>  	if (ret < 0)
+>  		goto err_component_unbind;
+>  
+> +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
+> +				  private->data->third_len);
+> +	if (ret < 0)
+> +		goto err_component_unbind;
+> +
+>  	/* Use OVL device for all DMA memory allocations */
+>  	np = private->comp_node[private->data->main_path[0]] ?:
+>  	     private->comp_node[private->data->ext_path[0]];
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> index c3378c452c0a..ecc00ca3221d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> @@ -17,7 +17,7 @@
+>  #include <linux/io.h>
+>  #include "mtk_drm_ddp_comp.h"
+>  
+> -#define MAX_CRTC	2
+> +#define MAX_CRTC	3
+>  #define MAX_CONNECTOR	2
+>  
+>  struct device;
+> @@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
+>  	unsigned int main_len;
+>  	const enum mtk_ddp_comp_id *ext_path;
+>  	unsigned int ext_len;
+> +	const enum mtk_ddp_comp_id *third_path;
+> +	unsigned int third_len;
+> +
+>  	bool shadow_register;
+>  };
+>  
