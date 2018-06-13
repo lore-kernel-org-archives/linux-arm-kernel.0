@@ -1,53 +1,108 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 13 Jun 2018 16:04:20 +0800
-Subject: [PATCH v2 14/27] drm/sun4i: Don't check for panel or bridge on TV
- TCONs
-In-Reply-To: <20180613074621.5phumovcyymbkfbn@flea>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-15-jernej.skrabec@siol.net>
- <20180613074621.5phumovcyymbkfbn@flea>
-Message-ID: <CAGb2v66QWr2CQhcfQ9BQds-0xeG=pS4MDzaNn7_HGz+q3gfkWA@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 13 Jun 2018 16:05:12 +0800
+Subject: [PATCH 13/28] drm/mediatek: add connection from RDMA0 to DSI3
+In-Reply-To: <1528875983.11190.29.camel@mtksdccf07>
+References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
+ <1528687580-549-14-git-send-email-stu.hsieh@mediatek.com>
+ <1528868751.15127.10.camel@mtksdaap41>
+ <1528875983.11190.29.camel@mtksdccf07>
+Message-ID: <1528877112.30263.24.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 3:46 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Jun 12, 2018 at 10:00:23PM +0200, Jernej Skrabec wrote:
->> TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
->> sense to check if panel or bridge is connected to them.
->>
->> Check if TCON has channel 0 and only then check for connected panel or
->> bridges.
->>
->> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> ---
->>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
->>  1 file changed, 9 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> index b1205a7bc20f..c9ffa5381185 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> @@ -1189,13 +1189,19 @@ static const struct component_ops sun4i_tcon_ops = {
->>  static int sun4i_tcon_probe(struct platform_device *pdev)
->>  {
->>       struct device_node *node = pdev->dev.of_node;
->> +     const struct sun4i_tcon_quirks *quirks;
->>       struct drm_bridge *bridge;
->>       struct drm_panel *panel;
->>       int ret;
->>
->> -     ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
->> -     if (ret == -EPROBE_DEFER)
->> -             return ret;
->> +     quirks = of_device_get_match_data(&pdev->dev);
->
-> We should probably check ofr the pointer value before dereferencing it.
+Hi, Stu:
 
-I think we've discussed this before. If the driver has data structures
-for all the supported compatible strings, and it is device tree only,
-then we should just let it blow up in the user's face, since they are
-obviously doing something they shouldn't be doing to get the driver
-to probe without a compatible string match.
+On Wed, 2018-06-13 at 15:46 +0800, Stu Hsieh wrote:
+> Hi, CK:
+> 
+> On Wed, 2018-06-13 at 13:45 +0800, CK Hu wrote:
+> > Hi, Stu:
+> > 
+> > Two inline comment.
+> > 
+> > On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
+> > > This patch add the connection from RDMA0 to DSI3
+> > > 
+> > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > > ---
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 4 ++++
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 +-
+> > >  2 files changed, 5 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > index c08aed8dae44..fed1b5704355 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > @@ -83,6 +83,7 @@
+> > >  #define GAMMA_MOUT_EN_RDMA1		0x1
+> > >  #define RDMA0_MOUT_DPI0			0x2
+> > >  #define RDMA0_MOUT_DSI2			0x4
+> > > +#define RDMA0_MOUT_DSI3			0x5
+> > 
+> > Usually, each bit of a mout register represent a output enable. Is this
+> > value 0x5 is a correct value?
+> 
+> In hw CONFIG SPEC show as following:
+> Bit(s)	Name			Description
+> 2:0	DISP_PATH0_SOUT_SEL_IN	0 : Output to DSI0
+> 				1:  Ooutput to DSI1
+> 				2:  Ooutput to DPI
+> 				3:  Ooutput to DPI1
+> 				4:  Ooutput to DSI2
+> 				5:  Ooutput to DSI3
+> 				6 : reserved
+> 				7:  Ooutput to DISP_UFOE
+> So, the value 0x5 is correct value.
+> 
 
-ChenYu
+>From the definition, it looks like that RDMA0 could only single output
+(output to only one destination at one moment). The register naming
+'DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN' (MOUT means output to multiple
+destination simultaneously) would confuse me. If the data sheet use the
+confused naming, I think I could just accept it.
+
+Regards,
+CK
+
+> Regard,
+> Stu
+> 
+> > 
+> > >  #define RDMA1_MOUT_DPI0			0x2
+> > >  #define DPI0_SEL_IN_RDMA1		0x1
+> > >  #define COLOR1_SEL_IN_OVL1		0x1
+> > > @@ -164,6 +165,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+> > >  	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI2) {
+> > >  		*addr = DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN;
+> > >  		value = RDMA0_MOUT_DSI2;
+> > > +	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI3) {
+> > > +		*addr = DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN;
+> > > +		value = RDMA0_MOUT_DSI3;
+> > >  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+> > >  		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+> > >  		value = RDMA1_MOUT_DPI0;
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > > index fe6fdc021fc7..22f4c72fa785 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > > @@ -228,7 +228,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> > >  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+> > >  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+> > >  	[DDP_COMPONENT_DSI2]	= { MTK_DSI,		2, NULL },
+> > > -	[DDP_COMPONENT_DSI2]	= { MTK_DSI,		3, NULL },
+> > > +	[DDP_COMPONENT_DSI3]	= { MTK_DSI,		3, NULL },
+> > 
+> > I think this is not related to this patch.
+> OK
+> 
+> > 
+> > Regards,
+> > CK
+> > 
+> > >  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
+> > >  	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
+> > >  	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
+> > 
+> > 
+> 
+> 
