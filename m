@@ -1,72 +1,63 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Wed, 13 Jun 2018 02:15:39 -0700
-Subject: [PATCH] net: thunderx: prevent concurrent data re-writing by
- nicvf_set_rx_mode
-In-Reply-To: <20180612.152540.1304714747425091865.davem@davemloft.net>
-References: <20180608092759.28059-1-Vadim.Lomovtsev@caviumnetworks.com>
- <20180610.123551.885190586229525170.davem@davemloft.net>
- <036618ae-887f-44b5-2b39-451b81191cc1@redhat.com>
- <20180612.152540.1304714747425091865.davem@davemloft.net>
-Message-ID: <20180613091539.GA21252@localhost.localdomain>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 13 Jun 2018 10:17:36 +0100
+Subject: [PATCH v3 3/3] arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
+In-Reply-To: <20180606043921.19851-4-yaojun8558363@gmail.com>
+References: <20180606043921.19851-1-yaojun8558363@gmail.com>
+ <20180606043921.19851-4-yaojun8558363@gmail.com>
+Message-ID: <1ef0fd31-001d-0872-7089-70ec22bab59f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for delay.
+Hi Jun,
 
-On Tue, Jun 12, 2018 at 03:25:40PM -0700, David Miller wrote:
-> From: Dean Nelson <dnelson@redhat.com>
-> Date: Mon, 11 Jun 2018 06:22:14 -0500
-> 
-> > On 06/10/2018 02:35 PM, David Miller wrote:
-> >> From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
-> >> Date: Fri,  8 Jun 2018 02:27:59 -0700
-> >> 
-> >>> +	/* Save message data locally to prevent them from
-> >>> +	 * being overwritten by next ndo_set_rx_mode call().
-> >>> +	 */
-> >>> +	spin_lock(&nic->rx_mode_wq_lock);
-> >>> +	mode = vf_work->mode;
-> >>> +	mc = vf_work->mc;
-> >>> +	vf_work->mc = NULL;
-> > 
-> > If I'm reading this code correctly, I believe nic->rx_mode_work.mc
-> > will
-> > have been set to NULL before the lock is dropped by
-> > nicvf_set_rx_mode_task() and acquired by nicvf_set_rx_mode().
-> > 
-> > 
-> >>> +	spin_unlock(&nic->rx_mode_wq_lock);
-> >> At the moment you drop this lock, the memory behind 'mc' can be
-> >> freed up by:
-> >> 
-> >>> +	spin_lock(&nic->rx_mode_wq_lock);
-> >>> +	kfree(nic->rx_mode_work.mc);
-> > 
-> > So the kfree() will be called with a NULL pointer and quickly return.
-> > 
-> > 
-> >> And you'll crash when you dereference it above via
-> >> __nicvf_set_rx_mode_task().
-> >> 
-> > 
-> > I believe the call to kfree() in nicvf_set_rx_mode() is there to free
-> > up a mc_list that has been allocated by nicvf_set_rx_mode() during a
-> > previous callback to the function, one that has not yet been processed
-> > by nicvf_set_rx_mode_task().
-> > 
-> > In this way only the last 'unprocessed' callback to
-> > nicvf_set_rx_mode()
-> > gets processed should there be multiple callbacks occurring between
-> > the
-> > times the nicvf_set_rx_mode_task() runs.
-> > 
-> > In my testing with this patch, this is what I see happening.
-> 
-> You're right, my bad.
-> 
-> Patch applied.
+On 06/06/18 05:39, Jun Yao wrote:
+> Migrate swapper_pg_dir and tramp_pg_dir. And their virtual addresses
+> do not correlate with kernel's address.
 
-Thank you for your time.
+This is all to make 'KSMA' harder, where an single arbitrary write is used to
+add a block mapping to the page-tables, giving the attacker full access to
+physical memory.
 
-WBR,
-Vadim
+This series is pretty complicated, and would still be overcome by arbitrary-read
+of __pa_swapper_pg_dir. Any attacker already has to defeat KASLR, but I guess
+that can be done without having read-access.
+
+
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 94056e064c6f..ba0b55158971 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -637,10 +647,29 @@ static void __init map_kernel(pgd_t *pgdp)
+>   */
+>  void __init paging_init(void)
+>  {
+> -	phys_addr_t pgd_phys = early_pgtable_alloc();
+> -	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
+> +	phys_addr_t pgd_phys;
+> +	pgd_t *pgdp;
+> +	phys_addr_t mem_size;
+>
+> -	__pa_swapper_pg_dir = __pa_symbol(swapper_pg_dir);
+> +	mem_size = __pa_symbol(swapper_pg_dir) + PAGE_SIZE
+> +			- (__pa_symbol(idmap_pg_dir) + IDMAP_DIR_SIZE);
+> +
+> +	if (mem_size == PAGE_SIZE) {
+> +		pgd_phys = early_pgtable_alloc();
+
+This is where we migrated swapper_pg_dir to, its the first memblock_alloc()
+call, and is guaranteed to be at the top of memory. Moving this allocation later
+will still cause a predictable page to be allocated as this setup code is the
+only thing running. I don't think we are in a better position after this series.
+
+
+Ideally we would put these pgd entries in the read-only section. We only modify
+swapper_pg_dir for vmalloc()/vmap() once its generated, which we could do
+through a fixmap entry.
+
+Like this, an attacker can find where swapper_pg_dir is, but can't write to it.
+(the tricky bit will be breaking swapper_pg_dir up, as we free parts of it)
+
+
+Thanks,
+
+James
