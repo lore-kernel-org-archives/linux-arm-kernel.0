@@ -1,70 +1,46 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 Jun 2018 08:24:33 -0500
-Subject: [U-Boot] [RFC PATCH 0/2] ARM: v7: Enable basic framework for
- supporting bits for CVE-2017-5715
-In-Reply-To: <20180613100803.GB17671@n2100.armlinux.org.uk>
-References: <20180125214559.27570-1-nm@ti.com>
- <CAOMZO5CcEf=EhFWknKmCXXLJPOgx=65jLH+X1OAGkg5VxBGVew@mail.gmail.com>
- <CAGo_u6qyf1Z+zSG-17TYRDPzG8V_0_-nk1F15HB4tPyT9rbUYQ@mail.gmail.com>
- <20180612214049.GA17671@n2100.armlinux.org.uk>
- <20180612215834.wrnfrb57ed3uxexa@kahuna>
- <20180613100803.GB17671@n2100.armlinux.org.uk>
-Message-ID: <20180613132433.ho3o4uorfewgmytj@kahuna>
+Date: Wed, 13 Jun 2018 08:29:10 -0500
+Subject: [PATCH] ARM: DRA7/OMAP5: Enable ACTLR[0] (Enable invalidates of
+ BTB) for secondary cores
+In-Reply-To: <20180613101153.GD6920@n2100.armlinux.org.uk>
+References: <20180612213611.2484-1-nm@ti.com>
+ <20180613101153.GD6920@n2100.armlinux.org.uk>
+Message-ID: <20180613132910.wr7ngq4nvxlgaoqi@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:08-20180613, Russell King - ARM Linux wrote:
-> On Tue, Jun 12, 2018 at 04:58:34PM -0500, Nishanth Menon wrote:
-> > On 21:40-20180612, Russell King - ARM Linux wrote:
-> > [...]
-> > > > I started respinning the series, while there is definitely a use of
-> > > > implementing in u-boot,
-> > > > I am starting to wonder if we should also be doing this in kernel.
-> > > 
-> > > How does the kernel set the bit when the kernel is running in non-secure
-> > > mode, when the ACTLR is read-only in that mode?
-> > 
-> > For OMAP5/DRA7 SMP systems, I just posted a patch that seems to resolve
-> > it:
-> > https://patchwork.kernel.org/patch/10461273/
-> > 
-> > This'd be similar in implementation to ARM erratum 801819 workaround
-> > that needs two pieces (u-boot + kernel). I am not really worried about
-> > OMAP5/DRA7 since they should'nt loose context in Low power modes.
-> > Other SoCs need to be aware of the constraints.
-> > 
-> > /me wishes PSCI was a standard during ARMv7, but it was'nt... So
-> > legacy v7 SoCs have implementations that are kind of different (even
-> > smc calling conventions vary).
+On 10:11-20180613, Russell King - ARM Linux wrote:
+> On Tue, Jun 12, 2018 at 04:36:11PM -0500, Nishanth Menon wrote:
+> > Call secure services to enable ACTLR[0] (Enable invalidates of BTB with
+> > ICIALLU) when branch hardening is enabled for kernel.
 > 
-> It may seem to be an easy way out (do everything in the kernel) but
-> have you considered that the secure world is also vulnerable?
-
-Yes, we have.
-
-> If the IBE bit is not set in the secure world, then the secure world
-> is not implementing the workarounds, and therefore the non-secure
-> world has the possibility to use the Spectre vulnerabilities to
-> exploit the secure world with enough effort and knowledge.
+> As mentioned elsewhere, I don't think this is a good idea - if the secure
+> world is not implementing the Spectre workarounds, then the _system_ is
+> exploitable.
 > 
-> You really need to _also_ fix these vulnerabilities in the secure
-> world, which includes setting the IBE bit there.
+> If the secure world is implementing the spectre workarounds, it will
+> already have enabled the IBE bit (which is r/w from secure, read only
+> from non-secure.)
+> 
+> So, basically, lack of the IBE bit being set is basically telling the
+> kernel that it's running on a vulnerable platform _even if the kernel
+> were to set it through some means_.
 
-Correct, but, unfortunately, this is NOT always the case / not necessary in
-some cases. Example:
+On GP devices OMAP5/DRA7, there is no possibility to update secure side
+since "secure world" is ROM and there are no override mechanisms possible.
+on HS devices, I agree, appropriate PPA will do the workarounds as well.
 
-On General purpose (GP) devices such as in OMAP, ROM owns the secure APIs,
-there is no override of secure world APIs possible. In such cases, we
-have to see if there is anything that needs to be protected. in case of
-GP devices, there are no secure assets to protect and any SMC calls are
-just support services provided by ROM.
+However, this patch is to enable the IBE enable on GP device for _a_
+core can only be done via SMC services that ROM provides for
+specifically the reasons you have already stated. u-boot will only
+enable the IBE for the boot core, by the time the secondary cores start
+up, u-boot is long gone.. so someone has to invoke the SMC call to
+enable the IBE bit for the secondary core.
 
-a) updating secure side is not possible
-b) secure side updates is not necessary since there are no critical run time
-   services provided by ROM.
+This is what the patch does.
 
-On devices such as Keystone 2 (TI) generation, yes, we do have ability
-to update secure side and must be done as well.
+If the above explanation makes sense, I will add that to the commit log
+as well.
 
 -- 
 Regards,
