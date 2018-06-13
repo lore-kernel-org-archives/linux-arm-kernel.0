@@ -1,40 +1,24 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 14 Jun 2018 01:06:52 +0200
-Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB
- with ICIALLU on Cortex-A15 for CVE-2017-5715
-In-Reply-To: <20180613213222.qxuiw7cajizslso7@kahuna>
-References: <20180612202411.29798-1-nm@ti.com>
- <20180612202411.29798-3-nm@ti.com>
- <8fac2f1c-ecc4-1aa1-0620-8ac6e2efdbf1@gmail.com>
- <20180613133215.2cv7iyjb2laaha3j@kahuna>
- <20180613154627.GP350@bill-the-cat.ec.rr.com>
- <20180613213222.qxuiw7cajizslso7@kahuna>
-Message-ID: <2286b326-3970-412a-a47b-164d65c6cb18@gmail.com>
+From: evgreen@chromium.org (Evan Green)
+Date: Wed, 13 Jun 2018 16:27:46 -0700
+Subject: [PATCH] arm64: dts: qcom: Add pm8005 and pm8998 support
+In-Reply-To: <20180613152054.54812-1-swboyd@chromium.org>
+References: <20180613152054.54812-1-swboyd@chromium.org>
+Message-ID: <CAE=gft4dFqR+hxLNsAVT6QZPuMMvV7-K-x_w8YXQogh5N00n7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2018 11:32 PM, Nishanth Menon wrote:
-> On 15:46-20180613, Tom Rini wrote:
->> On Wed, Jun 13, 2018 at 08:32:15AM -0500, Nishanth Menon wrote:
->>> On 23:05-20180612, Marek Vasut wrote:
->>>> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
->>> [..]
->>>>> +#ifdef CONFIG_ARM_CORTEX_A15_CVE_2017_5715
->>>>> +	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
->>>>> +	orr	r0, r0, #1 << 0		@ Enable invalidates of BTB
->>>>
->>>> Can we use BIT() macro in the assembler code too ?
->>>
->>> Probably, but just following convention in the rest of the file. Do we
->>> want to change from existing code?
->>
->> Agreed, we should follow the existing style (and I'm not 100% sure I
->> like using BIT() in asm files).
-> 
-> OK. Will drop this feedback about BIT() macro if I have to do a v2.
+On Wed, Jun 13, 2018 at 8:21 AM Stephen Boyd <swboyd@chromium.org> wrote:
+>
+> Add basic support for the pm8005 and pm8998 PMICs. For now just support
+> the GPIO controllers.
+>
+> Signed-off-by: Stephen Boyd <swboyd@chromium.org>
+> ---
+>  arch/arm64/boot/dts/qcom/pm8005.dtsi | 33 +++++++++++++++++
+>  arch/arm64/boot/dts/qcom/pm8998.dtsi | 55 ++++++++++++++++++++++++++++
+>  2 files changed, 88 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/qcom/pm8005.dtsi
+>  create mode 100644 arch/arm64/boot/dts/qcom/pm8998.dtsi
+>
 
-Fine by me
-
--- 
-Best regards,
-Marek Vasut
+Reviewed-by: Evan Green <evgreen@chromium.org>
