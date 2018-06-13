@@ -1,54 +1,54 @@
 From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 13 Jun 2018 19:32:33 +0800
-Subject: [PATCH 6/8] clocksource: time-pistachio: Register the persistent clock
+Date: Wed, 13 Jun 2018 19:32:32 +0800
+Subject: [PATCH 5/8] clocksource: timer-ti-32k: Register the persistent clock
 In-Reply-To: <cover.1528878545.git.baolin.wang@linaro.org>
 References: <cover.1528878545.git.baolin.wang@linaro.org>
-Message-ID: <e00f46be05f74439eecd9c4fb43baa4cd0dae297.1528878545.git.baolin.wang@linaro.org>
+Message-ID: <904493423cadb90576a712acdb3b512b4ed44887.1528878545.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the timer on pistachio platform is always available, we can
-register it as one persistent clock to compensate the suspend time
-for the OS time.
+Since the 32K counter is always available, then we can register the
+persistent clock to compensate the suspend time for the OS time.
 
 Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 ---
- drivers/clocksource/Kconfig          |    1 +
- drivers/clocksource/time-pistachio.c |    3 +++
- 2 files changed, 4 insertions(+)
+ drivers/clocksource/Kconfig        |    1 +
+ drivers/clocksource/timer-ti-32k.c |    4 ++++
+ 2 files changed, 5 insertions(+)
 
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 3cd136f..af552ba 100644
+index 5e51fcf..3cd136f 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -255,6 +255,7 @@ config CLKSRC_PISTACHIO
- 	bool "Clocksource for Pistachio SoC" if COMPILE_TEST
- 	depends on HAS_IOMEM
- 	select TIMER_OF
+@@ -262,6 +262,7 @@ config CLKSRC_TI_32K
+ 	bool "Texas Instruments 32.768 Hz Clocksource" if COMPILE_TEST
+ 	depends on GENERIC_SCHED_CLOCK
+ 	select TIMER_OF if OF
 +	select PERSISTENT_CLOCK
  	help
- 	  Enables the clocksource for the Pistachio SoC.
- 
-diff --git a/drivers/clocksource/time-pistachio.c b/drivers/clocksource/time-pistachio.c
-index a2dd85d..5c3eb71 100644
---- a/drivers/clocksource/time-pistachio.c
-+++ b/drivers/clocksource/time-pistachio.c
-@@ -20,6 +20,7 @@
- #include <linux/mfd/syscon.h>
+ 	  This option enables support for Texas Instruments 32.768 Hz clocksource
+ 	  available on many OMAP-like platforms.
+diff --git a/drivers/clocksource/timer-ti-32k.c b/drivers/clocksource/timer-ti-32k.c
+index 880a861..353ff9d 100644
+--- a/drivers/clocksource/timer-ti-32k.c
++++ b/drivers/clocksource/timer-ti-32k.c
+@@ -41,6 +41,7 @@
+ #include <linux/clocksource.h>
  #include <linux/of.h>
  #include <linux/of_address.h>
 +#include <linux/persistent_clock.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/sched_clock.h>
-@@ -212,6 +213,8 @@ static int __init pistachio_clksrc_of_init(struct device_node *node)
  
- 	raw_spin_lock_init(&pcs_gpt.lock);
- 	sched_clock_register(pistachio_read_sched_clock, 32, rate);
-+	persistent_clock_init_and_register(pistachio_read_sched_clock,
-+					   CLOCKSOURCE_MASK(32), rate, 0);
- 	return clocksource_register_hz(&pcs_gpt.cs, rate);
- }
- TIMER_OF_DECLARE(pistachio_gptimer, "img,pistachio-gptimer",
+ /*
+  * 32KHz clocksource ... always available, on pretty most chips except
+@@ -120,6 +121,9 @@ static int __init ti_32k_timer_init(struct device_node *np)
+ 	}
+ 
+ 	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
++	persistent_clock_init_and_register(omap_32k_read_sched_clock,
++					   CLOCKSOURCE_MASK(32), 32768, 0);
++
+ 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
+ 
+ 	return 0;
 -- 
 1.7.9.5
