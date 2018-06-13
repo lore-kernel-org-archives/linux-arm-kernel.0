@@ -1,76 +1,56 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 Jun 2018 15:38:37 +0800
-Subject: [PATCH 27/28] drm/mediatek: add third ddp path
-In-Reply-To: <1528687580-549-28-git-send-email-stu.hsieh@mediatek.com>
-References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-28-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528875517.30263.15.camel@mtksdaap41>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 13 Jun 2018 09:46:21 +0200
+Subject: [PATCH v2 14/27] drm/sun4i: Don't check for panel or bridge on
+ TV TCONs
+In-Reply-To: <20180612200036.21483-15-jernej.skrabec@siol.net>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180612200036.21483-15-jernej.skrabec@siol.net>
+Message-ID: <20180613074621.5phumovcyymbkfbn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
-> This patch create third crtc by third ddp path
+On Tue, Jun 12, 2018 at 10:00:23PM +0200, Jernej Skrabec wrote:
+> TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
+> sense to check if panel or bridge is connected to them.
 > 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
+> Check if TCON has channel 0 and only then check for connected panel or
+> bridges.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 3 +++
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 5 +++++
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h  | 5 ++++-
->  3 files changed, 12 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> index 658b8dd45b83..2d6aa150a9ff 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> @@ -539,6 +539,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index b1205a7bc20f..c9ffa5381185 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -1189,13 +1189,19 @@ static const struct component_ops sun4i_tcon_ops = {
+>  static int sun4i_tcon_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *node = pdev->dev.of_node;
+> +	const struct sun4i_tcon_quirks *quirks;
+>  	struct drm_bridge *bridge;
+>  	struct drm_panel *panel;
 >  	int ret;
->  	int i;
 >  
-> +	if (!path)
-> +		return 0;
-> +
->  	for (i = 0; i < path_len; i++) {
->  		enum mtk_ddp_comp_id comp_id = path[i];
->  		struct device_node *node;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 08d5d0b47bfe..3d279a299383 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -232,6 +232,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
->  	if (ret < 0)
->  		goto err_component_unbind;
->  
-> +	ret = mtk_drm_crtc_create(drm, private->data->third_path,
-> +				  private->data->third_len);
-> +	if (ret < 0)
-> +		goto err_component_unbind;
-> +
->  	/* Use OVL device for all DMA memory allocations */
->  	np = private->comp_node[private->data->main_path[0]] ?:
->  	     private->comp_node[private->data->ext_path[0]];
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index c3378c452c0a..ecc00ca3221d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -17,7 +17,7 @@
->  #include <linux/io.h>
->  #include "mtk_drm_ddp_comp.h"
->  
-> -#define MAX_CRTC	2
-> +#define MAX_CRTC	3
->  #define MAX_CONNECTOR	2
->  
->  struct device;
-> @@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
->  	unsigned int main_len;
->  	const enum mtk_ddp_comp_id *ext_path;
->  	unsigned int ext_len;
-> +	const enum mtk_ddp_comp_id *third_path;
-> +	unsigned int third_len;
-> +
->  	bool shadow_register;
->  };
->  
+> -	ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
+> -	if (ret == -EPROBE_DEFER)
+> -		return ret;
+> +	quirks = of_device_get_match_data(&pdev->dev);
+
+We should probably check ofr the pointer value before dereferencing it.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/86d5ae0a/attachment-0001.sig>
