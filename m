@@ -1,80 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 13 Jun 2018 22:36:56 +0200
-Subject: [PATCH 3/4] ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable
- invalidates of BTB) to facilitate CVE_2017-5715 WA in OS
-In-Reply-To: <20180613173634.GC17671@n2100.armlinux.org.uk>
-References: <20180612202411.29798-1-nm@ti.com>
- <20180612202411.29798-4-nm@ti.com>
- <780935f6-6506-0915-dfb2-b584c074b70d@gmail.com>
- <20180613173634.GC17671@n2100.armlinux.org.uk>
-Message-ID: <330ff593-4663-5393-74b3-55bf1f199561@gmail.com>
+From: Matt.Sealey@arm.com (Matt Sealey)
+Date: Wed, 13 Jun 2018 21:07:33 +0000
+Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
+ bindings
+In-Reply-To: <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+ <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
+ <20180612204802.GA15817@rob-hp-laptop>
+ <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
+ <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
+ <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
+ <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+ <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
+ <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
+Message-ID: <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2018 07:36 PM, Russell King - ARM Linux wrote:
-> On Wed, Jun 13, 2018 at 01:06:13AM +0200, Marek Vasut wrote:
->> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
->>> Enable CVE_2017_5715 and since we have our own v7_arch_cp15_set_acr
->>> function to setup the bits, we are able to override the settings.
->>>
->>> Without this enabled, Linux kernel reports:
->>> CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
->>>
->>> With this enabled, Linux kernel reports:
->>> CPU0: Spectre v2: using ICIALLU workaround
->>>
->>> NOTE: This by itself does not enable the workaround for CPU1 (on
->>> OMAP5 and DRA72/AM572 SoCs) and may require additional kernel patches.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> ---
->>>  arch/arm/mach-omap2/Kconfig | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->>> index 3bb1ecb58de0..77820cc8d1e4 100644
->>> --- a/arch/arm/mach-omap2/Kconfig
->>> +++ b/arch/arm/mach-omap2/Kconfig
->>> @@ -53,6 +53,7 @@ config OMAP54XX
->>>  	bool "OMAP54XX SoC"
->>>  	select ARM_ERRATA_798870
->>>  	select SYS_THUMB_BUILD
->>> +	select ARM_CORTEX_A15_CVE_2017_5715
->>>  	imply NAND_OMAP_ELM
->>>  	imply NAND_OMAP_GPMC
->>>  	imply SPL_DISPLAY_PRINT
->>>
->>
->> Can this be enabled for all CA15 systems somehow ? I am sure there are
->> more that are vulnerable.
-> 
-> I think you're missing the point.
-
-Please read the patch again.
-
-This enables it only for a specific SoC. My point being, this should be
-enabled for all SoCs with CA15, not just some select few.
-
-> Spectre affects the _entire_ system.  Working around it in just the
-> kernel does not mean that the system is no longer vulnerable.
-> 
-> Fixing the "system" means implementing the fixes also in the secure
-> world, which on A15 and A8 also means setting the IBE bit there.  If
-> the IBE bit is set in the secure world, it will also be set in the
-> non-secure world.
-> 
-> The fact that the kernel is complaining is telling you that the
-> system as a whole does not have the workarounds in place to mitigate
-> against the vulnerability.  Merely setting the IBE bit via some
-> secure API doesn't "magically" fix the secure world.
-> 
-> So, even if you were to set the IBE bit via some magic secure API,
-> the fact still remains: even with these workarounds in place, as I
-> understand it, the _system as a whole_ remains vulnerable - you
-> might as well _not_ have the kernel workarounds.
-> 
 
 
--- 
-Best regards,
-Marek Vasut
+> -----Original Message-----
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
+> > So, if the suggestion is to use an existing property "unit", I am fine
+> > with it, if people agree to it.
+>
+> If we're going to have something sharply different than ACPI I prefer
+> Rob's idea.
+
+What are you trying to say about being sharply different than ACPI?
+
+Ta,
+Matt
+
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
