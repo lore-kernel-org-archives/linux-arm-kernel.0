@@ -1,60 +1,54 @@
 From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 13 Jun 2018 19:32:31 +0800
-Subject: [PATCH 4/8] clocksource: arm_arch_timer: Register the persistent clock
+Date: Wed, 13 Jun 2018 19:32:33 +0800
+Subject: [PATCH 6/8] clocksource: time-pistachio: Register the persistent clock
 In-Reply-To: <cover.1528878545.git.baolin.wang@linaro.org>
 References: <cover.1528878545.git.baolin.wang@linaro.org>
-Message-ID: <5b450836ee0db88de27d47e43368de02c550425b.1528878545.git.baolin.wang@linaro.org>
+Message-ID: <e00f46be05f74439eecd9c4fb43baa4cd0dae297.1528878545.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the persistent clock to compensate the suspend time for OS time,
-if the ARM counter clocksource will not be stopped in suspend state.
+Since the timer on pistachio platform is always available, we can
+register it as one persistent clock to compensate the suspend time
+for the OS time.
 
 Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 ---
  drivers/clocksource/Kconfig          |    1 +
- drivers/clocksource/arm_arch_timer.c |   10 ++++++++++
- 2 files changed, 11 insertions(+)
+ drivers/clocksource/time-pistachio.c |    3 +++
+ 2 files changed, 4 insertions(+)
 
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 7f11c6c..5e51fcf 100644
+index 3cd136f..af552ba 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -308,6 +308,7 @@ config ARC_TIMERS_64BIT
- 
- config ARM_ARCH_TIMER
- 	bool
+@@ -255,6 +255,7 @@ config CLKSRC_PISTACHIO
+ 	bool "Clocksource for Pistachio SoC" if COMPILE_TEST
+ 	depends on HAS_IOMEM
+ 	select TIMER_OF
 +	select PERSISTENT_CLOCK
- 	select TIMER_OF if OF
- 	select TIMER_ACPI if ACPI
+ 	help
+ 	  Enables the clocksource for the Pistachio SoC.
  
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 57cb2f0..671be63 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -32,6 +32,7 @@
- #include <asm/virt.h>
- 
- #include <clocksource/arm_arch_timer.h>
+diff --git a/drivers/clocksource/time-pistachio.c b/drivers/clocksource/time-pistachio.c
+index a2dd85d..5c3eb71 100644
+--- a/drivers/clocksource/time-pistachio.c
++++ b/drivers/clocksource/time-pistachio.c
+@@ -20,6 +20,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
 +#include <linux/persistent_clock.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/sched_clock.h>
+@@ -212,6 +213,8 @@ static int __init pistachio_clksrc_of_init(struct device_node *node)
  
- #undef pr_fmt
- #define pr_fmt(fmt) "arch_timer: " fmt
-@@ -950,6 +951,15 @@ static void __init arch_counter_register(unsigned type)
- 
- 	/* 56 bits minimum, so we assume worst case rollover */
- 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-+
-+	/*
-+	 * Register the persistent clock if the clocksource will not be stopped
-+	 * in suspend state.
-+	 */
-+	if (!arch_counter_suspend_stop)
-+		persistent_clock_init_and_register(arch_timer_read_counter,
-+						   CLOCKSOURCE_MASK(56),
-+						   arch_timer_rate, 0);
+ 	raw_spin_lock_init(&pcs_gpt.lock);
+ 	sched_clock_register(pistachio_read_sched_clock, 32, rate);
++	persistent_clock_init_and_register(pistachio_read_sched_clock,
++					   CLOCKSOURCE_MASK(32), rate, 0);
+ 	return clocksource_register_hz(&pcs_gpt.cs, rate);
  }
- 
- static void arch_timer_stop(struct clock_event_device *clk)
+ TIMER_OF_DECLARE(pistachio_gptimer, "img,pistachio-gptimer",
 -- 
 1.7.9.5
