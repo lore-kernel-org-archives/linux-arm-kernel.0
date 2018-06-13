@@ -1,47 +1,40 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 13 Jun 2018 10:22:04 -0400
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <26470c5c-55db-9dff-3794-4e4a96c8bcb6@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 13 Jun 2018 16:36:35 +0200
+Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
+References: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
+ <20180613110647.ygg66nu36pcf6kpn@verge.net.au>
+ <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
+Message-ID: <20180613143626.rrdxq4i4guy2oryg@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On 5/18/2018 10:17 AM, Sinan Kaya wrote:
-> A host bridge is allowed to remap BAR addresses using _TRA attribute in
-> _CRS windows.
+On Wed, Jun 13, 2018 at 01:21:34PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
-> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+> On Wed, Jun 13, 2018 at 1:06 PM Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Jun 11, 2018 at 02:15:13PM +0200, Marek Vasut wrote:
+> > > Rather than hard-coding the quirk topology, which stopped scaling,
+> > > parse the information from DT. The code looks for all compatible
+> > > PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
+> > > to the same pin. If so, the code sends a matching sequence to the
+> > > PMIC to deassert the IRQ.
+> > >
+> > > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > Cc: linux-renesas-soc at vger.kernel.org
+> > > Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
+> >
+> > This looks fine to me but I will wait to see if there are other reviews
+> > before applying.
+> >
+> > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> When a VGA device is behind such a host bridge and the resource is
-> translated efifb driver is trying to do ioremap against bus address
-> rather than the resource address and is failing to probe.
-> 
-> efifb: probing for efifb
-> efifb: cannot reserve video memory at 0x1e000000
-> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
-> efifb: mode is 800x600x32, linelength=3200, pages=1
-> efifb: scrolling: redraw
-> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-> 
-> Use the host bridge offset information to convert bus address to
-> resource address in the fixup.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
+> Note that applying it now will break gose, as its DTS doesn't describe all
+> regulators yet.
 
-I didn't see any messages about these getting picked up for 4.18.
-
-Are they queued on your own branch?
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Ok, so old DT will break with new kernels?
