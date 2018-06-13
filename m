@@ -1,52 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jun 2018 11:08:04 +0100
-Subject: [U-Boot] [RFC PATCH 0/2] ARM: v7: Enable basic framework for
- supporting bits for CVE-2017-5715
-In-Reply-To: <20180612215834.wrnfrb57ed3uxexa@kahuna>
-References: <20180125214559.27570-1-nm@ti.com>
- <CAOMZO5CcEf=EhFWknKmCXXLJPOgx=65jLH+X1OAGkg5VxBGVew@mail.gmail.com>
- <CAGo_u6qyf1Z+zSG-17TYRDPzG8V_0_-nk1F15HB4tPyT9rbUYQ@mail.gmail.com>
- <20180612214049.GA17671@n2100.armlinux.org.uk>
- <20180612215834.wrnfrb57ed3uxexa@kahuna>
-Message-ID: <20180613100803.GB17671@n2100.armlinux.org.uk>
+From: rah@settrans.net (Bob Ham)
+Date: Wed, 13 Jun 2018 10:53:47 +0100
+Subject: [linux-sunxi] Re: [PATCH v2] arm: sun4i: Add support for Pengpod
+ 1000 tablet
+In-Reply-To: <4d041794-ba90-a9a6-0886-0ca18dab62b9@redhat.com>
+References: <20180602160313.26763-1-rah@settrans.net>
+ <20180604081302.hcn7j36gt6xeyquq@flea>
+ <313a74ea-0be6-cff1-6b2f-06a4b0b7ba8d@settrans.net>
+ <20180605145038.qptdlcphdbnw6jyg@flea>
+ <e2787b2a-230d-ea3c-89b9-316ddcd20f67@settrans.net>
+ <4d041794-ba90-a9a6-0886-0ca18dab62b9@redhat.com>
+Message-ID: <94669083-3729-ba6b-cede-40b380cf2440@settrans.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 04:58:34PM -0500, Nishanth Menon wrote:
-> On 21:40-20180612, Russell King - ARM Linux wrote:
-> [...]
-> > > I started respinning the series, while there is definitely a use of
-> > > implementing in u-boot,
-> > > I am starting to wonder if we should also be doing this in kernel.
-> > 
-> > How does the kernel set the bit when the kernel is running in non-secure
-> > mode, when the ACTLR is read-only in that mode?
-> 
-> For OMAP5/DRA7 SMP systems, I just posted a patch that seems to resolve
-> it:
-> https://patchwork.kernel.org/patch/10461273/
-> 
-> This'd be similar in implementation to ARM erratum 801819 workaround
-> that needs two pieces (u-boot + kernel). I am not really worried about
-> OMAP5/DRA7 since they should'nt loose context in Low power modes.
-> Other SoCs need to be aware of the constraints.
-> 
-> /me wishes PSCI was a standard during ARMv7, but it was'nt... So
-> legacy v7 SoCs have implementations that are kind of different (even
-> smc calling conventions vary).
+On 13/06/18 08:28, Hans de Goede wrote:
+> On 05-06-18 20:18, Bob Ham wrote:
 
-It may seem to be an easy way out (do everything in the kernel) but
-have you considered that the secure world is also vulnerable?
+>> It's a fine point but it makes me nervous.? I originally based my .dts
+>> on sun4i-a10-inet1.dts.? I've CC'd the original copyright holder, Hans
+>> de Goede.? Hans, are you willing to give permission for the license
+>> notice to be replaced with just an SPDX header indicating the dual
+>> licensing?
+> 
+> Yes that is fine by me and you've my permission to switch to using
+> just the SPDX header.
 
-If the IBE bit is not set in the secure world, then the secure world
-is not implementing the workarounds, and therefore the non-secure
-world has the possibility to use the Spectre vulnerabilities to
-exploit the secure world with enough effort and knowledge.
+Excellent, thanks! :-)
 
-You really need to _also_ fix these vulnerabilities in the secure
-world, which includes setting the IBE bit there.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Bob Ham <rah@settrans.net>
+
+for (;;) { ++pancakes; }
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 2913 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/b4d4d5c8/attachment.sig>
