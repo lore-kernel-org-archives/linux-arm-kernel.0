@@ -1,64 +1,63 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 13 Jun 2018 16:07:08 +0200
-Subject: [PATCH 3/9] media: cedrus: Add a macro to check for the validity of a
- control
+Date: Wed, 13 Jun 2018 16:07:07 +0200
+Subject: [PATCH 2/9] media: cedrus: Add wrappers around container_of for our
+ buffers
 In-Reply-To: <20180613140714.1686-1-maxime.ripard@bootlin.com>
 References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
-Message-ID: <20180613140714.1686-4-maxime.ripard@bootlin.com>
+Message-ID: <20180613140714.1686-3-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During our frame decoding setup, we need to check a number of controls to
-make sure that they are properly filled before trying to access them.
+The cedrus driver sub-classes the vb2_v4l2_buffer structure, but doesn't
+provide any function to wrap around the proper container_of call that needs
+to be duplicated in every calling site.
 
-It's not too bad with MPEG2 since there's just a single one, but with the
-upcoming increase of codecs, and the integration of more complex codecs,
-this logic will be duplicated a significant number of times. H264 for
-example uses 4 different controls.
-
-Add a macro that expands to the proper check in order to reduce the
-duplication.
+Add wrappers to make sure its opaque to the users and they don't have to
+care anymore.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- .../platform/sunxi/cedrus/sunxi_cedrus_dec.c     | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ .../platform/sunxi/cedrus/sunxi_cedrus_common.h      | 12 ++++++++++++
+ .../media/platform/sunxi/cedrus/sunxi_cedrus_hw.c    |  4 ++--
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-index 8c92af34ebeb..c19acf9626c4 100644
---- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-+++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-@@ -110,15 +110,16 @@ void sunxi_cedrus_device_run(void *priv)
+diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+index ee6883ef9cb7..b1ed1c8cb130 100644
+--- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
++++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+@@ -89,6 +89,18 @@ struct sunxi_cedrus_buffer {
+ 	struct list_head list;
+ };
  
- 	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
- 
-+#define CHECK_CONTROL(ctx, ctrl)					\
-+	if (!ctx->ctrls[(ctrl)]) {					\
-+		v4l2_err(&(ctx)->dev->v4l2_dev, "Invalid " #ctrl " control\n"); \
-+		(ctx)->job_abort = 1;					\
-+		goto unlock_complete;					\
-+	}
++static inline
++struct sunxi_cedrus_buffer *vb2_v4l2_to_cedrus_buffer(const struct vb2_v4l2_buffer *p)
++{
++	return container_of(p, struct sunxi_cedrus_buffer, vb);
++}
 +
- 	switch (ctx->vpu_src_fmt->fourcc) {
- 	case V4L2_PIX_FMT_MPEG2_FRAME:
--		if (!ctx->ctrls[SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR]) {
--			v4l2_err(&ctx->dev->v4l2_dev,
--				 "Invalid MPEG2 frame header control\n");
--			ctx->job_abort = 1;
--			goto unlock_complete;
--		}
--
-+		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
- 		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
- 		sunxi_cedrus_mpeg2_setup(ctx, &run);
- 
-@@ -128,6 +129,7 @@ void sunxi_cedrus_device_run(void *priv)
- 	default:
- 		ctx->job_abort = 1;
++static inline
++struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
++{
++	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
++}
++
+ struct sunxi_cedrus_dev {
+ 	struct v4l2_device v4l2_dev;
+ 	struct video_device vfd;
+diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+index 5783bd985855..fc688a5c1ea3 100644
+--- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
++++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+@@ -108,8 +108,8 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
+ 		return IRQ_HANDLED;
  	}
-+#undef CHECK_CONTROL
  
- unlock_complete:
- 	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
+-	src_buffer = container_of(src_vb, struct sunxi_cedrus_buffer, vb);
+-	dst_buffer = container_of(dst_vb, struct sunxi_cedrus_buffer, vb);
++	src_buffer = vb2_v4l2_to_cedrus_buffer(src_vb);
++	dst_buffer = vb2_v4l2_to_cedrus_buffer(dst_vb);
+ 
+ 	/* First bit of MPEG_STATUS indicates success. */
+ 	if (ctx->job_abort || !(status & 0x01))
 -- 
 2.17.0
