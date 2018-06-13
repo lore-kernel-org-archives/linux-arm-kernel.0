@@ -1,59 +1,44 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 13 Jun 2018 14:26:11 +0200
-Subject: [PATCH] clk: meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL
-In-Reply-To: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
-References: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1528892771.2292.2.camel@baylibre.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 13 Jun 2018 14:40:00 +0200
+Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
+In-Reply-To: <20180613122359.GA8695@bombadil.infradead.org>
+References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
+ <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
+ <20180613122359.GA8695@bombadil.infradead.org>
+Message-ID: <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-13 at 14:20 +0200, Neil Armstrong wrote:
-> On Amlogic Meson GXBB & GXL platforms, the SCPI Cortex-M4 Co-Processor
-> seems to be dependent on the FCLK_DIV2 to be operationnal.
-> 
-> The issue occured since v4.17-rc1 by freezing the kernel boot when
-> the 'schedutil' cpufreq governor was selected as default :
-> 
->   [   12.071837] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
->   domain-0 init dvfs: 4
->   [   12.087757] hctosys: unable to open rtc device (rtc0)
->   [   12.087907] cfg80211: Loading compiled-in X.509 certificates for regulatory database
->   [   12.102241] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
-> 
-> But when disabling the MMC driver, the boot finished but cpufreq failed to
-> change the CPU frequency :
-> 
->   [   12.153045] cpufreq: __target_index: Failed to change cpu frequency: -5
-> 
-> A bisect between v4.16 and v4.16-rc1 gave the 05f814402d61 commit to be
-> the first bad commit.
-> This commit added support for the missing clock gates before the fixed PLL
-> fixed dividers (FCLK_DIVx) and the clock framework basically disabled
-> all the unused fixed dividers, thus disabled a critical clock path for
-> the SCPI Co-Processor.
-> 
-> This patch simply sets the FCLK_DIV2 gate as critical to ensure
-> nobody can disable it.
-> 
-> Fixes: 05f814402d61 ("clk: meson: add fdiv clock gates")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Hi Matthew,
 
-Good catch !
-We'll probably have to check the axg family as well
+On 2018-06-13 14:24, Matthew Wilcox wrote:
+> On Wed, Jun 13, 2018 at 10:58:37AM +0200, Marek Szyprowski wrote:
+>> cma_alloc() function has gfp mask parameter, so users expect that it
+>> honors typical memory allocation related flags. The most imporant from
+>> the security point of view is handling of __GFP_ZERO flag, because memory
+>> allocated by this function usually can be directly remapped to userspace
+>> by device drivers as a part of multimedia processing and ignoring this
+>> flag might lead to leaking some kernel structures to userspace.
+>> Some callers of this function (for example arm64 dma-iommu glue code)
+>> already assumed that the allocated buffers are cleared when this flag
+>> is set. To avoid such issues, add simple code for clearing newly
+>> allocated buffer when __GFP_ZERO flag is set. Callers will be then
+>> updated to skip implicit clearing or adjust passed gfp flags.
+> I think the documentation for this function needs improving.  For example,
+> GFP_ATOMIC does not work (it takes a mutex lock, so it can sleep).
+> At the very least, the kernel-doc needs:
+>
+>   * Context: Process context (may sleep even if GFP flags indicate otherwise).
+>
+> Unless someone wants to rework this allocator to use spinlocks instead
+> of mutexes ...
 
-> ---
->  drivers/clk/meson/gxbb.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index b1e4d95..0e053c1 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -511,6 +511,7 @@ static struct clk_regmap gxbb_fclk_div2 = {
->  		.ops = &clk_regmap_gate_ops,
->  		.parent_names = (const char *[]){ "fclk_div2_div" },
->  		.num_parents = 1,
-> +		.flags = CLK_IS_CRITICAL,
->  	},
->  };
->  
+It is not only the matter of the spinlocks. GFP_ATOMIC is not supported 
+by the
+memory compaction code, which is used in alloc_contig_range(). Right, this
+should be also noted in the documentation.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
