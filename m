@@ -1,74 +1,190 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 Jun 2018 11:54:44 +0200
-Subject: [PATCH v3 5/6] dmaengine: imx-sdma: remove the maximum limation
- for bd numbers
-In-Reply-To: <1528729173-28684-6-git-send-email-yibin.gong@nxp.com>
-References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
- <1528729173-28684-6-git-send-email-yibin.gong@nxp.com>
-Message-ID: <20180613095444.uek6uzczdhx3rh56@pengutronix.de>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Wed, 13 Jun 2018 11:59:39 +0200
+Subject: [PATCH v2] media: stm32-dcmi: add power saving support
+Message-ID: <1528883979-30661-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Implements runtime & system sleep power management ops.
 
-In the subject: s/limation/limitation/
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+---
+version 2:
+  - Fix missing include file detected by kbuild on i386 & sparc64 arch:
+    - https://www.mail-archive.com/linux-media at vger.kernel.org/msg132766.html
+    - https://www.mail-archive.com/linux-media at vger.kernel.org/msg132771.html
 
-Sascha
+drivers/media/platform/stm32/stm32-dcmi.c | 81 +++++++++++++++++++++++++------
+ 1 file changed, 65 insertions(+), 16 deletions(-)
 
-On Mon, Jun 11, 2018 at 10:59:32PM +0800, Robin Gong wrote:
-> No this limitation now after virtual dma used since bd is allocated
-> dynamically instead of static.
-> 
-> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> ---
->  drivers/dma/imx-sdma.c | 14 --------------
->  1 file changed, 14 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index f150b38..0b0588d2 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -292,7 +292,6 @@ struct sdma_context_data {
->  	u32  scratch7;
->  } __attribute__ ((packed));
->  
-> -#define NUM_BD (int)(PAGE_SIZE / sizeof(struct sdma_buffer_descriptor))
->  
->  struct sdma_engine;
->  
-> @@ -1296,13 +1295,6 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
->  	if (ret)
->  		goto err_bd_out;
->  
-> -	if (sg_len > NUM_BD) {
-> -		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
-> -				channel, sg_len, NUM_BD);
-> -		ret = -EINVAL;
-> -		goto err_bd_out;
-> -	}
-> -
->  	desc->chn_count = 0;
->  	for_each_sg(sgl, sg, sg_len, i) {
->  		struct sdma_buffer_descriptor *bd = &desc->bd[i];
-> @@ -1412,12 +1404,6 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
->  	if (ret)
->  		goto err_bd_out;
->  
-> -	if (num_periods > NUM_BD) {
-> -		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
-> -				channel, num_periods, NUM_BD);
-> -		goto err_bd_out;
-> -	}
-> -
->  	if (period_len > 0xffff) {
->  		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
->  				channel, period_len, 0xffff);
-> -- 
-> 2.7.4
-> 
-> 
-
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 2e1933d..2ecf00e 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -22,7 +22,9 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_graph.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ #include <linux/videodev2.h>
+ 
+@@ -578,9 +580,9 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	u32 val = 0;
+ 	int ret;
+ 
+-	ret = clk_enable(dcmi->mclk);
++	ret = pm_runtime_get_sync(dcmi->dev);
+ 	if (ret) {
+-		dev_err(dcmi->dev, "%s: Failed to start streaming, cannot enable clock\n",
++		dev_err(dcmi->dev, "%s: Failed to start streaming, cannot get sync\n",
+ 			__func__);
+ 		goto err_release_buffers;
+ 	}
+@@ -590,7 +592,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	if (ret && ret != -ENOIOCTLCMD) {
+ 		dev_err(dcmi->dev, "%s: Failed to start streaming, subdev streamon error",
+ 			__func__);
+-		goto err_disable_clock;
++		goto err_pm_put;
+ 	}
+ 
+ 	spin_lock_irq(&dcmi->irqlock);
+@@ -675,8 +677,8 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ err_subdev_streamoff:
+ 	v4l2_subdev_call(dcmi->entity.subdev, video, s_stream, 0);
+ 
+-err_disable_clock:
+-	clk_disable(dcmi->mclk);
++err_pm_put:
++	pm_runtime_put(dcmi->dev);
+ 
+ err_release_buffers:
+ 	spin_lock_irq(&dcmi->irqlock);
+@@ -749,7 +751,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ 	/* Stop all pending DMA operations */
+ 	dmaengine_terminate_all(dcmi->dma_chan);
+ 
+-	clk_disable(dcmi->mclk);
++	pm_runtime_put(dcmi->dev);
+ 
+ 	if (dcmi->errors_count)
+ 		dev_warn(dcmi->dev, "Some errors found while streaming: errors=%d (overrun=%d), buffers=%d\n",
+@@ -1751,12 +1753,6 @@ static int dcmi_probe(struct platform_device *pdev)
+ 		return -EPROBE_DEFER;
+ 	}
+ 
+-	ret = clk_prepare(mclk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Unable to prepare mclk %p\n", mclk);
+-		goto err_dma_release;
+-	}
+-
+ 	spin_lock_init(&dcmi->irqlock);
+ 	mutex_init(&dcmi->lock);
+ 	init_completion(&dcmi->complete);
+@@ -1772,7 +1768,7 @@ static int dcmi_probe(struct platform_device *pdev)
+ 	/* Initialize the top-level structure */
+ 	ret = v4l2_device_register(&pdev->dev, &dcmi->v4l2_dev);
+ 	if (ret)
+-		goto err_clk_unprepare;
++		goto err_dma_release;
+ 
+ 	dcmi->vdev = video_device_alloc();
+ 	if (!dcmi->vdev) {
+@@ -1832,14 +1828,15 @@ static int dcmi_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "Probe done\n");
+ 
+ 	platform_set_drvdata(pdev, dcmi);
++
++	pm_runtime_enable(&pdev->dev);
++
+ 	return 0;
+ 
+ err_device_release:
+ 	video_device_release(dcmi->vdev);
+ err_device_unregister:
+ 	v4l2_device_unregister(&dcmi->v4l2_dev);
+-err_clk_unprepare:
+-	clk_unprepare(dcmi->mclk);
+ err_dma_release:
+ 	dma_release_channel(dcmi->dma_chan);
+ 
+@@ -1850,20 +1847,72 @@ static int dcmi_remove(struct platform_device *pdev)
+ {
+ 	struct stm32_dcmi *dcmi = platform_get_drvdata(pdev);
+ 
++	pm_runtime_disable(&pdev->dev);
++
+ 	v4l2_async_notifier_unregister(&dcmi->notifier);
+ 	v4l2_device_unregister(&dcmi->v4l2_dev);
+-	clk_unprepare(dcmi->mclk);
++
+ 	dma_release_channel(dcmi->dma_chan);
+ 
+ 	return 0;
+ }
+ 
++static __maybe_unused int dcmi_runtime_suspend(struct device *dev)
++{
++	struct stm32_dcmi *dcmi = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(dcmi->mclk);
++
++	return 0;
++}
++
++static __maybe_unused int dcmi_runtime_resume(struct device *dev)
++{
++	struct stm32_dcmi *dcmi = dev_get_drvdata(dev);
++	int ret;
++
++	ret = clk_prepare_enable(dcmi->mclk);
++	if (ret)
++		dev_err(dev, "%s: Failed to prepare_enable clock\n", __func__);
++
++	return ret;
++}
++
++static __maybe_unused int dcmi_suspend(struct device *dev)
++{
++	/* disable clock */
++	pm_runtime_force_suspend(dev);
++
++	/* change pinctrl state */
++	pinctrl_pm_select_sleep_state(dev);
++
++	return 0;
++}
++
++static __maybe_unused int dcmi_resume(struct device *dev)
++{
++	/* restore pinctl default state */
++	pinctrl_pm_select_default_state(dev);
++
++	/* clock enable */
++	pm_runtime_force_resume(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops dcmi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(dcmi_suspend, dcmi_resume)
++	SET_RUNTIME_PM_OPS(dcmi_runtime_suspend,
++			   dcmi_runtime_resume, NULL)
++};
++
+ static struct platform_driver stm32_dcmi_driver = {
+ 	.probe		= dcmi_probe,
+ 	.remove		= dcmi_remove,
+ 	.driver		= {
+ 		.name = DRV_NAME,
+ 		.of_match_table = of_match_ptr(stm32_dcmi_of_match),
++		.pm = &dcmi_pm_ops,
+ 	},
+ };
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
