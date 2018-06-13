@@ -1,304 +1,73 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 13 Jun 2018 23:12:40 +0300
-Subject: [PATCH v3 2/2] arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI
- support
-In-Reply-To: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
-References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
-Message-ID: <c78f1228-afb0-54cf-5d9e-5c812b678de3@cogentembedded.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 13 Jun 2018 13:18:35 -0700
+Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
+ sata ports
+In-Reply-To: <f20222ea-47ac-ca05-a8d3-69f28932de94@gmail.com>
+References: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
+ <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
+ <395f1fe8-76f1-8310-d09e-63e25bca23d2@broadcom.com>
+ <CAL_JsqJEFLXFf-Vq9c9XC41vBpisQwxkd06_v8Fmt6X=gp=2_g@mail.gmail.com>
+ <f20222ea-47ac-ca05-a8d3-69f28932de94@gmail.com>
+Message-ID: <0bf3c57c-dac8-8ece-6b8a-3b4d024140fc@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
-nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
-Analog Devices ADV7511W HDMI transmitter...
+Hi Rob,
 
-Based on the original (and large) patch by Vladimir Barinov.
+Thanks for comment - reply inline.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
----
-Changes in version 2:
-- added the V3HSK DT update, reworded the description, renamed the patch;
-- added a space between the HDMI node name and a brace.
-
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 +++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++++++
- 2 files changed, 226 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -45,6 +45,56 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	d1_8v: regulator-2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&adv7511_out>;
-+			};
-+		};
-+	};
-+
-+	lvds-decoder {
-+		compatible = "thine,thc63lvd1024";
-+		vcc-supply = <&d3_3v>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				thc63lvd1024_in: endpoint {
-+					remote-endpoint = <&lvds0_out>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				thc63lvd1024_out: endpoint {
-+					remote-endpoint = <&adv7511_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	x1_clk: x1-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <148500000>;
-+	};
- };
- 
- &avb {
-@@ -74,6 +124,13 @@
- 	};
- };
- 
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&x1_clk>;
-+	clock-names = "du.0", "dclkin.0";
-+	status = "okay";
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
-@@ -102,6 +159,55 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 	};
-+
-+	hdmi at 39 {
-+		compatible = "adi,adv7511w";
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
-+		avdd-supply = <&d1_8v>;
-+		dvdd-supply = <&d1_8v>;
-+		pvdd-supply = <&d1_8v>;
-+		bgvdd-supply = <&d1_8v>;
-+		dvdd-3v-supply = <&d3_3v>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7511_in: endpoint {
-+					remote-endpoint = <&thc63lvd1024_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7511_out: endpoint {
-+					remote-endpoint = <&hdmi_con>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&lvds0 {
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&thc63lvd1024_in>;
-+			};
-+		};
-+	};
- };
- 
- &mmc0 {
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -27,6 +27,63 @@
- 		/* first 128MB is reserved for secure area. */
- 		reg = <0 0x48000000 0 0x78000000>;
- 	};
-+
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&adv7511_out>;
-+			};
-+		};
-+	};
-+
-+	lvds-decoder {
-+		compatible = "thine,thc63lvd1024";
-+		vcc-supply = <&vcc3v3_d5>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				thc63lvd1024_in: endpoint {
-+					remote-endpoint = <&lvds0_out>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				thc63lvd1024_out: endpoint {
-+					remote-endpoint = <&adv7511_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vcc1v8_d4: regulator-0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC1V8_D4";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	vcc3v3_d5: regulator-1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC3V3_D5";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
-+&du {
-+	status = "okay";
- };
- 
- &extal_clk {
-@@ -53,6 +110,64 @@
- 	};
- };
- 
-+&lvds0 {
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&thc63lvd1024_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-0 = <&i2c0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	hdmi at 39 {
-+		compatible = "adi,adv7511w";
-+		#sound-dai-cells = <0>;
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
-+		avdd-supply = <&vcc1v8_d4>;
-+		dvdd-supply = <&vcc1v8_d4>;
-+		pvdd-supply = <&vcc1v8_d4>;
-+		bgvdd-supply = <&vcc1v8_d4>;
-+		dvdd-3v-supply = <&vcc3v3_d5>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7511_in: endpoint {
-+					remote-endpoint = <&thc63lvd1024_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7511_out: endpoint {
-+					remote-endpoint = <&hdmi_con>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
- &pfc {
- 	gether_pins: gether {
- 		groups = "gether_mdio_a", "gether_rgmii",
-@@ -60,6 +175,11 @@
- 		function = "gether";
- 	};
- 
-+	i2c0_pins: i2c0 {
-+		groups = "i2c0";
-+		function = "i2c0";
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
+On 18-06-13 12:31 PM, Florian Fainelli wrote:
+> On 06/12/2018 03:54 PM, Rob Herring wrote:
+>> On Thu, Jun 7, 2018 at 12:53 PM, Scott Branden
+>> <scott.branden@broadcom.com> wrote:
+>>> Hi Rob,
+>>>
+>>> Could you please kindly comment on change below.
+>>>
+>>> It allows board variants to be added easily via a simple define for
+>>> different number of SATA ports.
+>>>
+>>>
+>>>
+>>> On 18-06-04 09:22 AM, Florian Fainelli wrote:
+>>>> On 05/18/2018 11:34 AM, Scott Branden wrote:
+>>>>> Move remaining sata configuration to stingray-sata.dtsi and enable
+>>>>> ports based on NUM_SATA defined.
+>>>>> Now, all that needs to be done is define NUM_SATA per board.
+>>>> Rob could you review this and let us know if this approach is okay or
+>>>> not? Thank you!
+>>>>
+>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>>>>> ---
+>>>>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>> b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>> index 8c68e0c..7f6d176 100644
+>>>>> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+>>>>> @@ -43,7 +43,11 @@
+>>>>>                          interrupts = <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
+>>>>>                          #address-cells = <1>;
+>>>>>                          #size-cells = <0>;
+>>>>> +#if (NUM_SATA > 0)
+>>>>> +                       status = "okay";
+>>>>> +#else
+>>>>>                          status = "disabled";
+>>>>> +#endif
+>> This only works if ports are contiguously enabled (0-N). You might not
+>> care, but it is not a pattern that works in general.
+Correct - all board designs that include this dtsi file follow such 
+commonality (ie. design with SATA0 first, etc).? By having common board 
+designs it allows for commonality in dts files rather than duplicating 
+information everywhere.? If somebody designs a bizarro board they are 
+free to create their own dts file of course.
+>>   And I'm not a fan
+>> of C preprocessing in DT files in general beyond just defines for
+>> single numbers.
+The use of a define to specify the number of SATA ports in the board 
+design meets our requirements of being able to maintain many boards.? We 
+need a method to specify the number of ports in the board design rather 
+than copying and pasting the information in many dts files.? If you have 
+an alternative upstreamable mechanism to manage the configuration of 
+many boards without copy and paste that would be ideal?
+> Should we interpret this as a formal NAK?
