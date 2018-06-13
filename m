@@ -1,63 +1,38 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 13 Jun 2018 10:17:36 +0100
-Subject: [PATCH v3 3/3] arm64/mm: migrate swapper_pg_dir and tramp_pg_dir
-In-Reply-To: <20180606043921.19851-4-yaojun8558363@gmail.com>
-References: <20180606043921.19851-1-yaojun8558363@gmail.com>
- <20180606043921.19851-4-yaojun8558363@gmail.com>
-Message-ID: <1ef0fd31-001d-0872-7089-70ec22bab59f@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 13 Jun 2018 11:25:22 +0200
+Subject: [PATCH 3/3] rtc: ftrtc010: let the core handle range
+In-Reply-To: <CACRpkdabaH2yiYNnQHBru=-Snb3Eeni2eDAa9mjsa-3DqMC72g@mail.gmail.com>
+References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
+ <20180604141528.15635-3-alexandre.belloni@bootlin.com>
+ <CACRpkdabaH2yiYNnQHBru=-Snb3Eeni2eDAa9mjsa-3DqMC72g@mail.gmail.com>
+Message-ID: <20180613092522.GS10521@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jun,
+On 13/06/2018 11:10:35+0200, Linus Walleij wrote:
+> On Mon, Jun 4, 2018 at 4:15 PM, Alexandre Belloni
+> <alexandre.belloni@bootlin.com> wrote:
+> > The current range handling is highly suspicious. Anyway, let the core
+> > handle it.
+> 
+> Hmmm. I have datasheets, do you need some input about the hardware?
+> Something I should patch?
+> 
 
-On 06/06/18 05:39, Jun Yao wrote:
-> Migrate swapper_pg_dir and tramp_pg_dir. And their virtual addresses
-> do not correlate with kernel's address.
+Nothing to do as you seemed to confirm what I did was OK. I could find
+why it was set to 2148 in the first place. Maybe it correspond to the
+default days, hours minutes, second values on the SoC.
 
-This is all to make 'KSMA' harder, where an single arbitrary write is used to
-add a block mapping to the page-tables, giving the attacker full access to
-physical memory.
+> > The RTC has a 32 bit counter on top of days + hh:mm:ss registers.
+> >
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Yours,
+> Linus Walleij
 
-This series is pretty complicated, and would still be overcome by arbitrary-read
-of __pa_swapper_pg_dir. Any attacker already has to defeat KASLR, but I guess
-that can be done without having read-access.
-
-
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 94056e064c6f..ba0b55158971 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -637,10 +647,29 @@ static void __init map_kernel(pgd_t *pgdp)
->   */
->  void __init paging_init(void)
->  {
-> -	phys_addr_t pgd_phys = early_pgtable_alloc();
-> -	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
-> +	phys_addr_t pgd_phys;
-> +	pgd_t *pgdp;
-> +	phys_addr_t mem_size;
->
-> -	__pa_swapper_pg_dir = __pa_symbol(swapper_pg_dir);
-> +	mem_size = __pa_symbol(swapper_pg_dir) + PAGE_SIZE
-> +			- (__pa_symbol(idmap_pg_dir) + IDMAP_DIR_SIZE);
-> +
-> +	if (mem_size == PAGE_SIZE) {
-> +		pgd_phys = early_pgtable_alloc();
-
-This is where we migrated swapper_pg_dir to, its the first memblock_alloc()
-call, and is guaranteed to be at the top of memory. Moving this allocation later
-will still cause a predictable page to be allocated as this setup code is the
-only thing running. I don't think we are in a better position after this series.
-
-
-Ideally we would put these pgd entries in the read-only section. We only modify
-swapper_pg_dir for vmalloc()/vmap() once its generated, which we could do
-through a fixmap entry.
-
-Like this, an attacker can find where swapper_pg_dir is, but can't write to it.
-(the tricky bit will be breaking swapper_pg_dir up, as we free parts of it)
-
-
-Thanks,
-
-James
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
