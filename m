@@ -1,244 +1,144 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 13 Jun 2018 16:07:11 +0200
-Subject: [PATCH 6/9] media: cedrus: Add ops structure
+Date: Wed, 13 Jun 2018 16:07:12 +0200
+Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
 In-Reply-To: <20180613140714.1686-1-maxime.ripard@bootlin.com>
 References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
-Message-ID: <20180613140714.1686-7-maxime.ripard@bootlin.com>
+Message-ID: <20180613140714.1686-8-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to increase the number of codecs supported, we need to decouple
-the MPEG2 only code that was there up until now and turn it into something
-a bit more generic.
+The IRQ handler up until now was hardcoding the use of the MPEG engine to
+read the interrupt status, clear it and disable the interrupts.
 
-Do that by introducing an intermediate ops structure that would need to be
-filled by each supported codec. Start by implementing in that structure the
-setup and trigger hooks that are currently the only functions being
-implemented by codecs support.
+Obviously, that won't work really well with the introduction of new codecs
+that use a separate engine with a separate register set.
 
-To do so, we need to store the current codec in use, which we do at
-start_streaming time.
+In order to make this more future proof, introduce new decodec operations
+to deal with the interrupt management. The only one missing is the one to
+enable the interrupts in the first place, but that's taken care of by the
+trigger hook for now.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- .../platform/sunxi/cedrus/sunxi_cedrus.c      |  2 ++
- .../sunxi/cedrus/sunxi_cedrus_common.h        | 11 +++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_dec.c  | 10 +++---
- .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 11 +++++--
- .../sunxi/cedrus/sunxi_cedrus_mpeg2.h         | 33 -------------------
- .../sunxi/cedrus/sunxi_cedrus_video.c         | 17 +++++++++-
- 6 files changed, 42 insertions(+), 42 deletions(-)
- delete mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
+ .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
+ .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
+ .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
+ 3 files changed, 53 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
-index ccd41d9a3e41..bc80480f5dfd 100644
---- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
-+++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
-@@ -244,6 +244,8 @@ static int sunxi_cedrus_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	dev->dec_ops[SUNXI_CEDRUS_CODEC_MPEG2] = &sunxi_cedrus_dec_ops_mpeg2;
-+
- 	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
- 	if (ret)
- 		goto unreg_media;
 diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-index a5f83c452006..c2e2c92d103b 100644
+index c2e2c92d103b..a2a507eb9fc9 100644
 --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
 +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-@@ -75,6 +75,7 @@ struct sunxi_cedrus_ctx {
- 	struct v4l2_pix_format_mplane src_fmt;
- 	struct sunxi_cedrus_fmt *vpu_dst_fmt;
- 	struct v4l2_pix_format_mplane dst_fmt;
-+	enum sunxi_cedrus_codec current_codec;
- 
- 	struct v4l2_ctrl_handler hdl;
- 	struct v4l2_ctrl *ctrls[SUNXI_CEDRUS_CTRL_MAX];
-@@ -107,6 +108,14 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+@@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
  }
  
-+struct sunxi_cedrus_dec_ops {
-+	void (*setup)(struct sunxi_cedrus_ctx *ctx,
-+		      struct sunxi_cedrus_run *run);
-+	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
++enum sunxi_cedrus_irq_status {
++	SUNXI_CEDRUS_IRQ_NONE,
++	SUNXI_CEDRUS_IRQ_ERROR,
++	SUNXI_CEDRUS_IRQ_OK,
 +};
 +
-+extern struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2;
-+
- struct sunxi_cedrus_dev {
- 	struct v4l2_device v4l2_dev;
- 	struct video_device vfd;
-@@ -130,6 +139,8 @@ struct sunxi_cedrus_dev {
- 	struct reset_control *rstc;
- 
- 	struct regmap *syscon;
-+
-+	struct sunxi_cedrus_dec_ops	*dec_ops[SUNXI_CEDRUS_CODEC_LAST];
- };
- 
- static inline void sunxi_cedrus_write(struct sunxi_cedrus_dev *dev,
-diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-index f274408ab5a7..5e552fa05274 100644
---- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-+++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-@@ -28,7 +28,6 @@
- #include <media/v4l2-mem2mem.h>
- 
- #include "sunxi_cedrus_common.h"
--#include "sunxi_cedrus_mpeg2.h"
- #include "sunxi_cedrus_dec.h"
- #include "sunxi_cedrus_hw.h"
- 
-@@ -77,6 +76,7 @@ void sunxi_cedrus_device_work(struct work_struct *work)
- void sunxi_cedrus_device_run(void *priv)
- {
- 	struct sunxi_cedrus_ctx *ctx = priv;
-+	struct sunxi_cedrus_dev *dev = ctx->dev;
- 	struct sunxi_cedrus_run run = { 0 };
- 	struct media_request *src_req, *dst_req;
+ struct sunxi_cedrus_dec_ops {
++	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
++	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
++	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+ 	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+ 		      struct sunxi_cedrus_run *run);
+ 	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+index bb46a01214e0..6b97cbd2834e 100644
+--- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
++++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+@@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
+ 	struct sunxi_cedrus_ctx *ctx;
+ 	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
+ 	struct vb2_v4l2_buffer *src_vb, *dst_vb;
++	enum sunxi_cedrus_irq_status status;
  	unsigned long flags;
-@@ -120,8 +120,6 @@ void sunxi_cedrus_device_run(void *priv)
- 	case V4L2_PIX_FMT_MPEG2_FRAME:
- 		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
- 		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
--		sunxi_cedrus_mpeg2_setup(ctx, &run);
+-	unsigned int value, status;
+ 
+ 	spin_lock_irqsave(&dev->irq_lock, flags);
+ 
+-	/* Disable MPEG interrupts and stop the MPEG engine */
+-	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
+-	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
 -
- 		break;
+-	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
+-	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
+-	sunxi_cedrus_engine_disable(dev);
+-
+ 	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
+ 	if (!ctx) {
+ 		pr_err("Instance released before the end of transaction\n");
+ 		spin_unlock_irqrestore(&dev->irq_lock, flags);
  
- 	default:
-@@ -129,6 +127,9 @@ void sunxi_cedrus_device_run(void *priv)
+-		return IRQ_HANDLED;
++		return IRQ_NONE;
  	}
- #undef CHECK_CONTROL
  
-+	if (!ctx->job_abort)
-+		dev->dec_ops[ctx->current_codec]->setup(ctx, &run);
++	status = dev->dec_ops[ctx->current_codec]->irq_status(ctx);
++	if (status == SUNXI_CEDRUS_IRQ_NONE) {
++		spin_unlock_irqrestore(&dev->irq_lock, flags);
++		return IRQ_NONE;
++	}
 +
- unlock_complete:
- 	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
++	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
++	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
++
+ 	src_vb = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
+ 	dst_vb = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
  
-@@ -143,8 +144,7 @@ void sunxi_cedrus_device_run(void *priv)
- 	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
- 
- 	if (!ctx->job_abort) {
--		if (ctx->vpu_src_fmt->fourcc == V4L2_PIX_FMT_MPEG2_FRAME)
--			sunxi_cedrus_mpeg2_trigger(ctx);
-+		dev->dec_ops[ctx->current_codec]->trigger(ctx);
- 	} else {
- 		v4l2_m2m_buf_done(run.src, VB2_BUF_STATE_ERROR);
- 		v4l2_m2m_buf_done(run.dst, VB2_BUF_STATE_ERROR);
 diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-index d1d7a3cfce0d..e25075bb5779 100644
+index e25075bb5779..51fa0c0f9bf2 100644
 --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
 +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-@@ -52,8 +52,8 @@ static const u8 mpeg_default_non_intra_quant[64] = {
+@@ -52,6 +52,36 @@ static const u8 mpeg_default_non_intra_quant[64] = {
  
  #define m_niq(i) ((i << 8) | mpeg_default_non_intra_quant[i])
  
--void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
--			      struct sunxi_cedrus_run *run)
-+static void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
-+				     struct sunxi_cedrus_run *run)
- {
- 	struct sunxi_cedrus_dev *dev = ctx->dev;
- 	const struct v4l2_ctrl_mpeg2_frame_hdr *frame_hdr = run->mpeg2.hdr;
-@@ -148,9 +148,14 @@ void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
- 	sunxi_cedrus_write(dev, src_buf_addr + VBV_SIZE - 1, VE_MPEG_VLD_END);
- }
- 
--void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
-+static void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
- {
- 	struct sunxi_cedrus_dev *dev = ctx->dev;
- 
- 	sunxi_cedrus_write(dev, VE_TRIG_MPEG2, VE_MPEG_TRIGGER);
- }
-+
-+struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2 = {
-+	.setup		= sunxi_cedrus_mpeg2_setup,
-+	.trigger	= sunxi_cedrus_mpeg2_trigger,
-+};
-diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
-deleted file mode 100644
-index 4c380becfa1a..000000000000
---- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Sunxi-Cedrus VPU driver
-- *
-- * Copyright (C) 2018 Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-- * Copyright (C) 2016 Florent Revest <florent.revest@free-electrons.com>
-- *
-- * Based on the vim2m driver, that is:
-- *
-- * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-- * Pawel Osciak, <pawel@osciak.com>
-- * Marek Szyprowski, <m.szyprowski@samsung.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef _SUNXI_CEDRUS_MPEG2_H_
--#define _SUNXI_CEDRUS_MPEG2_H_
--
--struct sunxi_cedrus_ctx;
--struct sunxi_cedrus_run;
--
--void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
--			      struct sunxi_cedrus_run *run);
--void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx);
--
--#endif
-diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
-index 089abfe6bfeb..fb7b081a5bb7 100644
---- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
-+++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
-@@ -28,7 +28,6 @@
- #include <media/v4l2-mem2mem.h>
- 
- #include "sunxi_cedrus_common.h"
--#include "sunxi_cedrus_mpeg2.h"
- #include "sunxi_cedrus_dec.h"
- #include "sunxi_cedrus_hw.h"
- 
-@@ -414,6 +413,21 @@ static int sunxi_cedrus_buf_prepare(struct vb2_buffer *vb)
- 	return 0;
- }
- 
-+static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
++static enum sunxi_cedrus_irq_status
++sunxi_cedrus_mpeg2_irq_status(struct sunxi_cedrus_ctx *ctx)
 +{
-+	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
++	struct sunxi_cedrus_dev *dev = ctx->dev;
++	u32 reg = sunxi_cedrus_read(dev, VE_MPEG_STATUS) & 0x7;
 +
-+	switch (ctx->vpu_src_fmt->fourcc) {
-+	case V4L2_PIX_FMT_MPEG2_FRAME:
-+		ctx->current_codec = SUNXI_CEDRUS_CODEC_MPEG2;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
++	if (!reg)
++		return SUNXI_CEDRUS_IRQ_NONE;
 +
-+	return 0;
++	if (reg & (BIT(1) | BIT(2)))
++		return SUNXI_CEDRUS_IRQ_ERROR;
++
++	return SUNXI_CEDRUS_IRQ_OK;
 +}
 +
- static void sunxi_cedrus_stop_streaming(struct vb2_queue *q)
++static void sunxi_cedrus_mpeg2_irq_clear(struct sunxi_cedrus_ctx *ctx)
++{
++	struct sunxi_cedrus_dev *dev = ctx->dev;
++
++	sunxi_cedrus_write(dev, GENMASK(2, 0), VE_MPEG_STATUS);
++}
++
++static void sunxi_cedrus_mpeg2_irq_disable(struct sunxi_cedrus_ctx *ctx)
++{
++	struct sunxi_cedrus_dev *dev = ctx->dev;
++	u32 reg = sunxi_cedrus_read(dev, VE_MPEG_CTRL) & ~BIT(3);
++
++	sunxi_cedrus_write(dev, reg, VE_MPEG_CTRL);
++}
++
+ static void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+ 				     struct sunxi_cedrus_run *run)
  {
- 	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
-@@ -462,6 +476,7 @@ static struct vb2_ops sunxi_cedrus_qops = {
- 	.buf_cleanup		= sunxi_cedrus_buf_cleanup,
- 	.buf_queue		= sunxi_cedrus_buf_queue,
- 	.buf_request_complete	= sunxi_cedrus_buf_request_complete,
-+	.start_streaming	= sunxi_cedrus_start_streaming,
- 	.stop_streaming		= sunxi_cedrus_stop_streaming,
- 	.wait_prepare		= vb2_ops_wait_prepare,
- 	.wait_finish		= vb2_ops_wait_finish,
+@@ -156,6 +186,9 @@ static void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
+ }
+ 
+ struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2 = {
++	.irq_clear	= sunxi_cedrus_mpeg2_irq_clear,
++	.irq_disable	= sunxi_cedrus_mpeg2_irq_disable,
++	.irq_status	= sunxi_cedrus_mpeg2_irq_status,
+ 	.setup		= sunxi_cedrus_mpeg2_setup,
+ 	.trigger	= sunxi_cedrus_mpeg2_trigger,
+ };
 -- 
 2.17.0
