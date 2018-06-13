@@ -1,106 +1,153 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Jun 2018 13:28:44 +0200
-Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
-References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
- <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
- <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
- <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
- <CAMuHMdVJ+ad-kr0iYuoaH3chJ49_g6yjEb8PHmTpwjFdYcG4=Q@mail.gmail.com>
- <47e87deb-a7a8-4780-53b5-4e4ed6e1bac3@gmail.com>
- <CAMuHMdXJEC8HbuB5+YHMLjZy9GfCYyXmGTk0TXkoAxLhxTOJyA@mail.gmail.com>
- <6864ed2c-39ac-615d-f38e-b28c3647e451@gmail.com>
- <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
- <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
-Message-ID: <CAMuHMdUmqAWHFoM5tRJA+FoH59J8L3z0BMKVO-FEv4RQbokJyg@mail.gmail.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Wed, 13 Jun 2018 19:32:27 +0800
+Subject: [PATCH 0/8] Add persistent clock support
+Message-ID: <cover.1528878545.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi,
 
-On Mon, Jun 11, 2018 at 5:26 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 06/11/2018 04:30 PM, Geert Uytterhoeven wrote:
-> > On Mon, Jun 11, 2018 at 4:19 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> On 06/11/2018 04:10 PM, Geert Uytterhoeven wrote:
-> >>> On Mon, Jun 11, 2018 at 4:04 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >>>> On 06/11/2018 03:49 PM, Geert Uytterhoeven wrote:
-> >>>>> On Mon, Jun 11, 2018 at 3:39 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >>>>>> On 06/11/2018 03:03 PM, Geert Uytterhoeven wrote:
-> >>>>>>> On Mon, Jun 11, 2018 at 2:15 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >>>>>>>> On 06/11/2018 11:56 AM, Geert Uytterhoeven wrote:
-> >>>>>>>>> On Mon, Jun 4, 2018 at 7:59 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >>>>>>>>>> Rather than hard-coding the quirk topology, which stopped scaling,
-> >>>>>>>>>> parse the information from DT. The code looks for all compatible
-> >>>>>>>>>> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
-> >>>>>>>>>> to the same pin. If so, the code sends a matching sequence to the
-> >>>>>>>>>> PMIC to deassert the IRQ.
-> >>>>>
-> >>>>>>>>>> +               ret = of_property_read_u32(np, "reg", &addr);
-> >>>>>>>>>> +               if (ret)
-> >>>>>>>>>> +                       return ret;
-> >>>>>>>>>
-> >>>>>>>>> I think it's safer to skip this entry and continue, after calling
-> >>>>>>>>> kfree(quirk), of course.
-> >>>>>>>>>
-> >>>>>>>>>> +
-> >>>>>>>>>> +               quirk->id = id;
-> >>>>>>>>>> +               quirk->i2c_msg.addr = addr;
-> >>>>>>>>>> +               quirk->shared = false;
-> >>>>>>>>>> +
-> >>>>>>>>>> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
-> >>>>>>>>>> +               if (ret)
-> >>>>>>>>>> +                       return ret;
-> >>>>>>>>>
-> >>>>>>>>> kfree(quirk) and continue...
-> >>>>>>>>
-> >>>>>>>> I wonder if it shouldn't rather free the entire list and abort ?
-> >>>>>>>
-> >>>>>>> "Be strict when sending, be liberal when receiving."
-> >>>>>>
-> >>>>>> Meaning ? I think "the language barrier is protecting me" (TM)
-> >>>>>
-> >>>>> Do the best you can, given the buggy DT you received.
-> >>>>> I.e. don't fail completely, just ignore the bad device node, and continue.
-> >>>>
-> >>>> But if you ignore node, you might as well ignore one which is shared and
-> >>>> then the system crashes due to IRQ storm anyway. So hum, what can we do ?
-> >>>
-> >>> Correct. If it's a critical node, it will crash regardless.
-> >>> If it's a non-critical node, you have the choice between aborting and crashing,
-> >>> or ignoring and keeping the system alive. Your call.
-> >>
-> >> But wait, since we control which machines this code runs on , can't we
-> >> assure they have valid DTs ? This situation with invalid DT starts to
-> >> look a bit hypothetical to me.
-> >
-> > That assumes you keep the list of machines to check, and don't want to fix the
-> > issue automatically when detected (on any R-Car Gen2 or RZ/G1 platform, so
-> > you still need to check for r8a779[0-4] and r8a774[23457]).
->
-> Yes, I want to keep a list of machines to check, to be _sure_ some
-> machine doesn't randomly blow up.
+We will meet below issues when compensating the suspend time for the timekeeping.
 
-Just checking for the presence of a "renesas,irqc" node should be sufficient.
-Using that node would also get rid of the hardcoded IRQC_BASE address.
-Note that the code assumes IRQ2. If another IRQ is used, that won't harm
-much though (as in: if it didn't blow up before, it won't blow up now).
+1. We have too many different ways of dealing with persistent timekeeping
+across architectures, so it is hard for one driver to be compatible with
+different architectures. For example, we should register register_persistent_clock()
+on arm architecture, but we should set x86_platform.get_wallclock() on x86
+architecture, and we should implement the read_persistent_clock64() on arm64
+architecture and so on.
 
-> > Anyway, as we care about booting old DTBs on new kernels (for a while), we
-> > have a few more release cycles to bikeshed ;-)
->
-> I was about to ask if this patch then makes any sense or not.
+2. On some platforms (such as Spreadtrum platform), we registered the high
+resolution timer as one clocksource to update the OS time, but the high
+resolution timer will be stopped when system goes into suspend state.
+So we use another one always-on timer (but low resolution) to calculate
+the suspend time to compensate the OS time. Though we can register the
+always-on timer as one clocksource, we need re-calculate the mult/shift
+with one larger conversion range to calculate the suspend time and need
+update the clock in case of running over the always-on timer. 
 
-Sure. Less hard-coding is always better.
-Especially if it means we can make it work on more machines automatically :-)
+More duplicate code will be added if other platforms meet this case.
 
-Gr{oetje,eeting}s,
+3. Now we have 3 sources that could be used to compensate the OS time:
+Nonstop clocksource during suspend, persistent clock and rtc device,
+which is complicated. Another hand is that the nonstop clocksource can
+risk wrapping if the system suspend time is too long, so we need one
+mechanism to wake up the system before the nonstop clocksource wrapping.
 
-                        Geert
+According to above issues, we can introduce one common persistent clock
+framework to be compatible with different architectures, in future we will
+remove the persistent clock implementation for each architecture. Also
+this framework will implement common code to help drivers to register easily.
+Moreover if we converted all SUSPEND_NONSTOP clocksource to register to
+be one persistent clock, we can remove the SUSPEND_NONSTOP clocksource
+accounting in timekeeping, which means we can only compensate the OS time
+from persistent clock and RTC.
+
+Will be appreciated for any comments. Thank you all.
+
+Arnd posted some comments as below last time, but we did not get a general
+consensus, so I post them again. Arnd said:
+
+"I was planning to discuss this with Daniel and John during Linaro Connect,
+but that didn't happen, so I'd like to bring up the bigger picture here again.
+
+Today, we have a number of subsystem-type interfaces that deal with
+time keeping in the wider sense (I might be missing some):
+ - clock source
+ - clock event
+ - sched clock
+ - real time clock
+ - ptp clock
+ - persistent clock
+
+The first five have separate registration interfaces and may all refer
+to different hardware blocks, or (more commonly) have some overlap
+in the hardware. The fifth one is generalized by your series, without it
+it's really architecture specific (as the other ones were one one point).
+
+Are we happy with that structure in the long run? One of my earlier
+comments on this series was that I thought it should be combined with
+the clocksource registration, but upon talking to Baolin about it more,
+I realized that this just follows the same structure that we have for the
+others.
+
+In theory, we could have a more abstract way of registering a clock
+hardware that interfaces with any combination of the six subsystems
+I mentioned above, with a superset of the subsystem specific structures
+and a set of flags that indicate what a particular device is usable for.
+
+Combining all six might be a bit too much (in particular rtc, though
+it clearly overlaps the persistent-clk case), but what your general
+ideas on where we should be heading? Is it worth reworking the
+core kernel portion of the subsystems to simplify the individual
+drivers?"
+
+John also posted some important comments for this patch set, that I quite
+agree with his points. John said:
+
+"For context, these abstractions have grown out of the need for using
+different hardware components for all of these. It was quite common
+for x86 hardware to use the acpi_pm for clocksource, lapic/PIT for
+clockevent, tsc for sched_clock and CMOS RTC for persistent clock.
+While some of these could be backed by the same hardware, it wasn't
+common. However, hardware with less restrictions have allowed in some
+cases for these to be more unified, but I'm not sure if its particularly common.
+
+Another part of the reason that we don't combine the above
+abstractions, even when they are backed by the same hardware, is
+because some of the fields used for freq conversion (mult/shift) have
+different needs for the different types of accounting.
+
+For instance, with a clocksource, we are very focused on avoiding
+error to keep timekeeing accurate, thus we want to use as large a
+shift (and thus mult) as possible (and do our shifting as late as
+possible in our accounting). However, that then shrinks the amount of
+time that can be accumulated in one go w/o causing an overflow.
+
+Where as with sched_clock, we don't worry as much as about accuracy,
+so we can use smaller shifts (and thus mults), and thus can go for
+longer periods of time between accumulating without worrying.
+
+Similarly for the persistent clock case we don't need need to worry as
+much about accuracy, so we can can use smaller shifts, but we are not
+in as much of a hot patch, so we can also"
+
+Changes since RFC V1:
+ - Move the alarmtimer starting into alarmtimer.c.
+ - Export persistent_clock_start_alarmtimer().
+ - Add one memeber to indicate if the alarmtimer was initialized.
+ - Fix build issues.
+
+Baolin Wang (8):
+  time: Add persistent clock support
+  clocksource: sprd: Add one persistent timer for Spreadtrum platform
+  arm: time: Remove the persistent clock support for ARM architecture
+  clocksource: arm_arch_timer: Register the persistent clock
+  clocksource: timer-ti-32k: Register the persistent clock
+  clocksource: time-pistachio: Register the persistent clock
+  x86: tsc: Register the persistent clock
+  time: timekeeping: Remove time compensating from nonstop clocksources
+
+ arch/arm/include/asm/mach/time.h     |    4 -
+ arch/arm/kernel/time.c               |   36 -------
+ arch/arm/plat-omap/Kconfig           |    1 +
+ arch/arm/plat-omap/counter_32k.c     |   44 ++------
+ arch/x86/Kconfig                     |    1 +
+ arch/x86/kernel/tsc.c                |   21 ++++
+ drivers/clocksource/Kconfig          |    4 +
+ drivers/clocksource/arm_arch_timer.c |   10 ++
+ drivers/clocksource/tegra20_timer.c  |   12 ++-
+ drivers/clocksource/time-pistachio.c |    3 +
+ drivers/clocksource/timer-sprd.c     |   80 +++++++++++++++
+ drivers/clocksource/timer-ti-32k.c   |    4 +
+ include/linux/persistent_clock.h     |   23 +++++
+ kernel/time/Kconfig                  |    4 +
+ kernel/time/Makefile                 |    1 +
+ kernel/time/alarmtimer.c             |    4 +
+ kernel/time/persistent_clock.c       |  184 ++++++++++++++++++++++++++++++++++
+ kernel/time/timekeeping.c            |   19 +---
+ 18 files changed, 360 insertions(+), 95 deletions(-)
+ create mode 100644 include/linux/persistent_clock.h
+ create mode 100644 kernel/time/persistent_clock.c
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+1.7.9.5
