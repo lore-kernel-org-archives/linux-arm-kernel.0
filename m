@@ -1,19 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 13 Jun 2018 11:19:59 +0800
-Subject: [PATCH v2 02/27] clk: sunxi-ng: r40: Allow setting parent rate to
- display related clocks
-In-Reply-To: <20180612200036.21483-3-jernej.skrabec@siol.net>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-3-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v65PyFjC9vQjLj4wGqZ4ETuZd5dF664gwbCRf66=wKOH0w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Jun 2018 21:41:52 -0700
+Subject: [PATCH 01/10] ARM: OMAP1: ams-delta: drop GPIO lookup table for
+ serio device
+In-Reply-To: <69494657.T0PeNZxiFJ@z50>
+References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
+ <20180612222356.GD38773@dtor-ws> <69494657.T0PeNZxiFJ@z50>
+Message-ID: <20180613044152.GB112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 4:00 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> Display related peripherals need precise clocks to operate correctly.
->
-> Allow DE2, TCONs and HDMI to set parent clock.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+* Janusz Krzysztofik <jmkrzyszt@gmail.com> [180613 01:18]:
+> On Wednesday, June 13, 2018 12:23:56 AM CEST Dmitry Torokhov wrote:
+> > Hi Janusz,
+> > 
+> > On Sat, Jun 09, 2018 at 04:02:15PM +0200, Janusz Krzysztofik wrote:
+> > > GPIO lookup table for ams-delta-serio device was introduced by commit
+> > > 0486738928bf ("ARM: OMAP1: ams-delta: add GPIO lookup tables").
+> > > Unfortunately, a follow up patch "Input: ams_delta_serio: use GPIO
+> > > lookup table" was not accepted by subystem maintainer who requested
+> > > conversion of the driver to a platform driver, replacepemnt of IRQ GPIO
+> > > pin with IRQ resource, replacement of GPIO pin providing keyboard power
+> > > with a regulator and removal of remaining GPIO pins from the driver as
+> > > not handled by it.
+> > > 
+> > > Let's start with removal of no the longer needed GPIO lookup table from
+> > > the board init file.
+> > > 
+> > > Series created and tested on top of next-20180608 tag from linux-next
+> > > tree.
+> > 
+> > This all is really nice (modulo a couple of questions), thank you for
+> > implementing this. How do you want to merge this? Through OMAP tree or
+> > input?
+> 
+> Hi Dmitry,
+> 
+> If Tony doesn't mind, I would prefer it merged through OMAP tree as I still 
+> have a few board patches built on top of it in my queue.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Works for me once Dmitry is happy with the patches.
+
+Regards,
+
+Tony
