@@ -1,85 +1,110 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 13 Jun 2018 19:32:34 +0800
-Subject: [PATCH 7/8] x86: tsc: Register the persistent clock
-In-Reply-To: <cover.1528878545.git.baolin.wang@linaro.org>
-References: <cover.1528878545.git.baolin.wang@linaro.org>
-Message-ID: <3010faf8a1dda56be4eac0d5aa393fbfb96f3077.1528878545.git.baolin.wang@linaro.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Wed, 13 Jun 2018 13:58:41 +0200
+Subject: [PATCH v1 2/4] dt-bindings: mailbox: provide imx-mailbox
+ documentation
+In-Reply-To: <CAA+hA=RNxUHro_92YdORw7FOHba=ZSv4q697npCNKwoMG-_HMw@mail.gmail.com>
+References: <20180601065821.28234-1-o.rempel@pengutronix.de>
+ <20180601065821.28234-3-o.rempel@pengutronix.de>
+ <CAA+hA=RNxUHro_92YdORw7FOHba=ZSv4q697npCNKwoMG-_HMw@mail.gmail.com>
+Message-ID: <32ca8af2-7df7-4006-fbe1-f26077cbf455@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the tsc as one persistent clock to compensate the suspend time
-if the tsc clocksource is always available.
 
-Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
----
- arch/x86/Kconfig      |    1 +
- arch/x86/kernel/tsc.c |   21 +++++++++++++++++++++
- 2 files changed, 22 insertions(+)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 297789a..549dd01 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -200,6 +200,7 @@ config X86
- 	select USER_STACKTRACE_SUPPORT
- 	select VIRT_TO_BUS
- 	select X86_FEATURE_NAMES		if PROC_FS
-+	select PERSISTENT_CLOCK
- 
- config INSTRUCTION_DECODER
- 	def_bool y
-diff --git a/arch/x86/kernel/tsc.c b/arch/x86/kernel/tsc.c
-index 74392d9..cb4f495 100644
---- a/arch/x86/kernel/tsc.c
-+++ b/arch/x86/kernel/tsc.c
-@@ -11,6 +11,7 @@
- #include <linux/delay.h>
- #include <linux/clocksource.h>
- #include <linux/percpu.h>
-+#include <linux/persistent_clock.h>
- #include <linux/timex.h>
- #include <linux/static_key.h>
- 
-@@ -1032,6 +1033,11 @@ static u64 read_tsc(struct clocksource *cs)
- 	return (u64)rdtsc_ordered();
- }
- 
-+static u64 notrace tsc_read_persistent_clock(void)
-+{
-+	return (u64)rdtsc_ordered();
-+}
-+
- static void tsc_cs_mark_unstable(struct clocksource *cs)
- {
- 	if (tsc_unstable)
-@@ -1300,6 +1306,14 @@ static void tsc_refine_calibration_work(struct work_struct *work)
- 	if (boot_cpu_has(X86_FEATURE_ART))
- 		art_related_clocksource = &clocksource_tsc;
- 	clocksource_register_khz(&clocksource_tsc, tsc_khz);
-+
-+	if (clocksource_tsc.flags & CLOCK_SOURCE_SUSPEND_NONSTOP) {
-+		persistent_clock_init_and_register(tsc_read_persistent_clock,
-+						   CLOCKSOURCE_MASK(64),
-+						   tsc_khz * 1000, 0);
-+		persistent_clock_start_alarmtimer();
-+	}
-+
- unreg:
- 	clocksource_unregister(&clocksource_tsc_early);
- }
-@@ -1327,6 +1341,13 @@ static int __init init_tsc_clocksource(void)
- 		if (boot_cpu_has(X86_FEATURE_ART))
- 			art_related_clocksource = &clocksource_tsc;
- 		clocksource_register_khz(&clocksource_tsc, tsc_khz);
-+
-+		if (clocksource_tsc.flags & CLOCK_SOURCE_SUSPEND_NONSTOP) {
-+			persistent_clock_init_and_register(tsc_read_persistent_clock,
-+							   CLOCKSOURCE_MASK(64),
-+							   tsc_khz * 1000, 0);
-+			persistent_clock_start_alarmtimer();
-+		}
- unreg:
- 		clocksource_unregister(&clocksource_tsc_early);
- 		return 0;
--- 
-1.7.9.5
+On 13.06.2018 13:05, Dong Aisheng wrote:
+> Hi Oleksij,
+> 
+> Some more comments besides Rob's:
+> 
+> On Fri, Jun 1, 2018 at 2:58 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> ---
+>>  .../bindings/mailbox/imx-mailbox.txt          | 35 +++++++++++++++++++
+>>  1 file changed, 35 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+>> new file mode 100644
+>> index 000000000000..a45604b33039
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+>> @@ -0,0 +1,35 @@
+>> +i.MX Messaging Unit
+>> +===================
+>> +
+>> +The i.MX Messaging Unit (MU) contains two register sets: "A" and "B". In most cases
+>> +they are accessible from all Processor Units. On one hand, at least for mailbox functionality,
+>> +it makes no difference which application or processor is using which set of the MU. On
+>> +other hand, the register sets for each of the MU parts are not identical.
+>> +
+>> +Required properties:
+>> +- compatible : Shell be one of:
+>> +                    "fsl,imx7s-mu-a" and "fsl,imx7s-mu-b" for i.MX7S or i.MX7D
+> 
+> What's current requirement to distinguish Side A and B?
+> I see current code, side A only does extra clear of xCR register but none for B.
+> Is this a generic approach or something customized?
+
+A and B side have more then one BIT difference, and there is no way to
+see the difference by software. Current driver do not make use of it,
+but in devicetree we describe HW not SW. If HW is different, it should
+have different compatibles.
+
+> BTW can we name it more generically?e.g. fsl,imx7s-mu.
+> And using a property to indicate whether it's side A or B if really required.
+> 
+> Furthermore, AFAIK MX7 MU is derived from MX6SX.
+> Should we add and use fsl,imx6sx-mu instead?
+
+As soon as some one will test this driver on imx6sx and confirm it
+working, i'll add fsl,imx6sx-mu-a/b as well.
+
+> e.g.
+>  - compatible : Shell be one of:
+>                        "fsl,imx6sx-mu" and "fsl,imx7s-mu".
+> 
+> Regards
+> Dong Aisheng
+> 
+>> +- reg :        physical base address of the mailbox and length of
+>> +               memory mapped region.
+>> +- #mbox-cells: Common mailbox binding property to identify the number
+>> +               of cells required for the mailbox specifier. Should be 1.
+>> +- interrupts : interrupt number. The interrupt specifier format
+>> +               depends on the interrupt controller parent.
+>> +- clocks     :  phandle to the input clock.
+>> +
+>> +Example:
+>> +       mu0a: mu at 30aa0000 {
+>> +               compatible = "fsl,imx7s-mu-a";
+>> +               reg = <0x30aa0000 0x28>;
+>> +               interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+>> +               clocks = <&clks IMX7D_MU_ROOT_CLK>;
+>> +               #mbox-cells = <1>;
+>> +       };
+>> +
+>> +       mu0b: mu at 30ab0000 {
+>> +               compatible = "fsl,imx7s-mu-b";
+>> +               reg = <0x30ab0000 0x28>;
+>> +               interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+>> +               clocks = <&clks IMX7D_MU_ROOT_CLK>;
+>> +               #mbox-cells = <1>;
+>> +       };
+>> --
+>> 2.17.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/a91c9c57/attachment-0001.sig>
