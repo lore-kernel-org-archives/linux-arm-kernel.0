@@ -1,95 +1,38 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Wed, 13 Jun 2018 11:50:19 -0400
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
-Message-ID: <7481eea5c856bf0a285776e28a2c3ce1@codeaurora.org>
+From: trini@konsulko.com (Tom Rini)
+Date: Wed, 13 Jun 2018 11:46:27 -0400
+Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB
+ with ICIALLU on Cortex-A15 for CVE-2017-5715
+In-Reply-To: <20180613133215.2cv7iyjb2laaha3j@kahuna>
+References: <20180612202411.29798-1-nm@ti.com>
+ <20180612202411.29798-3-nm@ti.com>
+ <8fac2f1c-ecc4-1aa1-0620-8ac6e2efdbf1@gmail.com>
+ <20180613133215.2cv7iyjb2laaha3j@kahuna>
+Message-ID: <20180613154627.GP350@bill-the-cat.ec.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-06-13 11:45, Ard Biesheuvel wrote:
-> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
->> A host bridge is allowed to remap BAR addresses using _TRA attribute 
->> in
->> _CRS windows.
->> 
->> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff 
->> window] (bus address [0x00100000-0x1fffffff])
->> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
->> 
->> When a VGA device is behind such a host bridge and the resource is
->> translated efifb driver is trying to do ioremap against bus address
->> rather than the resource address and is failing to probe.
->> 
->> efifb: probing for efifb
->> efifb: cannot reserve video memory at 0x1e000000
->> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
->> efifb: mode is 800x600x32, linelength=3200, pages=1
->> efifb: scrolling: redraw
->> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
->> 
->> Use the host bridge offset information to convert bus address to
->> resource address in the fixup.
->> 
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+On Wed, Jun 13, 2018 at 08:32:15AM -0500, Nishanth Menon wrote:
+> On 23:05-20180612, Marek Vasut wrote:
+> > On 06/12/2018 10:24 PM, Nishanth Menon wrote:
+> [..]
+> > > +#ifdef CONFIG_ARM_CORTEX_A15_CVE_2017_5715
+> > > +	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
+> > > +	orr	r0, r0, #1 << 0		@ Enable invalidates of BTB
+> > 
+> > Can we use BIT() macro in the assembler code too ?
 > 
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> Bartlomiej, could you please take these via the fbdev tree for v4.19?
-> Peter already gave his ack but Sinan dropped it (presumably because of
-> the split in v2)
-> 
-> Sinan, does this need to go to -stable? I.e., has it ever worked 
-> before?
-> 
+> Probably, but just following convention in the rest of the file. Do we
+> want to change from existing code?
 
-Yes, it needs to go to stable. It never worked before. Issue was found 
-during a graphics bring up with AST driver.
+Agreed, we should follow the existing style (and I'm not 100% sure I
+like using BIT() in asm files).
 
-It needs a 32 bit graphics card and a 32 bit translating host bridge to 
-hit the issue.
-
-> 
-> 
->> ---
->>  drivers/video/fbdev/efifb.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->> 
->> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
->> index 6daac8d..429cc85 100644
->> --- a/drivers/video/fbdev/efifb.c
->> +++ b/drivers/video/fbdev/efifb.c
->> @@ -431,6 +431,7 @@ static void efifb_fixup_resources(struct pci_dev 
->> *dev)
->>                 .end = screen_info.lfb_base + screen_info.lfb_size - 
->> 1,
->>                 .flags = IORESOURCE_MEM,
->>         };
->> +       struct pci_bus_region region;
->>         int i;
->> 
->>         if (efifb_pci_dev || screen_info.orig_video_isVGA != 
->> VIDEO_TYPE_EFI)
->> @@ -442,6 +443,10 @@ static void efifb_fixup_resources(struct pci_dev 
->> *dev)
->>         if (!screen_res.start)
->>                 return;
->> 
->> +       region.start = screen_res.start;
->> +       region.end = screen_res.end;
->> +       pcibios_bus_to_resource(dev->bus, &screen_res, &region);
->> +
->>         for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
->>                 struct resource *res = &dev->resource[i];
->> 
->> --
->> 2.7.4
->> 
->> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/cebb11ee/attachment-0001.sig>
