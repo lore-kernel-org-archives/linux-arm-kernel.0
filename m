@@ -1,46 +1,32 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 13 Jun 2018 18:04:24 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 24/27] drm: of: Export
- drm_crtc_port_mask()
-In-Reply-To: <20180613073605.gnhcwrywooxhyryj@flea>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-25-jernej.skrabec@siol.net>
- <20180613073605.gnhcwrywooxhyryj@flea>
-Message-ID: <1909375.AJdhpVkKnf@jernej-laptop>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 13 Jun 2018 18:07:52 +0200
+Subject: [PATCH v3 0/6] add virt-dma support for imx-sdma
+In-Reply-To: <1528822708.13468.9.camel@nxp.com>
+References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
+ <1528714877.2842.3.camel@pengutronix.de> <1528822708.13468.9.camel@nxp.com>
+Message-ID: <1528906072.21021.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne sreda, 13. junij 2018 ob 09:36:05 CEST je Maxime Ripard napisal(a):
-> On Tue, Jun 12, 2018 at 10:00:33PM +0200, Jernej Skrabec wrote:
-> > Function is useful when drm_of_find_possible_crtcs() can't be used and
-> > custom parsing is needed. This can happen for example when there is a
-> > node with multiple muxes between crtc and encoder.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  drivers/gpu/drm/drm_of.c | 4 ++--
-> >  include/drm/drm_of.h     | 8 ++++++++
-> >  2 files changed, 10 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> > index 1fe122461298..2e9cea3287b2 100644
-> > --- a/drivers/gpu/drm/drm_of.c
-> > +++ b/drivers/gpu/drm/drm_of.c
-> > @@ -22,8 +22,8 @@ static void drm_release_of(struct device *dev, void
-> > *data)> 
-> >   * Given a port OF node, return the possible mask of the corresponding
-> >   * CRTC within a device's list of CRTCs.  Returns zero if not found.
-> >   */
-> > 
-> > -static uint32_t drm_crtc_port_mask(struct drm_device *dev,
-> > -				   struct device_node *port)
-> > +uint32_t drm_crtc_port_mask(struct drm_device *dev,
-> > +			    struct device_node *port)
-> 
-> It should probably be exported too?
+Hi Robin,
 
-Yes, of course. It will be in next version.
+Am Dienstag, den 12.06.2018, 08:58 +0000 schrieb Robin Gong:
+> Hi Lucas,
+> 	Is the below DEAD LOCK issue same as your side? If yes, then
+> I'm afraid that we have to make another patch for uart to split dma
+> functions in uart driver out of the code area which protected by
+> port.lock. The warning make sense since allocate sdma bd memory
+> dynamically in virt-dma instead of static allocated as before. I'll
+> make another uart patch into my next version patchset.
 
-Best regards,
-Jernej
+Yes, I see the same lockdep splat on my system. Though I'm not sure if
+this is really the root cause of the issue I see.
+
+I'm getting timeouts for a serdev attached device and I don't think
+this system ever enters memory reclaim, so the issue reported by
+lockdep seems to be a mostly theoretical on this system. But lets see
+how far I get when you fixed this issue, maybe the real bug is hiding
+behind this one.
+
+Regards,
+Lucas
