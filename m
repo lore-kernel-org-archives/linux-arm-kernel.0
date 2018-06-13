@@ -1,40 +1,44 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Wed, 13 Jun 2018 19:20:44 +0200
-Subject: [PATCH] PCI: xilinx: add missing of_node_put()
-Message-ID: <1528910444-25593-1-git-send-email-hofrat@osadl.org>
+From: valentin.schneider@arm.com (Valentin Schneider)
+Date: Wed, 13 Jun 2018 18:34:45 +0100
+Subject: [PATCH] arm64: dts: hikey: Define wl1835 power capabilities
+In-Reply-To: <20180613151305.17240-1-ryan@edited.us>
+References: <20180613151305.17240-1-ryan@edited.us>
+Message-ID: <521dd38a-29b8-5670-4296-84b300921b3d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- The call to of_get_next_child() returns a node pointer with refcount
-incremented thus it must be explicitly decremented here after the last
-usage.
+Hi,
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: commit 8961def56845 ("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver")
----
+On 13/06/18 16:13, Ryan Grachek wrote:
+> These properties are required for compatibility with runtime PM.
+> Without these properties, MMC host controller will not be aware
+> of power capabilities. When the wlcore driver attempts to power
+> on the device, it will erroneously fail with -EACCES.
+> 
 
-Problem found by an experimental cocinelle script
+I don't have a hikey620 to test this, but the hikey960 is suffering from the
+same issue (see [1]). I added these properties to the dwmmc2 node of the
+hikey960 (see snippet) and wlan0 does show up. Would you mind sending a
+similar patch for that board ?
 
-Patch was compile tested with: multi_v7_defconfig + ARCH_ZYNQ=y,
-COMPILE_TEST=y, PCIE_XILINX=y
-(with one sparse warning though not related to the change proposed)
+Thanks !
 
-Patch is against 4.17.0 (localversion-next is next-20180613)
+Valentin
 
- drivers/pci/controller/pcie-xilinx.c | 1 +
- 1 file changed, 1 insertion(+)
+[1]: https://lkml.org/lkml/2018/6/12/930
 
-diff --git a/drivers/pci/controller/pcie-xilinx.c b/drivers/pci/controller/pcie-xilinx.c
-index b110a3a..7b1389d 100644
---- a/drivers/pci/controller/pcie-xilinx.c
-+++ b/drivers/pci/controller/pcie-xilinx.c
-@@ -509,6 +509,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
- 	port->leg_domain = irq_domain_add_linear(pcie_intc_node, PCI_NUM_INTX,
- 						 &intx_domain_ops,
- 						 port);
-+	of_node_put(pcie_intc_node);
- 	if (!port->leg_domain) {
- 		dev_err(dev, "Failed to get a INTx IRQ domain\n");
- 		return -ENODEV;
--- 
-2.1.4
+--->8
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index 85aadf1b..c706f70 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -613,6 +613,8 @@
+        vmmc-supply = <&wlan_en>;
+        ti,non-removable;
+        non-removable;
++       cap-power-off-card;
++       keep-power-in-suspend;
+        #address-cells = <0x1>;
+        #size-cells = <0x0>;
+        status = "ok";
