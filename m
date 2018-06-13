@@ -1,62 +1,75 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 13 Jun 2018 22:53:41 +0200
-Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <CAMuHMdUmqAWHFoM5tRJA+FoH59J8L3z0BMKVO-FEv4RQbokJyg@mail.gmail.com>
-References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
- <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
- <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
- <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
- <CAMuHMdVJ+ad-kr0iYuoaH3chJ49_g6yjEb8PHmTpwjFdYcG4=Q@mail.gmail.com>
- <47e87deb-a7a8-4780-53b5-4e4ed6e1bac3@gmail.com>
- <CAMuHMdXJEC8HbuB5+YHMLjZy9GfCYyXmGTk0TXkoAxLhxTOJyA@mail.gmail.com>
- <6864ed2c-39ac-615d-f38e-b28c3647e451@gmail.com>
- <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
- <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
- <CAMuHMdUmqAWHFoM5tRJA+FoH59J8L3z0BMKVO-FEv4RQbokJyg@mail.gmail.com>
-Message-ID: <c86c2ae6-21de-391e-a23f-b70976e86852@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 13 Jun 2018 16:31:44 -0500
+Subject: [PATCH 3/4] ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable
+ invalidates of BTB) to facilitate CVE_2017-5715 WA in OS
+In-Reply-To: <330ff593-4663-5393-74b3-55bf1f199561@gmail.com>
+References: <20180612202411.29798-1-nm@ti.com>
+ <20180612202411.29798-4-nm@ti.com>
+ <780935f6-6506-0915-dfb2-b584c074b70d@gmail.com>
+ <20180613173634.GC17671@n2100.armlinux.org.uk>
+ <330ff593-4663-5393-74b3-55bf1f199561@gmail.com>
+Message-ID: <20180613213144.htyg7guzjourkc3r@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2018 01:28 PM, Geert Uytterhoeven wrote:
-> Hi Marek,
-
-Hi,
-
-[...]
-
->>>> But wait, since we control which machines this code runs on , can't we
->>>> assure they have valid DTs ? This situation with invalid DT starts to
->>>> look a bit hypothetical to me.
->>>
->>> That assumes you keep the list of machines to check, and don't want to fix the
->>> issue automatically when detected (on any R-Car Gen2 or RZ/G1 platform, so
->>> you still need to check for r8a779[0-4] and r8a774[23457]).
->>
->> Yes, I want to keep a list of machines to check, to be _sure_ some
->> machine doesn't randomly blow up.
+On 20:36-20180613, Marek Vasut wrote:
+> On 06/13/2018 07:36 PM, Russell King - ARM Linux wrote:
+> > On Wed, Jun 13, 2018 at 01:06:13AM +0200, Marek Vasut wrote:
+> >> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
+> >>> Enable CVE_2017_5715 and since we have our own v7_arch_cp15_set_acr
+> >>> function to setup the bits, we are able to override the settings.
+> >>>
+> >>> Without this enabled, Linux kernel reports:
+> >>> CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> >>>
+> >>> With this enabled, Linux kernel reports:
+> >>> CPU0: Spectre v2: using ICIALLU workaround
+> >>>
+> >>> NOTE: This by itself does not enable the workaround for CPU1 (on
+> >>> OMAP5 and DRA72/AM572 SoCs) and may require additional kernel patches.
+> >>>
+> >>> Signed-off-by: Nishanth Menon <nm@ti.com>
+> >>> ---
+> >>>  arch/arm/mach-omap2/Kconfig | 1 +
+> >>>  1 file changed, 1 insertion(+)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> >>> index 3bb1ecb58de0..77820cc8d1e4 100644
+> >>> --- a/arch/arm/mach-omap2/Kconfig
+> >>> +++ b/arch/arm/mach-omap2/Kconfig
+> >>> @@ -53,6 +53,7 @@ config OMAP54XX
+> >>>  	bool "OMAP54XX SoC"
+> >>>  	select ARM_ERRATA_798870
+> >>>  	select SYS_THUMB_BUILD
+> >>> +	select ARM_CORTEX_A15_CVE_2017_5715
+> >>>  	imply NAND_OMAP_ELM
+> >>>  	imply NAND_OMAP_GPMC
+> >>>  	imply SPL_DISPLAY_PRINT
+> >>>
+> >>
+> >> Can this be enabled for all CA15 systems somehow ? I am sure there are
+> >> more that are vulnerable.
+> > 
+> > I think you're missing the point.
 > 
-> Just checking for the presence of a "renesas,irqc" node should be sufficient.
-
-How so? Any other R-Car machine can have the irqc node too. That's
-fragile at best.
-
-> Using that node would also get rid of the hardcoded IRQC_BASE address.
-> Note that the code assumes IRQ2. If another IRQ is used, that won't harm
-> much though (as in: if it didn't blow up before, it won't blow up now).
-
-We could/should fix up the irqc detection though.
-
->>> Anyway, as we care about booting old DTBs on new kernels (for a while), we
->>> have a few more release cycles to bikeshed ;-)
->>
->> I was about to ask if this patch then makes any sense or not.
+> Please read the patch again.
 > 
-> Sure. Less hard-coding is always better.
-> Especially if it means we can make it work on more machines automatically :-)
+> This enables it only for a specific SoC. My point being, this should be
+> enabled for all SoCs with CA15, not just some select few.
+> 
 
-I prefer to be in control of that.
+As I had previously responded in
+https://marc.info/?l=u-boot&m=152889727127549&w=2
+
+I am not disagreeing this needs to be done for all CA15 based SoCs
+(and A8s for previous patches ...), but.. I am not sure what you'd
+like me to do here -> I just dont know what the SMC convention is
+for all SoCs with CA15! I can help with TI SoCs for sure.. but then,
+Russell has a point that this is just one part of the solution -> on
+devices that provide secure services, there is definitely a need to
+lock the secure entry points down as well. But, specifically to this
+patch, do recommend an alternative if one exists.. will gladly follow.
 
 -- 
-Best regards,
-Marek Vasut
+Regards,
+Nishanth Menon
