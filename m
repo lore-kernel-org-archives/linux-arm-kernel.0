@@ -1,64 +1,40 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 13 Jun 2018 15:42:28 -0700
-Subject: [PATCH] clk: meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL
-In-Reply-To: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 13 Jun 2018 14:20:21 +0200")
-References: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hsh5qwbor.fsf@baylibre.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 14 Jun 2018 01:06:52 +0200
+Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB
+ with ICIALLU on Cortex-A15 for CVE-2017-5715
+In-Reply-To: <20180613213222.qxuiw7cajizslso7@kahuna>
+References: <20180612202411.29798-1-nm@ti.com>
+ <20180612202411.29798-3-nm@ti.com>
+ <8fac2f1c-ecc4-1aa1-0620-8ac6e2efdbf1@gmail.com>
+ <20180613133215.2cv7iyjb2laaha3j@kahuna>
+ <20180613154627.GP350@bill-the-cat.ec.rr.com>
+ <20180613213222.qxuiw7cajizslso7@kahuna>
+Message-ID: <2286b326-3970-412a-a47b-164d65c6cb18@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+On 06/13/2018 11:32 PM, Nishanth Menon wrote:
+> On 15:46-20180613, Tom Rini wrote:
+>> On Wed, Jun 13, 2018 at 08:32:15AM -0500, Nishanth Menon wrote:
+>>> On 23:05-20180612, Marek Vasut wrote:
+>>>> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
+>>> [..]
+>>>>> +#ifdef CONFIG_ARM_CORTEX_A15_CVE_2017_5715
+>>>>> +	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
+>>>>> +	orr	r0, r0, #1 << 0		@ Enable invalidates of BTB
+>>>>
+>>>> Can we use BIT() macro in the assembler code too ?
+>>>
+>>> Probably, but just following convention in the rest of the file. Do we
+>>> want to change from existing code?
+>>
+>> Agreed, we should follow the existing style (and I'm not 100% sure I
+>> like using BIT() in asm files).
+> 
+> OK. Will drop this feedback about BIT() macro if I have to do a v2.
 
-> On Amlogic Meson GXBB & GXL platforms, the SCPI Cortex-M4 Co-Processor
-> seems to be dependent on the FCLK_DIV2 to be operationnal.
->
-> The issue occured since v4.17-rc1 by freezing the kernel boot when
-> the 'schedutil' cpufreq governor was selected as default :
->
->   [   12.071837] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
->   domain-0 init dvfs: 4
->   [   12.087757] hctosys: unable to open rtc device (rtc0)
->   [   12.087907] cfg80211: Loading compiled-in X.509 certificates for regulatory database
->   [   12.102241] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
->
-> But when disabling the MMC driver, the boot finished but cpufreq failed to
-> change the CPU frequency :
->
->   [   12.153045] cpufreq: __target_index: Failed to change cpu frequency: -5
->
-> A bisect between v4.16 and v4.16-rc1 gave the 05f814402d61 commit to be
-> the first bad commit.
-> This commit added support for the missing clock gates before the fixed PLL
-> fixed dividers (FCLK_DIVx) and the clock framework basically disabled
-> all the unused fixed dividers, thus disabled a critical clock path for
-> the SCPI Co-Processor.
->
-> This patch simply sets the FCLK_DIV2 gate as critical to ensure
-> nobody can disable it.
->
-> Fixes: 05f814402d61 ("clk: meson: add fdiv clock gates")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Fine by me
 
-Nice!  this also fixes the boot hang I had noticed on gxm-nexbox-a1
-(though MMC still needs to be disabled to fully boot.)
-
-Tested-by: Kevin Hilman <khilman@baylibre.com>
-
-Kevin
-
-> ---
->  drivers/clk/meson/gxbb.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index b1e4d95..0e053c1 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -511,6 +511,7 @@ static struct clk_regmap gxbb_fclk_div2 = {
->  		.ops = &clk_regmap_gate_ops,
->  		.parent_names = (const char *[]){ "fclk_div2_div" },
->  		.num_parents = 1,
-> +		.flags = CLK_IS_CRITICAL,
->  	},
->  };
+-- 
+Best regards,
+Marek Vasut
