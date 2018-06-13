@@ -1,45 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 13 Jun 2018 10:58:37 +0200
-Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
-References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
-Message-ID: <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 13 Jun 2018 17:33:53 +0800
+Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20180613161314.14894-3-yixun.lan@amlogic.com>
+References: <20180613161314.14894-3-yixun.lan@amlogic.com>
+Message-ID: <201806131738.lVPaDHhQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cma_alloc() function has gfp mask parameter, so users expect that it
-honors typical memory allocation related flags. The most imporant from
-the security point of view is handling of __GFP_ZERO flag, because memory
-allocated by this function usually can be directly remapped to userspace
-by device drivers as a part of multimedia processing and ignoring this
-flag might lead to leaking some kernel structures to userspace.
-Some callers of this function (for example arm64 dma-iommu glue code)
-already assumed that the allocated buffers are cleared when this flag
-is set. To avoid such issues, add simple code for clearing newly
-allocated buffer when __GFP_ZERO flag is set. Callers will be then
-updated to skip implicit clearing or adjust passed gfp flags.
+Hi Liang,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Thank you for the patch! Yet something to improve:
+
+[auto build test ERROR on mtd/nand/next]
+[also build test ERROR on v4.17 next-20180613]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Yixun-Lan/mtd-rawnand-meson-add-Amlogic-NAND-driver-support/20180613-161917
+base:   git://git.infradead.org/linux-mtd.git nand/next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/mtd/nand/raw/meson_nand.c:21:10: fatal error: clk-regmap.h: No such file or directory
+    #include "clk-regmap.h"
+             ^~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +21 drivers/mtd/nand/raw/meson_nand.c
+
+  > 21	#include "clk-regmap.h"
+    22	
+
 ---
- mm/cma.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/mm/cma.c b/mm/cma.c
-index 5809bbe360d7..1106d5aef2cc 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -464,6 +464,13 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
- 		start = bitmap_no + mask + 1;
- 	}
- 
-+	if (ret == 0 && gfp_mask & __GFP_ZERO) {
-+		int i;
-+
-+		for (i = 0; i < count; i++)
-+			clear_highpage(page + i);
-+	}
-+
- 	trace_cma_alloc(pfn, page, count, align);
- 
- 	if (ret && !(gfp_mask & __GFP_NOWARN)) {
--- 
-2.17.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62787 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/043f3907/attachment-0001.gz>
