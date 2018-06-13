@@ -1,44 +1,40 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 13 Jun 2018 14:40:00 +0200
-Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
-In-Reply-To: <20180613122359.GA8695@bombadil.infradead.org>
-References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
- <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
- <20180613122359.GA8695@bombadil.infradead.org>
-Message-ID: <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 13 Jun 2018 14:48:50 +0200
+Subject: [PATCH v1 4/4] mailbox: Add support for i.MX7D messaging unit
+In-Reply-To: <CAA+hA=RpoRXUK+jB18F4OeYE9PG73SDa_NLYeN5Q2G3B1bC-JA@mail.gmail.com>
+References: <20180601065821.28234-1-o.rempel@pengutronix.de>
+ <20180601065821.28234-5-o.rempel@pengutronix.de>
+ <CAA+hA=RpoRXUK+jB18F4OeYE9PG73SDa_NLYeN5Q2G3B1bC-JA@mail.gmail.com>
+Message-ID: <20180613124850.w3bzerkpkbql6ite@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthew,
+On Wed, Jun 13, 2018 at 08:21:10PM +0800, Dong Aisheng wrote:
+> Hi Oleksij,
+> 
+> On Fri, Jun 1, 2018 at 2:58 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+> > The Mailbox controller is able to send messages (up to 4 32 bit words)
+> > between the endpoints.
+> 
+> Could we really be able to send up to 4 42bit words with this driver?
+> 
+> It looks to me the current Mailbox framework is more designed for share mem
+> transfer which does not fit i.MX MU well.
 
-On 2018-06-13 14:24, Matthew Wilcox wrote:
-> On Wed, Jun 13, 2018 at 10:58:37AM +0200, Marek Szyprowski wrote:
->> cma_alloc() function has gfp mask parameter, so users expect that it
->> honors typical memory allocation related flags. The most imporant from
->> the security point of view is handling of __GFP_ZERO flag, because memory
->> allocated by this function usually can be directly remapped to userspace
->> by device drivers as a part of multimedia processing and ignoring this
->> flag might lead to leaking some kernel structures to userspace.
->> Some callers of this function (for example arm64 dma-iommu glue code)
->> already assumed that the allocated buffers are cleared when this flag
->> is set. To avoid such issues, add simple code for clearing newly
->> allocated buffer when __GFP_ZERO flag is set. Callers will be then
->> updated to skip implicit clearing or adjust passed gfp flags.
-> I think the documentation for this function needs improving.  For example,
-> GFP_ATOMIC does not work (it takes a mutex lock, so it can sleep).
-> At the very least, the kernel-doc needs:
->
->   * Context: Process context (may sleep even if GFP flags indicate otherwise).
->
-> Unless someone wants to rework this allocator to use spinlocks instead
-> of mutexes ...
+The mailbox framework just defines channels and messages. A message is a
+void * which may contain arbitrary data or even no data at all; some
+drivers simply ignore the message pointer, so in fact they act as a
+doorbell unit only.
 
-It is not only the matter of the spinlocks. GFP_ATOMIC is not supported 
-by the
-memory compaction code, which is used in alloc_contig_range(). Right, this
-should be also noted in the documentation.
+There's nothing about shared memory in the mailbox framework, but of
+course you can combine a mailbox driver and shared memory to a remote
+message mechanism. That could be done with the i.MX MU aswell and would
+indeed be a good match for the hardware.
 
-Best regards
+Sascha
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
