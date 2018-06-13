@@ -1,18 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Jun 2018 11:08:10 +0200
-Subject: [PATCH 2/3] rtc: ftrtc010: handle dates after 2106
-In-Reply-To: <20180604141528.15635-2-alexandre.belloni@bootlin.com>
+Date: Wed, 13 Jun 2018 11:10:35 +0200
+Subject: [PATCH 3/3] rtc: ftrtc010: let the core handle range
+In-Reply-To: <20180604141528.15635-3-alexandre.belloni@bootlin.com>
 References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
- <20180604141528.15635-2-alexandre.belloni@bootlin.com>
-Message-ID: <CACRpkdbt=2diDRueUqdEnHxViG-Nr0Rcs-aW67hjgrQnxQUaAg@mail.gmail.com>
+ <20180604141528.15635-3-alexandre.belloni@bootlin.com>
+Message-ID: <CACRpkdabaH2yiYNnQHBru=-Snb3Eeni2eDAa9mjsa-3DqMC72g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jun 4, 2018 at 4:15 PM, Alexandre Belloni
 <alexandre.belloni@bootlin.com> wrote:
+> The current range handling is highly suspicious. Anyway, let the core
+> handle it.
 
-> Use correct types for offset and time and use
-> rtc_time64_to_tm/rtc_tm_to_time64 to handle dates after 2106 properly.
+Hmmm. I have datasheets, do you need some input about the hardware?
+Something I should patch?
+
+> The RTC has a 32 bit counter on top of days + hh:mm:ss registers.
 >
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
