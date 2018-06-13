@@ -1,22 +1,20 @@
-From: dolinux.peng@gmail.com (Peng Donglin)
-Date: Wed, 13 Jun 2018 09:11:57 +0800
-Subject: [PATCH 0/2] Re-use DEFINE_SHOW_ATTRIBUTE() macro
-In-Reply-To: <b55024472e101a33b3d6b098aa2ce23c5b5dd6f7.1528819790.git.dolinux.peng@gmail.com>
-References: <b55024472e101a33b3d6b098aa2ce23c5b5dd6f7.1528819790.git.dolinux.peng@gmail.com>
-Message-ID: <cover.1528819790.git.dolinux.peng@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 13 Jun 2018 11:18:45 +0800
+Subject: [PATCH v2 01/27] clk: sunxi-ng: r40: Add minimal rate for video
+ PLLs
+In-Reply-To: <20180612200036.21483-2-jernej.skrabec@siol.net>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180612200036.21483-2-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v66rUqqUrqmq09hHcGHF1buZieYmu1zOkUXZyyQPtyUZew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-...instead of open coding file operations followed by custom ->open()
-callbacks per each attribute.
+On Wed, Jun 13, 2018 at 4:00 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> According to documentation and experience with other similar SoCs, video
+> PLLs don't work stable if their output frequency is set below 192 MHz.
+>
+> Because of that, set minimal rate to both R40 video PLLs to 192 MHz.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Peng Donglin (2):
-  ARM: dump: Convert to use DEFINE_SHOW_ATTRIBUTE macro
-  ARM64: dump: Convert to use DEFINE_SHOW_ATTRIBUTE macro
-
- arch/arm/mm/ptdump_debugfs.c   | 13 +------------
- arch/arm64/mm/ptdump_debugfs.c | 13 +------------
- 2 files changed, 2 insertions(+), 24 deletions(-)
-
--- 
-2.7.4
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
