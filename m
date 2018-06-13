@@ -1,120 +1,64 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Wed, 13 Jun 2018 08:20:54 -0700
-Subject: [PATCH] arm64: dts: qcom: Add pm8005 and pm8998 support
-Message-ID: <20180613152054.54812-1-swboyd@chromium.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 13 Jun 2018 17:22:25 +0200
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <442896963833043f84dd9d0c14d88351@codeaurora.org>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+ <26470c5c-55db-9dff-3794-4e4a96c8bcb6@codeaurora.org>
+ <CAKv+Gu8UG_D0AAR8Usdi7DrucqaEs+f-JTU1voR-CcrtNY2ZEQ@mail.gmail.com>
+ <442896963833043f84dd9d0c14d88351@codeaurora.org>
+Message-ID: <CAKv+Gu_ZRNvW9CeqRyUpQGnrkkoOi1Hh08re=_Gz=EGVTAvbsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for the pm8005 and pm8998 PMICs. For now just support
-the GPIO controllers.
+On 13 June 2018 at 17:17,  <okaya@codeaurora.org> wrote:
+> On 2018-06-13 11:06, Ard Biesheuvel wrote:
+>>
+>> On 13 June 2018 at 16:22, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>>
+>>> Hi Ard,
+>>>
+>>> On 5/18/2018 10:17 AM, Sinan Kaya wrote:
+>>>>
+>>>> A host bridge is allowed to remap BAR addresses using _TRA attribute in
+>>>> _CRS windows.
+>>>>
+>>>> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff
+>>>> window] (bus address [0x00100000-0x1fffffff])
+>>>> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+>>>>
+>>>> When a VGA device is behind such a host bridge and the resource is
+>>>> translated efifb driver is trying to do ioremap against bus address
+>>>> rather than the resource address and is failing to probe.
+>>>>
+>>>> efifb: probing for efifb
+>>>> efifb: cannot reserve video memory at 0x1e000000
+>>>> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+>>>> efifb: mode is 800x600x32, linelength=3200, pages=1
+>>>> efifb: scrolling: redraw
+>>>> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+>>>>
+>>>> Use the host bridge offset information to convert bus address to
+>>>> resource address in the fixup.
+>>>>
+>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>>> ---
+>>>
+>>>
+>>> I didn't see any messages about these getting picked up for 4.18.
+>>>
+>>> Are they queued on your own branch?
+>>>
+>>
+>> No, you never cc'ed me on them until now.
+>
+>
+> Ouch, I hoped that you would get it via get_maintainer script. Sorry for
+> that.
 
-Signed-off-by: Stephen Boyd <swboyd@chromium.org>
----
- arch/arm64/boot/dts/qcom/pm8005.dtsi | 33 +++++++++++++++++
- arch/arm64/boot/dts/qcom/pm8998.dtsi | 55 ++++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/pm8005.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/pm8998.dtsi
+Actually, get_maintainer is right: this should go through the fbdev
+tree not the EFI tree
 
-diff --git a/arch/arm64/boot/dts/qcom/pm8005.dtsi b/arch/arm64/boot/dts/qcom/pm8005.dtsi
-new file mode 100644
-index 000000000000..4d5aca3eeb69
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/pm8005.dtsi
-@@ -0,0 +1,33 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/* Copyright 2018 Google LLC. */
-+
-+#include <dt-bindings/spmi/spmi.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+&spmi_bus {
-+	pm8005_lsid0: pmic at 4 {
-+		compatible = "qcom,pm8005", "qcom,spmi-pmic";
-+		reg = <0x4 SPMI_USID>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pm8005_gpio: gpios at c000 {
-+			compatible = "qcom,pm8005-gpio", "qcom,spmi-gpio";
-+			reg = <0xc000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <0 0xc0 0 IRQ_TYPE_NONE>,
-+				     <0 0xc1 0 IRQ_TYPE_NONE>,
-+				     <0 0xc2 0 IRQ_TYPE_NONE>,
-+				     <0 0xc3 0 IRQ_TYPE_NONE>;
-+		};
-+
-+	};
-+
-+	pm8005_lsid1: pmic at 5 {
-+		compatible = "qcom,pm8005", "qcom,spmi-pmic";
-+		reg = <0x5 SPMI_USID>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-new file mode 100644
-index 000000000000..92bed1e7d4bb
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-@@ -0,0 +1,55 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/* Copyright 2018 Google LLC. */
-+
-+#include <dt-bindings/spmi/spmi.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+&spmi_bus {
-+	pm8998_lsid0: pmic at 0 {
-+		compatible = "qcom,pm8998", "qcom,spmi-pmic";
-+		reg = <0x0 SPMI_USID>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pm8998_gpio: gpios at c000 {
-+			compatible = "qcom,pm8998-gpio", "qcom,spmi-gpio";
-+			reg = <0xc000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <0 0xc0 0 IRQ_TYPE_NONE>,
-+				     <0 0xc1 0 IRQ_TYPE_NONE>,
-+				     <0 0xc2 0 IRQ_TYPE_NONE>,
-+				     <0 0xc3 0 IRQ_TYPE_NONE>,
-+				     <0 0xc4 0 IRQ_TYPE_NONE>,
-+				     <0 0xc5 0 IRQ_TYPE_NONE>,
-+				     <0 0xc6 0 IRQ_TYPE_NONE>,
-+				     <0 0xc7 0 IRQ_TYPE_NONE>,
-+				     <0 0xc8 0 IRQ_TYPE_NONE>,
-+				     <0 0xc9 0 IRQ_TYPE_NONE>,
-+				     <0 0xca 0 IRQ_TYPE_NONE>,
-+				     <0 0xcb 0 IRQ_TYPE_NONE>,
-+				     <0 0xcc 0 IRQ_TYPE_NONE>,
-+				     <0 0xcd 0 IRQ_TYPE_NONE>,
-+				     <0 0xce 0 IRQ_TYPE_NONE>,
-+				     <0 0xcf 0 IRQ_TYPE_NONE>,
-+				     <0 0xd0 0 IRQ_TYPE_NONE>,
-+				     <0 0xd1 0 IRQ_TYPE_NONE>,
-+				     <0 0xd2 0 IRQ_TYPE_NONE>,
-+				     <0 0xd3 0 IRQ_TYPE_NONE>,
-+				     <0 0xd4 0 IRQ_TYPE_NONE>,
-+				     <0 0xd5 0 IRQ_TYPE_NONE>,
-+				     <0 0xd6 0 IRQ_TYPE_NONE>,
-+				     <0 0xd7 0 IRQ_TYPE_NONE>,
-+				     <0 0xd8 0 IRQ_TYPE_NONE>,
-+				     <0 0xd9 0 IRQ_TYPE_NONE>;
-+		};
-+
-+	};
-+
-+	pm8998_lsid1: pmic at 1 {
-+		compatible = "qcom,pm8998", "qcom,spmi-pmic";
-+		reg = <0x1 SPMI_USID>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+};
--- 
-Sent by a computer through tubes
+Were you going to resend them? If not, I can find them in my archive
+and ack them, and we will ask Bartlomiej to take them for v4.19
