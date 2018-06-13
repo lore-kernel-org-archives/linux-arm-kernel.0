@@ -1,45 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 13 Jun 2018 17:06:08 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <26470c5c-55db-9dff-3794-4e4a96c8bcb6@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <26470c5c-55db-9dff-3794-4e4a96c8bcb6@codeaurora.org>
-Message-ID: <CAKv+Gu8UG_D0AAR8Usdi7DrucqaEs+f-JTU1voR-CcrtNY2ZEQ@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 13 Jun 2018 17:09:51 +0200
+Subject: [PATCH/RFT v2 2/2] arm64: dts: r8a77995: Add all HSCIF nodes
+Message-ID: <20180613150951.32322-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2018 at 16:22, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Hi Ard,
->
-> On 5/18/2018 10:17 AM, Sinan Kaya wrote:
->> A host bridge is allowed to remap BAR addresses using _TRA attribute in
->> _CRS windows.
->>
->> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
->> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
->>
->> When a VGA device is behind such a host bridge and the resource is
->> translated efifb driver is trying to do ioremap against bus address
->> rather than the resource address and is failing to probe.
->>
->> efifb: probing for efifb
->> efifb: cannot reserve video memory at 0x1e000000
->> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
->> efifb: mode is 800x600x32, linelength=3200, pages=1
->> efifb: scrolling: redraw
->> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
->>
->> Use the host bridge offset information to convert bus address to
->> resource address in the fixup.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->
-> I didn't see any messages about these getting picked up for 4.18.
->
-> Are they queued on your own branch?
->
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-No, you never cc'ed me on them until now.
+This patch adds the device nodes all HSCIF serial ports
+incl. clocks and power domain to the R8A77995 SoC.
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+[simon: updated internal clock from S3D1 to S3D1C to match documentation]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 35 +++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+ Based on renesas-devel-20180613-v4.17
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index 16cbb34692ad..0a9caf9cdc86 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -242,6 +242,41 @@
+ 			resets = <&cpg 407>;
+ 		};
+ 
++		hscif0: serial at e6540000 {
++			compatible = "renesas,hscif-r8a77995",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6540000 0 0x60>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 520>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
++			       <&dmac2 0x31>, <&dmac2 0x30>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 520>;
++			status = "disabled";
++		};
++
++		hscif3: serial at e66a0000 {
++			compatible = "renesas,hscif-r8a77995",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66a0000 0 0x60>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 517>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 517>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at e6500000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-- 
+2.11.0
