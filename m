@@ -1,28 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 13 Jun 2018 19:44:02 +0300
-Subject: [PATCH v2] arm64: dts: renesas: condor/v3hsk: specify Ethernet
- PHY IRQs
-In-Reply-To: <42861d8f-3570-03b9-987c-bb15fa92a9c7@cogentembedded.com>
-References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
- <42861d8f-3570-03b9-987c-bb15fa92a9c7@cogentembedded.com>
-Message-ID: <9d6f18ad-47d1-eb81-1a86-d124ca03e1c9@cogentembedded.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Jun 2018 18:48:37 +0200
+Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <20180613143626.rrdxq4i4guy2oryg@verge.net.au>
+References: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
+ <20180613110647.ygg66nu36pcf6kpn@verge.net.au>
+ <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
+ <20180613143626.rrdxq4i4guy2oryg@verge.net.au>
+Message-ID: <CAMuHMdUbpfpH6m1ScdegC8ra_W1mu_vwqC5g_GDGvC+oaxmmyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2018 07:42 PM, Sergei Shtylyov wrote:
+Hi Simon,
 
-> Specify Ethernet PHY IRQs in the Condor/V3HSK board device trees, now that
-> we have the GPIO support (previously phylib had  to resort to polling).
-> 
-> Based on the original (and large) patch by Vladimir Barinov.
-> 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
+On Wed, Jun 13, 2018 at 4:36 PM Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jun 13, 2018 at 01:21:34PM +0200, Geert Uytterhoeven wrote:
+> > On Wed, Jun 13, 2018 at 1:06 PM Simon Horman <horms@verge.net.au> wrote:
+> > > On Mon, Jun 11, 2018 at 02:15:13PM +0200, Marek Vasut wrote:
+> > > > Rather than hard-coding the quirk topology, which stopped scaling,
+> > > > parse the information from DT. The code looks for all compatible
+> > > > PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
+> > > > to the same pin. If so, the code sends a matching sequence to the
+> > > > PMIC to deassert the IRQ.
+> > > >
+> > > > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > > > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > > > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > > > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > > Cc: linux-renesas-soc at vger.kernel.org
+> > > > Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
+> > >
+> > > This looks fine to me but I will wait to see if there are other reviews
+> > > before applying.
+> > >
+> > > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > Note that applying it now will break gose, as its DTS doesn't describe all
+> > regulators yet.
+>
+> Ok, so old DT will break with new kernels?
 
-   Forgot to add the the patch is against the 'renesas-devel-20180613-v4.17' tag.
+For Lager, it will break with pre-v4.2 DTS, so I think that's not a problem.
+For Koelsch, the regulators were added even earlier.
+Stout had all regulators from the initial support in upstream.
 
-[...]
+So Gose is the only issue. Do we care?
 
-MBR, Sergei
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
