@@ -1,107 +1,50 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 13 Jun 2018 09:34:56 +0200
-Subject: [PATCH v2 04/27] dt-bindings: display: sunxi-drm: Add TCON TOP
- description
-In-Reply-To: <20180612200036.21483-5-jernej.skrabec@siol.net>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-5-jernej.skrabec@siol.net>
-Message-ID: <20180613073456.jk72zw4rt4ysjco7@flea>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 13 Jun 2018 15:35:05 +0800
+Subject: [PATCH 26/28] drm/mediatek: add DPI1/DSI1/DSI2/DSI3 in comp_init
+In-Reply-To: <1528687580-549-27-git-send-email-stu.hsieh@mediatek.com>
+References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
+ <1528687580-549-27-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1528875305.30263.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Stu:
 
-Thanks for working on this!
-
-On Tue, Jun 12, 2018 at 10:00:13PM +0200, Jernej Skrabec wrote:
-> TCON TOP main purpose is to configure whole display pipeline. It
-> determines relationships between mixers and TCONs, selects source TCON
-> for HDMI, muxes LCD and TV encoder GPIO output, selects TV encoder
-> clock source and contains additional TV TCON and DSI gates.
+On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
+> This patch add components DPI1/DSI1/DSI2/DSI3 in comp_init.
+> Because the some parameter for these components initialized
+> in their driver.
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 > ---
->  .../bindings/display/sunxi/sun4i-drm.txt      | 45 +++++++++++++++++++
->  include/dt-bindings/clock/sun8i-tcon-top.h    | 11 +++++
->  2 files changed, 56 insertions(+)
->  create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index 3346c1e2a7a0..ef64c589a4b3 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -187,6 +187,51 @@ And on the A23, A31, A31s and A33, you need one more clock line:
->     - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
->                   clock, that can be used to drive the LVDS clock
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index 22f4c72fa785..ff974d82a4a6 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -278,7 +278,11 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
 >  
-> +TCON TOP
-> +--------
-> +
-> +TCON TOPs main purpose is to configure whole display pipeline. It determines
-> +relationships between mixers and TCONs, selects source TCON for HDMI, muxes
-> +LCD and TV encoder GPIO output, selects TV encoder clock source and contains
-> +additional TV TCON and DSI gates.
-> +
-> +It allows display pipeline to be configured in very different ways:
-> +
-> +                             / LCD0/LVDS0
-> +                 / TCON-LCD0
-> +                 |           \ MIPI DSI
-> + mixer0          |
-> +        \        / TCON-LCD1 - LCD1/LVDS1
-> +         TCON-TOP
-> +        /        \ TCON-TV0 - TVE0/RGB
-> + mixer1          |          \
-> +                 |           TCON-TOP - HDMI
-> +                 |          /
-> +                 \ TCON-TV1 - TVE1/RGB
-> +
-> +Note that both TCON TOP references same physical unit.
-> +
-> +Required properties:
-> +  - compatible: value must be one of:
-> +    * allwinner,sun8i-r40-tcon-top
-> +  - reg: base address and size of the memory-mapped region.
-> +  - clocks: phandle to the clocks feeding the TCON TOP
-> +    * bus: TCON TOP interface clock
-> +  - clock-names: clock name mentioned above
-> +  - resets: phandle to the reset line driving the DRC
+>  	if (comp_id == DDP_COMPONENT_BLS ||
+>  	    comp_id == DDP_COMPONENT_DPI0 ||
+> +	    comp_id == DDP_COMPONENT_DPI1 ||
 
-s/DRC/TCON TOP/ ?
+Why not move this modification to the patch 'add component DPI1'?
 
-> +    * rst: TCON TOP reset line
+>  	    comp_id == DDP_COMPONENT_DSI0 ||
+> +	    comp_id == DDP_COMPONENT_DSI1 ||
+> +	    comp_id == DDP_COMPONENT_DSI2 ||
 
-Remaining consistent with the clock name would be great
+Why not move this modification to the patch 'add component DSI2'?
 
-> +  - reset-names: reset name mentioned above
-> +  - #clock-cells : must contain 1
+> +	    comp_id == DDP_COMPONENT_DSI3 ||
 
-An example would be nice here
+Why not move this modification to the patch 'add component DSI3'?
 
-> +- ports: A ports node with endpoint definitions as defined in
-> +    Documentation/devicetree/bindings/media/video-interfaces.txt. The first port
-> +    should be the input for mixer0 mux. The second should be the output for that
-> +    mux. Third port should be input for mixer1 mux. Fourth port should be output
-> +    for mixer1 mux. Fifth port should be input for HDMI mux. Sixth port should
-> +    be output for it. All output endpoints should have reg property with the id
-> +    of the target TCON. All ports should have only one enpoint connected to
+Regards,
+CK
 
-                                                          ^ endpoint
-
-I guess it would me more readable if you were to make it a bullet
-list, but this works for me otherwise.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/22350a8e/attachment.sig>
+>  	    comp_id == DDP_COMPONENT_PWM0) {
+>  		comp->regs = NULL;
+>  		comp->clk = NULL;
