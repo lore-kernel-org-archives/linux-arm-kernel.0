@@ -1,42 +1,41 @@
-From: dolinux.peng@gmail.com (Peng Donglin)
-Date: Wed, 13 Jun 2018 09:11:55 +0800
-Subject: [PATCH 1/2] ARM: dump: Convert to use DEFINE_SHOW_ATTRIBUTE macro
-In-Reply-To: <cover.1528819790.git.dolinux.peng@gmail.com>
-References: <cover.1528819790.git.dolinux.peng@gmail.com>
-Message-ID: <b55024472e101a33b3d6b098aa2ce23c5b5dd6f7.1528819790.git.dolinux.peng@gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed, 13 Jun 2018 03:16:20 +0200
+Subject: [PATCH 01/10] ARM: OMAP1: ams-delta: drop GPIO lookup table for
+ serio device
+In-Reply-To: <20180612222356.GD38773@dtor-ws>
+References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
+ <20180612222356.GD38773@dtor-ws>
+Message-ID: <69494657.T0PeNZxiFJ@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
+On Wednesday, June 13, 2018 12:23:56 AM CEST Dmitry Torokhov wrote:
+> Hi Janusz,
+> 
+> On Sat, Jun 09, 2018 at 04:02:15PM +0200, Janusz Krzysztofik wrote:
+> > GPIO lookup table for ams-delta-serio device was introduced by commit
+> > 0486738928bf ("ARM: OMAP1: ams-delta: add GPIO lookup tables").
+> > Unfortunately, a follow up patch "Input: ams_delta_serio: use GPIO
+> > lookup table" was not accepted by subystem maintainer who requested
+> > conversion of the driver to a platform driver, replacepemnt of IRQ GPIO
+> > pin with IRQ resource, replacement of GPIO pin providing keyboard power
+> > with a regulator and removal of remaining GPIO pins from the driver as
+> > not handled by it.
+> > 
+> > Let's start with removal of no the longer needed GPIO lookup table from
+> > the board init file.
+> > 
+> > Series created and tested on top of next-20180608 tag from linux-next
+> > tree.
+> 
+> This all is really nice (modulo a couple of questions), thank you for
+> implementing this. How do you want to merge this? Through OMAP tree or
+> input?
 
-Signed-off-by: Peng Donglin <dolinux.peng@gmail.com>
----
- arch/arm/mm/ptdump_debugfs.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
+Hi Dmitry,
 
-diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
-index be8d87b..79002fe 100644
---- a/arch/arm/mm/ptdump_debugfs.c
-+++ b/arch/arm/mm/ptdump_debugfs.c
-@@ -11,18 +11,7 @@ static int ptdump_show(struct seq_file *m, void *v)
- 	ptdump_walk_pgd(m, info);
- 	return 0;
- }
--
--static int ptdump_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, ptdump_show, inode->i_private);
--}
--
--static const struct file_operations ptdump_fops = {
--	.open		= ptdump_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--};
-+DEFINE_SHOW_ATTRIBUTE(ptdump);
- 
- int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
- {
--- 
-2.7.4
+If Tony doesn't mind, I would prefer it merged through OMAP tree as I still 
+have a few board patches built on top of it in my queue.
+
+Thanks,
+Janusz
