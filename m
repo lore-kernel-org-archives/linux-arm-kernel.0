@@ -1,78 +1,98 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 13 Jun 2018 11:13:10 +0300
-Subject: [PATCH v2 2/5] dt: qcom: 8996: thermal: Move to DT initialisation
-In-Reply-To: <20180612193507.GO14924@minitux>
-References: <cover.1528799892.git.amit.kucheria@linaro.org>
- <683ceb9a7d283bcad47fc6e8e4fcfbd7e76c1018.1528799892.git.amit.kucheria@linaro.org>
- <20180612193507.GO14924@minitux>
-Message-ID: <CAHLCerOaQ6LmuGkBNu6SuVXXX8hQ+yJJ9-N6NAyLhtTp_yCK-w@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 13 Jun 2018 16:14:35 +0800
+Subject: [PATCH 19/28] drm/mediatek: add connection from RDMA2 to DPI1
+In-Reply-To: <1528876862.11190.35.camel@mtksdccf07>
+References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
+ <1528687580-549-20-git-send-email-stu.hsieh@mediatek.com>
+ <1528874037.30263.6.camel@mtksdaap41>
+ <1528876862.11190.35.camel@mtksdccf07>
+Message-ID: <1528877675.30263.27.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 10:35 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Tue 12 Jun 03:54 PDT 2018, Amit Kucheria wrote:
->
->> We also split up the regmap address space into two, one for the TM
->> registers, the other for the SROT registers. This was required to deal with
->> different address offsets for the TM and SROT registers across different
->> SoC families.
->>
->> Since tsens-common.c/init_common() currently only registers one address space, the order is important (TM before SROT).This is OK since the code doesn't really use the SROT functionality yet.
->
-> Please line wrap this.
->
->>
->> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
->> ---
->>  arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
->>  drivers/thermal/qcom/tsens-8996.c     |  1 -
->>  2 files changed, 11 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
->> index 410ae78..b4aab18 100644
->> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
->> @@ -451,7 +451,17 @@
->>
->>               tsens0: thermal-sensor at 4a8000 {
->>                       compatible = "qcom,msm8996-tsens";
->> -                     reg = <0x4a8000 0x2000>;
->> +                     reg = <0x4a9000 0x1000>, /* TM */
->> +                           <0x4a8000 0x1000>; /* SROT */
->> +                     #qcom,sensors = <13>;
->> +                     #thermal-sensor-cells = <1>;
->> +             };
->> +
->> +             tsens1: thermal-sensor at 4ac000 {
->> +                     compatible = "qcom,msm8996-tsens";
->> +                     reg = <0x4ad000 0x1000>, /* TM */
->> +                           <0x4ac000 0x1000>; /* SROT */
->> +                     #qcom,sensors = <8>;
->>                       #thermal-sensor-cells = <1>;
->>               };
->>
->> diff --git a/drivers/thermal/qcom/tsens-8996.c b/drivers/thermal/qcom/tsens-8996.c
->> index e1f7781..6e59078 100644
->> --- a/drivers/thermal/qcom/tsens-8996.c
->> +++ b/drivers/thermal/qcom/tsens-8996.c
->> @@ -79,6 +79,5 @@ static const struct tsens_ops ops_8996 = {
->>  };
->>
->>  const struct tsens_data data_8996 = {
->> -     .num_sensors    = 13,
->
-> This will cause the current 8996 dts to fail probing the tsens. I think
-> you should just leave this as is, because specifying qcom,sensors in dts
-> will overwrite this number regardless.
+Hi, Stu:
 
-Ack, I didn't consider backword compatility of the code with the
-current dts. Will fix.
+On Wed, 2018-06-13 at 16:01 +0800, Stu Hsieh wrote:
+> Hi, CK:
+> 
+> 
+> On Wed, 2018-06-13 at 15:13 +0800, CK Hu wrote:
+> > Hi, Stu:
+> > 
+> > On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
+> > > This patch add the connection from RDMA2 to DPI1
+> > > 
+> > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > > ---
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
+> > >  1 file changed, 8 insertions(+)
+> > > 
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > index 31a0832ef9ec..2d883815d79c 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > > @@ -93,9 +93,11 @@
+> > >  #define RDMA1_MOUT_DPI0			0x2
+> > >  #define RDMA1_MOUT_DPI1			0x3
+> > >  #define RDMA2_MOUT_DPI0			0x2
+> > > +#define RDMA2_MOUT_DPI1			0x3
+> > 
+> > Usually, each bit of a mout register represent a output enable. Is this
+> > value 0x3 a correct value?
+> > 
+> > Regards,
+> > CK
+> > 
+> In HW CONFIG SPEC or MT2712_E2_MMSYS_Change_note show as following:
+> 
+> Bit(s)	Name			Description
+> 2:0	DISP_RDMA2_SOUT_SEL_IN	0: output to dsi0
+> 				1: outptu to dsi1
+> 				2: output to dpi0
+> 				3: output to dpi1
+> 				4: output to dsi2
+> 				5: output to dsi3
+> 
+> So, 0x3 is correct value.
 
-> It also would make this change dts specific, which is convenient as it
-> breaks the interdependency between the different subsystems.
->
->>       .ops            = &ops_8996,
->
-> Regards,
-> Bjorn
+The data sheet use the term SOUT match its function, so I think driver
+have better change the naming to SOUT.
+
+Regards,
+CK
+
+> 
+> Regard,
+> Stu
+> 
+> > >  #define DPI0_SEL_IN_RDMA1		0x1
+> > >  #define DPI0_SEL_IN_RDMA2		0x3
+> > >  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+> > > +#define DPI1_SEL_IN_RDMA2		(0x3 << 8)
+> > >  #define DSI1_SEL_IN_RDMA1		0x1
+> > >  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
+> > >  #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
+> > > @@ -199,6 +201,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+> > >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
+> > >  		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+> > >  		value = RDMA2_MOUT_DPI0;
+> > > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
+> > > +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+> > > +		value = RDMA2_MOUT_DPI1;
+> > >  	} else {
+> > >  		value = 0;
+> > >  	}
+> > > @@ -233,6 +238,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+> > >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
+> > >  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
+> > >  		value = DPI0_SEL_IN_RDMA2;
+> > > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
+> > > +		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
+> > > +		value = DPI1_SEL_IN_RDMA2;
+> > >  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+> > >  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+> > >  		value = COLOR1_SEL_IN_OVL1;
+> > 
+> > 
+> 
+> 
