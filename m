@@ -1,44 +1,107 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 13 Jun 2018 09:29:05 +0200
-Subject: [PATCH 4/4] net: emaclite: Remove xemaclite_mdio_setup return
- check
-In-Reply-To: <1528871719-1681-5-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1528871719-1681-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1528871719-1681-5-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <20180613072905.GE24314@lunn.ch>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 13 Jun 2018 09:34:56 +0200
+Subject: [PATCH v2 04/27] dt-bindings: display: sunxi-drm: Add TCON TOP
+ description
+In-Reply-To: <20180612200036.21483-5-jernej.skrabec@siol.net>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180612200036.21483-5-jernej.skrabec@siol.net>
+Message-ID: <20180613073456.jk72zw4rt4ysjco7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 12:05:19PM +0530, Radhey Shyam Pandey wrote:
-> Errors are already reported in xemaclite_mdio_setup so avoid
-> reporting it again.
+Hi,
+
+Thanks for working on this!
+
+On Tue, Jun 12, 2018 at 10:00:13PM +0200, Jernej Skrabec wrote:
+> TCON TOP main purpose is to configure whole display pipeline. It
+> determines relationships between mixers and TCONs, selects source TCON
+> for HDMI, muxes LCD and TV encoder GPIO output, selects TV encoder
+> clock source and contains additional TV TCON and DSI gates.
 > 
-> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  drivers/net/ethernet/xilinx/xilinx_emaclite.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
+>  .../bindings/display/sunxi/sun4i-drm.txt      | 45 +++++++++++++++++++
+>  include/dt-bindings/clock/sun8i-tcon-top.h    | 11 +++++
+>  2 files changed, 56 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
 > 
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> index ec4608e..2a0c06e 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> @@ -1143,9 +1143,7 @@ static int xemaclite_of_probe(struct platform_device *ofdev)
->  	xemaclite_update_address(lp, ndev->dev_addr);
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index 3346c1e2a7a0..ef64c589a4b3 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -187,6 +187,51 @@ And on the A23, A31, A31s and A33, you need one more clock line:
+>     - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
+>                   clock, that can be used to drive the LVDS clock
 >  
->  	lp->phy_node = of_parse_phandle(ofdev->dev.of_node, "phy-handle", 0);
-> -	rc = xemaclite_mdio_setup(lp, &ofdev->dev);
-> -	if (rc)
-> -		dev_warn(&ofdev->dev, "error registering MDIO bus\n");
-> +	xemaclite_mdio_setup(lp, &ofdev->dev);
->  
->  	dev_info(dev, "MAC address is now %pM\n", ndev->dev_addr);
+> +TCON TOP
+> +--------
+> +
+> +TCON TOPs main purpose is to configure whole display pipeline. It determines
+> +relationships between mixers and TCONs, selects source TCON for HDMI, muxes
+> +LCD and TV encoder GPIO output, selects TV encoder clock source and contains
+> +additional TV TCON and DSI gates.
+> +
+> +It allows display pipeline to be configured in very different ways:
+> +
+> +                             / LCD0/LVDS0
+> +                 / TCON-LCD0
+> +                 |           \ MIPI DSI
+> + mixer0          |
+> +        \        / TCON-LCD1 - LCD1/LVDS1
+> +         TCON-TOP
+> +        /        \ TCON-TV0 - TVE0/RGB
+> + mixer1          |          \
+> +                 |           TCON-TOP - HDMI
+> +                 |          /
+> +                 \ TCON-TV1 - TVE1/RGB
+> +
+> +Note that both TCON TOP references same physical unit.
+> +
+> +Required properties:
+> +  - compatible: value must be one of:
+> +    * allwinner,sun8i-r40-tcon-top
+> +  - reg: base address and size of the memory-mapped region.
+> +  - clocks: phandle to the clocks feeding the TCON TOP
+> +    * bus: TCON TOP interface clock
+> +  - clock-names: clock name mentioned above
+> +  - resets: phandle to the reset line driving the DRC
 
-The patch itself is O.K. 
+s/DRC/TCON TOP/ ?
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> +    * rst: TCON TOP reset line
 
-However, do you want to keep going if the MDIO bus fails? Maybe you
-should failed the probe?
+Remaining consistent with the clock name would be great
 
-    Andrew
+> +  - reset-names: reset name mentioned above
+> +  - #clock-cells : must contain 1
+
+An example would be nice here
+
+> +- ports: A ports node with endpoint definitions as defined in
+> +    Documentation/devicetree/bindings/media/video-interfaces.txt. The first port
+> +    should be the input for mixer0 mux. The second should be the output for that
+> +    mux. Third port should be input for mixer1 mux. Fourth port should be output
+> +    for mixer1 mux. Fifth port should be input for HDMI mux. Sixth port should
+> +    be output for it. All output endpoints should have reg property with the id
+> +    of the target TCON. All ports should have only one enpoint connected to
+
+                                                          ^ endpoint
+
+I guess it would me more readable if you were to make it a bullet
+list, but this works for me otherwise.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/22350a8e/attachment.sig>
