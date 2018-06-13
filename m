@@ -1,19 +1,36 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Wed, 13 Jun 2018 13:04:46 +0530
-Subject: [PATCH 0/2] Enable VDMA S2MM vertical flip support
-Message-ID: <1528875288-9140-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Date: Wed, 13 Jun 2018 13:04:47 +0530
+Subject: [PATCH 1/2] dt-bindings: dmaengine: xilinx_dma: Add VDMA vertical
+ flip property
+In-Reply-To: <1528875288-9140-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1528875288-9140-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <1528875288-9140-2-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXI VDMA core supports Vertical Flip with S2MM as the path when
-Enable Vertical Flip (Advanced tab) is selected. This patch series add
-DT property for vertical flip and program its state in VDMA start_transfer.
+The AXI VDMA core supports Vertical flip in S2MM path when Enable
+Vertical Flip (Advanced tab) is selected. To allow vertical flip
+programming define an optional 'xlnx,enable-vert-flip' channel
+child node property.
 
-Radhey Shyam Pandey (2):
-  dt-bindings: dmaengine: xilinx_dma: Add VDMA vertical flip property
-  dmaengine: xilinx_dma: Enable VDMA S2MM vertical flip support
+Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
- .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    2 +
- drivers/dma/xilinx/xilinx_dma.c                    |   22 ++++++++++++++++++++
- include/linux/dma/xilinx_dma.h                     |    2 +
- 3 files changed, 26 insertions(+), 0 deletions(-)
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+index a2b8bfa..174af2c 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -66,6 +66,8 @@ Optional child node properties:
+ Optional child node properties for VDMA:
+ - xlnx,genlock-mode: Tells Genlock synchronization is
+ 	enabled/disabled in hardware.
++- xlnx,enable-vert-flip: Tells vertical flip is
++	enabled/disabled in hardware(S2MM path).
+ Optional child node properties for AXI DMA:
+ -dma-channels: Number of dma channels in child node.
+ 
+-- 
+1.7.1
