@@ -1,54 +1,54 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 13 Jun 2018 19:32:32 +0800
-Subject: [PATCH 5/8] clocksource: timer-ti-32k: Register the persistent clock
-In-Reply-To: <cover.1528878545.git.baolin.wang@linaro.org>
-References: <cover.1528878545.git.baolin.wang@linaro.org>
-Message-ID: <904493423cadb90576a712acdb3b512b4ed44887.1528878545.git.baolin.wang@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 13 Jun 2018 14:20:21 +0200
+Subject: [PATCH] clk: meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL
+Message-ID: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the 32K counter is always available, then we can register the
-persistent clock to compensate the suspend time for the OS time.
+On Amlogic Meson GXBB & GXL platforms, the SCPI Cortex-M4 Co-Processor
+seems to be dependent on the FCLK_DIV2 to be operationnal.
 
-Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+The issue occured since v4.17-rc1 by freezing the kernel boot when
+the 'schedutil' cpufreq governor was selected as default :
+
+  [   12.071837] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
+  domain-0 init dvfs: 4
+  [   12.087757] hctosys: unable to open rtc device (rtc0)
+  [   12.087907] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+  [   12.102241] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+
+But when disabling the MMC driver, the boot finished but cpufreq failed to
+change the CPU frequency :
+
+  [   12.153045] cpufreq: __target_index: Failed to change cpu frequency: -5
+
+A bisect between v4.16 and v4.16-rc1 gave the 05f814402d61 commit to be
+the first bad commit.
+This commit added support for the missing clock gates before the fixed PLL
+fixed dividers (FCLK_DIVx) and the clock framework basically disabled
+all the unused fixed dividers, thus disabled a critical clock path for
+the SCPI Co-Processor.
+
+This patch simply sets the FCLK_DIV2 gate as critical to ensure
+nobody can disable it.
+
+Fixes: 05f814402d61 ("clk: meson: add fdiv clock gates")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clocksource/Kconfig        |    1 +
- drivers/clocksource/timer-ti-32k.c |    4 ++++
- 2 files changed, 5 insertions(+)
+ drivers/clk/meson/gxbb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 5e51fcf..3cd136f 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -262,6 +262,7 @@ config CLKSRC_TI_32K
- 	bool "Texas Instruments 32.768 Hz Clocksource" if COMPILE_TEST
- 	depends on GENERIC_SCHED_CLOCK
- 	select TIMER_OF if OF
-+	select PERSISTENT_CLOCK
- 	help
- 	  This option enables support for Texas Instruments 32.768 Hz clocksource
- 	  available on many OMAP-like platforms.
-diff --git a/drivers/clocksource/timer-ti-32k.c b/drivers/clocksource/timer-ti-32k.c
-index 880a861..353ff9d 100644
---- a/drivers/clocksource/timer-ti-32k.c
-+++ b/drivers/clocksource/timer-ti-32k.c
-@@ -41,6 +41,7 @@
- #include <linux/clocksource.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/persistent_clock.h>
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index b1e4d95..0e053c1 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -511,6 +511,7 @@ static struct clk_regmap gxbb_fclk_div2 = {
+ 		.ops = &clk_regmap_gate_ops,
+ 		.parent_names = (const char *[]){ "fclk_div2_div" },
+ 		.num_parents = 1,
++		.flags = CLK_IS_CRITICAL,
+ 	},
+ };
  
- /*
-  * 32KHz clocksource ... always available, on pretty most chips except
-@@ -120,6 +121,9 @@ static int __init ti_32k_timer_init(struct device_node *np)
- 	}
- 
- 	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
-+	persistent_clock_init_and_register(omap_32k_read_sched_clock,
-+					   CLOCKSOURCE_MASK(32), 32768, 0);
-+
- 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
- 
- 	return 0;
 -- 
-1.7.9.5
+2.7.4
