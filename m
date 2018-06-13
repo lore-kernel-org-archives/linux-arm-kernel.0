@@ -1,188 +1,60 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Wed, 13 Jun 2018 14:03:01 +0200
-Subject: [PATCH v7 5/6] regulator: pfuze100-regulator: provide
- pm_power_off_prepare handler
-In-Reply-To: <20180517055014.6607-6-o.rempel@pengutronix.de>
-References: <20180517055014.6607-1-o.rempel@pengutronix.de>
- <20180517055014.6607-6-o.rempel@pengutronix.de>
-Message-ID: <503b7af3-6a6a-1ed9-e2b6-609da537c855@pengutronix.de>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Wed, 13 Jun 2018 19:32:31 +0800
+Subject: [PATCH 4/8] clocksource: arm_arch_timer: Register the persistent clock
+In-Reply-To: <cover.1528878545.git.baolin.wang@linaro.org>
+References: <cover.1528878545.git.baolin.wang@linaro.org>
+Message-ID: <5b450836ee0db88de27d47e43368de02c550425b.1528878545.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Register the persistent clock to compensate the suspend time for OS time,
+if the ARM counter clocksource will not be stopped in suspend state.
 
-Rob ACKed DT bindings, Rafael ACKed export of pm_power_off_prepare. I
-need your OK for regulator patch.
+Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+---
+ drivers/clocksource/Kconfig          |    1 +
+ drivers/clocksource/arm_arch_timer.c |   10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
-On 17.05.2018 07:50, Oleksij Rempel wrote:
-> On some boards the SoC can use one pin "PMIC_STBY_REQ" to notify th PMIC
-> about state changes. In this case internal state of PMIC must be
-> preconfigured for upcomming state change.
-> It works fine with the current regulator framework, except with the
-> power-off case.
-> 
-> This patch is providing an optional pm_power_off_prepare handler
-> which will configure standby state of the PMIC to disable all power lines.
-> 
-> In my power consumption test on RIoTBoard, I got the following results:
-> power off without this patch:	320 mA
-> power off with this patch:	2   mA
-> suspend to ram:			40  mA
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  drivers/regulator/pfuze100-regulator.c | 92 ++++++++++++++++++++++++++
->  1 file changed, 92 insertions(+)
-> 
-> diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
-> index 63922a2167e5..f6c276ed91d8 100644
-> --- a/drivers/regulator/pfuze100-regulator.c
-> +++ b/drivers/regulator/pfuze100-regulator.c
-> @@ -28,6 +28,7 @@
->  #include <linux/regulator/pfuze100.h>
->  #include <linux/i2c.h>
->  #include <linux/slab.h>
-> +#include <linux/kallsyms.h>
->  #include <linux/regmap.h>
->  
->  #define PFUZE_NUMREGS		128
-> @@ -42,11 +43,17 @@
->  
->  #define PFUZE100_COINVOL	0x1a
->  #define PFUZE100_SW1ABVOL	0x20
-> +#define PFUZE100_SW1ABMODE	0x23
->  #define PFUZE100_SW1CVOL	0x2e
-> +#define PFUZE100_SW1CMODE	0x31
->  #define PFUZE100_SW2VOL		0x35
-> +#define PFUZE100_SW2MODE	0x38
->  #define PFUZE100_SW3AVOL	0x3c
-> +#define PFUZE100_SW3AMODE	0x3f
->  #define PFUZE100_SW3BVOL	0x43
-> +#define PFUZE100_SW3BMODE	0x46
->  #define PFUZE100_SW4VOL		0x4a
-> +#define PFUZE100_SW4MODE	0x4d
->  #define PFUZE100_SWBSTCON1	0x66
->  #define PFUZE100_VREFDDRCON	0x6a
->  #define PFUZE100_VSNVSVOL	0x6b
-> @@ -57,6 +64,13 @@
->  #define PFUZE100_VGEN5VOL	0x70
->  #define PFUZE100_VGEN6VOL	0x71
->  
-> +#define PFUZE100_SWxMODE_MASK	0xf
-> +#define PFUZE100_SWxMODE_APS_APS	0x8
-> +#define PFUZE100_SWxMODE_APS_OFF	0x4
-> +
-> +#define PFUZE100_VGENxLPWR	BIT(6)
-> +#define PFUZE100_VGENxSTBY	BIT(5)
-> +
->  enum chips { PFUZE100, PFUZE200, PFUZE3000 = 3 };
->  
->  struct pfuze_regulator {
-> @@ -489,6 +503,69 @@ static inline struct device_node *match_of_node(int index)
->  }
->  #endif
->  
-> +static struct pfuze_chip *syspm_pfuze_chip;
-> +
-> +static void pfuze_power_off_prepare(void)
-> +{
-> +	dev_info(syspm_pfuze_chip->dev, "Configure standy mode for power off");
-> +
-> +	/* Switch from default mode: APS/APS to APS/Off */
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW1ABMODE,
-> +			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW1CMODE,
-> +			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW2MODE,
-> +			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW3AMODE,
-> +			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW3BMODE,
-> +			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW4MODE,
-> +			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
-> +
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN1VOL,
-> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
-> +			   PFUZE100_VGENxSTBY);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN2VOL,
-> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
-> +			   PFUZE100_VGENxSTBY);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN3VOL,
-> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
-> +			   PFUZE100_VGENxSTBY);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN4VOL,
-> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
-> +			   PFUZE100_VGENxSTBY);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN5VOL,
-> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
-> +			   PFUZE100_VGENxSTBY);
-> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN6VOL,
-> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
-> +			   PFUZE100_VGENxSTBY);
-> +}
-> +
-> +static int pfuze_power_off_prepare_init(struct pfuze_chip *pfuze_chip)
-> +{
-> +	if (pfuze_chip->chip_id != PFUZE100) {
-> +		dev_warn(pfuze_chip->dev, "Requested pm_power_off_prepare handler for not supported chip\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (pm_power_off_prepare) {
-> +		dev_warn(pfuze_chip->dev, "pm_power_off_prepare is already registered.\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	if (syspm_pfuze_chip) {
-> +		dev_warn(pfuze_chip->dev, "syspm_pfuze_chip is already set.\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	syspm_pfuze_chip = pfuze_chip;
-> +	pm_power_off_prepare = pfuze_power_off_prepare;
-> +
-> +	return 0;
-> +}
-> +
->  static int pfuze_identify(struct pfuze_chip *pfuze_chip)
->  {
->  	unsigned int value;
-> @@ -659,6 +736,20 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
->  		}
->  	}
->  
-> +	if (of_property_read_bool(client->dev.of_node,
-> +				  "fsl,pmic-stby-poweroff"))
-> +		return pfuze_power_off_prepare_init(pfuze_chip);
-> +
-> +	return 0;
-> +}
-> +
-> +static int pfuze100_regulator_remove(struct i2c_client *client)
-> +{
-> +	if (syspm_pfuze_chip) {
-> +		syspm_pfuze_chip = NULL;
-> +		pm_power_off_prepare = NULL;
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -669,6 +760,7 @@ static struct i2c_driver pfuze_driver = {
->  		.of_match_table = pfuze_dt_ids,
->  	},
->  	.probe = pfuze100_regulator_probe,
-> +	.remove = pfuze100_regulator_remove,
->  };
->  module_i2c_driver(pfuze_driver);
->  
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/358050e0/attachment.sig>
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 7f11c6c..5e51fcf 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -308,6 +308,7 @@ config ARC_TIMERS_64BIT
+ 
+ config ARM_ARCH_TIMER
+ 	bool
++	select PERSISTENT_CLOCK
+ 	select TIMER_OF if OF
+ 	select TIMER_ACPI if ACPI
+ 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 57cb2f0..671be63 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -32,6 +32,7 @@
+ #include <asm/virt.h>
+ 
+ #include <clocksource/arm_arch_timer.h>
++#include <linux/persistent_clock.h>
+ 
+ #undef pr_fmt
+ #define pr_fmt(fmt) "arch_timer: " fmt
+@@ -950,6 +951,15 @@ static void __init arch_counter_register(unsigned type)
+ 
+ 	/* 56 bits minimum, so we assume worst case rollover */
+ 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
++
++	/*
++	 * Register the persistent clock if the clocksource will not be stopped
++	 * in suspend state.
++	 */
++	if (!arch_counter_suspend_stop)
++		persistent_clock_init_and_register(arch_timer_read_counter,
++						   CLOCKSOURCE_MASK(56),
++						   arch_timer_rate, 0);
+ }
+ 
+ static void arch_timer_stop(struct clock_event_device *clk)
+-- 
+1.7.9.5
