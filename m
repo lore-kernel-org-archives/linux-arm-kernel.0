@@ -1,32 +1,52 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 13 Jun 2018 18:07:52 +0200
-Subject: [PATCH v3 0/6] add virt-dma support for imx-sdma
-In-Reply-To: <1528822708.13468.9.camel@nxp.com>
-References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
- <1528714877.2842.3.camel@pengutronix.de> <1528822708.13468.9.camel@nxp.com>
-Message-ID: <1528906072.21021.22.camel@pengutronix.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 13 Jun 2018 18:08:36 +0200
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <CGME20180613154552epcas5p4877f53310b66cf9d3e17196b0d028e41@epcas5p4.samsung.com>
+ <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
+Message-ID: <6376822.ENUjdQ58sn@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
+> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
+> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
+> > _CRS windows.
+> >
+> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+> >
+> > When a VGA device is behind such a host bridge and the resource is
+> > translated efifb driver is trying to do ioremap against bus address
+> > rather than the resource address and is failing to probe.
+> >
+> > efifb: probing for efifb
+> > efifb: cannot reserve video memory at 0x1e000000
+> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+> > efifb: mode is 800x600x32, linelength=3200, pages=1
+> > efifb: scrolling: redraw
+> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+> >
+> > Use the host bridge offset information to convert bus address to
+> > resource address in the fixup.
+> >
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> 
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> Bartlomiej, could you please take these via the fbdev tree for v4.19?
 
-Am Dienstag, den 12.06.2018, 08:58 +0000 schrieb Robin Gong:
-> Hi Lucas,
-> 	Is the below DEAD LOCK issue same as your side? If yes, then
-> I'm afraid that we have to make another patch for uart to split dma
-> functions in uart driver out of the code area which protected by
-> port.lock. The warning make sense since allocate sdma bd memory
-> dynamically in virt-dma instead of static allocated as before. I'll
-> make another uart patch into my next version patchset.
+Sure, I will queue it after the current merge window.
 
-Yes, I see the same lockdep splat on my system. Though I'm not sure if
-this is really the root cause of the issue I see.
+> Peter already gave his ack but Sinan dropped it (presumably because of
+> the split in v2)
 
-I'm getting timeouts for a serdev attached device and I don't think
-this system ever enters memory reclaim, so the issue reported by
-lockdep seems to be a mostly theoretical on this system. But lets see
-how far I get when you fixed this issue, maybe the real bug is hiding
-behind this one.
+Peter, can I (re)add your ACK to V2 patches?
 
-Regards,
-Lucas
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
