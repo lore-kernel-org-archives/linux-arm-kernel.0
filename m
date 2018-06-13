@@ -1,61 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 13 Jun 2018 07:57:47 -0600
-Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
- bindings
-In-Reply-To: <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
-References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
- <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
- <20180612204802.GA15817@rob-hp-laptop>
- <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
- <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
- <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
-Message-ID: <CAL_JsqL1xWCEYG1knOfUjmw7Y59Sx1ss5o2RyRm-fxoYXbDrJA@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 13 Jun 2018 16:07:08 +0200
+Subject: [PATCH 3/9] media: cedrus: Add a macro to check for the validity of a
+ control
+In-Reply-To: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+Message-ID: <20180613140714.1686-4-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 7:35 AM, Suzuki K Poulose
-<Suzuki.Poulose@arm.com> wrote:
-> Hi Matt,
->
-> Thanks for your comments, responses inline.
->
-> On 13/06/18 13:49, Matt Sealey wrote:
->>
->> Suzuki,
->>
->> Why not use ?unit??
->>
->> I believe we had this discussion years ago about numbering serial ports
->> and sdhci (i.e. how do you know it?s UART0 or UART1 from just the address?
->> Some SoC?s don?t address sequentially *or* in a forward direction) - I
->> believe it?s not exactly codified in ePAPR, not am I sure where it may be
->> otherwise, but it exists.
->
->
-> We have different situation here. We need to know *the port number* as
-> understood by the
-> hardware, so that we can enable *the specific* port for a given path.
->
->>
->> I agree with Rob on the slave-mode nonsense, this is an SPI controller
->> concept weirdly stuffed into a directed graph which implicitly tells you the
->> data direction - it?s a rooted tree (just like DT!).
+During our frame decoding setup, we need to check a number of controls to
+make sure that they are properly filled before trying to access them.
 
-OF graph is not directional. All links must be bi-directional and in
-fact dtc checks that now. The parent node should know the numbering
-and direction of each port.
+It's not too bad with MPEG2 since there's just a single one, but with the
+upcoming increase of codecs, and the integration of more complex codecs,
+this logic will be duplicated a significant number of times. H264 for
+example uses 4 different controls.
 
-> Btw, the "slave-mode" is not a standard DT graph binding. It is not part of
-> the
-> generic DT graph binding. In fact the generic bindings stay away from the
-> direction
-> aspect and explicitly mentions the same.
+Add a macro that expands to the proper check in order to reduce the
+duplication.
 
-I really don't like slave-mode nor coresight,hwid.
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ .../platform/sunxi/cedrus/sunxi_cedrus_dec.c     | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-I would prefer to see getting rid of both and splitting ports into
-"in-ports" and "out-ports" nodes instead of a single "ports" node.
-Then you don't need any of these properties and reg can be used as the
-hwid.
-
-Rob
+diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+index 8c92af34ebeb..c19acf9626c4 100644
+--- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
++++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+@@ -110,15 +110,16 @@ void sunxi_cedrus_device_run(void *priv)
+ 
+ 	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+ 
++#define CHECK_CONTROL(ctx, ctrl)					\
++	if (!ctx->ctrls[(ctrl)]) {					\
++		v4l2_err(&(ctx)->dev->v4l2_dev, "Invalid " #ctrl " control\n"); \
++		(ctx)->job_abort = 1;					\
++		goto unlock_complete;					\
++	}
++
+ 	switch (ctx->vpu_src_fmt->fourcc) {
+ 	case V4L2_PIX_FMT_MPEG2_FRAME:
+-		if (!ctx->ctrls[SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR]) {
+-			v4l2_err(&ctx->dev->v4l2_dev,
+-				 "Invalid MPEG2 frame header control\n");
+-			ctx->job_abort = 1;
+-			goto unlock_complete;
+-		}
+-
++		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
+ 		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
+ 		sunxi_cedrus_mpeg2_setup(ctx, &run);
+ 
+@@ -128,6 +129,7 @@ void sunxi_cedrus_device_run(void *priv)
+ 	default:
+ 		ctx->job_abort = 1;
+ 	}
++#undef CHECK_CONTROL
+ 
+ unlock_complete:
+ 	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
+-- 
+2.17.0
