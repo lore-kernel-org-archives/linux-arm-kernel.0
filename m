@@ -1,56 +1,80 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 13 Jun 2018 13:51:44 -0700
-Subject: [PATCH 04/10] Input: ams_delta_serio: Replace power GPIO with
- regulator
-In-Reply-To: <2655614.ErW8VuCT6r@z50>
-References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
- <20180609140224.32606-4-jmkrzyszt@gmail.com>
- <20180612221724.GB38773@dtor-ws> <2655614.ErW8VuCT6r@z50>
-Message-ID: <20180613205144.GB62746@dtor-ws>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 13 Jun 2018 22:36:56 +0200
+Subject: [PATCH 3/4] ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable
+ invalidates of BTB) to facilitate CVE_2017-5715 WA in OS
+In-Reply-To: <20180613173634.GC17671@n2100.armlinux.org.uk>
+References: <20180612202411.29798-1-nm@ti.com>
+ <20180612202411.29798-4-nm@ti.com>
+ <780935f6-6506-0915-dfb2-b584c074b70d@gmail.com>
+ <20180613173634.GC17671@n2100.armlinux.org.uk>
+Message-ID: <330ff593-4663-5393-74b3-55bf1f199561@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 03:01:05AM +0200, Janusz Krzysztofik wrote:
-> On Wednesday, June 13, 2018 12:17:24 AM CEST Dmitry Torokhov wrote:
-> > On Sat, Jun 09, 2018 at 04:02:18PM +0200, Janusz Krzysztofik wrote:
-> > > ...
-> > > +	priv->vcc = devm_regulator_get(&pdev->dev, "vcc");
-> > > +	if (IS_ERR(priv->vcc)) {
-> > > +		err = PTR_ERR(priv->vcc);
-> > > +		dev_err(&pdev->dev, "regulator request failed (%d)\n", err);
-> > > +		/* Fail softly if the regulator is not available yet */
-> > > +		if (err == -ENODEV)
-> > > +			err = -EPROBE_DEFER;
-> > 
-> > Hmm, if regulator is not ready yet, devm_regulator_get() should be
-> > returning -EPROBE_DEFER already, we should not have to convert -ENODEV
-> > to -EPROBE_DEFER...
+On 06/13/2018 07:36 PM, Russell King - ARM Linux wrote:
+> On Wed, Jun 13, 2018 at 01:06:13AM +0200, Marek Vasut wrote:
+>> On 06/12/2018 10:24 PM, Nishanth Menon wrote:
+>>> Enable CVE_2017_5715 and since we have our own v7_arch_cp15_set_acr
+>>> function to setup the bits, we are able to override the settings.
+>>>
+>>> Without this enabled, Linux kernel reports:
+>>> CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+>>>
+>>> With this enabled, Linux kernel reports:
+>>> CPU0: Spectre v2: using ICIALLU workaround
+>>>
+>>> NOTE: This by itself does not enable the workaround for CPU1 (on
+>>> OMAP5 and DRA72/AM572 SoCs) and may require additional kernel patches.
+>>>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> ---
+>>>  arch/arm/mach-omap2/Kconfig | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>>> index 3bb1ecb58de0..77820cc8d1e4 100644
+>>> --- a/arch/arm/mach-omap2/Kconfig
+>>> +++ b/arch/arm/mach-omap2/Kconfig
+>>> @@ -53,6 +53,7 @@ config OMAP54XX
+>>>  	bool "OMAP54XX SoC"
+>>>  	select ARM_ERRATA_798870
+>>>  	select SYS_THUMB_BUILD
+>>> +	select ARM_CORTEX_A15_CVE_2017_5715
+>>>  	imply NAND_OMAP_ELM
+>>>  	imply NAND_OMAP_GPMC
+>>>  	imply SPL_DISPLAY_PRINT
+>>>
+>>
+>> Can this be enabled for all CA15 systems somehow ? I am sure there are
+>> more that are vulnerable.
 > 
-> Regulator is not ready because its initialization at subsys_initcall is 
-> deferred by not ready GPIO pin, that in turn is caused by gpio-mmio driver, 
-> unlike many other GPIO drivers, registered as late as at device_initcall.
-> 
-> I agree devm_regulator_get() could return -EPROBE_DEFER in this case, but I 
-> can see it does that only when of_get_regulator() indicates the regulator 
-> should exist. In non-dt case there is apparently no way to justify if it 
-> should unless its consumer supply table was already in place. For that,  
-> registration of that table would have to be independent of successful 
-> registration of the regulator itself while it's not. Maybe it should, but 
-> that's a separate topic for a separate discussion, I think.
-> 
-> > Is it because we have_full_constraints() returns false? You might need
-> > to add call to regulator_has_full_constraints() to your board file.
-> 
-> If have_full_constraints() returned true before the regulator or its consumer 
-> supply table is ready, devm_regulator_get() would happily return a dummy 
-> regulator and our keyboard would never get its power.
-> 
-> I'm afraid we have to live with that return code conversion as long as the 
-> only user of this driver is not migrated to dt.
+> I think you're missing the point.
 
-OK, fair enough. Can you please add a comment to that effect?
+Please read the patch again.
 
-Thanks.
+This enables it only for a specific SoC. My point being, this should be
+enabled for all SoCs with CA15, not just some select few.
+
+> Spectre affects the _entire_ system.  Working around it in just the
+> kernel does not mean that the system is no longer vulnerable.
+> 
+> Fixing the "system" means implementing the fixes also in the secure
+> world, which on A15 and A8 also means setting the IBE bit there.  If
+> the IBE bit is set in the secure world, it will also be set in the
+> non-secure world.
+> 
+> The fact that the kernel is complaining is telling you that the
+> system as a whole does not have the workarounds in place to mitigate
+> against the vulnerability.  Merely setting the IBE bit via some
+> secure API doesn't "magically" fix the secure world.
+> 
+> So, even if you were to set the IBE bit via some magic secure API,
+> the fact still remains: even with these workarounds in place, as I
+> understand it, the _system as a whole_ remains vulnerable - you
+> might as well _not_ have the kernel workarounds.
+> 
+
 
 -- 
-Dmitry
+Best regards,
+Marek Vasut
