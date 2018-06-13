@@ -1,65 +1,46 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 Jun 2018 15:07:38 +0800
-Subject: [PATCH 18/28] drm/mediatek: add connection from RDMA2 to DPI0
-In-Reply-To: <1528687580-549-19-git-send-email-stu.hsieh@mediatek.com>
-References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-19-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1528873658.30263.5.camel@mtksdaap41>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 13 Jun 2018 15:07:34 +0800
+Subject: [PATCH v2 05/27] drm/sun4i: Add TCON TOP driver
+In-Reply-To: <20180612200036.21483-6-jernej.skrabec@siol.net>
+References: <20180612200036.21483-6-jernej.skrabec@siol.net>
+Message-ID: <201806131342.27geZR8n%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+Hi Jernej,
 
-On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
-> This patch add the connection from RDMA2 to DPI0
-> 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+Thank you for the patch! Yet something to improve:
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+[auto build test ERROR on drm/drm-next]
+[also build test ERROR on v4.17 next-20180612]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index a5cee4b7f908..31a0832ef9ec 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -31,6 +31,7 @@
->  #define DISP_REG_CONFIG_DSIE_SEL_IN		0x0a4
->  #define DISP_REG_CONFIG_DSIO_SEL_IN		0x0a8
->  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
-> +#define DISP_REG_CONFIG_DISP_RDMA2_SOUT		0x0b8
->  #define DISP_REG_CONFIG_DISP_RDMA0_MOUT_EN	0x0c4
->  #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
->  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
-> @@ -91,7 +92,9 @@
->  #define RDMA1_MOUT_DSI3			0x5
->  #define RDMA1_MOUT_DPI0			0x2
->  #define RDMA1_MOUT_DPI1			0x3
-> +#define RDMA2_MOUT_DPI0			0x2
->  #define DPI0_SEL_IN_RDMA1		0x1
-> +#define DPI0_SEL_IN_RDMA2		0x3
->  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
->  #define DSI1_SEL_IN_RDMA1		0x1
->  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
-> @@ -193,6 +196,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI1) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
->  		value = RDMA1_MOUT_DPI1;
-> +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
-> +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-> +		value = RDMA2_MOUT_DPI0;
->  	} else {
->  		value = 0;
->  	}
-> @@ -224,6 +230,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI3) {
->  		*addr = DISP_REG_CONFIG_DSIO_SEL_IN;
->  		value = DSI3_SEL_IN_RDMA1;
-> +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
-> +		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
-> +		value = DPI0_SEL_IN_RDMA2;
->  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
->  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
->  		value = COLOR1_SEL_IN_OVL1;
+url:    https://github.com/0day-ci/linux/commits/Jernej-Skrabec/clk-sunxi-ng-r40-Add-minimal-rate-for-video-PLLs/20180613-041046
+base:   git://people.freedesktop.org/~airlied/linux.git drm-next
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   drivers/gpu/drm/sun4i/sun8i_tcon_top.o: In function `init_module':
+>> sun8i_tcon_top.c:(.init.text+0x0): multiple definition of `init_module'
+   drivers/gpu/drm/sun4i/sun8i_mixer.o:sun8i_mixer.c:(.init.text+0x0): first defined here
+   drivers/gpu/drm/sun4i/sun8i_tcon_top.o: In function `cleanup_module':
+>> sun8i_tcon_top.c:(.exit.text+0x0): multiple definition of `cleanup_module'
+   drivers/gpu/drm/sun4i/sun8i_mixer.o:sun8i_mixer.c:(.exit.text+0x0): first defined here
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43418 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/44b6eb84/attachment-0001.gz>
