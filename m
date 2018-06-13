@@ -1,39 +1,98 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Jun 2018 13:21:34 +0200
-Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <20180613110647.ygg66nu36pcf6kpn@verge.net.au>
-References: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
- <20180613110647.ygg66nu36pcf6kpn@verge.net.au>
-Message-ID: <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
+Date: Wed, 13 Jun 2018 13:28:44 +0200
+Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
+References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
+ <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
+ <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
+ <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
+ <CAMuHMdVJ+ad-kr0iYuoaH3chJ49_g6yjEb8PHmTpwjFdYcG4=Q@mail.gmail.com>
+ <47e87deb-a7a8-4780-53b5-4e4ed6e1bac3@gmail.com>
+ <CAMuHMdXJEC8HbuB5+YHMLjZy9GfCYyXmGTk0TXkoAxLhxTOJyA@mail.gmail.com>
+ <6864ed2c-39ac-615d-f38e-b28c3647e451@gmail.com>
+ <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
+ <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
+Message-ID: <CAMuHMdUmqAWHFoM5tRJA+FoH59J8L3z0BMKVO-FEv4RQbokJyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Marek,
 
-On Wed, Jun 13, 2018 at 1:06 PM Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Jun 11, 2018 at 02:15:13PM +0200, Marek Vasut wrote:
-> > Rather than hard-coding the quirk topology, which stopped scaling,
-> > parse the information from DT. The code looks for all compatible
-> > PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
-> > to the same pin. If so, the code sends a matching sequence to the
-> > PMIC to deassert the IRQ.
+On Mon, Jun 11, 2018 at 5:26 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> On 06/11/2018 04:30 PM, Geert Uytterhoeven wrote:
+> > On Mon, Jun 11, 2018 at 4:19 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> On 06/11/2018 04:10 PM, Geert Uytterhoeven wrote:
+> >>> On Mon, Jun 11, 2018 at 4:04 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>> On 06/11/2018 03:49 PM, Geert Uytterhoeven wrote:
+> >>>>> On Mon, Jun 11, 2018 at 3:39 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>>>> On 06/11/2018 03:03 PM, Geert Uytterhoeven wrote:
+> >>>>>>> On Mon, Jun 11, 2018 at 2:15 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>>>>>> On 06/11/2018 11:56 AM, Geert Uytterhoeven wrote:
+> >>>>>>>>> On Mon, Jun 4, 2018 at 7:59 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>>>>>>>> Rather than hard-coding the quirk topology, which stopped scaling,
+> >>>>>>>>>> parse the information from DT. The code looks for all compatible
+> >>>>>>>>>> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
+> >>>>>>>>>> to the same pin. If so, the code sends a matching sequence to the
+> >>>>>>>>>> PMIC to deassert the IRQ.
+> >>>>>
+> >>>>>>>>>> +               ret = of_property_read_u32(np, "reg", &addr);
+> >>>>>>>>>> +               if (ret)
+> >>>>>>>>>> +                       return ret;
+> >>>>>>>>>
+> >>>>>>>>> I think it's safer to skip this entry and continue, after calling
+> >>>>>>>>> kfree(quirk), of course.
+> >>>>>>>>>
+> >>>>>>>>>> +
+> >>>>>>>>>> +               quirk->id = id;
+> >>>>>>>>>> +               quirk->i2c_msg.addr = addr;
+> >>>>>>>>>> +               quirk->shared = false;
+> >>>>>>>>>> +
+> >>>>>>>>>> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
+> >>>>>>>>>> +               if (ret)
+> >>>>>>>>>> +                       return ret;
+> >>>>>>>>>
+> >>>>>>>>> kfree(quirk) and continue...
+> >>>>>>>>
+> >>>>>>>> I wonder if it shouldn't rather free the entire list and abort ?
+> >>>>>>>
+> >>>>>>> "Be strict when sending, be liberal when receiving."
+> >>>>>>
+> >>>>>> Meaning ? I think "the language barrier is protecting me" (TM)
+> >>>>>
+> >>>>> Do the best you can, given the buggy DT you received.
+> >>>>> I.e. don't fail completely, just ignore the bad device node, and continue.
+> >>>>
+> >>>> But if you ignore node, you might as well ignore one which is shared and
+> >>>> then the system crashes due to IRQ storm anyway. So hum, what can we do ?
+> >>>
+> >>> Correct. If it's a critical node, it will crash regardless.
+> >>> If it's a non-critical node, you have the choice between aborting and crashing,
+> >>> or ignoring and keeping the system alive. Your call.
+> >>
+> >> But wait, since we control which machines this code runs on , can't we
+> >> assure they have valid DTs ? This situation with invalid DT starts to
+> >> look a bit hypothetical to me.
 > >
-> > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > Cc: linux-renesas-soc at vger.kernel.org
-> > Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
+> > That assumes you keep the list of machines to check, and don't want to fix the
+> > issue automatically when detected (on any R-Car Gen2 or RZ/G1 platform, so
+> > you still need to check for r8a779[0-4] and r8a774[23457]).
 >
-> This looks fine to me but I will wait to see if there are other reviews
-> before applying.
->
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> Yes, I want to keep a list of machines to check, to be _sure_ some
+> machine doesn't randomly blow up.
 
-Note that applying it now will break gose, as its DTS doesn't describe all
-regulators yet.
+Just checking for the presence of a "renesas,irqc" node should be sufficient.
+Using that node would also get rid of the hardcoded IRQC_BASE address.
+Note that the code assumes IRQ2. If another IRQ is used, that won't harm
+much though (as in: if it didn't blow up before, it won't blow up now).
+
+> > Anyway, as we care about booting old DTBs on new kernels (for a while), we
+> > have a few more release cycles to bikeshed ;-)
+>
+> I was about to ask if this patch then makes any sense or not.
+
+Sure. Less hard-coding is always better.
+Especially if it means we can make it work on more machines automatically :-)
 
 Gr{oetje,eeting}s,
 
