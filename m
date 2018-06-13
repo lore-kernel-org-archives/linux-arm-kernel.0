@@ -1,123 +1,310 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 Jun 2018 17:01:01 +0800
-Subject: [PATCH 19/28] drm/mediatek: add connection from RDMA2 to DPI1
-In-Reply-To: <1528880291.11190.45.camel@mtksdccf07>
-References: <1528687580-549-1-git-send-email-stu.hsieh@mediatek.com>
- <1528687580-549-20-git-send-email-stu.hsieh@mediatek.com>
- <1528874037.30263.6.camel@mtksdaap41>
- <1528876862.11190.35.camel@mtksdccf07>
- <1528877675.30263.27.camel@mtksdaap41>
- <1528880291.11190.45.camel@mtksdccf07>
-Message-ID: <1528880461.18148.1.camel@mtksdaap41>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 13 Jun 2018 17:07:19 +0800
+Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20180613161314.14894-3-yixun.lan@amlogic.com>
+References: <20180613161314.14894-3-yixun.lan@amlogic.com>
+Message-ID: <201806131700.twRxl242%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+Hi Liang,
 
-On Wed, 2018-06-13 at 16:58 +0800, Stu Hsieh wrote:
-> Hi, CK:
-> 
-> On Wed, 2018-06-13 at 16:14 +0800, CK Hu wrote:
-> > Hi, Stu:
-> > 
-> > On Wed, 2018-06-13 at 16:01 +0800, Stu Hsieh wrote:
-> > > Hi, CK:
-> > > 
-> > > 
-> > > On Wed, 2018-06-13 at 15:13 +0800, CK Hu wrote:
-> > > > Hi, Stu:
-> > > > 
-> > > > On Mon, 2018-06-11 at 11:26 +0800, Stu Hsieh wrote:
-> > > > > This patch add the connection from RDMA2 to DPI1
-> > > > > 
-> > > > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> > > > > ---
-> > > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
-> > > > >  1 file changed, 8 insertions(+)
-> > > > > 
-> > > > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > > > > index 31a0832ef9ec..2d883815d79c 100644
-> > > > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > > > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > > > > @@ -93,9 +93,11 @@
-> > > > >  #define RDMA1_MOUT_DPI0			0x2
-> > > > >  #define RDMA1_MOUT_DPI1			0x3
-> > > > >  #define RDMA2_MOUT_DPI0			0x2
-> > > > > +#define RDMA2_MOUT_DPI1			0x3
-> > > > 
-> > > > Usually, each bit of a mout register represent a output enable. Is this
-> > > > value 0x3 a correct value?
-> > > > 
-> > > > Regards,
-> > > > CK
-> > > > 
-> > > In HW CONFIG SPEC or MT2712_E2_MMSYS_Change_note show as following:
-> > > 
-> > > Bit(s)	Name			Description
-> > > 2:0	DISP_RDMA2_SOUT_SEL_IN	0: output to dsi0
-> > > 				1: outptu to dsi1
-> > > 				2: output to dpi0
-> > > 				3: output to dpi1
-> > > 				4: output to dsi2
-> > > 				5: output to dsi3
-> > > 
-> > > So, 0x3 is correct value.
-> > 
-> > The data sheet use the term SOUT match its function, so I think driver
-> > have better change the naming to SOUT.
-> > 
-> > Regards,
-> > CK
-> > 
-> 
-> The definition DISP_REG_CONFIG_DISP_RDMA2_SOUT is use term SOUT in this
-> patch.
-> 
+Thank you for the patch! Yet something to improve:
 
-I know, but RDMA2_MOUT_DPI1 should be changed to RDMA2_SOUT_DPI1.
+[auto build test ERROR on mtd/nand/next]
+[also build test ERROR on v4.17 next-20180613]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Regards,
-CK
+url:    https://github.com/0day-ci/linux/commits/Yixun-Lan/mtd-rawnand-meson-add-Amlogic-NAND-driver-support/20180613-161917
+base:   git://git.infradead.org/linux-mtd.git nand/next
+config: sparc64-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-> Regard,
-> Stu
-> 
-> > > 
-> > > Regard,
-> > > Stu
-> > > 
-> > > > >  #define DPI0_SEL_IN_RDMA1		0x1
-> > > > >  #define DPI0_SEL_IN_RDMA2		0x3
-> > > > >  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
-> > > > > +#define DPI1_SEL_IN_RDMA2		(0x3 << 8)
-> > > > >  #define DSI1_SEL_IN_RDMA1		0x1
-> > > > >  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
-> > > > >  #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
-> > > > > @@ -199,6 +201,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
-> > > > >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
-> > > > >  		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-> > > > >  		value = RDMA2_MOUT_DPI0;
-> > > > > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
-> > > > > +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-> > > > > +		value = RDMA2_MOUT_DPI1;
-> > > > >  	} else {
-> > > > >  		value = 0;
-> > > > >  	}
-> > > > > @@ -233,6 +238,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
-> > > > >  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI0) {
-> > > > >  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
-> > > > >  		value = DPI0_SEL_IN_RDMA2;
-> > > > > +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
-> > > > > +		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
-> > > > > +		value = DPI1_SEL_IN_RDMA2;
-> > > > >  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
-> > > > >  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
-> > > > >  		value = COLOR1_SEL_IN_OVL1;
-> > > > 
-> > > > 
-> > > 
-> > > 
-> > 
-> > 
-> 
-> 
+All error/warnings (new ones prefixed by >>):
+
+   In file included from drivers/mtd/nand/raw/meson_nand.c:21:0:
+>> drivers/clk/meson/clk-regmap.h:22:16: error: field 'hw' has incomplete type
+     struct clk_hw hw;
+                   ^~
+>> drivers/mtd/nand/raw/meson_nand.c:951:2: error: field name not in record or union initializer
+     .hw.init = &(struct clk_init_data) {
+     ^
+   drivers/mtd/nand/raw/meson_nand.c:951:2: note: (near initialization for 'sd_emmc_c_ext_clk0_sel')
+>> drivers/mtd/nand/raw/meson_nand.c:952:4: error: 'struct clk_init_data' has no member named 'name'
+      .name = "sd_emmc_c_nand_clk_mux",
+       ^~~~
+>> drivers/mtd/nand/raw/meson_nand.c:952:11: warning: excess elements in struct initializer
+      .name = "sd_emmc_c_nand_clk_mux",
+              ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:952:11: note: (near initialization for '(anonymous)')
+>> drivers/mtd/nand/raw/meson_nand.c:953:4: error: 'struct clk_init_data' has no member named 'ops'
+      .ops = &clk_regmap_mux_ops,
+       ^~~
+   drivers/mtd/nand/raw/meson_nand.c:953:10: warning: excess elements in struct initializer
+      .ops = &clk_regmap_mux_ops,
+             ^
+   drivers/mtd/nand/raw/meson_nand.c:953:10: note: (near initialization for '(anonymous)')
+>> drivers/mtd/nand/raw/meson_nand.c:954:4: error: 'struct clk_init_data' has no member named 'parent_names'
+      .parent_names = sd_emmc_ext_clk0_parent_names,
+       ^~~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:954:19: warning: excess elements in struct initializer
+      .parent_names = sd_emmc_ext_clk0_parent_names,
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:954:19: note: (near initialization for '(anonymous)')
+>> drivers/mtd/nand/raw/meson_nand.c:955:4: error: 'struct clk_init_data' has no member named 'num_parents'
+      .num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+       ^~~~~~~~~~~
+   In file included from include/linux/list.h:9:0,
+                    from include/linux/kobject.h:19,
+                    from include/linux/device.h:16,
+                    from include/linux/platform_device.h:14,
+                    from drivers/mtd/nand/raw/meson_nand.c:9:
+>> include/linux/kernel.h:71:25: warning: excess elements in struct initializer
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                            ^
+>> drivers/mtd/nand/raw/meson_nand.c:955:18: note: in expansion of macro 'ARRAY_SIZE'
+      .num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+                     ^~~~~~~~~~
+   include/linux/kernel.h:71:25: note: (near initialization for '(anonymous)')
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                            ^
+>> drivers/mtd/nand/raw/meson_nand.c:955:18: note: in expansion of macro 'ARRAY_SIZE'
+      .num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+                     ^~~~~~~~~~
+>> drivers/mtd/nand/raw/meson_nand.c:956:4: error: 'struct clk_init_data' has no member named 'flags'
+      .flags = CLK_SET_RATE_PARENT,
+       ^~~~~
+>> drivers/mtd/nand/raw/meson_nand.c:956:12: error: 'CLK_SET_RATE_PARENT' undeclared here (not in a function); did you mean 'DL_STATE_DORMANT'?
+      .flags = CLK_SET_RATE_PARENT,
+               ^~~~~~~~~~~~~~~~~~~
+               DL_STATE_DORMANT
+   drivers/mtd/nand/raw/meson_nand.c:956:12: warning: excess elements in struct initializer
+   drivers/mtd/nand/raw/meson_nand.c:956:12: note: (near initialization for '(anonymous)')
+>> drivers/mtd/nand/raw/meson_nand.c:951:37: error: invalid use of undefined type 'struct clk_init_data'
+     .hw.init = &(struct clk_init_data) {
+                                        ^
+>> drivers/mtd/nand/raw/meson_nand.c:965:12: error: 'CLK_DIVIDER_ROUND_CLOSEST' undeclared here (not in a function); did you mean 'DIV_ROUND_CLOSEST'?
+      .flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+               ^~~~~~~~~~~~~~~~~~~~~~~~~
+               DIV_ROUND_CLOSEST
+>> drivers/mtd/nand/raw/meson_nand.c:965:40: error: 'CLK_DIVIDER_ONE_BASED' undeclared here (not in a function); did you mean 'CLK_DIVIDER_ROUND_CLOSEST'?
+      .flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+                                           ^~~~~~~~~~~~~~~~~~~~~
+                                           CLK_DIVIDER_ROUND_CLOSEST
+   drivers/mtd/nand/raw/meson_nand.c:967:2: error: field name not in record or union initializer
+     .hw.init = &(struct clk_init_data) {
+     ^
+   drivers/mtd/nand/raw/meson_nand.c:967:2: note: (near initialization for 'sd_emmc_c_ext_clk0_div')
+   drivers/mtd/nand/raw/meson_nand.c:968:4: error: 'struct clk_init_data' has no member named 'name'
+      .name = "sd_emmc_c_nand_clk_div",
+       ^~~~
+   drivers/mtd/nand/raw/meson_nand.c:968:11: warning: excess elements in struct initializer
+      .name = "sd_emmc_c_nand_clk_div",
+              ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:968:11: note: (near initialization for '(anonymous)')
+   drivers/mtd/nand/raw/meson_nand.c:969:4: error: 'struct clk_init_data' has no member named 'ops'
+      .ops = &clk_regmap_divider_ops,
+       ^~~
+   drivers/mtd/nand/raw/meson_nand.c:969:10: warning: excess elements in struct initializer
+      .ops = &clk_regmap_divider_ops,
+             ^
+   drivers/mtd/nand/raw/meson_nand.c:969:10: note: (near initialization for '(anonymous)')
+   drivers/mtd/nand/raw/meson_nand.c:970:4: error: 'struct clk_init_data' has no member named 'parent_names'
+      .parent_names = (const char *[]){ "sd_emmc_c_nand_clk_mux" },
+       ^~~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:970:19: warning: excess elements in struct initializer
+      .parent_names = (const char *[]){ "sd_emmc_c_nand_clk_mux" },
+                      ^
+   drivers/mtd/nand/raw/meson_nand.c:970:19: note: (near initialization for '(anonymous)')
+   drivers/mtd/nand/raw/meson_nand.c:971:4: error: 'struct clk_init_data' has no member named 'num_parents'
+      .num_parents = 1,
+       ^~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:971:18: warning: excess elements in struct initializer
+      .num_parents = 1,
+                     ^
+   drivers/mtd/nand/raw/meson_nand.c:971:18: note: (near initialization for '(anonymous)')
+   drivers/mtd/nand/raw/meson_nand.c:972:4: error: 'struct clk_init_data' has no member named 'flags'
+      .flags = CLK_SET_RATE_PARENT,
+       ^~~~~
+   drivers/mtd/nand/raw/meson_nand.c:972:12: warning: excess elements in struct initializer
+      .flags = CLK_SET_RATE_PARENT,
+               ^~~~~~~~~~~~~~~~~~~
+   drivers/mtd/nand/raw/meson_nand.c:972:12: note: (near initialization for '(anonymous)')
+   drivers/mtd/nand/raw/meson_nand.c: In function 'meson_nfc_clk_init':
+>> drivers/mtd/nand/raw/meson_nand.c:1007:38: error: implicit declaration of function '__clk_get_name'; did you mean 'clk_get_rate'? [-Werror=implicit-function-declaration]
+      sd_emmc_ext_clk0_parent_names[i] = __clk_get_name(clk);
+                                         ^~~~~~~~~~~~~~
+                                         clk_get_rate
+>> drivers/mtd/nand/raw/meson_nand.c:1007:36: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      sd_emmc_ext_clk0_parent_names[i] = __clk_get_name(clk);
+                                       ^
+>> drivers/mtd/nand/raw/meson_nand.c:1011:8: error: implicit declaration of function 'devm_clk_register'; did you mean 'device_register'? [-Werror=implicit-function-declaration]
+     clk = devm_clk_register(nfc->dev, &mux->hw);
+           ^~~~~~~~~~~~~~~~~
+           device_register
+   cc1: some warnings being treated as errors
+--
+   In file included from drivers/mtd//nand/raw/meson_nand.c:21:0:
+>> drivers/clk/meson/clk-regmap.h:22:16: error: field 'hw' has incomplete type
+     struct clk_hw hw;
+                   ^~
+   drivers/mtd//nand/raw/meson_nand.c:951:2: error: field name not in record or union initializer
+     .hw.init = &(struct clk_init_data) {
+     ^
+   drivers/mtd//nand/raw/meson_nand.c:951:2: note: (near initialization for 'sd_emmc_c_ext_clk0_sel')
+   drivers/mtd//nand/raw/meson_nand.c:952:4: error: 'struct clk_init_data' has no member named 'name'
+      .name = "sd_emmc_c_nand_clk_mux",
+       ^~~~
+   drivers/mtd//nand/raw/meson_nand.c:952:11: warning: excess elements in struct initializer
+      .name = "sd_emmc_c_nand_clk_mux",
+              ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:952:11: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:953:4: error: 'struct clk_init_data' has no member named 'ops'
+      .ops = &clk_regmap_mux_ops,
+       ^~~
+   drivers/mtd//nand/raw/meson_nand.c:953:10: warning: excess elements in struct initializer
+      .ops = &clk_regmap_mux_ops,
+             ^
+   drivers/mtd//nand/raw/meson_nand.c:953:10: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:954:4: error: 'struct clk_init_data' has no member named 'parent_names'
+      .parent_names = sd_emmc_ext_clk0_parent_names,
+       ^~~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:954:19: warning: excess elements in struct initializer
+      .parent_names = sd_emmc_ext_clk0_parent_names,
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:954:19: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:955:4: error: 'struct clk_init_data' has no member named 'num_parents'
+      .num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+       ^~~~~~~~~~~
+   In file included from include/linux/list.h:9:0,
+                    from include/linux/kobject.h:19,
+                    from include/linux/device.h:16,
+                    from include/linux/platform_device.h:14,
+                    from drivers/mtd//nand/raw/meson_nand.c:9:
+>> include/linux/kernel.h:71:25: warning: excess elements in struct initializer
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                            ^
+   drivers/mtd//nand/raw/meson_nand.c:955:18: note: in expansion of macro 'ARRAY_SIZE'
+      .num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+                     ^~~~~~~~~~
+   include/linux/kernel.h:71:25: note: (near initialization for '(anonymous)')
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                            ^
+   drivers/mtd//nand/raw/meson_nand.c:955:18: note: in expansion of macro 'ARRAY_SIZE'
+      .num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+                     ^~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:956:4: error: 'struct clk_init_data' has no member named 'flags'
+      .flags = CLK_SET_RATE_PARENT,
+       ^~~~~
+   drivers/mtd//nand/raw/meson_nand.c:956:12: error: 'CLK_SET_RATE_PARENT' undeclared here (not in a function); did you mean 'DL_STATE_DORMANT'?
+      .flags = CLK_SET_RATE_PARENT,
+               ^~~~~~~~~~~~~~~~~~~
+               DL_STATE_DORMANT
+   drivers/mtd//nand/raw/meson_nand.c:956:12: warning: excess elements in struct initializer
+   drivers/mtd//nand/raw/meson_nand.c:956:12: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:951:37: error: invalid use of undefined type 'struct clk_init_data'
+     .hw.init = &(struct clk_init_data) {
+                                        ^
+   drivers/mtd//nand/raw/meson_nand.c:965:12: error: 'CLK_DIVIDER_ROUND_CLOSEST' undeclared here (not in a function); did you mean 'DIV_ROUND_CLOSEST'?
+      .flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+               ^~~~~~~~~~~~~~~~~~~~~~~~~
+               DIV_ROUND_CLOSEST
+   drivers/mtd//nand/raw/meson_nand.c:965:40: error: 'CLK_DIVIDER_ONE_BASED' undeclared here (not in a function); did you mean 'CLK_DIVIDER_ROUND_CLOSEST'?
+      .flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+                                           ^~~~~~~~~~~~~~~~~~~~~
+                                           CLK_DIVIDER_ROUND_CLOSEST
+   drivers/mtd//nand/raw/meson_nand.c:967:2: error: field name not in record or union initializer
+     .hw.init = &(struct clk_init_data) {
+     ^
+   drivers/mtd//nand/raw/meson_nand.c:967:2: note: (near initialization for 'sd_emmc_c_ext_clk0_div')
+   drivers/mtd//nand/raw/meson_nand.c:968:4: error: 'struct clk_init_data' has no member named 'name'
+      .name = "sd_emmc_c_nand_clk_div",
+       ^~~~
+   drivers/mtd//nand/raw/meson_nand.c:968:11: warning: excess elements in struct initializer
+      .name = "sd_emmc_c_nand_clk_div",
+              ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:968:11: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:969:4: error: 'struct clk_init_data' has no member named 'ops'
+      .ops = &clk_regmap_divider_ops,
+       ^~~
+   drivers/mtd//nand/raw/meson_nand.c:969:10: warning: excess elements in struct initializer
+      .ops = &clk_regmap_divider_ops,
+             ^
+   drivers/mtd//nand/raw/meson_nand.c:969:10: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:970:4: error: 'struct clk_init_data' has no member named 'parent_names'
+      .parent_names = (const char *[]){ "sd_emmc_c_nand_clk_mux" },
+       ^~~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:970:19: warning: excess elements in struct initializer
+      .parent_names = (const char *[]){ "sd_emmc_c_nand_clk_mux" },
+                      ^
+   drivers/mtd//nand/raw/meson_nand.c:970:19: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:971:4: error: 'struct clk_init_data' has no member named 'num_parents'
+      .num_parents = 1,
+       ^~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:971:18: warning: excess elements in struct initializer
+      .num_parents = 1,
+                     ^
+   drivers/mtd//nand/raw/meson_nand.c:971:18: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c:972:4: error: 'struct clk_init_data' has no member named 'flags'
+      .flags = CLK_SET_RATE_PARENT,
+       ^~~~~
+   drivers/mtd//nand/raw/meson_nand.c:972:12: warning: excess elements in struct initializer
+      .flags = CLK_SET_RATE_PARENT,
+               ^~~~~~~~~~~~~~~~~~~
+   drivers/mtd//nand/raw/meson_nand.c:972:12: note: (near initialization for '(anonymous)')
+   drivers/mtd//nand/raw/meson_nand.c: In function 'meson_nfc_clk_init':
+   drivers/mtd//nand/raw/meson_nand.c:1007:38: error: implicit declaration of function '__clk_get_name'; did you mean 'clk_get_rate'? [-Werror=implicit-function-declaration]
+      sd_emmc_ext_clk0_parent_names[i] = __clk_get_name(clk);
+                                         ^~~~~~~~~~~~~~
+                                         clk_get_rate
+   drivers/mtd//nand/raw/meson_nand.c:1007:36: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      sd_emmc_ext_clk0_parent_names[i] = __clk_get_name(clk);
+                                       ^
+   drivers/mtd//nand/raw/meson_nand.c:1011:8: error: implicit declaration of function 'devm_clk_register'; did you mean 'device_register'? [-Werror=implicit-function-declaration]
+     clk = devm_clk_register(nfc->dev, &mux->hw);
+           ^~~~~~~~~~~~~~~~~
+           device_register
+   cc1: some warnings being treated as errors
+
+vim +/hw +22 drivers/clk/meson/clk-regmap.h
+
+ea11dda9 Jerome Brunet 2018-02-12  10  
+ea11dda9 Jerome Brunet 2018-02-12  11  /**
+ea11dda9 Jerome Brunet 2018-02-12  12   * struct clk_regmap - regmap backed clock
+ea11dda9 Jerome Brunet 2018-02-12  13   *
+ea11dda9 Jerome Brunet 2018-02-12  14   * @hw:		handle between common and hardware-specific interfaces
+ea11dda9 Jerome Brunet 2018-02-12  15   * @map:	pointer to the regmap structure controlling the clock
+ea11dda9 Jerome Brunet 2018-02-12  16   * @data:	data specific to the clock type
+ea11dda9 Jerome Brunet 2018-02-12  17   *
+ea11dda9 Jerome Brunet 2018-02-12  18   * Clock which is controlled by regmap backed registers. The actual type of
+ea11dda9 Jerome Brunet 2018-02-12  19   * of the clock is controlled by the clock_ops and data.
+ea11dda9 Jerome Brunet 2018-02-12  20   */
+ea11dda9 Jerome Brunet 2018-02-12  21  struct clk_regmap {
+ea11dda9 Jerome Brunet 2018-02-12 @22  	struct clk_hw	hw;
+ea11dda9 Jerome Brunet 2018-02-12  23  	struct regmap	*map;
+ea11dda9 Jerome Brunet 2018-02-12  24  	void		*data;
+ea11dda9 Jerome Brunet 2018-02-12  25  };
+ea11dda9 Jerome Brunet 2018-02-12  26  
+
+:::::: The code at line 22 was first introduced by commit
+:::::: ea11dda9e091aba0fe6497108477699286a2d036 clk: meson: add regmap clocks
+
+:::::: TO: Jerome Brunet <jbrunet@baylibre.com>
+:::::: CC: Neil Armstrong <narmstrong@baylibre.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 53278 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/76026361/attachment-0001.gz>
