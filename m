@@ -1,36 +1,62 @@
-From: Matt.Sealey@arm.com (Matt Sealey)
-Date: Wed, 13 Jun 2018 21:07:33 +0000
-Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
- bindings
-In-Reply-To: <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
-References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
- <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
- <20180612204802.GA15817@rob-hp-laptop>
- <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
- <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
- <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
- <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
- <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
- <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
-Message-ID: <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 13 Jun 2018 22:53:41 +0200
+Subject: [PATCH V3] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <CAMuHMdUmqAWHFoM5tRJA+FoH59J8L3z0BMKVO-FEv4RQbokJyg@mail.gmail.com>
+References: <20180604175911.799-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdXG6mMfFTz+fdZQ53hLxYgVZPmsGpaRri8TesiruUNYUg@mail.gmail.com>
+ <fa4f843b-ae9d-fac2-77e2-b3ac1116f916@gmail.com>
+ <CAMuHMdXw146fwm0tHS7CBAofDAgRgDD2tNqgEJwzx0Jm1xKCyw@mail.gmail.com>
+ <967b800e-c935-aa35-da5a-ca3672fd18c2@gmail.com>
+ <CAMuHMdVJ+ad-kr0iYuoaH3chJ49_g6yjEb8PHmTpwjFdYcG4=Q@mail.gmail.com>
+ <47e87deb-a7a8-4780-53b5-4e4ed6e1bac3@gmail.com>
+ <CAMuHMdXJEC8HbuB5+YHMLjZy9GfCYyXmGTk0TXkoAxLhxTOJyA@mail.gmail.com>
+ <6864ed2c-39ac-615d-f38e-b28c3647e451@gmail.com>
+ <CAMuHMdUSmpkwNUV+x9oGjsJdN42XBuUBNd0vSn=bgyX+953YOw@mail.gmail.com>
+ <3eda9da7-e26e-3e77-1040-9febe3b18abb@gmail.com>
+ <CAMuHMdUmqAWHFoM5tRJA+FoH59J8L3z0BMKVO-FEv4RQbokJyg@mail.gmail.com>
+Message-ID: <c86c2ae6-21de-391e-a23f-b70976e86852@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/13/2018 01:28 PM, Geert Uytterhoeven wrote:
+> Hi Marek,
 
+Hi,
 
-> -----Original Message-----
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-> > So, if the suggestion is to use an existing property "unit", I am fine
-> > with it, if people agree to it.
->
-> If we're going to have something sharply different than ACPI I prefer
-> Rob's idea.
+[...]
 
-What are you trying to say about being sharply different than ACPI?
+>>>> But wait, since we control which machines this code runs on , can't we
+>>>> assure they have valid DTs ? This situation with invalid DT starts to
+>>>> look a bit hypothetical to me.
+>>>
+>>> That assumes you keep the list of machines to check, and don't want to fix the
+>>> issue automatically when detected (on any R-Car Gen2 or RZ/G1 platform, so
+>>> you still need to check for r8a779[0-4] and r8a774[23457]).
+>>
+>> Yes, I want to keep a list of machines to check, to be _sure_ some
+>> machine doesn't randomly blow up.
+> 
+> Just checking for the presence of a "renesas,irqc" node should be sufficient.
 
-Ta,
-Matt
+How so? Any other R-Car machine can have the irqc node too. That's
+fragile at best.
 
+> Using that node would also get rid of the hardcoded IRQC_BASE address.
+> Note that the code assumes IRQ2. If another IRQ is used, that won't harm
+> much though (as in: if it didn't blow up before, it won't blow up now).
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+We could/should fix up the irqc detection though.
+
+>>> Anyway, as we care about booting old DTBs on new kernels (for a while), we
+>>> have a few more release cycles to bikeshed ;-)
+>>
+>> I was about to ask if this patch then makes any sense or not.
+> 
+> Sure. Less hard-coding is always better.
+> Especially if it means we can make it work on more machines automatically :-)
+
+I prefer to be in control of that.
+
+-- 
+Best regards,
+Marek Vasut
