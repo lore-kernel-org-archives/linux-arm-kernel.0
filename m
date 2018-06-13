@@ -1,52 +1,66 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 13 Jun 2018 18:08:36 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <CGME20180613154552epcas5p4877f53310b66cf9d3e17196b0d028e41@epcas5p4.samsung.com>
- <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
-Message-ID: <6376822.ENUjdQ58sn@amdc3058>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 13 Jun 2018 18:20:07 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 14/27] drm/sun4i: Don't check for
+ panel or bridge on TV TCONs
+In-Reply-To: <CAGb2v66QWr2CQhcfQ9BQds-0xeG=pS4MDzaNn7_HGz+q3gfkWA@mail.gmail.com>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180613074621.5phumovcyymbkfbn@flea>
+ <CAGb2v66QWr2CQhcfQ9BQds-0xeG=pS4MDzaNn7_HGz+q3gfkWA@mail.gmail.com>
+Message-ID: <2662622.yHSNrIAaJ9@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
-> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
-> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
-> > _CRS windows.
-> >
-> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
-> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
-> >
-> > When a VGA device is behind such a host bridge and the resource is
-> > translated efifb driver is trying to do ioremap against bus address
-> > rather than the resource address and is failing to probe.
-> >
-> > efifb: probing for efifb
-> > efifb: cannot reserve video memory at 0x1e000000
-> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
-> > efifb: mode is 800x600x32, linelength=3200, pages=1
-> > efifb: scrolling: redraw
-> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-> >
-> > Use the host bridge offset information to convert bus address to
-> > resource address in the fixup.
-> >
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Dne sreda, 13. junij 2018 ob 10:04:20 CEST je Chen-Yu Tsai napisal(a):
+> On Wed, Jun 13, 2018 at 3:46 PM, Maxime Ripard
 > 
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> <maxime.ripard@bootlin.com> wrote:
+> > On Tue, Jun 12, 2018 at 10:00:23PM +0200, Jernej Skrabec wrote:
+> >> TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
+> >> sense to check if panel or bridge is connected to them.
+> >> 
+> >> Check if TCON has channel 0 and only then check for connected panel or
+> >> bridges.
+> >> 
+> >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> >> ---
+> >> 
+> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
+> >>  1 file changed, 9 insertions(+), 3 deletions(-)
+> >> 
+> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index b1205a7bc20f..c9ffa5381185
+> >> 100644
+> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> @@ -1189,13 +1189,19 @@ static const struct component_ops sun4i_tcon_ops
+> >> = {>> 
+> >>  static int sun4i_tcon_probe(struct platform_device *pdev)
+> >>  {
+> >>  
+> >>       struct device_node *node = pdev->dev.of_node;
+> >> 
+> >> +     const struct sun4i_tcon_quirks *quirks;
+> >> 
+> >>       struct drm_bridge *bridge;
+> >>       struct drm_panel *panel;
+> >>       int ret;
+> >> 
+> >> -     ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
+> >> -     if (ret == -EPROBE_DEFER)
+> >> -             return ret;
+> >> +     quirks = of_device_get_match_data(&pdev->dev);
+> > 
+> > We should probably check ofr the pointer value before dereferencing it.
 > 
-> Bartlomiej, could you please take these via the fbdev tree for v4.19?
+> I think we've discussed this before. If the driver has data structures
+> for all the supported compatible strings, and it is device tree only,
+> then we should just let it blow up in the user's face, since they are
+> obviously doing something they shouldn't be doing to get the driver
+> to probe without a compatible string match.
 
-Sure, I will queue it after the current merge window.
-
-> Peter already gave his ack but Sinan dropped it (presumably because of
-> the split in v2)
-
-Peter, can I (re)add your ACK to V2 patches?
+TCON can't work with no quirks specified, since that would mean that neither 
+channels are present. Additionally, sun4i_tcon_bind() also doesn't check if 
+quirks are NULL or not. So I concur with Chen-Yu here.
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Jernej
