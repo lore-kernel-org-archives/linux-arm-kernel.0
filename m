@@ -1,95 +1,81 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 13 Jun 2018 16:07:05 +0200
-Subject: [PATCH 0/9] media: cedrus: Add H264 decoding support
-Message-ID: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+Date: Wed, 13 Jun 2018 16:07:13 +0200
+Subject: [PATCH 8/9] media: cedrus: Add start and stop decoder operations
+In-Reply-To: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+Message-ID: <20180613140714.1686-9-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some codec needs to perform some additional task when a decoding is started
+and stopped, and not only at every frame.
 
-Here is a preliminary version of the H264 decoding support in the
-cedrus driver.
+For example, the H264 decoding support needs to allocate buffers that will
+be used in the decoding process, but do not need to change over time, or at
+each frame.
 
-As you might already know, the cedrus driver relies on the Request
-API, and is a reverse engineered driver for the video decoding engine
-found on the Allwinner SoCs.
+In order to allow that for codecs, introduce a start and stop hook that
+will be called if present at start_streaming and stop_streaming time.
 
-This work has been possible thanks to the work done by the people
-behind libvdpau-sunxi found here:
-https://github.com/linux-sunxi/libvdpau-sunxi/
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ .../platform/sunxi/cedrus/sunxi_cedrus_common.h    |  2 ++
+ .../platform/sunxi/cedrus/sunxi_cedrus_video.c     | 14 +++++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-This driver is based on the last version of the cedrus driver sent by
-Paul, based on Request API v13 sent by Hans:
-https://lkml.org/lkml/2018/5/7/316
-
-This driver has been tested only with baseline profile videos, and is
-missing a few key features to decode videos with higher profiles.
-This has been tested using our cedrus-frame-test tool, which should be
-a quite generic v4l2-to-drm decoder using the request API to
-demonstrate the video decoding:
-https://github.com/free-electrons/cedrus-frame-test/, branch h264
-
-However, sending this preliminary version, I'd really like to start a
-discussion and get some feedback on the user-space API for the H264
-controls exposed through the request API.
-
-I've been using the controls currently integrated into ChromeOS that
-have a working version of this particular setup. However, these
-controls have a number of shortcomings and inconsistencies with other
-decoding API. I've worked with libva so far, but I've noticed already
-that:
-  - The kernel UAPI expects to have the nal_ref_idc variable, while
-    libva only exposes whether that frame is a reference frame or
-    not. I've looked at the rockchip driver in the ChromeOS tree, and
-    our own driver, and they both need only the information about
-    whether the frame is a reference one or not, so maybe we should
-    change this?
-  - The H264 bitstream exposes the picture default reference list (for
-    both list 0 and list 1), the slice reference list and an override
-    flag. The libva will only pass the reference list to be used (so
-    either the picture default's or the slice's) depending on the
-    override flag. The kernel UAPI wants the picture default reference
-    list and the slice reference list, but doesn't expose the override
-    flag, which prevents us from configuring properly the
-    hardware. Our video decoding engine needs the three information,
-    but we can easily adapt to having only one. However, having two
-    doesn't really work for us.
-
-It's pretty much the only one I've noticed so far, but we should
-probably fix them already. And there's probably other, feel free to
-step in.
-
-Maxime Ripard (8):
-  media: cedrus: Add wrappers around container_of for our buffers
-  media: cedrus: Add a macro to check for the validity of a control
-  media: cedrus: make engine type more generic
-  media: cedrus: Remove MPEG1 support
-  media: cedrus: Add ops structure
-  media: cedrus: Move IRQ maintainance to cedrus_dec_ops
-  media: cedrus: Add start and stop decoder operations
-  media: cedrus: Add H264 decoding support
-
-Pawel Osciak (1):
-  CHROMIUM: v4l: Add H264 low-level decoder API compound controls.
-
- drivers/media/platform/sunxi/cedrus/Makefile  |   2 +-
- .../platform/sunxi/cedrus/sunxi_cedrus.c      |  23 +
- .../sunxi/cedrus/sunxi_cedrus_common.h        |  81 +++-
- .../platform/sunxi/cedrus/sunxi_cedrus_dec.c  |  38 +-
- .../platform/sunxi/cedrus/sunxi_cedrus_h264.c | 443 ++++++++++++++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   |  35 +-
- .../platform/sunxi/cedrus/sunxi_cedrus_hw.h   |   6 +-
- .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         |  52 +-
- .../sunxi/cedrus/sunxi_cedrus_mpeg2.h         |  33 --
- .../platform/sunxi/cedrus/sunxi_cedrus_regs.h |  22 +-
- .../sunxi/cedrus/sunxi_cedrus_video.c         |  37 +-
- drivers/media/v4l2-core/v4l2-ctrls.c          |  42 ++
- include/media/v4l2-ctrls.h                    |  10 +
- include/uapi/linux/v4l2-controls.h            | 164 +++++++
- include/uapi/linux/videodev2.h                |  11 +
- 15 files changed, 912 insertions(+), 87 deletions(-)
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_h264.c
- delete mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
-
+diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+index a2a507eb9fc9..20c78ec1f037 100644
+--- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
++++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+@@ -120,6 +120,8 @@ struct sunxi_cedrus_dec_ops {
+ 	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+ 	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+ 		      struct sunxi_cedrus_run *run);
++	int (*start)(struct sunxi_cedrus_ctx *ctx);
++	void (*stop)(struct sunxi_cedrus_ctx *ctx);
+ 	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+ };
+ 
+diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+index fb7b081a5bb7..d93461178857 100644
+--- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
++++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+@@ -416,6 +416,8 @@ static int sunxi_cedrus_buf_prepare(struct vb2_buffer *vb)
+ static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+ {
+ 	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
++	struct sunxi_cedrus_dev *dev = ctx->dev;
++	int ret = 0;
+ 
+ 	switch (ctx->vpu_src_fmt->fourcc) {
+ 	case V4L2_PIX_FMT_MPEG2_FRAME:
+@@ -425,16 +427,26 @@ static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+ 		return -EINVAL;
+ 	}
+ 
+-	return 0;
++	if (V4L2_TYPE_IS_OUTPUT(q->type) &&
++	    dev->dec_ops[ctx->current_codec]->start)
++		ret = dev->dec_ops[ctx->current_codec]->start(ctx);
++
++	return ret;
+ }
+ 
+ static void sunxi_cedrus_stop_streaming(struct vb2_queue *q)
+ {
+ 	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
++	struct sunxi_cedrus_dev *dev = ctx->dev;
+ 	struct vb2_v4l2_buffer *vbuf;
+ 	unsigned long flags;
+ 
+ 	flush_scheduled_work();
++
++	if (V4L2_TYPE_IS_OUTPUT(q->type) &&
++	    dev->dec_ops[ctx->current_codec]->stop)
++		dev->dec_ops[ctx->current_codec]->stop(ctx);
++
+ 	for (;;) {
+ 		spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+ 
 -- 
 2.17.0
