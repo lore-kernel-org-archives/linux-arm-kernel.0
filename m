@@ -1,38 +1,45 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 13 Jun 2018 11:25:22 +0200
-Subject: [PATCH 3/3] rtc: ftrtc010: let the core handle range
-In-Reply-To: <CACRpkdabaH2yiYNnQHBru=-Snb3Eeni2eDAa9mjsa-3DqMC72g@mail.gmail.com>
-References: <20180604141528.15635-1-alexandre.belloni@bootlin.com>
- <20180604141528.15635-3-alexandre.belloni@bootlin.com>
- <CACRpkdabaH2yiYNnQHBru=-Snb3Eeni2eDAa9mjsa-3DqMC72g@mail.gmail.com>
-Message-ID: <20180613092522.GS10521@piout.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 13 Jun 2018 10:58:37 +0200
+Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
+References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
+Message-ID: <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/2018 11:10:35+0200, Linus Walleij wrote:
-> On Mon, Jun 4, 2018 at 4:15 PM, Alexandre Belloni
-> <alexandre.belloni@bootlin.com> wrote:
-> > The current range handling is highly suspicious. Anyway, let the core
-> > handle it.
-> 
-> Hmmm. I have datasheets, do you need some input about the hardware?
-> Something I should patch?
-> 
+cma_alloc() function has gfp mask parameter, so users expect that it
+honors typical memory allocation related flags. The most imporant from
+the security point of view is handling of __GFP_ZERO flag, because memory
+allocated by this function usually can be directly remapped to userspace
+by device drivers as a part of multimedia processing and ignoring this
+flag might lead to leaking some kernel structures to userspace.
+Some callers of this function (for example arm64 dma-iommu glue code)
+already assumed that the allocated buffers are cleared when this flag
+is set. To avoid such issues, add simple code for clearing newly
+allocated buffer when __GFP_ZERO flag is set. Callers will be then
+updated to skip implicit clearing or adjust passed gfp flags.
 
-Nothing to do as you seemed to confirm what I did was OK. I could find
-why it was set to 2148 in the first place. Maybe it correspond to the
-default days, hours minutes, second values on the SoC.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ mm/cma.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> > The RTC has a 32 bit counter on top of days + hh:mm:ss registers.
-> >
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Yours,
-> Linus Walleij
-
+diff --git a/mm/cma.c b/mm/cma.c
+index 5809bbe360d7..1106d5aef2cc 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -464,6 +464,13 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+ 		start = bitmap_no + mask + 1;
+ 	}
+ 
++	if (ret == 0 && gfp_mask & __GFP_ZERO) {
++		int i;
++
++		for (i = 0; i < count; i++)
++			clear_highpage(page + i);
++	}
++
+ 	trace_cma_alloc(pfn, page, count, align);
+ 
+ 	if (ret && !(gfp_mask & __GFP_NOWARN)) {
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.17.1
