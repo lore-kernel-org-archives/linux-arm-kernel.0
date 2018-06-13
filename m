@@ -1,61 +1,69 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 13 Jun 2018 14:56:43 +0200
-Subject: [PATCH] ARM64: dts: rockchip: add some pins to rk3399
-In-Reply-To: <B649911B-28E0-4466-B3F0-15875FFB9D43@theobroma-systems.com>
-References: <20180612152544.3812-1-ayaka@soulik.info>
- <B649911B-28E0-4466-B3F0-15875FFB9D43@theobroma-systems.com>
-Message-ID: <6575089.GrJ2ErpgXD@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Jun 2018 13:59:58 +0100
+Subject: [RFC V2 3/3] perf: qcom: Add Falkor CPU PMU IMPLEMENTATION
+ DEFINED event support
+In-Reply-To: <20180613103555.GC26280@arm.com>
+References: <1528379808-27970-1-git-send-email-agustinv@codeaurora.org>
+ <1528379808-27970-4-git-send-email-agustinv@codeaurora.org>
+ <20180612144055.m2h26n64spfm6k6o@lakrids.cambridge.arm.com>
+ <9957219b64252d3b2e19724db04a1179@codeaurora.org>
+ <20180613103555.GC26280@arm.com>
+Message-ID: <06c81a64-904f-59fa-5751-62818d6d2107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 12. Juni 2018, 20:21:06 CEST schrieb klaus.goger at theobroma-
-systems.com:
-> Hi Randy,
+On 13/06/18 11:35, Will Deacon wrote:
+> On Tue, Jun 12, 2018 at 04:41:32PM -0400, Agustin Vega-Frias wrote:
+>> Hi Mark,
+>>
+>> On 2018-06-12 10:40, Mark Rutland wrote:
+>>> Hi,
+>>>
+>>> On Thu, Jun 07, 2018 at 09:56:48AM -0400, Agustin Vega-Frias wrote:
+>>>> Selection of these events can be envisioned as indexing them from
+>>>> a 3D matrix:
+>>>> - the first index selects a Region Event Selection Register
+>>>> (PMRESRx_EL0)
+>>>> - the second index selects a group from which only one event at a time
+>>>>  can be selected
+>>>> - the third index selects the event
+>>>>
+>>>> The event is encoded into perf_event_attr.config as 0xPRCCG, where:
+>>>>  P  [config:16   ] = prefix   (flag that indicates a matrix-based
+>>>> event)
+>>>>  R  [config:12-15] = register (specifies the PMRESRx_EL0 instance)
+>>>>  G  [config:0-3  ] = group    (specifies the event group)
+>>>>  CC [config:4-11 ] = code     (specifies the event)
+>>>>
+>>>> Events with the P flag set to zero are treated as common PMUv3 events
+>>>> and are directly programmed into PMXEVTYPERx_EL0.
+>>>>
+>>>> The first two indexes are set combining the RESR and group number with
+>>>> a base number and writing it into the architected PMXEVTYPER_EL0
+>>>> register.
+>>>> The third index is set by writing the code into the bits corresponding
+>>>> with the group into the appropriate IMPLEMENTATION DEFINED PMRESRx_EL0
+>>>> register.
+>>>
+>>> When are the IMP DEF registers accessible at EL0? Are those goverend by
+>>> the same controls as the architected registers?
+>>
+>> No, there is a separate IMP DEF register to control access.
 > 
-> > On 12.06.2018, at 17:25, Randy Li <ayaka@soulik.info> wrote:
-> > 
-> > Those pins would be used by many boards.
-> > 
-> > Signed-off-by: Randy Li <ayaka@soulik.info>
-
-agree to everything Klaus said ;-) .
-
-[...]
-
-> > +			pcie_clkreqn: pci-clkreqn {
-> > +				rockchip,pins =
-> > +					<2 26 RK_FUNC_2 &pcfg_pull_none>;
-> > +			};
-> > +
-> > +			pcie_clkreqnb: pci-clkreqnb {
-> > +				rockchip,pins =
-> > +					<4 24 RK_FUNC_1 &pcfg_pull_none>;
-> > +			};
-> > +
+> Great :( We need to make sure we disable EL0 access during boot then, but
+> that means we need to prove for the existence of this thing in head.S
+> (since the PMU driver might not get loaded).
 > 
-> I?m not sure if pci-clkreqn is functional at all. If not I?m not sure if we
-> should add it to the dtsi. Shawn may know more about it.
+> Also, what's the kvm story here so that we don't accidentally open up a
+> VM-VM side-channel via these registers? How do the EL1 trapping controls
+> work?
 
-Yep, wasn't there a big change away from clkreqn, due it
-not being functional?
+We'd trap the IMPDEF register access and inject an UNDEF (assuming that
+the IMPDEF trapping works correctly). I have strictly no plan to support
+this in a guest.
 
+Thanks,
 
-> > 			pcie_clkreqnb_cpm: pci-clkreqnb-cpm {
-> > 			
-> > 				rockchip,pins =
-> > 
-> > -					<4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +					<4 24 RK_FUNC_GPIO &pcfg_pull_none>;
-> > 
-> > 			};
-> > 		
-> > 		};
-> 
-> Could we actually use RK_Pxx for all new pin definitions? Would increase
-> readability a lot.
-
-Especially as the above change really only seems to change RK_PD0 back
-to 24, so this block (and some others) will go away entirely.
-
-
-Heiko
+	M.
+-- 
+Jazz is not dead. It just smells funny...
