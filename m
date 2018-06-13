@@ -1,48 +1,71 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 13 Jun 2018 17:33:53 +0800
-Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-In-Reply-To: <20180613161314.14894-3-yixun.lan@amlogic.com>
-References: <20180613161314.14894-3-yixun.lan@amlogic.com>
-Message-ID: <201806131738.lVPaDHhQ%fengguang.wu@intel.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 13 Jun 2018 09:36:39 +0000
+Subject: [PATCH v1 0/4] add mailbox support for i.MX7D
+In-Reply-To: <20180601083411.s35c2floqdas6qni@pengutronix.de>
+References: <20180601065821.28234-1-o.rempel@pengutronix.de>
+ <20180601083411.s35c2floqdas6qni@pengutronix.de>
+Message-ID: <AM0PR04MB4211ABBDBEE2982312E15F6F807E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liang,
+Hi Robert,
 
-Thank you for the patch! Yet something to improve:
+Thanks for the forwarding.
 
-[auto build test ERROR on mtd/nand/next]
-[also build test ERROR on v4.17 next-20180613]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> -----Original Message-----
+> From: Robert Schwebel [mailto:r.schwebel at pengutronix.de]
+> Sent: Friday, June 1, 2018 4:34 PM
+> To: Oleksij Rempel <o.rempel@pengutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+> Rutland <mark.rutland@arm.com>; linux-clk at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; kernel at pengutronix.de;
+> devicetree at vger.kernel.org; A.s. Dong <aisheng.dong@nxp.com>; dl-linux-
+> imx <linux-imx@nxp.com>
+> Subject: Re: [PATCH v1 0/4] add mailbox support for i.MX7D
+> 
+> On Fri, Jun 01, 2018 at 08:58:17AM +0200, Oleksij Rempel wrote:
+> > This patches are providing support for mailbox (Messaging Unit) for
+> > i.MX7D. Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with
+> > Linux running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
+> >
 
-url:    https://github.com/0day-ci/linux/commits/Yixun-Lan/mtd-rawnand-meson-add-Amlogic-NAND-driver-support/20180613-161917
-base:   git://git.infradead.org/linux-mtd.git nand/next
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Thanks for the patch.
 
-All errors (new ones prefixed by >>):
+> > Both parts of i.MX messaging Unit are visible for all CPUs available
+> > on i.MX7D. Communication worked independent of MU side in
+> combination
+> > with CPU. For example MU-A used on ARM Cortex-A7 and MU-B used on
+> ARM
+> > Cortex-M4 or other ways around.
+> >
+> > The question to NXP developers: are there are limitations or
+> > recommendations about MU vs CPU combination? The i.MX7D
+> documentation
+> > talks about "Processor A" and "Processor B". It is not quite clear
+> > what processor it actually is (A7 or M4).
 
->> drivers/mtd/nand/raw/meson_nand.c:21:10: fatal error: clk-regmap.h: No such file or directory
-    #include "clk-regmap.h"
-             ^~~~~~~~~~~~~~
-   compilation terminated.
+The MU vs CPU combination usually are defined by HW design.
+It, MU Side A/B,  can either be used by both CPU (A core and M core)
+or fixed to one side.
+For MX7D case, both side memory map can be accessed by both CPU
+Including Interrupt signals. But the recommendation is A core using
+MU side A and M core using MU side B.
 
-vim +21 drivers/mtd/nand/raw/meson_nand.c
+Regards
+Dong Aisheng
 
-  > 21	#include "clk-regmap.h"
-    22	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62787 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180613/043f3907/attachment-0001.gz>
+> 
+> Adding Dong Aisheng and NXP linux team to Cc:.
+> 
+> rsc
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7Cf53
+> d9c9cdd744878740f08d5c79a7a1e%7C686ea1d3bc2b4c6fa92cd99c5c301635%7
+> C0%7C0%7C636634388645464924&sdata=2ehh92tNbfwf3fJTp%2Fx7IUOgGSU
+> h6pyrc2XsdRJkTw4%3D&reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
