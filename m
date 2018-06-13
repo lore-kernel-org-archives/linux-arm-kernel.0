@@ -1,230 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jun 2018 14:05:26 +0100
-Subject: [RFC V2 3/3] perf: qcom: Add Falkor CPU PMU IMPLEMENTATION
- DEFINED event support
-In-Reply-To: <9957219b64252d3b2e19724db04a1179@codeaurora.org>
-References: <1528379808-27970-1-git-send-email-agustinv@codeaurora.org>
- <1528379808-27970-4-git-send-email-agustinv@codeaurora.org>
- <20180612144055.m2h26n64spfm6k6o@lakrids.cambridge.arm.com>
- <9957219b64252d3b2e19724db04a1179@codeaurora.org>
-Message-ID: <20180613130526.y3xgqm5qjrke6vto@lakrids.cambridge.arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 13 Jun 2018 08:24:33 -0500
+Subject: [U-Boot] [RFC PATCH 0/2] ARM: v7: Enable basic framework for
+ supporting bits for CVE-2017-5715
+In-Reply-To: <20180613100803.GB17671@n2100.armlinux.org.uk>
+References: <20180125214559.27570-1-nm@ti.com>
+ <CAOMZO5CcEf=EhFWknKmCXXLJPOgx=65jLH+X1OAGkg5VxBGVew@mail.gmail.com>
+ <CAGo_u6qyf1Z+zSG-17TYRDPzG8V_0_-nk1F15HB4tPyT9rbUYQ@mail.gmail.com>
+ <20180612214049.GA17671@n2100.armlinux.org.uk>
+ <20180612215834.wrnfrb57ed3uxexa@kahuna>
+ <20180613100803.GB17671@n2100.armlinux.org.uk>
+Message-ID: <20180613132433.ho3o4uorfewgmytj@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 04:41:32PM -0400, Agustin Vega-Frias wrote:
-> On 2018-06-12 10:40, Mark Rutland wrote:
-> > On Thu, Jun 07, 2018 at 09:56:48AM -0400, Agustin Vega-Frias wrote:
-> > > +/*
-> > > + * Qualcomm Technologies CPU PMU IMPLEMENTATION DEFINED extensions
-> > > support
-> > > + *
-> > > + * Current extensions supported:
-> > > + *
-> > > + * - Matrix-based microarchitectural events support
-> > > + *
-> > > + *   Selection of these events can be envisioned as indexing them
-> > > from
-> > > + *   a 3D matrix:
-> > > + *   - the first index selects a Region Event Selection Register
-> > > (PMRESRx_EL0)
-> > > + *   - the second index selects a group from which only one event
-> > > at a time
-> > > + *     can be selected
-> > > + *   - the third index selects the event
-> > > + *
-> > > + *   The event is encoded into perf_event_attr.config as 0xPRCCG,
-> > > where:
-> > > + *     P  [config:16   ] = prefix   (flag that indicates a
-> > > matrix-based event)
-> > > + *     R  [config:12-15] = register (specifies the PMRESRx_EL0
-> > > instance)
-> > > + *     G  [config:0-3  ] = group    (specifies the event group)
-> > > + *     CC [config:4-11 ] = code     (specifies the event)
-> > > + *
-> > > + *   Events with the P flag set to zero are treated as common PMUv3
-> > > events
-> > > + *   and are directly programmed into PMXEVTYPERx_EL0.
+On 10:08-20180613, Russell King - ARM Linux wrote:
+> On Tue, Jun 12, 2018 at 04:58:34PM -0500, Nishanth Menon wrote:
+> > On 21:40-20180612, Russell King - ARM Linux wrote:
+> > [...]
+> > > > I started respinning the series, while there is definitely a use of
+> > > > implementing in u-boot,
+> > > > I am starting to wonder if we should also be doing this in kernel.
+> > > 
+> > > How does the kernel set the bit when the kernel is running in non-secure
+> > > mode, when the ACTLR is read-only in that mode?
 > > 
-> > When PMUv3 is given a raw event code, the config fields should be the
-> > PMU event number, and this conflicts with RESERVED encodings.
+> > For OMAP5/DRA7 SMP systems, I just posted a patch that seems to resolve
+> > it:
+> > https://patchwork.kernel.org/patch/10461273/
 > > 
-> > I'd rather we used a separate field for the QC extension events. e.g.
-> > turn config1 into a flags field, and move the P flag there.
+> > This'd be similar in implementation to ARM erratum 801819 workaround
+> > that needs two pieces (u-boot + kernel). I am not really worried about
+> > OMAP5/DRA7 since they should'nt loose context in Low power modes.
+> > Other SoCs need to be aware of the constraints.
 > > 
-> > We *should* add code to sanity check those fields are zero in the PMUv3
-> > driver, even though it's a potential ABI break to start now.
+> > /me wishes PSCI was a standard during ARMv7, but it was'nt... So
+> > legacy v7 SoCs have implementations that are kind of different (even
+> > smc calling conventions vary).
 > 
-> I should have stated clearly that in this case the event code is directly
-> programmed into PMXEVTYPERx_EL0.evtCount, not by this code, but by the PMUv3
-> code, which will do the masking and ensure reserved bits are not touched.
+> It may seem to be an easy way out (do everything in the kernel) but
+> have you considered that the secure world is also vulnerable?
 
-I understand this may be fine on the HW side; it's more to do with the
-userspace ABI expected with PMUv3. The config encoding should be the
-(PMUv3) type field, and I don't want a potential clash if/when PMUv3
-gets extended in future beyond the current 16 bits.
+Yes, we have.
 
-I'd very much like to keep the QC extension bits separate from that.
-
-> IOW, that case is no different from the raw event or a common event case.
+> If the IBE bit is not set in the secure world, then the secure world
+> is not implementing the workarounds, and therefore the non-secure
+> world has the possibility to use the Spectre vulnerabilities to
+> exploit the secure world with enough effort and knowledge.
 > 
-> I would prefer to keep the flag in config because it allows the use of
-> raw code encodings to access these events more easily, and given that
-> the flag is never propagated to any register I believe it is safe.
+> You really need to _also_ fix these vulnerabilities in the secure
+> world, which includes setting the IBE bit there.
 
-You can easily add sysfs fields to make this easy, e.g. have reg map to
-config1:x-y, and the user can specify the event based on that, e.g.
+Correct, but, unfortunately, this is NOT always the case / not necessary in
+some cases. Example:
 
-  perf ${cmd} -e qcom_pmuv3/reg=0xf,.../
+On General purpose (GP) devices such as in OMAP, ROM owns the secure APIs,
+there is no override of secure world APIs possible. In such cases, we
+have to see if there is anything that needs to be protected. in case of
+GP devices, there are no secure assets to protect and any SMC calls are
+just support services provided by ROM.
 
-Which means they're *explicitly* asking for the QC extension bits, and
-we can be sure they're not asking for something from baseline PMUv3.
+a) updating secure side is not possible
+b) secure side updates is not necessary since there are no critical run time
+   services provided by ROM.
 
-We *might* want to namespace the qc fields, in case we want to add
-anything similar to PMUv3 in future.
+On devices such as Keystone 2 (TI) generation, yes, we do have ability
+to update secure side and must be done as well.
 
-[...]
-
-> > > +/*
-> > > + * Check if e1 and e2 conflict with each other
-> > > + *
-> > > + * e1 is a matrix-based microarchitectural event we are checking
-> > > against e2.
-> > > + * A conflict exists if the events use the same reg, group, and a
-> > > different
-> > > + * code. Events with the same code are allowed because they could
-> > > be using
-> > > + * different filters (e.g. one to count user space and the other to
-> > > count
-> > > + * kernel space events).
-> > > + */
-
-> > Does the filter matter at all? When happens if I open two identical
-> > events, both counting the same reg, group, and code, with the same
-> > filter?
-> 
-> That is possible and allowed, similar to counting the same common event
-> in two configurable counters. Only problem is wasting a counter resource.
-
-Ok. Please drop the mention of filtering from the comment -- it makes it
-sound like there's a potential problem, and it isn't relevant.
-
-[...]
-
-> > > +		/* Matrix event, program the appropriate PMRESRx_EL0 */
-> > > +		struct arm_pmu *pmu = to_arm_pmu(event->pmu);
-> > > +		struct pmu_hw_events *events = this_cpu_ptr(pmu->hw_events);
-> > > +		u64 reg = QC_EVT_REG(event->attr.config);
-> > > +		u64 code = QC_EVT_CODE(event->attr.config);
-> > > +		u64 group = QC_EVT_GROUP(event->attr.config);
-> > > +		unsigned long flags;
-> > > +
-> > > +		raw_spin_lock_irqsave(&events->pmu_lock, flags);
-> > > +		falkor_set_resr(reg, group, code);
-> > > +		raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
-> > 
-> > Why is the spinlock required?
-> > 
-> > AFACIT this should only ever be called in contexts where IRQs are
-> > disabled already.
-> > 
-> 
-> falkor_set_resr is a read-modify-write operation. The PMUv3 code uses
-> the spinlock to protect the counter selection too (armv8pmu_enable_event).
-
-As I mention, that only happens in contexts where IRQs are disabled, so
-that shouldn't be a problem.
-
-> I believe this is to deal with event rotation which can potentially
-> be active when we are creating new events.
-
-Event rotation happens off the back of a hrtimer callback, with IRQs
-disabled. There's a lockdep assert to that effect in
-perf_mux_hrtimer_handler(), before it calls perf_rotate_context().
-
-> > > +	}
-> > > +
-> > > +	/* Let the original op handle the rest */
-> > > +	def_ops->enable(event);
-> > > +}
-> > > +
-> > > +/*
-> > > + * Disable the given event
-> > > + */
-> > > +static void falkor_disable(struct perf_event *event)
-> > > +{
-> > > +	/* Use the original op to disable the counter and interrupt  */
-> > > +	def_ops->enable(event);
-> > > +
-> > > +	if (!!(event->attr.config & QC_EVT_PFX_MASK)) {
-> > > +		/* Matrix event, de-program the appropriate PMRESRx_EL0 */
-> > > +		struct arm_pmu *pmu = to_arm_pmu(event->pmu);
-> > > +		struct pmu_hw_events *events = this_cpu_ptr(pmu->hw_events);
-> > > +		u64 reg = QC_EVT_REG(event->attr.config);
-> > > +		u64 group = QC_EVT_GROUP(event->attr.config);
-> > > +		unsigned long flags;
-> > > +
-> > > +		raw_spin_lock_irqsave(&events->pmu_lock, flags);
-> > > +		falkor_clear_resr(reg, group);
-> > > +		raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
-> > > +	}
-> > > +}
-> > 
-> > Same comments as with falkor_enable().
-> > 
-> > > +
-> > > +PMU_FORMAT_ATTR(event,  "config:0-15");
-> > > +PMU_FORMAT_ATTR(prefix, "config:16");
-> > > +PMU_FORMAT_ATTR(reg,    "config:12-15");
-> > > +PMU_FORMAT_ATTR(code,   "config:4-11");
-> > > +PMU_FORMAT_ATTR(group,  "config:0-3");
-> > 
-> > What sort of events are available? Do you plan to add anything to the
-> > userspace event database in tools/perf/pmu-events/ ?
-> > 
-> 
-> Yes, we are still doing some internal work to see what we can put in
-> the driver or as JSON events.
-
-Please put them in userspace. Events living in the kernel is really a
-legacy thing, and we've placed all other IMP-DEF events in userspace for
-ACPI systems.
-
-[...]
-
-> > > +	pmu->name = "qcom_pmuv3";
-> > 
-> > All the other CPU PMUs on an ARM ACPI system will have an index suffix,
-> > e.g. "armv8_pmuv3_0". I can see why we might want to change the name to
-> > indicate the QC extensions, but I think we should keep the existing
-> > pattern, with a '_0' suffix here.
-> 
-> This overrides the name before the suffix is added, so the PMU name will be
-> qcom_pmuv3_0 for Centriq 2400 which has only Falkor CPUs.
-
-Ok.
-
-[...]
-
-> > > +	/* Override the necessary ops */
-> > > +	pmu->map_event     = falkor_map_event;
-> > > +	pmu->get_event_idx = falkor_get_event_idx;
-> > > +	pmu->reset         = falkor_reset;
-> > > +	pmu->enable        = falkor_enable;
-> > > +	pmu->disable       = falkor_disable;
-> > 
-> > I'm somewhat concerned by hooking into the existing PMU code at this
-> > level, but I don't currently have a better suggestion.
-> > 
-> 
-> IMO this is no different from other PMUs implemented on top of the arm_pmu
-> framework. The difference is of course that I'm calling back into the base
-> PMUv3 ops, 
-
-Yup, the latter is what I'm concerned about. e.g. when you take the
-pmu_lock, if PMUv3 code has already taken this, there'll be a deadlock,
-and it means that we can't consider the PMUv3 code in isolation.
-
-As long as we can keep this *simple*, that'll just leave me uneasy.
-
-Thanks,
-Mark.
+-- 
+Regards,
+Nishanth Menon
