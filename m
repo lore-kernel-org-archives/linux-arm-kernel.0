@@ -1,108 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 12 Jun 2018 17:30:36 -0700
-Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB
- with ICIALLU on Cortex-A15 for CVE-2017-5715
-In-Reply-To: <20180612202411.29798-3-nm@ti.com>
-References: <20180612202411.29798-1-nm@ti.com>
- <20180612202411.29798-3-nm@ti.com>
-Message-ID: <6BFD98F8-FACB-43DE-82DC-E0A134D4E1C0@gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed, 13 Jun 2018 03:01:05 +0200
+Subject: [PATCH 04/10] Input: ams_delta_serio: Replace power GPIO with
+ regulator
+In-Reply-To: <20180612221724.GB38773@dtor-ws>
+References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
+ <20180609140224.32606-4-jmkrzyszt@gmail.com> <20180612221724.GB38773@dtor-ws>
+Message-ID: <2655614.ErW8VuCT6r@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On June 12, 2018 1:24:09 PM PDT, Nishanth Menon <nm@ti.com> wrote:
->As recommended by Arm in [1], ACTLR[0] (Enable invalidates of BTB)
->needs to be set[2] for BTB to be invalidated on ICIALLU. This needs to
->be done unconditionally for Cortex-A15 processors. Provide a config
->option for platforms to enable this option based on impact analysis
->for products.
->
->NOTE: This patch in itself is NOT the final solution, this requires:
->a) Implementation of v7_arch_cp15_set_acr on SoCs which may not
->   provide direct access to ACR register.
->b) Operating Systems such as Linux to provide adequate workaround in
->the
->   right locations.
-
-This is the case as of 4.18 so you could probably reference CONFIG_CPU_SPECTRE and CONFIG_HARDEN_BRANCH_PREDICTOR in a v2.
-
->c) This workaround applies to only the boot processor. It is important
->   to apply workaround as necessary (context-save-restore) around low
->   power context loss OR additional processors as necessary in either
->   firmware support OR elsewhere in OS.
-
-About that, I don't know enough of uboot but are there existing PSCI or other seemingly standard secondary core support in uboot that would make us go through the same initialization as the boot CPU? If not, is everything going to be largely implementation specific and scattered between uboot and the hypervisors or kernel?
-
-FWIW, this is what prompted me to submit this:
-
-https://patchwork.kernel.org/patch/10453643/
-
-
->
->[1] https://developer.arm.com/support/security-update
->[2]
->http://infocenter.arm.com/help/topic/com.arm.doc.ddi0438c/BABGHIBG.html
->
->Cc: Marc Zyngier <marc.zyngier@arm.com>
->Cc: Russell King <linux@arm.linux.org.uk>
->Cc: Tony Lindgren <tony@atomide.com>
->Cc: Robin Murphy <robin.murphy@arm.com>
->Cc: Florian Fainelli <f.fainelli@gmail.com>
->Cc: Catalin Marinas <catalin.marinas@arm.com>
->Cc: Will Deacon <will.deacon@arm.com>
->Cc: Christoffer Dall <christoffer.dall@linaro.org>
->Cc: Andre Przywara <Andre.Przywara@arm.com>
->Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->Cc: Tom Rini <trini@konsulko.com>
->Cc: Michael Nazzareno Trimarchi <michael@amarulasolutions.com>
->
->Signed-off-by: Nishanth Menon <nm@ti.com>
->---
-> arch/arm/Kconfig           | 4 ++++
-> arch/arm/cpu/armv7/start.S | 8 ++++++++
-> 2 files changed, 12 insertions(+)
->
->diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->index 9e32d5b43cb0..98f58fd27696 100644
->--- a/arch/arm/Kconfig
->+++ b/arch/arm/Kconfig
->@@ -109,6 +109,7 @@ config SYS_ARM_MPU
-> # CONFIG_ARM_ERRATA_798870
-> # CONFIG_ARM_ERRATA_801819
-> # CONFIG_ARM_CORTEX_A8_CVE_2017_5715
->+# CONFIG_ARM_CORTEX_A15_CVE_2017_5715
+On Wednesday, June 13, 2018 12:17:24 AM CEST Dmitry Torokhov wrote:
+> On Sat, Jun 09, 2018 at 04:02:18PM +0200, Janusz Krzysztofik wrote:
+> > ...
+> > +	priv->vcc = devm_regulator_get(&pdev->dev, "vcc");
+> > +	if (IS_ERR(priv->vcc)) {
+> > +		err = PTR_ERR(priv->vcc);
+> > +		dev_err(&pdev->dev, "regulator request failed (%d)\n", err);
+> > +		/* Fail softly if the regulator is not available yet */
+> > +		if (err == -ENODEV)
+> > +			err = -EPROBE_DEFER;
 > 
-> config ARM_ERRATA_430973
-> 	bool
->@@ -182,6 +183,9 @@ config ARM_ERRATA_855873
-> config ARM_CORTEX_A8_CVE_2017_5715
-> 	bool
-> 
->+config ARM_CORTEX_A15_CVE_2017_5715
->+	bool
->+
-> config CPU_ARM720T
-> 	bool
-> 	select SYS_CACHE_SHIFT_5
->diff --git a/arch/arm/cpu/armv7/start.S b/arch/arm/cpu/armv7/start.S
->index 3beaf5a93d81..81edec01bf32 100644
->--- a/arch/arm/cpu/armv7/start.S
->+++ b/arch/arm/cpu/armv7/start.S
->@@ -241,6 +241,14 @@ skip_errata_798870:
-> skip_errata_801819:
-> #endif
-> 
->+#ifdef CONFIG_ARM_CORTEX_A15_CVE_2017_5715
->+	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
->+	orr	r0, r0, #1 << 0		@ Enable invalidates of BTB
->+	push	{r1-r5}			@ Save the cpu info registers
->+	bl	v7_arch_cp15_set_acr
->+	pop	{r1-r5}			@ Restore the cpu info - fall through
->+#endif
->+
-> #ifdef CONFIG_ARM_ERRATA_454179
-> 	mrc	p15, 0, r0, c1, c0, 1	@ Read ACR
-> 
+> Hmm, if regulator is not ready yet, devm_regulator_get() should be
+> returning -EPROBE_DEFER already, we should not have to convert -ENODEV
+> to -EPROBE_DEFER...
 
+Regulator is not ready because its initialization at subsys_initcall is 
+deferred by not ready GPIO pin, that in turn is caused by gpio-mmio driver, 
+unlike many other GPIO drivers, registered as late as at device_initcall.
 
--- 
-Florian
+I agree devm_regulator_get() could return -EPROBE_DEFER in this case, but I 
+can see it does that only when of_get_regulator() indicates the regulator 
+should exist. In non-dt case there is apparently no way to justify if it 
+should unless its consumer supply table was already in place. For that,  
+registration of that table would have to be independent of successful 
+registration of the regulator itself while it's not. Maybe it should, but 
+that's a separate topic for a separate discussion, I think.
+
+> Is it because we have_full_constraints() returns false? You might need
+> to add call to regulator_has_full_constraints() to your board file.
+
+If have_full_constraints() returned true before the regulator or its consumer 
+supply table is ready, devm_regulator_get() would happily return a dummy 
+regulator and our keyboard would never get its power.
+
+I'm afraid we have to live with that return code conversion as long as the 
+only user of this driver is not migrated to dt.
+
+Thanks,
+Janusz
