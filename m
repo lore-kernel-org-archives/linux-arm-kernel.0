@@ -1,51 +1,51 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 14 Jun 2018 13:24:16 +0200
-Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and
- DVK
-In-Reply-To: <20180614090733.GV10521@piout.net>
-References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
- <20180614090733.GV10521@piout.net>
-Message-ID: <20180614112416.GY10521@piout.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 14 Jun 2018 13:30:37 +0200
+Subject: [PATCH 2/4] arm64: dts: rockchip: add phandles to some nodes on
+ rk3399-gru
+In-Reply-To: <20180614113039.29117-1-heiko@sntech.de>
+References: <20180614113039.29117-1-heiko@sntech.de>
+Message-ID: <20180614113039.29117-3-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/2018 11:07:33+0200, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 14/06/2018 09:51:54+0100, Ben Whitten wrote:
-> 
-> This need a proper commit message. Maybe you can also add a link to the
-> technical brief for the platform?
-> 
-> > Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile        |   3 +-
-> >  arch/arm/boot/dts/at91-wb45n.dts  |  66 +++++++++++++++
-> >  arch/arm/boot/dts/at91-wb45n.dtsi | 169 ++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 237 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
-> >  create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 7e24249..1ee94ee 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
-> >  	at91sam9g25ek.dtb \
-> >  	at91sam9g35ek.dtb \
-> >  	at91sam9x25ek.dtb \
-> > -	at91sam9x35ek.dtb
-> > +	at91sam9x35ek.dtb \
-> > +	at91-wb45n.dtb
-> 
-> The proper name for the file is <soc>-board.dtb so this should be
-> at91sam9g25-wb45n.dtb.
-> 
+Some nodes will need to be refined on a per board level, so add phandles
+to them to reference them later.
 
-Nicolas tells me that the name was right, please disregard my comment
-(also on the other patches).
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 614b4f198cc0..ca07f6032200 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -267,7 +267,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&bt_host_wake_l>;
+ 
+-		wake-on-bt {
++		wake_on_bt: wake-on-bt {
+ 			label = "Wake-on-Bluetooth";
+ 			gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_WAKEUP>;
+@@ -285,7 +285,7 @@
+ 		status = "okay";
+ 	};
+ 
+-	sound {
++	sound: sound {
+ 		compatible = "rockchip,rk3399-gru-sound";
+ 		rockchip,cpu = <&i2s0 &i2s2>;
+ 	};
+@@ -813,7 +813,7 @@ ap_i2c_audio: &i2c8 {
+ 		};
+ 	};
+ 
+-	wifi {
++	wifi: wifi {
+ 		wlan_module_reset_l: wlan-module-reset-l {
+ 			rockchip,pins = <1 11 RK_FUNC_GPIO &pcfg_pull_none>;
+ 		};
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.17.0
