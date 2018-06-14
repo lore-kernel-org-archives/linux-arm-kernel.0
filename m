@@ -1,148 +1,124 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 14 Jun 2018 17:55:06 +0300
-Subject: [PATCH v3 4/6] thermal: tsens: Add support for SDM845
-In-Reply-To: <CAL_JsqLPKktGFH4X9gDgCFq70Uo6NvFx9-a0sR7fQU35NwZe1g@mail.gmail.com>
-References: <cover.1528972165.git.amit.kucheria@linaro.org>
- <0cdd0957cf80c2f9921928755722a427c7309964.1528972165.git.amit.kucheria@linaro.org>
- <CAL_JsqLPKktGFH4X9gDgCFq70Uo6NvFx9-a0sR7fQU35NwZe1g@mail.gmail.com>
-Message-ID: <CAP245DUMdusJpSWRQK9B8JexwJsDKbY8=7DVwxrFTL05ZY6d1w@mail.gmail.com>
+From: Matt.Sealey@arm.com (Matt Sealey)
+Date: Thu, 14 Jun 2018 15:04:52 +0000
+Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
+ bindings
+In-Reply-To: <CAL_Jsq+0kExVY33kdDoR6bAxbr2VzRUzW2j0k+2wmv4CSNVnpQ@mail.gmail.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+ <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
+ <20180612204802.GA15817@rob-hp-laptop>
+ <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
+ <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
+ <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
+ <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+ <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
+ <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
+ <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+ <5e013d65-9931-6b8d-ce7c-4333309d4ada@arm.com>
+ <CAL_Jsq+0kExVY33kdDoR6bAxbr2VzRUzW2j0k+2wmv4CSNVnpQ@mail.gmail.com>
+Message-ID: <HE1PR0802MB241249AB5A90012AA6EB5235EE7D0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Rob,
 
-Thanks for the review.
+To take this in a somewhat different direction...
 
-On Thu, Jun 14, 2018 at 5:21 PM Rob Herring <robh+dt@kernel.org> wrote:
+> > No, the above comment is about using "unit" ( if it is a standard
+> > property for specifying something specific to hardware) instead of
+> > "coresight,hwid". I would prefer to stick to the DT graph bindings,
+> > because :
 >
-> On Thu, Jun 14, 2018 at 4:43 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> > SDM845 uses the TSENS v2 IP block
-> >
-> > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/thermal/qcom-tsens.txt | 1 +
-> >  arch/arm64/boot/dts/qcom/msm8996.dtsi                    | 2 +-
-> >  drivers/thermal/qcom/tsens-v2.c                          | 9 ++++++++-
-> >  drivers/thermal/qcom/tsens.c                             | 3 +++
-> >  drivers/thermal/qcom/tsens.h                             | 5 ++++-
-> >  5 files changed, 17 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> > index 06195e8..84da3db 100644
-> > --- a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> > +++ b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> > @@ -5,6 +5,7 @@ Required properties:
-> >   - "qcom,msm8916-tsens" : For 8916 Family of SoCs
-> >   - "qcom,msm8974-tsens" : For 8974 Family of SoCs
-> >   - "qcom,msm8996-tsens" : For 8996 Family of SoCs
-> > + - "qcom,tsens-v2"      : For any SoC with v2 version of the tsens IP
+> "unit" is not a standard property and I don't like it either.
+
+Fair enough.
+
+> If you have "in-ports" and "out-ports" nodes, then that gives you
+> direction and you can use reg for the "hardware port".
 >
-> Stick with "qcom,sdm845-tsens". Though perhaps it should be
-> '"qcom,sdm845-tsens", "qcom,msm8996-tsens"' if there is compatibility.
-
-There are lots of (30+) SoC families that use v2 of the tsens IP. So
-we're talking about potentially 100s of platforms using the IP. This
-could become very unwieldy to deal with very quickly.
-
-The core functionality in tsens v2 remains the same (e.g. reading the
-temperature) and any differences could potentially be addressed with
-more specific DTs or preferably dynamically detected by probing the
-minor version of the HW version register.
-
-> >  - reg: Address range of the thermal registers
-> >  - #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> > index 6c8a857..28d4c08 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> > @@ -460,7 +460,7 @@
-> >                 };
-> >
-> >                 tsens0: thermal-sensor at 4a8000 {
-> > -                       compatible = "qcom,msm8996-tsens";
-> > +                       compatible = "qcom,msm8996-tsens", "qcom,tsens-v2";
+> in-ports {
+>   port at 0 {
+>     reg = <0>;
+>     endpoint {...};
+>   };
+>   port at 1 {
+>     reg = <1>;
+>     endpoint {...};
+>   };
+> };
+> out-ports {
+>   port at 0 {
+>     reg = <0>;
+>     endpoint {...};
+>   };
+> };
 >
-> There's no point to adding this now because you already have to
-> support "qcom,msm8996-tsens".
+> I'll need to check, but dtc may need an update to not warn about this.
 
-Of course.
+If the requirement that unit-address and the low #address-cells of reg
+now being forced by a validation tool is screwing us over here, we can't
+really change the tool; that's a IEEE 1275-1994 requirement we'd be
+hacking around.
 
->
-> >                         reg = <0x4a9000 0x1000>, /* TM */
-> >                               <0x4a8000 0x1000>; /* SROT */
-> >                         #qcom,sensors = <13>;
-> > diff --git a/drivers/thermal/qcom/tsens-v2.c b/drivers/thermal/qcom/tsens-v2.c
-> > index c981a40..abc8f13 100644
-> > --- a/drivers/thermal/qcom/tsens-v2.c
-> > +++ b/drivers/thermal/qcom/tsens-v2.c
-> > @@ -69,8 +69,15 @@ static const struct tsens_ops ops_v2 = {
-> >         .get_temp       = get_temp_tsens_v2,
-> >  };
-> >
-> > +const struct tsens_data data_tsens_v2 = {
-> > +       .ops            = &ops_v2,
-> > +};
-> > +
-> > +/* Kept around for backward compatibility with old msm8996.dtsi.
-> > + * New platforms should use data_tsens_v2 if possible and define
-> > + * the #qcom,sensors property in DT.
->
-> Hum, I think this should just be implied by the compatible as it was.
-> If this was the *only* difference, then a property would be okay, but
-> as soon as you find some other difference you need yet another
-> property and have to do a DT update on all platforms.
+Here's a thought - why don't we define the ports in each component in a
+separate graph? Describing the ATB topology as a bus with a graph structure
+and then having the components simply reference the port nodes would make
+it much easier to design.
 
-Perhaps I was needless wordy, but the only reason to keep data_8996
-around is the num_sensors bit below. Now that Bjorn's patch
-6d7c70d1cd65 ("thermal: qcom: tsens: Allow number of sensors to come
-from DT") has landed, that should be the default way to specify the
-number of sensors connected to each IP block.
+Part of the problem is trying to describe an ATB bus via a component on
+an APB bus. You lose all the niceties of describing a bus with bus
+subcomponents. Lets take the ATB bus outside.. by describing the ingress
+and egress of the component you have no idea where in the graph you are
+at the point of entry (you could start parsing at a funnel, which means
+travelling around looking for other units that match other compatibles).
 
-We want future DTs to simply use the qcom,tsens-v2 property instead of
-saying that they're all compatible with 8996. That will more truly
-reflect the HW (tsens v2) and the qcom,msm8996-tsens binding probably
-shouldn't have been added in the first place.
+If the CoreSight subsystem could have a graph pre-made of the full
+topology, then the components can point to how they wrap parts of
+that topology. You can also do away with ridiculous non-programmable
+funnels and replicator nodes, since the trace graph would encapsulate
+that information without having to instantiate a stub driver for it.
 
-> > + */
-> >  const struct tsens_data data_8996 = {
-> >         .num_sensors    = 13,
-> >         .ops            = &ops_v2,
-> >  };
-> > -
-> > diff --git a/drivers/thermal/qcom/tsens.c b/drivers/thermal/qcom/tsens.c
-> > index 3440166c..a2c9bfa 100644
-> > --- a/drivers/thermal/qcom/tsens.c
-> > +++ b/drivers/thermal/qcom/tsens.c
-> > @@ -72,6 +72,9 @@ static const struct of_device_id tsens_table[] = {
-> >         }, {
-> >                 .compatible = "qcom,msm8996-tsens",
-> >                 .data = &data_8996,
-> > +       }, {
-> > +               .compatible = "qcom,tsens-v2",
-> > +               .data = &data_tsens_v2,
->
-> Why different data if 8996 is compatible with v2?
+That doesn't solve 'unit' or 'unit-address' or 'reg' or anything but
+it would keep us in graph bindings and abstract the ATB topology from
+the components. Other fun stuff; describing bridge components and bus
+widths within the graph could give abilities to describe bandwidths
+over each trace path.
 
-See above.
+In any case, what happens when you have to decide what your funnel
+port priorities are, you'll have to define a new property for that,
+and it won't be 'reg'.
 
-> >         },
-> >         {}
-> >  };
-> > diff --git a/drivers/thermal/qcom/tsens.h b/drivers/thermal/qcom/tsens.h
-> > index dc56e1e..69212cb 100644
-> > --- a/drivers/thermal/qcom/tsens.h
-> > +++ b/drivers/thermal/qcom/tsens.h
-> > @@ -87,6 +87,9 @@ void compute_intercept_slope(struct tsens_device *, u32 *, u32 *, u32);
-> >  int init_common(struct tsens_device *);
-> >  int get_temp_common(struct tsens_device *, int, int *);
-> >
-> > -extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
-> > +/* TSENS v1 targets */
-> > +extern const struct tsens_data data_8916, data_8974, data_8960;
-> > +/* TSENS v2 targets */
-> > +extern const struct tsens_data data_8996, data_tsens_v2;
-> >
-> >  #endif /* __QCOM_TSENS_H__ */
-> > --
-> > 2.7.4
-> >
+Trying not to add anything to the graph bindings is one thing but
+trying to shoehorn it in either by doing that or inventing wholly
+device-specific properties are just as bad.
+
+Perhaps we can use the path at unit-address:arguments <-- parameters here to
+add extra information about the port. 'my-args' would pull it out in Forth,
+I don't know how FDT code deals with it (but there should be something,
+since we use it for console definition in /chosen). They're entirely
+specific to the node in question, but not used in path matching.
+
+Why can't we decide on a graph-binding update that allows specifying
+something simple as a demultiplexer output in a way the driver can
+understand and map to the hardware?
+
+> If DT bindings can be reused for ACPI, that's fine
+
+However in my opinion not the preferred way to do it..
+
+> any DT bindings to be accepted simply because they match ACPI
+> bindings.
+
+I'm sure ACPI has capability of a much classier way of describing
+things, but I have some fear that it's just OF bindings stuffed in
+a _DSD.. DT and ACPI have the responsibility of shouldering the
+burden of describing hardware. Any attempts to try and make some
+commonality to promote brevity of Linux code is totally out of scope..
+
+You can always abstract whatever definition into whatever the Linux
+drivers need at the time. That's kind of the point. Locking in to
+'how it's currently coded' is stifling when realizing the first
+attempt didn't actually adequately do what it was intended.
+
+Ta,
+Matt
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
