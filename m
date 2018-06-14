@@ -1,112 +1,88 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 14 Jun 2018 11:50:41 +0200
-Subject: [PATCH 2/4] arm: dts: add support for Laird WB50N cpu module and
- DVK
-In-Reply-To: <1528966340-23216-2-git-send-email-ben.whitten@lairdtech.com>
-References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
- <1528966340-23216-2-git-send-email-ben.whitten@lairdtech.com>
-Message-ID: <20180614095041.GW10521@piout.net>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Thu, 14 Jun 2018 11:49:51 +0200
+Subject: Patch "serial: sh-sci: Stop using printk format %pCr" has been added
+ to the 4.16-stable tree
+Message-ID: <152896979196201@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/2018 09:51:55+0100, Ben Whitten wrote:
-> Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
-> ---
->  arch/arm/boot/dts/Makefile        |   3 +-
->  arch/arm/boot/dts/at91-wb50n.dts  | 116 ++++++++++++++++++++++
->  arch/arm/boot/dts/at91-wb50n.dtsi | 202 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 320 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/at91-wb50n.dts
->  create mode 100644 arch/arm/boot/dts/at91-wb50n.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 1ee94ee..fd5f8a6 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -61,7 +61,8 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
->  	at91-sama5d4_ma5d4evk.dtb \
->  	at91-sama5d4_xplained.dtb \
->  	at91-sama5d4ek.dtb \
-> -	at91-vinco.dtb
-> +	at91-vinco.dtb \
-> +	at91-wb50n.dtb
 
-I know we have been bad at this but this should be
-at91-<soc>-<board>.dtb so at91-sama5d31-wb50n.dtb
+This is a note to let you know that I've just added the patch titled
 
->  dtb-$(CONFIG_ARCH_ATLAS6) += \
->  	atlas6-evb.dtb
->  dtb-$(CONFIG_ARCH_ATLAS7) += \
-> diff --git a/arch/arm/boot/dts/at91-wb50n.dts b/arch/arm/boot/dts/at91-wb50n.dts
-> new file mode 100644
-> index 0000000..ee4f823
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91-wb50n.dts
-> @@ -0,0 +1,116 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * at91-wb50n.dts - Device Tree file for wb50n evaluation board
-> + *
-> + *  Copyright (C) 2018 Laird
-> + *
-> + */
-> +
-> +/dts-v1/;
-> +#include "at91-wb50n.dtsi"
-> +
-> +/ {
-> +	model = "Laird Workgroup Bridge 50N - Atmel SAMA5D";
-> +	compatible = "laird,wb50n", "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
-> +
-> +	ahb {
-> +		apb {
-> +			watchdog at fffffe40 {
+    serial: sh-sci: Stop using printk format %pCr
 
-I don't mind if you want to have a preparation patch adding the
-necessary labels in the soc dtsi so you don't have to reproduce the
-ahb/apb hierarchy here.
+to the 4.16-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
-> +	ahb {
-> +		apb {
-> +			pinctrl at fffff200 {
+The filename of the patch is:
+     serial-sh-sci-stop-using-printk-format-pcr.patch
+and it can be found in the queue-4.16 subdirectory.
 
-Ditto
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
 
-> +				board {
-> +					pinctrl_mmc0_cd: mmc0_cd {
-> +						atmel,pins = <AT91_PIOC 26 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PC26 GPIO with pullup deglitch */
-> +					};
-> +
-> +					pinctrl_usba_vbus: usba_vbus {
-> +						atmel,pins = <AT91_PIOB 13 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>; /* PB13 GPIO with deglitch */
-> +					};
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&slow_osc {
-> +	atmel,osc-bypass;
-> +};
 
-After the clock binding rework, this will have to be moved to the pmc
-node (the rework is not posted, this is just to remind me that this will
-have to be done).
+>From d63c16f8e1ab761775275adcf54f4bef7c330295 Mon Sep 17 00:00:00 2001
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+Date: Fri, 1 Jun 2018 11:28:21 +0200
+Subject: serial: sh-sci: Stop using printk format %pCr
 
-> +
-> +&usart1_clk {
-> +	atmel,clk-output-range = <0 132000000>;
-> +};
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The datasheet explicitly states that 66 MHz is the maximum allowed
-frequency for the USART. Note that the new binding will not allow you to
-do that.
+commit d63c16f8e1ab761775275adcf54f4bef7c330295 upstream.
 
-However, I see the table disappeared from the latest datasheet. Maybe
-Nicolas can comment on that?
+Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+called in atomic context.
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Replace it by open-coding the operation.  This is safe here, as the code
+runs in task context.
+
+Link: http://lkml.kernel.org/r/1527845302-12159-4-git-send-email-geert+renesas at glider.be
+To: Jia-Ju Bai <baijiaju1990@gmail.com>
+To: Jonathan Corbet <corbet@lwn.net>
+To: Michael Turquette <mturquette@baylibre.com>
+To: Stephen Boyd <sboyd@kernel.org>
+To: Zhang Rui <rui.zhang@intel.com>
+To: Eduardo Valentin <edubezval@gmail.com>
+To: Eric Anholt <eric@anholt.net>
+To: Stefan Wahren <stefan.wahren@i2se.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>
+Cc: Petr Mladek <pmladek@suse.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: linux-doc at vger.kernel.org
+Cc: linux-clk at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-serial at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-renesas-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: stable at vger.kernel.org # 4.5+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Petr Mladek <pmladek@suse.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/tty/serial/sh-sci.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -2691,8 +2691,8 @@ found:
+ 			dev_dbg(dev, "failed to get %s (%ld)\n", clk_names[i],
+ 				PTR_ERR(clk));
+ 		else
+-			dev_dbg(dev, "clk %s is %pC rate %pCr\n", clk_names[i],
+-				clk, clk);
++			dev_dbg(dev, "clk %s is %pC rate %lu\n", clk_names[i],
++				clk, clk_get_rate(clk));
+ 		sci_port->clks[i] = IS_ERR(clk) ? NULL : clk;
+ 	}
+ 	return 0;
+
+
+Patches currently in stable-queue which might be from geert+renesas at glider.be are
+
+queue-4.16/serial-sh-sci-stop-using-printk-format-pcr.patch
