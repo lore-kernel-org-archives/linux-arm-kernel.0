@@ -1,130 +1,51 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Thu, 14 Jun 2018 11:58:57 +0100
-Subject: [PATCH v5 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <1528973943-28132-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1528973943-28132-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1528973943-28132-3-git-send-email-michel.pollet@bp.renesas.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 14 Jun 2018 13:24:16 +0200
+Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and
+ DVK
+In-Reply-To: <20180614090733.GV10521@piout.net>
+References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
+ <20180614090733.GV10521@piout.net>
+Message-ID: <20180614112416.GY10521@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time, it
-requires a special enable method to get it started.
+On 14/06/2018 11:07:33+0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 14/06/2018 09:51:54+0100, Ben Whitten wrote:
+> 
+> This need a proper commit message. Maybe you can also add a link to the
+> technical brief for the platform?
+> 
+> > Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile        |   3 +-
+> >  arch/arm/boot/dts/at91-wb45n.dts  |  66 +++++++++++++++
+> >  arch/arm/boot/dts/at91-wb45n.dtsi | 169 ++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 237 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
+> >  create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 7e24249..1ee94ee 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+> >  	at91sam9g25ek.dtb \
+> >  	at91sam9g35ek.dtb \
+> >  	at91sam9x25ek.dtb \
+> > -	at91sam9x35ek.dtb
+> > +	at91sam9x35ek.dtb \
+> > +	at91-wb45n.dtb
+> 
+> The proper name for the file is <soc>-board.dtb so this should be
+> at91sam9g25-wb45n.dtb.
+> 
 
-Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/Makefile        |  1 +
- arch/arm/mach-shmobile/smp-r9a06g032.c | 90 ++++++++++++++++++++++++++++++++++
- 2 files changed, 91 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+Nicolas tells me that the name was right, please disregard my comment
+(also on the other patches).
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 1939f52..d7fc98f 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -34,6 +34,7 @@ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
- smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o
-+smp-$(CONFIG_ARCH_R9A06G032)	+= smp-r9a06g032.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
- 
- # PM objects
-diff --git a/arch/arm/mach-shmobile/smp-r9a06g032.c b/arch/arm/mach-shmobile/smp-r9a06g032.c
-new file mode 100644
-index 0000000..882a838
---- /dev/null
-+++ b/arch/arm/mach-shmobile/smp-r9a06g032.c
-@@ -0,0 +1,90 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * R9A06G032 Second CA7 enabler.
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Europe Limited
-+ *
-+ * Michel Pollet <michel.pollet@bp.renesas.com>, <buserror@gmail.com>
-+ * Derived from actions,s500-smp
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/smp.h>
-+
-+/*
-+ * The second CPU is parked in ROM at boot time. It requires waking it after
-+ * writing an address into the BOOTADDR register of sysctrl.
-+ *
-+ * So the default value of the "cpu-release-addr" corresponds to BOOTADDR...
-+ *
-+ * *However* the BOOTADDR register is not available when the kernel
-+ * starts in NONSEC mode.
-+ *
-+ * So for NONSEC mode, the bootloader re-parks the second CPU into a pen
-+ * in SRAM, and changes the "cpu-release-addr" of linux's DT to a SRAM address,
-+ * which is not restricted.
-+ */
-+
-+static void __iomem *cpu_bootaddr;
-+
-+static DEFINE_SPINLOCK(cpu_lock);
-+
-+static int r9a06g032_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (!cpu_bootaddr)
-+		return -ENODEV;
-+
-+	spin_lock(&cpu_lock);
-+
-+	writel(__pa_symbol(secondary_startup), cpu_bootaddr);
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
-+	spin_unlock(&cpu_lock);
-+
-+	return 0;
-+}
-+
-+static void __init r9a06g032_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *dn;
-+	int ret = -EINVAL, dns;
-+	u32 bootaddr;
-+
-+	dn = of_get_cpu_node(1, NULL);
-+	if (!dn) {
-+		pr_err("CPU#1: missing device tree node\n");
-+		return;
-+	}
-+	/*
-+	 * Determine the address from which the CPU is polling.
-+	 * The bootloader *does* change this property.
-+	 * Note: The property can be either 64 or 32 bits, so handle both cases
-+	 */
-+	if (of_find_property(dn, "cpu-release-addr", &dns)) {
-+		if (dns == sizeof(u64)) {
-+			u64 temp;
-+			ret = of_property_read_u64(dn,
-+					"cpu-release-addr", &temp);
-+			bootaddr = temp;
-+		} else
-+			ret = of_property_read_u32(dn,
-+					"cpu-release-addr", &bootaddr);
-+	}
-+	of_node_put(dn);
-+	if (ret) {
-+		pr_err("CPU#1: invalid cpu-release-addr property\n");
-+		return;
-+	}
-+	pr_info("CPU#1: cpu-release-addr %08x\n", bootaddr);
-+
-+	cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr));
-+}
-+
-+static const struct smp_operations r9a06g032_smp_ops __initconst = {
-+	.smp_prepare_cpus = r9a06g032_smp_prepare_cpus,
-+	.smp_boot_secondary = r9a06g032_smp_boot_secondary,
-+};
-+CPU_METHOD_OF_DECLARE(r9a06g032_smp,
-+	"renesas,r9a06g032-smp", &r9a06g032_smp_ops);
 -- 
-2.7.4
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
