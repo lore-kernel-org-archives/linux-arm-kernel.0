@@ -1,42 +1,35 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Thu, 14 Jun 2018 03:04:35 +0000
-Subject: [PATCH v3 0/6] add virt-dma support for imx-sdma
-In-Reply-To: <1528906072.21021.22.camel@pengutronix.de>
-References: <1528729173-28684-1-git-send-email-yibin.gong@nxp.com>
- <1528714877.2842.3.camel@pengutronix.de> <1528822708.13468.9.camel@nxp.com>
- <1528906072.21021.22.camel@pengutronix.de>
-Message-ID: <1528974252.10947.4.camel@nxp.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 14 Jun 2018 13:56:03 +1000
+Subject: [PATCH 1/3] arm: dts: Fix error in Aspeed OpenPower Romulus
+ device-tree
+Message-ID: <20180614035605.25286-1-benh@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
-	I have identified the root cause besides the lockdep issue.
-Will contain the UART patch into my next v4 patchset.
+The reserved memory for the VGA frame buffer is at the wrong address
+for this system.
 
-Hi Sascha,
-	Will address your comments in v4 too. Thank you both input.
+Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
+---
+ arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On ?, 2018-06-13 at 18:07 +0200, Lucas Stach wrote:
-> Hi Robin,
-> 
-> Am Dienstag, den 12.06.2018, 08:58 +0000 schrieb Robin Gong:
-> > 
-> > Hi Lucas,
-> > 	Is the below DEAD LOCK issue same as your side? If yes, then
-> > I'm afraid that we have to make another patch for uart to split dma
-> > functions in uart driver out of the code area which protected by
-> > port.lock. The warning make sense since allocate sdma bd memory
-> > dynamically in virt-dma instead of static allocated as before. I'll
-> > make another uart patch into my next version patchset.
-> Yes, I see the same lockdep splat on my system. Though I'm not sure
-> if
-> this is really the root cause of the issue I see.
-> 
-> I'm getting timeouts for a serdev attached device and I don't think
-> this system ever enters memory reclaim, so the issue reported by
-> lockdep seems to be a mostly theoretical on this system. But lets see
-> how far I get when you fixed this issue, maybe the real bug is hiding
-> behind this one.
-> 
-> Regards,
-> Lucas
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+index 0b9b37d4d6ef..7d28c03a9e0b 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+@@ -21,9 +21,9 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		vga_memory: framebuffer at bf000000 {
++		vga_memory: framebuffer at 9f000000 {
+ 			no-map;
+-			reg = <0xbf000000 0x01000000>; /* 16M */
++			reg = <0x9f000000 0x01000000>; /* 16M */
+ 		};
+ 
+ 		flash_memory: region at 98000000 {
+-- 
+2.17.0
