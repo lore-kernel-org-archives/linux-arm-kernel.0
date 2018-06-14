@@ -1,96 +1,41 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Thu, 14 Jun 2018 11:30:54 -0400
-Subject: [RFC V2 3/3] perf: qcom: Add Falkor CPU PMU IMPLEMENTATION
- DEFINED event support
-In-Reply-To: <20180613130232.GA27675@arm.com>
-References: <1528379808-27970-1-git-send-email-agustinv@codeaurora.org>
- <1528379808-27970-4-git-send-email-agustinv@codeaurora.org>
- <20180612144055.m2h26n64spfm6k6o@lakrids.cambridge.arm.com>
- <9957219b64252d3b2e19724db04a1179@codeaurora.org>
- <20180613103555.GC26280@arm.com>
- <06c81a64-904f-59fa-5751-62818d6d2107@arm.com>
- <20180613130232.GA27675@arm.com>
-Message-ID: <4a584145358bd046d735c30ba0d49db6@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 14 Jun 2018 23:35:47 +0800
+Subject: [PATCH v3 3/4] soc: sunxi: sram: Add updated compatible string for
+ A64 system control
+In-Reply-To: <20180614153548.9644-1-wens@csie.org>
+References: <20180614153548.9644-1-wens@csie.org>
+Message-ID: <20180614153548.9644-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The SRAM mapping controls on Allwinner SoCs is located in a block called
+"System Controls". This block also has registers for identifying the SoC,
+reading the state of an external boot-related pin, and on some newer SoCs,
+glue layer controls for the EMAC Ethernet controller.
 
-On 2018-06-13 09:02, Will Deacon wrote:
-> On Wed, Jun 13, 2018 at 01:59:58PM +0100, Marc Zyngier wrote:
->> On 13/06/18 11:35, Will Deacon wrote:
+The A64 variant compatible is renamed to "allwinner,a64-system-control"
+to reflect this. The old A64 compatible is deprecated. So far we haven't
+seen any actual use of it.
 
-[...]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/soc/sunxi/sunxi_sram.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->> > Great :( We need to make sure we disable EL0 access during boot then, but
->> > that means we need to prove for the existence of this thing in head.S
->> > (since the PMU driver might not get loaded).
-
-Unfortunately it appears the only check we can do for this is through
-the MIDR or PMPIDRx. I'm investigating whether we can detect this 
-through
-some other mechanism, but it that doesn't exists would the MIDR.PMPIDRx
-check be acceptable?
-
->> >
->> > Also, what's the kvm story here so that we don't accidentally open up a
->> > VM-VM side-channel via these registers? How do the EL1 trapping controls
->> > work?
-
-Traps for these registers are as follows:
-
-Architecture traps:
-- HCR_EL2.TIDCP enables a trap when accessing IMP DEF registers. kvm 
-will set
-   this bit for all guests and access from EL1/EL0 will cause a trap to 
-EL2.
-- MDCR_EL2.TPM enables a trap when accessing the PM registers from 
-EL1/EL0,
-   causing accesses to trap to EL2.
-- MDCR_EL2.TPM enables a trap when accessing the PM registers from 
-EL1/EL0,
-   causing accesses to trap to EL2.
-
-IMP DEF traps:
-- IMP DEF register PMACTLR_EL0.UEN controls EL0 access to all IMP DEF
-   registers related to performance monitoring:
-   0->disables EL0 access (default), 1->enables EL0 access
-- IMP DEF HACR_EL2.TCPUPMRBB enables a trap when accessing the RBB 
-registers
-   from EL1/EL0, causing accesses to trap to EL2.
-- IMP DEF HACR_EL2.TCPUPMPCCPT enables a trap when accessing the PCC 
-registers
-   from EL1/EL0, causing accesses to trap to EL2.
-- IMP DEF HACR_EL2.TCPUPMRESRRLDR enables a trap when accessing the 
-PMRESRx_EL0
-   registers from EL1/EL0, causing accesses to trap to EL2.
-
->> 
->> We'd trap the IMPDEF register access and inject an UNDEF (assuming 
->> that
->> the IMPDEF trapping works correctly). I have strictly no plan to 
->> support
->> this in a guest.
-> 
-> Ah, so we could actually configure that in el2_setup and solve the host
-> problem if we're entered at EL2. Agustin -- does that work, and what do 
-> we
-> need to do if the host is entered at EL1?
-> 
-
-Yes, that works, I understand there is no desire to support this under
-virtualization.
-
-As for the question about the EL1 host, all of our firmware 
-configurations
-boot the host OS at EL2. Is that sufficient guarantee or can you suggest
-an alternative mechanism to ensure security?
-
-Thanks,
-Agust?n
-
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+index eec7fc6e9f66..7fec1b160dbb 100644
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -359,6 +359,10 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
+ 		.compatible = "allwinner,sun50i-a64-sram-controller",
+ 		.data = &sun50i_a64_sramc_variant,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-a64-system-control",
++		.data = &sun50i_a64_sramc_variant,
++	},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_sram_dt_match);
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+2.17.1
