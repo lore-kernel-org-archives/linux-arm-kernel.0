@@ -1,48 +1,97 @@
 From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 14 Jun 2018 13:43:12 +0300
-Subject: [PATCH v3 2/6] dt: qcom: 8996: thermal: Move to DT initialisation
+Date: Thu, 14 Jun 2018 13:43:14 +0300
+Subject: [PATCH v3 4/6] thermal: tsens: Add support for SDM845
 In-Reply-To: <cover.1528972165.git.amit.kucheria@linaro.org>
 References: <cover.1528972165.git.amit.kucheria@linaro.org>
-Message-ID: <e451a4dc1c885921c66da63549a720805c287a6a.1528972165.git.amit.kucheria@linaro.org>
+Message-ID: <0cdd0957cf80c2f9921928755722a427c7309964.1528972165.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We also split up the regmap address space into two, one for the TM
-registers, the other for the SROT registers. This was required to deal with
-different address offsets for the TM and SROT registers across different
-SoC families.
-
-Since tsens-common.c/init_common() currently only registers one address
-space, the order is important (TM before SROT). This is OK since the code
-doesn't really use the SROT functionality yet.
+SDM845 uses the TSENS v2 IP block
 
 Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/thermal/qcom-tsens.txt | 1 +
+ arch/arm64/boot/dts/qcom/msm8996.dtsi                    | 2 +-
+ drivers/thermal/qcom/tsens-v2.c                          | 9 ++++++++-
+ drivers/thermal/qcom/tsens.c                             | 3 +++
+ drivers/thermal/qcom/tsens.h                             | 5 ++++-
+ 5 files changed, 17 insertions(+), 3 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+index 06195e8..84da3db 100644
+--- a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
++++ b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+@@ -5,6 +5,7 @@ Required properties:
+  - "qcom,msm8916-tsens" : For 8916 Family of SoCs
+  - "qcom,msm8974-tsens" : For 8974 Family of SoCs
+  - "qcom,msm8996-tsens" : For 8996 Family of SoCs
++ - "qcom,tsens-v2"      : For any SoC with v2 version of the tsens IP
+ 
+ - reg: Address range of the thermal registers
+ - #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
 diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 8c7f9ca..6c8a857 100644
+index 6c8a857..28d4c08 100644
 --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -461,7 +461,17 @@
- 
- 		tsens0: thermal-sensor at 4a8000 {
- 			compatible = "qcom,msm8996-tsens";
--			reg = <0x4a8000 0x2000>;
-+			reg = <0x4a9000 0x1000>, /* TM */
-+			      <0x4a8000 0x1000>; /* SROT */
-+			#qcom,sensors = <13>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		tsens1: thermal-sensor at 4ac000 {
-+			compatible = "qcom,msm8996-tsens";
-+			reg = <0x4ad000 0x1000>, /* TM */
-+			      <0x4ac000 0x1000>; /* SROT */
-+			#qcom,sensors = <8>;
- 			#thermal-sensor-cells = <1>;
+@@ -460,7 +460,7 @@
  		};
  
+ 		tsens0: thermal-sensor at 4a8000 {
+-			compatible = "qcom,msm8996-tsens";
++			compatible = "qcom,msm8996-tsens", "qcom,tsens-v2";
+ 			reg = <0x4a9000 0x1000>, /* TM */
+ 			      <0x4a8000 0x1000>; /* SROT */
+ 			#qcom,sensors = <13>;
+diff --git a/drivers/thermal/qcom/tsens-v2.c b/drivers/thermal/qcom/tsens-v2.c
+index c981a40..abc8f13 100644
+--- a/drivers/thermal/qcom/tsens-v2.c
++++ b/drivers/thermal/qcom/tsens-v2.c
+@@ -69,8 +69,15 @@ static const struct tsens_ops ops_v2 = {
+ 	.get_temp	= get_temp_tsens_v2,
+ };
+ 
++const struct tsens_data data_tsens_v2 = {
++	.ops            = &ops_v2,
++};
++
++/* Kept around for backward compatibility with old msm8996.dtsi.
++ * New platforms should use data_tsens_v2 if possible and define
++ * the #qcom,sensors property in DT.
++ */
+ const struct tsens_data data_8996 = {
+ 	.num_sensors	= 13,
+ 	.ops		= &ops_v2,
+ };
+-
+diff --git a/drivers/thermal/qcom/tsens.c b/drivers/thermal/qcom/tsens.c
+index 3440166c..a2c9bfa 100644
+--- a/drivers/thermal/qcom/tsens.c
++++ b/drivers/thermal/qcom/tsens.c
+@@ -72,6 +72,9 @@ static const struct of_device_id tsens_table[] = {
+ 	}, {
+ 		.compatible = "qcom,msm8996-tsens",
+ 		.data = &data_8996,
++	}, {
++		.compatible = "qcom,tsens-v2",
++		.data = &data_tsens_v2,
+ 	},
+ 	{}
+ };
+diff --git a/drivers/thermal/qcom/tsens.h b/drivers/thermal/qcom/tsens.h
+index dc56e1e..69212cb 100644
+--- a/drivers/thermal/qcom/tsens.h
++++ b/drivers/thermal/qcom/tsens.h
+@@ -87,6 +87,9 @@ void compute_intercept_slope(struct tsens_device *, u32 *, u32 *, u32);
+ int init_common(struct tsens_device *);
+ int get_temp_common(struct tsens_device *, int, int *);
+ 
+-extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
++/* TSENS v1 targets */
++extern const struct tsens_data data_8916, data_8974, data_8960;
++/* TSENS v2 targets */
++extern const struct tsens_data data_8996, data_tsens_v2;
+ 
+ #endif /* __QCOM_TSENS_H__ */
 -- 
 2.7.4
