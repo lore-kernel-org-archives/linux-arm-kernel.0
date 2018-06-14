@@ -1,173 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 14 Jun 2018 21:50:04 +0200
-Subject: [PATCH V2] ARM: dts: add Raspberry Pi Compute Module and IO board
-Message-ID: <1529005804-3065-1-git-send-email-stefan.wahren@i2se.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Thu, 14 Jun 2018 13:20:04 -0700
+Subject: [PATCH] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE dependency
+In-Reply-To: <71cfc192be06d07e79bfdfe43a566d3260e19cd6.camel@kernel.crashing.org>
+References: <20180525160729.92026-1-arnd@arndb.de>
+ <87o9gxcono.fsf@linux.intel.com>
+ <71cfc192be06d07e79bfdfe43a566d3260e19cd6.camel@kernel.crashing.org>
+Message-ID: <db22cad5-c25f-1b34-1784-5df5ed1ac0b2@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi Compute Module (CM1) is a SoM which contains a
-BCM2835 processor, 512 MB RAM and a 4 GB eMMC. There is also a carrier
-board which is called Compute Module IO Board.
+On 06/11/2018 09:29 PM, Benjamin Herrenschmidt wrote:
+> On Wed, 2018-05-30 at 15:29 +0300, Felipe Balbi wrote:
+>> Hi,
+>>
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>>> Without that option, we run into a link failure:
+>>>
+>>> drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
+>>> hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
+>>>
+>>> Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+> 
+> Greg, can you send this to Linus asap ? Some people are hitting build
+> breakages upstream because of this.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
+Agreed.
 
-Changes in V2:
-- fix HDMI detect polarity
-- drop dsi1 which prevent vc4 from probing
+> Thanks !
 
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts | 88 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi    | 34 ++++++++++++
- 3 files changed, 123 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+ditto.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 37a3de7..07b306f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-rev2.dtb \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
-+	bcm2835-rpi-cm1-io1.dtb \
- 	bcm2836-rpi-2-b.dtb \
- 	bcm2837-rpi-3-b.dtb \
- 	bcm2837-rpi-3-b-plus.dtb \
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-new file mode 100644
-index 0000000..4764a25
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-@@ -0,0 +1,88 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2835-rpi-cm1.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,compute-module", "brcm,bcm2835";
-+	model = "Raspberry Pi Compute Module IO board rev1";
-+};
-+
-+&gpio {
-+	/*
-+	 * This is based on the official GPU firmware DT blob.
-+	 *
-+	 * Legend:
-+	 * "NC" = not connected (no rail from the SoC)
-+	 * "FOO" = GPIO line named "FOO" on the schematic
-+	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
-+	 */
-+	gpio-line-names = "GPIO0",
-+			  "GPIO1",
-+			  "GPIO2",
-+			  "GPIO3",
-+			  "GPIO4",
-+			  "GPIO5",
-+			  "GPIO6",
-+			  "GPIO7",
-+			  "GPIO8",
-+			  "GPIO9",
-+			  "GPIO10",
-+			  "GPIO11",
-+			  "GPIO12",
-+			  "GPIO13",
-+			  "GPIO14",
-+			  "GPIO15",
-+			  "GPIO16",
-+			  "GPIO17",
-+			  "GPIO18",
-+			  "GPIO19",
-+			  "GPIO20",
-+			  "GPIO21",
-+			  "GPIO22",
-+			  "GPIO23",
-+			  "GPIO24",
-+			  "GPIO25",
-+			  "GPIO26",
-+			  "GPIO27",
-+			  "GPIO28",
-+			  "GPIO29",
-+			  "GPIO30",
-+			  "GPIO31",
-+			  "GPIO32",
-+			  "GPIO33",
-+			  "GPIO34",
-+			  "GPIO35",
-+			  "GPIO36",
-+			  "GPIO37",
-+			  "GPIO38",
-+			  "GPIO39",
-+			  "GPIO40",
-+			  "GPIO41",
-+			  "GPIO42",
-+			  "GPIO43",
-+			  "GPIO44",
-+			  "GPIO45",
-+			  "HDMI_HPD_N",
-+			  /* Also used as ACT LED */
-+			  "EMMC_EN_N",
-+			  /* Used by eMMC */
-+			  "SD_CLK_R",
-+			  "SD_CMD_R",
-+			  "SD_DATA0_R",
-+			  "SD_DATA1_R",
-+			  "SD_DATA2_R",
-+			  "SD_DATA3_R";
-+
-+	pinctrl-0 = <&gpioout &alt0>;
-+};
-+
-+&hdmi {
-+	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-new file mode 100644
-index 0000000..ef22c2d
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-@@ -0,0 +1,34 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2835.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+
-+/ {
-+	leds {
-+		act {
-+			gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	reg_3v3: fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	reg_1v8: fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1V8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+};
-+
-+&sdhost {
-+	non-removable;
-+	vmmc-supply = <&reg_3v3>;
-+	vqmmc-supply = <&reg_1v8>;
-+};
 -- 
-2.7.4
+~Randy
