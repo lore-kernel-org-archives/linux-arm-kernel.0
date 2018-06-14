@@ -1,84 +1,43 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 14 Jun 2018 14:23:59 +0800
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
-References: <1527768879-88161-2-git-send-email-xiexiuqi@huawei.com>
- <20180606154516.GL6631@arm.com>
- <CAErSpo6S0qtR42tjGZrFu4aMFFyThx1hkHTSowTt6t3XerpHnA@mail.gmail.com>
- <20180607105514.GA13139@dhcp22.suse.cz>
- <5ed798a0-6c9c-086e-e5e8-906f593ca33e@huawei.com>
- <20180607122152.GP32433@dhcp22.suse.cz>
- <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
- <20180611085237.GI13364@dhcp22.suse.cz>
- <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
- <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
- <20180611145330.GO13364@dhcp22.suse.cz>
- <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
- <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <28ab6a17-dfb6-13d5-764c-d8255569c6bc@huawei.com>
+From: eyalr@ti.com (Reizer, Eyal)
+Date: Thu, 14 Jun 2018 06:40:05 +0000
+Subject: [EXTERNAL] Re: [PATCH] arm64: dts: hikey: Define wl1835 power
+ capabilities
+In-Reply-To: <87tvq6a577.fsf@kamboji.qca.qualcomm.com>
+References: <20180613151305.17240-1-ryan@edited.us>
+ <CANcMJZASEDRxaXwdG96nNeEDPrDm_ap5MjhXonEcg=yHZ8F=qg@mail.gmail.com>
+ <87tvq6a577.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <ae036763950c4c9e80ceccc8c61e78dd@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+> >> These properties are required for compatibility with runtime PM.
+> >> Without these properties, MMC host controller will not be aware
+> >> of power capabilities. When the wlcore driver attempts to power
+> >> on the device, it will erroneously fail with -EACCES.
+> >>
+> >> Signed-off-by: Ryan Grachek <ryan@edited.us>
+> >
+> > Fixes: 60f36637bbbd ("wlcore: sdio: allow pm to handle sdio power")
+> > Tested-by: John Stultz <john.stultz@linaro.org>
+> > Acked-by: John Stultz <john.stultz@linaro.org>
+> >
+> > Wei Xu: This fixes a functional regression with wifi on the HiKey
+> > board that was introduced in 4.18-rc with commit 60f36637bbbd
+> > ("wlcore: sdio: allow pm to handle sdio power").
+> >
+> > Could you please be sure to queue this for the 4.18-rc ?
+> 
+> Adding linux-wireless so that wireless folks are aware of this wlcore
+> regression fix as well.
+> 
+Actually  "cap-power-off-card" is normally included with all .dts files supporting wilink 
+So it should have been there from the start for this board as well. 
+It probably worked without it due to the explicit call to mmc_power_restore_host()
+that was there as an old workaround for trying to control the power explicitly from the
+driver which was actually causing other failures on suspend/resume as the mmc layer 
+already power the module on resume.
+"keep-power-in-suspend" is needed in case of planning to use "WoWLAN":
+Iw phy0 wowlan enable....
 
-On 2018/6/14 1:39, Punit Agrawal wrote:
-> Punit Agrawal <punit.agrawal@arm.com> writes:
-> 
-> 
-> [...]
-> 
->>
->> CONFIG_HAVE_MEMORYLESS node is not enabled on arm64 which means we end
->> up returning the original node in the fallback path.
->>
->> Xie, does the below patch help? I can submit a proper patch if this
->> fixes the issue for you.
->>
->> -- >8 --
->> Subject: [PATCH] arm64/numa: Enable memoryless numa nodes
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> ---
->>  arch/arm64/Kconfig   | 4 ++++
->>  arch/arm64/mm/numa.c | 2 ++
->>  2 files changed, 6 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index eb2cf4938f6d..5317e9aa93ab 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -756,6 +756,10 @@ config USE_PERCPU_NUMA_NODE_ID
->>  	def_bool y
->>  	depends on NUMA
->>  
->> +config HAVE_MEMORYLESS_NODES
->> +       def_bool y
->> +       depends on NUMA
->> +
->>  config HAVE_SETUP_PER_CPU_AREA
->>  	def_bool y
->>  	depends on NUMA
->> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
->> index dad128ba98bf..c699dcfe93de 100644
->> --- a/arch/arm64/mm/numa.c
->> +++ b/arch/arm64/mm/numa.c
->> @@ -73,6 +73,8 @@ EXPORT_SYMBOL(cpumask_of_node);
->>  static void map_cpu_to_node(unsigned int cpu, int nid)
->>  {
->>  	set_cpu_numa_node(cpu, nid);
->> +	set_numa_mem(local_memory_node(nid));
-> 
-> Argh, this should be
-> 
->         set_cpu_numa_mem(cpu, local_memory_node(nid));
-> 
-> There is not guarantee that map_cpu_to_node() will be called on the
-> local cpu.
-> 
-> Hanjun, Xie - can you try with the update please?
-
-Thanks for looking into this, we will try this tomorrow
-(the hardware is occupied now) and update here.
-
-Thanks
-Hanjun
+Best Regards,
+Eyal
