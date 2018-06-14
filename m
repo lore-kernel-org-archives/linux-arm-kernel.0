@@ -1,33 +1,102 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 14 Jun 2018 13:45:20 -0700
-Subject: [PATCH v8 03/10] firmware: xilinx: Add zynqmp IOCTL API for
- device control
-In-Reply-To: <1529000862-11510-4-git-send-email-jollys@xilinx.com>
-References: <1529000862-11510-1-git-send-email-jollys@xilinx.com>
- <1529000862-11510-4-git-send-email-jollys@xilinx.com>
-Message-ID: <3044c2b9-2268-dfcb-2d45-0117c6f91a8d@infradead.org>
+From: ilia.lin@gmail.com (ilia.lin at gmail.com)
+Date: Thu, 14 Jun 2018 23:53:47 +0200
+Subject: [PATCH v13 0/8] Clock for CPU scaling support for msm8996
+Message-ID: <20180614215358.11264-1-ilia.lin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2018 11:27 AM, Jolly Shah wrote:
-> From: Rajan Vaja <rajanv@xilinx.com>
-> 
-> Add ZynqMP firmware IOCTL API to control and configure
-> devices like PLLs, SD, Gem, etc.
-> 
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> ---
->  drivers/firmware/xilinx/zynqmp.c     | 20 ++++++++++++++++++++
->  include/linux/firmware/xlnx-zynqmp.h |  2 ++
->  2 files changed, 22 insertions(+)
+From: Ilia Lin <ilia.lin@gmail.com>
 
-Hi,
+[v13]
+ * Rebased
 
-Does this driver claim (implement) some specific ioctl code or ID?
+[v12]
+ * Addressed the kbuild fail on arm architecture
 
-If so, its ioctl numbers should be documented in Documentation/ioctl/ioctl-number.txt.
+[v11]
+ * Split the series into domains
 
-thanks,
+[v9]
+ * Addressed comments from Viresh and Russel about the error handling
+
+[v8]
+ * Reordered the patch series into 4 groups
+ * Addressed comments from Amit about the comments and commit messages
+ * Addressed comments from Amit and Viresh about the resourses deallocation
+
+[v7]
+ * Addressed comments from Viresh about resourses deallocation and DT compatible
+
+[v6]
+ * Addressed comments from Viresh about:
+  ** Comments style
+  ** Kconfig bool instead of tristate
+  ** DT and documentation style
+  ** Resourses deallocation on an error
+  ** Typos
+
+[v5]
+ * Rebased
+ * Addressed comments from Bjorn about SPDX style, functions and parameters naming
+ * Addressed comments from Viresh DT properties and style, comments style, resourses deallocation, documentation placement
+ * Addressed comments from Sricharan about unnessesary include
+ * Addressed comments from Nicolas
+ * Addressed comments from Rob about the commit messages and acks
+ * Addressed comments from Mark
+
+[v4]
+ * Adressed all comments from Stephen
+ * Added CPU regulator support
+ * Added qcom-cpufreq-kryo driver
+
+[v3]
+ * Rebased on top of the latest PLL driver changes
+ * Addressed comment from Rob Herring for bindings
+
+[v2]
+ * Addressed comments from Rob Herring for bindings
+ * Addressed comments from Mark Rutland for memory barrier
+ * Addressed comments from Julien Thierry for clock reenabling condition
+ * Tuned the HW configuration for clock frequencies below 600MHz
+
+SOC (1/15):
+Extracts the kryo l2 accessors driver from the QCOM PMU driver
+
+Clocks (2/15-9/15):
+This series adds support for the CPU clocks on msm8996 devices.
+The driver uses the existing PLL drivers and is required to control
+the CPU frequency scaling on the MSM8996.
+
+Ilia Lin (5):
+soc: qcom: Separate kryo l2 accessors from PMU driver
+clk: Use devm_ in the register fixed factor clock
+clk: qcom: Add CPU clock driver for msm8996
+dt-bindings: clk: qcom: Add bindings for CPU clock for msm8996
+clk: qcom: Add ACD path to CPU clock driver for msm8996
+
+Rajendra Nayak (3):
+clk: qcom: Make clk_alpha_pll_configure available to modules
+clk: qcom: cpu-8996: Add support to switch to alternate PLL
+clk: qcom: cpu-8996: Add support to switch below 600Mhz
+
+.../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
+drivers/clk/clk-fixed-factor.c                     |   2 +-
+drivers/clk/qcom/Kconfig                           |  10 +
+drivers/clk/qcom/Makefile                          |   1 +
+drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
+drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
+drivers/clk/qcom/clk-cpu-8996.c                    | 510 +++++++++++++++++++++
+drivers/perf/Kconfig                               |   1 +
+drivers/perf/qcom_l2_pmu.c                         |  90 +---
+drivers/soc/qcom/Kconfig                           |   3 +
+drivers/soc/qcom/Makefile                          |   1 +
+drivers/soc/qcom/kryo-l2-accessors.c               |  56 +++
+include/soc/qcom/kryo-l2-accessors.h               |  12 +
+13 files changed, 643 insertions(+), 67 deletions(-)
+create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
+create mode 100644 drivers/clk/qcom/clk-cpu-8996.c
+create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
+create mode 100644 include/soc/qcom/kryo-l2-accessors.h
+
 -- 
-~Randy
+2.11.0
