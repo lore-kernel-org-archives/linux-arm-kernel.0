@@ -1,150 +1,124 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 14 Jun 2018 09:58:49 +0200
-Subject: [PATCH v7 3/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <20180613163621.23995-4-radu.pirea@microchip.com>
-References: <20180613163621.23995-1-radu.pirea@microchip.com>
- <20180613163621.23995-4-radu.pirea@microchip.com>
-Message-ID: <20180614075849.dfiqwcu6rtzgpzq7@rfolt0960.corp.atmel.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Thu, 14 Jun 2018 11:04:11 +0300
+Subject: [PATCH v3 1/3] media: v4l2-ctrl: Change control for VP8 profile
+ to menu control
+In-Reply-To: <20180614074652.162796-2-keiichiw@chromium.org>
+References: <20180614074652.162796-1-keiichiw@chromium.org>
+ <20180614074652.162796-2-keiichiw@chromium.org>
+Message-ID: <2c5a4dbf-6640-052b-a873-76b4c50abe73@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 07:36:18PM +0300, Radu Pirea wrote:
-> This mfd driver is just a wrapper over atmel_serial driver and
-> spi-at91-usart driver. Selection of one of the drivers is based on a
-> property from device tree. If the property is not specified, the default
-> driver is atmel_serial.
+Hi Keiichi,
+
+On 06/14/2018 10:46 AM, Keiichi Watanabe wrote:
+> Add a menu control V4L2_CID_MPEG_VIDEO_VP8_PROFILE for VP8 profile and
+> make V4L2_CID_MPEG_VIDEO_VPX_PROFILE an alias of it. This new control
+> is used to select a desired profile for VP8 encoder, and query for
+> supported profiles by VP8 encoder/decoder.
 > 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> Though we have originally a control V4L2_CID_MPEG_VIDEO_VPX_PROFILE and its name
+> contains 'VPX', it works only for VP8 because supported profiles usually differ
+> between VP8 and VP9. In addition, this contorol cannot be used for querying
+> since it is not a menu control but an integer control, which cannot return an
+> arbitrary set of supported profiles.
+> 
+> The new control V4L2_CID_MPEG_VIDEO_VP8_PROFILE is a menu control as with
+> controls for other codec profiles. (e.g. H264)
+> 
+> In addition, this patch also fixes the use of
+> V4L2_CID_MPEG_VIDEO_VPX_PROFILE in drivers of Qualcomm's venus and
+> Samsung's s5p-mfc.
+> 
+> Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
 > ---
->  drivers/mfd/Kconfig      |  9 ++++++
->  drivers/mfd/Makefile     |  1 +
->  drivers/mfd/at91-usart.c | 69 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 79 insertions(+)
->  create mode 100644 drivers/mfd/at91-usart.c
+>  .../media/uapi/v4l/extended-controls.rst      | 27 ++++++++++++++++---
+>  drivers/media/platform/qcom/venus/core.h      |  2 +-
+>  .../media/platform/qcom/venus/hfi_helper.h    | 12 ++++-----
+>  .../media/platform/qcom/venus/vdec_ctrls.c    | 10 ++++---
+>  drivers/media/platform/qcom/venus/venc.c      | 14 +++++-----
+>  .../media/platform/qcom/venus/venc_ctrls.c    | 12 +++++----
+>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c  | 15 +++++------
+>  drivers/media/v4l2-core/v4l2-ctrls.c          | 12 ++++++++-
+>  include/uapi/linux/v4l2-controls.h            | 11 +++++++-
+>  9 files changed, 79 insertions(+), 36 deletions(-)
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index b860eb5aa194..a886672b960d 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -99,6 +99,15 @@ config MFD_AAT2870_CORE
->  	  additional drivers must be enabled in order to use the
->  	  functionality of the device.
->  
-> +config MFD_AT91_USART
-> +	tristate "AT91 USART Driver"
-> +	select MFD_CORE
-> +	help
-> +	  Select this to get support for AT91 USART IP. This is a wrapper
-> +	  over at91-usart-serial driver and usart-spi-driver. Only one function
-> +	  can be used at a time. The choice is done at boot time by the probe
-> +	  function of this MFD driver according to a device tree property.
+> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+> index 03931f9b1285..de99eafb0872 100644
+> --- a/Documentation/media/uapi/v4l/extended-controls.rst
+> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+> @@ -1955,9 +1955,30 @@ enum v4l2_vp8_golden_frame_sel -
+>  ``V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP (integer)``
+>      Quantization parameter for a P frame for VP8.
+> 
+> -``V4L2_CID_MPEG_VIDEO_VPX_PROFILE (integer)``
+> -    Select the desired profile for VPx encoder. Acceptable values are 0,
+> -    1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
+> +.. _v4l2-mpeg-video-vp8-profile:
 > +
->  config MFD_ATMEL_FLEXCOM
->  	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
->  	select MFD_CORE
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index d9d2cf0d32ef..db1332aa96db 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -185,6 +185,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
->  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
->  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
->  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-> +obj-$(CONFIG_MFD_AT91_USART)	+= at91-usart.o
->  obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
->  obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
->  obj-$(CONFIG_MFD_ATMEL_SMC)	+= atmel-smc.o
-> diff --git a/drivers/mfd/at91-usart.c b/drivers/mfd/at91-usart.c
-> new file mode 100644
-> index 000000000000..3014ce532644
-> --- /dev/null
-> +++ b/drivers/mfd/at91-usart.c
-> @@ -0,0 +1,69 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Driver for AT91 USART
-> + *
-> + * Copyright (C) 2018 Microchip Technology
-> + *
-> + * Author: Radu Pirea <radu.pirea@microchip.com>
-> + *
-> + */
+> +``V4L2_CID_MPEG_VIDEO_VP8_PROFILE``
+> +    (enum)
 > +
-> +#include <dt-bindings/mfd/at91-usart.h>
+> +enum v4l2_mpeg_video_vp8_profile -
+> +    This control allows to select the profile for VP8 encoder.
+> +    This is also used to enumerate supported profiles by VP8 encoder or decoder.
+> +    Possible values are:
 > +
-> +#include <linux/module.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/property.h>
 > +
-> +static struct mfd_cell at91_usart_spi_subdev = {
-> +		.name = "at91_usart_spi",
-> +		.of_compatible = "microchip,at91sam9g45-usart-spi",
-> +	};
 > +
-> +static struct mfd_cell at91_usart_serial_subdev = {
-> +		.name = "atmel_usart_serial",
-> +		.of_compatible = "atmel,at91rm9200-usart-serial",
-> +	};
+> +.. flat-table::
+> +    :header-rows:  0
+> +    :stub-columns: 0
 > +
-> +static int at91_usart_mode_probe(struct platform_device *pdev)
-> +{
-> +	struct mfd_cell cell;
-> +	u32 opmode = AT91_USART_MODE_SERIAL;
-> +
-> +	device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
-> +
-> +	switch (opmode) {
-> +	case AT91_USART_MODE_SPI:
-> +		cell = at91_usart_spi_subdev;
-> +		break;
-> +	case AT91_USART_MODE_SERIAL:
-> +		cell = at91_usart_serial_subdev;
-> +		break;
-> +	default:
-> +		break;
-
-If there is an invalid opmode from the DT, you will pass a non initialized cell
-to mfd_add_device().
-
-Regards
-
-Ludovic
-
-> +	}
-> +
-> +	return devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_AUTO, &cell, 1,
-> +			      NULL, 0, NULL);
-> +}
-> +
-> +static const struct of_device_id at91_usart_mode_of_match[] = {
-> +	{ .compatible = "atmel,at91rm9200-usart" },
-> +	{ .compatible = "atmel,at91sam9260-usart" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, at91_flexcom_of_match);
-> +
-> +static struct platform_driver at91_usart_mfd = {
-> +	.probe	= at91_usart_mode_probe,
-> +	.driver	= {
-> +		.name		= "at91_usart_mode",
-> +		.of_match_table	= at91_usart_mode_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(at91_usart_mfd);
-> +
-> +MODULE_AUTHOR("Radu Pirea <radu.pirea@microchip.com>");
-> +MODULE_DESCRIPTION("AT91 USART MFD driver");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 2.17.1
+> +    * - ``V4L2_MPEG_VIDEO_VP8_PROFILE_0``
+> +      - Profile 0
+> +    * - ``V4L2_MPEG_VIDEO_VP8_PROFILE_1``
+> +      - Profile 1
+> +    * - ``V4L2_MPEG_VIDEO_VP8_PROFILE_2``
+> +      - Profile 2
+> +    * - ``V4L2_MPEG_VIDEO_VP8_PROFILE_3``
+> +      - Profile 3
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  High Efficiency Video Coding (HEVC/H.265) Control Reference
+> diff --git a/drivers/media/platform/qcom/venus/core.h b/drivers/media/platform/qcom/venus/core.h
+> index 0360d295f4c8..f242e7f9f6a2 100644
+> --- a/drivers/media/platform/qcom/venus/core.h
+> +++ b/drivers/media/platform/qcom/venus/core.h
+> @@ -159,7 +159,7 @@ struct venc_controls {
+>  	struct {
+>  		u32 mpeg4;
+>  		u32 h264;
+> -		u32 vpx;
+> +		u32 vp8;
+>  	} profile;
+>  	struct {
+>  		u32 mpeg4;
+> diff --git a/drivers/media/platform/qcom/venus/hfi_helper.h b/drivers/media/platform/qcom/venus/hfi_helper.h
+> index 55d8eb21403a..07bf49dd2ec6 100644
+> --- a/drivers/media/platform/qcom/venus/hfi_helper.h
+> +++ b/drivers/media/platform/qcom/venus/hfi_helper.h
+> @@ -333,12 +333,12 @@
+>  #define HFI_VC1_LEVEL_3				0x00000040
+>  #define HFI_VC1_LEVEL_4				0x00000080
+> 
+> -#define HFI_VPX_PROFILE_SIMPLE			0x00000001
+> -#define HFI_VPX_PROFILE_ADVANCED		0x00000002
+> -#define HFI_VPX_PROFILE_VERSION_0		0x00000004
+> -#define HFI_VPX_PROFILE_VERSION_1		0x00000008
+> -#define HFI_VPX_PROFILE_VERSION_2		0x00000010
+> -#define HFI_VPX_PROFILE_VERSION_3		0x00000020
+> +#define HFI_VP8_PROFILE_SIMPLE			0x00000001
+> +#define HFI_VP8_PROFILE_ADVANCED		0x00000002
+> +#define HFI_VP8_PROFILE_VERSION_0		0x00000004
+> +#define HFI_VP8_PROFILE_VERSION_1		0x00000008
+> +#define HFI_VP8_PROFILE_VERSION_2		0x00000010
+> +#define HFI_VP8_PROFILE_VERSION_3		0x00000020
+
+Please do not rename these driver internal defines, just leave VPX as it
+is now.
+
+
+-- 
+regards,
+Stan
