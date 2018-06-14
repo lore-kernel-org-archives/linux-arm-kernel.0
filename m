@@ -1,58 +1,70 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 14 Jun 2018 16:27:31 +0900
-Subject: [RESEND PATCH] media: helene: fix tuning frequency of satellite
-In-Reply-To: <20180529010640.18604-1-suzuki.katsuhiro@socionext.com>
-References: <20180529010640.18604-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <00c701d403b1$28015e20$78041a60$@socionext.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 14 Jun 2018 10:19:20 +0300
+Subject: [RFC PATCH] sdhci-of-arasan: card initialization failure -84
+In-Reply-To: <20180604064211.q2thyftgpffuaer2@laureti-dev>
+References: <20180604064211.q2thyftgpffuaer2@laureti-dev>
+Message-ID: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+And again without mangling Atul's email address.
 
-This patch is wrong, I got a mistake.
-
-DTV_FREQUENCY for satellite delivery systems, the frequency is in 'kHz' not 'Hz',
-so original code is correct. 
-
-Please forget this patch. Sorry for confusing...
-
-
-Regards,
---
-Katsuhiro Suzuki
-
-> -----Original Message-----
-> From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> Sent: Tuesday, May 29, 2018 10:07 AM
-> To: Abylay Ospan <aospan@netup.ru>; Mauro Carvalho Chehab
-> <mchehab+samsung@kernel.org>; linux-media at vger.kernel.org
-> Cc: Masami Hiramatsu <masami.hiramatsu@linaro.org>; Jassi Brar
-> <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; Suzuki, Katsuhiro/?? ??
-> <suzuki.katsuhiro@socionext.com>
-> Subject: [RESEND PATCH] media: helene: fix tuning frequency of satellite
+On 04/06/18 09:42, Helmut Grohne wrote:
+> Work around repeated:
 > 
-> This patch fixes tuning frequency of satellite to kHz. That as same
-> as terrestrial one.
-> 
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+>     mmc0: error -84 whilst initialising SD card
 > ---
->  drivers/media/dvb-frontends/helene.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mmc/host/sdhci.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/media/dvb-frontends/helene.c
-> b/drivers/media/dvb-frontends/helene.c
-> index 04033f0c278b..0a4f312c4368 100644
-> --- a/drivers/media/dvb-frontends/helene.c
-> +++ b/drivers/media/dvb-frontends/helene.c
-> @@ -523,7 +523,7 @@ static int helene_set_params_s(struct dvb_frontend *fe)
->  	enum helene_tv_system_t tv_system;
->  	struct dtv_frontend_properties *p = &fe->dtv_property_cache;
->  	struct helene_priv *priv = fe->tuner_priv;
-> -	int frequencykHz = p->frequency;
-> +	int frequencykHz = p->frequency / 1000;
->  	uint32_t frequency4kHz = 0;
->  	u32 symbol_rate = p->symbol_rate/1000;
+> I'm seeing the above error -84 with a series of Kingston cards of 4GB capacity
+> when used with an arasan host controller. Using the cards with other hosts or
+> using other cards with the host is not problematic. The host controller has the
+> following device tree:
 > 
-> --
-> 2.17.0
+> 	ps7-sdio at e0100000 {
+> 		compatible = "arasan,sdhci-8.9a";
+> 		reg = <0xe0100000 0x1000>;
+> 		clock-names = "clk_xin", "clk_ahb";
+> 		clock-frequency = <50000000>;
+> 		clocks = <&clkc 21>, <&clkc 32>;
+> 		interrupt-parent = <&ps7_scugic_0>;
+> 		interrupts = <0 24 4>;
+> 	};
+> 
+> When enabling sufficient debugging (and thus slowing the kernel down), the
+> problem goes away. Without debug features, the insertion of this delay suffices
+> for my particular instance. Inserting the same delay before the
+> SDHCI_CLOCK_CARD_EN write also makes the error go away.
+> 
+> While instrumenting the code I found that the loop waiting for the
+> SDHCI_CLOCK_INT_STABLE would always terminate immediately (regardless of the
+> card being used). Only when the card is removed, the loop would spin once. This
+> hints that potentially the stable checking is broken for this host controller.
+> 
+> During my testing I checked 7 Kingston cards, 2 Transcend Cards, 1 Apacer card,
+> 3 arasn hosts, 3 non-arasan hosts and had consistent reports for a similar
+> number of devices from others.
+> 
+> If my hypothesis is reasonable, I can turn this patch into a new quirk that
+> replaces the stable polling with msleep(20), which is the poll timeout. Is
+> there anything else I should investigate before doing so?
+
+Please avoid quirks.  Perhaps use the ->set_clock() callback.
+
+> 
+> Helmut
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 90cc1977b792..5d2809aeb4eb 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1430,6 +1430,7 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
+>  
+>  	clk |= SDHCI_CLOCK_CARD_EN;
+>  	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+> +	udelay(80);
+>  }
+>  EXPORT_SYMBOL_GPL(sdhci_enable_clk);
+>  
+> 
