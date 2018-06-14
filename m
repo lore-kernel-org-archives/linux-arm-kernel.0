@@ -1,642 +1,112 @@
-From: ben.whitten@gmail.com (Ben Whitten)
-Date: Thu, 14 Jun 2018 09:51:57 +0100
-Subject: [PATCH 4/4] arm: dts: add support for Laird SOM60 module and DVK
- boards
-In-Reply-To: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
-References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
-Message-ID: <1528966340-23216-4-git-send-email-ben.whitten@lairdtech.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 14 Jun 2018 16:55:49 +0800
+Subject: [PATCH] pinctrl: mt7622: fix a kernel panic when pio don't work as
+ EINT controller
+Message-ID: <6615b85997509d659358d33eab2d280e235b8659.1528966092.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
----
- arch/arm/boot/dts/Makefile                    |   3 +-
- arch/arm/boot/dts/at91-dvk_som60.dts          |  95 +++++++++++
- arch/arm/boot/dts/at91-dvk_su60_somc.dtsi     | 159 ++++++++++++++++++
- arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi |  96 +++++++++++
- arch/arm/boot/dts/at91-som60.dtsi             | 229 ++++++++++++++++++++++++++
- 5 files changed, 581 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/at91-dvk_som60.dts
- create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
- create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
- create mode 100644 arch/arm/boot/dts/at91-som60.dtsi
+From: Sean Wang <sean.wang@mediatek.com>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 486ab59..4d3d9ca 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -63,7 +63,8 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
- 	at91-sama5d4ek.dtb \
- 	at91-vinco.dtb \
- 	at91-wb50n.dtb \
--	at91-gatwick.dtb
-+	at91-gatwick.dtb \
-+	at91-dvk_som60.dtb
- dtb-$(CONFIG_ARCH_ATLAS6) += \
- 	atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_ATLAS7) += \
-diff --git a/arch/arm/boot/dts/at91-dvk_som60.dts b/arch/arm/boot/dts/at91-dvk_som60.dts
-new file mode 100644
-index 0000000..ededd5b
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-dvk_som60.dts
-@@ -0,0 +1,95 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-dvk_som60.dts - Device Tree file for the DVK SOM60 board
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+/dts-v1/;
-+#include "at91-som60.dtsi"
-+#include "at91-dvk_su60_somc.dtsi"
-+#include "at91-dvk_su60_somc_lcm.dtsi"
-+
-+/ {
-+	model = "Laird DVK SOM60";
-+	compatible = "laird,dvk-som60", "laird,som60", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
-+
-+	chosen {
-+		stdout-path = &dbgu;
-+		tick-timer = &pit;
-+	};
-+};
-+
-+&mmc0 {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	status = "okay";
-+};
-+
-+&ssc0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&usart1 {
-+	status = "okay";
-+};
-+
-+&usart2 {
-+	status = "okay";
-+};
-+
-+&usart3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dbgu {
-+	status = "okay";
-+};
-+
-+&pit {
-+	status = "okay";
-+};
-+
-+&adc0 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&macb0 {
-+	status = "okay";
-+};
-+
-+&macb1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/at91-dvk_su60_somc.dtsi b/arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
-new file mode 100644
-index 0000000..6031c2f
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
-@@ -0,0 +1,159 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-dvk_su60_somc.dtsi - Device Tree file for the DVK SOM60 base board
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+
-+/ {
-+	sound {
-+		compatible = "atmel,asoc-wm8904";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pck2_as_audio_mck>;
-+
-+		atmel,model = "wm8904 @ DVK-SOM60";
-+		atmel,audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"IN2L", "Line In Jack",
-+			"IN2R", "Line In Jack",
-+			"Mic", "MICBIAS",
-+			"IN1L", "Mic";
-+
-+		atmel,ssc-controller = <&ssc0>;
-+		atmel,audio-codec = <&wm8904>;
-+
-+		status = "okay";
-+	};
-+};
-+
-+&mmc0 {
-+	status = "okay";
-+
-+	pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_cd>;
-+	slot at 0 {
-+		bus-width = <4>;
-+		cd-gpios = <&pioE 31 GPIO_ACTIVE_HIGH>;
-+		cd-inverted;
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	/* spi0.0: 4M Flash Macronix MX25R4035FM1IL0 */
-+	spi-flash at 0 {
-+		compatible = "mxicy,mx25u4035", "jedec,spi-nor";
-+		spi-max-frequency = <33000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&ssc0 {
-+	atmel,clk-from-rk-pin;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	wm8904: wm8904 at 1a {
-+		compatible = "wlf,wm8904";
-+		reg = <0x1a>;
-+		clocks = <&pck2>;
-+		clock-names = "mclk";
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	eeprom at 87 {
-+		compatible = "giantec,24c32";
-+		reg = <87>;
-+		pagesize = <32>;
-+	};
-+};
-+
-+&usart1 {
-+	status = "okay";
-+};
-+
-+&usart2 {
-+	status = "okay";
-+};
-+
-+&usart3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dbgu {
-+	status = "okay";
-+};
-+
-+&pit {
-+	status = "okay";
-+};
-+
-+&adc0 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&macb0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "okay";
-+
-+	ethernet-phy at 7 {
-+		reg = <7>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_geth_int>;
-+		interrupt-parent = <&pioB>;
-+		interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-+		txen-skew-ps = <800>;
-+		txc-skew-ps = <3000>;
-+		rxdv-skew-ps = <400>;
-+		rxc-skew-ps = <3000>;
-+		rxd0-skew-ps = <400>;
-+		rxd1-skew-ps = <400>;
-+		rxd2-skew-ps = <400>;
-+		rxd3-skew-ps = <400>;
-+	};
-+};
-+
-+&macb1 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "okay";
-+
-+	ethernet-phy at 1 {
-+		reg = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_eth_int>;
-+		interrupt-parent = <&pioC>;
-+		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
-+	};
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi b/arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
-new file mode 100644
-index 0000000..d98c644
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
-@@ -0,0 +1,96 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-dvk_su60_somc_lcm.dtsi - Device Tree file for the DVK SOM60 LCD board
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+
-+/ {
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				board {
-+					pinctrl_lcd_ctp_int: lcd_ctp_int {
-+						 atmel,pins =
-+							 <AT91_PIOC 28 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-+					};
-+				};
-+			};
-+		};
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&hlcdc_pwm 0 50000 0>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		/* Actually Winstar WF70GTIAGDNG0 */
-+		compatible = "innolux,at070tn92", "simple-panel";
-+		backlight = <&backlight>;
-+		power-supply = <&vcc_lcd_reg>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+
-+		port at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			panel_input: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&hlcdc_panel_output>;
-+			};
-+		};
-+	};
-+
-+	vcc_lcd_reg: fixedregulator_lcd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC LCM";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+		status = "okay";
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	ft5426 at 56 {
-+		/* Actually FT5426 */
-+		compatible = "edt,edt-ft5406";
-+		reg = <56>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcd_ctp_int>;
-+
-+		interrupt-parent = <&pioC>;
-+		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
-+
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+	};
-+};
-+
-+&hlcdc {
-+	status = "okay";
-+
-+	hlcdc-display-controller {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
-+
-+		port at 0 {
-+			hlcdc_panel_output: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&panel_input>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91-som60.dtsi b/arch/arm/boot/dts/at91-som60.dtsi
-new file mode 100644
-index 0000000..1843284
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-som60.dtsi
-@@ -0,0 +1,229 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-som60.dtsi - Device Tree file for the SOM60 module
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+#include "sama5d36.dtsi"
-+
-+/ {
-+	model = "Laird SOM60";
-+	compatible = "laird,som60", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
-+
-+	chosen {
-+		stdout-path = &dbgu;
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x8000000>;
-+	};
-+
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				board {
-+					pinctrl_mmc0_cd: mmc0_cd {
-+						atmel,pins =
-+							<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+					};
-+
-+					pinctrl_mmc0_en: mmc0_en {
-+						atmel,pins =
-+							<AT91_PIOE 30 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_nand0_wp: nand0_wp {
-+						atmel,pins =
-+							<AT91_PIOE 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
-+					};
-+
-+					pinctrl_usb_vbus: usb_vbus {
-+						atmel,pins =
-+							<AT91_PIOE 20 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>; /* Conflicts with USART2_SCK */
-+					};
-+
-+					pinctrl_usart2_sck: usart2_sck {
-+						atmel,pins =
-+							<AT91_PIOE 20 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* Conflicts with USB_VBUS */
-+					};
-+
-+					pinctrl_usb_oc: usb_oc {
-+						atmel,pins =
-+							<AT91_PIOE 15 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>; /* Conflicts with USART3_SCK */
-+					};
-+
-+					pinctrl_usart3_sck: usart3_sck {
-+						atmel,pins =
-+							<AT91_PIOE 15 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* Conflicts with USB_OC */
-+					};
-+
-+					pinctrl_usba_vbus: usba_vbus {
-+					   atmel,pins =
-+							<AT91_PIOC 14 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+					};
-+
-+					pinctrl_geth_int: geth_int {
-+						atmel,pins =
-+							<AT91_PIOB 25 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>; /* Conflicts with USART1_SCK */
-+					};
-+
-+					pinctrl_usart1_sck: usart1_sck {
-+						atmel,pins =
-+							<AT91_PIOB 25 AT91_PERIPH_A AT91_PINCTRL_NONE>; /* Conflicts with GETH_INT */
-+					};
-+
-+					pinctrl_eth_int: eth_int {
-+						atmel,pins =
-+							<AT91_PIOC 10 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+					};
-+
-+					pinctrl_pck2_as_audio_mck: pck2_as_audio_mck {
-+						atmel,pins =
-+							<AT91_PIOC 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&mmc0 {
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <8>;
-+	};
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+	};
-+};
-+
-+&spi0 {
-+	cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
-+};
-+
-+&usart0 {
-+	atmel,use-dma-rx;
-+	atmel,use-dma-tx;
-+	status = "okay";
-+	pinctrl-0 = <&pinctrl_usart0 &pinctrl_usart0_rts_cts>;
-+};
-+
-+&usart1 {
-+	pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
-+};
-+
-+&usart2 {
-+	pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rts_cts>;
-+};
-+
-+&usart3 {
-+	pinctrl-0 = <&pinctrl_usart3 &pinctrl_usart3_rts_cts>;
-+};
-+
-+&adc0 {
-+	pinctrl-0 = <
-+		&pinctrl_adc0_adtrg
-+		&pinctrl_adc0_ad0
-+		&pinctrl_adc0_ad1
-+		&pinctrl_adc0_ad2
-+		&pinctrl_adc0_ad3
-+		&pinctrl_adc0_ad4
-+		&pinctrl_adc0_ad5
-+		>;
-+};
-+
-+&macb0 {
-+	phy-mode = "rgmii";
-+};
-+
-+&macb1 {
-+	phy-mode = "rmii";
-+};
-+
-+
-+&ebi {
-+	pinctrl-0 = <&pinctrl_ebi_nand_addr>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-+
-+&nand_controller {
-+	status = "okay";
-+
-+	nand: nand at 3 {
-+		reg = <0x3 0x0 0x2>;
-+		atmel,rb = <0>;
-+		nand-bus-width = <8>;
-+		nand-ecc-mode = "hw";
-+		nand-ecc-strength = <8>;
-+		nand-ecc-step-size = <512>;
-+		nand-on-flash-bbt;
-+		label = "atmel_nand";
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ubootspl at 0 {
-+				label = "u-boot-spl";
-+				reg = <0x0 0x20000>;
-+			};
-+
-+			uboot at 20000 {
-+				label = "u-boot";
-+				reg = <0x20000 0x80000>;
-+			};
-+
-+			ubootenv at a0000 {
-+				label = "u-boot-env";
-+				reg = <0xa0000 0x20000>;
-+			};
-+
-+			ubootenv at c0000 {
-+				label = "u-boot-env";
-+				reg = <0xc0000 0x20000>;
-+			};
-+
-+			ubi at e0000 {
-+				label = "ubi";
-+				reg = <0xe0000 0xfe00000>;
-+			};
-+		};
-+	};
-+};
-+
-+&usb0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usba_vbus>;
-+	atmel,vbus-gpio = <&pioC 14 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_vbus &pinctrl_usb_oc>;
-+	num-ports = <3>;
-+	atmel,vbus-gpio = <0
-+		&pioE 20 GPIO_ACTIVE_HIGH
-+		0>;
-+	atmel,oc-gpio = <0
-+		&pioE 15 GPIO_ACTIVE_LOW
-+		0>;
-+};
+The function, external interrupt controller, is made as an optional to
+mt7622 pinctrl. But if we don't want pio behaves as an external interrupt
+controller, it would lead to hw->eint not be created properly and then
+will cause 'kernel NULL pointer' issue when gpiochip try to call .to_irq
+or .set_config. To fix it, check hw->eint before accessing the member.
+
+[    1.339494] Unable to handle kernel NULL pointer dereference at virtual
+	       address 00000010
+[    1.347857] Mem abort info:
+[    1.350742]   ESR = 0x96000005
+[    1.353905]   Exception class = DABT (current EL), IL = 32 bits
+[    1.360024]   SET = 0, FnV = 0
+[    1.363185]   EA = 0, S1PTW = 0
+[    1.366431] Data abort info:
+[    1.369405]   ISV = 0, ISS = 0x00000005
+[    1.373363]   CM = 0, WnR = 0
+[    1.376437] [0000000000000010] user address but active_mm is swapper
+[    1.383005] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+[    1.388748] Modules linked in:
+[    1.391897] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc1+ #344
+[    1.398625] Hardware name: MediaTek MT7622 RFB1 board (DT)
+[    1.404279] pstate: 80000005 (Nzcv daif -PAN -UAO)
+[    1.409221] pc : mtk_eint_find_irq+0x8/0x24
+[    1.413532] lr : mtk_gpio_to_irq+0x20/0x28
+[    1.417749] sp : ffffff800801baf0
+[    1.421161] x29: ffffff800801baf0 x28: ffffff8008792f40
+[    1.426637] x27: ffffff800886b000 x26: ffffff8008615620
+[    1.432113] x25: ffffffc00e4dbdc8 x24: ffffff80087b8000
+[    1.437589] x23: ffffffc00325a000 x22: ffffffc00325a010
+[    1.443066] x21: ffffffc0033dec18 x20: 00000000ffffffea
+[    1.448542] x19: ffffffc00e4db800 x18: 0000000000000130
+[    1.454018] x17: 000000000000000e x16: 0000000000000007
+[    1.459494] x15: ffffff80085ee000 x14: 0000000000000001
+[    1.464970] x13: 0000000000000001 x12: 0000000000000010
+[    1.470446] x11: 0101010101010101 x10: 0000000000000880
+[    1.475922] x9 : ffffff800801b990 x8 : ffffffc0030688e0
+[    1.481399] x7 : ffffff80080c0660 x6 : ffffffc00e4dbbb0
+[    1.486875] x5 : 0000000000000000 x4 : 0000000000000000
+[    1.492351] x3 : ffffff80082a92f4 x2 : 00000000fffffffa
+[    1.497826] x1 : 0000000000000051 x0 : 0000000000000000
+[    1.503305] Process swapper/0 (pid: 1, stack limit = 0x0000000054e053bd)
+[    1.510210] Call trace:
+[    1.512727]  mtk_eint_find_irq+0x8/0x24
+[    1.516677]  mtk_gpio_to_irq+0x20/0x28
+[    1.520539]  gpiod_to_irq+0x48/0x60
+[    1.524135]  mmc_gpiod_request_cd_irq+0x3c/0xc4
+[    1.528804]  mmc_start_host+0x6c/0x8c
+[    1.532575]  mmc_add_host+0x58/0x7c
+[    1.536168]  msdc_drv_probe+0x4fc/0x67c
+[    1.540121]  platform_drv_probe+0x58/0xa4
+[    1.544251]  driver_probe_device+0x204/0x44c
+[    1.548649]  __driver_attach+0x84/0xf8
+[    1.552512]  bus_for_each_dev+0x68/0xa0
+[    1.556461]  driver_attach+0x20/0x28
+[    1.560142]  bus_add_driver+0xec/0x240
+[    1.564002]  driver_register+0x98/0xe4
+[    1.567863]  __platform_driver_register+0x48/0x50
+[    1.572711]  mt_msdc_driver_init+0x18/0x20
+[    1.576932]  do_one_initcall+0x98/0x130
+[    1.580886]  kernel_init_freeable+0x13c/0x1d4
+[    1.585375]  kernel_init+0x10/0xf8
+[    1.588879]  ret_from_fork+0x10/0x18
+[    1.592564] Code: a8c67bfd d65f03c0 a9bf7bfd 910003fd (f9400800)
+[    1.598849] ---[ end trace 4bbcb7bc30e98492 ]---
+[    1.603677] Kernel panic - not syncing: Attempted to kill init!
+	       exitcode=0x0000000b
+[    1.603677]
+
+cc: Kevin Hilman <khilman@baylibre.com>
+Cc: stable at vger.kernel.org
+Fixes: e6dabd38d8e7 ("pinctrl: mediatek: add EINT support to MT7622 SoC")
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mt7622.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+index ad6da11..e3f1ab2 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+@@ -1459,6 +1459,9 @@ static int mtk_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
+ 	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
+ 	unsigned long eint_n;
+ 
++	if (!hw->eint)
++		return -ENOTSUPP;
++
+ 	eint_n = offset;
+ 
+ 	return mtk_eint_find_irq(hw->eint, eint_n);
+@@ -1471,7 +1474,8 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
+ 	unsigned long eint_n;
+ 	u32 debounce;
+ 
+-	if (pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE)
++	if (!hw->eint ||
++	    pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE)
+ 		return -ENOTSUPP;
+ 
+ 	debounce = pinconf_to_config_argument(config);
 -- 
 2.7.4
