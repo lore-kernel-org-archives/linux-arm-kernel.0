@@ -1,112 +1,78 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu, 14 Jun 2018 11:53:04 -0700
-Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
- sata ports
-In-Reply-To: <CABGGiszcTNw23e_qA7EiGb_2hc6kHfVQJq02pQjbpTnv1CNksg@mail.gmail.com>
-References: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
- <d35afa1f-e0fd-84f1-7d42-60595e22cc77@gmail.com>
- <395f1fe8-76f1-8310-d09e-63e25bca23d2@broadcom.com>
- <CAL_JsqJEFLXFf-Vq9c9XC41vBpisQwxkd06_v8Fmt6X=gp=2_g@mail.gmail.com>
- <f20222ea-47ac-ca05-a8d3-69f28932de94@gmail.com>
- <0bf3c57c-dac8-8ece-6b8a-3b4d024140fc@broadcom.com>
- <CABGGiszcTNw23e_qA7EiGb_2hc6kHfVQJq02pQjbpTnv1CNksg@mail.gmail.com>
-Message-ID: <ad3e7225-35f6-f926-d925-42627154659b@broadcom.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 14 Jun 2018 11:57:03 -0700
+Subject: [PATCH v3 6/7] mmc: sunxi: Add runtime_pm support
+In-Reply-To: <1caa07d2-17ad-18aa-9216-037c06b36281@arm.com>
+References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
+ <4514368de4ef7b4224be455f2d9e6090b464e819.1523888566.git-series.maxime.ripard@bootlin.com>
+ <1caa07d2-17ad-18aa-9216-037c06b36281@arm.com>
+Message-ID: <CAOi56cV_6GLDZsRxSb8JWaJcrB-7evto82+uJTZRUoF=6z7zVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 14, 2018 at 7:12 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> Hi Maxime,
+>
+> On 16/04/18 15:23, Maxime Ripard wrote:
+> > So far, even if our card was not in use, we didn't shut down our MMC
+> > controller, which meant that it was still active and clocking the bus.
+> >
+> > While this obviously means that we could save some power there, it also
+> > creates issues when it comes to EMC control since we'll have a perfect peak
+> > at the card clock rate.
+> >
+> > Let's implement runtime_pm with autosuspend so that we will shut down the
+> > controller when it's not been in use for quite some time.
+> >
+[...]
 
+> This patch has the unfortunate impact of killing my A20 system
+> (cubietruck), as of 9a8e1e8cc2c02c57c4e941651a8481a633506c91:
 
-On 18-06-13 03:06 PM, Rob Herring wrote:
-> On Wed, Jun 13, 2018 at 2:18 PM, Scott Branden
-> <scott.branden@broadcom.com> wrote:
->> Hi Rob,
->>
->> Thanks for comment - reply inline.
->>
->>
->>
->> On 18-06-13 12:31 PM, Florian Fainelli wrote:
->>> On 06/12/2018 03:54 PM, Rob Herring wrote:
->>>> On Thu, Jun 7, 2018 at 12:53 PM, Scott Branden
->>>> <scott.branden@broadcom.com> wrote:
->>>>> Hi Rob,
->>>>>
->>>>> Could you please kindly comment on change below.
->>>>>
->>>>> It allows board variants to be added easily via a simple define for
->>>>> different number of SATA ports.
->>>>>
->>>>>
->>>>>
->>>>> On 18-06-04 09:22 AM, Florian Fainelli wrote:
->>>>>> On 05/18/2018 11:34 AM, Scott Branden wrote:
->>>>>>> Move remaining sata configuration to stingray-sata.dtsi and enable
->>>>>>> ports based on NUM_SATA defined.
->>>>>>> Now, all that needs to be done is define NUM_SATA per board.
->>>>>> Rob could you review this and let us know if this approach is okay or
->>>>>> not? Thank you!
->>>>>>
->>>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->>>>>>> ---
->>>>>>> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
->>>>>>> b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
->>>>>>> index 8c68e0c..7f6d176 100644
->>>>>>> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
->>>>>>> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
->>>>>>> @@ -43,7 +43,11 @@
->>>>>>>                           interrupts = <GIC_SPI 321
->>>>>>> IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>                           #address-cells = <1>;
->>>>>>>                           #size-cells = <0>;
->>>>>>> +#if (NUM_SATA > 0)
->>>>>>> +                       status = "okay";
->>>>>>> +#else
->>>>>>>                           status = "disabled";
->>>>>>> +#endif
->>>> This only works if ports are contiguously enabled (0-N). You might not
->>>> care, but it is not a pattern that works in general.
->> Correct - all board designs that include this dtsi file follow such
->> commonality (ie. design with SATA0 first, etc).  By having common board
->> designs it allows for commonality in dts files rather than duplicating
->> information everywhere.  If somebody designs a bizarro board they are free
->> to create their own dts file of course.
->>>>    And I'm not a fan
->>>> of C preprocessing in DT files in general beyond just defines for
->>>> single numbers.
->> The use of a define to specify the number of SATA ports in the board design
->> meets our requirements of being able to maintain many boards.  We need a
->> method to specify the number of ports in the board design rather than
->> copying and pasting the information in many dts files.  If you have an
->> alternative upstreamable mechanism to manage the configuration of many
->> boards without copy and paste that would be ideal?
-> Is this really the only problem with maintaining lots of boards? What
-> about all the other nodes that are conditionally enabled? Really, I
-> don't see the problem with 3 lines per node.
-Yes - the problem with maintaining lots of boards is having to copy and 
-paste duplicated lines per nodes in many files which can be maintained 
-with a single define.
->
-> Does having an unused port enabled cause problems? If not, you could
-> handle it all at run-time and just shutdown ports which have no link.
-> You'd want to do that anyway for boards with a port, but is not
-> connected to a drive (except for hotplug capable ports).
-SATA is not the only place we use defines.? This is one change for 
-review to see if there are any "real" problems with doing it upstream 
-and get comment.? All the board variations simply add a few defines and 
-don't need to do anything else using my approach.? No out-of-tree 
-special tools or scripts required to generate dts files, no run-time 
-bootloader or kernel changes necessary.
->
-> Maybe we could add a property in /chosen that is a list of nodes to
-> enable and either the bootloader or kernel could update their
-> 'status'. Or It could even be done in dtc perhaps with some
-> /directive/.
-Sure, if it is a single line change needed through a "chosen" or 
-"directive" instead of a "define" that sounds fine.? How would I do that 
-in the SATA example?
-I am looking for an in-tree solution to managing the boards in a simpler 
-manner than what is available by cutting and pasting nodes in many files.
-The use of the defines allows such without any special script or tool or 
-repo needing to be maintained out of tree.
->
-> Rob
+kernelCI also found failures on a few a10/a20 platfforms[1], and they
+all fail to reach userspace, similar to what Marc reported.
+
+I bisected on a sun7i-a20-bananapi and that pointed at this commit
+also (in mainline as 9a8e1e8cc2c0 mmc: sunxi: Add runtime_pm support)
+
+Kevin
+
+[1] https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.17-11928-g2837461dbe6f/
+[2] $ git bisect log
+git bisect start
+# good: [5037be168f0e4ee910602935b1180291082d3aac] Merge branch
+'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/s390/linux
+git bisect good 5037be168f0e4ee910602935b1180291082d3aac
+# bad: [f60342fac9fae20ada2cd5faadbc2a1337cae03f] Merge tag
+'mmc-v4.18' of git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc
+git bisect bad f60342fac9fae20ada2cd5faadbc2a1337cae03f
+# good: [fd59ccc53062964007beda8787ffd9cd93968d63] Merge tag
+'fscrypt_for_linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/tytso/fscrypt
+git bisect good fd59ccc53062964007beda8787ffd9cd93968d63
+# good: [2158091d9cda6f126f71973667e8a9fc1e795d03] Merge branch
+'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input
+git bisect good 2158091d9cda6f126f71973667e8a9fc1e795d03
+# bad: [bfd694d5e21c2f0d344db6afeaf993bb0f299545] mmc: core: Add
+tunable delay before detecting card after card is inserted
+git bisect bad bfd694d5e21c2f0d344db6afeaf993bb0f299545
+# good: [743b819e4178935e3f098e5f13db301f532fa9e0] mmc: sunxi: Reorder
+the headers
+git bisect good 743b819e4178935e3f098e5f13db301f532fa9e0
+# bad: [ebca50dfae525341c48c2f69798667352318549e] mmc:
+renesas_sdhi_internal_dmac: remove superfluous WARN
+git bisect bad ebca50dfae525341c48c2f69798667352318549e
+# bad: [eef797ac13c08fae0f0ce7d2215d0951e884fa2d] mmc: sunxi: Drop the
+init / reset of the controller from set_ios
+git bisect bad eef797ac13c08fae0f0ce7d2215d0951e884fa2d
+# good: [ad04d9555da02c719de25b7d1e81ea8d0d2c4838] mmc: sunxi: Move
+clock configuration to a function
+git bisect good ad04d9555da02c719de25b7d1e81ea8d0d2c4838
+# bad: [9a8e1e8cc2c02c57c4e941651a8481a633506c91] mmc: sunxi: Add
+runtime_pm support
+git bisect bad 9a8e1e8cc2c02c57c4e941651a8481a633506c91
+# good: [e27e1f3d04061ccc3735361554088cd7aa286e31] mmc: sunxi: Move
+the card power configuration to a function
+git bisect good e27e1f3d04061ccc3735361554088cd7aa286e31
+# first bad commit: [9a8e1e8cc2c02c57c4e941651a8481a633506c91] mmc:
+sunxi: Add runtime_pm support
