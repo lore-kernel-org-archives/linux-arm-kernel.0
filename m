@@ -1,80 +1,62 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 14 Jun 2018 14:39:37 +0900
-Subject: [PATCH] gpio: uniphier: set legitimate irq trigger type in
- .to_irq hook
-In-Reply-To: <1528954065-25563-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1528954065-25563-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASh4j2nTbemsPmQXOnCrqJ4BQ0-PnWHQsUe-qa4KzpDLA@mail.gmail.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Thu, 14 Jun 2018 22:02:55 +0800
+Subject: [PATCH v4 0/7] add virt-dma support for imx-sdma
+Message-ID: <1528984982-5074-1-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-14 14:27 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> If a GPIO chip is a part of a hierarchy IRQ domain, there is no
-> way to specify the trigger type when gpio(d)_to_irq() allocates an
-> interrupt on-the-fly.
->
-> Currently, uniphier_gpio_to_irq() sets IRQ_TYPE_NONE, but it causes
-> an error in the .alloc() hook of the parent domain.
-> (drivers/irq/irq-uniphier-aidet.c)
->
-> Even if we change irq-uniphier-aidet.c to accept the NONE type,
-> GIC complains about it since commit 83a86fbb5b56 ("irqchip/gic:
-> Loudly complain about the use of IRQ_TYPE_NONE").
->
-> Instead, use IRQ_TYPE_LEVEL_HIGH as a temporary value when an irq
-> is allocated.  irq_set_irq_type() will override it when the irq is
-> really requested.
->
-> Fixes: dbe776c2ca54 ("gpio: uniphier: add UniPhier GPIO controller driver")
-> Reported-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Tested-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
+The legacy sdma driver has below limitations or drawbacks:
+  1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
+     one page size for one channel regardless of only few BDs needed
+     most time. But in few cases, the max PAGE_SIZE maybe not enough.
+  2. One SDMA channel can't stop immediatley once channel disabled which
+     means SDMA interrupt may come in after this channel terminated.There
+     are some patches for this corner case such as commit "2746e2c389f9",
+     but not cover non-cyclic.
 
-BTW, gpio-xgene-sb.c is also suspicious.
-https://github.com/torvalds/linux/blob/v4.17/drivers/gpio/gpio-xgene-sb.c#L136
+The common virt-dma overcomes the above limitations. It can alloc bd
+dynamically and free bd once this tx transfer done. No memory wasted or
+maximum limititation here, only depends on how many memory can be requested
+from kernel. For No.2, such issue can be workaround by checking if there
+is available descript("sdmac->desc") now once the unwanted interrupt
+coming. At last the common virt-dma is easier for sdma driver maintain.
 
+Change from v3:
+  1. add two uart patches which impacted by this patchset.
+  2. unlock 'vc.lock' before cyclic dma callback and lock again after
+     it because some driver such as uart will call dmaengine_tx_status
+     which will acquire 'vc.lock' again and dead lock comes out.
+  3. remove 'Revert commit' stuff since that patch is not wrong and
+     combine two patch into one patch as Sascha's comment.
 
-I do not have that hardware, but GIC will complain about NONE type
-if gpio(d)_to_irq() is used.
+Change from v2:
+  1. include Sascha's patch to make the main patch easier to review.
+     Thanks Sacha.
+  2. remove useless 'desc'/'chan' in struct sdma_channe.
 
+Change from v1:
+  1. split v1 patch into 5 patches.
+  2. remove some unnecessary condition check.
+  3. remove unnecessary 'pending' list.
 
+Robin Gong (6):
+  tty: serial: imx: correct dma cookie status
+  dmaengine: imx-sdma: add virt-dma support
+  dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in 'struct
+    sdma_channel'
+  dmaengine: imx-sdma: remove the maximum limitation for bd numbers
+  dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
+  tty: serial: imx: split all dma setup operations out of 'port.lock'
+    protector
 
-Commit 83a86fbb5b56 ("irqchip/gic: Loudly complain about the use of
-IRQ_TYPE_NONE")
-only mentions DT cases.
+Sascha Hauer (1):
+  dmaengine: imx-sdma: factor out a struct sdma_desc from struct
+    sdma_channel
 
-It is unclear how to take care of GPIO-originated IRQs.
-
-
-
-
->  drivers/gpio/gpio-uniphier.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpio/gpio-uniphier.c b/drivers/gpio/gpio-uniphier.c
-> index d3cf950..58faeb1 100644
-> --- a/drivers/gpio/gpio-uniphier.c
-> +++ b/drivers/gpio/gpio-uniphier.c
-> @@ -181,7 +181,11 @@ static int uniphier_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
->         fwspec.fwnode = of_node_to_fwnode(chip->parent->of_node);
->         fwspec.param_count = 2;
->         fwspec.param[0] = offset - UNIPHIER_GPIO_IRQ_OFFSET;
-> -       fwspec.param[1] = IRQ_TYPE_NONE;
-> +       /*
-> +        * IRQ_TYPE_NONE is rejected by the parent irq domain. Set LEVEL_HIGH
-> +        * temporarily. Anyway, ->irq_set_type() will override it later.
-> +        */
-> +       fwspec.param[1] = IRQ_TYPE_LEVEL_HIGH;
->
->         return irq_create_fwspec_mapping(&fwspec);
->  }
-> --
-> 2.7.4
->
-
-
+ drivers/dma/Kconfig      |   1 +
+ drivers/dma/imx-sdma.c   | 394 +++++++++++++++++++++++++++--------------------
+ drivers/tty/serial/imx.c |  99 ++++++------
+ 3 files changed, 282 insertions(+), 212 deletions(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.7.4
