@@ -1,30 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Jun 2018 10:35:30 +0200
-Subject: [PATCH] pinctrl: actions: Fix uninitialized error in
- owl_pin_config_set()
-In-Reply-To: <1528452347-23986-1-git-send-email-geert@linux-m68k.org>
-References: <1528452347-23986-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CACRpkdbMogW3oVv0NEX1b622H8g4k-3MtzLONhog5TKsPn5qCA@mail.gmail.com>
+Date: Thu, 14 Jun 2018 10:33:32 +0200
+Subject: [PATCH] pinctrl: pinctrl-single: Avoid divisions in context
+ save/restore
+In-Reply-To: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
+References: <1528374274-26385-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CACRpkdYo9Tmes7sXCFWSMKpYXpEKDXkfqp33EBHziHeT=CpdfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 8, 2018 at 12:05 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
+On Thu, Jun 7, 2018 at 2:24 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
 
-> With gcc 4.1.2:
+> The divisions (and multiplications) can be avoided by changing the loops
+> to use increments of mux_bytes instead of 1.
+> While at it, remove the unneeded casts when assigning void pointers.
 >
->     drivers/pinctrl/actions/pinctrl-owl.c: In function ?owl_pin_config_set?:
->     drivers/pinctrl/actions/pinctrl-owl.c:336: warning: ?ret? may be used uninitialized in this function
+> This saves +100 bytes of kernel size on arm32/arm64.
 >
-> Indeed, if num_configs is zero, the uninitialized value will be returned
-> as an error code.
->
-> Fix this by preinitializing it to zero.
->
-> Fixes: 2242ddfbf4d699b5 ("pinctrl: actions: Add Actions S900 pinctrl driver")
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Patch applied with Manivannan's ACK.
+Patch applied for v4.19.
 
 Yours,
 Linus Walleij
