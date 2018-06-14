@@ -1,76 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Jun 2018 10:45:57 +0200
-Subject: [PATCH 06/10] ARM: OMAP1: ams-delta FIQ: don't use static GPIO
- numbers
-In-Reply-To: <20180609140224.32606-6-jmkrzyszt@gmail.com>
-References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
- <20180609140224.32606-6-jmkrzyszt@gmail.com>
-Message-ID: <CACRpkdZj0c+pY7u63SDcUK_i7pPQDkgCgsm2cc37H2uHjZjDFw@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 14 Jun 2018 10:14:34 +0300
+Subject: [RFC PATCH] sdhci-of-arasan: card initialization failure -84
+In-Reply-To: <20180604064211.q2thyftgpffuaer2@laureti-dev>
+References: <20180604064211.q2thyftgpffuaer2@laureti-dev>
+Message-ID: <658c1c31-9193-990b-e6d0-944958aa7b1f@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 9, 2018 at 4:02 PM, Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+On 04/06/18 09:42, Helmut Grohne wrote:
+> Work around repeated:
+> 
+>     mmc0: error -84 whilst initialising SD card
+> ---
+>  drivers/mmc/host/sdhci.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> I'm seeing the above error -84 with a series of Kingston cards of 4GB capacity
+> when used with an arasan host controller. Using the cards with other hosts or
+> using other cards with the host is not problematic. The host controller has the
+> following device tree:
+> 
+> 	ps7-sdio at e0100000 {
+> 		compatible = "arasan,sdhci-8.9a";
+> 		reg = <0xe0100000 0x1000>;
+> 		clock-names = "clk_xin", "clk_ahb";
+> 		clock-frequency = <50000000>;
+> 		clocks = <&clkc 21>, <&clkc 32>;
+> 		interrupt-parent = <&ps7_scugic_0>;
+> 		interrupts = <0 24 4>;
+> 	};
+> 
+> When enabling sufficient debugging (and thus slowing the kernel down), the
+> problem goes away. Without debug features, the insertion of this delay suffices
+> for my particular instance. Inserting the same delay before the
+> SDHCI_CLOCK_CARD_EN write also makes the error go away.
+> 
+> While instrumenting the code I found that the loop waiting for the
+> SDHCI_CLOCK_INT_STABLE would always terminate immediately (regardless of the
+> card being used). Only when the card is removed, the loop would spin once. This
+> hints that potentially the stable checking is broken for this host controller.
+> 
+> During my testing I checked 7 Kingston cards, 2 Transcend Cards, 1 Apacer card,
+> 3 arasn hosts, 3 non-arasan hosts and had consistent reports for a similar
+> number of devices from others.
+> 
+> If my hypothesis is reasonable, I can turn this patch into a new quirk that
+> replaces the stable polling with msleep(20), which is the poll timeout. Is
+> there anything else I should investigate before doing so?
 
-> With introduction of GPIO lookup tables to Amstrad Delta board init
-> file, semantics of symbols representing OMAP GPIO pins defined in
-> <mach/board-ams-delta.h> changed from statically assigned global GPIO
-> numbers to hardware pin numbers local to OMAP "gpio-0-15" chip.
->
-> This patch modifies deferred FIQ interrupt handler so it no longer uses
-> static GPIO numbers in favour of IRQ data descriptors obtained at FIQ
-> initialization time from descriptor of the GPIO chip with use of its
-> hardware pin numbers.  The chip descriptor is passed from the board
-> init file.
->
-> As a benefit, the deferred FIQ handler should work faster.
->
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+Please avoid quirks.  Perhaps use the ->set_clock() callback.
 
-Making the kernel a better place, so:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-> +/*
-> + * Some drivers may not use GPIO lookup tables but need to be provided
-> + * with GPIO numbers.  The same applies to GPIO based IRQ lines - some
-> + * drivers may even not use GPIO layer but expect just IRQ numbers.
-> + * We could either define GPIO lookup tables then use them on behalf
-> + * of those devices, or we can use GPIO driver level methods for
-> + * identification of GPIO and IRQ numbers. For the purpose of the latter,
-> + * defina a helper function which identifies GPIO chips by their labels.
-> + */
-> +static int gpiochip_match_by_label(struct gpio_chip *chip, void *data)
-> +{
-> +       char *label = data;
-> +
-> +       return !strcmp(label, chip->label);
-> +}
-> +
-> +/*
-> + * The purpose of this function is to take care of proper initialization of
-> + * devices and data structures which depend on GPIO lines provided by OMAP GPIO
-> + * banks but their drivers don't use GPIO lookup tables or GPIO layer at all.
-> + * The function may be called as soon as OMAP GPIO devices are probed.
-> + * Since that happens at postcore_initcall, it can be called successfully
-> + * from init_machine or later.
-> + * Dependent devices may be registered from within this function or later.
-> + */
-> +static void __init omap_gpio_deps_init(void)
-> +{
-> +       struct gpio_chip *chip;
-> +
-> +       chip = gpiochip_find(OMAP_GPIO_LABEL, gpiochip_match_by_label);
-> +       if (!chip) {
-> +               pr_err("%s: OMAP GPIO chip not found\n", __func__);
-> +               return;
-> +       }
-> +
-> +       ams_delta_init_fiq(chip);
-> +}
-
-This is some real stunt work isn't it.
-
-We should really think about ways to get gpiolib more helpful for board
-setups like this, but it seems complex.
-
-Yours,
-Linus Walleij
+> 
+> Helmut
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 90cc1977b792..5d2809aeb4eb 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1430,6 +1430,7 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
+>  
+>  	clk |= SDHCI_CLOCK_CARD_EN;
+>  	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+> +	udelay(80);
+>  }
+>  EXPORT_SYMBOL_GPL(sdhci_enable_clk);
+>  
+> 
