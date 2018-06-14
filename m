@@ -1,36 +1,37 @@
 From: ilia.lin@gmail.com (ilia.lin at gmail.com)
-Date: Thu, 14 Jun 2018 23:53:49 +0200
-Subject: [PATCH v13 2/8] clk: qcom: Make clk_alpha_pll_configure available to
- modules
+Date: Thu, 14 Jun 2018 23:53:50 +0200
+Subject: [PATCH v13 3/8] clk: Use devm_ in the register fixed factor clock
 In-Reply-To: <20180614215358.11264-1-ilia.lin@gmail.com>
 References: <20180614215358.11264-1-ilia.lin@gmail.com>
-Message-ID: <20180614215358.11264-3-ilia.lin@gmail.com>
+Message-ID: <20180614215358.11264-4-ilia.lin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@codeaurora.org>
+From: Ilia Lin <ilialin@codeaurora.org>
 
-Allow clk_alpha_pll_configure to be called from loadable
-kernel modules.
+Use devm_clk_hw_register instead of clk_hw_register
+to simplify the usage of this API. This way drivers that call
+the clk_hw_register_fixed_factor won't need to maintain
+a data structure for further cleanup.
 
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
 ---
- drivers/clk/qcom/clk-alpha-pll.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/clk-fixed-factor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
-index 3c49a60072f1..a43f80ac94a4 100644
---- a/drivers/clk/qcom/clk-alpha-pll.c
-+++ b/drivers/clk/qcom/clk-alpha-pll.c
-@@ -228,6 +228,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
- 	if (pll->flags & SUPPORTS_FSM_MODE)
- 		qcom_pll_set_fsm_mode(regmap, PLL_MODE(pll), 6, 0);
- }
-+EXPORT_SYMBOL_GPL(clk_alpha_pll_configure);
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index a5d402de5584..8e39bda8e596 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -94,7 +94,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
+ 	init.num_parents = 1;
  
- static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
- {
+ 	hw = &fix->hw;
+-	ret = clk_hw_register(dev, hw);
++	ret = devm_clk_hw_register(dev, hw);
+ 	if (ret) {
+ 		kfree(fix);
+ 		hw = ERR_PTR(ret);
 -- 
 2.11.0
