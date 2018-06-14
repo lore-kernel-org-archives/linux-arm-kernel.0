@@ -1,83 +1,110 @@
 From: ilia.lin@gmail.com (ilia.lin at gmail.com)
-Date: Thu, 14 Jun 2018 23:53:52 +0200
-Subject: [PATCH v13 5/8] dt-bindings: clk: qcom: Add bindings for CPU clock
- for msm8996
+Date: Thu, 14 Jun 2018 23:53:53 +0200
+Subject: [PATCH v13 6/8] clk: qcom: cpu-8996: Add support to switch to
+ alternate PLL
 In-Reply-To: <20180614215358.11264-1-ilia.lin@gmail.com>
 References: <20180614215358.11264-1-ilia.lin@gmail.com>
-Message-ID: <20180614215358.11264-6-ilia.lin@gmail.com>
+Message-ID: <20180614215358.11264-7-ilia.lin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ilia Lin <ilialin@codeaurora.org>
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
-Each of the CPU clusters (Power and Perf) on msm8996 are
-clocked via 2 PLLs, a primary and alternate. There are also
-2 Mux'es, a primary and secondary all connected together
-as shown below
+Each of the CPU clusters on msm8996 are powered via a primary
+PLL and a secondary PLL. The primary PLL is what drives the
+CPU clk, except for times when we are reprogramming the PLL
+itself, when we temporarily switch to an alternate PLL.
+Use clock rate change notifiers to support this.
 
-                             +-------+
-              XO             |       |
-          +------------------>0      |
-                             |       |
-                   PLL/2     | SMUX  +----+
-                     +------->1      |    |
-                     |       |       |    |
-                     |       +-------+    |    +-------+
-                     |                    +---->0      |
-                     |                         |       |
-+---------------+    |             +----------->1      | CPU clk
-|Primary PLL    +----+ PLL_EARLY   |           |       +------>
-|               +------+-----------+    +------>2 PMUX |
-+---------------+      |                |      |       |
-                       |   +------+     |   +-->3      |
-                       +--^+  ACD +-----+   |  +-------+
-+---------------+          +------+         |
-|Alt PLL        |                           |
-|               +---------------------------+
-+---------------+         PLL_EARLY
-
-The primary PLL is what drives the CPU clk, except for times
-when we are reprogramming the PLL itself (for rate changes) when
-we temporarily switch to an alternate PLL. A subsequent patch adds
-support to switch between primary and alternate PLL during rate
-changes.
-
-The primary PLL operates on a single VCO range, between 600MHz
-and 3GHz. However the CPUs do support OPPs with frequencies
-between 300MHz and 600MHz. In order to support running the CPUs
-at those frequencies we end up having to lock the PLL at twice
-the rate and drive the CPU clk via the PLL/2 output and SMUX.
-
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
 Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
 ---
- Documentation/devicetree/bindings/clock/qcom,kryocc.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
+ drivers/clk/qcom/clk-cpu-8996.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,kryocc.txt b/Documentation/devicetree/bindings/clock/qcom,kryocc.txt
-new file mode 100644
-index 000000000000..8458783c5a1a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,kryocc.txt
-@@ -0,0 +1,17 @@
-+Qualcomm CPUSS clock controller for Kryo CPUs
-+----------------------------------------------------
+diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
+index d92cad93af20..620fdc2266ba 100644
+--- a/drivers/clk/qcom/clk-cpu-8996.c
++++ b/drivers/clk/qcom/clk-cpu-8996.c
+@@ -52,6 +52,7 @@
+  * detect voltage droops.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+@@ -178,10 +179,14 @@ struct clk_cpu_8996_mux {
+ 	u32	reg;
+ 	u8	shift;
+ 	u8	width;
++	struct notifier_block nb;
+ 	struct clk_hw	*pll;
+ 	struct clk_regmap clkr;
+ };
+ 
++#define to_clk_cpu_8996_mux_nb(_nb) \
++	container_of(_nb, struct clk_cpu_8996_mux, nb)
 +
-+Required properties :
-+- compatible : shall contain only one of the following:
+ static inline
+ struct clk_cpu_8996_mux *to_clk_cpu_8996_mux_hw(struct clk_hw *hw)
+ {
+@@ -227,6 +232,26 @@ clk_cpu_8996_mux_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+ 	return 0;
+ }
+ 
++int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
++			void *data)
++{
++	int ret;
++	struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_nb(nb);
 +
-+			"qcom,msm8996-apcc"
++	switch (event) {
++	case PRE_RATE_CHANGE:
++		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
++		break;
++	case POST_RATE_CHANGE:
++		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, PLL_INDEX);
++		break;
++	default:
++		ret = 0;
++		break;
++	}
 +
-+- reg : shall contain base register location and length
-+- #clock-cells : shall contain 1
++	return notifier_from_errno(ret);
++};
+ const struct clk_ops clk_cpu_8996_mux_ops = {
+ 	.set_parent = clk_cpu_8996_mux_set_parent,
+ 	.get_parent = clk_cpu_8996_mux_get_parent,
+@@ -270,6 +295,7 @@ static struct clk_cpu_8996_mux pwrcl_pmux = {
+ 	.shift = 0,
+ 	.width = 2,
+ 	.pll = &pwrcl_pll.clkr.hw,
++	.nb.notifier_call = cpu_clk_notifier_cb,
+ 	.clkr.hw.init = &(struct clk_init_data) {
+ 		.name = "pwrcl_pmux",
+ 		.parent_names = (const char *[]){
+@@ -289,6 +315,7 @@ static struct clk_cpu_8996_mux perfcl_pmux = {
+ 	.shift = 0,
+ 	.width = 2,
+ 	.pll = &perfcl_pll.clkr.hw,
++	.nb.notifier_call = cpu_clk_notifier_cb,
+ 	.clkr.hw.init = &(struct clk_init_data) {
+ 		.name = "perfcl_pmux",
+ 		.parent_names = (const char *[]){
+@@ -347,6 +374,12 @@ qcom_cpu_clk_msm8996_register_clks(struct device *dev, struct regmap *regmap)
+ 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
+ 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
+ 
++	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
++	if (ret)
++		return ret;
 +
-+Example:
-+	kryocc: clock-controller at 6400000 {
-+		compatible = "qcom,msm8996-apcc";
-+		reg = <0x6400000 0x90000>;
-+		#clock-cells = <1>;
-+	};
++	ret = clk_notifier_register(perfcl_pmux.clkr.hw.clk, &perfcl_pmux.nb);
++
+ 	return ret;
+ }
+ 
 -- 
 2.11.0
