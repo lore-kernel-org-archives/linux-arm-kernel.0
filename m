@@ -1,36 +1,99 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 14 Jun 2018 14:55:27 +0200
-Subject: [PATCH 1/1] arm64: dts: rockchip: correct voltage selector
- Firefly-RK3399
-In-Reply-To: <20180604171523.28454-1-xypron.glpk@gmx.de>
-References: <20180604171523.28454-1-xypron.glpk@gmx.de>
-Message-ID: <19360053.2ABrQ075F2@phil>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 14 Jun 2018 13:57:02 +0100
+Subject: [PATCH 2/4] KVM: arm64: Don't mask softirq with IRQs disabled in
+ vcpu_put()
+In-Reply-To: <ff9c9b77-20f5-42f0-23f5-09bdaebfcbe6@arm.com>
+References: <1528976039-25826-1-git-send-email-Dave.Martin@arm.com>
+ <1528976546-25999-1-git-send-email-Dave.Martin@arm.com>
+ <1528976546-25999-2-git-send-email-Dave.Martin@arm.com>
+ <ff9c9b77-20f5-42f0-23f5-09bdaebfcbe6@arm.com>
+Message-ID: <20180614125701.GN22983@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 4. Juni 2018, 19:15:23 CEST schrieb Heinrich Schuchardt:
-> Without this patch the Firefly-RK3399 board boot process hangs after these
-> lines:
+On Thu, Jun 14, 2018 at 01:50:00PM +0100, Marc Zyngier wrote:
+> Hi Dave,
 > 
->    fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
->    fan53555-reg: supplied by vcc_sys
->    vcc1v8_s3: supplied by vcc_1v8
+> On 14/06/18 12:42, Dave Martin wrote:
+> > Commit e6b673b ("KVM: arm64: Optimise FPSIMD handling to reduce
+> > guest/host thrashing") introduces a specific helper
+> > kvm_arch_vcpu_put_fp() for saving the vcpu FPSIMD state during
+> > vcpu_put().
+> > 
+> > This function uses local_bh_disable()/_enable() to protect the
+> > FPSIMD context manipulation from interruption by softirqs.
+> > 
+> > This approach is not correct, because vcpu_put() can be invoked
+> > either from the KVM host vcpu thread (when exiting the vcpu run
+> > loop), or via a preempt notifier.  In the former case, only
+> > preemption is disabled.  In the latter case, the function is called
+> > from inside __schedule(), which means that IRQs are disabled.
+> > 
+> > Use of local_bh_disable()/_enable() with IRQs disabled is considerd
+> > an error, resulting in lockdep splats while running VMs if lockdep
+> > is enabled.
+> > 
+> > It is probably possible in theory to relax this restriction on
+> > local_bh_disable()/_enable() usage, but for now this patch takes
+> > the simple approach of managing softirq masking only if IRQs happen
+> > to be enabled when kvm_arch_vcpu_put_fp() is called.
+> > 
+> > Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
+> > Reported-by: Andre Przywara <andre.przywara@arm.com>
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/kvm/fpsimd.c | 16 ++++++++++++----
+> >  1 file changed, 12 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> > index dc6ecfa..b51ff80 100644
+> > --- a/arch/arm64/kvm/fpsimd.c
+> > +++ b/arch/arm64/kvm/fpsimd.c
+> > @@ -90,10 +90,8 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
+> >   * disappears and another task or vcpu appears that recycles the same
+> >   * struct fpsimd_state.
+> >   */
+> > -void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+> > +static void __kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+> >  {
+> > -	local_bh_disable();
+> > -
+> >  	update_thread_flag(TIF_SVE,
+> >  			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
+> >  
+> > @@ -105,6 +103,16 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+> >  		/* Ensure user trap controls are correctly restored */
+> >  		fpsimd_bind_task_to_cpu();
+> >  	}
+> > +}
+> > +
+> >  
+> > -	local_bh_enable();
+> > +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+> > +{
+> > +	if (irqs_disabled())
+> > +		__kvm_arch_vcpu_put_fp(vcpu);
+> > +	else {
+> > +		local_bh_disable();
+> > +		__kvm_arch_vcpu_put_fp(vcpu);
+> > +		local_bh_enable();
+> > +	}
+> >  }
+> > 
 > 
-> Blacklisting driver fan53555 allows booting.
+> I'm of the opinion to always run kvm_arch_vcpu_put_fp() with interrupt
+> disabled. local_bh_enable() does quite a lot of stuff (running the
+> softirqs), which adds overhead we could do without.
 > 
-> The device tree uses a value of fcs,suspend-voltage-selector different to
-> any other board.
-> 
-> Changing this setting to the usual value is sufficient to enable booting.
-> 
-> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+> I'd replace local_bh_{disable,enable} with local_irq_{save,restore).
 
-applied for 4.19.
+I don't have a huge problem with that.  This creates interrupt blackout
+on run loop exit, but it's a) not worse than the blackout in
+__schedule() and b) presumably the rare case compared with run loop
+preemption.
 
-I've amended your commit message with the info from your reply about
-the vendor kernel using the same value and added an appropriate Fixes
-tag to possibly get it merged into stable.
+So, while disabling interrupts seemed a bit brutal, in context it
+doesn't look like such a big deal.
 
-
-Thanks
-Heiko
+Cheers
+---Dave
