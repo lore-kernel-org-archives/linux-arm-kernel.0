@@ -1,40 +1,113 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 14 Jun 2018 23:35:46 +0800
-Subject: [PATCH v3 2/4] dt-bindings: sram: Rename A64 SRAM controller
- compatible
-In-Reply-To: <20180614153548.9644-1-wens@csie.org>
-References: <20180614153548.9644-1-wens@csie.org>
-Message-ID: <20180614153548.9644-3-wens@csie.org>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 14 Jun 2018 17:39:53 +0200
+Subject: [PATCH v3 11/14] media: platform: Add Sunxi-Cedrus VPU decoder
+ driver
+In-Reply-To: <20180507154201.4vz3y6j7u7kzfud6@flea>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+ <20180507124500.20434-12-paul.kocialkowski@bootlin.com>
+ <20180507154201.4vz3y6j7u7kzfud6@flea>
+Message-ID: <042923c4f378f3e134bf490d5f6a650173984411.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SRAM mapping controls on Allwinner SoCs is located in a block called
-"System Controls". This block also has registers for identifying the SoC,
-reading the state of an external boot-related pin, and on some newer SoCs,
-glue layer controls for the EMAC Ethernet controller.
+Hi,
 
-The A64 variant compatible is renamed to "allwinner,a64-system-control"
-to reflect this. The old A64 compatible is deprecated. So far we haven't
-seen any actual use of it.
+On Mon, 2018-05-07 at 17:42 +0200, Maxime Ripard wrote:
+> On Mon, May 07, 2018 at 02:44:57PM +0200, Paul Kocialkowski wrote:
+> > +#define SYSCON_SRAM_CTRL_REG0	0x0
+> > +#define SYSCON_SRAM_C1_MAP_VE	0x7fffffff
+> 
+> This isn't needed anymore
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/sram/sunxi-sram.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Will do in the next revision.
 
-diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-index d087f04a4d7f..9ef40e2e0a48 100644
---- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-@@ -11,7 +11,8 @@ Controller Node
- Required properties:
- - compatible : should be:
-     - "allwinner,sun4i-a10-sram-controller"
--    - "allwinner,sun50i-a64-sram-controller"
-+    - "allwinner,sun50i-a64-sram-controller" (deprecated)
-+    - "allwinner,sun50i-a64-system-control"
- - reg : sram controller register offset + length
- 
- SRAM nodes
+> > +	dev->ahb_clk = devm_clk_get(dev->dev, "ahb");
+> > +	if (IS_ERR(dev->ahb_clk)) {
+> > +		dev_err(dev->dev, "failed to get ahb clock\n");
+> > +		return PTR_ERR(dev->ahb_clk);
+> > +	}
+> > +	dev->mod_clk = devm_clk_get(dev->dev, "mod");
+> > +	if (IS_ERR(dev->mod_clk)) {
+> > +		dev_err(dev->dev, "failed to get mod clock\n");
+> > +		return PTR_ERR(dev->mod_clk);
+> > +	}
+> > +	dev->ram_clk = devm_clk_get(dev->dev, "ram");
+> > +	if (IS_ERR(dev->ram_clk)) {
+> > +		dev_err(dev->dev, "failed to get ram clock\n");
+> > +		return PTR_ERR(dev->ram_clk);
+> > +	}
+> 
+> Please add some blank lines between those blocks
+
+Yes, looks much better that way!
+
+> > +	dev->rstc = devm_reset_control_get(dev->dev, NULL);
+> 
+> You're not checking the error code here
+
+Good catch.
+
+> > +	dev->syscon = syscon_regmap_lookup_by_phandle(dev->dev->of_node,
+> > +						      "syscon");
+> > +	if (IS_ERR(dev->syscon)) {
+> > +		dev->syscon = NULL;
+> > +	} else {
+> > +		regmap_write_bits(dev->syscon, SYSCON_SRAM_CTRL_REG0,
+> > +				  SYSCON_SRAM_C1_MAP_VE,
+> > +				  SYSCON_SRAM_C1_MAP_VE);
+> > +	}
+> 
+> You don't need the syscon part anymore either
+
+Correct.
+
+> > +	ret = clk_prepare_enable(dev->ahb_clk);
+> > +	if (ret) {
+> > +		dev_err(dev->dev, "could not enable ahb clock\n");
+> > +		return -EFAULT;
+> > +	}
+> > +	ret = clk_prepare_enable(dev->mod_clk);
+> > +	if (ret) {
+> > +		clk_disable_unprepare(dev->ahb_clk);
+> > +		dev_err(dev->dev, "could not enable mod clock\n");
+> > +		return -EFAULT;
+> > +	}
+> > +	ret = clk_prepare_enable(dev->ram_clk);
+> > +	if (ret) {
+> > +		clk_disable_unprepare(dev->mod_clk);
+> > +		clk_disable_unprepare(dev->ahb_clk);
+> > +		dev_err(dev->dev, "could not enable ram clock\n");
+> > +		return -EFAULT;
+> > +	}
+> > +
+> > +	ret = reset_control_reset(dev->rstc);
+> > +	if (ret) {
+> > +		clk_disable_unprepare(dev->ram_clk);
+> > +		clk_disable_unprepare(dev->mod_clk);
+> > +		clk_disable_unprepare(dev->ahb_clk);
+> > +		dev_err(dev->dev, "could not reset device\n");
+> > +		return -EFAULT;
+> 
+> labels would simplify this greatly, and you should also release the
+> sram and the memory region here.
+
+I'll definitely do a sweep and add labels/gotos for this before
+submitting the nexr revision.
+
+Thanks for the review!
+
+Cheers,
+
+Paul
+
 -- 
-2.17.1
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180614/71c6d245/attachment.sig>
