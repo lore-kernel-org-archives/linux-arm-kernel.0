@@ -1,78 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 14 Jun 2018 11:57:03 -0700
-Subject: [PATCH v3 6/7] mmc: sunxi: Add runtime_pm support
-In-Reply-To: <1caa07d2-17ad-18aa-9216-037c06b36281@arm.com>
-References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
- <4514368de4ef7b4224be455f2d9e6090b464e819.1523888566.git-series.maxime.ripard@bootlin.com>
- <1caa07d2-17ad-18aa-9216-037c06b36281@arm.com>
-Message-ID: <CAOi56cV_6GLDZsRxSb8JWaJcrB-7evto82+uJTZRUoF=6z7zVA@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Thu, 14 Jun 2018 14:58:21 -0400 (EDT)
+Subject: [PATCH] arm64: fix infinite stacktrace
+Message-ID: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 7:12 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> Hi Maxime,
->
-> On 16/04/18 15:23, Maxime Ripard wrote:
-> > So far, even if our card was not in use, we didn't shut down our MMC
-> > controller, which meant that it was still active and clocking the bus.
-> >
-> > While this obviously means that we could save some power there, it also
-> > creates issues when it comes to EMC control since we'll have a perfect peak
-> > at the card clock rate.
-> >
-> > Let's implement runtime_pm with autosuspend so that we will shut down the
-> > controller when it's not been in use for quite some time.
-> >
-[...]
+I've got this infinite stacktrace when debugging another problem:
+[  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
+[  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
+[  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
+[  908.800284] Task dump for CPU 1:
+[  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
+[  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
+[  908.820285] Call trace:
+[  908.824785]  __switch_to+0x68/0x90
+[  908.837661]  0xfffffe00603afd90
+[  908.844119]  0xfffffe00603afd90
+[  908.850091]  0xfffffe00603afd90
+[  908.854285]  0xfffffe00603afd90
+[  908.863538]  0xfffffe00603afd90
+[  908.865523]  0xfffffe00603afd90
 
-> This patch has the unfortunate impact of killing my A20 system
-> (cubietruck), as of 9a8e1e8cc2c02c57c4e941651a8481a633506c91:
+The machine just locked up and kept on printing the same line over and
+over again. This patch fixes it.
 
-kernelCI also found failures on a few a10/a20 platfforms[1], and they
-all fail to reach userspace, similar to what Marc reported.
+Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
+Cc: stable at vger.kernel.org
 
-I bisected on a sun7i-a20-bananapi and that pointed at this commit
-also (in mainline as 9a8e1e8cc2c0 mmc: sunxi: Add runtime_pm support)
-
-Kevin
-
-[1] https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.17-11928-g2837461dbe6f/
-[2] $ git bisect log
-git bisect start
-# good: [5037be168f0e4ee910602935b1180291082d3aac] Merge branch
-'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/s390/linux
-git bisect good 5037be168f0e4ee910602935b1180291082d3aac
-# bad: [f60342fac9fae20ada2cd5faadbc2a1337cae03f] Merge tag
-'mmc-v4.18' of git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc
-git bisect bad f60342fac9fae20ada2cd5faadbc2a1337cae03f
-# good: [fd59ccc53062964007beda8787ffd9cd93968d63] Merge tag
-'fscrypt_for_linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/tytso/fscrypt
-git bisect good fd59ccc53062964007beda8787ffd9cd93968d63
-# good: [2158091d9cda6f126f71973667e8a9fc1e795d03] Merge branch
-'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input
-git bisect good 2158091d9cda6f126f71973667e8a9fc1e795d03
-# bad: [bfd694d5e21c2f0d344db6afeaf993bb0f299545] mmc: core: Add
-tunable delay before detecting card after card is inserted
-git bisect bad bfd694d5e21c2f0d344db6afeaf993bb0f299545
-# good: [743b819e4178935e3f098e5f13db301f532fa9e0] mmc: sunxi: Reorder
-the headers
-git bisect good 743b819e4178935e3f098e5f13db301f532fa9e0
-# bad: [ebca50dfae525341c48c2f69798667352318549e] mmc:
-renesas_sdhi_internal_dmac: remove superfluous WARN
-git bisect bad ebca50dfae525341c48c2f69798667352318549e
-# bad: [eef797ac13c08fae0f0ce7d2215d0951e884fa2d] mmc: sunxi: Drop the
-init / reset of the controller from set_ios
-git bisect bad eef797ac13c08fae0f0ce7d2215d0951e884fa2d
-# good: [ad04d9555da02c719de25b7d1e81ea8d0d2c4838] mmc: sunxi: Move
-clock configuration to a function
-git bisect good ad04d9555da02c719de25b7d1e81ea8d0d2c4838
-# bad: [9a8e1e8cc2c02c57c4e941651a8481a633506c91] mmc: sunxi: Add
-runtime_pm support
-git bisect bad 9a8e1e8cc2c02c57c4e941651a8481a633506c91
-# good: [e27e1f3d04061ccc3735361554088cd7aa286e31] mmc: sunxi: Move
-the card power configuration to a function
-git bisect good e27e1f3d04061ccc3735361554088cd7aa286e31
-# first bad commit: [9a8e1e8cc2c02c57c4e941651a8481a633506c91] mmc:
-sunxi: Add runtime_pm support
+Index: linux-2.6/arch/arm64/kernel/stacktrace.c
+===================================================================
+--- linux-2.6.orig/arch/arm64/kernel/stacktrace.c
++++ linux-2.6/arch/arm64/kernel/stacktrace.c
+@@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
+ 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+ 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+ 
++	if (frame->fp <= fp)
++		return -EINVAL;
++
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	if (tsk->ret_stack &&
+ 			(frame->pc == (unsigned long)return_to_handler)) {
