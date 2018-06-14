@@ -1,89 +1,59 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Thu, 14 Jun 2018 21:35:34 +0800
-Subject: [PATCH v4 4/7] dmaengine: imx-sdma: remove useless 'lock' and
- 'enabled' in 'struct sdma_channel'
+Date: Thu, 14 Jun 2018 21:35:35 +0800
+Subject: [PATCH v4 5/7] dmaengine: imx-sdma: remove the maximum limitation for
+ bd numbers
 In-Reply-To: <1528983337-2726-1-git-send-email-yibin.gong@nxp.com>
 References: <1528983337-2726-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1528983337-2726-5-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1528983337-2726-6-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 'sdmac->vc.lock' and 'sdmac->desc' can be used as 'lock' and
-'enabled' in 'struct sdma_channel sdmac', remove them.
+No this limitation now after virtual dma used since bd is allocated
+dynamically instead of static.
 
 Signed-off-by: Robin Gong <yibin.gong@nxp.com>
 ---
- drivers/dma/imx-sdma.c | 23 -----------------------
- 1 file changed, 23 deletions(-)
+ drivers/dma/imx-sdma.c | 14 --------------
+ 1 file changed, 14 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 719bf9f..27b76eb 100644
+index 27b76eb..f56226f 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -349,10 +349,8 @@ struct sdma_channel {
- 	unsigned long			event_mask[2];
- 	unsigned long			watermark_level;
- 	u32				shp_addr, per_addr;
--	spinlock_t			lock;
- 	enum dma_status			status;
- 	struct imx_dma_data		data;
--	bool				enabled;
- };
+@@ -292,7 +292,6 @@ struct sdma_context_data {
+ 	u32  scratch7;
+ } __attribute__ ((packed));
  
- #define IMX_DMA_SG_LOOP		BIT(0)
-@@ -613,14 +611,7 @@ static int sdma_config_ownership(struct sdma_channel *sdmac,
+-#define NUM_BD (int)(PAGE_SIZE / sizeof(struct sdma_buffer_descriptor))
  
- static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
- {
--	unsigned long flags;
--	struct sdma_channel *sdmac = &sdma->channel[channel];
--
- 	writel(BIT(channel), sdma->regs + SDMA_H_START);
--
--	spin_lock_irqsave(&sdmac->lock, flags);
--	sdmac->enabled = true;
--	spin_unlock_irqrestore(&sdmac->lock, flags);
- }
+ struct sdma_engine;
  
- /*
-@@ -738,14 +729,6 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
- 	struct sdma_buffer_descriptor *bd;
- 	int error = 0;
- 	enum dma_status	old_status = sdmac->status;
--	unsigned long flags;
--
--	spin_lock_irqsave(&sdmac->lock, flags);
--	if (!sdmac->enabled) {
--		spin_unlock_irqrestore(&sdmac->lock, flags);
--		return;
+@@ -1297,13 +1296,6 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 	if (ret)
+ 		goto err_bd_out;
+ 
+-	if (sg_len > NUM_BD) {
+-		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
+-				channel, sg_len, NUM_BD);
+-		ret = -EINVAL;
+-		goto err_bd_out;
 -	}
--	spin_unlock_irqrestore(&sdmac->lock, flags);
- 
- 	/*
- 	 * loop mode. Iterate over descriptors, re-setup them and
-@@ -1007,15 +990,10 @@ static int sdma_disable_channel(struct dma_chan *chan)
- 	struct sdma_channel *sdmac = to_sdma_chan(chan);
- 	struct sdma_engine *sdma = sdmac->sdma;
- 	int channel = sdmac->channel;
--	unsigned long flags;
- 
- 	writel_relaxed(BIT(channel), sdma->regs + SDMA_H_STATSTOP);
- 	sdmac->status = DMA_ERROR;
- 
--	spin_lock_irqsave(&sdmac->lock, flags);
--	sdmac->enabled = false;
--	spin_unlock_irqrestore(&sdmac->lock, flags);
 -
- 	return 0;
- }
+ 	desc->chn_count = 0;
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		struct sdma_buffer_descriptor *bd = &desc->bd[i];
+@@ -1413,12 +1405,6 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 	if (ret)
+ 		goto err_bd_out;
  
-@@ -1929,7 +1907,6 @@ static int sdma_probe(struct platform_device *pdev)
- 		struct sdma_channel *sdmac = &sdma->channel[i];
- 
- 		sdmac->sdma = sdma;
--		spin_lock_init(&sdmac->lock);
- 
- 		sdmac->channel = i;
- 		sdmac->vc.desc_free = sdma_desc_free;
+-	if (num_periods > NUM_BD) {
+-		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
+-				channel, num_periods, NUM_BD);
+-		goto err_bd_out;
+-	}
+-
+ 	if (period_len > 0xffff) {
+ 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
+ 				channel, period_len, 0xffff);
 -- 
 2.7.4
