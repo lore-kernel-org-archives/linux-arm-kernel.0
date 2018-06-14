@@ -1,56 +1,46 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Jun 2018 09:53:46 +0100
-Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
- bindings
-In-Reply-To: <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
-References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
- <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
- <20180612204802.GA15817@rob-hp-laptop>
- <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
- <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
- <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
- <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
- <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
- <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
- <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
-Message-ID: <5e013d65-9931-6b8d-ce7c-4333309d4ada@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 14 Jun 2018 11:07:33 +0200
+Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and
+ DVK
+In-Reply-To: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
+References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
+Message-ID: <20180614090733.GV10521@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/18 22:07, Matt Sealey wrote:
+Hi,
+
+On 14/06/2018 09:51:54+0100, Ben Whitten wrote:
+
+This need a proper commit message. Maybe you can also add a link to the
+technical brief for the platform?
+
+> Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
+> ---
+>  arch/arm/boot/dts/Makefile        |   3 +-
+>  arch/arm/boot/dts/at91-wb45n.dts  |  66 +++++++++++++++
+>  arch/arm/boot/dts/at91-wb45n.dtsi | 169 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 237 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
+>  create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
 > 
-> 
->> -----Original Message-----
->> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->>
->>> So, if the suggestion is to use an existing property "unit", I am fine
->>> with it, if people agree to it.
->>
->> If we're going to have something sharply different than ACPI I prefer
->> Rob's idea.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 7e24249..1ee94ee 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+>  	at91sam9g25ek.dtb \
+>  	at91sam9g35ek.dtb \
+>  	at91sam9x25ek.dtb \
+> -	at91sam9x35ek.dtb
+> +	at91sam9x35ek.dtb \
+> +	at91-wb45n.dtb
 
-No, the above comment is about using "unit" ( if it is a standard property
-for specifying something specific to hardware) instead of "coresight,hwid".
-I would prefer to stick to the DT graph bindings, because :
+The proper name for the file is <soc>-board.dtb so this should be
+at91sam9g25-wb45n.dtb.
 
-1) The connections are bi-directional => Well, not necessarily bi-directional
-in terms of the data flow. But the connection information is critical. i.e,
-we need information about both the end-points of a connection, which the DT
-graph bindings solves.
 
-All we are missing is a way for specifying the "hardware port" number and the
-direction of flow. I don't see why do we need to create something new just for
-these two properties for something that exists today and works reasonably well
-for the usecase.
-
-> 
-> What are you trying to say about being sharply different than ACPI?
-
-The proposed Coresight ACPI draft bindings are based on the ACPI Graph bindings
-(just like the DT graph bindings and is compatible with it, in terms of the APIs.
-i.e, fwnode_graph_* operations work for both ACPI and DT  alike).
-
-So, what Mathieu, in turn means is, if we depart from the DT Graph bindings, which
-I personally don't see any benefit in.
-
-Suzuki
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
