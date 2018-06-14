@@ -1,43 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 14 Jun 2018 13:45:00 +0100
-Subject: [PATCH 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17
-In-Reply-To: <1528976039-25826-1-git-send-email-Dave.Martin@arm.com>
-References: <1528976039-25826-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180614124457.GM22983@e103592.cambridge.arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 14 Jun 2018 07:46:58 -0500
+Subject: [PATCH 2/4] ARM: Introduce ability to enable invalidate of BTB
+ with ICIALLU on Cortex-A15 for CVE-2017-5715
+In-Reply-To: <2786d17e-1075-e0fb-1864-fb5900e4a2af@gmail.com>
+References: <20180612202411.29798-1-nm@ti.com>
+ <20180612202411.29798-3-nm@ti.com>
+ <6BFD98F8-FACB-43DE-82DC-E0A134D4E1C0@gmail.com>
+ <20180613133704.dwytvpj3zeuywooh@kahuna>
+ <2786d17e-1075-e0fb-1864-fb5900e4a2af@gmail.com>
+Message-ID: <20180614124658.yh6b7bqhd4ybxk4m@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 12:33:55PM +0100, Dave Martin wrote:
-> This series contains fixes for some issues observed since the KVM arm64
-> pull request for 4.17.
+On 21:36-20180613, Florian Fainelli wrote:
+[...]
+> >>> c) This workaround applies to only the boot processor. It is important
+> >>>   to apply workaround as necessary (context-save-restore) around low
+> >>>   power context loss OR additional processors as necessary in either
+> >>>   firmware support OR elsewhere in OS.
+> >>
+> >> About that, I don't know enough of uboot but are there existing PSCI or
+> >> other seemingly standard secondary core support in uboot that would make
+> >> us go through the same initialization as the boot CPU? If not, is
+> >> everything going to be largely implementation specific and
+> >> scattered between uboot and the hypervisors or kernel?
+> > 
+> > in ARMV7 SoCs, unfortunately, we lived in a world of no-exact-standard.
+> > even within TI, Few of the SoCs use PSCI, others did implement custom
+> > SMC calls (since they existed in an architecture prior to PSCI).
+> > 
+> >>
+> >> FWIW, this is what prompted me to submit this:
+> >>
+> >> https://patchwork.kernel.org/patch/10453643/
+> > 
+> > That wont work in a generic manner for precisely the same reason I had to do
+> > it with weak function in u-boot (some SoCs will only permit 'mcr
+> > p15, 0, r0, c1, c0, 1' in secure world and you need to make a custom smc
+> > call to make it happen). Unfortunately, IMHO, at least at this
+> > point, there'd be custom implementations per SoC and layers depending on
+> > where to implement it.
+> 
+> It won't work in a generic manner but it will work for some platforms
+> where updating the firmware is impractical, and since the bits are write
+> ignore if your PL does not allow it, this still seems like a net win for
+> platforms where this is effective, and it does take care of Linux doing
+> the SMP bring-up of secondary cores as well. That's what we have in our
+> downstream tree at least, and I was hoping this could land upstream too.
 
-*ahem*, that should read 4.18.
 
-> The first patch (from Mark Rutland) adds a straightforward helper to
-> modify particular bits in a system register conditionally.  This is used
-> by patch 3 (though obviously it could be coded round and patch 1
-> dropped, if preferred).
-> 
-> See other patches for details of the individual fixes.
-> 
-> Dave Martin (3):
->   KVM: arm64: Don't mask softirq with IRQs disabled in vcpu_put()
->   KVM: arm64/sve: Fix SVE trap restoration for non-current tasks
->   KVM: arm64: Avoid mistaken attempts to save SVE state for vcpus
-> 
-> Mark Rutland (1):
->   arm64: introduce sysreg_clear_set()
-> 
->  arch/arm64/include/asm/kvm_host.h |  1 +
->  arch/arm64/include/asm/sysreg.h   | 11 ++++++++++
->  arch/arm64/kvm/fpsimd.c           | 46 +++++++++++++++++++++++++++++----------
->  3 files changed, 47 insertions(+), 11 deletions(-)
-> 
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I think it is clear from Russell's summary that we dont want "may work"
+workaround in kernel/bootloaders. in case of u-boot (which this patch is
+about), I'd suggest adding the CONFIG_*CVE* input to the Kconfig for the
+SoC where you know for sure this works.
+
+Does that sound a fair tradeoff?
+
+-- 
+Regards,
+Nishanth Menon
