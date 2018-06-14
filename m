@@ -1,35 +1,45 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 14 Jun 2018 13:56:03 +1000
-Subject: [PATCH 1/3] arm: dts: Fix error in Aspeed OpenPower Romulus
- device-tree
-Message-ID: <20180614035605.25286-1-benh@kernel.crashing.org>
+Date: Thu, 14 Jun 2018 13:56:04 +1000
+Subject: [PATCH 2/3] arm: dts: Update AST2500 device-tree
+In-Reply-To: <20180614035605.25286-1-benh@kernel.crashing.org>
+References: <20180614035605.25286-1-benh@kernel.crashing.org>
+Message-ID: <20180614035605.25286-2-benh@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reserved memory for the VGA frame buffer is at the wrong address
-for this system.
+Add the missing node for the CVIC (the coprocessor interrupt
+controller) and add a label to the SRAM node so it can be
+referenced from the board device-tree file.
 
 Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 ---
----
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/aspeed-g5.dtsi | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-index 0b9b37d4d6ef..7d28c03a9e0b 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-@@ -21,9 +21,9 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		vga_memory: framebuffer at bf000000 {
-+		vga_memory: framebuffer at 9f000000 {
- 			no-map;
--			reg = <0xbf000000 0x01000000>; /* 16M */
-+			reg = <0x9f000000 0x01000000>; /* 16M */
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 17f2714d18a7..251664984398 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -127,6 +127,11 @@
+ 			reg = <0x1e6c0080 0x80>;
  		};
  
- 		flash_memory: region at 98000000 {
++		cvic: interrupt-controller at 1e6c2000 {
++			compatible = "aspeed,ast2400-cvic";
++			reg = <0x1e6c2000 0x80>;
++		};
++
+ 		mac0: ethernet at 1e660000 {
+ 			compatible = "aspeed,ast2500-mac", "faraday,ftgmac100";
+ 			reg = <0x1e660000 0x180>;
+@@ -211,7 +216,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			sram at 1e720000 {
++			sram: sram at 1e720000 {
+ 				compatible = "mmio-sram";
+ 				reg = <0x1e720000 0x9000>;	// 36K
+ 			};
 -- 
 2.17.0
