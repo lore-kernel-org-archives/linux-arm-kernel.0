@@ -1,163 +1,51 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Thu, 14 Jun 2018 11:22:25 +0300
-Subject: [PATCH v7 3/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <20180614075849.dfiqwcu6rtzgpzq7@rfolt0960.corp.atmel.com>
-References: <20180613163621.23995-1-radu.pirea@microchip.com>
- <20180613163621.23995-4-radu.pirea@microchip.com>
- <20180614075849.dfiqwcu6rtzgpzq7@rfolt0960.corp.atmel.com>
-Message-ID: <1086330e-40e4-8d9b-50aa-1ae9bf48aa22@microchip.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 14 Jun 2018 16:23:36 +0800
+Subject: [PATCH v1 4/4] mailbox: Add support for i.MX7D messaging unit
+In-Reply-To: <20180613124850.w3bzerkpkbql6ite@pengutronix.de>
+References: <20180601065821.28234-1-o.rempel@pengutronix.de>
+ <20180601065821.28234-5-o.rempel@pengutronix.de>
+ <CAA+hA=RpoRXUK+jB18F4OeYE9PG73SDa_NLYeN5Q2G3B1bC-JA@mail.gmail.com>
+ <20180613124850.w3bzerkpkbql6ite@pengutronix.de>
+Message-ID: <CAA+hA=TjExQ7B3Px2HBHSejexBcXE_b93=8h8uihUkKDD9fpFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sascha,
 
-
-On 06/14/2018 10:58 AM, Ludovic Desroches wrote:
-> On Wed, Jun 13, 2018 at 07:36:18PM +0300, Radu Pirea wrote:
->> This mfd driver is just a wrapper over atmel_serial driver and
->> spi-at91-usart driver. Selection of one of the drivers is based on a
->> property from device tree. If the property is not specified, the default
->> driver is atmel_serial.
+On Wed, Jun 13, 2018 at 8:48 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Jun 13, 2018 at 08:21:10PM +0800, Dong Aisheng wrote:
+>> Hi Oleksij,
 >>
->> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
->> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>   drivers/mfd/Kconfig      |  9 ++++++
->>   drivers/mfd/Makefile     |  1 +
->>   drivers/mfd/at91-usart.c | 69 ++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 79 insertions(+)
->>   create mode 100644 drivers/mfd/at91-usart.c
+>> On Fri, Jun 1, 2018 at 2:58 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+>> > The Mailbox controller is able to send messages (up to 4 32 bit words)
+>> > between the endpoints.
 >>
->> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->> index b860eb5aa194..a886672b960d 100644
->> --- a/drivers/mfd/Kconfig
->> +++ b/drivers/mfd/Kconfig
->> @@ -99,6 +99,15 @@ config MFD_AAT2870_CORE
->>   	  additional drivers must be enabled in order to use the
->>   	  functionality of the device.
->>   
->> +config MFD_AT91_USART
->> +	tristate "AT91 USART Driver"
->> +	select MFD_CORE
->> +	help
->> +	  Select this to get support for AT91 USART IP. This is a wrapper
->> +	  over at91-usart-serial driver and usart-spi-driver. Only one function
->> +	  can be used at a time. The choice is done at boot time by the probe
->> +	  function of this MFD driver according to a device tree property.
->> +
->>   config MFD_ATMEL_FLEXCOM
->>   	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
->>   	select MFD_CORE
->> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
->> index d9d2cf0d32ef..db1332aa96db 100644
->> --- a/drivers/mfd/Makefile
->> +++ b/drivers/mfd/Makefile
->> @@ -185,6 +185,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
->>   obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
->>   obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
->>   obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
->> +obj-$(CONFIG_MFD_AT91_USART)	+= at91-usart.o
->>   obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
->>   obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
->>   obj-$(CONFIG_MFD_ATMEL_SMC)	+= atmel-smc.o
->> diff --git a/drivers/mfd/at91-usart.c b/drivers/mfd/at91-usart.c
->> new file mode 100644
->> index 000000000000..3014ce532644
->> --- /dev/null
->> +++ b/drivers/mfd/at91-usart.c
->> @@ -0,0 +1,69 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Driver for AT91 USART
->> + *
->> + * Copyright (C) 2018 Microchip Technology
->> + *
->> + * Author: Radu Pirea <radu.pirea@microchip.com>
->> + *
->> + */
->> +
->> +#include <dt-bindings/mfd/at91-usart.h>
->> +
->> +#include <linux/module.h>
->> +#include <linux/mfd/core.h>
->> +#include <linux/property.h>
->> +
->> +static struct mfd_cell at91_usart_spi_subdev = {
->> +		.name = "at91_usart_spi",
->> +		.of_compatible = "microchip,at91sam9g45-usart-spi",
->> +	};
->> +
->> +static struct mfd_cell at91_usart_serial_subdev = {
->> +		.name = "atmel_usart_serial",
->> +		.of_compatible = "atmel,at91rm9200-usart-serial",
->> +	};
->> +
->> +static int at91_usart_mode_probe(struct platform_device *pdev)
->> +{
->> +	struct mfd_cell cell;
->> +	u32 opmode = AT91_USART_MODE_SERIAL;
->> +
->> +	device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
->> +
->> +	switch (opmode) {
->> +	case AT91_USART_MODE_SPI:
->> +		cell = at91_usart_spi_subdev;
->> +		break;
->> +	case AT91_USART_MODE_SERIAL:
->> +		cell = at91_usart_serial_subdev;
->> +		break;
->> +	default:
->> +		break;
-> 
-> If there is an invalid opmode from the DT, you will pass a non initialized cell
-> to mfd_add_device().
-> 
-> Regards
-> 
-> Ludovic
-
-Hi Ludovic,
-
-Tnx. That's true. How is better to do if atmel,usart-mode has an invalid 
-value? To initialize cell with at91_usart_serial_subdev or to print an 
-error message and return -EINVAL?
-
-Regards.
-Radu Pirea
-> 
->> +	}
->> +
->> +	return devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_AUTO, &cell, 1,
->> +			      NULL, 0, NULL);
->> +}
->> +
->> +static const struct of_device_id at91_usart_mode_of_match[] = {
->> +	{ .compatible = "atmel,at91rm9200-usart" },
->> +	{ .compatible = "atmel,at91sam9260-usart" },
->> +	{ /* sentinel */ }
->> +};
->> +
->> +MODULE_DEVICE_TABLE(of, at91_flexcom_of_match);
->> +
->> +static struct platform_driver at91_usart_mfd = {
->> +	.probe	= at91_usart_mode_probe,
->> +	.driver	= {
->> +		.name		= "at91_usart_mode",
->> +		.of_match_table	= at91_usart_mode_of_match,
->> +	},
->> +};
->> +
->> +module_platform_driver(at91_usart_mfd);
->> +
->> +MODULE_AUTHOR("Radu Pirea <radu.pirea@microchip.com>");
->> +MODULE_DESCRIPTION("AT91 USART MFD driver");
->> +MODULE_LICENSE("GPL v2");
->> -- 
->> 2.17.1
+>> Could we really be able to send up to 4 42bit words with this driver?
 >>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> It looks to me the current Mailbox framework is more designed for share mem
+>> transfer which does not fit i.MX MU well.
+>
+> The mailbox framework just defines channels and messages. A message is a
+> void * which may contain arbitrary data or even no data at all; some
+> drivers simply ignore the message pointer, so in fact they act as a
+> doorbell unit only.
+>
+> There's nothing about shared memory in the mailbox framework, but of
+> course you can combine a mailbox driver and shared memory to a remote
+> message mechanism. That could be done with the i.MX MU aswell and would
+> indeed be a good match for the hardware.
+>
+
+Yes, you're right. My earlier reply is less accurate.
+It seems the actual data type is interpreted by the underlying MU driver.
+
+Regards
+Dong Aisheng
+
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
