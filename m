@@ -1,51 +1,58 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 14 Jun 2018 23:35:44 +0800
-Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system control
-Message-ID: <20180614153548.9644-1-wens@csie.org>
+Date: Thu, 14 Jun 2018 23:35:48 +0800
+Subject: [PATCH v3 4/4] arm64: dts: allwinner: a64: add SRAM controller device
+ tree node
+In-Reply-To: <20180614153548.9644-1-wens@csie.org>
+References: <20180614153548.9644-1-wens@csie.org>
+Message-ID: <20180614153548.9644-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Icenowy Zheng <icenowy@aosc.io>
 
-This series is the remaining A64 syscon changes from the R40 DWMAC
-series. The series aligns how the A64 system control exports a regmap
-for the sun8i DWMAC driver to access with what we've done for the R40.
+Allwinner A64 has a SRAM controller, and in the device tree currently
+we have a syscon node to enable EMAC driver to access the EMAC clock
+register. As SRAM controller driver can now export regmap for this
+register, replace the syscon node to the SRAM controller device node,
+and let EMAC driver to acquire its EMAC clock regmap.
 
-Originally the A64 used the generic syscon for this bit of hardware.
-But this block also contains mapping bits for the onboard SRAM, used
-by various peripherals, and other vendor specific bits we may use in
-the future. It is by no means generic. And we already have a device
-tree binding and driver for the SRAM part.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+[wens at csie.org: Updated compatible string]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-The first patch make the SRAM control device export a regmap, exposing
-a single EMAC control register, for the DWMAC driver to consume.
-
-The second and third patches rename the A64 compatible string to read
-"system control", which is what the block is named in the user manual.
-
-The last patch fixes up the device node, and also adds the lone mappable
-SRAM block, which is needed by the Display Engine.
-
-Changes since v2:
-
-  - changed the compatible string from "*-sram-controller" to
-    "*-system-control"
-
-
-ChenYu
-
-Chen-Yu Tsai (2):
-  dt-bindings: sram: Rename A64 SRAM controller compatible
-  soc: sunxi: sram: Add updated compatible string for A64 system control
-
-Icenowy Zheng (2):
-  soc: sunxi: export a regmap for EMAC clock reg on A64
-  arm64: dts: allwinner: a64: add SRAM controller device tree node
-
- .../devicetree/bindings/sram/sunxi-sram.txt   |  3 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++-
- drivers/soc/sunxi/sunxi_sram.c                | 61 ++++++++++++++++++-
- 3 files changed, 78 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1b2ef28c42bd..87968dafe1dc 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -169,9 +169,24 @@
+ 		ranges;
+ 
+ 		syscon: syscon at 1c00000 {
+-			compatible = "allwinner,sun50i-a64-system-controller",
+-				"syscon";
++			compatible = "allwinner,sun50i-a64-system-control";
+ 			reg = <0x01c00000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_c: sram at 18000 {
++				compatible = "mmio-sram";
++				reg = <0x00018000 0x28000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00018000 0x28000>;
++
++				de2_sram: sram-section at 0 {
++					compatible = "allwinner,sun50i-a64-sram-c";
++					reg = <0x0000 0x28000>;
++				};
++			};
+ 		};
+ 
+ 		dma: dma-controller at 1c02000 {
 -- 
 2.17.1
