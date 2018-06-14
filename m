@@ -1,44 +1,58 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Thu, 14 Jun 2018 14:58:21 -0400 (EDT)
-Subject: [PATCH] arm64: fix infinite stacktrace
-Message-ID: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Thu, 14 Jun 2018 18:30:03 +0000
+Subject: [PATCH v7 10/10] drivers: clk: Add ZynqMP clock driver
+In-Reply-To: <c042fd9b-85cb-f0d3-101c-f78f3dc4fc44@infradead.org>
+References: <1527713725-1086-1-git-send-email-jollys@xilinx.com>
+ <1527713725-1086-11-git-send-email-jollys@xilinx.com>
+ <c042fd9b-85cb-f0d3-101c-f78f3dc4fc44@infradead.org>
+Message-ID: <SN1PR02MB3758971F60A9800642B16F95B87D0@SN1PR02MB3758.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've got this infinite stacktrace when debugging another problem:
-[  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
-[  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
-[  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
-[  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
-[  908.800284] Task dump for CPU 1:
-[  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
-[  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
-[  908.820285] Call trace:
-[  908.824785]  __switch_to+0x68/0x90
-[  908.837661]  0xfffffe00603afd90
-[  908.844119]  0xfffffe00603afd90
-[  908.850091]  0xfffffe00603afd90
-[  908.854285]  0xfffffe00603afd90
-[  908.863538]  0xfffffe00603afd90
-[  908.865523]  0xfffffe00603afd90
+Hi Randy,
 
-The machine just locked up and kept on printing the same line over and
-over again. This patch fixes it.
+Thanks for review,
 
-Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
-Cc: stable at vger.kernel.org
+> -----Original Message-----
+> From: Randy Dunlap [mailto:rdunlap at infradead.org]
+> Sent: Wednesday, May 30, 2018 2:18 PM
+> To: Jolly Shah <JOLLYS@xilinx.com>; ard.biesheuvel at linaro.org;
+> mingo at kernel.org; gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; mturquette at baylibre.com;
+> sboyd at codeaurora.org; michal.simek at xilinx.com; robh+dt at kernel.org;
+> mark.rutland at arm.com; linux-clk at vger.kernel.org
+> Cc: Rajan Vaja <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Tejas Patel
+> <TEJASP@xilinx.com>; Shubhrajyoti Datta <shubhraj@xilinx.com>; Jolly Shah
+> <JOLLYS@xilinx.com>
+> Subject: Re: [PATCH v7 10/10] drivers: clk: Add ZynqMP clock driver
+> 
+> On 05/30/2018 01:55 PM, Jolly Shah wrote:
+> > From: Jolly Shah <jolly.shah@xilinx.com>
+> 
+> 
+> > diff --git a/drivers/clk/zynqmp/Kconfig b/drivers/clk/zynqmp/Kconfig
+> > new file mode 100644 index 0000000..fe815f7
+> > --- /dev/null
+> > +++ b/drivers/clk/zynqmp/Kconfig
+> > @@ -0,0 +1,11 @@
+> > +# SPDX-License-Identifier: GPL-2.0
+> > +
+> > +config COMMON_CLK_ZYNQMP
+> > +	bool "Support for Xilinx ZynqMP Ultrascale+ clock controllers"
+> > +	depends on OF
+> > +	depends on ARCH_ZYNQMP || COMPILE_TEST
+> > +	depends on ZYNQMP_FIRMWARE
+> > +	help
+> > +	  Support for the Zynqmp Ultrascale clock controller.
+> > +	  It has a dependency on the PMU firmware.
+> > +	  Say Y if you want to support clock support
+> 
+> 	  Say Y if you want to include clock support.
+> 
+	Fixed in v8
 
-Index: linux-2.6/arch/arm64/kernel/stacktrace.c
-===================================================================
---- linux-2.6.orig/arch/arm64/kernel/stacktrace.c
-+++ linux-2.6/arch/arm64/kernel/stacktrace.c
-@@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
- 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
- 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
- 
-+	if (frame->fp <= fp)
-+		return -EINVAL;
-+
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk->ret_stack &&
- 			(frame->pc == (unsigned long)return_to_handler)) {
+> 
+> --
+> ~Randy
