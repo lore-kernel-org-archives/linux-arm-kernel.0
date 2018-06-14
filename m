@@ -1,101 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 14 Jun 2018 18:37:17 +0200
-Subject: [PATCH 0/9] media: cedrus: Add H264 decoding support
-In-Reply-To: <CAAFQd5A-GMBnNnRCfm0-51R9rn_pWw+UC3r-JX-_BE3cdznqig@mail.gmail.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <CAAFQd5A-GMBnNnRCfm0-51R9rn_pWw+UC3r-JX-_BE3cdznqig@mail.gmail.com>
-Message-ID: <20180614163717.hqxeiwn63vvnk5xg@flea>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 14 Jun 2018 17:44:06 +0100
+Subject: [PATCHv2 02/19] arm64: move SCTLR_EL{1,2} assertions to
+ <asm/sysreg.h>
+In-Reply-To: <20180601112441.37810-3-mark.rutland@arm.com>
+References: <20180601112441.37810-1-mark.rutland@arm.com>
+ <20180601112441.37810-3-mark.rutland@arm.com>
+Message-ID: <20180614164405.GE26471@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On Thu, Jun 14, 2018 at 10:00:43PM +0900, Tomasz Figa wrote:
-> Hi Maxime,
+On Fri, Jun 01, 2018 at 12:24:24PM +0100, Mark Rutland wrote:
+> Currently we assert that the SCTLR_EL{1,2}_{SET,CLEAR} bits are
+> self-consistent with an assertion in config_sctlr_el1(). This is a bit
+> unusual, since config_sctlr_el1() doesn't make use of these definitions,
+> and is far away from the definitions themselves.
 > 
-> On Wed, Jun 13, 2018 at 11:07 PM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > Hi,
-> >
-> > Here is a preliminary version of the H264 decoding support in the
-> > cedrus driver.
+> We can use the CPP #error directive to have equivalent assertions in
+> <asm/sysreg.h>, next to the definitions of the set/clear bits, which is
+> a bit clearer and simpler.
 > 
-> Thanks for the series! Let me reply inline to some of the points raised here.
+> The preprocessor handles literals differently than regular C, e.g. ~0 is
+> equivalent to ~(intmax_t)0 rather than ~(int)0. Therefore, instead of ~0
+> we use 0xffffffff, which is unambiguous.
 > 
-> > As you might already know, the cedrus driver relies on the Request
-> > API, and is a reverse engineered driver for the video decoding engine
-> > found on the Allwinner SoCs.
-> >
-> > This work has been possible thanks to the work done by the people
-> > behind libvdpau-sunxi found here:
-> > https://github.com/linux-sunxi/libvdpau-sunxi/
-> >
-> > This driver is based on the last version of the cedrus driver sent by
-> > Paul, based on Request API v13 sent by Hans:
-> > https://lkml.org/lkml/2018/5/7/316
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Dave Martin <dave.martin@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
 > 
-> Just FYI, there is v15 already. :)
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 6171178075dc..bd1d1194a5e7 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -452,9 +452,9 @@
+>  			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
+>  			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
+>  
+> -/* Check all the bits are accounted for */
+> -#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
+> -
+> +#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffff
+> +#error "Inconsistent SCTLR_EL2 set/clear bits"
+> +#endif
 
-Yeah, we know, Paul is currently working on rebasing to that version :)
+Please can you extend this check to be 64-bit, since SCTLR is growing fields
+up there and we'll want to check them too?
 
-> > This driver has been tested only with baseline profile videos, and is
-> > missing a few key features to decode videos with higher profiles.
-> > This has been tested using our cedrus-frame-test tool, which should be
-> > a quite generic v4l2-to-drm decoder using the request API to
-> > demonstrate the video decoding:
-> > https://github.com/free-electrons/cedrus-frame-test/, branch h264
-> >
-> > However, sending this preliminary version, I'd really like to start a
-> > discussion and get some feedback on the user-space API for the H264
-> > controls exposed through the request API.
-> >
-> > I've been using the controls currently integrated into ChromeOS that
-> > have a working version of this particular setup. However, these
-> > controls have a number of shortcomings and inconsistencies with other
-> > decoding API. I've worked with libva so far, but I've noticed already
-> > that:
-> 
-> Note that these controls are supposed to be defined exactly like the
-> bitstream headers deserialized into C structs in memory. I believe
-> Pawel (on CC) defined them based on the actual H264 specification.
-> 
-> >   - The kernel UAPI expects to have the nal_ref_idc variable, while
-> >     libva only exposes whether that frame is a reference frame or
-> >     not. I've looked at the rockchip driver in the ChromeOS tree, and
-> >     our own driver, and they both need only the information about
-> >     whether the frame is a reference one or not, so maybe we should
-> >     change this?
-> 
-> The fact that 2 drivers only need partial information doesn't mean
-> that we should ignore the data being already in the bitstream. IMHO
-> this API should to provide all the metadata available in the stream to
-> the kernel driver, as a replacement for bitstream parsing in firmware
-> (or in kernel... yuck).
+Thanks,
 
-The point is more that libva will only pass the result of (nal_ref_idc
-!= 0). So in the libva plugin, you won't be able to fill the proper
-value to the kernel, since you don't have access to it.
-
-> >   - The H264 bitstream exposes the picture default reference list (for
-> >     both list 0 and list 1), the slice reference list and an override
-> >     flag. The libva will only pass the reference list to be used (so
-> >     either the picture default's or the slice's) depending on the
-> >     override flag. The kernel UAPI wants the picture default reference
-> >     list and the slice reference list, but doesn't expose the override
-> >     flag, which prevents us from configuring properly the
-> >     hardware. Our video decoding engine needs the three information,
-> >     but we can easily adapt to having only one. However, having two
-> >     doesn't really work for us.
-> 
-> Where does the override flag come from? If it's in the bitstream, then
-> I guess it was just missed when creating the structures.
-
-It's in the bitstream yeah. I'll add it then.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Will
