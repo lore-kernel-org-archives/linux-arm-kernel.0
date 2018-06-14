@@ -1,30 +1,87 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 14 Jun 2018 15:00:28 +0200
-Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and
- DVK
-In-Reply-To: <03f0f635-3fc2-085b-20e0-e1fcaa9e8062@microchip.com>
-References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
- <03f0f635-3fc2-085b-20e0-e1fcaa9e8062@microchip.com>
-Message-ID: <20180614130028.GA16660@piout.net>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 14 Jun 2018 22:00:43 +0900
+Subject: [PATCH 0/9] media: cedrus: Add H264 decoding support
+In-Reply-To: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+Message-ID: <CAAFQd5A-GMBnNnRCfm0-51R9rn_pWw+UC3r-JX-_BE3cdznqig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/2018 14:52:25+0200, Nicolas Ferre wrote:
-> > +	gpio_keys {
-> > +		compatible = "gpio-keys";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		irqbtn at pb18 {
-> 
-> I'm not sure that the @pb18 can be used like this. This address extension
-> must be used in a "reg" property in the node. dtc used with warning switch
-> on might trigger an error for this.
-> 
+Hi Maxime,
 
-Indeed, no unit-address without a reg property.
+On Wed, Jun 13, 2018 at 11:07 PM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> Hi,
+>
+> Here is a preliminary version of the H264 decoding support in the
+> cedrus driver.
 
+Thanks for the series! Let me reply inline to some of the points raised here.
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>
+> As you might already know, the cedrus driver relies on the Request
+> API, and is a reverse engineered driver for the video decoding engine
+> found on the Allwinner SoCs.
+>
+> This work has been possible thanks to the work done by the people
+> behind libvdpau-sunxi found here:
+> https://github.com/linux-sunxi/libvdpau-sunxi/
+>
+> This driver is based on the last version of the cedrus driver sent by
+> Paul, based on Request API v13 sent by Hans:
+> https://lkml.org/lkml/2018/5/7/316
+
+Just FYI, there is v15 already. :)
+
+>
+> This driver has been tested only with baseline profile videos, and is
+> missing a few key features to decode videos with higher profiles.
+> This has been tested using our cedrus-frame-test tool, which should be
+> a quite generic v4l2-to-drm decoder using the request API to
+> demonstrate the video decoding:
+> https://github.com/free-electrons/cedrus-frame-test/, branch h264
+>
+> However, sending this preliminary version, I'd really like to start a
+> discussion and get some feedback on the user-space API for the H264
+> controls exposed through the request API.
+>
+> I've been using the controls currently integrated into ChromeOS that
+> have a working version of this particular setup. However, these
+> controls have a number of shortcomings and inconsistencies with other
+> decoding API. I've worked with libva so far, but I've noticed already
+> that:
+
+Note that these controls are supposed to be defined exactly like the
+bitstream headers deserialized into C structs in memory. I believe
+Pawel (on CC) defined them based on the actual H264 specification.
+
+>   - The kernel UAPI expects to have the nal_ref_idc variable, while
+>     libva only exposes whether that frame is a reference frame or
+>     not. I've looked at the rockchip driver in the ChromeOS tree, and
+>     our own driver, and they both need only the information about
+>     whether the frame is a reference one or not, so maybe we should
+>     change this?
+
+The fact that 2 drivers only need partial information doesn't mean
+that we should ignore the data being already in the bitstream. IMHO
+this API should to provide all the metadata available in the stream to
+the kernel driver, as a replacement for bitstream parsing in firmware
+(or in kernel... yuck).
+
+>   - The H264 bitstream exposes the picture default reference list (for
+>     both list 0 and list 1), the slice reference list and an override
+>     flag. The libva will only pass the reference list to be used (so
+>     either the picture default's or the slice's) depending on the
+>     override flag. The kernel UAPI wants the picture default reference
+>     list and the slice reference list, but doesn't expose the override
+>     flag, which prevents us from configuring properly the
+>     hardware. Our video decoding engine needs the three information,
+>     but we can easily adapt to having only one. However, having two
+>     doesn't really work for us.
+
+Where does the override flag come from? If it's in the bitstream, then
+I guess it was just missed when creating the structures.
+
+Best regards,
+Tomasz
