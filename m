@@ -1,52 +1,30 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 14 Jun 2018 10:32:20 +0200
-Subject: [PATCH v7 3/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <1086330e-40e4-8d9b-50aa-1ae9bf48aa22@microchip.com>
-References: <20180613163621.23995-1-radu.pirea@microchip.com>
- <20180613163621.23995-4-radu.pirea@microchip.com>
- <20180614075849.dfiqwcu6rtzgpzq7@rfolt0960.corp.atmel.com>
- <1086330e-40e4-8d9b-50aa-1ae9bf48aa22@microchip.com>
-Message-ID: <20180614083220.GU10521@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Jun 2018 10:35:30 +0200
+Subject: [PATCH] pinctrl: actions: Fix uninitialized error in
+ owl_pin_config_set()
+In-Reply-To: <1528452347-23986-1-git-send-email-geert@linux-m68k.org>
+References: <1528452347-23986-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CACRpkdbMogW3oVv0NEX1b622H8g4k-3MtzLONhog5TKsPn5qCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/2018 11:22:25+0300, Radu Pirea wrote:
-> On 06/14/2018 10:58 AM, Ludovic Desroches wrote:
-> > > +static int at91_usart_mode_probe(struct platform_device *pdev)
-> > > +{
-> > > +	struct mfd_cell cell;
-> > > +	u32 opmode = AT91_USART_MODE_SERIAL;
-> > > +
-> > > +	device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
-> > > +
-> > > +	switch (opmode) {
-> > > +	case AT91_USART_MODE_SPI:
-> > > +		cell = at91_usart_spi_subdev;
-> > > +		break;
-> > > +	case AT91_USART_MODE_SERIAL:
-> > > +		cell = at91_usart_serial_subdev;
-> > > +		break;
-> > > +	default:
-> > > +		break;
-> > 
-> > If there is an invalid opmode from the DT, you will pass a non initialized cell
-> > to mfd_add_device().
-> > 
-> > Regards
-> > 
-> > Ludovic
-> 
-> Hi Ludovic,
-> 
-> Tnx. That's true. How is better to do if atmel,usart-mode has an invalid
-> value? To initialize cell with at91_usart_serial_subdev or to print an error
-> message and return -EINVAL?
-> 
+On Fri, Jun 8, 2018 at 12:05 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
 
-Returning an error is probably the correct choice because it means the
-DT has an invalid value (something was done and is wrong).
+> With gcc 4.1.2:
+>
+>     drivers/pinctrl/actions/pinctrl-owl.c: In function ?owl_pin_config_set?:
+>     drivers/pinctrl/actions/pinctrl-owl.c:336: warning: ?ret? may be used uninitialized in this function
+>
+> Indeed, if num_configs is zero, the uninitialized value will be returned
+> as an error code.
+>
+> Fix this by preinitializing it to zero.
+>
+> Fixes: 2242ddfbf4d699b5 ("pinctrl: actions: Add Actions S900 pinctrl driver")
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Patch applied with Manivannan's ACK.
+
+Yours,
+Linus Walleij
