@@ -1,63 +1,35 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 14 Jun 2018 21:36:59 +0200
-Subject: [PATCH] crypto: sun4i-ss: prevent deadlock on emulated hardware
-Message-ID: <20180614193659.29261-1-clabbe.montjoie@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 14 Jun 2018 21:44:38 +0200
+Subject: [PATCH v7 3/6] DTS: gta04: add uart2 child node for w2sg0004 GPS
+ receiver
+In-Reply-To: <9ebb28aed589aca8e9b5bc5c910f1d2f0d62669d.1525340143.git.hns@goldelico.com>
+References: <cover.1525340143.git.hns@goldelico.com>
+ <9ebb28aed589aca8e9b5bc5c910f1d2f0d62669d.1525340143.git.hns@goldelico.com>
+Message-ID: <20180614194428.GA17808@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running a qemu emulated cubieboard with sun4i-ss driver enabled led to a never
-ending boot.
-This is due to sun4i-ss deadlocked and taking all cpu in an infinite loop.
-Since the crypto hardware is not implemented, all registers are read as 0.
-So sun4i-ss will never progress in any operations. (TX_CNT being always 0)
+On Thu 2018-05-03 11:35:48, H. Nikolaus Schaller wrote:
+> GTA04 has a W2SG0004 module connected to UART2 of the OMAP3
+> processor. A GPIO can pulse the on/off toggle switch.
+> 
+> Note that there is no WAKEUP output from the W2SG0004,
+> hence we can't use the generic SirfStar binding.
+> 
+> The VSIM regulator is used to power on/off the LNA of an
+> external active GPS antenna so that a driver can turn the
+> LNA off if GPS is not needed to save battery energy.
 
-The first idea is to add a "TX_CNT always zero timeout" but this made cipher/hash loops
-more complex and prevent a case that never happen on real hardware.
+This reads as if you did low->high->low to turn GPS on, then
+low->high->low to turn GPS off again. Is that correct?
 
-The best way to fix is to check at probe time if we run on a virtual
-machine with hardware emulated but non-implemented and prevent
-sun4i-ss to be loaded in that case.
-Letting sun4i-ss to load is useless anyway since all crypto algorithm will be
-disabled since they will fail crypto selftests.
-
-Tested-on: qemu-cubieboard
-Tested-on: cubieboard2
-
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/crypto/sunxi-ss/sun4i-ss-core.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-index a81d89b3b7d8..a178e80adcf3 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-@@ -341,9 +341,18 @@ static int sun4i_ss_probe(struct platform_device *pdev)
- 	 * I expect to be a sort of Security System Revision number.
- 	 * Since the A80 seems to have an other version of SS
- 	 * this info could be useful
-+	 * Detect virtual machine with non-implemented hardware
-+	 * (qemu-cubieboard) by checking the register value after a write to it.
-+	 * On non-implemented hardware, all registers are read as 0.
-+	 * On real hardware we should have a value > 0.
- 	 */
- 	writel(SS_ENABLED, ss->base + SS_CTL);
- 	v = readl(ss->base + SS_CTL);
-+	if (!v) {
-+		dev_err(&pdev->dev, "Qemu with non-implemented SS detected.\n");
-+		err = -ENODEV;
-+		goto error_rst;
-+	}
- 	v >>= 16;
- 	v &= 0x07;
- 	dev_info(&pdev->dev, "Die ID %d\n", v);
-@@ -398,6 +407,7 @@ static int sun4i_ss_probe(struct platform_device *pdev)
- 			break;
- 		}
- 	}
-+error_rst:
- 	if (ss->reset)
- 		reset_control_assert(ss->reset);
- error_clk:
 -- 
-2.16.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180614/8a830def/attachment.sig>
