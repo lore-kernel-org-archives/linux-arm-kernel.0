@@ -1,48 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 14 Jun 2018 22:19:58 +0300
-Subject: [PATCH v2 2/2] arm64: dts: renesas: condor: add PCIe support
-In-Reply-To: <b37d458c-071a-833a-2057-be8a07c880be@cogentembedded.com>
-References: <b37d458c-071a-833a-2057-be8a07c880be@cogentembedded.com>
-Message-ID: <eba72bac-60f8-2c09-e3e7-4b6a73e5fdfa@cogentembedded.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 14 Jun 2018 21:36:59 +0200
+Subject: [PATCH] crypto: sun4i-ss: prevent deadlock on emulated hardware
+Message-ID: <20180614193659.29261-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCIe PHY and PCIEC and specify the PCIe bus clock for the Condor
-board.
+Running a qemu emulated cubieboard with sun4i-ss driver enabled led to a never
+ending boot.
+This is due to sun4i-ss deadlocked and taking all cpu in an infinite loop.
+Since the crypto hardware is not implemented, all registers are read as 0.
+So sun4i-ss will never progress in any operations. (TX_CNT being always 0)
 
-Based on the original (and large) patch by Vladimir Barinov.
+The first idea is to add a "TX_CNT always zero timeout" but this made cipher/hash loops
+more complex and prevent a case that never happen on real hardware.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+The best way to fix is to check at probe time if we run on a virtual
+machine with hardware emulated but non-implemented and prevent
+sun4i-ss to be loaded in that case.
+Letting sun4i-ss to load is useless anyway since all crypto algorithm will be
+disabled since they will fail crypto selftests.
 
+Tested-on: qemu-cubieboard
+Tested-on: cubieboard2
+
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
-Changes in version 2:
-- mentioned Vladimir's original work and added his signoff;
-- refreshed the patch.
+ drivers/crypto/sunxi-ss/sun4i-ss-core.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -223,6 +223,18 @@
- 	status = "okay";
- };
- 
-+&pciec {
-+	status = "okay";
-+};
-+
-+&pcie_bus_clk {
-+	clock-frequency = <100000000>;
-+};
-+
-+&pcie_phy {
-+	status = "okay";
-+};
-+
- &pfc {
- 	avb_pins: avb {
- 		groups = "avb_mdio", "avb_rgmii";
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+index a81d89b3b7d8..a178e80adcf3 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+@@ -341,9 +341,18 @@ static int sun4i_ss_probe(struct platform_device *pdev)
+ 	 * I expect to be a sort of Security System Revision number.
+ 	 * Since the A80 seems to have an other version of SS
+ 	 * this info could be useful
++	 * Detect virtual machine with non-implemented hardware
++	 * (qemu-cubieboard) by checking the register value after a write to it.
++	 * On non-implemented hardware, all registers are read as 0.
++	 * On real hardware we should have a value > 0.
+ 	 */
+ 	writel(SS_ENABLED, ss->base + SS_CTL);
+ 	v = readl(ss->base + SS_CTL);
++	if (!v) {
++		dev_err(&pdev->dev, "Qemu with non-implemented SS detected.\n");
++		err = -ENODEV;
++		goto error_rst;
++	}
+ 	v >>= 16;
+ 	v &= 0x07;
+ 	dev_info(&pdev->dev, "Die ID %d\n", v);
+@@ -398,6 +407,7 @@ static int sun4i_ss_probe(struct platform_device *pdev)
+ 			break;
+ 		}
+ 	}
++error_rst:
+ 	if (ss->reset)
+ 		reset_control_assert(ss->reset);
+ error_clk:
+-- 
+2.16.4
