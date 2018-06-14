@@ -1,70 +1,29 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 14 Jun 2018 10:19:20 +0300
-Subject: [RFC PATCH] sdhci-of-arasan: card initialization failure -84
-In-Reply-To: <20180604064211.q2thyftgpffuaer2@laureti-dev>
-References: <20180604064211.q2thyftgpffuaer2@laureti-dev>
-Message-ID: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Jun 2018 09:20:00 +0200
+Subject: [PATCH v2] arm64: dts: renesas: condor/v3hsk: specify Ethernet
+ PHY IRQs
+In-Reply-To: <9d6f18ad-47d1-eb81-1a86-d124ca03e1c9@cogentembedded.com>
+References: <4acc208e-c593-1e8a-00ca-fc9a5574074e@cogentembedded.com>
+ <42861d8f-3570-03b9-987c-bb15fa92a9c7@cogentembedded.com>
+ <9d6f18ad-47d1-eb81-1a86-d124ca03e1c9@cogentembedded.com>
+Message-ID: <20180614071959.z6mt55lfqptb7hmg@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And again without mangling Atul's email address.
+On Wed, Jun 13, 2018 at 07:44:02PM +0300, Sergei Shtylyov wrote:
+> On 06/13/2018 07:42 PM, Sergei Shtylyov wrote:
+> 
+> > Specify Ethernet PHY IRQs in the Condor/V3HSK board device trees, now that
+> > we have the GPIO support (previously phylib had  to resort to polling).
+> > 
+> > Based on the original (and large) patch by Vladimir Barinov.
+> > 
+> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > 
+> > ---
+> 
+>    Forgot to add the the patch is against the 'renesas-devel-20180613-v4.17' tag.
+> 
 
-On 04/06/18 09:42, Helmut Grohne wrote:
-> Work around repeated:
-> 
->     mmc0: error -84 whilst initialising SD card
-> ---
->  drivers/mmc/host/sdhci.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> I'm seeing the above error -84 with a series of Kingston cards of 4GB capacity
-> when used with an arasan host controller. Using the cards with other hosts or
-> using other cards with the host is not problematic. The host controller has the
-> following device tree:
-> 
-> 	ps7-sdio at e0100000 {
-> 		compatible = "arasan,sdhci-8.9a";
-> 		reg = <0xe0100000 0x1000>;
-> 		clock-names = "clk_xin", "clk_ahb";
-> 		clock-frequency = <50000000>;
-> 		clocks = <&clkc 21>, <&clkc 32>;
-> 		interrupt-parent = <&ps7_scugic_0>;
-> 		interrupts = <0 24 4>;
-> 	};
-> 
-> When enabling sufficient debugging (and thus slowing the kernel down), the
-> problem goes away. Without debug features, the insertion of this delay suffices
-> for my particular instance. Inserting the same delay before the
-> SDHCI_CLOCK_CARD_EN write also makes the error go away.
-> 
-> While instrumenting the code I found that the loop waiting for the
-> SDHCI_CLOCK_INT_STABLE would always terminate immediately (regardless of the
-> card being used). Only when the card is removed, the loop would spin once. This
-> hints that potentially the stable checking is broken for this host controller.
-> 
-> During my testing I checked 7 Kingston cards, 2 Transcend Cards, 1 Apacer card,
-> 3 arasn hosts, 3 non-arasan hosts and had consistent reports for a similar
-> number of devices from others.
-> 
-> If my hypothesis is reasonable, I can turn this patch into a new quirk that
-> replaces the stable polling with msleep(20), which is the poll timeout. Is
-> there anything else I should investigate before doing so?
-
-Please avoid quirks.  Perhaps use the ->set_clock() callback.
-
-> 
-> Helmut
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 90cc1977b792..5d2809aeb4eb 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1430,6 +1430,7 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
->  
->  	clk |= SDHCI_CLOCK_CARD_EN;
->  	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-> +	udelay(80);
->  }
->  EXPORT_SYMBOL_GPL(sdhci_enable_clk);
->  
-> 
+Thanks Sergei, applied.
