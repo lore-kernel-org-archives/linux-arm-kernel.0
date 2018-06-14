@@ -1,610 +1,291 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Thu, 14 Jun 2018 22:02:58 +0800
-Subject: [PATCH v4 3/7] dmaengine: imx-sdma: add virt-dma support
+Date: Thu, 14 Jun 2018 22:03:02 +0800
+Subject: [PATCH v4 7/7] tty: serial: imx: split all dma setup operations out
+ of 'port.lock' protector
 In-Reply-To: <1528984982-5074-1-git-send-email-yibin.gong@nxp.com>
 References: <1528984982-5074-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1528984982-5074-4-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1528984982-5074-8-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy sdma driver has below limitations or drawbacks:
-  1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
-     one page size for one channel regardless of only few BDs needed
-     most time. But in few cases, the max PAGE_SIZE maybe not enough.
-  2. One SDMA channel can't stop immediatley once channel disabled which
-     means SDMA interrupt may come in after this channel terminated.There
-     are some patches for this corner case such as commit "2746e2c389f9",
-     but not cover non-cyclic.
+After sdma driver change to virt-dma, all bds will be allocated
+dynamically with 'port.lock' acquired instead of statically allocated
+before. That means the lock sequence is 'port.lock' -> 'fs_reclaim_acquire'
+.But in case uart rx/tx dma callback coming after other kernel code which
+have already acquired 'fs_reclaim_acquire' lock, which means the above lock
+sequence reverted as 'fs_reclaim_acquire' -> 'port.lock'(acquired in uart
+dma callback), thus, lockdep warning comes as beow. Actually don't need to
+spinlock all DMA operations in UART driver with 'port.lock', because dma
+driver can wipe off race condition by commone virt-dma lock . Split all dma
+operations out of the code areas which protected by 'port.lock'.
 
-The common virt-dma overcomes the above limitations. It can alloc bd
-dynamically and free bd once this tx transfer done. No memory wasted or
-maximum limititation here, only depends on how many memory can be requested
-from kernel. For No.2, such issue can be workaround by checking if there
-is available descript("sdmac->desc") now once the unwanted interrupt
-coming. At last the common virt-dma is easier for sdma driver maintain.
+[   46.155406] =====================================================
+[   46.161503] WARNING: HARDIRQ-safe -> HARDIRQ-unsafe lock order detected
+[   46.168122] 4.17.0-rc6-00008-g7caafa3-dirty #48 Not tainted
+[   46.173696] -----------------------------------------------------
+[   46.179795] mxc_uart_stress/419 [HC0[0]:SC0[0]:HE0:SE1] is trying to acquire:
+[   46.186934] fa7c1440 (fs_reclaim){+.+.}, at: fs_reclaim_acquire.part.3+0x0/0x48
+[   46.194270]
+[   46.194270] and this task is already holding:
+[   46.200106] 09a17fda (&port_lock_key){-.-.}, at: uart_write+0x84/0x190
+[   46.206658] which would create a new lock dependency:
+[   46.211710]  (&port_lock_key){-.-.} -> (fs_reclaim){+.+.}
+[   46.217132]
+[   46.217132] but this new dependency connects a HARDIRQ-irq-safe lock:
+[   46.225051]  (&port_lock_key){-.-.}
+[   46.225062]
+[   46.225062] ... which became HARDIRQ-irq-safe at:
+[   46.234740]   lock_acquire+0x70/0x90
+[   46.238326]   _raw_spin_lock_irqsave+0x40/0x54
+[   46.242777]   imx_uart_console_write+0x1bc/0x1e0
+[   46.247402]   console_unlock+0x320/0x5f0
+[   46.251329]   vprintk_emit+0x22c/0x3fc
+[   46.255082]   vprintk_default+0x28/0x30
+[   46.258923]   vprintk_func+0x78/0xcc
+[   46.262503]   printk+0x34/0x54
+[   46.265566]   crng_fast_load+0xf8/0x138
+[   46.269407]   add_interrupt_randomness+0x21c/0x24c
+[   46.274204]   handle_irq_event_percpu+0x40/0x84
+[   46.278739]   handle_irq_event+0x40/0x64
+[   46.282667]   handle_fasteoi_irq+0xbc/0x178
+[   46.286854]   generic_handle_irq+0x28/0x3c
+[   46.290954]   __handle_domain_irq+0x6c/0xe8
+[   46.295148]   gic_handle_irq+0x64/0xc4
+[   46.298904]   __irq_svc+0x70/0x98
+[   46.302225]   _raw_spin_unlock_irq+0x30/0x34
+[   46.306505]   finish_task_switch+0xc0/0x27c
+[   46.310693]   __schedule+0x2c0/0x79c
+[   46.314272]   schedule_idle+0x40/0x84
+[   46.317941]   do_idle+0x178/0x2b4
+[   46.321259]   cpu_startup_entry+0x20/0x24
+[   46.325278]   rest_init+0x214/0x264
+[   46.328775]   start_kernel+0x39c/0x424
+[   46.332527]     (null)
+[   46.334891]
+[   46.334891] to a HARDIRQ-irq-unsafe lock:
+[   46.340379]  (fs_reclaim){+.+.}
+[   46.340391]
+[   46.340391] ... which became HARDIRQ-irq-unsafe at:
+[   46.349885] ...
+[   46.349895]   lock_acquire+0x70/0x90
+[   46.355225]   fs_reclaim_acquire.part.3+0x38/0x48
+[   46.359933]   fs_reclaim_acquire+0x1c/0x20
+[   46.364036]   kmem_cache_alloc+0x2c/0x174
+[   46.368051]   alloc_worker.constprop.10+0x1c/0x58
+[   46.372759]   init_rescuer.part.4+0x18/0xa4
+[   46.376952]   workqueue_init+0xc0/0x210
+[   46.380793]   kernel_init_freeable+0x58/0x1d8
+[   46.385156]   kernel_init+0x10/0x11c
+[   46.388736]   ret_from_fork+0x14/0x20
+[   46.392399]     (null)
+[   46.394762]
+[   46.394762] other info that might help us debug this:
+[   46.394762]
+[   46.402769]  Possible interrupt unsafe locking scenario:
+[   46.402769]
+[   46.409560]        CPU0                    CPU1
+[   46.414092]        ----                    ----
+[   46.418622]   lock(fs_reclaim);
+[   46.421772]                                local_irq_disable();
+[   46.427693]                                lock(&port_lock_key);
+[   46.433707]                                lock(fs_reclaim);
+[   46.439372]   <Interrupt>
+[   46.441993]     lock(&port_lock_key);
+[   46.445661]
+[   46.445661]  *** DEADLOCK ***
+[   46.445661]
 
 Signed-off-by: Robin Gong <yibin.gong@nxp.com>
 ---
- drivers/dma/Kconfig    |   1 +
- drivers/dma/imx-sdma.c | 261 ++++++++++++++++++++++++++++++++-----------------
- 2 files changed, 170 insertions(+), 92 deletions(-)
+ drivers/tty/serial/imx.c | 97 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 53 insertions(+), 44 deletions(-)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 6d61cd0..78715a2 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -257,6 +257,7 @@ config IMX_SDMA
- 	tristate "i.MX SDMA support"
- 	depends on ARCH_MXC
- 	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
- 	help
- 	  Support the i.MX SDMA engine. This engine is integrated into
- 	  Freescale i.MX25/31/35/51/53/6 chips.
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 556d087..719bf9f 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -48,6 +48,7 @@
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
- 
- #include "dmaengine.h"
-+#include "virt-dma.h"
- 
- /* SDMA registers */
- #define SDMA_H_C0PTR		0x000
-@@ -308,6 +309,7 @@ struct sdma_engine;
-  * @bd			pointer of alloced bd
-  */
- struct sdma_desc {
-+	struct virt_dma_desc	vd;
- 	unsigned int		num_bd;
- 	dma_addr_t		bd_phys;
- 	unsigned int		buf_tail;
-@@ -331,8 +333,8 @@ struct sdma_desc {
-  * @word_size		peripheral access size
-  */
- struct sdma_channel {
-+	struct virt_dma_chan		vc;
- 	struct sdma_desc		*desc;
--	struct sdma_desc		_desc;
- 	struct sdma_engine		*sdma;
- 	unsigned int			channel;
- 	enum dma_transfer_direction		direction;
-@@ -347,11 +349,8 @@ struct sdma_channel {
- 	unsigned long			event_mask[2];
- 	unsigned long			watermark_level;
- 	u32				shp_addr, per_addr;
--	struct dma_chan			chan;
- 	spinlock_t			lock;
--	struct dma_async_tx_descriptor	txdesc;
- 	enum dma_status			status;
--	struct tasklet_struct		tasklet;
- 	struct imx_dma_data		data;
- 	bool				enabled;
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index b83bc2c..f2a2966 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -223,6 +223,7 @@ struct imx_port {
+ 	dma_cookie_t		rx_cookie;
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
++	struct work_struct	tsk_dma_tx;
+ 	unsigned int            saved_reg[10];
+ 	bool			context_saved;
  };
-@@ -705,6 +704,35 @@ static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
- 	writel_relaxed(val, sdma->regs + chnenbl);
+@@ -491,8 +492,6 @@ static void imx_uart_enable_ms(struct uart_port *port)
+ 	mctrl_gpio_enable_ms(sport->gpios);
  }
  
-+static struct sdma_desc *to_sdma_desc(struct dma_async_tx_descriptor *t)
-+{
-+	return container_of(t, struct sdma_desc, vd.tx);
-+}
-+
-+static void sdma_start_desc(struct sdma_channel *sdmac)
-+{
-+	struct virt_dma_desc *vd = vchan_next_desc(&sdmac->vc);
-+	struct sdma_desc *desc;
-+	struct sdma_engine *sdma = sdmac->sdma;
-+	int channel = sdmac->channel;
-+
-+	if (!vd) {
-+		sdmac->desc = NULL;
+-static void imx_uart_dma_tx(struct imx_port *sport);
+-
+ /* called with port.lock taken and irqs off */
+ static inline void imx_uart_transmit_buffer(struct imx_port *sport)
+ {
+@@ -524,7 +523,7 @@ static inline void imx_uart_transmit_buffer(struct imx_port *sport)
+ 			imx_uart_writel(sport, ucr1, UCR1);
+ 		} else {
+ 			imx_uart_writel(sport, ucr1, UCR1);
+-			imx_uart_dma_tx(sport);
++			schedule_work(&sport->tsk_dma_tx);
+ 		}
+ 
+ 		return;
+@@ -574,7 +573,7 @@ static void imx_uart_dma_tx_callback(void *data)
+ 		uart_write_wakeup(&sport->port);
+ 
+ 	if (!uart_circ_empty(xmit) && !uart_tx_stopped(&sport->port))
+-		imx_uart_dma_tx(sport);
++		schedule_work(&sport->tsk_dma_tx);
+ 	else if (sport->port.rs485.flags & SER_RS485_ENABLED) {
+ 		u32 ucr4 = imx_uart_readl(sport, UCR4);
+ 		ucr4 |= UCR4_TCEN;
+@@ -584,19 +583,21 @@ static void imx_uart_dma_tx_callback(void *data)
+ 	spin_unlock_irqrestore(&sport->port.lock, flags);
+ }
+ 
+-/* called with port.lock taken and irqs off */
+-static void imx_uart_dma_tx(struct imx_port *sport)
++static void dma_tx_work(struct work_struct *w)
+ {
++	struct imx_port *sport = container_of(w, struct imx_port, tsk_dma_tx);
+ 	struct circ_buf *xmit = &sport->port.state->xmit;
+ 	struct scatterlist *sgl = sport->tx_sgl;
+ 	struct dma_async_tx_descriptor *desc;
+ 	struct dma_chan	*chan = sport->dma_chan_tx;
+ 	struct device *dev = sport->port.dev;
++	unsigned long flags;
+ 	u32 ucr1, ucr4;
+ 	int ret;
+ 
++	spin_lock_irqsave(&sport->port.lock, flags);
+ 	if (sport->dma_is_txing)
+-		return;
++		goto work_out;
+ 
+ 	ucr4 = imx_uart_readl(sport, UCR4);
+ 	ucr4 &= ~UCR4_TCEN;
+@@ -604,45 +605,51 @@ static void imx_uart_dma_tx(struct imx_port *sport)
+ 
+ 	sport->tx_bytes = uart_circ_chars_pending(xmit);
+ 
+-	if (xmit->tail < xmit->head) {
+-		sport->dma_tx_nents = 1;
+-		sg_init_one(sgl, xmit->buf + xmit->tail, sport->tx_bytes);
+-	} else {
+-		sport->dma_tx_nents = 2;
+-		sg_init_table(sgl, 2);
+-		sg_set_buf(sgl, xmit->buf + xmit->tail,
+-				UART_XMIT_SIZE - xmit->tail);
+-		sg_set_buf(sgl + 1, xmit->buf, xmit->head);
+-	}
++	if (sport->tx_bytes > 0) {
++		if (xmit->tail < xmit->head) {
++			sport->dma_tx_nents = 1;
++			sg_init_one(sgl, xmit->buf + xmit->tail,
++					sport->tx_bytes);
++		} else {
++			sport->dma_tx_nents = 2;
++			sg_init_table(sgl, 2);
++			sg_set_buf(sgl, xmit->buf + xmit->tail,
++					UART_XMIT_SIZE - xmit->tail);
++			sg_set_buf(sgl + 1, xmit->buf, xmit->head);
++		}
++		spin_unlock_irqrestore(&sport->port.lock, flags);
+ 
+-	ret = dma_map_sg(dev, sgl, sport->dma_tx_nents, DMA_TO_DEVICE);
+-	if (ret == 0) {
+-		dev_err(dev, "DMA mapping error for TX.\n");
+-		return;
+-	}
+-	desc = dmaengine_prep_slave_sg(chan, sgl, sport->dma_tx_nents,
++		ret = dma_map_sg(dev, sgl, sport->dma_tx_nents, DMA_TO_DEVICE);
++		if (ret == 0) {
++			dev_err(dev, "DMA mapping error for TX.\n");
++			return;
++		}
++		desc = dmaengine_prep_slave_sg(chan, sgl, sport->dma_tx_nents,
+ 					DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
+-	if (!desc) {
+-		dma_unmap_sg(dev, sgl, sport->dma_tx_nents,
+-			     DMA_TO_DEVICE);
+-		dev_err(dev, "We cannot prepare for the TX slave dma!\n");
+-		return;
+-	}
+-	desc->callback = imx_uart_dma_tx_callback;
+-	desc->callback_param = sport;
++		if (!desc) {
++			dma_unmap_sg(dev, sgl, sport->dma_tx_nents,
++				     DMA_TO_DEVICE);
++			dev_err(dev, "We cannot prepare for the TX slave dma!\n");
++			return;
++		}
++		desc->callback = imx_uart_dma_tx_callback;
++		desc->callback_param = sport;
+ 
+-	dev_dbg(dev, "TX: prepare to send %lu bytes by DMA.\n",
+-			uart_circ_chars_pending(xmit));
++		dev_dbg(dev, "TX: prepare to send %lu bytes by DMA.\n",
++				uart_circ_chars_pending(xmit));
+ 
+-	ucr1 = imx_uart_readl(sport, UCR1);
+-	ucr1 |= UCR1_TXDMAEN;
+-	imx_uart_writel(sport, ucr1, UCR1);
++		ucr1 = imx_uart_readl(sport, UCR1);
++		ucr1 |= UCR1_TXDMAEN;
++		imx_uart_writel(sport, ucr1, UCR1);
+ 
+-	/* fire it */
+-	sport->dma_is_txing = 1;
+-	dmaengine_submit(desc);
+-	dma_async_issue_pending(chan);
+-	return;
++		/* fire it */
++		sport->dma_is_txing = 1;
++		dmaengine_submit(desc);
++		dma_async_issue_pending(chan);
 +		return;
 +	}
-+	sdmac->desc = desc = to_sdma_desc(&vd->tx);
-+	/*
-+	 * Do not delete the node in desc_issued list in cyclic mode, otherwise
-+	 * the desc alloced will never be freed in vchan_dma_desc_free_list
-+	 */
-+	if (!(sdmac->flags & IMX_DMA_SG_LOOP))
-+		list_del(&vd->node);
-+
-+	sdma->channel_control[channel].base_bd_ptr = desc->bd_phys;
-+	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
-+	sdma_enable_channel(sdma, sdmac->channel);
-+}
-+
- static void sdma_update_channel_loop(struct sdma_channel *sdmac)
- {
- 	struct sdma_buffer_descriptor *bd;
-@@ -723,7 +751,7 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
- 	 * loop mode. Iterate over descriptors, re-setup them and
- 	 * call callback function.
++work_out:
++	spin_unlock_irqrestore(&sport->port.lock, flags);
+ }
+ 
+ /* called with port.lock taken and irqs off */
+@@ -696,7 +703,7 @@ static void imx_uart_start_tx(struct uart_port *port)
+ 
+ 		if (!uart_circ_empty(&port->state->xmit) &&
+ 		    !uart_tx_stopped(port))
+-			imx_uart_dma_tx(sport);
++			schedule_work(&sport->tsk_dma_tx);
+ 		return;
+ 	}
+ }
+@@ -1405,7 +1412,9 @@ static int imx_uart_startup(struct uart_port *port)
  	 */
--	while (1) {
-+	while (sdmac->desc) {
- 		struct sdma_desc *desc = sdmac->desc;
+ 	imx_uart_enable_ms(&sport->port);
  
- 		bd = &desc->bd[desc->buf_tail];
-@@ -754,15 +782,16 @@ static void sdma_update_channel_loop(struct sdma_channel *sdmac)
- 		 * SDMA transaction status by the time the client tasklet is
- 		 * executed.
- 		 */
--
--		dmaengine_desc_get_callback_invoke(&sdmac->txdesc, NULL);
-+		spin_unlock(&sdmac->vc.lock);
-+		dmaengine_desc_get_callback_invoke(&desc->vd.tx, NULL);
-+		spin_lock(&sdmac->vc.lock);
- 
- 		if (error)
- 			sdmac->status = old_status;
- 	}
- }
- 
--static void mxc_sdma_handle_channel_normal(unsigned long data)
-+static void mxc_sdma_handle_channel_normal(struct sdma_channel *data)
- {
- 	struct sdma_channel *sdmac = (struct sdma_channel *) data;
- 	struct sdma_buffer_descriptor *bd;
-@@ -785,10 +814,6 @@ static void mxc_sdma_handle_channel_normal(unsigned long data)
- 		sdmac->status = DMA_ERROR;
- 	else
- 		sdmac->status = DMA_COMPLETE;
--
--	dma_cookie_complete(&sdmac->txdesc);
--
--	dmaengine_desc_get_callback_invoke(&sdmac->txdesc, NULL);
- }
- 
- static irqreturn_t sdma_int_handler(int irq, void *dev_id)
-@@ -804,12 +829,21 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
- 	while (stat) {
- 		int channel = fls(stat) - 1;
- 		struct sdma_channel *sdmac = &sdma->channel[channel];
-+		struct sdma_desc *desc;
-+
-+		spin_lock(&sdmac->vc.lock);
-+		desc = sdmac->desc;
-+		if (desc) {
-+			if (sdmac->flags & IMX_DMA_SG_LOOP) {
-+				sdma_update_channel_loop(sdmac);
-+			} else {
-+				mxc_sdma_handle_channel_normal(sdmac);
-+				vchan_cookie_complete(&desc->vd);
-+				sdma_start_desc(sdmac);
-+			}
-+		}
- 
--		if (sdmac->flags & IMX_DMA_SG_LOOP)
--			sdma_update_channel_loop(sdmac);
--		else
--			tasklet_schedule(&sdmac->tasklet);
--
-+		spin_unlock(&sdmac->vc.lock);
- 		__clear_bit(channel, &stat);
++	spin_unlock_irqrestore(&sport->port.lock, flags);
+ 	if (dma_is_inited) {
++		INIT_WORK(&sport->tsk_dma_tx, dma_tx_work);
+ 		imx_uart_enable_dma(sport);
+ 		imx_uart_start_rx_dma(sport);
+ 	} else {
+@@ -1418,8 +1427,6 @@ static int imx_uart_startup(struct uart_port *port)
+ 		imx_uart_writel(sport, ucr2, UCR2);
  	}
  
-@@ -965,7 +999,7 @@ static int sdma_load_context(struct sdma_channel *sdmac)
- 
- static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
- {
--	return container_of(chan, struct sdma_channel, chan);
-+	return container_of(chan, struct sdma_channel, vc.chan);
- }
- 
- static int sdma_disable_channel(struct dma_chan *chan)
-@@ -987,7 +1021,16 @@ static int sdma_disable_channel(struct dma_chan *chan)
- 
- static int sdma_disable_channel_with_delay(struct dma_chan *chan)
- {
-+	struct sdma_channel *sdmac = to_sdma_chan(chan);
-+	unsigned long flags;
-+	LIST_HEAD(head);
-+
- 	sdma_disable_channel(chan);
-+	spin_lock_irqsave(&sdmac->vc.lock, flags);
-+	vchan_get_all_descriptors(&sdmac->vc, &head);
-+	sdmac->desc = NULL;
-+	spin_unlock_irqrestore(&sdmac->vc.lock, flags);
-+	vchan_dma_desc_free_list(&sdmac->vc, &head);
- 
- 	/*
- 	 * According to NXP R&D team a delay of one BD SDMA cost time
-@@ -1116,46 +1159,56 @@ static int sdma_set_channel_priority(struct sdma_channel *sdmac,
+-	spin_unlock_irqrestore(&sport->port.lock, flags);
+-
  	return 0;
  }
  
--static int sdma_request_channel(struct sdma_channel *sdmac)
-+static int sdma_request_channel0(struct sdma_engine *sdma)
- {
--	struct sdma_engine *sdma = sdmac->sdma;
--	struct sdma_desc *desc;
--	int channel = sdmac->channel;
- 	int ret = -EBUSY;
+@@ -1435,6 +1442,8 @@ static void imx_uart_shutdown(struct uart_port *port)
+ 		dmaengine_terminate_sync(sport->dma_chan_tx);
+ 		dmaengine_terminate_sync(sport->dma_chan_rx);
  
--	sdmac->desc = &sdmac->_desc;
--	desc = sdmac->desc;
--
--	desc->bd = dma_zalloc_coherent(NULL, PAGE_SIZE, &desc->bd_phys,
-+	sdma->bd0 = dma_zalloc_coherent(NULL, PAGE_SIZE, &sdma->bd0_phys,
- 					GFP_KERNEL);
--	if (!desc->bd) {
-+	if (!sdma->bd0) {
- 		ret = -ENOMEM;
- 		goto out;
- 	}
- 
--	sdma->channel_control[channel].base_bd_ptr = desc->bd_phys;
--	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
-+	sdma->channel_control[0].base_bd_ptr = sdma->bd0_phys;
-+	sdma->channel_control[0].current_bd_ptr = sdma->bd0_phys;
- 
--	sdma_set_channel_priority(sdmac, MXC_SDMA_DEFAULT_PRIORITY);
-+	sdma_set_channel_priority(&sdma->channel[0], MXC_SDMA_DEFAULT_PRIORITY);
- 	return 0;
- out:
- 
- 	return ret;
- }
- 
--static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
++		cancel_work_sync(&sport->tsk_dma_tx);
 +
-+static int sdma_alloc_bd(struct sdma_desc *desc)
- {
--	unsigned long flags;
--	struct sdma_channel *sdmac = to_sdma_chan(tx->chan);
--	dma_cookie_t cookie;
-+	u32 bd_size = desc->num_bd * sizeof(struct sdma_buffer_descriptor);
-+	int ret = 0;
- 
--	spin_lock_irqsave(&sdmac->lock, flags);
-+	desc->bd = dma_zalloc_coherent(NULL, bd_size, &desc->bd_phys,
-+					GFP_ATOMIC);
-+	if (!desc->bd) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+out:
-+	return ret;
-+}
- 
--	cookie = dma_cookie_assign(tx);
-+static void sdma_free_bd(struct sdma_desc *desc)
-+{
-+	u32 bd_size = desc->num_bd * sizeof(struct sdma_buffer_descriptor);
- 
--	spin_unlock_irqrestore(&sdmac->lock, flags);
-+	dma_free_coherent(NULL, bd_size, desc->bd, desc->bd_phys);
-+}
- 
--	return cookie;
-+static void sdma_desc_free(struct virt_dma_desc *vd)
-+{
-+	struct sdma_desc *desc = container_of(vd, struct sdma_desc, vd);
-+
-+	sdma_free_bd(desc);
-+	kfree(desc);
- }
- 
- static int sdma_alloc_chan_resources(struct dma_chan *chan)
-@@ -1191,19 +1244,10 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
- 	if (ret)
- 		goto disable_clk_ipg;
- 
--	ret = sdma_request_channel(sdmac);
--	if (ret)
--		goto disable_clk_ahb;
--
- 	ret = sdma_set_channel_priority(sdmac, prio);
- 	if (ret)
- 		goto disable_clk_ahb;
- 
--	dma_async_tx_descriptor_init(&sdmac->txdesc, chan);
--	sdmac->txdesc.tx_submit = sdma_tx_submit;
--	/* txd.flags will be overwritten in prep funcs */
--	sdmac->txdesc.flags = DMA_CTRL_ACK;
--
- 	return 0;
- 
- disable_clk_ahb:
-@@ -1217,9 +1261,8 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
- {
- 	struct sdma_channel *sdmac = to_sdma_chan(chan);
- 	struct sdma_engine *sdma = sdmac->sdma;
--	struct sdma_desc *desc = sdmac->desc;
- 
--	sdma_disable_channel(chan);
-+	sdma_disable_channel_with_delay(chan);
- 
- 	if (sdmac->event_id0)
- 		sdma_event_disable(sdmac, sdmac->event_id0);
-@@ -1231,8 +1274,6 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
- 
- 	sdma_set_channel_priority(sdmac, 0);
- 
--	dma_free_coherent(NULL, PAGE_SIZE, desc->bd, desc->bd_phys);
--
- 	clk_disable(sdma->clk_ipg);
- 	clk_disable(sdma->clk_ahb);
- }
-@@ -1247,7 +1288,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 	int ret, i, count;
- 	int channel = sdmac->channel;
- 	struct scatterlist *sg;
--	struct sdma_desc *desc = sdmac->desc;
-+	struct sdma_desc *desc;
- 
- 	if (sdmac->status == DMA_IN_PROGRESS)
- 		return NULL;
-@@ -1255,23 +1296,34 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 
- 	sdmac->flags = 0;
- 
-+	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
-+	if (!desc)
-+		goto err_out;
-+
- 	desc->buf_tail = 0;
- 	desc->buf_ptail = 0;
-+	desc->sdmac = sdmac;
-+	desc->num_bd = sg_len;
- 	desc->chn_real_count = 0;
- 
-+	if (sdma_alloc_bd(desc)) {
-+		kfree(desc);
-+		goto err_out;
-+	}
-+
- 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
- 			sg_len, channel);
- 
- 	sdmac->direction = direction;
- 	ret = sdma_load_context(sdmac);
- 	if (ret)
--		goto err_out;
-+		goto err_bd_out;
- 
- 	if (sg_len > NUM_BD) {
- 		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
- 				channel, sg_len, NUM_BD);
- 		ret = -EINVAL;
--		goto err_out;
-+		goto err_bd_out;
- 	}
- 
- 	desc->chn_count = 0;
-@@ -1287,7 +1339,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 			dev_err(sdma->dev, "SDMA channel %d: maximum bytes for sg entry exceeded: %d > %d\n",
- 					channel, count, 0xffff);
- 			ret = -EINVAL;
--			goto err_out;
-+			goto err_bd_out;
- 		}
- 
- 		bd->mode.count = count;
-@@ -1295,25 +1347,25 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 
- 		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES) {
- 			ret =  -EINVAL;
--			goto err_out;
-+			goto err_bd_out;
- 		}
- 
- 		switch (sdmac->word_size) {
- 		case DMA_SLAVE_BUSWIDTH_4_BYTES:
- 			bd->mode.command = 0;
- 			if (count & 3 || sg->dma_address & 3)
--				return NULL;
-+				goto err_bd_out;
- 			break;
- 		case DMA_SLAVE_BUSWIDTH_2_BYTES:
- 			bd->mode.command = 2;
- 			if (count & 1 || sg->dma_address & 1)
--				return NULL;
-+				goto err_bd_out;
- 			break;
- 		case DMA_SLAVE_BUSWIDTH_1_BYTE:
- 			bd->mode.command = 1;
- 			break;
- 		default:
--			return NULL;
-+			goto err_bd_out;
- 		}
- 
- 		param = BD_DONE | BD_EXTD | BD_CONT;
-@@ -1332,10 +1384,10 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 		bd->mode.status = param;
- 	}
- 
--	desc->num_bd = sg_len;
--	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
--
--	return &sdmac->txdesc;
-+	return vchan_tx_prep(&sdmac->vc, &desc->vd, flags);
-+err_bd_out:
-+	sdma_free_bd(desc);
-+	kfree(desc);
- err_out:
- 	sdmac->status = DMA_ERROR;
- 	return NULL;
-@@ -1351,7 +1403,7 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 	int num_periods = buf_len / period_len;
- 	int channel = sdmac->channel;
- 	int ret, i = 0, buf = 0;
--	struct sdma_desc *desc = sdmac->desc;
-+	struct sdma_desc *desc;
- 
- 	dev_dbg(sdma->dev, "%s channel: %d\n", __func__, channel);
- 
-@@ -1360,27 +1412,39 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 
- 	sdmac->status = DMA_IN_PROGRESS;
- 
-+	desc = kzalloc((sizeof(*desc)), GFP_KERNEL);
-+	if (!desc)
-+		goto err_out;
-+
- 	desc->buf_tail = 0;
- 	desc->buf_ptail = 0;
-+	desc->sdmac = sdmac;
-+	desc->num_bd = num_periods;
- 	desc->chn_real_count = 0;
- 	desc->period_len = period_len;
- 
- 	sdmac->flags |= IMX_DMA_SG_LOOP;
- 	sdmac->direction = direction;
-+
-+	if (sdma_alloc_bd(desc)) {
-+		kfree(desc);
-+		goto err_bd_out;
-+	}
-+
- 	ret = sdma_load_context(sdmac);
- 	if (ret)
--		goto err_out;
-+		goto err_bd_out;
- 
- 	if (num_periods > NUM_BD) {
- 		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
- 				channel, num_periods, NUM_BD);
--		goto err_out;
-+		goto err_bd_out;
- 	}
- 
- 	if (period_len > 0xffff) {
- 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
- 				channel, period_len, 0xffff);
--		goto err_out;
-+		goto err_bd_out;
- 	}
- 
- 	while (buf < buf_len) {
-@@ -1392,7 +1456,7 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 		bd->mode.count = period_len;
- 
- 		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES)
--			goto err_out;
-+			goto err_bd_out;
- 		if (sdmac->word_size == DMA_SLAVE_BUSWIDTH_4_BYTES)
- 			bd->mode.command = 0;
- 		else
-@@ -1415,10 +1479,10 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 		i++;
- 	}
- 
--	desc->num_bd = num_periods;
--	sdma->channel_control[channel].current_bd_ptr = desc->bd_phys;
--
--	return &sdmac->txdesc;
-+	return vchan_tx_prep(&sdmac->vc, &desc->vd, flags);
-+err_bd_out:
-+	sdma_free_bd(desc);
-+	kfree(desc);
- err_out:
- 	sdmac->status = DMA_ERROR;
- 	return NULL;
-@@ -1457,14 +1521,31 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
- 				      struct dma_tx_state *txstate)
- {
- 	struct sdma_channel *sdmac = to_sdma_chan(chan);
--	struct sdma_desc *desc = sdmac->desc;
-+	struct sdma_desc *desc;
- 	u32 residue;
-+	struct virt_dma_desc *vd;
-+	enum dma_status ret;
-+	unsigned long flags;
- 
--	if (sdmac->flags & IMX_DMA_SG_LOOP)
--		residue = (desc->num_bd - desc->buf_ptail) *
--			   desc->period_len - desc->chn_real_count;
--	else
--		residue = desc->chn_count - desc->chn_real_count;
-+	ret = dma_cookie_status(chan, cookie, txstate);
-+	if (ret == DMA_COMPLETE || !txstate)
-+		return ret;
-+
-+	spin_lock_irqsave(&sdmac->vc.lock, flags);
-+	vd = vchan_find_desc(&sdmac->vc, cookie);
-+	if (vd) {
-+		desc = to_sdma_desc(&vd->tx);
-+		if (sdmac->flags & IMX_DMA_SG_LOOP)
-+			residue = (desc->num_bd - desc->buf_ptail) *
-+				desc->period_len - desc->chn_real_count;
-+		else
-+			residue = desc->chn_count - desc->chn_real_count;
-+	} else if (sdmac->desc && sdmac->desc->vd.tx.cookie == cookie) {
-+		residue = sdmac->desc->chn_count - sdmac->desc->chn_real_count;
-+	} else {
-+		residue = 0;
-+	}
-+	spin_unlock_irqrestore(&sdmac->vc.lock, flags);
- 
- 	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
- 			 residue);
-@@ -1475,10 +1556,12 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
- static void sdma_issue_pending(struct dma_chan *chan)
- {
- 	struct sdma_channel *sdmac = to_sdma_chan(chan);
--	struct sdma_engine *sdma = sdmac->sdma;
-+	unsigned long flags;
- 
--	if (sdmac->status == DMA_IN_PROGRESS)
--		sdma_enable_channel(sdma, sdmac->channel);
-+	spin_lock_irqsave(&sdmac->vc.lock, flags);
-+	if (vchan_issue_pending(&sdmac->vc) && !sdmac->desc)
-+		sdma_start_desc(sdmac);
-+	spin_unlock_irqrestore(&sdmac->vc.lock, flags);
- }
- 
- #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
-@@ -1684,12 +1767,10 @@ static int sdma_init(struct sdma_engine *sdma)
- 	for (i = 0; i < MAX_DMA_CHANNELS; i++)
- 		writel_relaxed(0, sdma->regs + SDMA_CHNPRI_0 + i * 4);
- 
--	ret = sdma_request_channel(&sdma->channel[0]);
-+	ret = sdma_request_channel0(sdma);
- 	if (ret)
- 		goto err_dma_alloc;
- 
--	sdma->bd0 = sdma->channel[0].desc->bd;
--
- 	sdma_config_ownership(&sdma->channel[0], false, true, false);
- 
- 	/* Set Command Channel (Channel Zero) */
-@@ -1850,20 +1931,15 @@ static int sdma_probe(struct platform_device *pdev)
- 		sdmac->sdma = sdma;
- 		spin_lock_init(&sdmac->lock);
- 
--		sdmac->chan.device = &sdma->dma_device;
--		dma_cookie_init(&sdmac->chan);
- 		sdmac->channel = i;
--
--		tasklet_init(&sdmac->tasklet, mxc_sdma_handle_channel_normal,
--			     (unsigned long) sdmac);
-+		sdmac->vc.desc_free = sdma_desc_free;
- 		/*
- 		 * Add the channel to the DMAC list. Do not add channel 0 though
- 		 * because we need it internally in the SDMA driver. This also means
- 		 * that channel 0 in dmaengine counting matches sdma channel 1.
- 		 */
- 		if (i)
--			list_add_tail(&sdmac->chan.device_node,
--					&sdma->dma_device.channels);
-+			vchan_init(&sdmac->vc, &sdma->dma_device);
- 	}
- 
- 	ret = sdma_init(sdma);
-@@ -1968,7 +2044,8 @@ static int sdma_remove(struct platform_device *pdev)
- 	for (i = 0; i < MAX_DMA_CHANNELS; i++) {
- 		struct sdma_channel *sdmac = &sdma->channel[i];
- 
--		tasklet_kill(&sdmac->tasklet);
-+		tasklet_kill(&sdmac->vc.task);
-+		sdma_free_chan_resources(&sdmac->vc.chan);
- 	}
- 
- 	platform_set_drvdata(pdev, NULL);
+ 		spin_lock_irqsave(&sport->port.lock, flags);
+ 		imx_uart_stop_tx(port);
+ 		imx_uart_stop_rx(port);
 -- 
 2.7.4
