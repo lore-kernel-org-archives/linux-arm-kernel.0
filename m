@@ -1,87 +1,66 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Thu, 14 Jun 2018 22:00:43 +0900
-Subject: [PATCH 0/9] media: cedrus: Add H264 decoding support
-In-Reply-To: <20180613140714.1686-1-maxime.ripard@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
-Message-ID: <CAAFQd5A-GMBnNnRCfm0-51R9rn_pWw+UC3r-JX-_BE3cdznqig@mail.gmail.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 14 Jun 2018 15:02:31 +0200
+Subject: [PATCH v3 02/14] drivers: soc: sunxi: Add dedicated compatibles
+ for the A13, A20 and A33
+In-Reply-To: <20180511102033.i6jtzljbvkg47wz3@flea>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+ <20180507124500.20434-3-paul.kocialkowski@bootlin.com>
+ <CAGb2v67An8RSCKEDSgW_jY7m8iw22K4rRHb02q67decmCBcjhg@mail.gmail.com>
+ <20180511102033.i6jtzljbvkg47wz3@flea>
+Message-ID: <2d9de70f50bbf358592c3e219a3e4890bb0806d6.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On Wed, Jun 13, 2018 at 11:07 PM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> Hi,
->
-> Here is a preliminary version of the H264 decoding support in the
-> cedrus driver.
+On Fri, 2018-05-11 at 12:20 +0200, Maxime Ripard wrote:
+> On Thu, May 10, 2018 at 10:05:33PM -0700, Chen-Yu Tsai wrote:
+> > On Mon, May 7, 2018 at 5:44 AM, Paul Kocialkowski
+> > <paul.kocialkowski@bootlin.com> wrote:
+> > > This introduces platform-specific compatibles for the A13, A20 and A33
+> > > SRAM driver. No particular adaptation for these platforms is required at
+> > > this point, although this might become the case in the future.
+> > > 
+> > > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > > ---
+> > >  drivers/soc/sunxi/sunxi_sram.c | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > > 
+> > > diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+> > > index 74cb81f37bd6..43ebc3bd33f2 100644
+> > > --- a/drivers/soc/sunxi/sunxi_sram.c
+> > > +++ b/drivers/soc/sunxi/sunxi_sram.c
+> > > @@ -315,6 +315,9 @@ static int sunxi_sram_probe(struct platform_device *pdev)
+> > > 
+> > >  static const struct of_device_id sunxi_sram_dt_match[] = {
+> > >         { .compatible = "allwinner,sun4i-a10-sram-controller" },
+> > > +       { .compatible = "allwinner,sun5i-a13-sram-controller" },
+> > > +       { .compatible = "allwinner,sun7i-a20-sram-controller" },
+> > > +       { .compatible = "allwinner,sun8i-a33-sram-controller" },
+> > 
+> > We should probably name these "system-controller". Maxime?
 
-Thanks for the series! Let me reply inline to some of the points raised here.
+Would you like me to make that change for v4 of this series, or have it
+a separate follow-up patch outside of this series?
 
->
-> As you might already know, the cedrus driver relies on the Request
-> API, and is a reverse engineered driver for the video decoding engine
-> found on the Allwinner SoCs.
->
-> This work has been possible thanks to the work done by the people
-> behind libvdpau-sunxi found here:
-> https://github.com/linux-sunxi/libvdpau-sunxi/
->
-> This driver is based on the last version of the cedrus driver sent by
-> Paul, based on Request API v13 sent by Hans:
-> https://lkml.org/lkml/2018/5/7/316
+> This would make sense yes, but we don't really need to add the A20 one
+> to the driver, it's exactly the same than the A10.
 
-Just FYI, there is v15 already. :)
+Noted, I'll ditch the a20 compatible from the next revison of the
+series.
 
->
-> This driver has been tested only with baseline profile videos, and is
-> missing a few key features to decode videos with higher profiles.
-> This has been tested using our cedrus-frame-test tool, which should be
-> a quite generic v4l2-to-drm decoder using the request API to
-> demonstrate the video decoding:
-> https://github.com/free-electrons/cedrus-frame-test/, branch h264
->
-> However, sending this preliminary version, I'd really like to start a
-> discussion and get some feedback on the user-space API for the H264
-> controls exposed through the request API.
->
-> I've been using the controls currently integrated into ChromeOS that
-> have a working version of this particular setup. However, these
-> controls have a number of shortcomings and inconsistencies with other
-> decoding API. I've worked with libva so far, but I've noticed already
-> that:
+Thanks for the feedback,
 
-Note that these controls are supposed to be defined exactly like the
-bitstream headers deserialized into C structs in memory. I believe
-Pawel (on CC) defined them based on the actual H264 specification.
+Paul
 
->   - The kernel UAPI expects to have the nal_ref_idc variable, while
->     libva only exposes whether that frame is a reference frame or
->     not. I've looked at the rockchip driver in the ChromeOS tree, and
->     our own driver, and they both need only the information about
->     whether the frame is a reference one or not, so maybe we should
->     change this?
-
-The fact that 2 drivers only need partial information doesn't mean
-that we should ignore the data being already in the bitstream. IMHO
-this API should to provide all the metadata available in the stream to
-the kernel driver, as a replacement for bitstream parsing in firmware
-(or in kernel... yuck).
-
->   - The H264 bitstream exposes the picture default reference list (for
->     both list 0 and list 1), the slice reference list and an override
->     flag. The libva will only pass the reference list to be used (so
->     either the picture default's or the slice's) depending on the
->     override flag. The kernel UAPI wants the picture default reference
->     list and the slice reference list, but doesn't expose the override
->     flag, which prevents us from configuring properly the
->     hardware. Our video decoding engine needs the three information,
->     but we can easily adapt to having only one. However, having two
->     doesn't really work for us.
-
-Where does the override flag come from? If it's in the bitstream, then
-I guess it was just missed when creating the structures.
-
-Best regards,
-Tomasz
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180614/0377b365/attachment.sig>
