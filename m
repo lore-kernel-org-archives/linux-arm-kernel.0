@@ -1,42 +1,53 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 14 Jun 2018 12:28:42 +0200
-Subject: [PATCH v1] ARM: dts: imx6sx: fix irq for pcie bridge
-In-Reply-To: <20180614094527.25905-1-o.rempel@pengutronix.de>
-References: <20180614094527.25905-1-o.rempel@pengutronix.de>
-Message-ID: <1528972122.21021.38.camel@pengutronix.de>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu, 14 Jun 2018 13:43:10 +0300
+Subject: [PATCH v3 0/6] thermal: tsens: Refactoring for TSENSv2 IP
+Message-ID: <cover.1528972165.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 14.06.2018, 11:45 +0200 schrieb Oleksij Rempel:
-> Without this patch MSI interrupts are not routed from Intel
-> i350 PCIe adapter.
+This series is a mixed bag: Some code moves to deal with v2 of the
+TSENS IP into common functions, a new qcom,tsens-v2 DT property to cover
+all v2 platforms, new platform support (sdm845), a cleanup
+patch and a DT change to have a common way to deal with the SROT and TM
+registers despite slightly different features across the IP family and
+different register offsets.
 
-This has nothing to do with the attached endpoint device, so the commit
-message should read something like:
+Rob, I haven't added your Ack to patch 4 because it changed a bit.
 
-Use the correct IRQ line for the MSI controller in the PCIe host
-controller. Apparently a different IRQ line is used compared to other
-i.MX6 variants. Without this change MSI IRQs aren't properly propagated
-to the the upstream interrupt controller.
+Regards,
+Amit
 
-With this fixed:
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Changes since v2:
+- Based on review, moved tsens-8996.c to tsens-v2.c and changed
+  corresponding function names, struct names to allow for generic tsensv2
+  platforms
+- All v2 platforms will now only need to use the qcom,tsen-v2 property
+- Added a DT patch to initialize tsens driver on sdm845, now that 4.18-rc1
+  will contain an sdm845.dtsi
 
-> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
-> ?arch/arm/boot/dts/imx6sx.dtsi | 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index 49c7205b8db8..77fdad65e2bb 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -1351,7 +1351,7 @@
-> > ?			ranges = <0x81000000 0 0??????????0x08f80000 0 0x00010000 /* downstream I/O */
-> > ?				??0x82000000 0 0x08000000 0x08000000 0 0x00f00000>; /* non-prefetchable memory */
-> > ?			num-lanes = <1>;
-> > -			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-> > +			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-> > ?			interrupt-names = "msi";
-> > ?			#interrupt-cells = <1>;
-> > ?			interrupt-map-mask = <0 0 0 0x7>;
+Changes since v1:
+- Move get_temp() from tsens-8996 to tsens-common and rename
+- Change 8996 DT entry to allow init_common() to work across sdm845 and
+  8996 due to different offsets
+
+
+Amit Kucheria (6):
+  thermal: tsens: Get rid of unused fields in structure
+  dt: qcom: 8996: thermal: Move to DT initialisation
+  thermal: tsens: Rename tsens-8996 to tsens-v2 for reuse
+  thermal: tsens: Add support for SDM845
+  thermal: tsens: Check if we have valid data before reading
+  arm64: dts: sdm845: Add tsens nodes
+
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  1 +
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 12 ++++++-
+ arch/arm64/boot/dts/qcom/sdm845.dtsi               | 16 +++++++++
+ drivers/thermal/qcom/Makefile                      |  2 +-
+ drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c}  | 42 +++++++++++++---------
+ drivers/thermal/qcom/tsens.c                       |  3 ++
+ drivers/thermal/qcom/tsens.h                       |  7 ++--
+ 7 files changed, 61 insertions(+), 22 deletions(-)
+ rename drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c} (65%)
+
+-- 
+2.7.4
