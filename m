@@ -1,117 +1,91 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 14 Jun 2018 08:21:38 -0600
-Subject: [PATCH v3 4/6] thermal: tsens: Add support for SDM845
-In-Reply-To: <0cdd0957cf80c2f9921928755722a427c7309964.1528972165.git.amit.kucheria@linaro.org>
-References: <cover.1528972165.git.amit.kucheria@linaro.org>
- <0cdd0957cf80c2f9921928755722a427c7309964.1528972165.git.amit.kucheria@linaro.org>
-Message-ID: <CAL_JsqLPKktGFH4X9gDgCFq70Uo6NvFx9-a0sR7fQU35NwZe1g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Jun 2018 16:24:24 +0200
+Subject: [PATCH] pinctrl: mt7622: fix a kernel panic when pio don't work
+ as EINT controller
+In-Reply-To: <6615b85997509d659358d33eab2d280e235b8659.1528966092.git.sean.wang@mediatek.com>
+References: <6615b85997509d659358d33eab2d280e235b8659.1528966092.git.sean.wang@mediatek.com>
+Message-ID: <CACRpkdaipxgMbUHSA-UFQ3De9AGSKE2jCBU5_SaFJS7M0=eygQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 4:43 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> SDM845 uses the TSENS v2 IP block
->
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  Documentation/devicetree/bindings/thermal/qcom-tsens.txt | 1 +
->  arch/arm64/boot/dts/qcom/msm8996.dtsi                    | 2 +-
->  drivers/thermal/qcom/tsens-v2.c                          | 9 ++++++++-
->  drivers/thermal/qcom/tsens.c                             | 3 +++
->  drivers/thermal/qcom/tsens.h                             | 5 ++++-
->  5 files changed, 17 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> index 06195e8..84da3db 100644
-> --- a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> +++ b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> @@ -5,6 +5,7 @@ Required properties:
->   - "qcom,msm8916-tsens" : For 8916 Family of SoCs
->   - "qcom,msm8974-tsens" : For 8974 Family of SoCs
->   - "qcom,msm8996-tsens" : For 8996 Family of SoCs
-> + - "qcom,tsens-v2"      : For any SoC with v2 version of the tsens IP
+On Thu, Jun 14, 2018 at 10:55 AM,  <sean.wang@mediatek.com> wrote:
 
-Stick with "qcom,sdm845-tsens". Though perhaps it should be
-'"qcom,sdm845-tsens", "qcom,msm8996-tsens"' if there is compatibility.
-
+> From: Sean Wang <sean.wang@mediatek.com>
 >
->  - reg: Address range of the thermal registers
->  - #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index 6c8a857..28d4c08 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -460,7 +460,7 @@
->                 };
+> The function, external interrupt controller, is made as an optional to
+> mt7622 pinctrl. But if we don't want pio behaves as an external interrupt
+> controller, it would lead to hw->eint not be created properly and then
+> will cause 'kernel NULL pointer' issue when gpiochip try to call .to_irq
+> or .set_config. To fix it, check hw->eint before accessing the member.
 >
->                 tsens0: thermal-sensor at 4a8000 {
-> -                       compatible = "qcom,msm8996-tsens";
-> +                       compatible = "qcom,msm8996-tsens", "qcom,tsens-v2";
-
-There's no point to adding this now because you already have to
-support "qcom,msm8996-tsens".
-
->                         reg = <0x4a9000 0x1000>, /* TM */
->                               <0x4a8000 0x1000>; /* SROT */
->                         #qcom,sensors = <13>;
-> diff --git a/drivers/thermal/qcom/tsens-v2.c b/drivers/thermal/qcom/tsens-v2.c
-> index c981a40..abc8f13 100644
-> --- a/drivers/thermal/qcom/tsens-v2.c
-> +++ b/drivers/thermal/qcom/tsens-v2.c
-> @@ -69,8 +69,15 @@ static const struct tsens_ops ops_v2 = {
->         .get_temp       = get_temp_tsens_v2,
->  };
+> [    1.339494] Unable to handle kernel NULL pointer dereference at virtual
+>                address 00000010
+> [    1.347857] Mem abort info:
+> [    1.350742]   ESR = 0x96000005
+> [    1.353905]   Exception class = DABT (current EL), IL = 32 bits
+> [    1.360024]   SET = 0, FnV = 0
+> [    1.363185]   EA = 0, S1PTW = 0
+> [    1.366431] Data abort info:
+> [    1.369405]   ISV = 0, ISS = 0x00000005
+> [    1.373363]   CM = 0, WnR = 0
+> [    1.376437] [0000000000000010] user address but active_mm is swapper
+> [    1.383005] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+> [    1.388748] Modules linked in:
+> [    1.391897] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc1+ #344
+> [    1.398625] Hardware name: MediaTek MT7622 RFB1 board (DT)
+> [    1.404279] pstate: 80000005 (Nzcv daif -PAN -UAO)
+> [    1.409221] pc : mtk_eint_find_irq+0x8/0x24
+> [    1.413532] lr : mtk_gpio_to_irq+0x20/0x28
+> [    1.417749] sp : ffffff800801baf0
+> [    1.421161] x29: ffffff800801baf0 x28: ffffff8008792f40
+> [    1.426637] x27: ffffff800886b000 x26: ffffff8008615620
+> [    1.432113] x25: ffffffc00e4dbdc8 x24: ffffff80087b8000
+> [    1.437589] x23: ffffffc00325a000 x22: ffffffc00325a010
+> [    1.443066] x21: ffffffc0033dec18 x20: 00000000ffffffea
+> [    1.448542] x19: ffffffc00e4db800 x18: 0000000000000130
+> [    1.454018] x17: 000000000000000e x16: 0000000000000007
+> [    1.459494] x15: ffffff80085ee000 x14: 0000000000000001
+> [    1.464970] x13: 0000000000000001 x12: 0000000000000010
+> [    1.470446] x11: 0101010101010101 x10: 0000000000000880
+> [    1.475922] x9 : ffffff800801b990 x8 : ffffffc0030688e0
+> [    1.481399] x7 : ffffff80080c0660 x6 : ffffffc00e4dbbb0
+> [    1.486875] x5 : 0000000000000000 x4 : 0000000000000000
+> [    1.492351] x3 : ffffff80082a92f4 x2 : 00000000fffffffa
+> [    1.497826] x1 : 0000000000000051 x0 : 0000000000000000
+> [    1.503305] Process swapper/0 (pid: 1, stack limit = 0x0000000054e053bd)
+> [    1.510210] Call trace:
+> [    1.512727]  mtk_eint_find_irq+0x8/0x24
+> [    1.516677]  mtk_gpio_to_irq+0x20/0x28
+> [    1.520539]  gpiod_to_irq+0x48/0x60
+> [    1.524135]  mmc_gpiod_request_cd_irq+0x3c/0xc4
+> [    1.528804]  mmc_start_host+0x6c/0x8c
+> [    1.532575]  mmc_add_host+0x58/0x7c
+> [    1.536168]  msdc_drv_probe+0x4fc/0x67c
+> [    1.540121]  platform_drv_probe+0x58/0xa4
+> [    1.544251]  driver_probe_device+0x204/0x44c
+> [    1.548649]  __driver_attach+0x84/0xf8
+> [    1.552512]  bus_for_each_dev+0x68/0xa0
+> [    1.556461]  driver_attach+0x20/0x28
+> [    1.560142]  bus_add_driver+0xec/0x240
+> [    1.564002]  driver_register+0x98/0xe4
+> [    1.567863]  __platform_driver_register+0x48/0x50
+> [    1.572711]  mt_msdc_driver_init+0x18/0x20
+> [    1.576932]  do_one_initcall+0x98/0x130
+> [    1.580886]  kernel_init_freeable+0x13c/0x1d4
+> [    1.585375]  kernel_init+0x10/0xf8
+> [    1.588879]  ret_from_fork+0x10/0x18
+> [    1.592564] Code: a8c67bfd d65f03c0 a9bf7bfd 910003fd (f9400800)
+> [    1.598849] ---[ end trace 4bbcb7bc30e98492 ]---
+> [    1.603677] Kernel panic - not syncing: Attempted to kill init!
+>                exitcode=0x0000000b
+> [    1.603677]
 >
-> +const struct tsens_data data_tsens_v2 = {
-> +       .ops            = &ops_v2,
-> +};
-> +
-> +/* Kept around for backward compatibility with old msm8996.dtsi.
-> + * New platforms should use data_tsens_v2 if possible and define
-> + * the #qcom,sensors property in DT.
+> cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: stable at vger.kernel.org
+> Fixes: e6dabd38d8e7 ("pinctrl: mediatek: add EINT support to MT7622 SoC")
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 
-Hum, I think this should just be implied by the compatible as it was.
-If this was the *only* difference, then a property would be okay, but
-as soon as you find some other difference you need yet another
-property and have to do a DT update on all platforms.
+Patch applied for fixes.
 
-> + */
->  const struct tsens_data data_8996 = {
->         .num_sensors    = 13,
->         .ops            = &ops_v2,
->  };
-> -
-> diff --git a/drivers/thermal/qcom/tsens.c b/drivers/thermal/qcom/tsens.c
-> index 3440166c..a2c9bfa 100644
-> --- a/drivers/thermal/qcom/tsens.c
-> +++ b/drivers/thermal/qcom/tsens.c
-> @@ -72,6 +72,9 @@ static const struct of_device_id tsens_table[] = {
->         }, {
->                 .compatible = "qcom,msm8996-tsens",
->                 .data = &data_8996,
-> +       }, {
-> +               .compatible = "qcom,tsens-v2",
-> +               .data = &data_tsens_v2,
-
-Why different data if 8996 is compatible with v2?
-
->         },
->         {}
->  };
-> diff --git a/drivers/thermal/qcom/tsens.h b/drivers/thermal/qcom/tsens.h
-> index dc56e1e..69212cb 100644
-> --- a/drivers/thermal/qcom/tsens.h
-> +++ b/drivers/thermal/qcom/tsens.h
-> @@ -87,6 +87,9 @@ void compute_intercept_slope(struct tsens_device *, u32 *, u32 *, u32);
->  int init_common(struct tsens_device *);
->  int get_temp_common(struct tsens_device *, int, int *);
->
-> -extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
-> +/* TSENS v1 targets */
-> +extern const struct tsens_data data_8916, data_8974, data_8960;
-> +/* TSENS v2 targets */
-> +extern const struct tsens_data data_8996, data_tsens_v2;
->
->  #endif /* __QCOM_TSENS_H__ */
-> --
-> 2.7.4
->
+Yours,
+Linus Walleij
