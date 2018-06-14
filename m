@@ -1,46 +1,48 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 14 Jun 2018 13:43:16 +0300
-Subject: [PATCH v3 6/6] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <cover.1528972165.git.amit.kucheria@linaro.org>
-References: <cover.1528972165.git.amit.kucheria@linaro.org>
-Message-ID: <448cdc793c6ac83ab6d0ba2a6bef00036ad20801.1528972165.git.amit.kucheria@linaro.org>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Thu, 14 Jun 2018 11:58:55 +0100
+Subject: [PATCH v5 0/3] Renesas R9A06G032 SMP enabler
+Message-ID: <1528973943-28132-1-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-sensors.
+*WARNING -- this requires the base R9A06G032 support patches
+already posted
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+This patch series is for enabling the second CA7 of the R9A06G032.
+It's based on a spin_table method, and it reuses the same binding
+property as that driver.
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index cdaabeb..7dd59b4 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -221,6 +221,22 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		tsens0: tsens at c222000 {
-+			compatible = "qcom,tsens-v2";
-+			reg = <0xc263000 0x1ff>, /* TM */
-+			      <0xc222000 0x1ff>; /* SROT */
-+			#qcom,sensors = <13>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		tsens1: tsens at c223000 {
-+			compatible = "qcom,tsens-v2";
-+			reg = <0xc265000 0x1ff>, /* TM */
-+			      <0xc223000 0x1ff>; /* SROT */
-+			#qcom,sensors = <8>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
- 		spmi_bus: spmi at c440000 {
- 			compatible = "qcom,spmi-pmic-arb";
- 			reg = <0xc440000 0x1100>,
+v5:
+  + Fixed a couple of typos
+  + Added the Reviewed-by tags where appropriate
+  + Rebased on base patch v9
+  + Replaced the dts property with a 64 bits one.
+  + Changed the driver to support 32 or 64 bits property.
+v4:
+  + Geert's comments adressed.
+  + Renamed symbols to r9a06g032 to match the rest of patchset
+  + Rebased on base patch v8
+v3:
+  + Removed mentions of rz/?n1d?
+  + Rebased on base patch v7
+v2:
+  + Added suggestions from Florian Fainelli
+  + Use __pa_symbol()
+  + Simplified logic in prepare_cpu()
+  + Reordered the patches
+  + Rebased on RZN1 Base patch v5
+
+Michel Pollet (3):
+  dt-bindings: cpu: Add Renesas R9A06G032 SMP enable method.
+  arm: shmobile: Add the R9A06G032 SMP enabler driver
+  ARM: dts: Renesas R9A06G032 SMP enable method
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/r9a06g032.dtsi               |  2 +
+ arch/arm/mach-shmobile/Makefile                |  1 +
+ arch/arm/mach-shmobile/smp-r9a06g032.c         | 90 ++++++++++++++++++++++++++
+ 4 files changed, 94 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+
 -- 
 2.7.4
