@@ -1,91 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Jun 2018 16:24:24 +0200
-Subject: [PATCH] pinctrl: mt7622: fix a kernel panic when pio don't work
- as EINT controller
-In-Reply-To: <6615b85997509d659358d33eab2d280e235b8659.1528966092.git.sean.wang@mediatek.com>
-References: <6615b85997509d659358d33eab2d280e235b8659.1528966092.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdaipxgMbUHSA-UFQ3De9AGSKE2jCBU5_SaFJS7M0=eygQ@mail.gmail.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 14 Jun 2018 16:34:45 +0200
+Subject: [linux-sunxi] [PATCH v2 00/27] Add support for R40 HDMI pipeline
+In-Reply-To: <CAMty3ZC-Edg5XJQpqEuwLbSFzmam3zP3zUPak4K7ypyT2+arAg@mail.gmail.com>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <CAMty3ZC-Edg5XJQpqEuwLbSFzmam3zP3zUPak4K7ypyT2+arAg@mail.gmail.com>
+Message-ID: <2742773.k39D243pH3@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 10:55 AM,  <sean.wang@mediatek.com> wrote:
+Dne ?etrtek, 14. junij 2018 ob 09:12:41 CEST je Jagan Teki napisal(a):
+> On Wed, Jun 13, 2018 at 1:30 AM, Jernej Skrabec <jernej.skrabec@siol.net> 
+wrote:
+> > This series adds support for R40 HDMI pipeline. It is a bit special
+> > than other already supported pipelines because it has additional unit
+> > called TCON TOP responsible for relationship configuration between
+> > mixers, TCONs and HDMI. Additionally, it has additional gates for DSI
+> > and TV TCONs, TV encoder clock settings and pin muxing between LCD
+> > and TV encoders.
+> > 
+> > However, it seems that TCON TOP will become a norm, since newer
+> > Allwinner SoCs like H6 also have this unit.
+> > 
+> > I tested different possible configurations:
+> > - mixer0 <> TCON-TV0 <> HDMI
+> > - mixer0 <> TCON-TV1 <> HDMI
+> > - mixer1 <> TCON-TV0 <> HDMI
+> > - mixer1 <> TCON-TV1 <> HDMI
+> > 
+> > Please review.
+> > 
+> > Best regards,
+> > Jernej
+> > 
+> > Changes from v1:
+> > - Split DT bindings patch and updated description
+> > - Split HDMI PHY patch
+> > - Move header file from TCON TOP patch to dt bindings patch
+> > - Added Rob reviewed-by tag
+> > - Used clk_hw_register_gate() instead of custom gate registration code
+> > - Reworked TCON TOP to be part of of-graph. Because of that, a lot of
+> > 
+> >   new patches were added.
+> > 
+> > - Droped mixer index quirk patch
+> > - Reworked TCON support for TCON TOP
+> > - Updated commit messages
+> > 
+> > Jernej Skrabec (27):
+> >   clk: sunxi-ng: r40: Add minimal rate for video PLLs
+> >   clk: sunxi-ng: r40: Allow setting parent rate to display related
+> >   
+> >     clocks
+> >   
+> >   clk: sunxi-ng: r40: Export video PLLs
+> >   dt-bindings: display: sunxi-drm: Add TCON TOP description
+> >   drm/sun4i: Add TCON TOP driver
+> >   drm/sun4i: Fix releasing node when enumerating enpoints
+> >   drm/sun4i: Split out code for enumerating endpoints in output port
+> >   drm/sun4i: Add support for traversing graph with TCON TOP
+> >   drm/sun4i: Don't skip TCONs if they don't have channel 0
+> >   dt-bindings: display: sun4i-drm: Add R40 TV TCON description
+> >   drm/sun4i: tcon: Add support for tcon-top gate
+> >   drm/sun4i: tcon: Generalize engine search algorithm
+> >   drm/sun4i: Don't check for LVDS and RGB when TCON has only ch1
+> >   drm/sun4i: Don't check for panel or bridge on TV TCONs
+> >   drm/sun4i: Add support for R40 TV TCON
+> >   dt-bindings: display: sun4i-drm: Add R40 mixer compatibles
+> >   drm/sun4i: Add support for R40 mixers
+> >   dt-bindings: display: sun4i-drm: Add description of A64 HDMI PHY
+> >   drm/sun4i: Enable DW HDMI PHY clock
+> >   drm/sun4i: Don't change clock bits in DW HDMI PHY driver
+> >   drm/sun4i: DW HDMI PHY: Add support for second PLL
+> >   drm/sun4i: Add support for second clock parent to DW HDMI PHY clk
+> >   
+> >     driver
+> >   
+> >   drm/sun4i: Add support for A64 HDMI PHY
+> >   drm: of: Export drm_crtc_port_mask()
+> >   drm/sun4i: DW HDMI: Expand algorithm for possible crtcs
+> >   ARM: dts: sun8i: r40: Add HDMI pipeline
+> >   ARM: dts: sun8i: r40: Enable HDMI output on BananaPi M2 Ultra
+> 
+> Tested whole series on top of linux-next.
+> 
+> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
 
-> From: Sean Wang <sean.wang@mediatek.com>
->
-> The function, external interrupt controller, is made as an optional to
-> mt7622 pinctrl. But if we don't want pio behaves as an external interrupt
-> controller, it would lead to hw->eint not be created properly and then
-> will cause 'kernel NULL pointer' issue when gpiochip try to call .to_irq
-> or .set_config. To fix it, check hw->eint before accessing the member.
->
-> [    1.339494] Unable to handle kernel NULL pointer dereference at virtual
->                address 00000010
-> [    1.347857] Mem abort info:
-> [    1.350742]   ESR = 0x96000005
-> [    1.353905]   Exception class = DABT (current EL), IL = 32 bits
-> [    1.360024]   SET = 0, FnV = 0
-> [    1.363185]   EA = 0, S1PTW = 0
-> [    1.366431] Data abort info:
-> [    1.369405]   ISV = 0, ISS = 0x00000005
-> [    1.373363]   CM = 0, WnR = 0
-> [    1.376437] [0000000000000010] user address but active_mm is swapper
-> [    1.383005] Internal error: Oops: 96000005 [#1] PREEMPT SMP
-> [    1.388748] Modules linked in:
-> [    1.391897] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc1+ #344
-> [    1.398625] Hardware name: MediaTek MT7622 RFB1 board (DT)
-> [    1.404279] pstate: 80000005 (Nzcv daif -PAN -UAO)
-> [    1.409221] pc : mtk_eint_find_irq+0x8/0x24
-> [    1.413532] lr : mtk_gpio_to_irq+0x20/0x28
-> [    1.417749] sp : ffffff800801baf0
-> [    1.421161] x29: ffffff800801baf0 x28: ffffff8008792f40
-> [    1.426637] x27: ffffff800886b000 x26: ffffff8008615620
-> [    1.432113] x25: ffffffc00e4dbdc8 x24: ffffff80087b8000
-> [    1.437589] x23: ffffffc00325a000 x22: ffffffc00325a010
-> [    1.443066] x21: ffffffc0033dec18 x20: 00000000ffffffea
-> [    1.448542] x19: ffffffc00e4db800 x18: 0000000000000130
-> [    1.454018] x17: 000000000000000e x16: 0000000000000007
-> [    1.459494] x15: ffffff80085ee000 x14: 0000000000000001
-> [    1.464970] x13: 0000000000000001 x12: 0000000000000010
-> [    1.470446] x11: 0101010101010101 x10: 0000000000000880
-> [    1.475922] x9 : ffffff800801b990 x8 : ffffffc0030688e0
-> [    1.481399] x7 : ffffff80080c0660 x6 : ffffffc00e4dbbb0
-> [    1.486875] x5 : 0000000000000000 x4 : 0000000000000000
-> [    1.492351] x3 : ffffff80082a92f4 x2 : 00000000fffffffa
-> [    1.497826] x1 : 0000000000000051 x0 : 0000000000000000
-> [    1.503305] Process swapper/0 (pid: 1, stack limit = 0x0000000054e053bd)
-> [    1.510210] Call trace:
-> [    1.512727]  mtk_eint_find_irq+0x8/0x24
-> [    1.516677]  mtk_gpio_to_irq+0x20/0x28
-> [    1.520539]  gpiod_to_irq+0x48/0x60
-> [    1.524135]  mmc_gpiod_request_cd_irq+0x3c/0xc4
-> [    1.528804]  mmc_start_host+0x6c/0x8c
-> [    1.532575]  mmc_add_host+0x58/0x7c
-> [    1.536168]  msdc_drv_probe+0x4fc/0x67c
-> [    1.540121]  platform_drv_probe+0x58/0xa4
-> [    1.544251]  driver_probe_device+0x204/0x44c
-> [    1.548649]  __driver_attach+0x84/0xf8
-> [    1.552512]  bus_for_each_dev+0x68/0xa0
-> [    1.556461]  driver_attach+0x20/0x28
-> [    1.560142]  bus_add_driver+0xec/0x240
-> [    1.564002]  driver_register+0x98/0xe4
-> [    1.567863]  __platform_driver_register+0x48/0x50
-> [    1.572711]  mt_msdc_driver_init+0x18/0x20
-> [    1.576932]  do_one_initcall+0x98/0x130
-> [    1.580886]  kernel_init_freeable+0x13c/0x1d4
-> [    1.585375]  kernel_init+0x10/0xf8
-> [    1.588879]  ret_from_fork+0x10/0x18
-> [    1.592564] Code: a8c67bfd d65f03c0 a9bf7bfd 910003fd (f9400800)
-> [    1.598849] ---[ end trace 4bbcb7bc30e98492 ]---
-> [    1.603677] Kernel panic - not syncing: Attempted to kill init!
->                exitcode=0x0000000b
-> [    1.603677]
->
-> cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: stable at vger.kernel.org
-> Fixes: e6dabd38d8e7 ("pinctrl: mediatek: add EINT support to MT7622 SoC")
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-
-Patch applied for fixes.
-
-Yours,
-Linus Walleij
+Thanks!
