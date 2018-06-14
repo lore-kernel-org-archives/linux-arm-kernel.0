@@ -1,30 +1,32 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 14 Jun 2018 09:37:46 -0400
-Subject: [PATCH] MAINTAINERS: Update email-id of Sinan Kaya
-Message-ID: <1528983482-31028-1-git-send-email-okaya@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Jun 2018 14:48:01 +0100
+Subject: [PATCH 1/2] ASoC: pxa: add binding for pxa2xx-ac97 audio complex
+In-Reply-To: <87y3fiqzp8.fsf@belgarion.home>
+References: <20180611202211.15501-1-robert.jarzmik@free.fr>
+ <20180612221359.GA26741@rob-hp-laptop>
+ <87y3fiqzp8.fsf@belgarion.home>
+Message-ID: <20180614134801.GB9660@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm no longer with QCOM. I am still interested in maintaining or reviewing
-PCI/DMA engine patches. Update email-id to an active one.
+On Wed, Jun 13, 2018 at 09:00:19PM +0200, Robert Jarzmik wrote:
+> Rob Herring <robh@kernel.org> writes:
+> > On Mon, Jun 11, 2018 at 10:22:10PM +0200, Robert Jarzmik wrote:
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> >> +Required properties:
+> >> +  - compatible: "marvell,pxa2xx-ac97"
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 44fb3a1..dd9bd2d 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11803,7 +11803,7 @@ S:	Supported
- F:	arch/hexagon/
- 
- QUALCOMM HIDMA DRIVER
--M:	Sinan Kaya <okaya@codeaurora.org>
-+M:	Sinan Kaya <okaya@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org
- L:	linux-arm-msm at vger.kernel.org
- L:	dmaengine at vger.kernel.org
--- 
-2.7.4
+> > Don't use wildcards in compatible strings. Though this is so old...
+
+> Yes, I could use pxa270-ac97.
+
+If you're going to do that then probably best to put in a compatible
+string for each SoC since they are actually meaningfully different, they
+seemed to manage to break something with each new revision.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 484 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180614/31b38c15/attachment.sig>
