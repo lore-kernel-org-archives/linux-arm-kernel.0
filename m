@@ -1,92 +1,312 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Jun 2018 13:50:00 +0100
-Subject: [PATCH 2/4] KVM: arm64: Don't mask softirq with IRQs disabled in
- vcpu_put()
-In-Reply-To: <1528976546-25999-2-git-send-email-Dave.Martin@arm.com>
-References: <1528976039-25826-1-git-send-email-Dave.Martin@arm.com>
- <1528976546-25999-1-git-send-email-Dave.Martin@arm.com>
- <1528976546-25999-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <ff9c9b77-20f5-42f0-23f5-09bdaebfcbe6@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 14 Jun 2018 14:52:25 +0200
+Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and
+ DVK
+In-Reply-To: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
+References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
+Message-ID: <03f0f635-3fc2-085b-20e0-e1fcaa9e8062@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On 14/06/18 12:42, Dave Martin wrote:
-> Commit e6b673b ("KVM: arm64: Optimise FPSIMD handling to reduce
-> guest/host thrashing") introduces a specific helper
-> kvm_arch_vcpu_put_fp() for saving the vcpu FPSIMD state during
-> vcpu_put().
-> 
-> This function uses local_bh_disable()/_enable() to protect the
-> FPSIMD context manipulation from interruption by softirqs.
-> 
-> This approach is not correct, because vcpu_put() can be invoked
-> either from the KVM host vcpu thread (when exiting the vcpu run
-> loop), or via a preempt notifier.  In the former case, only
-> preemption is disabled.  In the latter case, the function is called
-> from inside __schedule(), which means that IRQs are disabled.
-> 
-> Use of local_bh_disable()/_enable() with IRQs disabled is considerd
-> an error, resulting in lockdep splats while running VMs if lockdep
-> is enabled.
-> 
-> It is probably possible in theory to relax this restriction on
-> local_bh_disable()/_enable() usage, but for now this patch takes
-> the simple approach of managing softirq masking only if IRQs happen
-> to be enabled when kvm_arch_vcpu_put_fp() is called.
-> 
-> Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
-> Reported-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+On 14/06/2018 at 10:51, Ben Whitten wrote:
+> Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
 > ---
->  arch/arm64/kvm/fpsimd.c | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
+>   arch/arm/boot/dts/Makefile        |   3 +-
+>   arch/arm/boot/dts/at91-wb45n.dts  |  66 +++++++++++++++
+>   arch/arm/boot/dts/at91-wb45n.dtsi | 169 ++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 237 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
+>   create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
 > 
-> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-> index dc6ecfa..b51ff80 100644
-> --- a/arch/arm64/kvm/fpsimd.c
-> +++ b/arch/arm64/kvm/fpsimd.c
-> @@ -90,10 +90,8 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
->   * disappears and another task or vcpu appears that recycles the same
->   * struct fpsimd_state.
->   */
-> -void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
-> +static void __kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
->  {
-> -	local_bh_disable();
-> -
->  	update_thread_flag(TIF_SVE,
->  			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
->  
-> @@ -105,6 +103,16 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
->  		/* Ensure user trap controls are correctly restored */
->  		fpsimd_bind_task_to_cpu();
->  	}
-> +}
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 7e24249..1ee94ee 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+>   	at91sam9g25ek.dtb \
+>   	at91sam9g35ek.dtb \
+>   	at91sam9x25ek.dtb \
+> -	at91sam9x35ek.dtb
+> +	at91sam9x35ek.dtb \
+> +	at91-wb45n.dtb
+>   dtb-$(CONFIG_SOC_SAM_V7) += \
+>   	at91-kizbox2.dtb \
+>   	at91-nattis-2-natte-2.dtb \
+> diff --git a/arch/arm/boot/dts/at91-wb45n.dts b/arch/arm/boot/dts/at91-wb45n.dts
+> new file mode 100644
+> index 0000000..4e88815
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-wb45n.dts
+> @@ -0,0 +1,66 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * at91-wb45n.dts - Device Tree file for WB45NBT board
+> + *
+> + *  Copyright (C) 2018 Laird
+> + *
+> +*/
+> +/dts-v1/;
+> +#include "at91-wb45n.dtsi"
 > +
->  
-> -	local_bh_enable();
-> +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
-> +{
-> +	if (irqs_disabled())
-> +		__kvm_arch_vcpu_put_fp(vcpu);
-> +	else {
-> +		local_bh_disable();
-> +		__kvm_arch_vcpu_put_fp(vcpu);
-> +		local_bh_enable();
-> +	}
->  }
+> +/ {
+> +	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
+> +	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5", "atmel,at91sam9";
+
+"laird" prefix must be added to 
+Documentation/devicetree/bindings/vendor-prefixes.txt before using it: 
+you can do a little patch as a first patch of this series.
+Otherwise it will trigger a warning message while running 
+scripts/checkpatch.pl on top of your patch.
+
+
+> +
+> +	ahb {
+> +		apb {
+> +			watchdog at fffffe40 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		irqbtn at pb18 {
+
+I'm not sure that the @pb18 can be used like this. This address 
+extension must be used in a "reg" property in the node. dtc used with 
+warning switch on might trigger an error for this.
+
+> +			label = "IRQBTN";
+> +			linux,code = <99>;
+> +			gpios = <&pioB 18 GPIO_ACTIVE_LOW>;
+> +			gpio-key,wakeup = <1>;
+> +		};
+> +	};
+> +};
+> +
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	status = "okay";
+> +};
+> +
+> +&spi0 {
+> +	status = "okay";
+> +};
+> +
+> +&macb0 {
+> +	status = "okay";
+> +};
+> +
+> +&dbgu {
+> +	status = "okay";
+> +};
+> +
+> +&usart0 {
+> +	status = "okay";
+> +};
+> +
+> +&usart3 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/at91-wb45n.dtsi b/arch/arm/boot/dts/at91-wb45n.dtsi
+> new file mode 100644
+> index 0000000..2fa58e2
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-wb45n.dtsi
+> @@ -0,0 +1,169 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * at91-wb45n.dtsi - Device Tree file for WB45NBT board
+> + *
+> + *  Copyright (C) 2018 Laird
+> + *
+> + */
+> +
+> +#include "at91sam9g25.dtsi"
+> +
+> +/ {
+> +	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
+> +	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "ubi.mtd=6 root=ubi0:rootfs rootfstype=ubifs rw";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			shdwc at fffffe10 {
+
+I would advice you to take exactly the node name:
+"shutdown-controller at fffffe10"; Anyway, it will go away after you use 
+the label notation as advised by Alexandre.
+
+> +				atmel,wakeup-mode = "low";
+> +			};
+> +
+> +			pinctrl at fffff400 {
+> +				usb2 {
+> +					pinctrl_board_usb2: usb2-board {
+> +						atmel,pins =
+> +							<AT91_PIOB 11 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB11 gpio vbus sense, deglitch */
+> +					};
+> +				};
+> +			};
+> +
+> +			rstc at fffffe00 {
+> +				compatible = "atmel,sama5d3-rstc";
+> +			};
+
+I don't think this node is needed.
+
+> +
+> +		};
+> +	};
+> +
+> +	atheros {
+> +		compatible = "atheros,ath6kl";
+> +		atheros,board-id = "SD32";
+> +	};
+> +};
+> +
+> +&slow_xtal {
+> +	clock-frequency = <32768>;
+> +};
+> +
+> +&main_xtal {
+> +	clock-frequency = <12000000>;
+> +};
+> +
+> +&ebi {
+> +	status = "okay";
+> +	nand_controller: nand-controller {
+> +		pinctrl-0 = <&pinctrl_nand_cs &pinctrl_nand_rb &pinctrl_nand_oe_we>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +
+> +		nand at 3 {
+> +			reg = <0x3 0x0 0x800000>;
+> +			rb-gpios = <&pioD 5 GPIO_ACTIVE_HIGH>;
+> +			cs-gpios = <&pioD 4 GPIO_ACTIVE_HIGH>;
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "hw";
+> +			nand-ecc-strength = <4>;
+> +			nand-ecc-step-size = <512>;
+> +			nand-on-flash-bbt;
+> +			label = "atmel_nand";
+> +
+> +			partitions {
+> +				compatible = "fixed-partitions";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +
+> +				at91bootstrap at 0 {
+> +					label = "at91bs";
+> +					reg = <0x0 0x20000>;
+> +				};
+> +
+> +				uboot at 20000 {
+> +					label = "u-boot";
+> +					reg = <0x20000 0x80000>;
+> +				};
+> +
+> +				ubootenv at a0000 {
+> +					label = "u-boot-env";
+> +					reg = <0xa0000 0x20000>;
+> +				};
+> +
+> +				ubootenv at c0000 {
+> +					label = "redund-env";
+> +					reg = <0xc0000 0x20000>;
+> +				};
+> +
+> +				kernel-a at e0000 {
+> +					label = "kernel-a";
+> +					reg = <0xe0000 0x280000>;
+> +				};
+> +
+> +				kernel-b at 360000 {
+> +					label = "kernel-b";
+> +					reg = <0x360000 0x280000>;
+> +				};
+> +
+> +				rootfs-a at 5e0000 {
+> +					label = "rootfs-a";
+> +					reg = <0x5e0000 0x2600000>;
+> +				};
+> +
+> +				rootfs-b at 2be0000 {
+> +					label = "rootfs-b";
+> +					reg = <0x2be0000 0x2600000>;
+> +				};
+> +
+> +				user at 51e0000 {
+> +					label = "user";
+> +					reg = <0x51e0000 0x2dc0000>;
+> +				};
+> +
+> +				logs at 7fa0000 {
+> +					label = "logs";
+> +					reg = <0x7fa0000 0x60000>;
+> +				};
+> +
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&usb0 {
+
+This must be &usb1 label, isn't it?
+Because you are referring to ohci binding I suspect (found by having a 
+look at: atmel,oc-gpio property...).
+
+> +	num-ports = <2>;
+> +	atmel,vbus-gpio = <
+> +		&pioB 12 GPIO_ACTIVE_HIGH
+> +		&pioA 31 GPIO_ACTIVE_HIGH
+> +		>;
+> +	atmel,oc-gpio = <&pioB 13 GPIO_ACTIVE_LOW>;
+> +};
+> +
+> +&macb0 {
+> +	phy-mode = "rmii";
+> +};
+> +
+> +&spi0 {
+> +	cs-gpios = <&pioA 14 0>, <&pioA 7 0>, <0>, <0>;
+> +};
+> +
+> +&usb2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_board_usb2>;
+> +	atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-0 = <
+> +		&pinctrl_mmc0_slot0_clk_cmd_dat0
+> +		&pinctrl_mmc0_slot0_dat1_3>;
+> +	slot at 0 {
+> +		reg = <0>;
+> +		bus-width = <4>;
+> +	};
+> +};
 > 
 
-I'm of the opinion to always run kvm_arch_vcpu_put_fp() with interrupt
-disabled. local_bh_enable() does quite a lot of stuff (running the
-softirqs), which adds overhead we could do without.
 
-I'd replace local_bh_{disable,enable} with local_irq_{save,restore).
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Nicolas Ferre
