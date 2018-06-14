@@ -1,68 +1,279 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 14 Jun 2018 10:14:34 +0300
-Subject: [RFC PATCH] sdhci-of-arasan: card initialization failure -84
-In-Reply-To: <20180604064211.q2thyftgpffuaer2@laureti-dev>
-References: <20180604064211.q2thyftgpffuaer2@laureti-dev>
-Message-ID: <658c1c31-9193-990b-e6d0-944958aa7b1f@intel.com>
+From: ben.whitten@gmail.com (Ben Whitten)
+Date: Thu, 14 Jun 2018 09:51:54 +0100
+Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and DVK
+Message-ID: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/18 09:42, Helmut Grohne wrote:
-> Work around repeated:
-> 
->     mmc0: error -84 whilst initialising SD card
-> ---
->  drivers/mmc/host/sdhci.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> I'm seeing the above error -84 with a series of Kingston cards of 4GB capacity
-> when used with an arasan host controller. Using the cards with other hosts or
-> using other cards with the host is not problematic. The host controller has the
-> following device tree:
-> 
-> 	ps7-sdio at e0100000 {
-> 		compatible = "arasan,sdhci-8.9a";
-> 		reg = <0xe0100000 0x1000>;
-> 		clock-names = "clk_xin", "clk_ahb";
-> 		clock-frequency = <50000000>;
-> 		clocks = <&clkc 21>, <&clkc 32>;
-> 		interrupt-parent = <&ps7_scugic_0>;
-> 		interrupts = <0 24 4>;
-> 	};
-> 
-> When enabling sufficient debugging (and thus slowing the kernel down), the
-> problem goes away. Without debug features, the insertion of this delay suffices
-> for my particular instance. Inserting the same delay before the
-> SDHCI_CLOCK_CARD_EN write also makes the error go away.
-> 
-> While instrumenting the code I found that the loop waiting for the
-> SDHCI_CLOCK_INT_STABLE would always terminate immediately (regardless of the
-> card being used). Only when the card is removed, the loop would spin once. This
-> hints that potentially the stable checking is broken for this host controller.
-> 
-> During my testing I checked 7 Kingston cards, 2 Transcend Cards, 1 Apacer card,
-> 3 arasn hosts, 3 non-arasan hosts and had consistent reports for a similar
-> number of devices from others.
-> 
-> If my hypothesis is reasonable, I can turn this patch into a new quirk that
-> replaces the stable polling with msleep(20), which is the poll timeout. Is
-> there anything else I should investigate before doing so?
+Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
+---
+ arch/arm/boot/dts/Makefile        |   3 +-
+ arch/arm/boot/dts/at91-wb45n.dts  |  66 +++++++++++++++
+ arch/arm/boot/dts/at91-wb45n.dtsi | 169 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 237 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
+ create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
 
-Please avoid quirks.  Perhaps use the ->set_clock() callback.
-
-> 
-> Helmut
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 90cc1977b792..5d2809aeb4eb 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1430,6 +1430,7 @@ void sdhci_enable_clk(struct sdhci_host *host, u16 clk)
->  
->  	clk |= SDHCI_CLOCK_CARD_EN;
->  	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-> +	udelay(80);
->  }
->  EXPORT_SYMBOL_GPL(sdhci_enable_clk);
->  
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7e24249..1ee94ee 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+ 	at91sam9g25ek.dtb \
+ 	at91sam9g35ek.dtb \
+ 	at91sam9x25ek.dtb \
+-	at91sam9x35ek.dtb
++	at91sam9x35ek.dtb \
++	at91-wb45n.dtb
+ dtb-$(CONFIG_SOC_SAM_V7) += \
+ 	at91-kizbox2.dtb \
+ 	at91-nattis-2-natte-2.dtb \
+diff --git a/arch/arm/boot/dts/at91-wb45n.dts b/arch/arm/boot/dts/at91-wb45n.dts
+new file mode 100644
+index 0000000..4e88815
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-wb45n.dts
+@@ -0,0 +1,66 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * at91-wb45n.dts - Device Tree file for WB45NBT board
++ *
++ *  Copyright (C) 2018 Laird
++ *
++*/
++/dts-v1/;
++#include "at91-wb45n.dtsi"
++
++/ {
++	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
++	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5", "atmel,at91sam9";
++
++	ahb {
++		apb {
++			watchdog at fffffe40 {
++				status = "okay";
++			};
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		irqbtn at pb18 {
++			label = "IRQBTN";
++			linux,code = <99>;
++			gpios = <&pioB 18 GPIO_ACTIVE_LOW>;
++			gpio-key,wakeup = <1>;
++		};
++	};
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&mmc0 {
++	status = "okay";
++};
++
++&spi0 {
++	status = "okay";
++};
++
++&macb0 {
++	status = "okay";
++};
++
++&dbgu {
++	status = "okay";
++};
++
++&usart0 {
++	status = "okay";
++};
++
++&usart3 {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/at91-wb45n.dtsi b/arch/arm/boot/dts/at91-wb45n.dtsi
+new file mode 100644
+index 0000000..2fa58e2
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-wb45n.dtsi
+@@ -0,0 +1,169 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * at91-wb45n.dtsi - Device Tree file for WB45NBT board
++ *
++ *  Copyright (C) 2018 Laird
++ *
++ */
++
++#include "at91sam9g25.dtsi"
++
++/ {
++	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
++	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "ubi.mtd=6 root=ubi0:rootfs rootfstype=ubifs rw";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	ahb {
++		apb {
++			shdwc at fffffe10 {
++				atmel,wakeup-mode = "low";
++			};
++
++			pinctrl at fffff400 {
++				usb2 {
++					pinctrl_board_usb2: usb2-board {
++						atmel,pins =
++							<AT91_PIOB 11 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB11 gpio vbus sense, deglitch */
++					};
++				};
++			};
++
++			rstc at fffffe00 {
++				compatible = "atmel,sama5d3-rstc";
++			};
++
++		};
++	};
++
++	atheros {
++		compatible = "atheros,ath6kl";
++		atheros,board-id = "SD32";
++	};
++};
++
++&slow_xtal {
++	clock-frequency = <32768>;
++};
++
++&main_xtal {
++	clock-frequency = <12000000>;
++};
++
++&ebi {
++	status = "okay";
++	nand_controller: nand-controller {
++		pinctrl-0 = <&pinctrl_nand_cs &pinctrl_nand_rb &pinctrl_nand_oe_we>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		nand at 3 {
++			reg = <0x3 0x0 0x800000>;
++			rb-gpios = <&pioD 5 GPIO_ACTIVE_HIGH>;
++			cs-gpios = <&pioD 4 GPIO_ACTIVE_HIGH>;
++			nand-bus-width = <8>;
++			nand-ecc-mode = "hw";
++			nand-ecc-strength = <4>;
++			nand-ecc-step-size = <512>;
++			nand-on-flash-bbt;
++			label = "atmel_nand";
++
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				at91bootstrap at 0 {
++					label = "at91bs";
++					reg = <0x0 0x20000>;
++				};
++
++				uboot at 20000 {
++					label = "u-boot";
++					reg = <0x20000 0x80000>;
++				};
++
++				ubootenv at a0000 {
++					label = "u-boot-env";
++					reg = <0xa0000 0x20000>;
++				};
++
++				ubootenv at c0000 {
++					label = "redund-env";
++					reg = <0xc0000 0x20000>;
++				};
++
++				kernel-a at e0000 {
++					label = "kernel-a";
++					reg = <0xe0000 0x280000>;
++				};
++
++				kernel-b at 360000 {
++					label = "kernel-b";
++					reg = <0x360000 0x280000>;
++				};
++
++				rootfs-a at 5e0000 {
++					label = "rootfs-a";
++					reg = <0x5e0000 0x2600000>;
++				};
++
++				rootfs-b at 2be0000 {
++					label = "rootfs-b";
++					reg = <0x2be0000 0x2600000>;
++				};
++
++				user at 51e0000 {
++					label = "user";
++					reg = <0x51e0000 0x2dc0000>;
++				};
++
++				logs at 7fa0000 {
++					label = "logs";
++					reg = <0x7fa0000 0x60000>;
++				};
++
++			};
++		};
++	};
++};
++
++&usb0 {
++	num-ports = <2>;
++	atmel,vbus-gpio = <
++		&pioB 12 GPIO_ACTIVE_HIGH
++		&pioA 31 GPIO_ACTIVE_HIGH
++		>;
++	atmel,oc-gpio = <&pioB 13 GPIO_ACTIVE_LOW>;
++};
++
++&macb0 {
++	phy-mode = "rmii";
++};
++
++&spi0 {
++	cs-gpios = <&pioA 14 0>, <&pioA 7 0>, <0>, <0>;
++};
++
++&usb2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_board_usb2>;
++	atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
++};
++
++&mmc0 {
++	pinctrl-0 = <
++		&pinctrl_mmc0_slot0_clk_cmd_dat0
++		&pinctrl_mmc0_slot0_dat1_3>;
++	slot at 0 {
++		reg = <0>;
++		bus-width = <4>;
++	};
++};
+-- 
+2.7.4
