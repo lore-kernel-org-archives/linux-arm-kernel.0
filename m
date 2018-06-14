@@ -1,37 +1,48 @@
 From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 14 Jun 2018 13:20:04 -0700
-Subject: [PATCH] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE dependency
-In-Reply-To: <71cfc192be06d07e79bfdfe43a566d3260e19cd6.camel@kernel.crashing.org>
-References: <20180525160729.92026-1-arnd@arndb.de>
- <87o9gxcono.fsf@linux.intel.com>
- <71cfc192be06d07e79bfdfe43a566d3260e19cd6.camel@kernel.crashing.org>
-Message-ID: <db22cad5-c25f-1b34-1784-5df5ed1ac0b2@infradead.org>
+Date: Thu, 14 Jun 2018 13:40:59 -0700
+Subject: [PATCH v8 02/10] firmware: xilinx: Add Zynqmp firmware driver
+In-Reply-To: <1529000862-11510-3-git-send-email-jollys@xilinx.com>
+References: <1529000862-11510-1-git-send-email-jollys@xilinx.com>
+ <1529000862-11510-3-git-send-email-jollys@xilinx.com>
+Message-ID: <7cd908ac-a0cc-3fd0-702f-d36a4e325a68@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2018 09:29 PM, Benjamin Herrenschmidt wrote:
-> On Wed, 2018-05-30 at 15:29 +0300, Felipe Balbi wrote:
->> Hi,
->>
->> Arnd Bergmann <arnd@arndb.de> writes:
->>> Without that option, we run into a link failure:
->>>
->>> drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
->>> hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
->>>
->>> Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+On 06/14/2018 11:27 AM, Jolly Shah wrote:
+> From: Rajan Vaja <rajanv@xilinx.com>
 > 
-> Greg, can you send this to Linus asap ? Some people are hitting build
-> breakages upstream because of this.
 
-Agreed.
+Hi,
 
-> Thanks !
+> diff --git a/drivers/firmware/xilinx/Kconfig b/drivers/firmware/xilinx/Kconfig
+> new file mode 100644
+> index 0000000..cce4e4f
+> --- /dev/null
+> +++ b/drivers/firmware/xilinx/Kconfig
+> @@ -0,0 +1,16 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +# Kconfig for Xilinx firmwares
+> +
+> +menu "Zynq MPSoC Firmware Drivers"
+> +	depends on ARCH_ZYNQMP
+> +
+> +config ZYNQMP_FIRMWARE
+> +	bool "Enable Xilinx Zynq MPSoC firmware interface"
+> +	help
+> +	  Firmware interface driver is used by different to
 
-ditto.
+used by different <what>?  Missing something there.
+
+> +	  communicate with the firmware for various platform
+> +	  management services.
+> +	  Say yes to enable ZynqMP firmware interface driver.
+> +	  In doubt, say N
+
+	  If in doubt, say N.
+
+> +
+> +endmenu
+
 
 -- 
 ~Randy
