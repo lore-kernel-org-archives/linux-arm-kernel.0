@@ -1,13 +1,13 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 14 Jun 2018 16:04:29 +0200
-Subject: [PATCH 4.16 25/43] serial: sh-sci: Stop using printk format %pCr
-In-Reply-To: <20180614132135.111973468@linuxfoundation.org>
-References: <20180614132135.111973468@linuxfoundation.org>
-Message-ID: <20180614132136.880991791@linuxfoundation.org>
+Date: Thu, 14 Jun 2018 16:04:41 +0200
+Subject: [PATCH 4.14 18/36] serial: sh-sci: Stop using printk format %pCr
+In-Reply-To: <20180614132157.333004166@linuxfoundation.org>
+References: <20180614132157.333004166@linuxfoundation.org>
+Message-ID: <20180614132158.085822615@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.16-stable review patch.  If anyone has any objections, please let me know.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -54,7 +54,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -2691,8 +2691,8 @@ found:
+@@ -2669,8 +2669,8 @@ found:
  			dev_dbg(dev, "failed to get %s (%ld)\n", clk_names[i],
  				PTR_ERR(clk));
  		else
