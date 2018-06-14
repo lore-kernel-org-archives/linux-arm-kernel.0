@@ -1,38 +1,117 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Jun 2018 16:20:01 +0200
-Subject: [PATCH] gpio: uniphier: set legitimate irq trigger type in
- .to_irq hook
-In-Reply-To: <1528954065-25563-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1528954065-25563-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYKO6BArTXzk9ms70AJrNC4kAk_ZyaNHUGJANwuBqqUtg@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 14 Jun 2018 08:21:38 -0600
+Subject: [PATCH v3 4/6] thermal: tsens: Add support for SDM845
+In-Reply-To: <0cdd0957cf80c2f9921928755722a427c7309964.1528972165.git.amit.kucheria@linaro.org>
+References: <cover.1528972165.git.amit.kucheria@linaro.org>
+ <0cdd0957cf80c2f9921928755722a427c7309964.1528972165.git.amit.kucheria@linaro.org>
+Message-ID: <CAL_JsqLPKktGFH4X9gDgCFq70Uo6NvFx9-a0sR7fQU35NwZe1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 7:27 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Thu, Jun 14, 2018 at 4:43 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> SDM845 uses the TSENS v2 IP block
+>
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/thermal/qcom-tsens.txt | 1 +
+>  arch/arm64/boot/dts/qcom/msm8996.dtsi                    | 2 +-
+>  drivers/thermal/qcom/tsens-v2.c                          | 9 ++++++++-
+>  drivers/thermal/qcom/tsens.c                             | 3 +++
+>  drivers/thermal/qcom/tsens.h                             | 5 ++++-
+>  5 files changed, 17 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+> index 06195e8..84da3db 100644
+> --- a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+> +++ b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+> @@ -5,6 +5,7 @@ Required properties:
+>   - "qcom,msm8916-tsens" : For 8916 Family of SoCs
+>   - "qcom,msm8974-tsens" : For 8974 Family of SoCs
+>   - "qcom,msm8996-tsens" : For 8996 Family of SoCs
+> + - "qcom,tsens-v2"      : For any SoC with v2 version of the tsens IP
 
-> If a GPIO chip is a part of a hierarchy IRQ domain, there is no
-> way to specify the trigger type when gpio(d)_to_irq() allocates an
-> interrupt on-the-fly.
->
-> Currently, uniphier_gpio_to_irq() sets IRQ_TYPE_NONE, but it causes
-> an error in the .alloc() hook of the parent domain.
-> (drivers/irq/irq-uniphier-aidet.c)
->
-> Even if we change irq-uniphier-aidet.c to accept the NONE type,
-> GIC complains about it since commit 83a86fbb5b56 ("irqchip/gic:
-> Loudly complain about the use of IRQ_TYPE_NONE").
->
-> Instead, use IRQ_TYPE_LEVEL_HIGH as a temporary value when an irq
-> is allocated.  irq_set_irq_type() will override it when the irq is
-> really requested.
->
-> Fixes: dbe776c2ca54 ("gpio: uniphier: add UniPhier GPIO controller driver")
-> Reported-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Tested-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Stick with "qcom,sdm845-tsens". Though perhaps it should be
+'"qcom,sdm845-tsens", "qcom,msm8996-tsens"' if there is compatibility.
 
-Patch applied for fixes!
+>
+>  - reg: Address range of the thermal registers
+>  - #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
+> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> index 6c8a857..28d4c08 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> @@ -460,7 +460,7 @@
+>                 };
+>
+>                 tsens0: thermal-sensor at 4a8000 {
+> -                       compatible = "qcom,msm8996-tsens";
+> +                       compatible = "qcom,msm8996-tsens", "qcom,tsens-v2";
 
-Yours,
-Linus Walleij
+There's no point to adding this now because you already have to
+support "qcom,msm8996-tsens".
+
+>                         reg = <0x4a9000 0x1000>, /* TM */
+>                               <0x4a8000 0x1000>; /* SROT */
+>                         #qcom,sensors = <13>;
+> diff --git a/drivers/thermal/qcom/tsens-v2.c b/drivers/thermal/qcom/tsens-v2.c
+> index c981a40..abc8f13 100644
+> --- a/drivers/thermal/qcom/tsens-v2.c
+> +++ b/drivers/thermal/qcom/tsens-v2.c
+> @@ -69,8 +69,15 @@ static const struct tsens_ops ops_v2 = {
+>         .get_temp       = get_temp_tsens_v2,
+>  };
+>
+> +const struct tsens_data data_tsens_v2 = {
+> +       .ops            = &ops_v2,
+> +};
+> +
+> +/* Kept around for backward compatibility with old msm8996.dtsi.
+> + * New platforms should use data_tsens_v2 if possible and define
+> + * the #qcom,sensors property in DT.
+
+Hum, I think this should just be implied by the compatible as it was.
+If this was the *only* difference, then a property would be okay, but
+as soon as you find some other difference you need yet another
+property and have to do a DT update on all platforms.
+
+> + */
+>  const struct tsens_data data_8996 = {
+>         .num_sensors    = 13,
+>         .ops            = &ops_v2,
+>  };
+> -
+> diff --git a/drivers/thermal/qcom/tsens.c b/drivers/thermal/qcom/tsens.c
+> index 3440166c..a2c9bfa 100644
+> --- a/drivers/thermal/qcom/tsens.c
+> +++ b/drivers/thermal/qcom/tsens.c
+> @@ -72,6 +72,9 @@ static const struct of_device_id tsens_table[] = {
+>         }, {
+>                 .compatible = "qcom,msm8996-tsens",
+>                 .data = &data_8996,
+> +       }, {
+> +               .compatible = "qcom,tsens-v2",
+> +               .data = &data_tsens_v2,
+
+Why different data if 8996 is compatible with v2?
+
+>         },
+>         {}
+>  };
+> diff --git a/drivers/thermal/qcom/tsens.h b/drivers/thermal/qcom/tsens.h
+> index dc56e1e..69212cb 100644
+> --- a/drivers/thermal/qcom/tsens.h
+> +++ b/drivers/thermal/qcom/tsens.h
+> @@ -87,6 +87,9 @@ void compute_intercept_slope(struct tsens_device *, u32 *, u32 *, u32);
+>  int init_common(struct tsens_device *);
+>  int get_temp_common(struct tsens_device *, int, int *);
+>
+> -extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
+> +/* TSENS v1 targets */
+> +extern const struct tsens_data data_8916, data_8974, data_8960;
+> +/* TSENS v2 targets */
+> +extern const struct tsens_data data_8996, data_tsens_v2;
+>
+>  #endif /* __QCOM_TSENS_H__ */
+> --
+> 2.7.4
+>
