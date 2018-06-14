@@ -1,45 +1,52 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 14 Jun 2018 13:56:05 +1000
-Subject: [PATCH 3/3] arm: dts: Update AST2400 device-tree
-In-Reply-To: <20180614035605.25286-1-benh@kernel.crashing.org>
-References: <20180614035605.25286-1-benh@kernel.crashing.org>
-Message-ID: <20180614035605.25286-3-benh@kernel.crashing.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 14 Jun 2018 14:27:45 +0900
+Subject: [PATCH] gpio: uniphier: set legitimate irq trigger type in .to_irq
+ hook
+Message-ID: <1528954065-25563-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing node for the CVIC (the coprocessor interrupt
-controller) and add a label to the SRAM node so it can be
-referenced from the board device-tree file.
+If a GPIO chip is a part of a hierarchy IRQ domain, there is no
+way to specify the trigger type when gpio(d)_to_irq() allocates an
+interrupt on-the-fly.
 
-Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Currently, uniphier_gpio_to_irq() sets IRQ_TYPE_NONE, but it causes
+an error in the .alloc() hook of the parent domain.
+(drivers/irq/irq-uniphier-aidet.c)
+
+Even if we change irq-uniphier-aidet.c to accept the NONE type,
+GIC complains about it since commit 83a86fbb5b56 ("irqchip/gic:
+Loudly complain about the use of IRQ_TYPE_NONE").
+
+Instead, use IRQ_TYPE_LEVEL_HIGH as a temporary value when an irq
+is allocated.  irq_set_irq_type() will override it when the irq is
+really requested.
+
+Fixes: dbe776c2ca54 ("gpio: uniphier: add UniPhier GPIO controller driver")
+Reported-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Tested-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 75df1573380e..435595534ec4 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -92,6 +92,11 @@
- 			reg = <0x1e6c0080 0x80>;
- 		};
+ drivers/gpio/gpio-uniphier.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpio/gpio-uniphier.c b/drivers/gpio/gpio-uniphier.c
+index d3cf950..58faeb1 100644
+--- a/drivers/gpio/gpio-uniphier.c
++++ b/drivers/gpio/gpio-uniphier.c
+@@ -181,7 +181,11 @@ static int uniphier_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
+ 	fwspec.fwnode = of_node_to_fwnode(chip->parent->of_node);
+ 	fwspec.param_count = 2;
+ 	fwspec.param[0] = offset - UNIPHIER_GPIO_IRQ_OFFSET;
+-	fwspec.param[1] = IRQ_TYPE_NONE;
++	/*
++	 * IRQ_TYPE_NONE is rejected by the parent irq domain. Set LEVEL_HIGH
++	 * temporarily. Anyway, ->irq_set_type() will override it later.
++	 */
++	fwspec.param[1] = IRQ_TYPE_LEVEL_HIGH;
  
-+		cvic: interrupt-controller at 1e6c2000 {
-+			compatible = "aspeed,ast2400-cvic";
-+			reg = <0x1e6c2000 0x80>;
-+		};
-+
- 		mac0: ethernet at 1e660000 {
- 			compatible = "aspeed,ast2400-mac", "faraday,ftgmac100";
- 			reg = <0x1e660000 0x180>;
-@@ -161,7 +166,7 @@
- 				status = "disabled";
- 			};
- 
--			sram at 1e720000 {
-+			sram: sram at 1e720000 {
- 				compatible = "mmio-sram";
- 				reg = <0x1e720000 0x8000>;	// 32K
- 			};
+ 	return irq_create_fwspec_mapping(&fwspec);
+ }
 -- 
-2.17.0
+2.7.4
