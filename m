@@ -1,63 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jun 2018 05:38:05 -0700
-Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
-In-Reply-To: <20180607233853.p7iw7nlxxuyi66og@kahuna>
-References: <20180605060510.32473-1-nm@ti.com>
- <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
- <20180607233853.p7iw7nlxxuyi66og@kahuna>
-Message-ID: <20180614123805.GF112168@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 14 Jun 2018 13:45:00 +0100
+Subject: [PATCH 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17
+In-Reply-To: <1528976039-25826-1-git-send-email-Dave.Martin@arm.com>
+References: <1528976039-25826-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180614124457.GM22983@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 14, 2018 at 12:33:55PM +0100, Dave Martin wrote:
+> This series contains fixes for some issues observed since the KVM arm64
+> pull request for 4.17.
 
-Some comments on the ranges below.
+*ahem*, that should read 4.18.
 
-* Nishanth Menon <nm@ti.com> [180607 16:41]:
-> +	soc0: soc0 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-
-I suggest you leave out the soc0, that's not real. Just make
-the cbass at 0 the top level interconnect. It can then provide
-ranges to mcu interconnect which can provide ranges to the wkup
-interconnect. So just model it after what's in the hardware :)
-
-I found the following ranges based on a quick look at the TRM,
-they could be split further if needed for power domains for
-genpd for example.
-
-main covers
-0x0000000000 - 0x5402000000
-
-main provides at least the following ranges for mcu
-0x0028380000 - 0x002bc00000
-0x0040080000 - 0x0041c80000
-0x0045100000 - 0x0045180000
-0x0045600000 - 0x0045640000
-0x0045810000 - 0x0045860000
-0x0045950000 - 0x0045950400
-0x0045a50000 - 0x0045a50400
-0x0045b04000 - 0x0045b06400
-0x0045d10000 - 0x0045d24000
-0x0046000000 - 0x0060000000
-0x0400000000 - 0x0800000000
-0x4c3c020000 - 0x4c3c030000
-0x4c3e000000 - 0x4c3e040000
-0x5400000000 - 0x5402000000
-
-then mcu provides the following ranges for wkup
-0x0042000000 - 0x0044410020
-0x0045000000 - 0x0045030000
-0x0045080000 - 0x00450a0000
-0x0045808000 - 0x0045808800
-0x0045b00000 - 0x0045b02400
-
-This based on looking at "figure 1-1. device top-level
-block diagram" and the memory map in TRM.
-
-Regards,
-
-Tony
+> The first patch (from Mark Rutland) adds a straightforward helper to
+> modify particular bits in a system register conditionally.  This is used
+> by patch 3 (though obviously it could be coded round and patch 1
+> dropped, if preferred).
+> 
+> See other patches for details of the individual fixes.
+> 
+> Dave Martin (3):
+>   KVM: arm64: Don't mask softirq with IRQs disabled in vcpu_put()
+>   KVM: arm64/sve: Fix SVE trap restoration for non-current tasks
+>   KVM: arm64: Avoid mistaken attempts to save SVE state for vcpus
+> 
+> Mark Rutland (1):
+>   arm64: introduce sysreg_clear_set()
+> 
+>  arch/arm64/include/asm/kvm_host.h |  1 +
+>  arch/arm64/include/asm/sysreg.h   | 11 ++++++++++
+>  arch/arm64/kvm/fpsimd.c           | 46 +++++++++++++++++++++++++++++----------
+>  3 files changed, 47 insertions(+), 11 deletions(-)
+> 
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
