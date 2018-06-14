@@ -1,41 +1,56 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Thu, 14 Jun 2018 11:04:34 +0200
-Subject: [PATCH] PCI: xilinx-nwl: add missing of_node_put()
-Message-ID: <1528967074-30024-1-git-send-email-hofrat@osadl.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 14 Jun 2018 09:53:46 +0100
+Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
+ bindings
+In-Reply-To: <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+ <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
+ <20180612204802.GA15817@rob-hp-laptop>
+ <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
+ <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
+ <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
+ <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+ <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
+ <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
+ <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+Message-ID: <5e013d65-9931-6b8d-ce7c-4333309d4ada@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- The call to of_get_next_child() returns a node pointer with
-refcount incremented thus it must be explicitly decremented
-here after the last usage.
+On 13/06/18 22:07, Matt Sealey wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>>> So, if the suggestion is to use an existing property "unit", I am fine
+>>> with it, if people agree to it.
+>>
+>> If we're going to have something sharply different than ACPI I prefer
+>> Rob's idea.
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: commit ab597d35ef11 ("PCI: xilinx-nwl: Add support for Xilinx NWL PCIe Host Controller")
----
+No, the above comment is about using "unit" ( if it is a standard property
+for specifying something specific to hardware) instead of "coresight,hwid".
+I would prefer to stick to the DT graph bindings, because :
 
-Problem found by an experimental cocinelle script
+1) The connections are bi-directional => Well, not necessarily bi-directional
+in terms of the data flow. But the connection information is critical. i.e,
+we need information about both the end-points of a connection, which the DT
+graph bindings solves.
 
-Patch was compile tested with: multi_v7_defconfig + ARCH_ZYNQ=y,
-COMPILE_TEST=y, PCIE_XILINX_NWL=y
-(one sparse warning though not related to the change proposed though)
+All we are missing is a way for specifying the "hardware port" number and the
+direction of flow. I don't see why do we need to create something new just for
+these two properties for something that exists today and works reasonably well
+for the usecase.
 
-Patch is against 4.17.0 (localversion-next is next-20180613)
+> 
+> What are you trying to say about being sharply different than ACPI?
 
- drivers/pci/controller/pcie-xilinx-nwl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The proposed Coresight ACPI draft bindings are based on the ACPI Graph bindings
+(just like the DT graph bindings and is compatible with it, in terms of the APIs.
+i.e, fwnode_graph_* operations work for both ACPI and DT  alike).
 
-diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
-index 6a4bbb5..fb32840 100644
---- a/drivers/pci/controller/pcie-xilinx-nwl.c
-+++ b/drivers/pci/controller/pcie-xilinx-nwl.c
-@@ -559,7 +559,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
- 							PCI_NUM_INTX,
- 							&legacy_domain_ops,
- 							pcie);
--
-+	of_node_put(legacy_intc_node);
- 	if (!pcie->legacy_irq_domain) {
- 		dev_err(dev, "failed to create IRQ domain\n");
- 		return -ENOMEM;
--- 
-2.1.4
+So, what Mathieu, in turn means is, if we depart from the DT Graph bindings, which
+I personally don't see any benefit in.
+
+Suzuki
