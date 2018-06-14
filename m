@@ -1,100 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Jun 2018 07:59:33 -0600
-Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
- bindings
-In-Reply-To: <5e013d65-9931-6b8d-ce7c-4333309d4ada@arm.com>
-References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
- <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
- <20180612204802.GA15817@rob-hp-laptop>
- <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
- <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
- <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
- <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
- <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
- <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
- <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
- <5e013d65-9931-6b8d-ce7c-4333309d4ada@arm.com>
-Message-ID: <CAL_Jsq+0kExVY33kdDoR6bAxbr2VzRUzW2j0k+2wmv4CSNVnpQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 14 Jun 2018 16:04:16 +0200
+Subject: [PATCH 4.17 25/45] serial: sh-sci: Stop using printk format %pCr
+In-Reply-To: <20180614132126.797006529@linuxfoundation.org>
+References: <20180614132126.797006529@linuxfoundation.org>
+Message-ID: <20180614132128.135775884@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 2:53 AM, Suzuki K Poulose
-<Suzuki.Poulose@arm.com> wrote:
-> On 13/06/18 22:07, Matt Sealey wrote:
->>
->>
->>
->>> -----Original Message-----
->>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>
->>>> So, if the suggestion is to use an existing property "unit", I am fine
->>>> with it, if people agree to it.
->>>
->>>
->>> If we're going to have something sharply different than ACPI I prefer
->>> Rob's idea.
->
->
-> No, the above comment is about using "unit" ( if it is a standard property
-> for specifying something specific to hardware) instead of "coresight,hwid".
-> I would prefer to stick to the DT graph bindings, because :
+4.17-stable review patch.  If anyone has any objections, please let me know.
 
-"unit" is not a standard property and I don't like it either.
+------------------
 
->
-> 1) The connections are bi-directional => Well, not necessarily
-> bi-directional
-> in terms of the data flow. But the connection information is critical. i.e,
-> we need information about both the end-points of a connection, which the DT
-> graph bindings solves.
->
-> All we are missing is a way for specifying the "hardware port" number and
-> the
-> direction of flow. I don't see why do we need to create something new just
-> for
-> these two properties for something that exists today and works reasonably
-> well
-> for the usecase.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-If you have "in-ports" and "out-ports" nodes, then that gives you
-direction and you can use reg for the "hardware port".
+commit d63c16f8e1ab761775275adcf54f4bef7c330295 upstream.
 
-in-ports {
-  port at 0 {
-    reg = <0>;
-    endpoint {...};
-  };
-  port at 1 {
-    reg = <1>;
-    endpoint {...};
-  };
-};
-out-ports {
-  port at 0 {
-    reg = <0>;
-    endpoint {...};
-  };
-};
+Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+called in atomic context.
 
-I'll need to check, but dtc may need an update to not warn about this.
+Replace it by open-coding the operation.  This is safe here, as the code
+runs in task context.
 
->
->>
->> What are you trying to say about being sharply different than ACPI?
->
->
-> The proposed Coresight ACPI draft bindings are based on the ACPI Graph
-> bindings
-> (just like the DT graph bindings and is compatible with it, in terms of the
-> APIs.
-> i.e, fwnode_graph_* operations work for both ACPI and DT  alike).
->
-> So, what Mathieu, in turn means is, if we depart from the DT Graph bindings,
-> which
-> I personally don't see any benefit in.
+Link: http://lkml.kernel.org/r/1527845302-12159-4-git-send-email-geert+renesas at glider.be
+To: Jia-Ju Bai <baijiaju1990@gmail.com>
+To: Jonathan Corbet <corbet@lwn.net>
+To: Michael Turquette <mturquette@baylibre.com>
+To: Stephen Boyd <sboyd@kernel.org>
+To: Zhang Rui <rui.zhang@intel.com>
+To: Eduardo Valentin <edubezval@gmail.com>
+To: Eric Anholt <eric@anholt.net>
+To: Stefan Wahren <stefan.wahren@i2se.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>
+Cc: Petr Mladek <pmladek@suse.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: linux-doc at vger.kernel.org
+Cc: linux-clk at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-serial at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-renesas-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: stable at vger.kernel.org # 4.5+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Petr Mladek <pmladek@suse.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-If DT bindings can be reused for ACPI, that's fine, but don't expect
-any DT bindings to be accepted simply because they match ACPI
-bindings.
+---
+ drivers/tty/serial/sh-sci.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Rob
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -2704,8 +2704,8 @@ found:
+ 			dev_dbg(dev, "failed to get %s (%ld)\n", clk_names[i],
+ 				PTR_ERR(clk));
+ 		else
+-			dev_dbg(dev, "clk %s is %pC rate %pCr\n", clk_names[i],
+-				clk, clk);
++			dev_dbg(dev, "clk %s is %pC rate %lu\n", clk_names[i],
++				clk, clk_get_rate(clk));
+ 		sci_port->clks[i] = IS_ERR(clk) ? NULL : clk;
+ 	}
+ 	return 0;
