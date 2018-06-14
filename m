@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 14 Jun 2018 11:49:51 +0200
+Date: Thu, 14 Jun 2018 11:50:10 +0200
 Subject: Patch "serial: sh-sci: Stop using printk format %pCr" has been added
- to the 4.16-stable tree
-Message-ID: <152896979196201@kroah.com>
+ to the 4.17-stable tree
+Message-ID: <152896981015898@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     serial: sh-sci: Stop using printk format %pCr
 
-to the 4.16-stable tree which can be found at:
+to the 4.17-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      serial-sh-sci-stop-using-printk-format-pcr.patch
-and it can be found in the queue-4.16 subdirectory.
+and it can be found in the queue-4.17 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -70,7 +70,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -2691,8 +2691,8 @@ found:
+@@ -2704,8 +2704,8 @@ found:
  			dev_dbg(dev, "failed to get %s (%ld)\n", clk_names[i],
  				PTR_ERR(clk));
  		else
@@ -85,4 +85,4 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from geert+renesas at glider.be are
 
-queue-4.16/serial-sh-sci-stop-using-printk-format-pcr.patch
+queue-4.17/serial-sh-sci-stop-using-printk-format-pcr.patch
