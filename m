@@ -1,227 +1,217 @@
-From: ilia.lin@gmail.com (ilia.lin at gmail.com)
-Date: Thu, 14 Jun 2018 23:53:55 +0200
-Subject: [PATCH v13 8/8] clk: qcom: Add ACD path to CPU clock driver for
- msm8996
-In-Reply-To: <20180614215358.11264-1-ilia.lin@gmail.com>
-References: <20180614215358.11264-1-ilia.lin@gmail.com>
-Message-ID: <20180614215358.11264-9-ilia.lin@gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Fri, 15 Jun 2018 00:16:49 +0200
+Subject: [PATCH 4/10 v2] Input: ams_delta_serio: Replace power GPIO with
+ regulator
+In-Reply-To: <20180613205144.GB62746@dtor-ws>
+References: <20180613205144.GB62746@dtor-ws>
+Message-ID: <20180614221649.12850-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ilia Lin <ilialin@codeaurora.org>
+Modify the driver so it no longer requests and manipulates the
+"keybrd_pwr" GPIO pin but a "vcc" regulator supply instead.
 
-The PMUX for each duplex allows for selection of ACD clock source.
-The DVM (Dynamic Variation Monitor) will flag an error
-when a voltage droop event is detected. This flagged error
-enables ACD to provide a div-by-2 clock, sourced from the primary PLL.
-The duplex will be provided the divided clock
-until a pre-programmed delay has expired.
+For this to work with Amstrad Delta, define a regulator over the
+"keybrd_pwr" GPIO pin with the "vcc" supply for ams-delta-serio device
+and register it from the board file.  Both assign an absulute GPIO
+number to the soon depreciated .gpio member of the regulator config
+structure, and also build and register a GPIO lookup table so it is
+ready for use by the regulator driver as soon as its upcoming update
+is applied.
 
-This change configures ACD during the probe and switches
-the PMUXes to the ACD clock source.
-
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- drivers/clk/qcom/clk-cpu-8996.c | 75 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 65 insertions(+), 10 deletions(-)
+Changelog:
+v2: Extend the comment above error code conversion, thanks Dmitry for 
+    requesting that.
 
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index ff5c0a5740d2..0a908d849cda 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -53,9 +53,11 @@
-  */
+If you prefer me to resubmit the whole series as v2, please let me know.
+In that case, I'll also add the patch which moves substitution of IRQ
+handler out of the driver and submit complete v2 as soon as I get access
+to the device (next weekend) and can test that extra change, otherwise
+I'll submit it as a separate patch.
+
+Thanks,
+Janusz
+
+
+ arch/arm/mach-omap1/board-ams-delta.c | 63 +++++++++++++++++++++++++++++++++--
+ drivers/input/serio/ams_delta_serio.c | 37 +++++++++++++++-----
+ 2 files changed, 89 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 2119d2d3ba84..706eb2f9301d 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -509,6 +509,46 @@ static struct platform_device ams_delta_serio_device = {
+ 	.id		= PLATFORM_DEVID_NONE,
+ };
  
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/module.h>
++static struct regulator_consumer_supply keybrd_pwr_consumers[] = {
++	/*
++	 * Initialize supply .dev_name with NULL.  It will be replaced
++	 * with serio dev_name() as soon as the serio device is registered.
++	 */
++	REGULATOR_SUPPLY("vcc", NULL),
++};
++
++static struct regulator_init_data keybrd_pwr_initdata = {
++	.constraints		= {
++		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(keybrd_pwr_consumers),
++	.consumer_supplies	= keybrd_pwr_consumers,
++};
++
++static struct fixed_voltage_config keybrd_pwr_config = {
++	.supply_name		= "keybrd_pwr",
++	.microvolts		= 5000000,
++	.gpio			= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
++	.enable_high		= 1,
++	.init_data		= &keybrd_pwr_initdata,
++};
++
++static struct platform_device keybrd_pwr_device = {
++	.name	= "reg-fixed-voltage",
++	.id	= PLATFORM_DEVID_AUTO,
++	.dev	= {
++		.platform_data	= &keybrd_pwr_config,
++	},
++};
++
++static struct gpiod_lookup_table keybrd_pwr_gpio_table = {
++	.table = {
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_KEYBRD_PWR, NULL,
++			    GPIO_ACTIVE_HIGH),
++		{ },
++	},
++};
++
+ static struct platform_device *ams_delta_devices[] __initdata = {
+ 	&latch1_gpio_device,
+ 	&latch2_gpio_device,
+@@ -526,6 +566,7 @@ static struct platform_device *late_devices[] __initdata = {
+ 
+ static struct gpiod_lookup_table *ams_delta_gpio_tables[] __initdata = {
+ 	&ams_delta_audio_gpio_table,
++	&keybrd_pwr_gpio_table,
+ };
+ 
+ static struct gpiod_lookup_table *late_gpio_tables[] __initdata = {
+@@ -566,12 +607,30 @@ static void __init ams_delta_init(void)
+ 	platform_add_devices(ams_delta_devices, ARRAY_SIZE(ams_delta_devices));
+ 
+ 	/*
+-	 * As soon as devices have been registered, assign their dev_names
+-	 * to respective GPIO lookup tables before they are added.
++	 * As soon as regulator consumers have been registered, assign their
++	 * dev_names to consumer supply entries of respective regulators.
++	 */
++	keybrd_pwr_consumers[0].dev_name =
++			dev_name(&ams_delta_serio_device.dev);
++
++	/*
++	 * Once consumer supply entries are populated with dev_names,
++	 * register regulator devices.  At this stage only the keyboard
++	 * power regulator has its consumer supply table fully populated.
++	 */
++	platform_device_register(&keybrd_pwr_device);
++
++	/*
++	 * As soon as GPIO consumers have been registered, assign
++	 * their dev_names to respective GPIO lookup tables.
+ 	 */
+ 	ams_delta_audio_gpio_table.dev_id =
+ 			dev_name(&ams_delta_audio_device.dev);
++	keybrd_pwr_gpio_table.dev_id = dev_name(&keybrd_pwr_device.dev);
+ 
++	/*
++	 * Once GPIO lookup tables are populated with dev_names, register them.
++	 */
+ 	gpiod_add_lookup_tables(ams_delta_gpio_tables,
+ 				ARRAY_SIZE(ams_delta_gpio_tables));
+ 
+diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+index 551a4fa73fe4..854d0d3ada52 100644
+--- a/drivers/input/serio/ams_delta_serio.c
++++ b/drivers/input/serio/ams_delta_serio.c
+@@ -23,6 +23,7 @@
+ #include <linux/gpio.h>
+ #include <linux/irq.h>
  #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <soc/qcom/kryo-l2-accessors.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/serio.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+@@ -39,6 +40,7 @@ MODULE_LICENSE("GPL");
  
- #include "clk-alpha-pll.h"
- #include "clk-regmap.h"
-@@ -69,6 +71,11 @@ enum _pmux_input {
+ struct ams_delta_serio {
+ 	struct serio *serio;
++	struct regulator *vcc;
  };
  
- #define DIV_2_THRESHOLD		600000000
-+#define PWRCL_REG_OFFSET 0x0
-+#define PERFCL_REG_OFFSET 0x80000
-+#define MUX_OFFSET	0x40
-+#define ALT_PLL_OFFSET	0x100
-+#define SSSCTL_OFFSET 0x160
+ static int check_data(struct serio *serio, int data)
+@@ -94,16 +96,18 @@ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
  
- static const u8 prim_pll_regs[PLL_OFF_MAX_REGS] = {
-        [PLL_OFF_L_VAL] = 0x04,
-@@ -107,7 +114,7 @@ static const struct alpha_pll_config hfpll_config = {
- };
+ static int ams_delta_serio_open(struct serio *serio)
+ {
+-	/* enable keyboard */
+-	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 1);
++	struct ams_delta_serio *priv = serio->port_data;
  
- static struct clk_alpha_pll perfcl_pll = {
--	.offset = 0x80000,
-+	.offset = PERFCL_REG_OFFSET,
- 	.regs = prim_pll_regs,
- 	.flags = SUPPORTS_DYNAMIC_UPDATE | SUPPORTS_FSM_MODE,
- 	.clkr.hw.init = &(struct clk_init_data){
-@@ -119,7 +126,7 @@ static struct clk_alpha_pll perfcl_pll = {
- };
- 
- static struct clk_alpha_pll pwrcl_pll = {
--	.offset = 0x0,
-+	.offset = PWRCL_REG_OFFSET,
- 	.regs = prim_pll_regs,
- 	.flags = SUPPORTS_DYNAMIC_UPDATE | SUPPORTS_FSM_MODE,
- 	.clkr.hw.init = &(struct clk_init_data){
-@@ -149,7 +156,7 @@ static const struct alpha_pll_config altpll_config = {
- };
- 
- static struct clk_alpha_pll perfcl_alt_pll = {
--	.offset = 0x80100,
-+	.offset = PERFCL_REG_OFFSET + ALT_PLL_OFFSET,
- 	.regs = alt_pll_regs,
- 	.vco_table = alt_pll_vco_modes,
- 	.num_vco = ARRAY_SIZE(alt_pll_vco_modes),
-@@ -163,7 +170,7 @@ static struct clk_alpha_pll perfcl_alt_pll = {
- };
- 
- static struct clk_alpha_pll pwrcl_alt_pll = {
--	.offset = 0x100,
-+	.offset = PWRCL_REG_OFFSET + ALT_PLL_OFFSET,
- 	.regs = alt_pll_regs,
- 	.vco_table = alt_pll_vco_modes,
- 	.num_vco = ARRAY_SIZE(alt_pll_vco_modes),
-@@ -176,6 +183,9 @@ static struct clk_alpha_pll pwrcl_alt_pll = {
- 	},
- };
- 
-+void __iomem *base;
-+static void qcom_cpu_clk_msm8996_acd_init(void __iomem *base);
-+
- /* Mux'es */
- 
- struct clk_cpu_8996_mux {
-@@ -253,6 +263,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	switch (event) {
- 	case PRE_RATE_CHANGE:
- 		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
-+		qcom_cpu_clk_msm8996_acd_init(base);
- 		break;
- 	case POST_RATE_CHANGE:
- 		if (cnd->new_rate < DIV_2_THRESHOLD)
-@@ -260,7 +271,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 							  DIV_2_INDEX);
- 		else
- 			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
--							  PLL_INDEX);
-+							  ACD_INDEX);
- 		break;
- 	default:
- 		ret = 0;
-@@ -276,7 +287,7 @@ const struct clk_ops clk_cpu_8996_mux_ops = {
- };
- 
- static struct clk_cpu_8996_mux pwrcl_smux = {
--	.reg = 0x40,
-+	.reg = PWRCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 2,
- 	.width = 2,
- 	.clkr.hw.init = &(struct clk_init_data) {
-@@ -292,7 +303,7 @@ static struct clk_cpu_8996_mux pwrcl_smux = {
- };
- 
- static struct clk_cpu_8996_mux perfcl_smux = {
--	.reg = 0x80040,
-+	.reg = PERFCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 2,
- 	.width = 2,
- 	.clkr.hw.init = &(struct clk_init_data) {
-@@ -308,7 +319,7 @@ static struct clk_cpu_8996_mux perfcl_smux = {
- };
- 
- static struct clk_cpu_8996_mux pwrcl_pmux = {
--	.reg = 0x40,
-+	.reg = PWRCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &pwrcl_pll.clkr.hw,
-@@ -329,7 +340,7 @@ static struct clk_cpu_8996_mux pwrcl_pmux = {
- };
- 
- static struct clk_cpu_8996_mux perfcl_pmux = {
--	.reg = 0x80040,
-+	.reg = PERFCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &perfcl_pll.clkr.hw,
-@@ -393,6 +404,10 @@ qcom_cpu_clk_msm8996_register_clks(struct device *dev, struct regmap *regmap)
- 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
- 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
- 
-+	/* Enable alt PLLs */
-+	clk_prepare_enable(pwrcl_alt_pll.clkr.hw.clk);
-+	clk_prepare_enable(perfcl_alt_pll.clkr.hw.clk);
-+
- 	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
- 	if (ret)
- 		return ret;
-@@ -402,10 +417,48 @@ qcom_cpu_clk_msm8996_register_clks(struct device *dev, struct regmap *regmap)
- 	return ret;
+-	return 0;
++	/* enable keyboard */
++	return regulator_enable(priv->vcc);
  }
  
-+#define CPU_AFINITY_MASK 0xFFF
-+#define PWRCL_CPU_REG_MASK 0x3
-+#define PERFCL_CPU_REG_MASK 0x103
-+
-+#define L2ACDCR_REG 0x580ULL
-+#define L2ACDTD_REG 0x581ULL
-+#define L2ACDDVMRC_REG 0x584ULL
-+#define L2ACDSSCR_REG 0x589ULL
-+
-+static DEFINE_SPINLOCK(acd_lock);
-+
-+static void qcom_cpu_clk_msm8996_acd_init(void __iomem *base)
-+{
-+	u64 hwid;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&acd_lock, flags);
-+
-+	hwid = read_cpuid_mpidr() & CPU_AFINITY_MASK;
-+
-+	kryo_l2_set_indirect_reg(L2ACDTD_REG, 0x00006A11);
-+	kryo_l2_set_indirect_reg(L2ACDDVMRC_REG, 0x000E0F0F);
-+	kryo_l2_set_indirect_reg(L2ACDSSCR_REG, 0x00000601);
-+
-+	if (PWRCL_CPU_REG_MASK == (hwid | PWRCL_CPU_REG_MASK)) {
-+		writel(0xF, base + PWRCL_REG_OFFSET + SSSCTL_OFFSET);
-+		wmb();
-+		kryo_l2_set_indirect_reg(L2ACDCR_REG, 0x002C5FFD);
-+	}
-+
-+	if (PERFCL_CPU_REG_MASK == (hwid | PERFCL_CPU_REG_MASK)) {
-+		kryo_l2_set_indirect_reg(L2ACDCR_REG, 0x002C5FFD);
-+		writel(0xF, base + PERFCL_REG_OFFSET + SSSCTL_OFFSET);
-+		wmb();
-+	}
-+
-+	spin_unlock_irqrestore(&acd_lock, flags);
-+}
-+
- static int qcom_cpu_clk_msm8996_driver_probe(struct platform_device *pdev)
+ static void ams_delta_serio_close(struct serio *serio)
  {
- 	int ret;
--	void __iomem *base;
- 	struct resource *res;
- 	struct regmap *regmap;
- 	struct clk_hw_onecell_data *data;
-@@ -429,6 +482,8 @@ static int qcom_cpu_clk_msm8996_driver_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	qcom_cpu_clk_msm8996_acd_init(base);
++	struct ams_delta_serio *priv = serio->port_data;
 +
- 	data->hws[0] = &pwrcl_pmux.clkr.hw;
- 	data->hws[1] = &perfcl_pmux.clkr.hw;
- 	data->num = 2;
+ 	/* disable keyboard */
+-	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 0);
++	regulator_disable(priv->vcc);
+ }
+ 
+ static const struct gpio ams_delta_gpios[] __initconst_or_module = {
+@@ -117,11 +121,6 @@ static const struct gpio ams_delta_gpios[] __initconst_or_module = {
+ 		.flags	= GPIOF_DIR_IN,
+ 		.label	= "serio-clock",
+ 	},
+-	{
+-		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
+-		.flags	= GPIOF_OUT_INIT_LOW,
+-		.label	= "serio-power",
+-	},
+ 	{
+ 		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
+ 		.flags	= GPIOF_OUT_INIT_LOW,
+@@ -146,6 +145,26 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ 		goto serio;
+ 	}
+ 
++	priv->vcc = devm_regulator_get(&pdev->dev, "vcc");
++	if (IS_ERR(priv->vcc)) {
++		err = PTR_ERR(priv->vcc);
++		dev_err(&pdev->dev, "regulator request failed (%d)\n", err);
++		/*
++		 * When running on a non-dt platform and requested regulator
++		 * is not available, devm_regulator_get() never returns
++		 * -EPROBE_DEFER as it is not able to justify if the regulator
++		 * may still appear later.  On the other hand, the board can
++		 * still set full constriants flag at late_initcall in order
++		 * to instruct devm_regulator_get() to returnn a dummy one
++		 * if sufficient.  Hence, if we get -ENODEV here, let's convert
++		 * it to -EPROBE_DEFER and wait for the board to decide or
++		 * let Deferred Probe infrastructure handle this error.
++		 */
++		if (err == -ENODEV)
++			err = -EPROBE_DEFER;
++		goto gpio;
++	}
++
+ 	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+ 			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
+ 			DRIVER_NAME, priv);
 -- 
-2.11.0
+2.16.1
