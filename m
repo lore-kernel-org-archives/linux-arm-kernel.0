@@ -1,74 +1,84 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 15 Jun 2018 10:15:54 +0200
-Subject: [PATCH] crypto: sun4i-ss: prevent deadlock on emulated hardware
-In-Reply-To: <20180615075754.b3ivyagjsomiafwk@flea>
-References: <20180614193659.29261-1-clabbe.montjoie@gmail.com>
- <20180615075754.b3ivyagjsomiafwk@flea>
-Message-ID: <20180615081554.GA3047@Red>
+From: h.grohne@intenta.de (Helmut Grohne)
+Date: Fri, 15 Jun 2018 10:18:32 +0200
+Subject: [PATCH v2] mmc: sdhci-of-arasan: Add quirk for unstable clocks
+In-Reply-To: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
+References: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
+Message-ID: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 09:57:54AM +0200, Maxime Ripard wrote:
-> On Thu, Jun 14, 2018 at 09:36:59PM +0200, Corentin Labbe wrote:
-> > Running a qemu emulated cubieboard with sun4i-ss driver enabled led to a never
-> > ending boot.
-> > This is due to sun4i-ss deadlocked and taking all cpu in an infinite loop.
-> > Since the crypto hardware is not implemented, all registers are read as 0.
-> > So sun4i-ss will never progress in any operations. (TX_CNT being always 0)
-> > 
-> > The first idea is to add a "TX_CNT always zero timeout" but this made cipher/hash loops
-> > more complex and prevent a case that never happen on real hardware.
-> > 
-> > The best way to fix is to check at probe time if we run on a virtual
-> > machine with hardware emulated but non-implemented and prevent
-> > sun4i-ss to be loaded in that case.
-> > Letting sun4i-ss to load is useless anyway since all crypto algorithm will be
-> > disabled since they will fail crypto selftests.
-> > 
-> > Tested-on: qemu-cubieboard
-> > Tested-on: cubieboard2
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> > index a81d89b3b7d8..a178e80adcf3 100644
-> > --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> > @@ -341,9 +341,18 @@ static int sun4i_ss_probe(struct platform_device *pdev)
-> >  	 * I expect to be a sort of Security System Revision number.
-> >  	 * Since the A80 seems to have an other version of SS
-> >  	 * this info could be useful
-> > +	 * Detect virtual machine with non-implemented hardware
-> > +	 * (qemu-cubieboard) by checking the register value after a write to it.
-> > +	 * On non-implemented hardware, all registers are read as 0.
-> > +	 * On real hardware we should have a value > 0.
-> >  	 */
-> >  	writel(SS_ENABLED, ss->base + SS_CTL);
-> >  	v = readl(ss->base + SS_CTL);
-> > +	if (!v) {
-> > +		dev_err(&pdev->dev, "Qemu with non-implemented SS detected.\n");
-> > +		err = -ENODEV;
-> > +		goto error_rst;
-> > +	}
-> 
-> This is wrong way to tackle the issue. There's multiple reason why
-> this could happen (for example the device not being clocked, or
-> maintained in reset). There's nothing specific about qemu here, and
-> the fundamental issue isn't that the device isn't functional in qemu,
-> it's that qemu lies about which hardware it can emulate in the DT it
-> passes to the kernel.
-> 
-> There's no way this can scale, alone from the fact that qemu should
-> patch the DT according to what it can do. Not trying to chase after
-> each and every device that is broken in qemu.
-> 
-> NAK.
-> 
+Some controllers immediately report SDHCI_CLOCK_INT_STABLE after
+enabling the clock even when the clock is not stable. When used in
+conjunction with older/slower cards, this can result in:
 
-My fix detect also when the device is badly clocked.
-So since it could fix problem unrelated to qemu, I will send a V2 with updated comment.
+    mmc0: error -84 whilst initialising SD card
 
-Regards
+When the stable reporting is broken, we simply wait for the maximum
+stabilization period.
+
+Signed-off-by: Helmut Grohne <h.grohne@intenta.de>
+---
+ Documentation/devicetree/bindings/mmc/arasan,sdhci.txt |  2 ++
+ drivers/mmc/host/sdhci-of-arasan.c                     | 16 ++++++++++++++++
+ 2 files changed, 18 insertions(+)
+
+Changes since v1 (RFC):
+ * Use an arasan-specific quirk in the ->set_clock() callback as requested by
+   Adrian Hunter.
+
+diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index 60481bfc3d31..c0e0f04a8504 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -39,6 +39,8 @@ Optional Properties:
+   - xlnx,fails-without-test-cd: when present, the controller doesn't work when
+     the CD line is not connected properly, and the line is not connected
+     properly. Test mode can be used to force the controller to function.
++  - xlnx,int-clock-stable-broken: when present, the controller always reports
++    that the internal clock is stable even when it is not.
+ 
+ Example:
+ 	sdhci at e0100000 {
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index c33a5f7393bd..f7fe26c75150 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -102,6 +102,9 @@ struct sdhci_arasan_data {
+ 
+ /* Controller does not have CD wired and will not function normally without */
+ #define SDHCI_ARASAN_QUIRK_FORCE_CDTEST	BIT(0)
++/* Controller immediately reports SDHCI_CLOCK_INT_STABLE after enabling the
++ * internal clock even when the clock isn't stable */
++#define SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE BIT(1)
+ };
+ 
+ static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
+@@ -207,6 +210,16 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+ 
+ 	sdhci_set_clock(host, clock);
+ 
++	if (sdhci_arasan->quirks & SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE)
++		/*
++		 * Some controllers immediately report SDHCI_CLOCK_INT_STABLE
++		 * after enabling the clock even though the clock is not
++		 * stable. Trying to use a clock without waiting here results
++		 * in EILSEQ while detecting some older/slower cards. The
++		 * chosen delay is the maximum delay from sdhci_set_clock.
++		 */
++		msleep(20);
++
+ 	if (ctrl_phy) {
+ 		phy_power_on(sdhci_arasan->phy);
+ 		sdhci_arasan->is_phy_on = true;
+@@ -759,6 +772,9 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 	if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
+ 		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+ 
++	if (of_property_read_bool(np, "xlnx,int-clock-stable-broken"))
++		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE;
++
+ 	pltfm_host->clk = clk_xin;
+ 
+ 	if (of_device_is_compatible(pdev->dev.of_node,
+-- 
+2.11.0
