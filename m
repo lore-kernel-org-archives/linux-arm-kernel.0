@@ -1,55 +1,38 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 15 Jun 2018 23:14:03 +0800
-Subject: [PATCH v2] crypto: arm64/aes-blk - fix and move
- skcipher_walk_done out of kernel_neon_begin,_end
-In-Reply-To: <1528443704-26850-1-git-send-email-hejianet@gmail.com>
-Message-ID: <20180615151403.cdvalbmdrt7gnodk@gondor.apana.org.au>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 15 Jun 2018 16:47:22 +0100
+Subject: [PATCH v2 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17
+Message-ID: <1529077646-2848-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jia He <hejianet@gmail.com> wrote:
-> In a arm64 server(QDF2400),I met a similar might-sleep warning as [1]:
-> [    7.019116] BUG: sleeping function called from invalid context at
-> ./include/crypto/algapi.h:416
-> [    7.027863] in_atomic(): 1, irqs_disabled(): 0, pid: 410, name:
-> cryptomgr_test
-> [    7.035106] 1 lock held by cryptomgr_test/410:
-> [    7.039549]  #0:         (ptrval) (&drbg->drbg_mutex){+.+.}, at:
-> drbg_instantiate+0x34/0x398
-> [    7.048038] CPU: 9 PID: 410 Comm: cryptomgr_test Not tainted
-> 4.17.0-rc6+ #27
-> [    7.068228]  dump_backtrace+0x0/0x1c0
-> [    7.071890]  show_stack+0x24/0x30
-> [    7.075208]  dump_stack+0xb0/0xec
-> [    7.078523]  ___might_sleep+0x160/0x238
-> [    7.082360]  skcipher_walk_done+0x118/0x2c8
-> [    7.086545]  ctr_encrypt+0x98/0x130
-> [    7.090035]  simd_skcipher_encrypt+0x68/0xc0
-> [    7.094304]  drbg_kcapi_sym_ctr+0xd4/0x1f8
-> [    7.098400]  drbg_ctr_update+0x98/0x330
-> [    7.102236]  drbg_seed+0x1b8/0x2f0
-> [    7.105637]  drbg_instantiate+0x2ac/0x398
-> [    7.109646]  drbg_kcapi_seed+0xbc/0x188
-> [    7.113482]  crypto_rng_reset+0x4c/0xb0
-> [    7.117319]  alg_test_drbg+0xec/0x330
-> [    7.120981]  alg_test.part.6+0x1c8/0x3c8
-> [    7.124903]  alg_test+0x58/0xa0
-> [    7.128044]  cryptomgr_test+0x50/0x58
-> [    7.131708]  kthread+0x134/0x138
-> [    7.134936]  ret_from_fork+0x10/0x1c
-> 
-> Seems there is a bug in Ard Biesheuvel's commit.
-> Fixes: 683381747270 ("crypto: arm64/aes-blk - move kernel mode neon
-> en/disable into loop")
-> 
-> [1] https://www.spinics.net/lists/linux-crypto/msg33103.html
-> 
-> Signed-off-by: jia.he at hxt-semitech.com
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: <stable@vger.kernel.org> # 4.17
+This series contains fixes for some issues observed since the KVM arm64
+pull request for 4.17.
 
-Patch applied.  Thanks.
+It supersedes the previous v1 [1].
+
+The first patch (from Mark Rutland) adds a straightforward helper to
+modify particular bits in a system register conditionally.  This is used
+by patch 3 (though obviously it could be coded round and patch 1
+dropped, if preferred).
+
+See other patches for details of the individual fixes and changes from
+the previous posting.
+
+[1] [PATCH 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584107.html
+
+Dave Martin (3):
+  KVM: arm64: Don't mask softirq with IRQs disabled in vcpu_put()
+  KVM: arm64/sve: Fix SVE trap restoration for non-current tasks
+  KVM: arm64: Avoid mistaken attempts to save SVE state for vcpus
+
+Mark Rutland (1):
+  arm64: introduce sysreg_clear_set()
+
+ arch/arm64/include/asm/kvm_host.h |  1 +
+ arch/arm64/include/asm/sysreg.h   | 11 +++++++++++
+ arch/arm64/kvm/fpsimd.c           | 36 +++++++++++++++++++++++++++---------
+ 3 files changed, 39 insertions(+), 9 deletions(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.1.4
