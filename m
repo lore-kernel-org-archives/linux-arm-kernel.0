@@ -1,39 +1,97 @@
 From: ben.whitten@gmail.com (Ben Whitten)
-Date: Fri, 15 Jun 2018 14:40:50 +0100
-Subject: [PATCH v2 1/6] dt-bindings: add laird and giantec vendor prefix
-Message-ID: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
+Date: Fri, 15 Jun 2018 14:40:51 +0100
+Subject: [PATCH v2 2/6] arm: dts: at91: add labels to soc dtsi for derivative
+ boards
+In-Reply-To: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
+References: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
+Message-ID: <1529070055-18701-2-git-send-email-ben.whitten@lairdtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a vendor prefix "laird" for Laird PLC who make
-CPU modules and system on chips.
-Also adds "giantec" for Giantec Semiconductor, Inc. who
-make eeprom memory used on Laird designs.
+This adds labels to commonly used device-tree nodes so that derivative
+boards can avoid ahb/apb hierarchy.
 
 Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/at91sam9x5.dtsi | 8 ++++----
+ arch/arm/boot/dts/sama5d3.dtsi    | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index a38d8bf..adf808c 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -132,6 +132,7 @@ geekbuying	GeekBuying
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- geniatech	Geniatech, Inc.
-+giantec	Giantec Semiconductor, Inc.
- giantplus	Giantplus Technology Co., Ltd.
- globalscale	Globalscale Technologies, Inc.
- gmt	Global Mixed-mode Technology, Inc.
-@@ -188,6 +189,7 @@ kingnovel	Kingnovel Technology Co., Ltd.
- kosagi	Sutajio Ko-Usagi PTE Ltd.
- kyo	Kyocera Corporation
- lacie	LaCie
-+laird	Laird PLC
- lantiq	Lantiq Semiconductor
- lattice	Lattice Semiconductor
- lego	LEGO Systems A/S
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index a3c3c31..11c0ef1 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -389,13 +389,13 @@
+ 				};
+ 			};
+ 
+-			rstc at fffffe00 {
++			reset_controller: rstc at fffffe00 {
+ 				compatible = "atmel,at91sam9g45-rstc";
+ 				reg = <0xfffffe00 0x10>;
+ 				clocks = <&clk32k>;
+ 			};
+ 
+-			shdwc at fffffe10 {
++			shutdown_controller: shdwc at fffffe10 {
+ 				compatible = "atmel,at91sam9x5-shdwc";
+ 				reg = <0xfffffe10 0x10>;
+ 				clocks = <&clk32k>;
+@@ -470,7 +470,7 @@
+ 				clock-names = "dma_clk";
+ 			};
+ 
+-			pinctrl at fffff400 {
++			pinctrl: pinctrl at fffff400 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
+@@ -1206,7 +1206,7 @@
+ 				};
+ 			};
+ 
+-			watchdog at fffffe40 {
++			watchdog: watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index eae5e1e..1408fa4 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -494,7 +494,7 @@
+ 				atmel,external-irqs = <47>;
+ 			};
+ 
+-			pinctrl at fffff200 {
++			pinctrl: pinctrl at fffff200 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				compatible = "atmel,sama5d3-pinctrl", "atmel,at91sam9x5-pinctrl", "simple-bus";
+@@ -1340,13 +1340,13 @@
+ 				};
+ 			};
+ 
+-			rstc at fffffe00 {
++			reset_controller: rstc at fffffe00 {
+ 				compatible = "atmel,sama5d3-rstc", "atmel,at91sam9g45-rstc";
+ 				reg = <0xfffffe00 0x10>;
+ 				clocks = <&clk32k>;
+ 			};
+ 
+-			shutdown-controller at fffffe10 {
++			shutdown_controller: shutdown-controller at fffffe10 {
+ 				compatible = "atmel,at91sam9x5-shdwc";
+ 				reg = <0xfffffe10 0x10>;
+ 				clocks = <&clk32k>;
+@@ -1359,7 +1359,7 @@
+ 				clocks = <&mck>;
+ 			};
+ 
+-			watchdog at fffffe40 {
++			watchdog: watchdog at fffffe40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
+ 				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
 -- 
 2.7.4
