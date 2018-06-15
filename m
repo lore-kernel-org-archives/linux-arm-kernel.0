@@ -1,124 +1,31 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 15 Jun 2018 12:14:59 +0100
-Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
-In-Reply-To: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
-References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
-Message-ID: <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 15 Jun 2018 13:23:49 +0200
+Subject: [PATCH 5/6] arm64: dts: rockchip: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <d7f32cb0c3b77901cb5e37320a454e5e1dfed958.1527225682.git.viresh.kumar@linaro.org>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <d7f32cb0c3b77901cb5e37320a454e5e1dfed958.1527225682.git.viresh.kumar@linaro.org>
+Message-ID: <5093249.sUvQcHjlij@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
-
-On 13/06/18 19:22, Geoff Levand wrote:
-> Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
-> a work-around for HPE ProLiant m400 APEI firmware problems.
+Am Freitag, 25. Mai 2018, 07:40:05 CEST schrieb Viresh Kumar:
+> The cooling device properties, like "#cooling-cells" and
+> "dynamic-power-coefficient", should either be present for all the CPUs
+> of a cluster or none. If these are present only for a subset of CPUs of
+> a cluster then things will start falling apart as soon as the CPUs are
+> brought online in a different order. For example, this will happen
+> because the operating system looks for such properties in the CPU node
+> it is trying to bring up, so that it can register a cooling device.
 > 
-> The work-around disables APEI when CONFIG_ACPI_APEI is set and
-> m400 firmware is detected.  Without this fixup m400 systems
-> experience errors like these on startup:
+> Add such missing properties.
 > 
->   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
->   [Hardware Error]: event severity: fatal
->   [Hardware Error]:  Error 0, type: fatal
->   [Hardware Error]:   section_type: memory error
->   [Hardware Error]:   error_status: 0x0000000000001300
+> Do minor rearrangement as well to keep ordering consistent.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-"Access to a memory address which is not mapped to any component"
+applied for 4.19
 
 
->   [Hardware Error]:   error_type: 10, invalid address
->   Kernel panic - not syncing: Fatal hardware error!
-
-Why is this a problem?
-
-Surely this is a valid description of an error.
-(okay its not particularly useful without the physical address, but the address
-is optional in that structure)
-
-When does this happen during boot? This looks like a driver mapping some
-non-existent physical address space to see if its device is present...
-unsurprisingly this doesn't go well.
-(might also be a typo in the DSDT)
-
-Can't we pin down the driver that does this and fix it. Its either wrong for
-everyone, or still broken after you disable APEI.
-
-
-> It seems unlikely there will be any m400 firmware updates to fix
-> this problem.
-
-What is the problem? This patch looks like it shoots the messenger for bringing
-bad news.
-
-
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 7b09487ff8fb..3c315c2c7476 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -31,6 +31,8 @@
->  #include <asm/cpu_ops.h>
->  #include <asm/smp_plat.h>
->  
-> +#include <acpi/apei.h>
-> +
->  #ifdef CONFIG_ACPI_APEI
->  # include <linux/efi.h>
->  # include <asm/pgtable.h>
-> @@ -177,6 +179,33 @@ static int __init acpi_fadt_sanity_check(void)
->  	return ret;
->  }
->  
-> +/*
-> + * acpi_fixup_m400_quirks - Work-around for HPE ProLiant m400 APEI firmware
-> + * problems.
-> + */
-> +static void __init acpi_fixup_m400_quirks(void)
-> +{
-> +	acpi_status status;
-> +	struct acpi_table_header *header;
-> +#if !defined(CONFIG_ACPI_APEI)
-> +	int hest_disable = HEST_DISABLED;
-> +#endif
-
-Yuck.
-
-
-> +
-> +	if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
-> +		return;
-> +
-> +	status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
-> +
-> +	if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
-> +		!strncmp(header->oem_table_id, "ProLiant", 8) &&
-
-You should match the affected range of OEM table revisions too, that way a
-firmware upgrade should start working, instead of being permanently disabled
-because we think its unlikely.
-
-
-> +		MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
-
-How is the CPU implementer relevant?
-
-You suggest a firmware-update would make this issue go away...
-
-
-> +		hest_disable = HEST_DISABLED;
-> +		pr_info("Disabled APEI for m400.\n");
-> +	}
-> +
-> +	acpi_put_table(header);
-> +}
-> +
->  /*
->   * acpi_boot_table_init() called from setup_arch(), always.
->   *	1. find RSDP and get its address, and then find XSDT
-
-Nothing arch-specific here. You're adding this to arch/arm64 because
-drivers/acpi/apei doesn't have an existing quirks table?
-
-
-Thanks,
-
-James
+Thanks
+Heiko
