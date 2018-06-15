@@ -1,96 +1,124 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 15 Jun 2018 13:08:35 +0200
-Subject: [linux-sunxi] Re: [PATCH] crypto: sun4i-ss: prevent deadlock on
- emulated hardware
-In-Reply-To: <20180615091650.GC3047@Red>
-References: <20180614193659.29261-1-clabbe.montjoie@gmail.com>
- <20180615075754.b3ivyagjsomiafwk@flea> <20180615081554.GA3047@Red>
- <20180615090412.xgw35ga5cvc6w3h3@flea> <20180615091650.GC3047@Red>
-Message-ID: <20180615110835.ctawebyouaqt7dki@flea>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 15 Jun 2018 12:14:59 +0100
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+Message-ID: <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 11:16:50AM +0200, Corentin Labbe wrote:
-> On Fri, Jun 15, 2018 at 11:04:12AM +0200, Maxime Ripard wrote:
-> > On Fri, Jun 15, 2018 at 10:15:54AM +0200, Corentin Labbe wrote:
-> > > On Fri, Jun 15, 2018 at 09:57:54AM +0200, Maxime Ripard wrote:
-> > > > On Thu, Jun 14, 2018 at 09:36:59PM +0200, Corentin Labbe wrote:
-> > > > > Running a qemu emulated cubieboard with sun4i-ss driver enabled led to a never
-> > > > > ending boot.
-> > > > > This is due to sun4i-ss deadlocked and taking all cpu in an infinite loop.
-> > > > > Since the crypto hardware is not implemented, all registers are read as 0.
-> > > > > So sun4i-ss will never progress in any operations. (TX_CNT being always 0)
-> > > > > 
-> > > > > The first idea is to add a "TX_CNT always zero timeout" but this made cipher/hash loops
-> > > > > more complex and prevent a case that never happen on real hardware.
-> > > > > 
-> > > > > The best way to fix is to check at probe time if we run on a virtual
-> > > > > machine with hardware emulated but non-implemented and prevent
-> > > > > sun4i-ss to be loaded in that case.
-> > > > > Letting sun4i-ss to load is useless anyway since all crypto algorithm will be
-> > > > > disabled since they will fail crypto selftests.
-> > > > > 
-> > > > > Tested-on: qemu-cubieboard
-> > > > > Tested-on: cubieboard2
-> > > > > 
-> > > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > > ---
-> > > > >  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 10 ++++++++++
-> > > > >  1 file changed, 10 insertions(+)
-> > > > > 
-> > > > > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> > > > > index a81d89b3b7d8..a178e80adcf3 100644
-> > > > > --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> > > > > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> > > > > @@ -341,9 +341,18 @@ static int sun4i_ss_probe(struct platform_device *pdev)
-> > > > >  	 * I expect to be a sort of Security System Revision number.
-> > > > >  	 * Since the A80 seems to have an other version of SS
-> > > > >  	 * this info could be useful
-> > > > > +	 * Detect virtual machine with non-implemented hardware
-> > > > > +	 * (qemu-cubieboard) by checking the register value after a write to it.
-> > > > > +	 * On non-implemented hardware, all registers are read as 0.
-> > > > > +	 * On real hardware we should have a value > 0.
-> > > > >  	 */
-> > > > >  	writel(SS_ENABLED, ss->base + SS_CTL);
-> > > > >  	v = readl(ss->base + SS_CTL);
-> > > > > +	if (!v) {
-> > > > > +		dev_err(&pdev->dev, "Qemu with non-implemented SS detected.\n");
-> > > > > +		err = -ENODEV;
-> > > > > +		goto error_rst;
-> > > > > +	}
-> > > > 
-> > > > This is wrong way to tackle the issue. There's multiple reason why
-> > > > this could happen (for example the device not being clocked, or
-> > > > maintained in reset). There's nothing specific about qemu here, and
-> > > > the fundamental issue isn't that the device isn't functional in qemu,
-> > > > it's that qemu lies about which hardware it can emulate in the DT it
-> > > > passes to the kernel.
-> > > > 
-> > > > There's no way this can scale, alone from the fact that qemu should
-> > > > patch the DT according to what it can do. Not trying to chase after
-> > > > each and every device that is broken in qemu.
-> > > > 
-> > > > NAK.
-> > > > 
-> > > 
-> > > My fix detect also when the device is badly clocked.
-> > 
-> > In which case, the proper fix is to enable the clock, not throw the
-> > kernel's arm up in the air.
-> > 
+Hi Geoff,
+
+On 13/06/18 19:22, Geoff Levand wrote:
+> Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
+> a work-around for HPE ProLiant m400 APEI firmware problems.
 > 
-> By badly I mean "not clocked" or "with the wrong frequencies".
->
-> I could change the clock rate range test to exit (it issue only a
-> warning for now).  But I think this fix detect all cases and still
-> permit someone to play with overclocking/downclocking.
+> The work-around disables APEI when CONFIG_ACPI_APEI is set and
+> m400 firmware is detected.  Without this fixup m400 systems
+> experience errors like these on startup:
+> 
+>   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+>   [Hardware Error]: event severity: fatal
+>   [Hardware Error]:  Error 0, type: fatal
+>   [Hardware Error]:   section_type: memory error
+>   [Hardware Error]:   error_status: 0x0000000000001300
 
-You're still trying to fix the consequence when you should be fixing
-the cause.
+"Access to a memory address which is not mapped to any component"
 
-Maxime
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>   [Hardware Error]:   error_type: 10, invalid address
+>   Kernel panic - not syncing: Fatal hardware error!
+
+Why is this a problem?
+
+Surely this is a valid description of an error.
+(okay its not particularly useful without the physical address, but the address
+is optional in that structure)
+
+When does this happen during boot? This looks like a driver mapping some
+non-existent physical address space to see if its device is present...
+unsurprisingly this doesn't go well.
+(might also be a typo in the DSDT)
+
+Can't we pin down the driver that does this and fix it. Its either wrong for
+everyone, or still broken after you disable APEI.
+
+
+> It seems unlikely there will be any m400 firmware updates to fix
+> this problem.
+
+What is the problem? This patch looks like it shoots the messenger for bringing
+bad news.
+
+
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 7b09487ff8fb..3c315c2c7476 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -31,6 +31,8 @@
+>  #include <asm/cpu_ops.h>
+>  #include <asm/smp_plat.h>
+>  
+> +#include <acpi/apei.h>
+> +
+>  #ifdef CONFIG_ACPI_APEI
+>  # include <linux/efi.h>
+>  # include <asm/pgtable.h>
+> @@ -177,6 +179,33 @@ static int __init acpi_fadt_sanity_check(void)
+>  	return ret;
+>  }
+>  
+> +/*
+> + * acpi_fixup_m400_quirks - Work-around for HPE ProLiant m400 APEI firmware
+> + * problems.
+> + */
+> +static void __init acpi_fixup_m400_quirks(void)
+> +{
+> +	acpi_status status;
+> +	struct acpi_table_header *header;
+> +#if !defined(CONFIG_ACPI_APEI)
+> +	int hest_disable = HEST_DISABLED;
+> +#endif
+
+Yuck.
+
+
+> +
+> +	if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
+> +		return;
+> +
+> +	status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
+> +
+> +	if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
+> +		!strncmp(header->oem_table_id, "ProLiant", 8) &&
+
+You should match the affected range of OEM table revisions too, that way a
+firmware upgrade should start working, instead of being permanently disabled
+because we think its unlikely.
+
+
+> +		MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
+
+How is the CPU implementer relevant?
+
+You suggest a firmware-update would make this issue go away...
+
+
+> +		hest_disable = HEST_DISABLED;
+> +		pr_info("Disabled APEI for m400.\n");
+> +	}
+> +
+> +	acpi_put_table(header);
+> +}
+> +
+>  /*
+>   * acpi_boot_table_init() called from setup_arch(), always.
+>   *	1. find RSDP and get its address, and then find XSDT
+
+Nothing arch-specific here. You're adding this to arch/arm64 because
+drivers/acpi/apei doesn't have an existing quirks table?
+
+
+Thanks,
+
+James
