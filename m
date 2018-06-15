@@ -1,36 +1,40 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Fri, 15 Jun 2018 22:43:42 +0300
-Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
+Date: Fri, 15 Jun 2018 22:43:43 +0300
+Subject: [PATCH 2/3] fbdev: mxsfb: Return ENODEV on missing display node
 In-Reply-To: <cover.1529091248.git.leonard.crestez@nxp.com>
 References: <cover.1529091248.git.leonard.crestez@nxp.com>
-Message-ID: <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
+Message-ID: <31ca6156a1b36c8ca2811d60e28c6128e988d5d4.1529091248.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FBDEV driver uses the same name and both can't be registered at the
-same time. Fix this by renaming the drm driver to mxsfb-drm
+When this driver encounters drm-style bindings it returns -ENOENT and
+this reports a probe error. Make it return -ENODEV to signal an explicit
+rejection instead.
+
+This allows peaceful coexistence between the DRM_MXSFB and FB_MXS config
+options.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- drivers/gpu/drm/mxsfb/mxsfb_drv.c | 2 +-
+ drivers/video/fbdev/mxsfb.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-index ffe5137ccaf8..dd1dd58e4956 100644
---- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-+++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-@@ -417,11 +417,11 @@ static int mxsfb_remove(struct platform_device *pdev)
- static struct platform_driver mxsfb_platform_driver = {
- 	.probe		= mxsfb_probe,
- 	.remove		= mxsfb_remove,
- 	.id_table	= mxsfb_devtype,
- 	.driver	= {
--		.name		= "mxsfb",
-+		.name		= "mxsfb-drm",
- 		.of_match_table	= mxsfb_dt_ids,
- 	},
- };
+diff --git a/drivers/video/fbdev/mxsfb.c b/drivers/video/fbdev/mxsfb.c
+index 12c8bd1d24d5..9ec8882d7b3d 100644
+--- a/drivers/video/fbdev/mxsfb.c
++++ b/drivers/video/fbdev/mxsfb.c
+@@ -736,11 +736,11 @@ static int mxsfb_init_fbinfo_dt(struct fb_info *fb_info,
+ 	int ret;
  
- module_platform_driver(mxsfb_platform_driver);
+ 	display_np = of_parse_phandle(np, "display", 0);
+ 	if (!display_np) {
+ 		dev_err(dev, "failed to find display phandle\n");
+-		return -ENOENT;
++		return -ENODEV;
+ 	}
+ 
+ 	ret = of_property_read_u32(display_np, "bus-width", &width);
+ 	if (ret < 0) {
+ 		dev_err(dev, "failed to get property bus-width\n");
 -- 
 2.17.1
