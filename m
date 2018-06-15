@@ -1,19 +1,33 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 15 Jun 2018 10:39:52 -0700
-Subject: [PATCH] MAINTAINERS: Remove the AT91 clk driver entry
-In-Reply-To: <20180613082936.14038-1-boris.brezillon@bootlin.com>
-References: <20180613082936.14038-1-boris.brezillon@bootlin.com>
-Message-ID: <152908439262.16708.14967126581942370673@swboyd.mtv.corp.google.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 15 Jun 2018 11:15:34 -0700
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <5120aa9f167c19712c01dc812f689eaef23bf0c5.camel@redhat.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5120aa9f167c19712c01dc812f689eaef23bf0c5.camel@redhat.com>
+Message-ID: <7a1768e2-bab5-c9f3-51b4-2131c9009498@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris Brezillon (2018-06-13 01:29:36)
-> I've stopped actively maintaining this driver for quite some time
-> already, and at91 maintainers are doing a good job at maintaining it.
-> Remove the AT91 clk driver entry so that the driver automatically
-> falls under the "ARM/Microchip (AT91) SoC support" entry.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> ---
+Hi Mark,
 
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+On 06/15/2018 10:33 AM, Mark Salter wrote:
+> On Fri, 2018-06-15 at 10:17 -0700, Geoff Levand wrote:
+>>>> +            MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
+>>>
+>>> How is the CPU implementer relevant?
+>>
+>> That was just a copy of what other fixes had.  Should I remove it?
+> 
+> It was there because HPE ProLiant strings are generic and you may end up
+> disabling platforms which would otherwise work. It is the ProLiant system
+> based on the APM chipset which is the problem. Thus the check for cpu
+> implementor.
+
+Your original fix that had this cpu implementor check was in the main
+ACPI code, so would be built for other arches.  This is now in
+arch/arm64/kernel/acpi.c, which will only be built for arm64.  Is that
+enough to limit it, or do we still need the check?
+
+-Geoff 
