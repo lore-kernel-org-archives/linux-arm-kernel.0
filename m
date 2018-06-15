@@ -1,335 +1,93 @@
-From: Ben.Whitten@lairdtech.com (Ben Whitten)
-Date: Fri, 15 Jun 2018 10:01:49 +0000
-Subject: [PATCH 1/4] arm: dts: add support for Laird WB45N cpu module and
- DVK
-In-Reply-To: <03f0f635-3fc2-085b-20e0-e1fcaa9e8062@microchip.com>
-References: <1528966340-23216-1-git-send-email-ben.whitten@lairdtech.com>
- <03f0f635-3fc2-085b-20e0-e1fcaa9e8062@microchip.com>
-Message-ID: <BY1PR02MB1114728E5FF0709137B4224FE77C0@BY1PR02MB1114.namprd02.prod.outlook.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 15 Jun 2018 12:14:55 +0200
+Subject: [PATCH 00/11] Split i2c_lock_adapter into i2c_lock_root and
+ i2c_lock_segment
+Message-ID: <20180615101506.8012-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 14/06/2018 at 10:51, Ben Whitten wrote:
-> > Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
-> > ---
-> >   arch/arm/boot/dts/Makefile        |   3 +-
-> >   arch/arm/boot/dts/at91-wb45n.dts  |  66 +++++++++++++++
-> >   arch/arm/boot/dts/at91-wb45n.dtsi | 169
-> ++++++++++++++++++++++++++++++++++++++
-> >   3 files changed, 237 insertions(+), 1 deletion(-)
-> >   create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
-> >   create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
-> >
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 7e24249..1ee94ee 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -42,7 +42,8 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
-> >   	at91sam9g25ek.dtb \
-> >   	at91sam9g35ek.dtb \
-> >   	at91sam9x25ek.dtb \
-> > -	at91sam9x35ek.dtb
-> > +	at91sam9x35ek.dtb \
-> > +	at91-wb45n.dtb
-> >   dtb-$(CONFIG_SOC_SAM_V7) += \
-> >   	at91-kizbox2.dtb \
-> >   	at91-nattis-2-natte-2.dtb \
-> > diff --git a/arch/arm/boot/dts/at91-wb45n.dts b/arch/arm/boot/dts/at91-
-> wb45n.dts
-> > new file mode 100644
-> > index 0000000..4e88815
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/at91-wb45n.dts
-> > @@ -0,0 +1,66 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * at91-wb45n.dts - Device Tree file for WB45NBT board
-> > + *
-> > + *  Copyright (C) 2018 Laird
-> > + *
-> > +*/
-> > +/dts-v1/;
-> > +#include "at91-wb45n.dtsi"
-> > +
-> > +/ {
-> > +	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
-> > +	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5",
-> "atmel,at91sam9";
-> 
-> "laird" prefix must be added to
-> Documentation/devicetree/bindings/vendor-prefixes.txt before using it:
-> you can do a little patch as a first patch of this series.
-> Otherwise it will trigger a warning message while running
-> scripts/checkpatch.pl on top of your patch.
-> 
-> 
-> > +
-> > +	ahb {
-> > +		apb {
-> > +			watchdog at fffffe40 {
-> > +				status = "okay";
-> > +			};
-> > +		};
-> > +	};
-> > +
-> > +	gpio_keys {
-> > +		compatible = "gpio-keys";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		irqbtn at pb18 {
-> 
-> I'm not sure that the @pb18 can be used like this. This address
-> extension must be used in a "reg" property in the node. dtc used with
-> warning switch on might trigger an error for this.
-> 
-> > +			label = "IRQBTN";
-> > +			linux,code = <99>;
-> > +			gpios = <&pioB 18 GPIO_ACTIVE_LOW>;
-> > +			gpio-key,wakeup = <1>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&usb0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&mmc0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&spi0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&macb0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&dbgu {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usart0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usart3 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&i2c1 {
-> > +	status = "okay";
-> > +};
-> > diff --git a/arch/arm/boot/dts/at91-wb45n.dtsi b/arch/arm/boot/dts/at91-
-> wb45n.dtsi
-> > new file mode 100644
-> > index 0000000..2fa58e2
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/at91-wb45n.dtsi
-> > @@ -0,0 +1,169 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * at91-wb45n.dtsi - Device Tree file for WB45NBT board
-> > + *
-> > + *  Copyright (C) 2018 Laird
-> > + *
-> > + */
-> > +
-> > +#include "at91sam9g25.dtsi"
-> > +
-> > +/ {
-> > +	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
-> > +	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5",
-> "atmel,at91sam9";
-> > +
-> > +	chosen {
-> > +		bootargs = "ubi.mtd=6 root=ubi0:rootfs rootfstype=ubifs
-> rw";
-> > +		stdout-path = "serial0:115200n8";
-> > +	};
-> > +
-> > +	memory {
-> > +		reg = <0x20000000 0x4000000>;
-> > +	};
-> > +
-> > +	ahb {
-> > +		apb {
-> > +			shdwc at fffffe10 {
-> 
-> I would advice you to take exactly the node name:
-> "shutdown-controller at fffffe10"; Anyway, it will go away after you use
-> the label notation as advised by Alexandre.
-> 
-> > +				atmel,wakeup-mode = "low";
-> > +			};
-> > +
-> > +			pinctrl at fffff400 {
-> > +				usb2 {
-> > +					pinctrl_board_usb2: usb2-board {
-> > +						atmel,pins =
-> > +							<AT91_PIOB 11
-> AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB11 gpio
-> vbus sense, deglitch */
-> > +					};
-> > +				};
-> > +			};
-> > +
-> > +			rstc at fffffe00 {
-> > +				compatible = "atmel,sama5d3-rstc";
-> > +			};
-> 
-> I don't think this node is needed.
+Hi!
 
-I dug through our old code reviews and found this message relating to testing
-reboot over several thousand times in our testbed:
-After the slow clock has been enabled on the reset controller via upstream
-changes, the dram disable access and power down code is causing the SAM9G25
-to hang occasionally on reboot.  Using the simple reset function provided
-for SAMA5D3 instead.
+With the introduction of mux-locked I2C muxes, the concept of
+locking only a segment of the I2C adapter tree was added. At the
+time, I did not want to cause a lot of extra churn, so left most
+users of i2c_lock_adapter alone and aparently didn't think enough
+about it; they simply continued to lock the whole adapter tree.
+However, i2c_lock_adapter is in fact wrong for almost every caller
+(there are naturally exceptions) that is itself not a driver for
+a root adapter. What normal drivers generally want is to only
+lock the segment of the adapter tree that their device sits on.
 
-So it appears to be a workaround for a bug that existed ~2 years ago, may still be
-relevant as there haven't been many changes to the reset code in that time.
+In fact, if a device sits behind a mux-locked I2C mux, and its
+driver calls i2c_lock_adapter followed by an unlocked I2C transfer,
+things will deadlock (since even a mux-locked I2C adapter will lock
+its parent at some point). If the device is not sitting behind a
+mux-locked I2C mux (i.e. either directly on the root adapter or
+behind a (chain of) parent-locked I2C muxes) the root/segment
+distinction is of no consequence; the root adapter is locked either
+way.
 
-> > +
-> > +		};
-> > +	};
-> > +
-> > +	atheros {
-> > +		compatible = "atheros,ath6kl";
-> > +		atheros,board-id = "SD32";
-> > +	};
-> > +};
-> > +
-> > +&slow_xtal {
-> > +	clock-frequency = <32768>;
-> > +};
-> > +
-> > +&main_xtal {
-> > +	clock-frequency = <12000000>;
-> > +};
-> > +
-> > +&ebi {
-> > +	status = "okay";
-> > +	nand_controller: nand-controller {
-> > +		pinctrl-0 = <&pinctrl_nand_cs &pinctrl_nand_rb
-> &pinctrl_nand_oe_we>;
-> > +		pinctrl-names = "default";
-> > +		status = "okay";
-> > +
-> > +		nand at 3 {
-> > +			reg = <0x3 0x0 0x800000>;
-> > +			rb-gpios = <&pioD 5 GPIO_ACTIVE_HIGH>;
-> > +			cs-gpios = <&pioD 4 GPIO_ACTIVE_HIGH>;
-> > +			nand-bus-width = <8>;
-> > +			nand-ecc-mode = "hw";
-> > +			nand-ecc-strength = <4>;
-> > +			nand-ecc-step-size = <512>;
-> > +			nand-on-flash-bbt;
-> > +			label = "atmel_nand";
-> > +
-> > +			partitions {
-> > +				compatible = "fixed-partitions";
-> > +				#address-cells = <1>;
-> > +				#size-cells = <1>;
-> > +
-> > +				at91bootstrap at 0 {
-> > +					label = "at91bs";
-> > +					reg = <0x0 0x20000>;
-> > +				};
-> > +
-> > +				uboot at 20000 {
-> > +					label = "u-boot";
-> > +					reg = <0x20000 0x80000>;
-> > +				};
-> > +
-> > +				ubootenv at a0000 {
-> > +					label = "u-boot-env";
-> > +					reg = <0xa0000 0x20000>;
-> > +				};
-> > +
-> > +				ubootenv at c0000 {
-> > +					label = "redund-env";
-> > +					reg = <0xc0000 0x20000>;
-> > +				};
-> > +
-> > +				kernel-a at e0000 {
-> > +					label = "kernel-a";
-> > +					reg = <0xe0000 0x280000>;
-> > +				};
-> > +
-> > +				kernel-b at 360000 {
-> > +					label = "kernel-b";
-> > +					reg = <0x360000 0x280000>;
-> > +				};
-> > +
-> > +				rootfs-a at 5e0000 {
-> > +					label = "rootfs-a";
-> > +					reg = <0x5e0000 0x2600000>;
-> > +				};
-> > +
-> > +				rootfs-b at 2be0000 {
-> > +					label = "rootfs-b";
-> > +					reg = <0x2be0000 0x2600000>;
-> > +				};
-> > +
-> > +				user at 51e0000 {
-> > +					label = "user";
-> > +					reg = <0x51e0000 0x2dc0000>;
-> > +				};
-> > +
-> > +				logs at 7fa0000 {
-> > +					label = "logs";
-> > +					reg = <0x7fa0000 0x60000>;
-> > +				};
-> > +
-> > +			};
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&usb0 {
-> 
-> This must be &usb1 label, isn't it?
-> Because you are referring to ohci binding I suspect (found by having a
-> look at: atmel,oc-gpio property...).
+Mux-locked I2C muxes are probably not that common, and putting any
+of the affected devices behind one is probably even rarer, which
+is why we have not seen any deadlocks. At least not that I know
+of...
 
-I believe usb0 is correct, as this is a at91sam9x5 part, the node in dtsi is -ohci.
-sama5d3 is usb1 for -ohci.
+Since silently changing the semantics of i2c_lock_adapter might
+be quite a surprise, especially for out-of-tree users, this
+series instead introduces new helpers to make it easier to only
+lock the I2C segment, then converts drivers over and finally
+renames the remaining i2c_lock_adapter instances to i2c_lock_root.
 
-> > +	num-ports = <2>;
-> > +	atmel,vbus-gpio = <
-> > +		&pioB 12 GPIO_ACTIVE_HIGH
-> > +		&pioA 31 GPIO_ACTIVE_HIGH
-> > +		>;
-> > +	atmel,oc-gpio = <&pioB 13 GPIO_ACTIVE_LOW>;
-> > +};
-> > +
-> > +&macb0 {
-> > +	phy-mode = "rmii";
-> > +};
-> > +
-> > +&spi0 {
-> > +	cs-gpios = <&pioA 14 0>, <&pioA 7 0>, <0>, <0>;
-> > +};
-> > +
-> > +&usb2 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_board_usb2>;
-> > +	atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
-> > +};
-> > +
-> > +&mmc0 {
-> > +	pinctrl-0 = <
-> > +		&pinctrl_mmc0_slot0_clk_cmd_dat0
-> > +		&pinctrl_mmc0_slot0_dat1_3>;
-> > +	slot at 0 {
-> > +		reg = <0>;
-> > +		bus-width = <4>;
-> > +	};
-> > +};
-> >
-> 
-> 
-> --
-> Nicolas Ferre
+I suggest that Wolfram takes this series through the I2C tree
+and creates an immutable branch for the other subsystems. The
+series is based on v4.17, but I did not find any new instances in
+neither linus-master nor linux-next and the series still applies
+cleanly to linus-master for me. linux-next has removed suspend
+support from the i2c-tegra driver. A bit strange, I thought the
+I2C changes was merged for this window? Anyway, the resolution
+for that conflict is trivial, just remove the i2c-tegra hunk from
+patch 11.
+
+I do not have *any* of the affected devices, and have thus only
+done build tests.
+
+Cheers,
+Peter
+
+Peter Rosin (11):
+  i2c: add helpers for locking the I2C segment
+  tpm/tpm_i2c_infineon: switch to i2c_lock_segment
+  i2c: mux: pca9541: switch to i2c_lock_segment
+  input: rohm_bu21023: switch to i2c_lock_segment
+  media: af9013: switch to i2c_lock_segment
+  media: drxk_hard: switch to i2c_lock_segment
+  media: rtl2830: switch to i2c_lock_segment
+  media: tda1004x: switch to i2c_lock_segment
+  media: tda18271: switch to i2c_lock_segment
+  mfd: 88pm860x-i2c: switch to i2c_lock_segment
+  i2c: rename i2c_lock_adapter to i2c_lock_root
+
+ drivers/char/tpm/tpm_i2c_infineon.c      |  8 ++++----
+ drivers/i2c/busses/i2c-brcmstb.c         |  8 ++++----
+ drivers/i2c/busses/i2c-davinci.c         |  4 ++--
+ drivers/i2c/busses/i2c-gpio.c            | 12 ++++++------
+ drivers/i2c/busses/i2c-s3c2410.c         |  4 ++--
+ drivers/i2c/busses/i2c-sprd.c            |  8 ++++----
+ drivers/i2c/busses/i2c-tegra.c           |  8 ++++----
+ drivers/i2c/i2c-core-base.c              |  6 +++---
+ drivers/i2c/i2c-core-slave.c             |  8 ++++----
+ drivers/i2c/i2c-core-smbus.c             |  4 ++--
+ drivers/i2c/muxes/i2c-mux-pca9541.c      |  6 +++---
+ drivers/iio/temperature/mlx90614.c       |  4 ++--
+ drivers/input/touchscreen/rohm_bu21023.c |  4 ++--
+ drivers/media/dvb-frontends/af9013.c     |  8 ++++----
+ drivers/media/dvb-frontends/drxk_hard.c  |  4 ++--
+ drivers/media/dvb-frontends/rtl2830.c    | 12 ++++++------
+ drivers/media/dvb-frontends/tda1004x.c   |  6 +++---
+ drivers/media/tuners/tda18271-common.c   |  8 ++++----
+ drivers/mfd/88pm860x-i2c.c               |  8 ++++----
+ include/linux/i2c.h                      | 22 ++++++++++++++++++++--
+ 20 files changed, 85 insertions(+), 67 deletions(-)
+
+-- 
+2.11.0
