@@ -1,51 +1,108 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 15 Jun 2018 17:43:13 +0100
-Subject: [PATCH v2 1/4] arm64: introduce sysreg_clear_set()
-In-Reply-To: <20180615162124.jz5655podkezdcu3@armageddon.cambridge.arm.com>
-References: <1529077646-2848-1-git-send-email-Dave.Martin@arm.com>
- <1529077646-2848-2-git-send-email-Dave.Martin@arm.com>
- <20180615162124.jz5655podkezdcu3@armageddon.cambridge.arm.com>
-Message-ID: <20180615164313.GQ22983@e103592.cambridge.arm.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Fri, 15 Jun 2018 19:45:22 +0300
+Subject: [patch v26 3/4] Documentation: jtag: Add bindings for Aspeed SoC 24xx
+ and 25xx families JTAG master driver
+In-Reply-To: <1529081123-30873-1-git-send-email-oleksandrs@mellanox.com>
+References: <1529081123-30873-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1529081123-30873-4-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 05:21:25PM +0100, Catalin Marinas wrote:
-> On Fri, Jun 15, 2018 at 04:47:23PM +0100, Dave P Martin wrote:
-> > From: Mark Rutland <mark.rutland@arm.com>
-> > 
-> > Currently we have a couple of helpers to manipulate bits in particular
-> > sysregs:
-> > 
-> >  * config_sctlr_el1(u32 clear, u32 set)
-> > 
-> >  * change_cpacr(u64 val, u64 mask)
-> > 
-> > The parameters of these differ in naming convention, order, and size,
-> > which is unfortunate. They also differ slightly in behaviour, as
-> > change_cpacr() skips the sysreg write if the bits are unchanged, which
-> > is a useful optimization when sysreg writes are expensive.
-> > 
-> > Before we gain more yet another sysreg manipulation function, let's
-> > unify these with a common helper, providing a consistent order for
-> > clear/set operands, and the write skipping behaviour from
-> > change_cpacr(). Code will be migrated to the new helper in subsequent
-> > patches.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reviewed-by: Dave Martin <dave.martin@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Since you are submitting this patch, it should have your signed-off-by
-> as well. Other than that:
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+It has been tested on Mellanox system with BMC equipped with
+Aspeed 2520 SoC for programming CPLD devices.
 
-Oops, added locally.
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v21->v22
+v20->v21
+v19->v20
+v18->v19
 
-I had considered this optional if the patch was unmodified from the
-original author, but I guess I at least applied it on a different base.
-In any case, I can see why it would be considered mandatory.
+v17->v18
+v16->v17
+v15->v16
+Comments pointed by Joel Stanley <joel.stan@gmail.com>
+- change clocks = <&clk_apb> to proper clocks = <&syscon ASPEED_CLK_APB>
+- add reset descriptions in bndings file
 
-Cheers
----Dave
+v14->v15
+v13->v14
+v12->v13
+v11->v12
+v10->v11
+v9->v10
+v8->v9
+v7->v8
+Comments pointed by pointed by Joel Stanley <joel.stan@gmail.com>
+- Change compatible string to ast2400 and ast2000
+
+V6->v7
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+ - Fix spell "Doccumentation" -> "Documentation"
+
+v5->v6
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+- Small nit: s/documentation/Documentation/
+
+v4->v5
+
+V3->v4
+Comments pointed by Rob Herring <robh@kernel.org>
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+
+v2->v3
+Comments pointed by Rob Herring <robh@kernel.org>
+- split Aspeed jtag driver and binding to sepatrate patches
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+---
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   22 ++++++++++++++++++++
+ MAINTAINERS                                        |    1 +
+ 2 files changed, 23 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+
+diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+new file mode 100644
+index 0000000..7c36eb6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+@@ -0,0 +1,22 @@
++Aspeed JTAG driver for ast2400 and ast2500 SoC
++
++Required properties:
++- compatible:		Should be one of
++      - "aspeed,ast2400-jtag"
++      - "aspeed,ast2500-jtag"
++- reg			contains the offset and length of the JTAG memory
++			region
++- clocks		root clock of bus, should reference the APB
++			clock in the second cell
++- resets		phandle to reset controller with the reset number in
++			the second cell
++- interrupts		should contain JTAG controller interrupt
++
++Example:
++jtag: jtag at 1e6e4000 {
++	compatible = "aspeed,ast2500-jtag";
++	reg = <0x1e6e4000 0x1c>;
++	clocks = <&syscon ASPEED_CLK_APB>;
++	resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
++	interrupts = <43>;
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e7b8b2c..a5e5f75 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7617,6 +7617,7 @@ S:	Maintained
+ F:	include/linux/jtag.h
+ F:	include/uapi/linux/jtag.h
+ F:	drivers/jtag/
++F:	Documentation/devicetree/bindings/jtag/
+ 
+ K10TEMP HARDWARE MONITORING DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
+-- 
+1.7.1
