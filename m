@@ -1,66 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Jun 2018 19:08:14 +0530
-Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
-In-Reply-To: <20180615050108.GG112168@atomide.com>
-References: <20180605060510.32473-1-nm@ti.com>
- <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
- <20180607233853.p7iw7nlxxuyi66og@kahuna>
- <20180614123805.GF112168@atomide.com>
- <20180614130435.j2bmzam6corrjylx@kahuna>
- <20180615050108.GG112168@atomide.com>
-Message-ID: <a69fcb7a-f7a1-481b-8a02-1da7d1e20671@ti.com>
+From: ben.whitten@gmail.com (Ben Whitten)
+Date: Fri, 15 Jun 2018 14:40:50 +0100
+Subject: [PATCH v2 1/6] dt-bindings: add laird and giantec vendor prefix
+Message-ID: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+This adds a vendor prefix "laird" for Laird PLC who make
+CPU modules and system on chips.
+Also adds "giantec" for Giantec Semiconductor, Inc. who
+make eeprom memory used on Laird designs.
 
-On Friday 15 June 2018 10:31 AM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [180614 13:07]:
->> On 12:38-20180614, Tony Lindgren wrote:
+Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
->> From A53 view, a more accurate view might be  - from an interconnect
->> view of the world (still simplified - i have ignored the sub bus
->> segments in the representations below):
->>
->> msmc {
->> 	navss_main {
->> 		cbass_main{
->> 			cbass_mcu {
->> 				navss_mcu {
->> 				};
->> 				cbass_wkup{
->> 				};
->> 			};
->> 		};
->> 	};
->> };
->>
->> From R5 view, the view will be very different ofcourse:
->> view of the world (still simplified):
->>
->> cbass_mcu {
->> 	navss_mcu {
->> 	};
->> 	cbass_wkup{
->> 	};
->> 	cbass_main{
->> 		navss_main {
->> 			msmc {
->> 			};
->> 		};
->> 	};
->> };
-> 
-> Well if we follow the hardware representation of the interconnects,
-> it should not matter from which processor view you're looking at things.
-> There are just different ranges provided.
-
-AFAIK, the root node needs to have the CPU which is using the DT. So,
-the hierarchy will change based on CPU view (if we describe it fully).
-
-How well we can reuse individual interconnect segments is something I
-have to think about / experiment. Will have to be wary of any "short
-paths" or "cross connections".
-
-Thanks,
-Sekhar
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index a38d8bf..adf808c 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -132,6 +132,7 @@ geekbuying	GeekBuying
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
++giantec	Giantec Semiconductor, Inc.
+ giantplus	Giantplus Technology Co., Ltd.
+ globalscale	Globalscale Technologies, Inc.
+ gmt	Global Mixed-mode Technology, Inc.
+@@ -188,6 +189,7 @@ kingnovel	Kingnovel Technology Co., Ltd.
+ kosagi	Sutajio Ko-Usagi PTE Ltd.
+ kyo	Kyocera Corporation
+ lacie	LaCie
++laird	Laird PLC
+ lantiq	Lantiq Semiconductor
+ lattice	Lattice Semiconductor
+ lego	LEGO Systems A/S
+-- 
+2.7.4
