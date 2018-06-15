@@ -1,9 +1,9 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Fri, 15 Jun 2018 12:14:58 +0200
-Subject: [PATCH 03/11] i2c: mux: pca9541: switch to i2c_lock_segment
+Date: Fri, 15 Jun 2018 12:15:00 +0200
+Subject: [PATCH 05/11] media: af9013: switch to i2c_lock_segment
 In-Reply-To: <20180615101506.8012-1-peda@axentia.se>
 References: <20180615101506.8012-1-peda@axentia.se>
-Message-ID: <20180615101506.8012-4-peda@axentia.se>
+Message-ID: <20180615101506.8012-6-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,27 +14,38 @@ the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/i2c/muxes/i2c-mux-pca9541.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/media/dvb-frontends/af9013.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/i2c/muxes/i2c-mux-pca9541.c b/drivers/i2c/muxes/i2c-mux-pca9541.c
-index 6a39adaf433f..74c560ed44cc 100644
---- a/drivers/i2c/muxes/i2c-mux-pca9541.c
-+++ b/drivers/i2c/muxes/i2c-mux-pca9541.c
-@@ -345,11 +345,11 @@ static int pca9541_probe(struct i2c_client *client,
+diff --git a/drivers/media/dvb-frontends/af9013.c b/drivers/media/dvb-frontends/af9013.c
+index 482bce49819a..a504697ff557 100644
+--- a/drivers/media/dvb-frontends/af9013.c
++++ b/drivers/media/dvb-frontends/af9013.c
+@@ -1312,10 +1312,10 @@ static int af9013_wregs(struct i2c_client *client, u8 cmd, u16 reg,
+ 	memcpy(&buf[3], val, len);
  
- 	/*
- 	 * I2C accesses are unprotected here.
--	 * We have to lock the adapter before releasing the bus.
-+	 * We have to lock the I2C segment before releasing the bus.
- 	 */
--	i2c_lock_adapter(adap);
-+	i2c_lock_segment(adap);
- 	pca9541_release_bus(client);
--	i2c_unlock_adapter(adap);
-+	i2c_unlock_segment(adap);
+ 	if (lock)
+-		i2c_lock_adapter(client->adapter);
++		i2c_lock_segment(client->adapter);
+ 	ret = __i2c_transfer(client->adapter, msg, 1);
+ 	if (lock)
+-		i2c_unlock_adapter(client->adapter);
++		i2c_unlock_segment(client->adapter);
+ 	if (ret < 0) {
+ 		goto err;
+ 	} else if (ret != 1) {
+@@ -1353,10 +1353,10 @@ static int af9013_rregs(struct i2c_client *client, u8 cmd, u16 reg,
+ 	buf[2] = cmd;
  
- 	/* Create mux adapter */
- 
+ 	if (lock)
+-		i2c_lock_adapter(client->adapter);
++		i2c_lock_segment(client->adapter);
+ 	ret = __i2c_transfer(client->adapter, msg, 2);
+ 	if (lock)
+-		i2c_unlock_adapter(client->adapter);
++		i2c_unlock_segment(client->adapter);
+ 	if (ret < 0) {
+ 		goto err;
+ 	} else if (ret != 2) {
 -- 
 2.11.0
