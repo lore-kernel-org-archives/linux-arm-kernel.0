@@ -1,48 +1,86 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 15 Jun 2018 11:14:13 +0200
-Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
- control
-In-Reply-To: <20180614153548.9644-1-wens@csie.org>
-References: <20180614153548.9644-1-wens@csie.org>
-Message-ID: <20180615091413.pbdtrpa7txe6i4ee@flea>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 15 Jun 2018 11:16:50 +0200
+Subject: [linux-sunxi] Re: [PATCH] crypto: sun4i-ss: prevent deadlock on
+ emulated hardware
+In-Reply-To: <20180615090412.xgw35ga5cvc6w3h3@flea>
+References: <20180614193659.29261-1-clabbe.montjoie@gmail.com>
+ <20180615075754.b3ivyagjsomiafwk@flea> <20180615081554.GA3047@Red>
+ <20180615090412.xgw35ga5cvc6w3h3@flea>
+Message-ID: <20180615091650.GC3047@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 11:35:44PM +0800, Chen-Yu Tsai wrote:
-> Hi,
+On Fri, Jun 15, 2018 at 11:04:12AM +0200, Maxime Ripard wrote:
+> On Fri, Jun 15, 2018 at 10:15:54AM +0200, Corentin Labbe wrote:
+> > On Fri, Jun 15, 2018 at 09:57:54AM +0200, Maxime Ripard wrote:
+> > > On Thu, Jun 14, 2018 at 09:36:59PM +0200, Corentin Labbe wrote:
+> > > > Running a qemu emulated cubieboard with sun4i-ss driver enabled led to a never
+> > > > ending boot.
+> > > > This is due to sun4i-ss deadlocked and taking all cpu in an infinite loop.
+> > > > Since the crypto hardware is not implemented, all registers are read as 0.
+> > > > So sun4i-ss will never progress in any operations. (TX_CNT being always 0)
+> > > > 
+> > > > The first idea is to add a "TX_CNT always zero timeout" but this made cipher/hash loops
+> > > > more complex and prevent a case that never happen on real hardware.
+> > > > 
+> > > > The best way to fix is to check at probe time if we run on a virtual
+> > > > machine with hardware emulated but non-implemented and prevent
+> > > > sun4i-ss to be loaded in that case.
+> > > > Letting sun4i-ss to load is useless anyway since all crypto algorithm will be
+> > > > disabled since they will fail crypto selftests.
+> > > > 
+> > > > Tested-on: qemu-cubieboard
+> > > > Tested-on: cubieboard2
+> > > > 
+> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > > ---
+> > > >  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 10 ++++++++++
+> > > >  1 file changed, 10 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> > > > index a81d89b3b7d8..a178e80adcf3 100644
+> > > > --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> > > > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> > > > @@ -341,9 +341,18 @@ static int sun4i_ss_probe(struct platform_device *pdev)
+> > > >  	 * I expect to be a sort of Security System Revision number.
+> > > >  	 * Since the A80 seems to have an other version of SS
+> > > >  	 * this info could be useful
+> > > > +	 * Detect virtual machine with non-implemented hardware
+> > > > +	 * (qemu-cubieboard) by checking the register value after a write to it.
+> > > > +	 * On non-implemented hardware, all registers are read as 0.
+> > > > +	 * On real hardware we should have a value > 0.
+> > > >  	 */
+> > > >  	writel(SS_ENABLED, ss->base + SS_CTL);
+> > > >  	v = readl(ss->base + SS_CTL);
+> > > > +	if (!v) {
+> > > > +		dev_err(&pdev->dev, "Qemu with non-implemented SS detected.\n");
+> > > > +		err = -ENODEV;
+> > > > +		goto error_rst;
+> > > > +	}
+> > > 
+> > > This is wrong way to tackle the issue. There's multiple reason why
+> > > this could happen (for example the device not being clocked, or
+> > > maintained in reset). There's nothing specific about qemu here, and
+> > > the fundamental issue isn't that the device isn't functional in qemu,
+> > > it's that qemu lies about which hardware it can emulate in the DT it
+> > > passes to the kernel.
+> > > 
+> > > There's no way this can scale, alone from the fact that qemu should
+> > > patch the DT according to what it can do. Not trying to chase after
+> > > each and every device that is broken in qemu.
+> > > 
+> > > NAK.
+> > > 
+> > 
+> > My fix detect also when the device is badly clocked.
 > 
-> This series is the remaining A64 syscon changes from the R40 DWMAC
-> series. The series aligns how the A64 system control exports a regmap
-> for the sun8i DWMAC driver to access with what we've done for the R40.
+> In which case, the proper fix is to enable the clock, not throw the
+> kernel's arm up in the air.
 > 
-> Originally the A64 used the generic syscon for this bit of hardware.
-> But this block also contains mapping bits for the onboard SRAM, used
-> by various peripherals, and other vendor specific bits we may use in
-> the future. It is by no means generic. And we already have a device
-> tree binding and driver for the SRAM part.
-> 
-> The first patch make the SRAM control device export a regmap, exposing
-> a single EMAC control register, for the DWMAC driver to consume.
-> 
-> The second and third patches rename the A64 compatible string to read
-> "system control", which is what the block is named in the user manual.
-> 
-> The last patch fixes up the device node, and also adds the lone mappable
-> SRAM block, which is needed by the Display Engine.
 
-For the serie:
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+By badly I mean "not clocked" or "with the wrong frequencies".
 
-Maxime
+I could change the clock rate range test to exit (it issue only a warning for now).
+But I think this fix detect all cases and still permit someone to play with overclocking/downclocking.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180615/9fbf8015/attachment.sig>
+Regards
