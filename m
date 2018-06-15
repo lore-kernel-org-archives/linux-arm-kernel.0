@@ -1,64 +1,67 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 15 Jun 2018 10:31:10 +0200
-Subject: [PATCH v2 11/27] drm/sun4i: tcon: Add support for tcon-top gate
-In-Reply-To: <20180612200036.21483-12-jernej.skrabec@siol.net>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-12-jernej.skrabec@siol.net>
-Message-ID: <20180615083110.laruycabvyjmesmo@flea>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 15 Jun 2018 10:31:56 +0200
+Subject: Charge counter on droid 4
+In-Reply-To: <20180615080014.GA29192@amd>
+References: <20180615080014.GA29192@amd>
+Message-ID: <20180615083156.GA32102@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
-> TV TCONs connected to TCON TOP have to enable additional gate in order
-> to work.
+On Fri 2018-06-15 10:00:14, Pavel Machek wrote:
+> Hi!
 > 
-> Add support for such TCONs.
+> Droid 4 has non-removable battery, yet the charge counter is reset to
+> near zero on each boot of linux.
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
->  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
->  2 files changed, 15 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 08747fc3ee71..0afb5a94a414 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device *dev,
->  		dev_err(dev, "Couldn't get the TCON bus clock\n");
->  		return PTR_ERR(tcon->clk);
->  	}
-> +
-> +	if (tcon->quirks->has_tcon_top_gate) {
-> +		tcon->top_clk = devm_clk_get(dev, "tcon-top");
-> +		if (IS_ERR(tcon->top_clk)) {
-> +			dev_err(dev, "Couldn't get the TCON TOP bus clock\n");
-> +			return PTR_ERR(tcon->top_clk);
-> +		}
-> +		clk_prepare_enable(tcon->top_clk);
-> +	}
-> +
+> Unfortunately, that makes charge counter pretty much useless on d4, as
+> the "battery full" and "battery empty" limits will be different during
+> each boot.
 
-Is it required for the TCON itself to operate, or does the TCON
-requires the TCON TOP, which in turn requires that clock to be
-functional?
+Hmm, and could we refrain from providing "power" values?
 
-I find it quite odd to have a clock that isn't meant for a particular
-device to actually be wired to another device. I'm not saying this
-isn't the case, but it would be a first.
+I was thinking great, we have hardware that does proper power
+measuerement for us. No.... it is driver providing synthetic
+values. As userland has enough information to do that itself, I
+believe we should not do this in kernel.
 
-Maxime
+diff --git a/drivers/power/supply/cpcap-battery.c b/drivers/power/supply/cpcap-battery.c
+index 839e365..1610026 100644
+--- a/drivers/power/supply/cpcap-battery.c
++++ b/drivers/power/supply/cpcap-battery.c
+@@ -490,24 +490,6 @@ static int cpcap_battery_get_property(struct power_supply *psy,
+ 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+ 		val->intval = latest->counter_uah;
+ 		break;
+-	case POWER_SUPPLY_PROP_POWER_NOW:
+-		tmp = (latest->voltage / 10000) * latest->current_ua;
+-		val->intval = div64_s64(tmp, 100);
+-		break;
+-	case POWER_SUPPLY_PROP_POWER_AVG:
+-		if (cached) {
+-			tmp = cpcap_battery_cc_get_avg_current(ddata);
+-			tmp *= (latest->voltage / 10000);
+-			val->intval = div64_s64(tmp, 100);
+-			break;
+-		}
+-		sample = latest->cc.sample - previous->cc.sample;
+-		accumulator = latest->cc.accumulator - previous->cc.accumulator;
+-		tmp = cpcap_battery_cc_to_ua(ddata, sample, accumulator,
+-					     latest->cc.offset);
+-		tmp *= ((latest->voltage + previous->voltage) / 20000);
+-		val->intval = div64_s64(tmp, 100);
+-		break;
+ 	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
+ 		if (cpcap_battery_full(ddata))
+ 			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
 
+									Pavel
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180615/d5a22b93/attachment.sig>
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180615/2ce5a36e/attachment.sig>
