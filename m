@@ -1,67 +1,62 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 15 Jun 2018 10:31:56 +0200
-Subject: Charge counter on droid 4
-In-Reply-To: <20180615080014.GA29192@amd>
-References: <20180615080014.GA29192@amd>
-Message-ID: <20180615083156.GA32102@amd>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 15 Jun 2018 10:45:42 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 04/27] dt-bindings: display:
+ sunxi-drm: Add TCON TOP description
+In-Reply-To: <2481282.yoIGH2ksVh@jernej-laptop>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180612200036.21483-5-jernej.skrabec@siol.net>
+ <20180613073456.jk72zw4rt4ysjco7@flea>
+ <2481282.yoIGH2ksVh@jernej-laptop>
+Message-ID: <20180615084542.slp3ma4krrj744do@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-06-15 10:00:14, Pavel Machek wrote:
-> Hi!
+On Wed, Jun 13, 2018 at 06:03:21PM +0200, Jernej ?krabec wrote:
+> > > +Required properties:
+> > > +  - compatible: value must be one of:
+> > > +    * allwinner,sun8i-r40-tcon-top
+> > > +  - reg: base address and size of the memory-mapped region.
+> > > +  - clocks: phandle to the clocks feeding the TCON TOP
+> > > +    * bus: TCON TOP interface clock
+> > > +  - clock-names: clock name mentioned above
+> > > +  - resets: phandle to the reset line driving the DRC
+> > 
+> > s/DRC/TCON TOP/ ?
 > 
-> Droid 4 has non-removable battery, yet the charge counter is reset to
-> near zero on each boot of linux.
+> Yes, copy & paste issue
 > 
-> Unfortunately, that makes charge counter pretty much useless on d4, as
-> the "battery full" and "battery empty" limits will be different during
-> each boot.
+> > 
+> > > +    * rst: TCON TOP reset line
+> > 
+> > Remaining consistent with the clock name would be great
+> 
+> You mean "ahb"? I noticed that most other nodes with reset lines don't have a 
+> name associated. Maybe I could just drop it and use first specified reset?
 
-Hmm, and could we refrain from providing "power" values?
+It's called bus in the binding, but yes. And yeah, we can drop the
+name as well.
 
-I was thinking great, we have hardware that does proper power
-measuerement for us. No.... it is driver providing synthetic
-values. As userland has enough information to do that itself, I
-believe we should not do this in kernel.
+> > 
+> > > +  - reset-names: reset name mentioned above
+> > > +  - #clock-cells : must contain 1
+> > 
+> > An example would be nice here
+> 
+> You mean node example? with ports? In the past, Rob was against examples 
+> unless really necessary. Node from R40 DTSI can serve as an example.
 
-diff --git a/drivers/power/supply/cpcap-battery.c b/drivers/power/supply/cpcap-battery.c
-index 839e365..1610026 100644
---- a/drivers/power/supply/cpcap-battery.c
-+++ b/drivers/power/supply/cpcap-battery.c
-@@ -490,24 +490,6 @@ static int cpcap_battery_get_property(struct power_supply *psy,
- 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
- 		val->intval = latest->counter_uah;
- 		break;
--	case POWER_SUPPLY_PROP_POWER_NOW:
--		tmp = (latest->voltage / 10000) * latest->current_ua;
--		val->intval = div64_s64(tmp, 100);
--		break;
--	case POWER_SUPPLY_PROP_POWER_AVG:
--		if (cached) {
--			tmp = cpcap_battery_cc_get_avg_current(ddata);
--			tmp *= (latest->voltage / 10000);
--			val->intval = div64_s64(tmp, 100);
--			break;
--		}
--		sample = latest->cc.sample - previous->cc.sample;
--		accumulator = latest->cc.accumulator - previous->cc.accumulator;
--		tmp = cpcap_battery_cc_to_ua(ddata, sample, accumulator,
--					     latest->cc.offset);
--		tmp *= ((latest->voltage + previous->voltage) / 20000);
--		val->intval = div64_s64(tmp, 100);
--		break;
- 	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
- 		if (cpcap_battery_full(ddata))
- 			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
+Ok.
 
-									Pavel
+Maxime
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180615/2ce5a36e/attachment.sig>
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180615/6770fcf3/attachment.sig>
