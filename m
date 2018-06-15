@@ -1,82 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 15 Jun 2018 15:56:08 -0600
-Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
- controller
-In-Reply-To: <8c553dcc-e352-6e69-e08c-4e6237555ea7@ti.com>
-References: <20180605060125.9518-1-nm@ti.com> <20180605060125.9518-4-nm@ti.com>
- <20180612210640.GA20728@rob-hp-laptop>
- <8c553dcc-e352-6e69-e08c-4e6237555ea7@ti.com>
-Message-ID: <CAL_JsqLvygcUSqJpAF_xTt3QRq9=xgu7nF3UDchgPYk+QDj1JA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 15 Jun 2018 19:22:57 -0300
+Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
+In-Reply-To: <638457fd-85da-8fec-d146-517c43f71813@denx.de>
+References: <cover.1529091248.git.leonard.crestez@nxp.com>
+ <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
+ <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
+ <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
+ <638457fd-85da-8fec-d146-517c43f71813@denx.de>
+Message-ID: <CAOMZO5DJju6oBRLakkTx4np7w9nMwPm6TMkGGYjbMLUPDUugYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 11:17 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Hi Rob,
->
-> On Wednesday 13 June 2018 02:36 AM, Rob Herring wrote:
->> On Tue, Jun 05, 2018 at 01:01:22AM -0500, Nishanth Menon wrote:
->>> AM654 uses a UART controller that is compatible (partially) with
->>> existing 8250 UART, however, has a few differences with respect to DMA
->>> support and control paths. Introduce a base definition that allows us
->>> to build up the differences in follow on patches.
->>>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: Vignesh R <vigneshr@ti.com>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> ---
->>>  Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
->>>  drivers/tty/serial/8250/8250_omap.c                      | 1 +
->>>  2 files changed, 2 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
->>> index 4b0f05adb228..c35d5ece1156 100644
->>> --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
->>> +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
->>> @@ -1,6 +1,7 @@
->>>  OMAP UART controller
->>>
->>>  Required properties:
->>> +- compatible : should be "ti,am654-uart" for AM654 controllers
->>
->> Not compatible with any existing TI 8250 UARTs?
->
-> Curious on why you asked about this. Are you suggesting why not:
->
-> "ti,<new-soc>-uart", "ti,<old-soc>-uart"
+On Fri, Jun 15, 2018 at 6:36 PM, Marek Vasut <marex@denx.de> wrote:
 
-Correct.
+> Having two drivers in the kernel with different set of bugs is always bad.
 
-> or you are asking why introduce "ti,<new-soc>-uart" unless there is
-> clear demonstrable need for using it in driver code.
->
-> In general, I think "ti,<new-soc>-uart", "ti,<old-soc>-uart" in
-> device-tree (and by extension in binding document) is better even in
-> there are no _known_ incompatibilities at the time of initial driver
-> submission. The reason is silicon integration and process differences
-> many times spill over into driver.
+Sure, but breaking dtb's is also bad.
 
-Yes, and chip designers can't be trusted. ;)
+Can the mxsfb driver be modified to handle the old style bindings?
 
-> Of course, the idea is not to go postal and create a new compatible for
-> every pin-compatible part number that gets created, but probably a new
-> compatible should be created for a new silicon die.
+The IPU drm driver is capable of handling both the old style where the
+display timing is passed in dts and the new drm style.
 
-Yes, that's the criteria I would use too. That's sometimes hard if
-it's not the chip vendor doing the DT bindings.
+For example:
 
-> We have just started introducing support for this SoC, and since it
-> reuses many IPs, this question is likely to come up again.
->
-> In this particular case though, Nishanth is perfectly right in not saying
->
-> compatible : should be "ti,am654-uart", "ti,omap4-uart"
->
-> Because we *know* UART DMA integration is different and a match against
-> omap4 would result in non-working UART once DMA is enabled by default.
+arch/arm/boot/dts/imx6qdl-sabresd.dtsi uses the drm style binding
+arch/arm/boot/dts/imx6qdl-sabreauto.dtsi uses the old style of passing
+the display timings in dts
 
-Okay, makes sense. I'd suggest rewording the commit message to include
-this. The "compatible to 8250 except for DMA" part I would have
-applied to all TI UARTs rather than DMA differences with other TI
-UARTs.
+Both formats are accepted by the ipu drm driver.
 
-Rob
+Can't mxsfb drm driver support both? Then we don't need to worry about
+breaking dtb's and could safely remove the mxs fbdev driver.
