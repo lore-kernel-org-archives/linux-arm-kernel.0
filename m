@@ -1,9 +1,9 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Fri, 15 Jun 2018 12:15:00 +0200
-Subject: [PATCH 05/11] media: af9013: switch to i2c_lock_segment
+Date: Fri, 15 Jun 2018 12:15:02 +0200
+Subject: [PATCH 07/11] media: rtl2830: switch to i2c_lock_segment
 In-Reply-To: <20180615101506.8012-1-peda@axentia.se>
 References: <20180615101506.8012-1-peda@axentia.se>
-Message-ID: <20180615101506.8012-6-peda@axentia.se>
+Message-ID: <20180615101506.8012-8-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,38 +14,48 @@ the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/media/dvb-frontends/af9013.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/media/dvb-frontends/rtl2830.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/media/dvb-frontends/af9013.c b/drivers/media/dvb-frontends/af9013.c
-index 482bce49819a..a504697ff557 100644
---- a/drivers/media/dvb-frontends/af9013.c
-+++ b/drivers/media/dvb-frontends/af9013.c
-@@ -1312,10 +1312,10 @@ static int af9013_wregs(struct i2c_client *client, u8 cmd, u16 reg,
- 	memcpy(&buf[3], val, len);
+diff --git a/drivers/media/dvb-frontends/rtl2830.c b/drivers/media/dvb-frontends/rtl2830.c
+index 7bbfe11d11ed..85a8a9c4d020 100644
+--- a/drivers/media/dvb-frontends/rtl2830.c
++++ b/drivers/media/dvb-frontends/rtl2830.c
+@@ -24,9 +24,9 @@ static int rtl2830_bulk_write(struct i2c_client *client, unsigned int reg,
+ 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
+ 	int ret;
  
- 	if (lock)
--		i2c_lock_adapter(client->adapter);
-+		i2c_lock_segment(client->adapter);
- 	ret = __i2c_transfer(client->adapter, msg, 1);
- 	if (lock)
--		i2c_unlock_adapter(client->adapter);
-+		i2c_unlock_segment(client->adapter);
- 	if (ret < 0) {
- 		goto err;
- 	} else if (ret != 1) {
-@@ -1353,10 +1353,10 @@ static int af9013_rregs(struct i2c_client *client, u8 cmd, u16 reg,
- 	buf[2] = cmd;
+-	i2c_lock_adapter(client->adapter);
++	i2c_lock_segment(client->adapter);
+ 	ret = regmap_bulk_write(dev->regmap, reg, val, val_count);
+-	i2c_unlock_adapter(client->adapter);
++	i2c_unlock_segment(client->adapter);
+ 	return ret;
+ }
  
- 	if (lock)
--		i2c_lock_adapter(client->adapter);
-+		i2c_lock_segment(client->adapter);
- 	ret = __i2c_transfer(client->adapter, msg, 2);
- 	if (lock)
--		i2c_unlock_adapter(client->adapter);
-+		i2c_unlock_segment(client->adapter);
- 	if (ret < 0) {
- 		goto err;
- 	} else if (ret != 2) {
+@@ -36,9 +36,9 @@ static int rtl2830_update_bits(struct i2c_client *client, unsigned int reg,
+ 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
+ 	int ret;
+ 
+-	i2c_lock_adapter(client->adapter);
++	i2c_lock_segment(client->adapter);
+ 	ret = regmap_update_bits(dev->regmap, reg, mask, val);
+-	i2c_unlock_adapter(client->adapter);
++	i2c_unlock_segment(client->adapter);
+ 	return ret;
+ }
+ 
+@@ -48,9 +48,9 @@ static int rtl2830_bulk_read(struct i2c_client *client, unsigned int reg,
+ 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
+ 	int ret;
+ 
+-	i2c_lock_adapter(client->adapter);
++	i2c_lock_segment(client->adapter);
+ 	ret = regmap_bulk_read(dev->regmap, reg, val, val_count);
+-	i2c_unlock_adapter(client->adapter);
++	i2c_unlock_segment(client->adapter);
+ 	return ret;
+ }
+ 
 -- 
 2.11.0
