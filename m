@@ -1,115 +1,58 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Fri, 15 Jun 2018 10:51:09 +0100
-Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
-In-Reply-To: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
-References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
-Message-ID: <20180615095109.GA4380@xora-sinquacker>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Fri, 15 Jun 2018 11:51:05 +0200
+Subject: [PATCH v2 2/4] dt-bindings: mailbox: provide imx-mailbox documentation
+In-Reply-To: <20180615095107.24610-1-o.rempel@pengutronix.de>
+References: <20180615095107.24610-1-o.rempel@pengutronix.de>
+Message-ID: <20180615095107.24610-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 11:22:30AM -0700, Geoff Levand wrote:
-> Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
-> a work-around for HPE ProLiant m400 APEI firmware problems.
-> 
-> The work-around disables APEI when CONFIG_ACPI_APEI is set and
-> m400 firmware is detected.  Without this fixup m400 systems
-> experience errors like these on startup:
-> 
->   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
->   [Hardware Error]: event severity: fatal
->   [Hardware Error]:  Error 0, type: fatal
->   [Hardware Error]:   section_type: memory error
->   [Hardware Error]:   error_status: 0x0000000000001300
->   [Hardware Error]:   error_type: 10, invalid address
->   Kernel panic - not syncing: Fatal hardware error!
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
-> Hi,
-> 
-> It seems unlikely there will be any m400 firmware updates to fix
-> this problem.  APEI support is desired for new ARM64 servers coming
-> to market.  Distros are now forced to have their own fixes, not
-> enable APEI, or let m400 users fend for themselves.
-> 
-> Please consider.
-> 
-> -Geoff
-> 
->  arch/arm64/kernel/acpi.c | 40 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 36 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 7b09487ff8fb..3c315c2c7476 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -31,6 +31,8 @@
->  #include <asm/cpu_ops.h>
->  #include <asm/smp_plat.h>
->  
-> +#include <acpi/apei.h>
-> +
->  #ifdef CONFIG_ACPI_APEI
->  # include <linux/efi.h>
->  # include <asm/pgtable.h>
-> @@ -177,6 +179,33 @@ static int __init acpi_fadt_sanity_check(void)
->  	return ret;
->  }
->  
-> +/*
-> + * acpi_fixup_m400_quirks - Work-around for HPE ProLiant m400 APEI firmware
-> + * problems.
-> + */
-> +static void __init acpi_fixup_m400_quirks(void)
-> +{
-> +	acpi_status status;
-> +	struct acpi_table_header *header;
-> +#if !defined(CONFIG_ACPI_APEI)
-> +	int hest_disable = HEST_DISABLED;
-> +#endif
-> +
-> +	if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
-> +		return;
-> +
-> +	status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
-> +
-> +	if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
-> +		!strncmp(header->oem_table_id, "ProLiant", 8) &&
-> +		MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
-> +		hest_disable = HEST_DISABLED;
-> +		pr_info("Disabled APEI for m400.\n");
-> +	}
-> +
-> +	acpi_put_table(header);
-> +}
-> +
->  /*
->   * acpi_boot_table_init() called from setup_arch(), always.
->   *	1. find RSDP and get its address, and then find XSDT
-> @@ -232,11 +261,14 @@ void __init acpi_boot_table_init(void)
->  	if (acpi_disabled) {
->  		if (earlycon_acpi_spcr_enable)
->  			early_init_dt_scan_chosen_stdout();
-> -	} else {
-> -		acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
-> -		if (IS_ENABLED(CONFIG_ACPI_BGRT))
-> -			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
-> +		return;
->  	}
-> +
-> +	acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
-> +	if (IS_ENABLED(CONFIG_ACPI_BGRT))
-> +		acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
-> +
-> +	acpi_fixup_m400_quirks();
->  }
->  
->  #ifdef CONFIG_ACPI_APEI
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ .../bindings/mailbox/imx-mailbox.txt          | 35 +++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
 
-Quirk actually make code nicer to read.
-
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-
-Thanks we needed this having 90+ m400s
-
-Graeme
+diff --git a/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+new file mode 100644
+index 000000000000..1577b86f1206
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/imx-mailbox.txt
+@@ -0,0 +1,35 @@
++i.MX Messaging Unit
++===================
++
++The i.MX Messaging Unit (MU) contains two register sets: "A" and "B". In most
++cases they are accessible from all Processor Units. On one hand, at least for
++mailbox functionality, it makes no difference which application or processor is
++using which set of the MU. On other hand, the register sets for each of the MU
++parts are not identical.
++
++Required properties:
++- compatible :	Shell be one of:
++                    "fsl,imx7s-mu-a" and "fsl,imx7s-mu-b" for i.MX7S or i.MX7D
++- reg :		physical base address of the mailbox and length of
++		memory mapped region.
++- #mbox-cells:	Common mailbox binding property to identify the number
++		of cells required for the mailbox specifier. Should be 1.
++- interrupts :	The interrupt number
++- clocks     :  phandle to the input clock.
++
++Example:
++	mu0a: mailbox at 30aa0000 {
++		compatible = "fsl,imx7s-mu-a";
++		reg = <0x30aa0000 0x28>;
++		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks IMX7D_MU_ROOT_CLK>;
++		#mbox-cells = <1>;
++	};
++
++	mu0b: mailbox at 30ab0000 {
++		compatible = "fsl,imx7s-mu-b";
++		reg = <0x30ab0000 0x28>;
++		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks IMX7D_MU_ROOT_CLK>;
++		#mbox-cells = <1>;
++	};
+-- 
+2.17.1
