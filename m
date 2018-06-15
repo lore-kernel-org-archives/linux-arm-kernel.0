@@ -1,130 +1,90 @@
 From: ben.whitten@gmail.com (Ben Whitten)
-Date: Fri, 15 Jun 2018 14:40:54 +0100
-Subject: [PATCH v2 5/6] arm: dts: add support for Gatwick board based on WB50N
+Date: Fri, 15 Jun 2018 14:40:52 +0100
+Subject: [PATCH v2 3/6] arm: dts: add support for Laird WB45N cpu module and
+ DVK
 In-Reply-To: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
 References: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
-Message-ID: <1529070055-18701-5-git-send-email-ben.whitten@lairdtech.com>
+Message-ID: <1529070055-18701-3-git-send-email-ben.whitten@lairdtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the LoRa gateway from Laird, the RG1xx.
-This board houses the WB50NBT CPU module along with a Semtech SX1301 based
-concentrator card.
-https://www.lairdtech.com/products/rg1xx-lora-gateway
+This adds support for Lairds combo CPU module, featuring on board
+Atheros wifi, CSR Bluetooth radio and, Atmel CPU.
+https://www.lairdtech.com/products/wb45nbt
 
 Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
-
-# Conflicts:
-#	arch/arm/boot/dts/Makefile
 ---
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/at91-gatwick.dts | 121 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 122 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-gatwick.dts
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/at91-wb45n.dts  |  64 +++++++++++++++
+ arch/arm/boot/dts/at91-wb45n.dtsi | 165 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 230 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
+ create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 07823be..214d5d9 100644
+index 7e24249..04604d2 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -51,6 +51,7 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
- 	at91-sama5d2_ptc_ek.dtb \
- 	at91-sama5d2_xplained.dtb \
- 	at91-sama5d3_xplained.dtb \
-+	at91-gatwick.dtb \
- 	at91-tse850-3.dtb \
- 	at91-wb50n.dtb \
- 	sama5d31ek.dtb \
-diff --git a/arch/arm/boot/dts/at91-gatwick.dts b/arch/arm/boot/dts/at91-gatwick.dts
+@@ -38,6 +38,7 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+ 	at91-ariettag25.dtb \
+ 	at91-cosino_mega2560.dtb \
+ 	at91-kizboxmini.dtb \
++	at91-wb45n.dtb \
+ 	at91sam9g15ek.dtb \
+ 	at91sam9g25ek.dtb \
+ 	at91sam9g35ek.dtb \
+diff --git a/arch/arm/boot/dts/at91-wb45n.dts b/arch/arm/boot/dts/at91-wb45n.dts
 new file mode 100644
-index 0000000..5a81cab
+index 0000000..64ce150
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91-gatwick.dts
-@@ -0,0 +1,121 @@
++++ b/arch/arm/boot/dts/at91-wb45n.dts
+@@ -0,0 +1,64 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * at91-gatwick.dts - Device Tree file for the Gatwick board
++ * at91-wb45n.dts - Device Tree file for WB45NBT board
 + *
 + *  Copyright (C) 2018 Laird
 + *
-+ */
++*/
 +/dts-v1/;
-+#include "at91-wb50n.dtsi"
-+#include <dt-bindings/input/input.h>
++#include "at91-wb45n.dtsi"
 +
 +/ {
-+	model = "Laird Workgroup Bridge 50N - Project Gatwick";
-+	compatible = "laird,gatwick", "laird,wb50n", "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
++	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
++	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5", "atmel,at91sam9";
 +
 +	gpio_keys {
 +		compatible = "gpio-keys";
-+		autorepeat;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_key_gpio>;
-+
-+		reset-button {
-+			label = "Reset Button";
-+			linux,code = <KEY_SETUP>;
-+			gpios = <&pioE 31 GPIO_ACTIVE_LOW>;
-+			wakeup-source;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		ethernet {
-+			label = "gatwick:yellow:ethernet";
-+			gpios = <&pioA 10 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		wifi {
-+			label = "gatwick:green:wifi";
-+			gpios = <&pioA 28 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		ble {
-+			label = "gatwick:blue:ble";
-+			gpios = <&pioA 22 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		lora {
-+			label = "gatwick:orange:lora";
-+			gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		blank {
-+			label = "gatwick:green:blank";
-+			gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		user {
-+			label = "gatwick:yellow:user";
-+			gpios = <&pioA 12 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
++		irqbtn at 18 {
++			reg = <18>;
++			label = "IRQBTN";
++			linux,code = <99>;
++			gpios = <&pioB 18 GPIO_ACTIVE_LOW>;
++			gpio-key,wakeup = <1>;
 +		};
 +	};
 +};
 +
-+&pinctrl {
-+	board {
-+		pinctrl_key_gpio: key_gpio_0 {
-+		  atmel,pins =
-+			  <AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PE31 GPIO with pullup deglitch */
-+	  };
-+	};
++&watchdog {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
 +};
 +
 +&mmc0 {
 +	status = "okay";
 +};
 +
-+&macb1 {
++&spi0 {
++	status = "okay";
++};
++
++&macb0 {
 +	status = "okay";
 +};
 +
@@ -132,34 +92,187 @@ index 0000000..5a81cab
 +	status = "okay";
 +};
 +
-+/* FTDI USART */
 +&usart0 {
 +	status = "okay";
 +};
 +
-+/* GPS USART */
-+&usart1 {
-+	pinctrl-0 = <&pinctrl_usart1>;
++&usart3 {
 +	status = "okay";
 +};
 +
-+&spi1 {
++&i2c1 {
 +	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/at91-wb45n.dtsi b/arch/arm/boot/dts/at91-wb45n.dtsi
+new file mode 100644
+index 0000000..ebe61a2
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-wb45n.dtsi
+@@ -0,0 +1,165 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * at91-wb45n.dtsi - Device Tree file for WB45NBT board
++ *
++ *  Copyright (C) 2018 Laird
++ *
++ */
 +
-+	spidev at 0 {
-+		compatible = "semtech,sx1301";
-+		reg = <0>;
-+		spi-max-frequency = <8000000>;
++#include "at91sam9g25.dtsi"
++
++/ {
++	model = "Laird Workgroup Bridge 45N - Atmel AT91SAM (dt)";
++	compatible = "laird,wb45n", "laird,wbxx", "atmel,at91sam9x5", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "ubi.mtd=6 root=ubi0:rootfs rootfstype=ubifs rw";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	atheros {
++		compatible = "atheros,ath6kl";
++		atheros,board-id = "SD32";
 +	};
 +};
 +
-+&usb1 {
++&reset_controller {
++	compatible = "atmel,sama5d3-rstc";
++};
++
++&shutdown_controller {
++	atmel,wakeup-mode = "low";
++};
++
++&slow_xtal {
++	clock-frequency = <32768>;
++};
++
++&main_xtal {
++	clock-frequency = <12000000>;
++};
++
++&ebi {
 +	status = "okay";
-+	/delete-property/atmel,oc-gpio;
++	nand_controller: nand-controller {
++		pinctrl-0 = <&pinctrl_nand_cs &pinctrl_nand_rb &pinctrl_nand_oe_we>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		nand at 3 {
++			reg = <0x3 0x0 0x800000>;
++			rb-gpios = <&pioD 5 GPIO_ACTIVE_HIGH>;
++			cs-gpios = <&pioD 4 GPIO_ACTIVE_HIGH>;
++			nand-bus-width = <8>;
++			nand-ecc-mode = "hw";
++			nand-ecc-strength = <4>;
++			nand-ecc-step-size = <512>;
++			nand-on-flash-bbt;
++			label = "atmel_nand";
++
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				at91bootstrap at 0 {
++					label = "at91bs";
++					reg = <0x0 0x20000>;
++				};
++
++				uboot at 20000 {
++					label = "u-boot";
++					reg = <0x20000 0x80000>;
++				};
++
++				ubootenv at a0000 {
++					label = "u-boot-env";
++					reg = <0xa0000 0x20000>;
++				};
++
++				ubootenv at c0000 {
++					label = "redund-env";
++					reg = <0xc0000 0x20000>;
++				};
++
++				kernel-a at e0000 {
++					label = "kernel-a";
++					reg = <0xe0000 0x280000>;
++				};
++
++				kernel-b at 360000 {
++					label = "kernel-b";
++					reg = <0x360000 0x280000>;
++				};
++
++				rootfs-a at 5e0000 {
++					label = "rootfs-a";
++					reg = <0x5e0000 0x2600000>;
++				};
++
++				rootfs-b at 2be0000 {
++					label = "rootfs-b";
++					reg = <0x2be0000 0x2600000>;
++				};
++
++				user at 51e0000 {
++					label = "user";
++					reg = <0x51e0000 0x2dc0000>;
++				};
++
++				logs at 7fa0000 {
++					label = "logs";
++					reg = <0x7fa0000 0x60000>;
++				};
++
++			};
++		};
++	};
++};
++
++&usb0 {
++	num-ports = <2>;
++	atmel,vbus-gpio = <
++		&pioB 12 GPIO_ACTIVE_HIGH
++		&pioA 31 GPIO_ACTIVE_HIGH
++		>;
++	atmel,oc-gpio = <&pioB 13 GPIO_ACTIVE_LOW>;
++};
++
++&macb0 {
++	phy-mode = "rmii";
++};
++
++&spi0 {
++	cs-gpios = <&pioA 14 0>, <&pioA 7 0>, <0>, <0>;
 +};
 +
 +&usb2 {
-+	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_board_usb2>;
++	atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
 +};
++
++&mmc0 {
++	pinctrl-0 = <
++		&pinctrl_mmc0_slot0_clk_cmd_dat0
++		&pinctrl_mmc0_slot0_dat1_3>;
++	slot at 0 {
++		reg = <0>;
++		bus-width = <4>;
++	};
++};
++
++&pinctrl {
++	usb2 {
++		pinctrl_board_usb2: usb2-board {
++			atmel,pins =
++				<AT91_PIOB 11 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB11 gpio vbus sense, deglitch */
++		};
++	};
++};
++
 -- 
 2.7.4
