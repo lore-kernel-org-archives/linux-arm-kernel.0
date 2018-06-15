@@ -1,155 +1,69 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 15 Jun 2018 10:17:18 -0700
-Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
-In-Reply-To: <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
-References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
- <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
-Message-ID: <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Jun 2018 22:47:53 +0530
+Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
+ controller
+In-Reply-To: <20180612210640.GA20728@rob-hp-laptop>
+References: <20180605060125.9518-1-nm@ti.com>
+ <20180605060125.9518-4-nm@ti.com> <20180612210640.GA20728@rob-hp-laptop>
+Message-ID: <8c553dcc-e352-6e69-e08c-4e6237555ea7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Rob,
 
-Just for background, this is a well known bug in the m400's AEPI/HEST
-firmware.  There are a number of fixes out there the different distros
-have.  I just put together this patch to unify things and have a
-common 'upstream' fix.
-
-On 06/15/2018 04:14 AM, James Morse wrote:
-> On 13/06/18 19:22, Geoff Levand wrote:
->> Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
->> a work-around for HPE ProLiant m400 APEI firmware problems.
+On Wednesday 13 June 2018 02:36 AM, Rob Herring wrote:
+> On Tue, Jun 05, 2018 at 01:01:22AM -0500, Nishanth Menon wrote:
+>> AM654 uses a UART controller that is compatible (partially) with
+>> existing 8250 UART, however, has a few differences with respect to DMA
+>> support and control paths. Introduce a base definition that allows us
+>> to build up the differences in follow on patches.
 >>
->> The work-around disables APEI when CONFIG_ACPI_APEI is set and
->> m400 firmware is detected.  Without this fixup m400 systems
->> experience errors like these on startup:
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Vignesh R <vigneshr@ti.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
+>>  drivers/tty/serial/8250/8250_omap.c                      | 1 +
+>>  2 files changed, 2 insertions(+)
 >>
->>   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
->>   [Hardware Error]: event severity: fatal
->>   [Hardware Error]:  Error 0, type: fatal
->>   [Hardware Error]:   section_type: memory error
->>   [Hardware Error]:   error_status: 0x0000000000001300
-> 
-> "Access to a memory address which is not mapped to any component"
-> 
-> 
->>   [Hardware Error]:   error_type: 10, invalid address
->>   Kernel panic - not syncing: Fatal hardware error!
-> 
-> Why is this a problem?
-> 
-> Surely this is a valid description of an error.
-
-The firmware bug causes this failure, not bad hardware.
-
-> (okay its not particularly useful without the physical address, but the address
-> is optional in that structure)
-> 
-> When does this happen during boot? This looks like a driver mapping some
-> non-existent physical address space to see if its device is present...
-> unsurprisingly this doesn't go well.
-> (might also be a typo in the DSDT)
-> 
-> Can't we pin down the driver that does this and fix it. Its either wrong for
-> everyone, or still broken after you disable APEI.
-> 
-> 
->> It seems unlikely there will be any m400 firmware updates to fix
->> this problem.
-> 
-> What is the problem? This patch looks like it shoots the messenger for bringing
-> bad news.
- 
-The news is incorrect, so this patch disables the source (APEI code).
-
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 7b09487ff8fb..3c315c2c7476 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -31,6 +31,8 @@
->>  #include <asm/cpu_ops.h>
->>  #include <asm/smp_plat.h>
+>> diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
+>> index 4b0f05adb228..c35d5ece1156 100644
+>> --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
+>> +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
+>> @@ -1,6 +1,7 @@
+>>  OMAP UART controller
 >>  
->> +#include <acpi/apei.h>
->> +
->>  #ifdef CONFIG_ACPI_APEI
->>  # include <linux/efi.h>
->>  # include <asm/pgtable.h>
->> @@ -177,6 +179,33 @@ static int __init acpi_fadt_sanity_check(void)
->>  	return ret;
->>  }
->>  
->> +/*
->> + * acpi_fixup_m400_quirks - Work-around for HPE ProLiant m400 APEI firmware
->> + * problems.
->> + */
->> +static void __init acpi_fixup_m400_quirks(void)
->> +{
->> +	acpi_status status;
->> +	struct acpi_table_header *header;
->> +#if !defined(CONFIG_ACPI_APEI)
->> +	int hest_disable = HEST_DISABLED;
->> +#endif
+>>  Required properties:
+>> +- compatible : should be "ti,am654-uart" for AM654 controllers
 > 
-> Yuck.
+> Not compatible with any existing TI 8250 UARTs?
 
-Yes, unfortunately, the hest code conditionally defines hest_disable.
+Curious on why you asked about this. Are you suggesting why not:
 
->> +
->> +	if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
->> +		return;
->> +
->> +	status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
->> +
->> +	if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
->> +		!strncmp(header->oem_table_id, "ProLiant", 8) &&
-> 
-> You should match the affected range of OEM table revisions too, that way a
-> firmware upgrade should start working, instead of being permanently disabled
-> because we think its unlikely.
+"ti,<new-soc>-uart", "ti,<old-soc>-uart"
 
-The m400 has reached end of life. No one really expects to see any firmware
-update.  I don't know what the effected OEM table revisions are, and I don't
-think there is an active platform maintainer who could give that info either.
+or you are asking why introduce "ti,<new-soc>-uart" unless there is
+clear demonstrable need for using it in driver code.
 
-If someone can provide the info. I'll update the fix.
+In general, I think "ti,<new-soc>-uart", "ti,<old-soc>-uart" in
+device-tree (and by extension in binding document) is better even in
+there are no _known_ incompatibilities at the time of initial driver
+submission. The reason is silicon integration and process differences
+many times spill over into driver.
 
->> +		MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
-> 
-> How is the CPU implementer relevant?
+Of course, the idea is not to go postal and create a new compatible for
+every pin-compatible part number that gets created, but probably a new
+compatible should be created for a new silicon die.
 
-That was just a copy of what other fixes had.  Should I remove it?
+We have just started introducing support for this SoC, and since it
+reuses many IPs, this question is likely to come up again.
 
-> You suggest a firmware-update would make this issue go away...
-> 
-> 
->> +		hest_disable = HEST_DISABLED;
->> +		pr_info("Disabled APEI for m400.\n");
->> +	}
->> +
->> +	acpi_put_table(header);
->> +}
->> +
->>  /*
->>   * acpi_boot_table_init() called from setup_arch(), always.
->>   *	1. find RSDP and get its address, and then find XSDT
-> 
-> Nothing arch-specific here. You're adding this to arch/arm64 because
-> drivers/acpi/apei doesn't have an existing quirks table?
+In this particular case though, Nishanth is perfectly right in not saying
 
-There was a fix submitted that had it in drivers/acpi/scan.c, but the
-ACPI maintainer said he didn't want the fix in the main ACPI code.
-See:
+compatible : should be "ti,am654-uart", "ti,omap4-uart"
 
-  https://lkml.org/lkml/2018/4/19/1020 (ACPI / scan: Fix regression related to X-Gene UARTs)
+Because we *know* UART DMA integration is different and a match against
+omap4 would result in non-working UART once DMA is enabled by default.
 
-The m400 is an arm64 platform, so it seems most appropriate to
-have it in arch/arm64/kernel/acpi.c.  I followed what was done
-for x86 quirks (into arch/x86/kernel/acpi/boot.c), and what was
-suggested here: 
-
-  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=900581 (linux: Enable Buster kernel features for newer ARM64 servers)
-
-Thanks for the review.
-
--Geoff
+Thanks,
+Sekhar
