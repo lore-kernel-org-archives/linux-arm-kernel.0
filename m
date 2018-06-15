@@ -1,99 +1,43 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Fri, 15 Jun 2018 12:14:56 +0200
-Subject: [PATCH 01/11] i2c: add helpers for locking the I2C segment
+Date: Fri, 15 Jun 2018 12:14:59 +0200
+Subject: [PATCH 04/11] input: rohm_bu21023: switch to i2c_lock_segment
 In-Reply-To: <20180615101506.8012-1-peda@axentia.se>
 References: <20180615101506.8012-1-peda@axentia.se>
-Message-ID: <20180615101506.8012-2-peda@axentia.se>
+Message-ID: <20180615101506.8012-5-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is what almost all drivers want to do. By only advertising
-i2c_lock_adapter, they are tricked into locking the root adapter
-which is too big of a hammer in most cases.
-
-While at it, convert all open-coded locking of the I2C segment.
+Locking the root adapter for __i2c_transfer will deadlock if the
+device sits behind a mux-locked I2C mux. Switch to the finer-grained
+i2c_lock_segment. If the device does not sit behind a mux-locked mux,
+the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/i2c/i2c-core-base.c  |  6 +++---
- drivers/i2c/i2c-core-smbus.c |  4 ++--
- include/linux/i2c.h          | 18 ++++++++++++++++++
- 3 files changed, 23 insertions(+), 5 deletions(-)
+ drivers/input/touchscreen/rohm_bu21023.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-index 1ba40bb2b966..3eb09dc20573 100644
---- a/drivers/i2c/i2c-core-base.c
-+++ b/drivers/i2c/i2c-core-base.c
-@@ -1932,16 +1932,16 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
- #endif
+diff --git a/drivers/input/touchscreen/rohm_bu21023.c b/drivers/input/touchscreen/rohm_bu21023.c
+index bda0500c9b57..22d79db07234 100644
+--- a/drivers/input/touchscreen/rohm_bu21023.c
++++ b/drivers/input/touchscreen/rohm_bu21023.c
+@@ -304,7 +304,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
+ 	msg[1].len = len;
+ 	msg[1].buf = buf;
  
- 		if (in_atomic() || irqs_disabled()) {
--			ret = i2c_trylock_bus(adap, I2C_LOCK_SEGMENT);
-+			ret = i2c_trylock_segment(adap);
- 			if (!ret)
- 				/* I2C activity is ongoing. */
- 				return -EAGAIN;
- 		} else {
--			i2c_lock_bus(adap, I2C_LOCK_SEGMENT);
-+			i2c_lock_segment(adap);
+-	i2c_lock_adapter(adap);
++	i2c_lock_segment(adap);
+ 
+ 	for (i = 0; i < 2; i++) {
+ 		if (__i2c_transfer(adap, &msg[i], 1) < 0) {
+@@ -313,7 +313,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
  		}
+ 	}
  
- 		ret = __i2c_transfer(adap, msgs, num);
--		i2c_unlock_bus(adap, I2C_LOCK_SEGMENT);
-+		i2c_unlock_segment(adap);
+-	i2c_unlock_adapter(adap);
++	i2c_unlock_segment(adap);
  
- 		return ret;
- 	} else {
-diff --git a/drivers/i2c/i2c-core-smbus.c b/drivers/i2c/i2c-core-smbus.c
-index b5aec33002c3..8a820fdef3e0 100644
---- a/drivers/i2c/i2c-core-smbus.c
-+++ b/drivers/i2c/i2c-core-smbus.c
-@@ -537,7 +537,7 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
- 	flags &= I2C_M_TEN | I2C_CLIENT_PEC | I2C_CLIENT_SCCB;
- 
- 	if (adapter->algo->smbus_xfer) {
--		i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
-+		i2c_lock_segment(adapter);
- 
- 		/* Retry automatically on arbitration loss */
- 		orig_jiffies = jiffies;
-@@ -551,7 +551,7 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
- 				       orig_jiffies + adapter->timeout))
- 				break;
- 		}
--		i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
-+		i2c_unlock_segment(adapter);
- 
- 		if (res != -EOPNOTSUPP || !adapter->algo->master_xfer)
- 			goto trace;
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index 44ad14e016b5..c9080d49e988 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -768,6 +768,24 @@ i2c_unlock_adapter(struct i2c_adapter *adapter)
- 	i2c_unlock_bus(adapter, I2C_LOCK_ROOT_ADAPTER);
+ 	return ret;
  }
- 
-+static inline void
-+i2c_lock_segment(struct i2c_adapter *adapter)
-+{
-+	i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
-+}
-+
-+static inline int
-+i2c_trylock_segment(struct i2c_adapter *adapter)
-+{
-+	return i2c_trylock_bus(adapter, I2C_LOCK_SEGMENT);
-+}
-+
-+static inline void
-+i2c_unlock_segment(struct i2c_adapter *adapter)
-+{
-+	i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
-+}
-+
- /*flags for the client struct: */
- #define I2C_CLIENT_PEC		0x04	/* Use Packet Error Checking */
- #define I2C_CLIENT_TEN		0x10	/* we have a ten bit chip address */
 -- 
 2.11.0
