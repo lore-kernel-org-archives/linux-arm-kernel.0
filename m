@@ -1,95 +1,155 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 16 Jun 2018 01:13:17 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
- for tcon-top gate
-In-Reply-To: <2948115.KggauuSURZ@jernej-laptop>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-12-jernej.skrabec@siol.net>
- <20180615083110.laruycabvyjmesmo@flea>
- <2948115.KggauuSURZ@jernej-laptop>
-Message-ID: <CAGb2v66UFRKRF4_zbm8nQJYoOHb-iLbiU_0iYWep=WNiQDftMQ@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 15 Jun 2018 10:17:18 -0700
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+Message-ID: <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
-<jernej.skrabec@siol.net> wrote:
-> Hi,
->
-> Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard napisal(a):
->> Hi,
+Hi James,
+
+Just for background, this is a well known bug in the m400's AEPI/HEST
+firmware.  There are a number of fixes out there the different distros
+have.  I just put together this patch to unify things and have a
+common 'upstream' fix.
+
+On 06/15/2018 04:14 AM, James Morse wrote:
+> On 13/06/18 19:22, Geoff Levand wrote:
+>> Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
+>> a work-around for HPE ProLiant m400 APEI firmware problems.
 >>
->> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
->> > TV TCONs connected to TCON TOP have to enable additional gate in order
->> > to work.
->> >
->> > Add support for such TCONs.
->> >
->> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> > ---
->> >
->> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
->> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
->> >  2 files changed, 15 insertions(+)
->> >
->> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 08747fc3ee71..0afb5a94a414
->> > 100644
->> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device *dev,
->> >
->> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
->> >             return PTR_ERR(tcon->clk);
->> >
->> >     }
->> >
->> > +
->> > +   if (tcon->quirks->has_tcon_top_gate) {
->> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
->> > +           if (IS_ERR(tcon->top_clk)) {
->> > +                   dev_err(dev, "Couldn't get the TCON TOP bus clock\n");
->> > +                   return PTR_ERR(tcon->top_clk);
->> > +           }
->> > +           clk_prepare_enable(tcon->top_clk);
->> > +   }
->> > +
+>> The work-around disables APEI when CONFIG_ACPI_APEI is set and
+>> m400 firmware is detected.  Without this fixup m400 systems
+>> experience errors like these on startup:
 >>
->> Is it required for the TCON itself to operate, or does the TCON
->> requires the TCON TOP, which in turn requires that clock to be
->> functional?
->>
->> I find it quite odd to have a clock that isn't meant for a particular
->> device to actually be wired to another device. I'm not saying this
->> isn't the case, but it would be a first.
->
-> Documentation doesn't say much about that gate. I did few tests and TCON
-> registers can be read and written even if TCON TOP TV TCON gate is disabled.
-> However, there is no image, as expected.
+>>   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+>>   [Hardware Error]: event severity: fatal
+>>   [Hardware Error]:  Error 0, type: fatal
+>>   [Hardware Error]:   section_type: memory error
+>>   [Hardware Error]:   error_status: 0x0000000000001300
+> 
+> "Access to a memory address which is not mapped to any component"
+> 
+> 
+>>   [Hardware Error]:   error_type: 10, invalid address
+>>   Kernel panic - not syncing: Fatal hardware error!
+> 
+> Why is this a problem?
+> 
+> Surely this is a valid description of an error.
 
-The R40 manual does include it in the diagram, on page 504. There's also a
-mux to select whether the clock comes directly from the CCU or the TV encoder
-(a feedback mode?). I assume this is the gate you are referring to here, in
-which case it is not a bus clock, but rather the TCON module or channel clock,
-strangely routed.
+The firmware bug causes this failure, not bad hardware.
 
-> More interestingly, I enabled test pattern directly in TCON to eliminate
-> influence of the mixer. As soon as I disabled that gate, test pattern on HDMI
-> screen was gone, which suggest that this gate influences something inside
-> TCON.
->
-> Another test I did was that I moved enable/disable gate code to
-> sun4i_tcon_channel_set_status() and it worked just as well.
->
-> I'll ask AW engineer what that gate actually does, but from what I saw, I
-> would say that most appropriate location to enable/disable TCON TOP TV TCON
-> gate is TCON driver. Alternatively, TCON TOP driver could check if any TV TCON
-> is in use and enable appropriate gate. However, that doesn't sound right to me
-> for some reason.
+> (okay its not particularly useful without the physical address, but the address
+> is optional in that structure)
+> 
+> When does this happen during boot? This looks like a driver mapping some
+> non-existent physical address space to see if its device is present...
+> unsurprisingly this doesn't go well.
+> (might also be a typo in the DSDT)
+> 
+> Can't we pin down the driver that does this and fix it. Its either wrong for
+> everyone, or still broken after you disable APEI.
+> 
+> 
+>> It seems unlikely there will be any m400 firmware updates to fix
+>> this problem.
+> 
+> What is the problem? This patch looks like it shoots the messenger for bringing
+> bad news.
+ 
+The news is incorrect, so this patch disables the source (APEI code).
 
-If what I said above it true, then yes, the appropriate location to enable it
-is the TCON driver, but moreover, the representation of the clock tree should
-be fixed such that the TCON takes the clock from the TCON TOP as its channel/
-module clock instead. That way you don't need this patch, but you'd add another
-for all the clock routing.
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 7b09487ff8fb..3c315c2c7476 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -31,6 +31,8 @@
+>>  #include <asm/cpu_ops.h>
+>>  #include <asm/smp_plat.h>
+>>  
+>> +#include <acpi/apei.h>
+>> +
+>>  #ifdef CONFIG_ACPI_APEI
+>>  # include <linux/efi.h>
+>>  # include <asm/pgtable.h>
+>> @@ -177,6 +179,33 @@ static int __init acpi_fadt_sanity_check(void)
+>>  	return ret;
+>>  }
+>>  
+>> +/*
+>> + * acpi_fixup_m400_quirks - Work-around for HPE ProLiant m400 APEI firmware
+>> + * problems.
+>> + */
+>> +static void __init acpi_fixup_m400_quirks(void)
+>> +{
+>> +	acpi_status status;
+>> +	struct acpi_table_header *header;
+>> +#if !defined(CONFIG_ACPI_APEI)
+>> +	int hest_disable = HEST_DISABLED;
+>> +#endif
+> 
+> Yuck.
 
-ChenYu
+Yes, unfortunately, the hest code conditionally defines hest_disable.
+
+>> +
+>> +	if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
+>> +		return;
+>> +
+>> +	status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
+>> +
+>> +	if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
+>> +		!strncmp(header->oem_table_id, "ProLiant", 8) &&
+> 
+> You should match the affected range of OEM table revisions too, that way a
+> firmware upgrade should start working, instead of being permanently disabled
+> because we think its unlikely.
+
+The m400 has reached end of life. No one really expects to see any firmware
+update.  I don't know what the effected OEM table revisions are, and I don't
+think there is an active platform maintainer who could give that info either.
+
+If someone can provide the info. I'll update the fix.
+
+>> +		MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
+> 
+> How is the CPU implementer relevant?
+
+That was just a copy of what other fixes had.  Should I remove it?
+
+> You suggest a firmware-update would make this issue go away...
+> 
+> 
+>> +		hest_disable = HEST_DISABLED;
+>> +		pr_info("Disabled APEI for m400.\n");
+>> +	}
+>> +
+>> +	acpi_put_table(header);
+>> +}
+>> +
+>>  /*
+>>   * acpi_boot_table_init() called from setup_arch(), always.
+>>   *	1. find RSDP and get its address, and then find XSDT
+> 
+> Nothing arch-specific here. You're adding this to arch/arm64 because
+> drivers/acpi/apei doesn't have an existing quirks table?
+
+There was a fix submitted that had it in drivers/acpi/scan.c, but the
+ACPI maintainer said he didn't want the fix in the main ACPI code.
+See:
+
+  https://lkml.org/lkml/2018/4/19/1020 (ACPI / scan: Fix regression related to X-Gene UARTs)
+
+The m400 is an arm64 platform, so it seems most appropriate to
+have it in arch/arm64/kernel/acpi.c.  I followed what was done
+for x86 quirks (into arch/x86/kernel/acpi/boot.c), and what was
+suggested here: 
+
+  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=900581 (linux: Enable Buster kernel features for newer ARM64 servers)
+
+Thanks for the review.
+
+-Geoff
