@@ -1,59 +1,86 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 15 Jun 2018 12:15:05 +0200
-Subject: [PATCH 10/11] mfd: 88pm860x-i2c: switch to i2c_lock_segment
-In-Reply-To: <20180615101506.8012-1-peda@axentia.se>
-References: <20180615101506.8012-1-peda@axentia.se>
-Message-ID: <20180615101506.8012-11-peda@axentia.se>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 15 Jun 2018 11:16:45 +0100
+Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
+ priority masking
+In-Reply-To: <bc8bb69d-8db4-87b7-adfb-589e1dd905c0@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+ <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
+ <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
+ <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
+ <c4e5f8ff-ecde-7b88-8a37-39e47ef22917@arm.com>
+ <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
+ <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
+ <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
+ <bc8bb69d-8db4-87b7-adfb-589e1dd905c0@arm.com>
+Message-ID: <9b87c045-e925-a412-f750-ef2c94e50de5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Locking the root adapter for __i2c_transfer will deadlock if the
-device sits behind a mux-locked I2C mux. Switch to the finer-grained
-i2c_lock_segment. If the device does not sit behind a mux-locked mux,
-the two locking variants are equivalent.
+On 12/06/18 14:46, Julien Thierry wrote:
+> 
+> 
+> On 25/05/18 11:48, Julien Thierry wrote:
+>>
+>>
+>> On 25/05/18 11:41, Suzuki K Poulose wrote:
+>>> On 25/05/18 11:39, Julien Thierry wrote:
+>>>>
+>>>>
+>>>> On 25/05/18 11:36, Suzuki K Poulose wrote:
+>>>>> On 25/05/18 11:17, Julien Thierry wrote:
+>>>>>>
+>>>>>>
+>>>>>> On 25/05/18 11:04, Suzuki K Poulose wrote:
+>>>>>>> On 25/05/18 10:49, Julien Thierry wrote:
+>>>>>>>> Add a cpufeature indicating whether a cpu supports masking interrupts
+>>>>>>>> by priority.
+>>>>>>>
+>>>>>>> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
+>>>>>>> the description ?
+>>>>>>
+>>>>>> More or less.
+>>>>>>
+>>>>>> It is just to have an easier condition in the rest of the series. Basically the PRIO masking feature is enabled if we have a GICv3 CPUIF working *and* the option was selected at build time. Before this meant that I was checking for the GIC_CPUIF cap inside #ifdefs (and putting alternatives depending on that inside #ifdefs as well).
+>>>>>>
+>>>>>> Having this as a separate feature feels easier to manage in the code. It also makes it clearer at boot time that the kernel will be using irq priorities (although I admit it was not the initial intention):
+>>>>>>
+>>>>>> [??? 0.000000] CPU features: detected: IRQ priority masking
+>>>>>>
+>>>>>>
+>>>>>> But yes that new feature will be detected only if SYSREG_GIC_CPUIF gets detected as well.
+>>>>>
+>>>>> Well, you could always wrap the check like :
+>>>>>
+>>>>> static inline bool system_has_irq_priority_masking(void)
+>>>>> {
+>>>>> ?????return (IS_ENABLED(CONFIG_YOUR_CONFIG) && cpus_have_const_cap(HWCAP_SYSREG_GIC_CPUIF));
+>>>>> }
+>>>>>
+>>>>> and use it everywhere.
+>>>>>
+>>>>
+>>>> Yes, but I can't use that in the asm parts that use alternatives and would need to surround them in #ifdef... :\
+>>>
+>>> I thought there is _ALTERNATIVE_CFG() to base the alternative depend on a CONFIG_xxx ?
+>>> Doesn't that solve the problem ?
+>>
+>> Right, I didn't see that one. It should work yes.
+>>
+>> I'll try that when working on the next version.
+> 
+> I've been trying to use this now, but I can't figure out how.
+> 
+> The _ALTERNATIVE_CFG does not seem to work in assembly code (despite having its own definition for __ASSEMBLY__), and the alternative_insn does not seem to be suited for instructions that take operands (or more than one operand)
+> 
+> If I am mistaken, can you provide an example of how to use this in assembly with instructions having more than 1 operand?
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/mfd/88pm860x-i2c.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I am sorry, but I think the ALTERNATIVE_CFG is not the right one, as it
+omits the entire block, if the CONFIG is not enabled. So you are left with
+only three choices :
 
-diff --git a/drivers/mfd/88pm860x-i2c.c b/drivers/mfd/88pm860x-i2c.c
-index 84e313107233..8e54fc2dc29c 100644
---- a/drivers/mfd/88pm860x-i2c.c
-+++ b/drivers/mfd/88pm860x-i2c.c
-@@ -146,14 +146,14 @@ int pm860x_page_reg_write(struct i2c_client *i2c, int reg,
- 	unsigned char zero;
- 	int ret;
- 
--	i2c_lock_adapter(i2c->adapter);
-+	i2c_lock_segment(i2c->adapter);
- 	read_device(i2c, 0xFA, 0, &zero);
- 	read_device(i2c, 0xFB, 0, &zero);
- 	read_device(i2c, 0xFF, 0, &zero);
- 	ret = write_device(i2c, reg, 1, &data);
- 	read_device(i2c, 0xFE, 0, &zero);
- 	read_device(i2c, 0xFC, 0, &zero);
--	i2c_unlock_adapter(i2c->adapter);
-+	i2c_unlock_segment(i2c->adapter);
- 	return ret;
- }
- EXPORT_SYMBOL(pm860x_page_reg_write);
-@@ -164,14 +164,14 @@ int pm860x_page_bulk_read(struct i2c_client *i2c, int reg,
- 	unsigned char zero = 0;
- 	int ret;
- 
--	i2c_lock_adapter(i2c->adapter);
-+	i2c_lock_segment(i2c->adapter);
- 	read_device(i2c, 0xfa, 0, &zero);
- 	read_device(i2c, 0xfb, 0, &zero);
- 	read_device(i2c, 0xff, 0, &zero);
- 	ret = read_device(i2c, reg, count, buf);
- 	read_device(i2c, 0xFE, 0, &zero);
- 	read_device(i2c, 0xFC, 0, &zero);
--	i2c_unlock_adapter(i2c->adapter);
-+	i2c_unlock_segment(i2c->adapter);
- 	return ret;
- }
- EXPORT_SYMBOL(pm860x_page_bulk_read);
--- 
-2.11.0
+1) Use alternative call back
+2) Stick to two separate caps.
+3) Use #ifdef
+
+Cheers
+Suzuki
