@@ -1,40 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Jun 2018 17:21:25 +0100
-Subject: [PATCH v2 1/4] arm64: introduce sysreg_clear_set()
-In-Reply-To: <1529077646-2848-2-git-send-email-Dave.Martin@arm.com>
-References: <1529077646-2848-1-git-send-email-Dave.Martin@arm.com>
- <1529077646-2848-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180615162124.jz5655podkezdcu3@armageddon.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 15 Jun 2018 17:29:32 +0100
+Subject: [PATCH 0/3] arm64: kexec,kdump: fix boot failures on acpi-only
+ system
+In-Reply-To: <20180615075623.13454-1-takahiro.akashi@linaro.org>
+References: <20180615075623.13454-1-takahiro.akashi@linaro.org>
+Message-ID: <81a9a385-3b9f-113d-96f0-379be74c19f0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 04:47:23PM +0100, Dave P Martin wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
-> 
-> Currently we have a couple of helpers to manipulate bits in particular
-> sysregs:
-> 
->  * config_sctlr_el1(u32 clear, u32 set)
-> 
->  * change_cpacr(u64 val, u64 mask)
-> 
-> The parameters of these differ in naming convention, order, and size,
-> which is unfortunate. They also differ slightly in behaviour, as
-> change_cpacr() skips the sysreg write if the bits are unchanged, which
-> is a useful optimization when sysreg writes are expensive.
-> 
-> Before we gain more yet another sysreg manipulation function, let's
-> unify these with a common helper, providing a consistent order for
-> clear/set operands, and the write skipping behaviour from
-> change_cpacr(). Code will be migrated to the new helper in subsequent
-> patches.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Dave Martin <dave.martin@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+Hi Akashi,
 
-Since you are submitting this patch, it should have your signed-off-by
-as well. Other than that:
+Thanks for putting this together,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On 15/06/18 08:56, AKASHI Takahiro wrote:
+> This patch series is a set of bug fixes to address kexec/kdump
+> failures which are sometimes observed on ACPI-only system and reported
+> in LAK-ML before.
+> 
+> In short, the phenomena are:
+> 1. kexec'ed kernel can fail to boot because some ACPI table is corrupted
+>    by a new kernel (or other data) being loaded into System RAM. Currently
+>    kexec may possibly allocate space ignoring such "reserved" regions.
+>    We will see no messages after "Bye!"
+> 
+> 2. crash dump (kdump) kernel can fail to boot and get into panic due to
+>    an alignment fault when accessing ACPI tables. This can happen because
+>    those tables are not always properly aligned while they are mapped
+>    non-cacheable (ioremap'ed) as they are not recognized as part of System
+>    RAM under the current implementation.
+> 
+> After discussing several possibilities to address those issues,
+> the agreed approach, in my understanding, is
+> * to add resource entries for every "reserved", i.e. memblock_reserve(),
+>   regions to /proc/iomem.
+>   (NOMAP regions, also marked as "reserved," remains at top-level for
+>   backward compatibility.)
+
+This means user-space can tell the difference between reserved-system-ram and
+reserved-address-space.
+
+
+> * For case (1), user space (kexec-tools) should rule out such regions
+>   in searching for free space for loaded data.
+
+... but doesn't today, because it fails to account for second-level entries.
+We've always had second-level entries, so this is a user-space bug. We need both
+fixed to fix the issue.
+
+Our attempts to fix this just in the kernel reached a dead end, because Kdump
+needs to include reserved-system-ram, whereas kexec has to avoid it. User-space
+needs to be able to tell reserved-system-ram and reserved-address-space apart.
+Hence we need to expose that information, and pick it up in user-space.
+
+Patched-kernel and unpatch-user-space will work the same way it does today, as
+the additional reserved regions are ignored by user-space.
+
+Unpatched-kernel and patched-user-space will also work the same way it does
+today as the additional reserved regions are missing.
+
+I think this is the only way forwards on this issue...
+
+
+> * For case (2), the kernel should access ACPI tables by mapping
+>   them with appropriate memory attributes described in UEFI memory map.
+>   (This means that it doesn't require any changes in /proc/iomem, and
+>   hence user space.)
+
+(this one is handled entirely in the kernel)
+
+
+Thanks,
+
+James
