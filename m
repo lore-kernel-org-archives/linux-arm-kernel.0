@@ -1,62 +1,113 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 15 Jun 2018 10:45:42 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 04/27] dt-bindings: display:
- sunxi-drm: Add TCON TOP description
-In-Reply-To: <2481282.yoIGH2ksVh@jernej-laptop>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <20180612200036.21483-5-jernej.skrabec@siol.net>
- <20180613073456.jk72zw4rt4ysjco7@flea>
- <2481282.yoIGH2ksVh@jernej-laptop>
-Message-ID: <20180615084542.slp3ma4krrj744do@flea>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Fri, 15 Jun 2018 11:47:43 +0300
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+Message-ID: <CAAqcGHn7wYHJQ+Ue90LFExRTJ1Yh0BW3Wb2PC2+-5pc3xECxhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 06:03:21PM +0200, Jernej ?krabec wrote:
-> > > +Required properties:
-> > > +  - compatible: value must be one of:
-> > > +    * allwinner,sun8i-r40-tcon-top
-> > > +  - reg: base address and size of the memory-mapped region.
-> > > +  - clocks: phandle to the clocks feeding the TCON TOP
-> > > +    * bus: TCON TOP interface clock
-> > > +  - clock-names: clock name mentioned above
-> > > +  - resets: phandle to the reset line driving the DRC
-> > 
-> > s/DRC/TCON TOP/ ?
-> 
-> Yes, copy & paste issue
-> 
-> > 
-> > > +    * rst: TCON TOP reset line
-> > 
-> > Remaining consistent with the clock name would be great
-> 
-> You mean "ahb"? I noticed that most other nodes with reset lines don't have a 
-> name associated. Maybe I could just drop it and use first specified reset?
+On Wed, 13 Jun 2018 at 21:22, Geoff Levand <geoff@infradead.org> wrote:
+>
+> Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
+> a work-around for HPE ProLiant m400 APEI firmware problems.
+>
+> The work-around disables APEI when CONFIG_ACPI_APEI is set and
+> m400 firmware is detected.  Without this fixup m400 systems
+> experience errors like these on startup:
+>
+>   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+>   [Hardware Error]: event severity: fatal
+>   [Hardware Error]:  Error 0, type: fatal
+>   [Hardware Error]:   section_type: memory error
+>   [Hardware Error]:   error_status: 0x0000000000001300
+>   [Hardware Error]:   error_type: 10, invalid address
+>   Kernel panic - not syncing: Fatal hardware error!
+>
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+> Hi,
+>
+> It seems unlikely there will be any m400 firmware updates to fix
+> this problem.  APEI support is desired for new ARM64 servers coming
+> to market.  Distros are now forced to have their own fixes, not
+> enable APEI, or let m400 users fend for themselves.
 
-It's called bus in the binding, but yes. And yeah, we can drop the
-name as well.
+Thanks for working on this. This patch works well on m400 with APEI enabled.
 
-> > 
-> > > +  - reset-names: reset name mentioned above
-> > > +  - #clock-cells : must contain 1
-> > 
-> > An example would be nice here
-> 
-> You mean node example? with ports? In the past, Rob was against examples 
-> unless really necessary. Node from R40 DTSI can serve as an example.
+Tested-by: Riku Voipio <riku.voipio@linaro.org>
 
-Ok.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180615/6770fcf3/attachment.sig>
+> -Geoff
+>
+>  arch/arm64/kernel/acpi.c | 40 ++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 36 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 7b09487ff8fb..3c315c2c7476 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -31,6 +31,8 @@
+>  #include <asm/cpu_ops.h>
+>  #include <asm/smp_plat.h>
+>
+> +#include <acpi/apei.h>
+> +
+>  #ifdef CONFIG_ACPI_APEI
+>  # include <linux/efi.h>
+>  # include <asm/pgtable.h>
+> @@ -177,6 +179,33 @@ static int __init acpi_fadt_sanity_check(void)
+>         return ret;
+>  }
+>
+> +/*
+> + * acpi_fixup_m400_quirks - Work-around for HPE ProLiant m400 APEI firmware
+> + * problems.
+> + */
+> +static void __init acpi_fixup_m400_quirks(void)
+> +{
+> +       acpi_status status;
+> +       struct acpi_table_header *header;
+> +#if !defined(CONFIG_ACPI_APEI)
+> +       int hest_disable = HEST_DISABLED;
+> +#endif
+> +
+> +       if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
+> +               return;
+> +
+> +       status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
+> +
+> +       if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
+> +               !strncmp(header->oem_table_id, "ProLiant", 8) &&
+> +               MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
+> +               hest_disable = HEST_DISABLED;
+> +               pr_info("Disabled APEI for m400.\n");
+> +       }
+> +
+> +       acpi_put_table(header);
+> +}
+> +
+>  /*
+>   * acpi_boot_table_init() called from setup_arch(), always.
+>   *     1. find RSDP and get its address, and then find XSDT
+> @@ -232,11 +261,14 @@ void __init acpi_boot_table_init(void)
+>         if (acpi_disabled) {
+>                 if (earlycon_acpi_spcr_enable)
+>                         early_init_dt_scan_chosen_stdout();
+> -       } else {
+> -               acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
+> -               if (IS_ENABLED(CONFIG_ACPI_BGRT))
+> -                       acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+> +               return;
+>         }
+> +
+> +       acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
+> +       if (IS_ENABLED(CONFIG_ACPI_BGRT))
+> +               acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+> +
+> +       acpi_fixup_m400_quirks();
+>  }
+>
+>  #ifdef CONFIG_ACPI_APEI
+> --
+> 2.14.1
+>
