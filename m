@@ -1,82 +1,95 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 15 Jun 2018 11:12:09 -0600
-Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
-In-Reply-To: <20180615165232.GE2202@arm.com>
-References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
- <20180615165232.GE2202@arm.com>
-Message-ID: <20180615171208.GN11565@jcrouse-lnx.qualcomm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 16 Jun 2018 01:13:17 +0800
+Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
+ for tcon-top gate
+In-Reply-To: <2948115.KggauuSURZ@jernej-laptop>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <20180612200036.21483-12-jernej.skrabec@siol.net>
+ <20180615083110.laruycabvyjmesmo@flea>
+ <2948115.KggauuSURZ@jernej-laptop>
+Message-ID: <CAGb2v66UFRKRF4_zbm8nQJYoOHb-iLbiU_0iYWep=WNiQDftMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 05:52:32PM +0100, Will Deacon wrote:
-> Hi Vivek,
-> 
-> On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
-> > Qualcomm SoCs have an additional level of cache called as
-> > System cache or Last level cache[1]. This cache sits right
-> > before the DDR, and is tightly coupled with the memory
-> > controller.
-> > The cache is available to all the clients present in the
-> > SoC system. The clients request their slices from this system
-> > cache, make it active, and can then start using it. For these
-> > clients with smmu, to start using the system cache for
-> > dma buffers and related page tables [2], few of the memory
-> > attributes need to be set accordingly.
-> > This change makes the related memory Outer-Shareable, and
-> > updates the MAIR with necessary protection.
-> > 
-> > The MAIR attribute requirements are:
-> >     Inner Cacheablity = 0
-> >     Outer Cacheablity = 1, Write-Back Write Allocate
-> >     Outer Shareablity = 1
-> 
-> Hmm, so is this cache coherent with the CPU or not? Why don't normal
-> non-cacheable mappings allocated in the LLC by default?
-> 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index f7a96bcf94a6..8058e7205034 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -249,6 +249,7 @@ struct arm_smmu_domain {
-> >  	struct mutex			init_mutex; /* Protects smmu pointer */
-> >  	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
-> >  	struct iommu_domain		domain;
-> > +	bool				has_sys_cache;
-> >  };
-> >  
-> >  struct arm_smmu_option_prop {
-> > @@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
-> >  
-> >  	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
-> >  		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
-> > +	if (smmu_domain->has_sys_cache)
-> > +		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
-> >  
-> >  	smmu_domain->smmu = smmu;
-> >  	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
-> > @@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
-> >  	case DOMAIN_ATTR_NESTING:
-> >  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
-> >  		return 0;
-> > +	case DOMAIN_ATTR_USE_SYS_CACHE:
-> > +		*((int *)data) = smmu_domain->has_sys_cache;
-> > +		return 0;
-> 
-> I really don't like exposing this to clients directly like this,
-> particularly as there aren't any in-tree users. I would prefer that we
-> provide a way for the io-pgtable code to have its MAIR values overridden
-> so that all non-coherent DMA ends up using the system cache.
+On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
+<jernej.skrabec@siol.net> wrote:
+> Hi,
+>
+> Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard napisal(a):
+>> Hi,
+>>
+>> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
+>> > TV TCONs connected to TCON TOP have to enable additional gate in order
+>> > to work.
+>> >
+>> > Add support for such TCONs.
+>> >
+>> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>> > ---
+>> >
+>> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
+>> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
+>> >  2 files changed, 15 insertions(+)
+>> >
+>> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 08747fc3ee71..0afb5a94a414
+>> > 100644
+>> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device *dev,
+>> >
+>> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
+>> >             return PTR_ERR(tcon->clk);
+>> >
+>> >     }
+>> >
+>> > +
+>> > +   if (tcon->quirks->has_tcon_top_gate) {
+>> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
+>> > +           if (IS_ERR(tcon->top_clk)) {
+>> > +                   dev_err(dev, "Couldn't get the TCON TOP bus clock\n");
+>> > +                   return PTR_ERR(tcon->top_clk);
+>> > +           }
+>> > +           clk_prepare_enable(tcon->top_clk);
+>> > +   }
+>> > +
+>>
+>> Is it required for the TCON itself to operate, or does the TCON
+>> requires the TCON TOP, which in turn requires that clock to be
+>> functional?
+>>
+>> I find it quite odd to have a clock that isn't meant for a particular
+>> device to actually be wired to another device. I'm not saying this
+>> isn't the case, but it would be a first.
+>
+> Documentation doesn't say much about that gate. I did few tests and TCON
+> registers can be read and written even if TCON TOP TV TCON gate is disabled.
+> However, there is no image, as expected.
 
-FWIW here is a future in-tree user for LLC:
+The R40 manual does include it in the diagram, on page 504. There's also a
+mux to select whether the clock comes directly from the CCU or the TV encoder
+(a feedback mode?). I assume this is the gate you are referring to here, in
+which case it is not a bus clock, but rather the TCON module or channel clock,
+strangely routed.
 
-https://patchwork.freedesktop.org/series/40545/
+> More interestingly, I enabled test pattern directly in TCON to eliminate
+> influence of the mixer. As soon as I disabled that gate, test pattern on HDMI
+> screen was gone, which suggest that this gate influences something inside
+> TCON.
+>
+> Another test I did was that I moved enable/disable gate code to
+> sun4i_tcon_channel_set_status() and it worked just as well.
+>
+> I'll ask AW engineer what that gate actually does, but from what I saw, I
+> would say that most appropriate location to enable/disable TCON TOP TV TCON
+> gate is TCON driver. Alternatively, TCON TOP driver could check if any TV TCON
+> is in use and enable appropriate gate. However, that doesn't sound right to me
+> for some reason.
 
-Specifically:
+If what I said above it true, then yes, the appropriate location to enable it
+is the TCON driver, but moreover, the representation of the clock tree should
+be fixed such that the TCON takes the clock from the TCON TOP as its channel/
+module clock instead. That way you don't need this patch, but you'd add another
+for all the clock routing.
 
-https://patchwork.freedesktop.org/patch/212400/
-
-Jordan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+ChenYu
