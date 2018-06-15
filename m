@@ -1,31 +1,38 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Fri, 15 Jun 2018 17:52:03 -0300
-Subject: [PATCH v4 00/26] Fix some doc build warnings/errors and broken
- links
-In-Reply-To: <20180615130951.303a3ebb@lwn.net>
-References: <cover.1529079119.git.mchehab+samsung@kernel.org>
- <20180615130951.303a3ebb@lwn.net>
-Message-ID: <20180615175203.19bc4abc@coco.lan>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Fri, 15 Jun 2018 22:54:57 +0200
+Subject: [PATCH] Revert "drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE"
+In-Reply-To: <99b2583187fe9925251029e876b061aac9172597.camel@bootlin.com>
+References: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
+ <d5357ae3-9dc1-b0ac-47bf-8742d55c4f3b@micronovasrl.com>
+ <99b2583187fe9925251029e876b061aac9172597.camel@bootlin.com>
+Message-ID: <94a68af2-371f-d81e-b25d-31ae7869e98e@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 15 Jun 2018 13:09:51 -0600
-Jonathan Corbet <corbet@lwn.net> escreveu:
+Hi Paul,
 
-> On Fri, 15 Jun 2018 13:30:28 -0300
-> Mauro Carvalho Chehab <mchehab+samsung@kernel.org> wrote:
+Il 14/06/2018 09:26, Paul Kocialkowski ha scritto:
+> Hi,
 > 
-> > As discussed during the review of v2, your plans were to merge
-> > things with potential to conflict with merges by the end of the
-> > merge window. So, I'm resubmitting it in order to help you with
-> > that.  
+> On Wed, 2018-06-13 at 23:52 +0200, Giulio Benetti wrote:
+>> Hello,
+>>
+>> sorry for my ignorance.
+>> I don't know the right patch workflow in the case of "revert commit".
+>> When I fix this bug, should I have to re-submit the previous patch
+>> entire plus bug-fix?
+>>
+>> Or do I have to submit patch with bug-fix only?
 > 
-> Is there any chance you could send them directly Linusward with my ack?
-> I'm fighting a few real-world complications at the moment, and barely
-> have time to breathe...
+> Yes, that is usually how it works! The revert patch will be picked up by
+> the maintainer (Maxime), integrated in his tree and eventually merged
+> into Linus' tree (along with stable trees).
+> 
+> Fixup patches for this will need to take into account the revert patch,
+> so it becomes equivalent to submitting the same patch with that issue
+> resolved.
 
-Ok, I'll send him a pull request (likely tomorrow), adding your
-ack on the patches at this series.
+Thanks for explaining me.
+I'm going to submit new patch asap.
 
-Regards,
-Mauro
+Giulio
