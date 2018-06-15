@@ -1,99 +1,41 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 15 Jun 2018 10:30:05 +0800
-Subject: [PATCH v3 2/7] serdev: add dev_pm_domain_attach|detach()
-In-Reply-To: <CAPDyKFqVpfhJf3R3jbXtjGgXf+0pg=9dgALBnxM_bSyBQrQQDQ@mail.gmail.com>
-References: <cover.1528960095.git.sean.wang@mediatek.com>
- <e338118bb6b9f560560887eb974eb250a6c89984.1528960095.git.sean.wang@mediatek.com>
- <CAPDyKFqVpfhJf3R3jbXtjGgXf+0pg=9dgALBnxM_bSyBQrQQDQ@mail.gmail.com>
-Message-ID: <1529029805.29697.27.camel@mtkswgap22>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Fri, 15 Jun 2018 10:47:55 +0800
+Subject: [PATCH v3] PCI: mediatek: Add system pm support for MT2712
+In-Reply-To: <CAHp75VcEp2kFO4hncvMS4Dh1AzvoFbrps7+FLmdk0RLyNTHz7g@mail.gmail.com>
+References: <1527822270-30280-1-git-send-email-honghui.zhang@mediatek.com>
+ <CAHp75VeBTmC=3nJ-t+OO9bp0mzJuTYsGBwi8fokT16bu2nE9RA@mail.gmail.com>
+ <1527850145.28160.6.camel@mhfsdcap03>
+ <CAHp75VcEp2kFO4hncvMS4Dh1AzvoFbrps7+FLmdk0RLyNTHz7g@mail.gmail.com>
+Message-ID: <1529030875.28160.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-06-14 at 10:58 +0200, Ulf Hansson wrote:
-> On Thu, 14 Jun 2018 at 09:14, <sean.wang@mediatek.com> wrote:
+On Fri, 2018-06-01 at 13:52 +0300, Andy Shevchenko wrote:
+> On Fri, Jun 1, 2018 at 1:49 PM, Honghui Zhang
+> <honghui.zhang@mediatek.com> wrote:
+> > On Fri, 2018-06-01 at 13:17 +0300, Andy Shevchenko wrote:
+> >> On Fri, Jun 1, 2018 at 6:04 AM,  <honghui.zhang@mediatek.com> wrote:
+> >> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> >>
+> >> > +#ifdef CONFIG_PM_SLEEP
+> >> > +static int mtk_pcie_suspend_noirq(struct device *dev)
+> >>
+> >> __maybe_unused
+> >>
 > >
-> > From: Sean Wang <sean.wang@mediatek.com>
-> >
-> > In order to open up the required power gate before any operation can be
-> > effectively performed over the serial bus between CPU and serdev, it's
-> > clearly essential to add common attach functions for PM domains to serdev
-> > at the probe phase.
-> >
-> > Similarly, the relevant dettach function for the PM domains should be
-> > properly and reversely added at the remove phase.
-> >
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Jiri Slaby <jslaby@suse.com>
-> > Cc: linux-serial at vger.kernel.org
-> > ---
-> >  drivers/tty/serdev/core.c | 14 +++++++++++++-
-> >  1 file changed, 13 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/tty/serdev/core.c b/drivers/tty/serdev/core.c
-> > index df93b72..c93d8ee 100644
-> > --- a/drivers/tty/serdev/core.c
-> > +++ b/drivers/tty/serdev/core.c
-> > @@ -13,6 +13,7 @@
-> >  #include <linux/module.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/pm_domain.h>
-> >  #include <linux/serdev.h>
-> >  #include <linux/slab.h>
-> >
-> > @@ -330,8 +331,16 @@ EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
-> >  static int serdev_drv_probe(struct device *dev)
-> >  {
-> >         const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
-> > +       int ret;
-> > +
-> > +       ret = dev_pm_domain_attach(dev, true);
-> > +       if (ret != -EPROBE_DEFER) {
+> > Hi, Andy, thanks for your review.
+> > Bjorn had point this out that at:
+> > https://www.spinics.net/lists/arm-kernel/msg656774.html
 > 
-> From 4.18 rc1 via commit 919b7308fcc4, dev_pm_domain_attach() will
-> return better error codes.
+> Nice, one more maintainer with strong opinion here.
 > 
-> I suggest to change the above error path to:
-> if (ret)
->      return ret;
-> 
-> Then continue with the probing below.
-
-Thanks for sharing me the information. I'll happily respin using the
-patch because it makes the most sense.
-
-> 
-> > +               ret = sdrv->probe(to_serdev_device(dev));
-> > +               if (ret)
-> > +                       dev_pm_domain_detach(dev, true);
-> > +       }
-> >
-> > -       return sdrv->probe(to_serdev_device(dev));
-> > +       return ret;
-> >  }
-> >
-> >  static int serdev_drv_remove(struct device *dev)
-> > @@ -339,6 +348,9 @@ static int serdev_drv_remove(struct device *dev)
-> >         const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
-> >         if (sdrv->remove)
-> >                 sdrv->remove(to_serdev_device(dev));
-> > +
-> > +       dev_pm_domain_detach(dev, true);
-> > +
-> >         return 0;
-> >  }
-> >
-> > --
-> > 2.7.4
-> >
-> 
-> Otherwise, this makes sense to me!
+> Arnd, that's what I mentioned as a split in opinions earlier.
+> Any new developer or even existing contributor would be now really
+> confusing since maintainers asked for two different approaches on the
+> same matter.
 > 
 
-really thanks for your review!
+Hi, Arnd, Do you have any comments about this patch? Sorry I missed the
+previous discussion about which should be used for this approach.
 
-> Kind regards
-> Uffe
+thanks.
