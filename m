@@ -1,86 +1,199 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 15 Jun 2018 11:16:45 +0100
-Subject: [PATCH v4 02/26] arm64: cpufeature: Add cpufeature for IRQ
- priority masking
-In-Reply-To: <bc8bb69d-8db4-87b7-adfb-589e1dd905c0@arm.com>
-References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
- <1527241772-48007-3-git-send-email-julien.thierry@arm.com>
- <e44df12f-9868-ae94-4623-ec221d72d783@arm.com>
- <b0673d7e-9a1e-7dcb-5322-c05fe0821349@arm.com>
- <c4e5f8ff-ecde-7b88-8a37-39e47ef22917@arm.com>
- <54ff6127-928d-99a3-a6e9-59799628ca87@arm.com>
- <3f0afa54-8e98-798e-68dc-bbbc74bd9e19@arm.com>
- <acf4b44f-d5c7-c31a-7f47-cfbe1049eadc@arm.com>
- <bc8bb69d-8db4-87b7-adfb-589e1dd905c0@arm.com>
-Message-ID: <9b87c045-e925-a412-f750-ef2c94e50de5@arm.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 15 Jun 2018 16:23:29 +0530
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+Message-ID: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/18 14:46, Julien Thierry wrote:
-> 
-> 
-> On 25/05/18 11:48, Julien Thierry wrote:
->>
->>
->> On 25/05/18 11:41, Suzuki K Poulose wrote:
->>> On 25/05/18 11:39, Julien Thierry wrote:
->>>>
->>>>
->>>> On 25/05/18 11:36, Suzuki K Poulose wrote:
->>>>> On 25/05/18 11:17, Julien Thierry wrote:
->>>>>>
->>>>>>
->>>>>> On 25/05/18 11:04, Suzuki K Poulose wrote:
->>>>>>> On 25/05/18 10:49, Julien Thierry wrote:
->>>>>>>> Add a cpufeature indicating whether a cpu supports masking interrupts
->>>>>>>> by priority.
->>>>>>>
->>>>>>> How is this different from the SYSREG_GIC_CPUIF cap ? Is it just
->>>>>>> the description ?
->>>>>>
->>>>>> More or less.
->>>>>>
->>>>>> It is just to have an easier condition in the rest of the series. Basically the PRIO masking feature is enabled if we have a GICv3 CPUIF working *and* the option was selected at build time. Before this meant that I was checking for the GIC_CPUIF cap inside #ifdefs (and putting alternatives depending on that inside #ifdefs as well).
->>>>>>
->>>>>> Having this as a separate feature feels easier to manage in the code. It also makes it clearer at boot time that the kernel will be using irq priorities (although I admit it was not the initial intention):
->>>>>>
->>>>>> [??? 0.000000] CPU features: detected: IRQ priority masking
->>>>>>
->>>>>>
->>>>>> But yes that new feature will be detected only if SYSREG_GIC_CPUIF gets detected as well.
->>>>>
->>>>> Well, you could always wrap the check like :
->>>>>
->>>>> static inline bool system_has_irq_priority_masking(void)
->>>>> {
->>>>> ?????return (IS_ENABLED(CONFIG_YOUR_CONFIG) && cpus_have_const_cap(HWCAP_SYSREG_GIC_CPUIF));
->>>>> }
->>>>>
->>>>> and use it everywhere.
->>>>>
->>>>
->>>> Yes, but I can't use that in the asm parts that use alternatives and would need to surround them in #ifdef... :\
->>>
->>> I thought there is _ALTERNATIVE_CFG() to base the alternative depend on a CONFIG_xxx ?
->>> Doesn't that solve the problem ?
->>
->> Right, I didn't see that one. It should work yes.
->>
->> I'll try that when working on the next version.
-> 
-> I've been trying to use this now, but I can't figure out how.
-> 
-> The _ALTERNATIVE_CFG does not seem to work in assembly code (despite having its own definition for __ASSEMBLY__), and the alternative_insn does not seem to be suited for instructions that take operands (or more than one operand)
-> 
-> If I am mistaken, can you provide an example of how to use this in assembly with instructions having more than 1 operand?
+Qualcomm SoCs have an additional level of cache called as
+System cache or Last level cache[1]. This cache sits right
+before the DDR, and is tightly coupled with the memory
+controller.
+The cache is available to all the clients present in the
+SoC system. The clients request their slices from this system
+cache, make it active, and can then start using it. For these
+clients with smmu, to start using the system cache for
+dma buffers and related page tables [2], few of the memory
+attributes need to be set accordingly.
+This change makes the related memory Outer-Shareable, and
+updates the MAIR with necessary protection.
 
-I am sorry, but I think the ALTERNATIVE_CFG is not the right one, as it
-omits the entire block, if the CONFIG is not enabled. So you are left with
-only three choices :
+The MAIR attribute requirements are:
+    Inner Cacheablity = 0
+    Outer Cacheablity = 1, Write-Back Write Allocate
+    Outer Shareablity = 1
 
-1) Use alternative call back
-2) Stick to two separate caps.
-3) Use #ifdef
+This change is a realisation of following changes
+from downstream msm-4.9:
+iommu: io-pgtable-arm: Support DOMAIN_ATTRIBUTE_USE_UPSTREAM_HINT
+iommu: io-pgtable-arm: Implement IOMMU_USE_UPSTREAM_HINT
 
-Cheers
-Suzuki
+[1] https://patchwork.kernel.org/patch/10422531/
+[2] https://patchwork.kernel.org/patch/10302791/
+
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c       | 14 ++++++++++++++
+ drivers/iommu/io-pgtable-arm.c | 24 +++++++++++++++++++-----
+ drivers/iommu/io-pgtable.h     |  4 ++++
+ include/linux/iommu.h          |  4 ++++
+ 4 files changed, 41 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f7a96bcf94a6..8058e7205034 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -249,6 +249,7 @@ struct arm_smmu_domain {
+ 	struct mutex			init_mutex; /* Protects smmu pointer */
+ 	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
+ 	struct iommu_domain		domain;
++	bool				has_sys_cache;
+ };
+ 
+ struct arm_smmu_option_prop {
+@@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+ 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
++	if (smmu_domain->has_sys_cache)
++		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
+ 
+ 	smmu_domain->smmu = smmu;
+ 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+@@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+ 	case DOMAIN_ATTR_NESTING:
+ 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+ 		return 0;
++	case DOMAIN_ATTR_USE_SYS_CACHE:
++		*((int *)data) = smmu_domain->has_sys_cache;
++		return 0;
+ 	default:
+ 		return -ENODEV;
+ 	}
+@@ -1506,6 +1512,14 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+ 
+ 		break;
++	case DOMAIN_ATTR_USE_SYS_CACHE:
++		if (smmu_domain->smmu) {
++			ret = -EPERM;
++			goto out_unlock;
++		}
++		if (*((int *)data))
++			smmu_domain->has_sys_cache = true;
++		break;
+ 	default:
+ 		ret = -ENODEV;
+ 	}
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 010a254305dd..b2aee1828524 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -169,9 +169,11 @@
+ #define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
+ #define ARM_LPAE_MAIR_ATTR_NC		0x44
+ #define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
++#define ARM_LPAE_MAIR_ATTR_SYS_CACHE	0xf4
+ #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
+ #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
+ #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
++#define ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE	3
+ 
+ /* IOPTE accessors */
+ #define iopte_deref(pte,d) __va(iopte_to_paddr(pte, d))
+@@ -442,6 +444,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+ 		else if (prot & IOMMU_CACHE)
+ 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
+ 				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
++		else if (prot & IOMMU_SYS_CACHE)
++			pte |= (ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE
++				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
++
+ 	} else {
+ 		pte = ARM_LPAE_PTE_HAP_FAULT;
+ 		if (prot & IOMMU_READ)
+@@ -771,7 +777,8 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+ 	u64 reg;
+ 	struct arm_lpae_io_pgtable *data;
+ 
+-	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
++	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
++			    IO_PGTABLE_QUIRK_SYS_CACHE))
+ 		return NULL;
+ 
+ 	data = arm_lpae_alloc_pgtable(cfg);
+@@ -779,9 +786,14 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+ 		return NULL;
+ 
+ 	/* TCR */
+-	reg = (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
+-	      (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT) |
+-	      (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
++	if (cfg->quirks & IO_PGTABLE_QUIRK_SYS_CACHE) {
++		reg = (ARM_LPAE_TCR_SH_OS << ARM_LPAE_TCR_SH0_SHIFT) |
++		      (ARM_LPAE_TCR_RGN_NC << ARM_LPAE_TCR_IRGN0_SHIFT);
++	} else {
++		reg = (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
++		      (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT);
++	}
++	reg |= (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
+ 
+ 	switch (ARM_LPAE_GRANULE(data)) {
+ 	case SZ_4K:
+@@ -833,7 +845,9 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+ 	      (ARM_LPAE_MAIR_ATTR_WBRWA
+ 	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE)) |
+ 	      (ARM_LPAE_MAIR_ATTR_DEVICE
+-	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV));
++	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV)) |
++	      (ARM_LPAE_MAIR_ATTR_SYS_CACHE
++	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE));
+ 
+ 	cfg->arm_lpae_s1_cfg.mair[0] = reg;
+ 	cfg->arm_lpae_s1_cfg.mair[1] = 0;
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 2df79093cad9..b5a398380e9f 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -71,12 +71,16 @@ struct io_pgtable_cfg {
+ 	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
+ 	 *	software-emulated IOMMU), such that pagetable updates need not
+ 	 *	be treated as explicit DMA data.
++	 *
++	 * IO_PGTABLE_QUIRK_SYS_CACHE: Override the attributes set in TCR for
++	 *	the page table walker when using system cache.
+ 	 */
+ 	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
+ 	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
+ 	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
+ 	#define IO_PGTABLE_QUIRK_ARM_MTK_4GB	BIT(3)
+ 	#define IO_PGTABLE_QUIRK_NO_DMA		BIT(4)
++	#define IO_PGTABLE_QUIRK_SYS_CACHE	BIT(5)
+ 	unsigned long			quirks;
+ 	unsigned long			pgsize_bitmap;
+ 	unsigned int			ias;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 19938ee6eb31..dacb9648e9b3 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -41,6 +41,9 @@
+  * if the IOMMU page table format is equivalent.
+  */
+ #define IOMMU_PRIV	(1 << 5)
++/* Use last level cache available with few architectures */
++#define IOMMU_SYS_CACHE	(1 << 6)
++
+ 
+ struct iommu_ops;
+ struct iommu_group;
+@@ -124,6 +127,7 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+ 	DOMAIN_ATTR_FSL_PAMUV1,
+ 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
++	DOMAIN_ATTR_USE_SYS_CACHE,
+ 	DOMAIN_ATTR_MAX,
+ };
+ 
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
