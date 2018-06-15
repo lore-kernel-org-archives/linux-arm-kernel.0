@@ -1,639 +1,189 @@
-From: ben.whitten@gmail.com (Ben Whitten)
-Date: Fri, 15 Jun 2018 14:40:55 +0100
-Subject: [PATCH v2 6/6] arm: dts: add support for Laird SOM60 module and DVK
- boards
-In-Reply-To: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
-References: <1529070055-18701-1-git-send-email-ben.whitten@lairdtech.com>
-Message-ID: <1529070055-18701-6-git-send-email-ben.whitten@lairdtech.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 15 Jun 2018 07:45:03 -0700
+Subject: [PATCH v3 6/7] mmc: sunxi: Add runtime_pm support
+In-Reply-To: <CAPDyKFqc-+cr64DW0r_2V_vM=r45CuFrx5z4_fYf=sebb5EfQg@mail.gmail.com>
+References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
+ <4514368de4ef7b4224be455f2d9e6090b464e819.1523888566.git-series.maxime.ripard@bootlin.com>
+ <1caa07d2-17ad-18aa-9216-037c06b36281@arm.com>
+ <CAPDyKFqc-+cr64DW0r_2V_vM=r45CuFrx5z4_fYf=sebb5EfQg@mail.gmail.com>
+Message-ID: <CAOi56cX4B=meWmRJz=qvmpxooiWQ+fADRZ4pSd=iimTiWUdRAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for Lairds upcoming SOM module, featuring Marvell WiFi
-and Bluetooth, 2Gb NAND / 1Gb LPDDR SDRAM, and an Atmel SAMA5D3 CPU.
+On Fri, Jun 15, 2018 at 1:56 AM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>
+> On 14 June 2018 at 16:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Hi Maxime,
+> >
+> > On 16/04/18 15:23, Maxime Ripard wrote:
+> >> So far, even if our card was not in use, we didn't shut down our MMC
+> >> controller, which meant that it was still active and clocking the bus.
+> >>
+> >> While this obviously means that we could save some power there, it also
+> >> creates issues when it comes to EMC control since we'll have a perfect peak
+> >> at the card clock rate.
+> >>
+> >> Let's implement runtime_pm with autosuspend so that we will shut down the
+> >> controller when it's not been in use for quite some time.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> >> ---
+> >>  drivers/mmc/host/sunxi-mmc.c | 48 +++++++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 48 insertions(+)
+> >>
+> >> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> >> index 0165da0d022a..0253deb153a4 100644
+> >> --- a/drivers/mmc/host/sunxi-mmc.c
+> >> +++ b/drivers/mmc/host/sunxi-mmc.c
+> >> @@ -35,6 +35,7 @@
+> >>  #include <linux/of_gpio.h>
+> >>  #include <linux/of_platform.h>
+> >>  #include <linux/platform_device.h>
+> >> +#include <linux/pm_runtime.h>
+> >>  #include <linux/regulator/consumer.h>
+> >>  #include <linux/reset.h>
+> >>  #include <linux/scatterlist.h>
+> >> @@ -969,6 +970,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+> >>       unsigned long flags;
+> >>       u32 imask;
+> >>
+> >> +     if (enable)
+> >> +             pm_runtime_get_noresume(host->dev);
+> >> +
+> >>       spin_lock_irqsave(&host->lock, flags);
+> >>
+> >>       imask = mmc_readl(host, REG_IMASK);
+> >> @@ -981,6 +985,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+> >>       }
+> >>       mmc_writel(host, REG_IMASK, imask);
+> >>       spin_unlock_irqrestore(&host->lock, flags);
+> >> +
+> >> +     if (!enable)
+> >> +             pm_runtime_put_noidle(host->mmc->parent);
+> >>  }
+> >>
+> >>  static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
+> >> @@ -1394,6 +1401,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+> >>       if (ret)
+> >>               goto error_free_dma;
+> >>
+> >> +     pm_runtime_set_active(&pdev->dev);
+> >> +     pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> >> +     pm_runtime_use_autosuspend(&pdev->dev);
+> >> +     pm_runtime_enable(&pdev->dev);
+> >> +
+> >>       ret = mmc_add_host(mmc);
+> >>       if (ret)
+> >>               goto error_free_dma;
+> >> @@ -1414,6 +1426,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+> >>       struct sunxi_mmc_host *host = mmc_priv(mmc);
+> >>
+> >>       mmc_remove_host(mmc);
+> >> +     pm_runtime_force_suspend(&pdev->dev);
+> >>       disable_irq(host->irq);
+> >>       sunxi_mmc_disable(host);
+> >>       dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
+> >> @@ -1422,10 +1435,45 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+> >>       return 0;
+> >>  }
+> >>
+> >> +static int sunxi_mmc_runtime_resume(struct device *dev)
+> >> +{
+> >> +     struct mmc_host *mmc = dev_get_drvdata(dev);
+> >> +     struct sunxi_mmc_host *host = mmc_priv(mmc);
+> >> +     int ret;
+> >> +
+> >> +     ret = sunxi_mmc_enable(host);
+> >> +     if (ret)
+> >> +             return ret;
+> >> +
+> >> +     sunxi_mmc_init_host(host);
+> >> +     sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
+> >> +     sunxi_mmc_set_clk(host, &mmc->ios);
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static int sunxi_mmc_runtime_suspend(struct device *dev)
+> >> +{
+> >> +     struct mmc_host *mmc = dev_get_drvdata(dev);
+> >> +     struct sunxi_mmc_host *host = mmc_priv(mmc);
+> >> +
+> >> +     sunxi_mmc_reset_host(host);
+> >> +     sunxi_mmc_disable(host);
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static const struct dev_pm_ops sunxi_mmc_pm_ops = {
+> >> +     SET_RUNTIME_PM_OPS(sunxi_mmc_runtime_suspend,
+> >> +                        sunxi_mmc_runtime_resume,
+> >> +                        NULL)
+> >> +};
+> >> +
+> >>  static struct platform_driver sunxi_mmc_driver = {
+> >>       .driver = {
+> >>               .name   = "sunxi-mmc",
+> >>               .of_match_table = of_match_ptr(sunxi_mmc_of_match),
+> >> +             .pm = &sunxi_mmc_pm_ops,
+> >>       },
+> >>       .probe          = sunxi_mmc_probe,
+> >>       .remove         = sunxi_mmc_remove,
+> >>
+> >
+> > This patch has the unfortunate impact of killing my A20 system
+> > (cubietruck), as of 9a8e1e8cc2c02c57c4e941651a8481a633506c91:
+> >
+> > [...]
+> > [    3.286649] NET: Registered protocol family 10
+> > [    3.291898]  mmcblk0: p1
+> > [    3.295297] mmc1: queuing unknown CIS tuple 0x80 (2 bytes)
+> > [    3.302773] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
+> > [    3.305787] Segment Routing with IPv6
+> > [    3.312225] mip6: Mobile IPv6
+> > [    3.316166] sit: IPv6, IPv4 and MPLS over IPv4 tunneling driver
+> > [    3.316246] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
+> > [    3.323721] ip6_gre: GRE over IPv6 tunneling driver
+> > [    3.333954] NET: Registered protocol family 17
+> > [    3.338837] 9pnet: Installing 9P2000 support
+> > [    3.343379] NET: Registered protocol family 37
+> > [    3.347885] Key type dns_resolver registered
+> > [    3.352214] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
+> > [    3.352217] openvswitch: Open vSwitch switching datapath
+> > [    3.352620] mpls_gso: MPLS GSO support
+> > [    3.367001] ThumbEE CPU extension supported.
+> >
+> > and that's where it stops. No message, just a hard lockup (I suppose
+> > that both the CPUs are trying to access some device that is now not
+> > clocked).
+>
+> Seems like a reasonable analyze.
+>
+> >
+> > With a working kernel, I see SATA and the wifi SDIO being probed.
+> >
+> > Happy to help testing stuff if you have any idea.
+>
+> In principle I would start with avoiding having the sunxi-mmc driver
+> to probe. Or bail out early in probe, whichever is the easiest for
+> you.
+>
+> The point is, if the sunxi-mmc driver doesn't even enable its clock,
+> it would be interesting to see if there are other that depends on it.
+>
+> One could also play with clk_disable_unused(), the
+> late_initcall_sync(), which can be turned off with the module
+> parameter "clk_ignore_unused".
 
-Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/at91-dvk_som60.dts          |  95 +++++++++++
- arch/arm/boot/dts/at91-dvk_su60_somc.dtsi     | 159 ++++++++++++++++++
- arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi |  90 ++++++++++
- arch/arm/boot/dts/at91-som60.dtsi             | 231 ++++++++++++++++++++++++++
- 5 files changed, 576 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-dvk_som60.dts
- create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
- create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
- create mode 100644 arch/arm/boot/dts/at91-som60.dtsi
+I added clk_ignore_unused to the kernel command-line, and that didn't
+help, so it's not just an init-time clock that's causing the problem.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 214d5d9..b0e164a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -51,6 +51,7 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
- 	at91-sama5d2_ptc_ek.dtb \
- 	at91-sama5d2_xplained.dtb \
- 	at91-sama5d3_xplained.dtb \
-+	at91-dvk_som60.dtb \
- 	at91-gatwick.dtb \
- 	at91-tse850-3.dtb \
- 	at91-wb50n.dtb \
-diff --git a/arch/arm/boot/dts/at91-dvk_som60.dts b/arch/arm/boot/dts/at91-dvk_som60.dts
-new file mode 100644
-index 0000000..ededd5b
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-dvk_som60.dts
-@@ -0,0 +1,95 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-dvk_som60.dts - Device Tree file for the DVK SOM60 board
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+/dts-v1/;
-+#include "at91-som60.dtsi"
-+#include "at91-dvk_su60_somc.dtsi"
-+#include "at91-dvk_su60_somc_lcm.dtsi"
-+
-+/ {
-+	model = "Laird DVK SOM60";
-+	compatible = "laird,dvk-som60", "laird,som60", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
-+
-+	chosen {
-+		stdout-path = &dbgu;
-+		tick-timer = &pit;
-+	};
-+};
-+
-+&mmc0 {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	status = "okay";
-+};
-+
-+&ssc0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&usart1 {
-+	status = "okay";
-+};
-+
-+&usart2 {
-+	status = "okay";
-+};
-+
-+&usart3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dbgu {
-+	status = "okay";
-+};
-+
-+&pit {
-+	status = "okay";
-+};
-+
-+&adc0 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&macb0 {
-+	status = "okay";
-+};
-+
-+&macb1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/at91-dvk_su60_somc.dtsi b/arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
-new file mode 100644
-index 0000000..bb86f17
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
-@@ -0,0 +1,159 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-dvk_su60_somc.dtsi - Device Tree file for the DVK SOM60 base board
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+
-+/ {
-+	sound {
-+		compatible = "atmel,asoc-wm8904";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pck2_as_audio_mck>;
-+
-+		atmel,model = "wm8904 @ DVK-SOM60";
-+		atmel,audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"IN2L", "Line In Jack",
-+			"IN2R", "Line In Jack",
-+			"Mic", "MICBIAS",
-+			"IN1L", "Mic";
-+
-+		atmel,ssc-controller = <&ssc0>;
-+		atmel,audio-codec = <&wm8904>;
-+
-+		status = "okay";
-+	};
-+};
-+
-+&mmc0 {
-+	status = "okay";
-+
-+	pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_cd>;
-+	slot at 0 {
-+		bus-width = <4>;
-+		cd-gpios = <&pioE 31 GPIO_ACTIVE_HIGH>;
-+		cd-inverted;
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	/* spi0.0: 4M Flash Macronix MX25R4035FM1IL0 */
-+	spi-flash at 0 {
-+		compatible = "mxicy,mx25u4035", "jedec,spi-nor";
-+		spi-max-frequency = <33000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&ssc0 {
-+	atmel,clk-from-rk-pin;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	wm8904: wm8904 at 1a {
-+		compatible = "wlf,wm8904";
-+		reg = <0x1a>;
-+		clocks = <&pck2>;
-+		clock-names = "mclk";
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	eeprom at 87 {
-+		compatible = "giantec,gt24c32a", "atmel,24c32";
-+		reg = <87>;
-+		pagesize = <32>;
-+	};
-+};
-+
-+&usart1 {
-+	status = "okay";
-+};
-+
-+&usart2 {
-+	status = "okay";
-+};
-+
-+&usart3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dbgu {
-+	status = "okay";
-+};
-+
-+&pit {
-+	status = "okay";
-+};
-+
-+&adc0 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&macb0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "okay";
-+
-+	ethernet-phy at 7 {
-+		reg = <7>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_geth_int>;
-+		interrupt-parent = <&pioB>;
-+		interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-+		txen-skew-ps = <800>;
-+		txc-skew-ps = <3000>;
-+		rxdv-skew-ps = <400>;
-+		rxc-skew-ps = <3000>;
-+		rxd0-skew-ps = <400>;
-+		rxd1-skew-ps = <400>;
-+		rxd2-skew-ps = <400>;
-+		rxd3-skew-ps = <400>;
-+	};
-+};
-+
-+&macb1 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "okay";
-+
-+	ethernet-phy at 1 {
-+		reg = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_eth_int>;
-+		interrupt-parent = <&pioC>;
-+		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
-+	};
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi b/arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
-new file mode 100644
-index 0000000..4b9176d
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
-@@ -0,0 +1,90 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-dvk_su60_somc_lcm.dtsi - Device Tree file for the DVK SOM60 LCD board
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+
-+/ {
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&hlcdc_pwm 0 50000 0>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		compatible = "winstar,wf70gtiagdng0", "innolux,at070tn92", "simple-panel";
-+		backlight = <&backlight>;
-+		power-supply = <&vcc_lcd_reg>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+
-+		port at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			panel_input: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&hlcdc_panel_output>;
-+			};
-+		};
-+	};
-+
-+	vcc_lcd_reg: fixedregulator_lcd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC LCM";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+		status = "okay";
-+	};
-+};
-+
-+&pinctrl {
-+	board {
-+		pinctrl_lcd_ctp_int: lcd_ctp_int {
-+			 atmel,pins =
-+				 <AT91_PIOC 28 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	ft5426 at 56 {
-+		compatible = "focaltech,ft5426", "edt,edt-ft5406";
-+		reg = <56>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcd_ctp_int>;
-+
-+		interrupt-parent = <&pioC>;
-+		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
-+
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+	};
-+};
-+
-+&hlcdc {
-+	status = "okay";
-+
-+	hlcdc-display-controller {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
-+
-+		port at 0 {
-+			hlcdc_panel_output: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&panel_input>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91-som60.dtsi b/arch/arm/boot/dts/at91-som60.dtsi
-new file mode 100644
-index 0000000..6472fce
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-som60.dtsi
-@@ -0,0 +1,231 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * at91-som60.dtsi - Device Tree file for the SOM60 module
-+ *
-+ *  Copyright (C) 2018 Laird,
-+ *		  2018 Ben Whitten <ben.whitten@lairdtech.com>
-+ *
-+ */
-+#include "sama5d36.dtsi"
-+
-+/ {
-+	model = "Laird SOM60";
-+	compatible = "laird,som60", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
-+
-+	chosen {
-+		stdout-path = &dbgu;
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x8000000>;
-+	};
-+
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	board {
-+		pinctrl_mmc0_cd: mmc0_cd {
-+			atmel,pins =
-+				<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+		};
-+
-+		pinctrl_mmc0_en: mmc0_en {
-+			atmel,pins =
-+				<AT91_PIOE 30 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+		};
-+
-+		pinctrl_nand0_wp: nand0_wp {
-+			atmel,pins =
-+				<AT91_PIOE 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
-+		};
-+
-+		pinctrl_usb_vbus: usb_vbus {
-+			atmel,pins =
-+				<AT91_PIOE 20 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+				/* Conflicts with USART2_SCK */
-+		};
-+
-+		pinctrl_usart2_sck: usart2_sck {
-+			atmel,pins =
-+				<AT91_PIOE 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+				/* Conflicts with USB_VBUS */
-+		};
-+
-+		pinctrl_usb_oc: usb_oc {
-+			atmel,pins =
-+				<AT91_PIOE 15 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+				/* Conflicts with USART3_SCK */
-+		};
-+
-+		pinctrl_usart3_sck: usart3_sck {
-+			atmel,pins =
-+				<AT91_PIOE 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+				/* Conflicts with USB_OC */
-+		};
-+
-+		pinctrl_usba_vbus: usba_vbus {
-+		   atmel,pins =
-+				<AT91_PIOC 14 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+		};
-+
-+		pinctrl_geth_int: geth_int {
-+			atmel,pins =
-+				<AT91_PIOB 25 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+				/* Conflicts with USART1_SCK */
-+		};
-+
-+		pinctrl_usart1_sck: usart1_sck {
-+			atmel,pins =
-+				<AT91_PIOB 25 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+				/* Conflicts with GETH_INT */
-+		};
-+
-+		pinctrl_eth_int: eth_int {
-+			atmel,pins =
-+				<AT91_PIOC 10 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-+		};
-+
-+		pinctrl_pck2_as_audio_mck: pck2_as_audio_mck {
-+			atmel,pins =
-+				<AT91_PIOC 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+		};
-+	};
-+};
-+
-+&mmc0 {
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <8>;
-+	};
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+	};
-+};
-+
-+&spi0 {
-+	cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
-+};
-+
-+&usart0 {
-+	atmel,use-dma-rx;
-+	atmel,use-dma-tx;
-+	status = "okay";
-+	pinctrl-0 = <&pinctrl_usart0 &pinctrl_usart0_rts_cts>;
-+};
-+
-+&usart1 {
-+	pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
-+};
-+
-+&usart2 {
-+	pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rts_cts>;
-+};
-+
-+&usart3 {
-+	pinctrl-0 = <&pinctrl_usart3 &pinctrl_usart3_rts_cts>;
-+};
-+
-+&adc0 {
-+	pinctrl-0 = <
-+		&pinctrl_adc0_adtrg
-+		&pinctrl_adc0_ad0
-+		&pinctrl_adc0_ad1
-+		&pinctrl_adc0_ad2
-+		&pinctrl_adc0_ad3
-+		&pinctrl_adc0_ad4
-+		&pinctrl_adc0_ad5
-+		>;
-+};
-+
-+&macb0 {
-+	phy-mode = "rgmii";
-+};
-+
-+&macb1 {
-+	phy-mode = "rmii";
-+};
-+
-+
-+&ebi {
-+	pinctrl-0 = <&pinctrl_ebi_nand_addr>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-+
-+&nand_controller {
-+	status = "okay";
-+
-+	nand: nand at 3 {
-+		reg = <0x3 0x0 0x2>;
-+		atmel,rb = <0>;
-+		nand-bus-width = <8>;
-+		nand-ecc-mode = "hw";
-+		nand-ecc-strength = <8>;
-+		nand-ecc-step-size = <512>;
-+		nand-on-flash-bbt;
-+		label = "atmel_nand";
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ubootspl at 0 {
-+				label = "u-boot-spl";
-+				reg = <0x0 0x20000>;
-+			};
-+
-+			uboot at 20000 {
-+				label = "u-boot";
-+				reg = <0x20000 0x80000>;
-+			};
-+
-+			ubootenv at a0000 {
-+				label = "u-boot-env";
-+				reg = <0xa0000 0x20000>;
-+			};
-+
-+			ubootenv at c0000 {
-+				label = "u-boot-env";
-+				reg = <0xc0000 0x20000>;
-+			};
-+
-+			ubi at e0000 {
-+				label = "ubi";
-+				reg = <0xe0000 0xfe00000>;
-+			};
-+		};
-+	};
-+};
-+
-+&usb0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usba_vbus>;
-+	atmel,vbus-gpio = <&pioC 14 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_vbus &pinctrl_usb_oc>;
-+	num-ports = <3>;
-+	atmel,vbus-gpio = <0
-+		&pioE 20 GPIO_ACTIVE_HIGH
-+		0>;
-+	atmel,oc-gpio = <0
-+		&pioE 15 GPIO_ACTIVE_LOW
-+		0>;
-+};
--- 
-2.7.4
+> Anyway, to hide/fix the problem for now, we could add a call to
+> pm_runtime_get_noresume() before the sunxi-driver calls
+> pm_runtime_enable().
+
+I tried that and it makes the kernel finish booting, so that smells
+definitely like the MMC is disabling a clock when it goes idle that
+some other device (or CPU) depends on.
+
+Kevin
