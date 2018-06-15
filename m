@@ -1,33 +1,67 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri, 15 Jun 2018 09:41:29 +0200
-Subject: [PATCH v2] ARM: dts: imx6sx: fix irq for pcie bridge
-Message-ID: <20180615074129.16931-1-o.rempel@pengutronix.de>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 15 Jun 2018 16:56:20 +0900
+Subject: [PATCH 0/3] arm64: kexec, kdump: fix boot failures on acpi-only system
+Message-ID: <20180615075623.13454-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the correct IRQ line for the MSI controller in the PCIe host
-controller. Apparently a different IRQ line is used compared to other
-i.MX6 variants. Without this change MSI IRQs aren't properly propagated
-to the upstream interrupt controller.
+# apologies for a bit late updates
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6sx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch series is a set of bug fixes to address kexec/kdump
+failures which are sometimes observed on ACPI-only system and reported
+in LAK-ML before.
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 49c7205b8db8..77fdad65e2bb 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -1351,7 +1351,7 @@
- 			ranges = <0x81000000 0 0          0x08f80000 0 0x00010000 /* downstream I/O */
- 				  0x82000000 0 0x08000000 0x08000000 0 0x00f00000>; /* non-prefetchable memory */
- 			num-lanes = <1>;
--			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "msi";
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 0x7>;
+In short, the phenomena are:
+1. kexec'ed kernel can fail to boot because some ACPI table is corrupted
+   by a new kernel (or other data) being loaded into System RAM. Currently
+   kexec may possibly allocate space ignoring such "reserved" regions.
+   We will see no messages after "Bye!"
+
+2. crash dump (kdump) kernel can fail to boot and get into panic due to
+   an alignment fault when accessing ACPI tables. This can happen because
+   those tables are not always properly aligned while they are mapped
+   non-cacheable (ioremap'ed) as they are not recognized as part of System
+   RAM under the current implementation.
+
+After discussing several possibilities to address those issues,
+the agreed approach, in my understanding, is
+* to add resource entries for every "reserved", i.e. memblock_reserve(),
+  regions to /proc/iomem.
+  (NOMAP regions, also marked as "reserved," remains at top-level for
+  backward compatibility.)
+* For case (1), user space (kexec-tools) should rule out such regions
+  in searching for free space for loaded data.
+* For case (2), the kernel should access ACPI tables by mapping
+  them with appropriate memory attributes described in UEFI memory map.
+  (This means that it doesn't require any changes in /proc/iomem, and
+  hence user space.)
+
+Please find past discussions about /proc/iomem in [1].
+
+Patch#1 addresses kexec case, for which you are also required to update
+user space. See necessary patches in [2]. If you want to review Patch#1,
+please also take a look at and review [2].
+
+Patch#2 and #3 addresses kdump case. This is a revised version after
+Ard's comments.[3]
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-March/565980.html
+[2] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/resv_mem
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573655.html
+
+AKASHI Takahiro (2):
+  arm64: acpi,efi: fix alignment fault in accessing ACPI tables at kdump
+  init: map UEFI memory map early if on arm or arm64
+
+James Morse (1):
+  arm64: export memblock_reserve()d regions via /proc/iomem
+
+ arch/arm64/include/asm/acpi.h      | 23 ++++++++++++------
+ arch/arm64/kernel/acpi.c           | 11 +++------
+ arch/arm64/kernel/setup.c          | 38 ++++++++++++++++++++++++++++++
+ drivers/firmware/efi/arm-runtime.c | 27 ++++++++++-----------
+ init/main.c                        |  3 +++
+ 5 files changed, 72 insertions(+), 30 deletions(-)
+
 -- 
-2.17.1
+2.17.0
