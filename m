@@ -1,16 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 14 Jun 2018 17:08:16 -0700 (PDT)
-Subject: [PATCH 0/4] emaclite bug fixes and code cleanup
-In-Reply-To: <1528871719-1681-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1528871719-1681-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <20180614.170816.66333260131594276.davem@davemloft.net>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Fri, 15 Jun 2018 10:16:47 +0800
+Subject: [PATCH v3 0/4] clk: rockchip: support clock controller for px30 SoC
+Message-ID: <1529029011-15021-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-Date: Wed, 13 Jun 2018 12:05:15 +0530
+Change in V3:
+[PATCH v3 1/4]: Correct description
+[PATCH v3 2/4]: Use an SPDX tag instead.
+[PATCH v3 3/4]: Use an SPDX tag instead,
+		parent_rate might overflow and fix it.
+		fix up the checkpatch warning.
+		add more CMPOSITE_xxx_HALFdiv.
 
-> This patch series fixes bug in emaclite remove and mdio_setup routines.
-> It does minor code cleanup.
+Change in V2:
+[PATCH v2 2/4]: modify the Author name
+[PATCH v2 3/4]: provide a bit more explanation for commit message
 
-Series applied.
+Elaine Zhang (4):
+  dt-bindings: add bindings for px30 clock controller
+  clk: rockchip: add dt-binding header for px30
+  clk: rockchip: add support for half divider
+  clk: rockchip: add clock controller for px30
+
+ .../bindings/clock/rockchip,px30-cru.txt           |   66 ++
+ drivers/clk/rockchip/Makefile                      |    2 +
+ drivers/clk/rockchip/clk-half-divider.c            |  231 +++++
+ drivers/clk/rockchip/clk-px30.c                    | 1080 ++++++++++++++++++++
+ drivers/clk/rockchip/clk.c                         |   10 +
+ drivers/clk/rockchip/clk.h                         |  126 ++-
+ include/dt-bindings/clock/px30-cru.h               |  389 +++++++
+ 7 files changed, 1903 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,px30-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-half-divider.c
+ create mode 100644 drivers/clk/rockchip/clk-px30.c
+ create mode 100644 include/dt-bindings/clock/px30-cru.h
+
+-- 
+1.9.1
