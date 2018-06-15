@@ -1,79 +1,82 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Fri, 15 Jun 2018 13:30:31 -0300
-Subject: [PATCH v4 03/26] arch/*: Kconfig: fix documentation for NMI watchdog
-In-Reply-To: <cover.1529079119.git.mchehab+samsung@kernel.org>
-References: <cover.1529079119.git.mchehab+samsung@kernel.org>
-Message-ID: <3018fe79cb72e48491a2b35c577baa93af16af52.1529079119.git.mchehab+samsung@kernel.org>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 15 Jun 2018 11:12:09 -0600
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <20180615165232.GE2202@arm.com>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+ <20180615165232.GE2202@arm.com>
+Message-ID: <20180615171208.GN11565@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changeset 9919cba7ff71 ("watchdog: Update documentation") updated
-the documentation, removing the old nmi_watchdog.txt and adding
-a file with a new content.
+On Fri, Jun 15, 2018 at 05:52:32PM +0100, Will Deacon wrote:
+> Hi Vivek,
+> 
+> On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
+> > Qualcomm SoCs have an additional level of cache called as
+> > System cache or Last level cache[1]. This cache sits right
+> > before the DDR, and is tightly coupled with the memory
+> > controller.
+> > The cache is available to all the clients present in the
+> > SoC system. The clients request their slices from this system
+> > cache, make it active, and can then start using it. For these
+> > clients with smmu, to start using the system cache for
+> > dma buffers and related page tables [2], few of the memory
+> > attributes need to be set accordingly.
+> > This change makes the related memory Outer-Shareable, and
+> > updates the MAIR with necessary protection.
+> > 
+> > The MAIR attribute requirements are:
+> >     Inner Cacheablity = 0
+> >     Outer Cacheablity = 1, Write-Back Write Allocate
+> >     Outer Shareablity = 1
+> 
+> Hmm, so is this cache coherent with the CPU or not? Why don't normal
+> non-cacheable mappings allocated in the LLC by default?
+> 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index f7a96bcf94a6..8058e7205034 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -249,6 +249,7 @@ struct arm_smmu_domain {
+> >  	struct mutex			init_mutex; /* Protects smmu pointer */
+> >  	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
+> >  	struct iommu_domain		domain;
+> > +	bool				has_sys_cache;
+> >  };
+> >  
+> >  struct arm_smmu_option_prop {
+> > @@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+> >  
+> >  	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+> >  		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+> > +	if (smmu_domain->has_sys_cache)
+> > +		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
+> >  
+> >  	smmu_domain->smmu = smmu;
+> >  	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+> > @@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+> >  	case DOMAIN_ATTR_NESTING:
+> >  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+> >  		return 0;
+> > +	case DOMAIN_ATTR_USE_SYS_CACHE:
+> > +		*((int *)data) = smmu_domain->has_sys_cache;
+> > +		return 0;
+> 
+> I really don't like exposing this to clients directly like this,
+> particularly as there aren't any in-tree users. I would prefer that we
+> provide a way for the io-pgtable code to have its MAIR values overridden
+> so that all non-coherent DMA ends up using the system cache.
 
-Update Kconfig files accordingly.
+FWIW here is a future in-tree user for LLC:
 
-Fixes: 9919cba7ff71 ("watchdog: Update documentation")
+https://patchwork.freedesktop.org/series/40545/
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
----
- arch/arm/Kconfig    | 2 +-
- arch/parisc/Kconfig | 2 +-
- arch/sh/Kconfig     | 2 +-
- arch/sparc/Kconfig  | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Specifically:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 483d2858e367..54eeb8d00bc6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1302,7 +1302,7 @@ config SMP
- 	  will run faster if you say N here.
- 
- 	  See also <file:Documentation/x86/i386/IO-APIC.txt>,
--	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
-+	  <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO available at
- 	  <http://tldp.org/HOWTO/SMP-HOWTO.html>.
- 
- 	  If you don't know what to do here, say N.
-diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
-index 4d8f64d48597..c480770fabcd 100644
---- a/arch/parisc/Kconfig
-+++ b/arch/parisc/Kconfig
-@@ -275,7 +275,7 @@ config SMP
- 	  machines, but will use only one CPU of a multiprocessor machine.
- 	  On a uniprocessor machine, the kernel will run faster if you say N.
- 
--	  See also <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO
-+	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
- 	  available at <http://www.tldp.org/docs.html#howto>.
- 
- 	  If you don't know what to do here, say N.
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 4bedd1c97f29..dd4f3d3e644f 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -687,7 +687,7 @@ config SMP
- 	  People using multiprocessor machines who say Y here should also say
- 	  Y to "Enhanced Real Time Clock Support", below.
- 
--	  See also <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO
-+	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
- 	  available at <http://www.tldp.org/docs.html#howto>.
- 
- 	  If you don't know what to do here, say N.
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index 9a2b8877f174..0f535debf802 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -178,7 +178,7 @@ config SMP
- 	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
- 	  Management" code will be disabled if you say Y here.
- 
--	  See also <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO
-+	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
- 	  available at <http://www.tldp.org/docs.html#howto>.
- 
- 	  If you don't know what to do here, say N.
+https://patchwork.freedesktop.org/patch/212400/
+
+Jordan
+
 -- 
-2.17.1
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
