@@ -1,31 +1,42 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 15 Jun 2018 13:23:49 +0200
-Subject: [PATCH 5/6] arm64: dts: rockchip: Add missing cooling device
- properties for CPUs
-In-Reply-To: <d7f32cb0c3b77901cb5e37320a454e5e1dfed958.1527225682.git.viresh.kumar@linaro.org>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <d7f32cb0c3b77901cb5e37320a454e5e1dfed958.1527225682.git.viresh.kumar@linaro.org>
-Message-ID: <5093249.sUvQcHjlij@diego>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Jun 2018 04:29:16 -0700
+Subject: [PATCH v2] regulator: core: Enable voltage balancing
+In-Reply-To: <1528886026-9457-1-git-send-email-m.purski@samsung.com>
+References: <20180605044554.GC5738@atomide.com>
+ <CGME20180613103622eucas1p1778ba2c2e5dd85ccb4c488bd0a38386d@eucas1p1.samsung.com>
+ <1528886026-9457-1-git-send-email-m.purski@samsung.com>
+Message-ID: <20180615112916.GK112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 25. Mai 2018, 07:40:05 CEST schrieb Viresh Kumar:
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
-> 
-> Add such missing properties.
-> 
-> Do minor rearrangement as well to keep ordering consistent.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hi,
 
-applied for 4.19
+* Maciej Purski <m.purski@samsung.com> [180613 10:39]:
+> Call regulator_balance_voltage() instead of set_voltage_rdev()
+> in set_voltage_unlocked() and in enabling and disabling functions,
+> but only if the regulator is coupled.
+> 
+> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> 
+> ---
+> Changes in v2:
+> - fix compile errors
+> - make debug messages more informative
 
+Thanks for updating it. This series still hangs after loading
+modules on beagleboard-x15:
 
-Thanks
-Heiko
+[   26.679749] smps12: regulator_set_voltage: 3381
+[   26.684529] smps12: regulator_set_voltage_unlocked:  3045
+[   26.695616] smps12: _regulator_do_set_voltage: 2912
+[   26.701275] smps12: regulator_set_voltage: 3381
+[   26.706002] smps12: regulator_set_voltage_unlocked:  3045
+[   26.712349] smps12: _regulator_do_set_voltage: 2912
+[   26.719329] abb_mpu: regulator_set_voltage: 3381
+[   26.724105] abb_mpu: regulator_set_voltage_unlocked:  3045
+
+So it seems to be the abb_mpu where it hangs?
+
+Regards,
+
+Tony
