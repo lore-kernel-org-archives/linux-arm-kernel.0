@@ -1,28 +1,66 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Fri, 15 Jun 2018 06:01:28 -0700
-Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
- compound controls.
-In-Reply-To: <9c80de4e-c070-1051-2089-2d53826c6fc7@xs4all.nl>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-2-maxime.ripard@bootlin.com>
- <9c80de4e-c070-1051-2089-2d53826c6fc7@xs4all.nl>
-Message-ID: <CABXOdTdrXiseyjS_aWwbiAWW9F4gcQbRsK-KCkUVub82dBtZvA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Jun 2018 19:08:14 +0530
+Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
+In-Reply-To: <20180615050108.GG112168@atomide.com>
+References: <20180605060510.32473-1-nm@ti.com>
+ <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
+ <20180607233853.p7iw7nlxxuyi66og@kahuna>
+ <20180614123805.GF112168@atomide.com>
+ <20180614130435.j2bmzam6corrjylx@kahuna>
+ <20180615050108.GG112168@atomide.com>
+Message-ID: <a69fcb7a-f7a1-481b-8a02-1da7d1e20671@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 5:00 AM Hans Verkuil <hverkuil@xs4all.nl> wrote:
->
-> On 13/06/18 16:07, Maxime Ripard wrote:
-> > From: Pawel Osciak <posciak@chromium.org>
->
-> Obviously this needs a proper commit message.
->
-> >
-> > Signed-off-by: Pawel Osciak <posciak@chromium.org>
-> > Reviewed-by: Wu-cheng Li <wuchengli@chromium.org>
-> > Tested-by: Tomasz Figa <tfiga@chromium.org>
-> > [rebase44(groeck): include linux/types.h in v4l2-controls.h]
+Hi Tony,
 
-That internal note should go away.
+On Friday 15 June 2018 10:31 AM, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [180614 13:07]:
+>> On 12:38-20180614, Tony Lindgren wrote:
 
-Guenter
+>> From A53 view, a more accurate view might be  - from an interconnect
+>> view of the world (still simplified - i have ignored the sub bus
+>> segments in the representations below):
+>>
+>> msmc {
+>> 	navss_main {
+>> 		cbass_main{
+>> 			cbass_mcu {
+>> 				navss_mcu {
+>> 				};
+>> 				cbass_wkup{
+>> 				};
+>> 			};
+>> 		};
+>> 	};
+>> };
+>>
+>> From R5 view, the view will be very different ofcourse:
+>> view of the world (still simplified):
+>>
+>> cbass_mcu {
+>> 	navss_mcu {
+>> 	};
+>> 	cbass_wkup{
+>> 	};
+>> 	cbass_main{
+>> 		navss_main {
+>> 			msmc {
+>> 			};
+>> 		};
+>> 	};
+>> };
+> 
+> Well if we follow the hardware representation of the interconnects,
+> it should not matter from which processor view you're looking at things.
+> There are just different ranges provided.
+
+AFAIK, the root node needs to have the CPU which is using the DT. So,
+the hierarchy will change based on CPU view (if we describe it fully).
+
+How well we can reuse individual interconnect segments is something I
+have to think about / experiment. Will have to be wary of any "short
+paths" or "cross connections".
+
+Thanks,
+Sekhar
