@@ -1,106 +1,248 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 15 Jun 2018 16:56:21 +0900
-Subject: [PATCH 1/3] arm64: export memblock_reserve()d regions via /proc/iomem
+Date: Fri, 15 Jun 2018 16:56:22 +0900
+Subject: [PATCH 2/3] arm64: acpi,
+ efi: fix alignment fault in accessing ACPI tables at kdump
 In-Reply-To: <20180615075623.13454-1-takahiro.akashi@linaro.org>
 References: <20180615075623.13454-1-takahiro.akashi@linaro.org>
-Message-ID: <20180615075623.13454-2-takahiro.akashi@linaro.org>
+Message-ID: <20180615075623.13454-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+This is a fix against the issue that crash dump kernel may hang up
+during booting, which can happen on any ACPI-based system with "ACPI
+Reclaim Memory."
 
-There has been some confusion around what is necessary to prevent kexec
-overwriting important memory regions. memblock: reserve, or nomap?
-Only memblock nomap regions are reported via /proc/iomem, kexec's
-user-space doesn't know about memblock_reserve()d regions.
+(kernel messages after panic kicked off kdump)
+	   (snip...)
+	Bye!
+	   (snip...)
+	ACPI: Core revision 20170728
+	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
+	Internal error: Oops: 96000021 [#1] SMP
+	Modules linked in:
+	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
+	task: ffff000008d05180 task.stack: ffff000008cc0000
+	PC is at acpi_ns_lookup+0x25c/0x3c0
+	LR is at acpi_ds_load1_begin_op+0xa4/0x294
+	   (snip...)
+	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
+	Call trace:
+	   (snip...)
+	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
+	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
+	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
+	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
+	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
+	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
+	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
+	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
+	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
+	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
+	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
+	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
+	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
+	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
+	---[ end trace c46ed37f9651c58e ]---
+	Kernel panic - not syncing: Fatal exception
+	Rebooting in 10 seconds..
 
-Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
-as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
-and thus possible for kexec to overwrite with the new kernel or initrd.
-But this was always broken, as the UEFI memory map is also reserved
-and not marked as nomap.
+(diagnosis)
+* This fault is a data abort, alignment fault (ESR=0x96000021)
+  during reading out ACPI table.
+* Initial ACPI tables are normally stored in system ram and marked as
+  "ACPI Reclaim memory" by the firmware.
+* After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+  memory as MEMBLOCK_NOMAP"), those regions are differently handled
+  as they are "memblock-reserved", without NOMAP bit.
+* So they are now excluded from device tree's "usable-memory-range"
+  which kexec-tools determines based on a current view of /proc/iomem.
+* When crash dump kernel boots up, it tries to accesses ACPI tables by
+  mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
+  since they are no longer part of mapped system ram.
+* Given that ACPI accessor/helper functions are compiled in without
+  unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
+  any unaligned access to ACPI tables can cause a fatal panic.
 
-Exporting both nomap and reserved memblock types is a nuisance as
-they live in different memblock structures which we can't walk at
-the same time.
+With this patch, acpi_os_ioremap() always honors memory attribute
+information provided by the firmware (EFI) and retaining cacheability
+allows the kernel safe access to ACPI tables.
 
-Take a second walk over memblock.reserved and add new 'reserved'
-subnodes for the memblock_reserved() regions that aren't already
-described by the existing code. (e.g. Kernel Code)
+Please note that arm_enable_runtime_services() is now renamed to
+efi_enter_virtual_mode() due to the similarity to x86's.
 
-We use reserve_region_with_split() to find the gaps in existing named
-regions. This handles the gap between 'kernel code' and 'kernel data'
-which is memblock_reserve()d, but already partially described by
-request_standard_resources(). e.g.:
-| 80000000-dfffffff : System RAM
-|   80080000-80ffffff : Kernel code
-|   81000000-8158ffff : reserved
-|   81590000-8237efff : Kernel data
-|   a0000000-dfffffff : Crash kernel
-| e00f0000-f949ffff : System RAM
-
-reserve_region_with_split needs kzalloc() which isn't available when
-request_standard_resources() is called, use an initcall.
-
-Reported-by: Bhupesh Sharma <bhupesh.linux@gmail.com>
-Reported-by: Tyler Baicar <tbaicar@codeaurora.org>
-Suggested-by: Akashi Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: James Morse <james.morse@arm.com>
-Fixes: d28f6df1305a ("arm64/kexec: Add core kexec support")
-CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-CC: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Suggested-by: James Morse <james.morse@arm.com>
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reported-by and Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+  (for older version)
 ---
- arch/arm64/kernel/setup.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm64/include/asm/acpi.h      | 23 ++++++++++++++++-------
+ arch/arm64/kernel/acpi.c           | 11 +++--------
+ drivers/firmware/efi/arm-runtime.c | 27 ++++++++++++---------------
+ 3 files changed, 31 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 30ad2f085d1f..5b4fac434c84 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -241,6 +241,44 @@ static void __init request_standard_resources(void)
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 32f465a80e4e..d53c95f4e1a9 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -12,10 +12,12 @@
+ #ifndef _ASM_ACPI_H
+ #define _ASM_ACPI_H
+ 
++#include <linux/efi.h>
+ #include <linux/memblock.h>
+ #include <linux/psci.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/io.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -29,18 +31,22 @@
+ 
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
++pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
++
+ /* ACPI table mapping after acpi_permanent_mmap is set */
+ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+ 					    acpi_size size)
+ {
++	/* For normal memory we already have a cacheable mapping. */
++	if (memblock_is_map_memory(phys))
++		return (void __iomem *)__phys_to_virt(phys);
++
+ 	/*
+-	 * EFI's reserve_regions() call adds memory with the WB attribute
+-	 * to memblock via early_init_dt_add_memory_arch().
++	 * We should still honor the memory's attribute here because
++	 * crash dump kernel possibly excludes some ACPI (reclaim)
++	 * regions from memblock list.
+ 	 */
+-	if (!memblock_is_memory(phys))
+-		return ioremap(phys, size);
+-
+-	return ioremap_cache(phys, size);
++	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
+ }
+ #define acpi_os_ioremap acpi_os_ioremap
+ 
+@@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
+  * for compatibility.
+  */
+ #define acpi_disable_cmcff 1
+-pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
++static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
++{
++	return __acpi_get_mem_attribute(addr);
++}
+ #endif /* CONFIG_ACPI_APEI */
+ 
+ #ifdef CONFIG_ACPI_NUMA
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 7b09487ff8fb..ed46dc188b22 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -18,6 +18,7 @@
+ #include <linux/acpi.h>
+ #include <linux/bootmem.h>
+ #include <linux/cpumask.h>
++#include <linux/efi.h>
+ #include <linux/efi-bgrt.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
+@@ -29,13 +30,9 @@
+ 
+ #include <asm/cputype.h>
+ #include <asm/cpu_ops.h>
++#include <asm/pgtable.h>
+ #include <asm/smp_plat.h>
+ 
+-#ifdef CONFIG_ACPI_APEI
+-# include <linux/efi.h>
+-# include <asm/pgtable.h>
+-#endif
+-
+ int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+ int acpi_disabled = 1;
+ EXPORT_SYMBOL(acpi_disabled);
+@@ -239,8 +236,7 @@ void __init acpi_boot_table_init(void)
  	}
  }
  
-+static int __init reserve_memblock_reserved_regions(void)
-+{
-+	phys_addr_t start, end, roundup_end = 0;
-+	struct resource *mem, *res;
-+	u64 i;
-+
-+	for_each_reserved_mem_region(i, &start, &end) {
-+		if (end <= roundup_end)
-+			continue; /* done already */
-+
-+		start = __pfn_to_phys(PFN_DOWN(start));
-+		end = __pfn_to_phys(PFN_UP(end)) - 1;
-+		roundup_end = end;
-+
-+		res = kzalloc(sizeof(*res), GFP_ATOMIC);
-+		if (WARN_ON(!res))
-+			return -ENOMEM;
-+		res->start = start;
-+		res->end = end;
-+		res->name  = "reserved";
-+		res->flags = IORESOURCE_MEM;
-+
-+		mem = request_resource_conflict(&iomem_resource, res);
-+		/*
-+		 * We expected memblock_reserve() regions to conflict with
-+		 * memory created by request_standard_resources().
-+		 */
-+		if (WARN_ON_ONCE(!mem))
-+			continue;
-+		kfree(res);
-+
-+		reserve_region_with_split(mem, start, end, "reserved");
+-#ifdef CONFIG_ACPI_APEI
+-pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
++pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
+ {
+ 	/*
+ 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
+@@ -261,4 +257,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+ 		return __pgprot(PROT_NORMAL_NC);
+ 	return __pgprot(PROT_DEVICE_nGnRnE);
+ }
+-#endif
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index 5889cbea60b8..566ef0a9edb5 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -106,46 +106,43 @@ static bool __init efi_virtmap_init(void)
+  * non-early mapping of the UEFI system table and virtual mappings for all
+  * EFI_MEMORY_RUNTIME regions.
+  */
+-static int __init arm_enable_runtime_services(void)
++void __init efi_enter_virtual_mode(void)
+ {
+ 	u64 mapsize;
+ 
+ 	if (!efi_enabled(EFI_BOOT)) {
+ 		pr_info("EFI services will not be available.\n");
+-		return 0;
++		return;
 +	}
 +
-+	return 0;
-+}
-+arch_initcall(reserve_memblock_reserved_regions);
++	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
 +
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
++	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
++		pr_err("Failed to remap EFI memory map\n");
++		return;
+ 	}
  
- void __init setup_arch(char **cmdline_p)
+ 	if (efi_runtime_disabled()) {
+ 		pr_info("EFI runtime services will be disabled.\n");
+-		return 0;
++		return;
+ 	}
+ 
+ 	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+ 		pr_info("EFI runtime services access via paravirt.\n");
+-		return 0;
++		return;
+ 	}
+ 
+ 	pr_info("Remapping and enabling EFI services.\n");
+ 
+-	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
+-
+-	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+-		pr_err("Failed to remap EFI memory map\n");
+-		return -ENOMEM;
+-	}
+-
+ 	if (!efi_virtmap_init()) {
+ 		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
+-		return -ENOMEM;
++		return;
+ 	}
+ 
+ 	/* Set up runtime services function pointers */
+ 	efi_native_runtime_setup();
+ 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+-
+-	return 0;
+ }
+-early_initcall(arm_enable_runtime_services);
+ 
+ void efi_virtmap_load(void)
+ {
 -- 
 2.17.0
