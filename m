@@ -1,86 +1,54 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 15 Jun 2018 16:47:24 +0100
-Subject: [PATCH v2 2/4] KVM: arm64: Don't mask softirq with IRQs disabled in
- vcpu_put()
+Date: Fri, 15 Jun 2018 16:56:41 +0100
+Subject: [PATCH v2 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17
 In-Reply-To: <1529077646-2848-1-git-send-email-Dave.Martin@arm.com>
 References: <1529077646-2848-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1529077646-2848-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180615155640.GP22983@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e6b673b ("KVM: arm64: Optimise FPSIMD handling to reduce
-guest/host thrashing") introduces a specific helper
-kvm_arch_vcpu_put_fp() for saving the vcpu FPSIMD state during
-vcpu_put().
+On Fri, Jun 15, 2018 at 04:47:22PM +0100, Dave Martin wrote:
+> This series contains fixes for some issues observed since the KVM arm64
+> pull request for 4.17.
 
-This function uses local_bh_disable()/_enable() to protect the
-FPSIMD context manipulation from interruption by softirqs.
+Groan.  Again, this should read "4.18".  Apologies for the confusion!
+Fixed locally in case I respin.
 
-This approach is not correct, because vcpu_put() can be invoked
-either from the KVM host vcpu thread (when exiting the vcpu run
-loop), or via a preempt notifier.  In the former case, only
-preemption is disabled.  In the latter case, the function is called
-from inside __schedule(), which means that IRQs are disabled.
+Cheers
+---Dave
 
-Use of local_bh_disable()/_enable() with IRQs disabled is considerd
-an error, resulting in lockdep splats while running VMs if lockdep
-is enabled.
-
-This patch disables IRQs instead of attempting to disable softirqs,
-avoiding the problem of calling local_bh_enable() with IRQs
-disabled in the __schedule() path.  This creates an additional
-interrupt blackout during vcpu run loop exit, but this is the rare
-case and the blackout latency is still less than that of
-__schedule().
-
-Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
----
-
-Changes since v1:
-
-Requested by Marc Zyngier:
-
- * Disable IRQs unconditionally instead of attempting to conditionally
-   disable softirqs.  This creates an additional interrupt blackout
-   during vcpu run loop exit.  This is the rare case, and the blackout
-   latency is still less than that of __schedule().
----
- arch/arm64/kvm/fpsimd.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-index dc6ecfa..f9d0931 100644
---- a/arch/arm64/kvm/fpsimd.c
-+++ b/arch/arm64/kvm/fpsimd.c
-@@ -5,7 +5,7 @@
-  * Copyright 2018 Arm Limited
-  * Author: Dave Martin <Dave.Martin@arm.com>
-  */
--#include <linux/bottom_half.h>
-+#include <linux/irqflags.h>
- #include <linux/sched.h>
- #include <linux/thread_info.h>
- #include <linux/kvm_host.h>
-@@ -92,7 +92,9 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
-  */
- void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
- {
--	local_bh_disable();
-+	unsigned long flags;
-+
-+	local_irq_save(flags);
- 
- 	update_thread_flag(TIF_SVE,
- 			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
-@@ -106,5 +108,5 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
- 		fpsimd_bind_task_to_cpu();
- 	}
- 
--	local_bh_enable();
-+	local_irq_restore(flags);
- }
--- 
-2.1.4
+> 
+> It supersedes the previous v1 [1].
+> 
+> The first patch (from Mark Rutland) adds a straightforward helper to
+> modify particular bits in a system register conditionally.  This is used
+> by patch 3 (though obviously it could be coded round and patch 1
+> dropped, if preferred).
+> 
+> See other patches for details of the individual fixes and changes from
+> the previous posting.
+> 
+> [1] [PATCH 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584107.html
+> 
+> Dave Martin (3):
+>   KVM: arm64: Don't mask softirq with IRQs disabled in vcpu_put()
+>   KVM: arm64/sve: Fix SVE trap restoration for non-current tasks
+>   KVM: arm64: Avoid mistaken attempts to save SVE state for vcpus
+> 
+> Mark Rutland (1):
+>   arm64: introduce sysreg_clear_set()
+> 
+>  arch/arm64/include/asm/kvm_host.h |  1 +
+>  arch/arm64/include/asm/sysreg.h   | 11 +++++++++++
+>  arch/arm64/kvm/fpsimd.c           | 36 +++++++++++++++++++++++++++---------
+>  3 files changed, 39 insertions(+), 9 deletions(-)
+> 
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
