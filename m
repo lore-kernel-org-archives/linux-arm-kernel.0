@@ -1,23 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 15 Jun 2018 17:16:31 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabreauto: Add sensors
-In-Reply-To: <a20cc6a0c278cc2791c0bdfc30a79b022de396ef.camel@nxp.com>
-References: <b31ca3ff50566c193003614d0bbf5e0a0e95901c.1528390418.git.leonard.crestez@nxp.com>
- <CAOMZO5Czf1bO7vJZ1UG46DyVhzApqS82GFw+NFm_HN5tjD=xoQ@mail.gmail.com>
- <a20cc6a0c278cc2791c0bdfc30a79b022de396ef.camel@nxp.com>
-Message-ID: <CAOMZO5D0fBcwD+6SHor+mGvB=7m8WrTmi-QPTYWjMnQchVATOg@mail.gmail.com>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Fri, 15 Jun 2018 17:52:03 -0300
+Subject: [PATCH v4 00/26] Fix some doc build warnings/errors and broken
+ links
+In-Reply-To: <20180615130951.303a3ebb@lwn.net>
+References: <cover.1529079119.git.mchehab+samsung@kernel.org>
+ <20180615130951.303a3ebb@lwn.net>
+Message-ID: <20180615175203.19bc4abc@coco.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 7:17 AM, Leonard Crestez
-<leonard.crestez@nxp.com> wrote:
+Em Fri, 15 Jun 2018 13:09:51 -0600
+Jonathan Corbet <corbet@lwn.net> escreveu:
 
-> Should I also assign a label, like "isl29023: light-sensor at 44"? I
-> couldn't find any recommendation on this.
->
-> There are no immediate uses for a label but this practice is very
-> common. Having labels allows creating minor board variants with reduced
-> churn in the base dts so it seems good.
+> On Fri, 15 Jun 2018 13:30:28 -0300
+> Mauro Carvalho Chehab <mchehab+samsung@kernel.org> wrote:
+> 
+> > As discussed during the review of v2, your plans were to merge
+> > things with potential to conflict with merges by the end of the
+> > merge window. So, I'm resubmitting it in order to help you with
+> > that.  
+> 
+> Is there any chance you could send them directly Linusward with my ack?
+> I'm fighting a few real-world complications at the moment, and barely
+> have time to breathe...
 
-In the case of this specific board we don't have board variants, so no
-need to add a label.
+Ok, I'll send him a pull request (likely tomorrow), adding your
+ack on the patches at this series.
+
+Regards,
+Mauro
