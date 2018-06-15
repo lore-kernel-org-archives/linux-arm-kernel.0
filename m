@@ -1,69 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Jun 2018 22:47:53 +0530
-Subject: [RFC PATCH 3/6] serial: 8250_omap: Add support for AM654 UART
- controller
-In-Reply-To: <20180612210640.GA20728@rob-hp-laptop>
-References: <20180605060125.9518-1-nm@ti.com>
- <20180605060125.9518-4-nm@ti.com> <20180612210640.GA20728@rob-hp-laptop>
-Message-ID: <8c553dcc-e352-6e69-e08c-4e6237555ea7@ti.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 15 Jun 2018 13:33:15 -0400
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+Message-ID: <5120aa9f167c19712c01dc812f689eaef23bf0c5.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Wednesday 13 June 2018 02:36 AM, Rob Herring wrote:
-> On Tue, Jun 05, 2018 at 01:01:22AM -0500, Nishanth Menon wrote:
->> AM654 uses a UART controller that is compatible (partially) with
->> existing 8250 UART, however, has a few differences with respect to DMA
->> support and control paths. Introduce a base definition that allows us
->> to build up the differences in follow on patches.
->>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Vignesh R <vigneshr@ti.com>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
->>  drivers/tty/serial/8250/8250_omap.c                      | 1 +
->>  2 files changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
->> index 4b0f05adb228..c35d5ece1156 100644
->> --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
->> +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
->> @@ -1,6 +1,7 @@
->>  OMAP UART controller
->>  
->>  Required properties:
->> +- compatible : should be "ti,am654-uart" for AM654 controllers
+On Fri, 2018-06-15 at 10:17 -0700, Geoff Levand wrote:
+> > > +    if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
+> > > +            !strncmp(header->oem_table_id, "ProLiant", 8) &&
+> > 
+> > You should match the affected range of OEM table revisions too, that way a
+> > firmware upgrade should start working, instead of being permanently disabled
+> > because we think its unlikely.
 > 
-> Not compatible with any existing TI 8250 UARTs?
+> The m400 has reached end of life. No one really expects to see any firmware
+> update.  I don't know what the effected OEM table revisions are, and I don't
+> think there is an active platform maintainer who could give that info either.
+> 
+> If someone can provide the info. I'll update the fix.
+> 
+> > > +            MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
+> > 
+> > How is the CPU implementer relevant?
+> 
+> That was just a copy of what other fixes had.  Should I remove it?
 
-Curious on why you asked about this. Are you suggesting why not:
-
-"ti,<new-soc>-uart", "ti,<old-soc>-uart"
-
-or you are asking why introduce "ti,<new-soc>-uart" unless there is
-clear demonstrable need for using it in driver code.
-
-In general, I think "ti,<new-soc>-uart", "ti,<old-soc>-uart" in
-device-tree (and by extension in binding document) is better even in
-there are no _known_ incompatibilities at the time of initial driver
-submission. The reason is silicon integration and process differences
-many times spill over into driver.
-
-Of course, the idea is not to go postal and create a new compatible for
-every pin-compatible part number that gets created, but probably a new
-compatible should be created for a new silicon die.
-
-We have just started introducing support for this SoC, and since it
-reuses many IPs, this question is likely to come up again.
-
-In this particular case though, Nishanth is perfectly right in not saying
-
-compatible : should be "ti,am654-uart", "ti,omap4-uart"
-
-Because we *know* UART DMA integration is different and a match against
-omap4 would result in non-working UART once DMA is enabled by default.
-
-Thanks,
-Sekhar
+It was there because HPE ProLiant strings are generic and you may end up
+disabling platforms which would otherwise work. It is the ProLiant system
+based on the APM chipset which is the problem. Thus the check for cpu
+implementor.
