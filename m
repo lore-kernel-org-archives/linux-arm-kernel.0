@@ -1,68 +1,98 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Jun 2018 17:52:32 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
-In-Reply-To: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
-References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
-Message-ID: <20180615165232.GE2202@arm.com>
+Date: Fri, 15 Jun 2018 17:52:26 +0100
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <CACi5LpMV7_+tHH-OnMC1R59ZrhOGPXz5qy9MN2O7MVTmGnK33Q@mail.gmail.com>
+References: <1528785361-24477-1-git-send-email-bhsharma@redhat.com>
+ <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+ <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
+ <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
+ <20180613101124.GB26280@arm.com>
+ <CACi5LpMV7_+tHH-OnMC1R59ZrhOGPXz5qy9MN2O7MVTmGnK33Q@mail.gmail.com>
+Message-ID: <20180615165225.GD2202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Hi Bhupesh,
 
-On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
-> Qualcomm SoCs have an additional level of cache called as
-> System cache or Last level cache[1]. This cache sits right
-> before the DDR, and is tightly coupled with the memory
-> controller.
-> The cache is available to all the clients present in the
-> SoC system. The clients request their slices from this system
-> cache, make it active, and can then start using it. For these
-> clients with smmu, to start using the system cache for
-> dma buffers and related page tables [2], few of the memory
-> attributes need to be set accordingly.
-> This change makes the related memory Outer-Shareable, and
-> updates the MAIR with necessary protection.
+On Thu, Jun 14, 2018 at 11:53:53AM +0530, Bhupesh Sharma wrote:
+> On Wed, Jun 13, 2018 at 3:41 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Jun 13, 2018 at 10:46:56AM +0530, Bhupesh Sharma wrote:
+> >> On Tue, Jun 12, 2018 at 3:42 PM, James Morse <james.morse@arm.com> wrote:
+> >> > On 12/06/18 09:25, Bhupesh Sharma wrote:
+> >> >> 2b. Now if we use kexec-tools to obtain a crash vmcore we can see that
+> >> >> if we use 'readelf' to get the last program Header from vmcore (logs
+> >> >> below are for the non-kaslr case):
+> >> >>
+> >> >> # readelf -l vmcore
+> >> >>
+> >> >> ELF Header:
+> >> >> ........................
+> >> >>
+> >> >> Program Headers:
+> >> >>   Type           Offset             VirtAddr           PhysAddr
+> >> >>          FileSiz            MemSiz              Flags  Align
+> >> >> ..............................................................................................................................................................
+> >> >>   LOAD        0x0000000076d40000 0xffff80017fe00000 0x0000000180000000
+> >> >>                 0x0000001680000000 0x0000001680000000  RWE    0
+> >> >>
+> >> >> 3. So if we do a simple calculation:
+> >> >>
+> >> >> (VirtAddr + MemSiz) = 0xffff80017fe00000 + 0x0000001680000000 =
+> >> >> 0xFFFF8017FFE00000 != 0xffff801800000000.
+> >> >>
+> >> >> which indicates that the end virtual memory nodes are not the same
+> >> >> between vmlinux and vmcore.
+> >> >
+> >> > If I've followed this properly: the problem is that to generate the ELF headers
+> >> > in the post-kdump vmcore, at kdump-load-time kexec-tools has to guess the
+> >> > virtual addresses of the 'System RAM' regions it can see in /proc/iomem.
+> >> >
+> >> > The problem you are hitting is an invisible hole at the beginning of RAM,
+> >> > meaning user-space's guess_phys_to_virt() is off by the size of this hole.
+> >> >
+> >> > Isn't KASLR a special case for this? You must have to correct for that after
+> >> > kdump has happened, based on an elf-note in the vmcore. Can't we always do this?
+> >>
+> >> No, I hit this issue both for the KASLR and non-KASLR boot cases. We
+> >> can fix this either in kernel or user-space.
+> >>
+> >> Fixing this in kernel space seems better to me as the definition of
+> >> 'memstart_addr' is that it indicates the start of the physical ram,
+> >> but since in this case there is a hole at the start of the system ram
+> >> visible in Linux (and thus to user-space), but 'memstart_addr' is
+> >> still 0 which seems contradictory at the least. This causes PHY_OFFSET
+> >> to be 0 as well, which is again contradictory.
+> >
+> > Contradictory to who?
 > 
-> The MAIR attribute requirements are:
->     Inner Cacheablity = 0
->     Outer Cacheablity = 1, Write-Back Write Allocate
->     Outer Shareablity = 1
+> I meant that the 'memstart_addr' and PHY_OFFSET value are computed as
+> 0 in the above particular case, which is not the real representation
+> of the start of System RAM as the 1st memory block available in Linux
+> starts from 2MB [as confirmed by the 'memblock_start_of_DRAM()' value
+> of 0x200000] and indicated by '/proc/iomem':
+> 
+> # head -1 /proc/iomem
+> 00200000-0021ffff : reserved
 
-Hmm, so is this cache coherent with the CPU or not? Why don't normal
-non-cacheable mappings allocated in the LLC by default?
+Who said it's supposed to be the "real representation of the start of System
+RAM"? The kernel is fine with this being 0 in the case you describe. How
+about we rename the variable to 'memstart_addr_sometimes_zero'? Does that
+help?
 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index f7a96bcf94a6..8058e7205034 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -249,6 +249,7 @@ struct arm_smmu_domain {
->  	struct mutex			init_mutex; /* Protects smmu pointer */
->  	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
->  	struct iommu_domain		domain;
-> +	bool				has_sys_cache;
->  };
->  
->  struct arm_smmu_option_prop {
-> @@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->  
->  	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
->  		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
-> +	if (smmu_domain->has_sys_cache)
-> +		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
->  
->  	smmu_domain->smmu = smmu;
->  	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
-> @@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
->  	case DOMAIN_ATTR_NESTING:
->  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
->  		return 0;
-> +	case DOMAIN_ATTR_USE_SYS_CACHE:
-> +		*((int *)data) = smmu_domain->has_sys_cache;
-> +		return 0;
+> > Userspace has no business messing around with this
+> > stuff and I'm reluctant to make this an ABI by adding a symbol with a
+> > special name. Why can't the various constants needed by these tools be
+> > exported in the ELF headers for kcore/vmcore, or as a NOTE as James
+> > suggests? That sounds a lot less fragile to me.
+> 
+> But we already add the 'memstart_addr' variable to kallsyms in the
+> kernel, don't we? And so user-space tools do use the same - so we
+> already have a precedent available.
 
-I really don't like exposing this to clients directly like this,
-particularly as there aren't any in-tree users. I would prefer that we
-provide a way for the io-pgtable code to have its MAIR values overridden
-so that all non-coherent DMA ends up using the system cache.
+Whoa, whoa -- hold up! The implication here is that variables exposed via
+kallsyms are ABI. That's simply not true, otherwise we'd be breaking the
+ABI every kernel release.
 
 Will
