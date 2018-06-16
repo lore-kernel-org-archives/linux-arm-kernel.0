@@ -1,455 +1,870 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 16 Jun 2018 18:59:45 +0100
-Subject: [RFC PATCH] iio: adc: at91-sama5d2_adc: add support for
- oversampling resolution
-In-Reply-To: <1528699954-2353-1-git-send-email-eugen.hristev@microchip.com>
-References: <1528699954-2353-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180616185945.0e806ecb@archlinux>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 17 Jun 2018 00:40:57 +0200
+Subject: [PATCH v3 3/5] crypto: arm/speck - add NEON-accelerated
+ implementation of Speck-XTS
+In-Reply-To: <20180214184223.254359-4-ebiggers@google.com>
+References: <20180214184223.254359-1-ebiggers@google.com>
+ <20180214184223.254359-4-ebiggers@google.com>
+Message-ID: <bf0d6851c95b40ca970949229e6e6a00@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2018 09:52:34 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+Hi Eric,
 
-> This is implements oversampling support for the SAMA5D2 ADC
-> device.
-> Enabling oversampling : OSR can improve resolution from 12 bits to
-> 13 or 14 bits.
-> To not modify the scan element of the buffer , from 12 bits to 13 or 14,
-> I have added the extra bit(s) as MICRO values to the INT value from the
-> conversion.
-> Special care was required for the triggered buffer scenario (+ DMA).
+On 14.02.2018 19:42, Eric Biggers wrote:
+> Add an ARM NEON-accelerated implementation of Speck-XTS.  It operates on
+> 128-byte chunks at a time, i.e. 8 blocks for Speck128 or 16 blocks for
+> Speck64.  Each 128-byte chunk goes through XTS preprocessing, then is
+> encrypted/decrypted (doing one cipher round for all the blocks, then the
+> next round, etc.), then goes through XTS postprocessing.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> The performance depends on the processor but can be about 3 times faster
+> than the generic code.  For example, on an ARMv7 processor we observe
+> the following performance with Speck128/256-XTS:
+> 
+>     xts-speck128-neon:     Encryption 107.9 MB/s, Decryption 108.1 MB/s
+>     xts(speck128-generic): Encryption  32.1 MB/s, Decryption  36.6 MB/s
+> 
+> In comparison to AES-256-XTS without the Cryptography Extensions:
+> 
+>     xts-aes-neonbs:        Encryption  41.2 MB/s, Decryption  36.7 MB/s
+>     xts(aes-asm):          Encryption  31.7 MB/s, Decryption  30.8 MB/s
+>     xts(aes-generic):      Encryption  21.2 MB/s, Decryption  20.9 MB/s
+> 
+> Speck64/128-XTS is even faster:
+> 
+>     xts-speck64-neon:      Encryption 138.6 MB/s, Decryption 139.1 MB/s
+> 
+> Note that as with the generic code, only the Speck128 and Speck64
+> variants are supported.  Also, for now only the XTS mode of operation is
+> supported, to target the disk and file encryption use cases.  The NEON
+> code also only handles the portion of the data that is evenly divisible
+> into 128-byte chunks, with any remainder handled by a C fallback.  Of
+> course, other modes of operation could be added later if needed, and/or
+> the NEON code could be updated to handle other buffer sizes.
+> 
+> The XTS specification is only defined for AES which has a 128-bit block
+> size, so for the GF(2^64) math needed for Speck64-XTS we use the
+> reducing polynomial 'x^64 + x^4 + x^3 + x + 1' given by the original XEX
+> paper.  Of course, when possible users should use Speck128-XTS, but even
+> that may be too slow on some processors; Speck64-XTS can be faster.
+> 
+> Signed-off-by: Eric Biggers <ebiggers@google.com>
 > ---
-> Hello Jonathan,
+>  arch/arm/crypto/Kconfig           |   6 +
+>  arch/arm/crypto/Makefile          |   2 +
+>  arch/arm/crypto/speck-neon-core.S | 432 ++++++++++++++++++++++++++++++
+>  arch/arm/crypto/speck-neon-glue.c | 288 ++++++++++++++++++++
+>  4 files changed, 728 insertions(+)
+>  create mode 100644 arch/arm/crypto/speck-neon-core.S
+>  create mode 100644 arch/arm/crypto/speck-neon-glue.c
 > 
-> I marked this patch as RFC because I am not confident in the best way to handle
-> this oversampling support.
-> 
-> I modified the return value of the channels to use IIO_VALUE_INT_PLUS_MICRO
-> instead of IIO_VALUE_INT, so I can add an extra bit or two bits in there to the
-> INT value (0/500000 or 0/250000/500000/7500000) .
-> You know of a better way to add this support?
-> Looks like the iio channel spec cannot be modified at
-> runtime. Would be best if the real bits in the channel spec would be changed to
-> 13 or 14, but then, the buffer would be confused, as the buffer spec is now
-> le:u12/16>>0 so how can I change that to reflect oversampling, or,  
-> IIO_VALUE_INT_PLUS_MICRO ?
-> And I am not sure how to handle this w.r.t ABI and userspace changes.
-
-Hmm.  Yes, that rigidity in buffer formatting is sometimes a pain.  One day
-we should look at relaxing it.  I did look at it a long time ago but it looked
-really fiddly to actually do.
-
-> 
-> At this moment I added the micro values just to the software trigger readings,
-> and triggered buffer + DMA does not provide the extra bits, but, I need
-> to shift all values with 2 bits to the right . The code is rather ugly
-> right now, but I can change it to look prettier if this is the proper way
-> to do it.
-
-So if we were doing this from scratch (i.e. new driver) then it would be easy.
-you'd do the opposite - report it as a 14bit channel at all times and shift it
-left (0 fill) if not supplying 14bits due to lower oversampling ratios.
-
-Now the risk is some userspace code isn't actually reading the description
-but is assuming the buffer entry is 12 bits.  I would hope that no one
-is doing that (as generic code would be checking correctly) so perhaps we
-can get away with making that change?  That would mean also adjusting
-the scale value and sticking to integer output in sysfs (appropriately
-scaled when only 12 bits etc actually there).
-
-Given what you have here is an ABI change anyway, I'd just go for it
-and declare it to always be 14bits.  It would be valid if you want
-to not rescale the sysfs values at all, but instead adjust the 'scale'
-as the oversampling changes - either is valid under the ABI.
-
-Btw nicely designed hw doing overscaling does the shift for you 
-(i.e. it's the least sig bits that are just 0 when no oversampling).
-Makes the SW easy and means you've already gotten the placement right
-before you get to implementing oversampling.
-
-
-> 
-> Thanks for all the feedback,
-> Eugen
-> 
-> 
->  drivers/iio/adc/at91-sama5d2_adc.c | 198 ++++++++++++++++++++++++++++++++-----
->  1 file changed, 172 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-> index 58c4c2b..f1a89b7 100644
-> --- a/drivers/iio/adc/at91-sama5d2_adc.c
-> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-> @@ -130,6 +130,15 @@
->  #define AT91_SAMA5D2_OVER	0x3c
->  /* Extended Mode Register */
->  #define AT91_SAMA5D2_EMR	0x40
-> +/* Extended Mode Register - Oversampling rate */
-> +#define AT91_SAMA5D2_EMR_OSR(V)			((V) << 16)
-> +#define AT91_SAMA5D2_EMR_OSR_MASK		GENMASK(17, 16)
-> +#define AT91_SAMA5D2_EMR_OSR_0SAMPLES		0
-> +#define AT91_SAMA5D2_EMR_OSR_4SAMPLES		1
-> +#define AT91_SAMA5D2_EMR_OSR_16SAMPLES		2
+> diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+> index b8e69fe282b8..925d1364727a 100644
+> --- a/arch/arm/crypto/Kconfig
+> +++ b/arch/arm/crypto/Kconfig
+> @@ -121,4 +121,10 @@ config CRYPTO_CHACHA20_NEON
+>  	select CRYPTO_BLKCIPHER
+>  	select CRYPTO_CHACHA20
+>  
+> +config CRYPTO_SPECK_NEON
+> +	tristate "NEON accelerated Speck cipher algorithms"
+> +	depends on KERNEL_MODE_NEON
+> +	select CRYPTO_BLKCIPHER
+> +	select CRYPTO_SPECK
 > +
-> +/* Extended Mode Register - Averaging on single trigger event */
-> +#define AT91_SAMA5D2_EMR_ASTE(V)		((V) << 20)
->  /* Compare Window Register */
->  #define AT91_SAMA5D2_CWR	0x44
->  /* Channel Gain Register */
-> @@ -248,6 +257,14 @@
->  #define AT91_HWFIFO_MAX_SIZE_STR	"128"
->  #define AT91_HWFIFO_MAX_SIZE		128
+>  endif
+> diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+> index 30ef8e291271..a758107c5525 100644
+> --- a/arch/arm/crypto/Makefile
+> +++ b/arch/arm/crypto/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
+>  obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
+>  obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
+>  obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha20-neon.o
+> +obj-$(CONFIG_CRYPTO_SPECK_NEON) += speck-neon.o
 >  
-> +/* Possible values for oversampling ratio, and the string equivalent */
-> +#define AT91_OSR_0SAMPLES		0
-> +#define AT91_OSR_0SAMPLES_STR		"0"
-> +#define AT91_OSR_4SAMPLES		4
-> +#define AT91_OSR_4SAMPLES_STR		"4"
-> +#define AT91_OSR_16SAMPLES		16
-> +#define AT91_OSR_16SAMPLES_STR		"16"
+>  ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
+>  ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
+> @@ -53,6 +54,7 @@ ghash-arm-ce-y	:= ghash-ce-core.o ghash-ce-glue.o
+>  crct10dif-arm-ce-y	:= crct10dif-ce-core.o crct10dif-ce-glue.o
+>  crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+>  chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
+> +speck-neon-y := speck-neon-core.o speck-neon-glue.o
+>  
+>  quiet_cmd_perl = PERL    $@
+>        cmd_perl = $(PERL) $(<) > $(@)
+> diff --git a/arch/arm/crypto/speck-neon-core.S
+> b/arch/arm/crypto/speck-neon-core.S
+> new file mode 100644
+> index 000000000000..3c1e203e53b9
+> --- /dev/null
+> +++ b/arch/arm/crypto/speck-neon-core.S
+> @@ -0,0 +1,432 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * NEON-accelerated implementation of Speck128-XTS and Speck64-XTS
+> + *
+> + * Copyright (c) 2018 Google, Inc
+> + *
+> + * Author: Eric Biggers <ebiggers@google.com>
+> + */
 > +
->  #define AT91_SAMA5D2_CHAN_SINGLE(num, addr)				\
->  	{								\
->  		.type = IIO_VOLTAGE,					\
-> @@ -261,7 +278,8 @@
->  		},							\
->  		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
->  		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
-> -		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),\
-> +		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ)|\
-> +				BIT(IIO_CHAN_INFO_OVERSAMPLING_RATIO),	\
->  		.datasheet_name = "CH"#num,				\
->  		.indexed = 1,						\
->  	}
-> @@ -281,7 +299,8 @@
->  		},							\
->  		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
->  		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
-> -		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),\
-> +		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ)|\
-> +				BIT(IIO_CHAN_INFO_OVERSAMPLING_RATIO),	\
->  		.datasheet_name = "CH"#num"-CH"#num2,			\
->  		.indexed = 1,						\
->  	}
-> @@ -299,7 +318,8 @@
->  			.storagebits = 16,				\
->  		},							\
->  		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> -		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),\
-> +		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ)|\
-> +				BIT(IIO_CHAN_INFO_OVERSAMPLING_RATIO),	\
->  		.datasheet_name = name,					\
->  	}
->  #define AT91_SAMA5D2_CHAN_PRESSURE(num, name)				\
-> @@ -313,7 +333,8 @@
->  			.storagebits = 16,				\
->  		},							\
->  		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> -		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),\
-> +		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ)|\
-> +				BIT(IIO_CHAN_INFO_OVERSAMPLING_RATIO),	\
->  		.datasheet_name = name,					\
->  	}
->  
-> @@ -384,6 +405,7 @@ struct at91_adc_state {
->  	const struct iio_chan_spec	*chan;
->  	bool				conversion_done;
->  	u32				conversion_value;
-> +	unsigned int			oversampling_ratio;
->  	struct at91_adc_soc_info	soc_info;
->  	wait_queue_head_t		wq_data_available;
->  	struct at91_adc_dma		dma_st;
-> @@ -475,6 +497,76 @@ static inline int at91_adc_of_xlate(struct iio_dev *indio_dev,
->  	return at91_adc_chan_xlate(indio_dev, iiospec->args[0]);
->  }
->  
-> +static void at91_adc_config_emr(struct at91_adc_state *st)
+> +#include <linux/linkage.h>
+> +
+> +	.text
+> +	.fpu		neon
+> +
+> +	// arguments
+> +	ROUND_KEYS	.req	r0	// const {u64,u32} *round_keys
+> +	NROUNDS		.req	r1	// int nrounds
+> +	DST		.req	r2	// void *dst
+> +	SRC		.req	r3	// const void *src
+> +	NBYTES		.req	r4	// unsigned int nbytes
+> +	TWEAK		.req	r5	// void *tweak
+> +
+> +	// registers which hold the data being encrypted/decrypted
+> +	X0		.req	q0
+> +	X0_L		.req	d0
+> +	X0_H		.req	d1
+> +	Y0		.req	q1
+> +	Y0_H		.req	d3
+> +	X1		.req	q2
+> +	X1_L		.req	d4
+> +	X1_H		.req	d5
+> +	Y1		.req	q3
+> +	Y1_H		.req	d7
+> +	X2		.req	q4
+> +	X2_L		.req	d8
+> +	X2_H		.req	d9
+> +	Y2		.req	q5
+> +	Y2_H		.req	d11
+> +	X3		.req	q6
+> +	X3_L		.req	d12
+> +	X3_H		.req	d13
+> +	Y3		.req	q7
+> +	Y3_H		.req	d15
+> +
+> +	// the round key, duplicated in all lanes
+> +	ROUND_KEY	.req	q8
+> +	ROUND_KEY_L	.req	d16
+> +	ROUND_KEY_H	.req	d17
+> +
+> +	// index vector for vtbl-based 8-bit rotates
+> +	ROTATE_TABLE	.req	d18
+> +
+> +	// multiplication table for updating XTS tweaks
+> +	GF128MUL_TABLE	.req	d19
+> +	GF64MUL_TABLE	.req	d19
+> +
+> +	// current XTS tweak value(s)
+> +	TWEAKV		.req	q10
+> +	TWEAKV_L	.req	d20
+> +	TWEAKV_H	.req	d21
+> +
+> +	TMP0		.req	q12
+> +	TMP0_L		.req	d24
+> +	TMP0_H		.req	d25
+> +	TMP1		.req	q13
+> +	TMP2		.req	q14
+> +	TMP3		.req	q15
+> +
+> +	.align		4
+> +.Lror64_8_table:
+> +	.byte		1, 2, 3, 4, 5, 6, 7, 0
+> +.Lror32_8_table:
+> +	.byte		1, 2, 3, 0, 5, 6, 7, 4
+> +.Lrol64_8_table:
+> +	.byte		7, 0, 1, 2, 3, 4, 5, 6
+> +.Lrol32_8_table:
+> +	.byte		3, 0, 1, 2, 7, 4, 5, 6
+> +.Lgf128mul_table:
+> +	.byte		0, 0x87
+> +	.fill		14
+> +.Lgf64mul_table:
+> +	.byte		0, 0x1b, (0x1b << 1), (0x1b << 1) ^ 0x1b
+> +	.fill		12
+> +
+> +/*
+> + * _speck_round_128bytes() - Speck encryption round on 128 bytes at a time
+> + *
+> + * Do one Speck encryption round on the 128 bytes (8 blocks for
+> Speck128, 16 for
+> + * Speck64) stored in X0-X3 and Y0-Y3, using the round key stored in all lanes
+> + * of ROUND_KEY.  'n' is the lane size: 64 for Speck128, or 32 for Speck64.
+> + *
+> + * The 8-bit rotates are implemented using vtbl instead of vshr + vsli because
+> + * the vtbl approach is faster on some processors and the same speed on others.
+> + */
+> +.macro _speck_round_128bytes	n
+> +
+> +	// x = ror(x, 8)
+> +	vtbl.8		X0_L, {X0_L}, ROTATE_TABLE
+> +	vtbl.8		X0_H, {X0_H}, ROTATE_TABLE
+> +	vtbl.8		X1_L, {X1_L}, ROTATE_TABLE
+> +	vtbl.8		X1_H, {X1_H}, ROTATE_TABLE
+> +	vtbl.8		X2_L, {X2_L}, ROTATE_TABLE
+> +	vtbl.8		X2_H, {X2_H}, ROTATE_TABLE
+> +	vtbl.8		X3_L, {X3_L}, ROTATE_TABLE
+> +	vtbl.8		X3_H, {X3_H}, ROTATE_TABLE
+> +
+> +	// x += y
+> +	vadd.u\n	X0, Y0
+> +	vadd.u\n	X1, Y1
+> +	vadd.u\n	X2, Y2
+> +	vadd.u\n	X3, Y3
+> +
+> +	// x ^= k
+> +	veor		X0, ROUND_KEY
+> +	veor		X1, ROUND_KEY
+> +	veor		X2, ROUND_KEY
+> +	veor		X3, ROUND_KEY
+> +
+> +	// y = rol(y, 3)
+> +	vshl.u\n	TMP0, Y0, #3
+> +	vshl.u\n	TMP1, Y1, #3
+> +	vshl.u\n	TMP2, Y2, #3
+> +	vshl.u\n	TMP3, Y3, #3
+> +	vsri.u\n	TMP0, Y0, #(\n - 3)
+> +	vsri.u\n	TMP1, Y1, #(\n - 3)
+> +	vsri.u\n	TMP2, Y2, #(\n - 3)
+> +	vsri.u\n	TMP3, Y3, #(\n - 3)
+> +
+> +	// y ^= x
+> +	veor		Y0, TMP0, X0
+> +	veor		Y1, TMP1, X1
+> +	veor		Y2, TMP2, X2
+> +	veor		Y3, TMP3, X3
+> +.endm
+> +
+> +/*
+> + * _speck_unround_128bytes() - Speck decryption round on 128 bytes at a time
+> + *
+> + * This is the inverse of _speck_round_128bytes().
+> + */
+> +.macro _speck_unround_128bytes	n
+> +
+> +	// y ^= x
+> +	veor		TMP0, Y0, X0
+> +	veor		TMP1, Y1, X1
+> +	veor		TMP2, Y2, X2
+> +	veor		TMP3, Y3, X3
+> +
+> +	// y = ror(y, 3)
+> +	vshr.u\n	Y0, TMP0, #3
+> +	vshr.u\n	Y1, TMP1, #3
+> +	vshr.u\n	Y2, TMP2, #3
+> +	vshr.u\n	Y3, TMP3, #3
+> +	vsli.u\n	Y0, TMP0, #(\n - 3)
+> +	vsli.u\n	Y1, TMP1, #(\n - 3)
+> +	vsli.u\n	Y2, TMP2, #(\n - 3)
+> +	vsli.u\n	Y3, TMP3, #(\n - 3)
+> +
+> +	// x ^= k
+> +	veor		X0, ROUND_KEY
+> +	veor		X1, ROUND_KEY
+> +	veor		X2, ROUND_KEY
+> +	veor		X3, ROUND_KEY
+> +
+> +	// x -= y
+> +	vsub.u\n	X0, Y0
+> +	vsub.u\n	X1, Y1
+> +	vsub.u\n	X2, Y2
+> +	vsub.u\n	X3, Y3
+> +
+> +	// x = rol(x, 8);
+> +	vtbl.8		X0_L, {X0_L}, ROTATE_TABLE
+> +	vtbl.8		X0_H, {X0_H}, ROTATE_TABLE
+> +	vtbl.8		X1_L, {X1_L}, ROTATE_TABLE
+> +	vtbl.8		X1_H, {X1_H}, ROTATE_TABLE
+> +	vtbl.8		X2_L, {X2_L}, ROTATE_TABLE
+> +	vtbl.8		X2_H, {X2_H}, ROTATE_TABLE
+> +	vtbl.8		X3_L, {X3_L}, ROTATE_TABLE
+> +	vtbl.8		X3_H, {X3_H}, ROTATE_TABLE
+> +.endm
+> +
+> +.macro _xts128_precrypt_one	dst_reg, tweak_buf, tmp
+> +
+> +	// Load the next source block
+> +	vld1.8		{\dst_reg}, [SRC]!
+> +
+> +	// Save the current tweak in the tweak buffer
+> +	vst1.8		{TWEAKV}, [\tweak_buf:128]!
+> +
+> +	// XOR the next source block with the current tweak
+> +	veor		\dst_reg, TWEAKV
+> +
+> +	/*
+> +	 * Calculate the next tweak by multiplying the current one by x,
+> +	 * modulo p(x) = x^128 + x^7 + x^2 + x + 1.
+> +	 */
+> +	vshr.u64	\tmp, TWEAKV, #63
+> +	vshl.u64	TWEAKV, #1
+> +	veor		TWEAKV_H, \tmp\()_L
+> +	vtbl.8		\tmp\()_H, {GF128MUL_TABLE}, \tmp\()_H
+> +	veor		TWEAKV_L, \tmp\()_H
+> +.endm
+> +
+> +.macro _xts64_precrypt_two	dst_reg, tweak_buf, tmp
+> +
+> +	// Load the next two source blocks
+> +	vld1.8		{\dst_reg}, [SRC]!
+> +
+> +	// Save the current two tweaks in the tweak buffer
+> +	vst1.8		{TWEAKV}, [\tweak_buf:128]!
+> +
+> +	// XOR the next two source blocks with the current two tweaks
+> +	veor		\dst_reg, TWEAKV
+> +
+> +	/*
+> +	 * Calculate the next two tweaks by multiplying the current ones by x^2,
+> +	 * modulo p(x) = x^64 + x^4 + x^3 + x + 1.
+> +	 */
+> +	vshr.u64	\tmp, TWEAKV, #62
+> +	vshl.u64	TWEAKV, #2
+> +	vtbl.8		\tmp\()_L, {GF64MUL_TABLE}, \tmp\()_L
+> +	vtbl.8		\tmp\()_H, {GF64MUL_TABLE}, \tmp\()_H
+> +	veor		TWEAKV, \tmp
+> +.endm
+> +
+> +/*
+> + * _speck_xts_crypt() - Speck-XTS encryption/decryption
+> + *
+> + * Encrypt or decrypt NBYTES bytes of data from the SRC buffer to the
+> DST buffer
+> + * using Speck-XTS, specifically the variant with a block size of
+> '2n' and round
+> + * count given by NROUNDS.  The expanded round keys are given in
+> ROUND_KEYS, and
+> + * the current XTS tweak value is given in TWEAK.  It's assumed that
+> NBYTES is a
+> + * nonzero multiple of 128.
+> + */
+> +.macro _speck_xts_crypt	n, decrypting
+> +	push		{r4-r7}
+> +	mov		r7, sp
+> +
+> +	/*
+> +	 * The first four parameters were passed in registers r0-r3.  Load the
+> +	 * additional parameters, which were passed on the stack.
+> +	 */
+> +	ldr		NBYTES, [sp, #16]
+> +	ldr		TWEAK, [sp, #20]
+> +
+> +	/*
+> +	 * If decrypting, modify the ROUND_KEYS parameter to point to the last
+> +	 * round key rather than the first, since for decryption the round keys
+> +	 * are used in reverse order.
+> +	 */
+> +.if \decrypting
+> +.if \n == 64
+> +	add		ROUND_KEYS, ROUND_KEYS, NROUNDS, lsl #3
+> +	sub		ROUND_KEYS, #8
+> +.else
+> +	add		ROUND_KEYS, ROUND_KEYS, NROUNDS, lsl #2
+> +	sub		ROUND_KEYS, #4
+> +.endif
+> +.endif
+> +
+> +	// Load the index vector for vtbl-based 8-bit rotates
+> +.if \decrypting
+> +	ldr		r12, =.Lrol\n\()_8_table
+> +.else
+> +	ldr		r12, =.Lror\n\()_8_table
+> +.endif
+> +	vld1.8		{ROTATE_TABLE}, [r12:64]
+> +
+> +	// One-time XTS preparation
+> +
+> +	/*
+> +	 * Allocate stack space to store 128 bytes worth of tweaks.  For
+> +	 * performance, this space is aligned to a 16-byte boundary so that we
+> +	 * can use the load/store instructions that declare 16-byte alignment.
+> +	 */
+> +	sub		sp, #128
+> +	bic		sp, #0xf
+
+
+This fails here when building with CONFIG_THUMB2_KERNEL=y
+
+  AS      arch/arm/crypto/speck-neon-core.o                             
+                                                                   
+arch/arm/crypto/speck-neon-core.S: Assembler messages:                  
+                                                                   
+arch/arm/crypto/speck-neon-core.S:419: Error: r13 not allowed here --
+`bic sp,#0xf'                                                         
+arch/arm/crypto/speck-neon-core.S:423: Error: r13 not allowed here --
+`bic sp,#0xf'                                                         
+arch/arm/crypto/speck-neon-core.S:427: Error: r13 not allowed here --
+`bic sp,#0xf'                                                         
+arch/arm/crypto/speck-neon-core.S:431: Error: r13 not allowed here --
+`bic sp,#0xf'
+
+In a quick hack this change seems to address it:
+
+
+-       sub             sp, #128
+-       bic             sp, #0xf
++       mov             r6, sp
++       sub             r6, #128
++       bic             r6, #0xf
++       mov             sp, r6
+
+But there is probably a better solution to address this.
+
+--
+Stefan
+
+
+> +
+> +.if \n == 64
+> +	// Load first tweak
+> +	vld1.8		{TWEAKV}, [TWEAK]
+> +
+> +	// Load GF(2^128) multiplication table
+> +	ldr		r12, =.Lgf128mul_table
+> +	vld1.8		{GF128MUL_TABLE}, [r12:64]
+> +.else
+> +	// Load first tweak
+> +	vld1.8		{TWEAKV_L}, [TWEAK]
+> +
+> +	// Load GF(2^64) multiplication table
+> +	ldr		r12, =.Lgf64mul_table
+> +	vld1.8		{GF64MUL_TABLE}, [r12:64]
+> +
+> +	// Calculate second tweak, packing it together with the first
+> +	vshr.u64	TMP0_L, TWEAKV_L, #63
+> +	vtbl.u8		TMP0_L, {GF64MUL_TABLE}, TMP0_L
+> +	vshl.u64	TWEAKV_H, TWEAKV_L, #1
+> +	veor		TWEAKV_H, TMP0_L
+> +.endif
+> +
+> +.Lnext_128bytes_\@:
+> +
+> +	/*
+> +	 * Load the source blocks into {X,Y}[0-3], XOR them with their XTS tweak
+> +	 * values, and save the tweaks on the stack for later.  Then
+> +	 * de-interleave the 'x' and 'y' elements of each block, i.e. make it so
+> +	 * that the X[0-3] registers contain only the second halves of blocks,
+> +	 * and the Y[0-3] registers contain only the first halves of blocks.
+> +	 * (Speck uses the order (y, x) rather than the more intuitive (x, y).)
+> +	 */
+> +	mov		r12, sp
+> +.if \n == 64
+> +	_xts128_precrypt_one	X0, r12, TMP0
+> +	_xts128_precrypt_one	Y0, r12, TMP0
+> +	_xts128_precrypt_one	X1, r12, TMP0
+> +	_xts128_precrypt_one	Y1, r12, TMP0
+> +	_xts128_precrypt_one	X2, r12, TMP0
+> +	_xts128_precrypt_one	Y2, r12, TMP0
+> +	_xts128_precrypt_one	X3, r12, TMP0
+> +	_xts128_precrypt_one	Y3, r12, TMP0
+> +	vswp		X0_L, Y0_H
+> +	vswp		X1_L, Y1_H
+> +	vswp		X2_L, Y2_H
+> +	vswp		X3_L, Y3_H
+> +.else
+> +	_xts64_precrypt_two	X0, r12, TMP0
+> +	_xts64_precrypt_two	Y0, r12, TMP0
+> +	_xts64_precrypt_two	X1, r12, TMP0
+> +	_xts64_precrypt_two	Y1, r12, TMP0
+> +	_xts64_precrypt_two	X2, r12, TMP0
+> +	_xts64_precrypt_two	Y2, r12, TMP0
+> +	_xts64_precrypt_two	X3, r12, TMP0
+> +	_xts64_precrypt_two	Y3, r12, TMP0
+> +	vuzp.32		Y0, X0
+> +	vuzp.32		Y1, X1
+> +	vuzp.32		Y2, X2
+> +	vuzp.32		Y3, X3
+> +.endif
+> +
+> +	// Do the cipher rounds
+> +
+> +	mov		r12, ROUND_KEYS
+> +	mov		r6, NROUNDS
+> +
+> +.Lnext_round_\@:
+> +.if \decrypting
+> +.if \n == 64
+> +	vld1.64		ROUND_KEY_L, [r12]
+> +	sub		r12, #8
+> +	vmov		ROUND_KEY_H, ROUND_KEY_L
+> +.else
+> +	vld1.32		{ROUND_KEY_L[],ROUND_KEY_H[]}, [r12]
+> +	sub		r12, #4
+> +.endif
+> +	_speck_unround_128bytes	\n
+> +.else
+> +.if \n == 64
+> +	vld1.64		ROUND_KEY_L, [r12]!
+> +	vmov		ROUND_KEY_H, ROUND_KEY_L
+> +.else
+> +	vld1.32		{ROUND_KEY_L[],ROUND_KEY_H[]}, [r12]!
+> +.endif
+> +	_speck_round_128bytes	\n
+> +.endif
+> +	subs		r6, r6, #1
+> +	bne		.Lnext_round_\@
+> +
+> +	// Re-interleave the 'x' and 'y' elements of each block
+> +.if \n == 64
+> +	vswp		X0_L, Y0_H
+> +	vswp		X1_L, Y1_H
+> +	vswp		X2_L, Y2_H
+> +	vswp		X3_L, Y3_H
+> +.else
+> +	vzip.32		Y0, X0
+> +	vzip.32		Y1, X1
+> +	vzip.32		Y2, X2
+> +	vzip.32		Y3, X3
+> +.endif
+> +
+> +	// XOR the encrypted/decrypted blocks with the tweaks we saved earlier
+> +	mov		r12, sp
+> +	vld1.8		{TMP0, TMP1}, [r12:128]!
+> +	vld1.8		{TMP2, TMP3}, [r12:128]!
+> +	veor		X0, TMP0
+> +	veor		Y0, TMP1
+> +	veor		X1, TMP2
+> +	veor		Y1, TMP3
+> +	vld1.8		{TMP0, TMP1}, [r12:128]!
+> +	vld1.8		{TMP2, TMP3}, [r12:128]!
+> +	veor		X2, TMP0
+> +	veor		Y2, TMP1
+> +	veor		X3, TMP2
+> +	veor		Y3, TMP3
+> +
+> +	// Store the ciphertext in the destination buffer
+> +	vst1.8		{X0, Y0}, [DST]!
+> +	vst1.8		{X1, Y1}, [DST]!
+> +	vst1.8		{X2, Y2}, [DST]!
+> +	vst1.8		{X3, Y3}, [DST]!
+> +
+> +	// Continue if there are more 128-byte chunks remaining, else return
+> +	subs		NBYTES, #128
+> +	bne		.Lnext_128bytes_\@
+> +
+> +	// Store the next tweak
+> +.if \n == 64
+> +	vst1.8		{TWEAKV}, [TWEAK]
+> +.else
+> +	vst1.8		{TWEAKV_L}, [TWEAK]
+> +.endif
+> +
+> +	mov		sp, r7
+> +	pop		{r4-r7}
+> +	bx		lr
+> +.endm
+> +
+> +ENTRY(speck128_xts_encrypt_neon)
+> +	_speck_xts_crypt	n=64, decrypting=0
+> +ENDPROC(speck128_xts_encrypt_neon)
+> +
+> +ENTRY(speck128_xts_decrypt_neon)
+> +	_speck_xts_crypt	n=64, decrypting=1
+> +ENDPROC(speck128_xts_decrypt_neon)
+> +
+> +ENTRY(speck64_xts_encrypt_neon)
+> +	_speck_xts_crypt	n=32, decrypting=0
+> +ENDPROC(speck64_xts_encrypt_neon)
+> +
+> +ENTRY(speck64_xts_decrypt_neon)
+> +	_speck_xts_crypt	n=32, decrypting=1
+> +ENDPROC(speck64_xts_decrypt_neon)
+> diff --git a/arch/arm/crypto/speck-neon-glue.c
+> b/arch/arm/crypto/speck-neon-glue.c
+> new file mode 100644
+> index 000000000000..f012c3ea998f
+> --- /dev/null
+> +++ b/arch/arm/crypto/speck-neon-glue.c
+> @@ -0,0 +1,288 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * NEON-accelerated implementation of Speck128-XTS and Speck64-XTS
+> + *
+> + * Copyright (c) 2018 Google, Inc
+> + *
+> + * Note: the NIST recommendation for XTS only specifies a 128-bit block size,
+> + * but a 64-bit version (needed for Speck64) is fairly
+> straightforward; the math
+> + * is just done in GF(2^64) instead of GF(2^128), with the reducing polynomial
+> + * x^64 + x^4 + x^3 + x + 1 from the original XEX paper (Rogaway, 2004:
+> + * "Efficient Instantiations of Tweakable Blockciphers and Refinements to Modes
+> + * OCB and PMAC"), represented as 0x1B.
+> + */
+> +
+> +#include <asm/hwcap.h>
+> +#include <asm/neon.h>
+> +#include <asm/simd.h>
+> +#include <crypto/algapi.h>
+> +#include <crypto/gf128mul.h>
+> +#include <crypto/internal/skcipher.h>
+> +#include <crypto/speck.h>
+> +#include <crypto/xts.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +/* The assembly functions only handle multiples of 128 bytes */
+> +#define SPECK_NEON_CHUNK_SIZE	128
+> +
+> +/* Speck128 */
+> +
+> +struct speck128_xts_tfm_ctx {
+> +	struct speck128_tfm_ctx main_key;
+> +	struct speck128_tfm_ctx tweak_key;
+> +};
+> +
+> +asmlinkage void speck128_xts_encrypt_neon(const u64 *round_keys, int nrounds,
+> +					  void *dst, const void *src,
+> +					  unsigned int nbytes, void *tweak);
+> +
+> +asmlinkage void speck128_xts_decrypt_neon(const u64 *round_keys, int nrounds,
+> +					  void *dst, const void *src,
+> +					  unsigned int nbytes, void *tweak);
+> +
+> +typedef void (*speck128_crypt_one_t)(const struct speck128_tfm_ctx *,
+> +				     u8 *, const u8 *);
+> +typedef void (*speck128_xts_crypt_many_t)(const u64 *, int, void *,
+> +					  const void *, unsigned int, void *);
+> +
+> +static __always_inline int
+> +__speck128_xts_crypt(struct skcipher_request *req,
+> +		     speck128_crypt_one_t crypt_one,
+> +		     speck128_xts_crypt_many_t crypt_many)
 > +{
-> +	/* configure the extended mode register */
-> +	unsigned int emr = at91_adc_readl(st, AT91_SAMA5D2_EMR);
+> +	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+> +	const struct speck128_xts_tfm_ctx *ctx = crypto_skcipher_ctx(tfm);
+> +	struct skcipher_walk walk;
+> +	le128 tweak;
+> +	int err;
 > +
-> +	/* select oversampling per single trigger event */
-> +	emr |= AT91_SAMA5D2_EMR_ASTE(1);
+> +	err = skcipher_walk_virt(&walk, req, true);
 > +
-> +	/* delete leftover content if it's the case */
-> +	emr &= ~AT91_SAMA5D2_EMR_OSR_MASK;
+> +	crypto_speck128_encrypt(&ctx->tweak_key, (u8 *)&tweak, walk.iv);
 > +
-> +	/* select oversampling ratio from configuration */
-> +	switch (st->oversampling_ratio) {
-> +	case AT91_OSR_0SAMPLES:
-> +		emr |= AT91_SAMA5D2_EMR_OSR(AT91_SAMA5D2_EMR_OSR_0SAMPLES) &
-> +		       AT91_SAMA5D2_EMR_OSR_MASK;
-> +		break;
-> +	case AT91_OSR_4SAMPLES:
-> +		emr |= AT91_SAMA5D2_EMR_OSR(AT91_SAMA5D2_EMR_OSR_4SAMPLES) &
-> +		       AT91_SAMA5D2_EMR_OSR_MASK;
-> +		break;
-> +	case AT91_OSR_16SAMPLES:
-> +		emr |= AT91_SAMA5D2_EMR_OSR(AT91_SAMA5D2_EMR_OSR_16SAMPLES) &
-> +		       AT91_SAMA5D2_EMR_OSR_MASK;
-> +		break;
-> +	};
+> +	while (walk.nbytes > 0) {
+> +		unsigned int nbytes = walk.nbytes;
+> +		u8 *dst = walk.dst.virt.addr;
+> +		const u8 *src = walk.src.virt.addr;
 > +
-> +	at91_adc_writel(st, AT91_SAMA5D2_EMR, emr);
-> +}
+> +		if (nbytes >= SPECK_NEON_CHUNK_SIZE && may_use_simd()) {
+> +			unsigned int count;
 > +
-> +static int at91_adc_adjust_val_osr(struct at91_adc_state *st, int *val,
-> +				    int *val2)
-> +{
-> +	u8 extra_bits;
-> +
-> +	switch (st->oversampling_ratio) {
-> +	case AT91_OSR_4SAMPLES:
-> +		/* in this case we need to report 1 extra bit */
-> +		extra_bits = *val & 0x1;
-> +		if (extra_bits)
-> +			*val2 = 500000;
-> +		else
-> +			*val2 = 0;
-> +		*val >>= 1; /* keep just 12 bits */
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case AT91_OSR_16SAMPLES:
-> +		/* in this case we need to report 2 extra bits */
-> +		extra_bits = *val & 0x3;
-> +		switch (extra_bits) {
-> +		case 0:
-> +			*val2 = 0;
-> +			break;
-> +		case 1:
-> +			*val2 = 250000;
-> +			break;
-> +		case 2:
-> +			*val2 = 500000;
-> +			break;
-> +		case 3:
-> +			*val2 = 750000;
-> +			break;
-> +		};
-> +		*val >>= 2; /* keep just 12 bits */
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +	};
-> +
-> +	return IIO_VAL_INT;
-> +}
-> +
->  static int at91_adc_configure_touch(struct at91_adc_state *st, bool state)
->  {
->  	u32 clk_khz = st->current_sample_rate / 1000;
-> @@ -916,6 +1008,9 @@ static void at91_adc_trigger_handler_nodma(struct iio_dev *indio_dev,
->  {
->  	struct at91_adc_state *st = iio_priv(indio_dev);
->  	int i = 0;
-> +	/* micro value for oversampling data */
-> +	int micro;
-> +	int val;
->  	u8 bit;
->  
->  	for_each_set_bit(bit, indio_dev->active_scan_mask,
-> @@ -936,7 +1031,9 @@ static void at91_adc_trigger_handler_nodma(struct iio_dev *indio_dev,
->  		 * Thus, emit a warning.
->  		 */
->  		if (chan->type == IIO_VOLTAGE) {
-> -			st->buffer[i] = at91_adc_readl(st, chan->address);
-> +			val = at91_adc_readl(st, chan->address);
-> +			at91_adc_adjust_val_osr(st, &val, &micro);
-> +			st->buffer[i] = val;
->  		} else {
->  			st->buffer[i] = 0;
->  			WARN(true, "This trigger cannot handle this type of channel");
-> @@ -954,6 +1051,9 @@ static void at91_adc_trigger_handler_dma(struct iio_dev *indio_dev)
->  	s64 ns = iio_get_time_ns(indio_dev);
->  	s64 interval;
->  	int sample_index = 0, sample_count, sample_size;
-> +	/* micro value for oversampling data */
-> +	int micro;
-> +	int val, j;
->  
->  	u32 status = at91_adc_readl(st, AT91_SAMA5D2_ISR);
->  	/* if we reached this point, we cannot sample faster */
-> @@ -972,6 +1072,17 @@ static void at91_adc_trigger_handler_dma(struct iio_dev *indio_dev)
->  	interval = div_s64((ns - st->dma_st.dma_ts), sample_count);
->  
->  	while (transferred_len >= sample_size) {
-> +		/*
-> +		 * for all the values in the current sample,
-> +		 * adjust the values inside the buffer for oversampling
-> +		 */
-> +		for (j = 0; j < sample_size / 2; j++) {
-> +			/* buffer is byte-based. we need the whole value */
-> +			val = *((u16 *)&st->dma_st.rx_buf[st->dma_st.buf_idx + j * 2]);
-> +			at91_adc_adjust_val_osr(st, &val, &micro);
-> +			*((u16 *)&st->dma_st.rx_buf[st->dma_st.buf_idx + j * 2]) = val;
+> +			count = round_down(nbytes, SPECK_NEON_CHUNK_SIZE);
+> +			kernel_neon_begin();
+> +			(*crypt_many)(ctx->main_key.round_keys,
+> +				      ctx->main_key.nrounds,
+> +				      dst, src, count, &tweak);
+> +			kernel_neon_end();
+> +			dst += count;
+> +			src += count;
+> +			nbytes -= count;
 > +		}
 > +
->  		iio_push_to_buffers_with_timestamp(indio_dev,
->  				(st->dma_st.rx_buf + st->dma_st.buf_idx),
->  				(st->dma_st.dma_ts + interval * sample_index));
-> @@ -1190,8 +1301,10 @@ static irqreturn_t at91_adc_interrupt(int irq, void *private)
->  	return IRQ_HANDLED;
->  }
->  
+> +		/* Handle any remainder with generic code */
+> +		while (nbytes >= sizeof(tweak)) {
+> +			le128_xor((le128 *)dst, (const le128 *)src, &tweak);
+> +			(*crypt_one)(&ctx->main_key, dst, dst);
+> +			le128_xor((le128 *)dst, (const le128 *)dst, &tweak);
+> +			gf128mul_x_ble(&tweak, &tweak);
 > +
-
-Tidy this up by not adding the line above.
-
->  static int at91_adc_read_info_raw(struct iio_dev *indio_dev,
-> -				  struct iio_chan_spec const *chan, int *val)
-> +				  struct iio_chan_spec const *chan, int *val,
-> +				  int *val2)
->  {
->  	struct at91_adc_state *st = iio_priv(indio_dev);
->  	u32 cor = 0;
-> @@ -1212,7 +1325,7 @@ static int at91_adc_read_info_raw(struct iio_dev *indio_dev,
->  		mutex_unlock(&st->lock);
->  		iio_device_release_direct_mode(indio_dev);
->  
-> -		return ret;
-> +		return at91_adc_adjust_val_osr(st, val, val2);
->  	}
->  	if (chan->type == IIO_PRESSURE) {
->  		ret = iio_device_claim_direct_mode(indio_dev);
-> @@ -1225,7 +1338,7 @@ static int at91_adc_read_info_raw(struct iio_dev *indio_dev,
->  		mutex_unlock(&st->lock);
->  		iio_device_release_direct_mode(indio_dev);
->  
-> -		return ret;
-> +		return at91_adc_adjust_val_osr(st, val, val2);
->  	}
->  
->  	/* in this case we have a voltage channel */
-> @@ -1254,9 +1367,9 @@ static int at91_adc_read_info_raw(struct iio_dev *indio_dev,
->  
->  	if (ret > 0) {
->  		*val = st->conversion_value;
-> +		ret = at91_adc_adjust_val_osr(st, val, val2);
->  		if (chan->scan_type.sign == 's')
->  			*val = sign_extend32(*val, 11);
-> -		ret = IIO_VAL_INT;
->  		st->conversion_done = false;
->  	}
->  
-> @@ -1280,7 +1393,7 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
->  
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
-> -		return at91_adc_read_info_raw(indio_dev, chan, val);
-> +		return at91_adc_read_info_raw(indio_dev, chan, val, val2);
->  	case IIO_CHAN_INFO_SCALE:
->  		*val = st->vref_uv / 1000;
->  		if (chan->differential)
-> @@ -1292,6 +1405,10 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
->  		*val = at91_adc_get_sample_freq(st);
->  		return IIO_VAL_INT;
->  
-> +	case IIO_CHAN_INFO_OVERSAMPLING_RATIO:
-> +		*val = st->oversampling_ratio;
-> +		return IIO_VAL_INT;
+> +			dst += sizeof(tweak);
+> +			src += sizeof(tweak);
+> +			nbytes -= sizeof(tweak);
+> +		}
+> +		err = skcipher_walk_done(&walk, nbytes);
+> +	}
 > +
->  	default:
->  		return -EINVAL;
->  	}
-> @@ -1303,16 +1420,28 @@ static int at91_adc_write_raw(struct iio_dev *indio_dev,
->  {
->  	struct at91_adc_state *st = iio_priv(indio_dev);
->  
-> -	if (mask != IIO_CHAN_INFO_SAMP_FREQ)
-> -		return -EINVAL;
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_OVERSAMPLING_RATIO:
-> +		if ((val != AT91_OSR_0SAMPLES) && (val != AT91_OSR_4SAMPLES) &&
-> +		    (val != AT91_OSR_16SAMPLES))
-> +			return -EINVAL;
-> +		/* if no change, optimize out */
-> +		if (val == st->oversampling_ratio)
-> +			return 0;
-> +		st->oversampling_ratio = val;
-> +		/* update ratio */
-> +		at91_adc_config_emr(st);
-> +		return 0;
-> +	case IIO_CHAN_INFO_SAMP_FREQ:
-> +		if (val < st->soc_info.min_sample_rate ||
-> +		    val > st->soc_info.max_sample_rate)
-> +			return -EINVAL;
->  
-> -	if (val < st->soc_info.min_sample_rate ||
-> -	    val > st->soc_info.max_sample_rate)
-> +		at91_adc_setup_samp_freq(st, val);
-> +		return 0;
-> +	default:
->  		return -EINVAL;
-> -
-> -	at91_adc_setup_samp_freq(st, val);
-> -
-> -	return 0;
-> +	};
->  }
->  
->  static void at91_adc_dma_init(struct platform_device *pdev)
-> @@ -1446,14 +1575,6 @@ static int at91_adc_update_scan_mode(struct iio_dev *indio_dev,
->  	return 0;
->  }
->  
-> -static const struct iio_info at91_adc_info = {
-> -	.read_raw = &at91_adc_read_raw,
-> -	.write_raw = &at91_adc_write_raw,
-> -	.update_scan_mode = &at91_adc_update_scan_mode,
-> -	.of_xlate = &at91_adc_of_xlate,
-> -	.hwfifo_set_watermark = &at91_adc_set_watermark,
-> -};
-> -
->  static void at91_adc_hw_init(struct at91_adc_state *st)
->  {
->  	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
-> @@ -1466,6 +1587,9 @@ static void at91_adc_hw_init(struct at91_adc_state *st)
->  			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
->  
->  	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
+> +	return err;
+> +}
 > +
-> +	/* configure extended mode register */
-> +	at91_adc_config_emr(st);
->  }
->  
->  static ssize_t at91_adc_get_fifo_state(struct device *dev,
-> @@ -1496,6 +1620,19 @@ static IIO_DEVICE_ATTR(hwfifo_watermark, 0444,
->  static IIO_CONST_ATTR(hwfifo_watermark_min, "2");
->  static IIO_CONST_ATTR(hwfifo_watermark_max, AT91_HWFIFO_MAX_SIZE_STR);
->  
-> +static IIO_CONST_ATTR(oversampling_ratio_available,
-> +		      AT91_OSR_0SAMPLES_STR " " AT91_OSR_4SAMPLES_STR " "
-> +		      AT91_OSR_16SAMPLES_STR);
-
-Stringify macro?
-
+> +static int speck128_xts_encrypt(struct skcipher_request *req)
+> +{
+> +	return __speck128_xts_crypt(req, crypto_speck128_encrypt,
+> +				    speck128_xts_encrypt_neon);
+> +}
 > +
-> +static struct attribute *at91_adc_attributes[] = {
-> +	&iio_const_attr_oversampling_ratio_available.dev_attr.attr,
-> +	NULL,
+> +static int speck128_xts_decrypt(struct skcipher_request *req)
+> +{
+> +	return __speck128_xts_crypt(req, crypto_speck128_decrypt,
+> +				    speck128_xts_decrypt_neon);
+> +}
+> +
+> +static int speck128_xts_setkey(struct crypto_skcipher *tfm, const u8 *key,
+> +			       unsigned int keylen)
+> +{
+> +	struct speck128_xts_tfm_ctx *ctx = crypto_skcipher_ctx(tfm);
+> +	int err;
+> +
+> +	err = xts_verify_key(tfm, key, keylen);
+> +	if (err)
+> +		return err;
+> +
+> +	keylen /= 2;
+> +
+> +	err = crypto_speck128_setkey(&ctx->main_key, key, keylen);
+> +	if (err)
+> +		return err;
+> +
+> +	return crypto_speck128_setkey(&ctx->tweak_key, key + keylen, keylen);
+> +}
+> +
+> +/* Speck64 */
+> +
+> +struct speck64_xts_tfm_ctx {
+> +	struct speck64_tfm_ctx main_key;
+> +	struct speck64_tfm_ctx tweak_key;
 > +};
 > +
-> +static const struct attribute_group at91_adc_attribute_group = {
-> +	.attrs = at91_adc_attributes,
+> +asmlinkage void speck64_xts_encrypt_neon(const u32 *round_keys, int nrounds,
+> +					 void *dst, const void *src,
+> +					 unsigned int nbytes, void *tweak);
+> +
+> +asmlinkage void speck64_xts_decrypt_neon(const u32 *round_keys, int nrounds,
+> +					 void *dst, const void *src,
+> +					 unsigned int nbytes, void *tweak);
+> +
+> +typedef void (*speck64_crypt_one_t)(const struct speck64_tfm_ctx *,
+> +				    u8 *, const u8 *);
+> +typedef void (*speck64_xts_crypt_many_t)(const u32 *, int, void *,
+> +					 const void *, unsigned int, void *);
+> +
+> +static __always_inline int
+> +__speck64_xts_crypt(struct skcipher_request *req, speck64_crypt_one_t
+> crypt_one,
+> +		    speck64_xts_crypt_many_t crypt_many)
+> +{
+> +	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+> +	const struct speck64_xts_tfm_ctx *ctx = crypto_skcipher_ctx(tfm);
+> +	struct skcipher_walk walk;
+> +	__le64 tweak;
+> +	int err;
+> +
+> +	err = skcipher_walk_virt(&walk, req, true);
+> +
+> +	crypto_speck64_encrypt(&ctx->tweak_key, (u8 *)&tweak, walk.iv);
+> +
+> +	while (walk.nbytes > 0) {
+> +		unsigned int nbytes = walk.nbytes;
+> +		u8 *dst = walk.dst.virt.addr;
+> +		const u8 *src = walk.src.virt.addr;
+> +
+> +		if (nbytes >= SPECK_NEON_CHUNK_SIZE && may_use_simd()) {
+> +			unsigned int count;
+> +
+> +			count = round_down(nbytes, SPECK_NEON_CHUNK_SIZE);
+> +			kernel_neon_begin();
+> +			(*crypt_many)(ctx->main_key.round_keys,
+> +				      ctx->main_key.nrounds,
+> +				      dst, src, count, &tweak);
+> +			kernel_neon_end();
+> +			dst += count;
+> +			src += count;
+> +			nbytes -= count;
+> +		}
+> +
+> +		/* Handle any remainder with generic code */
+> +		while (nbytes >= sizeof(tweak)) {
+> +			*(__le64 *)dst = *(__le64 *)src ^ tweak;
+> +			(*crypt_one)(&ctx->main_key, dst, dst);
+> +			*(__le64 *)dst ^= tweak;
+> +			tweak = cpu_to_le64((le64_to_cpu(tweak) << 1) ^
+> +					    ((tweak & cpu_to_le64(1ULL << 63)) ?
+> +					     0x1B : 0));
+> +			dst += sizeof(tweak);
+> +			src += sizeof(tweak);
+> +			nbytes -= sizeof(tweak);
+> +		}
+> +		err = skcipher_walk_done(&walk, nbytes);
+> +	}
+> +
+> +	return err;
+> +}
+> +
+> +static int speck64_xts_encrypt(struct skcipher_request *req)
+> +{
+> +	return __speck64_xts_crypt(req, crypto_speck64_encrypt,
+> +				   speck64_xts_encrypt_neon);
+> +}
+> +
+> +static int speck64_xts_decrypt(struct skcipher_request *req)
+> +{
+> +	return __speck64_xts_crypt(req, crypto_speck64_decrypt,
+> +				   speck64_xts_decrypt_neon);
+> +}
+> +
+> +static int speck64_xts_setkey(struct crypto_skcipher *tfm, const u8 *key,
+> +			      unsigned int keylen)
+> +{
+> +	struct speck64_xts_tfm_ctx *ctx = crypto_skcipher_ctx(tfm);
+> +	int err;
+> +
+> +	err = xts_verify_key(tfm, key, keylen);
+> +	if (err)
+> +		return err;
+> +
+> +	keylen /= 2;
+> +
+> +	err = crypto_speck64_setkey(&ctx->main_key, key, keylen);
+> +	if (err)
+> +		return err;
+> +
+> +	return crypto_speck64_setkey(&ctx->tweak_key, key + keylen, keylen);
+> +}
+> +
+> +static struct skcipher_alg speck_algs[] = {
+> +	{
+> +		.base.cra_name		= "xts(speck128)",
+> +		.base.cra_driver_name	= "xts-speck128-neon",
+> +		.base.cra_priority	= 300,
+> +		.base.cra_blocksize	= SPECK128_BLOCK_SIZE,
+> +		.base.cra_ctxsize	= sizeof(struct speck128_xts_tfm_ctx),
+> +		.base.cra_alignmask	= 7,
+> +		.base.cra_module	= THIS_MODULE,
+> +		.min_keysize		= 2 * SPECK128_128_KEY_SIZE,
+> +		.max_keysize		= 2 * SPECK128_256_KEY_SIZE,
+> +		.ivsize			= SPECK128_BLOCK_SIZE,
+> +		.walksize		= SPECK_NEON_CHUNK_SIZE,
+> +		.setkey			= speck128_xts_setkey,
+> +		.encrypt		= speck128_xts_encrypt,
+> +		.decrypt		= speck128_xts_decrypt,
+> +	}, {
+> +		.base.cra_name		= "xts(speck64)",
+> +		.base.cra_driver_name	= "xts-speck64-neon",
+> +		.base.cra_priority	= 300,
+> +		.base.cra_blocksize	= SPECK64_BLOCK_SIZE,
+> +		.base.cra_ctxsize	= sizeof(struct speck64_xts_tfm_ctx),
+> +		.base.cra_alignmask	= 7,
+> +		.base.cra_module	= THIS_MODULE,
+> +		.min_keysize		= 2 * SPECK64_96_KEY_SIZE,
+> +		.max_keysize		= 2 * SPECK64_128_KEY_SIZE,
+> +		.ivsize			= SPECK64_BLOCK_SIZE,
+> +		.walksize		= SPECK_NEON_CHUNK_SIZE,
+> +		.setkey			= speck64_xts_setkey,
+> +		.encrypt		= speck64_xts_encrypt,
+> +		.decrypt		= speck64_xts_decrypt,
+> +	}
 > +};
 > +
->  static const struct attribute *at91_adc_fifo_attributes[] = {
->  	&iio_const_attr_hwfifo_watermark_min.dev_attr.attr,
->  	&iio_const_attr_hwfifo_watermark_max.dev_attr.attr,
-> @@ -1504,6 +1641,15 @@ static const struct attribute *at91_adc_fifo_attributes[] = {
->  	NULL,
->  };
->  
-> +static const struct iio_info at91_adc_info = {
-> +	.attrs = &at91_adc_attribute_group,
-> +	.read_raw = &at91_adc_read_raw,
-> +	.write_raw = &at91_adc_write_raw,
-> +	.update_scan_mode = &at91_adc_update_scan_mode,
-> +	.of_xlate = &at91_adc_of_xlate,
-> +	.hwfifo_set_watermark = &at91_adc_set_watermark,
-> +};
+> +static int __init speck_neon_module_init(void)
+> +{
+> +	if (!(elf_hwcap & HWCAP_NEON))
+> +		return -ENODEV;
+> +	return crypto_register_skciphers(speck_algs, ARRAY_SIZE(speck_algs));
+> +}
 > +
->  static int at91_adc_probe(struct platform_device *pdev)
->  {
->  	struct iio_dev *indio_dev;
+> +static void __exit speck_neon_module_exit(void)
+> +{
+> +	crypto_unregister_skciphers(speck_algs, ARRAY_SIZE(speck_algs));
+> +}
+> +
+> +module_init(speck_neon_module_init);
+> +module_exit(speck_neon_module_exit);
+> +
+> +MODULE_DESCRIPTION("Speck block cipher (NEON-accelerated)");
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Eric Biggers <ebiggers@google.com>");
+> +MODULE_ALIAS_CRYPTO("xts(speck128)");
+> +MODULE_ALIAS_CRYPTO("xts-speck128-neon");
+> +MODULE_ALIAS_CRYPTO("xts(speck64)");
+> +MODULE_ALIAS_CRYPTO("xts-speck64-neon");
