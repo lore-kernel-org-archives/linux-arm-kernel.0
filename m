@@ -1,77 +1,132 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 16 Jun 2018 01:32:44 +0200
-Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
-In-Reply-To: <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
-References: <cover.1529091248.git.leonard.crestez@nxp.com>
- <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
- <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
- <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
- <638457fd-85da-8fec-d146-517c43f71813@denx.de>
- <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
-Message-ID: <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 16 Jun 2018 13:48:38 +0800
+Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
+ for tcon-top gate
+In-Reply-To: <3871160.F3Km1rQkUz@jernej-laptop>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <2948115.KggauuSURZ@jernej-laptop>
+ <CAGb2v66UFRKRF4_zbm8nQJYoOHb-iLbiU_0iYWep=WNiQDftMQ@mail.gmail.com>
+ <3871160.F3Km1rQkUz@jernej-laptop>
+Message-ID: <CAGb2v66Tv7876_heSve0zb+vWfz9kbwbrU8NjnpTwUHm6xOKJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2018 12:42 AM, Leonard Crestez wrote:
-> On Fri, 2018-06-15 at 23:36 +0200, Marek Vasut wrote:
->> On 06/15/2018 10:58 PM, Leonard Crestez wrote:
->>> On Fri, 2018-06-15 at 16:47 -0300, Fabio Estevam wrote:
->>>> On Fri, Jun 15, 2018 at 4:43 PM, Leonard Crestez
->>>> <leonard.crestez@nxp.com> wrote:
-> 
->>>>> The FBDEV driver uses the same name and both can't be registered at the
->>>>> same time. Fix this by renaming the drm driver to mxsfb-drm
->>>>
->>>> Stefan sent the same patch a few days ago:
->>>
->>> In that thread there is a proposal for removing the old fbdev/mxsfb
->>> driver entirely.
->>>
->>> That would break old DTBs, isn't this generally considered bad? Also,
->>> are we sure the removal of fbdev/mxsfb wouldn't lose any features?
->>>
->>> What my series does is make both drivers work with the same kernel
->>> image and turns the choice into a board-level dtb decision. Supporting
->>> everything at once seems desirable to me and it allows for a very
->>> smooth upgrade path.
+On Sat, Jun 16, 2018 at 1:33 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
+> Dne petek, 15. junij 2018 ob 19:13:17 CEST je Chen-Yu Tsai napisal(a):
+>> On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
 >>
->> Having two drivers in the kernel with different set of bugs is always bad.
+>> <jernej.skrabec@siol.net> wrote:
+>> > Hi,
+>> >
+>> > Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard napisal(a):
+>> >> Hi,
+>> >>
+>> >> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
+>> >> > TV TCONs connected to TCON TOP have to enable additional gate in order
+>> >> > to work.
+>> >> >
+>> >> > Add support for such TCONs.
+>> >> >
+>> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>> >> > ---
+>> >> >
+>> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
+>> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
+>> >> >  2 files changed, 15 insertions(+)
+>> >> >
+>> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 08747fc3ee71..0afb5a94a414
+>> >> > 100644
+>> >> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device
+>> >> > *dev,
+>> >> >
+>> >> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
+>> >> >             return PTR_ERR(tcon->clk);
+>> >> >
+>> >> >     }
+>> >> >
+>> >> > +
+>> >> > +   if (tcon->quirks->has_tcon_top_gate) {
+>> >> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
+>> >> > +           if (IS_ERR(tcon->top_clk)) {
+>> >> > +                   dev_err(dev, "Couldn't get the TCON TOP bus
+>> >> > clock\n");
+>> >> > +                   return PTR_ERR(tcon->top_clk);
+>> >> > +           }
+>> >> > +           clk_prepare_enable(tcon->top_clk);
+>> >> > +   }
+>> >> > +
+>> >>
+>> >> Is it required for the TCON itself to operate, or does the TCON
+>> >> requires the TCON TOP, which in turn requires that clock to be
+>> >> functional?
+>> >>
+>> >> I find it quite odd to have a clock that isn't meant for a particular
+>> >> device to actually be wired to another device. I'm not saying this
+>> >> isn't the case, but it would be a first.
+>> >
+>> > Documentation doesn't say much about that gate. I did few tests and TCON
+>> > registers can be read and written even if TCON TOP TV TCON gate is
+>> > disabled. However, there is no image, as expected.
 >>
->>> The old driver could be removed later, after all users are converted.
+>> The R40 manual does include it in the diagram, on page 504. There's also a
+>> mux to select whether the clock comes directly from the CCU or the TV
+>> encoder (a feedback mode?). I assume this is the gate you are referring to
+>> here, in which case it is not a bus clock, but rather the TCON module or
+>> channel clock, strangely routed.
 >>
->> Both drivers were in for long enough already. And let's be realistic,
->> how many MX23/MX28 users of old DTs with new kernels are there who
->> cannot update the DT as well ?
-> 
-> Grepping for "display =" in arch/arm/boot/dts/imx* I see that old
-> bindings are also used by 3rd-party boards for imx6/7:
->  * imx6sx-nitrogen6sx
->  * imx6ul-geam
->  * imx6ul-isiot
->  * imx6ul-opos6uldev
->  * imx6ul-pico-hobbit
->  * imx6ul-tx6ul
->  * imx7d-nitrogen7
+>> > More interestingly, I enabled test pattern directly in TCON to eliminate
+>> > influence of the mixer. As soon as I disabled that gate, test pattern on
+>> > HDMI screen was gone, which suggest that this gate influences something
+>> > inside TCON.
+>> >
+>> > Another test I did was that I moved enable/disable gate code to
+>> > sun4i_tcon_channel_set_status() and it worked just as well.
+>> >
+>> > I'll ask AW engineer what that gate actually does, but from what I saw, I
+>> > would say that most appropriate location to enable/disable TCON TOP TV
+>> > TCON
+>> > gate is TCON driver. Alternatively, TCON TOP driver could check if any TV
+>> > TCON is in use and enable appropriate gate. However, that doesn't sound
+>> > right to me for some reason.
+>>
+>> If what I said above it true, then yes, the appropriate location to enable
+>> it is the TCON driver, but moreover, the representation of the clock tree
+>> should be fixed such that the TCON takes the clock from the TCON TOP as its
+>> channel/ module clock instead. That way you don't need this patch, but
+>> you'd add another for all the clock routing.
+>
+> Can you be more specific? I not sure what you mean here.
 
-Er, yes, a handful of boards which could be updated :)
+For clock related properties in the device tree:
 
-> Converting everything might be quite a bit of work, and explicitly
-> supporting old bindings is also work.
+&tcon_top {
+    clocks = <&ccu CLK_BUS_TCON_TOP>,
+             <&ccu CLK_TCON_TV0>,
+             <&tve0>,
+             <&ccu CLK_TCON_TV1>,
+             <&tve1>;
+    clock-names = "bus", "tcon-tv0", "tve0", "tcon-tv1", "tve1";
+    clock-output-names = "tcon-top-tv0", "tcon-top-tv1";
+};
 
-Does adding support for old bindings justify the effort invested ? I
-doubt so, it only adds more code to maintain.
+&tcon_tv0 {
+    clocks = <&ccu CLK_BUS_TCON_TV0>, <&tcon_top 0>'
+    clock-names = "ahb", "tcon-ch1";
+};
 
-> It is very confusing that there is a whole set of displays for imx6/7
-> which are supported by upstream but only with a non-default config.
-> While it is extremely common in the embedded field to have custom
-> configs the default one in the kernel should try to "just work".
-> 
-> Couldn't this patch series be considered a bugfix? It was also
-> surprisingly small.
+A diagram would look like:
 
-I think it's just a workaround which allows you to postpone the real
-fix, and I don't like that.
+                   | This part is TCON TOP |
+                   v                       v
+CCU CLK_TCON_TV0 --|----\                  |
+                   |     mux ---- gate ----|-- TCON_TV0
+TVE0 --------------|----/                  |
 
--- 
-Best regards,
-Marek Vasut
+And the same goes for TCON_TV1 and TVE1.
+
+The user manual is a bit lacking on how TVE outputs a clock though.
+
+ChenYu
