@@ -1,132 +1,230 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 16 Jun 2018 13:48:38 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
- for tcon-top gate
-In-Reply-To: <3871160.F3Km1rQkUz@jernej-laptop>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <2948115.KggauuSURZ@jernej-laptop>
- <CAGb2v66UFRKRF4_zbm8nQJYoOHb-iLbiU_0iYWep=WNiQDftMQ@mail.gmail.com>
- <3871160.F3Km1rQkUz@jernej-laptop>
-Message-ID: <CAGb2v66Tv7876_heSve0zb+vWfz9kbwbrU8NjnpTwUHm6xOKJQ@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Sat, 16 Jun 2018 12:15:34 +0200
+Subject: [RFC PATCH 03/10] devfreq: rk3399_dmc: Pass ODT and auto power
+ down parameters to TF-A.
+In-Reply-To: <5AFA0B94.4000100@samsung.com>
+References: <20180514211610.26618-1-enric.balletbo@collabora.com>
+ <CGME20180514211840epcas3p41708e430bc22d7e61e8b894b12a083f9@epcas3p4.samsung.com>
+ <20180514211610.26618-4-enric.balletbo@collabora.com>
+ <5AFA0B94.4000100@samsung.com>
+Message-ID: <CAFqH_51jDy6hvwTtVQf52OZ2QFwAACzH8bh2bUZdxAnvKqM6=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 16, 2018 at 1:33 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Dne petek, 15. junij 2018 ob 19:13:17 CEST je Chen-Yu Tsai napisal(a):
->> On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
->>
->> <jernej.skrabec@siol.net> wrote:
->> > Hi,
->> >
->> > Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard napisal(a):
->> >> Hi,
->> >>
->> >> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
->> >> > TV TCONs connected to TCON TOP have to enable additional gate in order
->> >> > to work.
->> >> >
->> >> > Add support for such TCONs.
->> >> >
->> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >> > ---
->> >> >
->> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
->> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
->> >> >  2 files changed, 15 insertions(+)
->> >> >
->> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 08747fc3ee71..0afb5a94a414
->> >> > 100644
->> >> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device
->> >> > *dev,
->> >> >
->> >> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
->> >> >             return PTR_ERR(tcon->clk);
->> >> >
->> >> >     }
->> >> >
->> >> > +
->> >> > +   if (tcon->quirks->has_tcon_top_gate) {
->> >> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
->> >> > +           if (IS_ERR(tcon->top_clk)) {
->> >> > +                   dev_err(dev, "Couldn't get the TCON TOP bus
->> >> > clock\n");
->> >> > +                   return PTR_ERR(tcon->top_clk);
->> >> > +           }
->> >> > +           clk_prepare_enable(tcon->top_clk);
->> >> > +   }
->> >> > +
->> >>
->> >> Is it required for the TCON itself to operate, or does the TCON
->> >> requires the TCON TOP, which in turn requires that clock to be
->> >> functional?
->> >>
->> >> I find it quite odd to have a clock that isn't meant for a particular
->> >> device to actually be wired to another device. I'm not saying this
->> >> isn't the case, but it would be a first.
->> >
->> > Documentation doesn't say much about that gate. I did few tests and TCON
->> > registers can be read and written even if TCON TOP TV TCON gate is
->> > disabled. However, there is no image, as expected.
->>
->> The R40 manual does include it in the diagram, on page 504. There's also a
->> mux to select whether the clock comes directly from the CCU or the TV
->> encoder (a feedback mode?). I assume this is the gate you are referring to
->> here, in which case it is not a bus clock, but rather the TCON module or
->> channel clock, strangely routed.
->>
->> > More interestingly, I enabled test pattern directly in TCON to eliminate
->> > influence of the mixer. As soon as I disabled that gate, test pattern on
->> > HDMI screen was gone, which suggest that this gate influences something
->> > inside TCON.
->> >
->> > Another test I did was that I moved enable/disable gate code to
->> > sun4i_tcon_channel_set_status() and it worked just as well.
->> >
->> > I'll ask AW engineer what that gate actually does, but from what I saw, I
->> > would say that most appropriate location to enable/disable TCON TOP TV
->> > TCON
->> > gate is TCON driver. Alternatively, TCON TOP driver could check if any TV
->> > TCON is in use and enable appropriate gate. However, that doesn't sound
->> > right to me for some reason.
->>
->> If what I said above it true, then yes, the appropriate location to enable
->> it is the TCON driver, but moreover, the representation of the clock tree
->> should be fixed such that the TCON takes the clock from the TCON TOP as its
->> channel/ module clock instead. That way you don't need this patch, but
->> you'd add another for all the clock routing.
+Hi Chanwoo,
+
+I'll send a new version soon, just wanted to ask some questions here. See below.
+
+Missatge de Chanwoo Choi <cw00.choi@samsung.com> del dia dt., 15 de
+maig 2018 a les 0:21:
 >
-> Can you be more specific? I not sure what you mean here.
+> Hi,
+>
+> On 2018? 05? 15? 06:16, Enric Balletbo i Serra wrote:
+> > Trusted Firmware-A (TF-A) for rk3399 implements a SiP call to get the
+> > on-die termination (ODT) and auto power down parameters from kernel,
+> > this patch adds the functionality to do this. Also, if DDR clock
+> > frequency is lower than the on-die termination (ODT) disable frequency
+> > this driver should disable the DDR ODT.
+>
+> I have a question.
+> 'disable frequency' is the same meaning of 'disable the DDR ODT'?
+>
 
-For clock related properties in the device tree:
+Yes, the DT defines an odt_dis_freq parameter, when the DDR frequency
+is less than the value in this parameter we disable the ODT on the
+DRAM.
 
-&tcon_top {
-    clocks = <&ccu CLK_BUS_TCON_TOP>,
-             <&ccu CLK_TCON_TV0>,
-             <&tve0>,
-             <&ccu CLK_TCON_TV1>,
-             <&tve1>;
-    clock-names = "bus", "tcon-tv0", "tve0", "tcon-tv1", "tve1";
-    clock-output-names = "tcon-top-tv0", "tcon-top-tv1";
-};
+> >
+> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > ---
+> >
+> >  drivers/devfreq/rk3399_dmc.c        | 50 ++++++++++++++++++++++++++++-
+> >  include/soc/rockchip/rockchip_sip.h |  1 +
+> >  2 files changed, 50 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+> > index d5c03e5abe13..cc1bbca3fb15 100644
+> > --- a/drivers/devfreq/rk3399_dmc.c
+> > +++ b/drivers/devfreq/rk3399_dmc.c
+> > @@ -18,14 +18,17 @@
+> >  #include <linux/devfreq.h>
+> >  #include <linux/devfreq-event.h>
+> >  #include <linux/interrupt.h>
+> > +#include <linux/mfd/syscon.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/pm_opp.h>
+> > +#include <linux/regmap.h>
+> >  #include <linux/regulator/consumer.h>
+> >  #include <linux/rwsem.h>
+> >  #include <linux/suspend.h>
+> >
+> > +#include <soc/rockchip/rk3399_grf.h>
+> >  #include <soc/rockchip/rockchip_sip.h>
+> >
+> >  struct dram_timing {
+> > @@ -69,8 +72,11 @@ struct rk3399_dmcfreq {
+> >       struct mutex lock;
+> >       struct dram_timing timing;
+> >       struct regulator *vdd_center;
+> > +     struct regmap *regmap_pmu;
+> >       unsigned long rate, target_rate;
+> >       unsigned long volt, target_volt;
+> > +     unsigned int odt_dis_freq;
+> > +     int odt_pd_arg0, odt_pd_arg1;
+> >  };
+> >
+> >  static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+> > @@ -80,6 +86,8 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+> >       struct dev_pm_opp *opp;
+> >       unsigned long old_clk_rate = dmcfreq->rate;
+> >       unsigned long target_volt, target_rate;
+> > +     struct arm_smccc_res res;
+> > +     int dram_flag;
+> >       int err;
+> >
+> >       opp = devfreq_recommended_opp(dev, freq, flags);
+> > @@ -95,6 +103,15 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+> >
+> >       mutex_lock(&dmcfreq->lock);
+> >
+> > +     dram_flag = 0;
+>
+> Also, if dram_flag is 0, it mean that disable ODT frequency?
 
-&tcon_tv0 {
-    clocks = <&ccu CLK_BUS_TCON_TV0>, <&tcon_top 0>'
-    clock-names = "ahb", "tcon-ch1";
-};
+Yes, not a good name, maybe I should just rename it to odt_enable to
+be more clear.
 
-A diagram would look like:
+> If it's right, you better to define the precise variables as following
+> instead of just integer(0 or 1).
+> For example,
+> - ROCKCHIP_SIP_DRAM_FREQ_ENABLE
+> - ROCKCHIP_SIP_DRAM_FREQ_DISABLE
+>
+> > +     if (target_rate >= dmcfreq->odt_dis_freq)
+> > +             dram_flag = 1;
+> > +
+> > +     arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, dmcfreq->odt_pd_arg0,
+> > +                   dmcfreq->odt_pd_arg1,
+> > +                   ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD,
+> > +                   dram_flag, 0, 0, 0, &res);
+> > +
+>
+> This operation is special for only rk3399_dmc. It is difficult
+> to understand what to do. I recommend you better to add the detailed comment
+> with code.
 
-                   | This part is TCON TOP |
-                   v                       v
-CCU CLK_TCON_TV0 --|----\                  |
-                   |     mux ---- gate ----|-- TCON_TV0
-TVE0 --------------|----/                  |
+Will do.
 
-And the same goes for TCON_TV1 and TVE1.
+>
+> >       /*
+> >        * If frequency scaling from low to high, adjust voltage first.
+> >        * If frequency scaling from high to low, adjust frequency first.
+> > @@ -294,11 +311,13 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+> >  {
+> >       struct arm_smccc_res res;
+> >       struct device *dev = &pdev->dev;
+> > -     struct device_node *np = pdev->dev.of_node;
+> > +     struct device_node *np = pdev->dev.of_node, *node;
+> >       struct rk3399_dmcfreq *data;
+> >       int ret, index, size;
+> >       uint32_t *timing;
+> >       struct dev_pm_opp *opp;
+> > +     u32 ddr_type;
+> > +     u32 val;
+> >
+> >       data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
+> >       if (!data)
+> > @@ -334,6 +353,29 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+> >               return ret;
+> >       }
+> >
+> > +     /* Try to find the optional reference to the pmu syscon */
+> > +     node = of_parse_phandle(np, "rockchip,pmu", 0);
+> > +     if (node) {
+> > +             data->regmap_pmu = syscon_node_to_regmap(node);
+> > +             if (IS_ERR(data->regmap_pmu))
+> > +                     return PTR_ERR(data->regmap_pmu);
+> > +     }
+> > +
+> > +     /* Get DDR type */
+> > +     regmap_read(data->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
+> > +     ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
+> > +                 RK3399_PMUGRF_DDRTYPE_MASK;
+> > +
+> > +     /* Get the odt_dis_freq parameter in function of the DDR type */
+> > +     if (ddr_type == RK3399_PMUGRF_DDRTYPE_DDR3)
+> > +             data->odt_dis_freq = data->timing.ddr3_odt_dis_freq;
+> > +     else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
+> > +             data->odt_dis_freq = data->timing.lpddr3_odt_dis_freq;
+> > +     else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
+> > +             data->odt_dis_freq = data->timing.lpddr4_odt_dis_freq;
+> > +     else
+> > +             return -EINVAL;
+> > +
+>
+> how about using 'switch' statement?
+>
 
-The user manual is a bit lacking on how TVE outputs a clock though.
+Ok
 
-ChenYu
+> >       /*
+> >        * Get dram timing and pass it to arm trust firmware,
+> >        * the dram drvier in arm trust firmware will get these
+> > @@ -358,6 +400,12 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+> >                     ROCKCHIP_SIP_CONFIG_DRAM_INIT,
+> >                     0, 0, 0, 0, &res);
+> >
+> > +     data->odt_pd_arg0 = (data->timing.sr_idle & 0xff) |
+> > +                         ((data->timing.sr_mc_gate_idle & 0xff) << 8) |
+> > +                         ((data->timing.standby_idle & 0xffff) << 16);
+> > +     data->odt_pd_arg1 = (data->timing.pd_idle & 0xfff) |
+> > +                         ((data->timing.srpd_lite_idle & 0xfff) << 16);
+> > +
+>
+> odt_pd_arg0 and odt_pd_arg1 might be used for disabling/enabling the ODT frequency.
+> As I commented, it depend on only rk3399_dmc. You better to add detailed comment.
+>
+
+Ok
+
+> And I prefer to define the XXX_SHIFT/XXX_MASK definition instead of
+> using 8/16/0xff/0xffff for the readability.
+>
+
+I tried to add the XXX_SHIFT/XXX_MASK definitions and IMHO the
+readability is worst if I use a maximum line length of 80 characters.
+These masks are only used here, let me try to convince you by adding a
+good doc in the next version and if you still prefer I add the
+definition I'll do.
+
+> >       /*
+> >        * We add a devfreq driver to our parent since it has a device tree node
+> >        * with operating points.
+> > diff --git a/include/soc/rockchip/rockchip_sip.h b/include/soc/rockchip/rockchip_sip.h
+> > index 7e28092c4d3d..ad9482c56797 100644
+> > --- a/include/soc/rockchip/rockchip_sip.h
+> > +++ b/include/soc/rockchip/rockchip_sip.h
+> > @@ -23,5 +23,6 @@
+> >  #define ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE    0x05
+> >  #define ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ     0x06
+> >  #define ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM   0x07
+> > +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD  0x08
+> >
+> >  #endif
+> >
+>
+>
+> --
+> Best Regards,
+> Chanwoo Choi
+> Samsung Electronics
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Cheers,
+ Enric
