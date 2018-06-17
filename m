@@ -1,18 +1,34 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 17 Jun 2018 15:31:49 +0800
-Subject: [PATCH v2 1/4] ARM: dts: imx6qdl-wandboard: remove regulators
- bus node
-In-Reply-To: <20180529062021.3154-2-akurz@blala.de>
-References: <20180529062021.3154-1-akurz@blala.de>
- <20180529062021.3154-2-akurz@blala.de>
-Message-ID: <20180617073148.GQ16091@dragon>
+Date: Sun, 17 Jun 2018 15:38:52 +0800
+Subject: [PATCH V2] soc: imx: gpcv2: correct PGC offset
+In-Reply-To: <1527643842-17643-1-git-send-email-Anson.Huang@nxp.com>
+References: <1527643842-17643-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180617073852.GR16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 06:20:18AM +0000, Alexander Kurz wrote:
-> To match the convention, move all regulator-fixed nodes directly into
-> the root node.
+On Wed, May 30, 2018 at 09:30:42AM +0800, Anson Huang wrote:
+> Correct MIPI/PCIe/USB_HSIC's PGC offset based on
+> design RTL, the values in the Reference Manual
+> (Rev. 1, 01/2018 and the older ones) are incorrect.
 > 
-> Signed-off-by: Alexander Kurz <akurz@blala.de>
+> The correct offset values should be as below:
+> 
+> 0x800 ~ 0x83F: PGC for core0 of A7 platform;
+> 0x840 ~ 0x87F: PGC for core1 of A7 platform;
+> 0x880 ~ 0x8BF: PGC for SCU of A7 platform;
+> 0xA00 ~ 0xA3F: PGC for fastmix/megamix;
+> 0xC00 ~ 0xC3F: PGC for MIPI PHY;
+> 0xC40 ~ 0xC7F: PGC for PCIe_PHY;
+> 0xC80 ~ 0xCBF: PGC for USB OTG1 PHY;
+> 0xCC0 ~ 0xCFF: PGC for USB OTG2 PHY;
+> 0xD00 ~ 0xD3F: PGC for USB HSIC PHY;
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Applied all, thanks.
+I added the Fixes tag below and applied it as a fix.
+
+ Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
+
+Shawn
