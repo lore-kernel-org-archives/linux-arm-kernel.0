@@ -1,245 +1,138 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sun, 17 Jun 2018 09:00:29 +0900
-Subject: [RFC PATCH 03/10] devfreq: rk3399_dmc: Pass ODT and auto power
- down parameters to TF-A.
-In-Reply-To: <CAFqH_51jDy6hvwTtVQf52OZ2QFwAACzH8bh2bUZdxAnvKqM6=A@mail.gmail.com>
-References: <20180514211610.26618-1-enric.balletbo@collabora.com>
- <CGME20180514211840epcas3p41708e430bc22d7e61e8b894b12a083f9@epcas3p4.samsung.com>
- <20180514211610.26618-4-enric.balletbo@collabora.com>
- <5AFA0B94.4000100@samsung.com>
- <CAFqH_51jDy6hvwTtVQf52OZ2QFwAACzH8bh2bUZdxAnvKqM6=A@mail.gmail.com>
-Message-ID: <CAGTfZH3DqzOXNy-w6x=DC9PJ-XPe8SPtZqkONwVO2aL5OGAcqA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 17 Jun 2018 14:44:03 +0800
+Subject: [PATCH v1] ARM: imx: add imx7d-m4
+In-Reply-To: <20180405115134.8036-1-o.rempel@pengutronix.de>
+References: <20180405115134.8036-1-o.rempel@pengutronix.de>
+Message-ID: <20180617064402.GI16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric
+On Thu, Apr 05, 2018 at 01:51:34PM +0200, Oleksij Rempel wrote:
+> Provide basic support for Cortex-M4 located on NXP iMX7D.
+> This code was tested in combination with imx-rproc driver
+> which will upload with specially formatted ELF image containing
+> kernel, device and CPIO rootfs.
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/Makefile         |  2 +-
+>  arch/arm/mach-imx/Kconfig          | 33 +++++++++++++++++++++------------
+>  arch/arm/mach-imx/Makefile         |  3 ++-
+>  arch/arm/mach-imx/mach-imx7d-cm4.c | 21 +++++++++++++++++++++
+>  4 files changed, 45 insertions(+), 14 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/mach-imx7d-cm4.c
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 852452515bea..d49bb9a58aee 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -527,7 +527,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+>  	imx6ul-tx6ul-0011.dtb \
+>  	imx6ul-tx6ul-mainboard.dtb \
+>  	imx6ull-14x14-evk.dtb
+> -dtb-$(CONFIG_SOC_IMX7D) += \
+> +dtb-$(CONFIG_SOC_IMX7D_CA7) += \
 
-2018-06-16 19:15 GMT+09:00 Enric Balletbo Serra <eballetbo@gmail.com>:
-> Hi Chanwoo,
->
-> I'll send a new version soon, just wanted to ask some questions here. See below.
->
-> Missatge de Chanwoo Choi <cw00.choi@samsung.com> del dia dt., 15 de
-> maig 2018 a les 0:21:
->>
->> Hi,
->>
->> On 2018? 05? 15? 06:16, Enric Balletbo i Serra wrote:
->> > Trusted Firmware-A (TF-A) for rk3399 implements a SiP call to get the
->> > on-die termination (ODT) and auto power down parameters from kernel,
->> > this patch adds the functionality to do this. Also, if DDR clock
->> > frequency is lower than the on-die termination (ODT) disable frequency
->> > this driver should disable the DDR ODT.
->>
->> I have a question.
->> 'disable frequency' is the same meaning of 'disable the DDR ODT'?
->>
->
-> Yes, the DT defines an odt_dis_freq parameter, when the DDR frequency
-> is less than the value in this parameter we disable the ODT on the
-> DRAM.
->
->> >
->> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> > ---
->> >
->> >  drivers/devfreq/rk3399_dmc.c        | 50 ++++++++++++++++++++++++++++-
->> >  include/soc/rockchip/rockchip_sip.h |  1 +
->> >  2 files changed, 50 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
->> > index d5c03e5abe13..cc1bbca3fb15 100644
->> > --- a/drivers/devfreq/rk3399_dmc.c
->> > +++ b/drivers/devfreq/rk3399_dmc.c
->> > @@ -18,14 +18,17 @@
->> >  #include <linux/devfreq.h>
->> >  #include <linux/devfreq-event.h>
->> >  #include <linux/interrupt.h>
->> > +#include <linux/mfd/syscon.h>
->> >  #include <linux/module.h>
->> >  #include <linux/of.h>
->> >  #include <linux/platform_device.h>
->> >  #include <linux/pm_opp.h>
->> > +#include <linux/regmap.h>
->> >  #include <linux/regulator/consumer.h>
->> >  #include <linux/rwsem.h>
->> >  #include <linux/suspend.h>
->> >
->> > +#include <soc/rockchip/rk3399_grf.h>
->> >  #include <soc/rockchip/rockchip_sip.h>
->> >
->> >  struct dram_timing {
->> > @@ -69,8 +72,11 @@ struct rk3399_dmcfreq {
->> >       struct mutex lock;
->> >       struct dram_timing timing;
->> >       struct regulator *vdd_center;
->> > +     struct regmap *regmap_pmu;
->> >       unsigned long rate, target_rate;
->> >       unsigned long volt, target_volt;
->> > +     unsigned int odt_dis_freq;
->> > +     int odt_pd_arg0, odt_pd_arg1;
->> >  };
->> >
->> >  static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
->> > @@ -80,6 +86,8 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
->> >       struct dev_pm_opp *opp;
->> >       unsigned long old_clk_rate = dmcfreq->rate;
->> >       unsigned long target_volt, target_rate;
->> > +     struct arm_smccc_res res;
->> > +     int dram_flag;
->> >       int err;
->> >
->> >       opp = devfreq_recommended_opp(dev, freq, flags);
->> > @@ -95,6 +103,15 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
->> >
->> >       mutex_lock(&dmcfreq->lock);
->> >
->> > +     dram_flag = 0;
->>
->> Also, if dram_flag is 0, it mean that disable ODT frequency?
->
-> Yes, not a good name, maybe I should just rename it to odt_enable to
-> be more clear.
->
->> If it's right, you better to define the precise variables as following
->> instead of just integer(0 or 1).
->> For example,
->> - ROCKCHIP_SIP_DRAM_FREQ_ENABLE
->> - ROCKCHIP_SIP_DRAM_FREQ_DISABLE
->>
->> > +     if (target_rate >= dmcfreq->odt_dis_freq)
->> > +             dram_flag = 1;
->> > +
->> > +     arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, dmcfreq->odt_pd_arg0,
->> > +                   dmcfreq->odt_pd_arg1,
->> > +                   ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD,
->> > +                   dram_flag, 0, 0, 0, &res);
->> > +
->>
->> This operation is special for only rk3399_dmc. It is difficult
->> to understand what to do. I recommend you better to add the detailed comment
->> with code.
->
-> Will do.
->
->>
->> >       /*
->> >        * If frequency scaling from low to high, adjust voltage first.
->> >        * If frequency scaling from high to low, adjust frequency first.
->> > @@ -294,11 +311,13 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
->> >  {
->> >       struct arm_smccc_res res;
->> >       struct device *dev = &pdev->dev;
->> > -     struct device_node *np = pdev->dev.of_node;
->> > +     struct device_node *np = pdev->dev.of_node, *node;
->> >       struct rk3399_dmcfreq *data;
->> >       int ret, index, size;
->> >       uint32_t *timing;
->> >       struct dev_pm_opp *opp;
->> > +     u32 ddr_type;
->> > +     u32 val;
->> >
->> >       data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
->> >       if (!data)
->> > @@ -334,6 +353,29 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
->> >               return ret;
->> >       }
->> >
->> > +     /* Try to find the optional reference to the pmu syscon */
->> > +     node = of_parse_phandle(np, "rockchip,pmu", 0);
->> > +     if (node) {
->> > +             data->regmap_pmu = syscon_node_to_regmap(node);
->> > +             if (IS_ERR(data->regmap_pmu))
->> > +                     return PTR_ERR(data->regmap_pmu);
->> > +     }
->> > +
->> > +     /* Get DDR type */
->> > +     regmap_read(data->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
->> > +     ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
->> > +                 RK3399_PMUGRF_DDRTYPE_MASK;
->> > +
->> > +     /* Get the odt_dis_freq parameter in function of the DDR type */
->> > +     if (ddr_type == RK3399_PMUGRF_DDRTYPE_DDR3)
->> > +             data->odt_dis_freq = data->timing.ddr3_odt_dis_freq;
->> > +     else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
->> > +             data->odt_dis_freq = data->timing.lpddr3_odt_dis_freq;
->> > +     else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
->> > +             data->odt_dis_freq = data->timing.lpddr4_odt_dis_freq;
->> > +     else
->> > +             return -EINVAL;
->> > +
->>
->> how about using 'switch' statement?
->>
->
-> Ok
->
->> >       /*
->> >        * Get dram timing and pass it to arm trust firmware,
->> >        * the dram drvier in arm trust firmware will get these
->> > @@ -358,6 +400,12 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
->> >                     ROCKCHIP_SIP_CONFIG_DRAM_INIT,
->> >                     0, 0, 0, 0, &res);
->> >
->> > +     data->odt_pd_arg0 = (data->timing.sr_idle & 0xff) |
->> > +                         ((data->timing.sr_mc_gate_idle & 0xff) << 8) |
->> > +                         ((data->timing.standby_idle & 0xffff) << 16);
->> > +     data->odt_pd_arg1 = (data->timing.pd_idle & 0xfff) |
->> > +                         ((data->timing.srpd_lite_idle & 0xfff) << 16);
->> > +
->>
->> odt_pd_arg0 and odt_pd_arg1 might be used for disabling/enabling the ODT frequency.
->> As I commented, it depend on only rk3399_dmc. You better to add detailed comment.
->>
->
-> Ok
->
->> And I prefer to define the XXX_SHIFT/XXX_MASK definition instead of
->> using 8/16/0xff/0xffff for the readability.
->>
->
-> I tried to add the XXX_SHIFT/XXX_MASK definitions and IMHO the
-> readability is worst if I use a maximum line length of 80 characters.
-> These masks are only used here, let me try to convince you by adding a
-> good doc in the next version and if you still prefer I add the
-> definition I'll do.
+I would keep this unchanged, and have future IMX7D_CM4 DTBs just
+covered by CONFIG_SOC_IMX7D as well.
 
-If you add the some description and it would be only used on here,
-I don't force to add some definition such as _SHIFT, _MASK as you suggested.
+Shawn
 
->
->> >       /*
->> >        * We add a devfreq driver to our parent since it has a device tree node
->> >        * with operating points.
->> > diff --git a/include/soc/rockchip/rockchip_sip.h b/include/soc/rockchip/rockchip_sip.h
->> > index 7e28092c4d3d..ad9482c56797 100644
->> > --- a/include/soc/rockchip/rockchip_sip.h
->> > +++ b/include/soc/rockchip/rockchip_sip.h
->> > @@ -23,5 +23,6 @@
->> >  #define ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE    0x05
->> >  #define ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ     0x06
->> >  #define ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM   0x07
->> > +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD  0x08
->> >
->> >  #endif
->> >
->>
->>
->> --
->> Best Regards,
->> Chanwoo Choi
->> Samsung Electronics
->>
->> _______________________________________________
->> Linux-rockchip mailing list
->> Linux-rockchip at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> Cheers,
->  Enric
-
-
-
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+>  	imx7d-cl-som-imx7.dtb \
+>  	imx7d-colibri-emmc-eval-v3.dtb \
+>  	imx7d-colibri-eval-v3.dtb \
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 782699e67600..101c8599d952 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -528,18 +528,6 @@ config SOC_IMX6UL
+>  	help
+>  	  This enables support for Freescale i.MX6 UltraLite processor.
+>  
+> -config SOC_IMX7D
+> -	bool "i.MX7 Dual support"
+> -	select PINCTRL_IMX7D
+> -	select ARM_GIC
+> -	select HAVE_ARM_ARCH_TIMER
+> -	select HAVE_IMX_ANATOP
+> -	select HAVE_IMX_MMDC
+> -	select HAVE_IMX_SRC
+> -	select IMX_GPCV2
+> -	help
+> -		This enables support for Freescale i.MX7 Dual processor.
+> -
+>  config SOC_LS1021A
+>  	bool "Freescale LS1021A support"
+>  	select ARM_GIC
+> @@ -554,6 +542,27 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+>  
+>  if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+>  
+> +config SOC_IMX7D_CA7
+> +	bool
+> +	select ARM_GIC
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select HAVE_IMX_ANATOP
+> +	select HAVE_IMX_MMDC
+> +	select HAVE_IMX_SRC
+> +	select IMX_GPCV2
+> +
+> +config SOC_IMX7D_CM4
+> +	bool
+> +	select ARMV7M_SYSTICK
+> +
+> +config SOC_IMX7D
+> +	bool "i.MX7 Dual support"
+> +	select PINCTRL_IMX7D
+> +	select SOC_IMX7D_CA7 if ARCH_MULTI_V7
+> +	select SOC_IMX7D_CM4 if ARM_SINGLE_ARMV7M
+> +	help
+> +		This enables support for Freescale i.MX7 Dual processor.
+> +
+>  config SOC_VF610
+>  	bool "Vybrid Family VF610 support"
+>  	select ARM_GIC if ARCH_MULTI_V7
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index 8ff71058207d..68640f100ef3 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -80,7 +80,8 @@ obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
+>  obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+>  obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+>  obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+> -obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+> +obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
+> +obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
+>  
+>  ifeq ($(CONFIG_SUSPEND),y)
+>  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+> diff --git a/arch/arm/mach-imx/mach-imx7d-cm4.c b/arch/arm/mach-imx/mach-imx7d-cm4.c
+> new file mode 100644
+> index 000000000000..c36dea79aeb8
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/mach-imx7d-cm4.c
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright 2017 Pengutronix
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <asm/v7m.h>
+> +#include <asm/mach/arch.h>
+> +
+> +static const char * const imx7d_cm4_dt_compat[] __initconst = {
+> +	"fsl,imx7d-cm4",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual Cortex-M4 (Device Tree)")
+> +	.dt_compat = imx7d_cm4_dt_compat,
+> +	.restart = armv7m_restart,
+> +MACHINE_END
+> -- 
+> 2.16.1
+> 
