@@ -1,119 +1,45 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 17 Jun 2018 15:24:19 +0200
-Subject: [PATCH] arm64: dts: rockchip: generalize rk3399 #sound-dai-cells
-Message-ID: <20180617132419.30688-1-heiko@sntech.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 17 Jun 2018 14:47:23 +0100
+Subject: [arm-platforms:irq/fixes-4.19 23/23]
+ drivers/irqchip/irq-gic-v3-its.c:2335:13: error: 'nr_cpu_idx' undeclared;
+ did you mean 'nr_cpu_ids'?
+In-Reply-To: <201806172046.o5ARazOK%fengguang.wu@intel.com>
+References: <201806172046.o5ARazOK%fengguang.wu@intel.com>
+Message-ID: <86zhzt7ces.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The soc spdif and i2s controllers always only have one compontent, so
-always require #sound-dai-cells to be 0. Therefore there is no need to
-duplicate this property in individual boards.
+On Sun, 17 Jun 2018 13:10:48 +0100,
+kbuild test robot <lkp@intel.com> wrote:
+> 
+> [1  <text/plain; us-ascii (7bit)>]
+> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/fixes-4.19
+> head:   2e077035935196976aa09ec043257efd56519810
+> commit: 2e077035935196976aa09ec043257efd56519810 [23/23] irqchip/gic-v3-its: Don't bind LPI to unavailable NUMA node
+> config: arm64-defconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         git checkout 2e077035935196976aa09ec043257efd56519810
+>         # save the attached .config to linux build tree
+>         GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/irqchip/irq-gic-v3-its.c: In function 'its_irq_domain_activate':
+> >> drivers/irqchip/irq-gic-v3-its.c:2335:13: error: 'nr_cpu_idx' undeclared (first use in this function); did you mean 'nr_cpu_ids'?
+>      if (cpu >= nr_cpu_idx) {
+>                 ^~~~~~~~~~
+>                 nr_cpu_ids
+>    drivers/irqchip/irq-gic-v3-its.c:2335:13: note: each undeclared identifier is reported only once for each function it appears in
 
-So move them to rk3399.dtsi.
+My bad, I pushed out the wrong branch, with the broken version of the
+patch (Yang's patch was correct). Now fixed and pushed out again.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts            | 3 ---
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi              | 1 -
- arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts | 2 --
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi          | 1 -
- arch/arm64/boot/dts/rockchip/rk3399.dtsi                   | 3 +++
- 5 files changed, 3 insertions(+), 7 deletions(-)
+Thanks for the heads up.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index d8a2f0ba4b2b..918944aafe83 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -492,19 +492,16 @@
- &i2s0 {
- 	rockchip,playback-channels = <8>;
- 	rockchip,capture-channels = <8>;
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
- 
- &i2s1 {
- 	rockchip,playback-channels = <2>;
- 	rockchip,capture-channels = <2>;
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
- 
- &i2s2 {
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
-index 111839a18465..0130b9f98c9d 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
-@@ -402,7 +402,6 @@
- 	pinctrl-0 = <&i2s0_2ch_bus>;
- 	rockchip,playback-channels = <2>;
- 	rockchip,capture-channels = <2>;
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts b/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts
-index 3768e1623e4f..fef2c0608999 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts
-@@ -149,7 +149,6 @@
- &i2s0 {
- 	rockchip,playback-channels = <8>;
- 	rockchip,capture-channels = <8>;
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
- 
-@@ -198,6 +197,5 @@
- &spdif {
- 	i2c-scl-rising-time-ns = <450>;
- 	i2c-scl-falling-time-ns = <15>;
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-index 5dada565429c..36b60791c156 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-@@ -425,7 +425,6 @@
- };
- 
- &i2s2 {
--	#sound-dai-cells = <0>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index ff63d9e93b4a..adb037cd80fe 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1483,6 +1483,7 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&spdif_bus>;
- 		power-domains = <&power RK3399_PD_SDIOAUDIO>;
-+		#sound-dai-cells = <0>;
- 		status = "disabled";
- 	};
- 
-@@ -1498,6 +1499,7 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s0_8ch_bus>;
- 		power-domains = <&power RK3399_PD_SDIOAUDIO>;
-+		#sound-dai-cells = <0>;
- 		status = "disabled";
- 	};
- 
-@@ -1512,6 +1514,7 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s1_2ch_bus>;
- 		power-domains = <&power RK3399_PD_SDIOAUDIO>;
-+		#sound-dai-cells = <0>;
- 		status = "disabled";
- 	};
- 
+	M.
+
 -- 
-2.17.0
+Jazz is not dead, it just smell funny.
