@@ -1,52 +1,85 @@
-From: david@lechnology.com (David Lechner)
-Date: Sun, 17 Jun 2018 10:48:47 -0500
-Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
-References: <20180518164829.27052-1-david@lechnology.com>
- <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
-Message-ID: <89b599d3-c43a-255f-8da6-9bea6cf53a5d@lechnology.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 17 Jun 2018 19:02:07 +0200
+Subject: [PATCH v3 04/14] mmc: pxamci: remove the dmaengine compat need
+In-Reply-To: <20180617170217.24177-1-robert.jarzmik@free.fr>
+References: <20180617170217.24177-1-robert.jarzmik@free.fr>
+Message-ID: <20180617170217.24177-5-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+As the pxa architecture switched towards the dmaengine slave map, the
+old compatibility mechanism to acquire the dma requestor line number and
+priority are not needed anymore.
 
-On 05/22/2018 04:38 AM, Sekhar Nori wrote:
-> Hi David,
-> 
-> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
->> This series converts mach-davinci to use the common clock framework.
->>
->> The series works like this, the first 3 patches fix some issues with the clock
->> drivers that have already been accepted into the mainline kernel.
->>
->> Then, starting with "ARM: davinci: pass clock as parameter to
->> davinci_timer_init()", we get the mach code ready for the switch by adding the
->> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
->> around the legacy clocks so that we can switch easily between the old and the
->> new.
->>
->> "ARM: davinci: switch to common clock framework" actually flips the switch
->> to start using the new clock drivers. Then the next 8 patches remove all
->> of the old clock code.
->>
->> The final four patches add device tree clock support to the one SoC that
->> supports it.
->>
->> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
->> board file).
-> 
-> If you do end up sending a v12, you can leave out the mach-davinci
-> portions unless there are any changes you need to make. I will pick them
-> up from this series once the driver dependencies are merged.
-> 
-> I do hope the drivers/clk/* changes can be merged from v4.18.
-> 
-> Thanks,
-> Sekhar
-> 
+This patch simplifies the dma resource acquisition, using the more
+generic function dma_request_slave_channel().
 
-Are you going to pick up the arch patches from this series now that
-the 4.18 merge window is closed?
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/host/pxamci.c | 29 +++--------------------------
+ 1 file changed, 3 insertions(+), 26 deletions(-)
 
-All of the clk patches landed in 4.18.
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index c763b404510f..6c94474e36f4 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -24,7 +24,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/dma/pxa-dma.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/mmc/host.h>
+@@ -637,10 +636,8 @@ static int pxamci_probe(struct platform_device *pdev)
+ {
+ 	struct mmc_host *mmc;
+ 	struct pxamci_host *host = NULL;
+-	struct resource *r, *dmarx, *dmatx;
+-	struct pxad_param param_rx, param_tx;
++	struct resource *r;
+ 	int ret, irq, gpio_cd = -1, gpio_ro = -1, gpio_power = -1;
+-	dma_cap_mask_t mask;
+ 
+ 	ret = pxamci_of_init(pdev);
+ 	if (ret)
+@@ -739,34 +736,14 @@ static int pxamci_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, mmc);
+ 
+-	if (!pdev->dev.of_node) {
+-		dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-		dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-		if (!dmarx || !dmatx) {
+-			ret = -ENXIO;
+-			goto out;
+-		}
+-		param_rx.prio = PXAD_PRIO_LOWEST;
+-		param_rx.drcmr = dmarx->start;
+-		param_tx.prio = PXAD_PRIO_LOWEST;
+-		param_tx.drcmr = dmatx->start;
+-	}
+-
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+-	host->dma_chan_rx =
+-		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+-						 &param_rx, &pdev->dev, "rx");
++	host->dma_chan_rx = dma_request_slave_channel(&pdev->dev, "rx");
+ 	if (host->dma_chan_rx == NULL) {
+ 		dev_err(&pdev->dev, "unable to request rx dma channel\n");
+ 		ret = -ENODEV;
+ 		goto out;
+ 	}
+ 
+-	host->dma_chan_tx =
+-		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+-						 &param_tx,  &pdev->dev, "tx");
++	host->dma_chan_tx = dma_request_slave_channel(&pdev->dev, "tx");
+ 	if (host->dma_chan_tx == NULL) {
+ 		dev_err(&pdev->dev, "unable to request tx dma channel\n");
+ 		ret = -ENODEV;
+-- 
+2.11.0
