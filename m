@@ -1,31 +1,44 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 17 Jun 2018 15:15:51 +0800
-Subject: [PATCH v2] ARM: dts: imx51-zii-rdu1: Make sure SD1_WP is low
-In-Reply-To: <20180526021238.30753-1-andrew.smirnov@gmail.com>
-References: <20180526021238.30753-1-andrew.smirnov@gmail.com>
-Message-ID: <20180617071550.GN16091@dragon>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Sun, 17 Jun 2018 09:31:38 +0200
+Subject: [PATCH v3] ARM: DTS: imx53: Add support for imx53 HSC/DDC
+ boards from K+P
+In-Reply-To: <20180617065700.GK16091@dragon>
+References: <20180509153428.1440-1-lukma@denx.de>
+ <20180612133208.22458-1-lukma@denx.de>
+ <20180617065700.GK16091@dragon>
+Message-ID: <20180617093138.30e925ee@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 07:12:38PM -0700, Andrey Smirnov wrote:
-> Make sure that MX51_PAD_GPIO1_1 does not remain configure as
-> ALT0/SD1_WP (it is out of reset). This is needed because of external
-> pull-up resistor attached to that pad that, when left unchanged, will
-> drive SD1_WP high preventing eSDHC1/eMMC from working correctly.
-> 
-> To fix that add a pinmux configuration line configureing the pad to
-> function as a GPIO. While we are at it, add a corresponding
-> output-high GPIO hog in an effort to minimize current consumption.
-> 
-> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Chris Healy <cphealy@gmail.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Hi Shawn,
 
-Applied, thanks.
+> On Tue, Jun 12, 2018 at 03:32:08PM +0200, Lukasz Majewski wrote:
+> > This commit provides support for HSC and DDC boards from
+> > Kieback&Peter GmbH vendor.
+> > 
+> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> > Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>  
+> 
+> "ARM: dts: ..." for prefix.  I fixed it up and applied the patch.
+> 
+> Shawn
+
+Thanks :-)
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180617/7b8e8d9a/attachment-0001.sig>
