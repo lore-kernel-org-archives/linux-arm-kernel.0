@@ -1,21 +1,21 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sun, 17 Jun 2018 13:23:47 +0200
-Subject: Patch "perf cs-etm: Support unknown_thread in cs_etm_auxtrace" has
- been added to the 4.16-stable tree
-Message-ID: <1529234627163178@kroah.com>
+Date: Sun, 17 Jun 2018 13:23:51 +0200
+Subject: Patch "spi: bcm2835aux: ensure interrupts are enabled for shared
+ handler" has been added to the 4.16-stable tree
+Message-ID: <152923463112765@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    perf cs-etm: Support unknown_thread in cs_etm_auxtrace
+    spi: bcm2835aux: ensure interrupts are enabled for shared handler
 
 to the 4.16-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     perf-cs-etm-support-unknown_thread-in-cs_etm_auxtrace.patch
+     spi-bcm2835aux-ensure-interrupts-are-enabled-for-shared-handler.patch
 and it can be found in the queue-4.16 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
@@ -23,97 +23,71 @@ please let <stable@vger.kernel.org> know about it.
 
 
 >From foo at baz Sun Jun 17 12:07:34 CEST 2018
-From: Leo Yan <leo.yan@linaro.org>
-Date: Thu, 10 May 2018 12:01:59 +0800
-Subject: perf cs-etm: Support unknown_thread in cs_etm_auxtrace
+From: Rob Herring <robh@kernel.org>
+Date: Thu, 3 May 2018 13:09:44 -0500
+Subject: spi: bcm2835aux: ensure interrupts are enabled for shared handler
 
-From: Leo Yan <leo.yan@linaro.org>
+From: Rob Herring <robh@kernel.org>
 
-[ Upstream commit 46d53620044f7b574c0f3216f8b4f2ce3559ce31 ]
+[ Upstream commit bc519d9574618e47a0c788000fb78da95e18d953 ]
 
-CoreSight doesn't allocate thread structure for unknown_thread in ETM
-auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
-contain valid tid and then cs_etm__mem_access() uses unknown_thread
-instead as thread handler, this results in a segmentation fault when
-thread__find_addr_map() accesses the thread handler.
+The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
+Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
+DT change which breaks compatibility with older kernels. The AUX irqchip
+was already rejected for upstream[1] and the DT change would break
+working systems if the DTB is updated to a newer one. The latter issue
+was brought to my attention by Alex Graf.
 
-This commit creates a new thread data which is used by unknown_thread, so
-CoreSight tracing can roll back to use unknown_thread if perf data
-doesn't include valid thread info.  This commit also releases thread
-data for initialization failure case and for normal auxtrace free flow.
+The root cause however is a bug in the shared handler. Shared handlers
+must check that interrupts are actually enabled before servicing the
+interrupt. Add a check that the TXEMPTY or IDLE interrupts are enabled.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
+[1] https://patchwork.kernel.org/patch/9781221/
+
+Cc: Alexander Graf <agraf@suse.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-spi at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1525924920-4381-1-git-send-email-leo.yan at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- tools/perf/util/cs-etm.c |   24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ drivers/spi/spi-bcm2835aux.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -212,6 +212,7 @@ static void cs_etm__free(struct perf_ses
- 	for (i = 0; i < aux->num_cpu; i++)
- 		zfree(&aux->metadata[i]);
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -184,6 +184,11 @@ static irqreturn_t bcm2835aux_spi_interr
+ 	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+ 	irqreturn_t ret = IRQ_NONE;
  
-+	thread__zput(aux->unknown_thread);
- 	zfree(&aux->metadata);
- 	zfree(&aux);
- }
-@@ -980,6 +981,23 @@ int cs_etm__process_auxtrace_info(union
- 	etm->auxtrace.free = cs_etm__free;
- 	session->auxtrace = &etm->auxtrace;
- 
-+	etm->unknown_thread = thread__new(999999999, 999999999);
-+	if (!etm->unknown_thread)
-+		goto err_free_queues;
++	/* IRQ may be shared, so return if our interrupts are disabled */
++	if (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_CNTL1) &
++	      (BCM2835_AUX_SPI_CNTL1_TXEMPTY | BCM2835_AUX_SPI_CNTL1_IDLE)))
++		return ret;
 +
-+	/*
-+	 * Initialize list node so that at thread__zput() we can avoid
-+	 * segmentation fault at list_del_init().
-+	 */
-+	INIT_LIST_HEAD(&etm->unknown_thread->node);
-+
-+	err = thread__set_comm(etm->unknown_thread, "unknown", 0);
-+	if (err)
-+		goto err_delete_thread;
-+
-+	if (thread__init_map_groups(etm->unknown_thread, etm->machine))
-+		goto err_delete_thread;
-+
- 	if (dump_trace) {
- 		cs_etm__print_auxtrace_info(auxtrace_info->priv, num_cpu);
- 		return 0;
-@@ -994,16 +1012,18 @@ int cs_etm__process_auxtrace_info(union
- 
- 	err = cs_etm__synth_events(etm, session);
- 	if (err)
--		goto err_free_queues;
-+		goto err_delete_thread;
- 
- 	err = auxtrace_queues__process_index(&etm->queues, session);
- 	if (err)
--		goto err_free_queues;
-+		goto err_delete_thread;
- 
- 	etm->data_queued = etm->queues.populated;
- 
- 	return 0;
- 
-+err_delete_thread:
-+	thread__zput(etm->unknown_thread);
- err_free_queues:
- 	auxtrace_queues__free(&etm->queues);
- 	session->auxtrace = NULL;
+ 	/* check if we have data to read */
+ 	while (bs->rx_len &&
+ 	       (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_STAT) &
 
 
-Patches currently in stable-queue which might be from leo.yan at linaro.org are
+Patches currently in stable-queue which might be from robh at kernel.org are
 
-queue-4.16/perf-cs-etm-support-unknown_thread-in-cs_etm_auxtrace.patch
+queue-4.16/sh-switch-to-no_bootmem.patch
+queue-4.16/spi-bcm2835aux-ensure-interrupts-are-enabled-for-shared-handler.patch
+queue-4.16/dt-bindings-panel-lvds-fix-path-to-display-timing-bindings.patch
+queue-4.16/dt-bindings-net-ravb-add-support-for-r8a77965-soc.patch
+queue-4.16/dt-bindings-pinctrl-sunxi-fix-reference-to-driver.patch
+queue-4.16/dt-bindings-serial-sh-sci-add-support-for-r8a77965-h-scif.patch
+queue-4.16/doc-add-vendor-prefix-for-kieback-peter-gmbh.patch
+queue-4.16/dt-bindings-dmaengine-rcar-dmac-document-r8a77965-support.patch
