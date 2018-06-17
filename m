@@ -1,76 +1,156 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sun, 17 Jun 2018 20:49:48 +0800
-Subject: [PATCH V2 3/4] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
-References: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1529239789-26849-4-git-send-email-aisheng.dong@nxp.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 17 Jun 2018 15:18:08 +0200
+Subject: [PATCH] ARM: dts: rockchip: convert rk3288 to operating-points-v2
+Message-ID: <20180617131808.30283-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Controller Firmware (SCFW) is a low-level system function
-which runs on a dedicated Cortex-M core to provide power, clock, and
-resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-(QM, QP), and i.MX8QX (QXP, DX).
+Operating points need to be present in each cpu core using it, not only
+the first one. With operating-points-v1 this would require duplicating
+this table into each cpu node.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v1->v2:
- * remove status
- * changed to mu1
----
- .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+With opp-v2 we can share the same table on all nodes.
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-new file mode 100644
-index 0000000..9b7c9fe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-@@ -0,0 +1,38 @@
-+NXP i.MX System Controller Firmware (SCFW)
-+--------------------------------------------------------------------
-+
-+The System Controller Firmware (SCFW) is a low-level system function
-+which runs on a dedicated Cortex-M core to provide power, clock, and
-+resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-+(QM, QP), and i.MX8QX (QXP, DX).
-+
-+The AP communicates with the SC using a multi-ported MU module found
-+in the LSIO subsystem. The current definition of this MU module provides
-+5 remote AP connections to the SC to support up to 5 execution environments
-+(TZ, HV, standard Linux, etc.). The SC side of this MU module interfaces
-+with the LSIO DSC IP bus. The SC firmware will communicate with this MU
-+using the MSI bus.
-+
-+System Controller Device Node:
-+=============================
-+
-+Required properties:
-+-------------------
-+- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
-+- fsl,mu: a phandle to the Message Unit used by SCU. Should be
-+	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
-+	  to make sure not use the one which is conflict with
-+	  other execution environments. e.g. ATF.
-+
-+Examples:
-+--------
-+lsio_mu1: mu at 5d1c0000 {
-+	compatible = "fsl,imx8qxp-mu";
-+	reg = <0x0 0x5d1c0000 0x0 0x10000>;
-+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 36 +++++++-------
+ arch/arm/boot/dts/rk3288.dtsi        | 70 ++++++++++++++++++++++------
+ 2 files changed, 75 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 823c7ed47fcf..c8c83bf544b9 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -91,22 +91,26 @@
+ 
+ &cpu0 {
+ 	cpu0-supply = <&vdd_cpu>;
+-	operating-points = <
+-		/* KHz    uV */
+-		1800000 1400000
+-		1704000 1350000
+-		1608000 1300000
+-		1512000 1250000
+-		1416000 1200000
+-		1200000 1100000
+-		1008000 1050000
+-		 816000 1000000
+-		 696000  950000
+-		 600000  900000
+-		 408000  900000
+-		 216000  900000
+-		 126000  900000
+-	>;
 +};
 +
-+scu {
-+	compatible = "fsl,imx8qxp-scu";
-+	fsl,mu = <&lsio_mu1>;
-+};
++/* rk3288-c used in Veyron Chrome-devices has slightly changed OPPs */
++&cpu_opp_table {
++	/delete-node/ opp02;
++
++	opp10 {
++		opp-microvolt = <1250000>;
++	};
++	opp11 {
++		opp-microvolt = <1300000>;
++	};
++	opp12 {
++		opp-hz = /bits/ 64 <1704000000>;
++		opp-microvolt = <1350000>;
++	};
++	opp13 {
++		opp-hz = /bits/ 64 <1800000000>;
++		opp-microvolt = <1400000>;
++	};
+ };
+ 
+ &emmc {
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 2a060c2dc383..a3af3f6ad8d0 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -60,21 +60,7 @@
+ 			compatible = "arm,cortex-a12";
+ 			reg = <0x500>;
+ 			resets = <&cru SRST_CORE0>;
+-			operating-points = <
+-				/* KHz    uV */
+-				1608000 1350000
+-				1512000 1300000
+-				1416000 1200000
+-				1200000 1100000
+-				1008000 1050000
+-				 816000 1000000
+-				 696000  950000
+-				 600000  900000
+-				 408000  900000
+-				 312000  900000
+-				 216000  900000
+-				 126000  900000
+-			>;
++			operating-points-v2 = <&cpu_opp_table>;
+ 			#cooling-cells = <2>; /* min followed by max */
+ 			clock-latency = <40000>;
+ 			clocks = <&cru ARMCLK>;
+@@ -99,6 +85,60 @@
+ 		};
+ 	};
+ 
++	cpu_opp_table: cpu-opp-table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp00 {
++			opp-hz = /bits/ 64 <126000000>;
++			opp-microvolt = <900000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <216000000>;
++			opp-microvolt = <900000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <312000000>;
++			opp-microvolt = <900000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <408000000>;
++			opp-microvolt = <900000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <900000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <696000000>;
++			opp-microvolt = <950000>;
++		};
++		opp06 {
++			opp-hz = /bits/ 64 <816000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp07 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <1050000>;
++		};
++		opp08 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1100000>;
++		};
++		opp09 {
++			opp-hz = /bits/ 64 <1416000000>;
++			opp-microvolt = <1200000>;
++		};
++		opp10 {
++			opp-hz = /bits/ 64 <1512000000>;
++			opp-microvolt = <1300000>;
++		};
++		opp11 {
++			opp-hz = /bits/ 64 <1608000000>;
++			opp-microvolt = <1350000>;
++		};
++	};
++
+ 	amba {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
 -- 
-2.7.4
+2.17.0
