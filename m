@@ -1,178 +1,244 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 17 Jun 2018 19:02:12 +0200
-Subject: [PATCH v3 09/14] ASoC: pxa: remove the dmaengine compat need
+Date: Sun, 17 Jun 2018 19:02:16 +0200
+Subject: [PATCH v3 13/14] ARM: pxa: remove the DMA IO resources
 In-Reply-To: <20180617170217.24177-1-robert.jarzmik@free.fr>
 References: <20180617170217.24177-1-robert.jarzmik@free.fr>
-Message-ID: <20180617170217.24177-10-robert.jarzmik@free.fr>
+Message-ID: <20180617170217.24177-14-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the pxa architecture switched towards the dmaengine slave map, the
-old compatibility mechanism to acquire the dma requestor line number and
-priority are not needed anymore.
-
-This patch simplifies the dma resource acquisition, using the more
-generic function dma_request_slave_channel().
+As the last driver using the former mechanism to acquire the DMA
+requestor line has be converted to the dma_slave_map, remove all these
+resources from the PXA devices.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Reviewed-by: Daniel Mack <daniel@zonque.org>
-Acked-by: Mark Brown <broonie@kernel.org>
 ---
- sound/arm/pxa2xx-ac97.c     | 14 ++------------
- sound/arm/pxa2xx-pcm-lib.c  |  6 +++---
- sound/soc/pxa/pxa2xx-ac97.c | 32 +++++---------------------------
- sound/soc/pxa/pxa2xx-i2s.c  |  6 ++----
- 4 files changed, 12 insertions(+), 46 deletions(-)
+ arch/arm/mach-pxa/devices.c | 136 --------------------------------------------
+ 1 file changed, 136 deletions(-)
 
-diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
-index 4bc244c40f80..236a63cdaf9f 100644
---- a/sound/arm/pxa2xx-ac97.c
-+++ b/sound/arm/pxa2xx-ac97.c
-@@ -63,28 +63,18 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
- 	.reset	= pxa2xx_ac97_legacy_reset,
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 1e8915fc340d..5a16ea74e28a 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -60,16 +60,6 @@ static struct resource pxamci_resources[] = {
+ 		.end	= IRQ_MMC,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		.start	= 21,
+-		.end	= 21,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start	= 22,
+-		.end	= 22,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
--static struct pxad_param pxa2xx_ac97_pcm_out_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 12,
--};
--
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_out = {
- 	.addr		= __PREG(PCDR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.chan_name	= "pcm_pcm_stereo_out",
- 	.maxburst	= 32,
--	.filter_data	= &pxa2xx_ac97_pcm_out_req,
--};
--
--static struct pxad_param pxa2xx_ac97_pcm_in_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 11,
+ static u64 pxamci_dmamask = 0xffffffffUL;
+@@ -407,16 +397,6 @@ static struct resource pxa_ir_resources[] = {
+ 		.end	= 0x40700023,
+ 		.flags  = IORESOURCE_MEM,
+ 	},
+-	[5] = {
+-		.start  = 17,
+-		.end	= 17,
+-		.flags  = IORESOURCE_DMA,
+-	},
+-	[6] = {
+-		.start  = 18,
+-		.end	= 18,
+-		.flags  = IORESOURCE_DMA,
+-	},
  };
  
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_in = {
- 	.addr		= __PREG(PCDR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.chan_name	= "pcm_pcm_stereo_in",
- 	.maxburst	= 32,
--	.filter_data	= &pxa2xx_ac97_pcm_in_req,
+ struct platform_device pxa_device_ficp = {
+@@ -545,18 +525,6 @@ static struct resource pxa25x_resource_ssp[] = {
+ 		.end	= IRQ_SSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 13,
+-		.end	= 13,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 14,
+-		.end	= 14,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
- static struct snd_pcm *pxa2xx_ac97_pcm;
-diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-index e8da3b8ee721..dcbe7ecc1835 100644
---- a/sound/arm/pxa2xx-pcm-lib.c
-+++ b/sound/arm/pxa2xx-pcm-lib.c
-@@ -125,9 +125,9 @@ int __pxa2xx_pcm_open(struct snd_pcm_substream *substream)
- 	if (ret < 0)
- 		return ret;
- 
--	return snd_dmaengine_pcm_open_request_chan(substream,
--					pxad_filter_fn,
--					dma_params->filter_data);
-+	return snd_dmaengine_pcm_open(
-+		substream, dma_request_slave_channel(rtd->cpu_dai->dev,
-+						     dma_params->chan_name));
- }
- EXPORT_SYMBOL(__pxa2xx_pcm_open);
- 
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 803818aabee9..1b41c0f2a8fb 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -68,61 +68,39 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
- 	.reset	= pxa2xx_ac97_cold_reset,
+ struct platform_device pxa25x_device_ssp = {
+@@ -583,18 +551,6 @@ static struct resource pxa25x_resource_nssp[] = {
+ 		.end	= IRQ_NSSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 15,
+-		.end	= 15,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 16,
+-		.end	= 16,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
--static struct pxad_param pxa2xx_ac97_pcm_stereo_in_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 11,
--};
--
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_in = {
- 	.addr		= __PREG(PCDR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.chan_name	= "pcm_pcm_stereo_in",
- 	.maxburst	= 32,
--	.filter_data	= &pxa2xx_ac97_pcm_stereo_in_req,
--};
--
--static struct pxad_param pxa2xx_ac97_pcm_stereo_out_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 12,
+ struct platform_device pxa25x_device_nssp = {
+@@ -621,18 +577,6 @@ static struct resource pxa25x_resource_assp[] = {
+ 		.end	= IRQ_ASSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 23,
+-		.end	= 23,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 24,
+-		.end	= 24,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_out = {
- 	.addr		= __PREG(PCDR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.chan_name	= "pcm_pcm_stereo_out",
- 	.maxburst	= 32,
--	.filter_data	= &pxa2xx_ac97_pcm_stereo_out_req,
+ struct platform_device pxa25x_device_assp = {
+@@ -751,18 +695,6 @@ static struct resource pxa27x_resource_ssp1[] = {
+ 		.end	= IRQ_SSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 13,
+-		.end	= 13,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 14,
+-		.end	= 14,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
--static struct pxad_param pxa2xx_ac97_pcm_aux_mono_out_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 10,
--};
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_out = {
- 	.addr		= __PREG(MODR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.chan_name	= "pcm_aux_mono_out",
- 	.maxburst	= 16,
--	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_out_req,
+ struct platform_device pxa27x_device_ssp1 = {
+@@ -789,18 +721,6 @@ static struct resource pxa27x_resource_ssp2[] = {
+ 		.end	= IRQ_SSP2,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 15,
+-		.end	= 15,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 16,
+-		.end	= 16,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
--static struct pxad_param pxa2xx_ac97_pcm_aux_mono_in_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 9,
--};
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_in = {
- 	.addr		= __PREG(MODR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.chan_name	= "pcm_aux_mono_in",
- 	.maxburst	= 16,
--	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_in_req,
+ struct platform_device pxa27x_device_ssp2 = {
+@@ -827,18 +747,6 @@ static struct resource pxa27x_resource_ssp3[] = {
+ 		.end	= IRQ_SSP3,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 66,
+-		.end	= 66,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 67,
+-		.end	= 67,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
--static struct pxad_param pxa2xx_ac97_pcm_aux_mic_mono_req = {
--	.prio = PXAD_PRIO_LOWEST,
--	.drcmr = 8,
--};
- static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_mic_mono_in = {
- 	.addr		= __PREG(MCDR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.chan_name	= "pcm_aux_mic_mono",
- 	.maxburst	= 16,
--	.filter_data	= &pxa2xx_ac97_pcm_aux_mic_mono_req,
+ struct platform_device pxa27x_device_ssp3 = {
+@@ -895,16 +803,6 @@ static struct resource pxa3xx_resources_mci2[] = {
+ 		.end	= IRQ_MMC2,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		.start	= 93,
+-		.end	= 93,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start	= 94,
+-		.end	= 94,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
- static int pxa2xx_ac97_hifi_startup(struct snd_pcm_substream *substream,
-diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
-index 3fb60baf6eab..e7184de0de04 100644
---- a/sound/soc/pxa/pxa2xx-i2s.c
-+++ b/sound/soc/pxa/pxa2xx-i2s.c
-@@ -82,20 +82,18 @@ static struct pxa_i2s_port pxa_i2s;
- static struct clk *clk_i2s;
- static int clk_ena = 0;
- 
--static unsigned long pxa2xx_i2s_pcm_stereo_out_req = 3;
- static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_out = {
- 	.addr		= __PREG(SADR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.chan_name	= "tx",
- 	.maxburst	= 32,
--	.filter_data	= &pxa2xx_i2s_pcm_stereo_out_req,
+ struct platform_device pxa3xx_device_mci2 = {
+@@ -934,16 +832,6 @@ static struct resource pxa3xx_resources_mci3[] = {
+ 		.end	= IRQ_MMC3,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		.start	= 100,
+-		.end	= 100,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start	= 101,
+-		.end	= 101,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
--static unsigned long pxa2xx_i2s_pcm_stereo_in_req = 2;
- static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_in = {
- 	.addr		= __PREG(SADR),
- 	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.chan_name	= "rx",
- 	.maxburst	= 32,
--	.filter_data	= &pxa2xx_i2s_pcm_stereo_in_req,
+ struct platform_device pxa3xx_device_mci3 = {
+@@ -1021,18 +909,6 @@ static struct resource pxa3xx_resources_nand[] = {
+ 		.end	= IRQ_NAND,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for Data DMA */
+-		.start	= 97,
+-		.end	= 97,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for Command DMA */
+-		.start	= 99,
+-		.end	= 99,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
- static int pxa2xx_i2s_startup(struct snd_pcm_substream *substream,
+ static u64 pxa3xx_nand_dma_mask = DMA_BIT_MASK(32);
+@@ -1066,18 +942,6 @@ static struct resource pxa3xx_resource_ssp4[] = {
+ 		.end	= IRQ_SSP4,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 2,
+-		.end	= 2,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 3,
+-		.end	= 3,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ /*
 -- 
 2.11.0
