@@ -1,33 +1,52 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 17 Jun 2018 16:47:57 +0200
-Subject: [PATCH 10/15] arm: dts: rk3288: Add missing cooling device
- properties for CPUs
-In-Reply-To: <11f16618dc965a7996976a2bca040cd87d1961d2.1527244201.git.viresh.kumar@linaro.org>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <11f16618dc965a7996976a2bca040cd87d1961d2.1527244201.git.viresh.kumar@linaro.org>
-Message-ID: <2717295.dpLKm0oEe9@phil>
+From: david@lechnology.com (David Lechner)
+Date: Sun, 17 Jun 2018 10:48:47 -0500
+Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
+References: <20180518164829.27052-1-david@lechnology.com>
+ <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
+Message-ID: <89b599d3-c43a-255f-8da6-9bea6cf53a5d@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 25. Mai 2018, 12:31:56 CEST schrieb Viresh Kumar:
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
-> 
-> Add such missing properties.
-> 
-> Fix other missing properties (clocks, OPP, clock latency) as well to
-> make it all work.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hi Sekhar,
 
-applied for 4.19, after adapting the patch to the opp-v2 conversion
-I Cc'ed you on [for your reference].
+On 05/22/2018 04:38 AM, Sekhar Nori wrote:
+> Hi David,
+> 
+> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
+>> This series converts mach-davinci to use the common clock framework.
+>>
+>> The series works like this, the first 3 patches fix some issues with the clock
+>> drivers that have already been accepted into the mainline kernel.
+>>
+>> Then, starting with "ARM: davinci: pass clock as parameter to
+>> davinci_timer_init()", we get the mach code ready for the switch by adding the
+>> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+>> around the legacy clocks so that we can switch easily between the old and the
+>> new.
+>>
+>> "ARM: davinci: switch to common clock framework" actually flips the switch
+>> to start using the new clock drivers. Then the next 8 patches remove all
+>> of the old clock code.
+>>
+>> The final four patches add device tree clock support to the one SoC that
+>> supports it.
+>>
+>> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+>> board file).
+> 
+> If you do end up sending a v12, you can leave out the mach-davinci
+> portions unless there are any changes you need to make. I will pick them
+> up from this series once the driver dependencies are merged.
+> 
+> I do hope the drivers/clk/* changes can be merged from v4.18.
+> 
+> Thanks,
+> Sekhar
+> 
 
+Are you going to pick up the arch patches from this series now that
+the 4.18 merge window is closed?
 
-Thanks
-Heiko
+All of the clk patches landed in 4.18.
