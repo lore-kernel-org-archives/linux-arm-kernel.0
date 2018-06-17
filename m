@@ -1,244 +1,69 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 17 Jun 2018 19:02:16 +0200
-Subject: [PATCH v3 13/14] ARM: pxa: remove the DMA IO resources
-In-Reply-To: <20180617170217.24177-1-robert.jarzmik@free.fr>
+From: daniel@zonque.org (Daniel Mack)
+Date: Sun, 17 Jun 2018 20:12:49 +0200
+Subject: [PATCH v3 06/14] mtd: rawnand: marvell: remove the dmaengine
+ compat need
+In-Reply-To: <20180617170217.24177-7-robert.jarzmik@free.fr>
 References: <20180617170217.24177-1-robert.jarzmik@free.fr>
-Message-ID: <20180617170217.24177-14-robert.jarzmik@free.fr>
+ <20180617170217.24177-7-robert.jarzmik@free.fr>
+Message-ID: <3a2a8951-f380-af99-bf97-6ff722404410@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the last driver using the former mechanism to acquire the DMA
-requestor line has be converted to the dma_slave_map, remove all these
-resources from the PXA devices.
+On Sunday, June 17, 2018 07:02 PM, Robert Jarzmik wrote:
+> As the pxa architecture switched towards the dmaengine slave map, the
+> old compatibility mechanism to acquire the dma requestor line number and
+> priority are not needed anymore.
+> 
+> This patch simplifies the dma resource acquisition, using the more
+> generic function dma_request_slave_channel().
+> 
+> Signed-off-by: Signed-off-by: Daniel Mack <daniel@zonque.org>
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/devices.c | 136 --------------------------------------------
- 1 file changed, 136 deletions(-)
+Something went wrong here, but you can simply fix that when applying the 
+series :)
 
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index 1e8915fc340d..5a16ea74e28a 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -60,16 +60,6 @@ static struct resource pxamci_resources[] = {
- 		.end	= IRQ_MMC,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		.start	= 21,
--		.end	= 21,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		.start	= 22,
--		.end	= 22,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- static u64 pxamci_dmamask = 0xffffffffUL;
-@@ -407,16 +397,6 @@ static struct resource pxa_ir_resources[] = {
- 		.end	= 0x40700023,
- 		.flags  = IORESOURCE_MEM,
- 	},
--	[5] = {
--		.start  = 17,
--		.end	= 17,
--		.flags  = IORESOURCE_DMA,
--	},
--	[6] = {
--		.start  = 18,
--		.end	= 18,
--		.flags  = IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa_device_ficp = {
-@@ -545,18 +525,6 @@ static struct resource pxa25x_resource_ssp[] = {
- 		.end	= IRQ_SSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 13,
--		.end	= 13,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 14,
--		.end	= 14,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa25x_device_ssp = {
-@@ -583,18 +551,6 @@ static struct resource pxa25x_resource_nssp[] = {
- 		.end	= IRQ_NSSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 15,
--		.end	= 15,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 16,
--		.end	= 16,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa25x_device_nssp = {
-@@ -621,18 +577,6 @@ static struct resource pxa25x_resource_assp[] = {
- 		.end	= IRQ_ASSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 23,
--		.end	= 23,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 24,
--		.end	= 24,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa25x_device_assp = {
-@@ -751,18 +695,6 @@ static struct resource pxa27x_resource_ssp1[] = {
- 		.end	= IRQ_SSP,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 13,
--		.end	= 13,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 14,
--		.end	= 14,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa27x_device_ssp1 = {
-@@ -789,18 +721,6 @@ static struct resource pxa27x_resource_ssp2[] = {
- 		.end	= IRQ_SSP2,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 15,
--		.end	= 15,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 16,
--		.end	= 16,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa27x_device_ssp2 = {
-@@ -827,18 +747,6 @@ static struct resource pxa27x_resource_ssp3[] = {
- 		.end	= IRQ_SSP3,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 66,
--		.end	= 66,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 67,
--		.end	= 67,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa27x_device_ssp3 = {
-@@ -895,16 +803,6 @@ static struct resource pxa3xx_resources_mci2[] = {
- 		.end	= IRQ_MMC2,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		.start	= 93,
--		.end	= 93,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		.start	= 94,
--		.end	= 94,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa3xx_device_mci2 = {
-@@ -934,16 +832,6 @@ static struct resource pxa3xx_resources_mci3[] = {
- 		.end	= IRQ_MMC3,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		.start	= 100,
--		.end	= 100,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		.start	= 101,
--		.end	= 101,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- struct platform_device pxa3xx_device_mci3 = {
-@@ -1021,18 +909,6 @@ static struct resource pxa3xx_resources_nand[] = {
- 		.end	= IRQ_NAND,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for Data DMA */
--		.start	= 97,
--		.end	= 97,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for Command DMA */
--		.start	= 99,
--		.end	= 99,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- static u64 pxa3xx_nand_dma_mask = DMA_BIT_MASK(32);
-@@ -1066,18 +942,6 @@ static struct resource pxa3xx_resource_ssp4[] = {
- 		.end	= IRQ_SSP4,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	[2] = {
--		/* DRCMR for RX */
--		.start	= 2,
--		.end	= 2,
--		.flags	= IORESOURCE_DMA,
--	},
--	[3] = {
--		/* DRCMR for TX */
--		.start	= 3,
--		.end	= 3,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- /*
--- 
-2.11.0
+
+Daniel
+
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Acked-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>   drivers/mtd/nand/raw/marvell_nand.c | 17 +----------------
+>   1 file changed, 1 insertion(+), 16 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
+> index 10e953218948..64618254d6de 100644
+> --- a/drivers/mtd/nand/raw/marvell_nand.c
+> +++ b/drivers/mtd/nand/raw/marvell_nand.c
+> @@ -2613,8 +2613,6 @@ static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
+>   						    dev);
+>   	struct dma_slave_config config = {};
+>   	struct resource *r;
+> -	dma_cap_mask_t mask;
+> -	struct pxad_param param;
+>   	int ret;
+>   
+>   	if (!IS_ENABLED(CONFIG_PXA_DMA)) {
+> @@ -2627,20 +2625,7 @@ static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
+>   	if (ret)
+>   		return ret;
+>   
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> -	if (!r) {
+> -		dev_err(nfc->dev, "No resource defined for data DMA\n");
+> -		return -ENXIO;
+> -	}
+> -
+> -	param.drcmr = r->start;
+> -	param.prio = PXAD_PRIO_LOWEST;
+> -	dma_cap_zero(mask);
+> -	dma_cap_set(DMA_SLAVE, mask);
+> -	nfc->dma_chan =
+> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+> -						 &param, nfc->dev,
+> -						 "data");
+> +	nfc->dma_chan =	dma_request_slave_channel(nfc->dev, "data");
+>   	if (!nfc->dma_chan) {
+>   		dev_err(nfc->dev,
+>   			"Unable to request data DMA channel\n");
+> 
