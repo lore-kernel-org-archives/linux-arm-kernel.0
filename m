@@ -1,59 +1,15 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 17 Jun 2018 15:05:28 +0800
-Subject: [PATCH v7 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <2307533.g32PyNi9fl@aspire.rjw.lan>
-References: <20180517055014.6607-1-o.rempel@pengutronix.de>
- <20180517055014.6607-4-o.rempel@pengutronix.de>
- <daba73df-037c-2583-3a08-f3f27c4129d1@pengutronix.de>
- <2307533.g32PyNi9fl@aspire.rjw.lan>
-Message-ID: <20180617070527.GL16091@dragon>
+Date: Sun, 17 Jun 2018 15:08:20 +0800
+Subject: [PATCH] ARM: dts: imx51-zii-rdu1: add rave-sp subdevices
+In-Reply-To: <20180517191923.16212-1-nikita.yoush@cogentembedded.com>
+References: <20180517191923.16212-1-nikita.yoush@cogentembedded.com>
+Message-ID: <20180617070819.GM16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 04:33:05PM +0200, Rafael J. Wysocki wrote:
-> On Tuesday, June 12, 2018 2:42:12 PM CEST Oleksij Rempel wrote:
-> >  This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
-> > --Sj2PRcQlY7eZybdA0sq9wWzJEO8fKS924
-> > Content-Type: multipart/mixed; boundary="d6BZYFRi4L3iCmOh3nm6wjii3dWC9QFDg";
-> >  protected-headers="v1"
-> > From: Oleksij Rempel <o.rempel@pengutronix.de>
-> > To: Shawn Guo <shawnguo@kernel.org>, Mark Brown <broonie@kernel.org>,
-> >  "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
-> > Cc: kernel at pengutronix.de, devicetree at vger.kernel.org,
-> >  linux-arm-kernel at lists.infradead.org, linux-clk at vger.kernel.org,
-> >  linux-kernel at vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
-> >  Liam Girdwood <lgirdwood@gmail.com>,
-> >  Leonard Crestez <leonard.crestez@nxp.com>, Rob Herring <robh+dt@kernel.org>,
-> >  Mark Rutland <mark.rutland@arm.com>,
-> >  Michael Turquette <mturquette@baylibre.com>,
-> >  Stephen Boyd <sboyd@codeaurora.org>, Fabio Estevam <fabio.estevam@nxp.com>,
-> >  Russell King <linux@armlinux.org.uk>
-> > Message-ID: <daba73df-037c-2583-3a08-f3f27c4129d1@pengutronix.de>
-> > Subject: Re: [PATCH v7 3/6] kernel/reboot.c: export pm_power_off_prepare
-> > References: <20180517055014.6607-1-o.rempel@pengutronix.de>
-> >  <20180517055014.6607-4-o.rempel@pengutronix.de>
-> > In-Reply-To: <20180517055014.6607-4-o.rempel@pengutronix.de>
-> > 
-> > --d6BZYFRi4L3iCmOh3nm6wjii3dWC9QFDg
-> > Content-Type: text/plain; charset=utf-8
-> > Content-Language: en-US
-> > Content-Transfer-Encoding: quoted-printable
-> > 
-> > Hi Rafael,
-> > 
-> > Last version of this patch was send at 17.05.2018. No other comment was
-> > provided and this patch is a blocker for other patches in this serie.
-> > Can you please give some feedback on it.
+On Thu, May 17, 2018 at 10:19:23PM +0300, Nikita Yushchenko wrote:
+> This adds rave-sp powerbutton and backlight devices to RDU1 device tree.
 > 
-> I would have done that had I not missed the patch.
-> 
-> Which probably wouldn't have happened had you CCed it to linux-pm.
-> 
-> Anyway, I have no particular problems with exporting pm_power_off_prepare via
-> EXPORT_SYMBOL_GPL().
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
 
-Rafael,
-
-Can we have your explicit Acked-by tag on this patch?  Thanks.
-
-Shawn
+Applied, thanks.
