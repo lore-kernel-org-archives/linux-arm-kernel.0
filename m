@@ -1,39 +1,31 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 17 Jun 2018 10:48:22 +0200
-Subject: [PATCH v2] drm/atmel-hlcdc: check stride values in the first plane
-Message-ID: <20180617084826.31885-1-stefan@agner.ch>
+Date: Sun, 17 Jun 2018 10:55:29 +0200
+Subject: [PATCH] drm/exynos: ipp: use correct enum type
+Message-ID: <20180617085533.13867-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The statement always evaluates to true since the struct fields
-are arrays. This has shown up as a warning when compiling with
-clang:
-  warning: address of array 'desc->layout.xstride' will always
-      evaluate to 'true' [-Wpointer-bool-conversion]
+The limit_id_fallback array uses enum drm_ipp_size_id to index its
+content. The content itself is of type enum drm_exynos_ipp_limit_type.
 
-Check for values in the first plane instead.
-
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-Changes in v2:
-- Check for first value instead of dropping if statement
-  (subject was: drm/atmel-hlcdc: remove unnecessary if statement)
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 2 +-
+ drivers/gpu/drm/exynos/exynos_drm_ipp.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-index 73c875db45f4..47e0992f3908 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-@@ -839,7 +839,7 @@ static int atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane)
- 			return ret;
- 	}
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+index 26374e58c557..04702e974e81 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+@@ -428,7 +428,7 @@ enum drm_ipp_size_id {
+ 	IPP_LIMIT_BUFFER, IPP_LIMIT_AREA, IPP_LIMIT_ROTATED, IPP_LIMIT_MAX
+ };
  
--	if (desc->layout.xstride && desc->layout.pstride) {
-+	if (desc->layout.xstride[0] && desc->layout.pstride[0]) {
- 		int ret;
- 
- 		ret = drm_plane_create_rotation_property(&plane->base,
+-static const enum drm_ipp_size_id limit_id_fallback[IPP_LIMIT_MAX][4] = {
++static const enum drm_exynos_ipp_limit_type limit_id_fallback[IPP_LIMIT_MAX][4] = {
+ 	[IPP_LIMIT_BUFFER]  = { DRM_EXYNOS_IPP_LIMIT_SIZE_BUFFER },
+ 	[IPP_LIMIT_AREA]    = { DRM_EXYNOS_IPP_LIMIT_SIZE_AREA,
+ 				DRM_EXYNOS_IPP_LIMIT_SIZE_BUFFER },
 -- 
 2.17.1
