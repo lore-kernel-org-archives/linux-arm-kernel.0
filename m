@@ -1,76 +1,74 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 17 Jun 2018 19:02:08 +0200
-Subject: [PATCH v3 05/14] media: pxa_camera: remove the dmaengine compat need
+Date: Sun, 17 Jun 2018 19:02:15 +0200
+Subject: [PATCH v3 12/14] dmaengine: pxa: make the filter function internal
 In-Reply-To: <20180617170217.24177-1-robert.jarzmik@free.fr>
 References: <20180617170217.24177-1-robert.jarzmik@free.fr>
-Message-ID: <20180617170217.24177-6-robert.jarzmik@free.fr>
+Message-ID: <20180617170217.24177-13-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the pxa architecture switched towards the dmaengine slave map, the
-old compatibility mechanism to acquire the dma requestor line number and
-priority are not needed anymore.
-
-This patch simplifies the dma resource acquisition, using the more
-generic function dma_request_slave_channel().
+As the pxa architecture and all its related drivers do not rely anymore
+on the filter function, thanks to the slave map conversion, make
+pxad_filter_fn() static, and remove it from the global namespace.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+Acked-by: Vinod Koul <vkoul@kernel.org>
 ---
- drivers/media/platform/pxa_camera.c | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
+Since v1: added Vinod's ack
+---
+ drivers/dma/pxa_dma.c       |  5 ++---
+ include/linux/dma/pxa-dma.h | 11 -----------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
-index c71a00736541..4c82d1880753 100644
---- a/drivers/media/platform/pxa_camera.c
-+++ b/drivers/media/platform/pxa_camera.c
-@@ -2357,8 +2357,6 @@ static int pxa_camera_probe(struct platform_device *pdev)
- 		.src_maxburst = 8,
- 		.direction = DMA_DEV_TO_MEM,
- 	};
--	dma_cap_mask_t mask;
--	struct pxad_param params;
- 	char clk_name[V4L2_CLK_NAME_SIZE];
- 	int irq;
- 	int err = 0, i;
-@@ -2432,34 +2430,20 @@ static int pxa_camera_probe(struct platform_device *pdev)
- 	pcdev->base = base;
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index b31c28b67ad3..0db29bd1b096 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -179,7 +179,7 @@ static unsigned int pxad_drcmr(unsigned int line)
+ 	return 0x1000 + line * 4;
+ }
  
- 	/* request dma */
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--	dma_cap_set(DMA_PRIVATE, mask);
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
++static bool pxad_filter_fn(struct dma_chan *chan, void *param);
+ 
+ /*
+  * Debug fs
+@@ -1501,7 +1501,7 @@ static struct platform_driver pxad_driver = {
+ 	.remove		= pxad_remove,
+ };
+ 
+-bool pxad_filter_fn(struct dma_chan *chan, void *param)
++static bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ {
+ 	struct pxad_chan *c = to_pxad_chan(chan);
+ 	struct pxad_param *p = param;
+@@ -1514,7 +1514,6 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ 
+ 	return true;
+ }
+-EXPORT_SYMBOL_GPL(pxad_filter_fn);
+ 
+ module_platform_driver(pxad_driver);
+ 
+diff --git a/include/linux/dma/pxa-dma.h b/include/linux/dma/pxa-dma.h
+index 9fc594f69eff..fceb5df07097 100644
+--- a/include/linux/dma/pxa-dma.h
++++ b/include/linux/dma/pxa-dma.h
+@@ -23,15 +23,4 @@ struct pxad_param {
+ 	enum pxad_chan_prio prio;
+ };
+ 
+-struct dma_chan;
 -
--	params.prio = 0;
--	params.drcmr = 68;
--	pcdev->dma_chans[0] =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &params, &pdev->dev, "CI_Y");
-+	pcdev->dma_chans[0] = dma_request_slave_channel(&pdev->dev, "CI_Y");
- 	if (!pcdev->dma_chans[0]) {
- 		dev_err(&pdev->dev, "Can't request DMA for Y\n");
- 		return -ENODEV;
- 	}
- 
--	params.drcmr = 69;
--	pcdev->dma_chans[1] =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &params, &pdev->dev, "CI_U");
-+	pcdev->dma_chans[1] = dma_request_slave_channel(&pdev->dev, "CI_U");
- 	if (!pcdev->dma_chans[1]) {
- 		dev_err(&pdev->dev, "Can't request DMA for Y\n");
- 		err = -ENODEV;
- 		goto exit_free_dma_y;
- 	}
- 
--	params.drcmr = 70;
--	pcdev->dma_chans[2] =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &params, &pdev->dev, "CI_V");
-+	pcdev->dma_chans[2] = dma_request_slave_channel(&pdev->dev, "CI_V");
- 	if (!pcdev->dma_chans[2]) {
- 		dev_err(&pdev->dev, "Can't request DMA for V\n");
- 		err = -ENODEV;
+-#ifdef CONFIG_PXA_DMA
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
+-#else
+-static inline bool pxad_filter_fn(struct dma_chan *chan, void *param)
+-{
+-	return false;
+-}
+-#endif
+-
+ #endif /* _PXA_DMA_H_ */
 -- 
 2.11.0
