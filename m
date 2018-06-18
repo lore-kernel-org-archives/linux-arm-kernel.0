@@ -1,51 +1,121 @@
 From: keiichiw@chromium.org (Keiichi Watanabe)
-Date: Mon, 18 Jun 2018 16:58:51 +0900
-Subject: [PATCH v4 0/3] Add controls for VP8/VP9 profile
-Message-ID: <20180618075854.12881-1-keiichiw@chromium.org>
+Date: Mon, 18 Jun 2018 16:58:53 +0900
+Subject: [PATCH v4 2/3] media: v4l2-ctrl: Add control for VP9 profile
+In-Reply-To: <20180618075854.12881-1-keiichiw@chromium.org>
+References: <20180618075854.12881-1-keiichiw@chromium.org>
+Message-ID: <20180618075854.12881-3-keiichiw@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is the 4th revision of the patch set that adds controls for VP8/VP9
-profiles. Please see v3 cover letter for more details.
-<https://lkml.org/lkml/2018/6/14/132>
+Add a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE for VP9 profiles. This control
+allows selecting the desired profile for VP9 encoder and querying for supported
+profiles by VP9 encoder/decoder.
 
-In this version, I changed the contents that pointed out by Stanimir and Hans.
+Though this control is similar to V4L2_CID_MPEG_VIDEO_VP8_PROFILE, we need to
+separate this control from it because supported profiles usually differ between
+VP8 and VP9.
 
-Changelog
-----------
+Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
+---
+ .../media/uapi/v4l/extended-controls.rst      | 23 +++++++++++++++++++
+ drivers/media/v4l2-core/v4l2-ctrls.c          | 11 +++++++++
+ include/uapi/linux/v4l2-controls.h            |  7 ++++++
+ 3 files changed, 41 insertions(+)
 
-Version 4 changes:
-- Remove unnecessary changes in venus drivers.
-- Remove unnecessary blank lines in documentations.
-- Fix typo and grammar mistakes.
+diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+index 01ef31a934b4..9f7312bf3365 100644
+--- a/Documentation/media/uapi/v4l/extended-controls.rst
++++ b/Documentation/media/uapi/v4l/extended-controls.rst
+@@ -1978,6 +1978,29 @@ enum v4l2_mpeg_video_vp8_profile -
+     * - ``V4L2_MPEG_VIDEO_VP8_PROFILE_3``
+       - Profile 3
 
-Version 3 changes:
-- Add V4L2_CID_MPEG_VIDEO_VP8_PROFILE in v4l2-controls.
-- Make V4L2_CID_MPEG_VIDEO_VPX_PROFILE to be an alias of
-  V4L2_CID_MPEG_VIDEO_VP8_PROFILE.
-- Fix the use of V4L2_CID_MPEG_VIDEO_VPX_PROFILE in venus/s5p_mfc drivers.
-- Small fix in mtk_vcodec_dec.
++.. _v4l2-mpeg-video-vp9-profile:
++
++``V4L2_CID_MPEG_VIDEO_VP9_PROFILE``
++    (enum)
++
++enum v4l2_mpeg_video_vp9_profile -
++    This control allows selecting the profile for VP9 encoder.
++    This is also used to enumerate supported profiles by VP9 encoder or decoder.
++    Possible values are:
++
++.. flat-table::
++    :header-rows:  0
++    :stub-columns: 0
++
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_0``
++      - Profile 0
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_1``
++      - Profile 1
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_2``
++      - Profile 2
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_3``
++      - Profile 3
++
 
-Version 2 changes:
-- Support V4L2_CID_MPEG_VIDEO_VP9_PROFILE in MediaTek decoder's driver.
+ High Efficiency Video Coding (HEVC/H.265) Control Reference
+ -----------------------------------------------------------
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index e7e6340b395e..eacfab7574dc 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -438,6 +438,13 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		"3",
+ 		NULL,
+ 	};
++	static const char * const vp9_profile[] = {
++		"0",
++		"1",
++		"2",
++		"3",
++		NULL,
++	};
 
-Version 1 changes:
-- Add V4L2_CID_MPEG_VIDEO_VP9_PROFILE in v4l2-controls.
+ 	static const char * const flash_led_mode[] = {
+ 		"Off",
+@@ -623,6 +630,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		return vpx_golden_frame_sel;
+ 	case V4L2_CID_MPEG_VIDEO_VP8_PROFILE:
+ 		return vp8_profile;
++	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
++		return vp9_profile;
+ 	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
+ 		return jpeg_chroma_subsampling;
+ 	case V4L2_CID_DV_TX_MODE:
+@@ -849,6 +858,7 @@ const char *v4l2_ctrl_get_name(u32 id)
+ 	case V4L2_CID_MPEG_VIDEO_VPX_I_FRAME_QP:		return "VPX I-Frame QP Value";
+ 	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+ 	case V4L2_CID_MPEG_VIDEO_VP8_PROFILE:			return "VP8 Profile";
++	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:			return "VP9 Profile";
 
-Keiichi Watanabe (3):
-  media: v4l2-ctrl: Change control for VP8 profile to menu control
-  media: v4l2-ctrl: Add control for VP9 profile
-  media: mtk-vcodec: Support VP9 profile in decoder
+ 	/* HEVC controls */
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I-Frame QP Value";
+@@ -1190,6 +1200,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+ 	case V4L2_CID_TUNE_DEEMPHASIS:
+ 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
+ 	case V4L2_CID_MPEG_VIDEO_VP8_PROFILE:
++	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
+ 	case V4L2_CID_DETECT_MD_MODE:
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
+diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+index 2001823c3072..f03d3214eec2 100644
+--- a/include/uapi/linux/v4l2-controls.h
++++ b/include/uapi/linux/v4l2-controls.h
+@@ -597,6 +597,13 @@ enum v4l2_mpeg_video_vp8_profile {
+ };
+ /* Deprecated alias for compatibility reasons. */
+ #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE	V4L2_CID_MPEG_VIDEO_VP8_PROFILE
++#define V4L2_CID_MPEG_VIDEO_VP9_PROFILE			(V4L2_CID_MPEG_BASE+512)
++enum v4l2_mpeg_video_vp9_profile {
++	V4L2_MPEG_VIDEO_VP9_PROFILE_0				= 0,
++	V4L2_MPEG_VIDEO_VP9_PROFILE_1				= 1,
++	V4L2_MPEG_VIDEO_VP9_PROFILE_2				= 2,
++	V4L2_MPEG_VIDEO_VP9_PROFILE_3				= 3,
++};
 
- .../media/uapi/v4l/extended-controls.rst      | 48 +++++++++++++++++--
- .../platform/mtk-vcodec/mtk_vcodec_dec.c      |  5 ++
- .../media/platform/qcom/venus/vdec_ctrls.c    | 10 ++--
- drivers/media/platform/qcom/venus/venc.c      |  4 +-
- .../media/platform/qcom/venus/venc_ctrls.c    | 10 ++--
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c  | 15 +++---
- drivers/media/v4l2-core/v4l2-ctrls.c          | 23 ++++++++-
- include/uapi/linux/v4l2-controls.h            | 18 ++++++-
- 8 files changed, 110 insertions(+), 23 deletions(-)
+ /* CIDs for HEVC encoding. */
 
 --
 2.18.0.rc1.244.gcf134e6275-goog
