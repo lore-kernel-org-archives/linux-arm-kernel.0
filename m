@@ -1,25 +1,26 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 18 Jun 2018 09:48:18 -0700
-Subject: [PATCH 0/5] Fix Cygnus, NS2, Stingray interrupt type
-In-Reply-To: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
-References: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <ac955f7d-6770-63a1-db85-024b0ee0b8af@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Jun 2018 18:12:30 +0100
+Subject: [PATCH] arm64: make secondary_start_kernel() notrace
+In-Reply-To: <1528794457-14129-1-git-send-email-zhizhouzhang@asrmicro.com>
+References: <1528794457-14129-1-git-send-email-zhizhouzhang@asrmicro.com>
+Message-ID: <20180618171230.tmqkyv4w62mt5diq@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2018 01:21 PM, Ray Jui wrote:
-> This patch series fixes incorrect interrupt types for I2C and PCIe in DT
-> for Broadcom Cygnus, NS2, and Stingray SoCs
+On Tue, Jun 12, 2018 at 05:07:37PM +0800, Zhizhou Zhang wrote:
+> We can't call function trace hook before setup percpu offset.
+> When entering secondary_start_kernel(), percpu offset has not
+> been initialized.  So this lead hotplug malfunction.
+> Here is the flow to reproduce this bug:
 > 
-> This patch series is based off v4.17 and is available on GIHUB:
-> repo: https://github.com/Broadcom/arm64-linux.git
-> branch: cygnus-ns2-dt-irq-type-fix-v1
+> echo 0 > /sys/devices/system/cpu/cpu1/online
+> echo function > /sys/kernel/debug/tracing/current_tracer
+> echo 1 > /sys/kernel/debug/tracing/tracing_on
+> echo 1 > /sys/devices/system/cpu/cpu1/online
+> 
+> Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
 
-Series applied to:
+Queued for 4.18. Thanks.
 
-- 1&2: devicetree/fixes
-- 3-5: devicetree-arm64/fixes
-
-Thanks Ray.
 -- 
-Florian
+Catalin
