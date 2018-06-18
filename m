@@ -1,52 +1,50 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 Jun 2018 14:18:43 +0100
-Subject: [PATCH v2 7/7] arm64: topology: re-introduce numa mask check for
- scheduler MC selection
-In-Reply-To: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
-References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1529327923-17911-8-git-send-email-sudeep.holla@arm.com>
+Date: Mon, 18 Jun 2018 14:18:36 +0100
+Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for CPU
+ hotplug
+Message-ID: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from
-core_siblings") selected the smallest of LLC, socket siblings, and NUMA
-node siblings to ensure that the sched domain we build for the MC layer
-isn't larger than the DIE above it or it's shrunk to the socket or NUMA
-node if LLC exist acrosis NUMA node/chiplets.
+Hi,
 
-Commit acd32e52e4e0 ("arm64: topology: Avoid checking numa mask for
-scheduler MC selection") reverted the NUMA siblings checks since the
-CPU topology masks weren't updated on hotplug at that time.
+Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from core_siblings")
+was reported to cause some hotplug and system suspend regressions when
+it was merged. On investigation, it was found that unlike x86/PPC,
+arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
+somewhat expected from the scheduler.
 
-This patch re-introduces numa mask check as the CPU and NUMA topology
-is now updated in hotplug paths. Effectively, this patch does the
-partial revert of commit acd32e52e4e0.
+Since these changes were bit invasive as a solution to the above
+mentioned regression, as small change was temporarily applied as a fix.
+This series updates the cpu and numa masks on CPU hotplug and reverts
+that temporary fix.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/kernel/topology.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+It would be good to get this tested(CPU hotplug - few and all CPUs in
+a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index e0db80252cfb..01cdc83b1ec7 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -215,8 +215,13 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+Regards,
+Sudeep
 
- const struct cpumask *cpu_coregroup_mask(int cpu)
- {
--	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
-+	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
+v1->v2:
+	- Rebased on v4.18-rc1 and hence do revert of the temporary fix
+	  that was merged for v4.18
+	- Removed one of the wrong use of possible_mask
 
-+	/* Find the smaller of NUMA, core or LLC siblings */
-+	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
-+		/* not numa in package, lets use the package siblings */
-+		core_mask = &cpu_topology[cpu].core_sibling;
-+	}
- 	if (cpu_topology[cpu].llc_id != -1) {
- 		if (cpumask_subset(&cpu_topology[cpu].llc_sibling, core_mask))
- 			core_mask = &cpu_topology[cpu].llc_sibling;
+Sudeep Holla (7):
+  arm64: topology: refactor reset_cpu_topology to add support for removing topology
+  arm64: numa: separate out updates to percpu nodeid and NUMA node cpumap
+  arm64: topology: add support to remove cpu topology sibling masks
+  arm64: topology: restrict updating siblings_masks to online cpus only
+  arm64: smp: remove cpu and numa topology information when hotplugging out CPU
+  arm64: topology: rename llc_siblings to align with other struct members
+  arm64: topology: re-introduce numa mask check for scheduler MC selection
+
+ arch/arm64/include/asm/numa.h     |  4 +++
+ arch/arm64/include/asm/topology.h |  3 +-
+ arch/arm64/kernel/smp.c           |  5 +++
+ arch/arm64/kernel/topology.c      | 69 ++++++++++++++++++++++++++-------------
+ arch/arm64/mm/numa.c              | 29 +++++++++++-----
+ 5 files changed, 79 insertions(+), 31 deletions(-)
+
 --
 2.7.4
