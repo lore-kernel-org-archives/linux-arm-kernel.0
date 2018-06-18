@@ -1,40 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 Jun 2018 00:09:25 +0800
-Subject: [PATCH v4 01/19] dt-bindings: sram: sunxi: Add A13, A20 and A33
- SRAM controller bindings
-In-Reply-To: <20180618160250.ik44c3gcbdxylmyd@flea>
-References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
- <20180618145843.14631-2-paul.kocialkowski@bootlin.com>
- <20180618160250.ik44c3gcbdxylmyd@flea>
-Message-ID: <CAGb2v67bh4EJ3Xci3S01FhKztYc=h3bw=Ry5phhJrHdt4b=_4Q@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 18 Jun 2018 19:16:47 +0300
+Subject: [PATCH v2 0/2] Add R8A77980/Condor PCIe support
+In-Reply-To: <20180618093623.s33bkiptazxem463@verge.net.au>
+References: <b37d458c-071a-833a-2057-be8a07c880be@cogentembedded.com>
+ <20180618093623.s33bkiptazxem463@verge.net.au>
+Message-ID: <cfa599bd-d244-0032-490b-553f7870d07c@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 12:02 AM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, Jun 18, 2018 at 04:58:25PM +0200, Paul Kocialkowski wrote:
->> This introduces dedicated bindings for the SRAM controllers found on the
->> A13, A20 and A33 sunxi platforms.
->>
->> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
->
-> Explaining why you need to add these new compatibles would be great.
->
->> diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
->> index d087f04a4d7f..19cc0b892672 100644
->> --- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
->> +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
->> @@ -11,6 +11,9 @@ Controller Node
->>  Required properties:
->>  - compatible : should be:
->>      - "allwinner,sun4i-a10-sram-controller"
->> +    - "allwinner,sun5i-a13-sram-controller"
->> +    - "allwinner,sun7i-a20-sram-controller"
->> +    - "allwinner,sun8i-a33-sram-controller"
->
-> And I think Chen-Yu asked you to rename this compatible to
-> -system-controller for the previous iteration?
+On 06/18/2018 12:36 PM, Simon Horman wrote:
 
--system-control. It's not an actual controller, just a bunch of registers.
+>> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+>> 'renesas-devel-20180614v2-v4.17' tag. We're adding the R8A77980 PCIe related
+>> device nodes and then enable PCIe on the Condor board. These patches depend
+>> on the R8A77980 PCIe PHY driver support in order to work properly. Note that
+>> in case the PCIe PHY driver is not enabled, the kernel will BUG() due to I/O
+>> space page leak in the PCIe driver...
+> 
+> Is that problem specific to the presence of PCIe nodes for
+> condor/r8a77980
 
-ChenYu
+   The nodes are safe unless they are enabled, so the Condor patch may be
+deferred untl I fix the PCI code.
+> condor/r8a77980 or is it also true of other (R-Car) boards where
+> PCIe is enabled?
+
+   The leak happens every time the driver fails to probe later than
+pci_remap_iospace() is called but the BUG_ON() is only triggered by rhe 2nd try
+with EPROBE_DEFER returned previously.
+
+> Regardless, it sounds like these patches expose a kernel bug.
+> Is it being fixed?
+
+   I'm working on a fix (which embraces several PCI drivers)...
+
+>> [1/2] arm64: dts: renesas: r8a77980: add PCIe support
+>> [2/2] arm64: dts: renesas: condor: add PCIe support
+
+WBR, Sergei
