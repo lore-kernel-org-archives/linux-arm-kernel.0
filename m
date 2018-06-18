@@ -1,159 +1,72 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 18 Jun 2018 12:05:19 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: convert rk3288 to operating-points-v2
-Message-ID: <20180618100519.14922-1-heiko@sntech.de>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Mon, 18 Jun 2018 13:08:23 +0300
+Subject: [PATCH v8 0/6] Driver for at91 usart in spi mode
+Message-ID: <20180618100829.13875-1-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Operating points need to be present in each cpu core using it, not only
-the first one. With operating-points-v1 this would require duplicating
-this table into each cpu node.
+Hello,
 
-With opp-v2 we can share the same table on all nodes.
+This is the second version of driver. I added a mfd driver which by
+default probes atmel_serial driver and if in dt is specified to probe
+the spi driver, then the spi-at91-usart driver will be probed. The
+compatible for atmel_serial is now the compatible for at91-usart mfd
+driver and compatilbe for atmel_serial driver was changed in order to
+keep the bindings for serial as they are.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes in v2:
-- adapt opp node names as suggested by Viresh
+Changes in v8:
+- fixed passing an empty mfd cell if "atmel,usart-mode" value is invalid
 
- arch/arm/boot/dts/rk3288-veyron.dtsi | 36 +++++++-------
- arch/arm/boot/dts/rk3288.dtsi        | 70 ++++++++++++++++++++++------
- 2 files changed, 75 insertions(+), 31 deletions(-)
+Changes in v7:
+- synced up  SPDIX license with module license
+- numbering of usart modes starts from 0 insteand of 1
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 823c7ed47fcf..2075120cfc4d 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -91,22 +91,26 @@
- 
- &cpu0 {
- 	cpu0-supply = <&vdd_cpu>;
--	operating-points = <
--		/* KHz    uV */
--		1800000 1400000
--		1704000 1350000
--		1608000 1300000
--		1512000 1250000
--		1416000 1200000
--		1200000 1100000
--		1008000 1050000
--		 816000 1000000
--		 696000  950000
--		 600000  900000
--		 408000  900000
--		 216000  900000
--		 126000  900000
--	>;
-+};
-+
-+/* rk3288-c used in Veyron Chrome-devices has slightly changed OPPs */
-+&cpu_opp_table {
-+	/delete-node/ opp-312000000;
-+
-+	opp-1512000000 {
-+		opp-microvolt = <1250000>;
-+	};
-+	opp-1608000000 {
-+		opp-microvolt = <1300000>;
-+	};
-+	opp-1704000000 {
-+		opp-hz = /bits/ 64 <1704000000>;
-+		opp-microvolt = <1350000>;
-+	};
-+	opp-1800000000 {
-+		opp-hz = /bits/ 64 <1800000000>;
-+		opp-microvolt = <1400000>;
-+	};
- };
- 
- &emmc {
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 2a060c2dc383..7094f95b967f 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -60,21 +60,7 @@
- 			compatible = "arm,cortex-a12";
- 			reg = <0x500>;
- 			resets = <&cru SRST_CORE0>;
--			operating-points = <
--				/* KHz    uV */
--				1608000 1350000
--				1512000 1300000
--				1416000 1200000
--				1200000 1100000
--				1008000 1050000
--				 816000 1000000
--				 696000  950000
--				 600000  900000
--				 408000  900000
--				 312000  900000
--				 216000  900000
--				 126000  900000
--			>;
-+			operating-points-v2 = <&cpu_opp_table>;
- 			#cooling-cells = <2>; /* min followed by max */
- 			clock-latency = <40000>;
- 			clocks = <&cru ARMCLK>;
-@@ -99,6 +85,60 @@
- 		};
- 	};
- 
-+	cpu_opp_table: cpu-opp-table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-126000000 {
-+			opp-hz = /bits/ 64 <126000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp-216000000 {
-+			opp-hz = /bits/ 64 <216000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp-312000000 {
-+			opp-hz = /bits/ 64 <312000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp-408000000 {
-+			opp-hz = /bits/ 64 <408000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp-600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp-696000000 {
-+			opp-hz = /bits/ 64 <696000000>;
-+			opp-microvolt = <950000>;
-+		};
-+		opp-816000000 {
-+			opp-hz = /bits/ 64 <816000000>;
-+			opp-microvolt = <1000000>;
-+		};
-+		opp-1008000000 {
-+			opp-hz = /bits/ 64 <1008000000>;
-+			opp-microvolt = <1050000>;
-+		};
-+		opp-1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1100000>;
-+		};
-+		opp-1416000000 {
-+			opp-hz = /bits/ 64 <1416000000>;
-+			opp-microvolt = <1200000>;
-+		};
-+		opp-1512000000 {
-+			opp-hz = /bits/ 64 <1512000000>;
-+			opp-microvolt = <1300000>;
-+		};
-+		opp-1608000000 {
-+			opp-hz = /bits/ 64 <1608000000>;
-+			opp-microvolt = <1350000>;
-+		};
-+	};
-+
- 	amba {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
+Changes in v6:
+- removed unused compatible strings from serial and spi drivers
+
+Changes in v5:
+- fixed usage of stdout-path property with atmel_serial driver
+
+Changes in v4:
+- modified the spi driver to use cs gpio support form spi subsystem
+- fixed dma transfers for serial driver
+- squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+
+Changes in v3:
+- fixed spi slaves probing
+
+Changes in v2:
+- added at91-usart mfd driver
+- modified spi-at91-usart driver to work as mfd driver child
+- modified atmel_serial driver to work as mfd driver child
+
+Changes in v1:
+- added spi-at91-usart driver
+
+Radu Pirea (6):
+  MAINTAINERS: add at91 usart mfd driver
+  dt-bindings: add binding for atmel-usart in SPI mode
+  mfd: at91-usart: added mfd driver for usart
+  MAINTAINERS: add at91 usart spi driver
+  spi: at91-usart: add driver for at91-usart as spi
+  tty/serial: atmel: change the driver to work under at91-usart mfd
+
+ .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+ MAINTAINERS                                   |  16 +
+ drivers/mfd/Kconfig                           |   9 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/at91-usart.c                      |  71 +++
+ drivers/spi/Kconfig                           |   9 +
+ drivers/spi/Makefile                          |   1 +
+ drivers/spi/spi-at91-usart.c                  | 434 ++++++++++++++++++
+ drivers/tty/serial/Kconfig                    |   1 +
+ drivers/tty/serial/atmel_serial.c             |  42 +-
+ include/dt-bindings/mfd/at91-usart.h          |  17 +
+ 11 files changed, 609 insertions(+), 17 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
+
 -- 
-2.17.0
+2.17.1
