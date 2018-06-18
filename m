@@ -1,94 +1,122 @@
-From: gerg@kernel.org (Greg Ungerer)
-Date: Mon, 18 Jun 2018 22:43:25 +1000
-Subject: [PATCH 2/4] ARM: NOMMU: Postpone MPU activation till
- __after_proc_init
-In-Reply-To: <7db4e6a5-4644-8afd-cf60-a00338386ca9@arm.com>
-References: <a266d2d9-44dc-16aa-6b35-7bbda080c4ef@kernel.org>
- <7db4e6a5-4644-8afd-cf60-a00338386ca9@arm.com>
-Message-ID: <52809702-caa9-9543-7bf0-2c184e379740@kernel.org>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 18 Jun 2018 18:28:02 +0530
+Subject: [linux-sunxi] [PATCH v2 00/27] Add support for R40 HDMI pipeline
+In-Reply-To: <5084905.C41JrL457O@jernej-laptop>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <2742773.k39D243pH3@jernej-laptop>
+ <CAMty3ZBt33q9HWm7n3SrON_Y51g+bsQNfoHajCCVzuKZLGHkjw@mail.gmail.com>
+ <5084905.C41JrL457O@jernej-laptop>
+Message-ID: <CAMty3ZB9f_HrbJDjbAEPvf4UhcEhDm8hCaB8yq-yeVkFbtSTTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Thu, Jun 14, 2018 at 10:59 PM, Jernej ?krabec
+<jernej.skrabec@siol.net> wrote:
+> Dne ?etrtek, 14. junij 2018 ob 19:16:46 CEST je Jagan Teki napisal(a):
+>> On Thu, Jun 14, 2018 at 8:04 PM, Jernej ?krabec <jernej.skrabec@siol.net>
+> wrote:
+>> > Dne ?etrtek, 14. junij 2018 ob 09:12:41 CEST je Jagan Teki napisal(a):
+>> >> On Wed, Jun 13, 2018 at 1:30 AM, Jernej Skrabec <jernej.skrabec@siol.net>
+>> >
+>> > wrote:
+>> >> > This series adds support for R40 HDMI pipeline. It is a bit special
+>> >> > than other already supported pipelines because it has additional unit
+>> >> > called TCON TOP responsible for relationship configuration between
+>> >> > mixers, TCONs and HDMI. Additionally, it has additional gates for DSI
+>> >> > and TV TCONs, TV encoder clock settings and pin muxing between LCD
+>> >> > and TV encoders.
+>> >> >
+>> >> > However, it seems that TCON TOP will become a norm, since newer
+>> >> > Allwinner SoCs like H6 also have this unit.
+>> >> >
+>> >> > I tested different possible configurations:
+>> >> > - mixer0 <> TCON-TV0 <> HDMI
+>> >> > - mixer0 <> TCON-TV1 <> HDMI
+>> >> > - mixer1 <> TCON-TV0 <> HDMI
+>> >> > - mixer1 <> TCON-TV1 <> HDMI
+>> >> >
+>> >> > Please review.
+>> >> >
+>> >> > Best regards,
+>> >> > Jernej
+>> >> >
+>> >> > Changes from v1:
+>> >> > - Split DT bindings patch and updated description
+>> >> > - Split HDMI PHY patch
+>> >> > - Move header file from TCON TOP patch to dt bindings patch
+>> >> > - Added Rob reviewed-by tag
+>> >> > - Used clk_hw_register_gate() instead of custom gate registration code
+>> >> > - Reworked TCON TOP to be part of of-graph. Because of that, a lot of
+>> >> >
+>> >> >   new patches were added.
+>> >> >
+>> >> > - Droped mixer index quirk patch
+>> >> > - Reworked TCON support for TCON TOP
+>> >> > - Updated commit messages
+>> >> >
+>> >> > Jernej Skrabec (27):
+>> >> >   clk: sunxi-ng: r40: Add minimal rate for video PLLs
+>> >> >   clk: sunxi-ng: r40: Allow setting parent rate to display related
+>> >> >
+>> >> >     clocks
+>> >> >
+>> >> >   clk: sunxi-ng: r40: Export video PLLs
+>> >> >   dt-bindings: display: sunxi-drm: Add TCON TOP description
+>> >> >   drm/sun4i: Add TCON TOP driver
+>> >> >   drm/sun4i: Fix releasing node when enumerating enpoints
+>> >> >   drm/sun4i: Split out code for enumerating endpoints in output port
+>> >> >   drm/sun4i: Add support for traversing graph with TCON TOP
+>> >> >   drm/sun4i: Don't skip TCONs if they don't have channel 0
+>> >> >   dt-bindings: display: sun4i-drm: Add R40 TV TCON description
+>> >> >   drm/sun4i: tcon: Add support for tcon-top gate
+>> >> >   drm/sun4i: tcon: Generalize engine search algorithm
+>> >> >   drm/sun4i: Don't check for LVDS and RGB when TCON has only ch1
+>> >> >   drm/sun4i: Don't check for panel or bridge on TV TCONs
+>> >> >   drm/sun4i: Add support for R40 TV TCON
+>> >> >   dt-bindings: display: sun4i-drm: Add R40 mixer compatibles
+>> >> >   drm/sun4i: Add support for R40 mixers
+>> >> >   dt-bindings: display: sun4i-drm: Add description of A64 HDMI PHY
+>> >> >   drm/sun4i: Enable DW HDMI PHY clock
+>> >> >   drm/sun4i: Don't change clock bits in DW HDMI PHY driver
+>> >> >   drm/sun4i: DW HDMI PHY: Add support for second PLL
+>> >> >   drm/sun4i: Add support for second clock parent to DW HDMI PHY clk
+>> >> >
+>> >> >     driver
+>> >> >
+>> >> >   drm/sun4i: Add support for A64 HDMI PHY
+>> >> >   drm: of: Export drm_crtc_port_mask()
+>> >> >   drm/sun4i: DW HDMI: Expand algorithm for possible crtcs
+>> >> >   ARM: dts: sun8i: r40: Add HDMI pipeline
+>> >> >   ARM: dts: sun8i: r40: Enable HDMI output on BananaPi M2 Ultra
+>> >>
+>> >> Tested whole series on top of linux-next.
+>> >>
+>> >> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+>> >
+>> > Thanks!
+>>
+>> I've V40 board, which is same as R40. I'm able to detect the HDMI but
+>> seems edid not detecting properly.
+>>
+>> [    0.983007] sun4i-drm display-engine: bound 1100000.mixer (ops
+>> 0xc074a80c) [    0.999043] sun4i-drm display-engine: bound 1200000.mixer
+>> (ops 0xc074a80c) [    1.006229] sun4i-drm display-engine: bound
+>> 1c70000.tcon-top (ops 0xc074e2ac) [    1.013609] sun4i-drm display-engine:
+>> bound 1c73000.lcd-controller (ops 0xc0747a28)
+>> [    1.053988] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller
+>> v1.32a with HDCP (sun8i_dw_hdmi_phy)
+>> [    1.063913] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI
+>> I2C bus driver
+>> [    1.071683] sun4i-drm display-engine: bound 1ee0000.hdmi (ops 0xc074a298)
+>> [    1.078484] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [    1.085098] [drm] No driver support for vblank timestamp query. [
+>> 1.091055] [drm] Cannot find any crtc or sizes
+>> [    1.095995] [drm] Initialized sun4i-drm 1.0.0 20150629 for
+>> display-engine on minor 0
+>
+> This seems like DT issue. Can you post somewhere your V40 DTSI (if it is
+> different to R40) and board DTS?
 
-On 18/06/18 19:52, Vladimir Murzin wrote:
->> On 12/02/2018 11:19:31, Vladimir Murzin wrote:
->>> This patch postpone MPU activation till __after_proc_init (which is
->>> placed in .text section) rather than doing it in __setup_mpu. It
->>> allows us ignore used-only-once .head.text section while programming
->>> PMSAv8 MPU (for PMSAv7 it stays covered anyway).
->>>
->>> Tested-by: Szemz? Andr?s <sza@xxxxxx>
->>> Signed-off-by: Vladimir Murzin <vladimir.murzin@xxxxxxx>
->>> ---
->>>  ?arch/arm/kernel/head-nommu.S | 45 ++++++++++++++++++++++----------------------
->>>  ?1 file changed, 22 insertions(+), 23 deletions(-)
->>>
->>> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
->>> index aaa25a6..482936a 100644
->>> --- a/arch/arm/kernel/head-nommu.S
->>> +++ b/arch/arm/kernel/head-nommu.S
->>> @@ -125,11 +125,24 @@ __secondary_data:
->>>  ? */
->>>  ???? .text
->>>  ?__after_proc_init:
->>> +#ifdef CONFIG_ARM_MPU
->>> +M_CLASS(movw??? r12, #:lower16:BASEADDR_V7M_SCB)
->>> +M_CLASS(movt??? r12, #:upper16:BASEADDR_V7M_SCB)
->>> +M_CLASS(ldr??? r3, [r12, 0x50])
->>> +AR_CLASS(mrc??? p15, 0, r3, c0, c1, 4)????????? @ Read ID_MMFR0
->>> +??? and??? r3, r3, #(MMFR0_PMSA)?????????? @ PMSA field
->>> +??? teq??? r3, #(MMFR0_PMSAv7)???????????? @ PMSA v7
->>> +#endif
->>>  ?#ifdef CONFIG_CPU_CP15
->>>  ???? /*
->>>  ????? * CP15 system control register value returned in r0 from
->>>  ????? * the CPU init function.
->>>  ????? */
->>> +
->>> +#ifdef CONFIG_ARM_MPU
->>> +??? biceq??? r0, r0, #CR_BR??????????? @ Disable the 'default mem-map'
->>> +??? orreq??? r0, r0, #CR_M??????????? @ Set SCTRL.M (MPU on)
->>> +#endif
->>>  ?#if defined(CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
->>>  ???? orr??? r0, r0, #CR_A
->>>  ?#else
->>> @@ -145,7 +158,15 @@ __after_proc_init:
->>>  ???? bic??? r0, r0, #CR_I
->>>  ?#endif
->>>  ???? mcr??? p15, 0, r0, c1, c0, 0??????? @ write control reg
->>> +??? isb
->>
->> This is causing breakage for me when building with my patches to
->> support the old Versatile platform in no-MMU mode:
->>
->>  ? AS????? arch/arm/kernel/head-nommu.o
->> arch/arm/kernel/head-nommu.S: Assembler messages:
->> arch/arm/kernel/head-nommu.S:180: Error: selected processor does not support `isb' in ARM mode
->> scripts/Makefile.build:417: recipe for target 'arch/arm/kernel/head-nommu.o' failed
->> make[2]: *** [arch/arm/kernel/head-nommu.o] Error 1
->> Makefile:1034: recipe for target 'arch/arm/kernel' failed
->> make[1]: *** [arch/arm/kernel] Error 2
->>
->> You may recall that patch series from some time back:
->> https://www.spinics.net/lists/arm-kernel/msg547602.html
->>
->> That patch series is pretty much unchanged, and I am running it
->> on top of linux-4.18-rc1, using a gcc-5.4.0 based toolchain.
->> (I really need to make an effort again to push this further...)
->>
->> Is the "isb" instruction valid on ARM926T?
-> 
-> Thanks for report and sorry for causing you problems. I've just sent
-> a patch to address that which I've quickly tested with
-> 
-> qemu-system-arm -M versatilepb ...
-> 
-> sure your patches were applied.
+same dtsi shared between r40 and v40, here is board dts support for HDMI[1]
 
-No problem. Thanks for the quick turn around. I tested the patch
-and it fixes the problem for me. Runs perfectly under qemu in
-my testing again now.
-
-Thanks
-Greg
+[1] https://paste.ubuntu.com/p/wqVz38BHrM/
