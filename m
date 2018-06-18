@@ -1,21 +1,25 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 18 Jun 2018 09:37:10 -0700
-Subject: [PATCH 3/3] ARM: dts: HR2: Fix interrupt types for i2c and PCIe
-In-Reply-To: <20180611224714.7007-4-f.fainelli@gmail.com>
-References: <20180611224714.7007-1-f.fainelli@gmail.com>
- <20180611224714.7007-4-f.fainelli@gmail.com>
-Message-ID: <20180618163710.27207-1-f.fainelli@gmail.com>
+Date: Mon, 18 Jun 2018 09:48:18 -0700
+Subject: [PATCH 0/5] Fix Cygnus, NS2, Stingray interrupt type
+In-Reply-To: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+References: <1528834891-17807-1-git-send-email-ray.jui@broadcom.com>
+Message-ID: <ac955f7d-6770-63a1-db85-024b0ee0b8af@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2018 15:47:14 -0700, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> The i2c and PCIe controllers had an incorrect type which should have
-> been set to IRQ_TYPE_LEVEL_HIGH, fix that.
+On 06/12/2018 01:21 PM, Ray Jui wrote:
+> This patch series fixes incorrect interrupt types for I2C and PCIe in DT
+> for Broadcom Cygnus, NS2, and Stingray SoCs
 > 
-> Fixes: b9099ec754b5 ("ARM: dts: Add Broadcom Hurricane 2 DTS include file")
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
+> This patch series is based off v4.17 and is available on GIHUB:
+> repo: https://github.com/Broadcom/arm64-linux.git
+> branch: cygnus-ns2-dt-irq-type-fix-v1
 
-Applied to devicetree/fixes, thanks!
---
+Series applied to:
+
+- 1&2: devicetree/fixes
+- 3-5: devicetree-arm64/fixes
+
+Thanks Ray.
+-- 
 Florian
