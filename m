@@ -1,59 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jun 2018 13:02:54 +0100
-Subject: [PATCHv3 03/19] arm64: introduce sysreg_clear_set()
-In-Reply-To: <20180618120310.39527-1-mark.rutland@arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
-Message-ID: <20180618120310.39527-4-mark.rutland@arm.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 18 Jun 2018 16:11:09 +0300
+Subject: [PATCH] ARM: dts: imx7d-sdb: Remove duplicate regulator-can2-3v3
+Message-ID: <abacbb7485b0c9b908eae8ae87be9d8e0eab87b3.1529327283.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have a couple of helpers to manipulate bits in particular
-sysregs:
+Two different regulators are defined with the same name and label but
+distinct properties.
 
- * config_sctlr_el1(u32 clear, u32 set)
+The first definition was added with the first board dts and the second
+was added when upstream added flexcan support.
 
- * change_cpacr(u64 val, u64 mask)
+Looking at schematics it is indeed gpio2 14 connected to the STB pin of
+the CAN transceiver so remove the first definition.
 
-The parameters of these differ in naming convention, order, and size,
-which is unfortunate. They also differ slightly in behaviour, as
-change_cpacr() skips the sysreg write if the bits are unchanged, which
-is a useful optimization when sysreg writes are expensive.
+The second definition entirely overrides the first so this already
+worked and this patch results in no DTB change, just a cleanup.
 
-Before we gain more yet another sysreg manipulation function, let's
-unify these with a common helper, providing a consistent order for
-clear/set operands, and the write skipping behaviour from
-change_cpacr(). Code will be migrated to the new helper in subsequent
-patches.
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Dave Martin <dave.martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 48ad361c178e..fefc17dae8ee 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -731,6 +731,17 @@ asm(
- 	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
- } while (0)
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 940849163104..9f9e6a1e3b72 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -69,18 +69,10 @@
+ 		regulator-max-microvolt = <5000000>;
+ 		gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
  
-+/*
-+ * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
-+ * set mask are set. Other bits are left as-is.
-+ */
-+#define sysreg_clear_set(sysreg, clear, set) do {			\
-+	u64 __scs_val = read_sysreg(sysreg);				\
-+	u64 __scs_new = (__scs_val & ~(u64)(clear)) | (set);		\
-+	if (__scs_new != __scs_val)					\
-+		write_sysreg(__scs_new, sysreg);			\
-+} while (0)
-+
- static inline void config_sctlr_el1(u32 clear, u32 set)
- {
- 	u32 val;
+-	reg_can2_3v3: regulator-can2-3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "can2-3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
+-	};
+-
+ 	reg_vref_1v8: regulator-vref-1v8 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vref-1v8";
+ 		regulator-min-microvolt = <1800000>;
+ 		regulator-max-microvolt = <1800000>;
 -- 
-2.11.0
+2.17.1
