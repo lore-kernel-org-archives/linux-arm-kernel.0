@@ -1,129 +1,33 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 18 Jun 2018 17:32:30 +0200
-Subject: [PATCH] ARM: mvebu: convert secondary CPU clock sync to hotplug state
-Message-ID: <20180618153230.32182-1-l.stach@pengutronix.de>
+From: manu@freebsd.org (Emmanuel Vadot)
+Date: Mon, 18 Jun 2018 17:42:57 +0200
+Subject: [PATCH] ARM: dts: imx6: RIoTboard Add chosen stdout-path property
+Message-ID: <20180618154257.16919-1-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current call site in boot_secondary is causing sleep in invalid context
-warnings, as this part of the code is running with interrrupts disabled and
-some of the calls into the clock framework might sleep on a mutex.
+The RIoTboard debug uart is connected to serial1.
+Add a chosen property in the DTS so OS knows what serial port to use for
+the console.
 
-Convert the secondary CPU clock sync to a hotplug state, which allows to
-call it from a sleepable context.
-
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- arch/arm/mach-mvebu/platsmp.c | 49 ++++++++++++++++-------------------
- include/linux/cpuhotplug.h    |  1 +
- 2 files changed, 24 insertions(+), 26 deletions(-)
+ arch/arm/boot/dts/imx6dl-riotboard.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index 4ffbbd217e82..c130497dc6cc 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -35,6 +35,8 @@
- #define AXP_BOOTROM_BASE 0xfff00000
- #define AXP_BOOTROM_SIZE 0x100000
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index 2e98c92adff7..315d2ae6fa45 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -19,6 +19,10 @@
+ 		reg = <0x10000000 0x40000000>;
+ 	};
  
-+static struct clk *boot_cpu_clk;
++	chosen {
++		stdout-path = "serial1:115200n8";
++	};
 +
- static struct clk *get_cpu_clk(int cpu)
- {
- 	struct clk *cpu_clk;
-@@ -48,30 +50,6 @@ static struct clk *get_cpu_clk(int cpu)
- 	return cpu_clk;
- }
- 
--static void set_secondary_cpu_clock(unsigned int cpu)
--{
--	int thiscpu;
--	unsigned long rate;
--	struct clk *cpu_clk;
--
--	thiscpu = get_cpu();
--
--	cpu_clk = get_cpu_clk(thiscpu);
--	if (!cpu_clk)
--		goto out;
--	clk_prepare_enable(cpu_clk);
--	rate = clk_get_rate(cpu_clk);
--
--	cpu_clk = get_cpu_clk(cpu);
--	if (!cpu_clk)
--		goto out;
--	clk_set_rate(cpu_clk, rate);
--	clk_prepare_enable(cpu_clk);
--
--out:
--	put_cpu();
--}
--
- static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret, hw_cpu;
-@@ -79,7 +57,6 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	pr_info("Booting CPU %d\n", cpu);
- 
- 	hw_cpu = cpu_logical_map(cpu);
--	set_secondary_cpu_clock(hw_cpu);
- 	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
- 
- 	/*
-@@ -122,6 +99,19 @@ static void __init armada_xp_smp_init_cpus(void)
- 		panic("Invalid number of CPUs in DT\n");
- }
- 
-+static int armada_xp_sync_secondary_clk(unsigned int cpu)
-+{
-+	struct clk *cpu_clk = get_cpu_clk(cpu);
-+
-+	if (!cpu_clk || !boot_cpu_clk)
-+		return 0;
-+
-+	clk_prepare_enable(cpu_clk);
-+	clk_set_rate(cpu_clk, clk_get_rate(boot_cpu_clk));
-+
-+	return 0;
-+}
-+
- static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *node;
-@@ -131,6 +121,14 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- 	flush_cache_all();
- 	set_cpu_coherent();
- 
-+	boot_cpu_clk = get_cpu_clk(smp_processor_id());
-+	if (boot_cpu_clk) {
-+		clk_prepare_enable(boot_cpu_clk);
-+		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_MVEBU_SYNC_CLOCKS,
-+					  "arm/mvebu/sync_clocks:online",
-+					  armada_xp_sync_secondary_clk, NULL);
-+	}
-+
- 	/*
- 	 * In order to boot the secondary CPUs we need to ensure
- 	 * the bootROM is mapped at the correct address.
-@@ -223,7 +221,6 @@ static int mv98dx3236_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	int ret, hw_cpu;
- 
- 	hw_cpu = cpu_logical_map(cpu);
--	set_secondary_cpu_clock(hw_cpu);
- 	mv98dx3236_resume_set_cpu_boot_addr(hw_cpu,
- 					    armada_xp_secondary_startup);
- 
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 8796ba387152..fa54e5fbea38 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -143,6 +143,7 @@ enum cpuhp_state {
- 	CPUHP_AP_SMPBOOT_THREADS,
- 	CPUHP_AP_X86_VDSO_VMA_ONLINE,
- 	CPUHP_AP_IRQ_AFFINITY_ONLINE,
-+	CPUHP_AP_ARM_MVEBU_SYNC_CLOCKS,
- 	CPUHP_AP_PERF_ONLINE,
- 	CPUHP_AP_PERF_X86_ONLINE,
- 	CPUHP_AP_PERF_X86_UNCORE_ONLINE,
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
-2.17.1
+2.17.0
