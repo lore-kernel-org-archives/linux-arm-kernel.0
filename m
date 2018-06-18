@@ -1,53 +1,47 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 18 Jun 2018 16:58:30 +0200
-Subject: [PATCH v4 06/19] drivers: soc: sunxi: Add support for the C1 SRAM
- region
-In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618145843.14631-7-paul.kocialkowski@bootlin.com>
+From: zsm@chromium.org (Zubin Mithra)
+Date: Mon, 18 Jun 2018 08:30:49 -0700
+Subject: [RFC v2 0/4] arm: Moving thread_info into task_struct
+Message-ID: <20180618153053.186224-1-zsm@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+These are a set of preparatory patches for moving the thread_info
+into task_struct for ARM. The patches that perform that actual move
+are not implemented yet.
 
-This introduces support for the SRAM C1 section, that is controlled by
-the system controller. This SRAM area can be muxed either to the CPU
-or the Video Engine, that needs this area to store various tables (e.g.
-the Huffman VLD decoding tables).
+These patches have only been tested on QEMU using the following boards.
+- versatilepb
+- vexpress-a9
 
-This only supports devices with the same layout as the A10 (which also
-includes the A13, A20, A33 and other SoCs).
+[v2 changes]
+- Add a patch that stores thread_info in sp^
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Zubin Mithra (4):
+  arm: Store address of thread_info in sp^
+  arm: factor out current_stack_pointer
+  arm: make cpu a percpu variable
+  arm: add refcounting for task stacks
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index 882be5ed7e84..74cb81f37bd6 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -63,6 +63,12 @@ static struct sunxi_sram_desc sun4i_a10_sram_a3_a4 = {
- 				  SUNXI_SRAM_MAP(1, 1, "emac")),
- };
- 
-+static struct sunxi_sram_desc sun4i_a10_sram_c1 = {
-+	.data	= SUNXI_SRAM_DATA("C1", 0x0, 0x0, 31,
-+				  SUNXI_SRAM_MAP(0, 0, "cpu"),
-+				  SUNXI_SRAM_MAP(0x7fffffff, 1, "ve")),
-+};
-+
- static struct sunxi_sram_desc sun4i_a10_sram_d = {
- 	.data	= SUNXI_SRAM_DATA("D", 0x4, 0x0, 1,
- 				  SUNXI_SRAM_MAP(0, 0, "cpu"),
-@@ -80,6 +86,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
- 		.compatible	= "allwinner,sun4i-a10-sram-a3-a4",
- 		.data		= &sun4i_a10_sram_a3_a4.data,
- 	},
-+	{
-+		.compatible	= "allwinner,sun4i-a10-sram-c1",
-+		.data		= &sun4i_a10_sram_c1.data,
-+	},
- 	{
- 		.compatible	= "allwinner,sun4i-a10-sram-d",
- 		.data		= &sun4i_a10_sram_d.data,
+ arch/arm/include/asm/assembler.h     | 27 ++++++++++++++++++++++-----
+ arch/arm/include/asm/percpu.h        |  2 ++
+ arch/arm/include/asm/smp.h           | 11 ++++++++++-
+ arch/arm/include/asm/stack_pointer.h |  9 +++++++++
+ arch/arm/include/asm/switch_to.h     | 11 +++++++++++
+ arch/arm/include/asm/thread_info.h   | 19 ++++++++++++-------
+ arch/arm/kernel/entry-armv.S         |  5 ++++-
+ arch/arm/kernel/entry-common.S       |  2 ++
+ arch/arm/kernel/head-common.S        |  2 ++
+ arch/arm/kernel/head.S               |  1 +
+ arch/arm/kernel/process.c            | 21 +++++++++++++++------
+ arch/arm/kernel/return_address.c     |  1 +
+ arch/arm/kernel/setup.c              |  2 +-
+ arch/arm/kernel/smp.c                | 13 +++++++++++--
+ arch/arm/kernel/stacktrace.c         |  8 ++++++++
+ arch/arm/kernel/topology.c           |  2 ++
+ arch/arm/kernel/traps.c              | 13 +++++++++++--
+ arch/arm/kernel/unwind.c             |  1 +
+ 18 files changed, 125 insertions(+), 25 deletions(-)
+ create mode 100644 arch/arm/include/asm/stack_pointer.h
+
 -- 
-2.17.0
+2.18.0.rc1.244.gcf134e6275-goog
