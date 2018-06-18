@@ -1,67 +1,124 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 18 Jun 2018 15:17:31 +0200
-Subject: [PATCH v2] regulator: core: Enable voltage balancing
-In-Reply-To: <20180615112916.GK112168@atomide.com>
-References: <20180605044554.GC5738@atomide.com>
- <CGME20180613103622eucas1p1778ba2c2e5dd85ccb4c488bd0a38386d@eucas1p1.samsung.com>
- <1528886026-9457-1-git-send-email-m.purski@samsung.com>
- <20180615112916.GK112168@atomide.com>
-Message-ID: <20180618131733eucas1p1351a8d5eecdfde1008e1b753eb9ade21~5Q5SUWbnP3050130501eucas1p1H@eucas1p1.samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 Jun 2018 14:18:38 +0100
+Subject: [PATCH v2 2/7] arm64: numa: separate out updates to percpu nodeid and
+ NUMA node cpumap
+In-Reply-To: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1529327923-17911-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently numa_clear_node removes both cpu information from the NUMA
+node cpumap as well as the NUMA node id from the cpu. Similarly
+numa_store_cpu_info updates both percpu nodeid and NUMA cpumap.
 
+However we need to retain the numa node id for the cpu and only remove
+the cpu information from the numa node cpumap during CPU hotplug out.
+The same can be extended for hotplugging in the CPU.
 
-On 06/15/2018 01:29 PM, Tony Lindgren wrote:
-> Hi,
-> 
-> * Maciej Purski <m.purski@samsung.com> [180613 10:39]:
->> Call regulator_balance_voltage() instead of set_voltage_rdev()
->> in set_voltage_unlocked() and in enabling and disabling functions,
->> but only if the regulator is coupled.
->>
->> Signed-off-by: Maciej Purski <m.purski@samsung.com>
->>
->> ---
->> Changes in v2:
->> - fix compile errors
->> - make debug messages more informative
-> 
-> Thanks for updating it. This series still hangs after loading
-> modules on beagleboard-x15:
-> 
-> [   26.679749] smps12: regulator_set_voltage: 3381
-> [   26.684529] smps12: regulator_set_voltage_unlocked:  3045
-> [   26.695616] smps12: _regulator_do_set_voltage: 2912
-> [   26.701275] smps12: regulator_set_voltage: 3381
-> [   26.706002] smps12: regulator_set_voltage_unlocked:  3045
-> [   26.712349] smps12: _regulator_do_set_voltage: 2912
-> [   26.719329] abb_mpu: regulator_set_voltage: 3381
-> [   26.724105] abb_mpu: regulator_set_voltage_unlocked:  3045
-> 
-> So it seems to be the abb_mpu where it hangs?
-> 
-> Regards,
-> 
-> Tony
-> 
+This patch separates out numa_{add,remove}_cpu from numa_clear_node and
+numa_store_cpu_info.
 
-Hi,
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/include/asm/numa.h |  4 ++++
+ arch/arm64/kernel/smp.c       |  2 ++
+ arch/arm64/mm/numa.c          | 29 +++++++++++++++++++++--------
+ 3 files changed, 27 insertions(+), 8 deletions(-)
 
-thanks for testing. Yes, it seems that it fails on abb_mpu. I don't know
-yet, what is so special about that regulator.
+diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+index 01bc46d5b43a..626ad01e83bf 100644
+--- a/arch/arm64/include/asm/numa.h
++++ b/arch/arm64/include/asm/numa.h
+@@ -35,10 +35,14 @@ void __init numa_set_distance(int from, int to, int distance);
+ void __init numa_free_distance(void);
+ void __init early_map_cpu_to_node(unsigned int cpu, int nid);
+ void numa_store_cpu_info(unsigned int cpu);
++void numa_add_cpu(unsigned int cpu);
++void numa_remove_cpu(unsigned int cpu);
 
-We know at least, that it fails on voltage setting somewhere
-between set_voltage_unlocked() and do_set_voltage()
-and it does not look like any locking issue.
-The most suspicious part in voltage balancing code is of course the
-infinite loop. Soon I'll send a next patch on top of my latest compiling
-path:
-2ff49a6 regulator: core: Enable voltage balancing.
-It should reveal, if it is indeed the loop.
+ #else	/* CONFIG_NUMA */
 
-As usual, I'd be grateful, if you gave it a try.
+ static inline void numa_store_cpu_info(unsigned int cpu) { }
++static inline void numa_add_cpu(unsigned int cpu) { }
++static inline void numa_remove_cpu(unsigned int cpu) { }
+ static inline void arm64_numa_init(void) { }
+ static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
 
-Best regards,
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index f3e2e3aec0b0..49a021e30dfb 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -225,6 +225,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	notify_cpu_starting(cpu);
 
-Maciej Purski
+ 	store_cpu_topology(cpu);
++	numa_add_cpu(cpu);
+
+ 	/*
+ 	 * OK, now it's safe to let the boot CPU continue.  Wait for
+@@ -679,6 +680,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	this_cpu = smp_processor_id();
+ 	store_cpu_topology(this_cpu);
+ 	numa_store_cpu_info(this_cpu);
++	numa_add_cpu(this_cpu);
+
+ 	/*
+ 	 * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index dad128ba98bf..43cc669bc7bc 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -70,19 +70,32 @@ EXPORT_SYMBOL(cpumask_of_node);
+
+ #endif
+
+-static void map_cpu_to_node(unsigned int cpu, int nid)
++static void numa_update_cpu(unsigned int cpu, bool remove)
+ {
+-	set_cpu_numa_node(cpu, nid);
+-	if (nid >= 0)
++	int nid = cpu_to_node(cpu);
++
++	if (nid < 0)
++		return;
++
++	if (remove)
++		cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
++	else
+ 		cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
+ }
+
+-void numa_clear_node(unsigned int cpu)
++void numa_add_cpu(unsigned int cpu)
+ {
+-	int nid = cpu_to_node(cpu);
++	numa_update_cpu(cpu, false);
++}
+
+-	if (nid >= 0)
+-		cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
++void numa_remove_cpu(unsigned int cpu)
++{
++	numa_update_cpu(cpu, true);
++}
++
++void numa_clear_node(unsigned int cpu)
++{
++	numa_remove_cpu(cpu);
+ 	set_cpu_numa_node(cpu, NUMA_NO_NODE);
+ }
+
+@@ -116,7 +129,7 @@ static void __init setup_node_to_cpumask_map(void)
+  */
+ void numa_store_cpu_info(unsigned int cpu)
+ {
+-	map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
++	set_cpu_numa_node(cpu, cpu_to_node_map[cpu]);
+ }
+
+ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+--
+2.7.4
