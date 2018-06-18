@@ -1,90 +1,49 @@
 From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Tue, 19 Jun 2018 00:19:05 +1000
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile machine
- for no-MMU
+Date: Tue, 19 Jun 2018 00:19:03 +1000
+Subject: [PATCHv4 2/4] ARM: versatile: define empty debug_ll_io_init() for
+ no-MMU
 In-Reply-To: <20180618141905.7789-1-gerg@linux-m68k.org>
 References: <20180618141905.7789-1-gerg@linux-m68k.org>
-Message-ID: <20180618141905.7789-5-gerg@linux-m68k.org>
+Message-ID: <20180618141905.7789-3-gerg@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the arm versatile machine to be configured for no-MMU operation.
+No-MMU configured targets have no definition for debug_ll_io_init().
+Not all machines use this and it will only be required if CONFIG_DEBUG_LL
+is enabled.
 
-Older kernels had the ability to build the versatile machine with the MMU
-disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
-to device tree lost this ability. (Although older kernels could be built
-they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
+But when compiling for a target that uses it and it is configured for
+no-MMU (!CONFIG_MMU), for example the versatile machine, you will get:
 
-The motivation for this is that the versatile machine is well supported
-in qemu. And this provides an excellent platform for development and
-testing no-MMU support on ARM in general.
+  CC      arch/arm/mach-versatile/versatile_dt.o
+arch/arm/mach-versatile/versatile_dt.c: In function ?versatile_map_io?:
+arch/arm/mach-versatile/versatile_dt.c:283:2: error: implicit declaration of function ?debug_ll_io_init? [-Werror=implicit-function-declaration]
+  debug_ll_io_init();
+  ^
 
-This patch adds a versatile platform selection in the upper level arm
-system type menu - where it appeared in older kernel versions - when
-configuring for the no-MMU case. There is no visible change to the way
-versatile is selected for the MMU enabled case.
+Fix by adding a macro for it to the !CONFIG_MMU path in map.h.
 
 Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
+Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig                | 11 +++++++++++
- arch/arm/Kconfig.debug          |  3 ++-
- arch/arm/mach-versatile/Kconfig |  5 +++--
- 3 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/mach/map.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-v2: don't use a multiplatform setup, move versatile choice to top level menu
+v2: no change
 v3: rebase on top of linux-4.10
-v3: rebase on top of linux-4.17
+v4: rebase in top of linux-4.17
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 54eeb8d00bc6..0608a6a32fac 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -356,6 +356,17 @@ config ARM_SINGLE_ARMV7M
- 	select SPARSE_IRQ
- 	select USE_OF
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 9b7c328fb207..b1fe9c8b5c3e 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -62,6 +62,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
+ #else
+ #define iotable_init(map,num)	do { } while (0)
+ #define vm_reserve_area_early(a,s,c)	do { } while (0)
++#define debug_ll_io_init()	do { } while (0)
+ #endif
  
-+config ARM_SINGLE_ARCH_VERSATILE
-+	bool "ARM Ltd. Versatile family"
-+	depends on !MMU
-+	select AUTO_ZRELADDR
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select GPIOLIB
-+	select SPARSE_IRQ
-+	select USE_OF
-+
- config ARCH_EBSA110
- 	bool "EBSA-110"
- 	select ARCH_USES_GETTIMEOFFSET
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 693f84392f1b..242a0f744c8a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1836,7 +1836,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
-+					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
-+					ARM_SINGLE_ARCH_VERSATILE
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index f5c275434d6c..06ad999d5978 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -1,7 +1,8 @@
- # SPDX-License-Identifier: GPL-2.0
- config ARCH_VERSATILE
--	bool "ARM Ltd. Versatile family"
--	depends on ARCH_MULTI_V5
-+	bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
-+	depends on ARCH_MULTI_V5 || ARM_SINGLE_ARCH_VERSATILE
-+	default y if ARM_SINGLE_ARCH_VERSATILE
- 	select ARM_AMBA
- 	select ARM_TIMER_SP804
- 	select ARM_VIC
+ #endif
 -- 
 2.17.1
