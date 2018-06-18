@@ -1,19 +1,17 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:06:02 -0700
-Subject: RESEND [PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
+Date: Mon, 18 Jun 2018 08:06:06 -0700
+Subject: RESEND [PATCH 3/6] arm64: Refactor vDSO init/setup
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-17-salyzyn@android.com>
+Message-ID: <20180618150613.10322-21-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
-config option (enabled by default). When disabled, all kuser
-helpers-related code is removed from the kernel and no mapping is done
-at the fixed high address (0xffff0000); any attempt to use a kuser
-helper from a 32-bit process will result in a segfault.
+Move the logic for setting up mappings and pages for the vDSO into
+static functions. This makes the vDSO setup code more consistent with
+the compat side and will allow to reuse it for the future compat vDSO.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -34,142 +32,188 @@ Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
-
-v2:
-- split off assembler changes to a new previous patch in series to reduce churn
-- modify slightly the feature documentation to reduce its reach
-- modify slightly the feature documentation to rationalize the yes default.
-- There are more ifdefs as a result of the rebase.
-
-v3:
-- rebase
 ---
- arch/arm64/Kconfig         | 30 ++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile |  2 +-
- arch/arm64/kernel/vdso.c   | 10 ++++++++++
- 3 files changed, 41 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/vdso.c | 118 +++++++++++++++++++++++----------------
+ 1 file changed, 70 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 42c090cf0292..11b4c6aef7d7 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1296,6 +1296,36 @@ config COMPAT
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config KUSER_HELPERS
-+	bool "Enable the kuser helpers page in 32-bit processes"
-+	depends on COMPAT
-+	default y
-+	help
-+	  Warning: disabling this option may break 32-bit applications.
-+
-+	  Provide kuser helpers in a special purpose fixed-address page. The
-+	  kernel provides helper code to userspace in read-only form at a fixed
-+	  location to allow userspace to be independent of the CPU type fitted
-+	  to the system. This permits 32-bit binaries to be run on ARMv6 through
-+	  to ARMv8 without modification.
-+
-+	  See Documentation/arm/kernel_user_helpers.txt for details.
-+
-+	  However, the fixed-address nature of these helpers can be used by ROP
-+	  (return-orientated programming) authors when creating exploits.
-+
-+	  If all of the 32-bit binaries and libraries that run on your platform
-+	  are built specifically for your platform, and make no use of these
-+	  helpers, then you can turn this option off to hinder such exploits.
-+	  However, in that case, if a binary or library relying on those helpers
-+	  is run, it will receive a SIGSEGV signal, which will terminate the
-+	  program. Typically, binaries compiled for ARMv7 or later do not use
-+	  the kuser helpers.
-+
-+	  Say N here only if you are absolutely certain that you do not need
-+	  these helpers; otherwise, the safe option is to say Y (the default
-+	  for now)
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 9851be3ef932..c16be3cf39bf 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -29,7 +29,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o	\
- 					   sys_compat.o entry32.o
- arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
--arm64-obj-$(CONFIG_COMPAT)		+= kuser32.o
-+arm64-obj-$(CONFIG_KUSER_HELPERS)	+= kuser32.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
 diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 5398f6454ce1..76a94bed4bd5 100644
+index 76a94bed4bd5..8529e85a521f 100644
 --- a/arch/arm64/kernel/vdso.c
 +++ b/arch/arm64/kernel/vdso.c
-@@ -62,18 +62,22 @@ static const struct vm_special_mapping compat_vdso_spec[] = {
- 		.name	= "[sigpage]",
- 		.pages	= &vectors_page[0],
- 	},
-+#ifdef CONFIG_KUSER_HELPERS
- 	{
- 		.name	= "[kuserhelpers]",
- 		.pages	= &vectors_page[1],
- 	},
-+#endif
- };
- static struct page *vectors_page[ARRAY_SIZE(compat_vdso_spec)] __ro_after_init;
+@@ -39,8 +39,11 @@
+ #include <asm/vdso.h>
+ #include <asm/vdso_datapage.h>
  
- static int __init alloc_vectors_page(void)
- {
-+#ifdef CONFIG_KUSER_HELPERS
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
- 	size_t kuser_sz = __kuser_helper_end - __kuser_helper_start;
- 	unsigned long kuser_vpage;
-+#endif
+-extern char vdso_start[], vdso_end[];
+-static unsigned long vdso_pages __ro_after_init;
++struct vdso_mappings {
++	unsigned long num_code_pages;
++	struct vm_special_mapping data_mapping;
++	struct vm_special_mapping code_mapping;
++};
  
- 	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
- 	size_t sigret_sz =
-@@ -84,22 +88,26 @@ static int __init alloc_vectors_page(void)
- 	if (!sigret_vpage)
- 		return -ENOMEM;
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	kuser_vpage = get_zeroed_page(GFP_ATOMIC);
- 	if (!kuser_vpage) {
- 		free_page(sigret_vpage);
- 		return -ENOMEM;
- 	}
-+#endif
- 
- 	/* sigreturn code */
- 	memcpy((void *)sigret_vpage, __aarch32_sigret_code_start, sigret_sz);
- 	flush_icache_range(sigret_vpage, sigret_vpage + PAGE_SIZE);
- 	vectors_page[0] = virt_to_page(sigret_vpage);
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	/* kuser helpers */
- 	memcpy((void *)kuser_vpage + 0x1000 - kuser_sz, __kuser_helper_start,
- 		kuser_sz);
- 	flush_icache_range(kuser_vpage, kuser_vpage + PAGE_SIZE);
- 	vectors_page[1] = virt_to_page(kuser_vpage);
-+#endif
- 
+ /*
+  * The vDSO data page.
+@@ -164,95 +167,114 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
  	return 0;
  }
-@@ -128,11 +136,13 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
  
- 	current->mm->context.vdso = (void *)addr;
+-static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
+-	{
+-		.name	= "[vvar]",
+-	},
+-	{
+-		.name	= "[vdso]",
+-		.mremap = vdso_mremap,
+-	},
+-};
+-
+-static int __init vdso_init(void)
++static int __init vdso_mappings_init(const char *name,
++				     const char *code_start,
++				     const char *code_end,
++				     struct vdso_mappings *mappings)
+ {
+-	int i;
++	unsigned long i, vdso_page;
+ 	struct page **vdso_pagelist;
+ 	unsigned long pfn;
  
-+#ifdef CONFIG_KUSER_HELPERS
- 	/* Map the kuser helpers at the ABI-defined high address. */
- 	ret = _install_special_mapping(mm, AARCH32_KUSER_HELPERS_BASE,
- 				       PAGE_SIZE,
- 				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
- 				       &compat_vdso_spec[1]);
-+#endif
- out:
+-	if (memcmp(vdso_start, "\177ELF", 4)) {
+-		pr_err("vDSO is not a valid ELF object!\n");
++	if (memcmp(code_start, "\177ELF", 4)) {
++		pr_err("%s is not a valid ELF object!\n", name);
+ 		return -EINVAL;
+ 	}
+ 
+-	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
+-	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
+-		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
+-
+-	/* Allocate the vDSO pagelist, plus a page for the data. */
+-	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
+-				GFP_KERNEL);
++	vdso_pages = (code_end - code_start) >> PAGE_SHIFT;
++	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
++		name, vdso_pages + 1, vdso_pages, code_start, 1L,
++		vdso_data);
++
++	/*
++	 * Allocate space for storing pointers to the vDSO code pages + the
++	 * data page. The pointers must have the same lifetime as the mappings,
++	 * which are static, so there is no need to keep track of the pointer
++	 * array to free it.
++	 */
++	vdso_pagelist = kmalloc_array(vdso_pages + 1, sizeof(struct page *),
++				      GFP_KERNEL);
+ 	if (vdso_pagelist == NULL)
+ 		return -ENOMEM;
+ 
+ 	/* Grab the vDSO data page. */
+ 	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
+ 
+-
+ 	/* Grab the vDSO code pages. */
+-	pfn = sym_to_pfn(vdso_start);
++	pfn = sym_to_pfn(code_start);
+ 
+ 	for (i = 0; i < vdso_pages; i++)
+ 		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
+ 
+-	vdso_spec[0].pages = &vdso_pagelist[0];
+-	vdso_spec[1].pages = &vdso_pagelist[1];
++	/* Populate the special mapping structures */
++	mappings->data_mapping = (struct vm_special_mapping) {
++		.name	= "[vvar]",
++		.pages	= &vdso_pagelist[0],
++	};
++
++	mappings->code_mapping = (struct vm_special_mapping) {
++		.name	= "[vdso]",
++		.pages	= &vdso_pagelist[1],
++	};
+ 
++	mappings->num_code_pages = vdso_pages;
+ 	return 0;
+ }
++
++static struct vdso_mappings vdso_mappings __ro_after_init;
++
++static int __init vdso_init(void)
++{
++	extern char vdso_start[], vdso_end[];
++
++	return vdso_mappings_init("vdso", vdso_start, vdso_end,
++				  &vdso_mappings);
++}
+ arch_initcall(vdso_init);
+ 
+-int arch_setup_additional_pages(struct linux_binprm *bprm,
+-				int uses_interp)
++static int vdso_setup(struct mm_struct *mm,
++		      const struct vdso_mappings *mappings)
+ {
+-	struct mm_struct *mm = current->mm;
+ 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+ 	void *ret;
+ 
+-	vdso_text_len = vdso_pages << PAGE_SHIFT;
++	vdso_text_len = mappings->num_code_pages << PAGE_SHIFT;
+ 	/* Be sure to map the data page */
+ 	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+ 
+-	if (down_write_killable(&mm->mmap_sem))
+-		return -EINTR;
+ 	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
+-	if (IS_ERR_VALUE(vdso_base)) {
+-		ret = ERR_PTR(vdso_base);
+-		goto up_fail;
+-	}
++	if (IS_ERR_VALUE(vdso_base))
++		ret = PTR_ERR_OR_ZERO(ERR_PTR(vdso_base));
++
+ 	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
+ 				       VM_READ|VM_MAYREAD,
+-				       &vdso_spec[0]);
++				       &mappings->data_mapping);
+ 	if (IS_ERR(ret))
+-		goto up_fail;
++		return PTR_ERR_OR_ZERO(ret);
+ 
+ 	vdso_base += PAGE_SIZE;
+-	mm->context.vdso = (void *)vdso_base;
+ 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
+ 				       VM_READ|VM_EXEC|
+ 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+-				       &vdso_spec[1]);
+-	if (IS_ERR(ret))
+-		goto up_fail;
++				       &mappings->code_mapping);
++	if (!IS_ERR(ret))
++		mm->context.vdso = (void *)vdso_base;
++
++	return PTR_ERR_OR_ZERO(ret);
++}
+ 
++int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
++{
++	struct mm_struct *mm = current->mm;
++	int ret;
+ 
+-	up_write(&mm->mmap_sem);
+-	return 0;
++	if (down_write_killable(&mm->mmap_sem))
++		return -EINTR;
++
++	ret = vdso_setup(mm, &vdso_mappings);
+ 
+-up_fail:
+-	mm->context.vdso = NULL;
  	up_write(&mm->mmap_sem);
+-	return PTR_ERR(ret);
++	return ret;
+ }
  
+ /*
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
