@@ -1,58 +1,159 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Mon, 18 Jun 2018 09:49:44 +0000
-Subject: [PATCH 2/2] media: stm32-dcmi: add mandatory of_node_put() in
- success path
-In-Reply-To: <1528824138-19089-2-git-send-email-hofrat@osadl.org>
-References: <1528824138-19089-1-git-send-email-hofrat@osadl.org>
- <1528824138-19089-2-git-send-email-hofrat@osadl.org>
-Message-ID: <7f3ca88b-e1b0-ea2c-da02-63da5cdc9e09@st.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 18 Jun 2018 12:05:19 +0200
+Subject: [PATCH v2] ARM: dts: rockchip: convert rk3288 to operating-points-v2
+Message-ID: <20180618100519.14922-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicholas,
-Thanks for patch.
-BR,
-Hugues.
+Operating points need to be present in each cpu core using it, not only
+the first one. With operating-points-v1 this would require duplicating
+this table into each cpu node.
 
-On 06/12/2018 07:22 PM, Nicholas Mc Guire wrote:
-> The endpoint allocated by of_graph_get_next_endpoint() needs an of_node_put()
-> in both error and success path. As  ep  is not used the refcount decrement
-> can be right after the last use of  ep.
-> 
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Acked-by: Hugues Fruchet <hugues.fruchet@st.com>
+With opp-v2 we can share the same table on all nodes.
 
-> Fixes: commit 37404f91ef8b ("[media] stm32-dcmi: STM32 DCMI camera interface driver")
-> ---
-> 
-> Problem located with an experimental coccinelle script
-> 
-> Patch was compile tested with: x86_64_defconfig, MEDIA_SUPPORT=y
-> MEDIA_CAMERA_SUPPORT=y, V4L_PLATFORM_DRIVERS=y, OF=y, COMPILE_TEST=y
-> CONFIG_VIDEO_STM32_DCMI=y
-> (There are a number of sparse warnings - not related to the changes though)
-> 
-> Patch is on top of "[PATCH 1/2] media: stm32-dcmi: drop unneceeary while(1)
-> loop" against 4.17.0 (localversion-next is next-20180608)
-> 
->   drivers/media/platform/stm32/stm32-dcmi.c | 5 ++---
->   1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-> index 70b81d2..542d148 100644
-> --- a/drivers/media/platform/stm32/stm32-dcmi.c
-> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
-> @@ -1610,10 +1610,9 @@ static int dcmi_graph_parse(struct stm32_dcmi *dcmi, struct device_node *node)
->   		return -EINVAL;
->   
->   	remote = of_graph_get_remote_port_parent(ep);
-> -	if (!remote) {
-> -		of_node_put(ep);
-> +	of_node_put(ep);
-> +	if (!remote)
->   		return -EINVAL;
-> -	}
->   
->   	/* Remote node to connect */
->   	dcmi->entity.node = remote;
-> 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes in v2:
+- adapt opp node names as suggested by Viresh
+
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 36 +++++++-------
+ arch/arm/boot/dts/rk3288.dtsi        | 70 ++++++++++++++++++++++------
+ 2 files changed, 75 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 823c7ed47fcf..2075120cfc4d 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -91,22 +91,26 @@
+ 
+ &cpu0 {
+ 	cpu0-supply = <&vdd_cpu>;
+-	operating-points = <
+-		/* KHz    uV */
+-		1800000 1400000
+-		1704000 1350000
+-		1608000 1300000
+-		1512000 1250000
+-		1416000 1200000
+-		1200000 1100000
+-		1008000 1050000
+-		 816000 1000000
+-		 696000  950000
+-		 600000  900000
+-		 408000  900000
+-		 216000  900000
+-		 126000  900000
+-	>;
++};
++
++/* rk3288-c used in Veyron Chrome-devices has slightly changed OPPs */
++&cpu_opp_table {
++	/delete-node/ opp-312000000;
++
++	opp-1512000000 {
++		opp-microvolt = <1250000>;
++	};
++	opp-1608000000 {
++		opp-microvolt = <1300000>;
++	};
++	opp-1704000000 {
++		opp-hz = /bits/ 64 <1704000000>;
++		opp-microvolt = <1350000>;
++	};
++	opp-1800000000 {
++		opp-hz = /bits/ 64 <1800000000>;
++		opp-microvolt = <1400000>;
++	};
+ };
+ 
+ &emmc {
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 2a060c2dc383..7094f95b967f 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -60,21 +60,7 @@
+ 			compatible = "arm,cortex-a12";
+ 			reg = <0x500>;
+ 			resets = <&cru SRST_CORE0>;
+-			operating-points = <
+-				/* KHz    uV */
+-				1608000 1350000
+-				1512000 1300000
+-				1416000 1200000
+-				1200000 1100000
+-				1008000 1050000
+-				 816000 1000000
+-				 696000  950000
+-				 600000  900000
+-				 408000  900000
+-				 312000  900000
+-				 216000  900000
+-				 126000  900000
+-			>;
++			operating-points-v2 = <&cpu_opp_table>;
+ 			#cooling-cells = <2>; /* min followed by max */
+ 			clock-latency = <40000>;
+ 			clocks = <&cru ARMCLK>;
+@@ -99,6 +85,60 @@
+ 		};
+ 	};
+ 
++	cpu_opp_table: cpu-opp-table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-126000000 {
++			opp-hz = /bits/ 64 <126000000>;
++			opp-microvolt = <900000>;
++		};
++		opp-216000000 {
++			opp-hz = /bits/ 64 <216000000>;
++			opp-microvolt = <900000>;
++		};
++		opp-312000000 {
++			opp-hz = /bits/ 64 <312000000>;
++			opp-microvolt = <900000>;
++		};
++		opp-408000000 {
++			opp-hz = /bits/ 64 <408000000>;
++			opp-microvolt = <900000>;
++		};
++		opp-600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <900000>;
++		};
++		opp-696000000 {
++			opp-hz = /bits/ 64 <696000000>;
++			opp-microvolt = <950000>;
++		};
++		opp-816000000 {
++			opp-hz = /bits/ 64 <816000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp-1008000000 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <1050000>;
++		};
++		opp-1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1100000>;
++		};
++		opp-1416000000 {
++			opp-hz = /bits/ 64 <1416000000>;
++			opp-microvolt = <1200000>;
++		};
++		opp-1512000000 {
++			opp-hz = /bits/ 64 <1512000000>;
++			opp-microvolt = <1300000>;
++		};
++		opp-1608000000 {
++			opp-hz = /bits/ 64 <1608000000>;
++			opp-microvolt = <1350000>;
++		};
++	};
++
+ 	amba {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+-- 
+2.17.0
