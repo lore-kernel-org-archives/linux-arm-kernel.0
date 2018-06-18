@@ -1,42 +1,71 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 18 Jun 2018 19:42:15 +0200
-Subject: [PATCH 1/2] arm64: dts: exynos: Remove leading 0x from unit addresses
- in Exynos5433
-Message-ID: <20180618174216.24801-1-krzk@kernel.org>
+Date: Mon, 18 Jun 2018 19:42:16 +0200
+Subject: [PATCH 2/2] arm64: dts: exynos: Remove unneeded DSI and DECON
+ address/size cells in Exynos5433
+In-Reply-To: <20180618174216.24801-1-krzk@kernel.org>
+References: <20180618174216.24801-1-krzk@kernel.org>
+Message-ID: <20180618174216.24801-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove leading 0x from recently introduced unit addresses to fix DTC
-warnings:
+The decon, decon_tv and dsi nodes have only one child port so
+address/size mappings are not necessary.  This fixes DTC warnings like:
 
-    Warning (unit_address_format): /soc/sysmmu at 0x15040000: unit name should not have leading "0x"
+    Warning (graph_child_address): /soc/decon at 13800000/ports:
+        graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi |  6 +-----
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi            | 12 ++----------
+ 2 files changed, 3 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index a1e3194b7483..0a15ee513f5c 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -321,11 +321,7 @@
+ 	status = "okay";
+ 
+ 	ports {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		port at 0 {
+-			reg = <0>;
++		port {
+ 			tv_to_hdmi: endpoint {
+ 				remote-endpoint = <&hdmi_to_tv>;
+ 			};
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 038c99792ccb..3a9b4c4b9c63 100644
+index 3a9b4c4b9c63..e4367fd39120 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -1171,7 +1171,7 @@
- 			power-domains = <&pd_gscl>;
- 		};
+@@ -850,11 +850,7 @@
+ 			iommu-names = "m0", "m1";
  
--		sysmmu_scaler_0: sysmmu at 0x15040000 {
-+		sysmmu_scaler_0: sysmmu at 15040000 {
- 			compatible = "samsung,exynos-sysmmu";
- 			reg = <0x15040000 0x1000>;
- 			interrupts = <GIC_SPI 404 IRQ_TYPE_LEVEL_HIGH>;
-@@ -1182,7 +1182,7 @@
- 			power-domains = <&pd_mscl>;
- 		};
+ 			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++				port {
+ 					decon_to_mic: endpoint {
+ 						remote-endpoint =
+ 							<&mic_to_decon>;
+@@ -914,11 +910,7 @@
+ 			#size-cells = <0>;
  
--		sysmmu_scaler_1: sysmmu at 0x15050000 {
-+		sysmmu_scaler_1: sysmmu at 15050000 {
- 			compatible = "samsung,exynos-sysmmu";
- 			reg = <0x15050000 0x1000>;
- 			interrupts = <GIC_SPI 406 IRQ_TYPE_LEVEL_HIGH>;
+ 			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++				port {
+ 					dsi_to_mic: endpoint {
+ 						remote-endpoint = <&mic_to_dsi>;
+ 					};
 -- 
 2.14.1
