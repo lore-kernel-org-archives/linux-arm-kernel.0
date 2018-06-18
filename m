@@ -1,41 +1,23 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:05:46 -0700
-Subject: RESEND arm+arm64+aarch32 vdso rewrite
-Message-ID: <20180618150613.10322-1-salyzyn@android.com>
+Date: Mon, 18 Jun 2018 08:05:59 -0700
+Subject: RESEND [PATCH] lib: vdso: add support for time
+In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
+References: <20180618150613.10322-1-salyzyn@android.com>
+Message-ID: <20180618150613.10322-14-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following 23 patches are rebased and resent, and represent a
-rewrite of the arm and arm64 vDSO into C, adding support for arch32
-(32-bit user space hosted 64-bit kernels) and into a common library
-that other (arm, or non-arm) architectures may utilize.
+From: Mark Salyzyn <salyzyn@google.com>
 
-[PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
-[PATCH v5 02/12] arm: vdso: add include file defining __get_datapage()
-[PATCH v5 03/12] arm: vdso: inline assembler operations to compiler.h
-[PATCH v5 04/12] arm: vdso: do calculations outside reader loops
-[PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
-[PATCH v5 06/12] arm: vdso: add support for clock_getres
-[PATCH v5 07/12] arm: vdso: disable profiling
-[PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
-[PATCH v5 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
-[PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
-[PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
-[PATCH v5 12/12] lib: vdso: do not expose gettimeofday, if no arch supported timer
-[PATCH] lib: vdso: add support for time
-[PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
-[PATCH v2 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
-[PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
-[PATCH] arm64: compat: Expose offset to registers in sigframes
-[PATCH 1/6] arm64: compat: Use vDSO sigreturn trampolines if available
-[PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
-[PATCH 3/6] arm64: Refactor vDSO init/setup
-[PATCH v2 4/6] arm64: compat: Add a 32-bit vDSO
-[PATCH 5/6] arm64: compat: 32-bit vDSO setup
-[PATCH 6/6] arm64: Wire up and expose the new compat vDSO
+Add time() vdso support to match up with existing support in the x86's
+vdso.  Currently benefitting arm and arm64 which uses the common
+vgettimeofday.c implementation.  On arm provides about a ~14 fold
+improvement in speed over the straight syscall, and about a ~5 fold
+improvement in speed over an alternate library implementation that
+relies on the vdso call to gettimeofday to fulfill the request.
 
-This patch series' above has been applied to the latest Pixel phones
-and resulted in a 0.4% battery improvement.
+We can provide __vdso_time even if we can not provide a speed
+enhanced __vdso_gettimeofday. (arm, virtual counters).
 
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
@@ -56,3 +38,78 @@ Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
+---
+ arch/arm/kernel/vdso.c            |  1 +
+ arch/arm/vdso/vdso.lds.S          |  1 +
+ arch/arm64/kernel/vdso/compiler.h |  1 +
+ arch/arm64/kernel/vdso/vdso.lds.S |  1 +
+ lib/vdso/vgettimeofday.c          | 10 ++++++++++
+ 5 files changed, 14 insertions(+)
+
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index 51d8dcbd9952..6721854c5ae6 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -192,6 +192,7 @@ static void __init patch_vdso(void *ehdr)
+ 		vdso_nullpatch_one(&einfo, "__vdso_gettimeofday");
+ 		vdso_nullpatch_one(&einfo, "__vdso_clock_gettime");
+ 		vdso_nullpatch_one(&einfo, "__vdso_clock_getres");
++		/* do not zero out __vdso_time, no cntvct_ok dependency */
+ 	}
+ }
+ 
+diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
+index 1d81e8c3acf6..1eb577091d1f 100644
+--- a/arch/arm/vdso/vdso.lds.S
++++ b/arch/arm/vdso/vdso.lds.S
+@@ -83,6 +83,7 @@ VERSION
+ 		__vdso_clock_gettime;
+ 		__vdso_gettimeofday;
+ 		__vdso_clock_getres;
++		__vdso_time;
+ 	local: *;
+ 	};
+ }
+diff --git a/arch/arm64/kernel/vdso/compiler.h b/arch/arm64/kernel/vdso/compiler.h
+index 921a7191b497..fb27545640f2 100644
+--- a/arch/arm64/kernel/vdso/compiler.h
++++ b/arch/arm64/kernel/vdso/compiler.h
+@@ -65,5 +65,6 @@ static __always_inline notrace u64 arch_vdso_read_counter(void)
+ #define __vdso_clock_gettime __kernel_clock_gettime
+ #define __vdso_gettimeofday __kernel_gettimeofday
+ #define __vdso_clock_getres __kernel_clock_getres
++#define __vdso_time __kernel_time
+ 
+ #endif /* __VDSO_COMPILER_H */
+diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
+index beca249bc2f3..9de0ffc369c5 100644
+--- a/arch/arm64/kernel/vdso/vdso.lds.S
++++ b/arch/arm64/kernel/vdso/vdso.lds.S
+@@ -88,6 +88,7 @@ VERSION
+ 		__kernel_gettimeofday;
+ 		__kernel_clock_gettime;
+ 		__kernel_clock_getres;
++		__kernel_time;
+ 	local: *;
+ 	};
+ }
+diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
+index 54e519c99c4b..dfced9608cd3 100644
+--- a/lib/vdso/vgettimeofday.c
++++ b/lib/vdso/vgettimeofday.c
+@@ -386,3 +386,13 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
+ 
+ 	return 0;
+ }
++
++notrace time_t __vdso_time(time_t *t)
++{
++	const struct vdso_data *vd = __get_datapage();
++	time_t result = READ_ONCE(vd->xtime_coarse_sec);
++
++	if (t)
++		*t = result;
++	return result;
++}
+-- 
+2.18.0.rc1.244.gcf134e6275-goog
