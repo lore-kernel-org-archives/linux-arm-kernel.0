@@ -1,36 +1,30 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 18 Jun 2018 16:58:36 +0200
-Subject: [PATCH v4 12/19] ARM: sun8i-a33: Add SRAM controller node and C1 SRAM
- region
+Date: Mon, 18 Jun 2018 16:58:34 +0200
+Subject: [PATCH v4 10/19] ARM: sun5i: Add support for the C1 SRAM region with
+ the SRAM controller
 In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
 References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618145843.14631-13-paul.kocialkowski@bootlin.com>
+Message-ID: <20180618145843.14631-11-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-This adds a SRAM controller node for the A33, with support for the C1
-SRAM region that is shared between the Video Engine and the CPU.
+This adds support for the C1 SRAM region (to be used with the SRAM
+controller driver) for sun5i-based platforms. The region is shared
+between the Video Engine and the CPU.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index a21f2ed07a52..97a976b3b1ef 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -204,6 +204,28 @@
- 	};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 72433f38b4e4..6fa9e28edc59 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -135,6 +135,20 @@
+ 				status = "disabled";
+ 			};
  
- 	soc at 1c00000 {
-+		sram-controller at 1c00000 {
-+			compatible = "allwinner,sun8i-a33-sram-controller";
-+			reg = <0x01c00000 0x30>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
 +			sram_c: sram at 1d00000 {
 +				compatible = "mmio-sram";
 +				reg = <0x01d00000 0xd00000>;
@@ -39,15 +33,14 @@ index a21f2ed07a52..97a976b3b1ef 100644
 +				ranges = <0 0x01d00000 0xd00000>;
 +
 +				ve_sram: sram-section at 0 {
-+					compatible = "allwinner,sun8i-a33-sram-c1",
++					compatible = "allwinner,sun5i-a13-sram-c1",
 +						     "allwinner,sun4i-a10-sram-c1";
 +					reg = <0x000000 0x80000>;
 +				};
 +			};
-+		};
 +
- 		tcon0: lcd-controller at 1c0c000 {
- 			compatible = "allwinner,sun8i-a33-tcon";
- 			reg = <0x01c0c000 0x1000>;
+ 			sram_d: sram at 10000 {
+ 				compatible = "mmio-sram";
+ 				reg = <0x00010000 0x1000>;
 -- 
 2.17.0
