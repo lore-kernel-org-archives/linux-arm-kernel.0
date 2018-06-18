@@ -1,655 +1,221 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Mon, 18 Jun 2018 19:08:04 -0300
-Subject: [PATCH] arm64: dts: rockchip: add 96boards RK3399 Ficus board
-Message-ID: <20180618220804.18468-1-ezequiel@collabora.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 18 Jun 2018 18:18:28 -0400
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
+ <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+Message-ID: <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3399 Ficus board is an Enterprise Edition board
-manufactured by Vamrs Ltd., based on the Rockchip RK3399 SoC.
+On Mon, 2018-06-18 at 11:04 -0700, Geoff Levand wrote:
+> Hi James,
+> 
+> Thanks for all the comments, but my lack of access to an m400 platform, and
+> my lack of knowledge about the m400 limits what I can comment on and what I
+> can do.  
 
-The board exposes a bunch of nice peripherals, including
-SATA, HDMI, MIPI CSI, Ethernet, WiFi, USB 2.0, USB 3.0
-and PCIe.
+I can take another look at this on an m400 here. I don't believe it is a
+memory access to physical space with nothing attached to it. I seem to recall
+an errata with xgene-1 where such accesses cause the cpu to halt. But I could
+be misremembering that. I have no trouble believing the firmware ras code was
+untested. It is probably some boilerplate code built in before ras was supported
+in kernel. But the problem occurs early enough in boot where there can't be
+that many things that would cause a problem on m400 and not mustang so I'll
+look again.
 
-Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
----
-I am not including USB support because I cannot seem
-to make it work.
-
-[    1.677293] dwc3 fe800000.dwc3: Failed to get clk 'ref': -2
-[    1.677937] dwc3 fe800000.dwc3: Configuration mismatch. dr_mode forced to host
-[    1.678602] dwc3 fe800000.dwc3: failed to initialize core
-[    1.679409] dwc3 fe900000.dwc3: Failed to get clk 'ref': -2
-[    1.679988] dwc3 fe900000.dwc3: failed to initialize core
-
-I am under the impression it is related to:
-
-commit fe8abf332b8f66868013cfcd6bfe727136a2ab5f
-Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date:   Wed May 16 11:41:07 2018 +0900
-
-    usb: dwc3: support clocks and resets for DWC3 core
-
-Any ideas? Would like to sort out the USB issue before
-merging.
-
-Also, I should probably split the rk3399.dtsi change.
-
- arch/arm64/boot/dts/rockchip/Makefile         |   1 +
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 564 ++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi      |   9 +
- 3 files changed, 574 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 48a83f882947..2811fb701f12 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-ficus.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-new file mode 100644
-index 000000000000..17471b4b7a14
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -0,0 +1,564 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Collabora Ltd.
-+ * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
-+ */
-+
-+/dts-v1/;
-+#include "rk3399.dtsi"
-+#include "rk3399-opp.dtsi"
-+
-+/ {
-+	model = "96boards RK3399 Ficus";
-+	compatible = "vamrs,ficus", "rockchip,rk3399";
-+
-+	chosen {
-+		stdout-path = "serial2:1500000n8";
-+	};
-+
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
-+
-+	usb_typec_vbus: usb-typec-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "typec-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	vcc1v8_s0: vcc1v8-s0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc1v8_s0";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_sys: vcc-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vcc3v3_sys: vcc3v3-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3_sys";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	vcc3v3_pcie: vcc3v3-pcie-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pcie_drv>;
-+		regulator-boot-on;
-+		regulator-name = "vcc3v3_pcie";
-+		vin-supply = <&vcc3v3_sys>;
-+	};
-+
-+	vcc5v0_host: vcc5v0-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_vbus_drv>;
-+		regulator-name = "vcc5v0_host";
-+		regulator-always-on;
-+	};
-+
-+	vdd_log: vdd-log {
-+		compatible = "pwm-regulator";
-+		pwms = <&pwm2 0 25000 0>;
-+		regulator-name = "vdd_log";
-+		regulator-min-microvolt = <800000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+
-+		/* for rockchip boot on */
-+		rockchip,pwm_id= <2>;
-+		rockchip,pwm_voltage = <900000>;
-+
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+};
-+
-+&cpu_l0 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l1 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l2 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l3 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_b0 {
-+	cpu-supply = <&vdd_cpu_b>;
-+};
-+
-+&cpu_b1 {
-+	cpu-supply = <&vdd_cpu_b>;
-+};
-+
-+&emmc_phy {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	clock_in_out = "input";
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rgmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c3>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_cec>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	i2c-scl-rising-time-ns = <168>;
-+	i2c-scl-falling-time-ns = <4>;
-+	clock-frequency = <400000>;
-+
-+	vdd_cpu_b: syr827 at 40 {
-+		status = "okay";
-+		compatible = "silergy,syr827";
-+		reg = <0x40>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-name = "vdd_cpu_b";
-+		regulator-min-microvolt = <712500>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-ramp-delay = <1000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vcc_sys>;
-+
-+		regulator-state-mem {
-+			regulator-off-in-suspend;
-+		};
-+	};
-+
-+        vdd_gpu: regulator at 41 {
-+                compatible = "silergy,syr828";
-+                reg = <0x41>;
-+                fcs,suspend-voltage-selector = <1>;
-+                regulator-name = "vdd_gpu";
-+                regulator-min-microvolt = <712500>;
-+                regulator-max-microvolt = <1500000>;
-+                regulator-ramp-delay = <1000>;
-+                regulator-always-on;
-+                regulator-boot-on;
-+                vin-supply = <&vcc_sys>;
-+
-+                regulator-state-mem {
-+                        regulator-off-in-suspend;
-+                };
-+        };
-+
-+	fusb0: fusb30x at 22 {
-+		vbus-supply = <&usb_typec_vbus>;
-+		compatible = "fairchild,fusb302";
-+		reg = <0x22>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&fusb0_int>;
-+		int-n-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		status = "okay";
-+	};
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int_l>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc3v3_sys>;
-+		vcc9-supply = <&vcc_sys>;
-+		vcc10-supply = <&vcc_sys>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc3v3_sys>;
-+		vddio-supply = <&vcc_1v8>;
-+
-+		regulators {
-+			vdd_center: DCDC_REG1 {
-+				regulator-name = "vdd_center";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_cpu_l: DCDC_REG2 {
-+				regulator-name = "vdd_cpu_l";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				//regulator-ramp-delay = <6001>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_1v8: DCDC_REG4 {
-+				regulator-name = "vcc_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc1v8_dvp: LDO_REG1 {
-+				regulator-name = "vcc1v8_dvp";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca1v8_hdmi: LDO_REG2 {
-+				regulator-name = "vcca1v8_hdmi";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca_1v8: LDO_REG3 {
-+				regulator-name = "vcca_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc_sd: LDO_REG4 {
-+				regulator-name = "vcc_sd";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc3v0_sd: LDO_REG5 {
-+				regulator-name = "vcc3v0_sd";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc_1v5: LDO_REG6 {
-+				regulator-name = "vcc_1v5";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1500000>;
-+				};
-+			};
-+
-+			vcca0v9_hdmi: LDO_REG7 {
-+				regulator-name = "vcca0v9_hdmi";
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <900000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <900000>;
-+				};
-+			};
-+
-+			vcc_3v0: LDO_REG8 {
-+				regulator-name = "vcc_3v0";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc3v3_s3: SWITCH_REG1 {
-+				regulator-name = "vcc3v3_s3";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc3v3_s0: SWITCH_REG2 {
-+				regulator-name = "vcc3v3_s0";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&io_domains {
-+	status = "okay";
-+
-+	bt656-supply = <&vcc1v8_s0>; /* bt656_gpio2ab_ms */
-+	audio-supply = <&vcc1v8_s0>; /* audio_gpio3d4a_ms */
-+	sdmmc-supply = <&vcc_sd>; /* sdmmc_gpio4b_ms */
-+	gpio1830-supply = <&vcc_3v0>; /* gpio1833_gpio4cd_ms */
-+};
-+
-+&pcie_phy {
-+	status = "okay";
-+};
-+
-+&pcie0 {
-+	ep-gpios = <&gpio4 RK_PD4 GPIO_ACTIVE_HIGH>;
-+	num-lanes = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pcie_clkreqn_cpm>;
-+	status = "okay";
-+};
-+
-+&pmu_io_domains {
-+	pmu1830-supply = <&vcc_1v8>;
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	gmac {
-+		rgmii_sleep_pins: rgmii-sleep-pins {
-+			rockchip,pins =
-+				<3 15 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_bus1: sdmmc-bus1 {
-+			rockchip,pins =
-+				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins =
-+				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 9 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 10 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 11 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins =
-+				<4 12 RK_FUNC_1 &pcfg_pull_none_18ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins =
-+				<4 13 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+	};
-+
-+	pcie {
-+		pcie_drv: pcie-drv {
-+			rockchip,pins =
-+				<1 24 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+	};
-+
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins =
-+				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		vsel1_gpio: vsel1-gpio {
-+			rockchip,pins =
-+				<1 17 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+
-+		vsel2_gpio: vsel2-gpio {
-+			rockchip,pins =
-+				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+
-+	usb2 {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins =
-+				<4 27 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	fusb30x {
-+		fusb0_int: fusb0-int {
-+			rockchip,pins =
-+				<1 2 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&sdhci {
-+	bus-width = <8>;
-+	mmc-hs400-1_8v;
-+	mmc-hs400-enhanced-strobe;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	clock-frequency = <100000000>;
-+	clock-freq-min-max = <100000 100000000>;
-+	disable-wp;
-+	sd-uhs-sdr104;
-+	vqmmc-supply = <&vcc_sd>;
-+	card-detect-delay = <800>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer &uart0_cts>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index adb037cd80fe..7169603590f5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1923,6 +1923,11 @@
- 			drive-strength = <12>;
- 		};
- 
-+                pcfg_pull_none_18ma: pcfg-pull-none-18ma {
-+                        bias-disable;
-+                        drive-strength = <18>;
-+                };
-+
- 		pcfg_pull_up_8ma: pcfg-pull-up-8ma {
- 			bias-pull-up;
- 			drive-strength = <8>;
-@@ -1948,6 +1953,10 @@
- 			drive-strength = <13>;
- 		};
- 
-+                pcfg_output_low: pcfg-output-low {
-+                        output-low;
-+                };
-+
- 		clock {
- 			clk_32k: clk-32k {
- 				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
--- 
-2.17.1
+> 
+> My motivation for submitting this fix was to enable CONFIG_ACPI_APEI in the
+> Debian 10 kernel (for the new Cavium ThunderX2 based systems).  The Debian
+> maintainers wanted to either have an upstream kernel fix for this m400 APEI
+> problem or to disable CONFIG_ACPI_APEI.  The later would be unfortunate.  It
+> means users would need to have custom kernels to get APEI support or go
+> without.
+> 
+> Comments follow.
+> 
+> On 06/18/2018 09:18 AM, James Morse wrote:
+> > On 15/06/18 18:17, Geoff Levand wrote:
+> > 
+> > From:
+> > https://bugzilla.redhat.com/show_bug.cgi?id=1574718
+> > 
+> > This is tripped by the ghes_probe() call, it finds an error has already occurred
+> > before ghes code is initialized.
+> > 
+> > Does this still happen if you compile without CONFIG_PCI? (that is easily half
+> > the dmesg that has happened before this point).
+> > Disabling CONFIG_EFIVAR_FS would be interesting too, as that is firmware-code we
+> > can't fix bugs in.
+> 
+> Sorry, no m400 to test these on, but looking at the code, I would say it doesn't
+> occur if CONFIG_PCI=n.
+> 
+> > Your argument here is the that the firmware-vendor only build-tested their code,
+> > and never noticed it notifies a fatal exception on startup. I find this hard to
+> > believe, especially as these systems don't have EL3.
+> > 
+> > It's much more likely a driver is causing this, possibly because of bad data in
+> > the firmware tables. I'd like to quirk the driver, so we can fix the next error
+> > like this, as opposed to blindly continuing.
+> 
+> That sounds OK, but which driver?
+> 
+> > If it really is firmware, what is it doing that causes this error, and where
+> > does it run? Disabling APEI is just reacting after the error has occurred, when
+> > we could prevent it happening.
+> > 
+> > I can't reproduce this on a Mustang. I assume its the different ACPI tables, not
+> > the kernel-config.
+> 
+> From what I understand this is only on the m400, not the Mustang.
+> 
+> > > I just put together this patch to unify things and have a
+> > > common 'upstream' fix.
+> > 
+> > Wouldn't passing 'hest_disable' on the cmdline do the same for all kernel versions?
+> 
+> Yes, the current patch essentially just sets hest_disable when an m400 is
+> detected.  The cmdline work-around is what some have been using, but is
+> not an acceptable solution for the Debian maintainers.  See
+> 
+>   https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=900581
+> 
+> > > On 06/15/2018 04:14 AM, James Morse wrote:
+> > > > On 13/06/18 19:22, Geoff Levand wrote:
+> > > > > Adds a new ACPI init routine acpi_fixup_m400_quirks that adds
+> > > > > a work-around for HPE ProLiant m400 APEI firmware problems.
+> > > > > 
+> > > > > The work-around disables APEI when CONFIG_ACPI_APEI is set and
+> > > > > m400 firmware is detected.  Without this fixup m400 systems
+> > > > > experience errors like these on startup:
+> > > > > 
+> > > > >   [Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+> > > > >   [Hardware Error]: event severity: fatal
+> > > > >   [Hardware Error]:  Error 0, type: fatal
+> > > > >   [Hardware Error]:   section_type: memory error
+> > > > >   [Hardware Error]:   error_status: 0x0000000000001300
+> > > > 
+> > > > "Access to a memory address which is not mapped to any component"
+> > > > 
+> > > > 
+> > > > >   [Hardware Error]:   error_type: 10, invalid address
+> > > > >   Kernel panic - not syncing: Fatal hardware error!
+> > > > 
+> > > > Why is this a problem?
+> > > > 
+> > > > Surely this is a valid description of an error.
+> > > 
+> > > The firmware bug causes this failure, not bad hardware.
+> > 
+> > I'm not talking about bad hardware here. What I think is happening is a software
+> > bug is causing the CPU to make a bad access, which the RAS mechanism is
+> > reporting like this because software would never be stupid enough to access an
+> > address which is not mapped to any component! The RAS stuff believes this must
+> > be address corruption.
+> > 
+> > I think this is a linux-driver bug, or a typo in the firmware tables, that cause
+> > $non_existent_address to be mapped and probed.
+> 
+> From what I know about it the problem is in the access of the firmware tables,
+> and that corrupted data is retrieved.  But I am not sure, as there are so many
+> reported m400 firmware problems it is hard to tell what exactly is what.
+> 
+> > > > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> > > > > index 7b09487ff8fb..3c315c2c7476 100644
+> > > > > --- a/arch/arm64/kernel/acpi.c
+> > > > > +++ b/arch/arm64/kernel/acpi.c
+> > > > > +
+> > > > > +	if (!IS_ENABLED(CONFIG_ACPI_APEI) || hest_disable != HEST_ENABLED)
+> > > > > +		return;
+> > > > > +
+> > > > > +	status = acpi_get_table(ACPI_SIG_HEST, 0, &header);
+> > > > > +
+> > > > > +	if (ACPI_SUCCESS(status) && !strncmp(header->oem_id, "HPE   ", 6) &&
+> > > > > +		!strncmp(header->oem_table_id, "ProLiant", 8) &&
+> > > > You should match the affected range of OEM table revisions too, that way a
+> > > > firmware upgrade should start working, instead of being permanently disabled
+> > > > because we think its unlikely.
+> > > 
+> > > The m400 has reached end of life. No one really expects to see any firmware
+> > > update.  I don't know what the effected OEM table revisions are, and I don't
+> > > think there is an active platform maintainer who could give that info either.
+> > > 
+> > > If someone can provide the info. I'll update the fix.
+> > 
+> > We can start with the version you have. You mention distro's have their own
+> > fixes, hopefully they can supply the missing range of values.
+> 
+> It seems you are living in a dream world...
+> 
+> > > > > +		MIDR_IMPLEMENTOR(read_cpuid_id()) == ARM_CPU_IMP_APM) {
+> > > > 
+> > > > How is the CPU implementer relevant?
+> > > 
+> > > That was just a copy of what other fixes had.  Should I remove it?
+> > 
+> > The conclusion in the rest of this thread was HPE also produces ProLiant boxes
+> > with a (presumably) identical HEST, but a totally different architecture.
+> > 
+> > Matching the DMI platform name as well would work round this. (or somewhere only
+> > arm64 builds, with an appropriate comment in case we move it).
+> > 
+> > 
+> > > > Nothing arch-specific here. You're adding this to arch/arm64 because
+> > > > drivers/acpi/apei doesn't have an existing quirks table?
+> > > 
+> > > There was a fix submitted that had it in drivers/acpi/scan.c, but the
+> > > ACPI maintainer said he didn't want the fix in the main ACPI code.
+> > 
+> > Specifically about a HID-hack in the core device enumeration code, as opposed to
+> > in the driver that claims it.
+> > 
+> > 
+> > > See:
+> > > 
+> > >   https://lkml.org/lkml/2018/4/19/1020 (ACPI / scan: Fix regression related to X-Gene UARTs)
+> > > 'some X-Gene based platforms (Mustang and M400) with invalid DSDT.'
+> > 
+> > ... sounds familiar ...
+> > 
+> > And:
+> > https://bugzilla.redhat.com/attachment.cgi?id=1144903&action=diff
+> > 
+> > Fixes a typo in firmware description of the GIC.
+> > 
+> > Why do we think this is a new kind of firmware bug, and not a repeat of the last
+> > two? The only difference is this is being caught by the RAS code.
+> 
+> It could very well be.
+> 
+> > > The m400 is an arm64 platform, so it seems most appropriate to
+> > > have it in arch/arm64/kernel/acpi.c.
+> > 
+> > We don't keep all drivers under arch/arm64, I'd really like to find the driver
+> > that is causing this, and quirk it there.
+> > 
+> > If we have to bolt the hest-stable-door, drivers/acpi/apei/hest.c looks better,
+> > it at least doesn't have to bodge around hest_disabled not being exposed in a
+> > compatible way. If the maintainer objects, (as x86 hasn't had to do this yet),
+> > then we can try drivers/acpi/arm64/hest_quirks.c.
+> 
+> We need to call acpi_fixup_m400_quirks early enough to get hest_disable set
+> before it is used.  To do that from drivers/acpi/ code we would need have
+> it as arch_initcall, or still call it from acpi_boot_table_init.  I think
+> having it as a static routine and the call in arch/arm64/kernel/acpi.c is
+> cleaner.
+> 
+> > When only once architecture had to quirk stuff based on the ACPI tables, the
+> > arch-code was a suitable dumping ground. Now there is more than one, we should
+> > do things in a way they are useful to both architectures.
+> 
+> As I mentioned in the opening, I don't have access to m400 equipment.  There is
+> little I can do.  I could move acpi_fixup_m400_quirks into
+> drivers/acpi/apei/hest.c and submit that to the ACPI maintainer, but based on
+> https://lkml.org/lkml/2018/4/19/1020, I don't think it would be accepted.
+> 
+> -Geoff
+> 
