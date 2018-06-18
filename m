@@ -1,109 +1,43 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 18 Jun 2018 11:56:17 +0100
-Subject: [PATCH 4/6] dts: bindings: Document device tree binding for CATU
-In-Reply-To: <1529319379-17895-1-git-send-email-suzuki.poulose@arm.com>
-References: <1529319379-17895-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1529319379-17895-5-git-send-email-suzuki.poulose@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 18 Jun 2018 20:05:03 +0900
+Subject: [PATCH 01/11] i2c: add helpers for locking the I2C segment
+In-Reply-To: <20180615101506.8012-2-peda@axentia.se>
+References: <20180615101506.8012-1-peda@axentia.se>
+ <20180615101506.8012-2-peda@axentia.se>
+Message-ID: <20180618110502.cb5s24srp4frahm6@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document CATU device-tree bindings. CATU augments the TMC-ETR
-by providing an improved Scatter Gather mechanism for streaming
-trace data to non-contiguous system RAM pages.
 
-Cc: devicetree at vger.kernel.org
-Cc: frowand.list at gmail.com
-Cc: Rob Herring <robh@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- .../devicetree/bindings/arm/coresight.txt          | 53 ++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+> +static inline void
+> +i2c_lock_segment(struct i2c_adapter *adapter)
+> +{
+> +	i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
+> +}
+> +
+> +static inline int
+> +i2c_trylock_segment(struct i2c_adapter *adapter)
+> +{
+> +	return i2c_trylock_bus(adapter, I2C_LOCK_SEGMENT);
+> +}
+> +
+> +static inline void
+> +i2c_unlock_segment(struct i2c_adapter *adapter)
+> +{
+> +	i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
+> +}
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 9aa30a1..5d1ad09 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -39,6 +39,8 @@ its hardware characteristcs.
- 
- 		- System Trace Macrocell:
- 			"arm,coresight-stm", "arm,primecell"; [1]
-+		- Coresight Address Translation Unit (CATU)
-+			"arm,coresight-catu", "arm,primecell";
- 
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
-@@ -90,6 +92,10 @@ its hardware characteristcs.
- 	* arm,scatter-gather: boolean. Indicates that the TMC-ETR can safely
- 	  use the SG mode on this system.
- 
-+* Optional property for CATU :
-+	* interrupts : Exactly one SPI may be listed for reporting the address
-+	  error
-+
- Example:
- 
- 1. Sinks
-@@ -121,6 +127,35 @@ Example:
- 		};
- 	};
- 
-+	etr at 20070000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20070000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg =  <0>;
-+				etr_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator2_out_port0>;
-+				};
-+			};
-+
-+			/* CATU link represented by output port */
-+			port at 1 {
-+				reg = <1>;
-+				etr_out_port: endpoint {
-+					remote-endpoint = <&catu_in_port>;
-+				};
-+			};
-+		};
-+	};
-+
- 2. Links
- 	replicator {
- 		/* non-configurable replicators don't show up on the
-@@ -250,5 +285,23 @@ Example:
- 		};
- 	};
- 
-+5. CATU
-+
-+	catu at 207e0000 {
-+		compatible = "arm,coresight-catu", "arm,primecell";
-+		reg = <0 0x207e0000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+		port {
-+			catu_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&etr_out_port>;
-+			};
-+		};
-+	};
-+
- [1]. There is currently two version of STM: STM32 and STM500.  Both
- have the same HW interface and as such don't need an explicit binding name.
--- 
-2.7.4
+I wonder if i2c_lock_segment() and i2c_lock_root_adapter() are really
+more readable and convenient than i2c_lock_bus() with the flag. I think
+the flags have speaking names, too.
+
+Is that an idea to remove these functions altogether and start using
+i2c_lock_bus()?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180618/b15be943/attachment.sig>
