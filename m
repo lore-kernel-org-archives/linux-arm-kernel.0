@@ -1,28 +1,42 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:05:57 -0700
-Subject: RESEND [PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
+Date: Mon, 18 Jun 2018 08:06:00 -0700
+Subject: RESEND [PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines
+ and kuser helpers (C sources)
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-12-salyzyn@android.com>
+Message-ID: <20180618150613.10322-15-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture. But instead of landing it in arm64, land the
-result into lib/vdso and unify both implementations to simplify
-future maintenance.
+From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Add a case for CLOCK_BOOTTIME as it is popular for measuring
-relative time on systems expected to suspend() or hibernate().
+AArch32 processes are currently installed a special [vectors] page that
+contains the sigreturn trampolines and the kuser helpers, at the fixed
+address mandated by the kuser helpers ABI.
 
-Android uses CLOCK_BOOTTIME for all relative time measurements
-and timeouts. Switching to vdso reduced CPU utilization and improves
-accuracy. There is also a desire by some partners to switch all
-logging over to CLOCK_BOOTTIME, and thus this operation alone would
-contribute to a near percentile CPU load.
+Having both functionalities in the same page has become problematic,
+because:
 
+* It makes it impossible to disable the kuser helpers (the sigreturn
+  trampolines cannot be removed), which is possible on arm.
+
+* A future 32-bit vDSO would provide the sigreturn trampolines itself,
+  making those in [vectors] redundant.
+
+This patch addresses the problem by moving the sigreturn trampolines to
+a separate [sigpage] page, mirroring [sigpage] on arm.
+
+Even though [vectors] has always been a misnomer on arm64/compat, as
+there is no AArch32 vector there (and now only the kuser helpers),
+its name has been left unchanged, for compatibility with arm (there
+are reports of software relying on [vectors] being there as the last
+mapping in /proc/maps).
+
+mm->context.vdso used to point to the [vectors] page, which is
+unnecessary (as its address is fixed). It now points to the [sigpage]
+page (whose address is randomized like a vDSO).
+
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
@@ -36,7 +50,6 @@ Cc: Laura Abbott <labbott@redhat.com>
 Cc: Kees Cook <keescook@chromium.org>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
 Cc: Andrew Pinski <apinski@cavium.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
@@ -44,187 +57,191 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
 
 v2:
-- rebased and changed from 3/3 to 10/10, fortified commit message.
+- reduce churniness (and defer later to vDSO patches)
+- vectors_page and compat_vdso_spec as array of 2
+- free sigpage if vectors allocation failed
 
 v3:
-- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c.
-
-v4:
-- update commit message to reflect specific, and overall reasoning
-  of patch series.
-- drop forced inline operations.
-- switch typeof() with __kernel_time_t.
-
-v5:
-- added comment about open coded timepsec_add_ns() for clarity.
-
-v6:
-- fix issue with __iter_div_u64_rem scaling by splitting sec & nsec
+- rebase
 ---
- arch/arm/include/asm/vdso_datapage.h   |  2 +
- arch/arm/kernel/vdso.c                 |  4 ++
- arch/arm64/include/asm/vdso_datapage.h |  2 +
- arch/arm64/kernel/vdso.c               |  4 ++
- lib/vdso/vgettimeofday.c               | 56 ++++++++++++++++++++++++++
- 5 files changed, 68 insertions(+)
+ arch/arm64/include/asm/processor.h |  4 +-
+ arch/arm64/include/asm/signal32.h  |  2 -
+ arch/arm64/kernel/signal32.c       |  5 +-
+ arch/arm64/kernel/vdso.c           | 82 ++++++++++++++++++++----------
+ 4 files changed, 60 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
-index 1c6e6a5d5d9d..0120852b6b12 100644
---- a/arch/arm/include/asm/vdso_datapage.h
-+++ b/arch/arm/include/asm/vdso_datapage.h
-@@ -64,6 +64,8 @@ struct vdso_data {
- 	u32 tz_minuteswest;	/* timezone info for gettimeofday(2) */
- 	u32 tz_dsttime;
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index a73ae1e49200..3bcb897cb972 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -66,9 +66,9 @@
  
-+	u32 btm_sec;		/* monotonic to boot time */
-+	u32 btm_nsec;
- 	/* Raw clocksource multipler */
- 	u32 cs_raw_mult;
- 	/* Raw time */
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index c299967df63c..51d8dcbd9952 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -337,6 +337,8 @@ void update_vsyscall(struct timekeeper *tk)
- 	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
+ #define STACK_TOP_MAX		TASK_SIZE_64
+ #ifdef CONFIG_COMPAT
+-#define AARCH32_VECTORS_BASE	0xffff0000
++#define AARCH32_KUSER_HELPERS_BASE 0xffff0000
+ #define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
+-				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
++				AARCH32_KUSER_HELPERS_BASE : STACK_TOP_MAX)
+ #else
+ #define STACK_TOP		STACK_TOP_MAX
+ #endif /* CONFIG_COMPAT */
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index 81abea0b7650..58e288aaf0ba 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -20,8 +20,6 @@
+ #ifdef CONFIG_COMPAT
+ #include <linux/compat.h>
  
- 	if (!vdso_data->use_syscall) {
-+		struct timespec btm = ktime_to_timespec(tk->offs_boot);
-+
- 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
- 		vdso_data->raw_time_sec		= tk->raw_sec;
- 		vdso_data->raw_time_nsec	= tk->tkr_raw.xtime_nsec;
-@@ -347,6 +349,8 @@ void update_vsyscall(struct timekeeper *tk)
- 		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
- 		vdso_data->cs_mask		= tk->tkr_mono.mask;
-+		vdso_data->btm_sec		= btm.tv_sec;
-+		vdso_data->btm_nsec		= btm.tv_nsec;
+-#define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
+-
+ int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 		       struct pt_regs *regs);
+ int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 77b91f478995..9c018878056b 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -393,14 +393,13 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 		retcode = ptr_to_compat(ka->sa.sa_restorer);
+ 	} else {
+ 		/* Set up sigreturn pointer */
++		void *sigreturn_base = current->mm->context.vdso;
+ 		unsigned int idx = thumb << 1;
+ 
+ 		if (ka->sa.sa_flags & SA_SIGINFO)
+ 			idx += 3;
+ 
+-		retcode = AARCH32_VECTORS_BASE +
+-			  AARCH32_KERN_SIGRET_CODE_OFFSET +
+-			  (idx << 2) + thumb;
++		retcode = ptr_to_compat(sigreturn_base) + (idx << 2) + thumb;
  	}
  
- 	vdso_write_end(vdso_data);
-diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-index 95f4a7abab80..348b9be9efe7 100644
---- a/arch/arm64/include/asm/vdso_datapage.h
-+++ b/arch/arm64/include/asm/vdso_datapage.h
-@@ -45,6 +45,8 @@ struct vdso_data {
- 	__u64 xtime_coarse_nsec;
- 	__u64 wtm_clock_sec;	/* Wall to monotonic time */
- 	vdso_wtm_clock_nsec_t wtm_clock_nsec;
-+	__u32 btm_sec;		/* monotonic to boot time */
-+	__u32 btm_nsec;
- 	__u32 tb_seq_count;	/* Timebase sequence counter */
- 	/* cs_* members must be adjacent and in this order (ldp accesses) */
- 	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
+ 	regs->regs[0]	= usig;
 diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 59f150c25889..8dd2ad220a0f 100644
+index 8dd2ad220a0f..5398f6454ce1 100644
 --- a/arch/arm64/kernel/vdso.c
 +++ b/arch/arm64/kernel/vdso.c
-@@ -233,6 +233,8 @@ void update_vsyscall(struct timekeeper *tk)
- 	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
+@@ -1,5 +1,7 @@
+ /*
+- * VDSO implementation for AArch64 and vector page setup for AArch32.
++ * Additional userspace pages setup for AArch64 and AArch32.
++ *  - AArch64: vDSO pages setup, vDSO data page update.
++ *  - AArch32: sigreturn and kuser helpers pages setup.
+  *
+  * Copyright (C) 2012 ARM Limited
+  *
+@@ -53,32 +55,51 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
+ /*
+  * Create and map the vectors page for AArch32 tasks.
+  */
+-static struct page *vectors_page[1] __ro_after_init;
++static struct page *vectors_page[] __ro_after_init;
++static const struct vm_special_mapping compat_vdso_spec[] = {
++	{
++		/* Must be named [sigpage] for compatibility with arm. */
++		.name	= "[sigpage]",
++		.pages	= &vectors_page[0],
++	},
++	{
++		.name	= "[kuserhelpers]",
++		.pages	= &vectors_page[1],
++	},
++};
++static struct page *vectors_page[ARRAY_SIZE(compat_vdso_spec)] __ro_after_init;
  
- 	if (!use_syscall) {
-+		struct timespec btm = ktime_to_timespec(tk->offs_boot);
-+
- 		/* tkr_mono.cycle_last == tkr_raw.cycle_last */
- 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
- 		vdso_data->raw_time_sec         = tk->raw_sec;
-@@ -243,6 +245,8 @@ void update_vsyscall(struct timekeeper *tk)
- 		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
- 		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
-+		vdso_data->btm_sec		= btm.tv_sec;
-+		vdso_data->btm_nsec		= btm.tv_nsec;
- 	}
+ static int __init alloc_vectors_page(void)
+ {
+ 	extern char __kuser_helper_start[], __kuser_helper_end[];
+-	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
++	size_t kuser_sz = __kuser_helper_end - __kuser_helper_start;
++	unsigned long kuser_vpage;
  
- 	smp_wmb();
-diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
-index 33c5917fe9f8..4c3af7bc6499 100644
---- a/lib/vdso/vgettimeofday.c
-+++ b/lib/vdso/vgettimeofday.c
-@@ -247,6 +247,51 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
+-	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
+-	int sigret_sz = __aarch32_sigret_code_end - __aarch32_sigret_code_start;
+-	unsigned long vpage;
+-
+-	vpage = get_zeroed_page(GFP_ATOMIC);
++	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
++	size_t sigret_sz =
++		__aarch32_sigret_code_end - __aarch32_sigret_code_start;
++	unsigned long sigret_vpage;
+ 
+-	if (!vpage)
++	sigret_vpage = get_zeroed_page(GFP_ATOMIC);
++	if (!sigret_vpage)
+ 		return -ENOMEM;
+ 
+-	/* kuser helpers */
+-	memcpy((void *)vpage + 0x1000 - kuser_sz, __kuser_helper_start,
+-		kuser_sz);
++	kuser_vpage = get_zeroed_page(GFP_ATOMIC);
++	if (!kuser_vpage) {
++		free_page(sigret_vpage);
++		return -ENOMEM;
++	}
+ 
+ 	/* sigreturn code */
+-	memcpy((void *)vpage + AARCH32_KERN_SIGRET_CODE_OFFSET,
+-               __aarch32_sigret_code_start, sigret_sz);
++	memcpy((void *)sigret_vpage, __aarch32_sigret_code_start, sigret_sz);
++	flush_icache_range(sigret_vpage, sigret_vpage + PAGE_SIZE);
++	vectors_page[0] = virt_to_page(sigret_vpage);
+ 
+-	flush_icache_range(vpage, vpage + PAGE_SIZE);
+-	vectors_page[0] = virt_to_page(vpage);
++	/* kuser helpers */
++	memcpy((void *)kuser_vpage + 0x1000 - kuser_sz, __kuser_helper_start,
++		kuser_sz);
++	flush_icache_range(kuser_vpage, kuser_vpage + PAGE_SIZE);
++	vectors_page[1] = virt_to_page(kuser_vpage);
+ 
  	return 0;
  }
+@@ -87,23 +108,32 @@ arch_initcall(alloc_vectors_page);
+ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
+-	unsigned long addr = AARCH32_VECTORS_BASE;
+-	static const struct vm_special_mapping spec = {
+-		.name	= "[vectors]",
+-		.pages	= vectors_page,
+-
+-	};
++	unsigned long addr;
+ 	void *ret;
  
-+static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
-+{
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last;
-+	vdso_wtm_clock_nsec_t wtm_nsec;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
-+	u64 mask;
-+#endif
-+	__kernel_time_t sec;
-+
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		if (vd->use_syscall)
-+			return -1;
-+
-+		cycle_last = vd->cs_cycle_last;
-+
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
-+		mask = vd->cs_mask;
-+#endif
-+
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
-+
-+		sec += vd->wtm_clock_sec + vd->btm_sec;
-+		wtm_nsec = vd->wtm_clock_nsec + vd->btm_nsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	nsec += wtm_nsec;
-+
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
-+
-+	return 0;
-+}
-+
- #else /* ARCH_PROVIDES_TIMER */
+ 	if (down_write_killable(&mm->mmap_sem))
+ 		return -EINTR;
+-	current->mm->context.vdso = (void *)addr;
++	addr = get_unmapped_area(NULL, 0, PAGE_SIZE, 0, 0);
++	if (IS_ERR_VALUE(addr)) {
++		ret = ERR_PTR(addr);
++		goto out;
++	}
  
- static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
-@@ -265,6 +310,12 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- 	return -1;
- }
+-	/* Map vectors page at the high address. */
+ 	ret = _install_special_mapping(mm, addr, PAGE_SIZE,
+-				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
+-				       &spec);
++				       VM_READ|VM_EXEC|
++				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
++				       &compat_vdso_spec[0]);
++	if (IS_ERR(ret))
++		goto out;
  
-+static notrace int do_boottime(const struct vdso_data *vd,
-+			       struct timespec *ts)
-+{
-+	return -1;
-+}
++	current->mm->context.vdso = (void *)addr;
 +
- #endif /* ARCH_PROVIDES_TIMER */
++	/* Map the kuser helpers at the ABI-defined high address. */
++	ret = _install_special_mapping(mm, AARCH32_KUSER_HELPERS_BASE,
++				       PAGE_SIZE,
++				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
++				       &compat_vdso_spec[1]);
++out:
+ 	up_write(&mm->mmap_sem);
  
- notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
-@@ -290,6 +341,10 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- 		if (do_monotonic_raw(vd, ts))
- 			goto fallback;
- 		break;
-+	case CLOCK_BOOTTIME:
-+		if (do_boottime(vd, ts))
-+			goto fallback;
-+		break;
- 	default:
- 		goto fallback;
- 	}
-@@ -326,6 +381,7 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
- 	long nsec;
- 
- 	if (clock == CLOCK_REALTIME ||
-+	    clock == CLOCK_BOOTTIME ||
- 	    clock == CLOCK_MONOTONIC ||
- 	    clock == CLOCK_MONOTONIC_RAW)
- 		nsec = MONOTONIC_RES_NSEC;
+ 	return PTR_ERR_OR_ZERO(ret);
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
