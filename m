@@ -1,44 +1,41 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 18 Jun 2018 18:01:50 +0200
-Subject: [PATCH v4 03/19] dt-bindings: sram: sunxi: Add A13 binding for
- the C1 SRAM region
-In-Reply-To: <20180618145843.14631-4-paul.kocialkowski@bootlin.com>
-References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
- <20180618145843.14631-4-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618160150.cowgucupmsm47tl7@flea>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 18 Jun 2018 18:03:17 +0200
+Subject: [PATCH] ARM: dts: imx6: RIoTboard Add chosen stdout-path property
+In-Reply-To: <20180618154257.16919-1-manu@freebsd.org>
+References: <20180618154257.16919-1-manu@freebsd.org>
+Message-ID: <1529337797.7211.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 04:58:27PM +0200, Paul Kocialkowski wrote:
-> This introduces a dedicated binding for the C1 SRAM region for the A13
-> sunxi platform.
+Am Montag, den 18.06.2018, 17:42 +0200 schrieb Emmanuel Vadot:
+> The RIoTboard debug uart is connected to serial1.
+> Add a chosen property in the DTS so OS knows what serial port to use for
+> the console.
 > 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> ---
+> ?arch/arm/boot/dts/imx6dl-riotboard.dts | 4 ++++
+> ?1 file changed, 4 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> index 5af5bafd5572..ddc82cbd7f4d 100644
-> --- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> @@ -32,6 +32,9 @@ The valid sections compatible for A10 are:
->      - allwinner,sun4i-a10-sram-c1
->      - allwinner,sun4i-a10-sram-d
->  
-> +The valid sections compatible for A13 are:
-> +    - allwinner,sun5i-a13-sram-c1
+> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> index 2e98c92adff7..315d2ae6fa45 100644
+> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> @@ -19,6 +19,10 @@
+> > ?		reg = <0x10000000 0x40000000>;
+> > ?	};
+> ?
+> > +	chosen {
+> +		stdout-path = "serial1:115200n8";
 
-It supports more SRAM than that, namely the SRAM A3-A4, C1 and D, at
-least.
+If there a reason to deviate from the "stdout-path = &uart1;" notation
+used by other i.MX boards?
 
-Maxime
+Regards,
+Lucas
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180618/8a70d486/attachment.sig>
+> +	};
+> +
+> > ?	regulators {
+> > ?		compatible = "simple-bus";
+> > ?		#address-cells = <1>;
