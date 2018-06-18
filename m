@@ -1,50 +1,72 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 18 Jun 2018 13:32:47 +0200
-Subject: [PATCH 01/11] i2c: add helpers for locking the I2C segment
-In-Reply-To: <20180618110502.cb5s24srp4frahm6@ninjato>
-References: <20180615101506.8012-1-peda@axentia.se>
- <20180615101506.8012-2-peda@axentia.se>
- <20180618110502.cb5s24srp4frahm6@ninjato>
-Message-ID: <b860025e-3d4b-f333-80b4-3831dd969757@axentia.se>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 Jun 2018 12:40:07 +0100
+Subject: [PATCH] power: vexpress: fix corruption in notifier registration
+Message-ID: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-06-18 13:05, Wolfram Sang wrote:
-> 
->> +static inline void
->> +i2c_lock_segment(struct i2c_adapter *adapter)
->> +{
->> +	i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
->> +}
->> +
->> +static inline int
->> +i2c_trylock_segment(struct i2c_adapter *adapter)
->> +{
->> +	return i2c_trylock_bus(adapter, I2C_LOCK_SEGMENT);
->> +}
->> +
->> +static inline void
->> +i2c_unlock_segment(struct i2c_adapter *adapter)
->> +{
->> +	i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
->> +}
-> 
-> I wonder if i2c_lock_segment() and i2c_lock_root_adapter() are really
-> more readable and convenient than i2c_lock_bus() with the flag. I think
-> the flags have speaking names, too.
-> 
-> Is that an idea to remove these functions altogether and start using
-> i2c_lock_bus()?
+Vexpress platforms provide two different restart handlers: SYS_REBOOT
+that restart the entire system, while DB_RESET only restarts the
+daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
+if it exists.
 
-That would be fine with me. I don't have a strong opinion and agree that
-both are readable enough...
+notifier_chain_register used in register_restart_handler by design
+allows notifier to be registered once only, however vexpress restart
+notifier can get registered twice. When this happen it corrupts list
+of notifiers, as result some notifiers can be not called on proper
+event, traverse on list can be cycled forever, and second unregister
+can access already freed memory.
 
-It would make for a reduction of the number of lines so that's nice, but
-the macro in drivers/i2c/busses/i2c-gpio.c (patch 11) would not fit in
-the current \-width (or whatever you'd call that line of backslashes to
-the right in a multi-line macro).
+So far, since this was the only restart handler in the system, no issue
+was observed even if the same notifier was registered twice. However
+commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
+support for SP805 restart handlers and since the system under test
+contains two vexpress restart and two SP805 watchdog instances, it was
+observed that during the boot traversing the restart handler list looped
+forever as there's a cycle in that list resulting in boot hang.
 
-Does anyone have a strong opinion?
+This patch fixes the issues by ensuring that the notifier is installed
+only once.
 
-Cheers,
-Peter
+Cc: Sebastian Reichel <sre@kernel.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/power/reset/vexpress-poweroff.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
+index 102f95a09460..cdc68eb06a91 100644
+--- a/drivers/power/reset/vexpress-poweroff.c
++++ b/drivers/power/reset/vexpress-poweroff.c
+@@ -35,6 +35,7 @@ static void vexpress_reset_do(struct device *dev, const char *what)
+ }
+ 
+ static struct device *vexpress_power_off_device;
++static atomic_t vexpress_restart_nb_refcnt = ATOMIC_INIT(0);
+ 
+ static void vexpress_power_off(void)
+ {
+@@ -96,13 +97,16 @@ static const struct of_device_id vexpress_reset_of_match[] = {
+ 
+ static int _vexpress_register_restart_handler(struct device *dev)
+ {
+-	int err;
++	int err = 0;
+ 
+ 	vexpress_restart_device = dev;
+-	err = register_restart_handler(&vexpress_restart_nb);
+-	if (err) {
+-		dev_err(dev, "cannot register restart handler (err=%d)\n", err);
+-		return err;
++	if (atomic_inc_return(&vexpress_restart_nb_refcnt) == 1) {
++		err = register_restart_handler(&vexpress_restart_nb);
++		if (err) {
++			dev_err(dev, "cannot register restart handler (err=%d)\n", err);
++			atomic_dec(&vexpress_restart_nb_refcnt);
++			return err;
++		}
+ 	}
+ 	device_create_file(dev, &dev_attr_active);
+ 
+-- 
+2.7.4
