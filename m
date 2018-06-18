@@ -1,30 +1,76 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 18 Jun 2018 20:37:50 +0200
-Subject: [PATCH 2/2] arm64: dts: exynos: Remove unneeded DSI and DECON
- address/size cells in Exynos5433
-In-Reply-To: <20180618174216.24801-2-krzk@kernel.org>
-References: <20180618174216.24801-1-krzk@kernel.org>
- <20180618174216.24801-2-krzk@kernel.org>
-Message-ID: <20180618183750.elfphari7vw2v2sl@kozik-lap>
+From: trini@konsulko.com (Tom Rini)
+Date: Mon, 18 Jun 2018 14:48:17 -0400
+Subject: [U-Boot] [PATCH 0/4] ARM: Provide workaround setup bits for
+ CVE-2017-5715 (A8/A15)
+In-Reply-To: <20180612202411.29798-1-nm@ti.com>
+References: <20180612202411.29798-1-nm@ti.com>
+Message-ID: <20180618184817.GK4609@bill-the-cat.ec.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 07:42:16PM +0200, Krzysztof Kozlowski wrote:
-> The decon, decon_tv and dsi nodes have only one child port so
-> address/size mappings are not necessary.  This fixes DTC warnings like:
-> 
->     Warning (graph_child_address): /soc/decon at 13800000/ports:
->         graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi |  6 +-----
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi            | 12 ++----------
->  2 files changed, 3 insertions(+), 15 deletions(-)
+On Tue, Jun 12, 2018 at 03:24:07PM -0500, Nishanth Menon wrote:
 
-The patch 1/2 should not have any impact but this one could have and I forgot
-to mention that it was not tested.  If someone could provide testing, it
-would be highly appreciated.
+> Hi,
+> 
+> This is a follow on from https://marc.info/?l=u-boot&m=151691688828176&w=2 (RFC)
+> 
+> NOTE:
+> * As per ARM recommendations[2], and discussions in list[1] ARM
+>   Cortex-A9/12/17 do not need additional steps in u-boot to enable the
+>   OS level workarounds.
+> * This itself is'nt a complete solution and is based on recommendation
+>   This from Arm[2] for variant 2 CVE-2017-5715 -> Kernel changes can be seen on
+>   linux next (next-20180612) or on linux master (upcoming v4.18-rc1 tag).
+> * I think it is necessary on older SoCs without firmware support
+>   (such as older OMAPs and AM*) to have kernel support mirroring what we do in
+>   u-boot to support additional cores AND/OR low power states where contexts are
+>   lost (assuming ACR states are'nt saved). just my 2 cents.
+> 
+> Few of the tests (with linux next-20180612):
+> AM571-IDK: https://pastebin.ubuntu.com/p/sr5X6sN3Tr/ (single core A15)
+> OMAP5-uEVM: https://pastebin.ubuntu.com/p/9yDM22bJ6n/ (dual core A15)
+> OMAP3-beagle-xm: https://pastebin.ubuntu.com/p/9DfDkpyxym/ (Single A8)
+> AM335x-Beaglebone-black: https://pastebin.ubuntu.com/p/DczT9jPMwb/ (Single A8)
+> 
+> Nishanth Menon (4):
+>   ARM: Introduce ability to enable ACR::IBE on Cortex-A8 for
+>     CVE-2017-5715
+>   ARM: Introduce ability to enable invalidate of BTB with ICIALLU on
+>     Cortex-A15 for CVE-2017-5715
+>   ARM: mach-omap2: omap5/dra7: Enable ACTLR[0] (Enable invalidates of
+>     BTB) to facilitate CVE_2017-5715 WA in OS
+>   ARM: mach-omap2: omap3/am335x: Enable ACR::IBE on Cortex-A8 SoCs for
+>     CVE-2017-5715
+> 
+>  arch/arm/Kconfig            |  9 +++++++++
+>  arch/arm/cpu/armv7/start.S  | 15 +++++++++++++--
+>  arch/arm/mach-omap2/Kconfig |  3 +++
+>  3 files changed, 25 insertions(+), 2 deletions(-)
+> 
+> [1] https://marc.info/?t=151639906500002&r=1&w=2
+> [2] https://developer.arm.com/support/security-update
+> [3] https://marc.info/?t=151543790400007&r=1&w=2 and the latest in:
+> 	https://marc.info/?l=linux-arm-kernel&m=151689379521082&w=2
+> [4]
+> 	https://github.com/ARM-software/arm-trusted-firmware/wiki/ARM-Trusted-Firmware-Security-Advisory-TFV-6
+> 	https://www.op-tee.org/security-advisories/
+> 	https://www.linaro.org/blog/meltdown-spectre/
 
-Best regards,
-Krzysztof
+This series of changes for U-Boot, if I can briefly summarize the
+feedback as I understand it, is that yes, this is correct and is a part
+of what is required to work around the issues, but only covers as much
+of the system as U-Boot can cover leaving other parts of the software
+stack (still) in need of fixes.  Yes?  If so, is there anything else
+that should be done before in U-Boot we grab these changes?  Would any
+of the knowledgeable but not usually U-Boot folks on CC feel comfortable
+adding an ack/reviewed-by to the series?  Thanks!
+
+-- 
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180618/fbdc1526/attachment.sig>
