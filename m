@@ -1,115 +1,69 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:05:59 -0700
-Subject: RESEND [PATCH] lib: vdso: add support for time
-In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
-References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-14-salyzyn@android.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Mon, 18 Jun 2018 16:58:43 +0200
+Subject: [PATCH v4 19/19] ARM: dts: sun8i-a33: Add Video Engine and reserved
+ memory nodes
+In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
+References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180618145843.14631-20-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salyzyn <salyzyn@google.com>
+This adds nodes for the Video Engine and the associated reserved memory
+for the A33. Up to 96 MiB of memory are dedicated to the CMA pool.
 
-Add time() vdso support to match up with existing support in the x86's
-vdso.  Currently benefitting arm and arm64 which uses the common
-vgettimeofday.c implementation.  On arm provides about a ~14 fold
-improvement in speed over the straight syscall, and about a ~5 fold
-improvement in speed over an alternate library implementation that
-relies on the vdso call to gettimeofday to fulfill the request.
+The VPU can only map the first 256 MiB of DRAM, so the reserved memory
+pool has to be located in that area. Following Allwinner's decision in
+downstream software, the last 96 MiB of the first 256 MiB of RAM are
+reserved for this purpose.
 
-We can provide __vdso_time even if we can not provide a speed
-enhanced __vdso_gettimeofday. (arm, virtual counters).
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Andrew Pinski <apinski@cavium.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Jeremy Linton <Jeremy.Linton@arm.com>
----
- arch/arm/kernel/vdso.c            |  1 +
- arch/arm/vdso/vdso.lds.S          |  1 +
- arch/arm64/kernel/vdso/compiler.h |  1 +
- arch/arm64/kernel/vdso/vdso.lds.S |  1 +
- lib/vdso/vgettimeofday.c          | 10 ++++++++++
- 5 files changed, 14 insertions(+)
-
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 51d8dcbd9952..6721854c5ae6 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -192,6 +192,7 @@ static void __init patch_vdso(void *ehdr)
- 		vdso_nullpatch_one(&einfo, "__vdso_gettimeofday");
- 		vdso_nullpatch_one(&einfo, "__vdso_clock_gettime");
- 		vdso_nullpatch_one(&einfo, "__vdso_clock_getres");
-+		/* do not zero out __vdso_time, no cntvct_ok dependency */
- 	}
- }
- 
-diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
-index 1d81e8c3acf6..1eb577091d1f 100644
---- a/arch/arm/vdso/vdso.lds.S
-+++ b/arch/arm/vdso/vdso.lds.S
-@@ -83,6 +83,7 @@ VERSION
- 		__vdso_clock_gettime;
- 		__vdso_gettimeofday;
- 		__vdso_clock_getres;
-+		__vdso_time;
- 	local: *;
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index 97a976b3b1ef..c5c108a11285 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -181,6 +181,21 @@
+ 		reg = <0x40000000 0x80000000>;
  	};
- }
-diff --git a/arch/arm64/kernel/vdso/compiler.h b/arch/arm64/kernel/vdso/compiler.h
-index 921a7191b497..fb27545640f2 100644
---- a/arch/arm64/kernel/vdso/compiler.h
-+++ b/arch/arm64/kernel/vdso/compiler.h
-@@ -65,5 +65,6 @@ static __always_inline notrace u64 arch_vdso_read_counter(void)
- #define __vdso_clock_gettime __kernel_clock_gettime
- #define __vdso_gettimeofday __kernel_gettimeofday
- #define __vdso_clock_getres __kernel_clock_getres
-+#define __vdso_time __kernel_time
  
- #endif /* __VDSO_COMPILER_H */
-diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
-index beca249bc2f3..9de0ffc369c5 100644
---- a/arch/arm64/kernel/vdso/vdso.lds.S
-+++ b/arch/arm64/kernel/vdso/vdso.lds.S
-@@ -88,6 +88,7 @@ VERSION
- 		__kernel_gettimeofday;
- 		__kernel_clock_gettime;
- 		__kernel_clock_getres;
-+		__kernel_time;
- 	local: *;
- 	};
- }
-diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
-index 54e519c99c4b..dfced9608cd3 100644
---- a/lib/vdso/vgettimeofday.c
-+++ b/lib/vdso/vgettimeofday.c
-@@ -386,3 +386,13 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
++		cma_pool: cma at 4a000000 {
++			compatible = "shared-dma-pool";
++			size = <0x6000000>;
++			alloc-ranges = <0x4a000000 0x6000000>;
++			reusable;
++			linux,cma-default;
++		};
++	};
++
+ 	sound: sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "sun8i-a33-audio";
+@@ -262,6 +277,20 @@
+ 			};
+ 		};
  
- 	return 0;
- }
++		vpu: video-codec at 01c0e000 {
++			compatible = "allwinner,sun8i-a33-video-engine";
++			reg = <0x01c0e000 0x1000>;
 +
-+notrace time_t __vdso_time(time_t *t)
-+{
-+	const struct vdso_data *vd = __get_datapage();
-+	time_t result = READ_ONCE(vd->xtime_coarse_sec);
++			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
++				 <&ccu CLK_DRAM_VE>;
++			clock-names = "ahb", "mod", "ram";
 +
-+	if (t)
-+		*t = result;
-+	return result;
-+}
++			resets = <&ccu RST_BUS_VE>;
++
++			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++			allwinner,sram = <&ve_sram 1>;
++		};
++
+ 		crypto: crypto-engine at 1c15000 {
+ 			compatible = "allwinner,sun4i-a10-crypto";
+ 			reg = <0x01c15000 0x1000>;
 -- 
-2.18.0.rc1.244.gcf134e6275-goog
+2.17.0
