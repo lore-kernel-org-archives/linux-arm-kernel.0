@@ -1,50 +1,63 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 Jun 2018 14:18:36 +0100
-Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for CPU
- hotplug
-Message-ID: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+Date: Mon, 18 Jun 2018 14:18:39 +0100
+Subject: [PATCH v2 3/7] arm64: topology: add support to remove cpu topology
+ sibling masks
+In-Reply-To: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1529327923-17911-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds support to remove all the CPU topology information using
+clear_cpu_topology and also resetting the sibling information on other
+sibling CPUs. This will be used in cpu_disable so that all the topology
+sibling information is removed on CPU hotplug out.
 
-Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from core_siblings")
-was reported to cause some hotplug and system suspend regressions when
-it was merged. On investigation, it was found that unlike x86/PPC,
-arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
-somewhat expected from the scheduler.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/include/asm/topology.h |  1 +
+ arch/arm64/kernel/topology.c      | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-Since these changes were bit invasive as a solution to the above
-mentioned regression, as small change was temporarily applied as a fix.
-This series updates the cpu and numa masks on CPU hotplug and reverts
-that temporary fix.
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index df48212f767b..fb996f454305 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -23,6 +23,7 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
 
-It would be good to get this tested(CPU hotplug - few and all CPUs in
-a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
+ void init_cpu_topology(void);
+ void store_cpu_topology(unsigned int cpuid);
++void remove_cpu_topology(unsigned int cpuid);
+ const struct cpumask *cpu_coregroup_mask(int cpu);
 
-Regards,
-Sudeep
+ #ifdef CONFIG_NUMA
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 6ea3ec49d418..38b102013708 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -322,6 +322,21 @@ static void __init reset_cpu_topology(void)
+ 		clear_cpu_topology(cpu, true);
+ }
 
-v1->v2:
-	- Rebased on v4.18-rc1 and hence do revert of the temporary fix
-	  that was merged for v4.18
-	- Removed one of the wrong use of possible_mask
-
-Sudeep Holla (7):
-  arm64: topology: refactor reset_cpu_topology to add support for removing topology
-  arm64: numa: separate out updates to percpu nodeid and NUMA node cpumap
-  arm64: topology: add support to remove cpu topology sibling masks
-  arm64: topology: restrict updating siblings_masks to online cpus only
-  arm64: smp: remove cpu and numa topology information when hotplugging out CPU
-  arm64: topology: rename llc_siblings to align with other struct members
-  arm64: topology: re-introduce numa mask check for scheduler MC selection
-
- arch/arm64/include/asm/numa.h     |  4 +++
- arch/arm64/include/asm/topology.h |  3 +-
- arch/arm64/kernel/smp.c           |  5 +++
- arch/arm64/kernel/topology.c      | 69 ++++++++++++++++++++++++++-------------
- arch/arm64/mm/numa.c              | 29 +++++++++++-----
- 5 files changed, 79 insertions(+), 31 deletions(-)
-
++#define cpu_llc_shared_mask(cpu)	(&cpu_topology[cpu].llc_siblings)
++void remove_cpu_topology(unsigned int cpu)
++{
++	int sibling;
++
++	for_each_cpu(sibling, topology_core_cpumask(cpu))
++		cpumask_clear_cpu(cpu, topology_core_cpumask(sibling));
++	for_each_cpu(sibling, topology_sibling_cpumask(cpu))
++		cpumask_clear_cpu(cpu, topology_sibling_cpumask(sibling));
++	for_each_cpu(sibling, cpu_llc_shared_mask(cpu))
++		cpumask_clear_cpu(cpu, cpu_llc_shared_mask(sibling));
++
++	clear_cpu_topology(cpu, false);
++}
++
+ #ifdef CONFIG_ACPI
+ /*
+  * Propagate the topology information of the processor_topology_node tree to the
 --
 2.7.4
