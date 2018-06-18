@@ -1,69 +1,46 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 18 Jun 2018 16:58:41 +0200
-Subject: [PATCH v4 17/19] ARM: dts: sun5i: Add Video Engine and reserved
- memory nodes
+Date: Mon, 18 Jun 2018 16:58:35 +0200
+Subject: [PATCH v4 11/19] ARM: sun7i-a20: Add support for the C1 SRAM region
+ with the SRAM controller
 In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
 References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618145843.14631-18-paul.kocialkowski@bootlin.com>
+Message-ID: <20180618145843.14631-12-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds nodes for the Video Engine and the associated reserved memory
-for sun5i-based platforms. Up to 96 MiB of memory are dedicated to the
-CMA pool.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+This adds support for the C1 SRAM region (to be used with the SRAM
+controller driver) for the A20 platform. The region is shared
+between the Video Engine and the CPU.
 
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 6fa9e28edc59..3138f791b6b2 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -108,6 +108,21 @@
- 		};
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+		cma_pool: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			size = <0x6000000>;
-+			alloc-ranges = <0x4a000000 0x6000000>;
-+			reusable;
-+			linux,cma-default;
-+		};
-+	};
-+
- 	soc at 1c00000 {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -292,6 +307,19 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index f64eab4ce6f1..9afd82f9ec79 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -274,6 +274,20 @@
+ 					status = "disabled";
+ 				};
  			};
++
++			sram_c: sram at 1d00000 {
++				compatible = "mmio-sram";
++				reg = <0x01d00000 0xd00000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x01d00000 0xd00000>;
++
++				ve_sram: sram-section at 0 {
++					compatible = "allwinner,sun7i-a20-sram-c1",
++						     "allwinner,sun4i-a10-sram-c1";
++					reg = <0x000000 0x80000>;
++				};
++			};
  		};
  
-+		vpu: video-codec at 1c0e000 {
-+			compatible = "allwinner,sun5i-a13-video-engine";
-+			reg = <0x01c0e000 0x1000>;
-+
-+			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+
-+			resets = <&ccu RST_VE>;
-+			interrupts = <53>;
-+			allwinner,sram = <&ve_sram 1>;
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c0f000 0x1000>;
+ 		nmi_intc: interrupt-controller at 1c00030 {
 -- 
 2.17.0
