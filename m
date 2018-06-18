@@ -1,30 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Jun 2018 01:28:58 -0700
-Subject: Charge counter on droid 4
-In-Reply-To: <20180618074023.GA16955@amd>
-References: <20180615080014.GA29192@amd> <20180615083156.GA32102@amd>
- <20180618065827.GN112168@atomide.com> <20180618074023.GA16955@amd>
-Message-ID: <20180618082858.GO112168@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 18 Jun 2018 10:13:32 +0200
+Subject: [PATCH 4.14 116/189] spi: bcm2835aux: ensure interrupts are enabled
+ for shared handler
+In-Reply-To: <20180618081209.254234434@linuxfoundation.org>
+References: <20180618081209.254234434@linuxfoundation.org>
+Message-ID: <20180618081213.916723840@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180618 07:43]:
-> 
-> So... there are mA, mAh values. Those come from hardware, and I
-> believe we should keep them.
-> 
-> But there are also mW, mWh values, which are synthetic. Userland can
-> compute them from mV, mA values... and it is confusing that kernel
-> provides them. (My tendency was to start computing these synthetic
-> values in userland, to compare them with "real hardware" values from
-> kernel. But then I looked at kernel implementation, and realized they
-> are synthetic, tooo...)
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
-Hmm mWh value is based on the hardware sampled shunt
-values and number of samples gathered between the
-two readings. I'd rather call the calculated values
-based on userland reading mV and mA values "synthetic" :)
+------------------
 
-Regards,
+From: Rob Herring <robh@kernel.org>
 
-Tony
+[ Upstream commit bc519d9574618e47a0c788000fb78da95e18d953 ]
+
+The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
+Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
+DT change which breaks compatibility with older kernels. The AUX irqchip
+was already rejected for upstream[1] and the DT change would break
+working systems if the DTB is updated to a newer one. The latter issue
+was brought to my attention by Alex Graf.
+
+The root cause however is a bug in the shared handler. Shared handlers
+must check that interrupts are actually enabled before servicing the
+interrupt. Add a check that the TXEMPTY or IDLE interrupts are enabled.
+
+[1] https://patchwork.kernel.org/patch/9781221/
+
+Cc: Alexander Graf <agraf@suse.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-spi at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/spi/spi-bcm2835aux.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -184,6 +184,11 @@ static irqreturn_t bcm2835aux_spi_interr
+ 	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+ 	irqreturn_t ret = IRQ_NONE;
+ 
++	/* IRQ may be shared, so return if our interrupts are disabled */
++	if (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_CNTL1) &
++	      (BCM2835_AUX_SPI_CNTL1_TXEMPTY | BCM2835_AUX_SPI_CNTL1_IDLE)))
++		return ret;
++
+ 	/* check if we have data to read */
+ 	while (bs->rx_len &&
+ 	       (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_STAT) &
