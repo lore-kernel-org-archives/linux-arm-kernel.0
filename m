@@ -1,47 +1,100 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 18 Jun 2018 18:02:50 +0200
-Subject: [PATCH v4 01/19] dt-bindings: sram: sunxi: Add A13, A20 and A33
- SRAM controller bindings
-In-Reply-To: <20180618145843.14631-2-paul.kocialkowski@bootlin.com>
-References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
- <20180618145843.14631-2-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618160250.ik44c3gcbdxylmyd@flea>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 18 Jun 2018 09:03:26 -0700
+Subject: [PATCH 2/5] net: emaclite: Balance braces in else statement
+In-Reply-To: <1529322610-27215-3-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1529322610-27215-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1529322610-27215-3-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <644296b273a76469baf641dd712c7a5451cd34fe.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 04:58:25PM +0200, Paul Kocialkowski wrote:
-> This introduces dedicated bindings for the SRAM controllers found on the
-> A13, A20 and A33 sunxi platforms.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+On Mon, 2018-06-18 at 17:20 +0530, Radhey Shyam Pandey wrote:
+> Remove else as it is not required with if doing a return.
+> Fixes below checkpatch warning.
 
-Explaining why you need to add these new compatibles would be great.
+> WARNING: else is not generally useful after a break or return
 
-> diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> index d087f04a4d7f..19cc0b892672 100644
-> --- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> @@ -11,6 +11,9 @@ Controller Node
->  Required properties:
->  - compatible : should be:
->      - "allwinner,sun4i-a10-sram-controller"
-> +    - "allwinner,sun5i-a13-sram-controller"
-> +    - "allwinner,sun7i-a20-sram-controller"
-> +    - "allwinner,sun8i-a33-sram-controller"
+checkpatch is stupid and doesn't understand code flow.
+Always try to improve code flow instead of merely
+following brainless instructions from a script.
 
-And I think Chen-Yu asked you to rename this compatible to
--system-controller for the previous iteration?
+So:
 
-Maxime
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+[]
+> @@ -569,13 +569,11 @@ static void xemaclite_tx_handler(struct net_device *dev)
+>  					(u8 *) lp->deferred_skb->data,
+>  					lp->deferred_skb->len) != 0)
+>  			return;
+> -		else {
+> -			dev->stats.tx_bytes += lp->deferred_skb->len;
+> -			dev_kfree_skb_irq(lp->deferred_skb);
+> -			lp->deferred_skb = NULL;
+> -			netif_trans_update(dev); /* prevent tx timeout */
+> -			netif_wake_queue(dev);
+> -		}
+> +		dev->stats.tx_bytes += lp->deferred_skb->len;
+> +		dev_kfree_skb_irq(lp->deferred_skb);
+> +		lp->deferred_skb = NULL;
+> +		netif_trans_update(dev); /* prevent tx timeout */
+> +		netif_wake_queue(dev);
+>  	}
+>  }
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180618/5f55c0f0/attachment-0001.sig>
+If you really want to redo this function, perhaps something like:
+
+static void xemaclite_tx_handler(struct net_device *dev)
+{
+	struct net_local *lp = netdev_priv(dev);
+
+	dev->stats.tx_packets++;
+
+	if (!lp->deferred_skb)
+		return;
+
+	if (xemaclite_send_data(lp, (u8 *)lp->deferred_skb->data,
+				lp->deferred_skb->len))
+		return;
+
+	dev->stats.tx_bytes += lp->deferred_skb->len;
+	dev_kfree_skb_irq(lp->deferred_skb);
+	lp->deferred_skb = NULL;
+	netif_trans_update(dev); /* prevent tx timeout */
+	netif_wake_queue(dev);
+}
+ 
+> @@ -1052,13 +1050,13 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
+>  {
+>  	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+>  
+> -	if (p) {
+> +	if (p)
+>  		return (bool)*p;
+> -	} else {
+> -		dev_warn(&ofdev->dev, "Parameter %s not found,"
+> +
+> +	dev_warn(&ofdev->dev, "Parameter %s not found,"
+>  			"defaulting to false\n", s);
+> -		return false;
+> -	}
+> +
+> +	return false;
+>  }
+
+And this function has backward logic as the failure paths
+are the ones that should return early or use a goto.
+
+Perhaps something like:
+
+static bool get_bool(struct platform_device *ofdev, const char *s)
+{
+	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+
+	if (!p) {
+		dev_warn(&ofdev->dev,
+			 "Parameter '%s' not found, defaulting to false\n", s);
+		return false;
+	}
+
+	return *p;
+}
