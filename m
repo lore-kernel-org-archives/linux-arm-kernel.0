@@ -1,151 +1,99 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jun 2018 13:03:01 +0100
-Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
+Date: Mon, 18 Jun 2018 13:02:53 +0100
+Subject: [PATCHv3 02/19] arm64: move SCTLR_EL{1,
+ 2} assertions to <asm/sysreg.h>
 In-Reply-To: <20180618120310.39527-1-mark.rutland@arm.com>
 References: <20180618120310.39527-1-mark.rutland@arm.com>
-Message-ID: <20180618120310.39527-11-mark.rutland@arm.com>
+Message-ID: <20180618120310.39527-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the syscall invocation logic is in C, we can migrate the rest
-of the syscall entry logic over, so that the entry assembly needn't look
-at the register values at all.
+Currently we assert that the SCTLR_EL{1,2}_{SET,CLEAR} bits are
+self-consistent with an assertion in config_sctlr_el1(). This is a bit
+unusual, since config_sctlr_el1() doesn't make use of these definitions,
+and is far away from the definitions themselves.
 
-The SVE reset across syscall logic now unconditionally clears TIF_SVE,
-but sve_user_disable() will only write back to CPACR_EL1 when SVE is
-actually enabled.
+We can use the CPP #error directive to have equivalent assertions in
+<asm/sysreg.h>, next to the definitions of the set/clear bits, which is
+a bit clearer and simpler.
+
+At the same time, lets fill in the upper 32 bits for both registers in
+their repsective RES0 definitions. This could be a little nicer with
+GENMASK_ULL(63, 32), but this currently lives in <linux/bitops.h>, which
+cannot safely be included from assembly, as <asm/sysreg.h> can.
+
+Note the when the preprocessor evaluates an expression for an #if
+directive, all signed or unsigned values are treated as intmax_t or
+uintmax_t respectively. To avoid ambiguity, we define explicitly define
+the mask of all 64 bits.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S   | 42 ++++--------------------------------------
- arch/arm64/kernel/syscall.c | 40 ++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 42 insertions(+), 40 deletions(-)
+ arch/arm64/include/asm/sysreg.h | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 05b9f03f3e00..156c4e3fd1a4 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -720,14 +720,9 @@ el0_sync_compat:
- 	b.ge	el0_dbg
- 	b	el0_inv
- el0_svc_compat:
--	/*
--	 * AArch32 syscall handling
--	 */
--	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
--	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
--	mov	wscno, w7			// syscall number in w7 (r7)
--	mov     wsc_nr, #__NR_compat_syscalls
--	b	el0_svc_naked
-+	mov	x0, sp
-+	bl	el0_svc_compat_handler
-+	b	ret_to_user
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 6171178075dc..48ad361c178e 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -436,7 +436,8 @@
+ #define SCTLR_EL2_RES0	((1 << 6)  | (1 << 7)  | (1 << 8)  | (1 << 9)  | \
+ 			 (1 << 10) | (1 << 13) | (1 << 14) | (1 << 15) | \
+ 			 (1 << 17) | (1 << 20) | (1 << 24) | (1 << 26) | \
+-			 (1 << 27) | (1 << 30) | (1 << 31))
++			 (1 << 27) | (1 << 30) | (1 << 31) | \
++			 (0xffffffffUL << 32))
  
- 	.align	6
- el0_irq_compat:
-@@ -925,37 +920,8 @@ ENDPROC(ret_to_user)
-  */
- 	.align	6
- el0_svc:
--	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
--	adrp	stbl, sys_call_table		// load syscall table pointer
--	mov	wscno, w8			// syscall number in w8
--	mov	wsc_nr, #__NR_syscalls
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+ #define ENDIAN_SET_EL2		SCTLR_ELx_EE
+@@ -452,9 +453,9 @@
+ 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
+ 			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
+ 
+-/* Check all the bits are accounted for */
+-#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
 -
--#ifdef CONFIG_ARM64_SVE
--alternative_if_not ARM64_SVE
--	b	el0_svc_naked
--alternative_else_nop_endif
--	tbz	x16, #TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
--	bic	x16, x16, #_TIF_SVE		// discard SVE state
--	str	x16, [tsk, #TSK_TI_FLAGS]
--
--	/*
--	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
--	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
--	 * happens if a context switch or kernel_neon_begin() or context
--	 * modification (sigreturn, ptrace) intervenes.
--	 * So, ensure that CPACR_EL1 is already correct for the fast-path case:
--	 */
--	mrs	x9, cpacr_el1
--	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
--	msr	cpacr_el1, x9			// synchronised by eret to el0
--#endif
--
--el0_svc_naked:					// compat entry point
- 	mov	x0, sp
--	mov	w1, wscno
--	mov	w2, wsc_nr
--	mov	x3, stbl
--	bl	el0_svc_common
-+	bl	el0_svc_handler
- 	b	ret_to_user
- ENDPROC(el0_svc)
- 
-diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-index 2adf1a073398..6a31bb2a382b 100644
---- a/arch/arm64/kernel/syscall.c
-+++ b/arch/arm64/kernel/syscall.c
-@@ -6,7 +6,9 @@
- #include <linux/ptrace.h>
- 
- #include <asm/daifflags.h>
-+#include <asm/fpsimd.h>
- #include <asm/thread_info.h>
-+#include <asm/unistd.h>
- 
- long do_ni_syscall(struct pt_regs *regs);
- 
-@@ -42,8 +44,8 @@ static inline bool has_syscall_work(unsigned long flags)
- int syscall_trace_enter(struct pt_regs *regs);
- void syscall_trace_exit(struct pt_regs *regs);
- 
--asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
--			       syscall_fn_t syscall_table[])
-+static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
-+			   syscall_fn_t syscall_table[])
- {
- 	unsigned long flags = current_thread_info()->flags;
- 
-@@ -80,3 +82,37 @@ asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
- trace_exit:
- 	syscall_trace_exit(regs);
- }
-+
-+static inline void sve_user_reset(void)
-+{
-+	if (!system_supports_sve())
-+		return;
-+
-+	/*
-+	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-+	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-+	 * happens if a context switch or kernel_neon_begin() or context
-+	 * modification (sigreturn, ptrace) intervenes.
-+	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
-+	 */
-+	clear_thread_flag(TIF_SVE);
-+	sve_user_disable();
-+}
-+
-+extern syscall_fn_t sys_call_table[];
-+
-+asmlinkage void el0_svc_handler(struct pt_regs *regs)
-+{
-+	sve_user_reset();
-+	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
-+}
-+
-+#ifdef CONFIG_COMPAT
-+extern syscall_fn_t compat_sys_call_table[];
-+
-+asmlinkage void el0_svc_compat_handler(struct pt_regs *regs)
-+{
-+	el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
-+		       compat_sys_call_table);
-+}
++#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
++#error "Inconsistent SCTLR_EL2 set/clear bits"
 +#endif
+ 
+ /* SCTLR_EL1 specific flags. */
+ #define SCTLR_EL1_UCI		(1 << 26)
+@@ -473,7 +474,8 @@
+ #define SCTLR_EL1_RES1	((1 << 11) | (1 << 20) | (1 << 22) | (1 << 28) | \
+ 			 (1 << 29))
+ #define SCTLR_EL1_RES0  ((1 << 6)  | (1 << 10) | (1 << 13) | (1 << 17) | \
+-			 (1 << 27) | (1 << 30) | (1 << 31))
++			 (1 << 27) | (1 << 30) | (1 << 31) | \
++			 (0xffffffffUL << 32))
+ 
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+ #define ENDIAN_SET_EL1		(SCTLR_EL1_E0E | SCTLR_ELx_EE)
+@@ -492,8 +494,9 @@
+ 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
+ 			 SCTLR_EL1_RES0)
+ 
+-/* Check all the bits are accounted for */
+-#define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
++#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
++#error "Inconsistent SCTLR_EL1 set/clear bits"
++#endif
+ 
+ /* id_aa64isar0 */
+ #define ID_AA64ISAR0_TS_SHIFT		52
+@@ -732,9 +735,6 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ {
+ 	u32 val;
+ 
+-	SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS;
+-	SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS;
+-
+ 	val = read_sysreg(sctlr_el1);
+ 	val &= ~clear;
+ 	val |= set;
 -- 
 2.11.0
