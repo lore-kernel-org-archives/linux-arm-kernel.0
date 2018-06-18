@@ -1,21 +1,17 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:06:05 -0700
-Subject: RESEND [PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
+Date: Mon, 18 Jun 2018 08:06:04 -0700
+Subject: RESEND [PATCH 1/6] arm64: compat: Use vDSO sigreturn trampolines if
+ available
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-20-salyzyn@android.com>
+Message-ID: <20180618150613.10322-19-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-If the compat vDSO is enabled, we need to set AT_SYSINFO_EHDR in the
-auxiliary vector of compat processes to the address of the vDSO code
-page, so that the dynamic linker can find it (just like the regular vDSO).
-
-Note that we cast context.vdso to Elf64_Off, instead of elf_addr_t,
-because elf_addr_t is Elf32_Off in compat_binfmt_elf.c, and casting
-context.vdso to u32 would trigger a pointer narrowing warning.
+If the compat vDSO is enabled, it replaces the sigreturn page.
+Therefore, we use the sigreturn trampolines the vDSO provides instead.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -37,45 +33,63 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
 ---
- arch/arm64/include/asm/elf.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/vdso.h |  3 +++
+ arch/arm64/kernel/signal32.c  | 15 +++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 433b9554c6a1..bf4672a0491b 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -147,10 +147,10 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- })
+diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+index 839ce0031bd5..f2a952338f1e 100644
+--- a/arch/arm64/include/asm/vdso.h
++++ b/arch/arm64/include/asm/vdso.h
+@@ -28,6 +28,9 @@
+ #ifndef __ASSEMBLY__
  
- /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
--#define ARCH_DLINFO							\
-+#define _SET_AUX_ENT_VDSO						\
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
--		    (elf_addr_t)current->mm->context.vdso);		\
-+		    (Elf64_Off)current->mm->context.vdso);		\
- 									\
- 	/*								\
- 	 * Should always be nonzero unless there's a kernel bug.	\
-@@ -162,6 +162,7 @@ do {									\
- 	else								\
- 		NEW_AUX_ENT(AT_IGNORE, 0);				\
- } while (0)
-+#define ARCH_DLINFO _SET_AUX_ENT_VDSO
- 
- #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
- struct linux_binprm;
-@@ -209,7 +210,11 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- ({									\
- 	set_thread_flag(TIF_32BIT);					\
-  })
+ #include <generated/vdso-offsets.h>
 +#ifdef CONFIG_VDSO32
-+#define COMPAT_ARCH_DLINFO	_SET_AUX_ENT_VDSO
-+#else
- #define COMPAT_ARCH_DLINFO
++#include <generated/vdso32-offsets.h>
 +#endif
- extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
- 				      int uses_interp);
- #define compat_arch_setup_additional_pages \
+ 
+ #define VDSO_SYMBOL(base, name)						   \
+ ({									   \
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 096c88731c56..5ee07da53fd1 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -29,6 +29,7 @@
+ #include <asm/traps.h>
+ #include <linux/uaccess.h>
+ #include <asm/unistd.h>
++#include <asm/vdso.h>
+ 
+ struct compat_vfp_sigframe {
+ 	compat_ulong_t	magic;
+@@ -347,6 +348,19 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 		retcode = ptr_to_compat(ka->sa.sa_restorer);
+ 	} else {
+ 		/* Set up sigreturn pointer */
++#ifdef CONFIG_VDSO32
++		void *vdso_base = current->mm->context.vdso;
++		void *trampoline =
++			(ka->sa.sa_flags & SA_SIGINFO
++			 ? (thumb
++			    ? VDSO_SYMBOL(vdso_base, compat_rt_sigreturn_thumb)
++			    : VDSO_SYMBOL(vdso_base, compat_rt_sigreturn_arm))
++			 : (thumb
++			    ? VDSO_SYMBOL(vdso_base, compat_sigreturn_thumb)
++			    : VDSO_SYMBOL(vdso_base, compat_sigreturn_arm)));
++
++		retcode = ptr_to_compat(trampoline) + thumb;
++#else
+ 		void *sigreturn_base = current->mm->context.vdso;
+ 		unsigned int idx = thumb << 1;
+ 
+@@ -354,6 +368,7 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 			idx += 3;
+ 
+ 		retcode = ptr_to_compat(sigreturn_base) + (idx << 2) + thumb;
++#endif
+ 	}
+ 
+ 	regs->regs[0]	= usig;
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
