@@ -1,95 +1,143 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 18 Jun 2018 10:59:31 +0200
-Subject: [PATCH v2] mmc: sdhci-of-arasan: Add quirk for unstable clocks
-In-Reply-To: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
-References: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
- <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
-Message-ID: <CAPDyKFonk-ftUMQ04r7SSu8Rs67TAV-qTWY+Nme1esOGQZdOoA@mail.gmail.com>
+From: Sven.Schmitt@mixed-mode.de (Sven Schmitt)
+Date: Mon, 18 Jun 2018 09:01:15 +0000
+Subject: [PATCH] soc: imx: gpc: fix PDN delay & improve readability
+Message-ID: <1529312474617.59395@mixed-mode.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 June 2018 at 10:18, Helmut Grohne <h.grohne@intenta.de> wrote:
-> Some controllers immediately report SDHCI_CLOCK_INT_STABLE after
-> enabling the clock even when the clock is not stable. When used in
-> conjunction with older/slower cards, this can result in:
->
->     mmc0: error -84 whilst initialising SD card
->
-> When the stable reporting is broken, we simply wait for the maximum
-> stabilization period.
->
-> Signed-off-by: Helmut Grohne <h.grohne@intenta.de>
-> ---
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt |  2 ++
+- imx6_pm_domain_power_off(): reads iso and iso2sw
+  from GPC_PGC_PUPSCR_OFFS which stores the power up delays
+  => use GPC_PGC_PDNSCR_OFFS for the correct delays
 
-Please split this. DT doc should be a separate patch.
+- remove unused #defines
 
-Otherwise this looks good to me.
+- struct imx_pm_domain: introduce cntr_pup_bit
+  to replace usage of cntr_pdn_bit+1 in imx6_pm_domain_power_on()
 
-Kind regards
-Uffe
+- GPC_PGC_DOMAIN_*: made consistent use of index defines
 
->  drivers/mmc/host/sdhci-of-arasan.c                     | 16 ++++++++++++++++
->  2 files changed, 18 insertions(+)
->
-> Changes since v1 (RFC):
->  * Use an arasan-specific quirk in the ->set_clock() callback as requested by
->    Adrian Hunter.
->
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index 60481bfc3d31..c0e0f04a8504 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -39,6 +39,8 @@ Optional Properties:
->    - xlnx,fails-without-test-cd: when present, the controller doesn't work when
->      the CD line is not connected properly, and the line is not connected
->      properly. Test mode can be used to force the controller to function.
-> +  - xlnx,int-clock-stable-broken: when present, the controller always reports
-> +    that the internal clock is stable even when it is not.
->
->  Example:
->         sdhci at e0100000 {
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index c33a5f7393bd..f7fe26c75150 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -102,6 +102,9 @@ struct sdhci_arasan_data {
->
->  /* Controller does not have CD wired and will not function normally without */
->  #define SDHCI_ARASAN_QUIRK_FORCE_CDTEST        BIT(0)
-> +/* Controller immediately reports SDHCI_CLOCK_INT_STABLE after enabling the
-> + * internal clock even when the clock isn't stable */
-> +#define SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE BIT(1)
->  };
->
->  static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
-> @@ -207,6 +210,16 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
->
->         sdhci_set_clock(host, clock);
->
-> +       if (sdhci_arasan->quirks & SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE)
-> +               /*
-> +                * Some controllers immediately report SDHCI_CLOCK_INT_STABLE
-> +                * after enabling the clock even though the clock is not
-> +                * stable. Trying to use a clock without waiting here results
-> +                * in EILSEQ while detecting some older/slower cards. The
-> +                * chosen delay is the maximum delay from sdhci_set_clock.
-> +                */
-> +               msleep(20);
-> +
->         if (ctrl_phy) {
->                 phy_power_on(sdhci_arasan->phy);
->                 sdhci_arasan->is_phy_on = true;
-> @@ -759,6 +772,9 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->         if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
->                 sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
->
-> +       if (of_property_read_bool(np, "xlnx,int-clock-stable-broken"))
-> +               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE;
-> +
->         pltfm_host->clk = clk_xin;
->
->         if (of_device_is_compatible(pdev->dev.of_node,
-> --
-> 2.11.0
->
+Signed-off-by: Sven Schmitt <sven.schmitt@mixed-mode.de>
+---
+ drivers/soc/imx/gpc.c | 41 ++++++++++++++++++++---------------------
+ 1 file changed, 20 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index c4d35f32af8d..b92377c75ddf 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -24,15 +24,6 @@
+ #define GPC_PGC_CTRL_OFFS	0x0
+ #define GPC_PGC_PUPSCR_OFFS	0x4
+ #define GPC_PGC_PDNSCR_OFFS	0x8
+-#define GPC_PGC_SW2ISO_SHIFT	0x8
+-#define GPC_PGC_SW_SHIFT	0x0
+-
+-#define GPC_PGC_GPU_PDN		0x260
+-#define GPC_PGC_GPU_PUPSCR	0x264
+-#define GPC_PGC_GPU_PDNSCR	0x268
+-
+-#define GPU_VPU_PUP_REQ		BIT(1)
+-#define GPU_VPU_PDN_REQ		BIT(0)
+ 
+ #define GPC_CLK_MAX		6
+ 
+@@ -46,6 +37,7 @@ struct imx_pm_domain {
+ 	int num_clks;
+ 	unsigned int reg_offs;
+ 	signed char cntr_pdn_bit;
++	signed char cntr_pup_bit;
+ 	unsigned int ipg_rate_mhz;
+ 	unsigned int flags;
+ };
+@@ -66,7 +58,7 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+ 		return -EBUSY;
+ 
+ 	/* Read ISO and ISO2SW power down delays */
+-	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
++	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PDNSCR_OFFS, &val);
+ 	iso = val & 0x3f;
+ 	iso2sw = (val >> 8) & 0x3f;
+ 
+@@ -116,7 +108,7 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+ 	sw2iso = (val >> 8) & 0x3f;
+ 
+ 	/* Request GPC to power up domain */
+-	val = BIT(pd->cntr_pdn_bit + 1);
++	val = BIT(pd->cntr_pup_bit);
+ 	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
+ 
+ 	/* Wait ISO + ISO2SW IPG clock cycles */
+@@ -241,22 +233,24 @@ static struct platform_driver imx_pgc_power_domain_driver = {
+ };
+ builtin_platform_driver(imx_pgc_power_domain_driver)
+ 
+-#define GPC_PGC_DOMAIN_ARM	0
+-#define GPC_PGC_DOMAIN_PU	1
+-#define GPC_PGC_DOMAIN_DISPLAY	2
+-
+ static struct genpd_power_state imx6_pm_domain_pu_state = {
+ 	.power_off_latency_ns = 25000,
+ 	.power_on_latency_ns = 2000000,
+ };
+ 
++#define GPC_PGC_DOMAIN_ARM 0
++#define GPC_PGC_DOMAIN_PU 1
++#define GPC_PGC_DOMAIN_DISPLAY 2
++#define GPC_PGC_DOMAIN_PCI 3
++
+ static struct imx_pm_domain imx_gpc_domains[] = {
+-	{
++	[GPC_PGC_DOMAIN_ARM] {
+ 		.base = {
+ 			.name = "ARM",
+ 			.flags = GENPD_FLAG_ALWAYS_ON,
+ 		},
+-	}, {
++	},
++	[GPC_PGC_DOMAIN_PU] {
+ 		.base = {
+ 			.name = "PU",
+ 			.power_off = imx6_pm_domain_power_off,
+@@ -266,7 +260,9 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+ 		},
+ 		.reg_offs = 0x260,
+ 		.cntr_pdn_bit = 0,
+-	}, {
++		.cntr_pup_bit = 1,
++	},
++	[GPC_PGC_DOMAIN_DISPLAY] {
+ 		.base = {
+ 			.name = "DISPLAY",
+ 			.power_off = imx6_pm_domain_power_off,
+@@ -274,7 +270,9 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+ 		},
+ 		.reg_offs = 0x240,
+ 		.cntr_pdn_bit = 4,
+-	}, {
++		.cntr_pup_bit = 5,
++	},
++	[GPC_PGC_DOMAIN_PCI] {
+ 		.base = {
+ 			.name = "PCI",
+ 			.power_off = imx6_pm_domain_power_off,
+@@ -282,6 +280,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+ 		},
+ 		.reg_offs = 0x200,
+ 		.cntr_pdn_bit = 6,
++		.cntr_pup_bit = 7,
+ 	},
+ };
+ 
+@@ -326,8 +325,8 @@ static const struct regmap_config imx_gpc_regmap_config = {
+ };
+ 
+ static struct generic_pm_domain *imx_gpc_onecell_domains[] = {
+-	&imx_gpc_domains[0].base,
+-	&imx_gpc_domains[1].base,
++	&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base,
++	&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base,
+ };
+ 
+ static struct genpd_onecell_data imx_gpc_onecell_data = {
+-- 
+2.17.1
