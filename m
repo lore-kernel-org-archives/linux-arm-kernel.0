@@ -1,49 +1,58 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 18 Jun 2018 09:06:53 +0200
-Subject: [PATCH] dt-bindings: Fix unbalanced quotation marks
-In-Reply-To: <20180617143127.11421-1-j.neuschaefer@gmx.net>
-References: <20180617143127.11421-1-j.neuschaefer@gmx.net>
-Message-ID: <CAJKOXPcAVovxU2mHSbkAG0axutFbd=_92bNdd2P_CnQGmhAfCg@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 18 Jun 2018 09:34:25 +0200
+Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
+ control
+In-Reply-To: <CAGb2v64Ar+rOgiXbjtRrQojHUZteLa9N7OwM3XY7ZcpS87Qpmw@mail.gmail.com>
+References: <20180614153548.9644-1-wens@csie.org>
+ <20180615091413.pbdtrpa7txe6i4ee@flea>
+ <CAGb2v64Ar+rOgiXbjtRrQojHUZteLa9N7OwM3XY7ZcpS87Qpmw@mail.gmail.com>
+Message-ID: <20180618073425.ce2dkipuvrtbqela@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 17, 2018 at 4:31 PM, Jonathan Neusch?fer
-<j.neuschaefer@gmx.net> wrote:
-> Multiple binding documents have various forms of unbalanced quotation
-> marks. Fix them.
->
-> Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
-> ---
->
-> Should I split this patch so that different parts can go through different trees?
-> ---
->  .../devicetree/bindings/arm/samsung/samsung-boards.txt          | 2 +-
->  .../devicetree/bindings/gpio/nintendo,hollywood-gpio.txt        | 2 +-
->  Documentation/devicetree/bindings/input/touchscreen/hideep.txt  | 2 +-
->  .../bindings/interrupt-controller/nvidia,tegra20-ictlr.txt      | 2 +-
->  .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt  | 2 +-
->  Documentation/devicetree/bindings/mips/brcm/soc.txt             | 2 +-
->  Documentation/devicetree/bindings/net/fsl-fman.txt              | 2 +-
->  Documentation/devicetree/bindings/power/power_domain.txt        | 2 +-
->  Documentation/devicetree/bindings/regulator/tps65090.txt        | 2 +-
->  Documentation/devicetree/bindings/reset/st,sti-softreset.txt    | 2 +-
->  Documentation/devicetree/bindings/sound/qcom,apq8016-sbc.txt    | 2 +-
->  Documentation/devicetree/bindings/sound/qcom,apq8096.txt        | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> index bdadc3da9556..6970f30a3770 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> @@ -66,7 +66,7 @@ Required root node properties:
->         - "insignal,arndale-octa" - for Exynos5420-based Insignal Arndale
->                                     Octa board.
->         - "insignal,origen"       - for Exynos4210-based Insignal Origen board.
-> -       - "insignal,origen4412    - for Exynos4412-based Insignal Origen board.
-> +       - "insignal,origen4412"   - for Exynos4412-based Insignal Origen board.
->
+On Mon, Jun 18, 2018 at 10:11:20AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jun 15, 2018 at 5:14 PM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > On Thu, Jun 14, 2018 at 11:35:44PM +0800, Chen-Yu Tsai wrote:
+> >> Hi,
+> >>
+> >> This series is the remaining A64 syscon changes from the R40 DWMAC
+> >> series. The series aligns how the A64 system control exports a regmap
+> >> for the sun8i DWMAC driver to access with what we've done for the R40.
+> >>
+> >> Originally the A64 used the generic syscon for this bit of hardware.
+> >> But this block also contains mapping bits for the onboard SRAM, used
+> >> by various peripherals, and other vendor specific bits we may use in
+> >> the future. It is by no means generic. And we already have a device
+> >> tree binding and driver for the SRAM part.
+> >>
+> >> The first patch make the SRAM control device export a regmap, exposing
+> >> a single EMAC control register, for the DWMAC driver to consume.
+> >>
+> >> The second and third patches rename the A64 compatible string to read
+> >> "system control", which is what the block is named in the user manual.
+> >>
+> >> The last patch fixes up the device node, and also adds the lone mappable
+> >> SRAM block, which is needed by the Display Engine.
+> >
+> > For the serie:
+> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> 
+> Cool. I'll apply them once you've rebased and pushed out any patches you
+> queued up during the merge window.
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+All should be pushed now, feel free to apply them :)
 
-Best regards,
-Krzysztof
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180618/4398cd96/attachment-0001.sig>
