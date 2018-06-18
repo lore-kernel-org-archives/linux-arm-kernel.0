@@ -1,33 +1,105 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Jun 2018 16:47:27 +0100
-Subject: [PATCH v2] arm64: dma-mapping: clear buffers allocated with
- FORCE_CONTIGUOUS flag
-In-Reply-To: <20180612110840.30436-1-m.szyprowski@samsung.com>
-References: <CGME20180612110857eucas1p1f5e3b6d984d4fd7e3b3ce31418df546e@eucas1p1.samsung.com>
- <20180612110840.30436-1-m.szyprowski@samsung.com>
-Message-ID: <20180618154726.zfhlq4mqkubsu3mn@armageddon.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 Jun 2018 16:51:12 +0100
+Subject: [PATCH] power: vexpress: fix corruption in notifier registration
+In-Reply-To: <20180618145608.GA26780@e107981-ln.cambridge.arm.com>
+References: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
+ <20180618145608.GA26780@e107981-ln.cambridge.arm.com>
+Message-ID: <5b5cb752-2128-4eaf-c477-877b32ac266e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
 
-On Tue, Jun 12, 2018 at 01:08:40PM +0200, Marek Szyprowski wrote:
-> dma_alloc_*() buffers might be exposed to userspace via mmap() call, so
-> they should be cleared on allocation. In case of IOMMU-based dma-mapping
-> implementation such buffer clearing was missing in the code path for
-> DMA_ATTR_FORCE_CONTIGUOUS flag handling, because dma_alloc_from_contiguous()
-> doesn't honor __GFP_ZERO flag. This patch fixes this issue. For more
-> information on clearing buffers allocated by dma_alloc_* functions,
-> see commit 6829e274a623 ("arm64: dma-mapping: always clear allocated
-> buffers").
+
+On 18/06/18 15:56, Lorenzo Pieralisi wrote:
+> On Mon, Jun 18, 2018 at 12:40:07PM +0100, Sudeep Holla wrote:
+>> Vexpress platforms provide two different restart handlers: SYS_REBOOT
+>> that restart the entire system, while DB_RESET only restarts the
+>> daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
+>> if it exists.
+>>
+>> notifier_chain_register used in register_restart_handler by design
+>> allows notifier to be registered once only, however vexpress restart
+>> notifier can get registered twice.
 > 
-> Fixes: 44176bb38fa4 ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Nit: I would say "notifier_chain_register() relies on notifiers to be
+> registered only once to work properly"; put it differently, it allows
+> notifiers to be registered twice (ie it does nothing to prevent it),
+> that's why we have this issue.
+> 
 
-I'll queue this patch for -rc2 but I hope a proper fix goes into the CMA
-code.
+Indeed. I saw there's notifier_chain_cond_register too, not sure why
+that's not used everywhere. I will change from allows to relies in the
+wording.
 
-Thanks.
+>> When this happen it corrupts list of notifiers, as result some
+>> notifiers can be not called on proper event, traverse on list can be
+>> cycled forever, and second unregister can access already freed memory.
+>>
+>> So far, since this was the only restart handler in the system, no issue
+>> was observed even if the same notifier was registered twice. However
+>> commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
+>> support for SP805 restart handlers and since the system under test
+>> contains two vexpress restart and two SP805 watchdog instances, it was
+>> observed that during the boot traversing the restart handler list looped
+>> forever as there's a cycle in that list resulting in boot hang.
+>>
+>> This patch fixes the issues by ensuring that the notifier is installed
+>> only once.
+>>
+>> Cc: Sebastian Reichel <sre@kernel.org>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/power/reset/vexpress-poweroff.c | 14 +++++++++-----
+>>  1 file changed, 9 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
+>> index 102f95a09460..cdc68eb06a91 100644
+>> --- a/drivers/power/reset/vexpress-poweroff.c
+>> +++ b/drivers/power/reset/vexpress-poweroff.c
+>> @@ -35,6 +35,7 @@ static void vexpress_reset_do(struct device *dev, const char *what)
+>>  }
+>>  
+>>  static struct device *vexpress_power_off_device;
+>> +static atomic_t vexpress_restart_nb_refcnt = ATOMIC_INIT(0);
+>>  
+>>  static void vexpress_power_off(void)
+>>  {
+>> @@ -96,13 +97,16 @@ static const struct of_device_id vexpress_reset_of_match[] = {
+>>  
+>>  static int _vexpress_register_restart_handler(struct device *dev)
+>>  {
+>> -	int err;
+>> +	int err = 0;
+> 
+> Nit: I do not not see why you need to initialize err.
+> 
+
+Yes, I did notice this just after I sent it out. Left over from my
+debugging, will remove it.
+
+>>  	vexpress_restart_device = dev;
+> 
+> It is unclear to me how the !vexpress_restart_device sentinel is
+> used while registering FUNC_RESET. It is unrelated to this patch
+> but if the registration below fails for FUNC_REBOOT can we end
+> up in a situation where vexpress_restart_device is initialized
+> with no restart handler registered ?
+> 
+
+Yes, it took sometime for me to understand that. IIUC, FUNC_RESET is
+optional, so it's probed first then !vexpress_restart_device will be
+used. FUNC_REBOOT will override FUNC_RESET but not other way around.
+
+> By looking at it I am not a big fan of the vexpress_restart_device
+> global variable it has been there since we merged this code but
+> its usage is a bit obscure.
+> 
+
+Yes, I was thinking of making access to it locked via mutex or some lock
+but that won't fix the issue seen as it won't prevent FUNC_RESET being
+probed first and then FUNC_REBOOT which will attempt to register
+notifier again anyways.
 
 -- 
-Catalin
+Regards,
+Sudeep
