@@ -1,46 +1,75 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 18 Jun 2018 10:48:32 +0100
-Subject: [PATCH] ARM: NOMMU: Use instr_sync instead of plain isb in common code
-Message-ID: <1529315312-35517-1-git-send-email-vladimir.murzin@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 18 Jun 2018 11:49:20 +0200
+Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
+In-Reply-To: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20180618114920.654647c0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg reported that commit 3c24121039c9d ("ARM: 8756/1: NOMMU: Postpone
-MPU activation till __after_proc_init") is causing breakage for the
-old Versatile platform in no-MMU mode (with out-of-tree patches):
+Hi Claudiu,
 
-  AS      arch/arm/kernel/head-nommu.o
-arch/arm/kernel/head-nommu.S: Assembler messages:
-arch/arm/kernel/head-nommu.S:180: Error: selected processor does not support `isb' in ARM mode
-scripts/Makefile.build:417: recipe for target 'arch/arm/kernel/head-nommu.o' failed
-make[2]: *** [arch/arm/kernel/head-nommu.o] Error 1
-Makefile:1034: recipe for target 'arch/arm/kernel' failed
-make[1]: *** [arch/arm/kernel] Error 2
+The subject prefix should be "mtd: spi-nor: atmel-quadspi: ". No need
+to send a new version just for that, I'll fix it when applying the
+patch.
 
-Since the code is common for all NOMMU builds usage of the isb was a
-bad idea (please, note that isb also used in MPU related code which is
-fine because MPU has dependency on CPU_V7/CPU_V7M), instead use more
-robust instr_sync assembler macro.
+Looks good otherwise. Marek, any objection? If not, can you add your
+Acked-by?
 
-Fixes: 3c24121039c9 ("ARM: 8756/1: NOMMU: Postpone MPU activation till __after_proc_init")
-Reported-by: Greg Ungerer <gerg@kernel.org>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/kernel/head-nommu.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index dd546d6..7a9b869 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -177,7 +177,7 @@ M_CLASS(streq	r3, [r12, #PMSAv8_MAIR1])
- 	bic	r0, r0, #CR_I
- #endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
--	isb
-+	instr_sync
- #elif defined (CONFIG_CPU_V7M)
- #ifdef CONFIG_ARM_MPU
- 	ldreq	r3, [r12, MPU_CTRL]
--- 
-1.9.1
+Boris
+
+On Mon, 4 Jun 2018 11:46:33 +0300
+Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+
+> Implement suspend/resume hooks.
+> 
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> ---
+> 
+> Changes in v2:
+> - use __maybe_unused instead of #ifdef CONFIG_PM_SLEEP
+> 
+>  drivers/mtd/spi-nor/atmel-quadspi.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
+> index 6c5708bacad8..ceaaef47f02e 100644
+> --- a/drivers/mtd/spi-nor/atmel-quadspi.c
+> +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
+> @@ -737,6 +737,26 @@ static int atmel_qspi_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static int __maybe_unused atmel_qspi_suspend(struct device *dev)
+> +{
+> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
+> +
+> +	clk_disable_unprepare(aq->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused atmel_qspi_resume(struct device *dev)
+> +{
+> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
+> +
+> +	clk_prepare_enable(aq->clk);
+> +
+> +	return atmel_qspi_init(aq);
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
+> +			 atmel_qspi_resume);
+>  
+>  static const struct of_device_id atmel_qspi_dt_ids[] = {
+>  	{ .compatible = "atmel,sama5d2-qspi" },
+> @@ -749,6 +769,7 @@ static struct platform_driver atmel_qspi_driver = {
+>  	.driver = {
+>  		.name	= "atmel_qspi",
+>  		.of_match_table	= atmel_qspi_dt_ids,
+> +		.pm	= &atmel_qspi_pm_ops,
+>  	},
+>  	.probe		= atmel_qspi_probe,
+>  	.remove		= atmel_qspi_remove,
