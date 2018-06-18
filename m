@@ -1,43 +1,28 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 18 Jun 2018 20:05:03 +0900
-Subject: [PATCH 01/11] i2c: add helpers for locking the I2C segment
-In-Reply-To: <20180615101506.8012-2-peda@axentia.se>
-References: <20180615101506.8012-1-peda@axentia.se>
- <20180615101506.8012-2-peda@axentia.se>
-Message-ID: <20180618110502.cb5s24srp4frahm6@ninjato>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 18 Jun 2018 08:05:12 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx6qdl-sabreauto: Add sensors
+In-Reply-To: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
+References: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
+Message-ID: <CAOMZO5AhN9K0wDZcsimM3f4O7KFp+7JkzjNmFJ9FDnJ131wX7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 18, 2018 at 5:15 AM, Leonard Crestez
+<leonard.crestez@nxp.com> wrote:
+> The following sensors are on I2C3 on the baseboard:
+> * isil,isl29023 light sensor
+> * fsl,mag3110 magnetometer
+> * fsl,mma8451 accelerometer
+>
+> Added under i2cmux/i2c at 1 because they're not otherwise accessible.
+>
+> These are all supported by iio with following configs:
+> * CONFIG_SENSORS_ISL29018
+> * CONFIG_MAG3110
+> * CONFIG_MMA8452
+>
+> Tested with raw reads from iio sysfs.
+>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-> +static inline void
-> +i2c_lock_segment(struct i2c_adapter *adapter)
-> +{
-> +	i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
-> +}
-> +
-> +static inline int
-> +i2c_trylock_segment(struct i2c_adapter *adapter)
-> +{
-> +	return i2c_trylock_bus(adapter, I2C_LOCK_SEGMENT);
-> +}
-> +
-> +static inline void
-> +i2c_unlock_segment(struct i2c_adapter *adapter)
-> +{
-> +	i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
-> +}
-
-I wonder if i2c_lock_segment() and i2c_lock_root_adapter() are really
-more readable and convenient than i2c_lock_bus() with the flag. I think
-the flags have speaking names, too.
-
-Is that an idea to remove these functions altogether and start using
-i2c_lock_bus()?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180618/b15be943/attachment.sig>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
