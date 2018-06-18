@@ -1,67 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 18 Jun 2018 10:17:09 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <89b599d3-c43a-255f-8da6-9bea6cf53a5d@lechnology.com>
-References: <20180518164829.27052-1-david@lechnology.com>
- <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
- <89b599d3-c43a-255f-8da6-9bea6cf53a5d@lechnology.com>
-Message-ID: <513d20f6-da4f-1e3e-7d11-4a0f1193b13d@ti.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 18 Jun 2018 14:59:02 +1000
+Subject: [PATCH v2 4/4] arm: dts: Update AST2400 device-tree
+In-Reply-To: <20180618045902.11453-1-benh@kernel.crashing.org>
+References: <20180618045902.11453-1-benh@kernel.crashing.org>
+Message-ID: <20180618045902.11453-5-benh@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Add the missing node for the CVIC (the coprocessor interrupt
+controller) and add a label to the SRAM node so it can be
+referenced from the board device-tree file.
 
-On Sunday 17 June 2018 09:18 PM, David Lechner wrote:
-> Hi Sekhar,
-> 
-> On 05/22/2018 04:38 AM, Sekhar Nori wrote:
->> Hi David,
->>
->> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
->>> This series converts mach-davinci to use the common clock framework.
->>>
->>> The series works like this, the first 3 patches fix some issues with
->>> the clock
->>> drivers that have already been accepted into the mainline kernel.
->>>
->>> Then, starting with "ARM: davinci: pass clock as parameter to
->>> davinci_timer_init()", we get the mach code ready for the switch by
->>> adding the
->>> code needed for the new clock drivers and adding #ifndef
->>> CONFIG_COMMON_CLK
->>> around the legacy clocks so that we can switch easily between the old
->>> and the
->>> new.
->>>
->>> "ARM: davinci: switch to common clock framework" actually flips the
->>> switch
->>> to start using the new clock drivers. Then the next 8 patches remove all
->>> of the old clock code.
->>>
->>> The final four patches add device tree clock support to the one SoC that
->>> supports it.
->>>
->>> This series has been tested on TI OMAP-L138 LCDK (both device tree
->>> and legacy
->>> board file).
->>
->> If you do end up sending a v12, you can leave out the mach-davinci
->> portions unless there are any changes you need to make. I will pick them
->> up from this series once the driver dependencies are merged.
->>
->> I do hope the drivers/clk/* changes can be merged from v4.18.
->>
->> Thanks,
->> Sekhar
->>
-> 
-> Are you going to pick up the arch patches from this series now that
-> the 4.18 merge window is closed?
-> 
-> All of the clk patches landed in 4.18.
+Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
+ arch/arm/boot/dts/aspeed-g4.dtsi | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-yes!
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 75df1573380e..b1a19f99a4c9 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -92,6 +92,12 @@
+ 			reg = <0x1e6c0080 0x80>;
+ 		};
+ 
++		cvic: copro-interrupt-controller at 1e6c2000 {
++			compatible = "aspeed,ast2400-cvic", "aspeed-cvic";
++			valid-sources = <0x7fffffff>;
++			reg = <0x1e6c2000 0x80>;
++		};
++
+ 		mac0: ethernet at 1e660000 {
+ 			compatible = "aspeed,ast2400-mac", "faraday,ftgmac100";
+ 			reg = <0x1e660000 0x180>;
+@@ -161,7 +167,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			sram at 1e720000 {
++			sram: sram at 1e720000 {
+ 				compatible = "mmio-sram";
+ 				reg = <0x1e720000 0x8000>;	// 32K
+ 			};
+-- 
+2.17.1
