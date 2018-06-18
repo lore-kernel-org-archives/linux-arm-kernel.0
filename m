@@ -1,17 +1,31 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:06:06 -0700
-Subject: RESEND [PATCH 3/6] arm64: Refactor vDSO init/setup
+Date: Mon, 18 Jun 2018 08:06:09 -0700
+Subject: RESEND [PATCH 6/6] arm64: Wire up and expose the new compat vDSO
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-21-salyzyn@android.com>
+Message-ID: <20180618150613.10322-24-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Move the logic for setting up mappings and pages for the vDSO into
-static functions. This makes the vDSO setup code more consistent with
-the compat side and will allow to reuse it for the future compat vDSO.
+Expose the new compat vDSO via the COMPAT_VDSO config option.
+
+The option is not enabled in defconfig because we really need a 32-bit
+compiler this time, and we rely on the user to provide it themselves
+by setting CROSS_COMPILE_ARM32. Therefore enabling the option by
+default would make little sense, since the user must explicitly set a
+non-standard environment variable anyway.
+
+CONFIG_COMPAT_VDSO is not directly used in the code, because we want
+to ignore it (build as if it were not set) if the user didn't set
+CROSS_COMPILE_ARM32. If the variable has been set to a valid prefix,
+CONFIG_VDSO32 will be set; this is the option that the code and
+Makefiles test.
+
+For more flexibility, like CROSS_COMPILE, CROSS_COMPILE_ARM32 can also
+be set via CONFIG_CROSS_COMPILE_ARM32 (the environment variable
+overrides the config option, as expected).
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -33,187 +47,122 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
 ---
- arch/arm64/kernel/vdso.c | 118 +++++++++++++++++++++++----------------
- 1 file changed, 70 insertions(+), 48 deletions(-)
+ arch/arm64/Kconfig         | 24 ++++++++++++++++++++++++
+ arch/arm64/Makefile        | 36 ++++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/Makefile |  3 +++
+ 3 files changed, 61 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 76a94bed4bd5..8529e85a521f 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -39,8 +39,11 @@
- #include <asm/vdso.h>
- #include <asm/vdso_datapage.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 11b4c6aef7d7..eb9d3fc45f6b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1330,6 +1330,30 @@ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
  
--extern char vdso_start[], vdso_end[];
--static unsigned long vdso_pages __ro_after_init;
-+struct vdso_mappings {
-+	unsigned long num_code_pages;
-+	struct vm_special_mapping data_mapping;
-+	struct vm_special_mapping code_mapping;
-+};
- 
- /*
-  * The vDSO data page.
-@@ -164,95 +167,114 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
- 	return 0;
- }
- 
--static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
--	{
--		.name	= "[vvar]",
--	},
--	{
--		.name	= "[vdso]",
--		.mremap = vdso_mremap,
--	},
--};
--
--static int __init vdso_init(void)
-+static int __init vdso_mappings_init(const char *name,
-+				     const char *code_start,
-+				     const char *code_end,
-+				     struct vdso_mappings *mappings)
- {
--	int i;
-+	unsigned long i, vdso_page;
- 	struct page **vdso_pagelist;
- 	unsigned long pfn;
- 
--	if (memcmp(vdso_start, "\177ELF", 4)) {
--		pr_err("vDSO is not a valid ELF object!\n");
-+	if (memcmp(code_start, "\177ELF", 4)) {
-+		pr_err("%s is not a valid ELF object!\n", name);
- 		return -EINVAL;
- 	}
- 
--	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
--	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
--		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
--
--	/* Allocate the vDSO pagelist, plus a page for the data. */
--	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
--				GFP_KERNEL);
-+	vdso_pages = (code_end - code_start) >> PAGE_SHIFT;
-+	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-+		name, vdso_pages + 1, vdso_pages, code_start, 1L,
-+		vdso_data);
++config COMPAT_VDSO
++	bool "32-bit vDSO"
++	depends on COMPAT
++	default n
++	help
++	  Warning: a 32-bit toolchain is necessary to build the vDSO. You
++	  must explicitly define which toolchain should be used by setting
++	  CROSS_COMPILE_ARM32 to the prefix of the 32-bit toolchain (same format
++	  as CROSS_COMPILE). If CROSS_COMPILE_ARM32 is empty, a warning will be
++	  printed and the kernel will be built as if COMPAT_VDSO had not been
++	  set. If CROSS_COMPILE_ARM32 is set to an invalid prefix, compilation
++	  will be aborted.
 +
-+	/*
-+	 * Allocate space for storing pointers to the vDSO code pages + the
-+	 * data page. The pointers must have the same lifetime as the mappings,
-+	 * which are static, so there is no need to keep track of the pointer
-+	 * array to free it.
-+	 */
-+	vdso_pagelist = kmalloc_array(vdso_pages + 1, sizeof(struct page *),
-+				      GFP_KERNEL);
- 	if (vdso_pagelist == NULL)
- 		return -ENOMEM;
- 
- 	/* Grab the vDSO data page. */
- 	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
- 
--
- 	/* Grab the vDSO code pages. */
--	pfn = sym_to_pfn(vdso_start);
-+	pfn = sym_to_pfn(code_start);
- 
- 	for (i = 0; i < vdso_pages; i++)
- 		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
- 
--	vdso_spec[0].pages = &vdso_pagelist[0];
--	vdso_spec[1].pages = &vdso_pagelist[1];
-+	/* Populate the special mapping structures */
-+	mappings->data_mapping = (struct vm_special_mapping) {
-+		.name	= "[vvar]",
-+		.pages	= &vdso_pagelist[0],
-+	};
++	  Provide a vDSO to 32-bit processes. It includes the symbols provided
++	  by the vDSO from the 32-bit kernel, so that a 32-bit libc can use
++	  the compat vDSO without modification. It also provides sigreturn
++	  trampolines, replacing the sigreturn page.
 +
-+	mappings->code_mapping = (struct vm_special_mapping) {
-+		.name	= "[vdso]",
-+		.pages	= &vdso_pagelist[1],
-+	};
- 
-+	mappings->num_code_pages = vdso_pages;
- 	return 0;
- }
++config CROSS_COMPILE_ARM32
++	string "32-bit toolchain prefix"
++	help
++	  Same as setting CROSS_COMPILE_ARM32 in the environment, but saved for
++	  future builds. The environment variable overrides this config option.
 +
-+static struct vdso_mappings vdso_mappings __ro_after_init;
+ endmenu
+ 
+ menu "Power management options"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 45272266dafb..f548123e1609 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -49,9 +49,39 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+   endif
+ endif
+ 
+-KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
++ifeq ($(CONFIG_COMPAT_VDSO), y)
++  CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_ARM32:"%"=%)
 +
-+static int __init vdso_init(void)
-+{
-+	extern char vdso_start[], vdso_end[];
++  # Check that the user has provided a valid prefix for the 32-bit toolchain.
++  # To prevent selecting the system $(cc-name) by default, the prefix is not
++  # allowed to be empty, unlike CROSS_COMPILE. In the unlikely event that the
++  # system $(cc-name) is actually the 32-bit ARM compiler to be used, the
++  # variable can be set to the dirname (e.g. CROSS_COMPILE_ARM32=/usr/bin/).
++  # Note: this Makefile is read both before and after regenerating the config
++  # (if needed). Any warning appearing before the config has been regenerated
++  # should be ignored. If the error is triggered and you set
++  # CONFIG_CROSS_COMPILE_ARM32, set CROSS_COMPILE_ARM32 to an appropriate value
++  # when invoking make and fix CONFIG_CROSS_COMPILE_ARM32.
++  ifeq ($(CROSS_COMPILE_ARM32),)
++    $(error CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built)
++  else ifeq ($(cc-name),clang)
++    export CLANG_TRIPLE_ARM32 ?= $(CROSS_COMPILE_ARM32)
++    export CLANG_TARGET_ARM32 := --target=$(notdir $(CLANG_TRIPLE_ARM32:%-=%))
++    export CONFIG_VDSO32 := y
++    vdso32 := -DCONFIG_VDSO32=1
++  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)$(cc-name) 2> /dev/null),)
++    $(error $(CROSS_COMPILE_ARM32)$(cc-name) not found, check CROSS_COMPILE_ARM32)
++  else
++    export CROSS_COMPILE_ARM32
++    export CONFIG_VDSO32 := y
++    vdso32 := -DCONFIG_VDSO32=1
++  endif
++endif
 +
-+	return vdso_mappings_init("vdso", vdso_start, vdso_end,
-+				  &vdso_mappings);
-+}
- arch_initcall(vdso_init);
++KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst) $(vdso32)
+ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+-KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
++KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
++KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(vdso32)
  
--int arch_setup_additional_pages(struct linux_binprm *bprm,
--				int uses_interp)
-+static int vdso_setup(struct mm_struct *mm,
-+		      const struct vdso_mappings *mappings)
- {
--	struct mm_struct *mm = current->mm;
- 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
- 	void *ret;
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+@@ -155,6 +185,8 @@ archclean:
+ prepare: vdso_prepare
+ vdso_prepare: prepare0
+ 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
++	$(if $(CONFIG_VDSO32),$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso32 \
++					  include/generated/vdso32-offsets.h)
  
--	vdso_text_len = vdso_pages << PAGE_SHIFT;
-+	vdso_text_len = mappings->num_code_pages << PAGE_SHIFT;
- 	/* Be sure to map the data page */
- 	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+ define archhelp
+   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index c16be3cf39bf..628d0308d809 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,7 +28,9 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
  
--	if (down_write_killable(&mm->mmap_sem))
--		return -EINTR;
- 	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
--	if (IS_ERR_VALUE(vdso_base)) {
--		ret = ERR_PTR(vdso_base);
--		goto up_fail;
--	}
-+	if (IS_ERR_VALUE(vdso_base))
-+		ret = PTR_ERR_OR_ZERO(ERR_PTR(vdso_base));
-+
- 	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
- 				       VM_READ|VM_MAYREAD,
--				       &vdso_spec[0]);
-+				       &mappings->data_mapping);
- 	if (IS_ERR(ret))
--		goto up_fail;
-+		return PTR_ERR_OR_ZERO(ret);
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o	\
+ 					   sys_compat.o entry32.o
++ifneq ($(CONFIG_VDSO32),y)
+ arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
++endif
+ arm64-obj-$(CONFIG_KUSER_HELPERS)	+= kuser32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+@@ -59,6 +61,7 @@ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+ arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
  
- 	vdso_base += PAGE_SIZE;
--	mm->context.vdso = (void *)vdso_base;
- 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
- 				       VM_READ|VM_EXEC|
- 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
--				       &vdso_spec[1]);
--	if (IS_ERR(ret))
--		goto up_fail;
-+				       &mappings->code_mapping);
-+	if (!IS_ERR(ret))
-+		mm->context.vdso = (void *)vdso_base;
-+
-+	return PTR_ERR_OR_ZERO(ret);
-+}
- 
-+int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
-+{
-+	struct mm_struct *mm = current->mm;
-+	int ret;
- 
--	up_write(&mm->mmap_sem);
--	return 0;
-+	if (down_write_killable(&mm->mmap_sem))
-+		return -EINTR;
-+
-+	ret = vdso_setup(mm, &vdso_mappings);
- 
--up_fail:
--	mm->context.vdso = NULL;
- 	up_write(&mm->mmap_sem);
--	return PTR_ERR(ret);
-+	return ret;
- }
- 
- /*
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
++obj-$(CONFIG_VDSO32)			+= vdso32/
+ obj-m					+= $(arm64-obj-m)
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
