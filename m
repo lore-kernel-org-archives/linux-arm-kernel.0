@@ -1,45 +1,66 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 18 Jun 2018 11:15:45 +0300
-Subject: [PATCH v2 2/2] ARM: imx_v6_v7_defconfig: Enable imx6qdl-sabreauto
- sensors
-In-Reply-To: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
-References: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
-Message-ID: <04bf3c71c57201fd89b121a56f1112e233d5adfd.1529309235.git.leonard.crestez@nxp.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 18 Jun 2018 10:12:43 +0200
+Subject: [PATCH 4.16 178/279] spi: bcm2835aux: ensure interrupts are enabled
+ for shared handler
+In-Reply-To: <20180618080608.851973560@linuxfoundation.org>
+References: <20180618080608.851973560@linuxfoundation.org>
+Message-ID: <20180618080616.307818426@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_SENSORS_ISL29018 supports isil,il29023 light sensor
-CONFIG_MMA8452 supports fsl,mma8451 accelerometer
+4.16-stable review patch.  If anyone has any objections, please let me know.
 
-CONFIG_MAG3110 for fsl,mag3110 is already enabled
+------------------
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+From: Rob Herring <robh@kernel.org>
+
+[ Upstream commit bc519d9574618e47a0c788000fb78da95e18d953 ]
+
+The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
+Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
+DT change which breaks compatibility with older kernels. The AUX irqchip
+was already rejected for upstream[1] and the DT change would break
+working systems if the DTB is updated to a newer one. The latter issue
+was brought to my attention by Alex Graf.
+
+The root cause however is a bug in the shared handler. Shared handlers
+must check that interrupts are actually enabled before servicing the
+interrupt. Add a check that the TXEMPTY or IDLE interrupts are enabled.
+
+[1] https://patchwork.kernel.org/patch/9781221/
+
+Cc: Alexander Graf <agraf@suse.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-spi at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/spi/spi-bcm2835aux.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Changes since v1:
- * Added "ARM:" prefix in title (Fabio)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index f70507ab91ee..a647cbb0e59f 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -372,12 +372,14 @@ CONFIG_MXS_DMA=y
- CONFIG_STAGING=y
- CONFIG_STAGING_MEDIA=y
- CONFIG_VIDEO_IMX_MEDIA=y
- CONFIG_COMMON_CLK_PWM=y
- CONFIG_IIO=y
-+CONFIG_MMA8452=y
- CONFIG_IMX7D_ADC=y
- CONFIG_VF610_ADC=y
-+CONFIG_SENSORS_ISL29018=y
- CONFIG_MAG3110=y
- CONFIG_MPL3115=y
- CONFIG_PWM=y
- CONFIG_PWM_FSL_FTM=y
- CONFIG_PWM_IMX=y
--- 
-2.17.1
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -184,6 +184,11 @@ static irqreturn_t bcm2835aux_spi_interr
+ 	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+ 	irqreturn_t ret = IRQ_NONE;
+ 
++	/* IRQ may be shared, so return if our interrupts are disabled */
++	if (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_CNTL1) &
++	      (BCM2835_AUX_SPI_CNTL1_TXEMPTY | BCM2835_AUX_SPI_CNTL1_IDLE)))
++		return ret;
++
+ 	/* check if we have data to read */
+ 	while (bs->rx_len &&
+ 	       (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_STAT) &
