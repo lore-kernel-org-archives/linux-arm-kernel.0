@@ -1,31 +1,31 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:06:09 -0700
-Subject: RESEND [PATCH 6/6] arm64: Wire up and expose the new compat vDSO
+Date: Mon, 18 Jun 2018 08:06:01 -0700
+Subject: RESEND [PATCH v2 2/3] arm64: compat: Split the sigreturn trampolines
+ and kuser helpers (assembler sources)
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-24-salyzyn@android.com>
+Message-ID: <20180618150613.10322-16-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Expose the new compat vDSO via the COMPAT_VDSO config option.
+AArch32 processes are currently installed a special [vectors] page that
+contains the sigreturn trampolines and the kuser helpers, at the fixed
+address mandated by the kuser helpers ABI.
 
-The option is not enabled in defconfig because we really need a 32-bit
-compiler this time, and we rely on the user to provide it themselves
-by setting CROSS_COMPILE_ARM32. Therefore enabling the option by
-default would make little sense, since the user must explicitly set a
-non-standard environment variable anyway.
+Having both functionalities in the same page has become problematic,
+because:
 
-CONFIG_COMPAT_VDSO is not directly used in the code, because we want
-to ignore it (build as if it were not set) if the user didn't set
-CROSS_COMPILE_ARM32. If the variable has been set to a valid prefix,
-CONFIG_VDSO32 will be set; this is the option that the code and
-Makefiles test.
+* It makes it impossible to disable the kuser helpers (the sigreturn
+  trampolines cannot be removed), which is possible on arm.
 
-For more flexibility, like CROSS_COMPILE, CROSS_COMPILE_ARM32 can also
-be set via CONFIG_CROSS_COMPILE_ARM32 (the environment variable
-overrides the config option, as expected).
+* A future 32-bit vDSO would provide the sigreturn trampolines itself,
+  making those in [vectors] redundant.
+
+This patch addresses the problem by moving the sigreturn trampolines
+sources to its own file.  Wrapped the comments to reduce the wrath of
+checkpatch.pl.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -46,123 +46,175 @@ Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
----
- arch/arm64/Kconfig         | 24 ++++++++++++++++++++++++
- arch/arm64/Makefile        | 36 ++++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/Makefile |  3 +++
- 3 files changed, 61 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 11b4c6aef7d7..eb9d3fc45f6b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1330,6 +1330,30 @@ config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
- 
-+config COMPAT_VDSO
-+	bool "32-bit vDSO"
-+	depends on COMPAT
-+	default n
-+	help
-+	  Warning: a 32-bit toolchain is necessary to build the vDSO. You
-+	  must explicitly define which toolchain should be used by setting
-+	  CROSS_COMPILE_ARM32 to the prefix of the 32-bit toolchain (same format
-+	  as CROSS_COMPILE). If CROSS_COMPILE_ARM32 is empty, a warning will be
-+	  printed and the kernel will be built as if COMPAT_VDSO had not been
-+	  set. If CROSS_COMPILE_ARM32 is set to an invalid prefix, compilation
-+	  will be aborted.
-+
-+	  Provide a vDSO to 32-bit processes. It includes the symbols provided
-+	  by the vDSO from the 32-bit kernel, so that a 32-bit libc can use
-+	  the compat vDSO without modification. It also provides sigreturn
-+	  trampolines, replacing the sigreturn page.
-+
-+config CROSS_COMPILE_ARM32
-+	string "32-bit toolchain prefix"
-+	help
-+	  Same as setting CROSS_COMPILE_ARM32 in the environment, but saved for
-+	  future builds. The environment variable overrides this config option.
-+
- endmenu
- 
- menu "Power management options"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 45272266dafb..f548123e1609 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -49,9 +49,39 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
-   endif
- endif
- 
--KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
-+ifeq ($(CONFIG_COMPAT_VDSO), y)
-+  CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_ARM32:"%"=%)
-+
-+  # Check that the user has provided a valid prefix for the 32-bit toolchain.
-+  # To prevent selecting the system $(cc-name) by default, the prefix is not
-+  # allowed to be empty, unlike CROSS_COMPILE. In the unlikely event that the
-+  # system $(cc-name) is actually the 32-bit ARM compiler to be used, the
-+  # variable can be set to the dirname (e.g. CROSS_COMPILE_ARM32=/usr/bin/).
-+  # Note: this Makefile is read both before and after regenerating the config
-+  # (if needed). Any warning appearing before the config has been regenerated
-+  # should be ignored. If the error is triggered and you set
-+  # CONFIG_CROSS_COMPILE_ARM32, set CROSS_COMPILE_ARM32 to an appropriate value
-+  # when invoking make and fix CONFIG_CROSS_COMPILE_ARM32.
-+  ifeq ($(CROSS_COMPILE_ARM32),)
-+    $(error CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built)
-+  else ifeq ($(cc-name),clang)
-+    export CLANG_TRIPLE_ARM32 ?= $(CROSS_COMPILE_ARM32)
-+    export CLANG_TARGET_ARM32 := --target=$(notdir $(CLANG_TRIPLE_ARM32:%-=%))
-+    export CONFIG_VDSO32 := y
-+    vdso32 := -DCONFIG_VDSO32=1
-+  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)$(cc-name) 2> /dev/null),)
-+    $(error $(CROSS_COMPILE_ARM32)$(cc-name) not found, check CROSS_COMPILE_ARM32)
-+  else
-+    export CROSS_COMPILE_ARM32
-+    export CONFIG_VDSO32 := y
-+    vdso32 := -DCONFIG_VDSO32=1
-+  endif
-+endif
-+
-+KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst) $(vdso32)
- KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
--KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
-+KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
-+KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(vdso32)
- 
- KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
- KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
-@@ -155,6 +185,8 @@ archclean:
- prepare: vdso_prepare
- vdso_prepare: prepare0
- 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
-+	$(if $(CONFIG_VDSO32),$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso32 \
-+					  include/generated/vdso32-offsets.h)
- 
- define archhelp
-   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
+v2:
+- split off from previous v1 'arm64: compat: Add CONFIG_KUSER_HELPERS'
+- adjust makefile so one line for each of the assembler source modules
+
+v3:
+- rebase
+---
+ arch/arm64/kernel/Makefile      |  4 +-
+ arch/arm64/kernel/kuser32.S     | 48 ++---------------------
+ arch/arm64/kernel/sigreturn32.S | 67 +++++++++++++++++++++++++++++++++
+ 3 files changed, 73 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm64/kernel/sigreturn32.S
+
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index c16be3cf39bf..628d0308d809 100644
+index 0025f8691046..9851be3ef932 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -28,7 +28,9 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+@@ -26,8 +26,10 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
+ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
  
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o	\
+-arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
++arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o	\
  					   sys_compat.o entry32.o
-+ifneq ($(CONFIG_VDSO32),y)
- arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
-+endif
- arm64-obj-$(CONFIG_KUSER_HELPERS)	+= kuser32.o
++arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
++arm64-obj-$(CONFIG_COMPAT)		+= kuser32.o
  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
-@@ -59,6 +61,7 @@ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
- arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/kuser32.S b/arch/arm64/kernel/kuser32.S
+index 997e6b27ff6a..d15b5c2935b3 100644
+--- a/arch/arm64/kernel/kuser32.S
++++ b/arch/arm64/kernel/kuser32.S
+@@ -20,16 +20,13 @@
+  *
+  * AArch32 user helpers.
+  *
+- * Each segment is 32-byte aligned and will be moved to the top of the high
+- * vector page.  New segments (if ever needed) must be added in front of
+- * existing ones.  This mechanism should be used only for things that are
+- * really small and justified, and not be abused freely.
++ * These helpers are provided for compatibility with AArch32 binaries that
++ * still need them. They are installed at a fixed address by
++ * aarch32_setup_additional_pages().
+  *
+  * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
+  */
  
- obj-y					+= $(arm64-obj-y) vdso/ probes/
-+obj-$(CONFIG_VDSO32)			+= vdso32/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
+-#include <asm/unistd.h>
+-
+ 	.align	5
+ 	.globl	__kuser_helper_start
+ __kuser_helper_start:
+@@ -77,42 +74,3 @@ __kuser_helper_version:			// 0xffff0ffc
+ 	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
+ 	.globl	__kuser_helper_end
+ __kuser_helper_end:
+-
+-/*
+- * AArch32 sigreturn code
+- *
+- * For ARM syscalls, the syscall number has to be loaded into r7.
+- * We do not support an OABI userspace.
+- *
+- * For Thumb syscalls, we also pass the syscall number via r7. We therefore
+- * need two 16-bit instructions.
+- */
+-	.globl __aarch32_sigret_code_start
+-__aarch32_sigret_code_start:
+-
+-	/*
+-	 * ARM Code
+-	 */
+-	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_sigreturn
+-	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_sigreturn
+-
+-	/*
+-	 * Thumb code
+-	 */
+-	.byte	__NR_compat_sigreturn, 0x27			// svc	#__NR_compat_sigreturn
+-	.byte	__NR_compat_sigreturn, 0xdf			// mov	r7, #__NR_compat_sigreturn
+-
+-	/*
+-	 * ARM code
+-	 */
+-	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_rt_sigreturn
+-	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_rt_sigreturn
+-
+-	/*
+-	 * Thumb code
+-	 */
+-	.byte	__NR_compat_rt_sigreturn, 0x27			// svc	#__NR_compat_rt_sigreturn
+-	.byte	__NR_compat_rt_sigreturn, 0xdf			// mov	r7, #__NR_compat_rt_sigreturn
+-
+-        .globl __aarch32_sigret_code_end
+-__aarch32_sigret_code_end:
+diff --git a/arch/arm64/kernel/sigreturn32.S b/arch/arm64/kernel/sigreturn32.S
+new file mode 100644
+index 000000000000..6ecda4d84cd5
+--- /dev/null
++++ b/arch/arm64/kernel/sigreturn32.S
+@@ -0,0 +1,67 @@
++/*
++ * sigreturn trampolines for AArch32.
++ *
++ * Copyright (C) 2005-2011 Nicolas Pitre <nico@fluxnic.net>
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ *
++ * AArch32 sigreturn code
++ *
++ * For ARM syscalls, the syscall number has to be loaded into r7.
++ * We do not support an OABI userspace.
++ *
++ * For Thumb syscalls, we also pass the syscall number via r7. We therefore
++ * need two 16-bit instructions.
++ */
++
++#include <asm/unistd.h>
++
++	.globl __aarch32_sigret_code_start
++__aarch32_sigret_code_start:
++
++	/*
++	 * ARM Code
++	 */
++	// mov	r7, #__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3
++	// svc	#__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef
++
++	/*
++	 * Thumb code
++	 */
++	// svc	#__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x27
++	// mov	r7, #__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0xdf
++
++	/*
++	 * ARM code
++	 */
++	// mov	r7, #__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3
++	// svc	#__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef
++
++	/*
++	 * Thumb code
++	 */
++	// svc	#__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x27
++	// mov	r7, #__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0xdf
++
++        .globl __aarch32_sigret_code_end
++__aarch32_sigret_code_end:
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
