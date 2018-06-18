@@ -1,47 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 17 Jun 2018 23:58:27 -0700
-Subject: Charge counter on droid 4
-In-Reply-To: <20180615083156.GA32102@amd>
-References: <20180615080014.GA29192@amd>
- <20180615083156.GA32102@amd>
-Message-ID: <20180618065827.GN112168@atomide.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 18 Jun 2018 09:06:53 +0200
+Subject: [PATCH] dt-bindings: Fix unbalanced quotation marks
+In-Reply-To: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+References: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+Message-ID: <CAJKOXPcAVovxU2mHSbkAG0axutFbd=_92bNdd2P_CnQGmhAfCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180615 08:34]:
-> On Fri 2018-06-15 10:00:14, Pavel Machek wrote:
-> > Hi!
-> > 
-> > Droid 4 has non-removable battery, yet the charge counter is reset to
-> > near zero on each boot of linux.
+On Sun, Jun 17, 2018 at 4:31 PM, Jonathan Neusch?fer
+<j.neuschaefer@gmx.net> wrote:
+> Multiple binding documents have various forms of unbalanced quotation
+> marks. Fix them.
+>
+> Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
+> ---
+>
+> Should I split this patch so that different parts can go through different trees?
+> ---
+>  .../devicetree/bindings/arm/samsung/samsung-boards.txt          | 2 +-
+>  .../devicetree/bindings/gpio/nintendo,hollywood-gpio.txt        | 2 +-
+>  Documentation/devicetree/bindings/input/touchscreen/hideep.txt  | 2 +-
+>  .../bindings/interrupt-controller/nvidia,tegra20-ictlr.txt      | 2 +-
+>  .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt  | 2 +-
+>  Documentation/devicetree/bindings/mips/brcm/soc.txt             | 2 +-
+>  Documentation/devicetree/bindings/net/fsl-fman.txt              | 2 +-
+>  Documentation/devicetree/bindings/power/power_domain.txt        | 2 +-
+>  Documentation/devicetree/bindings/regulator/tps65090.txt        | 2 +-
+>  Documentation/devicetree/bindings/reset/st,sti-softreset.txt    | 2 +-
+>  Documentation/devicetree/bindings/sound/qcom,apq8016-sbc.txt    | 2 +-
+>  Documentation/devicetree/bindings/sound/qcom,apq8096.txt        | 2 +-
+>  12 files changed, 12 insertions(+), 12 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> index bdadc3da9556..6970f30a3770 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> @@ -66,7 +66,7 @@ Required root node properties:
+>         - "insignal,arndale-octa" - for Exynos5420-based Insignal Arndale
+>                                     Octa board.
+>         - "insignal,origen"       - for Exynos4210-based Insignal Origen board.
+> -       - "insignal,origen4412    - for Exynos4412-based Insignal Origen board.
+> +       - "insignal,origen4412"   - for Exynos4412-based Insignal Origen board.
+>
 
-Not sure if we actively do anything to reset it. I'm guessing
-it's the Motorola bootloader that resets everything on boot.
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-> > Unfortunately, that makes charge counter pretty much useless on d4, as
-> > the "battery full" and "battery empty" limits will be different during
-> > each boot.
-
->From what I've seen also the stock kernel starts only with
-voltage based estimate initially after a reboot?
-
-> Hmm, and could we refrain from providing "power" values?
-> 
-> I was thinking great, we have hardware that does proper power
-> measuerement for us. No.... it is driver providing synthetic
-> values. As userland has enough information to do that itself, I
-> believe we should not do this in kernel.
-
-Hmm I don't follow you, why would we want to remove these as
-they implement a standard sysfs interface?
-
-I use the sysfs interface all the time to monitor the power
-consumption and the output seems to match what I was seeing
-with my power supply.
-
-Note that we also have the IIO raw data also available if that
-might help.
-
-Regards,
-
-Tony
+Best regards,
+Krzysztof
