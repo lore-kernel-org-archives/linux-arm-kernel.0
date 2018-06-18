@@ -1,101 +1,106 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Mon, 18 Jun 2018 15:00:06 +0300
-Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
-In-Reply-To: <8474a744-5552-932f-7ba8-85b7d95368ea@gmail.com>
-References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
- <20180618114920.654647c0@bbrezillon>
- <8474a744-5552-932f-7ba8-85b7d95368ea@gmail.com>
-Message-ID: <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Jun 2018 13:00:11 +0100
+Subject: Applied "ASoC: simple-card: move hp and mic detection to soc_card
+ probe" to the asoc tree
+In-Reply-To: <20180611083214.16858-2-suzuki.katsuhiro@socionext.com>
+Message-ID: <E1fUspP-00009M-T8@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patch
 
+   ASoC: simple-card: move hp and mic detection to soc_card probe
 
-On 18.06.2018 12:53, Marek Vasut wrote:
-> On 06/18/2018 11:49 AM, Boris Brezillon wrote:
->> Hi Claudiu,
->>
->> The subject prefix should be "mtd: spi-nor: atmel-quadspi: ". No need
->> to send a new version just for that, I'll fix it when applying the
->> patch.
->>
-Hi Boris,
+has been applied to the asoc tree at
 
-Thank you!
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
->> Looks good otherwise. Marek, any objection? If not, can you add your
->> Acked-by?
-> 
-> Will this work if you have ie. ubifs mounted on that QSPI NOR and you
-> suspect and resume during IO ? I think it would, but just curious if
-> there could be some problem.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-Hi Marek,
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-I tested only with read/writes while suspending, simple scripts, but not
-having ubifs mounted on QSPI NOR. I will double check also with ubifs
-mounted on QSPI NOR and come back with the results.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-Thank you,
-Claudiu
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-> 
->> Thanks,
->>
->> Boris
->>
->> On Mon, 4 Jun 2018 11:46:33 +0300
->> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
->>
->>> Implement suspend/resume hooks.
->>>
->>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>> ---
->>>
->>> Changes in v2:
->>> - use __maybe_unused instead of #ifdef CONFIG_PM_SLEEP
->>>
->>>  drivers/mtd/spi-nor/atmel-quadspi.c | 21 +++++++++++++++++++++
->>>  1 file changed, 21 insertions(+)
->>>
->>> diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
->>> index 6c5708bacad8..ceaaef47f02e 100644
->>> --- a/drivers/mtd/spi-nor/atmel-quadspi.c
->>> +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
->>> @@ -737,6 +737,26 @@ static int atmel_qspi_remove(struct platform_device *pdev)
->>>  	return 0;
->>>  }
->>>  
->>> +static int __maybe_unused atmel_qspi_suspend(struct device *dev)
->>> +{
->>> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
->>> +
->>> +	clk_disable_unprepare(aq->clk);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int __maybe_unused atmel_qspi_resume(struct device *dev)
->>> +{
->>> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
->>> +
->>> +	clk_prepare_enable(aq->clk);
->>> +
->>> +	return atmel_qspi_init(aq);
->>> +}
->>> +
->>> +static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
->>> +			 atmel_qspi_resume);
->>>  
->>>  static const struct of_device_id atmel_qspi_dt_ids[] = {
->>>  	{ .compatible = "atmel,sama5d2-qspi" },
->>> @@ -749,6 +769,7 @@ static struct platform_driver atmel_qspi_driver = {
->>>  	.driver = {
->>>  		.name	= "atmel_qspi",
->>>  		.of_match_table	= atmel_qspi_dt_ids,
->>> +		.pm	= &atmel_qspi_pm_ops,
->>>  	},
->>>  	.probe		= atmel_qspi_probe,
->>>  	.remove		= atmel_qspi_remove,
-> 
-> 
+Thanks,
+Mark
+
+>From 8d1bd113a194407f9ad083403ea1cf92108edf5c Mon Sep 17 00:00:00 2001
+From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Date: Mon, 11 Jun 2018 17:32:13 +0900
+Subject: [PATCH] ASoC: simple-card: move hp and mic detection to soc_card
+ probe
+
+This patch moves headphone and microphone detection to probe() of
+snd_soc_card from init() of snd_soc_dai_link. This is because init()
+is called (and an input device /dev/input/eventX is created too)
+twice or above if simple card has two or more DAI links.
+
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/generic/simple-card.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
+
+diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
+index a6477a022156..c5b6e04cd926 100644
+--- a/sound/soc/generic/simple-card.c
++++ b/sound/soc/generic/simple-card.c
+@@ -149,14 +149,6 @@ static int asoc_simple_card_dai_init(struct snd_soc_pcm_runtime *rtd)
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = asoc_simple_card_init_hp(rtd->card, &priv->hp_jack, PREFIX);
+-	if (ret < 0)
+-		return ret;
+-
+-	ret = asoc_simple_card_init_mic(rtd->card, &priv->mic_jack, PREFIX);
+-	if (ret < 0)
+-		return ret;
+-
+ 	return 0;
+ }
+ 
+@@ -350,6 +342,22 @@ static int asoc_simple_card_parse_of(struct simple_card_data *priv)
+ 	return ret;
+ }
+ 
++static int asoc_simple_soc_card_probe(struct snd_soc_card *card)
++{
++	struct simple_card_data *priv = snd_soc_card_get_drvdata(card);
++	int ret;
++
++	ret = asoc_simple_card_init_hp(card, &priv->hp_jack, PREFIX);
++	if (ret < 0)
++		return ret;
++
++	ret = asoc_simple_card_init_mic(card, &priv->mic_jack, PREFIX);
++	if (ret < 0)
++		return ret;
++
++	return 0;
++}
++
+ static int asoc_simple_card_probe(struct platform_device *pdev)
+ {
+ 	struct simple_card_data *priv;
+@@ -385,6 +393,7 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
+ 	card->dev		= dev;
+ 	card->dai_link		= priv->dai_link;
+ 	card->num_links		= num;
++	card->probe		= asoc_simple_soc_card_probe;
+ 
+ 	if (np && of_device_is_available(np)) {
+ 
+-- 
+2.17.1
