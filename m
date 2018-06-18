@@ -1,27 +1,19 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:05:48 -0700
-Subject: RESEND [PATCH v5 02/12] arm: vdso: add include file defining
- __get_datapage()
+Date: Mon, 18 Jun 2018 08:06:08 -0700
+Subject: RESEND [PATCH 5/6] arm64: compat: 32-bit vDSO setup
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-3-salyzyn@android.com>
+Message-ID: <20180618150613.10322-23-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture. But instead of landing it in arm64, land the
-result into lib/vdso and unify both implementations to simplify
-future maintenance.
+From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Define the prototype for __get_datapage() in local datapage.h header.
-Rename all vdata variable that point to the datapage shortened to vd
-to relect a consistent and concise style. Make sure that all
-references to the datapage in vdso operations are readonly (const).
-Make sure datapage is first parameter to all subroutines to also
-be consistent.
+If the compat vDSO is enabled, install it in compat processes. In this
+case, the compat vDSO replaces the sigreturn page (it provides its own
+sigreturn trampolines).
 
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
@@ -35,305 +27,142 @@ Cc: Laura Abbott <labbott@redhat.com>
 Cc: Kees Cook <keescook@chromium.org>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
 Cc: Andrew Pinski <apinski@cavium.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
-
-v2:
-- split first CL into 2 of 7 pieces
-
-v4:
-- update commit message to reflect overall reasoning
-
-v5:
-- rebase
 ---
- arch/arm/vdso/datapage.h      | 25 +++++++++
- arch/arm/vdso/vgettimeofday.c | 99 +++++++++++++++++------------------
- 2 files changed, 73 insertions(+), 51 deletions(-)
- create mode 100644 arch/arm/vdso/datapage.h
+ arch/arm64/kernel/vdso.c | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/arch/arm/vdso/datapage.h b/arch/arm/vdso/datapage.h
-new file mode 100644
-index 000000000000..e3088bdfb946
---- /dev/null
-+++ b/arch/arm/vdso/datapage.h
-@@ -0,0 +1,25 @@
-+/*
-+ * Userspace implementations of __get_datapage
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __VDSO_DATAPAGE_H
-+#define __VDSO_DATAPAGE_H
-+
-+#include <linux/types.h>
-+#include <asm/vdso_datapage.h>
-+
-+extern const struct vdso_data *__get_datapage(void);
-+
-+#endif /* __VDSO_DATAPAGE_H */
-diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index 8cf13af1323c..2474c17dc356 100644
---- a/arch/arm/vdso/vgettimeofday.c
-+++ b/arch/arm/vdso/vgettimeofday.c
-@@ -30,20 +30,19 @@
- #include <asm/bug.h>
- #include <asm/page.h>
- #include <asm/unistd.h>
--#include <asm/vdso_datapage.h>
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 8529e85a521f..9fb1e0d380ab 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -58,6 +58,7 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
+ /*
+  * Create and map the vectors page for AArch32 tasks.
+  */
++#if !defined(CONFIG_VDSO32) || defined(CONFIG_KUSER_HELPERS)
+ static struct page *vectors_page[] __ro_after_init;
+ static const struct vm_special_mapping compat_vdso_spec[] = {
+ 	{
+@@ -73,6 +74,7 @@ static const struct vm_special_mapping compat_vdso_spec[] = {
+ #endif
+ };
+ static struct page *vectors_page[ARRAY_SIZE(compat_vdso_spec)] __ro_after_init;
++#endif
  
- #ifndef CONFIG_AEABI
- #error This code depends on AEABI system call conventions
+ static int __init alloc_vectors_page(void)
+ {
+@@ -82,6 +84,7 @@ static int __init alloc_vectors_page(void)
+ 	unsigned long kuser_vpage;
  #endif
  
--extern struct vdso_data *__get_datapage(void);
-+#include "datapage.h"
++#ifndef CONFIG_VDSO32
+ 	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
+ 	size_t sigret_sz =
+ 		__aarch32_sigret_code_end - __aarch32_sigret_code_start;
+@@ -90,19 +93,24 @@ static int __init alloc_vectors_page(void)
+ 	sigret_vpage = get_zeroed_page(GFP_ATOMIC);
+ 	if (!sigret_vpage)
+ 		return -ENOMEM;
++#endif
  
--static notrace u32 vdso_read_begin(const struct vdso_data *vdata)
-+static notrace u32 vdso_read_begin(const struct vdso_data *vd)
- {
- 	u32 seq;
+ #ifdef CONFIG_KUSER_HELPERS
+ 	kuser_vpage = get_zeroed_page(GFP_ATOMIC);
+ 	if (!kuser_vpage) {
++#ifndef CONFIG_VDSO32
+ 		free_page(sigret_vpage);
++#endif
+ 		return -ENOMEM;
+ 	}
+ #endif
  
- 	do {
--		seq = READ_ONCE(vdata->tb_seq_count);
-+		seq = READ_ONCE(vd->tb_seq_count);
++#ifndef CONFIG_VDSO32
+ 	/* sigreturn code */
+ 	memcpy((void *)sigret_vpage, __aarch32_sigret_code_start, sigret_sz);
+ 	flush_icache_range(sigret_vpage, sigret_vpage + PAGE_SIZE);
+ 	vectors_page[0] = virt_to_page(sigret_vpage);
++#endif
  
- 		if ((seq & 1) == 0)
- 			break;
-@@ -55,12 +54,12 @@ static notrace u32 vdso_read_begin(const struct vdso_data *vdata)
- 	return seq;
+ #ifdef CONFIG_KUSER_HELPERS
+ 	/* kuser helpers */
+@@ -116,6 +124,7 @@ static int __init alloc_vectors_page(void)
  }
+ arch_initcall(alloc_vectors_page);
  
--static notrace int vdso_read_retry(const struct vdso_data *vdata, u32 start)
-+static notrace int vdso_read_retry(const struct vdso_data *vd, u32 start)
++#ifndef CONFIG_VDSO32
+ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
  {
- 	u32 seq;
+ 	struct mm_struct *mm = current->mm;
+@@ -151,6 +160,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
  
- 	smp_rmb(); /* Pairs with first smp_wmb in update_vsyscall */
--	seq = READ_ONCE(vdata->tb_seq_count);
-+	seq = READ_ONCE(vd->tb_seq_count);
- 	return seq != start;
+ 	return PTR_ERR_OR_ZERO(ret);
  }
++#endif /* !CONFIG_VDSO32 */
+ #endif /* CONFIG_COMPAT */
  
-@@ -81,38 +80,38 @@ static notrace long clock_gettime_fallback(clockid_t _clkid,
- 	return ret;
- }
- 
--static notrace int do_realtime_coarse(struct timespec *ts,
--				      struct vdso_data *vdata)
-+static notrace int do_realtime_coarse(const struct vdso_data *vd,
-+				      struct timespec *ts)
- {
- 	u32 seq;
- 
- 	do {
--		seq = vdso_read_begin(vdata);
-+		seq = vdso_read_begin(vd);
- 
--		ts->tv_sec = vdata->xtime_coarse_sec;
--		ts->tv_nsec = vdata->xtime_coarse_nsec;
-+		ts->tv_sec = vd->xtime_coarse_sec;
-+		ts->tv_nsec = vd->xtime_coarse_nsec;
- 
--	} while (vdso_read_retry(vdata, seq));
-+	} while (vdso_read_retry(vd, seq));
- 
+ static int vdso_mremap(const struct vm_special_mapping *sm,
+@@ -221,6 +231,23 @@ static int __init vdso_mappings_init(const char *name,
  	return 0;
  }
  
--static notrace int do_monotonic_coarse(struct timespec *ts,
--				       struct vdso_data *vdata)
-+static notrace int do_monotonic_coarse(const struct vdso_data *vd,
-+				       struct timespec *ts)
- {
- 	struct timespec tomono;
- 	u32 seq;
++#ifdef CONFIG_COMPAT
++#ifdef CONFIG_VDSO32
++
++static struct vdso_mappings vdso32_mappings __ro_after_init;
++
++static int __init vdso32_init(void)
++{
++	extern char vdso32_start[], vdso32_end[];
++
++	return vdso_mappings_init("vdso32", vdso32_start, vdso32_end,
++				  &vdso32_mappings);
++}
++arch_initcall(vdso32_init);
++
++#endif /* CONFIG_VDSO32 */
++#endif /* CONFIG_COMPAT */
++
+ static struct vdso_mappings vdso_mappings __ro_after_init;
  
- 	do {
--		seq = vdso_read_begin(vdata);
-+		seq = vdso_read_begin(vd);
- 
--		ts->tv_sec = vdata->xtime_coarse_sec;
--		ts->tv_nsec = vdata->xtime_coarse_nsec;
-+		ts->tv_sec = vd->xtime_coarse_sec;
-+		ts->tv_nsec = vd->xtime_coarse_nsec;
- 
--		tomono.tv_sec = vdata->wtm_clock_sec;
--		tomono.tv_nsec = vdata->wtm_clock_nsec;
-+		tomono.tv_sec = vd->wtm_clock_sec;
-+		tomono.tv_nsec = vd->wtm_clock_nsec;
- 
--	} while (vdso_read_retry(vdata, seq));
-+	} while (vdso_read_retry(vd, seq));
- 
- 	ts->tv_sec += tomono.tv_sec;
- 	timespec_add_ns(ts, tomono.tv_nsec);
-@@ -122,7 +121,7 @@ static notrace int do_monotonic_coarse(struct timespec *ts,
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
--static notrace u64 get_ns(struct vdso_data *vdata)
-+static notrace u64 get_ns(const struct vdso_data *vd)
- {
- 	u64 cycle_delta;
- 	u64 cycle_now;
-@@ -130,29 +129,29 @@ static notrace u64 get_ns(struct vdso_data *vdata)
- 
- 	cycle_now = arch_counter_get_cntvct();
- 
--	cycle_delta = (cycle_now - vdata->cs_cycle_last) & vdata->cs_mask;
-+	cycle_delta = (cycle_now - vd->cs_cycle_last) & vd->cs_mask;
- 
--	nsec = (cycle_delta * vdata->cs_mono_mult) + vdata->xtime_clock_snsec;
--	nsec >>= vdata->cs_shift;
-+	nsec = (cycle_delta * vd->cs_mono_mult) + vd->xtime_clock_snsec;
-+	nsec >>= vd->cs_shift;
- 
- 	return nsec;
+ static int __init vdso_init(void)
+@@ -263,6 +290,34 @@ static int vdso_setup(struct mm_struct *mm,
+ 	return PTR_ERR_OR_ZERO(ret);
  }
  
--static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
-+static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
++#ifdef CONFIG_COMPAT
++#ifdef CONFIG_VDSO32
++int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
++{
++	struct mm_struct *mm = current->mm;
++	void *ret;
++
++	if (down_write_killable(&mm->mmap_sem))
++		return -EINTR;
++
++	ret = ERR_PTR(vdso_setup(mm, &vdso32_mappings));
++#ifdef CONFIG_KUSER_HELPERS
++	if (!IS_ERR(ret))
++		/* Map the kuser helpers at the ABI-defined high address. */
++		ret = _install_special_mapping(mm, AARCH32_KUSER_HELPERS_BASE,
++					       PAGE_SIZE,
++					       VM_READ|VM_EXEC|
++					       VM_MAYREAD|VM_MAYEXEC,
++					       &compat_vdso_spec[1]);
++#endif
++
++	up_write(&mm->mmap_sem);
++
++	return PTR_ERR_OR_ZERO(ret);
++}
++#endif /* CONFIG_VDSO32 */
++#endif /* CONFIG_COMPAT */
++
+ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
  {
- 	u64 nsecs;
- 	u32 seq;
- 
- 	do {
--		seq = vdso_read_begin(vdata);
-+		seq = vdso_read_begin(vd);
- 
--		if (vdata->use_syscall)
-+		if (vd->use_syscall)
- 			return -1;
- 
--		ts->tv_sec = vdata->xtime_clock_sec;
--		nsecs = get_ns(vdata);
-+		ts->tv_sec = vd->xtime_clock_sec;
-+		nsecs = get_ns(vd);
- 
--	} while (vdso_read_retry(vdata, seq));
-+	} while (vdso_read_retry(vd, seq));
- 
- 	ts->tv_nsec = 0;
- 	timespec_add_ns(ts, nsecs);
-@@ -160,25 +159,25 @@ static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
- 	return 0;
- }
- 
--static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
-+static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- {
- 	struct timespec tomono;
- 	u64 nsecs;
- 	u32 seq;
- 
- 	do {
--		seq = vdso_read_begin(vdata);
-+		seq = vdso_read_begin(vd);
- 
--		if (vdata->use_syscall)
-+		if (vd->use_syscall)
- 			return -1;
- 
--		ts->tv_sec = vdata->xtime_clock_sec;
--		nsecs = get_ns(vdata);
-+		ts->tv_sec = vd->xtime_clock_sec;
-+		nsecs = get_ns(vd);
- 
--		tomono.tv_sec = vdata->wtm_clock_sec;
--		tomono.tv_nsec = vdata->wtm_clock_nsec;
-+		tomono.tv_sec = vd->wtm_clock_sec;
-+		tomono.tv_nsec = vd->wtm_clock_nsec;
- 
--	} while (vdso_read_retry(vdata, seq));
-+	} while (vdso_read_retry(vd, seq));
- 
- 	ts->tv_sec += tomono.tv_sec;
- 	ts->tv_nsec = 0;
-@@ -189,12 +188,12 @@ static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
- 
- #else /* CONFIG_ARM_ARCH_TIMER */
- 
--static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
-+static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
- {
- 	return -1;
- }
- 
--static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
-+static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- {
- 	return -1;
- }
-@@ -203,23 +202,22 @@ static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
- 
- notrace int __vdso_clock_gettime(clockid_t clkid, struct timespec *ts)
- {
--	struct vdso_data *vdata;
- 	int ret = -1;
- 
--	vdata = __get_datapage();
-+	const struct vdso_data *vd = __get_datapage();
- 
- 	switch (clkid) {
- 	case CLOCK_REALTIME_COARSE:
--		ret = do_realtime_coarse(ts, vdata);
-+		ret = do_realtime_coarse(vd, ts);
- 		break;
- 	case CLOCK_MONOTONIC_COARSE:
--		ret = do_monotonic_coarse(ts, vdata);
-+		ret = do_monotonic_coarse(vd, ts);
- 		break;
- 	case CLOCK_REALTIME:
--		ret = do_realtime(ts, vdata);
-+		ret = do_realtime(vd, ts);
- 		break;
- 	case CLOCK_MONOTONIC:
--		ret = do_monotonic(ts, vdata);
-+		ret = do_monotonic(vd, ts);
- 		break;
- 	default:
- 		break;
-@@ -251,12 +249,11 @@ static notrace long gettimeofday_fallback(struct timeval *_tv,
- notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
- {
- 	struct timespec ts;
--	struct vdso_data *vdata;
- 	int ret;
- 
--	vdata = __get_datapage();
-+	const struct vdso_data *vd = __get_datapage();
- 
--	ret = do_realtime(&ts, vdata);
-+	ret = do_realtime(vd, &ts);
- 	if (ret)
- 		return gettimeofday_fallback(tv, tz);
- 
-@@ -265,8 +262,8 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
- 		tv->tv_usec = ts.tv_nsec / 1000;
- 	}
- 	if (tz) {
--		tz->tz_minuteswest = vdata->tz_minuteswest;
--		tz->tz_dsttime = vdata->tz_dsttime;
-+		tz->tz_minuteswest = vd->tz_minuteswest;
-+		tz->tz_dsttime = vd->tz_dsttime;
- 	}
- 
- 	return ret;
+ 	struct mm_struct *mm = current->mm;
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
