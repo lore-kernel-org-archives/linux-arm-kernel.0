@@ -1,72 +1,46 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 Jun 2018 12:40:07 +0100
-Subject: [PATCH] power: vexpress: fix corruption in notifier registration
-Message-ID: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Jun 2018 04:48:32 -0700
+Subject: Charge counter on droid 4
+In-Reply-To: <20180618093459.GA21391@amd>
+References: <20180615080014.GA29192@amd> <20180615083156.GA32102@amd>
+ <20180618065827.GN112168@atomide.com> <20180618074023.GA16955@amd>
+ <20180618082858.GO112168@atomide.com> <20180618093459.GA21391@amd>
+Message-ID: <20180618114832.GR112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vexpress platforms provide two different restart handlers: SYS_REBOOT
-that restart the entire system, while DB_RESET only restarts the
-daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
-if it exists.
+* Pavel Machek <pavel@ucw.cz> [180618 09:37]:
+> On Mon 2018-06-18 01:28:58, Tony Lindgren wrote:
+> > * Pavel Machek <pavel@ucw.cz> [180618 07:43]:
+> > > 
+> > > So... there are mA, mAh values. Those come from hardware, and I
+> > > believe we should keep them.
+> > > 
+> > > But there are also mW, mWh values, which are synthetic. Userland can
+> > > compute them from mV, mA values... and it is confusing that kernel
+> > > provides them. (My tendency was to start computing these synthetic
+> > > values in userland, to compare them with "real hardware" values from
+> > > kernel. But then I looked at kernel implementation, and realized they
+> > > are synthetic, tooo...)
+> > 
+> > Hmm mWh value is based on the hardware sampled shunt
+> > values and number of samples gathered between the
+> > two readings. I'd rather call the calculated values
+> > based on userland reading mV and mA values "synthetic" :)
+> 
+> As far as I know, shunt resistors provide you with current (mA) not
+> power (mW) measurement... and cpcap-battery computes power_now as
+> voltage * current. I'd rather have kernel tell me "hardware can't
+> measure power" and do "voltage*current" computation in userspace.
 
-notifier_chain_register used in register_restart_handler by design
-allows notifier to be registered once only, however vexpress restart
-notifier can get registered twice. When this happen it corrupts list
-of notifiers, as result some notifiers can be not called on proper
-event, traverse on list can be cycled forever, and second unregister
-can access already freed memory.
+Yup you are correct the hardware samples mA and we still need
+to calculate mW based on the voltage.
 
-So far, since this was the only restart handler in the system, no issue
-was observed even if the same notifier was registered twice. However
-commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
-support for SP805 restart handlers and since the system under test
-contains two vexpress restart and two SP805 watchdog instances, it was
-observed that during the boot traversing the restart handler list looped
-forever as there's a cycle in that list resulting in boot hang.
+But considering it works and seems to match the power supply
+provided average power consumption numbers pretty well and at
+least I'm using it.. What is your reasoning for removing such
+a usable interface?
 
-This patch fixes the issues by ensuring that the notifier is installed
-only once.
+Regards,
 
-Cc: Sebastian Reichel <sre@kernel.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/power/reset/vexpress-poweroff.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
-index 102f95a09460..cdc68eb06a91 100644
---- a/drivers/power/reset/vexpress-poweroff.c
-+++ b/drivers/power/reset/vexpress-poweroff.c
-@@ -35,6 +35,7 @@ static void vexpress_reset_do(struct device *dev, const char *what)
- }
- 
- static struct device *vexpress_power_off_device;
-+static atomic_t vexpress_restart_nb_refcnt = ATOMIC_INIT(0);
- 
- static void vexpress_power_off(void)
- {
-@@ -96,13 +97,16 @@ static const struct of_device_id vexpress_reset_of_match[] = {
- 
- static int _vexpress_register_restart_handler(struct device *dev)
- {
--	int err;
-+	int err = 0;
- 
- 	vexpress_restart_device = dev;
--	err = register_restart_handler(&vexpress_restart_nb);
--	if (err) {
--		dev_err(dev, "cannot register restart handler (err=%d)\n", err);
--		return err;
-+	if (atomic_inc_return(&vexpress_restart_nb_refcnt) == 1) {
-+		err = register_restart_handler(&vexpress_restart_nb);
-+		if (err) {
-+			dev_err(dev, "cannot register restart handler (err=%d)\n", err);
-+			atomic_dec(&vexpress_restart_nb_refcnt);
-+			return err;
-+		}
- 	}
- 	device_create_file(dev, &dev_attr_active);
- 
--- 
-2.7.4
+Tony
