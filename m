@@ -1,47 +1,36 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 18 Jun 2018 14:59:01 +1000
-Subject: [PATCH v2 3/4] arm: dts: Update AST2500 device-tree
-In-Reply-To: <20180618045902.11453-1-benh@kernel.crashing.org>
-References: <20180618045902.11453-1-benh@kernel.crashing.org>
-Message-ID: <20180618045902.11453-4-benh@kernel.crashing.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Jun 2018 06:49:10 +0100
+Subject: [PATCH v4 23/26] devicetree: fix a series of wrong file references
+In-Reply-To: <266e5f874b36aa83f3327879d85921fab52d5461.1529079120.git.mchehab+samsung@kernel.org>
+References: <cover.1529079119.git.mchehab+samsung@kernel.org>
+ <266e5f874b36aa83f3327879d85921fab52d5461.1529079120.git.mchehab+samsung@kernel.org>
+Message-ID: <20180618054910.GB31141@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing node for the CVIC (the coprocessor interrupt
-controller) and add a label to the SRAM node so it can be
-referenced from the board device-tree file.
+On Fri, 15 Jun 2018, Mauro Carvalho Chehab wrote:
 
-Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
----
- arch/arm/boot/dts/aspeed-g5.dtsi | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+> As files got renamed, their references broke.
+> 
+> Manually fix a series of broken refs at the DT bindings.
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> ---
+>  .../devicetree/bindings/input/rmi4/rmi_2d_sensor.txt |  2 +-
+>  Documentation/devicetree/bindings/mfd/sun6i-prcm.txt |  2 +-
 
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 17f2714d18a7..21141ca1bfa4 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -127,6 +127,13 @@
- 			reg = <0x1e6c0080 0x80>;
- 		};
- 
-+		cvic: copro-interrupt-controller at 1e6c2000 {
-+			compatible = "aspeed,ast2500-cvic", "aspeed-cvic";
-+			valid-sources = <0xffffffff>;
-+			copro-sw-interrupts = <1>;
-+			reg = <0x1e6c2000 0x80>;
-+		};
-+
- 		mac0: ethernet at 1e660000 {
- 			compatible = "aspeed,ast2500-mac", "faraday,ftgmac100";
- 			reg = <0x1e660000 0x180>;
-@@ -211,7 +218,7 @@
- 				status = "disabled";
- 			};
- 
--			sram at 1e720000 {
-+			sram: sram at 1e720000 {
- 				compatible = "mmio-sram";
- 				reg = <0x1e720000 0x9000>;	// 36K
- 			};
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+>  .../devicetree/bindings/pci/hisilicon-pcie.txt       |  2 +-
+>  Documentation/devicetree/bindings/pci/kirin-pcie.txt |  2 +-
+>  .../devicetree/bindings/pci/pci-keystone.txt         |  4 ++--
+>  .../devicetree/bindings/sound/st,stm32-i2s.txt       |  2 +-
+>  .../devicetree/bindings/sound/st,stm32-sai.txt       |  2 +-
+>  MAINTAINERS                                          | 12 ++++++------
+>  8 files changed, 14 insertions(+), 14 deletions(-)
+
 -- 
-2.17.1
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
