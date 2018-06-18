@@ -1,74 +1,74 @@
 From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Mon, 18 Jun 2018 17:12:34 +0300
-Subject: [PATCH v5 0/5] ASoC: add driver for Atmel I2S controller
-Message-ID: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
+Date: Mon, 18 Jun 2018 17:12:35 +0300
+Subject: [PATCH v5 1/5] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
+References: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
+Message-ID: <20180618141239.10892-2-codrin.ciubotariu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a rework of Cyrille's patches named:
-[PATCH v3 0/2] ASoC: add driver for Atmel I2S controller
-https://lkml.org/lkml/2015/9/29/454
+The I2S mux clock can be used to select the I2S input clock. The
+available parents are the peripheral and the generated clocks.
 
-This is the version 5 of the series, and addresses the received feedback
-on the mailing lists.
+Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+---
 
-This series applies on top of clk-next branch of clk/linux.git.
+Changes in v5:
+	- specified clock's parent;
+	- added a newline before adding the clock's compatible string;
 
-Based on received feedback, I created a mux clock driver to select the I2S
-clock source, that also includes proper devicetree bindings and nodes.
-Also, I added the I2S nodes in sama5d2's devicetree, with the missing
-pin muxing for the second I2S controller.
+ .../devicetree/bindings/clock/at91-clock.txt  | 35 +++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-Alexandre Belloni plans to change the at91 fine grained clock nodes and
-he recommended to leave the bindings for this clock driver in the same
-(wrong) manner, so he could fix them all at once.
-
-This series of patches adds support to the new Atmel I2S controller
-embedded on sama5d2 SoCs.
-
-ChangeLog
-
-v4 -> v5
- - removed patches:
-   [PATCH v4 4/7] ASoC: atmel-i2s: dt-bindings: add DT bindings for I2S controller
-   [PATCH v4 5/7] ASoC: atmel-i2s: add driver for the new Atmel I2S controller
-   from this series since they were applied to the asoc tree at:
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
- - addressed comments received on the mux clock;
-
-v3 -> v4
- - as suggested by Rob Herring:
-   - added a clock mux driver for I2S's clock control bit;
-   - more precise description of I2S's devicetree bindings;
-   - removed SoC and internal detalls from bindings;
- - addressed comments from Mark Brown;
- - added devicetree nodes and pin muxing for I2S;
-
-v2 -> v3
- - fix the coding style, add some more comments and add a section dedicated
-  to sama5d2 SoCs in the DT binding documentation as suggested by Mark
-  Brown.
-
-v1 -> v2
- - initialize dev->dev before calling dev->caps->mck_init()
-
-Codrin Ciubotariu (3):
-  dt-bindings: clk: at91: add an I2S mux clock
-  clk: at91: add I2S clock mux driver
-  ARM: dts: at91: sama5d2: add I2S clock muxing nodes
-
-Cyrille Pitchen (2):
-  ARM: dts: at91: sama5d2: add nodes for I2S controllers
-  ARM: dts: at91: sama5d2 Xplained: add pin muxing for I2S
-
- .../devicetree/bindings/clock/at91-clock.txt  |  35 ++++++
- arch/arm/boot/dts/at91-sama5d2_xplained.dts   |  28 +++++
- arch/arm/boot/dts/sama5d2.dtsi                |  52 ++++++++
- arch/arm/mach-at91/Kconfig                    |   4 +
- drivers/clk/at91/Makefile                     |   1 +
- drivers/clk/at91/clk-i2s-mux.c                | 116 ++++++++++++++++++
- 6 files changed, 236 insertions(+)
- create mode 100644 drivers/clk/at91/clk-i2s-mux.c
-
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index 51c259a92d02..d0adbf5ae144 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -91,6 +91,9 @@ Required properties:
+ 		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
+ 		and can be used by peripheral clock or generic clock
+ 
++	"atmel,sama5d2-clk-i2s-mux" (under pmc node):
++		at91 I2S clock source selection
++
+ Required properties for SCKC node:
+ - reg : defines the IO memory reserved for the SCKC.
+ - #size-cells : shall be 0 (reg is used to encode clk id).
+@@ -507,3 +510,35 @@ For example:
+ 			atmel,clk-output-range = <0 83000000>;
+ 		};
+ 	};
++
++Required properties for I2S mux clocks:
++- #size-cells : shall be 0 (reg is used to encode I2S bus id).
++- #address-cells : shall be 1 (reg is used to encode I2S bus id).
++- name: device tree node describing a specific mux clock.
++	* #clock-cells : from common clock binding; shall be set to 0.
++	* clocks : shall be the mux clock parent phandles; shall be 2 phandles:
++	  peripheral and generated clock; the first phandle shall belong to the
++	  peripheral clock and the second one shall belong to the generated
++	  clock; "clock-indices" property can be user to specify
++	  the correct order.
++	* reg: I2S bus id of the corresponding mux clock.
++	  e.g. reg = <0>; for i2s0, reg = <1>; for i2s1
++
++For example:
++	i2s_clkmux {
++		compatible = "atmel,sama5d2-clk-i2s-mux";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2s0muxck: i2s0_muxclk {
++			clocks = <&i2s0_clk>, <&i2s0_gclk>;
++			#clock-cells = <0>;
++			reg = <0>;
++		};
++
++		i2s1muxck: i2s1_muxclk {
++			clocks = <&i2s1_clk>, <&i2s1_gclk>;
++			#clock-cells = <0>;
++			reg = <1>;
++		};
++	};
 -- 
 2.17.1
