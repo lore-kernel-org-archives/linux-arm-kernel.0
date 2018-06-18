@@ -1,120 +1,129 @@
-From: zsm@chromium.org (Zubin Mithra)
-Date: Mon, 18 Jun 2018 08:30:51 -0700
-Subject: [RFC v2 2/4] arm: factor out current_stack_pointer
-In-Reply-To: <20180618153053.186224-1-zsm@chromium.org>
-References: <20180618153053.186224-1-zsm@chromium.org>
-Message-ID: <20180618153053.186224-3-zsm@chromium.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 18 Jun 2018 17:32:30 +0200
+Subject: [PATCH] ARM: mvebu: convert secondary CPU clock sync to hotplug state
+Message-ID: <20180618153230.32182-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple header files that rely on current_stack_pointer do not have the
-necessary include <asm/thread_info.h>, and are thus fragile to changes
-in the header soup.
+The current call site in boot_secondary is causing sleep in invalid context
+warnings, as this part of the code is running with interrrupts disabled and
+some of the calls into the clock framework might sleep on a mutex.
 
-Subsequent patches will affect the header soup such that including
-<asm/thread_info.h> will result in a circular header include. Factor
-current_stack_pointer into its own header and have all the users include
-this header explicitly.
+Convert the secondary CPU clock sync to a hotplug state, which allows to
+call it from a sleepable context.
 
-Signed-off-by: Zubin Mithra <zsm@chromium.org>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/include/asm/percpu.h        | 2 ++
- arch/arm/include/asm/stack_pointer.h | 9 +++++++++
- arch/arm/include/asm/thread_info.h   | 7 +------
- arch/arm/kernel/return_address.c     | 1 +
- arch/arm/kernel/stacktrace.c         | 1 +
- arch/arm/kernel/unwind.c             | 1 +
- 6 files changed, 15 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/include/asm/stack_pointer.h
+ arch/arm/mach-mvebu/platsmp.c | 49 ++++++++++++++++-------------------
+ include/linux/cpuhotplug.h    |  1 +
+ 2 files changed, 24 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-index a89b4076cde4..6a19e634d0cf 100644
---- a/arch/arm/include/asm/percpu.h
-+++ b/arch/arm/include/asm/percpu.h
-@@ -16,6 +16,8 @@
- #ifndef _ASM_ARM_PERCPU_H_
- #define _ASM_ARM_PERCPU_H_
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 4ffbbd217e82..c130497dc6cc 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -35,6 +35,8 @@
+ #define AXP_BOOTROM_BASE 0xfff00000
+ #define AXP_BOOTROM_SIZE 0x100000
  
-+#include <asm/stack_pointer.h>
++static struct clk *boot_cpu_clk;
 +
- /*
-  * Same as asm-generic/percpu.h, except that we store the per cpu offset
-  * in the TPIDRPRW. TPIDRPRW only exists on V6K and V7
-diff --git a/arch/arm/include/asm/stack_pointer.h b/arch/arm/include/asm/stack_pointer.h
-new file mode 100644
-index 000000000000..5a6a8c6d9208
---- /dev/null
-+++ b/arch/arm/include/asm/stack_pointer.h
-@@ -0,0 +1,9 @@
-+#ifndef __ASM_STACK_POINTER_H
-+#define __ASM_STACK_POINTER_H
-+
-+/*
-+ * how to get the current stack pointer in C
-+ */
-+register unsigned long current_stack_pointer asm ("sp");
-+
-+#endif
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 4a351e0aba0e..61fa0379ea85 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -25,6 +25,7 @@
- struct task_struct;
- 
- #include <asm/types.h>
-+#include <asm/stack_pointer.h>
- 
- typedef unsigned long mm_segment_t;
- 
-@@ -75,12 +76,6 @@ struct thread_info {
- 	.addr_limit	= KERNEL_DS,					\
+ static struct clk *get_cpu_clk(int cpu)
+ {
+ 	struct clk *cpu_clk;
+@@ -48,30 +50,6 @@ static struct clk *get_cpu_clk(int cpu)
+ 	return cpu_clk;
  }
  
--/*
-- * how to get the current stack pointer in C
-- */
--register unsigned long current_stack_pointer asm ("sp");
+-static void set_secondary_cpu_clock(unsigned int cpu)
+-{
+-	int thiscpu;
+-	unsigned long rate;
+-	struct clk *cpu_clk;
 -
+-	thiscpu = get_cpu();
 -
- /*
-  * how to get the thread information struct from C
-  */
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index 36ed35073289..d76e64250816 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -14,6 +14,7 @@
- #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
- #include <linux/sched.h>
+-	cpu_clk = get_cpu_clk(thiscpu);
+-	if (!cpu_clk)
+-		goto out;
+-	clk_prepare_enable(cpu_clk);
+-	rate = clk_get_rate(cpu_clk);
+-
+-	cpu_clk = get_cpu_clk(cpu);
+-	if (!cpu_clk)
+-		goto out;
+-	clk_set_rate(cpu_clk, rate);
+-	clk_prepare_enable(cpu_clk);
+-
+-out:
+-	put_cpu();
+-}
+-
+ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	int ret, hw_cpu;
+@@ -79,7 +57,6 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	pr_info("Booting CPU %d\n", cpu);
  
-+#include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
+ 	hw_cpu = cpu_logical_map(cpu);
+-	set_secondary_cpu_clock(hw_cpu);
+ 	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
  
- struct return_address_data {
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index a56e7c856ab5..d519b8e0797f 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -4,6 +4,7 @@
- #include <linux/stacktrace.h>
+ 	/*
+@@ -122,6 +99,19 @@ static void __init armada_xp_smp_init_cpus(void)
+ 		panic("Invalid number of CPUs in DT\n");
+ }
  
- #include <asm/sections.h>
-+#include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
- #include <asm/traps.h>
++static int armada_xp_sync_secondary_clk(unsigned int cpu)
++{
++	struct clk *cpu_clk = get_cpu_clk(cpu);
++
++	if (!cpu_clk || !boot_cpu_clk)
++		return 0;
++
++	clk_prepare_enable(cpu_clk);
++	clk_set_rate(cpu_clk, clk_get_rate(boot_cpu_clk));
++
++	return 0;
++}
++
+ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	struct device_node *node;
+@@ -131,6 +121,14 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ 	flush_cache_all();
+ 	set_cpu_coherent();
  
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 0bee233fef9a..860f8ac187e0 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -45,6 +45,7 @@
- #include <linux/spinlock.h>
- #include <linux/list.h>
++	boot_cpu_clk = get_cpu_clk(smp_processor_id());
++	if (boot_cpu_clk) {
++		clk_prepare_enable(boot_cpu_clk);
++		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_MVEBU_SYNC_CLOCKS,
++					  "arm/mvebu/sync_clocks:online",
++					  armada_xp_sync_secondary_clk, NULL);
++	}
++
+ 	/*
+ 	 * In order to boot the secondary CPUs we need to ensure
+ 	 * the bootROM is mapped at the correct address.
+@@ -223,7 +221,6 @@ static int mv98dx3236_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	int ret, hw_cpu;
  
-+#include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
- #include <asm/traps.h>
- #include <asm/unwind.h>
+ 	hw_cpu = cpu_logical_map(cpu);
+-	set_secondary_cpu_clock(hw_cpu);
+ 	mv98dx3236_resume_set_cpu_boot_addr(hw_cpu,
+ 					    armada_xp_secondary_startup);
+ 
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 8796ba387152..fa54e5fbea38 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -143,6 +143,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_SMPBOOT_THREADS,
+ 	CPUHP_AP_X86_VDSO_VMA_ONLINE,
+ 	CPUHP_AP_IRQ_AFFINITY_ONLINE,
++	CPUHP_AP_ARM_MVEBU_SYNC_CLOCKS,
+ 	CPUHP_AP_PERF_ONLINE,
+ 	CPUHP_AP_PERF_X86_ONLINE,
+ 	CPUHP_AP_PERF_X86_UNCORE_ONLINE,
 -- 
-2.18.0.rc1.244.gcf134e6275-goog
+2.17.1
