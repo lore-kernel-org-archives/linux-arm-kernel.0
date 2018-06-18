@@ -1,10 +1,9 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 18 Jun 2018 08:05:50 -0700
-Subject: RESEND [PATCH v5 04/12] arm: vdso: do calculations outside reader
- loops
+Date: Mon, 18 Jun 2018 08:05:47 -0700
+Subject: RESEND [PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
 In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
 References: <20180618150613.10322-1-salyzyn@android.com>
-Message-ID: <20180618150613.10322-5-salyzyn@android.com>
+Message-ID: <20180618150613.10322-2-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,12 +14,13 @@ for each architecture. But instead of landing it in arm64, land the
 result into lib/vdso and unify both implementations to simplify
 future maintenance.
 
-In variable timer reading loops, pick up just the values until all
-are synchronized, then outside of loop pick up cntvct and perform
-calculations to determine final offset, shifted and multiplied
-output value.
+Rename seq_count to tb_seq_count. Rename tk_is_cntvct to use_syscall.
+Rename cs_mult to cs_mono_mult. All to align with the variables in the
+arm64 vdso datapage. Rework vdso_read_begin() and vdso_read_retry()
+functions to reflect modern access patterns for tb_seq_count field.
 
-This replaces get_ns with get_clock_shifted_nsec as cntvct reader.
+Update copyright message to reflect the start of the contributions in
+this series.
 
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
@@ -43,227 +43,213 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
 
 v2:
-- split first CL into 5 of 7 pieces
+- split first CL into 1 of 7 pieces
 
 v4:
-- split into two, moving ARCH_CLOCK_FIXED_MASK to later
-- update commit message to reflect overall reasoning
-- adjust for dropping forced inline
-- replace typeof() with types vdso_wtm_clock_nsec_t,
-  vdso_xtime_clock_sec and __kernel_time_t.
+- update commit message to reflect reasoning
 
 v5:
-- drop including linux/time.h in favour of uapi/linux/time.h in
-  vgettimeofday.c to limit architectural includes.
-- add linux/time.h to compiler.h for NSEC_PER_SEC definition.
-- replace last timespec_add_ns with __iter_div_u64_rem.
+- rebase
 ---
- arch/arm/include/asm/vdso_datapage.h | 18 +++++-
- arch/arm/vdso/compiler.h             |  1 +
- arch/arm/vdso/vgettimeofday.c        | 90 ++++++++++++++++++----------
- 3 files changed, 76 insertions(+), 33 deletions(-)
+ arch/arm/include/asm/vdso_datapage.h |  6 +--
+ arch/arm/kernel/vdso.c               | 17 ++++----
+ arch/arm/vdso/vgettimeofday.c        | 61 +++++++++++++++-------------
+ 3 files changed, 45 insertions(+), 39 deletions(-)
 
 diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
-index fa3e1856244d..8dd7303db4ec 100644
+index 9be259442fca..fa3e1856244d 100644
 --- a/arch/arm/include/asm/vdso_datapage.h
 +++ b/arch/arm/include/asm/vdso_datapage.h
-@@ -24,6 +24,16 @@
- 
- #include <asm/page.h>
- 
-+#ifndef _VDSO_WTM_CLOCK_SEC_T
-+#define _VDSO_WTM_CLOCK_SEC_T
-+typedef u32 vdso_wtm_clock_nsec_t;
-+#endif
-+
-+#ifndef _VDSO_XTIME_CLOCK_SEC_T
-+#define _VDSO_XTIME_CLOCK_SEC_T
-+typedef u32 vdso_xtime_clock_sec_t;
-+#endif
-+
- /* Try to be cache-friendly on systems that don't implement the
-  * generic timer: fit the unconditionally updated fields in the first
+@@ -29,8 +29,8 @@
   * 32 bytes.
-@@ -35,9 +45,11 @@ struct vdso_data {
+  */
+ struct vdso_data {
+-	u32 seq_count;		/* sequence count - odd during updates */
+-	u16 tk_is_cntvct;	/* fall back to syscall if false */
++	u32 tb_seq_count;	/* sequence count - odd during updates */
++	u16 use_syscall;	/* fall back to syscall if true */
+ 	u16 cs_shift;		/* clocksource shift */
  	u32 xtime_coarse_sec;	/* coarse time */
  	u32 xtime_coarse_nsec;
- 
--	u32 wtm_clock_sec;	/* wall to monotonic offset */
--	u32 wtm_clock_nsec;
--	u32 xtime_clock_sec;	/* CLOCK_REALTIME - seconds */
-+	/* wall to monotonic offset */
-+	u32 wtm_clock_sec;
-+	vdso_wtm_clock_nsec_t	wtm_clock_nsec;
-+	/* CLOCK_REALTIME - seconds */
-+	vdso_xtime_clock_sec_t	xtime_clock_sec;
- 	u32 cs_mono_mult;	/* clocksource multiplier */
+@@ -38,7 +38,7 @@ struct vdso_data {
+ 	u32 wtm_clock_sec;	/* wall to monotonic offset */
+ 	u32 wtm_clock_nsec;
+ 	u32 xtime_clock_sec;	/* CLOCK_REALTIME - seconds */
+-	u32 cs_mult;		/* clocksource multiplier */
++	u32 cs_mono_mult;	/* clocksource multiplier */
  
  	u64 cs_cycle_last;	/* last cycle value */
-diff --git a/arch/arm/vdso/compiler.h b/arch/arm/vdso/compiler.h
-index af24502797e8..3edddb705a1b 100644
---- a/arch/arm/vdso/compiler.h
-+++ b/arch/arm/vdso/compiler.h
-@@ -27,6 +27,7 @@
- #include <asm/processor.h>	/* for cpu_relax()			*/
- #include <asm/unistd.h>
- #include <linux/compiler.h>
-+#include <linux/time.h>		/* for NSEC_PER_SEC			*/
+ 	u64 cs_mask;		/* clocksource mask */
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index f4dd7f9663c1..c2c57f6b8c60 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -276,14 +276,14 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
  
- #ifndef CONFIG_AEABI
- #error This code depends on AEABI system call conventions
+ static void vdso_write_begin(struct vdso_data *vdata)
+ {
+-	++vdso_data->seq_count;
++	++vdso_data->tb_seq_count;
+ 	smp_wmb(); /* Pairs with smp_rmb in vdso_read_retry */
+ }
+ 
+ static void vdso_write_end(struct vdso_data *vdata)
+ {
+ 	smp_wmb(); /* Pairs with smp_rmb in vdso_read_begin */
+-	++vdso_data->seq_count;
++	++vdso_data->tb_seq_count;
+ }
+ 
+ static bool tk_is_cntvct(const struct timekeeper *tk)
+@@ -307,10 +307,10 @@ static bool tk_is_cntvct(const struct timekeeper *tk)
+  * counter again, making it even, indicating to userspace that the
+  * update is finished.
+  *
+- * Userspace is expected to sample seq_count before reading any other
+- * fields from the data page.  If seq_count is odd, userspace is
++ * Userspace is expected to sample tb_seq_count before reading any other
++ * fields from the data page.  If tb_seq_count is odd, userspace is
+  * expected to wait until it becomes even.  After copying data from
+- * the page, userspace must sample seq_count again; if it has changed
++ * the page, userspace must sample tb_seq_count again; if it has changed
+  * from its previous value, userspace must retry the whole sequence.
+  *
+  * Calls to update_vsyscall are serialized by the timekeeping core.
+@@ -328,18 +328,19 @@ void update_vsyscall(struct timekeeper *tk)
+ 
+ 	vdso_write_begin(vdso_data);
+ 
+-	vdso_data->tk_is_cntvct			= tk_is_cntvct(tk);
++	vdso_data->use_syscall			= !tk_is_cntvct(tk);
+ 	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
+ 	vdso_data->xtime_coarse_nsec		= (u32)(tk->tkr_mono.xtime_nsec >>
+ 							tk->tkr_mono.shift);
+ 	vdso_data->wtm_clock_sec		= wtm->tv_sec;
+ 	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
+ 
+-	if (vdso_data->tk_is_cntvct) {
++	if (!vdso_data->use_syscall) {
+ 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
+ 		vdso_data->xtime_clock_sec	= tk->xtime_sec;
+ 		vdso_data->xtime_clock_snsec	= tk->tkr_mono.xtime_nsec;
+-		vdso_data->cs_mult		= tk->tkr_mono.mult;
++		vdso_data->cs_mono_mult		= tk->tkr_mono.mult;
++		/* tkr_mono.shift == tkr_raw.shift */
+ 		vdso_data->cs_shift		= tk->tkr_mono.shift;
+ 		vdso_data->cs_mask		= tk->tkr_mono.mask;
+ 	}
 diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index 522094b147a2..59893fca03b3 100644
+index a9dd619c6c29..8cf13af1323c 100644
 --- a/arch/arm/vdso/vgettimeofday.c
 +++ b/arch/arm/vdso/vgettimeofday.c
-@@ -24,7 +24,8 @@
+@@ -1,18 +1,25 @@
+ /*
+- * Copyright 2015 Mentor Graphics Corporation.
++ * Userspace implementations of gettimeofday() and friends.
+  *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; version 2 of the
+- * License.
++ * Copyright (C) 2017 Cavium, Inc.
++ * Copyright (C) 2015 Mentor Graphics Corporation
++ * Copyright (C) 2012 ARM Limited
+  *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ * Rewriten from arch64 version into C by: Andrew Pinski <apinski@cavium.com>
++ * Reworked and rebased over arm version by: Mark Salyzyn <salyzyn@android.com>
+  */
  
- #include <asm/barrier.h>
- #include <linux/compiler.h>	/* for notrace				*/
--#include <linux/time.h>
-+#include <linux/math64.h>	/* for __iter_div_u64_rem()		*/
-+#include <uapi/linux/time.h>	/* for struct timespec			*/
+ #include <linux/compiler.h>
+@@ -31,32 +38,30 @@
  
- #include "compiler.h"
- #include "datapage.h"
-@@ -79,6 +80,7 @@ static notrace int do_monotonic_coarse(const struct vdso_data *vd,
- {
- 	struct timespec tomono;
- 	u32 seq;
-+	u64 nsec;
+ extern struct vdso_data *__get_datapage(void);
  
- 	do {
- 		seq = vdso_read_begin(vd);
-@@ -92,33 +94,41 @@ static notrace int do_monotonic_coarse(const struct vdso_data *vd,
- 	} while (vdso_read_retry(vd, seq));
- 
- 	ts->tv_sec += tomono.tv_sec;
--	timespec_add_ns(ts, tomono.tv_nsec);
-+	/* open coding timespec_add_ns */
-+	ts->tv_sec += __iter_div_u64_rem(ts->tv_nsec + tomono.tv_nsec,
-+					 NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
- 
- 	return 0;
- }
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
--static notrace u64 get_ns(const struct vdso_data *vd)
-+/*
-+ * Returns the clock delta, in nanoseconds left-shifted by the clock
-+ * shift.
-+ */
-+static notrace u64 get_clock_shifted_nsec(const u64 cycle_last,
-+					  const u32 mult,
-+					  const u64 mask)
- {
--	u64 cycle_delta;
--	u64 cycle_now;
--	u64 nsec;
+-static notrace u32 __vdso_read_begin(const struct vdso_data *vdata)
+-{
+-	u32 seq;
+-repeat:
+-	seq = READ_ONCE(vdata->seq_count);
+-	if (seq & 1) {
+-		cpu_relax();
+-		goto repeat;
+-	}
+-	return seq;
+-}
 -
--	cycle_now = arch_vdso_read_counter();
-+	u64 res;
+ static notrace u32 vdso_read_begin(const struct vdso_data *vdata)
+ {
+ 	u32 seq;
  
--	cycle_delta = (cycle_now - vd->cs_cycle_last) & vd->cs_mask;
-+	/* Read the virtual counter. */
-+	res = arch_vdso_read_counter();
+-	seq = __vdso_read_begin(vdata);
++	do {
++		seq = READ_ONCE(vdata->tb_seq_count);
++
++		if ((seq & 1) == 0)
++			break;
  
--	nsec = (cycle_delta * vd->cs_mono_mult) + vd->xtime_clock_snsec;
--	nsec >>= vd->cs_shift;
-+	res = res - cycle_last;
- 
--	return nsec;
-+	res &= mask;
-+	return res * mult;
+-	smp_rmb(); /* Pairs with smp_wmb in vdso_write_end */
++		cpu_relax();
++	} while (true);
++
++	smp_rmb(); /* Pairs with second smp_wmb in update_vsyscall */
+ 	return seq;
  }
  
- static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+ static notrace int vdso_read_retry(const struct vdso_data *vdata, u32 start)
  {
--	u64 nsecs;
--	u32 seq;
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last;
-+	u64 mask;
-+	vdso_xtime_clock_sec_t sec;
+-	smp_rmb(); /* Pairs with smp_wmb in vdso_write_begin */
+-	return vdata->seq_count != start;
++	u32 seq;
++
++	smp_rmb(); /* Pairs with first smp_wmb in update_vsyscall */
++	seq = READ_ONCE(vdata->tb_seq_count);
++	return seq != start;
+ }
  
+ static notrace long clock_gettime_fallback(clockid_t _clkid,
+@@ -127,7 +132,7 @@ static notrace u64 get_ns(struct vdso_data *vdata)
+ 
+ 	cycle_delta = (cycle_now - vdata->cs_cycle_last) & vdata->cs_mask;
+ 
+-	nsec = (cycle_delta * vdata->cs_mult) + vdata->xtime_clock_snsec;
++	nsec = (cycle_delta * vdata->cs_mono_mult) + vdata->xtime_clock_snsec;
+ 	nsec >>= vdata->cs_shift;
+ 
+ 	return nsec;
+@@ -141,7 +146,7 @@ static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
  	do {
- 		seq = vdso_read_begin(vd);
-@@ -126,22 +136,33 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
- 		if (vd->use_syscall)
+ 		seq = vdso_read_begin(vdata);
+ 
+-		if (!vdata->tk_is_cntvct)
++		if (vdata->use_syscall)
  			return -1;
  
--		ts->tv_sec = vd->xtime_clock_sec;
--		nsecs = get_ns(vd);
-+		cycle_last = vd->cs_cycle_last;
- 
--	} while (vdso_read_retry(vd, seq));
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+		mask = vd->cs_mask;
-+
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
- 
--	ts->tv_nsec = 0;
--	timespec_add_ns(ts, nsecs);
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
- 
- 	return 0;
- }
- 
- static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- {
--	struct timespec tomono;
--	u64 nsecs;
--	u32 seq;
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last;
-+	u64 mask;
-+	vdso_wtm_clock_nsec_t wtm_nsec;
-+	__kernel_time_t sec;
- 
+ 		ts->tv_sec = vdata->xtime_clock_sec;
+@@ -164,7 +169,7 @@ static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
  	do {
- 		seq = vdso_read_begin(vd);
-@@ -149,17 +170,26 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- 		if (vd->use_syscall)
+ 		seq = vdso_read_begin(vdata);
+ 
+-		if (!vdata->tk_is_cntvct)
++		if (vdata->use_syscall)
  			return -1;
  
--		ts->tv_sec = vd->xtime_clock_sec;
--		nsecs = get_ns(vd);
-+		cycle_last = vd->cs_cycle_last;
- 
--		tomono.tv_sec = vd->wtm_clock_sec;
--		tomono.tv_nsec = vd->wtm_clock_nsec;
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+		mask = vd->cs_mask;
- 
--	} while (vdso_read_retry(vd, seq));
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
- 
--	ts->tv_sec += tomono.tv_sec;
--	ts->tv_nsec = 0;
--	timespec_add_ns(ts, nsecs + tomono.tv_nsec);
-+		sec += vd->wtm_clock_sec;
-+		wtm_nsec = vd->wtm_clock_nsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	nsec += wtm_nsec;
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
- 
- 	return 0;
- }
+ 		ts->tv_sec = vdata->xtime_clock_sec;
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
