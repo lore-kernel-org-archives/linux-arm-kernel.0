@@ -1,111 +1,41 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jun 2018 13:02:57 +0100
-Subject: [PATCHv3 06/19] arm64: move sve_user_{enable,
- disable} to <asm/fpsimd.h>
+Date: Mon, 18 Jun 2018 13:02:52 +0100
+Subject: [PATCHv3 01/19] arm64: consistently use unsigned long for thread flags
 In-Reply-To: <20180618120310.39527-1-mark.rutland@arm.com>
 References: <20180618120310.39527-1-mark.rutland@arm.com>
-Message-ID: <20180618120310.39527-7-mark.rutland@arm.com>
+Message-ID: <20180618120310.39527-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In subsequent patches, we'll want to make use of sve_user_enable() and
-sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
-<asm/fpsimd.h> where we can make use of them.
+In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
+int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
+(e.g. in the entry assembly) we manipulate the flags as a 64-bit
+quantity.
 
-To avoid ifdeffery in sequences like:
-
-if (system_supports_sve() && some_condition
-	sve_user_disable();
-
-... empty stubs are provided when support for SVE is not enabled. Note
-that system_supports_sve() contains as IS_ENABLED(CONFIG_ARM64_SVE), so
-the sve_user_disable() call should be optimized away entirely when
-CONFIG_ARM64_SVE is not selected.
-
-To ensure that this is the case, the stub definitions contain a
-BUILD_BUG(), as we do for other stubs for which calls should always be
-optimized away when the relevant config option is not selected.
-
-At the same time, the include list of <asm/fpsimd.h> is sorted while
-adding <asm/sysreg.h>.
+For consistency, and to avoid problems if we end up with more than 32
+flags, let's make do_notify_resume take the flags as a 64-bit unsigned
+long.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
- arch/arm64/kernel/fpsimd.c      | 10 ----------
- 2 files changed, 16 insertions(+), 11 deletions(-)
+ arch/arm64/kernel/signal.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index fa92747a49c8..dd1ad3950ef5 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -16,13 +16,15 @@
- #ifndef __ASM_FP_H
- #define __ASM_FP_H
- 
--#include <asm/ptrace.h>
- #include <asm/errno.h>
-+#include <asm/ptrace.h>
- #include <asm/processor.h>
- #include <asm/sigcontext.h>
-+#include <asm/sysreg.h>
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/build_bug.h>
- #include <linux/cache.h>
- #include <linux/init.h>
- #include <linux/stddef.h>
-@@ -102,6 +104,16 @@ extern int sve_set_vector_length(struct task_struct *task,
- extern int sve_set_current_vl(unsigned long arg);
- extern int sve_get_current_vl(void);
- 
-+static inline void sve_user_disable(void)
-+{
-+	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
-+}
-+
-+static inline void sve_user_enable(void)
-+{
-+	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
-+}
-+
- /*
-  * Probing and setup functions.
-  * Calls to these functions must be serialised with one another.
-@@ -128,6 +140,9 @@ static inline int sve_get_current_vl(void)
- 	return -EINVAL;
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 511af13e8d8f..70287634706e 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -910,7 +910,7 @@ static void do_signal(struct pt_regs *regs)
  }
  
-+static inline void sve_user_disable(void) { BUILD_BUG(); }
-+static inline void sve_user_enable(void) { BUILD_BUG(); }
-+
- static inline void sve_init_vq_map(void) { }
- static inline void sve_update_vq_map(void) { }
- static inline int sve_verify_vq_map(void) { return 0; }
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index a98a7f96aff1..58c53bc96928 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -159,16 +159,6 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
- }
- 
--static void sve_user_disable(void)
--{
--	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
--}
--
--static void sve_user_enable(void)
--{
--	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
--}
--
- /*
-  * TIF_SVE controls whether a task can use SVE without trapping while
-  * in userspace, and also the way a task's FPSIMD/SVE state is stored
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++				 unsigned long thread_flags)
+ {
+ 	/*
+ 	 * The assembly code enters us with IRQs off, but it hasn't
 -- 
 2.11.0
