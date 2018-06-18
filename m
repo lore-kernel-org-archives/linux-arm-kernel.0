@@ -1,57 +1,44 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 18 Jun 2018 13:09:59 +0800
-Subject: [PATCH v1 6/6] perf cs-etm: Generate branch sample for
- CS_ETM_TRACE_ON packet
-In-Reply-To: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
-References: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1529298599-3876-7-git-send-email-leo.yan@linaro.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 18 Jun 2018 15:16:50 +1000
+Subject: [PATCH v2 1/4] arm: dts: Fix error in Aspeed OpenPower Romulus
+ device-tree
+In-Reply-To: <20180618045902.11453-2-benh@kernel.crashing.org>
+References: <20180618045902.11453-1-benh@kernel.crashing.org>
+ <20180618045902.11453-2-benh@kernel.crashing.org>
+Message-ID: <1d2271e0ee44f2387b869ac1fc6724d5b321118c.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CS_ETM_TRACE_ON packet itself can give the info that there have a
-discontinuity in the trace, this patch is to add branch sample for
-CS_ETM_TRACE_ON packet if it is inserted in the middle of CS_ETM_RANGE
-packets; as result we can have hint for the trace discontinuity.
+On Mon, 2018-06-18 at 14:58 +1000, Benjamin Herrenschmidt wrote:
+> The reserved memory for the VGA frame buffer is at the wrong address
+> for this system.
+> 
+> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- tools/perf/util/cs-etm.c | 24 +++++++++++++++++-------
- 1 file changed, 17 insertions(+), 7 deletions(-)
+Note: These are pre-reqs for subsequent work, so if they are accepted,
+I will put them in the fsi tree that I send to Greg (though it can also
+be in an ARM soc tree).
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index d3b7942..2ae6402 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -910,13 +910,23 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
- 		etmq->period_instructions = instrs_over;
- 	}
- 
--	if (etm->sample_branches &&
--	    etmq->prev_packet &&
--	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
--	    etmq->prev_packet->last_instr_taken_branch) {
--		ret = cs_etm__synth_branch_sample(etmq);
--		if (ret)
--			return ret;
-+	if (etm->sample_branches && etmq->prev_packet) {
-+		bool generate_sample = false;
-+
-+		/* Generate sample for tracing on packet */
-+		if (etmq->prev_packet->sample_type == CS_ETM_TRACE_ON)
-+			generate_sample = true;
-+
-+		/* Generate sample for branch taken packet */
-+		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
-+		    etmq->prev_packet->last_instr_taken_branch)
-+			generate_sample = true;
-+
-+		if (generate_sample) {
-+			ret = cs_etm__synth_branch_sample(etmq);
-+			if (ret)
-+				return ret;
-+		}
- 	}
- 
- 	if (etm->sample_branches || etm->synth_opts.last_branch) {
--- 
-2.7.4
+Let me know if you prefer that I create a topic branch to pull on both
+sides on k.org
+
+> ---
+>  arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> index 0b9b37d4d6ef..7d28c03a9e0b 100644
+> --- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> @@ -21,9 +21,9 @@
+>  		#size-cells = <1>;
+>  		ranges;
+>  
+> -		vga_memory: framebuffer at bf000000 {
+> +		vga_memory: framebuffer at 9f000000 {
+>  			no-map;
+> -			reg = <0xbf000000 0x01000000>; /* 16M */
+> +			reg = <0x9f000000 0x01000000>; /* 16M */
+>  		};
+>  
+>  		flash_memory: region at 98000000 {
