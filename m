@@ -1,60 +1,26 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Mon, 18 Jun 2018 18:30:38 +0200
-Subject: [PATCH] ARM: dts: imx6: RIoTboard Add chosen stdout-path property
-In-Reply-To: <1529337797.7211.4.camel@pengutronix.de>
-References: <20180618154257.16919-1-manu@freebsd.org>
- <1529337797.7211.4.camel@pengutronix.de>
-Message-ID: <20180618183038.c8ee3164ff62ab5e27535c5c@bidouilliste.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 18 Jun 2018 13:32:14 -0300
+Subject: [PATCH] ARM: dts: imx7d-sdb: Remove duplicate regulator-can2-3v3
+In-Reply-To: <abacbb7485b0c9b908eae8ae87be9d8e0eab87b3.1529327283.git.leonard.crestez@nxp.com>
+References: <abacbb7485b0c9b908eae8ae87be9d8e0eab87b3.1529327283.git.leonard.crestez@nxp.com>
+Message-ID: <CAOMZO5AJH=Ay4MPt1Gi8LxmUSfhg3dMdcHRjsFzzQ9ZxD72TjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jun 2018 18:03:17 +0200
-Lucas Stach <l.stach@pengutronix.de> wrote:
+On Mon, Jun 18, 2018 at 10:11 AM, Leonard Crestez
+<leonard.crestez@nxp.com> wrote:
+> Two different regulators are defined with the same name and label but
+> distinct properties.
+>
+> The first definition was added with the first board dts and the second
+> was added when upstream added flexcan support.
+>
+> Looking at schematics it is indeed gpio2 14 connected to the STB pin of
+> the CAN transceiver so remove the first definition.
+>
+> The second definition entirely overrides the first so this already
+> worked and this patch results in no DTB change, just a cleanup.
+>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-> Am Montag, den 18.06.2018, 17:42 +0200 schrieb Emmanuel Vadot:
-> > The RIoTboard debug uart is connected to serial1.
-> > Add a chosen property in the DTS so OS knows what serial port to use for
-> > the console.
-> > 
-> > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > ---
-> > ?arch/arm/boot/dts/imx6dl-riotboard.dts | 4 ++++
-> > ?1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> > index 2e98c92adff7..315d2ae6fa45 100644
-> > --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> > +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> > @@ -19,6 +19,10 @@
-> > > ?		reg = <0x10000000 0x40000000>;
-> > > ?	};
-> > ?
-> > > +	chosen {
-> > +		stdout-path = "serial1:115200n8";
-> 
-> If there a reason to deviate from the "stdout-path = &uart1;" notation
-> used by other i.MX boards?
-> 
-> Regards,
-> Lucas
-
- This is, AFAIK, the proper way to specify the stdout-path.
- See
-https://github.com/torvalds/linux/blob/master/Documentation/devicetree/bindings/chosen.txt#L31
-
- Cheers,
-
-> > +	};
-> > +
-> > > ?	regulators {
-> > > ?		compatible = "simple-bus";
-> > > ?		#address-cells = <1>;
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
