@@ -1,22 +1,50 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 18 Jun 2018 17:20:05 +0530
-Subject: [PATCH 0/5]  Fixes coding style in xilinx_emaclite.c
-Message-ID: <1529322610-27215-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Date: Mon, 18 Jun 2018 17:20:06 +0530
+Subject: [PATCH 1/5] net: emaclite: Use __func__ instead of hardcoded name
+In-Reply-To: <1529322610-27215-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1529322610-27215-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <1529322610-27215-2-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes checkpatch and kernel-doc warnings in
-xilinx emaclite driver. No functional change.
+Switch hardcoded function name with a reference to __func__ making
+the code more maintainable. Address below checkpatch warning:
 
-Radhey Shyam Pandey (5):
-  net: emaclite: Use __func__ instead of hardcoded name
-  net: emaclite: Balance braces in else statement
-  net: emaclite: update kernel-doc comments
-  net: emaclite: Fix block comments style
-  net: emaclite: Remove unnecessary spaces
+WARNING: Prefer using '"%s...", __func__' to using 'xemaclite_mdio_read',
+this function's name, in a string
++               "xemaclite_mdio_read(phy_id=%i, reg=%x) == %x\n",
 
- drivers/net/ethernet/xilinx/xilinx_emaclite.c | 101 +++++++++++++++-----------
- 1 file changed, 58 insertions(+), 43 deletions(-)
+WARNING: Prefer using '"%s...", __func__' to using 'xemaclite_mdio_write',
+this function's name, in a string
++               "xemaclite_mdio_write(phy_id=%i, reg=%x, val=%x)\n",
 
+Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 2a0c06e..0544134 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -757,7 +757,7 @@ static int xemaclite_mdio_read(struct mii_bus *bus, int phy_id, int reg)
+ 	rc = xemaclite_readl(lp->base_addr + XEL_MDIORD_OFFSET);
+ 
+ 	dev_dbg(&lp->ndev->dev,
+-		"xemaclite_mdio_read(phy_id=%i, reg=%x) == %x\n",
++		"%s(phy_id=%i, reg=%x) == %x\n", __func__,
+ 		phy_id, reg, rc);
+ 
+ 	return rc;
+@@ -780,7 +780,7 @@ static int xemaclite_mdio_write(struct mii_bus *bus, int phy_id, int reg,
+ 	u32 ctrl_reg;
+ 
+ 	dev_dbg(&lp->ndev->dev,
+-		"xemaclite_mdio_write(phy_id=%i, reg=%x, val=%x)\n",
++		"%s(phy_id=%i, reg=%x, val=%x)\n", __func__,
+ 		phy_id, reg, val);
+ 
+ 	if (xemaclite_mdio_wait(lp))
 -- 
 2.7.4
