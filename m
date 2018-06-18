@@ -1,38 +1,40 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 Jun 2018 10:52:17 -0300
-Subject: [PATCH 1/3] ARM: dts: imx53: Add 'ARM platform' node
-Message-ID: <1529329939-14117-1-git-send-email-festevam@gmail.com>
+Date: Mon, 18 Jun 2018 10:52:18 -0300
+Subject: [PATCH 2/3] ARM: dts: imx53: Add a label for the PMU node
+In-Reply-To: <1529329939-14117-1-git-send-email-festevam@gmail.com>
+References: <1529329939-14117-1-git-send-email-festevam@gmail.com>
+Message-ID: <1529329939-14117-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-As per the i.MX53 Reference Manual add an entry for the
-'ARM platform' region in the device tree.
+Add a label for the PMU node so that the board dts may be able to
+pass the 'secure-reg-access' property like this:
 
-This is needed for accessing the ARM_GPC register to set the
-DBGEN bit, so that the debug clocks can be turned on.
+&pmu {
+	secure-reg-access;
+};
+
+This also makes it consistent with the PMU node in imx6qdl.dtsi
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx53.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 1a7a7bb..a70fbf4 100644
+index a70fbf4..263bd39f 100644
 --- a/arch/arm/boot/dts/imx53.dtsi
 +++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -672,6 +672,11 @@
- 				status = "disabled";
- 			};
+@@ -113,7 +113,7 @@
+ 		};
+ 	};
  
-+			arm_platform: arm-platform at 63fa0000 {
-+				compatible = "fsl,imx53-arm-plat", "fsl,imx51-arm-plat";
-+				reg = <0x63fa0000 0x28>;
-+			};
-+
- 			owire: owire at 63fa4000 {
- 				compatible = "fsl,imx53-owire", "fsl,imx21-owire";
- 				reg = <0x63fa4000 0x4000>;
+-	pmu {
++	pmu: pmu {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupt-parent = <&tzic>;
+ 		interrupts = <77>;
 -- 
 2.7.4
