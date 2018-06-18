@@ -1,59 +1,69 @@
 From: bugalski.piotr@gmail.com (Piotr Bugalski)
-Date: Mon, 18 Jun 2018 18:21:22 +0200
-Subject: [RFC PATCH 0/2] New QuadSPI driver for Atmel SAMA5D2
-Message-ID: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+Date: Mon, 18 Jun 2018 18:21:24 +0200
+Subject: [RFC PATCH 2/2] dt-bindings: spi: QuadSPI driver for Atmel SAMA5D2
+ documentation
+In-Reply-To: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+Message-ID: <20180618162124.21749-3-bugalski.piotr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Documentation for DT-binding change.
 
-Atmel SAMA5D2 is equipped with two QSPI interfaces. These interfaces can
-work as in SPI-compatible mode or use two / four lines to improve
-communication speed. At the moment there is QSPI driver strongly tied to
-NOR-flash memory and MTD subsystem.
-Intention of this change is to provide new driver which will not be tied
-to MTD and allows using QSPI with NAND-flash memory or other peripherals
-New spi-mem API provides abstraction layer which can disconnect QSPI
-from MTD. This driver doesn't support regular SPI interface, it should
-be used with spi-mem interface only.
-Unfortunately SAMA5D2 hardware by default supports only NOR-flash
-memory. It allows 24- and 32-bit addressing while NAND-flash requires
-16-bit long. To workaround hardware limitation driver is a bit more
-complicated.
+Suggested-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Signed-off-by: Piotr Bugalski <pbu@cryptera.com>
 
-Request to spi-mem contains three fiels: opcode (command), address,
-dummy bytes. SAMA5D2 QSPI hardware supports opcode, address, dummy and
-option byte where address field can only be 24- or 32- bytes long.
-Handling 8-bits long addresses is done using option field. For 16-bits
-address behaviour depends of number of requested dummy bits. If there
-are 8 or more dummy cycles, address is shifted and sent with first dummy
-byte. Otherwise opcode is disabled and first byte of address contains
-command opcode (works only if opcode and address use the same buswidth).
-The limitation is when 16-bit address is used without enough dummy
-cycles and opcode is using different buswidth than address. Other modes
-are supported with described workaround.
-
-It looks like hardware has some limitation in performance. The same issue
-exists in current QSPI driver (MTD/nor-flash) and soft-pack (bare-metal
-library from Atmel). Without using DMA read speed is much worse than
-maximum bandwidth (efficiency 30-40%). Any help with performance
-improvement is highly welcome, especially for NAND-flash memories which
-offers higher capacity than NOR-flash used with previous driver.
-
-Best Regards,
-Piotr
-
-Piotr Bugalski (2):
-  spi: Add QuadSPI driver for Atmel SAMA5D2
-  dt-bindings: spi: QuadSPI driver for Atmel SAMA5D2 documentation
-
- .../devicetree/bindings/spi/spi_atmel-qspi.txt     |  41 ++
- drivers/spi/Kconfig                                |   9 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-atmel-qspi.c                       | 480 +++++++++++++++++++++
- 4 files changed, 531 insertions(+)
+---
+ .../devicetree/bindings/spi/spi_atmel-qspi.txt     | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
- create mode 100644 drivers/spi/spi-atmel-qspi.c
 
+diff --git a/Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt b/Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
+new file mode 100644
+index 000000000000..d52b534c9c2b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
+@@ -0,0 +1,41 @@
++* Atmel Quad Serial Peripheral Interface (QSPI)
++
++Required properties:
++- compatible:     Should be "atmel,sama5d2-spi-qspi".
++- reg:            Should contain the locations and lengths of the base registers
++                  and the mapped memory.
++- reg-names:      Should contain the resource reg names:
++                  - qspi_base: configuration register address space
++                  - qspi_mmap: memory mapped address space
++- interrupts:     Should contain the interrupt for the device.
++- clocks:         The phandle of the clock needed by the QSPI controller.
++- #address-cells: Should be <1>.
++- #size-cells:    Should be <0>.
++
++Example:
++
++qspi1: spi at f0024000 {
++	compatible = "atmel,sama5d2-spi-qspi";
++	reg = <0xf0024000 0x100>, <0xd8000000 0x08000000>;
++	reg-names = "qspi_base", "qspi_mmap";
++	interrupts = <53 IRQ_TYPE_LEVEL_HIGH 7>;
++	clocks = <&qspi1_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi1_default>;
++	status = "okay";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "winbond,w25m02gv", "spi-nand";
++		reg = <0>;
++		spi-max-frequency = <83000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
++
++		...
++	};
++};
++
 -- 
 2.11.0
