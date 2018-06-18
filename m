@@ -1,124 +1,63 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 Jun 2018 14:18:38 +0100
-Subject: [PATCH v2 2/7] arm64: numa: separate out updates to percpu nodeid and
- NUMA node cpumap
+Date: Mon, 18 Jun 2018 14:18:40 +0100
+Subject: [PATCH v2 4/7] arm64: topology: restrict updating siblings_masks to
+ online cpus only
 In-Reply-To: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
 References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1529327923-17911-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1529327923-17911-5-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently numa_clear_node removes both cpu information from the NUMA
-node cpumap as well as the NUMA node id from the cpu. Similarly
-numa_store_cpu_info updates both percpu nodeid and NUMA cpumap.
+It's incorrect to iterate over all the possible CPUs to update the
+sibling masks when any CPU is hotplugged in. In case the topology
+siblings masks of the CPU is removed when is it hotplugged out, we
+end up updating those masks when one of it's sibling is powered up
+again. This will provide inconsistent view.
 
-However we need to retain the numa node id for the cpu and only remove
-the cpu information from the numa node cpumap during CPU hotplug out.
-The same can be extended for hotplugging in the CPU.
+Further, since the CPU calling update_sibling_masks is yet to be set
+online, there's no need to compare itself with each online CPU when
+updating the siblings masks.
 
-This patch separates out numa_{add,remove}_cpu from numa_clear_node and
-numa_store_cpu_info.
+This patch restricts updation of sibling masks only for CPUs that are
+already online. It also the drops the unnecessary cpuid check.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/include/asm/numa.h |  4 ++++
- arch/arm64/kernel/smp.c       |  2 ++
- arch/arm64/mm/numa.c          | 29 +++++++++++++++++++++--------
- 3 files changed, 27 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/topology.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index 01bc46d5b43a..626ad01e83bf 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -35,10 +35,14 @@ void __init numa_set_distance(int from, int to, int distance);
- void __init numa_free_distance(void);
- void __init early_map_cpu_to_node(unsigned int cpu, int nid);
- void numa_store_cpu_info(unsigned int cpu);
-+void numa_add_cpu(unsigned int cpu);
-+void numa_remove_cpu(unsigned int cpu);
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 38b102013708..b60d7018e9db 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -231,7 +231,7 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	int cpu;
 
- #else	/* CONFIG_NUMA */
+ 	/* update core and thread sibling masks */
+-	for_each_possible_cpu(cpu) {
++	for_each_online_cpu(cpu) {
+ 		cpu_topo = &cpu_topology[cpu];
 
- static inline void numa_store_cpu_info(unsigned int cpu) { }
-+static inline void numa_add_cpu(unsigned int cpu) { }
-+static inline void numa_remove_cpu(unsigned int cpu) { }
- static inline void arm64_numa_init(void) { }
- static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
+ 		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
+@@ -243,15 +243,13 @@ static void update_siblings_masks(unsigned int cpuid)
+ 			continue;
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index f3e2e3aec0b0..49a021e30dfb 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -225,6 +225,7 @@ asmlinkage void secondary_start_kernel(void)
- 	notify_cpu_starting(cpu);
+ 		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+-		if (cpu != cpuid)
+-			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
++		cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
 
- 	store_cpu_topology(cpu);
-+	numa_add_cpu(cpu);
+ 		if (cpuid_topo->core_id != cpu_topo->core_id)
+ 			continue;
 
- 	/*
- 	 * OK, now it's safe to let the boot CPU continue.  Wait for
-@@ -679,6 +680,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	this_cpu = smp_processor_id();
- 	store_cpu_topology(this_cpu);
- 	numa_store_cpu_info(this_cpu);
-+	numa_add_cpu(this_cpu);
-
- 	/*
- 	 * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index dad128ba98bf..43cc669bc7bc 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -70,19 +70,32 @@ EXPORT_SYMBOL(cpumask_of_node);
-
- #endif
-
--static void map_cpu_to_node(unsigned int cpu, int nid)
-+static void numa_update_cpu(unsigned int cpu, bool remove)
- {
--	set_cpu_numa_node(cpu, nid);
--	if (nid >= 0)
-+	int nid = cpu_to_node(cpu);
-+
-+	if (nid < 0)
-+		return;
-+
-+	if (remove)
-+		cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
-+	else
- 		cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
+ 		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
+-		if (cpu != cpuid)
+-			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
++		cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
+ 	}
  }
 
--void numa_clear_node(unsigned int cpu)
-+void numa_add_cpu(unsigned int cpu)
- {
--	int nid = cpu_to_node(cpu);
-+	numa_update_cpu(cpu, false);
-+}
-
--	if (nid >= 0)
--		cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
-+void numa_remove_cpu(unsigned int cpu)
-+{
-+	numa_update_cpu(cpu, true);
-+}
-+
-+void numa_clear_node(unsigned int cpu)
-+{
-+	numa_remove_cpu(cpu);
- 	set_cpu_numa_node(cpu, NUMA_NO_NODE);
- }
-
-@@ -116,7 +129,7 @@ static void __init setup_node_to_cpumask_map(void)
-  */
- void numa_store_cpu_info(unsigned int cpu)
- {
--	map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
-+	set_cpu_numa_node(cpu, cpu_to_node_map[cpu]);
- }
-
- void __init early_map_cpu_to_node(unsigned int cpu, int nid)
 --
 2.7.4
