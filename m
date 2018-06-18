@@ -1,33 +1,50 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 18 Jun 2018 12:27:54 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Fix pgtable allocation in selftest
-Message-ID: <20180618112754.24942-1-jean-philippe.brucker@arm.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 18 Jun 2018 13:32:47 +0200
+Subject: [PATCH 01/11] i2c: add helpers for locking the I2C segment
+In-Reply-To: <20180618110502.cb5s24srp4frahm6@ninjato>
+References: <20180615101506.8012-1-peda@axentia.se>
+ <20180615101506.8012-2-peda@axentia.se>
+ <20180618110502.cb5s24srp4frahm6@ninjato>
+Message-ID: <b860025e-3d4b-f333-80b4-3831dd969757@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4b123757eeaa ("iommu/io-pgtable-arm: Make allocations
-NUMA-aware") added a NUMA hint to page table allocation, but the pgtable
-selftest doesn't provide an SMMU device parameter. Since dev_to_node
-doesn't accept a NULL argument, add a special case for selftest.
+On 2018-06-18 13:05, Wolfram Sang wrote:
+> 
+>> +static inline void
+>> +i2c_lock_segment(struct i2c_adapter *adapter)
+>> +{
+>> +	i2c_lock_bus(adapter, I2C_LOCK_SEGMENT);
+>> +}
+>> +
+>> +static inline int
+>> +i2c_trylock_segment(struct i2c_adapter *adapter)
+>> +{
+>> +	return i2c_trylock_bus(adapter, I2C_LOCK_SEGMENT);
+>> +}
+>> +
+>> +static inline void
+>> +i2c_unlock_segment(struct i2c_adapter *adapter)
+>> +{
+>> +	i2c_unlock_bus(adapter, I2C_LOCK_SEGMENT);
+>> +}
+> 
+> I wonder if i2c_lock_segment() and i2c_lock_root_adapter() are really
+> more readable and convenient than i2c_lock_bus() with the flag. I think
+> the flags have speaking names, too.
+> 
+> Is that an idea to remove these functions altogether and start using
+> i2c_lock_bus()?
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- drivers/iommu/io-pgtable-arm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+That would be fine with me. I don't have a strong opinion and agree that
+both are readable enough...
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 010a254305dd..88641b4560bc 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -237,7 +237,8 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
- 	void *pages;
- 
- 	VM_BUG_ON((gfp & __GFP_HIGHMEM));
--	p = alloc_pages_node(dev_to_node(dev), gfp | __GFP_ZERO, order);
-+	p = alloc_pages_node(dev ? dev_to_node(dev) : NUMA_NO_NODE,
-+			     gfp | __GFP_ZERO, order);
- 	if (!p)
- 		return NULL;
- 
--- 
-2.17.0
+It would make for a reduction of the number of lines so that's nice, but
+the macro in drivers/i2c/busses/i2c-gpio.c (patch 11) would not fit in
+the current \-width (or whatever you'd call that line of backslashes to
+the right in a multi-line macro).
+
+Does anyone have a strong opinion?
+
+Cheers,
+Peter
