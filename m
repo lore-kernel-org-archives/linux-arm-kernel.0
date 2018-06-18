@@ -1,74 +1,78 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 18 Jun 2018 16:58:38 +0200
-Subject: [PATCH v4 14/19] media: v4l: Add definition for Allwinner's
- MB32-tiled NV12 format
+Date: Mon, 18 Jun 2018 16:58:39 +0200
+Subject: [PATCH v4 15/19] dt-bindings: media: Document bindings for the
+ Sunxi-Cedrus VPU driver
 In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
 References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618145843.14631-15-paul.kocialkowski@bootlin.com>
+Message-ID: <20180618145843.14631-16-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces support for Allwinner's MB32-tiled NV12 format, where
-each plane is divided into macroblocks of 32x32 pixels. Hence, the size
-of each plane has to be aligned to 32 bytes. The pixels inside each
-macroblock are coded as they would be if the macroblock was a single
-plane, line after line.
-
-The MB32-tiled NV12 format is used by the video engine on Allwinner
-platforms: it is the default format for decoded frames (and the only one
-available in the oldest supported platforms).
+This adds a device-tree binding document that specifies the properties
+used by the Sunxi-Cedurs VPU driver, as well as examples.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-diff --git a/Documentation/media/uapi/v4l/pixfmt-reserved.rst b/Documentation/media/uapi/v4l/pixfmt-reserved.rst
-index 38af1472a4b4..9a68b6a787bf 100644
---- a/Documentation/media/uapi/v4l/pixfmt-reserved.rst
-+++ b/Documentation/media/uapi/v4l/pixfmt-reserved.rst
-@@ -243,7 +243,20 @@ please make a proposal on the linux-media mailing list.
- 	It is an opaque intermediate format and the MDP hardware must be
- 	used to convert ``V4L2_PIX_FMT_MT21C`` to ``V4L2_PIX_FMT_NV12M``,
- 	``V4L2_PIX_FMT_YUV420M`` or ``V4L2_PIX_FMT_YVU420``.
--
-+    * .. _V4L2-PIX-FMT-MB32-NV12:
+ create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+
+diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+new file mode 100644
+index 000000000000..5ddda595aa8f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+@@ -0,0 +1,53 @@
++Device-tree bindings for the VPU found in Allwinner SoCs, referred to as the
++Video Engine (VE) in Allwinner literature.
 +
-+      - ``V4L2_PIX_FMT_MB32_NV12``
-+      - 'MN12'
-+      - Two-planar NV12-based format used by the Allwinner video engine
-+        hardware, with 32x32 tiles for the luminance plane and 32x64 tiles
-+        for the chrominance plane. Each tile is a linear pixel data
-+        representation within its own bounds. Each tile follows the previous
-+        one linearly (as in, from left to right, top to bottom).
++The VPU can only access the first 256 MiB of DRAM, that are DMA-mapped starting
++from the DRAM base. This requires specific memory allocation and handling.
 +
-+        The frame dimensions are aligned to match an integer number of
-+        tiles, resulting in 32-aligned resolutions for the luminance plane
-+        and 16-aligned resolutions for the chrominance plane (with 2x2
-+        subsampling).
- 
- .. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
- 
-diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
-index 98961d5acb1a..c44d7134e8d5 100644
---- a/drivers/media/v4l2-core/v4l2-ioctl.c
-+++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-@@ -1294,6 +1294,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
- 		case V4L2_PIX_FMT_SE401:	descr = "GSPCA SE401"; break;
- 		case V4L2_PIX_FMT_S5C_UYVY_JPG:	descr = "S5C73MX interleaved UYVY/JPEG"; break;
- 		case V4L2_PIX_FMT_MT21C:	descr = "Mediatek Compressed Format"; break;
-+		case V4L2_PIX_FMT_MB32_NV12:	descr = "Allwinner tiled NV12 format"; break;
- 		default:
- 			WARN(1, "Unknown pixelformat 0x%08x\n", fmt->pixelformat);
- 			if (fmt->description[0])
-diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-index 5e950a6f20df..cbbeeaec9710 100644
---- a/include/uapi/linux/videodev2.h
-+++ b/include/uapi/linux/videodev2.h
-@@ -670,6 +670,7 @@ struct v4l2_pix_format {
- #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
- #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
- #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
-+#define V4L2_PIX_FMT_MB32_NV12 v4l2_fourcc('M', 'N', '1', '2') /* Allwinner tiled NV12 format */
- 
- /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6 bits unused */
- #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3', 'b') /* IPU3 packed 10-bit BGGR bayer */
++Required properties:
++- compatible		: must be one of the following compatibles:
++			- "allwinner,sun4i-a10-video-engine"
++			- "allwinner,sun5i-a13-video-engine"
++			- "allwinner,sun7i-a20-video-engine"
++			- "allwinner,sun8i-a33-video-engine"
++- reg			: register base and length of VE;
++- clocks		: list of clock specifiers, corresponding to entries in
++			  the clock-names property;
++- clock-names		: should contain "ahb", "mod" and "ram" entries;
++- resets		: phandle for reset;
++- interrupts		: VE interrupt number;
++- allwinner,sram	: SRAM region to use with the VE.
++
++Optional properties:
++- memory-region		: CMA pool to use for buffers allocation instead of the
++			  default CMA pool.
++
++Example:
++
++reserved-memory {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
++	cma_pool: cma at 4a000000 {
++		compatible = "shared-dma-pool";
++		size = <0x6000000>;
++		alloc-ranges = <0x4a000000 0x6000000>;
++		reusable;
++		linux,cma-default;
++	};
++};
++
++video-codec at 1c0e000 {
++	compatible = "allwinner,sun7i-a20-video-engine";
++	reg = <0x01c0e000 0x1000>;
++
++	clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
++		 <&ccu CLK_DRAM_VE>;
++	clock-names = "ahb", "mod", "ram";
++
++	resets = <&ccu RST_VE>;
++	interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++	allwinner,sram = <&ve_sram 1>;
++};
 -- 
 2.17.0
