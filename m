@@ -1,77 +1,50 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 18 Jun 2018 13:09:57 +0800
-Subject: [PATCH v1 4/6] perf cs-etm: Support dummy address value for
+Date: Mon, 18 Jun 2018 13:09:58 +0800
+Subject: [PATCH v1 5/6] perf cs-etm: Generate branch sample when receiving a
  CS_ETM_TRACE_ON packet
 In-Reply-To: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
 References: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1529298599-3876-5-git-send-email-leo.yan@linaro.org>
+Message-ID: <1529298599-3876-6-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For CS_ETM_TRACE_ON packet, its fields 'packet->start_addr' and
-'packet->end_addr' equal to 0xdeadbeefdeadbeefUL which are emitted in
-the decoder layer as dummy value, but the dummy value is pointless for
-branch sample when we use 'perf script' command to check program flow.
+If one CS_ETM_TRACE_ON packet is inserted, we miss to generate branch
+sample for the previous CS_ETM_RANGE packet.
 
-This patch is a preparation to support CS_ETM_TRACE_ON packet for
-branch sample, it converts the dummy address value to zero for more
-readable; this is accomplished by cs_etm__last_executed_instr() and
-cs_etm__first_executed_instr().  The later one is a new function
-introduced by this patch.
+This patch is to generate branch sample when receiving a CS_ETM_TRACE_ON
+packet, so this can save complete info for the previous CS_ETM_RANGE
+packet just before CS_ETM_TRACE_ON packet.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- tools/perf/util/cs-etm.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ tools/perf/util/cs-etm.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index ae7c9c88..976db84 100644
+index 976db84..d3b7942 100644
 --- a/tools/perf/util/cs-etm.c
 +++ b/tools/perf/util/cs-etm.c
-@@ -494,6 +494,10 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
- 
- static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+@@ -935,6 +935,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ static int cs_etm__flush(struct cs_etm_queue *etmq)
  {
-+	/* Returns 0 for the CS_ETM_TRACE_ON packet */
-+	if (packet->sample_type == CS_ETM_TRACE_ON)
-+		return 0;
-+
- 	/*
- 	 * The packet records the execution range with an exclusive end address
- 	 *
-@@ -505,6 +509,15 @@ static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
- 	return packet->end_addr - A64_INSTR_SIZE;
- }
+ 	int err = 0;
++	struct cs_etm_auxtrace *etm = etmq->etm;
+ 	struct cs_etm_packet *tmp;
  
-+static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
-+{
-+	/* Returns 0 for the CS_ETM_TRACE_ON packet */
-+	if (packet->sample_type == CS_ETM_TRACE_ON)
-+		return 0;
-+
-+	return packet->start_addr;
-+}
-+
- static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
- {
- 	/*
-@@ -546,7 +559,7 @@ static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
+ 	if (!etmq->prev_packet)
+@@ -965,6 +966,13 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
  
- 	be       = &bs->entries[etmq->last_branch_pos];
- 	be->from = cs_etm__last_executed_instr(etmq->prev_packet);
--	be->to	 = etmq->packet->start_addr;
-+	be->to	 = cs_etm__first_executed_instr(etmq->packet);
- 	/* No support for mispredict */
- 	be->flags.mispred = 0;
- 	be->flags.predicted = 1;
-@@ -701,7 +714,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
- 	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
- 	sample.pid = etmq->pid;
- 	sample.tid = etmq->tid;
--	sample.addr = etmq->packet->start_addr;
-+	sample.addr = cs_etm__first_executed_instr(etmq->packet);
- 	sample.id = etmq->etm->branches_id;
- 	sample.stream_id = etmq->etm->branches_id;
- 	sample.period = 1;
+ 	}
+ 
++	if (etm->sample_branches &&
++	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
++		err = cs_etm__synth_branch_sample(etmq);
++		if (err)
++			return err;
++	}
++
+ swap_packet:
+ 	if (etmq->etm->synth_opts.last_branch) {
+ 		/*
 -- 
 2.7.4
