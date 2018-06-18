@@ -1,70 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 Jun 2018 01:00:41 -0300
-Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
-In-Reply-To: <20180226134741.neqkpge33zo3pfzt@earth.universe>
-References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
- <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
- <20180224074543.GF3217@dragon>
- <20180226134741.neqkpge33zo3pfzt@earth.universe>
-Message-ID: <CAOMZO5Czdpdo3Vt0TjGYGUFoz=ZMuy_6F3C=dq4gp4NEvXBZAQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 18 Jun 2018 10:17:09 +0530
+Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <89b599d3-c43a-255f-8da6-9bea6cf53a5d@lechnology.com>
+References: <20180518164829.27052-1-david@lechnology.com>
+ <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
+ <89b599d3-c43a-255f-8da6-9bea6cf53a5d@lechnology.com>
+Message-ID: <513d20f6-da4f-1e3e-7d11-4a0f1193b13d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Hi David,
 
-[Adding Martin on Cc who also tried to enable DBGEN bit in a previous patch]
-
-On Mon, Feb 26, 2018 at 10:47 AM, Sebastian Reichel
-<sebastian.reichel@collabora.co.uk> wrote:
-> Hi Shawn,
->
-> On Sat, Feb 24, 2018 at 03:45:44PM +0800, Shawn Guo wrote:
->> On Mon, Feb 12, 2018 at 01:39:44PM +0100, Sebastian Reichel wrote:
->> > On i.MX53 it is necessary to set the DBG_EN bit in the
->> > platform GPC register to enable access to PMU counters
->> > other than the cycle counter.
->> >
->> > Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->> > ---
->> >  arch/arm/mach-imx/mach-imx53.c | 39 ++++++++++++++++++++++++++++++++++++++-
->> >  1 file changed, 38 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
->> > index 07c2e8dca494..658e28604dca 100644
->> > --- a/arch/arm/mach-imx/mach-imx53.c
->> > +++ b/arch/arm/mach-imx/mach-imx53.c
->> > @@ -28,10 +28,47 @@ static void __init imx53_init_early(void)
->> >     mxc_set_cpu_type(MXC_CPU_MX53);
->> >  }
->> >
->> > +#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
+On Sunday 17 June 2018 09:18 PM, David Lechner wrote:
+> Hi Sekhar,
+> 
+> On 05/22/2018 04:38 AM, Sekhar Nori wrote:
+>> Hi David,
 >>
->> The base address should be retrieved from device tree.
->
-> DT has no entry for 0x63fa0000-0x63fa3fff. iMX53 TRM lists it as "ARM Platform"
-> with 8 platform specific 32 bit registers. Do you think it's worth the trouble
-> adding a new binding? Do you have a suggestion for a compatible value?
+>> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
+>>> This series converts mach-davinci to use the common clock framework.
+>>>
+>>> The series works like this, the first 3 patches fix some issues with
+>>> the clock
+>>> drivers that have already been accepted into the mainline kernel.
+>>>
+>>> Then, starting with "ARM: davinci: pass clock as parameter to
+>>> davinci_timer_init()", we get the mach code ready for the switch by
+>>> adding the
+>>> code needed for the new clock drivers and adding #ifndef
+>>> CONFIG_COMMON_CLK
+>>> around the legacy clocks so that we can switch easily between the old
+>>> and the
+>>> new.
+>>>
+>>> "ARM: davinci: switch to common clock framework" actually flips the
+>>> switch
+>>> to start using the new clock drivers. Then the next 8 patches remove all
+>>> of the old clock code.
+>>>
+>>> The final four patches add device tree clock support to the one SoC that
+>>> supports it.
+>>>
+>>> This series has been tested on TI OMAP-L138 LCDK (both device tree
+>>> and legacy
+>>> board file).
+>>
+>> If you do end up sending a v12, you can leave out the mach-davinci
+>> portions unless there are any changes you need to make. I will pick them
+>> up from this series once the driver dependencies are merged.
+>>
+>> I do hope the drivers/clk/* changes can be merged from v4.18.
+>>
+>> Thanks,
+>> Sekhar
+>>
+> 
+> Are you going to pick up the arch patches from this series now that
+> the 4.18 merge window is closed?
+> 
+> All of the clk patches landed in 4.18.
 
-I also think we should add a compatible string for the "ARM platform" region.
+yes!
 
-This way both mx51 and mx53 could retrieve the base address from the
-device tree.
-
-What about:
-
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -672,6 +672,11 @@
-                                status = "disabled";
-                        };
-
-+                       arm_plat: arm-plat at 63fa0000 {
-+                               compatible = "fsl,imx53-arm-plat",
-"fsl,imx51-arm-plat";
-+                               reg = <0x63fa0000 0x4000>;
-+                       };
-+
-                        owire: owire at 63fa4000 {
-                                compatible = "fsl,imx53-owire",
-"fsl,imx21-owire";
-                                reg = <0x63fa4000 0x4000>;
+Thanks,
+Sekhar
