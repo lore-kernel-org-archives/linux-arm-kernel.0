@@ -1,70 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 Jun 2018 15:22:01 +0200
-Subject: [PATCH 0/5] RFC: Mezzanine handling for 96boards
-In-Reply-To: <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
- <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
-Message-ID: <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 18 Jun 2018 14:37:35 +0100
+Subject: [PATCH] ARM: NOMMU: Use instr_sync instead of plain isb in common
+ code
+In-Reply-To: <d32342e7-9ff0-0e26-e9e5-17b6fa2933b5@kernel.org>
+References: <1529315312-35517-1-git-send-email-vladimir.murzin@arm.com>
+ <d32342e7-9ff0-0e26-e9e5-17b6fa2933b5@kernel.org>
+Message-ID: <b12c44a6-74e6-4e90-a654-642dbf437abe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 June 2018 at 14:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, Jun 18, 2018 at 9:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> This is a proposal for how to handle the non-discoverable
->> 96boards plug-in expansion boards called "mezzanines" in the
->> Linux kernel. It is a working RFC series meant for discussion
->> at the moment.
->>
->> The RFC was done on the brand new Ultra96 board from Xilinx
->> with a Secure96 mezzanine expansion board. The main part
->> is in patch 4, the rest is enabling and examples.
->>
->> The code can be obtained from here:
->> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git/log/?h=ultra96
->>
->> You can for example probably augment the DTS file for any
->> upstream-supported 96board and get the Secure96 going with
->> it with minor efforts.
->
-> Hi Linus,
->
-> Thanks for your work on solving this long-standing problem. I've just
-> read through your patches briefly and have a few thoughts:
->
-> - I really like the idea of having C code deal with the mezzanine
->   connector itself, acting as an intermediate to tie a number of
->   boards to a number of add-on cards, this seems much simpler than
->   trying to do everything with overlays or one of the other more
->   generic mechanisms.
->
-> - I don't like the idea of having the bus driver contain a list of possible
->   add-ons, this seems to go against our usual driver model. What
->   I think we want instead is to make the connector itself a proper
->   bus_type, to allow drivers to register against it as loadable modules,
->   and devices (maybe limited to one device) being created as probed
->   from DT or some other method as you describe.
->
-> - You export symbols in the mezzanine_* namespace, which I think
->    is a bit too generic and should perhaps contain something related
->    to  96boards in its name to make it less ambiguous. I suspect we
->    would add a number of further connectors for hats, capes, lures etc,
->    which could all be described as mezzanines. One open question
->    is how we structure the commonality between the various
->    connectors, but we can defer that until we have more than one
->    or two of them.
->
+Hi Greg,
 
-Hello all,
+On 18/06/18 13:42, Greg Ungerer wrote:
+> Hi Vladimir,
+> 
+> On 18/06/18 19:48, Vladimir Murzin wrote:
+>> Greg reported that commit 3c24121039c9d ("ARM: 8756/1: NOMMU: Postpone
+>> MPU activation till __after_proc_init") is causing breakage for the
+>> old Versatile platform in no-MMU mode (with out-of-tree patches):
+>>
+>> ?? AS????? arch/arm/kernel/head-nommu.o
+>> arch/arm/kernel/head-nommu.S: Assembler messages:
+>> arch/arm/kernel/head-nommu.S:180: Error: selected processor does not support `isb' in ARM mode
+>> scripts/Makefile.build:417: recipe for target 'arch/arm/kernel/head-nommu.o' failed
+>> make[2]: *** [arch/arm/kernel/head-nommu.o] Error 1
+>> Makefile:1034: recipe for target 'arch/arm/kernel' failed
+>> make[1]: *** [arch/arm/kernel] Error 2
+>>
+>> Since the code is common for all NOMMU builds usage of the isb was a
+>> bad idea (please, note that isb also used in MPU related code which is
+>> fine because MPU has dependency on CPU_V7/CPU_V7M), instead use more
+>> robust instr_sync assembler macro.
+>>
+>> Fixes: 3c24121039c9 ("ARM: 8756/1: NOMMU: Postpone MPU activation till __after_proc_init")
+>> Reported-by: Greg Ungerer <gerg@kernel.org>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> 
+> Tested and working for me.
+> 
+> Tested-by: Greg Ungerer <gerg@kernel.org>
 
-We should also consider firmware use of the mezzanines. For instance,
-the Secure96 has a RNG which UEFI may want to use so the early boot
-code can access is for KASLR. It also has a TPM, which should not be
-reset/reinitialized/etc by the OS if we want to make meaningful use of
-it.
+Great! It is in Russell's tracker now (patch 8775/1)
 
-Also, given that we can (and do) already describe topologies involving
-mezzanines by ignoring the connector altogether (which is not entirely
-unreasonable given the fact that we [as Linaro/96boards] dropped the
-ball on this one and did not mandate discoverability for mezzanines).
-So ideally, DTs can be expressed such that older kernels can still use
-those peripherals.
+Cheers
+Vladimir
+
+> 
+> Thanks
+> Greg
+> 
+> 
+>> ---
+>> ? arch/arm/kernel/head-nommu.S | 2 +-
+>> ? 1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+>> index dd546d6..7a9b869 100644
+>> --- a/arch/arm/kernel/head-nommu.S
+>> +++ b/arch/arm/kernel/head-nommu.S
+>> @@ -177,7 +177,7 @@ M_CLASS(streq??? r3, [r12, #PMSAv8_MAIR1])
+>> ????? bic??? r0, r0, #CR_I
+>> ? #endif
+>> ????? mcr??? p15, 0, r0, c1, c0, 0??????? @ write control reg
+>> -??? isb
+>> +??? instr_sync
+>> ? #elif defined (CONFIG_CPU_V7M)
+>> ? #ifdef CONFIG_ARM_MPU
+>> ????? ldreq??? r3, [r12, MPU_CTRL]
+>>
+> 
