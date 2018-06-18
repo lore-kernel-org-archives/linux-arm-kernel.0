@@ -1,78 +1,31 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 18 Jun 2018 16:58:39 +0200
-Subject: [PATCH v4 15/19] dt-bindings: media: Document bindings for the
- Sunxi-Cedrus VPU driver
+Date: Mon, 18 Jun 2018 16:58:28 +0200
+Subject: [PATCH v4 04/19] dt-bindings: sram: sunxi: Add A20 binding for the C1
+ SRAM region
 In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
 References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618145843.14631-16-paul.kocialkowski@bootlin.com>
+Message-ID: <20180618145843.14631-5-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a device-tree binding document that specifies the properties
-used by the Sunxi-Cedurs VPU driver, as well as examples.
+This introduces a dedicated binding for the C1 SRAM region for the A20
+sunxi platform.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
- create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-
-diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-new file mode 100644
-index 000000000000..5ddda595aa8f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-@@ -0,0 +1,53 @@
-+Device-tree bindings for the VPU found in Allwinner SoCs, referred to as the
-+Video Engine (VE) in Allwinner literature.
+diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index ddc82cbd7f4d..221fa7b42c18 100644
+--- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -35,6 +35,9 @@ The valid sections compatible for A10 are:
+ The valid sections compatible for A13 are:
+     - allwinner,sun5i-a13-sram-c1
+ 
++The valid sections compatible for A20 are:
++    - allwinner,sun7i-a20-sram-c1
 +
-+The VPU can only access the first 256 MiB of DRAM, that are DMA-mapped starting
-+from the DRAM base. This requires specific memory allocation and handling.
-+
-+Required properties:
-+- compatible		: must be one of the following compatibles:
-+			- "allwinner,sun4i-a10-video-engine"
-+			- "allwinner,sun5i-a13-video-engine"
-+			- "allwinner,sun7i-a20-video-engine"
-+			- "allwinner,sun8i-a33-video-engine"
-+- reg			: register base and length of VE;
-+- clocks		: list of clock specifiers, corresponding to entries in
-+			  the clock-names property;
-+- clock-names		: should contain "ahb", "mod" and "ram" entries;
-+- resets		: phandle for reset;
-+- interrupts		: VE interrupt number;
-+- allwinner,sram	: SRAM region to use with the VE.
-+
-+Optional properties:
-+- memory-region		: CMA pool to use for buffers allocation instead of the
-+			  default CMA pool.
-+
-+Example:
-+
-+reserved-memory {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+	cma_pool: cma at 4a000000 {
-+		compatible = "shared-dma-pool";
-+		size = <0x6000000>;
-+		alloc-ranges = <0x4a000000 0x6000000>;
-+		reusable;
-+		linux,cma-default;
-+	};
-+};
-+
-+video-codec at 1c0e000 {
-+	compatible = "allwinner,sun7i-a20-video-engine";
-+	reg = <0x01c0e000 0x1000>;
-+
-+	clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
-+		 <&ccu CLK_DRAM_VE>;
-+	clock-names = "ahb", "mod", "ram";
-+
-+	resets = <&ccu RST_VE>;
-+	interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+	allwinner,sram = <&ve_sram 1>;
-+};
+ The valid sections compatible for A64 are:
+     - allwinner,sun50i-a64-sram-c
+ 
 -- 
 2.17.0
