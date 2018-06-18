@@ -1,157 +1,82 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 18 Jun 2018 11:27:09 +0200
-Subject: [PATCH] soc: imx: gpc: fix PDN delay & improve readability
-In-Reply-To: <1529312474617.59395@mixed-mode.de>
-References: <1529312474617.59395@mixed-mode.de>
-Message-ID: <1529314029.3684.2.camel@pengutronix.de>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Mon, 18 Jun 2018 09:34:04 +0000
+Subject: [PATCH 1/2] media: stm32-dcmi: drop unnecessary while(1) loop
+In-Reply-To: <1528824138-19089-1-git-send-email-hofrat@osadl.org>
+References: <1528824138-19089-1-git-send-email-hofrat@osadl.org>
+Message-ID: <a67e4d0c-8434-5669-329f-66a45b7be343@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 18.06.2018, 09:01 +0000 schrieb Sven Schmitt:
-> - imx6_pm_domain_power_off(): reads iso and iso2sw
-> ? from GPC_PGC_PUPSCR_OFFS which stores the power up delays
-> ? => use GPC_PGC_PDNSCR_OFFS for the correct delays
-> 
-> - remove unused #defines
-> 
-> - struct imx_pm_domain: introduce cntr_pup_bit
-> ? to replace usage of cntr_pdn_bit+1 in imx6_pm_domain_power_on()
+Hi Nicholas,
+thanks for patch !
 
-I'm not sure I see the value in that one.
-Otherwise this change looks fine.
-
-Regards,
-Lucas
-
+On 06/12/2018 07:22 PM, Nicholas Mc Guire wrote:
+> The while(1) is effectively useless as all possible paths within it
+> return thus there is no way to loop.
 > 
-> - GPC_PGC_DOMAIN_*: made consistent use of index defines
-> 
-> Signed-off-by: Sven Schmitt <sven.schmitt@mixed-mode.de>
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Acked-by: Hugues Fruchet <hugues.fruchet@st.com>
+
 > ---
-> ?drivers/soc/imx/gpc.c | 41 ++++++++++++++++++++---------------------
-> ?1 file changed, 20 insertions(+), 21 deletions(-)
 > 
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index c4d35f32af8d..b92377c75ddf 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -24,15 +24,6 @@
-> ?#define GPC_PGC_CTRL_OFFS	0x0
-> ?#define GPC_PGC_PUPSCR_OFFS	0x4
-> ?#define GPC_PGC_PDNSCR_OFFS	0x8
-> -#define GPC_PGC_SW2ISO_SHIFT	0x8
-> -#define GPC_PGC_SW_SHIFT	0x0
+> This is not actually fixing any bug - the while(1){ } will not hurt here
+> it is though simply unnecessary. Found during code review.
+> 
+> The diff output is not very readable - essentially only the outer
+> while(1){ } was removed.
+> 
+> Patch was compile tested with: x86_64_defconfig, MEDIA_SUPPORT=y
+> MEDIA_CAMERA_SUPPORT=y, V4L_PLATFORM_DRIVERS=y, OF=y, COMPILE_TEST=y
+> CONFIG_VIDEO_STM32_DCMI=y
+> (There are a number of sparse warnings - not related to the changes though)
+> 
+> Patch is against 4.17.0 (localversion-next is next-20180608)
+> 
+>   drivers/media/platform/stm32/stm32-dcmi.c | 28 +++++++++++++---------------
+>   1 file changed, 13 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+> index 2e1933d..70b81d2 100644
+> --- a/drivers/media/platform/stm32/stm32-dcmi.c
+> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
+> @@ -1605,23 +1605,21 @@ static int dcmi_graph_parse(struct stm32_dcmi *dcmi, struct device_node *node)
+>   	struct device_node *ep = NULL;
+>   	struct device_node *remote;
+>   
+> -	while (1) {
+> -		ep = of_graph_get_next_endpoint(node, ep);
+> -		if (!ep)
+> -			return -EINVAL;
 > -
-> -#define GPC_PGC_GPU_PDN		0x260
-> -#define GPC_PGC_GPU_PUPSCR	0x264
-> -#define GPC_PGC_GPU_PDNSCR	0x268
-> -
-> -#define GPU_VPU_PUP_REQ		BIT(1)
-> -#define GPU_VPU_PDN_REQ		BIT(0)
-> ?
-> ?#define GPC_CLK_MAX		6
-> ?
-> @@ -46,6 +37,7 @@ struct imx_pm_domain {
-> ?	int num_clks;
-> ?	unsigned int reg_offs;
-> ?	signed char cntr_pdn_bit;
-> +	signed char cntr_pup_bit;
-> ?	unsigned int ipg_rate_mhz;
-> ?	unsigned int flags;
-> ?};
-> @@ -66,7 +58,7 @@ static int imx6_pm_domain_power_off(struct
-> generic_pm_domain *genpd)
-> ?		return -EBUSY;
-> ?
-> ?	/* Read ISO and ISO2SW power down delays */
-> -	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS,
-> &val);
-> +	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PDNSCR_OFFS,
-> &val);
-> ?	iso = val & 0x3f;
-> ?	iso2sw = (val >> 8) & 0x3f;
-> ?
-> @@ -116,7 +108,7 @@ static int imx6_pm_domain_power_on(struct
-> generic_pm_domain *genpd)
-> ?	sw2iso = (val >> 8) & 0x3f;
-> ?
-> ?	/* Request GPC to power up domain */
-> -	val = BIT(pd->cntr_pdn_bit + 1);
-> +	val = BIT(pd->cntr_pup_bit);
-> ?	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
-> ?
-> ?	/* Wait ISO + ISO2SW IPG clock cycles */
-> @@ -241,22 +233,24 @@ static struct platform_driver
-> imx_pgc_power_domain_driver = {
-> ?};
-> ?builtin_platform_driver(imx_pgc_power_domain_driver)
-> ?
-> -#define GPC_PGC_DOMAIN_ARM	0
-> -#define GPC_PGC_DOMAIN_PU	1
-> -#define GPC_PGC_DOMAIN_DISPLAY	2
-> -
-> ?static struct genpd_power_state imx6_pm_domain_pu_state = {
-> ?	.power_off_latency_ns = 25000,
-> ?	.power_on_latency_ns = 2000000,
-> ?};
-> ?
-> +#define GPC_PGC_DOMAIN_ARM 0
-> +#define GPC_PGC_DOMAIN_PU 1
-> +#define GPC_PGC_DOMAIN_DISPLAY 2
-> +#define GPC_PGC_DOMAIN_PCI 3
+> -		remote = of_graph_get_remote_port_parent(ep);
+> -		if (!remote) {
+> -			of_node_put(ep);
+> -			return -EINVAL;
+> -		}
+> +	ep = of_graph_get_next_endpoint(node, ep);
+> +	if (!ep)
+> +		return -EINVAL;
+>   
+> -		/* Remote node to connect */
+> -		dcmi->entity.node = remote;
+> -		dcmi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
+> -		dcmi->entity.asd.match.fwnode = of_fwnode_handle(remote);
+> -		return 0;
+> +	remote = of_graph_get_remote_port_parent(ep);
+> +	if (!remote) {
+> +		of_node_put(ep);
+> +		return -EINVAL;
+>   	}
 > +
-> ?static struct imx_pm_domain imx_gpc_domains[] = {
-> -	{
-> +	[GPC_PGC_DOMAIN_ARM] {
-> ?		.base = {
-> ?			.name = "ARM",
-> ?			.flags = GENPD_FLAG_ALWAYS_ON,
-> ?		},
-> -	}, {
-> +	},
-> +	[GPC_PGC_DOMAIN_PU] {
-> ?		.base = {
-> ?			.name = "PU",
-> ?			.power_off = imx6_pm_domain_power_off,
-> @@ -266,7 +260,9 @@ static struct imx_pm_domain imx_gpc_domains[] = {
-> ?		},
-> ?		.reg_offs = 0x260,
-> ?		.cntr_pdn_bit = 0,
-> -	}, {
-> +		.cntr_pup_bit = 1,
-> +	},
-> +	[GPC_PGC_DOMAIN_DISPLAY] {
-> ?		.base = {
-> ?			.name = "DISPLAY",
-> ?			.power_off = imx6_pm_domain_power_off,
-> @@ -274,7 +270,9 @@ static struct imx_pm_domain imx_gpc_domains[] = {
-> ?		},
-> ?		.reg_offs = 0x240,
-> ?		.cntr_pdn_bit = 4,
-> -	}, {
-> +		.cntr_pup_bit = 5,
-> +	},
-> +	[GPC_PGC_DOMAIN_PCI] {
-> ?		.base = {
-> ?			.name = "PCI",
-> ?			.power_off = imx6_pm_domain_power_off,
-> @@ -282,6 +280,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
-> ?		},
-> ?		.reg_offs = 0x200,
-> ?		.cntr_pdn_bit = 6,
-> +		.cntr_pup_bit = 7,
-> ?	},
-> ?};
-> ?
-> @@ -326,8 +325,8 @@ static const struct regmap_config
-> imx_gpc_regmap_config = {
-> ?};
-> ?
-> ?static struct generic_pm_domain *imx_gpc_onecell_domains[] = {
-> -	&imx_gpc_domains[0].base,
-> -	&imx_gpc_domains[1].base,
-> +	&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base,
-> +	&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base,
-> ?};
-> ?
-> ?static struct genpd_onecell_data imx_gpc_onecell_data = {
+> +	/* Remote node to connect */
+> +	dcmi->entity.node = remote;
+> +	dcmi->entity.asd.match_type = V4L2_ASYNC_MATCH_FWNODE;
+> +	dcmi->entity.asd.match.fwnode = of_fwnode_handle(remote);
+> +	return 0;
+>   }
+>   
+>   static int dcmi_graph_init(struct stm32_dcmi *dcmi)
+> 
+
+BR,
+Hugues.
