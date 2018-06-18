@@ -1,64 +1,50 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 18 Jun 2018 05:08:20 -0600
-Subject: [PATCH 2/5] net: emaclite: Balance braces in else statement
+Date: Mon, 18 Jun 2018 05:08:19 -0600
+Subject: [PATCH 1/5] net: emaclite: Use __func__ instead of hardcoded name
 In-Reply-To: <1529320103-7711-1-git-send-email-radhey.shyam.pandey@xilinx.com>
 References: <1529320103-7711-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <1529320103-7711-3-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <1529320103-7711-2-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove else as it is not required with if doing a return.
-Fixes below checkpatch warning.
+Switch hardcoded function name with a reference to __func__ making
+the code more maintainable. Address below checkpatch warning:
 
-WARNING: else is not generally useful after a break or return
+WARNING: Prefer using '"%s...", __func__' to using 'xemaclite_mdio_read',
+this function's name, in a string
++               "xemaclite_mdio_read(phy_id=%i, reg=%x) == %x\n",
+
+WARNING: Prefer using '"%s...", __func__' to using 'xemaclite_mdio_write',
+this function's name, in a string
++               "xemaclite_mdio_write(phy_id=%i, reg=%x, val=%x)\n",
 
 Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- drivers/net/ethernet/xilinx/xilinx_emaclite.c | 22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 0544134..8d84f58 100644
+index 2a0c06e..0544134 100644
 --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
 +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -569,13 +569,11 @@ static void xemaclite_tx_handler(struct net_device *dev)
- 					(u8 *) lp->deferred_skb->data,
- 					lp->deferred_skb->len) != 0)
- 			return;
--		else {
--			dev->stats.tx_bytes += lp->deferred_skb->len;
--			dev_kfree_skb_irq(lp->deferred_skb);
--			lp->deferred_skb = NULL;
--			netif_trans_update(dev); /* prevent tx timeout */
--			netif_wake_queue(dev);
--		}
-+		dev->stats.tx_bytes += lp->deferred_skb->len;
-+		dev_kfree_skb_irq(lp->deferred_skb);
-+		lp->deferred_skb = NULL;
-+		netif_trans_update(dev); /* prevent tx timeout */
-+		netif_wake_queue(dev);
- 	}
- }
+@@ -757,7 +757,7 @@ static int xemaclite_mdio_read(struct mii_bus *bus, int phy_id, int reg)
+ 	rc = xemaclite_readl(lp->base_addr + XEL_MDIORD_OFFSET);
  
-@@ -1052,13 +1050,13 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
- {
- 	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+ 	dev_dbg(&lp->ndev->dev,
+-		"xemaclite_mdio_read(phy_id=%i, reg=%x) == %x\n",
++		"%s(phy_id=%i, reg=%x) == %x\n", __func__,
+ 		phy_id, reg, rc);
  
--	if (p) {
-+	if (p)
- 		return (bool)*p;
--	} else {
--		dev_warn(&ofdev->dev, "Parameter %s not found,"
-+
-+	dev_warn(&ofdev->dev, "Parameter %s not found,"
- 			"defaulting to false\n", s);
--		return false;
--	}
-+
-+	return false;
- }
+ 	return rc;
+@@ -780,7 +780,7 @@ static int xemaclite_mdio_write(struct mii_bus *bus, int phy_id, int reg,
+ 	u32 ctrl_reg;
  
- static const struct net_device_ops xemaclite_netdev_ops;
+ 	dev_dbg(&lp->ndev->dev,
+-		"xemaclite_mdio_write(phy_id=%i, reg=%x, val=%x)\n",
++		"%s(phy_id=%i, reg=%x, val=%x)\n", __func__,
+ 		phy_id, reg, val);
+ 
+ 	if (xemaclite_mdio_wait(lp))
 -- 
 2.7.4
