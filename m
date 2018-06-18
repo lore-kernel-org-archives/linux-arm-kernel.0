@@ -1,229 +1,47 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 18 Jun 2018 15:44:14 +0900
-Subject: [PATCH 2/3] arm64: acpi,efi: fix alignment fault in accessing
- ACPI tables at kdump
-In-Reply-To: <026a4d23-ac91-ed35-d711-c55882242037@arm.com>
-References: <20180615075623.13454-1-takahiro.akashi@linaro.org>
- <20180615075623.13454-3-takahiro.akashi@linaro.org>
- <026a4d23-ac91-ed35-d711-c55882242037@arm.com>
-Message-ID: <20180618064413.GF23681@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 17 Jun 2018 23:58:27 -0700
+Subject: Charge counter on droid 4
+In-Reply-To: <20180615083156.GA32102@amd>
+References: <20180615080014.GA29192@amd>
+ <20180615083156.GA32102@amd>
+Message-ID: <20180618065827.GN112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
-
-On Fri, Jun 15, 2018 at 05:30:08PM +0100, James Morse wrote:
-> Hi Akashi,
-> 
-> On 15/06/18 08:56, AKASHI Takahiro wrote:
-> > This is a fix against the issue that crash dump kernel may hang up
-> > during booting, which can happen on any ACPI-based system with "ACPI
-> > Reclaim Memory."
+* Pavel Machek <pavel@ucw.cz> [180615 08:34]:
+> On Fri 2018-06-15 10:00:14, Pavel Machek wrote:
+> > Hi!
 > > 
-> > (kernel messages after panic kicked off kdump)
-> > 	   (snip...)
-> > 	Bye!
-> > 	   (snip...)
-> > 	ACPI: Core revision 20170728
-> > 	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-> > 	Internal error: Oops: 96000021 [#1] SMP
-> > 	Modules linked in:
-> > 	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-> > 	task: ffff000008d05180 task.stack: ffff000008cc0000
-> > 	PC is at acpi_ns_lookup+0x25c/0x3c0
-> > 	LR is at acpi_ds_load1_begin_op+0xa4/0x294
-> > 	   (snip...)
-> > 	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-> > 	Call trace:
-> > 	   (snip...)
-> > 	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-> > 	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-> > 	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-> > 	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-> > 	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-> > 	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-> > 	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-> > 	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-> > 	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-> > 	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-> > 	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-> > 	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-> > 	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-> > 	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-> > 	---[ end trace c46ed37f9651c58e ]---
-> > 	Kernel panic - not syncing: Fatal exception
-> > 	Rebooting in 10 seconds..
-> > 
-> > (diagnosis)
-> > * This fault is a data abort, alignment fault (ESR=0x96000021)
-> >   during reading out ACPI table.
-> > * Initial ACPI tables are normally stored in system ram and marked as
-> >   "ACPI Reclaim memory" by the firmware.
-> > * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
-> >   memory as MEMBLOCK_NOMAP"), those regions are differently handled
-> >   as they are "memblock-reserved", without NOMAP bit.
-> > * So they are now excluded from device tree's "usable-memory-range"
-> >   which kexec-tools determines based on a current view of /proc/iomem.
-> > * When crash dump kernel boots up, it tries to accesses ACPI tables by
-> >   mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
-> >   since they are no longer part of mapped system ram.
-> > * Given that ACPI accessor/helper functions are compiled in without
-> >   unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
-> >   any unaligned access to ACPI tables can cause a fatal panic.
-> > 
-> > With this patch, acpi_os_ioremap() always honors memory attribute
-> > information provided by the firmware (EFI) and retaining cacheability
-> > allows the kernel safe access to ACPI tables.
-> 
-> 
-> > Please note that arm_enable_runtime_services() is now renamed to
-> > efi_enter_virtual_mode() due to the similarity to x86's.
-> 
-> Just a rename?:
+> > Droid 4 has non-removable battery, yet the charge counter is reset to
+> > near zero on each boot of linux.
 
-and maps EFI memory map whether or not runtime service is enabled.
+Not sure if we actively do anything to reset it. I'm guessing
+it's the Motorola bootloader that resets everything on boot.
 
-> >  drivers/firmware/efi/arm-runtime.c | 27 ++++++++++++---------------
-> 
-> 
-> 
-> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > index 32f465a80e4e..d53c95f4e1a9 100644
-> > --- a/arch/arm64/include/asm/acpi.h
-> > +++ b/arch/arm64/include/asm/acpi.h
-> > @@ -29,18 +31,22 @@
-> >  
-> >  /* Basic configuration for ACPI */
-> >  #ifdef	CONFIG_ACPI
-> > +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
-> > +
-> >  /* ACPI table mapping after acpi_permanent_mmap is set */
-> >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> >  					    acpi_size size)
-> >  {
-> > +	/* For normal memory we already have a cacheable mapping. */
-> > +	if (memblock_is_map_memory(phys))
-> > +		return (void __iomem *)__phys_to_virt(phys);
-> 
-> >  	/*
-> > -	 * EFI's reserve_regions() call adds memory with the WB attribute
-> > -	 * to memblock via early_init_dt_add_memory_arch().
-> > +	 * We should still honor the memory's attribute here because
-> > +	 * crash dump kernel possibly excludes some ACPI (reclaim)
-> > +	 * regions from memblock list.
-> >  	 */
-> 
-> (Even without kdump we would still need this. Regions ACPI wants mapped may not
-> be covered by the linear map. In this case we need to use the attributes
-> firmware described in the UEFI memory map. Kdump exacerbates this by
-> artificially reducing the range of the linear map.)
-> 
-> 
-> > -	if (!memblock_is_memory(phys))
-> > -		return ioremap(phys, size);
-> > -
-> > -	return ioremap_cache(phys, size);
-> > +	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
-> >  }
-> 
-> 
-> 
-> > diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> > index 5889cbea60b8..566ef0a9edb5 100644
-> > --- a/drivers/firmware/efi/arm-runtime.c
-> > +++ b/drivers/firmware/efi/arm-runtime.c
-> > @@ -106,46 +106,43 @@ static bool __init efi_virtmap_init(void)
-> >   * non-early mapping of the UEFI system table and virtual mappings for all
-> >   * EFI_MEMORY_RUNTIME regions.
-> >   */
-> > -static int __init arm_enable_runtime_services(void)
-> > +void __init efi_enter_virtual_mode(void)
-> >  {
-> >  	u64 mapsize;
-> >  
-> >  	if (!efi_enabled(EFI_BOOT)) {
-> >  		pr_info("EFI services will not be available.\n");
-> > -		return 0;
-> > +		return;
-> > +	}
-> > +
-> > +	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
-> > +
-> > +	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
-> > +		pr_err("Failed to remap EFI memory map\n");
-> > +		return;
-> >  	}
-> >  
-> >  	if (efi_runtime_disabled()) {
-> >  		pr_info("EFI runtime services will be disabled.\n");
-> > -		return 0;
-> > +		return;
-> >  	}
-> >  
-> >  	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-> >  		pr_info("EFI runtime services access via paravirt.\n");
-> > -		return 0;
-> > +		return;
-> >  	}
-> >  
-> >  	pr_info("Remapping and enabling EFI services.\n");
-> >  
-> > -	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
-> > -
-> > -	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
-> > -		pr_err("Failed to remap EFI memory map\n");
-> > -		return -ENOMEM;
-> > -	}
-> > -
-> >  	if (!efi_virtmap_init()) {
-> >  		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
-> > -		return -ENOMEM;
-> > +		return;
-> >  	}
-> >  
-> >  	/* Set up runtime services function pointers */
-> >  	efi_native_runtime_setup();
-> >  	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-> > -
-> > -	return 0;
-> >  }
-> 
-> Please have the drivers/firmware/efi/arm-runtime.c changes in a separate patch
-> (maybe combine it with patch 3). The 'efi/arm: ' prefix is more likely to catch
-> the maintainers attention.
->
-> I think this is what Ard meant by:
-> | Could you please move the changes to this file and init/main.c into a
-> | separate patch?
-> 
-> https://patchwork.kernel.org/patch/10361761/
-> 
-> 
-> > -early_initcall(arm_enable_runtime_services);
-> 
-> With just this patch, surely nothing ever calls arm_enable_runtime_services(),
-> and now acpi_os_ioremap() will return device memory for anything that isn't part
-> of the linear region. (This breaks RAS).
+> > Unfortunately, that makes charge counter pretty much useless on d4, as
+> > the "battery full" and "battery empty" limits will be different during
+> > each boot.
 
-Actually I noticed the issue.
+>From what I've seen also the stock kernel starts only with
+voltage based estimate initially after a reboot?
 
-> This will make it difficult to bisect through for any RAS or
-> efi-runtime-services issue. Its easily fixed: please put the efi+init changes in
-> a patch before the acpi_os_ioremap() changes.
-
-I was reluctant to put different part of code changes into one.
-But if nobody cares, I will do so in three patches.
-  * change arm_enable_runtime_services() with renaming
-  * move this function earlier in start_kernel()
-  * modify acpi_os_ioremap()
-
-Thanks,
--Takahiro AKASHI
-
-
-> Otherwise, looks good to me!
+> Hmm, and could we refrain from providing "power" values?
 > 
-> 
-> Thanks,
-> 
-> James
+> I was thinking great, we have hardware that does proper power
+> measuerement for us. No.... it is driver providing synthetic
+> values. As userland has enough information to do that itself, I
+> believe we should not do this in kernel.
+
+Hmm I don't follow you, why would we want to remove these as
+they implement a standard sysfs interface?
+
+I use the sysfs interface all the time to monitor the power
+consumption and the output seems to match what I was seeing
+with my power supply.
+
+Note that we also have the IIO raw data also available if that
+might help.
+
+Regards,
+
+Tony
