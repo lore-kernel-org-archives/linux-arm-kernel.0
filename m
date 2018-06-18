@@ -1,42 +1,44 @@
 From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Tue, 19 Jun 2018 00:19:04 +1000
-Subject: [PATCHv4 3/4] ARM: versatile: empty Makefile.boot needed for no-MMU
- compile
+Date: Tue, 19 Jun 2018 00:19:02 +1000
+Subject: [PATCHv4 1/4] ARM: versatile: support no-MMU mode addressing
 In-Reply-To: <20180618141905.7789-1-gerg@linux-m68k.org>
 References: <20180618141905.7789-1-gerg@linux-m68k.org>
-Message-ID: <20180618141905.7789-4-gerg@linux-m68k.org>
+Message-ID: <20180618141905.7789-2-gerg@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To compile the arm versatile board with the MMU disabled (!CONFIG_MMU)
-a Makefile.boot is required. Without it you get:
+Currently for the versatile boards the IO_ADDRESS() macro applies static
+virtual address mapping for built-in IO devices. When operating without
+the MMU enabled IO devices are accessed at their physical address, no
+address translation is required.
 
-  SYSMAP  System.map
-arch/arm/boot/Makefile:15: arch/arm/mach-versatile//Makefile.boot: No such file or directory
-make[2]: *** No rule to make target `arch/arm/mach-versatile//Makefile.boot'.  Stop.
-
-Create an empty Makefile.boot for the versatile machine. This is a
-copy of the other empty machine Makefile.boot files. (A few have this
-same commented empty file: stm32, ep93xx, lpc18xx, efm32 and vexpress).
+For the !CONFIG_MMU case then define the IO_ADDRESS() macro to return the
+physical address.
 
 Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
 ---
- arch/arm/mach-versatile/Makefile.boot | 3 +++
- 1 file changed, 3 insertions(+)
- create mode 100644 arch/arm/mach-versatile/Makefile.boot
+ arch/arm/mach-versatile/versatile_dt.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 v2: no change
 v3: rebase on top of linux-4.10
-v3: rebase on top of linux-4.17
+v4: rebase on top of linux-4.17
 
-diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
-new file mode 100644
-index 000000000000..eacfc3f5c33e
---- /dev/null
-+++ b/arch/arm/mach-versatile/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
+diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
+index 3c8d39c12909..8cfa05a37295 100644
+--- a/arch/arm/mach-versatile/versatile_dt.c
++++ b/arch/arm/mach-versatile/versatile_dt.c
+@@ -37,7 +37,11 @@
+ #include <asm/mach/map.h>
+ 
+ /* macro to get at MMIO space when running virtually */
++#ifdef CONFIG_MMU
+ #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
++#else
++#define IO_ADDRESS(x)		(x)
++#endif
+ #define __io_address(n)		((void __iomem __force *)IO_ADDRESS(n))
+ 
+ /*
 -- 
 2.17.1
