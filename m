@@ -1,82 +1,52 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 Jun 2018 14:18:42 +0100
-Subject: [PATCH v2 6/7] arm64: topology: rename llc_siblings to align with
- other struct members
+Date: Mon, 18 Jun 2018 14:18:43 +0100
+Subject: [PATCH v2 7/7] arm64: topology: re-introduce numa mask check for
+ scheduler MC selection
 In-Reply-To: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
 References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1529327923-17911-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1529327923-17911-8-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to core_sibling and thread_sibling, it's better to align and
-rename llc_siblings to llc_sibling.
+Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from
+core_siblings") selected the smallest of LLC, socket siblings, and NUMA
+node siblings to ensure that the sched domain we build for the MC layer
+isn't larger than the DIE above it or it's shrunk to the socket or NUMA
+node if LLC exist acrosis NUMA node/chiplets.
+
+Commit acd32e52e4e0 ("arm64: topology: Avoid checking numa mask for
+scheduler MC selection") reverted the NUMA siblings checks since the
+CPU topology masks weren't updated on hotplug at that time.
+
+This patch re-introduces numa mask check as the CPU and NUMA topology
+is now updated in hotplug paths. Effectively, this patch does the
+partial revert of commit acd32e52e4e0.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/include/asm/topology.h |  2 +-
- arch/arm64/kernel/topology.c      | 14 +++++++-------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/topology.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index fb996f454305..dda4b6dba6b4 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -11,7 +11,7 @@ struct cpu_topology {
- 	int llc_id;
- 	cpumask_t thread_sibling;
- 	cpumask_t core_sibling;
--	cpumask_t llc_siblings;
-+	cpumask_t llc_sibling;
- };
-
- extern struct cpu_topology cpu_topology[NR_CPUS];
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index b60d7018e9db..e0db80252cfb 100644
+index e0db80252cfb..01cdc83b1ec7 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -218,8 +218,8 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
- 	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
+@@ -215,8 +215,13 @@ EXPORT_SYMBOL_GPL(cpu_topology);
 
- 	if (cpu_topology[cpu].llc_id != -1) {
--		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
--			core_mask = &cpu_topology[cpu].llc_siblings;
-+		if (cpumask_subset(&cpu_topology[cpu].llc_sibling, core_mask))
-+			core_mask = &cpu_topology[cpu].llc_sibling;
- 	}
-
- 	return core_mask;
-@@ -235,8 +235,8 @@ static void update_siblings_masks(unsigned int cpuid)
- 		cpu_topo = &cpu_topology[cpu];
-
- 		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
--			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
--			cpumask_set_cpu(cpuid, &cpu_topo->llc_siblings);
-+			cpumask_set_cpu(cpu, &cpuid_topo->llc_sibling);
-+			cpumask_set_cpu(cpuid, &cpu_topo->llc_sibling);
- 		}
-
- 		if (cpuid_topo->package_id != cpu_topo->package_id)
-@@ -303,8 +303,8 @@ static void clear_cpu_topology(int cpu, bool reset)
- 		cpu_topo->llc_id = -1;
- 	}
-
--	cpumask_clear(&cpu_topo->llc_siblings);
--	cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
-+	cpumask_clear(&cpu_topo->llc_sibling);
-+	cpumask_set_cpu(cpu, &cpu_topo->llc_sibling);
-
- 	cpumask_clear(&cpu_topo->core_sibling);
- 	cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
-@@ -320,7 +320,7 @@ static void __init reset_cpu_topology(void)
- 		clear_cpu_topology(cpu, true);
- }
-
--#define cpu_llc_shared_mask(cpu)	(&cpu_topology[cpu].llc_siblings)
-+#define cpu_llc_shared_mask(cpu)	(&cpu_topology[cpu].llc_sibling)
- void remove_cpu_topology(unsigned int cpu)
+ const struct cpumask *cpu_coregroup_mask(int cpu)
  {
- 	int sibling;
+-	const cpumask_t *core_mask = &cpu_topology[cpu].core_sibling;
++	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
+
++	/* Find the smaller of NUMA, core or LLC siblings */
++	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
++		/* not numa in package, lets use the package siblings */
++		core_mask = &cpu_topology[cpu].core_sibling;
++	}
+ 	if (cpu_topology[cpu].llc_id != -1) {
+ 		if (cpumask_subset(&cpu_topology[cpu].llc_sibling, core_mask))
+ 			core_mask = &cpu_topology[cpu].llc_sibling;
 --
 2.7.4
