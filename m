@@ -1,69 +1,318 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 18 Jun 2018 16:58:43 +0200
-Subject: [PATCH v4 19/19] ARM: dts: sun8i-a33: Add Video Engine and reserved
- memory nodes
-In-Reply-To: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180618145843.14631-20-paul.kocialkowski@bootlin.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Mon, 18 Jun 2018 08:05:49 -0700
+Subject: RESEND [PATCH v5 03/12] arm: vdso: inline assembler operations to
+ compiler.h
+In-Reply-To: <20180618150613.10322-1-salyzyn@android.com>
+References: <20180618150613.10322-1-salyzyn@android.com>
+Message-ID: <20180618150613.10322-4-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds nodes for the Video Engine and the associated reserved memory
-for the A33. Up to 96 MiB of memory are dedicated to the CMA pool.
+Take an effort to recode the arm64 vdso code from assembler to C
+previously submitted by Andrew Pinski <apinski@cavium.com>, rework
+it for use in both arm and arm64, overlapping any optimizations
+for each architecture. But instead of landing it in arm64, land the
+result into lib/vdso and unify both implementations to simplify
+future maintenance.
 
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+Move compiler-specific code to a local compiler.h file:
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+- CONFIG_AEABI dependency check.
+- System call fallback functions standardized into a
+  DEFINE_FALLBACK macro.
+- Replace arch_counter_get_cntvct() with arch_vdso_read_counter.
+- Deal with architecture specific unresolved references emitted
+  by GCC.
+- Optimize handling of fallback calls in callers.
+- For time functions that always return success, do not waste time
+  checking return value for switch to fallback.
+- Optimize unlikely nullptr checking in __vdso_gettimeofday,
+  if tv null no need to proceed to fallback, as vdso is still
+  capable of filling in the tv values.
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 97a976b3b1ef..c5c108a11285 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -181,6 +181,21 @@
- 		reg = <0x40000000 0x80000000>;
- 	};
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jeremy Linton <Jeremy.Linton@arm.com>
+
+v2:
+- split first CL into 3 of 7 pieces
+
+v4:
+- switch to arch_vdso_read_counter as common API
+- update commit message to reflect overall reasoning
+
+v5:
+- comment about asm/arch_timer.h and asm/processor.h regarding why
+  they have been added in compiler.h for porting clarity.
+- add linux/compiler.h in vgettimeofday.c because of notrace.
+- remove unnecessary dependency on linux/hrtimer.h
+---
+ arch/arm/vdso/compiler.h      |  69 +++++++++++++++++++++
+ arch/arm/vdso/vgettimeofday.c | 109 +++++++++-------------------------
+ 2 files changed, 96 insertions(+), 82 deletions(-)
+ create mode 100644 arch/arm/vdso/compiler.h
+
+diff --git a/arch/arm/vdso/compiler.h b/arch/arm/vdso/compiler.h
+new file mode 100644
+index 000000000000..af24502797e8
+--- /dev/null
++++ b/arch/arm/vdso/compiler.h
+@@ -0,0 +1,69 @@
++/*
++ * Userspace implementations of fallback calls
++ *
++ * Copyright (C) 2017 Cavium, Inc.
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ * Rewriten into C by: Andrew Pinski <apinski@cavium.com>
++ */
++
++#ifndef __VDSO_COMPILER_H
++#define __VDSO_COMPILER_H
++
++#include <asm/arch_timer.h>	/* for arch_counter_get_cntvct()	*/
++#include <asm/processor.h>	/* for cpu_relax()			*/
++#include <asm/unistd.h>
++#include <linux/compiler.h>
++
++#ifndef CONFIG_AEABI
++#error This code depends on AEABI system call conventions
++#endif
++
++#define DEFINE_FALLBACK(name, type_arg1, name_arg1, type_arg2, name_arg2) \
++static notrace long name##_fallback(type_arg1 _##name_arg1,		  \
++				    type_arg2 _##name_arg2)		  \
++{									  \
++	register type_arg1 name_arg1 asm("r0") = _##name_arg1;		  \
++	register type_arg2 name_arg2 asm("r1") = _##name_arg2;		  \
++	register long ret asm ("r0");					  \
++	register long nr asm("r7") = __NR_##name;			  \
++									  \
++	asm volatile(							  \
++	"	swi #0\n"						  \
++	: "=r" (ret)							  \
++	: "r" (name_arg1), "r" (name_arg2), "r" (nr)			  \
++	: "memory");							  \
++									  \
++	return ret;							  \
++}
++
++#define arch_vdso_read_counter() arch_counter_get_cntvct()
++
++/* Avoid unresolved references emitted by GCC */
++
++void __aeabi_unwind_cpp_pr0(void)
++{
++}
++
++void __aeabi_unwind_cpp_pr1(void)
++{
++}
++
++void __aeabi_unwind_cpp_pr2(void)
++{
++}
++
++#endif /* __VDSO_COMPILER_H */
+diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
+index 2474c17dc356..522094b147a2 100644
+--- a/arch/arm/vdso/vgettimeofday.c
++++ b/arch/arm/vdso/vgettimeofday.c
+@@ -22,21 +22,16 @@
+  * Reworked and rebased over arm version by: Mark Salyzyn <salyzyn@android.com>
+  */
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+		cma_pool: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			size = <0x6000000>;
-+			alloc-ranges = <0x4a000000 0x6000000>;
-+			reusable;
-+			linux,cma-default;
-+		};
-+	};
-+
- 	sound: sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "sun8i-a33-audio";
-@@ -262,6 +277,20 @@
- 			};
- 		};
+-#include <linux/compiler.h>
+-#include <linux/hrtimer.h>
+-#include <linux/time.h>
+-#include <asm/arch_timer.h>
+ #include <asm/barrier.h>
+-#include <asm/bug.h>
+-#include <asm/page.h>
+-#include <asm/unistd.h>
+-
+-#ifndef CONFIG_AEABI
+-#error This code depends on AEABI system call conventions
+-#endif
++#include <linux/compiler.h>	/* for notrace				*/
++#include <linux/time.h>
  
-+		vpu: video-codec at 01c0e000 {
-+			compatible = "allwinner,sun8i-a33-video-engine";
-+			reg = <0x01c0e000 0x1000>;
++#include "compiler.h"
+ #include "datapage.h"
+ 
++DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
++DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
 +
-+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
+ static notrace u32 vdso_read_begin(const struct vdso_data *vd)
+ {
+ 	u32 seq;
+@@ -63,23 +58,6 @@ static notrace int vdso_read_retry(const struct vdso_data *vd, u32 start)
+ 	return seq != start;
+ }
+ 
+-static notrace long clock_gettime_fallback(clockid_t _clkid,
+-					   struct timespec *_ts)
+-{
+-	register struct timespec *ts asm("r1") = _ts;
+-	register clockid_t clkid asm("r0") = _clkid;
+-	register long ret asm ("r0");
+-	register long nr asm("r7") = __NR_clock_gettime;
+-
+-	asm volatile(
+-	"	swi #0\n"
+-	: "=r" (ret)
+-	: "r" (clkid), "r" (ts), "r" (nr)
+-	: "memory");
+-
+-	return ret;
+-}
+-
+ static notrace int do_realtime_coarse(const struct vdso_data *vd,
+ 				      struct timespec *ts)
+ {
+@@ -127,7 +105,7 @@ static notrace u64 get_ns(const struct vdso_data *vd)
+ 	u64 cycle_now;
+ 	u64 nsec;
+ 
+-	cycle_now = arch_counter_get_cntvct();
++	cycle_now = arch_vdso_read_counter();
+ 
+ 	cycle_delta = (cycle_now - vd->cs_cycle_last) & vd->cs_mask;
+ 
+@@ -200,85 +178,52 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
+ 
+ #endif /* CONFIG_ARM_ARCH_TIMER */
+ 
+-notrace int __vdso_clock_gettime(clockid_t clkid, struct timespec *ts)
++notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
+ {
+-	int ret = -1;
+-
+ 	const struct vdso_data *vd = __get_datapage();
+ 
+-	switch (clkid) {
++	switch (clock) {
+ 	case CLOCK_REALTIME_COARSE:
+-		ret = do_realtime_coarse(vd, ts);
++		do_realtime_coarse(vd, ts);
+ 		break;
+ 	case CLOCK_MONOTONIC_COARSE:
+-		ret = do_monotonic_coarse(vd, ts);
++		do_monotonic_coarse(vd, ts);
+ 		break;
+ 	case CLOCK_REALTIME:
+-		ret = do_realtime(vd, ts);
++		if (do_realtime(vd, ts))
++			goto fallback;
+ 		break;
+ 	case CLOCK_MONOTONIC:
+-		ret = do_monotonic(vd, ts);
++		if (do_monotonic(vd, ts))
++			goto fallback;
+ 		break;
+ 	default:
+-		break;
++		goto fallback;
+ 	}
+ 
+-	if (ret)
+-		ret = clock_gettime_fallback(clkid, ts);
+-
+-	return ret;
+-}
+-
+-static notrace long gettimeofday_fallback(struct timeval *_tv,
+-					  struct timezone *_tz)
+-{
+-	register struct timezone *tz asm("r1") = _tz;
+-	register struct timeval *tv asm("r0") = _tv;
+-	register long ret asm ("r0");
+-	register long nr asm("r7") = __NR_gettimeofday;
+-
+-	asm volatile(
+-	"	swi #0\n"
+-	: "=r" (ret)
+-	: "r" (tv), "r" (tz), "r" (nr)
+-	: "memory");
+-
+-	return ret;
++	return 0;
++fallback:
++	return clock_gettime_fallback(clock, ts);
+ }
+ 
+ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
+ {
+-	struct timespec ts;
+-	int ret;
+-
+ 	const struct vdso_data *vd = __get_datapage();
+ 
+-	ret = do_realtime(vd, &ts);
+-	if (ret)
+-		return gettimeofday_fallback(tv, tz);
++	if (likely(tv != NULL)) {
++		struct timespec ts;
 +
-+			resets = <&ccu RST_BUS_VE>;
++		if (do_realtime(vd, &ts))
++			return gettimeofday_fallback(tv, tz);
+ 
+-	if (tv) {
+ 		tv->tv_sec = ts.tv_sec;
+ 		tv->tv_usec = ts.tv_nsec / 1000;
+ 	}
+-	if (tz) {
 +
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			allwinner,sram = <&ve_sram 1>;
-+		};
-+
- 		crypto: crypto-engine at 1c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
++	if (unlikely(tz != NULL)) {
+ 		tz->tz_minuteswest = vd->tz_minuteswest;
+ 		tz->tz_dsttime = vd->tz_dsttime;
+ 	}
+ 
+-	return ret;
+-}
+-
+-/* Avoid unresolved references emitted by GCC */
+-
+-void __aeabi_unwind_cpp_pr0(void)
+-{
+-}
+-
+-void __aeabi_unwind_cpp_pr1(void)
+-{
+-}
+-
+-void __aeabi_unwind_cpp_pr2(void)
+-{
++	return 0;
+ }
 -- 
-2.17.0
+2.18.0.rc1.244.gcf134e6275-goog
