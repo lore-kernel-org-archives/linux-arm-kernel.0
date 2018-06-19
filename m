@@ -1,59 +1,63 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 19 Jun 2018 11:10:48 +0100
-Subject: [PATCH] dt-bindings: Fix unbalanced quotation marks
-In-Reply-To: <20180617143127.11421-1-j.neuschaefer@gmx.net>
-References: <20180617143127.11421-1-j.neuschaefer@gmx.net>
-Message-ID: <819db945-1f89-93d3-b213-365a9704e100@nvidia.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 19 Jun 2018 11:15:35 +0100
+Subject: [PATCH v3 0/7] arm64: perf: Support for chained counters
+Message-ID: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds support for counting PMU events using 64bit counters
+for arm64 PMU.
 
+The Arm v8 PMUv3 supports combining two adjacent 32bit counters
+(low even and hig odd counters) to count a given "event" in 64bit mode.
+This series adds the support for 64bit events in the core arm_pmu driver
+infrastructure and adds the support for armv8 64bit kernel PMU to use
+chained counters to count in 64bit mode. For CPU cycles, we use the cycle
+counter in 64bit mode, only when requested. If the cycle counter is not
+available, we fall back to chaining the counters.
 
-On 17/06/18 15:31, Jonathan Neusch?fer wrote:
-> Multiple binding documents have various forms of unbalanced quotation
-> marks. Fix them.
-> 
-> Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
-> ---
-> 
-> Should I split this patch so that different parts can go through different trees?
-> ---
->  .../devicetree/bindings/arm/samsung/samsung-boards.txt          | 2 +-
->  .../devicetree/bindings/gpio/nintendo,hollywood-gpio.txt        | 2 +-
->  Documentation/devicetree/bindings/input/touchscreen/hideep.txt  | 2 +-
->  .../bindings/interrupt-controller/nvidia,tegra20-ictlr.txt      | 2 +-
->  .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt  | 2 +-
->  Documentation/devicetree/bindings/mips/brcm/soc.txt             | 2 +-
->  Documentation/devicetree/bindings/net/fsl-fman.txt              | 2 +-
->  Documentation/devicetree/bindings/power/power_domain.txt        | 2 +-
->  Documentation/devicetree/bindings/regulator/tps65090.txt        | 2 +-
->  Documentation/devicetree/bindings/reset/st,sti-softreset.txt    | 2 +-
->  Documentation/devicetree/bindings/sound/qcom,apq8016-sbc.txt    | 2 +-
->  Documentation/devicetree/bindings/sound/qcom,apq8096.txt        | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
+Tested on Juno, Fast models. Applies on 4.18-rc1
 
-...
+Changes since v2:
+ - Clean up select counter routine. (Mark Rutland)
+ - Stop PMU while processing overflows (Mark Rutland)
+ - Drop special allocation algorithm for chain indices
+ - Since we access the counters when the PMU is stopped,
+   get rid of the unncessary barriers.
+ - Ensure a counter is allocated when checking for chained event
 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
-> index 1099fe0788fa..f246ccbf8838 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
-> @@ -15,7 +15,7 @@ Required properties:
->    include "nvidia,tegra30-ictlr".	
->  - reg : Specifies base physical address and size of the registers.
->    Each controller must be described separately (Tegra20 has 4 of them,
-> -  whereas Tegra30 and later have 5"  
-> +  whereas Tegra30 and later have 5).
->  - interrupt-controller : Identifies the node as an interrupt controller.
->  - #interrupt-cells : Specifies the number of cells needed to encode an
->    interrupt source. The value must be 3.
+Change since v1:
+ - Remove unnecessary isb()s in chain counter reads/writes
+ - Fix event programming order for counters
+ - Tighten chain counter event read sequence
+ - Set chain event to count in all ELs
+ - Cleanup helpers to be consistent
+ - Fix build break on xcale PMU (reported by kbuild-robot)
+ - Remove the explicit counter width field from pmu backends and default
+   to 32bit.
+ - Rename flag ARMPMU_EVT_LONG => ARMPMU_EVT_64BIT and
+   the format string "chain" => "bits64". (Unfortunately we can't use "64bit"
+   and I am open for suggestion on a better name)
+ - Rename armpmu_get_event_max_period() => armpmu_event_max_period()
+ - For 64bit CPU cycles events, allow chaining if cycle counter is
+   not available.
 
-For the above Tegra portion ...
+Suzuki K Poulose (7):
+  arm_pmu: Clean up maximum period handling
+  arm_pmu: Change API to support 64bit counter values
+  arm_pmu: Add support for 64bit event counters
+  arm_pmu: Tidy up clear_event_idx call backs
+  arm64: perf: Clean up armv8pmu_select_counter
+  arm64: perf: Disable PMU while processing counter overflows
+  arm64: perf: Add support for chaining event counters
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
+ arch/arm/kernel/perf_event_v6.c     |   6 +-
+ arch/arm/kernel/perf_event_v7.c     |   7 +-
+ arch/arm/kernel/perf_event_xscale.c |  10 +-
+ arch/arm64/kernel/perf_event.c      | 249 +++++++++++++++++++++++++++++-------
+ drivers/perf/arm_pmu.c              |  51 +++++---
+ include/linux/perf/arm_pmu.h        |  11 +-
+ 6 files changed, 255 insertions(+), 79 deletions(-)
 
 -- 
-nvpublic
+2.7.4
