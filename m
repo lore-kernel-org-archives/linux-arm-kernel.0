@@ -1,38 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:53:10 +0100
-Subject: [RESEND PATCH v2 5/9] sh: Don't pull in all of linux/bitops.h in
- asm/cmpxchg-xchg.h
-In-Reply-To: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529412794-17720-6-git-send-email-will.deacon@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jun 2018 14:15:24 +0100
+Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
+In-Reply-To: <20180619121814.GR22983@e103592.cambridge.arm.com>
+References: <20180618120310.39527-1-mark.rutland@arm.com>
+ <20180618120310.39527-11-mark.rutland@arm.com>
+ <20180619121814.GR22983@e103592.cambridge.arm.com>
+Message-ID: <20180619130932.ww53s5rnragcodha@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sh implementation of asm/cmpxchg-xchg.h pulls in linux/bitops.h
-so that it can refer to BITS_PER_BYTE. It also transitively relies on
-this pulling in linux/compiler.h for READ_ONCE().
+On Tue, Jun 19, 2018 at 01:18:17PM +0100, Dave Martin wrote:
+> On Mon, Jun 18, 2018 at 01:03:01PM +0100, Mark Rutland wrote:
+> > +static inline void sve_user_reset(void)
+> > +{
+> 
+> Can we call this "sve_user_discard" please?
+> 
+> "Reset" is a reasonable name for the concept, but the "discard"
+> terminology has been used elsewhere.
 
-Replace the #include with linux/bits.h and linux/compiler.h
+Sure; done.
 
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/sh/include/asm/cmpxchg-xchg.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> > +	if (!system_supports_sve())
+> > +		return;
+> > +
+> > +	/*
+> > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
+> > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
+> > +	 * happens if a context switch or kernel_neon_begin() or context
+> > +	 * modification (sigreturn, ptrace) intervenes.
+> > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
+> > +	 */
+> 
+> This comment should go after clear_thead_flag(), since it describes not
+> the purpose of this function but the presence of sve_user_disable().
+> 
+> > +	clear_thread_flag(TIF_SVE);
+> > +	sve_user_disable();
+> > +}
 
-diff --git a/arch/sh/include/asm/cmpxchg-xchg.h b/arch/sh/include/asm/cmpxchg-xchg.h
-index 1e881f5db659..593a9704782b 100644
---- a/arch/sh/include/asm/cmpxchg-xchg.h
-+++ b/arch/sh/include/asm/cmpxchg-xchg.h
-@@ -8,7 +8,8 @@
-  * This work is licensed under the terms of the GNU GPL, version 2.  See the
-  * file "COPYING" in the main directory of this archive for more details.
-  */
--#include <linux/bitops.h>
-+#include <linux/bits.h>
-+#include <linux/compiler.h>
- #include <asm/byteorder.h>
- 
- /*
--- 
-2.1.4
+Good point. I've moved the clear_thread_flag(TIF_SVE) above the comment
+(with a blank line before the comment).
+
+Thanks,
+Mark.
