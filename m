@@ -1,99 +1,145 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 19 Jun 2018 14:34:45 +0200
-Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU rate
- from 300Mhz to 1.2GHz
-In-Reply-To: <20180619123446.694-1-gregory.clement@bootlin.com>
-References: <20180619123446.694-1-gregory.clement@bootlin.com>
-Message-ID: <20180619123446.694-2-gregory.clement@bootlin.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Tue, 19 Jun 2018 20:40:03 +0800
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <20180619120714.GE13685@dhcp22.suse.cz>
+References: <5ed798a0-6c9c-086e-e5e8-906f593ca33e@huawei.com>
+ <20180607122152.GP32433@dhcp22.suse.cz>
+ <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
+ <20180611085237.GI13364@dhcp22.suse.cz>
+ <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
+ <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
+ <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+Message-ID: <1f5ec805-483d-8781-7bc9-4d040d4a33ce@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
-respectively) to L0 frequency (1.2 Ghz) requires a significant amount
-of time to let VDD stabilize to the appropriate voltage. This amount of
-time is large enough that it cannot be covered by the hardware
-countdown register. Due to this, the CPU might start operating at L0
-before the voltage is stabilized, leading to CPU stalls.
+Hi Michal,
 
-To work around this problem, we prevent switching directly from the
-L2/L3 frequencies to the L0 frequency, and instead switch to the L1
-frequency in-between. The sequence therefore becomes:
+On 2018/6/19 20:07, Michal Hocko wrote:
+> On Tue 19-06-18 20:03:07, Xie XiuQi wrote:
+> [...]
+>> I tested on a arm board with 128 cores 4 numa nodes, but I set CONFIG_NR_CPUS=72.
+>> Then node 3 is not be created, because node 3 has no memory, and no cpu.
+>> But some pci device may related to node 3, which be set in ACPI table.
+> 
+> Could you double check that zonelists for node 3 are generated
+> correctly?
+> 
 
-1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
-2. Sleep 20ms for stabling VDD voltage
-3. Then switch from L1(600MHZ) to L0(1200Mhz).
+zonelists for node 3 is not created at all.
 
-It is based on the work done by Ken Ma <make@marvell.com>
+Kernel parse SRAT table to create node info, but in this case,
+SRAT table is parsed not completed. Only the first 72 items are parsed.
+In SRAT table, we haven't seen node 3 information yet, because cpu_to_node_map[72] is too small.
 
-Cc: stable at vger.kernel.org
-Fixes: 2089dc33ea0e ("clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks")
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- drivers/clk/mvebu/armada-37xx-periph.c | 38 ++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30000 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30001 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30002 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30003 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30100 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30101 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30102 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30103 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30200 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30201 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30202 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30203 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30300 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30301 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30302 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30303 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30400 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30401 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30402 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30403 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30500 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30501 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30502 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30503 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30600 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30601 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30602 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30603 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30700 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30701 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30702 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x30703 -> Node 0
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10000 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10001 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10002 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10003 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10100 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10101 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10102 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10103 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10200 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10201 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10202 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10203 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10300 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10301 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10302 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10303 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10400 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10401 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10402 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10403 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10500 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10501 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10502 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10503 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10600 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10601 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10602 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10603 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10700 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10701 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10702 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10703 -> Node 1
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70000 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70001 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70002 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70003 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70100 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70101 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70102 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: PXM 2 -> MPIDR 0x70103 -> Node 2
+[    0.000000] ACPI: NUMA: SRAT: cpu_to_node_map[72] is too small, may not be able to use all cpus
+[    0.000000] ACPI: SRAT: Node 0 PXM 0 [mem 0x2080000000-0x23ffffffff]
+[    0.000000] ACPI: SRAT: Node 0 PXM 0 [mem 0x00000000-0x7fffffff]
+[    0.000000] ACPI: SRAT: Node 2 PXM 2 [mem 0x402000000000-0x4023ffffffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x23ffffe780-0x23ffffffff]
+[    0.000000] NUMA: Initmem setup node 1 [<memory-less node>]
+[    0.000000] NUMA: NODE_DATA [mem 0x4023fffed780-0x4023fffeefff]
+[    0.000000] NUMA: NODE_DATA(1) on node 2
+[    0.000000] NUMA: NODE_DATA [mem 0x4023fffebf00-0x4023fffed77f]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000000000000-0x00000000ffffffff]
+[    0.000000]   Normal   [mem 0x0000000100000000-0x00004023ffffffff]
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000000000000-0x000000003942ffff]
+[    0.000000]   node   0: [mem 0x0000000039430000-0x000000003956ffff]
+[    0.000000]   node   0: [mem 0x0000000039570000-0x000000003963ffff]
+[    0.000000]   node   0: [mem 0x0000000039640000-0x00000000396fffff]
+[    0.000000]   node   0: [mem 0x0000000039700000-0x000000003971ffff]
+[    0.000000]   node   0: [mem 0x0000000039720000-0x0000000039b6ffff]
+[    0.000000]   node   0: [mem 0x0000000039b70000-0x000000003eb5ffff]
+[    0.000000]   node   0: [mem 0x000000003eb60000-0x000000003eb8ffff]
+[    0.000000]   node   0: [mem 0x000000003eb90000-0x000000003fbfffff]
+[    0.000000]   node   0: [mem 0x0000002080000000-0x00000023ffffffff]
+[    0.000000]   node   2: [mem 0x0000402000000000-0x00004023ffffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x00000023ffffffff]
+[    0.000000] Could not find start_pfn for node 1
+[    0.000000] Initmem setup node 1 [mem 0x0000000000000000-0x0000000000000000]
+[    0.000000] Initmem setup node 2 [mem 0x0000402000000000-0x00004023ffffffff]
 
-diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-index 6860bd5a37c5..44e4e27eddad 100644
---- a/drivers/clk/mvebu/armada-37xx-periph.c
-+++ b/drivers/clk/mvebu/armada-37xx-periph.c
-@@ -35,6 +35,7 @@
- #define CLK_SEL		0x10
- #define CLK_DIS		0x14
- 
-+#define  ARMADA_37XX_DVFS_LOAD_1 1
- #define LOAD_LEVEL_NR	4
- 
- #define ARMADA_37XX_NB_L0L1	0x18
-@@ -507,6 +508,40 @@ static long clk_pm_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
- 	return -EINVAL;
- }
- 
-+/*
-+ * Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
-+ * respectively) to L0 frequency (1.2 Ghz) requires a significant
-+ * amount of time to let VDD stabilize to the appropriate
-+ * voltage. This amount of time is large enough that it cannot be
-+ * covered by the hardware countdown register. Due to this, the CPU
-+ * might start operating at L0 before the voltage is stabilized,
-+ * leading to CPU stalls.
-+ *
-+ * To work around this problem, we prevent switching directly from the
-+ * L2/L3 frequencies to the L0 frequency, and instead switch to the L1
-+ * frequency in-between. The sequence therefore becomes:
-+ * 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
-+ * 2. Sleep 20ms for stabling VDD voltage
-+ * 3. Then switch from L1(600MHZ) to L0(1200Mhz).
-+ */
-+static void clk_pm_cpu_set_rate_wa(unsigned long rate, struct regmap *base)
-+{
-+	unsigned int cur_level;
-+
-+	if (rate != 1200 * 1000 * 1000)
-+		return;
-+
-+	regmap_read(base, ARMADA_37XX_NB_CPU_LOAD, &cur_level);
-+	cur_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
-+	if (cur_level <= ARMADA_37XX_DVFS_LOAD_1)
-+		return;
-+
-+	regmap_update_bits(base, ARMADA_37XX_NB_CPU_LOAD,
-+			   ARMADA_37XX_NB_CPU_LOAD_MASK,
-+			   ARMADA_37XX_DVFS_LOAD_1);
-+	msleep(20);
-+}
-+
- static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
- 			       unsigned long parent_rate)
- {
-@@ -537,6 +572,9 @@ static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
- 			 */
- 			reg = ARMADA_37XX_NB_CPU_LOAD;
- 			mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
-+
-+			clk_pm_cpu_set_rate_wa(rate, base);
-+
- 			regmap_update_bits(base, reg, mask, load_level);
- 
- 			return rate;
+
+
 -- 
-2.17.1
+Thanks,
+Xie XiuQi
