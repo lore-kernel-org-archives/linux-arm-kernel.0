@@ -1,32 +1,99 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 19 Jun 2018 14:34:44 +0200
-Subject: [PATCH 0/2] clk: Fix switching CPU rate from 300Mhz to 1.2GHz on
- Armada 3700
-Message-ID: <20180619123446.694-1-gregory.clement@bootlin.com>
+Date: Tue, 19 Jun 2018 14:34:45 +0200
+Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU rate
+ from 300Mhz to 1.2GHz
+In-Reply-To: <20180619123446.694-1-gregory.clement@bootlin.com>
+References: <20180619123446.694-1-gregory.clement@bootlin.com>
+Message-ID: <20180619123446.694-2-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
+respectively) to L0 frequency (1.2 Ghz) requires a significant amount
+of time to let VDD stabilize to the appropriate voltage. This amount of
+time is large enough that it cannot be covered by the hardware
+countdown register. Due to this, the CPU might start operating at L0
+before the voltage is stabilized, leading to CPU stalls.
 
-in this series the first patch is the main patch which fixes the case
-when switching CPU rate from 300Mhz (or 200M MHz) to 1.2GH. See the
-commit log for the details. As this one is a fix, it should be applied
-on v4.18-rc.
+To work around this problem, we prevent switching directly from the
+L2/L3 frequencies to the L0 frequency, and instead switch to the L1
+frequency in-between. The sequence therefore becomes:
 
-While I was on this file, I also switch to SPDX license identifier,
-this one is fine for 4.19*;
+1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
+2. Sleep 20ms for stabling VDD voltage
+3. Then switch from L1(600MHZ) to L0(1200Mhz).
 
-Thanks,
+It is based on the work done by Ken Ma <make@marvell.com>
 
-Gregory
+Cc: stable at vger.kernel.org
+Fixes: 2089dc33ea0e ("clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks")
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ drivers/clk/mvebu/armada-37xx-periph.c | 38 ++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-Gregory CLEMENT (2):
-  clk: mvebu: armada-37xx-periph: Fix switching CPU rate from 300Mhz to
-    1.2GHz
-  clk: mvebu: armada-37xx-periph: switch to SPDX license identifier
-
- drivers/clk/mvebu/armada-37xx-periph.c | 43 +++++++++++++++++++++++---
- 1 file changed, 39 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
+index 6860bd5a37c5..44e4e27eddad 100644
+--- a/drivers/clk/mvebu/armada-37xx-periph.c
++++ b/drivers/clk/mvebu/armada-37xx-periph.c
+@@ -35,6 +35,7 @@
+ #define CLK_SEL		0x10
+ #define CLK_DIS		0x14
+ 
++#define  ARMADA_37XX_DVFS_LOAD_1 1
+ #define LOAD_LEVEL_NR	4
+ 
+ #define ARMADA_37XX_NB_L0L1	0x18
+@@ -507,6 +508,40 @@ static long clk_pm_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	return -EINVAL;
+ }
+ 
++/*
++ * Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
++ * respectively) to L0 frequency (1.2 Ghz) requires a significant
++ * amount of time to let VDD stabilize to the appropriate
++ * voltage. This amount of time is large enough that it cannot be
++ * covered by the hardware countdown register. Due to this, the CPU
++ * might start operating at L0 before the voltage is stabilized,
++ * leading to CPU stalls.
++ *
++ * To work around this problem, we prevent switching directly from the
++ * L2/L3 frequencies to the L0 frequency, and instead switch to the L1
++ * frequency in-between. The sequence therefore becomes:
++ * 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
++ * 2. Sleep 20ms for stabling VDD voltage
++ * 3. Then switch from L1(600MHZ) to L0(1200Mhz).
++ */
++static void clk_pm_cpu_set_rate_wa(unsigned long rate, struct regmap *base)
++{
++	unsigned int cur_level;
++
++	if (rate != 1200 * 1000 * 1000)
++		return;
++
++	regmap_read(base, ARMADA_37XX_NB_CPU_LOAD, &cur_level);
++	cur_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
++	if (cur_level <= ARMADA_37XX_DVFS_LOAD_1)
++		return;
++
++	regmap_update_bits(base, ARMADA_37XX_NB_CPU_LOAD,
++			   ARMADA_37XX_NB_CPU_LOAD_MASK,
++			   ARMADA_37XX_DVFS_LOAD_1);
++	msleep(20);
++}
++
+ static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			       unsigned long parent_rate)
+ {
+@@ -537,6 +572,9 @@ static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			 */
+ 			reg = ARMADA_37XX_NB_CPU_LOAD;
+ 			mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
++
++			clk_pm_cpu_set_rate_wa(rate, base);
++
+ 			regmap_update_bits(base, reg, mask, load_level);
+ 
+ 			return rate;
 -- 
 2.17.1
