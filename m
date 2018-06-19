@@ -1,59 +1,33 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Jun 2018 14:44:20 -0500
-Subject: [PATCH 1/2] Documentation: dt: keystone: ti-sci: Add optional host-id
- parameter
-In-Reply-To: <20180619194421.3432-1-nm@ti.com>
-References: <20180619194421.3432-1-nm@ti.com>
-Message-ID: <20180619194421.3432-2-nm@ti.com>
+Date: Tue, 19 Jun 2018 14:44:19 -0500
+Subject: [PATCH 0/2] firmware: ti_sci: Add host-id as an optional parameter
+Message-ID: <20180619194421.3432-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instrument's System Control Interface (TISCI) permits
-the ability for OSs running in virtual machines to be able to
-independently communicate with the firmware without the need going
-through an hypervisor.
+Hi,
 
-The "host-id" in effect is the hardware representation of the
-host (example: VMs locked to a core) as identified to the System
-Controller. Hypervisors can either fill in appropriate host-ids in dt
-used for each VM instance OR may use prebuilt blobs where the host-ids
-are pre-populated, as appropriate for the OS running in the VMs.
+Please find attached series to enable host-id as an optional dt property.
 
-This is introduced as an optional parameter to maintain consistency
-with legacy device tree blobs.
+Changes Since RFC:
+* Updated commit message based on feedback from Rob.
 
-We call this with a vendor prefix to prevent any possible confusion
-with SCSI ID (m68k) kernel option.
+The series is based on v4.18-rc1 and is available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-1-am6-tisci
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Changes since RFC:
-* Commit message update to elaborate usage in VM
+Consolidated all patches (including all series) are available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
 
-RFC: https://patchwork.kernel.org/patch/10447753/
+Full Boot log (integrated of all series for AM654) is available here:
+   https://pastebin.ubuntu.com/p/bBFmnzYtCd/
 
- Documentation/devicetree/bindings/arm/keystone/ti,sci.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+Nishanth Menon (2):
+  Documentation: dt: keystone: ti-sci: Add optional host-id parameter
+  firmware: ti_sci: Provide host-id as an optional dt parameter
 
-diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-index 31f5f9a104cc..b56a02c10ae6 100644
---- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-@@ -45,11 +45,15 @@ Optional Properties:
- 	debug_messages - Map the Debug message region
- - reg:  register space corresponding to the debug_messages
- - ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
-+- ti,host-id: Integer value corresponding to the host ID assigned by Firmware
-+	for identification of host processing entities such as virtual
-+	machines
- 
- Example (K2G):
- -------------
- 	pmmc: pmmc {
- 		compatible = "ti,k2g-sci";
-+		ti,host-id = <2>;
- 		mbox-names = "rx", "tx";
- 		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
- 			<&msgmgr &msgmgr_proxy_pmmc_tx>;
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 ++++
+ drivers/firmware/ti_sci.c                          | 24 ++++++++++++++++++----
+ 2 files changed, 24 insertions(+), 4 deletions(-)
+
 -- 
 2.15.1
