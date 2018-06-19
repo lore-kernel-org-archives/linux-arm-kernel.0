@@ -1,65 +1,79 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 19 Jun 2018 11:18:22 +0100
-Subject: [PATCH v5 3/3] arm64: Introduce command line parameter to disable CNP
-In-Reply-To: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1529403502-2843-4-git-send-email-vladimir.murzin@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 19 Jun 2018 11:21:30 +0100
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
+ <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+ <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
+Message-ID: <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are cases when activating of Common Not Private (CNP) feature
-might not be desirable; this patch allows to forcefully disable CNP
-even it is supported by hardware.
+Hi Mark,
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- Documentation/admin-guide/kernel-parameters.txt |  4 ++++
- arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+On 18/06/18 23:18, Mark Salter wrote:
+> On Mon, 2018-06-18 at 11:04 -0700, Geoff Levand wrote:
+>> Thanks for all the comments, but my lack of access to an m400 platform, and
+>> my lack of knowledge about the m400 limits what I can comment on and what I
+>> can do.  
+> 
+> I can take another look at this on an m400 here.
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index efc7aa7..4abc485 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -2648,6 +2648,10 @@
- 
- 	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
- 
-+	nocnp		[ARM64]
-+			Disable CNP (Common not Private translations)
-+			even if it is supported by processor.
-+
- 	nodelayacct	[KNL] Disable per-task delay accounting
- 
- 	nodsp		[SH] Disable hardware DSP at boot time.
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e0129f2..270fb3b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -860,6 +860,15 @@ static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
- 	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
- }
- 
-+static bool nocnp;
-+
-+static int __init early_nocnp(char *p)
-+{
-+	nocnp = true;
-+	return 0;
-+}
-+early_param("nocnp", early_nocnp);
-+
- static bool __maybe_unused
- has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
- {
-@@ -872,7 +881,7 @@ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
- 	 if (elfcorehdr_size)
- 		return false;
- #endif
--	return has_cpuid_feature(entry, scope);
-+	return has_cpuid_feature(entry, scope) && !nocnp;
- }
- 
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--- 
-2.0.0
+Thanks!
+
+
+> I don't believe it is a
+> memory access to physical space with nothing attached to it.
+
+That is what the CPER records are describing though.
+
+
+> I seem to recall
+> an errata with xgene-1 where such accesses cause the cpu to halt. But I could
+> be misremembering that. I have no trouble believing the firmware ras code was
+> untested. It is probably some boilerplate code built in before ras was supported
+> in kernel.
+
+It would be interesting to know which GHES this error is being found in, and
+whether the Error Status Block points anywhere (or at an empty block) when Linux
+is started from UEFI.
+
+If there is something in the Error Status Block out of UEFI, then this must be
+something triggered by UEFI, or a bug that can be fixed by UEFI clearing out the
+CPER records.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1285107
+suggests redhat can rebuild the UEFI firmware for this box.
+
+
+If there is nothing in the Error Status Block when Linux is started, surely
+Linux is doing something to cause this to happen. I'd like to find out what, as
+its probably a software bug.
+
+
+(The case where disabling HEST would be the right thing to do is if there is a
+bogus GHES->GAS entry in GHES.0, the access to which causes GHES.1 to be
+populated with 'Access to an address not mapped to any component', which we find
+next. If this is the case it would be better to check GHES entries against the
+UEFI memory map to check this is memory, and it was reserved.)
+
+
+> But the problem occurs early enough in boot where there can't be
+> that many things that would cause a problem on m400 and not mustang so I'll
+> look again.
+
+Playing spot the difference in the dmesg, I'd check for smoke coming out of:
+| acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
+| xgene-gpio APMC0D14:00: X-Gene GPIO driver registered.
+| pcie_pme: probe of 0000:00:00.0:pcie001 failed with error -22
+
+If the firmware description of the GIC is wrong in someway, disabling KVM may be
+worth testing too.
+
+
+Thanks,
+
+James
