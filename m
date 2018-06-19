@@ -1,47 +1,199 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 19 Jun 2018 03:28:19 +0200
-Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
-In-Reply-To: <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
-References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
- <20180618114920.654647c0@bbrezillon>
- <8474a744-5552-932f-7ba8-85b7d95368ea@gmail.com>
- <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
-Message-ID: <5b66cafe-782e-43a9-c221-cf0a1528f382@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 Jun 2018 10:12:20 +0800
+Subject: [PATCH 15/20] dts: arm: imx7{d,s}: Update coresight binding for
+ hardware ports
+In-Reply-To: <1528235011-30691-16-git-send-email-suzuki.poulose@arm.com>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+ <1528235011-30691-16-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180619021218.GV16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2018 02:00 PM, Claudiu Beznea wrote:
-> 
-> 
-> On 18.06.2018 12:53, Marek Vasut wrote:
->> On 06/18/2018 11:49 AM, Boris Brezillon wrote:
->>> Hi Claudiu,
->>>
->>> The subject prefix should be "mtd: spi-nor: atmel-quadspi: ". No need
->>> to send a new version just for that, I'll fix it when applying the
->>> patch.
->>>
-> Hi Boris,
-> 
-> Thank you!
-> 
->>> Looks good otherwise. Marek, any objection? If not, can you add your
->>> Acked-by?
->>
->> Will this work if you have ie. ubifs mounted on that QSPI NOR and you
->> suspect and resume during IO ? I think it would, but just curious if
->> there could be some problem.
-> 
-> Hi Marek,
-> 
-> I tested only with read/writes while suspending, simple scripts, but not
-> having ubifs mounted on QSPI NOR. I will double check also with ubifs
-> mounted on QSPI NOR and come back with the results.
+Hi Stefan,
 
-Thanks. I think it's gonna be OK, but let's just be sure.
-Make sure to disable 4K sector support when fiddling with UBI/UBIFS on
-QSPI NOR.
+Can you take a look at the patch?  Thanks.
 
--- 
-Best regards,
-Marek Vasut
+Shawn
+
+On Tue, Jun 05, 2018 at 10:43:26PM +0100, Suzuki K Poulose wrote:
+> Switch to the updated coresight bindings.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm/boot/dts/imx7d.dtsi |  5 ++++-
+>  arch/arm/boot/dts/imx7s.dtsi | 41 ++++++++++++++++++++++++++++++-----------
+>  2 files changed, 34 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 200714e..5faff17 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -87,7 +87,9 @@
+>  
+>  			port {
+>  				etm1_out_port: endpoint {
+> +					direction = <1>;
+>  					remote-endpoint = <&ca_funnel_in_port1>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> @@ -174,8 +176,9 @@
+>  	port at 1 {
+>  		reg = <1>;
+>  		ca_funnel_in_port1: endpoint {
+> -			slave-mode;
+> +			direction = <0>;
+>  			remote-endpoint = <&etm1_out_port>;
+> +			coresight,hwid = <1>;
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 4d42335..8e90915 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -151,23 +151,28 @@
+>  			port at 0 {
+>  				reg = <0>;
+>  				replicator_out_port0: endpoint {
+> +					direction = <1>;
+>  					remote-endpoint = <&tpiu_in_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  
+>  			port at 1 {
+>  				reg = <1>;
+>  				replicator_out_port1: endpoint {
+> +					direction = <1>;
+>  					remote-endpoint = <&etr_in_port>;
+> +					coresight,hwid = <1>;
+>  				};
+>  			};
+>  
+>  			/* replicator input port */
+>  			port at 2 {
+> -				reg = <0>;
+> +				reg = <2>;
+>  				replicator_in_port0: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&etf_out_port>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> @@ -203,16 +208,19 @@
+>  				port at 0 {
+>  					reg = <0>;
+>  					ca_funnel_in_port0: endpoint {
+> -						slave-mode;
+> +						direction = <0>;
+>  						remote-endpoint = <&etm0_out_port>;
+> +						coresight,hwid = <0>;
+>  					};
+>  				};
+>  
+>  				/* funnel output port */
+>  				port at 2 {
+> -					reg = <0>;
+> +					reg = <2>;
+>  					ca_funnel_out_port0: endpoint {
+> +						direction = <1>;
+>  						remote-endpoint = <&hugo_funnel_in_port0>;
+> +						coresight,hwid = <0>;
+>  					};
+>  				};
+>  
+> @@ -229,7 +237,9 @@
+>  
+>  			port {
+>  				etm0_out_port: endpoint {
+> +					direction = <1>;
+>  					remote-endpoint = <&ca_funnel_in_port0>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> @@ -248,22 +258,26 @@
+>  				port at 0 {
+>  					reg = <0>;
+>  					hugo_funnel_in_port0: endpoint {
+> -						slave-mode;
+> +						direction = <0>;
+>  						remote-endpoint = <&ca_funnel_out_port0>;
+> +						coresight,hwid = <0>;
+>  					};
+>  				};
+>  
+>  				port at 1 {
+>  					reg = <1>;
+>  					hugo_funnel_in_port1: endpoint {
+> -						slave-mode; /* M4 input */
+> +						direction = <0>; /* M4 input */
+> +						coresight,hwid = <1>;
+>  					};
+>  				};
+>  
+>  				port at 2 {
+> -					reg = <0>;
+> +					reg = <2>;
+>  					hugo_funnel_out_port0: endpoint {
+> +						direction = <1>;
+>  						remote-endpoint = <&etf_in_port>;
+> +						coresight,hwid = <0>;
+>  					};
+>  				};
+>  
+> @@ -284,15 +298,18 @@
+>  				port at 0 {
+>  					reg = <0>;
+>  					etf_in_port: endpoint {
+> -						slave-mode;
+> +						direction = <0>;
+>  						remote-endpoint = <&hugo_funnel_out_port0>;
+> +						coresight,hwid = <0>;
+>  					};
+>  				};
+>  
+>  				port at 1 {
+> -					reg = <0>;
+> +					reg = <1>;
+>  					etf_out_port: endpoint {
+> +						direction = <1>;
+>  						remote-endpoint = <&replicator_in_port0>;
+> +						coresight,hwid = <0>;
+>  					};
+>  				};
+>  			};
+> @@ -306,8 +323,9 @@
+>  
+>  			port {
+>  				etr_in_port: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&replicator_out_port1>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> @@ -320,8 +338,9 @@
+>  
+>  			port {
+>  				tpiu_in_port: endpoint {
+> -					slave-mode;
+> +					direction = <0>;
+>  					remote-endpoint = <&replicator_out_port1>;
+> +					coresight,hwid = <0>;
+>  				};
+>  			};
+>  		};
+> -- 
+> 2.7.4
+> 
