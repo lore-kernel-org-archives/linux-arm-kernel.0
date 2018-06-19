@@ -1,175 +1,117 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 14:33:19 +0100
-Subject: [PATCH 1/3] arm64: Avoid flush_icache_range() in alternatives
- patching code
-In-Reply-To: <1529412495-17525-2-git-send-email-will.deacon@arm.com>
+Date: Tue, 19 Jun 2018 14:55:28 +0100
+Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache
+ for kernel mappings
+In-Reply-To: <1529412495-17525-4-git-send-email-will.deacon@arm.com>
 References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
- <1529412495-17525-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20180619133319.f3zitmmrcbozbtmy@lakrids.cambridge.arm.com>
+ <1529412495-17525-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20180619135528.4rxgluvroybxgxem@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 01:48:13PM +0100, Will Deacon wrote:
-> The implementation of flush_icache_range() includes instruction sequences
-> which are themselves patched at runtime, so it is not safe to call from
-> the patching framework.
+On Tue, Jun 19, 2018 at 01:48:15PM +0100, Will Deacon wrote:
+> When invalidating the instruction cache for a kernel mapping via
+> flush_icache_range(), it is also necessary to flush the pipeline for
+> other CPUs so that instructions fetched into the pipeline before the
+> I-cache invalidation are discarded. For example, if module 'foo' is
+> unloaded and then module 'bar' is loaded into the same area of memory,
+> a CPU could end up executing instructions from 'foo' when branching into
+> 'bar' if these instructions were fetched into the pipeline before 'foo'
+> was unloaded.
 > 
-> This patch reworks the alternatives cache-flushing code so that it rolls
-> its own internal D-cache maintenance using DC CIVAC before invalidating
-> the entire I-cache after all alternatives have been applied at boot.
-> Modules don't cause any issues, since flush_icache_range() is safe to
-> call by the time they are loaded.
+> Whilst this is highly unlikely to occur in practice, particularly as
+> any exception acts as a context-synchronizing operation, following the
+> letter of the architecture requires us to execute an ISB on each CPU
+> in order for the new instruction stream to be visible.
 > 
-> Reported-by: Rohit Khanna <rokhanna@nvidia.com>
-> Cc: Alexander Van Brunt <avanbrunt@nvidia.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/include/asm/alternative.h |  7 +++++-
->  arch/arm64/kernel/alternative.c      | 46 ++++++++++++++++++++++++++++++------
->  arch/arm64/kernel/module.c           |  5 ++--
->  3 files changed, 47 insertions(+), 11 deletions(-)
+>  arch/arm64/include/asm/cacheflush.h | 13 ++++++++++++-
+>  arch/arm64/kernel/alternative.c     |  1 -
+>  arch/arm64/kernel/cpu_errata.c      |  2 +-
+>  arch/arm64/kernel/insn.c            | 15 ++-------------
+>  arch/arm64/mm/cache.S               |  4 ++--
+>  5 files changed, 17 insertions(+), 18 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index a91933b1e2e6..4b650ec1d7dd 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -28,7 +28,12 @@ typedef void (*alternative_cb_t)(struct alt_instr *alt,
->  				 __le32 *origptr, __le32 *updptr, int nr_inst);
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index d264a7274811..a0ec27066e6f 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -71,7 +71,7 @@
+>   *		- kaddr  - page address
+>   *		- size   - region size
+>   */
+> -extern void flush_icache_range(unsigned long start, unsigned long end);
+> +extern void __flush_icache_range(unsigned long start, unsigned long end);
+>  extern int  invalidate_icache_range(unsigned long start, unsigned long end);
+>  extern void __flush_dcache_area(void *addr, size_t len);
+>  extern void __inval_dcache_area(void *addr, size_t len);
+> @@ -81,6 +81,17 @@ extern void __clean_dcache_area_pou(void *addr, size_t len);
+>  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+>  extern void sync_icache_aliases(void *kaddr, unsigned long len);
 >  
->  void __init apply_alternatives_all(void);
-> -void apply_alternatives(void *start, size_t length);
-> +
-> +#ifdef CONFIG_MODULES
-> +void apply_alternatives_module(void *start, size_t length);
-> +#else
-> +static inline void apply_alternatives_module(void *start, size_t length) { }
-> +#endif
->  
->  #define ALTINSTR_ENTRY(feature,cb)					      \
->  	" .word 661b - .\n"				/* label           */ \
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index 5c4bce4ac381..4f3dcc15a5b2 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -122,7 +122,25 @@ static void patch_alternative(struct alt_instr *alt,
->  	}
->  }
->  
-
-It might be worth a comment here, e.g.
-
-/*
- * Since the regular dcache maintenance functions are patched with
- * alteratives, we use an unpatched copy to apply the alternatives
- * safely.
- */
-
-... so as to avoid any helpful cleanup patches in future moving back to
-the "optimized" the asm functions.
-
-Regardless:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> -static void __apply_alternatives(void *alt_region, bool use_linear_alias)
-> +static void clean_dcache_range_nopatch(u64 start, u64 end)
+> +static inline void flush_icache_range(unsigned long start, unsigned long end)
 > +{
-> +	u64 cur, d_size, ctr_el0;
-> +
-> +	ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
-> +	d_size = 4 << cpuid_feature_extract_unsigned_field(ctr_el0,
-> +							   CTR_DMINLINE_SHIFT);
-> +	cur = start & ~(d_size - 1);
-> +	do {
-> +		/*
-> +		 * We must clean+invalidate to the PoC in order to avoid
-> +		 * Cortex-A53 errata 826319, 827319, 824069 and 819472
-> +		 * (this corresponds to ARM64_WORKAROUND_CLEAN_CACHE)
-> +		 */
-> +		asm volatile("dc civac, %0" : : "r" (cur) : "memory");
-> +	} while (cur += d_size, cur < end);
-> +}
-> +
-> +static void __apply_alternatives(void *alt_region, bool is_module)
->  {
->  	struct alt_instr *alt;
->  	struct alt_region *region = alt_region;
-> @@ -145,7 +163,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->  		pr_info_once("patching kernel code\n");
->  
->  		origptr = ALT_ORIG_PTR(alt);
-> -		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
-> +		updptr = is_module ? origptr : lm_alias(origptr);
->  		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
->  
->  		if (alt->cpufeature < ARM64_CB_PATCH)
-> @@ -155,8 +173,20 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->  
->  		alt_cb(alt, origptr, updptr, nr_inst);
->  
-> -		flush_icache_range((uintptr_t)origptr,
-> -				   (uintptr_t)(origptr + nr_inst));
-> +		if (!is_module) {
-> +			clean_dcache_range_nopatch((u64)origptr,
-> +						   (u64)(origptr + nr_inst));
-> +		}
-> +	}
+> +	__flush_icache_range(start, end);
 > +
 > +	/*
-> +	 * The core module code takes care of cache maintenance in
-> +	 * flush_module_icache().
+> +	 * IPI all online CPUs so that they undergo a context synchronization
+> +	 * event and are forced to refetch the new instructions.
 > +	 */
-> +	if (!is_module) {
-> +		dsb(ish);
-> +		__flush_icache_all();
-> +		isb();
->  	}
+> +	kick_all_cpus_sync();
+> +}
+> +
+>  static inline void flush_cache_mm(struct mm_struct *mm)
+>  {
 >  }
->  
-> @@ -178,7 +208,7 @@ static int __apply_alternatives_multi_stop(void *unused)
->  		isb();
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index 4f3dcc15a5b2..0ac06560c166 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -205,7 +205,6 @@ static int __apply_alternatives_multi_stop(void *unused)
+>  	if (smp_processor_id()) {
+>  		while (!READ_ONCE(alternatives_applied))
+>  			cpu_relax();
+> -		isb();
 >  	} else {
 >  		BUG_ON(alternatives_applied);
-> -		__apply_alternatives(&region, true);
-> +		__apply_alternatives(&region, false);
->  		/* Barriers provided by the cache flushing */
->  		WRITE_ONCE(alternatives_applied, 1);
+>  		__apply_alternatives(&region, false);
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 1d2b6d768efe..0a338a1cd2d7 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -101,7 +101,7 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>  	for (i = 0; i < SZ_2K; i += 0x80)
+>  		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
+>  
+> -	flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
+> +	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
+>  }
+>  
+>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 816d03c4c913..4cc41864f277 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -249,7 +249,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>  	} else {
+>  		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
+>  			cpu_relax();
+> -		isb();
 >  	}
-> @@ -192,12 +222,14 @@ void __init apply_alternatives_all(void)
->  	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
->  }
->  
-> -void apply_alternatives(void *start, size_t length)
-> +#ifdef CONFIG_MODULES
-> +void apply_alternatives_module(void *start, size_t length)
->  {
->  	struct alt_region region = {
->  		.begin	= start,
->  		.end	= start + length,
->  	};
->  
-> -	__apply_alternatives(&region, false);
-> +	__apply_alternatives(&region, true);
->  }
-> +#endif
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index 155fd91e78f4..f0f27aeefb73 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -448,9 +448,8 @@ int module_finalize(const Elf_Ehdr *hdr,
->  	const char *secstrs = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
->  
->  	for (s = sechdrs, se = sechdrs + hdr->e_shnum; s < se; s++) {
-> -		if (strcmp(".altinstructions", secstrs + s->sh_name) == 0) {
-> -			apply_alternatives((void *)s->sh_addr, s->sh_size);
-> -		}
-> +		if (strcmp(".altinstructions", secstrs + s->sh_name) == 0)
-> +			apply_alternatives_module((void *)s->sh_addr, s->sh_size);
->  #ifdef CONFIG_ARM64_MODULE_PLTS
->  		if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
->  		    !strcmp(".text.ftrace_trampoline", secstrs + s->sh_name))
-> -- 
-> 2.1.4
-> 
+
+Something seems amiss here. 
+
+We call __apply_alternatives_multi_stop() via stop_machine(), and I
+thought that ensured that all CPUs had IRQs masked.
+
+If so, the IPI from flush_icache_range() will deadlock.
+
+If not, we can take IRQs, and execute potentially patched code.
+
+I think there's also an existing problem here. Even if with have IRQs
+masked, we could take SDEI events (or GICv3 psudeo-NMIs, once we have
+those). I don't know how we can manage those.
+
+Thanks,
+Mark.
