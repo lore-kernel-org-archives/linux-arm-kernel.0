@@ -1,20 +1,29 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 Jun 2018 11:09:33 +0800
-Subject: [PATCH] arm64: dts: freescale: Update to use SPDX identifiers
-In-Reply-To: <1528828122-9276-1-git-send-email-leoyang.li@nxp.com>
-References: <1528828122-9276-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <20180619030931.GD16091@dragon>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Tue, 19 Jun 2018 13:11:52 +0900
+Subject: [PATCH 1/2] arm64: dts: uniphier: add headphone detect gpio for LD20
+ global board
+Message-ID: <20180619041153.6668-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 01:28:42PM -0500, Li Yang wrote:
-> Replace license text with corresponding SPDX identifiers and update the
-> format of existing SPDX identifiers to follow the new guideline
-> Documentation/process/license-rules.rst.
-> 
-> Note that some of the files mentioned X11 license previously but the
-> license text actually matches MIT license.
-> 
-> Signed-off-by: Li Yang <leoyang.li@nxp.com>
+This patch adds GPIO for headphone detection on LD20 global board.
 
-Applied, thanks.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
+index 6a074a20c924..38b75998e2dd 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
+@@ -60,6 +60,7 @@
+ 			&i2s_port4
+ 			&spdif_port0
+ 			&comp_spdif_port0>;
++		hp-det-gpio = <&gpio UNIPHIER_GPIO_PORT(15, 0) GPIO_ACTIVE_LOW>;
+ 	};
+ 
+ 	spdif-out {
+-- 
+2.17.1
