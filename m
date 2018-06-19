@@ -1,59 +1,70 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 19 Jun 2018 16:44:23 +0800
-Subject: [PATCH v6 22/29] drm/mediatek: add connection from RDMA2 to DSI1
-In-Reply-To: <1529393670-26862-23-git-send-email-stu.hsieh@mediatek.com>
-References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
- <1529393670-26862-23-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529397863.26480.18.camel@mtksdaap41>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Wed, 20 Jun 2018 00:56:57 +0800
+Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
+Message-ID: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
-> This patch add the connection from RDMA2 to DSI1
-> 
+The legacy sdma driver has below limitations or drawbacks:
+  1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
+     one page size for one channel regardless of only few BDs needed
+     most time. But in few cases, the max PAGE_SIZE maybe not enough.
+  2. One SDMA channel can't stop immediatley once channel disabled which
+     means SDMA interrupt may come in after this channel terminated.There
+     are some patches for this corner case such as commit "2746e2c389f9",
+     but not cover non-cyclic.
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+The common virt-dma overcomes the above limitations. It can alloc bd
+dynamically and free bd once this tx transfer done. No memory wasted or
+maximum limititation here, only depends on how many memory can be requested
+from kernel. For No.2, such issue can be workaround by checking if there
+is available descript("sdmac->desc") now once the unwanted interrupt
+coming. At last the common virt-dma is easier for sdma driver maintain.
 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index a4b418302f32..db78fad785e3 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -94,11 +94,13 @@
->  #define RDMA1_SOUT_DSI3			0x5
->  #define RDMA2_SOUT_DPI0			0x2
->  #define RDMA2_SOUT_DPI1			0x3
-> +#define RDMA2_SOUT_DSI1			0x1
->  #define DPI0_SEL_IN_RDMA1		0x1
->  #define DPI0_SEL_IN_RDMA2		0x3
->  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
->  #define DPI1_SEL_IN_RDMA2		(0x3 << 8)
->  #define DSI1_SEL_IN_RDMA1		0x1
-> +#define DSI1_SEL_IN_RDMA2		0x4
->  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
->  #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
->  #define COLOR1_SEL_IN_OVL1		0x1
-> @@ -204,6 +206,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
->  		value = RDMA2_SOUT_DPI1;
-> +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
-> +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-> +		value = RDMA2_SOUT_DSI1;
->  	} else {
->  		value = 0;
->  	}
-> @@ -241,6 +246,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DPI1) {
->  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
->  		value = DPI1_SEL_IN_RDMA2;
-> +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
-> +		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
-> +		value = DSI1_SEL_IN_RDMA2;
->  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
->  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
->  		value = COLOR1_SEL_IN_OVL1;
+Change from v4:
+  1. identify lockdep issue which caused by allocate memory with
+     'GFP_KERNEL', change to 'GFP_NOWAIT' instead so that lockdep
+     ignore check. That also make sense since Audio/uart driver may
+     call dma function after spin_lock_irqsave()...
+  2. use dma pool instead for bd description allocated,since audio
+     driver may call dma_terminate_all in irq. Please refer to 7/7.
+  3. remove 7/7 serial patch in v4, since lockdep issued fixed by No.1 
+
+Change from v3:
+  1. add two uart patches which impacted by this patchset.
+  2. unlock 'vc.lock' before cyclic dma callback and lock again after
+     it because some driver such as uart will call dmaengine_tx_status
+     which will acquire 'vc.lock' again and dead lock comes out.
+  3. remove 'Revert commit' stuff since that patch is not wrong and
+     combine two patch into one patch as Sascha's comment.
+
+Change from v2:
+  1. include Sascha's patch to make the main patch easier to review.
+     Thanks Sacha.
+  2. remove useless 'desc'/'chan' in struct sdma_channe.
+
+Change from v1:
+  1. split v1 patch into 5 patches.
+  2. remove some unnecessary condition check.
+  3. remove unnecessary 'pending' list.
+
+Robin Gong (6):
+  tty: serial: imx: correct dma cookie status
+  dmaengine: imx-sdma: add virt-dma support
+  dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in 'struct
+    sdma_channel'
+  dmaengine: imx-sdma: remove the maximum limitation for bd numbers
+  dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
+  dmaengine: imx-sdma: alloclate bd memory from dma pool
+
+Sascha Hauer (1):
+  dmaengine: imx-sdma: factor out a struct sdma_desc from struct
+    sdma_channel
+
+ drivers/dma/Kconfig      |   1 +
+ drivers/dma/imx-sdma.c   | 400 +++++++++++++++++++++++++++--------------------
+ drivers/tty/serial/imx.c |   2 +-
+ 3 files changed, 235 insertions(+), 168 deletions(-)
+
+-- 
+2.7.4
