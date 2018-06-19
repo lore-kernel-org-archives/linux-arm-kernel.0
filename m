@@ -1,51 +1,58 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Tue, 19 Jun 2018 15:34:09 +0800
-Subject: [PATCH v6 08/29] drm/mediatek: add component DSI2
+Date: Tue, 19 Jun 2018 15:34:24 +0800
+Subject: [PATCH v6 23/29] drm/mediatek: add connection from RDMA2 to DSI2
 In-Reply-To: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529393670-26862-9-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529393670-26862-24-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the component DSI2
+This patch add the connection from RDMA2 to DSI2
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 ++
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
- 2 files changed, 3 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index cc74b1a7278c..071f9f5aefea 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -227,6 +227,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
- 	[DDP_COMPONENT_DPI1]	= { MTK_DPI,		1, NULL },
- 	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
- 	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
-+	[DDP_COMPONENT_DSI2]	= { MTK_DSI,		2, NULL },
- 	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
- 	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
- 	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
-@@ -278,6 +279,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
- 	    comp_id == DDP_COMPONENT_DPI0 ||
- 	    comp_id == DDP_COMPONENT_DPI1 ||
- 	    comp_id == DDP_COMPONENT_DSI0 ||
-+	    comp_id == DDP_COMPONENT_DSI2 ||
- 	    comp_id == DDP_COMPONENT_PWM0) {
- 		comp->regs = NULL;
- 		comp->clk = NULL;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 54c99c169093..8d152b337f15 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -50,6 +50,7 @@ enum mtk_ddp_comp_id {
- 	DDP_COMPONENT_DPI1,
- 	DDP_COMPONENT_DSI0,
- 	DDP_COMPONENT_DSI1,
-+	DDP_COMPONENT_DSI2,
- 	DDP_COMPONENT_GAMMA,
- 	DDP_COMPONENT_OD0,
- 	DDP_COMPONENT_OD1,
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index db78fad785e3..e5db1ab51c9b 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -95,6 +95,7 @@
+ #define RDMA2_SOUT_DPI0			0x2
+ #define RDMA2_SOUT_DPI1			0x3
+ #define RDMA2_SOUT_DSI1			0x1
++#define RDMA2_SOUT_DSI2			0x4
+ #define DPI0_SEL_IN_RDMA1		0x1
+ #define DPI0_SEL_IN_RDMA2		0x3
+ #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+@@ -102,6 +103,7 @@
+ #define DSI1_SEL_IN_RDMA1		0x1
+ #define DSI1_SEL_IN_RDMA2		0x4
+ #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
++#define DSI2_SEL_IN_RDMA2		(0x4 << 16)
+ #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
+ #define COLOR1_SEL_IN_OVL1		0x1
+ 
+@@ -209,6 +211,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
+ 		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+ 		value = RDMA2_SOUT_DSI1;
++	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
++		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
++		value = RDMA2_SOUT_DSI2;
+ 	} else {
+ 		value = 0;
+ 	}
+@@ -249,6 +254,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
+ 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
+ 		value = DSI1_SEL_IN_RDMA2;
++	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
++		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
++		value = DSI2_SEL_IN_RDMA2;
+ 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+ 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+ 		value = COLOR1_SEL_IN_OVL1;
 -- 
 2.12.5
