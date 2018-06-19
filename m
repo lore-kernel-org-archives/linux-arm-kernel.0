@@ -1,107 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 11:01:35 +0100
-Subject: [PATCH 1/2] KVM: Enforce error in ioctl for compat tasks when
- !KVM_COMPAT
-In-Reply-To: <20180619094251.8586-2-marc.zyngier@arm.com>
-References: <20180619094251.8586-1-marc.zyngier@arm.com>
- <20180619094251.8586-2-marc.zyngier@arm.com>
-Message-ID: <20180619100134.4loab4jtnfdzrpxu@lakrids.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jun 2018 11:02:48 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Fix pgtable allocation in selftest
+In-Reply-To: <20180618112754.24942-1-jean-philippe.brucker@arm.com>
+References: <20180618112754.24942-1-jean-philippe.brucker@arm.com>
+Message-ID: <20180619100247.GE13984@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 10:42:50AM +0100, Marc Zyngier wrote:
-> The current behaviour of the compat ioctls is a bit odd.
-> We provide a compat_ioctl method when KVM_COMPAT is set, and NULL
-> otherwise. But NULL means that the normal, non-compat ioctl should
-> be used directly for compat tasks, and there is no way to actually
-> prevent a compat task from issueing KVM ioctls.
+On Mon, Jun 18, 2018 at 12:27:54PM +0100, Jean-Philippe Brucker wrote:
+> Commit 4b123757eeaa ("iommu/io-pgtable-arm: Make allocations
+> NUMA-aware") added a NUMA hint to page table allocation, but the pgtable
+> selftest doesn't provide an SMMU device parameter. Since dev_to_node
+> doesn't accept a NULL argument, add a special case for selftest.
 > 
-> This patch changes this behaviour, by always registering a compat_ioctl
-> method, even if KVM_COMPAT is not selected. In that case, the callback
-> will always return -EINVAL.
-> 
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-I virt/kvm/Kconfig we have:
-
-config KVM_COMPAT
-       def_bool y
-       depends on KVM && COMPAT && !S390
-
-... and in arch/s390 we have COMPAT support, so does this potentially break
-anything there?
-
-Thanks,
-Mark.
-
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 > ---
->  virt/kvm/kvm_main.c | 19 +++++++++----------
->  1 file changed, 9 insertions(+), 10 deletions(-)
-> 
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index ada21f47f22b..8b47507faab5 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -116,6 +116,11 @@ static long kvm_vcpu_ioctl(struct file *file, unsigned int ioctl,
->  #ifdef CONFIG_KVM_COMPAT
->  static long kvm_vcpu_compat_ioctl(struct file *file, unsigned int ioctl,
->  				  unsigned long arg);
-> +#define KVM_COMPAT(c)	.compat_ioctl	= (c)
-> +#else
-> +static long kvm_no_compat_ioctl(struct file *file, unsigned int ioctl,
-> +				unsigned long arg) { return -EINVAL; }
-> +#define KVM_COMPAT(c)	.compat_ioctl	= kvm_no_compat_ioctl
->  #endif
->  static int hardware_enable_all(void);
->  static void hardware_disable_all(void);
-> @@ -2396,11 +2401,9 @@ static int kvm_vcpu_release(struct inode *inode, struct file *filp)
->  static struct file_operations kvm_vcpu_fops = {
->  	.release        = kvm_vcpu_release,
->  	.unlocked_ioctl = kvm_vcpu_ioctl,
-> -#ifdef CONFIG_KVM_COMPAT
-> -	.compat_ioctl   = kvm_vcpu_compat_ioctl,
-> -#endif
->  	.mmap           = kvm_vcpu_mmap,
->  	.llseek		= noop_llseek,
-> +	KVM_COMPAT(kvm_vcpu_compat_ioctl),
->  };
->  
->  /*
-> @@ -2824,10 +2827,8 @@ static int kvm_device_release(struct inode *inode, struct file *filp)
->  
->  static const struct file_operations kvm_device_fops = {
->  	.unlocked_ioctl = kvm_device_ioctl,
-> -#ifdef CONFIG_KVM_COMPAT
-> -	.compat_ioctl = kvm_device_ioctl,
-> -#endif
->  	.release = kvm_device_release,
-> +	KVM_COMPAT(kvm_device_ioctl),
->  };
->  
->  struct kvm_device *kvm_device_from_filp(struct file *filp)
-> @@ -3165,10 +3166,8 @@ static long kvm_vm_compat_ioctl(struct file *filp,
->  static struct file_operations kvm_vm_fops = {
->  	.release        = kvm_vm_release,
->  	.unlocked_ioctl = kvm_vm_ioctl,
-> -#ifdef CONFIG_KVM_COMPAT
-> -	.compat_ioctl   = kvm_vm_compat_ioctl,
-> -#endif
->  	.llseek		= noop_llseek,
-> +	KVM_COMPAT(kvm_vm_compat_ioctl),
->  };
->  
->  static int kvm_dev_ioctl_create_vm(unsigned long type)
-> @@ -3259,8 +3258,8 @@ static long kvm_dev_ioctl(struct file *filp,
->  
->  static struct file_operations kvm_chardev_ops = {
->  	.unlocked_ioctl = kvm_dev_ioctl,
-> -	.compat_ioctl   = kvm_dev_ioctl,
->  	.llseek		= noop_llseek,
-> +	KVM_COMPAT(kvm_dev_ioctl),
->  };
->  
->  static struct miscdevice kvm_dev = {
-> -- 
-> 2.17.1
-> 
+>  drivers/iommu/io-pgtable-arm.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+
+Thanks, I'll pick this up.
+
+Will
