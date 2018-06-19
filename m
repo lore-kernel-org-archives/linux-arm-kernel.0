@@ -1,79 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 20 Jun 2018 00:23:56 +0200
-Subject: [PATCH 0/2] Make badr macro compatible with newer GAS versions
-In-Reply-To: <20180619204531.GB28370@roeck-us.net>
-References: <20180619192633.21846-1-ard.biesheuvel@linaro.org>
- <20180619203223.GA28370@roeck-us.net>
- <CAKv+Gu-RHM7HAmzWw9Ge+w21kWxKxLbJT7DD5huv-7WWOPUVWA@mail.gmail.com>
- <20180619204531.GB28370@roeck-us.net>
-Message-ID: <CAKv+Gu_zsSxb_8Ej-6QwZOW2X5VfgW0gnjpnHpi62L6nPALoHQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Jun 2018 17:29:22 -0500
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2018 at 22:45, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Tue, Jun 19, 2018 at 10:34:38PM +0200, Ard Biesheuvel wrote:
->> On 19 June 2018 at 22:32, Guenter Roeck <linux@roeck-us.net> wrote:
->> > On Tue, Jun 19, 2018 at 09:26:31PM +0200, Ard Biesheuvel wrote:
->> >> Work around the mindless and backward incompatible change in GAS that
->> >> prevents us from using a simple addition to set the Thumb bit in local
->> >> symbol references taken using 'adr' instructions (#2)
->> >>
->> >> As a preparatory step, remove badr occurrences in ARM code sequences
->> >> contained in Thumb2 kernels.
->> >>
->> >> Ard Biesheuvel (2):
->> >>   ARM: avoid badr macro for switching to Thumb-2 mode
->> >>   ARM: assembler: prevent ADR from setting the Thumb bit twice
->> >>
->> >
->> > This doesn't work for images built with a toolchain based on gcc 7.3.0
->> > and binutils 2.28.1. It _does_ work for images built with gcc 7.3.0/
->> > binutils 2.30.
->> >
->>
->> Sigh.
->>
->> So does it fail? Or is the resulting binary broken?
->
-> Hard to say. It crashes early in boot, even before earlycon can say
-> anything.
->
+Minor subject nit: From the caller's point of view, we must convert a bus
+address to a resource *always* (the caller has no knowledge of "whether it
+is translated by the host bridge").
 
-OK, so even the linker handling is inconsistent.
+On Fri, May 18, 2018 at 10:17:51AM -0400, Sinan Kaya wrote:
+> A host bridge is allowed to remap BAR addresses using _TRA attribute in
+> _CRS windows.
 
-Working (binutils 2.30)
+Also, _TRA/_CRS are ACPI-specific terms and non-ACPI host bridges can
+also do the same sort of translation.  Another trivial nit.
 
-c0301164 <local_restart>:
-c0301164:       f8d9 a000       ldr.w   sl, [r9]
-c0301168:       e92d 0030       stmdb   sp!, {r4, r5}
-c030116c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
-c0301170:       d117            bne.n   c03011a2 <__sys_trace>
-c0301172:       46ba            mov     sl, r7
-c0301174:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
-c0301178:       bf28            it      cs
-c030117a:       f04f 0a00       movcs.w sl, #0
-c030117e:       f3af 8014       csdb
-c0301182:       f2af 1e83       subw    lr, pc, #387    ; 0x183
-                        c0301182: R_ARM_THM_ALU_PREL_11_0       .Lsym28
+> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+> 
+> When a VGA device is behind such a host bridge and the resource is
+> translated efifb driver is trying to do ioremap against bus address
+> rather than the resource address and is failing to probe.
+> 
+> efifb: probing for efifb
+> efifb: cannot reserve video memory at 0x1e000000
+> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+> efifb: mode is 800x600x32, linelength=3200, pages=1
+> efifb: scrolling: redraw
+> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+> 
+> Use the host bridge offset information to convert bus address to
+> resource address in the fixup.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
+Reviewed-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Broken (binutils 2.26)
+Thanks a lot for fixing this!
 
-c0301184 <local_restart>:
-c0301184:       f8d9 a000       ldr.w   sl, [r9]
-c0301188:       e92d 0030       stmdb   sp!, {r4, r5}
-c030118c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
-c0301190:       d117            bne.n   c03011c2 <__sys_trace>
-c0301192:       46ba            mov     sl, r7
-c0301194:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
-c0301198:       bf28            it      cs
-c030119a:       f04f 0a00       movcs.w sl, #0
-c030119e:       f3af 8014       csdb
-c03011a2:       f2af 1ea2       subw    lr, pc, #418    ; 0x1a2
-                        c03011a2: R_ARM_THM_ALU_PREL_11_0       .Lsym30
-
-
-Note the even immediate in the subw instruction. So this is another
-dead end, unfortunately.
-
-Thanks for testing.
+> ---
+>  drivers/video/fbdev/efifb.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+> index 6daac8d..429cc85 100644
+> --- a/drivers/video/fbdev/efifb.c
+> +++ b/drivers/video/fbdev/efifb.c
+> @@ -431,6 +431,7 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+>  		.end = screen_info.lfb_base + screen_info.lfb_size - 1,
+>  		.flags = IORESOURCE_MEM,
+>  	};
+> +	struct pci_bus_region region;
+>  	int i;
+>  
+>  	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+> @@ -442,6 +443,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+>  	if (!screen_res.start)
+>  		return;
+>  
+> +	region.start = screen_res.start;
+> +	region.end = screen_res.end;
+> +	pcibios_bus_to_resource(dev->bus, &screen_res, &region);
+> +
+>  	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
+>  		struct resource *res = &dev->resource[i];
+>  
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
