@@ -1,61 +1,22 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 19 Jun 2018 17:23:41 +0200
-Subject: [PATCH] arm64: mm: mark tramp_pg_dir read-only
-In-Reply-To: <20180619152035.GM13984@arm.com>
-References: <20180530044806.18449-1-yaojun8558363@gmail.com>
- <20180530091457.GB2452@arm.com>
- <CAKv+Gu8Zc7eQbG-Ww51GXUCEmhe2J03vbq5vVdyaKra-s13KrA@mail.gmail.com>
- <20180619152035.GM13984@arm.com>
-Message-ID: <CAKv+Gu-Mad64U63jjuKGjhg=h2wdoEKm2vywzATBYr-t_UY_bQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Jun 2018 16:24:36 +0100
+Subject: [PATCHv3 12/19] arm64: zero GPRs upon entry from EL0
+In-Reply-To: <20180618120310.39527-13-mark.rutland@arm.com>
+References: <20180618120310.39527-1-mark.rutland@arm.com>
+ <20180618120310.39527-13-mark.rutland@arm.com>
+Message-ID: <20180619152436.7lvsmiq2wseo4u6e@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2018 at 17:20, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> Sorry, I forgot to reply to this.
->
-> On Wed, May 30, 2018 at 11:53:20AM +0200, Ard Biesheuvel wrote:
->> On 30 May 2018 at 11:14, Will Deacon <will.deacon@arm.com> wrote:
->> > On Wed, May 30, 2018 at 12:48:06PM +0800, YaoJun wrote:
->> >> To protect against KSMA(Kernel Space Mirroring Attack), make
->> >> tramp_pg_dir read-only. The principle of KSMA is to insert a
->> >> carefully constructed PGD entry into the translation table.
->> >> The type of this entry is block, which maps the kernel text
->> >> and its access permissions bits are 01. The user process can
->> >> then modify kernel text directly through this mapping. In this
->> >> way, an arbitrary write can be converted to multiple arbitrary
->> >> writes.
->> >>
->> >> Signed-off-by: YaoJun <yaojun8558363@gmail.com>
->> >> ---
->> >>  arch/arm64/mm/mmu.c | 4 ++++
->> >>  1 file changed, 4 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> >> index 2dbb2c9f1ec1..ac4b22c7e435 100644
->> >> --- a/arch/arm64/mm/mmu.c
->> >> +++ b/arch/arm64/mm/mmu.c
->> >> @@ -551,6 +551,10 @@ static int __init map_entry_trampoline(void)
->> >>       __create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
->> >>                            prot, pgd_pgtable_alloc, 0);
->> >>
->> >> +     update_mapping_prot(__pa_symbol(tramp_pg_dir),
->> >> +                             (unsigned long)tramp_pg_dir,
->> >> +                             PGD_SIZE, PAGE_KERNEL_RO);
->> >
->> > Hmm, I like the idea but is there a risk that the page table has been mapped
->> > as part of a block entry, which we can't safely split at this point (i.e.
->> > we'll run into one of the BUG_ONs in the mapping code)?
->> >
->>
->> We'd need to create a separate segment for it initially so the mapping
->> is already at the right granularity.
->
-> Why do you think that's the case? I can't see anything that guarantees this
-> for the page table itself.
->
+On Mon, Jun 18, 2018 at 01:03:03PM +0100, Mark Rutland wrote:
+> We can zero GPRs x0 - x29 upon entry from EL0 to make it harder for
+> userspace to control values consumed by speculative gadgets.
+> 
+> We don't blat x30, since this is stashed much later, and we'll blat it
+> before invoking C code.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-We'd need to pass NO_BLOCK_MAPPINGS to map_kernel_segment(),
-obviously, but that shouldn't hurt since that segment is relatively
-tiny anyway.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
