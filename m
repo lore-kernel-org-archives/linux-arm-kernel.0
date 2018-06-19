@@ -1,62 +1,88 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 19 Jun 2018 10:07:01 +0100
-Subject: [PATCH] serial: mps2-uart: Initialize early console
-In-Reply-To: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
-References: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
-Message-ID: <173551dd-3632-08a6-ec42-2ee416ccb9ad@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 19 Jun 2018 12:09:17 +0300
+Subject: [PATCH v2] mmc: sdhci-of-arasan: Add quirk for unstable clocks
+In-Reply-To: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
+References: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
+ <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
+Message-ID: <8e6fa189-f585-c835-488f-e15f18128547@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-On 19/06/18 05:54, Guenter Roeck wrote:
-> The early console code for mps2-uart assumes that the serial hardware is
-> enabled for transmit when the system boots. However, this is not the case
-> after reset. This results in a hang in mps2_early_putchar() if the serial
-> transmitter is not enabled by a boot loader or ROM monitor.
-
-I was under impression that for earlycon there is an assumption/requirement
-that the serial port must already be setup and configured. For instance, I 
-see such requirement for pl011. So it looks like boot code's fault not to
-enable serial (for mps2 it needs to setup BAUDDIV as well).
-
-I'm not against the patch per se, but I'd like to hear if my understanding of
-earlycon requirements is correct or not.
-
-Cheers
-Vladimir
-
+On 15/06/18 11:18, Helmut Grohne wrote:
+> Some controllers immediately report SDHCI_CLOCK_INT_STABLE after
+> enabling the clock even when the clock is not stable. When used in
+> conjunction with older/slower cards, this can result in:
 > 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>     mmc0: error -84 whilst initialising SD card
+> 
+> When the stable reporting is broken, we simply wait for the maximum
+> stabilization period.
+> 
+> Signed-off-by: Helmut Grohne <h.grohne@intenta.de>
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
 > ---
->  drivers/tty/serial/mps2-uart.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt |  2 ++
+>  drivers/mmc/host/sdhci-of-arasan.c                     | 16 ++++++++++++++++
+>  2 files changed, 18 insertions(+)
 > 
-> diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
-> index 9f8f63719126..0743a0551ce1 100644
-> --- a/drivers/tty/serial/mps2-uart.c
-> +++ b/drivers/tty/serial/mps2-uart.c
-> @@ -448,6 +448,14 @@ static struct console mps2_uart_console = {
+> Changes since v1 (RFC):
+>  * Use an arasan-specific quirk in the ->set_clock() callback as requested by
+>    Adrian Hunter.
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 60481bfc3d31..c0e0f04a8504 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -39,6 +39,8 @@ Optional Properties:
+>    - xlnx,fails-without-test-cd: when present, the controller doesn't work when
+>      the CD line is not connected properly, and the line is not connected
+>      properly. Test mode can be used to force the controller to function.
+> +  - xlnx,int-clock-stable-broken: when present, the controller always reports
+> +    that the internal clock is stable even when it is not.
 >  
->  #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
+>  Example:
+>  	sdhci at e0100000 {
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index c33a5f7393bd..f7fe26c75150 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -102,6 +102,9 @@ struct sdhci_arasan_data {
 >  
-> +static void mps2_early_init(struct uart_port *port)
-> +{
-> +	u8 control = readb(port->membase + UARTn_CTRL);
+>  /* Controller does not have CD wired and will not function normally without */
+>  #define SDHCI_ARASAN_QUIRK_FORCE_CDTEST	BIT(0)
+> +/* Controller immediately reports SDHCI_CLOCK_INT_STABLE after enabling the
+> + * internal clock even when the clock isn't stable */
+> +#define SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE BIT(1)
+>  };
+>  
+>  static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
+> @@ -207,6 +210,16 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+>  
+>  	sdhci_set_clock(host, clock);
+>  
+> +	if (sdhci_arasan->quirks & SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE)
+> +		/*
+> +		 * Some controllers immediately report SDHCI_CLOCK_INT_STABLE
+> +		 * after enabling the clock even though the clock is not
+> +		 * stable. Trying to use a clock without waiting here results
+> +		 * in EILSEQ while detecting some older/slower cards. The
+> +		 * chosen delay is the maximum delay from sdhci_set_clock.
+> +		 */
+> +		msleep(20);
 > +
-> +	control |= UARTn_CTRL_TX_ENABLE;
-> +	writeb(control, port->membase + UARTn_CTRL);
-> +}
+>  	if (ctrl_phy) {
+>  		phy_power_on(sdhci_arasan->phy);
+>  		sdhci_arasan->is_phy_on = true;
+> @@ -759,6 +772,9 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
+>  		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+>  
+> +	if (of_property_read_bool(np, "xlnx,int-clock-stable-broken"))
+> +		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE;
 > +
->  static void mps2_early_putchar(struct uart_port *port, int ch)
->  {
->  	while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
-> @@ -469,6 +477,7 @@ static int __init mps2_early_console_setup(struct earlycon_device *device,
->  	if (!device->port.membase)
->  		return -ENODEV;
+>  	pltfm_host->clk = clk_xin;
 >  
-> +	mps2_early_init(&device->port);
->  	device->con->write = mps2_early_write;
->  
->  	return 0;
+>  	if (of_device_is_compatible(pdev->dev.of_node,
 > 
