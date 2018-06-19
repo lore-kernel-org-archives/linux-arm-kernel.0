@@ -1,59 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 16:14:49 +0100
-Subject: [PATCHv3 09/19] arm64: convert syscall trace logic to C
-In-Reply-To: <20180619143245.pjkcutm5hupfunla@localhost>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-10-mark.rutland@arm.com>
- <20180619143245.pjkcutm5hupfunla@localhost>
-Message-ID: <20180619151449.wdvseygpvcxmasrh@lakrids.cambridge.arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 19 Jun 2018 17:14:25 +0200
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+References: <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
+ <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
+ <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+ <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
+ <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+ <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20180619151425.GH13685@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 03:32:45PM +0100, Catalin Marinas wrote:
-> On Mon, Jun 18, 2018 at 01:03:00PM +0100, Mark Rutland wrote:
-> > +asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
-> > +			       syscall_fn_t syscall_table[])
-> > +{
-> > +	unsigned long flags = current_thread_info()->flags;
-> > +
-> > +	regs->orig_x0 = regs->regs[0];
-> > +	regs->syscallno = scno;
-> > +
-> > +	local_daif_restore(DAIF_PROCCTX);
-> > +	user_exit();
-> > +
-> > +	if (has_syscall_work(flags)) {
-> > +		/* set default errno for user-issued syscall(-1) */
-> > +		if (scno == NO_SYSCALL)
-> > +			regs->regs[0] = -ENOSYS;
-> > +		scno = syscall_trace_enter(regs);
-> > +		if (scno == NO_SYSCALL)
-> > +			goto trace_exit;
-> > +	}
-> > +
-> > +	invoke_syscall(regs, scno, sc_nr, syscall_table);
-> > +
-> > +	/*
-> > +	 * The tracing status may have changed under our feet, so we have to
-> > +	 * check again. However, if we were tracing entry, then we always trace
-> > +	 * exit regardless, as the old entry assembly did.
-> > +	 */
-> > +	if (!has_syscall_work(flags)) {
-> > +		local_daif_mask();
-> > +		flags = current_thread_info()->flags;
-> > +		if (!has_syscall_work(flags))
-> > +			return;
-> > +		local_daif_restore(DAIF_PROCCTX);
-> > +	}
-> 
-> IIUC the above 'if' block replaces ret_fast_syscall in entry.S with the
-> work_pending handled via ret_to_user (we used to check _TIF_WORK_MASK in
-> two places). 
+On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
+[...]
+> In terms of $SUBJECT, I wonder if it's worth taking the original patch
+> as a temporary fix (it'll also be easier to backport) while we work on
+> fixing these other issues and enabling memoryless nodes.
 
-Yes. This replaces the _TIF_SYSCALL_WORK check from ret_fast_syscall,
-leaving the _TIF_WORK_MASK check to the usual ret_to_user path.
-
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks!
-Mark.
+Well, x86 already does that but copying this antipatern is not really
+nice. So it is good as a quick fix but it would be definitely much
+better to have a robust fix. Who knows how many other places might hit
+this. You certainly do not want to add a hack like this all over...
+-- 
+Michal Hocko
+SUSE Labs
