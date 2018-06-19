@@ -1,61 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Jun 2018 20:24:40 -0000
-Subject: [PATCH 4/5] [omap1] Bluetooth device code common to HTC
- smartphones
-In-Reply-To: <AANLkTikGA9-TCM7v+_yivBYtxiX3ByJ7_ub1FOP0LgBO@mail.gmail.com>
-References: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
- <1280762976-17284-5-git-send-email-darkstar6262@gmail.com>
- <20100804101507.GG9881@atomide.com>
- <AANLkTikGA9-TCM7v+_yivBYtxiX3ByJ7_ub1FOP0LgBO@mail.gmail.com>
-Message-ID: <20100809074300.GB32480@atomide.com>
+From: matti.aarnio@zmailer.org (Matti Aarnio)
+Date: Tue, 19 Jun 2018 20:26:08 -0000
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <4C5FA698.90904@st.com>
+References: <4C5F9B25.8080401@st.com> <20100809064957.GB16661@pengutronix.de>
+ <4C5FA698.90904@st.com>
+Message-ID: <20100809090137.GP13165@mea-ext.zmailer.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cory Maccarrone <darkstar6262@gmail.com> [100808 20:22]:
-> On Wed, Aug 4, 2010 at 3:15 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Cory Maccarrone <darkstar6262@gmail.com> [100802 18:23]:
-> >> This change adds in a bluetooth controld driver/rfkill
-> >> interface to the serial bluetooth controller found on many
-> >> HTC smartphones such as the HTC Herald and HTC Wizard.
-> >
-> > To me it looks like most of this should be in drivers/bluetooth/omap7xx.c
-> > or something like that. Then you can just pass it the gpio numbers in
-> > the platform_data.
-> >
+On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
 > 
-> Not sure I agree that it fits there.  The driver isn't really a
-> bluetooth driver -- it's really just an RFKILL interface, and some
-> code to toggle UART clocks on and off, plus GPIO work on a
-> board-specific level.  In principle, the gpios could be set and the
-> clocks enabled in the board files, and this driver wouldn't be
-> necessary to get working bluetooth (as we'd use hciattach on
-> /dev/ttyS*).  But then, we can't toggle it off for power saving.
-> Maybe a better place would be plat-omap/?  But it really is more
-> specific to these HTC boards, not the architecture itself.
+> I missed this information in my last mail. We are using git send-email for
+> sending patches. As patches will go through Microsoft exchange server only,
+> so they are broken.
+> 
 
-Hmm well what we've used earlier is to set something like set_power
-function pointer in the platform data, then call that in the driver
-if set. But in this case the driver is 8250.c, so let's not mess
-with that..
+Let your boss complain to your IT keepers.
+"These are Machine-to-Machine messages, they must not be modified!"
 
-This issue should get properly solved with the omap specific serial
-driver once we get that merged as then we can have hooks for set_power
-in addition to cutting serial clocks when idle.
 
-> So really, the only point of this driver is to be able to power on and
-> off the external bluetooth chip, which is why I submitted it as helper
-> code to the board files.
+It would probably be "against corporate policy" to use gmail for these emails...
 
-Yeah. Can you take a look at the omap specific serial driver to get
-it working on omap1?
+> With previous server everything was working fine.
+> viresh.
 
-Then you can have your GPIO functions set in the board-*.c file
-as set_power or similar, and the UART driver can idle properly.
-
-Regards,
-
-Tony
+Best Regards,  Matti Aarnio,   one of  <postmaster@vger.kernel.org>
 --
-To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 the body of a message to majordomo at vger.kernel.org
 More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Please read the FAQ at  http://www.tux.org/lkml/
