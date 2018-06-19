@@ -1,43 +1,45 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 19 Jun 2018 16:25:18 +0800
-Subject: [PATCH v6 14/29] drm/mediatek: add connection from RDMA0 to DSI2
-In-Reply-To: <1529393670-26862-15-git-send-email-stu.hsieh@mediatek.com>
-References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
- <1529393670-26862-15-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529396718.26480.10.camel@mtksdaap41>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jun 2018 11:10:46 +0100
+Subject: [PATCH 2/2] KVM: arm64: Prevent KVM_COMPAT from being selected
+In-Reply-To: <20180619094251.8586-3-marc.zyngier@arm.com>
+References: <20180619094251.8586-1-marc.zyngier@arm.com>
+ <20180619094251.8586-3-marc.zyngier@arm.com>
+Message-ID: <20180619101046.nkn5ixdyfc73yxpi@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
-> This patch add the connection from RDMA0 to DSI2
+On Tue, Jun 19, 2018 at 10:42:51AM +0100, Marc Zyngier wrote:
+> There is very little point in trying to support the 32bit KVM/arm API
+> on arm64, and this was never an anticipated use case.
 > 
+> Let's make it clear by not selecting KVM_COMPAT.
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+Do any other architectures have KVM && COMPAT, and expose an
+incompatible ABI to COMPAT tasks?
 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Given the state of arm/arm64, this makes sense to me. FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  virt/kvm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 3a3f37f523f2..f985bad61d83 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -82,6 +82,7 @@
->  #define OVL1_MOUT_EN_COLOR1		0x1
->  #define GAMMA_MOUT_EN_RDMA1		0x1
->  #define RDMA0_SOUT_DPI0			0x2
-> +#define RDMA0_SOUT_DSI2			0x4
->  #define RDMA1_SOUT_DPI0			0x2
->  #define DPI0_SEL_IN_RDMA1		0x1
->  #define COLOR1_SEL_IN_OVL1		0x1
-> @@ -160,6 +161,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
->  		value = RDMA0_SOUT_DPI0;
-> +	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI2) {
-> +		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
-> +		value = RDMA0_SOUT_DSI2;
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
->  		value = RDMA1_SOUT_DPI0;
+> diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
+> index 72143cfaf6ec..ea434ddc8499 100644
+> --- a/virt/kvm/Kconfig
+> +++ b/virt/kvm/Kconfig
+> @@ -47,7 +47,7 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
+>  
+>  config KVM_COMPAT
+>         def_bool y
+> -       depends on KVM && COMPAT && !S390
+> +       depends on KVM && COMPAT && !(S390 || ARM64)
+>  
+>  config HAVE_KVM_IRQ_BYPASS
+>         bool
+> -- 
+> 2.17.1
+> 
