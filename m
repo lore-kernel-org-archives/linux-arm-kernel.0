@@ -1,57 +1,44 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 19 Jun 2018 10:09:05 +0200
-Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
- zero again
-In-Reply-To: <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
-References: <cover.1528288895.git.michal.simek@xilinx.com>
- <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
-Message-ID: <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 Jun 2018 16:14:06 +0800
+Subject: i.MX fixes for 4.18
+Message-ID: <20180619081405.GF16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6.6.2018 14:41, Michal Simek wrote:
-> Writing zero and NULLs to already initialized fields is not needed.
-> Remove this additional writes.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v2:
-> - new patch - it can be sent separately too
-> 
->  drivers/tty/serial/xilinx_uartps.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> index 8a3e34234e98..5f116f3ecd4a 100644
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
->  
->  	/* At this point, we've got an empty uart_port struct, initialize it */
->  	spin_lock_init(&port->lock);
-> -	port->membase	= NULL;
-> -	port->irq	= 0;
->  	port->type	= PORT_UNKNOWN;
->  	port->iotype	= UPIO_MEM32;
->  	port->flags	= UPF_BOOT_AUTOCONF;
->  	port->ops	= &cdns_uart_ops;
->  	port->fifosize	= CDNS_UART_FIFO_SIZE;
->  	port->line	= id;
-> -	port->dev	= NULL;
->  
->  	/*
->  	 * Register the port.
-> 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-Alan, Rob, Greg: Any comment about this RFC?
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-Thanks,
-Michal
+are available in the git repository at:
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.18
+
+for you to fetch changes up to 1bcfe0564044be578841744faea1c2f46adc8178:
+
+  ARM: dts: imx6sx: fix irq for pcie bridge (2018-06-19 14:39:36 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.18:
+ - Fix i.MX6SX PCIe MSI interrupt number, so that MSI IRQs can be
+   properly propagated to the upstream interrupt controller.
+ - Fix GPCv2 MIPI/PCIe/USB_HSIC's PGC offset.  The values in Reference
+   Manual are incorrect.
+ - Correct SDMA setting for i.MX6Q SPI5 device to fix the issue, that
+   the SPI controller RX FIFO was not empty after a DMA transfer, and
+   the driver gets stuck in the next PIO transfer when reading one word
+   more than expected.
+
+----------------------------------------------------------------
+Anson Huang (1):
+      soc: imx: gpcv2: correct PGC offset
+
+Oleksij Rempel (1):
+      ARM: dts: imx6sx: fix irq for pcie bridge
+
+Sean Nyekjaer (1):
+      ARM: dts: imx6q: Use correct SDMA script for SPI5 core
+
+ arch/arm/boot/dts/imx6q.dtsi  |  2 +-
+ arch/arm/boot/dts/imx6sx.dtsi |  2 +-
+ drivers/soc/imx/gpcv2.c       | 13 +++++++++----
+ 3 files changed, 11 insertions(+), 6 deletions(-)
