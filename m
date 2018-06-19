@@ -1,64 +1,87 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 19 Jun 2018 10:34:58 +0200
-Subject: [PATCH] crypto: arm/speck - fix building in Thumb2 mode
-In-Reply-To: <20180618223323.130072-1-ebiggers@google.com>
-References: <20180618223323.130072-1-ebiggers@google.com>
-Message-ID: <22f66c7360083b26850a6065a5624e1e@agner.ch>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 19 Jun 2018 10:36:57 +0200
+Subject: [PATCH] arm64: zynqmp: Add support for Avnet Ultra96 rev1 board
+In-Reply-To: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
+References: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
+Message-ID: <dcee0f07-967a-034b-1d95-576e0b458a89@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.06.2018 00:33, Eric Biggers wrote:
-> Building the kernel with CONFIG_THUMB2_KERNEL=y and
-> CONFIG_CRYPTO_SPECK_NEON set fails with the following errors:
+Hi,
+
+On 2.5.2018 13:53, Michal Simek wrote:
+> Avnet Ultra96 rev1 board is commercialized Xilinx zcu100 revC/D
+> internal board. The patch is reusing zcu100 revC files but changing
+> model description and compatible strings which are used for example by
+> libmraa.
 > 
->     arch/arm/crypto/speck-neon-core.S: Assembler messages:
-> 
->     arch/arm/crypto/speck-neon-core.S:419: Error: r13 not allowed here
-> -- `bic sp,#0xf'
->     arch/arm/crypto/speck-neon-core.S:423: Error: r13 not allowed here
-> -- `bic sp,#0xf'
->     arch/arm/crypto/speck-neon-core.S:427: Error: r13 not allowed here
-> -- `bic sp,#0xf'
->     arch/arm/crypto/speck-neon-core.S:431: Error: r13 not allowed here
-> -- `bic sp,#0xf'
-> 
-> The problem is that the 'bic' instruction can't operate on the 'sp'
-> register in Thumb2 mode.  Fix it by using a temporary register.  This
-> isn't in the main loop, so the performance difference is negligible.
-> This also matches what aes-neonbs-core.S does.
-> 
-> Reported-by: Stefan Agner <stefan@agner.ch>
-> Fixes: ede9622162fa ("crypto: arm/speck - add NEON-accelerated
-> implementation of Speck-XTS")
-> Signed-off-by: Eric Biggers <ebiggers@google.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > ---
->  arch/arm/crypto/speck-neon-core.S | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/crypto/speck-neon-core.S
-> b/arch/arm/crypto/speck-neon-core.S
-> index 3c1e203e53b9..57caa742016e 100644
-> --- a/arch/arm/crypto/speck-neon-core.S
-> +++ b/arch/arm/crypto/speck-neon-core.S
-> @@ -272,9 +272,11 @@
->  	 * Allocate stack space to store 128 bytes worth of tweaks.  For
->  	 * performance, this space is aligned to a 16-byte boundary so that we
->  	 * can use the load/store instructions that declare 16-byte alignment.
-> +	 * For Thumb2 compatibility, don't do the 'bic' directly on 'sp'.
->  	 */
-> -	sub		sp, #128
-> -	bic		sp, #0xf
-> +	sub		r12, sp, #128
-> +	bic		r12, #0xf
-> +	mov		sp, r12
+> I choose this option because there are houndreds of zcu100 boards
+> created and this will enable support both versions.
+> 
+> Record avnet prefix was sent by separate patch.
+> ---
+>  arch/arm64/boot/dts/xilinx/Makefile           |  1 +
+>  .../boot/dts/xilinx/avnet-ultra96-rev1.dts    | 19 +++++++++++++++++++
+>  2 files changed, 20 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
+> index d452f80e7601..60f5443f3ef4 100644
+> --- a/arch/arm64/boot/dts/xilinx/Makefile
+> +++ b/arch/arm64/boot/dts/xilinx/Makefile
+> @@ -1,4 +1,5 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += avnet-ultra96-rev1.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
+> diff --git a/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
+> new file mode 100644
+> index 000000000000..88aa06fa78a8
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
+> @@ -0,0 +1,19 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Avnet Ultra96 rev1
+> + *
+> + * (C) Copyright 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp-zcu100-revC.dts"
+> +
+> +/ {
+> +	model = "Avnet Ultra96 Rev1";
+> +	compatible = "avnet,ultra96-rev1", "avnet,ultra96",
+> +		     "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100",
+> +		     "xlnx,zynqmp";
+> +};
+> 
 
-Looks good to me and compiles fine here. Thanks!
+Rob/Mark: Do you see any issue with this patch?
 
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+Thanks,
+Michal
 
---
-Stefan
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
 
->  
->  .if \n == 64
->  	// Load first tweak
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/f48b93d3/attachment.sig>
