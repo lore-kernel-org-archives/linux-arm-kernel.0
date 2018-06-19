@@ -1,144 +1,62 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 20 Jun 2018 00:57:03 +0800
-Subject: [PATCH v5 6/7] dmaengine: imx-sdma: add sdma_transfer_init to
- decrease code overlap
-In-Reply-To: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1529427424-12321-7-git-send-email-yibin.gong@nxp.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 19 Jun 2018 10:07:01 +0100
+Subject: [PATCH] serial: mps2-uart: Initialize early console
+In-Reply-To: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
+References: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
+Message-ID: <173551dd-3632-08a6-ec42-2ee416ccb9ad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are lot of codes overlap between prep_sg and prep_cyclic function.
-Add sdma_transfer_init() function to elimated the code overlap.
+Hi Guenter,
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- drivers/dma/imx-sdma.c | 83 ++++++++++++++++++++++----------------------------
- 1 file changed, 37 insertions(+), 46 deletions(-)
+On 19/06/18 05:54, Guenter Roeck wrote:
+> The early console code for mps2-uart assumes that the serial hardware is
+> enabled for transmit when the system boots. However, this is not the case
+> after reset. This results in a hang in mps2_early_putchar() if the serial
+> transmitter is not enabled by a boot loader or ROM monitor.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 9f1a462..f8becaf 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1248,6 +1248,40 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
- 	clk_disable(sdma->clk_ahb);
- }
- 
-+static struct sdma_desc *sdma_transfer_init(struct sdma_channel *sdmac,
-+				enum dma_transfer_direction direction, u32 bds)
-+{
-+	struct sdma_desc *desc;
-+
-+	desc = kzalloc((sizeof(*desc)), GFP_NOWAIT);
-+	if (!desc)
-+		goto err_out;
-+
-+	sdmac->status = DMA_IN_PROGRESS;
-+	sdmac->direction = direction;
-+	sdmac->flags = 0;
-+
-+	desc->chn_count = 0;
-+	desc->chn_real_count = 0;
-+	desc->buf_tail = 0;
-+	desc->buf_ptail = 0;
-+	desc->sdmac = sdmac;
-+	desc->num_bd = bds;
-+
-+	if (sdma_alloc_bd(desc))
-+		goto err_desc_out;
-+
-+	if (sdma_load_context(sdmac))
-+		goto err_desc_out;
-+
-+	return desc;
-+
-+err_desc_out:
-+	kfree(desc);
-+err_out:
-+	return NULL;
-+}
-+
- static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 		struct dma_chan *chan, struct scatterlist *sgl,
- 		unsigned int sg_len, enum dma_transfer_direction direction,
-@@ -1260,36 +1294,13 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 	struct scatterlist *sg;
- 	struct sdma_desc *desc;
- 
--	if (sdmac->status == DMA_IN_PROGRESS)
--		return NULL;
--	sdmac->status = DMA_IN_PROGRESS;
--
--	sdmac->flags = 0;
--
--	desc = kzalloc((sizeof(*desc)), GFP_NOWAIT);
-+	desc = sdma_transfer_init(sdmac, direction, sg_len);
- 	if (!desc)
- 		goto err_out;
- 
--	desc->buf_tail = 0;
--	desc->buf_ptail = 0;
--	desc->sdmac = sdmac;
--	desc->num_bd = sg_len;
--	desc->chn_real_count = 0;
--
--	if (sdma_alloc_bd(desc)) {
--		kfree(desc);
--		goto err_out;
--	}
--
- 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
- 			sg_len, channel);
- 
--	sdmac->direction = direction;
--	ret = sdma_load_context(sdmac);
--	if (ret)
--		goto err_bd_out;
--
--	desc->chn_count = 0;
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct sdma_buffer_descriptor *bd = &desc->bd[i];
- 		int param;
-@@ -1365,38 +1376,18 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 	struct sdma_engine *sdma = sdmac->sdma;
- 	int num_periods = buf_len / period_len;
- 	int channel = sdmac->channel;
--	int ret, i = 0, buf = 0;
-+	int i = 0, buf = 0;
- 	struct sdma_desc *desc;
- 
- 	dev_dbg(sdma->dev, "%s channel: %d\n", __func__, channel);
- 
--	if (sdmac->status == DMA_IN_PROGRESS)
--		return NULL;
--
--	sdmac->status = DMA_IN_PROGRESS;
--
--	desc = kzalloc((sizeof(*desc)), GFP_NOWAIT);
-+	desc = sdma_transfer_init(sdmac, direction, num_periods);
- 	if (!desc)
- 		goto err_out;
- 
--	desc->buf_tail = 0;
--	desc->buf_ptail = 0;
--	desc->sdmac = sdmac;
--	desc->num_bd = num_periods;
--	desc->chn_real_count = 0;
- 	desc->period_len = period_len;
- 
- 	sdmac->flags |= IMX_DMA_SG_LOOP;
--	sdmac->direction = direction;
--
--	if (sdma_alloc_bd(desc)) {
--		kfree(desc);
--		goto err_bd_out;
--	}
--
--	ret = sdma_load_context(sdmac);
--	if (ret)
--		goto err_bd_out;
- 
- 	if (period_len > 0xffff) {
- 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
--- 
-2.7.4
+I was under impression that for earlycon there is an assumption/requirement
+that the serial port must already be setup and configured. For instance, I 
+see such requirement for pl011. So it looks like boot code's fault not to
+enable serial (for mps2 it needs to setup BAUDDIV as well).
+
+I'm not against the patch per se, but I'd like to hear if my understanding of
+earlycon requirements is correct or not.
+
+Cheers
+Vladimir
+
+> 
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  drivers/tty/serial/mps2-uart.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
+> index 9f8f63719126..0743a0551ce1 100644
+> --- a/drivers/tty/serial/mps2-uart.c
+> +++ b/drivers/tty/serial/mps2-uart.c
+> @@ -448,6 +448,14 @@ static struct console mps2_uart_console = {
+>  
+>  #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
+>  
+> +static void mps2_early_init(struct uart_port *port)
+> +{
+> +	u8 control = readb(port->membase + UARTn_CTRL);
+> +
+> +	control |= UARTn_CTRL_TX_ENABLE;
+> +	writeb(control, port->membase + UARTn_CTRL);
+> +}
+> +
+>  static void mps2_early_putchar(struct uart_port *port, int ch)
+>  {
+>  	while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
+> @@ -469,6 +477,7 @@ static int __init mps2_early_console_setup(struct earlycon_device *device,
+>  	if (!device->port.membase)
+>  		return -ENODEV;
+>  
+> +	mps2_early_init(&device->port);
+>  	device->con->write = mps2_early_write;
+>  
+>  	return 0;
+> 
