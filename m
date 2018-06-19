@@ -1,123 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:53:12 +0100
-Subject: [RESEND PATCH v2 7/9] asm-generic/bitops/lock.h: Rewrite using
- atomic_fetch_*
-In-Reply-To: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529412794-17720-8-git-send-email-will.deacon@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 Jun 2018 14:58:10 +0200
+Subject: [PATCH v2 0/5] crypto: ccree: cleanup, fixes and R-Car enabling
+In-Reply-To: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
+References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
+Message-ID: <CAMuHMdVXrppnFEBmR3xhwNu3i0N3mVE1+FJRjEcWBYpHHbsAsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lock bitops can be implemented more efficiently using the atomic_fetch_*
-ops, which provide finer-grained control over the memory ordering semantics
-than the bitops.
+Hi Gilad,
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/asm-generic/bitops/lock.h | 68 ++++++++++++++++++++++++++++++++-------
- 1 file changed, 56 insertions(+), 12 deletions(-)
+On Thu, May 24, 2018 at 4:19 PM Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> The patch set enables the use of CryptoCell found in some Renesas R-Car
+> Salvator-X boards and fixes some driver issues uncovered that prevented
+> to work properly.
 
-diff --git a/include/asm-generic/bitops/lock.h b/include/asm-generic/bitops/lock.h
-index 67ab280ad134..3ae021368f48 100644
---- a/include/asm-generic/bitops/lock.h
-+++ b/include/asm-generic/bitops/lock.h
-@@ -2,6 +2,10 @@
- #ifndef _ASM_GENERIC_BITOPS_LOCK_H_
- #define _ASM_GENERIC_BITOPS_LOCK_H_
- 
-+#include <linux/atomic.h>
-+#include <linux/compiler.h>
-+#include <asm/barrier.h>
-+
- /**
-  * test_and_set_bit_lock - Set a bit and return its old value, for lock
-  * @nr: Bit to set
-@@ -11,7 +15,20 @@
-  * the returned value is 0.
-  * It can be used to implement bit locks.
-  */
--#define test_and_set_bit_lock(nr, addr)	test_and_set_bit(nr, addr)
-+static inline int test_and_set_bit_lock(unsigned int nr,
-+					volatile unsigned long *p)
-+{
-+	long old;
-+	unsigned long mask = BIT_MASK(nr);
-+
-+	p += BIT_WORD(nr);
-+	if (READ_ONCE(*p) & mask)
-+		return 1;
-+
-+	old = atomic_long_fetch_or_acquire(mask, (atomic_long_t *)p);
-+	return !!(old & mask);
-+}
-+
- 
- /**
-  * clear_bit_unlock - Clear a bit in memory, for unlock
-@@ -20,11 +37,11 @@
-  *
-  * This operation is atomic and provides release barrier semantics.
-  */
--#define clear_bit_unlock(nr, addr)	\
--do {					\
--	smp_mb__before_atomic();	\
--	clear_bit(nr, addr);		\
--} while (0)
-+static inline void clear_bit_unlock(unsigned int nr, volatile unsigned long *p)
-+{
-+	p += BIT_WORD(nr);
-+	atomic_long_fetch_andnot_release(BIT_MASK(nr), (atomic_long_t *)p);
-+}
- 
- /**
-  * __clear_bit_unlock - Clear a bit in memory, for unlock
-@@ -37,11 +54,38 @@ do {					\
-  *
-  * See for example x86's implementation.
-  */
--#define __clear_bit_unlock(nr, addr)	\
--do {					\
--	smp_mb__before_atomic();	\
--	clear_bit(nr, addr);		\
--} while (0)
-+static inline void __clear_bit_unlock(unsigned int nr,
-+				      volatile unsigned long *p)
-+{
-+	unsigned long old;
- 
--#endif /* _ASM_GENERIC_BITOPS_LOCK_H_ */
-+	p += BIT_WORD(nr);
-+	old = READ_ONCE(*p);
-+	old &= ~BIT_MASK(nr);
-+	atomic_long_set_release((atomic_long_t *)p, old);
-+}
-+
-+/**
-+ * clear_bit_unlock_is_negative_byte - Clear a bit in memory and test if bottom
-+ *                                     byte is negative, for unlock.
-+ * @nr: the bit to clear
-+ * @addr: the address to start counting from
-+ *
-+ * This is a bit of a one-trick-pony for the filemap code, which clears
-+ * PG_locked and tests PG_waiters,
-+ */
-+#ifndef clear_bit_unlock_is_negative_byte
-+static inline bool clear_bit_unlock_is_negative_byte(unsigned int nr,
-+						     volatile unsigned long *p)
-+{
-+	long old;
-+	unsigned long mask = BIT_MASK(nr);
-+
-+	p += BIT_WORD(nr);
-+	old = atomic_long_fetch_andnot_release(mask, (atomic_long_t *)p);
-+	return !!(old & BIT(7));
-+}
-+#define clear_bit_unlock_is_negative_byte clear_bit_unlock_is_negative_byte
-+#endif
- 
-+#endif /* _ASM_GENERIC_BITOPS_LOCK_H_ */
+With DEBUG enabled on R-Car H3, I see lots of
+
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x00000098)
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x000000C0)
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x000000D0)
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x000000D8)
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x000000E0)
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x000000F0)
+    ccree e6601000.crypto: IRR includes unknown cause bits (0x000000F8)
+
+during boot. Is that expected?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.1.4
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
