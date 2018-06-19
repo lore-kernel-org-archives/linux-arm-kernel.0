@@ -1,44 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Jun 2018 16:15:06 +0100
-Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180618162124.21749-2-bugalski.piotr@gmail.com>
-References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
- <20180618162124.21749-2-bugalski.piotr@gmail.com>
-Message-ID: <20180619151506.GG11230@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jun 2018 16:20:35 +0100
+Subject: [PATCH] arm64: mm: mark tramp_pg_dir read-only
+In-Reply-To: <CAKv+Gu8Zc7eQbG-Ww51GXUCEmhe2J03vbq5vVdyaKra-s13KrA@mail.gmail.com>
+References: <20180530044806.18449-1-yaojun8558363@gmail.com>
+ <20180530091457.GB2452@arm.com>
+ <CAKv+Gu8Zc7eQbG-Ww51GXUCEmhe2J03vbq5vVdyaKra-s13KrA@mail.gmail.com>
+Message-ID: <20180619152035.GM13984@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 06:21:23PM +0200, Piotr Bugalski wrote:
+Hi Ard,
 
-> +static int atmel_qspi_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
-> +{
-> +	return 0;
-> +}
+Sorry, I forgot to reply to this.
 
-If this can be empty should we adjust the callers to allow it to just be
-omitted?
+On Wed, May 30, 2018 at 11:53:20AM +0200, Ard Biesheuvel wrote:
+> On 30 May 2018 at 11:14, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, May 30, 2018 at 12:48:06PM +0800, YaoJun wrote:
+> >> To protect against KSMA(Kernel Space Mirroring Attack), make
+> >> tramp_pg_dir read-only. The principle of KSMA is to insert a
+> >> carefully constructed PGD entry into the translation table.
+> >> The type of this entry is block, which maps the kernel text
+> >> and its access permissions bits are 01. The user process can
+> >> then modify kernel text directly through this mapping. In this
+> >> way, an arbitrary write can be converted to multiple arbitrary
+> >> writes.
+> >>
+> >> Signed-off-by: YaoJun <yaojun8558363@gmail.com>
+> >> ---
+> >>  arch/arm64/mm/mmu.c | 4 ++++
+> >>  1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >> index 2dbb2c9f1ec1..ac4b22c7e435 100644
+> >> --- a/arch/arm64/mm/mmu.c
+> >> +++ b/arch/arm64/mm/mmu.c
+> >> @@ -551,6 +551,10 @@ static int __init map_entry_trampoline(void)
+> >>       __create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+> >>                            prot, pgd_pgtable_alloc, 0);
+> >>
+> >> +     update_mapping_prot(__pa_symbol(tramp_pg_dir),
+> >> +                             (unsigned long)tramp_pg_dir,
+> >> +                             PGD_SIZE, PAGE_KERNEL_RO);
+> >
+> > Hmm, I like the idea but is there a risk that the page table has been mapped
+> > as part of a block entry, which we can't safely split at this point (i.e.
+> > we'll run into one of the BUG_ONs in the mapping code)?
+> >
+> 
+> We'd need to create a separate segment for it initially so the mapping
+> is already at the right granularity.
 
-> +static int atmel_qspi_remove(struct platform_device *pdev)
-> +{
-> +	struct spi_controller *ctrl = platform_get_drvdata(pdev);
-> +	struct atmel_qspi *aq = spi_controller_get_devdata(ctrl);
-> +
-> +	qspi_writel(aq, QSPI_CR, QSPI_CR_QSPIDIS);
-> +	clk_disable_unprepare(aq->clk);
-> +
-> +	spi_unregister_controller(ctrl);
-> +
-> +	return 0;
-> +}
+Why do you think that's the case? I can't see anything that guarantees this
+for the page table itself.
 
-You should unregister the controller before disabling the hardware,
-otherwise something could come in and try to start an operation on the
-controller (or already be running one) while the hardware is disabled
-which might blow up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/0ebd21f0/attachment.sig>
+Will
