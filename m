@@ -1,71 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 15:58:54 +0100
-Subject: [PATCHv3 08/19] arm64: convert raw syscall invocation to C
-In-Reply-To: <20180619145541.xi3yybejmbfenrum@armageddon.cambridge.arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-9-mark.rutland@arm.com>
- <20180619142125.esqcbknxd2pqeotb@localhost>
- <20180619144845.22mgd4req5cnp5tv@lakrids.cambridge.arm.com>
- <20180619145541.xi3yybejmbfenrum@armageddon.cambridge.arm.com>
-Message-ID: <20180619145854.rii42557taqbnyps@lakrids.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 19 Jun 2018 16:00:05 +0100
+Subject: [PATCH v2 1/4] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <72307608-90e0-4842-edc1-d3b284782940@oracle.com>
+References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
+ <20180619064424.6642-2-takahiro.akashi@linaro.org>
+ <72307608-90e0-4842-edc1-d3b284782940@oracle.com>
+Message-ID: <ca9e5d9d-e090-f9e0-bc10-3297c9e3b7e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 03:55:42PM +0100, Catalin Marinas wrote:
-> On Tue, Jun 19, 2018 at 03:48:45PM +0100, Mark Rutland wrote:
-> > On Tue, Jun 19, 2018 at 03:21:25PM +0100, Catalin Marinas wrote:
-> > > On Mon, Jun 18, 2018 at 01:02:59PM +0100, Mark Rutland wrote:
-> > > > diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-> > > > new file mode 100644
-> > > > index 000000000000..b463b962d597
-> > > > --- /dev/null
-> > > > +++ b/arch/arm64/kernel/syscall.c
-> > > > @@ -0,0 +1,30 @@
-> > > > +// SPDX-License-Identifier: GPL-2.0
-> > > > +
-> > > > +#include <linux/nospec.h>
-> > > > +#include <linux/ptrace.h>
-> > > > +
-> > > > +long do_ni_syscall(struct pt_regs *regs);
-> > > > +
-> > > > +typedef long (*syscall_fn_t)(unsigned long, unsigned long,
-> > > > +			     unsigned long, unsigned long,
-> > > > +			     unsigned long, unsigned long);
-> > > > +
-> > > > +static void __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
-> > > > +{
-> > > > +	regs->regs[0] = syscall_fn(regs->regs[0], regs->regs[1],
-> > > > +				   regs->regs[2], regs->regs[3],
-> > > > +				   regs->regs[4], regs->regs[5]);
-> > > > +}
-> > > > +
-> > > > +asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
-> > > > +			       unsigned int sc_nr,
-> > > > +			       syscall_fn_t syscall_table[])
-> > > > +{
-> > > > +	if (scno < sc_nr) {
-> > > > +		syscall_fn_t syscall_fn;
-> > > > +		syscall_fn = syscall_table[array_index_nospec(scno, sc_nr)];
-> > > > +		__invoke_syscall(regs, syscall_fn);
-> > > > +	} else {
-> > > > +		regs->regs[0] = do_ni_syscall(regs);
-> > > > +	}
-> > > > +}
-> > > 
-> > > While reviewing the subsequent patch, it crossed my mind that we no
-> > > longer have any callers to do_ni_syscall() outside this file. Can we not
-> > > more it here and have a similar implementation to __invoke_syscall() for
-> > > consistency, i.e. set regs->regs[0].
-> > 
-> > I think so, though it complicates the logic in do_ni_syscall(), since
-> > there are two places we may return a value.
-> > 
-> > Would you be happy if instead I made __invoke_syscall() return the
-> > result, and have invoke_syscall() place the result in regs->regs[0] in
-> > either case, e.g. as below?
+Hi Dave,
+
+On 19/06/18 14:37, Dave Kleikamp wrote:
+> On 06/19/2018 01:44 AM, AKASHI Takahiro wrote:
+>> +static int __init reserve_memblock_reserved_regions(void)
+>> +{
+>> +	phys_addr_t start, end, roundup_end = 0;
+>> +	struct resource *mem, *res;
+>> +	u64 i;
+>> +
+>> +	for_each_reserved_mem_region(i, &start, &end) {
+>> +		if (end <= roundup_end)
+>> +			continue; /* done already */
+>> +
+>> +		start = __pfn_to_phys(PFN_DOWN(start));
+>> +		end = __pfn_to_phys(PFN_UP(end)) - 1;
+>> +		roundup_end = end;
+>> +
+>> +		res = kzalloc(sizeof(*res), GFP_ATOMIC);
+>> +		if (WARN_ON(!res))
+>> +			return -ENOMEM;
+>> +		res->start = start;
+>> +		res->end = end;
+>> +		res->name  = "reserved";
+>> +		res->flags = IORESOURCE_MEM;
+>> +
+>> +		mem = request_resource_conflict(&iomem_resource, res);
+>> +		/*
+>> +		 * We expected memblock_reserve() regions to conflict with
+>> +		 * memory created by request_standard_resources().
+>> +		 */
+>> +		if (WARN_ON_ONCE(!mem))
+>> +			continue;
+>> +		kfree(res);
 > 
-> It looks fine. Feel free to keep the original reviewed-by tag.
+> Why is kfree() after the conditional continue? This is a memory leak.
 
-Will do; cheers!
+request_resource_conflict() inserts res into the iomem_resource tree, or returns
+the conflict if there is already something at this address.
 
-Mark.
+We expect something at this address: a 'System RAM' section added by
+request_resource(). This code wants the conflicting 'System RAM' entry so that
+reserve_region_with_split() can fill in the gaps below it with 'reserved'. See
+the commit-message for an example.
+
+If there was no conflict, it means the memory map doesn't look like we expect,
+we can't pass NULL to reserve_region_with_split(), and we just inserted the
+'reserved' at the top level. Freeing res at this point would be a use-after-free
+hanging from /proc/iomem.
+This code generates a WARN_ON_ONCE() and leaves the 'reserved' description where
+it is.
+
+Trying to cleanup here is pointless, we can remove the resource entry and free
+it ... but we still want to report it as reserved, which is what just happened,
+just not quite how we we wanted it.
+
+If you ever see this warning, it means some RAM stopped being nomap between
+request_resources() and reserve_memblock_reserved_regions(). I can't find any
+case where that ever happens.
+
+
+If all that makes sense: how can I improve the comment above the WARN_ON_ONCE()
+to make it clearer?
+
+
+Thanks,
+
+James
+
+
+>> +
+>> +		reserve_region_with_split(mem, start, end, "reserved");
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +arch_initcall(reserve_memblock_reserved_regions);
+>> +
+>>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+>>  
+>>  void __init setup_arch(char **cmdline_p)
+>>
