@@ -1,72 +1,65 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Jun 2018 06:01:08 -0700
-Subject: [PATCH] serial: mps2-uart: Initialize early console
-In-Reply-To: <173551dd-3632-08a6-ec42-2ee416ccb9ad@arm.com>
-References: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
- <173551dd-3632-08a6-ec42-2ee416ccb9ad@arm.com>
-Message-ID: <da7ba538-a81e-f2d2-d51c-1b39f5b455f0@roeck-us.net>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Tue, 19 Jun 2018 09:03:18 -0400 (EDT)
+Subject: [PATCH] arm: Hook up SYNC_CORE functionality for sys_membarrier()
+In-Reply-To: <20180619125849.GH13984@arm.com>
+References: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
+ <1431651959.17300.1529412602455.JavaMail.zimbra@efficios.com>
+ <20180619125849.GH13984@arm.com>
+Message-ID: <598200491.17317.1529413398241.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2018 02:07 AM, Vladimir Murzin wrote:
-> Hi Guenter,
-> 
-> On 19/06/18 05:54, Guenter Roeck wrote:
->> The early console code for mps2-uart assumes that the serial hardware is
->> enabled for transmit when the system boots. However, this is not the case
->> after reset. This results in a hang in mps2_early_putchar() if the serial
->> transmitter is not enabled by a boot loader or ROM monitor.
-> 
-> I was under impression that for earlycon there is an assumption/requirement
-> that the serial port must already be setup and configured. For instance, I
-> see such requirement for pl011. So it looks like boot code's fault not to
-> enable serial (for mps2 it needs to setup BAUDDIV as well).
-> 
+----- On Jun 19, 2018, at 8:58 AM, Will Deacon will.deacon at arm.com wrote:
 
-Good to know. Fine with me as well; I wasn't aware that such a requirement
-existed.
+> Hi Mathieu,
+> 
+> On Tue, Jun 19, 2018 at 08:50:02AM -0400, Mathieu Desnoyers wrote:
+>> ----- On Jun 19, 2018, at 8:22 AM, Will Deacon will.deacon at arm.com wrote:
+>> 
+>> > Exception return implies context synchronization, so we can hook up the
+>> > SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
+>> > just like we've done for arm64 already.
+>> > 
+>> > Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+>> > Cc: Orion Hodson <oth@google.com>
+>> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> > ---
+>> > arch/arm/Kconfig | 1 +
+>> > 1 file changed, 1 insertion(+)
+>> > 
+>> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> > index 54eeb8d00bc6..b0ac18547370 100644
+>> > --- a/arch/arm/Kconfig
+>> > +++ b/arch/arm/Kconfig
+>> > @@ -9,6 +9,7 @@ config ARM
+>> > 	select ARCH_HAS_ELF_RANDOMIZE
+>> > 	select ARCH_HAS_FORTIFY_SOURCE
+>> > 	select ARCH_HAS_KCOV
+>> > +	select ARCH_HAS_MEMBARRIER_SYNC_CORE
+>> 
+>> In addition to this, we added this comment in arch/arm64/kernel/entry.S:
+>> 
+>> +       /*
+>> +        * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on eret context synchronization
+>> +        * when returning from IPI handler, and when returning to user-space.
+>> +        */
+>> 
+>> So I would expect a similar comment in arch/arm/kernel/entry-header.S, within
+>> svc_exit and svc_exit_via_fiq:
+>> 
+>>         /*
+>>          * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on [insn] context synchronization
+>>          * when returning from IPI handler, and when returning to user-space.
+>>          */
+> 
+> Bah, you know I hate that comment ;) I should update arch-support.txt,
+> though. Diff below.
 
-Guenter
+It works for me with this update, thanks!
 
-> I'm not against the patch per se, but I'd like to hear if my understanding of
-> earlycon requirements is correct or not.
-> 
-> Cheers
-> Vladimir
-> 
->>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   drivers/tty/serial/mps2-uart.c | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
->> index 9f8f63719126..0743a0551ce1 100644
->> --- a/drivers/tty/serial/mps2-uart.c
->> +++ b/drivers/tty/serial/mps2-uart.c
->> @@ -448,6 +448,14 @@ static struct console mps2_uart_console = {
->>   
->>   #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
->>   
->> +static void mps2_early_init(struct uart_port *port)
->> +{
->> +	u8 control = readb(port->membase + UARTn_CTRL);
->> +
->> +	control |= UARTn_CTRL_TX_ENABLE;
->> +	writeb(control, port->membase + UARTn_CTRL);
->> +}
->> +
->>   static void mps2_early_putchar(struct uart_port *port, int ch)
->>   {
->>   	while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
->> @@ -469,6 +477,7 @@ static int __init mps2_early_console_setup(struct earlycon_device *device,
->>   	if (!device->port.membase)
->>   		return -ENODEV;
->>   
->> +	mps2_early_init(&device->port);
->>   	device->con->write = mps2_early_write;
->>   
->>   	return 0;
->>
-> 
-> 
+Mathieu
+
+-- 
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
