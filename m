@@ -1,68 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Jun 2018 12:47:41 +0100
-Subject: [PATCHv3 03/19] arm64: introduce sysreg_clear_set()
-In-Reply-To: <20180618120310.39527-4-mark.rutland@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jun 2018 12:48:09 +0100
+Subject: [PATCHv3 02/19] arm64: move SCTLR_EL{1,2} assertions to
+ <asm/sysreg.h>
+In-Reply-To: <20180618120310.39527-3-mark.rutland@arm.com>
 References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-4-mark.rutland@arm.com>
-Message-ID: <f113199e-45b4-efe0-99b2-f0b09393cb4b@arm.com>
+ <20180618120310.39527-3-mark.rutland@arm.com>
+Message-ID: <20180619114808.46jquqek6vpgdnnm@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/18 13:02, Mark Rutland wrote:
-> Currently we have a couple of helpers to manipulate bits in particular
-> sysregs:
+On Mon, Jun 18, 2018 at 01:02:53PM +0100, Mark Rutland wrote:
+> Currently we assert that the SCTLR_EL{1,2}_{SET,CLEAR} bits are
+> self-consistent with an assertion in config_sctlr_el1(). This is a bit
+> unusual, since config_sctlr_el1() doesn't make use of these definitions,
+> and is far away from the definitions themselves.
 > 
->  * config_sctlr_el1(u32 clear, u32 set)
+> We can use the CPP #error directive to have equivalent assertions in
+> <asm/sysreg.h>, next to the definitions of the set/clear bits, which is
+> a bit clearer and simpler.
 > 
->  * change_cpacr(u64 val, u64 mask)
-> 
-> The parameters of these differ in naming convention, order, and size,
-> which is unfortunate. They also differ slightly in behaviour, as
-> change_cpacr() skips the sysreg write if the bits are unchanged, which
-> is a useful optimization when sysreg writes are expensive.
-> 
-> Before we gain more yet another sysreg manipulation function, let's
-> unify these with a common helper, providing a consistent order for
-> clear/set operands, and the write skipping behaviour from
-> change_cpacr(). Code will be migrated to the new helper in subsequent
-> patches.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Dave Martin <dave.martin@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/sysreg.h | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 48ad361c178e..fefc17dae8ee 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -731,6 +731,17 @@ asm(
->  	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
->  } while (0)
->  
-> +/*
-> + * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
-> + * set mask are set. Other bits are left as-is.
-> + */
-> +#define sysreg_clear_set(sysreg, clear, set) do {			\
-> +	u64 __scs_val = read_sysreg(sysreg);				\
-> +	u64 __scs_new = (__scs_val & ~(u64)(clear)) | (set);		\
-> +	if (__scs_new != __scs_val)					\
-> +		write_sysreg(__scs_new, sysreg);			\
-> +} while (0)
-> +
->  static inline void config_sctlr_el1(u32 clear, u32 set)
->  {
->  	u32 val;
-> 
+> At the same time, lets fill in the upper 32 bits for both registers in
+> their repsective RES0 definitions. This could be a little nicer with
 
-For the record, I have this patch as part of Dave's FPSIMD/SVE fixes.
+Typo: s/repsective/respective/
 
-Thanks,
+I've fixed that up locally.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
