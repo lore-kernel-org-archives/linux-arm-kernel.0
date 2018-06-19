@@ -1,48 +1,67 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Tue, 19 Jun 2018 15:34:14 +0800
-Subject: [PATCH v6 13/29] drm/mediatek: add connection from RDMA0 to DPI0
-In-Reply-To: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
-References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529393670-26862-14-git-send-email-stu.hsieh@mediatek.com>
+Date: Tue, 19 Jun 2018 15:34:01 +0800
+Subject: [PATCH v6 00/29] Add support for mediatek SOC MT2712
+Message-ID: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the connection from RDMA0 to DPI0
+This patch add support for the Mediatek MT2712 DISP subsystem.
+MT2712 is base on MT8173, there are some difference as following:
+MT2712 support three disp output(two ovl and one rdma)
 
-Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Change in v6:
+- Update DDP_COMPONENT_DSI2 to DDP_COMPONENT_DSI3 in the patch
+  "drm/mediatek: add component DSI3"
+- Separate the patch
+  "drm/mediatek: add DPI1/DSI1/DSI2/DSI3 in comp_init" in v5
+  to following patch:
+  drm/mediatek: add component DPI1
+  drm/mediatek: add component DSI2
+  drm/mediatek: add component DSI3
+  drm/mediatek: add the DSI1 for component init condition
+- Update the RDMA definition term from "MOUT" to "SOUT"
+- Add new patch
+  "drm/mediatek: Update the definition of connection from RDMA1 to DPI0"
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 977df8facb79..3a3f37f523f2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -29,6 +29,7 @@
- #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
- #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
- #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
-+#define DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN	0x0c4
- #define DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN	0x0c8
- #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
- 
-@@ -80,6 +81,7 @@
- #define COLOR0_SEL_IN_OVL0		0x1
- #define OVL1_MOUT_EN_COLOR1		0x1
- #define GAMMA_MOUT_EN_RDMA1		0x1
-+#define RDMA0_SOUT_DPI0			0x2
- #define RDMA1_SOUT_DPI0			0x2
- #define DPI0_SEL_IN_RDMA1		0x1
- #define COLOR1_SEL_IN_OVL1		0x1
-@@ -155,6 +157,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
- 		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
- 		value = OD1_MOUT_EN_RDMA1;
-+	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
-+		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
-+		value = RDMA0_SOUT_DPI0;
- 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
- 		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
- 		value = RDMA1_SOUT_DPI0;
+Stu Hsieh (29):
+  drm/mediatek: update dt-bindings for mt2712
+  drm/mediatek: support maximum 64 mutex mod
+  drm/mediatek: add ddp component AAL1
+  drm/mediatek: add ddp component OD1
+  drm/mediatek: add ddp component PWM1
+  drm/mediatek: add ddp component PWM2
+  drm/mediatek: add component DPI1
+  drm/mediatek: add component DSI2
+  drm/mediatek: add component DSI3
+  drm/mediatek: add the DSI1 for component init condition
+  drm/mediatek: add connection from OD1 to RDMA1
+  drm/mediatek: Update the definition of connection from RDMA1 to DPI0
+  drm/mediatek: add connection from RDMA0 to DPI0
+  drm/mediatek: add connection from RDMA0 to DSI2
+  drm/mediatek: add connection from RDMA0 to DSI3
+  drm/mediatek: add connection from RDMA1 to DPI1
+  drm/mediatek: add connection from RDMA1 to DSI1
+  drm/mediatek: add connection from RDMA1 to DSI2
+  drm/mediatek: add connection from RDMA1 to DSI3
+  drm/mediatek: add connection from RDMA2 to DPI0
+  drm/mediatek: add connection from RDMA2 to DPI1
+  drm/mediatek: add connection from RDMA2 to DSI1
+  drm/mediatek: add connection from RDMA2 to DSI2
+  drm/mediatek: add connection from RDMA2 to DSI3
+  drm/mediatek: add DPI1 support for mutex
+  drm/mediatek: add DSI2 support for mutex
+  drm/mediatek: add DSI3 support for mutex
+  drm/mediatek: add third ddp path
+  drm/mediatek: Add support for mediatek SOC MT2712
+
+ .../bindings/display/mediatek/mediatek,disp.txt    |   2 +-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   3 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 235 ++++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  15 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |  10 +-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  47 ++++-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   5 +-
+ 7 files changed, 274 insertions(+), 43 deletions(-)
+
 -- 
 2.12.5
