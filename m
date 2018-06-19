@@ -1,79 +1,214 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 19 Jun 2018 11:21:30 +0100
-Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
-In-Reply-To: <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
-References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
- <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
- <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
- <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
- <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
- <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
-Message-ID: <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 19 Jun 2018 12:35:08 +0200
+Subject: [PATCH 15/20] dts: arm: imx7{d,s}: Update coresight binding for
+ hardware ports
+In-Reply-To: <20180619021218.GV16091@dragon>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+ <1528235011-30691-16-git-send-email-suzuki.poulose@arm.com>
+ <20180619021218.GV16091@dragon>
+Message-ID: <145043d7ed3ef7890b5fc78a59c1668a@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 18/06/18 23:18, Mark Salter wrote:
-> On Mon, 2018-06-18 at 11:04 -0700, Geoff Levand wrote:
->> Thanks for all the comments, but my lack of access to an m400 platform, and
->> my lack of knowledge about the m400 limits what I can comment on and what I
->> can do.  
+On 19.06.2018 04:12, Shawn Guo wrote:
+> Hi Stefan,
 > 
-> I can take another look at this on an m400 here.
+> Can you take a look at the patch?  Thanks.
+> 
+> Shawn
+> 
+> On Tue, Jun 05, 2018 at 10:43:26PM +0100, Suzuki K Poulose wrote:
+>> Switch to the updated coresight bindings.
 
-Thanks!
+Looks good to me.
 
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-> I don't believe it is a
-> memory access to physical space with nothing attached to it.
+--
+Stefan
 
-That is what the CPER records are describing though.
-
-
-> I seem to recall
-> an errata with xgene-1 where such accesses cause the cpu to halt. But I could
-> be misremembering that. I have no trouble believing the firmware ras code was
-> untested. It is probably some boilerplate code built in before ras was supported
-> in kernel.
-
-It would be interesting to know which GHES this error is being found in, and
-whether the Error Status Block points anywhere (or at an empty block) when Linux
-is started from UEFI.
-
-If there is something in the Error Status Block out of UEFI, then this must be
-something triggered by UEFI, or a bug that can be fixed by UEFI clearing out the
-CPER records.
-
-https://bugzilla.redhat.com/show_bug.cgi?id=1285107
-suggests redhat can rebuild the UEFI firmware for this box.
-
-
-If there is nothing in the Error Status Block when Linux is started, surely
-Linux is doing something to cause this to happen. I'd like to find out what, as
-its probably a software bug.
-
-
-(The case where disabling HEST would be the right thing to do is if there is a
-bogus GHES->GAS entry in GHES.0, the access to which causes GHES.1 to be
-populated with 'Access to an address not mapped to any component', which we find
-next. If this is the case it would be better to check GHES entries against the
-UEFI memory map to check this is memory, and it was reserved.)
-
-
-> But the problem occurs early enough in boot where there can't be
-> that many things that would cause a problem on m400 and not mustang so I'll
-> look again.
-
-Playing spot the difference in the dmesg, I'd check for smoke coming out of:
-| acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
-| xgene-gpio APMC0D14:00: X-Gene GPIO driver registered.
-| pcie_pme: probe of 0000:00:00.0:pcie001 failed with error -22
-
-If the firmware description of the GIC is wrong in someway, disabling KVM may be
-worth testing too.
-
-
-Thanks,
-
-James
+>>
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  arch/arm/boot/dts/imx7d.dtsi |  5 ++++-
+>>  arch/arm/boot/dts/imx7s.dtsi | 41 ++++++++++++++++++++++++++++++-----------
+>>  2 files changed, 34 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+>> index 200714e..5faff17 100644
+>> --- a/arch/arm/boot/dts/imx7d.dtsi
+>> +++ b/arch/arm/boot/dts/imx7d.dtsi
+>> @@ -87,7 +87,9 @@
+>>
+>>  			port {
+>>  				etm1_out_port: endpoint {
+>> +					direction = <1>;
+>>  					remote-endpoint = <&ca_funnel_in_port1>;
+>> +					coresight,hwid = <0>;
+>>  				};
+>>  			};
+>>  		};
+>> @@ -174,8 +176,9 @@
+>>  	port at 1 {
+>>  		reg = <1>;
+>>  		ca_funnel_in_port1: endpoint {
+>> -			slave-mode;
+>> +			direction = <0>;
+>>  			remote-endpoint = <&etm1_out_port>;
+>> +			coresight,hwid = <1>;
+>>  		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+>> index 4d42335..8e90915 100644
+>> --- a/arch/arm/boot/dts/imx7s.dtsi
+>> +++ b/arch/arm/boot/dts/imx7s.dtsi
+>> @@ -151,23 +151,28 @@
+>>  			port at 0 {
+>>  				reg = <0>;
+>>  				replicator_out_port0: endpoint {
+>> +					direction = <1>;
+>>  					remote-endpoint = <&tpiu_in_port>;
+>> +					coresight,hwid = <0>;
+>>  				};
+>>  			};
+>>
+>>  			port at 1 {
+>>  				reg = <1>;
+>>  				replicator_out_port1: endpoint {
+>> +					direction = <1>;
+>>  					remote-endpoint = <&etr_in_port>;
+>> +					coresight,hwid = <1>;
+>>  				};
+>>  			};
+>>
+>>  			/* replicator input port */
+>>  			port at 2 {
+>> -				reg = <0>;
+>> +				reg = <2>;
+>>  				replicator_in_port0: endpoint {
+>> -					slave-mode;
+>> +					direction = <0>;
+>>  					remote-endpoint = <&etf_out_port>;
+>> +					coresight,hwid = <0>;
+>>  				};
+>>  			};
+>>  		};
+>> @@ -203,16 +208,19 @@
+>>  				port at 0 {
+>>  					reg = <0>;
+>>  					ca_funnel_in_port0: endpoint {
+>> -						slave-mode;
+>> +						direction = <0>;
+>>  						remote-endpoint = <&etm0_out_port>;
+>> +						coresight,hwid = <0>;
+>>  					};
+>>  				};
+>>
+>>  				/* funnel output port */
+>>  				port at 2 {
+>> -					reg = <0>;
+>> +					reg = <2>;
+>>  					ca_funnel_out_port0: endpoint {
+>> +						direction = <1>;
+>>  						remote-endpoint = <&hugo_funnel_in_port0>;
+>> +						coresight,hwid = <0>;
+>>  					};
+>>  				};
+>>
+>> @@ -229,7 +237,9 @@
+>>
+>>  			port {
+>>  				etm0_out_port: endpoint {
+>> +					direction = <1>;
+>>  					remote-endpoint = <&ca_funnel_in_port0>;
+>> +					coresight,hwid = <0>;
+>>  				};
+>>  			};
+>>  		};
+>> @@ -248,22 +258,26 @@
+>>  				port at 0 {
+>>  					reg = <0>;
+>>  					hugo_funnel_in_port0: endpoint {
+>> -						slave-mode;
+>> +						direction = <0>;
+>>  						remote-endpoint = <&ca_funnel_out_port0>;
+>> +						coresight,hwid = <0>;
+>>  					};
+>>  				};
+>>
+>>  				port at 1 {
+>>  					reg = <1>;
+>>  					hugo_funnel_in_port1: endpoint {
+>> -						slave-mode; /* M4 input */
+>> +						direction = <0>; /* M4 input */
+>> +						coresight,hwid = <1>;
+>>  					};
+>>  				};
+>>
+>>  				port at 2 {
+>> -					reg = <0>;
+>> +					reg = <2>;
+>>  					hugo_funnel_out_port0: endpoint {
+>> +						direction = <1>;
+>>  						remote-endpoint = <&etf_in_port>;
+>> +						coresight,hwid = <0>;
+>>  					};
+>>  				};
+>>
+>> @@ -284,15 +298,18 @@
+>>  				port at 0 {
+>>  					reg = <0>;
+>>  					etf_in_port: endpoint {
+>> -						slave-mode;
+>> +						direction = <0>;
+>>  						remote-endpoint = <&hugo_funnel_out_port0>;
+>> +						coresight,hwid = <0>;
+>>  					};
+>>  				};
+>>
+>>  				port at 1 {
+>> -					reg = <0>;
+>> +					reg = <1>;
+>>  					etf_out_port: endpoint {
+>> +						direction = <1>;
+>>  						remote-endpoint = <&replicator_in_port0>;
+>> +						coresight,hwid = <0>;
+>>  					};
+>>  				};
+>>  			};
+>> @@ -306,8 +323,9 @@
+>>
+>>  			port {
+>>  				etr_in_port: endpoint {
+>> -					slave-mode;
+>> +					direction = <0>;
+>>  					remote-endpoint = <&replicator_out_port1>;
+>> +					coresight,hwid = <0>;
+>>  				};
+>>  			};
+>>  		};
+>> @@ -320,8 +338,9 @@
+>>
+>>  			port {
+>>  				tpiu_in_port: endpoint {
+>> -					slave-mode;
+>> +					direction = <0>;
+>>  					remote-endpoint = <&replicator_out_port1>;
+>> +					coresight,hwid = <0>;
+>>  				};
+>>  			};
+>>  		};
+>> --
+>> 2.7.4
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
