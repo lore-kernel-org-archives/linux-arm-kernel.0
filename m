@@ -1,40 +1,65 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Wed, 20 Jun 2018 01:12:22 +0900
-Subject: [PATCH -tip v6 17/27] arm64: kprobes: Don't call the
- ->break_handler() in arm64 kprobes code
-In-Reply-To: <152942424698.15209.15245996287444292393.stgit@devbox>
-References: <152942424698.15209.15245996287444292393.stgit@devbox>
-Message-ID: <152942474231.15209.17684808374429473004.stgit@devbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Jun 2018 17:13:17 +0100
+Subject: [PATCHv3 19/19] arm64: implement syscall wrappers
+In-Reply-To: <20180618120310.39527-20-mark.rutland@arm.com>
+References: <20180618120310.39527-1-mark.rutland@arm.com>
+ <20180618120310.39527-20-mark.rutland@arm.com>
+Message-ID: <20180619161316.le4rfp36ewjjegon@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't call the ->break_handler() from the arm64 kprobes code,
-because it was only used by jprobes which got removed.
+On Mon, Jun 18, 2018 at 01:03:10PM +0100, Mark Rutland wrote:
+> To minimize the risk of userspace-controlled values being used under
+> speculation, this patch adds pt_regs based syscall wrappers for arm64,
+> which pass the minimum set of required userspace values to syscall
+> implementations. For each syscall, a wrapper which takes a pt_regs
+> argument is automatically generated, and this extracts the arguments
+> before calling the "real" syscall implementation.
+> 
+> Each syscall has three functions generated:
+> 
+> * __do_<compat_>sys_<name> is the "real" syscall implementation, with
+>   the expected prototype.
+> 
+> * __se_<compat_>sys_<name> is the sign-extension/narrowing wrapper,
+>   inherited from common code. This takes a series of long parameters,
+>   casting each to the requisite types required by the "real" syscall
+>   implementation in __do_<compat_>sys_<name>.
+> 
+>   This wrapper *may* not be necessary on arm64 given the AAPCS rules on
+>   unused register bits, but it seemed safer to keep the wrapper for now.
+> 
+> * __arm64_<compat_>_sys_<name> takes a struct pt_regs pointer, and
+>   extracts *only* the relevant register values, passing these on to the
+>   __se_<compat_>sys_<name> wrapper.
+> 
+> The syscall invocation code is updated to handle the calling convention
+> required by __arm64_<compat_>_sys_<name>, and passes a single struct
+> pt_regs pointer.
+> 
+> The compiler can fold the syscall implementation and its wrappers, such
+> that the overhead of this approach is minimized.
+> 
+> Note that we play games with sys_ni_syscall(). It can't be defined with
+> SYSCALL_DEFINE0() because we must avoid the possibility of error
+> injection. Additionally, there are a couple of locations where we need
+> to call it from C code, and we don't (currently) have a
+> ksys_ni_syscall().  While it has no wrapper, passing in a redundant
+> pt_regs pointer is benign per the AAPCS.
+> 
+> When ARCH_HAS_SYSCALL_WRAPPER is selected, no prototype is defines for
+> sys_ni_syscall(). Since we need to treat it differently for in-kernel
+> calls and the syscall tables, the prototype is defined as-required.
+> 
+> The wrappers are largely the same as their x86 counterparts, but
+> simplified as we don't have a variety of compat calling conventions that
+> require separate stubs. Unlike x86, we have some zero-argument compat
+> syscalls, and must define COMPAT_SYSCALL_DEFINE0() to ensure that these
+> are also given an __arm64_compat_sys_ prefix.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm64/kernel/probes/kprobes.c |    8 --------
- 1 file changed, 8 deletions(-)
-
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index 3ca2351109a6..076c3c0775a6 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -408,14 +408,6 @@ static void __kprobes kprobe_handler(struct pt_regs *regs)
- 				return;
- 			}
- 		}
--	} else if ((le32_to_cpu(*(kprobe_opcode_t *) addr) ==
--	    BRK64_OPCODE_KPROBES) && cur_kprobe) {
--		/* We probably hit a jprobe.  Call its break handler. */
--		if (cur_kprobe->break_handler  &&
--		     cur_kprobe->break_handler(cur_kprobe, regs)) {
--			setup_singlestep(cur_kprobe, regs, kcb, 0);
--			return;
--		}
- 	}
- 	/*
- 	 * The breakpoint instruction was removed right
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
