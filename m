@@ -1,90 +1,57 @@
-From: javierm@redhat.com (Javier Martinez Canillas)
-Date: Tue, 19 Jun 2018 20:33:56 +0200
-Subject: [RFC PATCH v2] driver core: add a debugfs entry to show deferred
- devices
-Message-ID: <20180619183356.32106-1-javierm@redhat.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 19 Jun 2018 11:40:00 -0700
+Subject: [PATCH 04/11] input: rohm_bu21023: switch to i2c_lock_segment
+In-Reply-To: <20180615101506.8012-5-peda@axentia.se>
+References: <20180615101506.8012-1-peda@axentia.se>
+ <20180615101506.8012-5-peda@axentia.se>
+Message-ID: <20180619184000.GJ71788@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For debugging purposes it may be useful to know what are the devices whose
-probe function was deferred. Add a debugfs entry showing that information.
+On Fri, Jun 15, 2018 at 12:14:59PM +0200, Peter Rosin wrote:
+> Locking the root adapter for __i2c_transfer will deadlock if the
+> device sits behind a mux-locked I2C mux. Switch to the finer-grained
+> i2c_lock_segment. If the device does not sit behind a mux-locked mux,
+> the two locking variants are equivalent.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 
-  $ cat /sys/kernel/debug/deferred_devices
-  48070000.i2c:twl at 48:bci
-  musb-hdrc.0.auto
-  omapdrm.0
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+I'm OK with it going through Wolfram's tree; I do not think I'd need an
+immutable branch for this even...
 
----
+> ---
+>  drivers/input/touchscreen/rohm_bu21023.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/rohm_bu21023.c b/drivers/input/touchscreen/rohm_bu21023.c
+> index bda0500c9b57..22d79db07234 100644
+> --- a/drivers/input/touchscreen/rohm_bu21023.c
+> +++ b/drivers/input/touchscreen/rohm_bu21023.c
+> @@ -304,7 +304,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
+>  	msg[1].len = len;
+>  	msg[1].buf = buf;
+>  
+> -	i2c_lock_adapter(adap);
+> +	i2c_lock_segment(adap);
+>  
+>  	for (i = 0; i < 2; i++) {
+>  		if (__i2c_transfer(adap, &msg[i], 1) < 0) {
+> @@ -313,7 +313,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
+>  		}
+>  	}
+>  
+> -	i2c_unlock_adapter(adap);
+> +	i2c_unlock_segment(adap);
+>  
+>  	return ret;
+>  }
+> -- 
+> 2.11.0
+> 
 
-Changes in v2:
-- Remove unneeded ret variable from deferred_devs_show()
+Thanks.
 
- drivers/base/dd.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 1435d7281c6..d95bd4636fc 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -224,6 +224,42 @@ void device_unblock_probing(void)
- 	driver_deferred_probe_trigger();
- }
- 
-+#if IS_ENABLED(CONFIG_DEBUG_FS)
-+#include <linux/debugfs.h>
-+
-+static struct dentry *deferred_devices;
-+
-+/*
-+ * deferred_devs_show() - Show the devices in the deferred probe pending list.
-+ */
-+static int deferred_devs_show(struct seq_file *s, void *data)
-+{
-+	struct device_private *curr;
-+
-+	mutex_lock(&deferred_probe_mutex);
-+
-+	list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
-+		seq_printf(s, "%s\n", dev_name(curr->device));
-+
-+	mutex_unlock(&deferred_probe_mutex);
-+
-+	return 0;
-+}
-+
-+static int deferred_devs_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, deferred_devs_show, inode->i_private);
-+}
-+
-+static const struct file_operations deferred_devs_fops = {
-+	.owner = THIS_MODULE,
-+	.open = deferred_devs_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+#endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
-+
- /**
-  * deferred_probe_initcall() - Enable probing of deferred devices
-  *
-@@ -233,6 +269,14 @@ void device_unblock_probing(void)
-  */
- static int deferred_probe_initcall(void)
- {
-+	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
-+		deferred_devices = debugfs_create_file("deferred_devices",
-+						       0444, NULL, NULL,
-+						       &deferred_devs_fops);
-+		if (!deferred_devices)
-+			return -ENOMEM;
-+	}
-+
- 	driver_deferred_probe_enable = true;
- 	driver_deferred_probe_trigger();
- 	/* Sort as many dependencies as possible before exiting initcalls */
 -- 
-2.17.1
+Dmitry
