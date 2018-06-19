@@ -1,54 +1,57 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 19 Jun 2018 15:59:14 +0800
-Subject: [PATCH v6 09/29] drm/mediatek: add component DSI3
-In-Reply-To: <1529393670-26862-10-git-send-email-stu.hsieh@mediatek.com>
-References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
- <1529393670-26862-10-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529395154.26480.2.camel@mtksdaap41>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 19 Jun 2018 10:09:05 +0200
+Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
+ zero again
+In-Reply-To: <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
+References: <cover.1528288895.git.michal.simek@xilinx.com>
+ <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
+Message-ID: <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
-> This patch add the component DSI3
+On 6.6.2018 14:41, Michal Simek wrote:
+> Writing zero and NULLs to already initialized fields is not needed.
+> Remove this additional writes.
 > 
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 ++
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
->  2 files changed, 3 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index 071f9f5aefea..17b681686471 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -228,6 +228,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
->  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
->  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
->  	[DDP_COMPONENT_DSI2]	= { MTK_DSI,		2, NULL },
-> +	[DDP_COMPONENT_DSI3]	= { MTK_DSI,		3, NULL },
->  	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
->  	[DDP_COMPONENT_OD0]	= { MTK_DISP_OD,	0, &ddp_od },
->  	[DDP_COMPONENT_OD1]	= { MTK_DISP_OD,	1, &ddp_od },
-> @@ -280,6 +281,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
->  	    comp_id == DDP_COMPONENT_DPI1 ||
->  	    comp_id == DDP_COMPONENT_DSI0 ||
->  	    comp_id == DDP_COMPONENT_DSI2 ||
-> +	    comp_id == DDP_COMPONENT_DSI3 ||
->  	    comp_id == DDP_COMPONENT_PWM0) {
->  		comp->regs = NULL;
->  		comp->clk = NULL;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index 8d152b337f15..7413ffeb3c9d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -51,6 +51,7 @@ enum mtk_ddp_comp_id {
->  	DDP_COMPONENT_DSI0,
->  	DDP_COMPONENT_DSI1,
->  	DDP_COMPONENT_DSI2,
-> +	DDP_COMPONENT_DSI3,
->  	DDP_COMPONENT_GAMMA,
->  	DDP_COMPONENT_OD0,
->  	DDP_COMPONENT_OD1,
+> Changes in v2:
+> - new patch - it can be sent separately too
+> 
+>  drivers/tty/serial/xilinx_uartps.c | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index 8a3e34234e98..5f116f3ecd4a 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
+>  
+>  	/* At this point, we've got an empty uart_port struct, initialize it */
+>  	spin_lock_init(&port->lock);
+> -	port->membase	= NULL;
+> -	port->irq	= 0;
+>  	port->type	= PORT_UNKNOWN;
+>  	port->iotype	= UPIO_MEM32;
+>  	port->flags	= UPF_BOOT_AUTOCONF;
+>  	port->ops	= &cdns_uart_ops;
+>  	port->fifosize	= CDNS_UART_FIFO_SIZE;
+>  	port->line	= id;
+> -	port->dev	= NULL;
+>  
+>  	/*
+>  	 * Register the port.
+> 
+
+Alan, Rob, Greg: Any comment about this RFC?
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
