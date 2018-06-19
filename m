@@ -1,88 +1,116 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 19 Jun 2018 13:06:19 +0530
-Subject: [linux-sunxi] [PATCH v3 4/4] arm64: dts: allwinner: a64: add SRAM
- controller device tree node
-In-Reply-To: <5C14D945-0795-4100-86E2-6FBF04350715@aosc.io>
-References: <20180614153548.9644-1-wens@csie.org>
- <20180614153548.9644-5-wens@csie.org>
- <CAMty3ZARNpBOQKvS7knH8kWE2+bvjuJoAA4cFGZK8+GzTUQ5zA@mail.gmail.com>
- <2687631.x8iGEoiUx5@jernej-laptop>
- <5C14D945-0795-4100-86E2-6FBF04350715@aosc.io>
-Message-ID: <CAMty3ZCsPXh7Fhmhtd7UjTmJ9id+NeaZDVqkix1iQz7-fDqoUw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 19 Jun 2018 09:48:34 +0200
+Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr
+ address calculation
+In-Reply-To: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
+References: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
+Message-ID: <CAKv+Gu8Byj7G3Awnq4Y90Wot=GJTx0gO5A7-960au9ZkBBL2=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 4:39 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On 19 June 2018 at 07:07, Guenter Roeck <linux@roeck-us.net> wrote:
+> Modern assemblers may take the ISA into account when resolving local
+> symbols. This can result in bad address calculations when using badr
+> in the wrong location since the offset + 1 may be added twice, resulting
+> in an even address target for THUMB instructions. This in turn results
+> in an exception at (destination address + 2).
 >
+> Unhandled exception: IPSR = 00000006 LR = fffffff1
+> CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00026-gf773e5bdf0c9 #15
+> Hardware name: MPS2 (Device Tree Support)
+> PC is at ret_fast_syscall+0x2/0x58
+> LR is at tty_ioctl+0x2a5/0x528
+> pc : [<21009002>]    lr : [<210d1535>]    psr: 4000000b
+> sp : 21825fa8  ip : 0000001c  fp : 21a95892
+> r10: 00000000  r9 : 21824000  r8 : 210091c0
+> r7 : 00000036  r6 : 21ae1ee0  r5 : 00000000  r4 : 21ae1f3c
+> r3 : 00000000  r2 : 3d9adc25  r1 : 00000000  r0 : 00000000
+> xPSR: 4000000b
+> CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00026-gf773e5bdf0c9 #15
+> Hardware name: MPS2 (Device Tree Support)
+> [<2100bd8d>] (unwind_backtrace) from [<2100b13b>] (show_stack+0xb/0xc)
+> [<2100b13b>] (show_stack) from [<2100b87b>] (__invalid_entry+0x4b/0x4c)
 >
-> ? 2018?6?15? GMT+08:00 ??1:27:21, "Jernej ?krabec" <jernej.skrabec@gmail.com> ??:
->>Dne ?etrtek, 14. junij 2018 ob 19:09:56 CEST je Jagan Teki napisal(a):
->>> On Thu, Jun 14, 2018 at 9:05 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->>> > From: Icenowy Zheng <icenowy@aosc.io>
->>> >
->>> > Allwinner A64 has a SRAM controller, and in the device tree
->>currently
->>> > we have a syscon node to enable EMAC driver to access the EMAC
->>clock
->>> > register. As SRAM controller driver can now export regmap for this
->>> > register, replace the syscon node to the SRAM controller device
->>node,
->>> > and let EMAC driver to acquire its EMAC clock regmap.
->>> >
->>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> > [wens at csie.org: Updated compatible string]
->>> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> > ---
->>> >
->>> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19
->>+++++++++++++++++--
->>> >  1 file changed, 17 insertions(+), 2 deletions(-)
->>> >
->>> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> > b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi index
->>> > 1b2ef28c42bd..87968dafe1dc 100644
->>> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> > @@ -169,9 +169,24 @@
->>> >
->>> >                 ranges;
->>> >
->>> >                 syscon: syscon at 1c00000 {
->>> >
->>> > -                       compatible =
->>> > "allwinner,sun50i-a64-system-controller", -
->>
->>> > "syscon";
->>> > +                       compatible =
->>> > "allwinner,sun50i-a64-system-control";
->>> >
->>> >                         reg = <0x01c00000 0x1000>;
->>> >
->>> > +                       #address-cells = <1>;
->>> > +                       #size-cells = <1>;
->>> > +                       ranges;
->>> > +
->>> > +                       sram_c: sram at 18000 {
->>> > +                               compatible = "mmio-sram";
->>> > +                               reg = <0x00018000 0x28000>;
->>> > +                               #address-cells = <1>;
->>> > +                               #size-cells = <1>;
->>> > +                               ranges = <0 0x00018000 0x28000>;
->>> > +
->>> > +                               de2_sram: sram-section at 0 {
->>>
->>> So, this can attach to display-engine node through allwinner,sram and
->>> add support to claim the sram on sun4i/sun4i_drv.c, correct?
->>
->>Actually, it has to be added to display_clocks node and claimed in
->>drivers/
->>clk/sunxi-ng/ccu-sun8i-de2.c
+> Fix the problem by using a logical or instead of an addition. This is
+> less efficient but guaranteed to work.
 >
-> Sorry it's old practice.
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> RFC: I don't really like this, but my ARM assembler knowledge is quite
+> limited. Just dropping the "+ 1" from badr doesn't work because some
+> other code needs it (the image hangs completely if I try that).
+> Ultimately I don't even know if the invoke_syscall macro should just
+> have used adr instead of badr (but then how did this ever work ?).
 >
-> My new way is to add a bus driver which claims the SRAM.
+> Seen with various toolchains based on gcc 7.x and binutils 2.30 when
+> building and testing MPS2 images.
+>
 
-Are you pointing this driver[1] ? if yes do we have recent version
-patches for these changes so-that I can import.
+Hello Guenter,
 
-[1] https://patchwork.kernel.org/patch/10290399/
+This issue has been discussed before. It appears the binutils people
+suddenly started caring about the thumb annotation of local function
+symbols, resulting in behavior that is not backwards compatible.
+
+https://marc.info/?l=linux-arm-kernel&m=151143776213636&w=2
+https://sourceware.org/bugzilla/show_bug.cgi?id=21458
+
+Can you try the fix below please?
+
+>  arch/arm/include/asm/assembler.h | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 0cd4dccbae78..24c87ff2060f 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -195,7 +195,8 @@
+>         .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+>         .macro  badr\c, rd, sym
+>  #ifdef CONFIG_THUMB2_KERNEL
+> -       adr\c   \rd, \sym + 1
+> +       adr\c   \rd, \sym
+> +       orr     \rd, #1
+>  #else
+>         adr\c   \rd, \sym
+>  #endif
+> --
+> 2.7.4
+
+----------8<------------
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 16 Jan 2018 12:12:45 +0000
+Subject: [PATCH] ARM: assembler: prevent ADR from setting the Thumb bit twice
+
+To work around recent issues where ADR references to Thumb function
+symbols may or may not have the Thumb bit set already when they are
+resolved by GAS, reference the symbol indirectly via a local symbol
+typed as 'object', stripping the ARM/Thumb annotation.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 6ae42ad29518..dd2ff94ad90b 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -195,13 +195,19 @@
+        .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+        .macro  badr\c, rd, sym
+ #ifdef CONFIG_THUMB2_KERNEL
+-       adr\c   \rd, \sym + 1
++       __badr  \c, \rd, \sym
+ #else
+        adr\c   \rd, \sym
+ #endif
+        .endm
+        .endr
+
++       /* this needs to be a separate macro or \@ does not work correctly */
++       .macro  __badr, c, rd, sym
++       .eqv    .Lsym\@, \sym
++       adr\c   \rd, .Lsym\@ + 1
++       .endm
++
+ /*
+  * Get current thread_info.
+  */
