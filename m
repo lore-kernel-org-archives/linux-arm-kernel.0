@@ -1,49 +1,111 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 19 Jun 2018 17:29:12 +0200
-Subject: [PATCH] clk: meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL
-In-Reply-To: <1528892771.2292.2.camel@baylibre.com>
-References: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
- <1528892771.2292.2.camel@baylibre.com>
-Message-ID: <1529422152.28510.24.camel@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 19 Jun 2018 17:30:43 +0200
+Subject: [Dev] [PATCH 0/5] RFC: Mezzanine handling for 96boards
+In-Reply-To: <CAMuUZTHOuzQm3y-yF6cad9y1UgsK+6R2w7vSzz7MkkYCdYd3hA@mail.gmail.com>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+ <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
+ <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
+ <CAMuUZTG0q4f2T=+HjEijUCLb7KNXok9RJHOXOKNs2iap5p7m5Q@mail.gmail.com>
+ <CAKv+Gu_Dq1uY0wHRyREmCmQdSRSJbNheF1ZsrNhibKOZowvf+g@mail.gmail.com>
+ <CAMuUZTHOuzQm3y-yF6cad9y1UgsK+6R2w7vSzz7MkkYCdYd3hA@mail.gmail.com>
+Message-ID: <CAKv+Gu80zzaahJhoMScvZ9dS31QobMa0+JFjaOo-GxD+4XsuWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-13 at 14:26 +0200, Jerome Brunet wrote:
-> On Wed, 2018-06-13 at 14:20 +0200, Neil Armstrong wrote:
-> > On Amlogic Meson GXBB & GXL platforms, the SCPI Cortex-M4 Co-Processor
-> > seems to be dependent on the FCLK_DIV2 to be operationnal.
-> > 
-> > The issue occured since v4.17-rc1 by freezing the kernel boot when
-> > the 'schedutil' cpufreq governor was selected as default :
-> > 
-> >    [   12.071837] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
-> >    domain-0 init dvfs: 4
-> >    [   12.087757] hctosys: unable to open rtc device (rtc0)
-> >    [   12.087907] cfg80211: Loading compiled-in X.509 certificates for regulatory database
-> >    [   12.102241] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
-> > 
-> > But when disabling the MMC driver, the boot finished but cpufreq failed to
-> > change the CPU frequency :
-> > 
-> >    [   12.153045] cpufreq: __target_index: Failed to change cpu frequency: -5
-> > 
-> > A bisect between v4.16 and v4.16-rc1 gave the 05f814402d61 commit to be
-> > the first bad commit.
-> > This commit added support for the missing clock gates before the fixed PLL
-> > fixed dividers (FCLK_DIVx) and the clock framework basically disabled
-> > all the unused fixed dividers, thus disabled a critical clock path for
-> > the SCPI Co-Processor.
-> > 
-> > This patch simply sets the FCLK_DIV2 gate as critical to ensure
-> > nobody can disable it.
-> > 
-> > Fixes: 05f814402d61 ("clk: meson: add fdiv clock gates")
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> Good catch !
-> We'll probably have to check the axg family as well
+On 19 June 2018 at 17:26, Yang Zhang <yang.zhang@96boards.org> wrote:
+> Yes.
+>
+> https://github.com/96boards/documentation/blob/master/mezzanine/files/mezzanine-design-guidelines.pdf
+>
+> Under Configuration data section
+>
 
-SCPI is not enabled on AXG at this time. We'll deal with it when the time comes.
+OK, fair enough. Do any such mezzanines exist yet? Should we offer
+more guidance on how exactly this discovery should be implemented?
 
-patch applied.
-Thx
+> On 19 June 2018 at 16:25, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
+>> On 19 June 2018 at 17:14, Yang Zhang <yang.zhang@96boards.org> wrote:
+>> >
+>> >
+>> > On 18 June 2018 at 14:22, Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > wrote:
+>> >>
+>> >> On 18 June 2018 at 14:21, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > On Mon, Jun 18, 2018 at 9:45 AM, Linus Walleij
+>> >> > <linus.walleij@linaro.org> wrote:
+>> >> >> This is a proposal for how to handle the non-discoverable
+>> >> >> 96boards plug-in expansion boards called "mezzanines" in the
+>> >> >> Linux kernel. It is a working RFC series meant for discussion
+>> >> >> at the moment.
+>> >> >>
+>> >> >> The RFC was done on the brand new Ultra96 board from Xilinx
+>> >> >> with a Secure96 mezzanine expansion board. The main part
+>> >> >> is in patch 4, the rest is enabling and examples.
+>> >> >>
+>> >> >> The code can be obtained from here:
+>> >> >>
+>> >> >>
+>> >> >> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git/log/?h=ultra96
+>> >> >>
+>> >> >> You can for example probably augment the DTS file for any
+>> >> >> upstream-supported 96board and get the Secure96 going with
+>> >> >> it with minor efforts.
+>> >> >
+>> >> > Hi Linus,
+>> >> >
+>> >> > Thanks for your work on solving this long-standing problem. I've just
+>> >> > read through your patches briefly and have a few thoughts:
+>> >> >
+>> >> > - I really like the idea of having C code deal with the mezzanine
+>> >> >   connector itself, acting as an intermediate to tie a number of
+>> >> >   boards to a number of add-on cards, this seems much simpler than
+>> >> >   trying to do everything with overlays or one of the other more
+>> >> >   generic mechanisms.
+>> >> >
+>> >> > - I don't like the idea of having the bus driver contain a list of
+>> >> > possible
+>> >> >   add-ons, this seems to go against our usual driver model. What
+>> >> >   I think we want instead is to make the connector itself a proper
+>> >> >   bus_type, to allow drivers to register against it as loadable
+>> >> > modules,
+>> >> >   and devices (maybe limited to one device) being created as probed
+>> >> >   from DT or some other method as you describe.
+>> >> >
+>> >> > - You export symbols in the mezzanine_* namespace, which I think
+>> >> >    is a bit too generic and should perhaps contain something related
+>> >> >    to  96boards in its name to make it less ambiguous. I suspect we
+>> >> >    would add a number of further connectors for hats, capes, lures
+>> >> > etc,
+>> >> >    which could all be described as mezzanines. One open question
+>> >> >    is how we structure the commonality between the various
+>> >> >    connectors, but we can defer that until we have more than one
+>> >> >    or two of them.
+>> >> >
+>> >>
+>> >> Hello all,
+>> >>
+>> >> We should also consider firmware use of the mezzanines. For instance,
+>> >> the Secure96 has a RNG which UEFI may want to use so the early boot
+>> >> code can access is for KASLR. It also has a TPM, which should not be
+>> >> reset/reinitialized/etc by the OS if we want to make meaningful use of
+>> >> it.
+>> >>
+>> >> Also, given that we can (and do) already describe topologies involving
+>> >> mezzanines by ignoring the connector altogether (which is not entirely
+>> >> unreasonable given the fact that we [as Linaro/96boards] dropped the
+>> >> ball on this one and did not mandate discoverability for mezzanines).
+>> >
+>> >
+>> > The design guideline has been reviewed by many inside/outside linaro
+>> > through
+>> > the mezzanine at lists.96boards.org and 96b-spec-sig
+>> > <96b-spec-sig@96boards.org> published as recommended/strongly
+>> > recommended
+>> > item from day one. 'dropping the ball' is a strong conclusion.
+>> >
+>>
+>> Apologies for using a term that you seem to take issue with. Are you
+>> saying the spec currently recommends it?
+>
+>
