@@ -1,51 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jun 2018 15:32:45 +0100
-Subject: [PATCHv3 09/19] arm64: convert syscall trace logic to C
-In-Reply-To: <20180618120310.39527-10-mark.rutland@arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-10-mark.rutland@arm.com>
-Message-ID: <20180619143245.pjkcutm5hupfunla@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Jun 2018 15:41:43 +0100
+Subject: next/master boot: 138 boots: 8 failed, 112 passed with 18
+ offline (next-20180619)
+In-Reply-To: <69c0adb9-b784-4f73-fcc9-ff1a01ce27c5@arm.com>
+References: <5b290c6d.1c69fb81.fc936.98ee@mx.google.com>
+ <20180619141324.GD11230@sirena.org.uk>
+ <69c0adb9-b784-4f73-fcc9-ff1a01ce27c5@arm.com>
+Message-ID: <20180619144143.GE11230@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 01:03:00PM +0100, Mark Rutland wrote:
-> +asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
-> +			       syscall_fn_t syscall_table[])
-> +{
-> +	unsigned long flags = current_thread_info()->flags;
-> +
-> +	regs->orig_x0 = regs->regs[0];
-> +	regs->syscallno = scno;
-> +
-> +	local_daif_restore(DAIF_PROCCTX);
-> +	user_exit();
-> +
-> +	if (has_syscall_work(flags)) {
-> +		/* set default errno for user-issued syscall(-1) */
-> +		if (scno == NO_SYSCALL)
-> +			regs->regs[0] = -ENOSYS;
-> +		scno = syscall_trace_enter(regs);
-> +		if (scno == NO_SYSCALL)
-> +			goto trace_exit;
-> +	}
-> +
-> +	invoke_syscall(regs, scno, sc_nr, syscall_table);
-> +
-> +	/*
-> +	 * The tracing status may have changed under our feet, so we have to
-> +	 * check again. However, if we were tracing entry, then we always trace
-> +	 * exit regardless, as the old entry assembly did.
-> +	 */
-> +	if (!has_syscall_work(flags)) {
-> +		local_daif_mask();
-> +		flags = current_thread_info()->flags;
-> +		if (!has_syscall_work(flags))
-> +			return;
-> +		local_daif_restore(DAIF_PROCCTX);
-> +	}
+On Tue, Jun 19, 2018 at 03:22:47PM +0100, Sudeep Holla wrote:
 
-IIUC the above 'if' block replaces ret_fast_syscall in entry.S with the
-work_pending handled via ret_to_user (we used to check _TIF_WORK_MASK in
-two places). 
+> Based on the logs from successful boots, I see it's CPUFreq that gets
+> probed after fan53555-reg. I also see that it warns about unlisted OPPs
+> in the successful boots. I guess, the undefined instruction could occur
+> if there's issue with CPU DVFS(under voltage or frequency that's not
+> supported). I don't have much knowledge on the platform, I am just
+> guessing on the possible cause here.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Yeah, that was my guess - either an out of spec voltage/frequency was
+selected or the regulator isn't able to keep up with the voltage
+transition or a load spike and the power browns out.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/cd40b399/attachment.sig>
