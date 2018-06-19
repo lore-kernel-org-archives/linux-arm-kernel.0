@@ -1,56 +1,61 @@
-From: justinmattock@gmail.com (Justin P. Mattock)
-Date: Tue, 19 Jun 2018 20:24:31 -0000
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C5FA66D.7060404@st.com>
-References: <4C5F9B25.8080401@st.com> <4C5FA35E.50309@gmail.com>
- <4C5FA66D.7060404@st.com>
-Message-ID: <4C5FAF04.9070705@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Jun 2018 20:24:40 -0000
+Subject: [PATCH 4/5] [omap1] Bluetooth device code common to HTC
+ smartphones
+In-Reply-To: <AANLkTikGA9-TCM7v+_yivBYtxiX3ByJ7_ub1FOP0LgBO@mail.gmail.com>
+References: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
+ <1280762976-17284-5-git-send-email-darkstar6262@gmail.com>
+ <20100804101507.GG9881@atomide.com>
+ <AANLkTikGA9-TCM7v+_yivBYtxiX3ByJ7_ub1FOP0LgBO@mail.gmail.com>
+Message-ID: <20100809074300.GB32480@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2010 11:55 PM, viresh kumar wrote:
-> On 8/9/2010 12:12 PM, Justin P. Mattock wrote:
->> On 08/08/2010 11:07 PM, viresh kumar wrote:
->>>> Hello,
->>>>
->>>> Mail server in ST has recently changed and now we have Microsoft
->>>> exchange server. We are using thunderbird as mail client.
->>>> What we observed with this server is that patch are broken now while
->>>> sending as well as receiving. Tabs are replaced by spaces and may
->>>> be some other too which we haven't observed.
->>>>
->>>> Has anybody found a solution to this kind of issues? Are there any
->>>> workarounds possible?
->>>>
->>
->> still trying to figure this out with thunderbird.. but did notice in
->> Documentation/email-clients.txt and SubmittingPatches
->> there's info about that(just haven't gotten around to reading use git
->> send-email for patches)
->>
->> hope this helps.
->
-> I missed this information in my last mail. We are using git send-email for
-> sending patches. As patches will go through Microsoft exchange server only,
-> so they are broken.
->
-> viresh.
->
+* Cory Maccarrone <darkstar6262@gmail.com> [100808 20:22]:
+> On Wed, Aug 4, 2010 at 3:15 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Cory Maccarrone <darkstar6262@gmail.com> [100802 18:23]:
+> >> This change adds in a bluetooth controld driver/rfkill
+> >> interface to the serial bluetooth controller found on many
+> >> HTC smartphones such as the HTC Herald and HTC Wizard.
+> >
+> > To me it looks like most of this should be in drivers/bluetooth/omap7xx.c
+> > or something like that. Then you can just pass it the gpio numbers in
+> > the platform_data.
+> >
+> 
+> Not sure I agree that it fits there.  The driver isn't really a
+> bluetooth driver -- it's really just an RFKILL interface, and some
+> code to toggle UART clocks on and off, plus GPIO work on a
+> board-specific level.  In principle, the gpios could be set and the
+> clocks enabled in the board files, and this driver wouldn't be
+> necessary to get working bluetooth (as we'd use hciattach on
+> /dev/ttyS*).  But then, we can't toggle it off for power saving.
+> Maybe a better place would be plat-omap/?  But it really is more
+> specific to these HTC boards, not the architecture itself.
 
+Hmm well what we've used earlier is to set something like set_power
+function pointer in the platform data, then call that in the driver
+if set. But in this case the driver is 8250.c, so let's not mess
+with that..
 
-hmm.. then I don't know the answer to that.. always send through git 
-send-email(patches)and things are good(knock-on-wood)always ran into 
-issues with copy/pasting onto thunderbird. Hopefully somebody else with 
-more knowledge of using git send-email patches through microsoft 
-exchange answers this..
+This issue should get properly solved with the omap specific serial
+driver once we get that merged as then we can have hooks for set_power
+in addition to cutting serial clocks when idle.
 
-side note: maybe postfix or some type of wrapper around the wording 
-message(utf-8) to keep microsoft from mangling things or 
-something.(tough to say though)
+> So really, the only point of this driver is to be able to power on and
+> off the external bluetooth chip, which is why I submitted it as helper
+> code to the board files.
 
-Justin P. Mattock
+Yeah. Can you take a look at the omap specific serial driver to get
+it working on omap1?
+
+Then you can have your GPIO functions set in the board-*.c file
+as set_power or similar, and the UART driver can idle properly.
+
+Regards,
+
+Tony
 --
-To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+To unsubscribe from this list: send the line "unsubscribe linux-omap" in
 the body of a message to majordomo at vger.kernel.org
 More majordomo info at  http://vger.kernel.org/majordomo-info.html
-Please read the FAQ at  http://www.tux.org/lkml/
