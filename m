@@ -1,79 +1,89 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 19 Jun 2018 16:58:54 +1000
-Subject: [PATCH v2 2/4] dt-bindings: misc: Aspeed coprocessor interrupt
- controller
-In-Reply-To: <CACPK8XfCZA7m++KeJ1GyPAbBXPmyhebEkvb+R41Xy1iuGvkbLw@mail.gmail.com>
-References: <20180618045902.11453-1-benh@kernel.crashing.org>
- <20180618045902.11453-3-benh@kernel.crashing.org>
- <CACPK8XfCZA7m++KeJ1GyPAbBXPmyhebEkvb+R41Xy1iuGvkbLw@mail.gmail.com>
-Message-ID: <abec6c1847f9f46c5cbd1f485ec45acc7b5af1c7.camel@kernel.crashing.org>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 19 Jun 2018 09:25:59 +0200
+Subject: [PATCH 2/2] arm64: dts: exynos: Remove unneeded DSI and DECON
+ address/size cells in Exynos5433
+In-Reply-To: <20180618174216.24801-2-krzk@kernel.org>
+References: <20180618174216.24801-1-krzk@kernel.org>
+ <CGME20180618174318epcas1p4a79e7e7328d3b604efc3084e323421d7@epcas1p4.samsung.com>
+ <20180618174216.24801-2-krzk@kernel.org>
+Message-ID: <20180619072601eucas1p27e2b081429ed54e6df8a5794ef0f150b~5fvopvw1v0712907129eucas1p2R@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-06-19 at 16:26 +0930, Joel Stanley wrote:
-> On 18 June 2018 at 14:29, Benjamin Herrenschmidt
-> <benh@kernel.crashing.org> wrote:
-> > Add the device-tree binding definition for the AST2400
-> > and AST2500 coprocessor interrupt controller
-> > 
-> > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > ---
-> >  .../devicetree/bindings/misc/aspeed,cvic.txt  | 35 +++++++++++++++++++
-> >  1 file changed, 35 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/misc/aspeed,cvic.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/misc/aspeed,cvic.txt b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
-> > new file mode 100644
-> > index 000000000000..2562e2991e4d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
-> 
-> Is there a reason you didn't put this in bindings/interrupt-controller?
+On 18.06.2018 19:42, Krzysztof Kozlowski wrote:
+> The decon, decon_tv and dsi nodes have only one child port so
+> address/size mappings are not necessary.  This fixes DTC warnings like:
+>
+>     Warning (graph_child_address): /soc/decon at 13800000/ports:
+>         graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
 
-Well, I don't call it interrupt-controller anymore, it's not an
-interrupt controller for the main CPU so I decided to leave it out.
+DECON nodes according to documentation have only one port so it is OK.
+DSI has two ports, but since on all Exynos platforms DSI panels/bridges
+are subnodes of ExynosDSI the 2nd port is not used.
+So if there will be a platform with DSI panel/bridge controlled via I2C,
+it should be reverted., but this is theoretical problem.
 
-If you (or somebody) has strong feeling about it, I can call it
-interrupt-controller again and move it back there :)
 
-> Aside from that this looks good.
-> 
-> > @@ -0,0 +1,35 @@
-> > +* Aspeed AST2400 and AST2500 coprocessor interrupt controller
-> > +
-> > +This file describes the bindings for the interrupt controller present
-> > +in the AST2400 and AST2500 BMC SoCs which provides interrupt to the
-> > +ColdFire coprocessor.
-> > +
-> > +It is not a normal interrupt controller and it would be rather
-> > +inconvenient to create an interrupt tree for it as it somewhat shares
-> > +some of the same sources as the main ARM interrupt controller but with
-> > +different numbers.
-> > +
-> > +The AST2500 supports a SW generated interrupt
-> > +
-> > +Required properties:
-> > +- reg: address and length of the register for the device.
-> > +- compatible: "aspeed,cvic" and one of:
-> > +               "aspeed,ast2400-cvic"
-> > +             or
-> > +               "aspeed,ast2500-cvic"
-> > +
-> > +- valid-sources: One cell, bitmap of supported sources for the implementation
-> > +
-> > +Optional properties;
-> > +- copro-sw-interrupts: List of interrupt numbers that can be used as
-> > +                      SW interrupts from the ARM to the coprocessor.
-> > +                      (AST2500 only)
-> > +
-> > +Example:
-> > +
-> > +       cvic: copro-interrupt-controller at 1e6c2000 {
-> > +               compatible = "aspeed,ast2500-cvic";
-> > +               valid-sources = <0xffffffff>;
-> > +               copro-sw-interrupts = <1>;
-> > +               reg = <0x1e6c2000 0x80>;
-> > +       };
-> > --
-> > 2.17.1
-> > 
+
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+?--
+Regards
+Andrzej
+
+
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi |  6 +-----
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi            | 12 ++----------
+>  2 files changed, 3 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> index a1e3194b7483..0a15ee513f5c 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> @@ -321,11 +321,7 @@
+>  	status = "okay";
+>  
+>  	ports {
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+> -		port at 0 {
+> -			reg = <0>;
+> +		port {
+>  			tv_to_hdmi: endpoint {
+>  				remote-endpoint = <&hdmi_to_tv>;
+>  			};
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> index 3a9b4c4b9c63..e4367fd39120 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> @@ -850,11 +850,7 @@
+>  			iommu-names = "m0", "m1";
+>  
+>  			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +				port {
+>  					decon_to_mic: endpoint {
+>  						remote-endpoint =
+>  							<&mic_to_decon>;
+> @@ -914,11 +910,7 @@
+>  			#size-cells = <0>;
+>  
+>  			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +				port {
+>  					dsi_to_mic: endpoint {
+>  						remote-endpoint = <&mic_to_dsi>;
+>  					};
