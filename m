@@ -1,17 +1,46 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 19 Jun 2018 10:01:56 +0530
-Subject: [PATCH] MAINTAINERS: Update email-id of Sinan Kaya
-In-Reply-To: <1528983482-31028-1-git-send-email-okaya@codeaurora.org>
-References: <1528983482-31028-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180619043156.GO25852@vkoul-mobl>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 18 Jun 2018 21:54:57 -0700
+Subject: [PATCH] serial: mps2-uart: Initialize early console
+Message-ID: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-06-18, 09:37, Sinan Kaya wrote:
-> I'm no longer with QCOM. I am still interested in maintaining or reviewing
-> PCI/DMA engine patches. Update email-id to an active one.
+The early console code for mps2-uart assumes that the serial hardware is
+enabled for transmit when the system boots. However, this is not the case
+after reset. This results in a hang in mps2_early_putchar() if the serial
+transmitter is not enabled by a boot loader or ROM monitor.
 
-Applied, thanks
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/tty/serial/mps2-uart.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
+diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
+index 9f8f63719126..0743a0551ce1 100644
+--- a/drivers/tty/serial/mps2-uart.c
++++ b/drivers/tty/serial/mps2-uart.c
+@@ -448,6 +448,14 @@ static struct console mps2_uart_console = {
+ 
+ #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
+ 
++static void mps2_early_init(struct uart_port *port)
++{
++	u8 control = readb(port->membase + UARTn_CTRL);
++
++	control |= UARTn_CTRL_TX_ENABLE;
++	writeb(control, port->membase + UARTn_CTRL);
++}
++
+ static void mps2_early_putchar(struct uart_port *port, int ch)
+ {
+ 	while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
+@@ -469,6 +477,7 @@ static int __init mps2_early_console_setup(struct earlycon_device *device,
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
++	mps2_early_init(&device->port);
+ 	device->con->write = mps2_early_write;
+ 
+ 	return 0;
 -- 
-~Vinod
+2.7.4
