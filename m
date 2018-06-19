@@ -1,91 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:58:50 +0100
-Subject: [PATCH] arm: Hook up SYNC_CORE functionality for sys_membarrier()
-In-Reply-To: <1431651959.17300.1529412602455.JavaMail.zimbra@efficios.com>
-References: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
- <1431651959.17300.1529412602455.JavaMail.zimbra@efficios.com>
-Message-ID: <20180619125849.GH13984@arm.com>
+Date: Tue, 19 Jun 2018 13:53:14 +0100
+Subject: [RESEND PATCH v2 9/9] arm64: bitops: Include
+ <asm-generic/bitops/ext2-atomic-setbit.h>
+In-Reply-To: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
+References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1529412794-17720-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+asm-generic/bitops/ext2-atomic-setbit.h provides the ext2 atomic bitop
+definitions, so we don't need to define our own.
 
-On Tue, Jun 19, 2018 at 08:50:02AM -0400, Mathieu Desnoyers wrote:
-> ----- On Jun 19, 2018, at 8:22 AM, Will Deacon will.deacon at arm.com wrote:
-> 
-> > Exception return implies context synchronization, so we can hook up the
-> > SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
-> > just like we've done for arm64 already.
-> > 
-> > Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-> > Cc: Orion Hodson <oth@google.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> > arch/arm/Kconfig | 1 +
-> > 1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 54eeb8d00bc6..b0ac18547370 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -9,6 +9,7 @@ config ARM
-> > 	select ARCH_HAS_ELF_RANDOMIZE
-> > 	select ARCH_HAS_FORTIFY_SOURCE
-> > 	select ARCH_HAS_KCOV
-> > +	select ARCH_HAS_MEMBARRIER_SYNC_CORE
-> 
-> In addition to this, we added this comment in arch/arm64/kernel/entry.S:
-> 
-> +       /*
-> +        * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on eret context synchronization
-> +        * when returning from IPI handler, and when returning to user-space.
-> +        */
-> 
-> So I would expect a similar comment in arch/arm/kernel/entry-header.S, within
-> svc_exit and svc_exit_via_fiq:
-> 
->         /*
->          * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on [insn] context synchronization
->          * when returning from IPI handler, and when returning to user-space.
->          */
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/bitops.h | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-Bah, you know I hate that comment ;) I should update arch-support.txt,
-though. Diff below.
-
-> Which instruction exactly is responsible for context synchronization on
-> arm32 ?
-
-It's the act of doing an exception return, so there are multiple instruction
-sequences to do that on 32-bit arm.
-
-Will
-
---->8
-
-diff --git a/Documentation/features/sched/membarrier-sync-core/arch-support.txt b/Documentation/features/sched/membarrier-sync-core/arch-support.txt
-index dbdf62907703..c7858dd1ea8f 100644
---- a/Documentation/features/sched/membarrier-sync-core/arch-support.txt
-+++ b/Documentation/features/sched/membarrier-sync-core/arch-support.txt
-@@ -5,10 +5,10 @@
- #
- # Architecture requirements
- #
--# * arm64
-+# * arm/arm64
- #
--# Rely on eret context synchronization when returning from IPI handler, and
--# when returning to user-space.
-+# Rely on implicit context synchronization as a result of exception return
-+# when returning from IPI handler, and when returning to user-space.
- #
- # * x86
- #
-@@ -31,7 +31,7 @@
-     -----------------------
-     |       alpha: | TODO |
-     |         arc: | TODO |
--    |         arm: | TODO |
-+    |         arm: |  ok  |
-     |       arm64: |  ok  |
-     |         c6x: | TODO |
-     |       h8300: | TODO |
+diff --git a/arch/arm64/include/asm/bitops.h b/arch/arm64/include/asm/bitops.h
+index 13501460be6b..10d536b1af74 100644
+--- a/arch/arm64/include/asm/bitops.h
++++ b/arch/arm64/include/asm/bitops.h
+@@ -38,11 +38,6 @@
+ #include <asm-generic/bitops/lock.h>
+ #include <asm-generic/bitops/non-atomic.h>
+ #include <asm-generic/bitops/le.h>
+-
+-/*
+- * Ext2 is defined to use little-endian byte ordering.
+- */
+-#define ext2_set_bit_atomic(lock, nr, p)	test_and_set_bit_le(nr, p)
+-#define ext2_clear_bit_atomic(lock, nr, p)	test_and_clear_bit_le(nr, p)
++#include <asm-generic/bitops/ext2-atomic-setbit.h>
+ 
+ #endif /* __ASM_BITOPS_H */
+-- 
+2.1.4
