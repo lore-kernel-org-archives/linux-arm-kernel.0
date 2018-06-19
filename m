@@ -1,51 +1,110 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 Jun 2018 23:20:09 +0800
-Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
- control
-In-Reply-To: <20180618073425.ce2dkipuvrtbqela@flea>
-References: <20180614153548.9644-1-wens@csie.org>
- <20180615091413.pbdtrpa7txe6i4ee@flea>
- <CAGb2v64Ar+rOgiXbjtRrQojHUZteLa9N7OwM3XY7ZcpS87Qpmw@mail.gmail.com>
- <20180618073425.ce2dkipuvrtbqela@flea>
-Message-ID: <CAGb2v65-X6X6C0sgCom2G3dBvn5iqD9aRfh84qSCv3jf8v-C0A@mail.gmail.com>
+From: dave.kleikamp@oracle.com (Dave Kleikamp)
+Date: Tue, 19 Jun 2018 10:22:46 -0500
+Subject: [PATCH v2 1/4] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <ca9e5d9d-e090-f9e0-bc10-3297c9e3b7e1@arm.com>
+References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
+ <20180619064424.6642-2-takahiro.akashi@linaro.org>
+ <72307608-90e0-4842-edc1-d3b284782940@oracle.com>
+ <ca9e5d9d-e090-f9e0-bc10-3297c9e3b7e1@arm.com>
+Message-ID: <891c3e5a-9760-1353-4a2c-0900082dd245@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 3:34 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, Jun 18, 2018 at 10:11:20AM +0800, Chen-Yu Tsai wrote:
->> On Fri, Jun 15, 2018 at 5:14 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Thu, Jun 14, 2018 at 11:35:44PM +0800, Chen-Yu Tsai wrote:
->> >> Hi,
->> >>
->> >> This series is the remaining A64 syscon changes from the R40 DWMAC
->> >> series. The series aligns how the A64 system control exports a regmap
->> >> for the sun8i DWMAC driver to access with what we've done for the R40.
->> >>
->> >> Originally the A64 used the generic syscon for this bit of hardware.
->> >> But this block also contains mapping bits for the onboard SRAM, used
->> >> by various peripherals, and other vendor specific bits we may use in
->> >> the future. It is by no means generic. And we already have a device
->> >> tree binding and driver for the SRAM part.
->> >>
->> >> The first patch make the SRAM control device export a regmap, exposing
->> >> a single EMAC control register, for the DWMAC driver to consume.
->> >>
->> >> The second and third patches rename the A64 compatible string to read
->> >> "system control", which is what the block is named in the user manual.
->> >>
->> >> The last patch fixes up the device node, and also adds the lone mappable
->> >> SRAM block, which is needed by the Display Engine.
->> >
->> > For the serie:
->> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On 06/19/2018 10:00 AM, James Morse wrote:
+> Hi Dave,
+> 
+> On 19/06/18 14:37, Dave Kleikamp wrote:
+>> On 06/19/2018 01:44 AM, AKASHI Takahiro wrote:
+>>> +static int __init reserve_memblock_reserved_regions(void)
+>>> +{
+>>> +	phys_addr_t start, end, roundup_end = 0;
+>>> +	struct resource *mem, *res;
+>>> +	u64 i;
+>>> +
+>>> +	for_each_reserved_mem_region(i, &start, &end) {
+>>> +		if (end <= roundup_end)
+>>> +			continue; /* done already */
+>>> +
+>>> +		start = __pfn_to_phys(PFN_DOWN(start));
+>>> +		end = __pfn_to_phys(PFN_UP(end)) - 1;
+>>> +		roundup_end = end;
+>>> +
+>>> +		res = kzalloc(sizeof(*res), GFP_ATOMIC);
+>>> +		if (WARN_ON(!res))
+>>> +			return -ENOMEM;
+>>> +		res->start = start;
+>>> +		res->end = end;
+>>> +		res->name  = "reserved";
+>>> +		res->flags = IORESOURCE_MEM;
+>>> +
+>>> +		mem = request_resource_conflict(&iomem_resource, res);
+>>> +		/*
+>>> +		 * We expected memblock_reserve() regions to conflict with
+>>> +		 * memory created by request_standard_resources().
+>>> +		 */
+>>> +		if (WARN_ON_ONCE(!mem))
+>>> +			continue;
+>>> +		kfree(res);
 >>
->> Cool. I'll apply them once you've rebased and pushed out any patches you
->> queued up during the merge window.
->
-> All should be pushed now, feel free to apply them :)
+>> Why is kfree() after the conditional continue? This is a memory leak.
+> 
+> request_resource_conflict() inserts res into the iomem_resource tree, or returns
+> the conflict if there is already something at this address.
+> 
+> We expect something at this address: a 'System RAM' section added by
+> request_resource(). This code wants the conflicting 'System RAM' entry so that
+> reserve_region_with_split() can fill in the gaps below it with 'reserved'. See
+> the commit-message for an example.
+> 
+> If there was no conflict, it means the memory map doesn't look like we expect,
+> we can't pass NULL to reserve_region_with_split(), and we just inserted the
+> 'reserved' at the top level. Freeing res at this point would be a use-after-free
+> hanging from /proc/iomem.
+> This code generates a WARN_ON_ONCE() and leaves the 'reserved' description where
+> it is.
 
-Applied. Thanks.
+Okay. I get it.
 
-ChenYu
+> Trying to cleanup here is pointless, we can remove the resource entry and free
+> it ... but we still want to report it as reserved, which is what just happened,
+> just not quite how we we wanted it.
+> 
+> If you ever see this warning, it means some RAM stopped being nomap between
+> request_resources() and reserve_memblock_reserved_regions(). I can't find any
+> case where that ever happens.
+> 
+> 
+> If all that makes sense: how can I improve the comment above the WARN_ON_ONCE()
+> to make it clearer?
+
+I guess something like you described above.
+
+/*
+ * We expect a 'System RAM' section at this address. In the unexpected
+ * case where one is not found, request_resource_conflict() will insert
+ * res into the iomem_resource tree.
+ */
+
+Do you think this is clearer?
+
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+>>> +
+>>> +		reserve_region_with_split(mem, start, end, "reserved");
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +arch_initcall(reserve_memblock_reserved_regions);
+>>> +
+>>>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+>>>  
+>>>  void __init setup_arch(char **cmdline_p)
+>>>
+> 
