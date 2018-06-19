@@ -1,87 +1,64 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 19 Jun 2018 10:36:57 +0200
-Subject: [PATCH] arm64: zynqmp: Add support for Avnet Ultra96 rev1 board
-In-Reply-To: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
-References: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
-Message-ID: <dcee0f07-967a-034b-1d95-576e0b458a89@monstr.eu>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 19 Jun 2018 16:39:27 +0800
+Subject: [PATCH v6 17/29] drm/mediatek: add connection from RDMA1 to DSI1
+In-Reply-To: <1529393670-26862-18-git-send-email-stu.hsieh@mediatek.com>
+References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+ <1529393670-26862-18-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529397567.26480.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2.5.2018 13:53, Michal Simek wrote:
-> Avnet Ultra96 rev1 board is commercialized Xilinx zcu100 revC/D
-> internal board. The patch is reusing zcu100 revC files but changing
-> model description and compatible strings which are used for example by
-> libmraa.
+On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
+> This patch add the connection from RDMA1 to DSI1
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 > ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> I choose this option because there are houndreds of zcu100 boards
-> created and this will enable support both versions.
-> 
-> Record avnet prefix was sent by separate patch.
-> ---
->  arch/arm64/boot/dts/xilinx/Makefile           |  1 +
->  .../boot/dts/xilinx/avnet-ultra96-rev1.dts    | 19 +++++++++++++++++++
->  2 files changed, 20 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
-> index d452f80e7601..60f5443f3ef4 100644
-> --- a/arch/arm64/boot/dts/xilinx/Makefile
-> +++ b/arch/arm64/boot/dts/xilinx/Makefile
-> @@ -1,4 +1,5 @@
->  # SPDX-License-Identifier: GPL-2.0
-> +dtb-$(CONFIG_ARCH_ZYNQMP) += avnet-ultra96-rev1.dtb
->  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
->  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
->  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
-> diff --git a/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-> new file mode 100644
-> index 000000000000..88aa06fa78a8
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-> @@ -0,0 +1,19 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * dts file for Avnet Ultra96 rev1
-> + *
-> + * (C) Copyright 2018, Xilinx, Inc.
-> + *
-> + * Michal Simek <michal.simek@xilinx.com>
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "zynqmp-zcu100-revC.dts"
-> +
-> +/ {
-> +	model = "Avnet Ultra96 Rev1";
-> +	compatible = "avnet,ultra96-rev1", "avnet,ultra96",
-> +		     "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100",
-> +		     "xlnx,zynqmp";
-> +};
-> 
-
-Rob/Mark: Do you see any issue with this patch?
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/f48b93d3/attachment.sig>
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 13e91903f493..90228cad051a 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -28,6 +28,7 @@
+>  #define DISP_REG_CONFIG_DISP_UFOE_MOUT_EN	0x050
+>  #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+>  #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
+> +#define DISP_REG_CONFIG_DSIO_SEL_IN		0x0a8
+>  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+>  #define DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN	0x0c4
+>  #define DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN	0x0c8
+> @@ -86,8 +87,10 @@
+>  #define RDMA0_SOUT_DSI3			0x5
+>  #define RDMA1_SOUT_DPI0			0x2
+>  #define RDMA1_SOUT_DPI1			0x3
+> +#define RDMA1_SOUT_DSI1			0x1
+>  #define DPI0_SEL_IN_RDMA1		0x1
+>  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+> +#define DSI1_SEL_IN_RDMA1		0x1
+>  #define COLOR1_SEL_IN_OVL1		0x1
+>  
+>  #define OVL_MOUT_EN_RDMA		0x1
+> @@ -170,6 +173,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI3) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
+>  		value = RDMA0_SOUT_DSI3;
+> +	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI1) {
+> +		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
+> +		value = RDMA1_SOUT_DSI1;
+>  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
+>  		value = RDMA1_SOUT_DPI0;
+> @@ -198,6 +204,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI1) {
+>  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
+>  		value = DPI1_SEL_IN_RDMA1;
+> +	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI1) {
+> +		*addr = DISP_REG_CONFIG_DSIO_SEL_IN;
+> +		value = DSI1_SEL_IN_RDMA1;
+>  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+>  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+>  		value = COLOR1_SEL_IN_OVL1;
