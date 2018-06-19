@@ -1,80 +1,32 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 19 Jun 2018 17:29:22 -0500
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 19 Jun 2018 15:37:36 -0700
+Subject: [PATCH 1/5] net: emaclite: Use __func__ instead of hardcoded name
+In-Reply-To: <CAHp75VcKuqnUgynqXvACS7zY5=6aRxqymGE1w3Yh8sshehSm2g@mail.gmail.com>
+References: <1529320103-7711-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1529320103-7711-2-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <CAHp75VcKuqnUgynqXvACS7zY5=6aRxqymGE1w3Yh8sshehSm2g@mail.gmail.com>
+Message-ID: <3013aae1803c096645887864d1b161efbfba7c77.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor subject nit: From the caller's point of view, we must convert a bus
-address to a resource *always* (the caller has no knowledge of "whether it
-is translated by the host bridge").
+On Wed, 2018-06-20 at 00:36 +0300, Andy Shevchenko wrote:
+> On Mon, Jun 18, 2018 at 2:08 PM, Radhey Shyam Pandey
+> <radhey.shyam.pandey@xilinx.com> wrote:
+> > Switch hardcoded function name with a reference to __func__ making
+> > the code more maintainable. Address below checkpatch warning:
+> > 
+> > WARNING: Prefer using '"%s...", __func__' to using 'xemaclite_mdio_read',
+> > this function's name, in a string
+> > +               "xemaclite_mdio_read(phy_id=%i, reg=%x) == %x\n",
+> > 
+> > WARNING: Prefer using '"%s...", __func__' to using 'xemaclite_mdio_write',
+> > this function's name, in a string
+> > +               "xemaclite_mdio_write(phy_id=%i, reg=%x, val=%x)\n",
+> > 
+> 
+> For dev_dbg() the __func__ should be completely dropped away.
 
-On Fri, May 18, 2018 at 10:17:51AM -0400, Sinan Kaya wrote:
-> A host bridge is allowed to remap BAR addresses using _TRA attribute in
-> _CRS windows.
+Not really the same.
 
-Also, _TRA/_CRS are ACPI-specific terms and non-ACPI host bridges can
-also do the same sort of translation.  Another trivial nit.
-
-> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
-> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
-> 
-> When a VGA device is behind such a host bridge and the resource is
-> translated efifb driver is trying to do ioremap against bus address
-> rather than the resource address and is failing to probe.
-> 
-> efifb: probing for efifb
-> efifb: cannot reserve video memory at 0x1e000000
-> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
-> efifb: mode is 800x600x32, linelength=3200, pages=1
-> efifb: scrolling: redraw
-> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-> 
-> Use the host bridge offset information to convert bus address to
-> resource address in the fixup.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-
-Reviewed-by: Bjorn Helgaas <bhelgaas@google.com>
-
-Thanks a lot for fixing this!
-
-> ---
->  drivers/video/fbdev/efifb.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-> index 6daac8d..429cc85 100644
-> --- a/drivers/video/fbdev/efifb.c
-> +++ b/drivers/video/fbdev/efifb.c
-> @@ -431,6 +431,7 @@ static void efifb_fixup_resources(struct pci_dev *dev)
->  		.end = screen_info.lfb_base + screen_info.lfb_size - 1,
->  		.flags = IORESOURCE_MEM,
->  	};
-> +	struct pci_bus_region region;
->  	int i;
->  
->  	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-> @@ -442,6 +443,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
->  	if (!screen_res.start)
->  		return;
->  
-> +	region.start = screen_res.start;
-> +	region.end = screen_res.end;
-> +	pcibios_bus_to_resource(dev->bus, &screen_res, &region);
-> +
->  	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
->  		struct resource *res = &dev->resource[i];
->  
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+dev_dbg without CONFIG_DYNAMIC_DEBUG does not have
+the ability to prefix __func__.
