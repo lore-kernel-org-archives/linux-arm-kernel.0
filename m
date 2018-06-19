@@ -1,122 +1,32 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 19 Jun 2018 13:19:19 +0100
-Subject: [PATCHv3 06/19] arm64: move sve_user_{enable, disable} to
- <asm/fpsimd.h>
-In-Reply-To: <20180618120310.39527-7-mark.rutland@arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-7-mark.rutland@arm.com>
-Message-ID: <20180619121918.GS22983@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jun 2018 13:22:54 +0100
+Subject: [PATCH] arm: Hook up SYNC_CORE functionality for sys_membarrier()
+Message-ID: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 01:02:57PM +0100, Mark Rutland wrote:
-> In subsequent patches, we'll want to make use of sve_user_enable() and
-> sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
-> <asm/fpsimd.h> where we can make use of them.
-> 
-> To avoid ifdeffery in sequences like:
-> 
-> if (system_supports_sve() && some_condition
-> 	sve_user_disable();
-> 
-> ... empty stubs are provided when support for SVE is not enabled. Note
-> that system_supports_sve() contains as IS_ENABLED(CONFIG_ARM64_SVE), so
-> the sve_user_disable() call should be optimized away entirely when
-> CONFIG_ARM64_SVE is not selected.
-> 
-> To ensure that this is the case, the stub definitions contain a
-> BUILD_BUG(), as we do for other stubs for which calls should always be
-> optimized away when the relevant config option is not selected.
-> 
-> At the same time, the include list of <asm/fpsimd.h> is sorted while
-> adding <asm/sysreg.h>.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Exception return implies context synchronization, so we can hook up the
+SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
+just like we've done for arm64 already.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Cc: Orion Hodson <oth@google.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
->  arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
->  arch/arm64/kernel/fpsimd.c      | 10 ----------
->  2 files changed, 16 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index fa92747a49c8..dd1ad3950ef5 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -16,13 +16,15 @@
->  #ifndef __ASM_FP_H
->  #define __ASM_FP_H
->  
-> -#include <asm/ptrace.h>
->  #include <asm/errno.h>
-> +#include <asm/ptrace.h>
->  #include <asm/processor.h>
->  #include <asm/sigcontext.h>
-> +#include <asm/sysreg.h>
->  
->  #ifndef __ASSEMBLY__
->  
-> +#include <linux/build_bug.h>
->  #include <linux/cache.h>
->  #include <linux/init.h>
->  #include <linux/stddef.h>
-> @@ -102,6 +104,16 @@ extern int sve_set_vector_length(struct task_struct *task,
->  extern int sve_set_current_vl(unsigned long arg);
->  extern int sve_get_current_vl(void);
->  
-> +static inline void sve_user_disable(void)
-> +{
-> +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
-> +}
-> +
-> +static inline void sve_user_enable(void)
-> +{
-> +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
-> +}
-> +
->  /*
->   * Probing and setup functions.
->   * Calls to these functions must be serialised with one another.
-> @@ -128,6 +140,9 @@ static inline int sve_get_current_vl(void)
->  	return -EINVAL;
->  }
->  
-> +static inline void sve_user_disable(void) { BUILD_BUG(); }
-> +static inline void sve_user_enable(void) { BUILD_BUG(); }
-> +
->  static inline void sve_init_vq_map(void) { }
->  static inline void sve_update_vq_map(void) { }
->  static inline int sve_verify_vq_map(void) { return 0; }
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index a98a7f96aff1..58c53bc96928 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -159,16 +159,6 @@ static void sve_free(struct task_struct *task)
->  	__sve_free(task);
->  }
->  
-> -static void sve_user_disable(void)
-> -{
-> -	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
-> -}
-> -
-> -static void sve_user_enable(void)
-> -{
-> -	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
-> -}
-> -
->  /*
->   * TIF_SVE controls whether a task can use SVE without trapping while
->   * in userspace, and also the way a task's FPSIMD/SVE state is stored
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 54eeb8d00bc6..b0ac18547370 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -9,6 +9,7 @@ config ARM
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_KCOV
++	select ARCH_HAS_MEMBARRIER_SYNC_CORE
+ 	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
+ 	select ARCH_HAS_PHYS_TO_DMA
+ 	select ARCH_HAS_SET_MEMORY
+-- 
+2.1.4
