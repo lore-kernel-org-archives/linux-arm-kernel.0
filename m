@@ -1,43 +1,67 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Jun 2018 10:24:22 -0700
-Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr
- address calculation
-In-Reply-To: <CAKv+Gu-T8Fx3Nry7pUdOoOeRU-Ns89w3oo4itmu1q4FzYF5Rag@mail.gmail.com>
-References: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
- <CAKv+Gu8Byj7G3Awnq4Y90Wot=GJTx0gO5A7-960au9ZkBBL2=A@mail.gmail.com>
- <b8bff03d-91a7-0e53-a44e-d1924beb382d@roeck-us.net>
- <CAKv+Gu-T8Fx3Nry7pUdOoOeRU-Ns89w3oo4itmu1q4FzYF5Rag@mail.gmail.com>
-Message-ID: <20180619172422.GB16846@roeck-us.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 Jun 2018 11:46:02 -0600
+Subject: [PATCH v1 0/6] perf cs-etm: Fix tracing packet handling and minor
+ refactoring
+In-Reply-To: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
+References: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkyxuz+tPrC7wb1omsw+qj=7ZB5t6FRbqZz54994g62q6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 03:35:07PM +0200, Ard Biesheuvel wrote:
-> >>
-> >> +       /* this needs to be a separate macro or \@ does not work correctly
-> >> */
-> >> +       .macro  __badr, c, rd, sym
-> >> +       .eqv    .Lsym\@, \sym
-> >> +       adr\c   \rd, .Lsym\@ + 1
-> >
-> >
-> > Wild shot, but the following works for me.
-> >
-> >         .eqv    .Lsym\@, \sym + 1
-> >         adr\c   \rd, .Lsym\@
-> >
-> > Does it make sense ?
-> >
-> 
-> Interesting. Do you mean this works with your 2.30 binutils that
-> triggers the original issue?
-> 
+On Sun, 17 Jun 2018 at 23:10, Leo Yan <leo.yan@linaro.org> wrote:
+>
+> Due the current code is missing to handle cs-etm start tracing packet
+> and CS_ETM_TRACE_ON packet, we fail to generate branch sample for them.
+>
+> This patch series is to fix cs-etm tracing packet handling:
+>
+> Patch 0001 is to add invalid address macro for readable coding;
+>
+> Patch 0002 is one minor fixing to return error code for instruction
+> sample failure;
+>
+> Patches 0003~0006 are fixing patches for start tracing packet
+> and CS_ETM_TRACE_ON packet.
+>
+> This patch series is applied on acme tree [1] on branch perf/core with
+> latest commit: e238cf2e3d2e ("perf intel-pt: Fix packet decoding of CYC
+> packets").  Also applied successfully this patch series on Linus tree
+> on 4.18-rc1.
+>
+> This patch series has been verified on Hikey620 platform with below two
+> commands:
+> perf script --itrace=i10000il128 -F cpu,event,ip,addr,sym -k ./vmlinux
+> perf script -F cpu,event,ip,addr,sym -k ./vmlinux
+>
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
+>
+>
+> Leo Yan (6):
+>   perf cs-etm: Introduce invalid address macro
+>   perf cs-etm: Bail out immediately for instruction sample failure
+>   perf cs-etm: Fix start tracing packet handling
+>   perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
+>   perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
+>     packet
+>   perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
+>
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
+>  tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
+>  3 files changed, 68 insertions(+), 14 deletions(-)
 
-Yes, it does. It is also the solution used for some graphics libraries,
-though of course now I don't find the link anymore.
+Good day Arnaldo,
 
-Guess this is going nowhere given Russell's response, so I'll just
-live with it, like obviously everyone else does already. I built
-a toolchain using gcc 7.3.0 and binutils 2.28.1 which "solves"
-the problem for me.
+I am good with this set:
 
-Guenter
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+
+Please consider for inclusion in your tree if you are satisfied with the work.
+
+Regards,
+Mathieu
+
+>
+> --
+> 2.7.4
+>
