@@ -1,47 +1,52 @@
 From: digetx@gmail.com (Dmitry Osipenko)
-Date: Tue, 19 Jun 2018 14:00:27 +0300
-Subject: [PATCH v2 5/5] ARM: tegra: Always boot CPU in ARM-mode
-In-Reply-To: <20180619110027.16935-1-digetx@gmail.com>
-References: <20180619110027.16935-1-digetx@gmail.com>
-Message-ID: <20180619110027.16935-6-digetx@gmail.com>
+Date: Tue, 19 Jun 2018 14:00:22 +0300
+Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
+Message-ID: <20180619110027.16935-1-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU always jumps into the reset handler in ARM-mode from the Trusted
-Foundations firmware, hence make CPU to always jump into kernel in
-ARM-mode regardless of the firmware presence to support Thumb2 kernel + TF
-case.
+Hello,
 
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
- arch/arm/mach-tegra/reset-handler.S | 1 +
- arch/arm/mach-tegra/reset.c         | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+This series of patches brings initial support of Trusted Foundations to
+Tegra30, that is to the consumer-grade Tegra30 devices which do not allow
+to easily replace the proprietary bootloader. Support is initial because
+this series implements only a proper CPU boot-up (main + secondary cores)
+and a basic L2 cache maintenance that is done using the TF firmware.
+Suspend-resume support is missing yet as I couldn't get it to work
+(CPU hangs on resume from suspend after awhile and seems that is related
+to inappropriately done cache maintenance during of suspend-resume using
+the firmware), it is work-in-progress for now.
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index e9f2a7775998..8eda5c786f50 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -113,6 +113,7 @@ ENTRY(__tegra_cpu_reset_handler_start)
-  *       must be position-independent.
-  */
- 
-+	.arm
- 	.align L1_CACHE_SHIFT
- ENTRY(__tegra_cpu_reset_handler)
- 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index b02ae7699842..3f1ef4561298 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -97,7 +97,7 @@ void __init tegra_cpu_reset_handler_init(void)
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_PRESENT] =
- 		*((u32 *)cpu_possible_mask);
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_SECONDARY] =
--		__pa_symbol((void *)secondary_startup);
-+		__pa_symbol((void *)secondary_startup_arm);
- #endif
- 
- #ifdef CONFIG_PM_SLEEP
+This patchset is partially based on the work done by Micha? Miros?aw [0].
+
+[0] https://www.spinics.net/lists/linux-tegra/msg30368.html
+
+Changelog:
+
+v2:
+	- The "Don't apply CPU erratas in insecure mode" patch got some
+	  cleanup, in particular resolved the messiness in
+	  __tegra_cpu_reset_handler_data.
+
+	- Added a comment to tf_cache_write_sec(), justifying the warning
+	  message.
+
+Dmitry Osipenko (5):
+  ARM: trusted_foundations: Implement L2 cache initialization callback
+  ARM: trusted_foundations: Provide information about whether firmware
+    is registered
+  ARM: tegra: Setup L2 cache using Trusted Foundations firmware
+  ARM: tegra: Don't apply CPU erratas in insecure mode
+  ARM: tegra: Always boot CPU in ARM-mode
+
+ arch/arm/firmware/trusted_foundations.c    | 32 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h |  7 +++++
+ arch/arm/mach-tegra/reset-handler.S        | 25 +++++++++--------
+ arch/arm/mach-tegra/reset.c                |  5 +++-
+ arch/arm/mach-tegra/reset.h                |  9 ++++--
+ arch/arm/mach-tegra/sleep-tegra20.S        |  4 +++
+ arch/arm/mach-tegra/tegra.c                | 15 ++++++++++
+ 7 files changed, 82 insertions(+), 15 deletions(-)
+
 -- 
 2.17.1
