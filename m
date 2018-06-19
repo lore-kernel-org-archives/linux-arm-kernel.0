@@ -1,27 +1,25 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 Jun 2018 10:54:00 +0800
-Subject: [PATCH v2 1/2] ARM: dts: imx6qdl-sabreauto: Add sensors
-In-Reply-To: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
-References: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
-Message-ID: <20180619025359.GB16091@dragon>
+Date: Tue, 19 Jun 2018 10:55:55 +0800
+Subject: [PATCH] ARM: dts: imx7d-sdb: Remove duplicate regulator-can2-3v3
+In-Reply-To: <abacbb7485b0c9b908eae8ae87be9d8e0eab87b3.1529327283.git.leonard.crestez@nxp.com>
+References: <abacbb7485b0c9b908eae8ae87be9d8e0eab87b3.1529327283.git.leonard.crestez@nxp.com>
+Message-ID: <20180619025554.GC16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 11:15:44AM +0300, Leonard Crestez wrote:
-> The following sensors are on I2C3 on the baseboard:
-> * isil,isl29023 light sensor
-> * fsl,mag3110 magnetometer
-> * fsl,mma8451 accelerometer
+On Mon, Jun 18, 2018 at 04:11:09PM +0300, Leonard Crestez wrote:
+> Two different regulators are defined with the same name and label but
+> distinct properties.
 > 
-> Added under i2cmux/i2c at 1 because they're not otherwise accessible.
+> The first definition was added with the first board dts and the second
+> was added when upstream added flexcan support.
 > 
-> These are all supported by iio with following configs:
-> * CONFIG_SENSORS_ISL29018
-> * CONFIG_MAG3110
-> * CONFIG_MMA8452
+> Looking at schematics it is indeed gpio2 14 connected to the STB pin of
+> the CAN transceiver so remove the first definition.
 > 
-> Tested with raw reads from iio sysfs.
+> The second definition entirely overrides the first so this already
+> worked and this patch results in no DTB change, just a cleanup.
 > 
 > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Applied both, thanks.
+Applied, thanks.
