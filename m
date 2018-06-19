@@ -1,50 +1,93 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:53:06 +0100
-Subject: [RESEND PATCH v2 1/9] h8300: Don't include linux/kernel.h in
- asm/atomic.h
+Date: Tue, 19 Jun 2018 13:53:08 +0100
+Subject: [RESEND PATCH v2 3/9] asm-generic: Move some macros from
+ linux/bitops.h to a new bits.h file
 In-Reply-To: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
 References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529412794-17720-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1529412794-17720-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux/kernel.h isn't needed by asm/atomic.h and will result in circular
-dependencies when the asm-generic atomic bitops are built around the
-tomic_long_t interface.
+In preparation for implementing the asm-generic atomic bitops in terms
+of atomic_long_*, we need to prevent asm/atomic.h implementations from
+pulling in linux/bitops.h. A common reason for this include is for the
+BITS_PER_BYTE definition, so move this and some other BIT() and masking
+macros into a new header file, linux/bits.h
 
-Remove the broad include and replace it with linux/compiler.h for
-READ_ONCE() etc and asm/irqflags.h for arch_local_irq_save() etc.
-
-Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
 Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/h8300/include/asm/atomic.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/bitops.h | 22 +---------------------
+ include/linux/bits.h   | 26 ++++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 21 deletions(-)
+ create mode 100644 include/linux/bits.h
 
-diff --git a/arch/h8300/include/asm/atomic.h b/arch/h8300/include/asm/atomic.h
-index 941e7554e886..b174dec099bf 100644
---- a/arch/h8300/include/asm/atomic.h
-+++ b/arch/h8300/include/asm/atomic.h
-@@ -2,8 +2,10 @@
- #ifndef __ARCH_H8300_ATOMIC__
- #define __ARCH_H8300_ATOMIC__
+diff --git a/include/linux/bitops.h b/include/linux/bitops.h
+index 4cac4e1a72ff..af419012d77d 100644
+--- a/include/linux/bitops.h
++++ b/include/linux/bitops.h
+@@ -2,29 +2,9 @@
+ #ifndef _LINUX_BITOPS_H
+ #define _LINUX_BITOPS_H
+ #include <asm/types.h>
++#include <linux/bits.h>
  
-+#include <linux/compiler.h>
- #include <linux/types.h>
- #include <asm/cmpxchg.h>
-+#include <asm/irqflags.h>
- 
- /*
-  * Atomic operations that C can't guarantee us.  Useful for
-@@ -15,8 +17,6 @@
- #define atomic_read(v)		READ_ONCE((v)->counter)
- #define atomic_set(v, i)	WRITE_ONCE(((v)->counter), (i))
- 
--#include <linux/kernel.h>
+-#ifdef	__KERNEL__
+-#define BIT(nr)			(1UL << (nr))
+-#define BIT_ULL(nr)		(1ULL << (nr))
+-#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+-#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+-#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+-#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+-#define BITS_PER_BYTE		8
+ #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+-#endif
 -
- #define ATOMIC_OP_RETURN(op, c_op)				\
- static inline int atomic_##op##_return(int i, atomic_t *v)	\
- {								\
+-/*
+- * Create a contiguous bitmask starting@bit position @l and ending at
+- * position @h. For example
+- * GENMASK_ULL(39, 21) gives us the 64bit vector 0x000000ffffe00000.
+- */
+-#define GENMASK(h, l) \
+-	(((~0UL) - (1UL << (l)) + 1) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+-
+-#define GENMASK_ULL(h, l) \
+-	(((~0ULL) - (1ULL << (l)) + 1) & \
+-	 (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
+ 
+ extern unsigned int __sw_hweight8(unsigned int w);
+ extern unsigned int __sw_hweight16(unsigned int w);
+diff --git a/include/linux/bits.h b/include/linux/bits.h
+new file mode 100644
+index 000000000000..2b7b532c1d51
+--- /dev/null
++++ b/include/linux/bits.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __LINUX_BITS_H
++#define __LINUX_BITS_H
++#include <asm/bitsperlong.h>
++
++#define BIT(nr)			(1UL << (nr))
++#define BIT_ULL(nr)		(1ULL << (nr))
++#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
++#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
++#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
++#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
++#define BITS_PER_BYTE		8
++
++/*
++ * Create a contiguous bitmask starting@bit position @l and ending at
++ * position @h. For example
++ * GENMASK_ULL(39, 21) gives us the 64bit vector 0x000000ffffe00000.
++ */
++#define GENMASK(h, l) \
++	(((~0UL) - (1UL << (l)) + 1) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
++
++#define GENMASK_ULL(h, l) \
++	(((~0ULL) - (1ULL << (l)) + 1) & \
++	 (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
++
++#endif	/* __LINUX_BITS_H */
 -- 
 2.1.4
