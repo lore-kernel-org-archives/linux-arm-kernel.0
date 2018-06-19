@@ -1,67 +1,65 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Tue, 19 Jun 2018 10:19:26 +0200
-Subject: [PATCH v3 5/9] drm/panel: add support for BOE HV070WSA-100 panel to
- simple-panel
+Date: Tue, 19 Jun 2018 10:19:27 +0200
+Subject: [PATCH v3 6/9] dt-bindings: tc358754: add DT bindings
 In-Reply-To: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
 References: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
- <CGME20180619082000eucas1p1ed44d7aea857b12ce2c92c240be4dedd@eucas1p1.samsung.com>
-Message-ID: <1529396370-18761-6-git-send-email-m.purski@samsung.com>
+ <CGME20180619082001eucas1p1df565ba7d1eaa320c2703e7dc019792b@eucas1p1.samsung.com>
+Message-ID: <1529396370-18761-7-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrzej Hajda <a.hajda@samsung.com>
 
-The patch adds support for BOE HV070WSA-100 WSVGA 7.01 inch panel
-in panel-simple driver. The panel is used in Exynos5250-arndale boards.
+The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
+Bindings describe power supplies, reset gpio and video interfaces.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ .../bindings/display/bridge/toshiba,tc358764.txt   | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index cbf1ab4..d5da58d 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
- 	},
- };
- 
-+static const struct drm_display_mode boe_hv070wsa_mode = {
-+	.clock = 40800,
-+	.hdisplay = 1024,
-+	.hsync_start = 1024 + 90,
-+	.hsync_end = 1024 + 90 + 90,
-+	.htotal = 1024 + 90 + 90 + 90,
-+	.vdisplay = 600,
-+	.vsync_start = 600 + 3,
-+	.vsync_end = 600 + 3 + 4,
-+	.vtotal = 600 + 3 + 4 + 3,
-+	.vrefresh = 60,
-+};
+diff --git a/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+new file mode 100644
+index 0000000..8f9abf2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+@@ -0,0 +1,35 @@
++TC358764 MIPI-DSI to LVDS panel bridge
 +
-+static const struct panel_desc boe_hv070wsa = {
-+	.modes = &boe_hv070wsa_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 154,
-+		.height = 90,
-+	},
-+};
++Required properties:
++  - compatible: "toshiba,tc358764"
++  - reg: the virtual channel number of a DSI peripheral
++  - vddc-supply: core voltage supply, 1.2V
++  - vddio-supply: I/O voltage supply, 1.8V or 3.3V
++  - vddlvds-supply: LVDS1/2 voltage supply, 3.3V
++  - reset-gpios: a GPIO spec for the reset pin
 +
- static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
- 	{
- 		.clock = 71900,
-@@ -2113,6 +2135,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "avic,tm070ddh03",
- 		.data = &avic_tm070ddh03,
- 	}, {
-+		.compatible = "boe,hv070wsa-100",
-+		.data = &boe_hv070wsa
-+	}, {
- 		.compatible = "boe,nv101wxmn51",
- 		.data = &boe_nv101wxmn51,
- 	}, {
++The device node can contain following 'port' child nodes,
++according to the OF graph bindings defined in [1]:
++  0: DSI Input, not required, if the bridge is DSI controlled
++  1: LVDS Output, mandatory
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++
++	bridge at 0 {
++		reg = <0>;
++		compatible = "toshiba,tc358764";
++		vddc-supply = <&vcc_1v2_reg>;
++		vddio-supply = <&vcc_1v8_reg>;
++		vddlvds-supply = <&vcc_3v3_reg>;
++		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 1 {
++			reg = <1>;
++			lvds_ep: endpoint {
++				remote-endpoint = <&panel_ep>;
++			};
++		};
++	};
 -- 
 2.7.4
