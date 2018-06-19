@@ -1,36 +1,34 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 19 Jun 2018 16:31:04 -0700
-Subject: [GIT PULL 3/3] Broadcom maintainers-arm64 fixes for 4.18
-In-Reply-To: <20180619233104.32173-1-f.fainelli@gmail.com>
-References: <20180619233104.32173-1-f.fainelli@gmail.com>
-Message-ID: <20180619233104.32173-3-f.fainelli@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 20 Jun 2018 02:43:14 +0300
+Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
+In-Reply-To: <20180619225145.GA23389@kroah.com>
+References: <20180619205914.21375-1-javierm@redhat.com>
+ <20180619225145.GA23389@kroah.com>
+Message-ID: <CAHp75VcOd5K+T6bkxyz3qgqNr4-=K9GGRh+DQ_qgW7dGKdzO5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Wed, Jun 20, 2018 at 1:51 AM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Tue, Jun 19, 2018 at 10:59:14PM +0200, Javier Martinez Canillas wrote:
+>> For debugging purposes it may be useful to know what are the devices whose
+>> probe function was deferred. Add a debugfs entry showing that information.
+>>
+>>   $ cat /sys/kernel/debug/deferred_devices
+>>   48070000.i2c:twl at 48:bci
+>>   musb-hdrc.0.auto
+>>   omapdrm.0
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-are available in the git repository at:
+> And what is the use of this file?  What can you do with this
+> information?  Who is going to use it?  Don't we have other deferred
+> probe debugging somewhere else?
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/maintainers-arm64-fixes
+Indeed.
 
-for you to fetch changes up to d64324acdb7052b08b13ffc8c12af232c6a29afd:
+Javier, have you tried to add 'initcall_debug' to a kernel command
+line followed by 'dyndbg="file drivers/base/dd.c +p"'?
 
-  MAINTAINERS: Update Broadcom iProc entry with Stingray (2018-06-18 09:28:36 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM64-based SoCs MAINTAINERS file
-fixes for 4.18, please pull the following:
-
-- Florian fixes the entry for the Northstar2 SoCs which was somehow lost
-  during a directory move. He also adds an entry for the Stingray SoCs
-  which was missing from the day files were added
-
-----------------------------------------------------------------
-Florian Fainelli (2):
-      MAINAINTERS: Corrected Broadcom Northstar2 entry
-      MAINTAINERS: Update Broadcom iProc entry with Stingray
-
- MAINTAINERS | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+-- 
+With Best Regards,
+Andy Shevchenko
