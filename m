@@ -1,46 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 14:15:24 +0100
-Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
-In-Reply-To: <20180619121814.GR22983@e103592.cambridge.arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-11-mark.rutland@arm.com>
- <20180619121814.GR22983@e103592.cambridge.arm.com>
-Message-ID: <20180619130932.ww53s5rnragcodha@lakrids.cambridge.arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 19 Jun 2018 09:17:35 -0400
+Subject: Dynamic ftrace self test broken on ARM
+In-Reply-To: <b9f269ed2143688c38cdcbba7367b101@agner.ch>
+References: <65fb14b356bc0a414f1fe5cf5c6eb395@agner.ch>
+ <20180618175437.3e6c85a1@gandalf.local.home>
+ <b9f269ed2143688c38cdcbba7367b101@agner.ch>
+Message-ID: <20180619091735.7aec75d0@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 01:18:17PM +0100, Dave Martin wrote:
-> On Mon, Jun 18, 2018 at 01:03:01PM +0100, Mark Rutland wrote:
-> > +static inline void sve_user_reset(void)
-> > +{
-> 
-> Can we call this "sve_user_discard" please?
-> 
-> "Reset" is a reasonable name for the concept, but the "discard"
-> terminology has been used elsewhere.
+On Tue, 19 Jun 2018 10:16:19 +0200
+Stefan Agner <stefan@agner.ch> wrote:
 
-Sure; done.
-
-> > +	if (!system_supports_sve())
-> > +		return;
-> > +
-> > +	/*
-> > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-> > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-> > +	 * happens if a context switch or kernel_neon_begin() or context
-> > +	 * modification (sigreturn, ptrace) intervenes.
-> > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
-> > +	 */
+> > I'm guessing that it boots fine with CONFIG_FTRACE_STARTUP_TEST=n? Can
+> > you try disable the tracers to see if it's the function graph or
+> > function tracer that is causing the issue? That is, turn off
+> > CONFIG_FUNCTION_GRAPH_TRACER and test it again, and if that crashes,
+> > turn off CONFIG_FUNCTION_TRACER to make sure the crash goes away there
+> > too.  
 > 
-> This comment should go after clear_thead_flag(), since it describes not
-> the purpose of this function but the presence of sve_user_disable().
+> Without CONFIG_FTRACE_STARTUP_TEST the kernel boots fine.
 > 
-> > +	clear_thread_flag(TIF_SVE);
-> > +	sve_user_disable();
-> > +}
+> CONFIG_FUNCTION_TRACER=y
+> # CONFIG_FUNCTION_GRAPH_TRACER is not set
+> # CONFIG_SCHED_TRACER is not set
+> CONFIG_FTRACE_STARTUP_TEST=y
 
-Good point. I've moved the clear_thread_flag(TIF_SVE) above the comment
-(with a blank line before the comment).
+OK, so it's not a graph tracer issue, but a function tracer issue.
 
-Thanks,
-Mark.
+> 
+> Crashes with the same stack trace.
+> 
+> # CONFIG_FUNCTION_TRACER is not set
+> CONFIG_SCHED_TRACER=y
+> CONFIG_FTRACE_STARTUP_TEST=y
+> 
+> Runs tracer tests and boots fine.
+
+Thanks. Did this ever work? And if so, perhaps you have time to perform
+a bisect. If you have a ktest setup, you can have it run the bisect for
+you (over night).
+
+-- Steve
