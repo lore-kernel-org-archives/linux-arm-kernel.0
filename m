@@ -1,146 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:48:15 +0100
-Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache for
- kernel mappings
-In-Reply-To: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
-References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529412495-17525-4-git-send-email-will.deacon@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 19 Jun 2018 13:52:16 +0100
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <20180619120714.GE13685@dhcp22.suse.cz> (Michal Hocko's message
+ of "Tue, 19 Jun 2018 14:07:14 +0200")
+References: <5ed798a0-6c9c-086e-e5e8-906f593ca33e@huawei.com>
+ <20180607122152.GP32433@dhcp22.suse.cz>
+ <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
+ <20180611085237.GI13364@dhcp22.suse.cz>
+ <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
+ <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
+ <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+Message-ID: <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When invalidating the instruction cache for a kernel mapping via
-flush_icache_range(), it is also necessary to flush the pipeline for
-other CPUs so that instructions fetched into the pipeline before the
-I-cache invalidation are discarded. For example, if module 'foo' is
-unloaded and then module 'bar' is loaded into the same area of memory,
-a CPU could end up executing instructions from 'foo' when branching into
-'bar' if these instructions were fetched into the pipeline before 'foo'
-was unloaded.
+Michal Hocko <mhocko@kernel.org> writes:
 
-Whilst this is highly unlikely to occur in practice, particularly as
-any exception acts as a context-synchronizing operation, following the
-letter of the architecture requires us to execute an ISB on each CPU
-in order for the new instruction stream to be visible.
+> On Tue 19-06-18 20:03:07, Xie XiuQi wrote:
+> [...]
+>> I tested on a arm board with 128 cores 4 numa nodes, but I set CONFIG_NR_CPUS=72.
+>> Then node 3 is not be created, because node 3 has no memory, and no cpu.
+>> But some pci device may related to node 3, which be set in ACPI table.
+>
+> Could you double check that zonelists for node 3 are generated
+> correctly?
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cacheflush.h | 13 ++++++++++++-
- arch/arm64/kernel/alternative.c     |  1 -
- arch/arm64/kernel/cpu_errata.c      |  2 +-
- arch/arm64/kernel/insn.c            | 15 ++-------------
- arch/arm64/mm/cache.S               |  4 ++--
- 5 files changed, 17 insertions(+), 18 deletions(-)
+The cpus in node 3 aren't onlined and there's no memory attached - I
+suspect that no zonelists are built for this node.
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index d264a7274811..a0ec27066e6f 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -71,7 +71,7 @@
-  *		- kaddr  - page address
-  *		- size   - region size
-  */
--extern void flush_icache_range(unsigned long start, unsigned long end);
-+extern void __flush_icache_range(unsigned long start, unsigned long end);
- extern int  invalidate_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
- extern void __inval_dcache_area(void *addr, size_t len);
-@@ -81,6 +81,17 @@ extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- extern void sync_icache_aliases(void *kaddr, unsigned long len);
- 
-+static inline void flush_icache_range(unsigned long start, unsigned long end)
-+{
-+	__flush_icache_range(start, end);
-+
-+	/*
-+	 * IPI all online CPUs so that they undergo a context synchronization
-+	 * event and are forced to refetch the new instructions.
-+	 */
-+	kick_all_cpus_sync();
-+}
-+
- static inline void flush_cache_mm(struct mm_struct *mm)
- {
- }
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 4f3dcc15a5b2..0ac06560c166 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -205,7 +205,6 @@ static int __apply_alternatives_multi_stop(void *unused)
- 	if (smp_processor_id()) {
- 		while (!READ_ONCE(alternatives_applied))
- 			cpu_relax();
--		isb();
- 	} else {
- 		BUG_ON(alternatives_applied);
- 		__apply_alternatives(&region, false);
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 1d2b6d768efe..0a338a1cd2d7 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -101,7 +101,7 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 	for (i = 0; i < SZ_2K; i += 0x80)
- 		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
- 
--	flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
-+	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
- }
- 
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 816d03c4c913..4cc41864f277 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -249,7 +249,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
- 	} else {
- 		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
- 			cpu_relax();
--		isb();
- 	}
- 
- 	return ret;
-@@ -283,18 +282,8 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
- 		if (ret)
- 			return ret;
- 
--		if (aarch64_insn_hotpatch_safe(insn, insns[0])) {
--			/*
--			 * ARMv8 architecture doesn't guarantee all CPUs see
--			 * the new instruction after returning from function
--			 * aarch64_insn_patch_text_nosync(). So send IPIs to
--			 * all other CPUs to achieve instruction
--			 * synchronization.
--			 */
--			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
--			kick_all_cpus_sync();
--			return ret;
--		}
-+		if (aarch64_insn_hotpatch_safe(insn, insns[0]))
-+			return aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
- 	}
- 
- 	return aarch64_insn_patch_text_sync(addrs, insns, cnt);
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 30334d81b021..0c22ede52f90 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -35,7 +35,7 @@
-  *	- start   - virtual start address of region
-  *	- end     - virtual end address of region
-  */
--ENTRY(flush_icache_range)
-+ENTRY(__flush_icache_range)
- 	/* FALLTHROUGH */
- 
- /*
-@@ -77,7 +77,7 @@ alternative_else_nop_endif
- 9:
- 	mov	x0, #-EFAULT
- 	b	1b
--ENDPROC(flush_icache_range)
-+ENDPROC(__flush_icache_range)
- ENDPROC(__flush_cache_user_range)
- 
- /*
--- 
-2.1.4
+We skip creating a node, if the number of SRAT entries parsed exceeds
+NR_CPUS[0]. This in turn prevents onlining the numa node and so no
+zonelists will be created for it.
+
+I think the problem will go away if the cpus are restricted via the
+kernel command line by setting nr_cpus.
+
+Xie, can you try the below patch on top of the one enabling memoryless
+nodes? I'm not sure this is the right solution but at least it'll
+confirm the problem.
+
+Thanks,
+Punit
+
+[0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/kernel/acpi_numa.c?h=v4.18-rc1#n73
+
+-- >8 --
+diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
+index d190a7b231bf..fea0f7164f1a 100644
+--- a/arch/arm64/kernel/acpi_numa.c
++++ b/arch/arm64/kernel/acpi_numa.c
+@@ -70,11 +70,9 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+        if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+                return;
+
+-   if (cpus_in_srat >= NR_CPUS) {
++ if (cpus_in_srat >= NR_CPUS)
+                pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
+                             NR_CPUS);
+-           return;
+-   }
+
+        pxm = pa->proximity_domain;
+        node = acpi_map_pxm_to_node(pxm);
