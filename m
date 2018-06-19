@@ -1,117 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 15:48:45 +0100
-Subject: [PATCHv3 08/19] arm64: convert raw syscall invocation to C
-In-Reply-To: <20180619142125.esqcbknxd2pqeotb@localhost>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-9-mark.rutland@arm.com>
- <20180619142125.esqcbknxd2pqeotb@localhost>
-Message-ID: <20180619144845.22mgd4req5cnp5tv@lakrids.cambridge.arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 19 Jun 2018 15:54:26 +0100
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <20180619140818.GA16927@e107981-ln.cambridge.arm.com> (Lorenzo
+ Pieralisi's message of "Tue, 19 Jun 2018 15:08:26 +0100")
+References: <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
+ <20180611085237.GI13364@dhcp22.suse.cz>
+ <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
+ <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
+ <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+ <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
+ <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+Message-ID: <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 03:21:25PM +0100, Catalin Marinas wrote:
-> On Mon, Jun 18, 2018 at 01:02:59PM +0100, Mark Rutland wrote:
-> > diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-> > new file mode 100644
-> > index 000000000000..b463b962d597
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/syscall.c
-> > @@ -0,0 +1,30 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +
-> > +#include <linux/nospec.h>
-> > +#include <linux/ptrace.h>
-> > +
-> > +long do_ni_syscall(struct pt_regs *regs);
-> > +
-> > +typedef long (*syscall_fn_t)(unsigned long, unsigned long,
-> > +			     unsigned long, unsigned long,
-> > +			     unsigned long, unsigned long);
-> > +
-> > +static void __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
-> > +{
-> > +	regs->regs[0] = syscall_fn(regs->regs[0], regs->regs[1],
-> > +				   regs->regs[2], regs->regs[3],
-> > +				   regs->regs[4], regs->regs[5]);
-> > +}
-> > +
-> > +asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
-> > +			       unsigned int sc_nr,
-> > +			       syscall_fn_t syscall_table[])
-> > +{
-> > +	if (scno < sc_nr) {
-> > +		syscall_fn_t syscall_fn;
-> > +		syscall_fn = syscall_table[array_index_nospec(scno, sc_nr)];
-> > +		__invoke_syscall(regs, syscall_fn);
-> > +	} else {
-> > +		regs->regs[0] = do_ni_syscall(regs);
-> > +	}
-> > +}
-> 
-> While reviewing the subsequent patch, it crossed my mind that we no
-> longer have any callers to do_ni_syscall() outside this file. Can we not
-> more it here and have a similar implementation to __invoke_syscall() for
-> consistency, i.e. set regs->regs[0].
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-I think so, though it complicates the logic in do_ni_syscall(), since
-there are two places we may return a value.
+> On Tue, Jun 19, 2018 at 01:52:16PM +0100, Punit Agrawal wrote:
+>> Michal Hocko <mhocko@kernel.org> writes:
+>> 
+>> > On Tue 19-06-18 20:03:07, Xie XiuQi wrote:
+>> > [...]
+>> >> I tested on a arm board with 128 cores 4 numa nodes, but I set CONFIG_NR_CPUS=72.
+>> >> Then node 3 is not be created, because node 3 has no memory, and no cpu.
+>> >> But some pci device may related to node 3, which be set in ACPI table.
+>> >
+>> > Could you double check that zonelists for node 3 are generated
+>> > correctly?
+>> 
+>> The cpus in node 3 aren't onlined and there's no memory attached - I
+>> suspect that no zonelists are built for this node.
+>> 
+>> We skip creating a node, if the number of SRAT entries parsed exceeds
+>> NR_CPUS[0]. This in turn prevents onlining the numa node and so no
+>> zonelists will be created for it.
+>> 
+>> I think the problem will go away if the cpus are restricted via the
+>> kernel command line by setting nr_cpus.
+>> 
+>> Xie, can you try the below patch on top of the one enabling memoryless
+>> nodes? I'm not sure this is the right solution but at least it'll
+>> confirm the problem.
+>
+> This issue looks familiar (or at least related):
+>
+> git log d3bd058826aa
 
-Would you be happy if instead I made __invoke_syscall() return the
-result, and have invoke_syscall() place the result in regs->regs[0] in
-either case, e.g. as below?
+Indeed. Thanks for digging into this.
 
-Thanks,
-Mark.
+>
+> The reason why the NR_CPUS guard is there is to avoid overflowing
+> the early_node_cpu_hwid array.
 
----->8----
-// SPDX-License-Identifier: GPL-2.0
+Ah right... I missed that. The below patch is definitely not what we
+want.
 
-#include <linux/errno.h>
-#include <linux/nospec.h>
-#include <linux/ptrace.h>
-#include <linux/syscalls.h>
+> IA64 does something different in
+> that respect compared to x86, we have to have a look into this.
+>
+> Regardless, AFAICS the proximity domains to nodes mappings should not
+> depend on CONFIG_NR_CPUS, it seems that there is something wrong in that
+> in ARM64 ACPI SRAT parsing.
 
-#include <asm/compat.h>
+Not only SRAT parsing but it looks like there is a similar restriction
+while parsing the ACPI MADT in acpi_map_gic_cpu_interface().
 
-long compat_arm_syscall(struct pt_regs *regs);
+The incomplete parsing introduces a dependency on the ordering of
+entries being aligned between SRAT and MADT when NR_CPUS is
+restricted. We want to parse the entire table in both cases so that the
+code is robust to reordering of entries.
 
-static long do_ni_syscall(struct pt_regs *regs)
-{
-#ifdef CONFIG_COMPAT
-	long ret;
-	if (is_compat_task()) {
-		ret = compat_arm_syscall(regs);
-		if (ret != -ENOSYS)
-			return ret;
-	}
-#endif
-
-	return sys_ni_syscall();
-}
-
-typedef long (*syscall_fn_t)(unsigned long, unsigned long,
-			     unsigned long, unsigned long,
-			     unsigned long, unsigned long);
-
-static long __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
-{
-	return syscall_fn(regs->regs[0], regs->regs[1], regs->regs[2],
-			  regs->regs[3], regs->regs[4], regs->regs[5]);
-}
-
-asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
-			       unsigned int sc_nr,
-			       syscall_fn_t syscall_table[])
-{
-	long ret;
-
-	if (scno < sc_nr) {
-		syscall_fn_t syscall_fn;
-		syscall_fn = syscall_table[array_index_nospec(scno, sc_nr)];
-		ret = __invoke_syscall(regs, syscall_fn);
-	} else {
-		ret = do_ni_syscall(regs);
-	}
-
-	regs->regs[0] = ret;
-}
+In terms of $SUBJECT, I wonder if it's worth taking the original patch
+as a temporary fix (it'll also be easier to backport) while we work on
+fixing these other issues and enabling memoryless nodes.
