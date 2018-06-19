@@ -1,63 +1,118 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 18 Jun 2018 22:07:08 -0700
-Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr address
- calculation
-Message-ID: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
+From: radheys@xilinx.com (Radhey Shyam Pandey)
+Date: Tue, 19 Jun 2018 05:42:11 +0000
+Subject: [PATCH 2/5] net: emaclite: Balance braces in else statement
+In-Reply-To: <644296b273a76469baf641dd712c7a5451cd34fe.camel@perches.com>
+References: <1529322610-27215-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1529322610-27215-3-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <644296b273a76469baf641dd712c7a5451cd34fe.camel@perches.com>
+Message-ID: <DM6PR02MB436134273D962B3FF3242723C7700@DM6PR02MB4361.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern assemblers may take the ISA into account when resolving local
-symbols. This can result in bad address calculations when using badr
-in the wrong location since the offset + 1 may be added twice, resulting
-in an even address target for THUMB instructions. This in turn results
-in an exception at (destination address + 2).
+> -----Original Message-----
+> From: Joe Perches [mailto:joe at perches.com]
+> Sent: Monday, June 18, 2018 9:33 PM
+> To: Radhey Shyam Pandey <radheys@xilinx.com>; davem at davemloft.net;
+> andrew at lunn.ch; Michal Simek <michals@xilinx.com>
+> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH 2/5] net: emaclite: Balance braces in else statement
+> 
+> On Mon, 2018-06-18 at 17:20 +0530, Radhey Shyam Pandey wrote:
+> > Remove else as it is not required with if doing a return.
+> > Fixes below checkpatch warning.
+> 
+> > WARNING: else is not generally useful after a break or return
+> 
+> checkpatch is stupid and doesn't understand code flow.
+> Always try to improve code flow instead of merely
+> following brainless instructions from a script.
+> 
+> So:
+> 
+> > diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> []
+> > @@ -569,13 +569,11 @@ static void xemaclite_tx_handler(struct net_device
+> *dev)
+> >  					(u8 *) lp->deferred_skb->data,
+> >  					lp->deferred_skb->len) != 0)
+> >  			return;
+> > -		else {
+> > -			dev->stats.tx_bytes += lp->deferred_skb->len;
+> > -			dev_kfree_skb_irq(lp->deferred_skb);
+> > -			lp->deferred_skb = NULL;
+> > -			netif_trans_update(dev); /* prevent tx timeout */
+> > -			netif_wake_queue(dev);
+> > -		}
+> > +		dev->stats.tx_bytes += lp->deferred_skb->len;
+> > +		dev_kfree_skb_irq(lp->deferred_skb);
+> > +		lp->deferred_skb = NULL;
+> > +		netif_trans_update(dev); /* prevent tx timeout */
+> > +		netif_wake_queue(dev);
+> >  	}
+> >  }
+> 
+> If you really want to redo this function, perhaps something like:
+Thanks for the review. Yes, In v2 I will refactor the code to have
+failure path return early.
 
-Unhandled exception: IPSR = 00000006 LR = fffffff1
-CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00026-gf773e5bdf0c9 #15
-Hardware name: MPS2 (Device Tree Support)
-PC is at ret_fast_syscall+0x2/0x58
-LR is at tty_ioctl+0x2a5/0x528
-pc : [<21009002>]    lr : [<210d1535>]    psr: 4000000b
-sp : 21825fa8  ip : 0000001c  fp : 21a95892
-r10: 00000000  r9 : 21824000  r8 : 210091c0
-r7 : 00000036  r6 : 21ae1ee0  r5 : 00000000  r4 : 21ae1f3c
-r3 : 00000000  r2 : 3d9adc25  r1 : 00000000  r0 : 00000000
-xPSR: 4000000b
-CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00026-gf773e5bdf0c9 #15
-Hardware name: MPS2 (Device Tree Support)
-[<2100bd8d>] (unwind_backtrace) from [<2100b13b>] (show_stack+0xb/0xc)
-[<2100b13b>] (show_stack) from [<2100b87b>] (__invalid_entry+0x4b/0x4c)
+> 
+> static void xemaclite_tx_handler(struct net_device *dev)
+> {
+> 	struct net_local *lp = netdev_priv(dev);
+> 
+> 	dev->stats.tx_packets++;
+> 
+> 	if (!lp->deferred_skb)
+> 		return;
+> 
+> 	if (xemaclite_send_data(lp, (u8 *)lp->deferred_skb->data,
+> 				lp->deferred_skb->len))
+> 		return;
+> 
+> 	dev->stats.tx_bytes += lp->deferred_skb->len;
+> 	dev_kfree_skb_irq(lp->deferred_skb);
+> 	lp->deferred_skb = NULL;
+> 	netif_trans_update(dev); /* prevent tx timeout */
+> 	netif_wake_queue(dev);
+> }
+> 
+> > @@ -1052,13 +1050,13 @@ static bool get_bool(struct platform_device
+> *ofdev, const char *s)
+> >  {
+> >  	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+> >
+> > -	if (p) {
+> > +	if (p)
+> >  		return (bool)*p;
+> > -	} else {
+> > -		dev_warn(&ofdev->dev, "Parameter %s not found,"
+> > +
+> > +	dev_warn(&ofdev->dev, "Parameter %s not found,"
+> >  			"defaulting to false\n", s);
+> > -		return false;
+> > -	}
+> > +
+> > +	return false;
+> >  }
+> 
+> And this function has backward logic as the failure paths
+> are the ones that should return early or use a goto.
+> 
+> Perhaps something like:
+Yes, will change it. 
 
-Fix the problem by using a logical or instead of an addition. This is
-less efficient but guaranteed to work.
-
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-RFC: I don't really like this, but my ARM assembler knowledge is quite
-limited. Just dropping the "+ 1" from badr doesn't work because some
-other code needs it (the image hangs completely if I try that).
-Ultimately I don't even know if the invoke_syscall macro should just
-have used adr instead of badr (but then how did this ever work ?).
-
-Seen with various toolchains based on gcc 7.x and binutils 2.30 when
-building and testing MPS2 images.
-
- arch/arm/include/asm/assembler.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 0cd4dccbae78..24c87ff2060f 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -195,7 +195,8 @@
- 	.irp	c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
- 	.macro	badr\c, rd, sym
- #ifdef CONFIG_THUMB2_KERNEL
--	adr\c	\rd, \sym + 1
-+	adr\c	\rd, \sym
-+	orr	\rd, #1
- #else
- 	adr\c	\rd, \sym
- #endif
--- 
-2.7.4
+> 
+> static bool get_bool(struct platform_device *ofdev, const char *s)
+> {
+> 	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+> 
+> 	if (!p) {
+> 		dev_warn(&ofdev->dev,
+> 			 "Parameter '%s' not found, defaulting to false\n", s);
+> 		return false;
+> 	}
+> 
+> 	return *p;
+> }
