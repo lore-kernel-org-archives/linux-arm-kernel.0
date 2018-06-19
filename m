@@ -1,65 +1,124 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Tue, 19 Jun 2018 13:24:15 +0200
-Subject: [PATCH 1/2] KVM: Enforce error in ioctl for compat tasks when
- !KVM_COMPAT
-In-Reply-To: <8e4d21bf-d30f-ac66-3017-2badf6a29ec5@arm.com>
-References: <20180619094251.8586-1-marc.zyngier@arm.com>
- <20180619094251.8586-2-marc.zyngier@arm.com>
- <20180619100134.4loab4jtnfdzrpxu@lakrids.cambridge.arm.com>
- <8e4d21bf-d30f-ac66-3017-2badf6a29ec5@arm.com>
-Message-ID: <22acc63b-8737-39b4-d4d4-87927a49fa8c@de.ibm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 19 Jun 2018 12:26:09 +0100
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <CACi5LpMoKP4eG5XhYe5hf5VC9MOY8KuHK=j0ujb8GFpyjAuAww@mail.gmail.com>
+References: <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+ <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
+ <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
+ <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
+ <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
+ <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
+ <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619085541.GB13984@arm.com>
+ <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619094045.GD13984@arm.com>
+ <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
+ <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
+ <CACi5LpMoKP4eG5XhYe5hf5VC9MOY8KuHK=j0ujb8GFpyjAuAww@mail.gmail.com>
+Message-ID: <b0d40351-8d78-fd69-cc87-d5ea5eaabd2a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bhupesh,
 
+On 19/06/18 11:37, Bhupesh Sharma wrote:
+> On Tue, Jun 19, 2018 at 3:46 PM, James Morse <james.morse@arm.com> wrote:
+>> On 19/06/18 10:57, Jin, Yanjiang wrote:
+>>>> -----Original Message-----
+>>>> From: Will Deacon [mailto:will.deacon at arm.com]
+>>>> Sent: 2018?6?19? 17:41
+>>>> To: Jin, Yanjiang <yanjiang.jin@hxt-semitech.com>
+>>>> Cc: James Morse <james.morse@arm.com>; Bhupesh Sharma
+>>>> <bhsharma@redhat.com>; Mark Rutland <mark.rutland@arm.com>; Ard
+>>>> Biesheuvel <ard.biesheuvel@linaro.org>; Catalin Marinas
+>>>> <catalin.marinas@arm.com>; Kexec Mailing List <kexec@lists.infradead.org>;
+>>>> AKASHI Takahiro <takahiro.akashi@linaro.org>; Bhupesh SHARMA
+>>>> <bhupesh.linux@gmail.com>; linux-arm-kernel <linux-arm-
+>>>> kernel at lists.infradead.org>
+>>>> Subject: Re: [PATCH] arm64/mm: Introduce a variable to hold base address of
+>>>> linear region
 
-On 06/19/2018 12:10 PM, Marc Zyngier wrote:
-> On 19/06/18 11:01, Mark Rutland wrote:
->> On Tue, Jun 19, 2018 at 10:42:50AM +0100, Marc Zyngier wrote:
->>> The current behaviour of the compat ioctls is a bit odd.
->>> We provide a compat_ioctl method when KVM_COMPAT is set, and NULL
->>> otherwise. But NULL means that the normal, non-compat ioctl should
->>> be used directly for compat tasks, and there is no way to actually
->>> prevent a compat task from issueing KVM ioctls.
+>>>>>>> It is hard to know all above in kexec-tools now. Originally I
+>>>>>>> planned to read memstart_addr's value from "/dev/mem", but someone
+>>>>>>> thought not all Kernels enable "/dev/mem", we'd better find a more
+>>>>>>> generic approach. So we want to get some suggestions from ARM kernel
+>>>> community.
+>>>>>>> Can we export this variable in Kernel side through sysconf() or
+>>>>>>> other similar methods? Or someone can provide an effect way to get
+>>>>>>> memstart_addr's value?
+>>>>>>
+>>>>>> I thought the suggestion from James was to expose this via an ELF
+>>>>>> NOTE in kcore and vmcore (or in the header directly if that's possible, but I'm
+>>>> not sure about it)?
+>>>>>
+>>>>> Thanks for your reply firstly. But same as DEVMEM, kcore is not a
+>>>>> must-have, so we can't depend on it.
+>>>>
+>>>> Neither is KEXEC. We can select PROC_KCORE from KEXEC if it helps.
+>>>>
+>>>>> On the other hand, phys_to_virt() is called during generating vmcore
+>>>>> in Kexec-tools, vmcore also can't help this issue.
+>>>>
+>>>> I don't understand this part. If you have the vmcore in your hand, why can't you
+>>>> grok the pv offset from the note and use that in phys_to_virt()?
 >>>
->>> This patch changes this behaviour, by always registering a compat_ioctl
->>> method, even if KVM_COMPAT is not selected. In that case, the callback
->>> will always return -EINVAL.
->>>
->>> Reported-by: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> It is a chicken-and-egg issue.
+>>> phys_to virt() is for crashdump setup. To generate vmcore, we must call
+>>> phys_to_virt(). At this point, no vmcore exists.
 >>
->> I virt/kvm/Kconfig we have:
+>> Its needed for the parts of the ELF header that kexec-tools generates at kdump
+>> load time?
 >>
->> config KVM_COMPAT
->>        def_bool y
->>        depends on KVM && COMPAT && !S390
->>
->> ... and in arch/s390 we have COMPAT support, so does this potentially break
->> anything there?
+>> So adding this pv_offset to the key=value data crash_save_vmcoreinfo_init()
+>> saves isn't available early enough?
+
+> Yes, one case where it is not actually available early enough for
+> makedumpfile usage is if we are determining the PT_NOTE contents from
+> the '/proc/kcore' on a 'live' system
+
+> int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len)
 > 
-> It doesn't seem to (COMPAT seems to support the 31 bit stuff, which I
-> don't think ever had KVM support), but my s390-foo is quite basic.
+> {
 > 
-> Christian, could you help here?
+> <snip..>
+> kvaddr = (ulong)vmcoreinfo_addr + PAGE_OFFSET;
+> 
+> }
 
-We do not support KVM for 31 bit. So the original goal of the KVM_COMPAT stuff
-was to actually disable the compat thing for the KVM device driver. 
+You are trying to read the vmcoreinfo through /proc/kcore given knowledge of its
+physical address.
 
-See
-
-commit de8e5d744051568c8aad ("KVM: Disable compat ioctl for s390").
-
-Now looking back, this patch actually only disabled the compat wrappers and
-still allows an 31bit process to run the 64bit ioctls. In theory this should
-cause no issues as the 64bit ioctl must fence off all invalid input anyway
-but actually forbidding KVM for compat processes is even better.
+I'm suggesting adding the contents of vmcoreinfo as a PT_NOTE section of
+/proc/kcore's ELF header. No special knowledge necessary, any elf-parser should
+be able to dump the values.
 
 
+> Now the problem at hand is to determine the offset at which the
+> pv_offset (key=value data pair) lies in the '/proc/kcore' (I assume
+> that when you mentioned above and earlier about adding this pair to
+> the elfnotes you meant both the vmcoreinfo and 'proc/kcore'), as we
+> can have 'n' number of PT_LOAD segments.
 
-So I think this patch actually is a good thing.
+It looks like there is already a NOTE section with core info in there:
+| # readelf -l /proc/kcore
+|
+| Elf file type is CORE (Core file)
+| Entry point 0x0
+| There are 16 program headers, starting at offset 64
+|
+| Program Headers:
+|  Type           Offset             VirtAddr           PhysAddr
+|                 FileSiz            MemSiz              Flags  Align
+|   NOTE           0x00000000000003c0 0x0000000000000000 0x0000000000000000
+|                  0x0000000000001114 0x0000000000000000         0x0
 
-Acked-by: Christian Borntraeger <borntraeger@de.ibm.com>
+I assume we can add more notes without breaking the existing user...
 
-if you want you could even add a
-Fixes: tag.
+(and it looks like there are some broken __pa(kernel symbol) users in there.
+
+
+Thanks,
+
+James
