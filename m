@@ -1,88 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 19 Jun 2018 17:25:07 +0200
-Subject: [Dev] [PATCH 0/5] RFC: Mezzanine handling for 96boards
-In-Reply-To: <CAMuUZTG0q4f2T=+HjEijUCLb7KNXok9RJHOXOKNs2iap5p7m5Q@mail.gmail.com>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
- <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
- <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
- <CAMuUZTG0q4f2T=+HjEijUCLb7KNXok9RJHOXOKNs2iap5p7m5Q@mail.gmail.com>
-Message-ID: <CAKv+Gu_Dq1uY0wHRyREmCmQdSRSJbNheF1ZsrNhibKOZowvf+g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jun 2018 16:28:05 +0100
+Subject: [PATCH] arm64: mm: mark tramp_pg_dir read-only
+In-Reply-To: <CAKv+Gu-Mad64U63jjuKGjhg=h2wdoEKm2vywzATBYr-t_UY_bQ@mail.gmail.com>
+References: <20180530044806.18449-1-yaojun8558363@gmail.com>
+ <20180530091457.GB2452@arm.com>
+ <CAKv+Gu8Zc7eQbG-Ww51GXUCEmhe2J03vbq5vVdyaKra-s13KrA@mail.gmail.com>
+ <20180619152035.GM13984@arm.com>
+ <CAKv+Gu-Mad64U63jjuKGjhg=h2wdoEKm2vywzATBYr-t_UY_bQ@mail.gmail.com>
+Message-ID: <20180619152805.GN13984@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2018 at 17:14, Yang Zhang <yang.zhang@96boards.org> wrote:
->
->
-> On 18 June 2018 at 14:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>
->> On 18 June 2018 at 14:21, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Mon, Jun 18, 2018 at 9:45 AM, Linus Walleij
->> > <linus.walleij@linaro.org> wrote:
->> >> This is a proposal for how to handle the non-discoverable
->> >> 96boards plug-in expansion boards called "mezzanines" in the
->> >> Linux kernel. It is a working RFC series meant for discussion
->> >> at the moment.
->> >>
->> >> The RFC was done on the brand new Ultra96 board from Xilinx
->> >> with a Secure96 mezzanine expansion board. The main part
->> >> is in patch 4, the rest is enabling and examples.
->> >>
->> >> The code can be obtained from here:
->> >>
->> >> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git/log/?h=ultra96
->> >>
->> >> You can for example probably augment the DTS file for any
->> >> upstream-supported 96board and get the Secure96 going with
->> >> it with minor efforts.
->> >
->> > Hi Linus,
->> >
->> > Thanks for your work on solving this long-standing problem. I've just
->> > read through your patches briefly and have a few thoughts:
->> >
->> > - I really like the idea of having C code deal with the mezzanine
->> >   connector itself, acting as an intermediate to tie a number of
->> >   boards to a number of add-on cards, this seems much simpler than
->> >   trying to do everything with overlays or one of the other more
->> >   generic mechanisms.
->> >
->> > - I don't like the idea of having the bus driver contain a list of
->> > possible
->> >   add-ons, this seems to go against our usual driver model. What
->> >   I think we want instead is to make the connector itself a proper
->> >   bus_type, to allow drivers to register against it as loadable modules,
->> >   and devices (maybe limited to one device) being created as probed
->> >   from DT or some other method as you describe.
->> >
->> > - You export symbols in the mezzanine_* namespace, which I think
->> >    is a bit too generic and should perhaps contain something related
->> >    to  96boards in its name to make it less ambiguous. I suspect we
->> >    would add a number of further connectors for hats, capes, lures etc,
->> >    which could all be described as mezzanines. One open question
->> >    is how we structure the commonality between the various
->> >    connectors, but we can defer that until we have more than one
->> >    or two of them.
->> >
->>
->> Hello all,
->>
->> We should also consider firmware use of the mezzanines. For instance,
->> the Secure96 has a RNG which UEFI may want to use so the early boot
->> code can access is for KASLR. It also has a TPM, which should not be
->> reset/reinitialized/etc by the OS if we want to make meaningful use of
->> it.
->>
->> Also, given that we can (and do) already describe topologies involving
->> mezzanines by ignoring the connector altogether (which is not entirely
->> unreasonable given the fact that we [as Linaro/96boards] dropped the
->> ball on this one and did not mandate discoverability for mezzanines).
->
->
-> The design guideline has been reviewed by many inside/outside linaro through
-> the mezzanine at lists.96boards.org and 96b-spec-sig
-> <96b-spec-sig@96boards.org> published as recommended/strongly recommended
-> item from day one. 'dropping the ball' is a strong conclusion.
->
+On Tue, Jun 19, 2018 at 05:23:41PM +0200, Ard Biesheuvel wrote:
+> On 19 June 2018 at 17:20, Will Deacon <will.deacon@arm.com> wrote:
+> > Hi Ard,
+> >
+> > Sorry, I forgot to reply to this.
+> >
+> > On Wed, May 30, 2018 at 11:53:20AM +0200, Ard Biesheuvel wrote:
+> >> On 30 May 2018 at 11:14, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Wed, May 30, 2018 at 12:48:06PM +0800, YaoJun wrote:
+> >> >> To protect against KSMA(Kernel Space Mirroring Attack), make
+> >> >> tramp_pg_dir read-only. The principle of KSMA is to insert a
+> >> >> carefully constructed PGD entry into the translation table.
+> >> >> The type of this entry is block, which maps the kernel text
+> >> >> and its access permissions bits are 01. The user process can
+> >> >> then modify kernel text directly through this mapping. In this
+> >> >> way, an arbitrary write can be converted to multiple arbitrary
+> >> >> writes.
+> >> >>
+> >> >> Signed-off-by: YaoJun <yaojun8558363@gmail.com>
+> >> >> ---
+> >> >>  arch/arm64/mm/mmu.c | 4 ++++
+> >> >>  1 file changed, 4 insertions(+)
+> >> >>
+> >> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >> >> index 2dbb2c9f1ec1..ac4b22c7e435 100644
+> >> >> --- a/arch/arm64/mm/mmu.c
+> >> >> +++ b/arch/arm64/mm/mmu.c
+> >> >> @@ -551,6 +551,10 @@ static int __init map_entry_trampoline(void)
+> >> >>       __create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+> >> >>                            prot, pgd_pgtable_alloc, 0);
+> >> >>
+> >> >> +     update_mapping_prot(__pa_symbol(tramp_pg_dir),
+> >> >> +                             (unsigned long)tramp_pg_dir,
+> >> >> +                             PGD_SIZE, PAGE_KERNEL_RO);
+> >> >
+> >> > Hmm, I like the idea but is there a risk that the page table has been mapped
+> >> > as part of a block entry, which we can't safely split at this point (i.e.
+> >> > we'll run into one of the BUG_ONs in the mapping code)?
+> >> >
+> >>
+> >> We'd need to create a separate segment for it initially so the mapping
+> >> is already at the right granularity.
+> >
+> > Why do you think that's the case? I can't see anything that guarantees this
+> > for the page table itself.
+> >
+> 
+> We'd need to pass NO_BLOCK_MAPPINGS to map_kernel_segment(),
+> obviously, but that shouldn't hurt since that segment is relatively
+> tiny anyway.
 
-Apologies for using a term that you seem to take issue with. Are you
-saying the spec currently recommends it?
+Ah right, with NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS, I agree that we're good.
+Ideally, we'd move {idmap,swapper,tramp}_pg_dir into .rodata...
+
+Will
