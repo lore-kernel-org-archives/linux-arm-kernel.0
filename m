@@ -1,32 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:22:54 +0100
-Subject: [PATCH] arm: Hook up SYNC_CORE functionality for sys_membarrier()
-Message-ID: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 19 Jun 2018 14:34:44 +0200
+Subject: [PATCH 0/2] clk: Fix switching CPU rate from 300Mhz to 1.2GHz on
+ Armada 3700
+Message-ID: <20180619123446.694-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exception return implies context synchronization, so we can hook up the
-SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
-just like we've done for arm64 already.
+Hello,
 
-Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-Cc: Orion Hodson <oth@google.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+in this series the first patch is the main patch which fixes the case
+when switching CPU rate from 300Mhz (or 200M MHz) to 1.2GH. See the
+commit log for the details. As this one is a fix, it should be applied
+on v4.18-rc.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 54eeb8d00bc6..b0ac18547370 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -9,6 +9,7 @@ config ARM
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_FORTIFY_SOURCE
- 	select ARCH_HAS_KCOV
-+	select ARCH_HAS_MEMBARRIER_SYNC_CORE
- 	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
- 	select ARCH_HAS_PHYS_TO_DMA
- 	select ARCH_HAS_SET_MEMORY
+While I was on this file, I also switch to SPDX license identifier,
+this one is fine for 4.19*;
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (2):
+  clk: mvebu: armada-37xx-periph: Fix switching CPU rate from 300Mhz to
+    1.2GHz
+  clk: mvebu: armada-37xx-periph: switch to SPDX license identifier
+
+ drivers/clk/mvebu/armada-37xx-periph.c | 43 +++++++++++++++++++++++---
+ 1 file changed, 39 insertions(+), 4 deletions(-)
+
 -- 
-2.1.4
+2.17.1
