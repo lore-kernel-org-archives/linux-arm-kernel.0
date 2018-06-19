@@ -1,82 +1,92 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Jun 2018 15:50:10 -0700
-Subject: [PATCH 0/2] Make badr macro compatible with newer GAS versions
-In-Reply-To: <CAKv+Gu_zsSxb_8Ej-6QwZOW2X5VfgW0gnjpnHpi62L6nPALoHQ@mail.gmail.com>
-References: <20180619192633.21846-1-ard.biesheuvel@linaro.org>
- <20180619203223.GA28370@roeck-us.net>
- <CAKv+Gu-RHM7HAmzWw9Ge+w21kWxKxLbJT7DD5huv-7WWOPUVWA@mail.gmail.com>
- <20180619204531.GB28370@roeck-us.net>
- <CAKv+Gu_zsSxb_8Ej-6QwZOW2X5VfgW0gnjpnHpi62L6nPALoHQ@mail.gmail.com>
-Message-ID: <20180619225010.GA740@roeck-us.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 20 Jun 2018 07:51:45 +0900
+Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
+In-Reply-To: <20180619205914.21375-1-javierm@redhat.com>
+References: <20180619205914.21375-1-javierm@redhat.com>
+Message-ID: <20180619225145.GA23389@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 12:23:56AM +0200, Ard Biesheuvel wrote:
+On Tue, Jun 19, 2018 at 10:59:14PM +0200, Javier Martinez Canillas wrote:
+> For debugging purposes it may be useful to know what are the devices whose
+> probe function was deferred. Add a debugfs entry showing that information.
 > 
-> OK, so even the linker handling is inconsistent.
+>   $ cat /sys/kernel/debug/deferred_devices
+>   48070000.i2c:twl at 48:bci
+>   musb-hdrc.0.auto
+>   omapdrm.0
 > 
-> Working (binutils 2.30)
+> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
 > 
-> c0301164 <local_restart>:
-> c0301164:       f8d9 a000       ldr.w   sl, [r9]
-> c0301168:       e92d 0030       stmdb   sp!, {r4, r5}
-> c030116c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
-> c0301170:       d117            bne.n   c03011a2 <__sys_trace>
-> c0301172:       46ba            mov     sl, r7
-> c0301174:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
-> c0301178:       bf28            it      cs
-> c030117a:       f04f 0a00       movcs.w sl, #0
-> c030117e:       f3af 8014       csdb
-> c0301182:       f2af 1e83       subw    lr, pc, #387    ; 0x183
->                         c0301182: R_ARM_THM_ALU_PREL_11_0       .Lsym28
+> ---
 > 
+> Changes since RFC v1:
+> - Remove unneeded ret variable from deferred_devs_show()
 > 
-> Broken (binutils 2.26)
+> Changes since RFC v2:
+> - Use DEFINE_SHOW_ATTRIBUTE() macro.
+> - Don't propagate debugfs_create_file() error.
+> - Remove IS_ENABLED(CONFIG_DEBUG_FS) guards.
+> - Drop RFC prefix.
 > 
-> c0301184 <local_restart>:
-> c0301184:       f8d9 a000       ldr.w   sl, [r9]
-> c0301188:       e92d 0030       stmdb   sp!, {r4, r5}
-> c030118c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
-> c0301190:       d117            bne.n   c03011c2 <__sys_trace>
-> c0301192:       46ba            mov     sl, r7
-> c0301194:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
-> c0301198:       bf28            it      cs
-> c030119a:       f04f 0a00       movcs.w sl, #0
-> c030119e:       f3af 8014       csdb
-> c03011a2:       f2af 1ea2       subw    lr, pc, #418    ; 0x1a2
->                         c03011a2: R_ARM_THM_ALU_PREL_11_0       .Lsym30
+>  drivers/base/dd.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 > 
-> 
-> Note the even immediate in the subw instruction. So this is another
-> dead end, unfortunately.
-> 
-Looks like someone is trying to make things really difficunt :-(.
-I think I'll just stick with binutils 2.28.1. Not optimal, but
-at least it works.
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 1435d7281c6..8ec9e3cfbe4 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -16,6 +16,7 @@
+>   * Copyright (c) 2007-2009 Novell Inc.
+>   */
+>  
+> +#include <linux/debugfs.h>
+>  #include <linux/device.h>
+>  #include <linux/delay.h>
+>  #include <linux/dma-mapping.h>
+> @@ -224,6 +225,24 @@ void device_unblock_probing(void)
+>  	driver_deferred_probe_trigger();
+>  }
+>  
+> +/*
+> + * deferred_devs_show() - Show the devices in the deferred probe pending list.
+> + */
+> +static int deferred_devs_show(struct seq_file *s, void *data)
+> +{
+> +	struct device_private *curr;
+> +
+> +	mutex_lock(&deferred_probe_mutex);
+> +
+> +	list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
+> +		seq_printf(s, "%s\n", dev_name(curr->device));
+> +
+> +	mutex_unlock(&deferred_probe_mutex);
+> +
+> +	return 0;
+> +}
+> +DEFINE_SHOW_ATTRIBUTE(deferred_devs);
+> +
+>  /**
+>   * deferred_probe_initcall() - Enable probing of deferred devices
+>   *
+> @@ -233,6 +252,9 @@ void device_unblock_probing(void)
+>   */
+>  static int deferred_probe_initcall(void)
+>  {
+> +	debugfs_create_file("deferred_devices", 0444, NULL, NULL,
+> +			    &deferred_devs_fops);
 
-Something else: I can boot Cortex-M under qemu (-M mps2-an385). The only problem
-I have is this:
+In the root of debugfs?
 
-/ # kill -1 1
-[    3.806568] 
-[    3.806568] Unhandled exception: IPSR = 00000006 LR = fffffffd
-[    3.807221] CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00043-gba4dbdedd3ed #42
-[    3.807590] Hardware name: MPS2 (Device Tree Support)
-[    3.808162] PC is at   (null)
-[    3.808374] LR is at 0x2170fc37
-[    3.808549] pc : [<00000000>]    lr : [<2170fc37>]    psr: 60000000
-[    3.808841] sp : 21761b90  ip : 21761f00  fp : 21758c04
-[    3.809118] r10: 00000000  r9 : 00000000  r8 : 00000000
-[    3.809329] r7 : 00000000  r6 : 00000001  r5 : 00000000  r4 : 2175452c
-[    3.809565] r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : 00000001
-[    3.809791] xPSR: 60000000
-[    3.809926] CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00043-gba4dbdedd3ed #42
-[    3.810179] Hardware name: MPS2 (Device Tree Support)
-[    3.811246] [<2100bd8d>] (unwind_backtrace) from [<2100b13b>] (show_stack+0xb/0xc)
-[    3.811656] [<2100b13b>] (show_stack) from [<2100b87b>] (__invalid_entry+0x4b/0x4c)
+Anyway, what about "devices_deferred", to help keep things semi-sane if
+we have other driver core debugfs entries?
 
-Everything else seems to work, just sending a signal to init causes it
-to blow up. Any idea what might cause this ?
+And you don't remove the file ever?
 
-Thanks,
-Guenter
+And what is the use of this file?  What can you do with this
+information?  Who is going to use it?  Don't we have other deferred
+probe debugging somewhere else?
+
+thanks,
+
+greg k-h
