@@ -1,121 +1,292 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 14:59:13 +0100
-Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache
- for kernel mappings
-In-Reply-To: <20180619135528.4rxgluvroybxgxem@lakrids.cambridge.arm.com>
-References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
- <1529412495-17525-4-git-send-email-will.deacon@arm.com>
- <20180619135528.4rxgluvroybxgxem@lakrids.cambridge.arm.com>
-Message-ID: <20180619135910.mwjyqrnw6nzhbqxm@lakrids.cambridge.arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 19 Jun 2018 19:15:24 +0530
+Subject: [PATCH v10 13/14] cpufreq: Add module to register cpufreq on Krait
+ CPUs
+In-Reply-To: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
+References: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1529415925-28915-14-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 02:55:28PM +0100, Mark Rutland wrote:
-> On Tue, Jun 19, 2018 at 01:48:15PM +0100, Will Deacon wrote:
-> > When invalidating the instruction cache for a kernel mapping via
-> > flush_icache_range(), it is also necessary to flush the pipeline for
-> > other CPUs so that instructions fetched into the pipeline before the
-> > I-cache invalidation are discarded. For example, if module 'foo' is
-> > unloaded and then module 'bar' is loaded into the same area of memory,
-> > a CPU could end up executing instructions from 'foo' when branching into
-> > 'bar' if these instructions were fetched into the pipeline before 'foo'
-> > was unloaded.
-> > 
-> > Whilst this is highly unlikely to occur in practice, particularly as
-> > any exception acts as a context-synchronizing operation, following the
-> > letter of the architecture requires us to execute an ISB on each CPU
-> > in order for the new instruction stream to be visible.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/include/asm/cacheflush.h | 13 ++++++++++++-
-> >  arch/arm64/kernel/alternative.c     |  1 -
-> >  arch/arm64/kernel/cpu_errata.c      |  2 +-
-> >  arch/arm64/kernel/insn.c            | 15 ++-------------
-> >  arch/arm64/mm/cache.S               |  4 ++--
-> >  5 files changed, 17 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> > index d264a7274811..a0ec27066e6f 100644
-> > --- a/arch/arm64/include/asm/cacheflush.h
-> > +++ b/arch/arm64/include/asm/cacheflush.h
-> > @@ -71,7 +71,7 @@
-> >   *		- kaddr  - page address
-> >   *		- size   - region size
-> >   */
-> > -extern void flush_icache_range(unsigned long start, unsigned long end);
-> > +extern void __flush_icache_range(unsigned long start, unsigned long end);
-> >  extern int  invalidate_icache_range(unsigned long start, unsigned long end);
-> >  extern void __flush_dcache_area(void *addr, size_t len);
-> >  extern void __inval_dcache_area(void *addr, size_t len);
-> > @@ -81,6 +81,17 @@ extern void __clean_dcache_area_pou(void *addr, size_t len);
-> >  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
-> >  extern void sync_icache_aliases(void *kaddr, unsigned long len);
-> >  
-> > +static inline void flush_icache_range(unsigned long start, unsigned long end)
-> > +{
-> > +	__flush_icache_range(start, end);
-> > +
-> > +	/*
-> > +	 * IPI all online CPUs so that they undergo a context synchronization
-> > +	 * event and are forced to refetch the new instructions.
-> > +	 */
-> > +	kick_all_cpus_sync();
-> > +}
-> > +
-> >  static inline void flush_cache_mm(struct mm_struct *mm)
-> >  {
-> >  }
-> > diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> > index 4f3dcc15a5b2..0ac06560c166 100644
-> > --- a/arch/arm64/kernel/alternative.c
-> > +++ b/arch/arm64/kernel/alternative.c
-> > @@ -205,7 +205,6 @@ static int __apply_alternatives_multi_stop(void *unused)
-> >  	if (smp_processor_id()) {
-> >  		while (!READ_ONCE(alternatives_applied))
-> >  			cpu_relax();
-> > -		isb();
-> >  	} else {
-> >  		BUG_ON(alternatives_applied);
-> >  		__apply_alternatives(&region, false);
-> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > index 1d2b6d768efe..0a338a1cd2d7 100644
-> > --- a/arch/arm64/kernel/cpu_errata.c
-> > +++ b/arch/arm64/kernel/cpu_errata.c
-> > @@ -101,7 +101,7 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
-> >  	for (i = 0; i < SZ_2K; i += 0x80)
-> >  		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
-> >  
-> > -	flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
-> > +	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
-> >  }
-> >  
-> >  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
-> > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> > index 816d03c4c913..4cc41864f277 100644
-> > --- a/arch/arm64/kernel/insn.c
-> > +++ b/arch/arm64/kernel/insn.c
-> > @@ -249,7 +249,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
-> >  	} else {
-> >  		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
-> >  			cpu_relax();
-> > -		isb();
-> >  	}
-> 
-> Something seems amiss here. 
-> 
-> We call __apply_alternatives_multi_stop() via stop_machine(), and I
-> thought that ensured that all CPUs had IRQs masked.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-Whoops; that should say aarch64_insn_patch_text_cb(), not
-__apply_alternatives_multi_stop()
+Register a cpufreq-generic device whenever we detect that a
+"qcom,krait" compatible CPU is present in DT.
 
-> If so, the IPI from flush_icache_range() will deadlock.
-> 
-> If not, we can take IRQs, and execute potentially patched code.
-> 
-> I think there's also an existing problem here. Even if with have IRQs
-> masked, we could take SDEI events (or GICv3 psudeo-NMIs, once we have
-> those). I don't know how we can manage those.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+[Sricharan: updated to use dev_pm_opp_set_prop_name and
+	    nvmem apis]
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+[Thierry Escande: update to add support for opp-supported-hw]
+Signed-off-by: Thierry Escande <thierry.escande@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ [v10] updated to add support for opp-supported-hw given by
+       Thierry Escande <thierry.escande@linaro.org>
 
-Mark.
+ drivers/cpufreq/Kconfig.arm          |  10 ++
+ drivers/cpufreq/Makefile             |   1 +
+ drivers/cpufreq/cpufreq-dt-platdev.c |   5 +
+ drivers/cpufreq/qcom-cpufreq.c       | 201 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 217 insertions(+)
+ create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 7f56fe5..87e5d8d 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -134,6 +134,16 @@ config ARM_OMAP2PLUS_CPUFREQ
+ 	depends on ARCH_OMAP2PLUS
+ 	default ARCH_OMAP2PLUS
+ 
++config ARM_QCOM_CPUFREQ
++	bool "CPUfreq driver for the QCOM SoCs with KRAIT processors"
++	depends on ARCH_QCOM
++	select PM_OPP
++	help
++	  This enables the CPUFreq driver for Qualcomm SoCs with
++	  KRAIT processors.
++
++	  If in doubt, say N.
++
+ config ARM_S3C_CPUFREQ
+ 	bool
+ 	help
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 8d24ade..c591e1e 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -65,6 +65,7 @@ obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
+ obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+ obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+ obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
++obj-$(CONFIG_ARM_QCOM_CPUFREQ)		+= qcom-cpufreq.o
+ obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
+ obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
+ obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 3b585e4..e2e9a99 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -127,6 +127,11 @@
+ 	{ .compatible = "ti,am43", },
+ 	{ .compatible = "ti,dra7", },
+ 
++	{ .compatible = "qcom,ipq8064", },
++	{ .compatible = "qcom,apq8064", },
++	{ .compatible = "qcom,msm8974", },
++	{ .compatible = "qcom,msm8960", },
++
+ 	{ }
+ };
+ 
+diff --git a/drivers/cpufreq/qcom-cpufreq.c b/drivers/cpufreq/qcom-cpufreq.c
+new file mode 100644
+index 0000000..1d4ab54
+--- /dev/null
++++ b/drivers/cpufreq/qcom-cpufreq.c
+@@ -0,0 +1,201 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include <linux/cpu.h>
++#include <linux/module.h>
++#include <linux/nvmem-consumer.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/pm_opp.h>
++#include <linux/slab.h>
++
++static void __init get_krait_bin_format_a(int *speed, int *pvs, int *pvs_ver,
++					  struct nvmem_cell *pvs_nvmem, u8 *buf)
++{
++	u32 pte_efuse;
++
++	pte_efuse = *((u32 *)buf);
++
++	*speed = pte_efuse & 0xf;
++	if (*speed == 0xf)
++		*speed = (pte_efuse >> 4) & 0xf;
++
++	if (*speed == 0xf) {
++		*speed = 0;
++		pr_warn("Speed bin: Defaulting to %d\n", *speed);
++	} else {
++		pr_info("Speed bin: %d\n", *speed);
++	}
++
++	*pvs = (pte_efuse >> 10) & 0x7;
++	if (*pvs == 0x7)
++		*pvs = (pte_efuse >> 13) & 0x7;
++
++	if (*pvs == 0x7) {
++		*pvs = 0;
++		pr_warn("PVS bin: Defaulting to %d\n", *pvs);
++	} else {
++		pr_info("PVS bin: %d\n", *pvs);
++	}
++
++	kfree(buf);
++}
++
++static void __init get_krait_bin_format_b(int *speed, int *pvs, int *pvs_ver,
++					  struct nvmem_cell *pvs_nvmem, u8 *buf)
++{
++	u32 pte_efuse, redundant_sel;
++
++	pte_efuse = *((u32 *)buf);
++	redundant_sel = (pte_efuse >> 24) & 0x7;
++	*speed = pte_efuse & 0x7;
++
++	/* 4 bits of PVS are in efuse register bits 31, 8-6. */
++	*pvs = ((pte_efuse >> 28) & 0x8) | ((pte_efuse >> 6) & 0x7);
++	*pvs_ver = (pte_efuse >> 4) & 0x3;
++
++	switch (redundant_sel) {
++	case 1:
++		*speed = (pte_efuse >> 27) & 0xf;
++		break;
++	case 2:
++		*pvs = (pte_efuse >> 27) & 0xf;
++		break;
++	}
++
++	/* Check SPEED_BIN_BLOW_STATUS */
++	if (pte_efuse & BIT(3)) {
++		pr_info("Speed bin: %d\n", *speed);
++	} else {
++		pr_warn("Speed bin not set. Defaulting to 0!\n");
++		*speed = 0;
++	}
++
++	/* Check PVS_BLOW_STATUS */
++	pte_efuse = *(((u32 *)buf) + 4);
++	if (pte_efuse) {
++		pr_info("PVS bin: %d\n", *pvs);
++	} else {
++		pr_warn("PVS bin not set. Defaulting to 0!\n");
++		*pvs = 0;
++	}
++
++	pr_info("PVS version: %d\n", *pvs_ver);
++	kfree(buf);
++}
++
++static int __init qcom_cpufreq_populate_opps(struct nvmem_cell *pvs_nvmem,
++					     struct opp_table **tbl1,
++					     struct opp_table **tbl2)
++{
++	int speed = 0, pvs = 0, pvs_ver = 0, cpu, ret;
++	struct device *cpu_dev;
++	u8 *buf;
++	size_t len;
++	char pvs_name[] = "speedXX-pvsXX-vXX";
++	u32 hw_version;
++
++	buf = nvmem_cell_read(pvs_nvmem, &len);
++	if (len == 4)
++		get_krait_bin_format_a(&speed, &pvs, &pvs_ver, pvs_nvmem, buf);
++	else if (len == 8)
++		get_krait_bin_format_b(&speed, &pvs, &pvs_ver, pvs_nvmem, buf);
++	else
++		pr_warn("Unable to read nvmem data. Defaulting to 0!\n");
++
++	snprintf(pvs_name, sizeof(pvs_name), "speed%d-pvs%d-v%d",
++		 speed, pvs, pvs_ver);
++
++	hw_version = (1 << speed);
++
++	for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
++		cpu_dev = get_cpu_device(cpu);
++		if (!cpu_dev)
++			return -ENODEV;
++
++		tbl1[cpu] = dev_pm_opp_set_prop_name(cpu_dev, pvs_name);
++		if (IS_ERR(tbl1[cpu])) {
++			ret = PTR_ERR(tbl1[cpu]);
++			tbl1[cpu] = 0;
++			pr_warn("failed to add OPP name %s\n", pvs_name);
++			return ret;
++		}
++
++		tbl2[cpu] = dev_pm_opp_set_supported_hw(cpu_dev, &hw_version,
++							1);
++		if (IS_ERR(tbl2[cpu])) {
++			ret = PTR_ERR(tbl2[cpu]);
++			tbl2[cpu] = 0;
++			pr_warn("failed to set supported hw version\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int __init qcom_cpufreq_driver_init(void)
++{
++	struct platform_device *pdev;
++	struct device *cpu_dev;
++	struct device_node *np;
++	struct nvmem_cell *pvs_nvmem;
++	struct opp_table *tbl1[NR_CPUS] = { NULL }, *tbl2[NR_CPUS] = { NULL };
++	int ret, cpu = 0;
++
++	cpu_dev = get_cpu_device(0);
++	if (!cpu_dev)
++		return -ENODEV;
++
++	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev);
++	if (!np)
++		return -ENOENT;
++
++	if (!of_device_is_compatible(np, "operating-points-v2-krait-cpu")) {
++		ret = -ENOENT;
++		goto free_np;
++	}
++
++	pvs_nvmem = of_nvmem_cell_get(np, NULL);
++	if (IS_ERR(pvs_nvmem)) {
++		dev_err(cpu_dev, "Could not get nvmem cell\n");
++		ret = PTR_ERR(pvs_nvmem);
++		goto free_np;
++	}
++
++	ret = qcom_cpufreq_populate_opps(pvs_nvmem, tbl1, tbl2);
++	if (ret)
++		goto free_opp_name;
++
++	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++	if (IS_ERR(pdev)) {
++		ret = PTR_ERR(pdev);
++		goto free_opp_name;
++	}
++
++	of_node_put(np);
++
++	return 0;
++
++free_opp_name:
++	while (tbl1[cpu]) {
++		dev_pm_opp_put_prop_name(tbl1[cpu]);
++		cpu++;
++	}
++
++	cpu = 0;
++	while (tbl2[cpu]) {
++		dev_pm_opp_put_supported_hw(tbl2[cpu]);
++		cpu++;
++	}
++
++free_np:
++	of_node_put(np);
++
++	return ret;
++}
++late_initcall(qcom_cpufreq_driver_init);
++
++MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
++MODULE_AUTHOR("Stephen Boyd <sboyd@codeaurora.org>");
++MODULE_LICENSE("GPL v2");
+-- 
+1.9.1
