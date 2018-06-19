@@ -1,68 +1,95 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 19 Jun 2018 15:19:43 -0300
-Subject: [PATCH v1 0/6] perf cs-etm: Fix tracing packet handling and
- minor refactoring
-In-Reply-To: <CANLsYkyxuz+tPrC7wb1omsw+qj=7ZB5t6FRbqZz54994g62q6g@mail.gmail.com>
-References: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
- <CANLsYkyxuz+tPrC7wb1omsw+qj=7ZB5t6FRbqZz54994g62q6g@mail.gmail.com>
-Message-ID: <20180619181943.GL20477@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 19 Jun 2018 20:20:02 +0200
+Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr
+ address calculation
+In-Reply-To: <CAKv+Gu9JTsKEwwKN4OjmNHLf_86s753f2yEdo=7esERdUCaWiQ@mail.gmail.com>
+References: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
+ <CAKv+Gu8Byj7G3Awnq4Y90Wot=GJTx0gO5A7-960au9ZkBBL2=A@mail.gmail.com>
+ <b8bff03d-91a7-0e53-a44e-d1924beb382d@roeck-us.net>
+ <CAKv+Gu-T8Fx3Nry7pUdOoOeRU-Ns89w3oo4itmu1q4FzYF5Rag@mail.gmail.com>
+ <20180619172422.GB16846@roeck-us.net>
+ <CAKv+Gu9JTsKEwwKN4OjmNHLf_86s753f2yEdo=7esERdUCaWiQ@mail.gmail.com>
+Message-ID: <CAKv+Gu-SWaq0s46x_RCQ_TVN2vCBFp_NDmW3jUgUyMrbGoLcbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, Jun 19, 2018 at 11:46:02AM -0600, Mathieu Poirier escreveu:
-> On Sun, 17 Jun 2018 at 23:10, Leo Yan <leo.yan@linaro.org> wrote:
-> >
-> > Due the current code is missing to handle cs-etm start tracing packet
-> > and CS_ETM_TRACE_ON packet, we fail to generate branch sample for them.
-> >
-> > This patch series is to fix cs-etm tracing packet handling:
-> >
-> > Patch 0001 is to add invalid address macro for readable coding;
-> >
-> > Patch 0002 is one minor fixing to return error code for instruction
-> > sample failure;
-> >
-> > Patches 0003~0006 are fixing patches for start tracing packet
-> > and CS_ETM_TRACE_ON packet.
-> >
-> > This patch series is applied on acme tree [1] on branch perf/core with
-> > latest commit: e238cf2e3d2e ("perf intel-pt: Fix packet decoding of CYC
-> > packets").  Also applied successfully this patch series on Linus tree
-> > on 4.18-rc1.
-> >
-> > This patch series has been verified on Hikey620 platform with below two
-> > commands:
-> > perf script --itrace=i10000il128 -F cpu,event,ip,addr,sym -k ./vmlinux
-> > perf script -F cpu,event,ip,addr,sym -k ./vmlinux
-> >
-> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
-> >
-> >
-> > Leo Yan (6):
-> >   perf cs-etm: Introduce invalid address macro
-> >   perf cs-etm: Bail out immediately for instruction sample failure
-> >   perf cs-etm: Fix start tracing packet handling
-> >   perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
-> >   perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
-> >     packet
-> >   perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
-> >
-> >  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
-> >  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
-> >  tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
-> >  3 files changed, 68 insertions(+), 14 deletions(-)
-> 
-> Good day Arnaldo,
-> 
-> I am good with this set:
-> 
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> 
-> Please consider for inclusion in your tree if you are satisfied with the work.
+On 19 June 2018 at 20:17, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 19 June 2018 at 19:24, Guenter Roeck <linux@roeck-us.net> wrote:
+>> On Tue, Jun 19, 2018 at 03:35:07PM +0200, Ard Biesheuvel wrote:
+>>> >>
+>>> >> +       /* this needs to be a separate macro or \@ does not work correctly
+>>> >> */
+>>> >> +       .macro  __badr, c, rd, sym
+>>> >> +       .eqv    .Lsym\@, \sym
+>>> >> +       adr\c   \rd, .Lsym\@ + 1
+>>> >
+>>> >
+>>> > Wild shot, but the following works for me.
+>>> >
+>>> >         .eqv    .Lsym\@, \sym + 1
+>>> >         adr\c   \rd, .Lsym\@
+>>> >
+>>> > Does it make sense ?
+>>> >
+>>>
+>>> Interesting. Do you mean this works with your 2.30 binutils that
+>>> triggers the original issue?
+>>>
+>>
+>> Yes, it does. It is also the solution used for some graphics libraries,
+>> though of course now I don't find the link anymore.
+>>
+>> Guess this is going nowhere given Russell's response, so I'll just
+>> live with it, like obviously everyone else does already. I built
+>> a toolchain using gcc 7.3.0 and binutils 2.28.1 which "solves"
+>> the problem for me.
+>>
+>
+> If we can live with using a wide encoding unconditionally, we could
+> consider something like below. That forces the symbol references to be
+> resolved at link time, which means we completely sidestep the new GAS
+> code.
+>
+> -----------8<----------------
+> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Date: Tue, 16 Jan 2018 12:12:45 +0000
+> Subject: [PATCH] ARM: assembler: prevent ADR from setting the Thumb bit twice
+>
+> To work around recent issues where ADR references to Thumb function
+> symbols may or may not have the Thumb bit set already when they are
+> resolved by GAS, reference the symbol indirectly via a global symbol
+> typed as 'function', and emit a relocation that lets the linker fix
+> up the reference.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 6ae42ad29518..1a55ce4b245c 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -195,13 +195,22 @@
+>         .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+>         .macro  badr\c, rd, sym
+>  #ifdef CONFIG_THUMB2_KERNEL
+> -       adr\c   \rd, \sym + 1
+> +       __badr  \c, \rd, \sym
+>  #else
+>         adr\c   \rd, \sym
+>  #endif
+>         .endm
+>         .endr
+>
+> +       /* this needs to be a separate macro or \@ does not work correctly */
+> +       .macro          __badr, c, rd, sym
+> +       .globl          .Lsym_\sym\()_\@
+> +       .type           .Lsym_\sym\()_\@, %function
+> +       .set            .Lsym_\sym\()_\@, \sym
+> +       .reloc          ., R_ARM_THM_ALU_PREL_11_0, .Lsym_\sym\()_\@
+> +       adr\c\().w      \rd, .
+> +       .endm
+> +
+>  /*
+>   * Get current thread_info.
+>   */
 
-I'll take a look and get it into perf/core, now I'm concentrating on
-perf/urgent work.
-
-Thanks,
-
-- Arnaldo
+It seems we can drop the .globl btw
