@@ -1,68 +1,144 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 14:34:18 +0100
-Subject: [PATCH 2/3] arm64: Remove unnecessary ISBs from set_{pte, pmd,
- pud}
-In-Reply-To: <1529412495-17525-3-git-send-email-will.deacon@arm.com>
-References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
- <1529412495-17525-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20180619133418.rzxccizysr23uf72@lakrids.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 19 Jun 2018 15:35:07 +0200
+Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr
+ address calculation
+In-Reply-To: <b8bff03d-91a7-0e53-a44e-d1924beb382d@roeck-us.net>
+References: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
+ <CAKv+Gu8Byj7G3Awnq4Y90Wot=GJTx0gO5A7-960au9ZkBBL2=A@mail.gmail.com>
+ <b8bff03d-91a7-0e53-a44e-d1924beb382d@roeck-us.net>
+Message-ID: <CAKv+Gu-T8Fx3Nry7pUdOoOeRU-Ns89w3oo4itmu1q4FzYF5Rag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 01:48:14PM +0100, Will Deacon wrote:
-> Commit 7f0b1bf04511 ("arm64: Fix barriers used for page table modifications")
-> fixed a reported issue with fixmap page-table entries not being visible
-> to the walker due to a missing DSB instruction. At the same time, it added
-> ISB instructions to the arm64 set_{pte,pmd,pud} functions, which are not
-> required by the architecture and make little sense in isolation.
-> 
-> Remove the redundant ISBs.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On 19 June 2018 at 15:29, Guenter Roeck <linux@roeck-us.net> wrote:
+> Hi Ard,
+>
+>
+> On 06/19/2018 12:48 AM, Ard Biesheuvel wrote:
+>>
+>> On 19 June 2018 at 07:07, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>
+>>> Modern assemblers may take the ISA into account when resolving local
+>>> symbols. This can result in bad address calculations when using badr
+>>> in the wrong location since the offset + 1 may be added twice, resulting
+>>> in an even address target for THUMB instructions. This in turn results
+>>> in an exception at (destination address + 2).
+>>>
+>>> Unhandled exception: IPSR = 00000006 LR = fffffff1
+>>> CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00026-gf773e5bdf0c9 #15
+>>> Hardware name: MPS2 (Device Tree Support)
+>>> PC is at ret_fast_syscall+0x2/0x58
+>>> LR is at tty_ioctl+0x2a5/0x528
+>>> pc : [<21009002>]    lr : [<210d1535>]    psr: 4000000b
+>>> sp : 21825fa8  ip : 0000001c  fp : 21a95892
+>>> r10: 00000000  r9 : 21824000  r8 : 210091c0
+>>> r7 : 00000036  r6 : 21ae1ee0  r5 : 00000000  r4 : 21ae1f3c
+>>> r3 : 00000000  r2 : 3d9adc25  r1 : 00000000  r0 : 00000000
+>>> xPSR: 4000000b
+>>> CPU: 0 PID: 1 Comm: init Not tainted 4.18.0-rc1-00026-gf773e5bdf0c9 #15
+>>> Hardware name: MPS2 (Device Tree Support)
+>>> [<2100bd8d>] (unwind_backtrace) from [<2100b13b>] (show_stack+0xb/0xc)
+>>> [<2100b13b>] (show_stack) from [<2100b87b>] (__invalid_entry+0x4b/0x4c)
+>>>
+>>> Fix the problem by using a logical or instead of an addition. This is
+>>> less efficient but guaranteed to work.
+>>>
+>>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>>> ---
+>>> RFC: I don't really like this, but my ARM assembler knowledge is quite
+>>> limited. Just dropping the "+ 1" from badr doesn't work because some
+>>> other code needs it (the image hangs completely if I try that).
+>>> Ultimately I don't even know if the invoke_syscall macro should just
+>>> have used adr instead of badr (but then how did this ever work ?).
+>>>
+>>> Seen with various toolchains based on gcc 7.x and binutils 2.30 when
+>>> building and testing MPS2 images.
+>>>
+>>
+>> Hello Guenter,
+>>
+>> This issue has been discussed before. It appears the binutils people
+>> suddenly started caring about the thumb annotation of local function
+>> symbols, resulting in behavior that is not backwards compatible.
+>>
+>> https://marc.info/?l=linux-arm-kernel&m=151143776213636&w=2
+>> https://sourceware.org/bugzilla/show_bug.cgi?id=21458
+>>
+>> Can you try the fix below please?
+>>
+>>>   arch/arm/include/asm/assembler.h | 3 ++-
+>>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/assembler.h
+>>> b/arch/arm/include/asm/assembler.h
+>>> index 0cd4dccbae78..24c87ff2060f 100644
+>>> --- a/arch/arm/include/asm/assembler.h
+>>> +++ b/arch/arm/include/asm/assembler.h
+>>> @@ -195,7 +195,8 @@
+>>>          .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+>>>          .macro  badr\c, rd, sym
+>>>   #ifdef CONFIG_THUMB2_KERNEL
+>>> -       adr\c   \rd, \sym + 1
+>>> +       adr\c   \rd, \sym
+>>> +       orr     \rd, #1
+>>>   #else
+>>>          adr\c   \rd, \sym
+>>>   #endif
+>>> --
+>>> 2.7.4
+>>
+>>
+>> ----------8<------------
+>> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Date: Tue, 16 Jan 2018 12:12:45 +0000
+>> Subject: [PATCH] ARM: assembler: prevent ADR from setting the Thumb bit
+>> twice
+>>
+>> To work around recent issues where ADR references to Thumb function
+>> symbols may or may not have the Thumb bit set already when they are
+>> resolved by GAS, reference the symbol indirectly via a local symbol
+>> typed as 'object', stripping the ARM/Thumb annotation.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> diff --git a/arch/arm/include/asm/assembler.h
+>> b/arch/arm/include/asm/assembler.h
+>> index 6ae42ad29518..dd2ff94ad90b 100644
+>> --- a/arch/arm/include/asm/assembler.h
+>> +++ b/arch/arm/include/asm/assembler.h
+>> @@ -195,13 +195,19 @@
+>>          .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+>>          .macro  badr\c, rd, sym
+>>   #ifdef CONFIG_THUMB2_KERNEL
+>> -       adr\c   \rd, \sym + 1
+>> +       __badr  \c, \rd, \sym
+>>   #else
+>>          adr\c   \rd, \sym
+>>   #endif
+>>          .endm
+>>          .endr
+>>
+>> +       /* this needs to be a separate macro or \@ does not work correctly
+>> */
+>> +       .macro  __badr, c, rd, sym
+>> +       .eqv    .Lsym\@, \sym
+>> +       adr\c   \rd, .Lsym\@ + 1
+>
+>
+> Wild shot, but the following works for me.
+>
+>         .eqv    .Lsym\@, \sym + 1
+>         adr\c   \rd, .Lsym\@
+>
+> Does it make sense ?
+>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Interesting. Do you mean this works with your 2.30 binutils that
+triggers the original issue?
 
-Mark.
+If so, then yes, it makes sense, although it still seems fragile,
+since we are relying on \sym being resolved without the Thumb bit in
+the context of the .eqv pseudo op. But if this works across all
+implementations we care about, I would be fine with it.
 
-> ---
->  arch/arm64/include/asm/pgtable.h | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 9f82d6b53851..1bdeca8918a6 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -224,10 +224,8 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
->  	 * Only if the new pte is valid and kernel, otherwise TLB maintenance
->  	 * or update_mmu_cache() have the necessary barriers.
->  	 */
-> -	if (pte_valid_not_user(pte)) {
-> +	if (pte_valid_not_user(pte))
->  		dsb(ishst);
-> -		isb();
-> -	}
->  }
->  
->  extern void __sync_icache_dcache(pte_t pteval);
-> @@ -434,7 +432,6 @@ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
->  {
->  	WRITE_ONCE(*pmdp, pmd);
->  	dsb(ishst);
-> -	isb();
->  }
->  
->  static inline void pmd_clear(pmd_t *pmdp)
-> @@ -485,7 +482,6 @@ static inline void set_pud(pud_t *pudp, pud_t pud)
->  {
->  	WRITE_ONCE(*pudp, pud);
->  	dsb(ishst);
-> -	isb();
->  }
->  
->  static inline void pud_clear(pud_t *pudp)
-> -- 
-> 2.1.4
-> 
+Russell?
