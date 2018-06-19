@@ -1,66 +1,146 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Tue, 19 Jun 2018 08:50:02 -0400 (EDT)
-Subject: [PATCH] arm: Hook up SYNC_CORE functionality for sys_membarrier()
-In-Reply-To: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
-References: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1431651959.17300.1529412602455.JavaMail.zimbra@efficios.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jun 2018 13:48:15 +0100
+Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache for
+ kernel mappings
+In-Reply-To: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
+References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1529412495-17525-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jun 19, 2018, at 8:22 AM, Will Deacon will.deacon at arm.com wrote:
+When invalidating the instruction cache for a kernel mapping via
+flush_icache_range(), it is also necessary to flush the pipeline for
+other CPUs so that instructions fetched into the pipeline before the
+I-cache invalidation are discarded. For example, if module 'foo' is
+unloaded and then module 'bar' is loaded into the same area of memory,
+a CPU could end up executing instructions from 'foo' when branching into
+'bar' if these instructions were fetched into the pipeline before 'foo'
+was unloaded.
 
-> Exception return implies context synchronization, so we can hook up the
-> SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
-> just like we've done for arm64 already.
-> 
-> Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-> Cc: Orion Hodson <oth@google.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> arch/arm/Kconfig | 1 +
-> 1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 54eeb8d00bc6..b0ac18547370 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -9,6 +9,7 @@ config ARM
-> 	select ARCH_HAS_ELF_RANDOMIZE
-> 	select ARCH_HAS_FORTIFY_SOURCE
-> 	select ARCH_HAS_KCOV
-> +	select ARCH_HAS_MEMBARRIER_SYNC_CORE
+Whilst this is highly unlikely to occur in practice, particularly as
+any exception acts as a context-synchronizing operation, following the
+letter of the architecture requires us to execute an ISB on each CPU
+in order for the new instruction stream to be visible.
 
-In addition to this, we added this comment in arch/arm64/kernel/entry.S:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/cacheflush.h | 13 ++++++++++++-
+ arch/arm64/kernel/alternative.c     |  1 -
+ arch/arm64/kernel/cpu_errata.c      |  2 +-
+ arch/arm64/kernel/insn.c            | 15 ++-------------
+ arch/arm64/mm/cache.S               |  4 ++--
+ 5 files changed, 17 insertions(+), 18 deletions(-)
 
-+       /*
-+        * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on eret context synchronization
-+        * when returning from IPI handler, and when returning to user-space.
-+        */
-
-So I would expect a similar comment in arch/arm/kernel/entry-header.S, within
-svc_exit and svc_exit_via_fiq:
-
-        /*
-         * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on [insn] context synchronization
-         * when returning from IPI handler, and when returning to user-space.
-         */
-
-Which instruction exactly is responsible for context synchronization on
-arm32 ?
-
-Thanks,
-
-Mathieu
-
-
-
-> 	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
-> 	select ARCH_HAS_PHYS_TO_DMA
-> 	select ARCH_HAS_SET_MEMORY
-> --
-> 2.1.4
-
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index d264a7274811..a0ec27066e6f 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -71,7 +71,7 @@
+  *		- kaddr  - page address
+  *		- size   - region size
+  */
+-extern void flush_icache_range(unsigned long start, unsigned long end);
++extern void __flush_icache_range(unsigned long start, unsigned long end);
+ extern int  invalidate_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
+ extern void __inval_dcache_area(void *addr, size_t len);
+@@ -81,6 +81,17 @@ extern void __clean_dcache_area_pou(void *addr, size_t len);
+ extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+ extern void sync_icache_aliases(void *kaddr, unsigned long len);
+ 
++static inline void flush_icache_range(unsigned long start, unsigned long end)
++{
++	__flush_icache_range(start, end);
++
++	/*
++	 * IPI all online CPUs so that they undergo a context synchronization
++	 * event and are forced to refetch the new instructions.
++	 */
++	kick_all_cpus_sync();
++}
++
+ static inline void flush_cache_mm(struct mm_struct *mm)
+ {
+ }
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 4f3dcc15a5b2..0ac06560c166 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -205,7 +205,6 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 	if (smp_processor_id()) {
+ 		while (!READ_ONCE(alternatives_applied))
+ 			cpu_relax();
+-		isb();
+ 	} else {
+ 		BUG_ON(alternatives_applied);
+ 		__apply_alternatives(&region, false);
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 1d2b6d768efe..0a338a1cd2d7 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -101,7 +101,7 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+ 	for (i = 0; i < SZ_2K; i += 0x80)
+ 		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
+ 
+-	flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
++	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
+ }
+ 
+ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 816d03c4c913..4cc41864f277 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -249,7 +249,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+ 	} else {
+ 		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
+ 			cpu_relax();
+-		isb();
+ 	}
+ 
+ 	return ret;
+@@ -283,18 +282,8 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+ 		if (ret)
+ 			return ret;
+ 
+-		if (aarch64_insn_hotpatch_safe(insn, insns[0])) {
+-			/*
+-			 * ARMv8 architecture doesn't guarantee all CPUs see
+-			 * the new instruction after returning from function
+-			 * aarch64_insn_patch_text_nosync(). So send IPIs to
+-			 * all other CPUs to achieve instruction
+-			 * synchronization.
+-			 */
+-			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
+-			kick_all_cpus_sync();
+-			return ret;
+-		}
++		if (aarch64_insn_hotpatch_safe(insn, insns[0]))
++			return aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
+ 	}
+ 
+ 	return aarch64_insn_patch_text_sync(addrs, insns, cnt);
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 30334d81b021..0c22ede52f90 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -35,7 +35,7 @@
+  *	- start   - virtual start address of region
+  *	- end     - virtual end address of region
+  */
+-ENTRY(flush_icache_range)
++ENTRY(__flush_icache_range)
+ 	/* FALLTHROUGH */
+ 
+ /*
+@@ -77,7 +77,7 @@ alternative_else_nop_endif
+ 9:
+ 	mov	x0, #-EFAULT
+ 	b	1b
+-ENDPROC(flush_icache_range)
++ENDPROC(__flush_icache_range)
+ ENDPROC(__flush_cache_user_range)
+ 
+ /*
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+2.1.4
