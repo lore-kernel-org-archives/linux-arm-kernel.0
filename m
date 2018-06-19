@@ -1,44 +1,51 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Tue, 19 Jun 2018 15:34:07 +0800
-Subject: [PATCH v6 06/29] drm/mediatek: add ddp component PWM2
+Date: Tue, 19 Jun 2018 15:34:08 +0800
+Subject: [PATCH v6 07/29] drm/mediatek: add component DPI1
 In-Reply-To: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529393670-26862-7-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529393670-26862-8-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add component PWM2
+This patch add the component DPI1
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 ++
  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
- 2 files changed, 2 insertions(+)
+ 2 files changed, 3 insertions(+)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index a5c7ac2d162d..86e8c9e5df41 100644
+index 86e8c9e5df41..cc74b1a7278c 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -233,6 +233,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
- 	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
- 	[DDP_COMPONENT_PWM0]	= { MTK_DISP_PWM,	0, NULL },
- 	[DDP_COMPONENT_PWM1]	= { MTK_DISP_PWM,	1, NULL },
-+	[DDP_COMPONENT_PWM2]	= { MTK_DISP_PWM,	2, NULL },
- 	[DDP_COMPONENT_RDMA0]	= { MTK_DISP_RDMA,	0, NULL },
- 	[DDP_COMPONENT_RDMA1]	= { MTK_DISP_RDMA,	1, NULL },
- 	[DDP_COMPONENT_RDMA2]	= { MTK_DISP_RDMA,	2, NULL },
+@@ -224,6 +224,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
+ 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+ 	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
++	[DDP_COMPONENT_DPI1]	= { MTK_DPI,		1, NULL },
+ 	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+ 	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+ 	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
+@@ -275,6 +276,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+ 
+ 	if (comp_id == DDP_COMPONENT_BLS ||
+ 	    comp_id == DDP_COMPONENT_DPI0 ||
++	    comp_id == DDP_COMPONENT_DPI1 ||
+ 	    comp_id == DDP_COMPONENT_DSI0 ||
+ 	    comp_id == DDP_COMPONENT_PWM0) {
+ 		comp->regs = NULL;
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 9b19fc4423f1..e00c2e798abd 100644
+index e00c2e798abd..54c99c169093 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -56,6 +56,7 @@ enum mtk_ddp_comp_id {
- 	DDP_COMPONENT_OVL1,
- 	DDP_COMPONENT_PWM0,
- 	DDP_COMPONENT_PWM1,
-+	DDP_COMPONENT_PWM2,
- 	DDP_COMPONENT_RDMA0,
- 	DDP_COMPONENT_RDMA1,
- 	DDP_COMPONENT_RDMA2,
+@@ -47,6 +47,7 @@ enum mtk_ddp_comp_id {
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_COLOR1,
+ 	DDP_COMPONENT_DPI0,
++	DDP_COMPONENT_DPI1,
+ 	DDP_COMPONENT_DSI0,
+ 	DDP_COMPONENT_DSI1,
+ 	DDP_COMPONENT_GAMMA,
 -- 
 2.12.5
