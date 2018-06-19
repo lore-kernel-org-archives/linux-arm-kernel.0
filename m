@@ -1,52 +1,66 @@
 From: digetx@gmail.com (Dmitry Osipenko)
-Date: Tue, 19 Jun 2018 14:00:22 +0300
-Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
-Message-ID: <20180619110027.16935-1-digetx@gmail.com>
+Date: Tue, 19 Jun 2018 14:00:24 +0300
+Subject: [PATCH v2 2/5] ARM: trusted_foundations: Provide information about
+ whether firmware is registered
+In-Reply-To: <20180619110027.16935-1-digetx@gmail.com>
+References: <20180619110027.16935-1-digetx@gmail.com>
+Message-ID: <20180619110027.16935-3-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add a helper that provides information about whether Trusted Foundations
+firmware operations have been registered.
 
-This series of patches brings initial support of Trusted Foundations to
-Tegra30, that is to the consumer-grade Tegra30 devices which do not allow
-to easily replace the proprietary bootloader. Support is initial because
-this series implements only a proper CPU boot-up (main + secondary cores)
-and a basic L2 cache maintenance that is done using the TF firmware.
-Suspend-resume support is missing yet as I couldn't get it to work
-(CPU hangs on resume from suspend after awhile and seems that is related
-to inappropriately done cache maintenance during of suspend-resume using
-the firmware), it is work-in-progress for now.
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+---
+ arch/arm/firmware/trusted_foundations.c    | 5 +++++
+ arch/arm/include/asm/trusted_foundations.h | 7 +++++++
+ 2 files changed, 12 insertions(+)
 
-This patchset is partially based on the work done by Micha? Miros?aw [0].
-
-[0] https://www.spinics.net/lists/linux-tegra/msg30368.html
-
-Changelog:
-
-v2:
-	- The "Don't apply CPU erratas in insecure mode" patch got some
-	  cleanup, in particular resolved the messiness in
-	  __tegra_cpu_reset_handler_data.
-
-	- Added a comment to tf_cache_write_sec(), justifying the warning
-	  message.
-
-Dmitry Osipenko (5):
-  ARM: trusted_foundations: Implement L2 cache initialization callback
-  ARM: trusted_foundations: Provide information about whether firmware
-    is registered
-  ARM: tegra: Setup L2 cache using Trusted Foundations firmware
-  ARM: tegra: Don't apply CPU erratas in insecure mode
-  ARM: tegra: Always boot CPU in ARM-mode
-
- arch/arm/firmware/trusted_foundations.c    | 32 ++++++++++++++++++++++
- arch/arm/include/asm/trusted_foundations.h |  7 +++++
- arch/arm/mach-tegra/reset-handler.S        | 25 +++++++++--------
- arch/arm/mach-tegra/reset.c                |  5 +++-
- arch/arm/mach-tegra/reset.h                |  9 ++++--
- arch/arm/mach-tegra/sleep-tegra20.S        |  4 +++
- arch/arm/mach-tegra/tegra.c                | 15 ++++++++++
- 7 files changed, 82 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+index 30df6547020f..f6eeb67de217 100644
+--- a/arch/arm/firmware/trusted_foundations.c
++++ b/arch/arm/firmware/trusted_foundations.c
+@@ -124,3 +124,8 @@ void of_register_trusted_foundations(void)
+ 		panic("Trusted Foundation: missing version-minor property\n");
+ 	register_trusted_foundations(&pdata);
+ }
++
++bool trusted_foundations_registered(void)
++{
++	return firmware_ops == &trusted_foundations_ops;
++}
+diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+index 00748350cf72..bfd0d780824b 100644
+--- a/arch/arm/include/asm/trusted_foundations.h
++++ b/arch/arm/include/asm/trusted_foundations.h
+@@ -31,6 +31,7 @@
+ #include <linux/of.h>
+ #include <linux/cpu.h>
+ #include <linux/smp.h>
++#include <linux/types.h>
+ 
+ struct trusted_foundations_platform_data {
+ 	unsigned int version_major;
+@@ -41,6 +42,7 @@ struct trusted_foundations_platform_data {
+ 
+ void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
+ void of_register_trusted_foundations(void);
++bool trusted_foundations_registered(void);
+ 
+ #else /* CONFIG_TRUSTED_FOUNDATIONS */
+ 
+@@ -68,6 +70,11 @@ static inline void of_register_trusted_foundations(void)
+ 	if (of_find_compatible_node(NULL, NULL, "tlm,trusted-foundations"))
+ 		register_trusted_foundations(NULL);
+ }
++
++static inline bool trusted_foundations_registered(void)
++{
++	return false;
++}
+ #endif /* CONFIG_TRUSTED_FOUNDATIONS */
+ 
+ #endif
 -- 
 2.17.1
