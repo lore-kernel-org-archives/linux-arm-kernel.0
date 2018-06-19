@@ -1,23 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 11:02:48 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Fix pgtable allocation in selftest
-In-Reply-To: <20180618112754.24942-1-jean-philippe.brucker@arm.com>
-References: <20180618112754.24942-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180619100247.GE13984@arm.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Wed, 20 Jun 2018 00:57:02 +0800
+Subject: [PATCH v5 5/7] dmaengine: imx-sdma: remove the maximum limitation for
+ bd numbers
+In-Reply-To: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1529427424-12321-6-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 12:27:54PM +0100, Jean-Philippe Brucker wrote:
-> Commit 4b123757eeaa ("iommu/io-pgtable-arm: Make allocations
-> NUMA-aware") added a NUMA hint to page table allocation, but the pgtable
-> selftest doesn't provide an SMMU device parameter. Since dev_to_node
-> doesn't accept a NULL argument, add a special case for selftest.
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> ---
->  drivers/iommu/io-pgtable-arm.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+No this limitation now after virtual dma used since bd is allocated
+dynamically instead of static.
 
-Thanks, I'll pick this up.
+Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+---
+ drivers/dma/imx-sdma.c | 14 --------------
+ 1 file changed, 14 deletions(-)
 
-Will
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index d1d3494..9f1a462 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -285,7 +285,6 @@ struct sdma_context_data {
+ 	u32  scratch7;
+ } __attribute__ ((packed));
+ 
+-#define NUM_BD (int)(PAGE_SIZE / sizeof(struct sdma_buffer_descriptor))
+ 
+ struct sdma_engine;
+ 
+@@ -1290,13 +1289,6 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 	if (ret)
+ 		goto err_bd_out;
+ 
+-	if (sg_len > NUM_BD) {
+-		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
+-				channel, sg_len, NUM_BD);
+-		ret = -EINVAL;
+-		goto err_bd_out;
+-	}
+-
+ 	desc->chn_count = 0;
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		struct sdma_buffer_descriptor *bd = &desc->bd[i];
+@@ -1406,12 +1398,6 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 	if (ret)
+ 		goto err_bd_out;
+ 
+-	if (num_periods > NUM_BD) {
+-		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
+-				channel, num_periods, NUM_BD);
+-		goto err_bd_out;
+-	}
+-
+ 	if (period_len > 0xffff) {
+ 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
+ 				channel, period_len, 0xffff);
+-- 
+2.7.4
