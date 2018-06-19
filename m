@@ -1,38 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Jun 2018 20:24:16 -0000
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 19 Jun 2018 20:24:18 -0000
 Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C5F9B25.8080401@st.com>
-References: <4C5F9B25.8080401@st.com>
-Message-ID: <20100809064957.GB16661@pengutronix.de>
+In-Reply-To: <4C5FA35E.50309@gmail.com>
+References: <4C5F9B25.8080401@st.com> <4C5FA35E.50309@gmail.com>
+Message-ID: <4C5FA66D.7060404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Aug 09, 2010 at 11:37:33AM +0530, viresh kumar wrote:
-> Hello,
+On 8/9/2010 12:12 PM, Justin P. Mattock wrote:
+> On 08/08/2010 11:07 PM, viresh kumar wrote:
+>> > Hello,
+>> >
+>> > Mail server in ST has recently changed and now we have Microsoft
+>> > exchange server. We are using thunderbird as mail client.
+>> > What we observed with this server is that patch are broken now while
+>> > sending as well as receiving. Tabs are replaced by spaces and may
+>> > be some other too which we haven't observed.
+>> >
+>> > Has anybody found a solution to this kind of issues? Are there any
+>> > workarounds possible?
+>> >
+>
+> still trying to figure this out with thunderbird.. but did notice in 
+> Documentation/email-clients.txt and SubmittingPatches
+> there's info about that(just haven't gotten around to reading use git 
+> send-email for patches)
 > 
-> Mail server in ST has recently changed and now we have Microsoft
-> exchange server. We are using thunderbird as mail client.
-> What we observed with this server is that patch are broken now while
-> sending as well as receiving. Tabs are replaced by spaces and may
-> be some other too which we haven't observed.
-unlucky you.
- 
-> Has anybody found a solution to this kind of issues? Are there any
-> workarounds possible?
-git.git has some tips for thunderbird, see
+> hope this helps.
 
-	http://git.kernel.org/?p=git/git.git;a=blob;f=Documentation/SubmittingPatches;hb=HEAD
+I missed this information in my last mail. We are using git send-email for
+sending patches. As patches will go through Microsoft exchange server only,
+so they are broken.
 
-and look for the section titled "Thunderbird" (small surprise).
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+viresh.
 --
 To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 the body of a message to majordomo at vger.kernel.org
