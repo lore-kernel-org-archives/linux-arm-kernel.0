@@ -1,33 +1,34 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 19 Jun 2018 09:59:04 +0200
-Subject: [PATCH 2/2] arm64: dts: exynos: Remove unneeded DSI and DECON
- address/size cells in Exynos5433
-In-Reply-To: <20180619072652eucas1p1943deb1b158eda52980448e41f83e5e9~5fwX6lI2o2633926339eucas1p1Q@eucas1p1.samsung.com>
-References: <20180618174216.24801-1-krzk@kernel.org>
- <CGME20180618174316epcas1p397b66c8e4e8479fce8655941a4d4279f@epcas1p3.samsung.com>
- <20180618174216.24801-2-krzk@kernel.org>
- <20180619072652eucas1p1943deb1b158eda52980448e41f83e5e9~5fwX6lI2o2633926339eucas1p1Q@eucas1p1.samsung.com>
-Message-ID: <CAJKOXPeCT3CkqqNowEZaeTw7goJd6=Nbd2S61QzTFW-nGr5AKg@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 19 Jun 2018 16:00:45 +0800
+Subject: [PATCH v6 10/29] drm/mediatek: add the DSI1 for component init
+ condition
+In-Reply-To: <1529393670-26862-11-git-send-email-stu.hsieh@mediatek.com>
+References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+ <1529393670-26862-11-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529395245.26480.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2018 at 09:26, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hi Krzysztof,
->
-> On 2018-06-18 19:42, Krzysztof Kozlowski wrote:
->> The decon, decon_tv and dsi nodes have only one child port so
->> address/size mappings are not necessary.  This fixes DTC warnings like:
->>
->>      Warning (graph_child_address): /soc/decon at 13800000/ports:
->>          graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> Works fine with current Exynos DRM Decon/MIC/DSI drivers.
->
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
+> This patch add the DSI1 for component init condition
+> 
 
-Thanks for review and testing!
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-Best regards,
-Krzysztof
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index 17b681686471..ff974d82a4a6 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -280,6 +280,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+>  	    comp_id == DDP_COMPONENT_DPI0 ||
+>  	    comp_id == DDP_COMPONENT_DPI1 ||
+>  	    comp_id == DDP_COMPONENT_DSI0 ||
+> +	    comp_id == DDP_COMPONENT_DSI1 ||
+>  	    comp_id == DDP_COMPONENT_DSI2 ||
+>  	    comp_id == DDP_COMPONENT_DSI3 ||
+>  	    comp_id == DDP_COMPONENT_PWM0) {
