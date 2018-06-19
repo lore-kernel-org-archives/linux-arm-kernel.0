@@ -1,54 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 09:55:41 +0100
-Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
- linear region
-In-Reply-To: <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
-References: <1528785361-24477-1-git-send-email-bhsharma@redhat.com>
- <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
- <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
- <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
- <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
- <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
- <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
- <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
- <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
-Message-ID: <20180619085541.GB13984@arm.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 19 Jun 2018 16:47:45 +0800
+Subject: [PATCH v6 24/29] drm/mediatek: add connection from RDMA2 to DSI3
+In-Reply-To: <1529393670-26862-25-git-send-email-stu.hsieh@mediatek.com>
+References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+ <1529393670-26862-25-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529398065.26480.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 03:02:15AM +0000, Jin, Yanjiang wrote:
-> > You seem to be using this for user-space phys_to_virt() based on values found in
-> > /proc/iomem. This should give you what you want, and isolate your user-space
-> > from the kernel's unexpected naming of variables.
+On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
+> This patch add the connection from RDMA2 to DSI3
 > 
-> I don't know could I simplify this problem?
-> Let's ignore what memstart_addr represents here, we just want to implement
-> phys_to_virt() in an userspace applications(kexec-tools or others).
-> 
-> ARM64 Kernel has a below definition:
-> 
-> #define __phys_to_virt(x)       ((unsigned long)((x) - PHYS_OFFSET) | PAGE_OFFSET)
-> 
-> So userspace app must know PHYS_OFFSET(equal to memstart_addr now). Seems
-> this is very simple, but memstart_addr has gone through several operations
-> in arm64_memblock_init() depends on different Kernel configurations, so
-> userspace app needs to know many additional definitions as following:
-> 
-> memblock_start_of_DRAM(),  (ifdef CONFIG_SPARSEMEM_VMEMMAP),
-> ARM64_MEMSTART_SHIFT,  SECTION_SIZE_BITS,  PAGE_OFFSET,
-> memblock_end_of_DRAM(), IS_ENABLED(CONFIG_RANDOMIZE_BASE),
-> memstart_offset_seed.
-> 
-> It is hard to know all above in kexec-tools now. Originally I planned to
-> read memstart_addr's value from "/dev/mem", but someone thought not all
-> Kernels enable "/dev/mem", we'd better find a more generic approach. So we
-> want to get some suggestions from ARM kernel community.
-> Can we export this variable in Kernel side through sysconf() or other
-> similar methods? Or someone can provide an effect way to get
-> memstart_addr's value?
 
-I thought the suggestion from James was to expose this via an ELF NOTE
-in kcore and vmcore (or in the header directly if that's possible, but
-I'm not sure about it)?
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-Will
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index e5db1ab51c9b..0a1b967cab1b 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -96,6 +96,7 @@
+>  #define RDMA2_SOUT_DPI1			0x3
+>  #define RDMA2_SOUT_DSI1			0x1
+>  #define RDMA2_SOUT_DSI2			0x4
+> +#define RDMA2_SOUT_DSI3			0x5
+>  #define DPI0_SEL_IN_RDMA1		0x1
+>  #define DPI0_SEL_IN_RDMA2		0x3
+>  #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+> @@ -105,6 +106,7 @@
+>  #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
+>  #define DSI2_SEL_IN_RDMA2		(0x4 << 16)
+>  #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
+> +#define DSI3_SEL_IN_RDMA2		(0x4 << 16)
+>  #define COLOR1_SEL_IN_OVL1		0x1
+>  
+>  #define OVL_MOUT_EN_RDMA		0x1
+> @@ -214,6 +216,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+>  		value = RDMA2_SOUT_DSI2;
+> +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI3) {
+> +		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
+> +		value = RDMA2_SOUT_DSI3;
+>  	} else {
+>  		value = 0;
+>  	}
+> @@ -257,6 +262,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
+>  		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
+>  		value = DSI2_SEL_IN_RDMA2;
+> +	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI3) {
+> +		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
+> +		value = DSI3_SEL_IN_RDMA2;
+>  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+>  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+>  		value = COLOR1_SEL_IN_OVL1;
