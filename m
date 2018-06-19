@@ -1,77 +1,79 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Jun 2018 18:21:43 -0400
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <2593baec-8a28-a3e7-7ebf-7c21addda0b8@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 20 Jun 2018 00:23:56 +0200
+Subject: [PATCH 0/2] Make badr macro compatible with newer GAS versions
+In-Reply-To: <20180619204531.GB28370@roeck-us.net>
+References: <20180619192633.21846-1-ard.biesheuvel@linaro.org>
+ <20180619203223.GA28370@roeck-us.net>
+ <CAKv+Gu-RHM7HAmzWw9Ge+w21kWxKxLbJT7DD5huv-7WWOPUVWA@mail.gmail.com>
+ <20180619204531.GB28370@roeck-us.net>
+Message-ID: <CAKv+Gu_zsSxb_8Ej-6QwZOW2X5VfgW0gnjpnHpi62L6nPALoHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/19/2018 5:43 PM, Bjorn Helgaas wrote:
->> Hotplug driver removes the device from system when a link down interrupt
->> is observed and performs re-enumeration when link up interrupt is observed.
+On 19 June 2018 at 22:45, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Tue, Jun 19, 2018 at 10:34:38PM +0200, Ard Biesheuvel wrote:
+>> On 19 June 2018 at 22:32, Guenter Roeck <linux@roeck-us.net> wrote:
+>> > On Tue, Jun 19, 2018 at 09:26:31PM +0200, Ard Biesheuvel wrote:
+>> >> Work around the mindless and backward incompatible change in GAS that
+>> >> prevents us from using a simple addition to set the Thumb bit in local
+>> >> symbol references taken using 'adr' instructions (#2)
+>> >>
+>> >> As a preparatory step, remove badr occurrences in ARM code sequences
+>> >> contained in Thumb2 kernels.
+>> >>
+>> >> Ard Biesheuvel (2):
+>> >>   ARM: avoid badr macro for switching to Thumb-2 mode
+>> >>   ARM: assembler: prevent ADR from setting the Thumb bit twice
+>> >>
+>> >
+>> > This doesn't work for images built with a toolchain based on gcc 7.3.0
+>> > and binutils 2.28.1. It _does_ work for images built with gcc 7.3.0/
+>> > binutils 2.30.
+>> >
 >>
->> This conflicts with what this code is trying to do. Try secondary bus reset
->> only if pci_reset_slot() fails/unsupported.
-> Hi Sinan,
-> 
-> We had a bunch of discussion here but not sure we ever reached a
-> consensus.  It did seem like we'd like to avoid putting hotplug
-> knowledge in drivers, though.  What do you think the path forward is?
-> 
+>> Sigh.
+>>
+>> So does it fail? Or is the resulting binary broken?
+>
+> Hard to say. It crashes early in boot, even before earlycon can say
+> anything.
+>
 
-There are multiple issues. 
+OK, so even the linker handling is inconsistent.
 
-We discussed the need for a retrain API on this thread. However, retrain API may
-not be enough for this particular usage as the device might need a full link training
-sequence following firmware load including a hot reset message. I don't think we can
-remove the bus reset usage in this code.
+Working (binutils 2.30)
 
-I'd like to start with a small one to address your comment here.
+c0301164 <local_restart>:
+c0301164:       f8d9 a000       ldr.w   sl, [r9]
+c0301168:       e92d 0030       stmdb   sp!, {r4, r5}
+c030116c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
+c0301170:       d117            bne.n   c03011a2 <__sys_trace>
+c0301172:       46ba            mov     sl, r7
+c0301174:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
+c0301178:       bf28            it      cs
+c030117a:       f04f 0a00       movcs.w sl, #0
+c030117e:       f3af 8014       csdb
+c0301182:       f2af 1e83       subw    lr, pc, #387    ; 0x183
+                        c0301182: R_ARM_THM_ALU_PREL_11_0       .Lsym28
 
-"I think my concern is that knowledge about this reset/link down/hotplug issue is
-leaking out and we'll end up with different reset interfaces that may
-or may not result in hotplug events.  This seems like a confusing API
-because it's hard to explain which interface a driver should use."
 
-I'm thinking of removing pci_reset_slot() and pci_try_reset_slot() functions
-as an exported API and fold them into pci_reset_bus() and  pci_try_reset_bus()
-API respectively.
+Broken (binutils 2.26)
 
-This is what happens when you insert a fatal error to a hotplug slot. See multiple
-link up/down messages.
+c0301184 <local_restart>:
+c0301184:       f8d9 a000       ldr.w   sl, [r9]
+c0301188:       e92d 0030       stmdb   sp!, {r4, r5}
+c030118c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
+c0301190:       d117            bne.n   c03011c2 <__sys_trace>
+c0301192:       46ba            mov     sl, r7
+c0301194:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
+c0301198:       bf28            it      cs
+c030119a:       f04f 0a00       movcs.w sl, #0
+c030119e:       f3af 8014       csdb
+c03011a2:       f2af 1ea2       subw    lr, pc, #418    ; 0x1a2
+                        c03011a2: R_ARM_THM_ALU_PREL_11_0       .Lsym30
 
-/_#_[__333.699731]_pcieport_0001:00:00.0:_AER:_Uncorrected_(Fatal)_error_received:_id=0000
-[  333.748116] pcieport 0001:00:00.0: PCIe Bus Error: severity=Uncorrected (Fatal), type=Transaction Layer, id
-[  333.816044] pcieport 0001:00:00.0:   device [17cb:0404] error status/mask=00040000/00400000
-[  333.871581] pcieport 0001:00:00.0:    [18] Malformed TLP          (First)
-[  333.914675] pcieport 0001:00:00.0:   TLP Header: 40000001 000000ff 00000000 00000000
-[  333.968397] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
-[  334.043234] iommu: Removing device 0001:01:00.4 from group 0
-[  334.095952] iommu: Removing device 0001:01:00.3 from group 0
-[  334.144644] iommu: Removing device 0001:01:00.2 from group 0
-[  334.194653] iommu: Removing device 0001:01:00.1 from group 0
-[  334.243564] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up
-[  334.282556] iommu: Removing device 0001:01:00.0 from group 0
-[  334.330994] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up event queued; currently getting powered off
-[  334.890587] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x13f1 (issued 282900 msec ago)
-[  335.070190] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
-[  335.106960] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down event queued; currently getting powered on
-[  335.191119] pcieport 0001:00:00.0: AER: Device recovery failed
-[  346.590153] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x17f1 (issued 10250 msec ago)
 
-As a suggestion:
+Note the even immediate in the subw instruction. So this is another
+dead end, unfortunately.
 
-1. If the device belongs to a slot, do slot reset. 
-2. Otherwise, do bus reset.
-
-Since Oza's DPC/AER patch to refactor fatal error handling, both hotplug driver
-and AER/DPC driver will try removing devices and perform enumeration on link events/AER events.
-
-Perfect environment for race condition without a change.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks for testing.
