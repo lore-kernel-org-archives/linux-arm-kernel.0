@@ -1,149 +1,175 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 19 Jun 2018 19:15:19 +0530
-Subject: [PATCH v10 08/14] clk: qcom: Add KPSS ACC/GCC driver
-In-Reply-To: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
-References: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1529415925-28915-9-git-send-email-sricharan@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jun 2018 14:33:19 +0100
+Subject: [PATCH 1/3] arm64: Avoid flush_icache_range() in alternatives
+ patching code
+In-Reply-To: <1529412495-17525-2-git-send-email-will.deacon@arm.com>
+References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
+ <1529412495-17525-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20180619133319.f3zitmmrcbozbtmy@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+On Tue, Jun 19, 2018 at 01:48:13PM +0100, Will Deacon wrote:
+> The implementation of flush_icache_range() includes instruction sequences
+> which are themselves patched at runtime, so it is not safe to call from
+> the patching framework.
+> 
+> This patch reworks the alternatives cache-flushing code so that it rolls
+> its own internal D-cache maintenance using DC CIVAC before invalidating
+> the entire I-cache after all alternatives have been applied at boot.
+> Modules don't cause any issues, since flush_icache_range() is safe to
+> call by the time they are loaded.
+> 
+> Reported-by: Rohit Khanna <rokhanna@nvidia.com>
+> Cc: Alexander Van Brunt <avanbrunt@nvidia.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/alternative.h |  7 +++++-
+>  arch/arm64/kernel/alternative.c      | 46 ++++++++++++++++++++++++++++++------
+>  arch/arm64/kernel/module.c           |  5 ++--
+>  3 files changed, 47 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> index a91933b1e2e6..4b650ec1d7dd 100644
+> --- a/arch/arm64/include/asm/alternative.h
+> +++ b/arch/arm64/include/asm/alternative.h
+> @@ -28,7 +28,12 @@ typedef void (*alternative_cb_t)(struct alt_instr *alt,
+>  				 __le32 *origptr, __le32 *updptr, int nr_inst);
+>  
+>  void __init apply_alternatives_all(void);
+> -void apply_alternatives(void *start, size_t length);
+> +
+> +#ifdef CONFIG_MODULES
+> +void apply_alternatives_module(void *start, size_t length);
+> +#else
+> +static inline void apply_alternatives_module(void *start, size_t length) { }
+> +#endif
+>  
+>  #define ALTINSTR_ENTRY(feature,cb)					      \
+>  	" .word 661b - .\n"				/* label           */ \
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index 5c4bce4ac381..4f3dcc15a5b2 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -122,7 +122,25 @@ static void patch_alternative(struct alt_instr *alt,
+>  	}
+>  }
+>  
 
-The ACC and GCC regions present in KPSSv1 contain registers to
-control clocks and power to each Krait CPU and L2. For CPUfreq
-purposes probe these devices and expose a mux clock that chooses
-between PXO and PLL8.
+It might be worth a comment here, e.g.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/qcom/Kconfig    |  8 +++++
- drivers/clk/qcom/Makefile   |  1 +
- drivers/clk/qcom/kpss-xcc.c | 87 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+)
- create mode 100644 drivers/clk/qcom/kpss-xcc.c
+/*
+ * Since the regular dcache maintenance functions are patched with
+ * alteratives, we use an unpatched copy to apply the alternatives
+ * safely.
+ */
 
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index 66894d2..b17f638 100644
---- a/drivers/clk/qcom/Kconfig
-+++ b/drivers/clk/qcom/Kconfig
-@@ -262,6 +262,14 @@ config QCOM_HFPLL
- 	  Say Y if you want to support CPU frequency scaling on devices
- 	  such as MSM8974, APQ8084, etc.
- 
-+config KPSS_XCC
-+	tristate "KPSS Clock Controller"
-+	depends on COMMON_CLK_QCOM
-+	help
-+	  Support for the Krait ACC and GCC clock controllers. Say Y
-+	  if you want to support CPU frequency scaling on devices such
-+	  as MSM8960, APQ8064, etc.
-+
- config KRAIT_CLOCKS
- 	bool
- 	select KRAIT_L2_ACCESSORS
-diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index 82615ed..b9cf068 100644
---- a/drivers/clk/qcom/Makefile
-+++ b/drivers/clk/qcom/Makefile
-@@ -43,4 +43,5 @@ obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
- obj-$(CONFIG_SDM_GCC_845) += gcc-sdm845.o
- obj-$(CONFIG_SDM_VIDEOCC_845) += videocc-sdm845.o
- obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
-+obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
- obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
-diff --git a/drivers/clk/qcom/kpss-xcc.c b/drivers/clk/qcom/kpss-xcc.c
-new file mode 100644
-index 0000000..8590b5e
---- /dev/null
-+++ b/drivers/clk/qcom/kpss-xcc.c
-@@ -0,0 +1,87 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+
-+static const char *aux_parents[] = {
-+	"pll8_vote",
-+	"pxo",
-+};
-+
-+static unsigned int aux_parent_map[] = {
-+	3,
-+	0,
-+};
-+
-+static const struct of_device_id kpss_xcc_match_table[] = {
-+	{ .compatible = "qcom,kpss-acc-v1", .data = (void *)1UL },
-+	{ .compatible = "qcom,kpss-gcc" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, kpss_xcc_match_table);
-+
-+static int kpss_xcc_driver_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *id;
-+	struct clk *clk;
-+	struct resource *res;
-+	void __iomem *base;
-+	const char *name;
-+
-+	id = of_match_device(kpss_xcc_match_table, &pdev->dev);
-+	if (!id)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	if (id->data) {
-+		if (of_property_read_string_index(pdev->dev.of_node,
-+						  "clock-output-names",
-+						  0, &name))
-+			return -ENODEV;
-+		base += 0x14;
-+	} else {
-+		name = "acpu_l2_aux";
-+		base += 0x28;
-+	}
-+
-+	clk = clk_register_mux_table(&pdev->dev, name, aux_parents,
-+				     ARRAY_SIZE(aux_parents), 0, base, 0, 0x3,
-+				     0, aux_parent_map, NULL);
-+
-+	platform_set_drvdata(pdev, clk);
-+
-+	return PTR_ERR_OR_ZERO(clk);
-+}
-+
-+static int kpss_xcc_driver_remove(struct platform_device *pdev)
-+{
-+	clk_unregister_mux(platform_get_drvdata(pdev));
-+	return 0;
-+}
-+
-+static struct platform_driver kpss_xcc_driver = {
-+	.probe = kpss_xcc_driver_probe,
-+	.remove = kpss_xcc_driver_remove,
-+	.driver = {
-+		.name = "kpss-xcc",
-+		.of_match_table = kpss_xcc_match_table,
-+	},
-+};
-+module_platform_driver(kpss_xcc_driver);
-+
-+MODULE_DESCRIPTION("Krait Processor Sub System (KPSS) Clock Driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:kpss-xcc");
--- 
-1.9.1
+... so as to avoid any helpful cleanup patches in future moving back to
+the "optimized" the asm functions.
+
+Regardless:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> -static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+> +static void clean_dcache_range_nopatch(u64 start, u64 end)
+> +{
+> +	u64 cur, d_size, ctr_el0;
+> +
+> +	ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
+> +	d_size = 4 << cpuid_feature_extract_unsigned_field(ctr_el0,
+> +							   CTR_DMINLINE_SHIFT);
+> +	cur = start & ~(d_size - 1);
+> +	do {
+> +		/*
+> +		 * We must clean+invalidate to the PoC in order to avoid
+> +		 * Cortex-A53 errata 826319, 827319, 824069 and 819472
+> +		 * (this corresponds to ARM64_WORKAROUND_CLEAN_CACHE)
+> +		 */
+> +		asm volatile("dc civac, %0" : : "r" (cur) : "memory");
+> +	} while (cur += d_size, cur < end);
+> +}
+> +
+> +static void __apply_alternatives(void *alt_region, bool is_module)
+>  {
+>  	struct alt_instr *alt;
+>  	struct alt_region *region = alt_region;
+> @@ -145,7 +163,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>  		pr_info_once("patching kernel code\n");
+>  
+>  		origptr = ALT_ORIG_PTR(alt);
+> -		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
+> +		updptr = is_module ? origptr : lm_alias(origptr);
+>  		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
+>  
+>  		if (alt->cpufeature < ARM64_CB_PATCH)
+> @@ -155,8 +173,20 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>  
+>  		alt_cb(alt, origptr, updptr, nr_inst);
+>  
+> -		flush_icache_range((uintptr_t)origptr,
+> -				   (uintptr_t)(origptr + nr_inst));
+> +		if (!is_module) {
+> +			clean_dcache_range_nopatch((u64)origptr,
+> +						   (u64)(origptr + nr_inst));
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * The core module code takes care of cache maintenance in
+> +	 * flush_module_icache().
+> +	 */
+> +	if (!is_module) {
+> +		dsb(ish);
+> +		__flush_icache_all();
+> +		isb();
+>  	}
+>  }
+>  
+> @@ -178,7 +208,7 @@ static int __apply_alternatives_multi_stop(void *unused)
+>  		isb();
+>  	} else {
+>  		BUG_ON(alternatives_applied);
+> -		__apply_alternatives(&region, true);
+> +		__apply_alternatives(&region, false);
+>  		/* Barriers provided by the cache flushing */
+>  		WRITE_ONCE(alternatives_applied, 1);
+>  	}
+> @@ -192,12 +222,14 @@ void __init apply_alternatives_all(void)
+>  	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
+>  }
+>  
+> -void apply_alternatives(void *start, size_t length)
+> +#ifdef CONFIG_MODULES
+> +void apply_alternatives_module(void *start, size_t length)
+>  {
+>  	struct alt_region region = {
+>  		.begin	= start,
+>  		.end	= start + length,
+>  	};
+>  
+> -	__apply_alternatives(&region, false);
+> +	__apply_alternatives(&region, true);
+>  }
+> +#endif
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index 155fd91e78f4..f0f27aeefb73 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -448,9 +448,8 @@ int module_finalize(const Elf_Ehdr *hdr,
+>  	const char *secstrs = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+>  
+>  	for (s = sechdrs, se = sechdrs + hdr->e_shnum; s < se; s++) {
+> -		if (strcmp(".altinstructions", secstrs + s->sh_name) == 0) {
+> -			apply_alternatives((void *)s->sh_addr, s->sh_size);
+> -		}
+> +		if (strcmp(".altinstructions", secstrs + s->sh_name) == 0)
+> +			apply_alternatives_module((void *)s->sh_addr, s->sh_size);
+>  #ifdef CONFIG_ARM64_MODULE_PLTS
+>  		if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+>  		    !strcmp(".text.ftrace_trampoline", secstrs + s->sh_name))
+> -- 
+> 2.1.4
+> 
