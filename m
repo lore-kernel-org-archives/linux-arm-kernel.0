@@ -1,251 +1,77 @@
-From: alex.gonzalez@digi.com (Alex Gonzalez)
-Date: Tue, 19 Jun 2018 09:32:14 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6ul: Add DTS for ConnectCore 6UL SBC Express
-In-Reply-To: <1529393534-7827-1-git-send-email-alex.gonzalez@digi.com>
-References: <1529393534-7827-1-git-send-email-alex.gonzalez@digi.com>
-Message-ID: <1529393534-7827-3-git-send-email-alex.gonzalez@digi.com>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Tue, 19 Jun 2018 15:34:04 +0800
+Subject: [PATCH v6 03/29] drm/mediatek: add ddp component AAL1
+In-Reply-To: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529393670-26862-4-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ConnectCore 6UL Single Board Computer (SBC) Express contains the
-ConnectCore 6UL System-On-Module.
+This patch add component AAL1 and
+rename AAL to AAL0
 
-Its hardware specifications are:
-
-* 256MB DDR3 memory
-* 256MB NAND flash
-* Single Ethernet
-* USB Host and USB-OTG
-* MicroSD external storage
-* Groove connectors and Raspberry Pi Hat compatible expansion header
-
-Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts | 205 ++++++++++++++++++++++++
- 2 files changed, 206 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 2 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 3 ++-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 3 ++-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 2 +-
+ 4 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 37a3de760d40..6135d3dc381c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -533,6 +533,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-udoo-neo-full.dtb
- dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-14x14-evk.dtb \
-+	imx6ul-ccimx6ulsbcexpress.dtb \
- 	imx6ul-geam.dtb \
- 	imx6ul-isiot-emmc.dtb \
- 	imx6ul-isiot-nand.dtb \
-diff --git a/arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts b/arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
-new file mode 100644
-index 000000000000..1e3c4200b924
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
-@@ -0,0 +1,205 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Digi International's ConnectCore6UL SBC Express board device tree source
-+ *
-+ * Copyright 2018 Digi International, Inc.
-+ *
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include "imx6ul.dtsi"
-+#include "imx6ul-ccimx6ulsom.dtsi"
-+
-+/ {
-+	model = "Digi International ConnectCore 6UL SBC Express.";
-+	compatible = "digi,ccimx6ulsbcexpress", "digi,ccimx6ulsom",
-+		     "fsl,imx6ul";
-+};
-+
-+&adc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_adc1>;
-+	adc-ch-list = <4>;
-+	status = "okay";
-+};
-+
-+&ecspi3 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3_master>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy0>;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			smsc,disable-energy-detect;
-+			reg = <0>;
-+		};
-+	};
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	xceiver-supply = <&ext_3v3>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&pwm1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm1>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	broken-cd;      /* no carrier detect line (use polling) */
-+	no-1-8-v;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	imx6ul-ccimx6ul {
-+		pinctrl_adc1: adc1grp {
-+			fsl,pins = <
-+				/* GPIO1_4/ADC1_IN4 (pin 7 of the expansion header) */
-+				MX6UL_PAD_GPIO1_IO04__GPIO1_IO04        0xb0
-+			>;
-+		};
-+
-+		pinctrl_ecspi3_master: ecspi3grp1 {
-+			fsl,pins = <
-+				MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK	0x10b0
-+				MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI	0x10b0
-+				MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO	0x10b0
-+				MX6UL_PAD_UART2_TX_DATA__GPIO1_IO20	0x10b0 /* Chip Select */
-+			>;
-+		};
-+
-+		pinctrl_ecspi3_slave: ecspi3grp2 {
-+			fsl,pins = <
-+				MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK	0x10b0
-+				MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI	0x10b0
-+				MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO	0x10b0
-+				MX6UL_PAD_UART2_TX_DATA__ECSPI3_SS0	0x10b0 /* Chip Select */
-+			>;
-+		};
-+
-+		pinctrl_enet1: enet1grp {
-+			fsl,pins = <
-+				MX6UL_PAD_GPIO1_IO07__ENET1_MDC		0x1b0b0
-+				MX6UL_PAD_GPIO1_IO06__ENET1_MDIO	0x1b0b0
-+				MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
-+				MX6UL_PAD_ENET1_RX_ER__ENET1_RX_ER	0x1b0b0
-+				MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
-+				MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
-+				MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
-+				MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
-+				MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
-+				MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x40017051
-+			>;
-+		};
-+
-+		pinctrl_flexcan1: flexcan1grp{
-+			fsl,pins = <
-+				MX6UL_PAD_LCD_DATA08__FLEXCAN1_TX	0x1b020
-+				MX6UL_PAD_LCD_DATA09__FLEXCAN1_RX	0x1b020
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6UL_PAD_GPIO1_IO00__I2C2_SCL 0x4001b8b0
-+				MX6UL_PAD_GPIO1_IO01__I2C2_SDA 0x4001b8b0
-+			>;
-+		};
-+
-+		pinctrl_pwm1: pwm1grp {
-+			fsl,pins = <
-+				MX6UL_PAD_LCD_DATA00__PWM1_OUT		0x10b0
-+			>;
-+		};
-+
-+		pinctrl_uart4: uart4grp {
-+			fsl,pins = <
-+				MX6UL_PAD_LCD_CLK__UART4_DCE_TX		0x1b0b1
-+				MX6UL_PAD_LCD_ENABLE__UART4_DCE_RX	0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_uart5: uart5grp {
-+			fsl,pins = <
-+				MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX	0x1b0b1
-+				MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX	0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_usdhc2: usdhc2grp {
-+			fsl,pins = <
-+				MX6UL_PAD_CSI_HSYNC__USDHC2_CMD		0x17059
-+				MX6UL_PAD_CSI_VSYNC__USDHC2_CLK		0x10071
-+				MX6UL_PAD_CSI_DATA00__USDHC2_DATA0	0x17059
-+				MX6UL_PAD_CSI_DATA01__USDHC2_DATA1	0x17059
-+				MX6UL_PAD_CSI_DATA02__USDHC2_DATA2	0x17059
-+				MX6UL_PAD_CSI_DATA03__USDHC2_DATA3	0x17059
-+			>;
-+		};
-+
-+		/* General purpose pinctrl */
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				/* GPIOs BANK 3 */
-+				MX6UL_PAD_LCD_RESET__GPIO3_IO04		0xf030
-+			>;
-+		};
-+
-+	};
-+};
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 47ffa240bd25..7217665f4b5d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -110,7 +110,7 @@ static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+ };
+ 
+ static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+-	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
++	[DDP_COMPONENT_AAL0] = MT8173_MUTEX_MOD_DISP_AAL,
+ 	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
+ 	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
+ 	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 4672317e3ad1..0919039805aa 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -218,7 +218,8 @@ struct mtk_ddp_comp_match {
+ };
+ 
+ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+-	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
++	[DDP_COMPONENT_AAL0]	= { MTK_DISP_AAL,	0, &ddp_aal },
++	[DDP_COMPONENT_AAL1]	= { MTK_DISP_AAL,	1, &ddp_aal },
+ 	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
+ 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
+ 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index 0828cf8bf85c..eee3c0cc2632 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -41,7 +41,8 @@ enum mtk_ddp_comp_type {
+ };
+ 
+ enum mtk_ddp_comp_id {
+-	DDP_COMPONENT_AAL,
++	DDP_COMPONENT_AAL0,
++	DDP_COMPONENT_AAL1,
+ 	DDP_COMPONENT_BLS,
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_COLOR1,
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index a2ca90fc403c..a415260f3d5f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -149,7 +149,7 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
+ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_COLOR0,
+-	DDP_COMPONENT_AAL,
++	DDP_COMPONENT_AAL0,
+ 	DDP_COMPONENT_OD,
+ 	DDP_COMPONENT_RDMA0,
+ 	DDP_COMPONENT_UFOE,
+-- 
+2.12.5
