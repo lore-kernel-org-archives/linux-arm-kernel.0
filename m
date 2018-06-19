@@ -1,52 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 19 Jun 2018 18:29:19 +0200
-Subject: [PATCH] ARM: proc-v7: fix Thumb annotation of cpu_v7_hvc_switch_mm
-Message-ID: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 19 Jun 2018 17:32:56 +0100
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
+References: <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+ <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
+ <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+ <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+ <20180619151425.GH13685@dhcp22.suse.cz>
+ <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20180619163256.GA18952@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to what appears to be a copy/paste error, the opening ENTRY()
-of cpu_v7_hvc_switch_mm() lacks a matching ENDPROC(), and instead,
-the one for cpu_v7_smc_switch_mm() is duplicated.
+On Tue, Jun 19, 2018 at 04:35:40PM +0100, Punit Agrawal wrote:
+> Michal Hocko <mhocko@kernel.org> writes:
+> 
+> > On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
+> > [...]
+> >> In terms of $SUBJECT, I wonder if it's worth taking the original patch
+> >> as a temporary fix (it'll also be easier to backport) while we work on
+> >> fixing these other issues and enabling memoryless nodes.
+> >
+> > Well, x86 already does that but copying this antipatern is not really
+> > nice. So it is good as a quick fix but it would be definitely much
+> > better to have a robust fix. Who knows how many other places might hit
+> > this. You certainly do not want to add a hack like this all over...
+> 
+> Completely agree! I was only suggesting it as a temporary measure,
+> especially as it looked like a proper fix might be invasive.
+> 
+> Another fix might be to change the node specific allocation to node
+> agnostic allocations. It isn't clear why the allocation is being
+> requested from a specific node. I think Lorenzo suggested this in one of
+> the threads.
 
-Given that it is ENDPROC() that emits the Thumb annotation, the
-cpu_v7_hvc_switch_mm() routine will be called in ARM mode on a
-Thumb2 kernel, resulting in the following splat:
+I think that code was just copypasted but it is better to fix the
+underlying issue.
 
-  Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc1-00030-g4d28ad89189d-dirty #488
-  Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
-  PC is at cpu_v7_hvc_switch_mm+0x12/0x18
-  LR is at flush_old_exec+0x31b/0x570
-  pc : [<c0316efe>]    lr : [<c04117c7>]    psr: 00000013
-  sp : ee899e50  ip : 00000000  fp : 00000001
-  r10: eda28f34  r9 : eda31800  r8 : c12470e0
-  r7 : eda1fc00  r6 : eda53000  r5 : 00000000  r4 : ee88c000
-  r3 : c0316eec  r2 : 00000001  r1 : eda53000  r0 : 6da6c000
-  Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> I've started putting together a set fixing the issues identified in this
+> thread. It should give a better idea on the best course of action.
 
-Note the 'ISA ARM' in the last line.
+On ACPI ARM64, this diff should do if I read the code correctly, it
+should be (famous last words) just a matter of mapping PXMs to nodes for
+every SRAT GICC entry, feel free to pick it up if it works.
 
-Fix this by using the correct name in ENDPROC().
+Yes, we can take the original patch just because it is safer for an -rc
+cycle even though if the patch below would do delaying the fix for a
+couple of -rc (to get it tested across ACPI ARM64 NUMA platforms) is
+not a disaster.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/mm/proc-v7.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Lorenzo
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 6fe52819e014..339eb17c9808 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -112,7 +112,7 @@ ENTRY(cpu_v7_hvc_switch_mm)
- 	hvc	#0
- 	ldmfd	sp!, {r0 - r3}
- 	b	cpu_v7_switch_mm
--ENDPROC(cpu_v7_smc_switch_mm)
-+ENDPROC(cpu_v7_hvc_switch_mm)
- #endif
- ENTRY(cpu_v7_iciallu_switch_mm)
- 	mov	r3, #0
--- 
-2.17.1
+-- >8 --
+diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
+index d190a7b231bf..877b268ef9fa 100644
+--- a/arch/arm64/kernel/acpi_numa.c
++++ b/arch/arm64/kernel/acpi_numa.c
+@@ -70,12 +70,6 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+ 	if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+ 		return;
+ 
+-	if (cpus_in_srat >= NR_CPUS) {
+-		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
+-			     NR_CPUS);
+-		return;
+-	}
+-
+ 	pxm = pa->proximity_domain;
+ 	node = acpi_map_pxm_to_node(pxm);
+ 
+@@ -85,6 +79,14 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+ 		return;
+ 	}
+ 
++	node_set(node, numa_nodes_parsed);
++
++	if (cpus_in_srat >= NR_CPUS) {
++		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
++			     NR_CPUS);
++		return;
++	}
++
+ 	mpidr = acpi_map_madt_entry(pa->acpi_processor_uid);
+ 	if (mpidr == PHYS_CPUID_INVALID) {
+ 		pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
+@@ -95,7 +97,6 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+ 
+ 	early_node_cpu_hwid[cpus_in_srat].node_id = node;
+ 	early_node_cpu_hwid[cpus_in_srat].cpu_hwid =  mpidr;
+-	node_set(node, numa_nodes_parsed);
+ 	cpus_in_srat++;
+ 	pr_info("SRAT: PXM %d -> MPIDR 0x%Lx -> Node %d\n",
+ 		pxm, mpidr, node);
