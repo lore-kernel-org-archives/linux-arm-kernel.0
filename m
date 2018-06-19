@@ -1,22 +1,72 @@
-From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Tue, 19 Jun 2018 15:56:18 +0300
-Subject: [PATCH 02/11] tpm/tpm_i2c_infineon: switch to i2c_lock_segment
-In-Reply-To: <20180615101506.8012-3-peda@axentia.se>
-References: <20180615101506.8012-1-peda@axentia.se>
- <20180615101506.8012-3-peda@axentia.se>
-Message-ID: <20180619125618.GB5609@linux.intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 19 Jun 2018 06:01:08 -0700
+Subject: [PATCH] serial: mps2-uart: Initialize early console
+In-Reply-To: <173551dd-3632-08a6-ec42-2ee416ccb9ad@arm.com>
+References: <1529384097-1631-1-git-send-email-linux@roeck-us.net>
+ <173551dd-3632-08a6-ec42-2ee416ccb9ad@arm.com>
+Message-ID: <da7ba538-a81e-f2d2-d51c-1b39f5b455f0@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 12:14:57PM +0200, Peter Rosin wrote:
-> Locking the root adapter for __i2c_transfer will deadlock if the
-> device sits behind a mux-locked I2C mux. Switch to the finer-grained
-> i2c_lock_segment. If the device does not sit behind a mux-locked mux,
-> the two locking variants are equivalent.
+On 06/19/2018 02:07 AM, Vladimir Murzin wrote:
+> Hi Guenter,
 > 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+> On 19/06/18 05:54, Guenter Roeck wrote:
+>> The early console code for mps2-uart assumes that the serial hardware is
+>> enabled for transmit when the system boots. However, this is not the case
+>> after reset. This results in a hang in mps2_early_putchar() if the serial
+>> transmitter is not enabled by a boot loader or ROM monitor.
+> 
+> I was under impression that for earlycon there is an assumption/requirement
+> that the serial port must already be setup and configured. For instance, I
+> see such requirement for pl011. So it looks like boot code's fault not to
+> enable serial (for mps2 it needs to setup BAUDDIV as well).
+> 
 
-Can you quickly explain (or give a reference) the difference with these
-functions? Not an expert in this area. Thanks.
+Good to know. Fine with me as well; I wasn't aware that such a requirement
+existed.
 
-/Jarkko
+Guenter
+
+> I'm not against the patch per se, but I'd like to hear if my understanding of
+> earlycon requirements is correct or not.
+> 
+> Cheers
+> Vladimir
+> 
+>>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>   drivers/tty/serial/mps2-uart.c | 9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
+>> index 9f8f63719126..0743a0551ce1 100644
+>> --- a/drivers/tty/serial/mps2-uart.c
+>> +++ b/drivers/tty/serial/mps2-uart.c
+>> @@ -448,6 +448,14 @@ static struct console mps2_uart_console = {
+>>   
+>>   #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
+>>   
+>> +static void mps2_early_init(struct uart_port *port)
+>> +{
+>> +	u8 control = readb(port->membase + UARTn_CTRL);
+>> +
+>> +	control |= UARTn_CTRL_TX_ENABLE;
+>> +	writeb(control, port->membase + UARTn_CTRL);
+>> +}
+>> +
+>>   static void mps2_early_putchar(struct uart_port *port, int ch)
+>>   {
+>>   	while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
+>> @@ -469,6 +477,7 @@ static int __init mps2_early_console_setup(struct earlycon_device *device,
+>>   	if (!device->port.membase)
+>>   		return -ENODEV;
+>>   
+>> +	mps2_early_init(&device->port);
+>>   	device->con->write = mps2_early_write;
+>>   
+>>   	return 0;
+>>
+> 
+> 
