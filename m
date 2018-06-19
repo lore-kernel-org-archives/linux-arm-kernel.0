@@ -1,31 +1,44 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 19 Jun 2018 17:14:25 +0200
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
-References: <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
- <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
- <20180611145330.GO13364@dhcp22.suse.cz>
- <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
- <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
- <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
- <20180619120714.GE13685@dhcp22.suse.cz>
- <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
- <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
- <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20180619151425.GH13685@dhcp22.suse.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Jun 2018 16:15:06 +0100
+Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <20180618162124.21749-2-bugalski.piotr@gmail.com>
+References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+ <20180618162124.21749-2-bugalski.piotr@gmail.com>
+Message-ID: <20180619151506.GG11230@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
-[...]
-> In terms of $SUBJECT, I wonder if it's worth taking the original patch
-> as a temporary fix (it'll also be easier to backport) while we work on
-> fixing these other issues and enabling memoryless nodes.
+On Mon, Jun 18, 2018 at 06:21:23PM +0200, Piotr Bugalski wrote:
 
-Well, x86 already does that but copying this antipatern is not really
-nice. So it is good as a quick fix but it would be definitely much
-better to have a robust fix. Who knows how many other places might hit
-this. You certainly do not want to add a hack like this all over...
--- 
-Michal Hocko
-SUSE Labs
+> +static int atmel_qspi_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
+> +{
+> +	return 0;
+> +}
+
+If this can be empty should we adjust the callers to allow it to just be
+omitted?
+
+> +static int atmel_qspi_remove(struct platform_device *pdev)
+> +{
+> +	struct spi_controller *ctrl = platform_get_drvdata(pdev);
+> +	struct atmel_qspi *aq = spi_controller_get_devdata(ctrl);
+> +
+> +	qspi_writel(aq, QSPI_CR, QSPI_CR_QSPIDIS);
+> +	clk_disable_unprepare(aq->clk);
+> +
+> +	spi_unregister_controller(ctrl);
+> +
+> +	return 0;
+> +}
+
+You should unregister the controller before disabling the hardware,
+otherwise something could come in and try to start an operation on the
+controller (or already be running one) while the hardware is disabled
+which might blow up.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/0ebd21f0/attachment.sig>
