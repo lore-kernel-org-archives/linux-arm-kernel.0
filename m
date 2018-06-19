@@ -1,88 +1,86 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 19 Jun 2018 12:09:17 +0300
-Subject: [PATCH v2] mmc: sdhci-of-arasan: Add quirk for unstable clocks
-In-Reply-To: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
-References: <da0ebcb3-b19a-86a6-8462-87a1c0e81fff@intel.com>
- <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
-Message-ID: <8e6fa189-f585-c835-488f-e15f18128547@intel.com>
+From: yanjiang.jin@hxt-semitech.com (Jin, Yanjiang)
+Date: Tue, 19 Jun 2018 09:34:56 +0000
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <20180619085541.GB13984@arm.com>
+References: <1528785361-24477-1-git-send-email-bhsharma@redhat.com>
+ <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+ <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
+ <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
+ <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
+ <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
+ <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
+ <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619085541.GB13984@arm.com>
+Message-ID: <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/18 11:18, Helmut Grohne wrote:
-> Some controllers immediately report SDHCI_CLOCK_INT_STABLE after
-> enabling the clock even when the clock is not stable. When used in
-> conjunction with older/slower cards, this can result in:
-> 
->     mmc0: error -84 whilst initialising SD card
-> 
-> When the stable reporting is broken, we simply wait for the maximum
-> stabilization period.
-> 
-> Signed-off-by: Helmut Grohne <h.grohne@intenta.de>
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-> ---
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt |  2 ++
->  drivers/mmc/host/sdhci-of-arasan.c                     | 16 ++++++++++++++++
->  2 files changed, 18 insertions(+)
-> 
-> Changes since v1 (RFC):
->  * Use an arasan-specific quirk in the ->set_clock() callback as requested by
->    Adrian Hunter.
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index 60481bfc3d31..c0e0f04a8504 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -39,6 +39,8 @@ Optional Properties:
->    - xlnx,fails-without-test-cd: when present, the controller doesn't work when
->      the CD line is not connected properly, and the line is not connected
->      properly. Test mode can be used to force the controller to function.
-> +  - xlnx,int-clock-stable-broken: when present, the controller always reports
-> +    that the internal clock is stable even when it is not.
->  
->  Example:
->  	sdhci at e0100000 {
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index c33a5f7393bd..f7fe26c75150 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -102,6 +102,9 @@ struct sdhci_arasan_data {
->  
->  /* Controller does not have CD wired and will not function normally without */
->  #define SDHCI_ARASAN_QUIRK_FORCE_CDTEST	BIT(0)
-> +/* Controller immediately reports SDHCI_CLOCK_INT_STABLE after enabling the
-> + * internal clock even when the clock isn't stable */
-> +#define SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE BIT(1)
->  };
->  
->  static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
-> @@ -207,6 +210,16 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
->  
->  	sdhci_set_clock(host, clock);
->  
-> +	if (sdhci_arasan->quirks & SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE)
-> +		/*
-> +		 * Some controllers immediately report SDHCI_CLOCK_INT_STABLE
-> +		 * after enabling the clock even though the clock is not
-> +		 * stable. Trying to use a clock without waiting here results
-> +		 * in EILSEQ while detecting some older/slower cards. The
-> +		 * chosen delay is the maximum delay from sdhci_set_clock.
-> +		 */
-> +		msleep(20);
-> +
->  	if (ctrl_phy) {
->  		phy_power_on(sdhci_arasan->phy);
->  		sdhci_arasan->is_phy_on = true;
-> @@ -759,6 +772,9 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->  	if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
->  		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
->  
-> +	if (of_property_read_bool(np, "xlnx,int-clock-stable-broken"))
-> +		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_CLOCK_UNSTABLE;
-> +
->  	pltfm_host->clk = clk_xin;
->  
->  	if (of_device_is_compatible(pdev->dev.of_node,
-> 
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2018?6?19? 16:56
+> To: Jin, Yanjiang <yanjiang.jin@hxt-semitech.com>
+> Cc: James Morse <james.morse@arm.com>; Bhupesh Sharma
+> <bhsharma@redhat.com>; Mark Rutland <mark.rutland@arm.com>; Ard
+> Biesheuvel <ard.biesheuvel@linaro.org>; Catalin Marinas
+> <catalin.marinas@arm.com>; Kexec Mailing List <kexec@lists.infradead.org>;
+> AKASHI Takahiro <takahiro.akashi@linaro.org>; Bhupesh SHARMA
+> <bhupesh.linux@gmail.com>; linux-arm-kernel <linux-arm-
+> kernel at lists.infradead.org>
+> Subject: Re: [PATCH] arm64/mm: Introduce a variable to hold base address of
+> linear region
+>
+> On Tue, Jun 19, 2018 at 03:02:15AM +0000, Jin, Yanjiang wrote:
+> > > You seem to be using this for user-space phys_to_virt() based on
+> > > values found in /proc/iomem. This should give you what you want, and
+> > > isolate your user-space from the kernel's unexpected naming of variables.
+> >
+> > I don't know could I simplify this problem?
+> > Let's ignore what memstart_addr represents here, we just want to
+> > implement
+> > phys_to_virt() in an userspace applications(kexec-tools or others).
+> >
+> > ARM64 Kernel has a below definition:
+> >
+> > #define __phys_to_virt(x)       ((unsigned long)((x) - PHYS_OFFSET) |
+> PAGE_OFFSET)
+> >
+> > So userspace app must know PHYS_OFFSET(equal to memstart_addr now).
+> > Seems this is very simple, but memstart_addr has gone through several
+> > operations in arm64_memblock_init() depends on different Kernel
+> > configurations, so userspace app needs to know many additional definitions as
+> following:
+> >
+> > memblock_start_of_DRAM(),  (ifdef CONFIG_SPARSEMEM_VMEMMAP),
+> > ARM64_MEMSTART_SHIFT,  SECTION_SIZE_BITS,  PAGE_OFFSET,
+> > memblock_end_of_DRAM(), IS_ENABLED(CONFIG_RANDOMIZE_BASE),
+> > memstart_offset_seed.
+> >
+> > It is hard to know all above in kexec-tools now. Originally I planned
+> > to read memstart_addr's value from "/dev/mem", but someone thought not
+> > all Kernels enable "/dev/mem", we'd better find a more generic
+> > approach. So we want to get some suggestions from ARM kernel community.
+> > Can we export this variable in Kernel side through sysconf() or other
+> > similar methods? Or someone can provide an effect way to get
+> > memstart_addr's value?
+>
+> I thought the suggestion from James was to expose this via an ELF NOTE in kcore
+> and vmcore (or in the header directly if that's possible, but I'm not sure about it)?
+
+Hi Will,
+
+Thanks for your reply firstly. But same as DEVMEM, kcore is not a must-have, so we can't depend on it.
+On the other hand, phys_to_virt() is called during generating vmcore in Kexec-tools, vmcore also can't help this issue.
+Unfortunately, not all platforms support analyzing Kernel config in userspace application, so Kexec-tools can't know some key kernel options. If not so, we can simulate the whole arm64_memblock_init()  progress in kexec-tools.
+
+Thanks,
+Yanjiang
+>
+> Will
+
+
+
+This email is intended only for the named addressee. It may contain information that is confidential/private, legally privileged, or copyright-protected, and you should handle it accordingly. If you are not the intended recipient, you do not have legal rights to retain, copy, or distribute this email or its contents, and should promptly delete the email and all electronic copies in your system; do not retain copies in any media. If you have received this email in error, please notify the sender promptly. Thank you.
