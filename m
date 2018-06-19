@@ -1,172 +1,135 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 19 Jun 2018 11:15:36 +0100
-Subject: [PATCH v3 1/7] arm_pmu: Clean up maximum period handling
-In-Reply-To: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
-References: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1529403342-17899-2-git-send-email-suzuki.poulose@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 19 Jun 2018 11:16:06 +0100
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
+References: <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+ <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
+ <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
+ <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
+ <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
+ <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
+ <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619085541.GB13984@arm.com>
+ <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619094045.GD13984@arm.com>
+ <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
+Message-ID: <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each PMU defines their max_period of the counter as the maximum
-value that can be counted. Since all the PMU backends support
-32bit counters by default, let us remove the redundant field.
+Hi Yanjiang, Will,
 
-No functional changes.
+On 19/06/18 10:57, Jin, Yanjiang wrote:
+>> -----Original Message-----
+>> From: Will Deacon [mailto:will.deacon at arm.com]
+>> Sent: 2018?6?19? 17:41
+>> To: Jin, Yanjiang <yanjiang.jin@hxt-semitech.com>
+>> Cc: James Morse <james.morse@arm.com>; Bhupesh Sharma
+>> <bhsharma@redhat.com>; Mark Rutland <mark.rutland@arm.com>; Ard
+>> Biesheuvel <ard.biesheuvel@linaro.org>; Catalin Marinas
+>> <catalin.marinas@arm.com>; Kexec Mailing List <kexec@lists.infradead.org>;
+>> AKASHI Takahiro <takahiro.akashi@linaro.org>; Bhupesh SHARMA
+>> <bhupesh.linux@gmail.com>; linux-arm-kernel <linux-arm-
+>> kernel at lists.infradead.org>
+>> Subject: Re: [PATCH] arm64/mm: Introduce a variable to hold base address of
+>> linear region
+>>
+>> On Tue, Jun 19, 2018 at 09:34:56AM +0000, Jin, Yanjiang wrote:
+>>>> On Tue, Jun 19, 2018 at 03:02:15AM +0000, Jin, Yanjiang wrote:
+>>>>>> You seem to be using this for user-space phys_to_virt() based on
+>>>>>> values found in /proc/iomem. This should give you what you want,
+>>>>>> and isolate your user-space from the kernel's unexpected naming of
+>> variables.
+>>>>>
+>>>>> I don't know could I simplify this problem?
+>>>>> Let's ignore what memstart_addr represents here, we just want to
+>>>>> implement
+>>>>> phys_to_virt() in an userspace applications(kexec-tools or others).
+>>>>>
+>>>>> ARM64 Kernel has a below definition:
+>>>>>
+>>>>> #define __phys_to_virt(x)       ((unsigned long)((x) - PHYS_OFFSET) |
+>>>> PAGE_OFFSET)
+>>>>>
+>>>>> So userspace app must know PHYS_OFFSET(equal to memstart_addr now).
+>>>>> Seems this is very simple, but memstart_addr has gone through
+>>>>> several operations in arm64_memblock_init() depends on different
+>>>>> Kernel configurations, so userspace app needs to know many
+>>>>> additional definitions as
+>>>> following:
+>>>>>
+>>>>> memblock_start_of_DRAM(),  (ifdef CONFIG_SPARSEMEM_VMEMMAP),
+>>>>> ARM64_MEMSTART_SHIFT,  SECTION_SIZE_BITS,  PAGE_OFFSET,
+>>>>> memblock_end_of_DRAM(), IS_ENABLED(CONFIG_RANDOMIZE_BASE),
+>>>>> memstart_offset_seed.
+>>>>>
+>>>>> It is hard to know all above in kexec-tools now. Originally I
+>>>>> planned to read memstart_addr's value from "/dev/mem", but someone
+>>>>> thought not all Kernels enable "/dev/mem", we'd better find a more
+>>>>> generic approach. So we want to get some suggestions from ARM kernel
+>> community.
+>>>>> Can we export this variable in Kernel side through sysconf() or
+>>>>> other similar methods? Or someone can provide an effect way to get
+>>>>> memstart_addr's value?
+>>>>
+>>>> I thought the suggestion from James was to expose this via an ELF
+>>>> NOTE in kcore and vmcore (or in the header directly if that's possible, but I'm
+>> not sure about it)?
+>>>
+>>> Thanks for your reply firstly. But same as DEVMEM, kcore is not a
+>>> must-have, so we can't depend on it.
+>>
+>> Neither is KEXEC. We can select PROC_KCORE from KEXEC if it helps.
+>>
+>>> On the other hand, phys_to_virt() is called during generating vmcore
+>>> in Kexec-tools, vmcore also can't help this issue.
+>>
+>> I don't understand this part. If you have the vmcore in your hand, why can't you
+>> grok the pv offset from the note and use that in phys_to_virt()?
+> 
+> It is a chicken-and-egg issue.
+> phys_to virt() is for crashdump setup. To generate vmcore, we must call
+> phys_to_virt(). At this point, no vmcore exists.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-No changes since v2
----
- arch/arm/kernel/perf_event_v6.c     |  2 --
- arch/arm/kernel/perf_event_v7.c     |  1 -
- arch/arm/kernel/perf_event_xscale.c |  2 --
- arch/arm64/kernel/perf_event.c      |  1 -
- drivers/perf/arm_pmu.c              | 16 ++++++++++++----
- include/linux/perf/arm_pmu.h        |  1 -
- 6 files changed, 12 insertions(+), 11 deletions(-)
+Its needed for the parts of the ELF header that kexec-tools generates at kdump
+load time?
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index be42c4f..f64a6bf 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -495,7 +495,6 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->stop		= armv6pmu_stop;
- 	cpu_pmu->map_event	= armv6_map_event;
- 	cpu_pmu->num_events	= 3;
--	cpu_pmu->max_period	= (1LLU << 32) - 1;
- }
- 
- static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -546,7 +545,6 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->stop		= armv6pmu_stop;
- 	cpu_pmu->map_event	= armv6mpcore_map_event;
- 	cpu_pmu->num_events	= 3;
--	cpu_pmu->max_period	= (1LLU << 32) - 1;
- 
- 	return 0;
- }
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 57f01e0..ecca4cd 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -1170,7 +1170,6 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->start		= armv7pmu_start;
- 	cpu_pmu->stop		= armv7pmu_stop;
- 	cpu_pmu->reset		= armv7pmu_reset;
--	cpu_pmu->max_period	= (1LLU << 32) - 1;
- };
- 
- static void armv7_read_num_pmnc_events(void *info)
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index 88d1a76..c4f0294 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -374,7 +374,6 @@ static int xscale1pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->stop		= xscale1pmu_stop;
- 	cpu_pmu->map_event	= xscale_map_event;
- 	cpu_pmu->num_events	= 3;
--	cpu_pmu->max_period	= (1LLU << 32) - 1;
- 
- 	return 0;
- }
-@@ -743,7 +742,6 @@ static int xscale2pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->stop		= xscale2pmu_stop;
- 	cpu_pmu->map_event	= xscale_map_event;
- 	cpu_pmu->num_events	= 5;
--	cpu_pmu->max_period	= (1LLU << 32) - 1;
- 
- 	return 0;
- }
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 33147aa..678ecff 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -960,7 +960,6 @@ static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->start			= armv8pmu_start,
- 	cpu_pmu->stop			= armv8pmu_stop,
- 	cpu_pmu->reset			= armv8pmu_reset,
--	cpu_pmu->max_period		= (1LLU << 32) - 1,
- 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
- 
- 	return 0;
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index a6347d4..6ddc00d 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -28,6 +28,11 @@
- static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
- static DEFINE_PER_CPU(int, cpu_irq);
- 
-+static inline u64 arm_pmu_max_period(void)
-+{
-+	return (1ULL << 32) - 1;
-+}
-+
- static int
- armpmu_map_cache_event(const unsigned (*cache_map)
- 				      [PERF_COUNT_HW_CACHE_MAX]
-@@ -114,8 +119,10 @@ int armpmu_event_set_period(struct perf_event *event)
- 	struct hw_perf_event *hwc = &event->hw;
- 	s64 left = local64_read(&hwc->period_left);
- 	s64 period = hwc->sample_period;
-+	u64 max_period;
- 	int ret = 0;
- 
-+	max_period = arm_pmu_max_period();
- 	if (unlikely(left <= -period)) {
- 		left = period;
- 		local64_set(&hwc->period_left, left);
-@@ -136,8 +143,8 @@ int armpmu_event_set_period(struct perf_event *event)
- 	 * effect we are reducing max_period to account for
- 	 * interrupt latency (and we are being very conservative).
- 	 */
--	if (left > (armpmu->max_period >> 1))
--		left = armpmu->max_period >> 1;
-+	if (left > (max_period >> 1))
-+		left = (max_period >> 1);
- 
- 	local64_set(&hwc->prev_count, (u64)-left);
- 
-@@ -153,6 +160,7 @@ u64 armpmu_event_update(struct perf_event *event)
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
- 	u64 delta, prev_raw_count, new_raw_count;
-+	u64 max_period = arm_pmu_max_period();
- 
- again:
- 	prev_raw_count = local64_read(&hwc->prev_count);
-@@ -162,7 +170,7 @@ u64 armpmu_event_update(struct perf_event *event)
- 			     new_raw_count) != prev_raw_count)
- 		goto again;
- 
--	delta = (new_raw_count - prev_raw_count) & armpmu->max_period;
-+	delta = (new_raw_count - prev_raw_count) & max_period;
- 
- 	local64_add(delta, &event->count);
- 	local64_sub(delta, &hwc->period_left);
-@@ -402,7 +410,7 @@ __hw_perf_event_init(struct perf_event *event)
- 		 * is far less likely to overtake the previous one unless
- 		 * you have some serious IRQ latency issues.
- 		 */
--		hwc->sample_period  = armpmu->max_period >> 1;
-+		hwc->sample_period  = arm_pmu_max_period() >> 1;
- 		hwc->last_period    = hwc->sample_period;
- 		local64_set(&hwc->period_left, hwc->sample_period);
- 	}
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index ad54444..12c30a2 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -94,7 +94,6 @@ struct arm_pmu {
- 	void		(*reset)(void *);
- 	int		(*map_event)(struct perf_event *event);
- 	int		num_events;
--	u64		max_period;
- 	bool		secure_access; /* 32-bit ARM only */
- #define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
- 	DECLARE_BITMAP(pmceid_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
--- 
-2.7.4
+So adding this pv_offset to the key=value data crash_save_vmcoreinfo_init()
+saves isn't available early enough?
+
+
+If we select PROC_KCORE for KEXEC so you know you will have /proc/kcore if the
+system supports kdump. We should probably provide the same information in the
+PT_NOTE section of the /proc/kcore file.
+
+
+(I thought the kdump kernel exported that crash_save_vmcoreinfo_init() data as
+an elf-note itself, but digging deeper I see the kernel exposes the physical
+address in /sys/kernel/vmcoreinfo. Presumably its passed back via the kdump
+elfcorehdr.)
+
+
+>>> Unfortunately, not all platforms support analyzing Kernel config in
+>>> userspace application, so Kexec-tools can't know some key kernel options.
+>>> If not so, we can simulate the whole arm64_memblock_init()  progress
+>>> in kexec-tools.
+>>
+>> I don't understand what the kernel config has to do with kexec tools.
+> 
+> I mean that if we can know kernel .config in all circumstances, we can calculate memstart_addr  as below in Kexec-tools:
+> 
+> 
+>         memstart_addr = round_down(memblock_start_of_DRAM(),
+>                                    ARM64_MEMSTART_ALIGN);
+
+This wouldn't work for KASLR. Having the kernel provide you with the offset
+means you are insulated from the details of phys_to_virt() and what affects
+these values. It should be possible to do this in the same way for all
+architectures.
+
+
+Thanks,
+
+James
