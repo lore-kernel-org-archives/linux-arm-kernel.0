@@ -1,95 +1,54 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 20 Jun 2018 00:06:19 +0300
-Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
-In-Reply-To: <20180619205914.21375-1-javierm@redhat.com>
-References: <20180619205914.21375-1-javierm@redhat.com>
-Message-ID: <CAHp75VeHWNi2UFEjYOG5xMmb_AWoAwS37U62uCcM3-V6TvVp4g@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 19 Jun 2018 23:19:23 +0200
+Subject: [PATCH v5 0/6] clocksource: rework Atmel TCB timer driver
+Message-ID: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 11:59 PM, Javier Martinez Canillas
-<javierm@redhat.com> wrote:
-> For debugging purposes it may be useful to know what are the devices whose
-> probe function was deferred. Add a debugfs entry showing that information.
->
->   $ cat /sys/kernel/debug/deferred_devices
->   48070000.i2c:twl at 48:bci
->   musb-hdrc.0.auto
->   omapdrm.0
->
+Hi,
 
-FWIW,
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+This series reworks the Atmel TCB drivers. It introduces a new driver to handle
+the clocksource and clockevent devices.
 
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
->
-> ---
->
-> Changes since RFC v1:
-> - Remove unneeded ret variable from deferred_devs_show()
->
-> Changes since RFC v2:
-> - Use DEFINE_SHOW_ATTRIBUTE() macro.
-> - Don't propagate debugfs_create_file() error.
-> - Remove IS_ENABLED(CONFIG_DEBUG_FS) guards.
-> - Drop RFC prefix.
->
->  drivers/base/dd.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 1435d7281c6..8ec9e3cfbe4 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -16,6 +16,7 @@
->   * Copyright (c) 2007-2009 Novell Inc.
->   */
->
-> +#include <linux/debugfs.h>
->  #include <linux/device.h>
->  #include <linux/delay.h>
->  #include <linux/dma-mapping.h>
-> @@ -224,6 +225,24 @@ void device_unblock_probing(void)
->         driver_deferred_probe_trigger();
->  }
->
-> +/*
-> + * deferred_devs_show() - Show the devices in the deferred probe pending list.
-> + */
-> +static int deferred_devs_show(struct seq_file *s, void *data)
-> +{
-> +       struct device_private *curr;
-> +
-> +       mutex_lock(&deferred_probe_mutex);
-> +
-> +       list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
-> +               seq_printf(s, "%s\n", dev_name(curr->device));
-> +
-> +       mutex_unlock(&deferred_probe_mutex);
-> +
-> +       return 0;
-> +}
-> +DEFINE_SHOW_ATTRIBUTE(deferred_devs);
-> +
->  /**
->   * deferred_probe_initcall() - Enable probing of deferred devices
->   *
-> @@ -233,6 +252,9 @@ void device_unblock_probing(void)
->   */
->  static int deferred_probe_initcall(void)
->  {
-> +       debugfs_create_file("deferred_devices", 0444, NULL, NULL,
-> +                           &deferred_devs_fops);
-> +
->         driver_deferred_probe_enable = true;
->         driver_deferred_probe_trigger();
->         /* Sort as many dependencies as possible before exiting initcalls */
-> --
-> 2.17.1
->
+As a reminder, this is necessary because:
+ - the current tcb_clksrc driver is probed too late to be able to be used at
+   boot and we now have SoCs that don't have a PIT. They currently are not able
+   to boot a mainline kernel.
+ - using the PIT doesn't work well with preempt-rt because its interrupt is
+   shared (in particular with the UART and their interrupt flags are
+   incompatible)
+ - the current solution is wasting some TCB channels
 
+The plan is to get this driver upstream, then convert the TCB PWM driver to be
+able to get rid of the tcb_clksrc driver along with atmel_tclib now that AVR32
+is gone.
 
+changes in v5:
+ - rebased on v4.18-rc1
+ - fixed the clock enabling/disabling in atomic context under preempt-rt
+
+Changes in v4:
+ - rebased on top of v4.17-rc1
+ - fixed an issue when setting max_delta for clockevents_config_and_register
+
+Alexandre Belloni (6):
+  ARM: at91: add TCB registers definitions
+  clocksource/drivers: Add a new driver for the Atmel ARM TC blocks
+  clocksource/drivers: atmel-pit: make option silent
+  ARM: at91: Implement clocksource selection
+  ARM: configs: at91: use new TCB timer driver
+  ARM: configs: at91: unselect PIT
+
+ arch/arm/configs/at91_dt_defconfig    |   2 +-
+ arch/arm/configs/sama5_defconfig      |   2 +-
+ arch/arm/mach-at91/Kconfig            |  25 +
+ drivers/clocksource/Kconfig           |  13 +-
+ drivers/clocksource/Makefile          |   3 +-
+ drivers/clocksource/timer-atmel-tcb.c | 630 ++++++++++++++++++++++++++
+ include/soc/at91/atmel_tcb.h          | 216 +++++++++
+ 7 files changed, 887 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/clocksource/timer-atmel-tcb.c
+ create mode 100644 include/soc/at91/atmel_tcb.h
 
 -- 
-With Best Regards,
-Andy Shevchenko
+2.17.1
