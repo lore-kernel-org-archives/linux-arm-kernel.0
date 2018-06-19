@@ -1,25 +1,27 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 Jun 2018 10:49:31 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6dl: Add Engicam i.CoreM6 1.5 Quad/Dual
- MIPI starter kit support
-In-Reply-To: <20180607135133.3104-1-jagan@amarulasolutions.com>
-References: <20180607135133.3104-1-jagan@amarulasolutions.com>
-Message-ID: <20180619024930.GA16091@dragon>
+Date: Tue, 19 Jun 2018 10:54:00 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx6qdl-sabreauto: Add sensors
+In-Reply-To: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
+References: <1be8dc197f842d3be31a15315594a25c8ad8f298.1529309235.git.leonard.crestez@nxp.com>
+Message-ID: <20180619025359.GB16091@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 07:21:31PM +0530, Jagan Teki wrote:
-> i.CoreM6 1.5 is an another i.CoreM6 QDL cpu modules which can be connected
-> to EDIMM starter kit design with eMMC and MIPI-CSI interfaces suitable for
-> Android and video capture application.
+On Mon, Jun 18, 2018 at 11:15:44AM +0300, Leonard Crestez wrote:
+> The following sensors are on I2C3 on the baseboard:
+> * isil,isl29023 light sensor
+> * fsl,mag3110 magnetometer
+> * fsl,mma8451 accelerometer
 > 
-> notable features:
-> CPU                 NXP i.MX6 S/DL/D/Q, Up to 4 x Cortex-A9 at 800MHz
-> Memory              Up to 2 GB DDR3-1066
-> Video Interfaces    Up to 1 Parallel Up to 2 LVDS HDMI 1.4
->                     port 8 bit CSI INPUT MIPI-CSI INPUT
-> 1 x 10/100 Ethernet interface, 2 x USB, 1 x PCIe, 1 x I2S etc
+> Added under i2cmux/i2c at 1 because they're not otherwise accessible.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> These are all supported by iio with following configs:
+> * CONFIG_SENSORS_ISL29018
+> * CONFIG_MAG3110
+> * CONFIG_MMA8452
+> 
+> Tested with raw reads from iio sysfs.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Applied all, thanks.
+Applied both, thanks.
