@@ -1,52 +1,59 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 19 Jun 2018 22:55:20 +0300
-Subject: [RFC PATCH v2] driver core: add a debugfs entry to show deferred
- devices
-In-Reply-To: <CAHp75Vcn39N9rZ0UO3szGrODVLxek4X746uWs+RPXwy4i0s1Ug@mail.gmail.com>
-References: <20180619183356.32106-1-javierm@redhat.com>
- <CAHp75Vcn39N9rZ0UO3szGrODVLxek4X746uWs+RPXwy4i0s1Ug@mail.gmail.com>
-Message-ID: <CAHp75VdpHdanWJmcwLBRTSDoDkbpPxuAGwwVO0hosXSRn4PUoA@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 19 Jun 2018 14:44:20 -0500
+Subject: [PATCH 1/2] Documentation: dt: keystone: ti-sci: Add optional host-id
+ parameter
+In-Reply-To: <20180619194421.3432-1-nm@ti.com>
+References: <20180619194421.3432-1-nm@ti.com>
+Message-ID: <20180619194421.3432-2-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 10:53 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Tue, Jun 19, 2018 at 9:33 PM, Javier Martinez Canillas
-> <javierm@redhat.com> wrote:
->> For debugging purposes it may be useful to know what are the devices whose
->> probe function was deferred. Add a debugfs entry showing that information.
+Texas Instrument's System Control Interface (TISCI) permits
+the ability for OSs running in virtual machines to be able to
+independently communicate with the firmware without the need going
+through an hypervisor.
 
->> +static int deferred_devs_open(struct inode *inode, struct file *file)
->> +{
->> +       return single_open(file, deferred_devs_show, inode->i_private);
->> +}
->> +
->> +static const struct file_operations deferred_devs_fops = {
->> +       .owner = THIS_MODULE,
->> +       .open = deferred_devs_open,
->> +       .read = seq_read,
->> +       .llseek = seq_lseek,
->> +       .release = single_release,
->> +};
->
-> Isn't this DEFINE_SHOW_ATTRIBUTE() ?
+The "host-id" in effect is the hardware representation of the
+host (example: VMs locked to a core) as identified to the System
+Controller. Hypervisors can either fill in appropriate host-ids in dt
+used for each VM instance OR may use prebuilt blobs where the host-ids
+are pre-populated, as appropriate for the OS running in the VMs.
 
-Besides that, you are summoning Greg's dark side :-)
-See below.
+This is introduced as an optional parameter to maintain consistency
+with legacy device tree blobs.
 
->> +       if (IS_ENABLED(CONFIG_DEBUG_FS)) {
->> +               deferred_devices = debugfs_create_file("deferred_devices",
->> +                                                      0444, NULL, NULL,
->> +                                                      &deferred_devs_fops);
+We call this with a vendor prefix to prevent any possible confusion
+with SCSI ID (m68k) kernel option.
 
->> +               if (!deferred_devices)
->> +                       return -ENOMEM;
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Changes since RFC:
+* Commit message update to elaborate usage in VM
 
-This must not prevent the execution. So, the check introduces actually
-a regression.
+RFC: https://patchwork.kernel.org/patch/10447753/
 
->> +       }
+ Documentation/devicetree/bindings/arm/keystone/ti,sci.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+index 31f5f9a104cc..b56a02c10ae6 100644
+--- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+@@ -45,11 +45,15 @@ Optional Properties:
+ 	debug_messages - Map the Debug message region
+ - reg:  register space corresponding to the debug_messages
+ - ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
++- ti,host-id: Integer value corresponding to the host ID assigned by Firmware
++	for identification of host processing entities such as virtual
++	machines
+ 
+ Example (K2G):
+ -------------
+ 	pmmc: pmmc {
+ 		compatible = "ti,k2g-sci";
++		ti,host-id = <2>;
+ 		mbox-names = "rx", "tx";
+ 		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
+ 			<&msgmgr &msgmgr_proxy_pmmc_tx>;
 -- 
-With Best Regards,
-Andy Shevchenko
+2.15.1
