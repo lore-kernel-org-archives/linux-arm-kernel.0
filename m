@@ -1,46 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Jun 2018 15:13:24 +0100
-Subject: next/master boot: 138 boots: 8 failed, 112 passed with 18
- offline (next-20180619)
-In-Reply-To: <5b290c6d.1c69fb81.fc936.98ee@mx.google.com>
-References: <5b290c6d.1c69fb81.fc936.98ee@mx.google.com>
-Message-ID: <20180619141324.GD11230@sirena.org.uk>
+From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
+Date: Tue, 19 Jun 2018 14:14:27 +0000
+Subject: [PATCH v3] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
+ observed before enabling
+In-Reply-To: <86o9jf174o.wl-marc.zyngier@arm.com>
+References: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
+ <d1161c2d-e16d-14e6-5450-be26d348100d@arm.com>
+ <8087e009-4eca-ab92-cbca-23ccfb3fafac@codeaurora.org>
+ <86o9jf174o.wl-marc.zyngier@arm.com>
+Message-ID: <8898674D84E3B24BA3A2D289B872026A69F37935@G01JPEXMBKW03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 07:00:13AM -0700, kernelci.org bot wrote:
+Hi shankerd, Marc
 
-Today and yesterday's -next is failing to boot on rk3399-firefly in two
-configs:
+I have one question.
 
->     defconfig:
->         rk3399-firefly:
->             lab-baylibre-seattle: failing since 1 day (last pass: next-20180615 - first fail: next-20180618)
+Does it means after GICR_CTLR.EnableLPI has been written to 1, 
+if the bit GICR_CTLR.EnableLPI becomes RES1, we can't use LPIs?
+Because its_cpu_init_lpis and its_cpu_init_collections will not be called. 
 
->     defconfig+CONFIG_RANDOMIZE_BASE=y:
->         rk3399-firefly:
->             lab-baylibre-seattle: failing since 1 day (last pass: next-20180615 - first fail: next-20180618)
+> whether
+> +	 * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to
+> 0.
+> +	 * Bail out the driver probe() on systems where it's RES1.
+> +	 * 
+> +	/**
+> +	 * After it has been written to 1, it is IMPLEMENTATION DEFINED
+> whether
+> +	 * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to
+> 0.
+> +	 * Bail out the driver probe() on systems where it's RES1.
+> +	 */
+> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
+> +		pr_err("CPU%d: Failed to disable LPIs\n",
+> smp_processor_id());
+> +		return -EBUSY;
+> +	}
 
-The log ends with:
-
-[    2.629278] SWITCH_REG2: supplied by vcc3v3_sys
-[    2.633030] fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
-[    2.633723] fan53555-reg: supplied by vcc_sys
-[    2.6353|] Internal error: undefined instruction: 0 [#1] PREEMPT SMP
-
-which is rather entertaining. 
-
-The pending fixes -next branch is fine.  More diagnostics can be seen
-at:
-
-	https://kernelci.org/boot/id/5b28eadb59b514636d79a877/
-
-(that's the defconfig.)  Other boards don't seem to be affected, there's
-some other boards that are failing but don't seem to be related.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/0dbabfd4/attachment.sig>
+Best Regards,
+Lei Zhang
+zhang.lei at jp.fujitsu.com
