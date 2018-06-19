@@ -1,35 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jun 2018 12:19:48 +0100
-Subject: [PATCHv3 01/19] arm64: consistently use unsigned long for thread
- flags
-In-Reply-To: <20180619104939.likbams3ly5c5ugu@armageddon.cambridge.arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-2-mark.rutland@arm.com>
- <20180619104939.likbams3ly5c5ugu@armageddon.cambridge.arm.com>
-Message-ID: <20180619111948.mqrhpd43d7fidmuh@lakrids.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 19 Jun 2018 13:45:26 +0200
+Subject: dynamic reservation and allocation of physically contiguous
+ memory using CMA
+In-Reply-To: <DF0025E0-5C00-4566-82D2-F3599F206210@cisco.com>
+References: <CGME20180618182314epcas1p37a2b1ba6db9a829c07abf55ca0d3d50d@epcas1p3.samsung.com>
+ <DF0025E0-5C00-4566-82D2-F3599F206210@cisco.com>
+Message-ID: <20180619114527eucas1p154dc59055086a514a0423fc4cfb0b8c8~5jSJigH_r0719907199eucas1p1N@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 11:49:40AM +0100, Catalin Marinas wrote:
-> On Mon, Jun 18, 2018 at 01:02:52PM +0100, Mark Rutland wrote:
-> > In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
-> > int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
-> > (e.g. in the entry assembly) we manipulate the flags as a 64-bit
-> > quantity.
-> > 
-> > For consistency, and to avoid problems if we end up with more than 32
-> > flags, let's make do_notify_resume take the flags as a 64-bit unsigned
-> > long.
-> 
-> When we get to more than 32 flags, you may want to modify the _TIF_*
-> definitions as well to (UL(1) << TIF_*).
+Hi Amit,
 
-Agreed. I can spin a patch or two for a that as a subsequent cleanup.
+On 2018-06-18 20:23, Amit Chandra (amichand) wrote:
+>
+> Hi experts,
+>
+> I had a question related to CMA. I have been trying to use the CMA 
+> infra to reserve and allocate physically contiguous memory dynamically 
+> at runtime.
+>
+> I built a custom kernel based on linux-4.14.47 to invoke the cma 
+> initialization apis at runtime from kernel loadable module.
+>
+> I invoke cma_declare_contiguous() followed by cma_init_reserved_areas().
+>
+> cma_declare_contiguous throws no surprises and succeeds. The issue 
+> happens when cma_init_reserved_areas() is invoked post that.
+>
+> Here is the kernel log snippet post that call:
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.593218] cma: 
+> cma_declare_contiguous(size 0x0000000200000000, base 
+> 0x0000000000000000, limit 0x0000000000000000 alignment 0x0000000000000000)
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.593228] cma: Reserved 
+> 8192 MiB at 0x0000001d4d000000
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.593345] BUG: Bad page 
+> state in process insmod? pfn:1d4d000
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.595758] 
+> page:ffffefc335340000 count:0 mapcount:-127 mapping:????????? (null) 
+> index:0x0
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.599193] flags: 
+> 0x57fffc000000000()
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.600751] raw: 
+> 057fffc000000000 0000000000000000 0000000000000000 00000000ffffff80
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.603946] raw: 
+> ffffefc335330020 ffffefc335350020 000000000000000a 0000000000000000
+>
+> Jun 15 03:30:31 ubuntu-quickstart kernel: [? 384.607152] page dumped 
+> because: nonzero mapcount
+>
+> I am having a hard time trying to understand why the mapcount is less 
+> than 0 here. I figured this is happening in the call to __free_pages() 
+> from init_cma_reserved_pageblock().
+>
+> Any pointers here would be really helpful. If I am missing any step 
+> for cma reservation, please do let me know.
+>
+> Thanks in advance.
+>
 
-> In the meantime:
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+CMA initialization is possible only on very early boot stage. CMA will 
+not work as dynamic module.
 
-Cheers!
-
-Mark.
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
