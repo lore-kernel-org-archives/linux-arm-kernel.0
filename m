@@ -1,67 +1,80 @@
 From: javierm@redhat.com (Javier Martinez Canillas)
-Date: Tue, 19 Jun 2018 22:54:45 +0200
-Subject: [RFC PATCH v2] driver core: add a debugfs entry to show deferred
- devices
-In-Reply-To: <CAHp75VdpHdanWJmcwLBRTSDoDkbpPxuAGwwVO0hosXSRn4PUoA@mail.gmail.com>
-References: <20180619183356.32106-1-javierm@redhat.com>
- <CAHp75Vcn39N9rZ0UO3szGrODVLxek4X746uWs+RPXwy4i0s1Ug@mail.gmail.com>
- <CAHp75VdpHdanWJmcwLBRTSDoDkbpPxuAGwwVO0hosXSRn4PUoA@mail.gmail.com>
-Message-ID: <c0003b93-886f-10d1-fd7b-17b0323b90a7@redhat.com>
+Date: Tue, 19 Jun 2018 22:59:14 +0200
+Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
+Message-ID: <20180619205914.21375-1-javierm@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andy,
+For debugging purposes it may be useful to know what are the devices whose
+probe function was deferred. Add a debugfs entry showing that information.
 
-Thanks a lot for your feedback.
+  $ cat /sys/kernel/debug/deferred_devices
+  48070000.i2c:twl at 48:bci
+  musb-hdrc.0.auto
+  omapdrm.0
 
-On 06/19/2018 09:55 PM, Andy Shevchenko wrote:
-> On Tue, Jun 19, 2018 at 10:53 PM, Andy Shevchenko
-> <andy.shevchenko@gmail.com> wrote:
->> On Tue, Jun 19, 2018 at 9:33 PM, Javier Martinez Canillas
->> <javierm@redhat.com> wrote:
->>> For debugging purposes it may be useful to know what are the devices whose
->>> probe function was deferred. Add a debugfs entry showing that information.
-> 
->>> +static int deferred_devs_open(struct inode *inode, struct file *file)
->>> +{
->>> +       return single_open(file, deferred_devs_show, inode->i_private);
->>> +}
->>> +
->>> +static const struct file_operations deferred_devs_fops = {
->>> +       .owner = THIS_MODULE,
->>> +       .open = deferred_devs_open,
->>> +       .read = seq_read,
->>> +       .llseek = seq_lseek,
->>> +       .release = single_release,
->>> +};
->>
->> Isn't this DEFINE_SHOW_ATTRIBUTE() ?
->
+Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
 
-Indeed.
+---
+
+Changes since RFC v1:
+- Remove unneeded ret variable from deferred_devs_show()
+
+Changes since RFC v2:
+- Use DEFINE_SHOW_ATTRIBUTE() macro.
+- Don't propagate debugfs_create_file() error.
+- Remove IS_ENABLED(CONFIG_DEBUG_FS) guards.
+- Drop RFC prefix.
+
+ drivers/base/dd.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 1435d7281c6..8ec9e3cfbe4 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -16,6 +16,7 @@
+  * Copyright (c) 2007-2009 Novell Inc.
+  */
  
-> Besides that, you are summoning Greg's dark side :-)
-> See below.
-> 
->>> +       if (IS_ENABLED(CONFIG_DEBUG_FS)) {
->>> +               deferred_devices = debugfs_create_file("deferred_devices",
->>> +                                                      0444, NULL, NULL,
->>> +                                                      &deferred_devs_fops);
-> 
->>> +               if (!deferred_devices)
->>> +                       return -ENOMEM;
-> 
-> This must not prevent the execution. So, the check introduces actually
-> a regression.
->
-
-Fair enough, I'll fix these an re-spin the patch.
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+@@ -224,6 +225,24 @@ void device_unblock_probing(void)
+ 	driver_deferred_probe_trigger();
+ }
  
->>> +       }
-> 
-
-Best regards,
++/*
++ * deferred_devs_show() - Show the devices in the deferred probe pending list.
++ */
++static int deferred_devs_show(struct seq_file *s, void *data)
++{
++	struct device_private *curr;
++
++	mutex_lock(&deferred_probe_mutex);
++
++	list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
++		seq_printf(s, "%s\n", dev_name(curr->device));
++
++	mutex_unlock(&deferred_probe_mutex);
++
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(deferred_devs);
++
+ /**
+  * deferred_probe_initcall() - Enable probing of deferred devices
+  *
+@@ -233,6 +252,9 @@ void device_unblock_probing(void)
+  */
+ static int deferred_probe_initcall(void)
+ {
++	debugfs_create_file("deferred_devices", 0444, NULL, NULL,
++			    &deferred_devs_fops);
++
+ 	driver_deferred_probe_enable = true;
+ 	driver_deferred_probe_trigger();
+ 	/* Sort as many dependencies as possible before exiting initcalls */
 -- 
-Javier Martinez Canillas
-Software Engineer - Desktop Hardware Enablement
-Red Hat
+2.17.1
