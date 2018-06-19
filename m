@@ -1,73 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 Jun 2018 09:16:47 +0800
-Subject: [PATCH] ARM: dts: imx53-qsb: Let the codec control MCLK pinctrl
-In-Reply-To: <1528160209-2849-1-git-send-email-festevam@gmail.com>
-References: <1528160209-2849-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180619011645.GU16091@dragon>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 19 Jun 2018 03:28:19 +0200
+Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
+In-Reply-To: <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
+References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
+ <20180618114920.654647c0@bbrezillon>
+ <8474a744-5552-932f-7ba8-85b7d95368ea@gmail.com>
+ <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
+Message-ID: <5b66cafe-782e-43a9-c221-cf0a1528f382@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2018 at 09:56:49PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On 06/18/2018 02:00 PM, Claudiu Beznea wrote:
 > 
-> sgtl5000 codec needs MCLK clock to be present so that it can
-> successfully read/write via I2C.
 > 
-> In the case of imx53-qsb, MCLK is provided via
-> MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK pad. 
+> On 18.06.2018 12:53, Marek Vasut wrote:
+>> On 06/18/2018 11:49 AM, Boris Brezillon wrote:
+>>> Hi Claudiu,
+>>>
+>>> The subject prefix should be "mtd: spi-nor: atmel-quadspi: ". No need
+>>> to send a new version just for that, I'll fix it when applying the
+>>> patch.
+>>>
+> Hi Boris,
 > 
-> Move the MCLK pinctrl from hog group to the codec group, so that the
-> codec clock can be present prior to reading the codec ID.
+> Thank you!
+> 
+>>> Looks good otherwise. Marek, any objection? If not, can you add your
+>>> Acked-by?
+>>
+>> Will this work if you have ie. ubifs mounted on that QSPI NOR and you
+>> suspect and resume during IO ? I think it would, but just curious if
+>> there could be some problem.
+> 
+> Hi Marek,
+> 
+> I tested only with read/writes while suspending, simple scripts, but not
+> having ubifs mounted on QSPI NOR. I will double check also with ubifs
+> mounted on QSPI NOR and come back with the results.
 
-Are you saying that pins in hog group hasn't been set up yet when codec
-driver probes?
+Thanks. I think it's gonna be OK, but let's just be sure.
+Make sure to disable 4K sector support when fiddling with UBI/UBIFS on
+QSPI NOR.
 
-Shawn
-
-> 
-> This avoids the following sgtl5000 probe error:
-> 
-> sgtl5000 1-000a: Error reading chip id -6
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx53-qsb-common.dtsi | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> index ef7658a..7423d46 100644
-> --- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> +++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> @@ -153,7 +153,6 @@
->  	imx53-qsb {
->  		pinctrl_hog: hoggrp {
->  			fsl,pins = <
-> -				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
->  				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
->  				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
->  				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-> @@ -180,6 +179,12 @@
->  			>;
->  		};
->  
-> +		pinctrl_codec: codecgrp {
-> +			fsl,pins = <
-> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x1c4
-> +			>;
-> +		};
-> +
->  		pinctrl_esdhc1: esdhc1grp {
->  			fsl,pins = <
->  				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-> @@ -310,6 +315,8 @@
->  	sgtl5000: codec at a {
->  		compatible = "fsl,sgtl5000";
->  		reg = <0x0a>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_codec>;
->  		#sound-dai-cells = <0>;
->  		VDDA-supply = <&reg_3p2v>;
->  		VDDIO-supply = <&reg_3p2v>;
-> -- 
-> 2.7.4
-> 
+-- 
+Best regards,
+Marek Vasut
