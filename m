@@ -1,46 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:48:12 +0100
-Subject: [PATCH 0/3] I-side fixes
-Message-ID: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Tue, 19 Jun 2018 08:50:02 -0400 (EDT)
+Subject: [PATCH] arm: Hook up SYNC_CORE functionality for sys_membarrier()
+In-Reply-To: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
+References: <1529410974-18929-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1431651959.17300.1529412602455.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+----- On Jun 19, 2018, at 8:22 AM, Will Deacon will.deacon at arm.com wrote:
 
-These three patches attempt to address some issues with ISBs and I-cache
-maintenance. Specifically:
+> Exception return implies context synchronization, so we can hook up the
+> SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
+> just like we've done for arm64 already.
+> 
+> Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+> Cc: Orion Hodson <oth@google.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> arch/arm/Kconfig | 1 +
+> 1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 54eeb8d00bc6..b0ac18547370 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -9,6 +9,7 @@ config ARM
+> 	select ARCH_HAS_ELF_RANDOMIZE
+> 	select ARCH_HAS_FORTIFY_SOURCE
+> 	select ARCH_HAS_KCOV
+> +	select ARCH_HAS_MEMBARRIER_SYNC_CORE
 
-  - Ensure we don't invoke dynamically modified I-cache maintenance code
-    as part of the instruction patching routines
-  - Remove ISBs from pte/pmd/pud setter functions
-  - IPI other CPUs when invalidating the I-cache for kernel mappings
+In addition to this, we added this comment in arch/arm64/kernel/entry.S:
 
-Whilst the IPI is a bit nasty, I couldn't figure out a better way to
-ensure that CPUs don't retain instructions from freed pages in their
-pipelines. I initially hoped to deal with this by hooking into RCU, but
-that would rely on RCU being the only mechanism used to defer reclaim of
-executable pages and this doesn't appear to be the case for e.g. modules.
++       /*
++        * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on eret context synchronization
++        * when returning from IPI handler, and when returning to user-space.
++        */
 
-Feedback welcome,
+So I would expect a similar comment in arch/arm/kernel/entry-header.S, within
+svc_exit and svc_exit_via_fiq:
 
-Will
+        /*
+         * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on [insn] context synchronization
+         * when returning from IPI handler, and when returning to user-space.
+         */
 
---->8
+Which instruction exactly is responsible for context synchronization on
+arm32 ?
 
-Will Deacon (3):
-  arm64: Avoid flush_icache_range() in alternatives patching code
-  arm64: Remove unnecessary ISBs from set_{pte,pmd,pud}
-  arm64: IPI each CPU after invalidating the I-cache for kernel mappings
+Thanks,
 
- arch/arm64/include/asm/alternative.h |  7 +++++-
- arch/arm64/include/asm/cacheflush.h  | 13 +++++++++-
- arch/arm64/include/asm/pgtable.h     |  6 +----
- arch/arm64/kernel/alternative.c      | 47 ++++++++++++++++++++++++++++++------
- arch/arm64/kernel/cpu_errata.c       |  2 +-
- arch/arm64/kernel/insn.c             | 15 ++----------
- arch/arm64/kernel/module.c           |  5 ++--
- arch/arm64/mm/cache.S                |  4 +--
- 8 files changed, 65 insertions(+), 34 deletions(-)
+Mathieu
+
+
+
+> 	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
+> 	select ARCH_HAS_PHYS_TO_DMA
+> 	select ARCH_HAS_SET_MEMORY
+> --
+> 2.1.4
 
 -- 
-2.1.4
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
