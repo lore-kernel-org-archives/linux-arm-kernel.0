@@ -1,166 +1,124 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 19 Jun 2018 16:07:57 +0530
-Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
- linear region
-In-Reply-To: <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
-References: <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
- <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
- <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
- <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
- <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
- <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
- <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
- <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
- <20180619085541.GB13984@arm.com>
- <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
- <20180619094045.GD13984@arm.com>
- <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
- <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
-Message-ID: <CACi5LpMoKP4eG5XhYe5hf5VC9MOY8KuHK=j0ujb8GFpyjAuAww@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jun 2018 11:43:23 +0100
+Subject: [PATCH v3 6/7] arm64: perf: Disable PMU while processing counter
+ overflows
+In-Reply-To: <1529403342-17899-7-git-send-email-suzuki.poulose@arm.com>
+References: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
+ <1529403342-17899-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180619104323.huwx5n2z53lmtnux@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Tue, Jun 19, 2018 at 11:15:41AM +0100, Suzuki K Poulose wrote:
+> The arm64 PMU updates the event counters and reprograms the
+> counters in the overflow IRQ handler without disabling the
+> PMU. This could potentially cause skews in for group counters,
+> where the overflowed counters may potentially loose some event
+> counts, while they are reprogrammed. To prevent this, disable
+> the PMU while we process the counter overflows and enable it
+> right back when we are done.
+> 
+> This patch also moves the PMU stop/start routines to avoid a
+> forward declaration.
+> 
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-On Tue, Jun 19, 2018 at 3:46 PM, James Morse <james.morse@arm.com> wrote:
-> Hi Yanjiang, Will,
->
-> On 19/06/18 10:57, Jin, Yanjiang wrote:
->>> -----Original Message-----
->>> From: Will Deacon [mailto:will.deacon at arm.com]
->>> Sent: 2018?6?19? 17:41
->>> To: Jin, Yanjiang <yanjiang.jin@hxt-semitech.com>
->>> Cc: James Morse <james.morse@arm.com>; Bhupesh Sharma
->>> <bhsharma@redhat.com>; Mark Rutland <mark.rutland@arm.com>; Ard
->>> Biesheuvel <ard.biesheuvel@linaro.org>; Catalin Marinas
->>> <catalin.marinas@arm.com>; Kexec Mailing List <kexec@lists.infradead.org>;
->>> AKASHI Takahiro <takahiro.akashi@linaro.org>; Bhupesh SHARMA
->>> <bhupesh.linux@gmail.com>; linux-arm-kernel <linux-arm-
->>> kernel at lists.infradead.org>
->>> Subject: Re: [PATCH] arm64/mm: Introduce a variable to hold base address of
->>> linear region
->>>
->>> On Tue, Jun 19, 2018 at 09:34:56AM +0000, Jin, Yanjiang wrote:
->>>>> On Tue, Jun 19, 2018 at 03:02:15AM +0000, Jin, Yanjiang wrote:
->>>>>>> You seem to be using this for user-space phys_to_virt() based on
->>>>>>> values found in /proc/iomem. This should give you what you want,
->>>>>>> and isolate your user-space from the kernel's unexpected naming of
->>> variables.
->>>>>>
->>>>>> I don't know could I simplify this problem?
->>>>>> Let's ignore what memstart_addr represents here, we just want to
->>>>>> implement
->>>>>> phys_to_virt() in an userspace applications(kexec-tools or others).
->>>>>>
->>>>>> ARM64 Kernel has a below definition:
->>>>>>
->>>>>> #define __phys_to_virt(x)       ((unsigned long)((x) - PHYS_OFFSET) |
->>>>> PAGE_OFFSET)
->>>>>>
->>>>>> So userspace app must know PHYS_OFFSET(equal to memstart_addr now).
->>>>>> Seems this is very simple, but memstart_addr has gone through
->>>>>> several operations in arm64_memblock_init() depends on different
->>>>>> Kernel configurations, so userspace app needs to know many
->>>>>> additional definitions as
->>>>> following:
->>>>>>
->>>>>> memblock_start_of_DRAM(),  (ifdef CONFIG_SPARSEMEM_VMEMMAP),
->>>>>> ARM64_MEMSTART_SHIFT,  SECTION_SIZE_BITS,  PAGE_OFFSET,
->>>>>> memblock_end_of_DRAM(), IS_ENABLED(CONFIG_RANDOMIZE_BASE),
->>>>>> memstart_offset_seed.
->>>>>>
->>>>>> It is hard to know all above in kexec-tools now. Originally I
->>>>>> planned to read memstart_addr's value from "/dev/mem", but someone
->>>>>> thought not all Kernels enable "/dev/mem", we'd better find a more
->>>>>> generic approach. So we want to get some suggestions from ARM kernel
->>> community.
->>>>>> Can we export this variable in Kernel side through sysconf() or
->>>>>> other similar methods? Or someone can provide an effect way to get
->>>>>> memstart_addr's value?
->>>>>
->>>>> I thought the suggestion from James was to expose this via an ELF
->>>>> NOTE in kcore and vmcore (or in the header directly if that's possible, but I'm
->>> not sure about it)?
->>>>
->>>> Thanks for your reply firstly. But same as DEVMEM, kcore is not a
->>>> must-have, so we can't depend on it.
->>>
->>> Neither is KEXEC. We can select PROC_KCORE from KEXEC if it helps.
->>>
->>>> On the other hand, phys_to_virt() is called during generating vmcore
->>>> in Kexec-tools, vmcore also can't help this issue.
->>>
->>> I don't understand this part. If you have the vmcore in your hand, why can't you
->>> grok the pv offset from the note and use that in phys_to_virt()?
->>
->> It is a chicken-and-egg issue.
->> phys_to virt() is for crashdump setup. To generate vmcore, we must call
->> phys_to_virt(). At this point, no vmcore exists.
->
-> Its needed for the parts of the ELF header that kexec-tools generates at kdump
-> load time?
->
-> So adding this pv_offset to the key=value data crash_save_vmcoreinfo_init()
-> saves isn't available early enough?
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Yes, one case where it is not actually available early enough for
-makedumpfile usage is if we are determining the PT_NOTE contents from
-the '/proc/kcore' on a 'live' system
-
-See <https://github.com/bhupesh-sharma/makedumpfile/blob/devel/elf_info.c#L375>
-for example:
-
-int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len)
-
-{
-
-<snip..>
-kvaddr = (ulong)vmcoreinfo_addr + PAGE_OFFSET;
-
-}
-
-Now the problem at hand is to determine the offset at which the
-pv_offset (key=value data pair) lies in the '/proc/kcore' (I assume
-that when you mentioned above and earlier about adding this pair to
-the elfnotes you meant both the vmcoreinfo and 'proc/kcore'), as we
-can have 'n' number of PT_LOAD segments.
-
-So, we have a chicken and egg situation in such case(s). Do you have
-any pointers on how we can fix such use-cases.
+This makes me realise that we could remove the pmu_lock, but that's not
+a new problem, and we can address that separately.
 
 Thanks,
-Bhupesh
+Mark.
 
-> If we select PROC_KCORE for KEXEC so you know you will have /proc/kcore if the
-> system supports kdump. We should probably provide the same information in the
-> PT_NOTE section of the /proc/kcore file.
->
->
-> (I thought the kdump kernel exported that crash_save_vmcoreinfo_init() data as
-> an elf-note itself, but digging deeper I see the kernel exposes the physical
-> address in /sys/kernel/vmcoreinfo. Presumably its passed back via the kdump
-> elfcorehdr.)
->
->
->>>> Unfortunately, not all platforms support analyzing Kernel config in
->>>> userspace application, so Kexec-tools can't know some key kernel options.
->>>> If not so, we can simulate the whole arm64_memblock_init()  progress
->>>> in kexec-tools.
->>>
->>> I don't understand what the kernel config has to do with kexec tools.
->>
->> I mean that if we can know kernel .config in all circumstances, we can calculate memstart_addr  as below in Kexec-tools:
->>
->>
->>         memstart_addr = round_down(memblock_start_of_DRAM(),
->>                                    ARM64_MEMSTART_ALIGN);
->
-> This wouldn't work for KASLR. Having the kernel provide you with the offset
-> means you are insulated from the details of phys_to_virt() and what affects
-> these values. It should be possible to do this in the same way for all
-> architectures.
->
->
-> Thanks,
->
-> James
+> ---
+>  arch/arm64/kernel/perf_event.c | 50 +++++++++++++++++++++++-------------------
+>  1 file changed, 28 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 9ce3729..eebc635 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -678,6 +678,28 @@ static void armv8pmu_disable_event(struct perf_event *event)
+>  	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+>  }
+>  
+> +static void armv8pmu_start(struct arm_pmu *cpu_pmu)
+> +{
+> +	unsigned long flags;
+> +	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
+> +
+> +	raw_spin_lock_irqsave(&events->pmu_lock, flags);
+> +	/* Enable all counters */
+> +	armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMU_PMCR_E);
+> +	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+> +}
+> +
+> +static void armv8pmu_stop(struct arm_pmu *cpu_pmu)
+> +{
+> +	unsigned long flags;
+> +	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
+> +
+> +	raw_spin_lock_irqsave(&events->pmu_lock, flags);
+> +	/* Disable all counters */
+> +	armv8pmu_pmcr_write(armv8pmu_pmcr_read() & ~ARMV8_PMU_PMCR_E);
+> +	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+> +}
+> +
+>  static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
+>  {
+>  	u32 pmovsr;
+> @@ -702,6 +724,11 @@ static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
+>  	 */
+>  	regs = get_irq_regs();
+>  
+> +	/*
+> +	 * Stop the PMU while processing the counter overflows
+> +	 * to prevent skews in group events.
+> +	 */
+> +	armv8pmu_stop(cpu_pmu);
+>  	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
+>  		struct perf_event *event = cpuc->events[idx];
+>  		struct hw_perf_event *hwc;
+> @@ -726,6 +753,7 @@ static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
+>  		if (perf_event_overflow(event, &data, regs))
+>  			cpu_pmu->disable(event);
+>  	}
+> +	armv8pmu_start(cpu_pmu);
+>  
+>  	/*
+>  	 * Handle the pending perf events.
+> @@ -739,28 +767,6 @@ static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static void armv8pmu_start(struct arm_pmu *cpu_pmu)
+> -{
+> -	unsigned long flags;
+> -	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
+> -
+> -	raw_spin_lock_irqsave(&events->pmu_lock, flags);
+> -	/* Enable all counters */
+> -	armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMU_PMCR_E);
+> -	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+> -}
+> -
+> -static void armv8pmu_stop(struct arm_pmu *cpu_pmu)
+> -{
+> -	unsigned long flags;
+> -	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
+> -
+> -	raw_spin_lock_irqsave(&events->pmu_lock, flags);
+> -	/* Disable all counters */
+> -	armv8pmu_pmcr_write(armv8pmu_pmcr_read() & ~ARMV8_PMU_PMCR_E);
+> -	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+> -}
+> -
+>  static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
+>  				  struct perf_event *event)
+>  {
+> -- 
+> 2.7.4
+> 
