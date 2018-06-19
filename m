@@ -1,123 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Jun 2018 11:10:45 +0100
-Subject: [PATCH 1/2] KVM: Enforce error in ioctl for compat tasks when
- !KVM_COMPAT
-In-Reply-To: <20180619100134.4loab4jtnfdzrpxu@lakrids.cambridge.arm.com>
-References: <20180619094251.8586-1-marc.zyngier@arm.com>
- <20180619094251.8586-2-marc.zyngier@arm.com>
- <20180619100134.4loab4jtnfdzrpxu@lakrids.cambridge.arm.com>
-Message-ID: <8e4d21bf-d30f-ac66-3017-2badf6a29ec5@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 19 Jun 2018 11:10:48 +0100
+Subject: [PATCH] dt-bindings: Fix unbalanced quotation marks
+In-Reply-To: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+References: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+Message-ID: <819db945-1f89-93d3-b213-365a9704e100@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/18 11:01, Mark Rutland wrote:
-> On Tue, Jun 19, 2018 at 10:42:50AM +0100, Marc Zyngier wrote:
->> The current behaviour of the compat ioctls is a bit odd.
->> We provide a compat_ioctl method when KVM_COMPAT is set, and NULL
->> otherwise. But NULL means that the normal, non-compat ioctl should
->> be used directly for compat tasks, and there is no way to actually
->> prevent a compat task from issueing KVM ioctls.
->>
->> This patch changes this behaviour, by always registering a compat_ioctl
->> method, even if KVM_COMPAT is not selected. In that case, the callback
->> will always return -EINVAL.
->>
->> Reported-by: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+
+On 17/06/18 15:31, Jonathan Neusch?fer wrote:
+> Multiple binding documents have various forms of unbalanced quotation
+> marks. Fix them.
 > 
-> I virt/kvm/Kconfig we have:
+> Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
+> ---
 > 
-> config KVM_COMPAT
->        def_bool y
->        depends on KVM && COMPAT && !S390
-> 
-> ... and in arch/s390 we have COMPAT support, so does this potentially break
-> anything there?
+> Should I split this patch so that different parts can go through different trees?
+> ---
+>  .../devicetree/bindings/arm/samsung/samsung-boards.txt          | 2 +-
+>  .../devicetree/bindings/gpio/nintendo,hollywood-gpio.txt        | 2 +-
+>  Documentation/devicetree/bindings/input/touchscreen/hideep.txt  | 2 +-
+>  .../bindings/interrupt-controller/nvidia,tegra20-ictlr.txt      | 2 +-
+>  .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt  | 2 +-
+>  Documentation/devicetree/bindings/mips/brcm/soc.txt             | 2 +-
+>  Documentation/devicetree/bindings/net/fsl-fman.txt              | 2 +-
+>  Documentation/devicetree/bindings/power/power_domain.txt        | 2 +-
+>  Documentation/devicetree/bindings/regulator/tps65090.txt        | 2 +-
+>  Documentation/devicetree/bindings/reset/st,sti-softreset.txt    | 2 +-
+>  Documentation/devicetree/bindings/sound/qcom,apq8016-sbc.txt    | 2 +-
+>  Documentation/devicetree/bindings/sound/qcom,apq8096.txt        | 2 +-
+>  12 files changed, 12 insertions(+), 12 deletions(-)
 
-It doesn't seem to (COMPAT seems to support the 31 bit stuff, which I
-don't think ever had KVM support), but my s390-foo is quite basic.
+...
 
-Christian, could you help here?
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+> index 1099fe0788fa..f246ccbf8838 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+> @@ -15,7 +15,7 @@ Required properties:
+>    include "nvidia,tegra30-ictlr".	
+>  - reg : Specifies base physical address and size of the registers.
+>    Each controller must be described separately (Tegra20 has 4 of them,
+> -  whereas Tegra30 and later have 5"  
+> +  whereas Tegra30 and later have 5).
+>  - interrupt-controller : Identifies the node as an interrupt controller.
+>  - #interrupt-cells : Specifies the number of cells needed to encode an
+>    interrupt source. The value must be 3.
 
-Thanks,
+For the above Tegra portion ...
 
-	M.
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
 
-> 
-> Thanks,
-> Mark.
-> 
->> ---
->>  virt/kvm/kvm_main.c | 19 +++++++++----------
->>  1 file changed, 9 insertions(+), 10 deletions(-)
->>
->> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
->> index ada21f47f22b..8b47507faab5 100644
->> --- a/virt/kvm/kvm_main.c
->> +++ b/virt/kvm/kvm_main.c
->> @@ -116,6 +116,11 @@ static long kvm_vcpu_ioctl(struct file *file, unsigned int ioctl,
->>  #ifdef CONFIG_KVM_COMPAT
->>  static long kvm_vcpu_compat_ioctl(struct file *file, unsigned int ioctl,
->>  				  unsigned long arg);
->> +#define KVM_COMPAT(c)	.compat_ioctl	= (c)
->> +#else
->> +static long kvm_no_compat_ioctl(struct file *file, unsigned int ioctl,
->> +				unsigned long arg) { return -EINVAL; }
->> +#define KVM_COMPAT(c)	.compat_ioctl	= kvm_no_compat_ioctl
->>  #endif
->>  static int hardware_enable_all(void);
->>  static void hardware_disable_all(void);
->> @@ -2396,11 +2401,9 @@ static int kvm_vcpu_release(struct inode *inode, struct file *filp)
->>  static struct file_operations kvm_vcpu_fops = {
->>  	.release        = kvm_vcpu_release,
->>  	.unlocked_ioctl = kvm_vcpu_ioctl,
->> -#ifdef CONFIG_KVM_COMPAT
->> -	.compat_ioctl   = kvm_vcpu_compat_ioctl,
->> -#endif
->>  	.mmap           = kvm_vcpu_mmap,
->>  	.llseek		= noop_llseek,
->> +	KVM_COMPAT(kvm_vcpu_compat_ioctl),
->>  };
->>  
->>  /*
->> @@ -2824,10 +2827,8 @@ static int kvm_device_release(struct inode *inode, struct file *filp)
->>  
->>  static const struct file_operations kvm_device_fops = {
->>  	.unlocked_ioctl = kvm_device_ioctl,
->> -#ifdef CONFIG_KVM_COMPAT
->> -	.compat_ioctl = kvm_device_ioctl,
->> -#endif
->>  	.release = kvm_device_release,
->> +	KVM_COMPAT(kvm_device_ioctl),
->>  };
->>  
->>  struct kvm_device *kvm_device_from_filp(struct file *filp)
->> @@ -3165,10 +3166,8 @@ static long kvm_vm_compat_ioctl(struct file *filp,
->>  static struct file_operations kvm_vm_fops = {
->>  	.release        = kvm_vm_release,
->>  	.unlocked_ioctl = kvm_vm_ioctl,
->> -#ifdef CONFIG_KVM_COMPAT
->> -	.compat_ioctl   = kvm_vm_compat_ioctl,
->> -#endif
->>  	.llseek		= noop_llseek,
->> +	KVM_COMPAT(kvm_vm_compat_ioctl),
->>  };
->>  
->>  static int kvm_dev_ioctl_create_vm(unsigned long type)
->> @@ -3259,8 +3258,8 @@ static long kvm_dev_ioctl(struct file *filp,
->>  
->>  static struct file_operations kvm_chardev_ops = {
->>  	.unlocked_ioctl = kvm_dev_ioctl,
->> -	.compat_ioctl   = kvm_dev_ioctl,
->>  	.llseek		= noop_llseek,
->> +	KVM_COMPAT(kvm_dev_ioctl),
->>  };
->>  
->>  static struct miscdevice kvm_dev = {
->> -- 
->> 2.17.1
->>
-
+Cheers
+Jon
 
 -- 
-Jazz is not dead. It just smells funny...
+nvpublic
