@@ -1,62 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jun 2018 13:53:07 +0100
-Subject: [RESEND PATCH v2 2/9] m68k: Don't use asm-generic/bitops/lock.h
-In-Reply-To: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529412794-17720-3-git-send-email-will.deacon@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 19 Jun 2018 13:52:24 +0100
+Subject: [PATCH] iommu/io-pgtable-arm-v7s: Abort allocation when table address
+ overflows the PTE
+Message-ID: <20180619125224.1008-1-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm-generic/bitops/lock.h is shortly going to be built on top of the
-atomic_long_* API, which introduces a nasty circular dependency for
-m68k where linux/atomic.h pulls in linux/bitops.h via:
+When run on a 64-bit system in selftest, the v7s driver may obtain page
+table with physical addresses larger than 32-bit. Level-2 tables are 1KB
+and are are allocated with slab, which doesn't accept the GFP_DMA32
+flag. Currently map() truncates the address written in the PTE, causing
+iova_to_phys() or unmap() to access invalid memory. Kasan reports it as
+a use-after-free. To avoid any nasty surprise, test if the physical
+address fits in a PTE before returning a new table. 32-bit systems,
+which are the main users of this page table format, shouldn't see any
+difference.
 
-	linux/atomic.h
-	asm/atomic.h
-	linux/irqflags.h
-	asm/irqflags.h
-	linux/preempt.h
-	asm/preempt.h
-	asm-generic/preempt.h
-	linux/thread_info.h
-	asm/thread_info.h
-	asm/page.h
-	asm-generic/getorder.h
-	linux/log2.h
-	linux/bitops.h
-
-Since m68k isn't SMP and doesn't support ACQUIRE/RELEASE barriers, we
-can just define the lock bitops in terms of the atomic bitops in the
-asm/bitops.h header.
-
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/m68k/include/asm/bitops.h | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/iommu/io-pgtable-arm-v7s.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/m68k/include/asm/bitops.h b/arch/m68k/include/asm/bitops.h
-index 93b47b1f6fb4..18193419f97d 100644
---- a/arch/m68k/include/asm/bitops.h
-+++ b/arch/m68k/include/asm/bitops.h
-@@ -515,12 +515,16 @@ static inline int __fls(int x)
- 
- #endif
- 
-+/* Simple test-and-set bit locks */
-+#define test_and_set_bit_lock	test_and_set_bit
-+#define clear_bit_unlock	clear_bit
-+#define __clear_bit_unlock	clear_bit_unlock
-+
- #include <asm-generic/bitops/ext2-atomic.h>
- #include <asm-generic/bitops/le.h>
- #include <asm-generic/bitops/fls64.h>
- #include <asm-generic/bitops/sched.h>
- #include <asm-generic/bitops/hweight.h>
--#include <asm-generic/bitops/lock.h>
- #endif /* __KERNEL__ */
- 
- #endif /* _M68K_BITOPS_H */
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 50e3a9fcf43e..b5948ba6b3b3 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -192,6 +192,7 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
+ {
+ 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+ 	struct device *dev = cfg->iommu_dev;
++	phys_addr_t phys;
+ 	dma_addr_t dma;
+ 	size_t size = ARM_V7S_TABLE_SIZE(lvl);
+ 	void *table = NULL;
+@@ -200,6 +201,10 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
+ 		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
+ 	else if (lvl == 2)
+ 		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
++	phys = virt_to_phys(table);
++	if (phys != (arm_v7s_iopte)phys)
++		/* Doesn't fit in PTE */
++		goto out_free;
+ 	if (table && !(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
+ 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
+ 		if (dma_mapping_error(dev, dma))
+@@ -209,7 +214,7 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
+ 		 * address directly, so if the DMA layer suggests otherwise by
+ 		 * translating or truncating them, that bodes very badly...
+ 		 */
+-		if (dma != virt_to_phys(table))
++		if (dma != phys)
+ 			goto out_unmap;
+ 	}
+ 	kmemleak_ignore(table);
 -- 
-2.1.4
+2.17.0
