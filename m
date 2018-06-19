@@ -1,79 +1,72 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 19 Jun 2018 15:54:26 +0100
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <20180619140818.GA16927@e107981-ln.cambridge.arm.com> (Lorenzo
- Pieralisi's message of "Tue, 19 Jun 2018 15:08:26 +0100")
-References: <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
- <20180611085237.GI13364@dhcp22.suse.cz>
- <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
- <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
- <20180611145330.GO13364@dhcp22.suse.cz>
- <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
- <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
- <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
- <20180619120714.GE13685@dhcp22.suse.cz>
- <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
- <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
-Message-ID: <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 19 Jun 2018 08:55:10 -0600
+Subject: [PATCH 5/5] RFC: ARM64: dts: Add Low-Speed Connector to ZCU100
+In-Reply-To: <20180618074556.6944-6-linus.walleij@linaro.org>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+ <20180618074556.6944-6-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqL8ZRHCwE4Mqr9qP+JZmao8fmjc34xrqOHucfopkL7pvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
++David G
 
-> On Tue, Jun 19, 2018 at 01:52:16PM +0100, Punit Agrawal wrote:
->> Michal Hocko <mhocko@kernel.org> writes:
->> 
->> > On Tue 19-06-18 20:03:07, Xie XiuQi wrote:
->> > [...]
->> >> I tested on a arm board with 128 cores 4 numa nodes, but I set CONFIG_NR_CPUS=72.
->> >> Then node 3 is not be created, because node 3 has no memory, and no cpu.
->> >> But some pci device may related to node 3, which be set in ACPI table.
->> >
->> > Could you double check that zonelists for node 3 are generated
->> > correctly?
->> 
->> The cpus in node 3 aren't onlined and there's no memory attached - I
->> suspect that no zonelists are built for this node.
->> 
->> We skip creating a node, if the number of SRAT entries parsed exceeds
->> NR_CPUS[0]. This in turn prevents onlining the numa node and so no
->> zonelists will be created for it.
->> 
->> I think the problem will go away if the cpus are restricted via the
->> kernel command line by setting nr_cpus.
->> 
->> Xie, can you try the below patch on top of the one enabling memoryless
->> nodes? I'm not sure this is the right solution but at least it'll
->> confirm the problem.
+On Mon, Jun 18, 2018 at 1:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This adds the low-speed connector to the ZCU100 rev C device
+> tree (also known as the Ultra96 board).
 >
-> This issue looks familiar (or at least related):
+> This is a proof-of-concept only, showing how it is possible
+> to populate a Secure96 board using the other patches in the
+> series.
 >
-> git log d3bd058826aa
-
-Indeed. Thanks for digging into this.
-
+> If you comment out or delete the board {} node, you can
+> populate/depopulate the board from sysfs instead.
 >
-> The reason why the NR_CPUS guard is there is to avoid overflowing
-> the early_node_cpu_hwid array.
-
-Ah right... I missed that. The below patch is definitely not what we
-want.
-
-> IA64 does something different in
-> that respect compared to x86, we have to have a look into this.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  .../boot/dts/xilinx/zynqmp-zcu100-revC.dts    | 27 +++++++++++++++++--
+>  1 file changed, 25 insertions(+), 2 deletions(-)
 >
-> Regardless, AFAICS the proximity domains to nodes mappings should not
-> depend on CONFIG_NR_CPUS, it seems that there is something wrong in that
-> in ARM64 ACPI SRAT parsing.
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> index d62276e0e0a9..fc30497f248d 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> @@ -110,6 +110,28 @@
+>                 compatible = "mmc-pwrseq-simple";
+>                 reset-gpios = <&gpio 7 GPIO_ACTIVE_LOW>; /* WIFI_EN */
+>         };
+> +
+> +       lscon: connector {
+> +               compatible = "96boards,low-speed-connector";
+> +               i2c0 = <&i2csw_0>;
+> +               i2c1 = <&i2csw_1>;
+> +               spi = <&spi0>;
 
-Not only SRAT parsing but it looks like there is a similar restriction
-while parsing the ACPI MADT in acpi_map_gic_cpu_interface().
+David had suggested having an aliases node here for mapping things
+like SPI and I2C. That actually seems like a good use for aliases
+compared to the usual abuse to make Linux provide fixed numbering.
 
-The incomplete parsing introduces a dependency on the ordering of
-entries being aligned between SRAT and MADT when NR_CPUS is
-restricted. We want to parse the entire table in both cases so that the
-code is robust to reordering of entries.
+> +               gpios = <&gpio 36 GPIO_ACTIVE_HIGH>, /* GPIO-A */
 
-In terms of $SUBJECT, I wonder if it's worth taking the original patch
-as a temporary fix (it'll also be easier to backport) while we work on
-fixing these other issues and enabling memoryless nodes.
+Why aren't you using gpio-map? This is what it was defined for.
+
+> +                       <&gpio 37 GPIO_ACTIVE_HIGH>, /* GPIO-B */
+> +                       <&gpio 39 GPIO_ACTIVE_HIGH>, /* GPIO-C */
+> +                       <&gpio 40 GPIO_ACTIVE_HIGH>, /* GPIO-D */
+> +                       <&gpio 44 GPIO_ACTIVE_HIGH>, /* GPIO-E */
+> +                       <&gpio 45 GPIO_ACTIVE_HIGH>, /* GPIO-F */
+> +                       <&gpio 78 GPIO_ACTIVE_HIGH>, /* GPIO-G */
+> +                       <&gpio 79 GPIO_ACTIVE_HIGH>, /* GPIO-H */
+> +                       <&gpio 80 GPIO_ACTIVE_HIGH>, /* GPIO-I */
+> +                       <&gpio 81 GPIO_ACTIVE_HIGH>, /* GPIO-J */
+> +                       <&gpio 82 GPIO_ACTIVE_HIGH>, /* GPIO-K */
+> +                       <&gpio 83 GPIO_ACTIVE_HIGH>; /* GPIO-L */
+> +               board {
+> +                       compatible = "96boards,secure96";
+
+I'm all for putting things in the kernel/drivers for things we can't
+nail down bindings for, but it really seems like you are punting all
+the problems. Plus if we fully define how to handle the different
+bindings, we'll likely end up with something different and
+incompatible with what you have here.
+
+Rob
