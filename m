@@ -1,98 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 Jun 2018 17:32:56 +0100
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
-References: <20180611145330.GO13364@dhcp22.suse.cz>
- <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
- <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
- <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
- <20180619120714.GE13685@dhcp22.suse.cz>
- <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
- <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
- <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
- <20180619151425.GH13685@dhcp22.suse.cz>
- <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20180619163256.GA18952@e107981-ln.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jun 2018 17:50:19 +0100
+Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache
+ for kernel mappings
+In-Reply-To: <20180619135528.4rxgluvroybxgxem@lakrids.cambridge.arm.com>
+References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
+ <1529412495-17525-4-git-send-email-will.deacon@arm.com>
+ <20180619135528.4rxgluvroybxgxem@lakrids.cambridge.arm.com>
+Message-ID: <20180619165019.GU13984@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 04:35:40PM +0100, Punit Agrawal wrote:
-> Michal Hocko <mhocko@kernel.org> writes:
+On Tue, Jun 19, 2018 at 02:55:28PM +0100, Mark Rutland wrote:
+> On Tue, Jun 19, 2018 at 01:48:15PM +0100, Will Deacon wrote:
+> > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> > index 816d03c4c913..4cc41864f277 100644
+> > --- a/arch/arm64/kernel/insn.c
+> > +++ b/arch/arm64/kernel/insn.c
+> > @@ -249,7 +249,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+> >  	} else {
+> >  		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
+> >  			cpu_relax();
+> > -		isb();
+> >  	}
 > 
-> > On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
-> > [...]
-> >> In terms of $SUBJECT, I wonder if it's worth taking the original patch
-> >> as a temporary fix (it'll also be easier to backport) while we work on
-> >> fixing these other issues and enabling memoryless nodes.
-> >
-> > Well, x86 already does that but copying this antipatern is not really
-> > nice. So it is good as a quick fix but it would be definitely much
-> > better to have a robust fix. Who knows how many other places might hit
-> > this. You certainly do not want to add a hack like this all over...
+> Something seems amiss here. 
 > 
-> Completely agree! I was only suggesting it as a temporary measure,
-> especially as it looked like a proper fix might be invasive.
+> We call __apply_alternatives_multi_stop() via stop_machine(), and I
+> thought that ensured that all CPUs had IRQs masked.
 > 
-> Another fix might be to change the node specific allocation to node
-> agnostic allocations. It isn't clear why the allocation is being
-> requested from a specific node. I think Lorenzo suggested this in one of
-> the threads.
+> If so, the IPI from flush_icache_range() will deadlock.
+> 
+> If not, we can take IRQs, and execute potentially patched code.
 
-I think that code was just copypasted but it is better to fix the
-underlying issue.
+Yes, I think you're right, and I think this only applies to kprobes (since
+it patches arbitrary instructions and requires the stop_machine()). However,
+I think that highlights another issue, which is that the "nosync" patching
+cases as used by things like jump_labels are still going to want this IPI,
+so actually the fastpath stuff can all be ripped out. ftrace can probably
+be left as-is, since I doubt it's critical that new CPUs immediately see
+dynamic tracepoints.
 
-> I've started putting together a set fixing the issues identified in this
-> thread. It should give a better idea on the best course of action.
+I'll cook a patch sorting this out and include it in v2.
 
-On ACPI ARM64, this diff should do if I read the code correctly, it
-should be (famous last words) just a matter of mapping PXMs to nodes for
-every SRAT GICC entry, feel free to pick it up if it works.
+> I think there's also an existing problem here. Even if with have IRQs
+> masked, we could take SDEI events (or GICv3 psudeo-NMIs, once we have
+> those). I don't know how we can manage those.
 
-Yes, we can take the original patch just because it is safer for an -rc
-cycle even though if the patch below would do delaying the fix for a
-couple of -rc (to get it tested across ACPI ARM64 NUMA platforms) is
-not a disaster.
+I guess there are just some places where we can't deal with an SDEI event.
+That said, it's fine as long as the SDEI path is careful about what it runs
+(and SDEI is masked until the worst of the patching is over during boot).
 
-Lorenzo
+James?
 
--- >8 --
-diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
-index d190a7b231bf..877b268ef9fa 100644
---- a/arch/arm64/kernel/acpi_numa.c
-+++ b/arch/arm64/kernel/acpi_numa.c
-@@ -70,12 +70,6 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
- 	if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
- 		return;
- 
--	if (cpus_in_srat >= NR_CPUS) {
--		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
--			     NR_CPUS);
--		return;
--	}
--
- 	pxm = pa->proximity_domain;
- 	node = acpi_map_pxm_to_node(pxm);
- 
-@@ -85,6 +79,14 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
- 		return;
- 	}
- 
-+	node_set(node, numa_nodes_parsed);
-+
-+	if (cpus_in_srat >= NR_CPUS) {
-+		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
-+			     NR_CPUS);
-+		return;
-+	}
-+
- 	mpidr = acpi_map_madt_entry(pa->acpi_processor_uid);
- 	if (mpidr == PHYS_CPUID_INVALID) {
- 		pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
-@@ -95,7 +97,6 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
- 
- 	early_node_cpu_hwid[cpus_in_srat].node_id = node;
- 	early_node_cpu_hwid[cpus_in_srat].cpu_hwid =  mpidr;
--	node_set(node, numa_nodes_parsed);
- 	cpus_in_srat++;
- 	pr_info("SRAT: PXM %d -> MPIDR 0x%Lx -> Node %d\n",
- 		pxm, mpidr, node);
+Will
