@@ -1,211 +1,64 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 Jun 2018 08:57:20 -0600
-Subject: [PATCH 15/20] dts: arm: imx7{d,s}: Update coresight binding for
- hardware ports
-In-Reply-To: <20180619021218.GV16091@dragon>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-16-git-send-email-suzuki.poulose@arm.com>
- <20180619021218.GV16091@dragon>
-Message-ID: <CANLsYkx1LFJodeg5npiLMBg9cWf-_PLeB2+RcYErGek_rokzyA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 19 Jun 2018 16:57:41 +0200
+Subject: next/master boot: 138 boots: 8 failed,
+ 112 passed with 18 offline (next-20180619)
+In-Reply-To: <20180619144143.GE11230@sirena.org.uk>
+References: <5b290c6d.1c69fb81.fc936.98ee@mx.google.com>
+ <69c0adb9-b784-4f73-fcc9-ff1a01ce27c5@arm.com>
+ <20180619144143.GE11230@sirena.org.uk>
+Message-ID: <7241956.9AMTTgrPoJ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jun 2018 at 20:13, Shawn Guo <shawnguo@kernel.org> wrote:
->
-> Hi Stefan,
->
-> Can you take a look at the patch?  Thanks.
->
+> > On Tue, Jun 19, 2018 at 07:00:13AM -0700, kernelci.org bot wrote:
+> > 
+> > Today and yesterday's -next is failing to boot on rk3399-firefly in two
+> > 
+> > configs:
+> >>     defconfig:
+> >>         rk3399-firefly:
+> >>             lab-baylibre-seattle: failing since 1 day (last pass:
+> >>             next-20180615 - first fail: next-20180618)>>     
+> >>     defconfig+CONFIG_RANDOMIZE_BASE=y:
+> >>         rk3399-firefly:
+> >>             lab-baylibre-seattle: failing since 1 day (last pass:
+> >>             next-20180615 - first fail: next-20180618)> 
+> > The log ends with:
+> > 
+> > [    2.629278] SWITCH_REG2: supplied by vcc3v3_sys
+> > [    2.633030] fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1]
+> > Detected! [    2.633723] fan53555-reg: supplied by vcc_sys
+> > [    2.6353|] Internal error: undefined instruction: 0 [#1] PREEMPT SMP
+> > 
+> > which is rather entertaining.
 
-These bindings are still being discussed and patches related to them
-shouldn't be merged.  The next iteration of this patchset will not
-included individual modifications to device tree files, that will be
-left for a later time when bindings have been agreed upon.
+> Am Dienstag, 19. Juni 2018, 16:41:43 CEST schrieb Mark Brown:
+> On Tue, Jun 19, 2018 at 03:22:47PM +0100, Sudeep Holla wrote:
+> > Based on the logs from successful boots, I see it's CPUFreq that gets
+> > probed after fan53555-reg. I also see that it warns about unlisted OPPs
+> > in the successful boots. I guess, the undefined instruction could occur
+> > if there's issue with CPU DVFS(under voltage or frequency that's not
+> > supported). I don't have much knowledge on the platform, I am just
+> > guessing on the possible cause here.
+> 
+> Yeah, that was my guess - either an out of spec voltage/frequency was
+> selected or the regulator isn't able to keep up with the voltage
+> transition or a load spike and the power browns out.
 
-Thanks,
-Mathieu
+I guess this is related to
+	arm64: dts: rockchip: correct voltage selector Firefly-RK3399 [0]
 
-> Shawn
->
-> On Tue, Jun 05, 2018 at 10:43:26PM +0100, Suzuki K Poulose wrote:
-> > Switch to the updated coresight bindings.
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > ---
-> >  arch/arm/boot/dts/imx7d.dtsi |  5 ++++-
-> >  arch/arm/boot/dts/imx7s.dtsi | 41 ++++++++++++++++++++++++++++++-----------
-> >  2 files changed, 34 insertions(+), 12 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> > index 200714e..5faff17 100644
-> > --- a/arch/arm/boot/dts/imx7d.dtsi
-> > +++ b/arch/arm/boot/dts/imx7d.dtsi
-> > @@ -87,7 +87,9 @@
-> >
-> >                       port {
-> >                               etm1_out_port: endpoint {
-> > +                                     direction = <1>;
-> >                                       remote-endpoint = <&ca_funnel_in_port1>;
-> > +                                     coresight,hwid = <0>;
-> >                               };
-> >                       };
-> >               };
-> > @@ -174,8 +176,9 @@
-> >       port at 1 {
-> >               reg = <1>;
-> >               ca_funnel_in_port1: endpoint {
-> > -                     slave-mode;
-> > +                     direction = <0>;
-> >                       remote-endpoint = <&etm1_out_port>;
-> > +                     coresight,hwid = <1>;
-> >               };
-> >       };
-> >  };
-> > diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> > index 4d42335..8e90915 100644
-> > --- a/arch/arm/boot/dts/imx7s.dtsi
-> > +++ b/arch/arm/boot/dts/imx7s.dtsi
-> > @@ -151,23 +151,28 @@
-> >                       port at 0 {
-> >                               reg = <0>;
-> >                               replicator_out_port0: endpoint {
-> > +                                     direction = <1>;
-> >                                       remote-endpoint = <&tpiu_in_port>;
-> > +                                     coresight,hwid = <0>;
-> >                               };
-> >                       };
-> >
-> >                       port at 1 {
-> >                               reg = <1>;
-> >                               replicator_out_port1: endpoint {
-> > +                                     direction = <1>;
-> >                                       remote-endpoint = <&etr_in_port>;
-> > +                                     coresight,hwid = <1>;
-> >                               };
-> >                       };
-> >
-> >                       /* replicator input port */
-> >                       port at 2 {
-> > -                             reg = <0>;
-> > +                             reg = <2>;
-> >                               replicator_in_port0: endpoint {
-> > -                                     slave-mode;
-> > +                                     direction = <0>;
-> >                                       remote-endpoint = <&etf_out_port>;
-> > +                                     coresight,hwid = <0>;
-> >                               };
-> >                       };
-> >               };
-> > @@ -203,16 +208,19 @@
-> >                               port at 0 {
-> >                                       reg = <0>;
-> >                                       ca_funnel_in_port0: endpoint {
-> > -                                             slave-mode;
-> > +                                             direction = <0>;
-> >                                               remote-endpoint = <&etm0_out_port>;
-> > +                                             coresight,hwid = <0>;
-> >                                       };
-> >                               };
-> >
-> >                               /* funnel output port */
-> >                               port at 2 {
-> > -                                     reg = <0>;
-> > +                                     reg = <2>;
-> >                                       ca_funnel_out_port0: endpoint {
-> > +                                             direction = <1>;
-> >                                               remote-endpoint = <&hugo_funnel_in_port0>;
-> > +                                             coresight,hwid = <0>;
-> >                                       };
-> >                               };
-> >
-> > @@ -229,7 +237,9 @@
-> >
-> >                       port {
-> >                               etm0_out_port: endpoint {
-> > +                                     direction = <1>;
-> >                                       remote-endpoint = <&ca_funnel_in_port0>;
-> > +                                     coresight,hwid = <0>;
-> >                               };
-> >                       };
-> >               };
-> > @@ -248,22 +258,26 @@
-> >                               port at 0 {
-> >                                       reg = <0>;
-> >                                       hugo_funnel_in_port0: endpoint {
-> > -                                             slave-mode;
-> > +                                             direction = <0>;
-> >                                               remote-endpoint = <&ca_funnel_out_port0>;
-> > +                                             coresight,hwid = <0>;
-> >                                       };
-> >                               };
-> >
-> >                               port at 1 {
-> >                                       reg = <1>;
-> >                                       hugo_funnel_in_port1: endpoint {
-> > -                                             slave-mode; /* M4 input */
-> > +                                             direction = <0>; /* M4 input */
-> > +                                             coresight,hwid = <1>;
-> >                                       };
-> >                               };
-> >
-> >                               port at 2 {
-> > -                                     reg = <0>;
-> > +                                     reg = <2>;
-> >                                       hugo_funnel_out_port0: endpoint {
-> > +                                             direction = <1>;
-> >                                               remote-endpoint = <&etf_in_port>;
-> > +                                             coresight,hwid = <0>;
-> >                                       };
-> >                               };
-> >
-> > @@ -284,15 +298,18 @@
-> >                               port at 0 {
-> >                                       reg = <0>;
-> >                                       etf_in_port: endpoint {
-> > -                                             slave-mode;
-> > +                                             direction = <0>;
-> >                                               remote-endpoint = <&hugo_funnel_out_port0>;
-> > +                                             coresight,hwid = <0>;
-> >                                       };
-> >                               };
-> >
-> >                               port at 1 {
-> > -                                     reg = <0>;
-> > +                                     reg = <1>;
-> >                                       etf_out_port: endpoint {
-> > +                                             direction = <1>;
-> >                                               remote-endpoint = <&replicator_in_port0>;
-> > +                                             coresight,hwid = <0>;
-> >                                       };
-> >                               };
-> >                       };
-> > @@ -306,8 +323,9 @@
-> >
-> >                       port {
-> >                               etr_in_port: endpoint {
-> > -                                     slave-mode;
-> > +                                     direction = <0>;
-> >                                       remote-endpoint = <&replicator_out_port1>;
-> > +                                     coresight,hwid = <0>;
-> >                               };
-> >                       };
-> >               };
-> > @@ -320,8 +338,9 @@
-> >
-> >                       port {
-> >                               tpiu_in_port: endpoint {
-> > -                                     slave-mode;
-> > +                                     direction = <0>;
-> >                                       remote-endpoint = <&replicator_out_port1>;
-> > +                                     coresight,hwid = <0>;
-> >                               };
-> >                       };
-> >               };
-> > --
-> > 2.7.4
-> >
+which is in so far interesting as the patch seems to fix a similar issue
+to the above with the opposite "fcs,suspend-voltage-selector" value.
+And also claims to be in line with the vendor kernel.
+
+>From looking at the schematics, we might have a discrepancy between the
+fcs,suspend-voltage-selector and vsel input-pin leading to a gpio
+[likely depending on what the bootloader set this pin up for].
+
+I'll drop the patch for now and get in contact with the patch submitter.
+
+
+Heiko
+
+[0] https://patchwork.kernel.org/patch/10447075/
