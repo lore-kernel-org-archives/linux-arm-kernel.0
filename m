@@ -1,26 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jun 2018 17:14:10 +0100
-Subject: [PATCHv3 00/19] arm64: invoke syscalls with pt_regs
-In-Reply-To: <20180619153810.mm4yt3pqjagvjo7p@lakrids.cambridge.arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180619153810.mm4yt3pqjagvjo7p@lakrids.cambridge.arm.com>
-Message-ID: <20180619161410.6in5qe5y3ydzbfit@armageddon.cambridge.arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 19 Jun 2018 10:14:24 -0700
+Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr
+ address calculation
+In-Reply-To: <20180619151235.GH17671@n2100.armlinux.org.uk>
+References: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
+ <CAKv+Gu8Byj7G3Awnq4Y90Wot=GJTx0gO5A7-960au9ZkBBL2=A@mail.gmail.com>
+ <b8bff03d-91a7-0e53-a44e-d1924beb382d@roeck-us.net>
+ <CAKv+Gu-T8Fx3Nry7pUdOoOeRU-Ns89w3oo4itmu1q4FzYF5Rag@mail.gmail.com>
+ <20180619151235.GH17671@n2100.armlinux.org.uk>
+Message-ID: <20180619171424.GA16846@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 04:38:10PM +0100, Mark Rutland wrote:
-> From b47791fe74fce8bb48696ab0cdda48a9bae0e397 Mon Sep 17 00:00:00 2001
-> From: Mark Rutland <mark.rutland@arm.com>
-> Date: Tue, 19 Jun 2018 12:49:54 +0100
-> Subject: [PATCH] arm64: don't restore GPRs when context tracking
+On Tue, Jun 19, 2018 at 04:12:35PM +0100, Russell King - ARM Linux wrote:
 > 
-> Now that syscalls are invoked with pt_regs, we no longer need to ensure
-> that the argument regsiters are live in the entry assembly, and it's
-> fine to not restore them after context_tracking_user_exit() has
-> corrupted them.
+> So, I'm going to continue sitting on the fence on this, and basically
+> take the attitude that it's better that people don't use the new
+> binutils until binutils people can provide us with an officially
+> sanctioned solution that's going to work for both older and future
+> assemblers.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+I would so much love if people were working together instead of against
+each other :-(. Never mind, I'll try a toolchain with binutils 2.28.1.
+At least that is still supported with buildroot.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Guenter
