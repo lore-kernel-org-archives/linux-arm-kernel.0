@@ -1,82 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 Jun 2018 15:08:26 +0100
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
-References: <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
- <20180611085237.GI13364@dhcp22.suse.cz>
- <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
- <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
- <20180611145330.GO13364@dhcp22.suse.cz>
- <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
- <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
- <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
- <20180619120714.GE13685@dhcp22.suse.cz>
- <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Jun 2018 15:13:24 +0100
+Subject: next/master boot: 138 boots: 8 failed, 112 passed with 18
+ offline (next-20180619)
+In-Reply-To: <5b290c6d.1c69fb81.fc936.98ee@mx.google.com>
+References: <5b290c6d.1c69fb81.fc936.98ee@mx.google.com>
+Message-ID: <20180619141324.GD11230@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 01:52:16PM +0100, Punit Agrawal wrote:
-> Michal Hocko <mhocko@kernel.org> writes:
-> 
-> > On Tue 19-06-18 20:03:07, Xie XiuQi wrote:
-> > [...]
-> >> I tested on a arm board with 128 cores 4 numa nodes, but I set CONFIG_NR_CPUS=72.
-> >> Then node 3 is not be created, because node 3 has no memory, and no cpu.
-> >> But some pci device may related to node 3, which be set in ACPI table.
-> >
-> > Could you double check that zonelists for node 3 are generated
-> > correctly?
-> 
-> The cpus in node 3 aren't onlined and there's no memory attached - I
-> suspect that no zonelists are built for this node.
-> 
-> We skip creating a node, if the number of SRAT entries parsed exceeds
-> NR_CPUS[0]. This in turn prevents onlining the numa node and so no
-> zonelists will be created for it.
-> 
-> I think the problem will go away if the cpus are restricted via the
-> kernel command line by setting nr_cpus.
-> 
-> Xie, can you try the below patch on top of the one enabling memoryless
-> nodes? I'm not sure this is the right solution but at least it'll
-> confirm the problem.
+On Tue, Jun 19, 2018 at 07:00:13AM -0700, kernelci.org bot wrote:
 
-This issue looks familiar (or at least related):
+Today and yesterday's -next is failing to boot on rk3399-firefly in two
+configs:
 
-git log d3bd058826aa
+>     defconfig:
+>         rk3399-firefly:
+>             lab-baylibre-seattle: failing since 1 day (last pass: next-20180615 - first fail: next-20180618)
 
-The reason why the NR_CPUS guard is there is to avoid overflowing
-the early_node_cpu_hwid array. IA64 does something different in
-that respect compared to x86, we have to have a look into this.
+>     defconfig+CONFIG_RANDOMIZE_BASE=y:
+>         rk3399-firefly:
+>             lab-baylibre-seattle: failing since 1 day (last pass: next-20180615 - first fail: next-20180618)
 
-Regardless, AFAICS the proximity domains to nodes mappings should not
-depend on CONFIG_NR_CPUS, it seems that there is something wrong in that
-in ARM64 ACPI SRAT parsing.
+The log ends with:
 
-Lorenzo
+[    2.629278] SWITCH_REG2: supplied by vcc3v3_sys
+[    2.633030] fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
+[    2.633723] fan53555-reg: supplied by vcc_sys
+[    2.6353|] Internal error: undefined instruction: 0 [#1] PREEMPT SMP
 
-> 
-> Thanks,
-> Punit
-> 
-> [0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/kernel/acpi_numa.c?h=v4.18-rc1#n73
-> 
-> -- >8 --
-> diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
-> index d190a7b231bf..fea0f7164f1a 100644
-> --- a/arch/arm64/kernel/acpi_numa.c
-> +++ b/arch/arm64/kernel/acpi_numa.c
-> @@ -70,11 +70,9 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
->         if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
->                 return;
-> 
-> -   if (cpus_in_srat >= NR_CPUS) {
-> + if (cpus_in_srat >= NR_CPUS)
->                 pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
->                              NR_CPUS);
-> -           return;
-> -   }
-> 
->         pxm = pa->proximity_domain;
->         node = acpi_map_pxm_to_node(pxm);
+which is rather entertaining. 
+
+The pending fixes -next branch is fine.  More diagnostics can be seen
+at:
+
+	https://kernelci.org/boot/id/5b28eadb59b514636d79a877/
+
+(that's the defconfig.)  Other boards don't seem to be affected, there's
+some other boards that are failing but don't seem to be related.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180619/0dbabfd4/attachment.sig>
