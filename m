@@ -1,112 +1,95 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 19 Jun 2018 11:15:41 +0100
-Subject: [PATCH v3 6/7] arm64: perf: Disable PMU while processing counter
- overflows
+Date: Tue, 19 Jun 2018 11:15:39 +0100
+Subject: [PATCH v3 4/7] arm_pmu: Tidy up clear_event_idx call backs
 In-Reply-To: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
 References: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1529403342-17899-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1529403342-17899-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 PMU updates the event counters and reprograms the
-counters in the overflow IRQ handler without disabling the
-PMU. This could potentially cause skews in for group counters,
-where the overflowed counters may potentially loose some event
-counts, while they are reprogrammed. To prevent this, disable
-the PMU while we process the counter overflows and enable it
-right back when we are done.
+The armpmu uses get_event_idx callback to allocate an event
+counter for a given event, which marks the selected counter
+as "used". Now, when we delete the counter, the arm_pmu goes
+ahead and clears the "used" bit and then invokes the "clear_event_idx"
+call back, which kind of splits the job between the core code
+and the backend. Tidy this up by relying on the clear_event_idx
+to do the book keeping, if available. Otherwise, let the core
+driver do the default "clear" bit operation. This will be useful
+for adding the chained event support, where we leave the event
+idx maintenance to the backend.
 
-This patch also moves the PMU stop/start routines to avoid a
-forward declaration.
+Also, when an event is removed from the PMU, reset the hw.idx
+to indicate that a counter is not allocated for this event,
+to help the backends do better checks. This will be also used
+for the chain counter support.
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 50 +++++++++++++++++++++++-------------------
- 1 file changed, 28 insertions(+), 22 deletions(-)
+Changes since v2:
+ - Reset the event counter after an event is removed.
+---
+ arch/arm/kernel/perf_event_v7.c |  2 ++
+ drivers/perf/arm_pmu.c          | 17 +++++++++++++----
+ 2 files changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 9ce3729..eebc635 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -678,6 +678,28 @@ static void armv8pmu_disable_event(struct perf_event *event)
- 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index fd7ce01..765d265 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1637,6 +1637,7 @@ static void krait_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ 	bool venum_event = EVENT_VENUM(hwc->config_base);
+ 	bool krait_event = EVENT_CPU(hwc->config_base);
+ 
++	clear_bit(hwc->idx, cpuc->used_mask);
+ 	if (venum_event || krait_event) {
+ 		bit = krait_event_to_bit(event, region, group);
+ 		clear_bit(bit, cpuc->used_mask);
+@@ -1966,6 +1967,7 @@ static void scorpion_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ 	bool venum_event = EVENT_VENUM(hwc->config_base);
+ 	bool scorpion_event = EVENT_CPU(hwc->config_base);
+ 
++	clear_bit(hwc->idx, cpuc->used_mask);
+ 	if (venum_event || scorpion_event) {
+ 		bit = scorpion_event_to_bit(event, region, group);
+ 		clear_bit(bit, cpuc->used_mask);
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index e3766a8..6e10e8c 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -227,6 +227,16 @@ static void armpmu_start(struct perf_event *event, int flags)
+ 	armpmu->enable(event);
  }
  
-+static void armv8pmu_start(struct arm_pmu *cpu_pmu)
++static void armpmu_clear_event_idx(struct arm_pmu *armpmu,
++				   struct pmu_hw_events *hw_events,
++				   struct perf_event *event)
 +{
-+	unsigned long flags;
-+	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
-+
-+	raw_spin_lock_irqsave(&events->pmu_lock, flags);
-+	/* Enable all counters */
-+	armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMU_PMCR_E);
-+	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++	if (armpmu->clear_event_idx)
++		armpmu->clear_event_idx(hw_events, event);
++	else
++		clear_bit(event->hw.idx, hw_events->used_mask);
 +}
 +
-+static void armv8pmu_stop(struct arm_pmu *cpu_pmu)
-+{
-+	unsigned long flags;
-+	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
-+
-+	raw_spin_lock_irqsave(&events->pmu_lock, flags);
-+	/* Disable all counters */
-+	armv8pmu_pmcr_write(armv8pmu_pmcr_read() & ~ARMV8_PMU_PMCR_E);
-+	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
-+}
-+
- static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
+ static void
+ armpmu_del(struct perf_event *event, int flags)
  {
- 	u32 pmovsr;
-@@ -702,6 +724,11 @@ static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
- 	 */
- 	regs = get_irq_regs();
+@@ -237,11 +247,10 @@ armpmu_del(struct perf_event *event, int flags)
  
-+	/*
-+	 * Stop the PMU while processing the counter overflows
-+	 * to prevent skews in group events.
-+	 */
-+	armv8pmu_stop(cpu_pmu);
- 	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
- 		struct perf_event *event = cpuc->events[idx];
- 		struct hw_perf_event *hwc;
-@@ -726,6 +753,7 @@ static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
- 		if (perf_event_overflow(event, &data, regs))
- 			cpu_pmu->disable(event);
- 	}
-+	armv8pmu_start(cpu_pmu);
- 
- 	/*
- 	 * Handle the pending perf events.
-@@ -739,28 +767,6 @@ static irqreturn_t armv8pmu_handle_irq(struct arm_pmu *cpu_pmu)
- 	return IRQ_HANDLED;
+ 	armpmu_stop(event, PERF_EF_UPDATE);
+ 	hw_events->events[idx] = NULL;
+-	clear_bit(idx, hw_events->used_mask);
+-	if (armpmu->clear_event_idx)
+-		armpmu->clear_event_idx(hw_events, event);
+-
++	armpmu_clear_event_idx(armpmu, hw_events, event);
+ 	perf_event_update_userpage(event);
++	/* Clear the allocated counter */
++	hwc->idx = -1;
  }
  
--static void armv8pmu_start(struct arm_pmu *cpu_pmu)
--{
--	unsigned long flags;
--	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
--
--	raw_spin_lock_irqsave(&events->pmu_lock, flags);
--	/* Enable all counters */
--	armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMU_PMCR_E);
--	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
--}
--
--static void armv8pmu_stop(struct arm_pmu *cpu_pmu)
--{
--	unsigned long flags;
--	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
--
--	raw_spin_lock_irqsave(&events->pmu_lock, flags);
--	/* Disable all counters */
--	armv8pmu_pmcr_write(armv8pmu_pmcr_read() & ~ARMV8_PMU_PMCR_E);
--	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
--}
--
- static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
- 				  struct perf_event *event)
- {
+ static int
 -- 
 2.7.4
