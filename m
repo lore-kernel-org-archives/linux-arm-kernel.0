@@ -1,64 +1,40 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Tue, 19 Jun 2018 15:41:05 +0300
-Subject: [PATCH 1/8] dt-bindings: tegra186-hsp: Add shared interrupts
-In-Reply-To: <2bed23e6-19d5-66f8-774e-d613a91b1607@nvidia.com>
-References: <20180508114403.14499-1-mperttunen@nvidia.com>
- <20180508114403.14499-2-mperttunen@nvidia.com>
- <2bed23e6-19d5-66f8-774e-d613a91b1607@nvidia.com>
-Message-ID: <3b5708ef-c82f-c4b2-da50-2cb2afa3edb2@kapsi.fi>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 19 Jun 2018 14:34:46 +0200
+Subject: [PATCH 2/2] clk: mvebu: armada-37xx-periph: switch to SPDX license
+ identifier
+In-Reply-To: <20180619123446.694-1-gregory.clement@bootlin.com>
+References: <20180619123446.694-1-gregory.clement@bootlin.com>
+Message-ID: <20180619123446.694-3-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.2018 18:15, Jon Hunter wrote:
-> 
-> On 08/05/18 12:43, Mikko Perttunen wrote:
->> Non-doorbell interrupts are routed through "shared interrupts". These
->> interrupts can be mapped to various internal interrupt lines. Add
->> interrupt properties for shared interrupts to the tegra186-hsp device
->> tree bindings.
-> 
-> Reading the Tegra documentation, although the doorbells have dedicated 
-> interrupts, it appears that the doorbell interrupts can also be routed 
-> via these shared interrupts.
+Adopt the SPDX license identifier headers to ease license compliance
+management.
 
-Thanks, I changed the text slightly to account for this.
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ drivers/clk/mvebu/armada-37xx-periph.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-> 
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->> ? Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt | 
->> 2 ++
->> ? 1 file changed, 2 insertions(+)
->>
->> diff --git 
->> a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt 
->> b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
->> index b99d25fc2f26..9edcdf82d719 100644
->> --- a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
->> +++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
->> @@ -21,6 +21,8 @@ Required properties:
->> ????? Contains a list of names for the interrupts described by the 
->> interrupt
->> ????? property. May contain the following entries, in any order:
->> ????? - "doorbell"
->> +??? - "sharedN", where 'N' is a number from zero up to the number of
->> +????? external interrupts supported by the HSP instance minus one.
->> ????? Users of this binding MUST look up entries in the interrupt 
->> property
->> ????? by name, using this interrupt-names property to do so.
->> ? - interrupts
-> 
-> How is the mapping of shared-mailboxes interrupts to the actual 
-> 'sharedN' interrupt managed?
-
-Currently the driver always uses shared0 for mailbox-full interrupt, and 
-nothing else, which is what downstream does as well. It's difficult to 
-do anything else as we can trample on some other driver's configuration..
-
-> 
-> Cheers
-> Jon
-> 
-
-Thanks,
-Mikko
+diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
+index 44e4e27eddad..a51edaab0c5c 100644
+--- a/drivers/clk/mvebu/armada-37xx-periph.c
++++ b/drivers/clk/mvebu/armada-37xx-periph.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0+
+ /*
+  * Marvell Armada 37xx SoC Peripheral clocks
+  *
+@@ -5,10 +6,6 @@
+  *
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2 or later. This program is licensed "as is"
+- * without any warranty of any kind, whether express or implied.
+- *
+  * Most of the peripheral clocks can be modelled like this:
+  *             _____    _______    _______
+  * TBG-A-P  --|     |  |       |  |       |   ______
+-- 
+2.17.1
