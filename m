@@ -1,54 +1,56 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 19 Jun 2018 23:19:23 +0200
-Subject: [PATCH v5 0/6] clocksource: rework Atmel TCB timer driver
-Message-ID: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+Date: Tue, 19 Jun 2018 23:19:27 +0200
+Subject: [PATCH v5 4/6] ARM: at91: Implement clocksource selection
+In-Reply-To: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+Message-ID: <20180619211929.22908-5-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Allow selecting and unselecting the PIT clocksource driver so it doesn't
+have to be compile when unused.
 
-This series reworks the Atmel TCB drivers. It introduces a new driver to handle
-the clocksource and clockevent devices.
+Tested-by: Alexander Dahl <ada@thorsis.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ arch/arm/mach-at91/Kconfig | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-As a reminder, this is necessary because:
- - the current tcb_clksrc driver is probed too late to be able to be used at
-   boot and we now have SoCs that don't have a PIT. They currently are not able
-   to boot a mainline kernel.
- - using the PIT doesn't work well with preempt-rt because its interrupt is
-   shared (in particular with the UART and their interrupt flags are
-   incompatible)
- - the current solution is wasting some TCB channels
-
-The plan is to get this driver upstream, then convert the TCB PWM driver to be
-able to get rid of the tcb_clksrc driver along with atmel_tclib now that AVR32
-is gone.
-
-changes in v5:
- - rebased on v4.18-rc1
- - fixed the clock enabling/disabling in atomic context under preempt-rt
-
-Changes in v4:
- - rebased on top of v4.17-rc1
- - fixed an issue when setting max_delta for clockevents_config_and_register
-
-Alexandre Belloni (6):
-  ARM: at91: add TCB registers definitions
-  clocksource/drivers: Add a new driver for the Atmel ARM TC blocks
-  clocksource/drivers: atmel-pit: make option silent
-  ARM: at91: Implement clocksource selection
-  ARM: configs: at91: use new TCB timer driver
-  ARM: configs: at91: unselect PIT
-
- arch/arm/configs/at91_dt_defconfig    |   2 +-
- arch/arm/configs/sama5_defconfig      |   2 +-
- arch/arm/mach-at91/Kconfig            |  25 +
- drivers/clocksource/Kconfig           |  13 +-
- drivers/clocksource/Makefile          |   3 +-
- drivers/clocksource/timer-atmel-tcb.c | 630 ++++++++++++++++++++++++++
- include/soc/at91/atmel_tcb.h          | 216 +++++++++
- 7 files changed, 887 insertions(+), 4 deletions(-)
- create mode 100644 drivers/clocksource/timer-atmel-tcb.c
- create mode 100644 include/soc/at91/atmel_tcb.h
-
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 1254bf9d91b4..64f18cd220b9 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -106,6 +106,31 @@ config SOC_AT91SAM9
+ 	    AT91SAM9X35
+ 	    AT91SAM9XE
+ 
++comment "Clocksource driver selection"
++
++config ATMEL_CLOCKSOURCE_PIT
++	bool "Periodic Interval Timer (PIT) support"
++	depends on SOC_AT91SAM9 || SOC_SAMA5
++	default SOC_AT91SAM9 || SOC_SAMA5
++	select ATMEL_PIT
++	help
++	  Select this to get a clocksource based on the Atmel Periodic Interval
++	  Timer. It has a relatively low resolution and the TC Block clocksource
++	  should be preferred.
++
++config ATMEL_CLOCKSOURCE_TCB
++	bool "Timer Counter Blocks (TCB) support"
++	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5 || COMPILE_TEST
++	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
++	depends on !ATMEL_TCLIB
++	select ATMEL_ARM_TCB_CLKSRC
++	help
++	  Select this to get a high precision clocksource based on a
++	  TC block with a 5+ MHz base clock rate.
++	  On platforms with 16-bit counters, two timer channels are combined
++	  to make a single 32-bit timer.
++	  It can also be used as a clock event device supporting oneshot mode.
++
+ config HAVE_AT91_UTMI
+ 	bool
+ 
 -- 
 2.17.1
