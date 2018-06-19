@@ -1,65 +1,126 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 19 Jun 2018 21:26:33 +0200
-Subject: [PATCH 2/2] ARM: assembler: prevent ADR from setting the Thumb bit
- twice
-In-Reply-To: <20180619192633.21846-1-ard.biesheuvel@linaro.org>
-References: <20180619192633.21846-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180619192633.21846-3-ard.biesheuvel@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 19 Jun 2018 14:42:53 -0500
+Subject: [PATCH 5/5] arm64: dts: ti: Add support for AM654 EVM base board
+In-Reply-To: <20180619194253.27288-1-nm@ti.com>
+References: <20180619194253.27288-1-nm@ti.com>
+Message-ID: <20180619194253.27288-6-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To work around recent issues where ADR references to Thumb function
-symbols may or may not have the Thumb bit set already when they are
-resolved by GAS, reference the symbol indirectly via a local symbol
-typed as 'function', and emit the reference in a way that prevents
-the assembler from resolving it directly. Instead, it will be fixed
-up by the linker, which behaves consistently and according to spec
-when it comes to relocations of symbols with function annotation
-targetting wide ADR instructions.
+The EValuation Module(EVM) platform for AM654 consists of a
+common Base board + one or more of daughter cards, which include:
+a) "Personality Modules", which can be specific to a profile, such as
+ ICSSG enabled or Multi-media (including audio).
+b) SERDES modules, which may be 2 lane PCIe or two port PCIe + USB2
+c) Camera daughter card
+d) various display panels
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Among other options. There are two basic configurations defined which
+include an "EVM" configuration and "IDK" (Industrial development kit)
+which differ in the specific combination of daughter cards that are
+used.
+
+To simplify support, we choose to support just the base board as the
+core device tree file and all daughter cards would be expected to be
+device tree overlays.
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/include/asm/assembler.h | 22 +++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 6ae42ad29518..ee2d4eb26318 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -195,13 +195,33 @@
- 	.irp	c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
- 	.macro	badr\c, rd, sym
- #ifdef CONFIG_THUMB2_KERNEL
--	adr\c	\rd, \sym + 1
-+	__badr	\c, \rd, \sym
- #else
- 	adr\c	\rd, \sym
- #endif
- 	.endm
- 	.endr
+Changes since RFC:
+* Since defaults are enabled, and uart has been spun off, dropped the
+  redundant nodes from baseboard dts
+
+RFC: https://patchwork.kernel.org/patch/10447741/
+
+ MAINTAINERS                                    |  1 +
+ arch/arm64/boot/dts/Makefile                   |  1 +
+ arch/arm64/boot/dts/ti/Makefile                |  9 +++++++
+ arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 36 ++++++++++++++++++++++++++
+ 4 files changed, 47 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/ti/Makefile
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6785ceaf5b0b..e9e916d1fb52 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2093,6 +2093,7 @@ M:	Nishanth Menon <nm@ti.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Supported
+ F:	Documentation/devicetree/bindings/arm/ti/k3.txt
++F:	arch/arm64/boot/dts/ti/Makefile
+ F:	arch/arm64/boot/dts/ti/k3-*
  
-+	/*
-+	 * GAS's behavior with respect to setting the Thumb bit on addresses
-+	 * of locally defined symbols taken using adr instructions is
-+	 * inconsistent, and so we are better off letting the linker handle
-+	 * it instead. So emit the reference as a relocation, and force a
-+	 * wide encoding so that we can support both forward and backward
-+	 * references, and avoid the R_ARM_THM_PC8 relocation that operates
-+	 * on the narrow encoding, which is documented as not taking the
-+	 * Thumb bit into account. (IHI 0044E ELF for the ARM Architecture)
-+	 *
-+	 * Note that this needs to be a separate macro or \@ does not work
-+	 * correctly.
-+	 */
-+	.macro		__badr, c, rd, sym
-+	.set		.Lsym\@, \sym
-+	.type		.Lsym\@, %function
-+	.reloc		., R_ARM_THM_ALU_PREL_11_0, .Lsym\@
-+	adr\c\().w	\rd, .
-+	.endm
+ ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 3543bc324553..4690364d584b 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -23,5 +23,6 @@ subdir-y += rockchip
+ subdir-y += socionext
+ subdir-y += sprd
+ subdir-y += synaptics
++subdir-y += ti
+ subdir-y += xilinx
+ subdir-y += zte
+diff --git a/arch/arm64/boot/dts/ti/Makefile b/arch/arm64/boot/dts/ti/Makefile
+new file mode 100644
+index 000000000000..63e619d0b5b8
+--- /dev/null
++++ b/arch/arm64/boot/dts/ti/Makefile
+@@ -0,0 +1,9 @@
++# SPDX-License-Identifier: GPL-2.0
++#
++# Make file to build device tree binaries for boards based on
++# Texas Instruments Inc processors
++#
++# Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
++#
 +
- /*
-  * Get current thread_info.
-  */
++dtb-$(CONFIG_ARCH_K3_AM6_SOC) += k3-am654-base-board.dtb
+diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+new file mode 100644
+index 000000000000..af6956fdc13f
+--- /dev/null
++++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+@@ -0,0 +1,36 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
++ */
++
++/dts-v1/;
++
++#include "k3-am654.dtsi"
++
++/ {
++	compatible =  "ti,am654-evm", "ti,am654";
++	model = "Texas Instruments AM654 Base Board";
++
++	chosen {
++		stdout-path = "serial2:115200n8";
++		bootargs = "earlycon=ns16550a,mmio32,0x02800000";
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		/* 4G RAM */
++		reg = <0x00000000 0x80000000 0x00000000 0x80000000>,
++		      <0x00000008 0x80000000 0x00000000 0x80000000>;
++	};
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		secure_ddr: secure_ddr at 9e800000 {
++			reg = <0 0x9e800000 0 0x01800000>; /* for OP-TEE */
++			alignment = <0x1000>;
++			no-map;
++		};
++	};
++};
 -- 
-2.17.1
+2.15.1
