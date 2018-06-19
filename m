@@ -1,47 +1,44 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 20 Jun 2018 01:21:31 +0200
-Subject: [PATCH 1/1] arm64: dts: rockchip: correct voltage selector
- Firefly-RK3399
-In-Reply-To: <19360053.2ABrQ075F2@phil>
-References: <20180604171523.28454-1-xypron.glpk@gmx.de>
- <19360053.2ABrQ075F2@phil>
-Message-ID: <10782218.jfpm9omiT7@phil>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 19 Jun 2018 16:31:02 -0700
+Subject: [GIT PULL 1/3] Broadcom devicetree fixes for 4.18
+Message-ID: <20180619233104.32173-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heinrich,
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-Am Donnerstag, 14. Juni 2018, 14:55:27 CEST schrieb Heiko Stuebner:
-> Am Montag, 4. Juni 2018, 19:15:23 CEST schrieb Heinrich Schuchardt:
-> > Without this patch the Firefly-RK3399 board boot process hangs after these
-> > lines:
-> > 
-> >    fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
-> >    fan53555-reg: supplied by vcc_sys
-> >    vcc1v8_s3: supplied by vcc_1v8
-> > 
-> > Blacklisting driver fan53555 allows booting.
-> > 
-> > The device tree uses a value of fcs,suspend-voltage-selector different to
-> > any other board.
-> > 
-> > Changing this setting to the usual value is sufficient to enable booting.
-> > 
-> > Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> 
-> applied for 4.19.
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-and dropped again.
+are available in the git repository at:
 
-Sadly it looks like the patch causes conflicts with at least one firefly
-board in a kernelci lab. My own is currently not ready to use, so I cannot
-look myself right now.
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/devicetree-fixes
 
-The issue kernelci people described sounded quite a lot like the one
-in your commit message, so my current theory is that the
-suspend-voltage-selector must in some form corespond to the
-cpu_b_sleep_h gpio setting we're currently not handling at all, which
-would therefore depend on how the bootloader sets this up.
+for you to fetch changes up to 6cb1628ad3506b315cdddd7676db0ff2af378d28:
 
+  ARM: dts: Cygnus: Fix PCIe controller interrupt type (2018-06-18 09:40:36 -0700)
 
-Heiko
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs Device Tree fixes for
+4.18, please pull the following:
+
+- Ray fixes the I2C and PCIe interrupt types for the Cygnus SoC
+
+- Florian fixes the I2C and PCIe interrupts for the Northstar
+  (BCM5301x), Northstar Plus and Hurricane 2 SoCs
+
+----------------------------------------------------------------
+Florian Fainelli (4):
+      ARM: dts: NSP: Fix i2c controller interrupt type
+      ARM: dts: NSP: Fix PCIe controllers interrupt types
+      ARM: dts: HR2: Fix interrupt types for i2c and PCIe
+      ARM: dts: BCM5301x: Fix i2c controller interrupt type
+
+Ray Jui (2):
+      ARM: dts: Cygnus: Fix I2C controller interrupt type
+      ARM: dts: Cygnus: Fix PCIe controller interrupt type
+
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 24 ++++++++++++------------
+ arch/arm/boot/dts/bcm-hr2.dtsi    | 24 ++++++++++++------------
+ arch/arm/boot/dts/bcm-nsp.dtsi    | 32 ++++++++++++++++----------------
+ arch/arm/boot/dts/bcm5301x.dtsi   |  2 +-
+ 4 files changed, 41 insertions(+), 41 deletions(-)
