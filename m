@@ -1,26 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jun 2018 16:20:19 +0100
-Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
-In-Reply-To: <20180618120310.39527-11-mark.rutland@arm.com>
-References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-11-mark.rutland@arm.com>
-Message-ID: <20180619152019.rkgi2w7kndccawaf@armageddon.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 19 Jun 2018 23:20:09 +0800
+Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
+ control
+In-Reply-To: <20180618073425.ce2dkipuvrtbqela@flea>
+References: <20180614153548.9644-1-wens@csie.org>
+ <20180615091413.pbdtrpa7txe6i4ee@flea>
+ <CAGb2v64Ar+rOgiXbjtRrQojHUZteLa9N7OwM3XY7ZcpS87Qpmw@mail.gmail.com>
+ <20180618073425.ce2dkipuvrtbqela@flea>
+Message-ID: <CAGb2v65-X6X6C0sgCom2G3dBvn5iqD9aRfh84qSCv3jf8v-C0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 01:03:01PM +0100, Mark Rutland wrote:
-> Now that the syscall invocation logic is in C, we can migrate the rest
-> of the syscall entry logic over, so that the entry assembly needn't look
-> at the register values at all.
-> 
-> The SVE reset across syscall logic now unconditionally clears TIF_SVE,
-> but sve_user_disable() will only write back to CPACR_EL1 when SVE is
-> actually enabled.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Mon, Jun 18, 2018 at 3:34 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Mon, Jun 18, 2018 at 10:11:20AM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Jun 15, 2018 at 5:14 PM, Maxime Ripard
+>> <maxime.ripard@bootlin.com> wrote:
+>> > On Thu, Jun 14, 2018 at 11:35:44PM +0800, Chen-Yu Tsai wrote:
+>> >> Hi,
+>> >>
+>> >> This series is the remaining A64 syscon changes from the R40 DWMAC
+>> >> series. The series aligns how the A64 system control exports a regmap
+>> >> for the sun8i DWMAC driver to access with what we've done for the R40.
+>> >>
+>> >> Originally the A64 used the generic syscon for this bit of hardware.
+>> >> But this block also contains mapping bits for the onboard SRAM, used
+>> >> by various peripherals, and other vendor specific bits we may use in
+>> >> the future. It is by no means generic. And we already have a device
+>> >> tree binding and driver for the SRAM part.
+>> >>
+>> >> The first patch make the SRAM control device export a regmap, exposing
+>> >> a single EMAC control register, for the DWMAC driver to consume.
+>> >>
+>> >> The second and third patches rename the A64 compatible string to read
+>> >> "system control", which is what the block is named in the user manual.
+>> >>
+>> >> The last patch fixes up the device node, and also adds the lone mappable
+>> >> SRAM block, which is needed by the Display Engine.
+>> >
+>> > For the serie:
+>> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+>>
+>> Cool. I'll apply them once you've rebased and pushed out any patches you
+>> queued up during the merge window.
+>
+> All should be pushed now, feel free to apply them :)
 
-Other than Dave's comments, it looks fine to me.
+Applied. Thanks.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+ChenYu
