@@ -1,214 +1,166 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 19 Jun 2018 12:35:08 +0200
-Subject: [PATCH 15/20] dts: arm: imx7{d,s}: Update coresight binding for
- hardware ports
-In-Reply-To: <20180619021218.GV16091@dragon>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-16-git-send-email-suzuki.poulose@arm.com>
- <20180619021218.GV16091@dragon>
-Message-ID: <145043d7ed3ef7890b5fc78a59c1668a@agner.ch>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Tue, 19 Jun 2018 16:07:57 +0530
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
+References: <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <CACi5LpNdg=Enp66BybNNuj5tQOp3ggyX=tm_SVzr8v2qCRteDw@mail.gmail.com>
+ <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
+ <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
+ <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
+ <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
+ <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
+ <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619085541.GB13984@arm.com>
+ <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619094045.GD13984@arm.com>
+ <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
+ <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
+Message-ID: <CACi5LpMoKP4eG5XhYe5hf5VC9MOY8KuHK=j0ujb8GFpyjAuAww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.06.2018 04:12, Shawn Guo wrote:
-> Hi Stefan,
-> 
-> Can you take a look at the patch?  Thanks.
-> 
-> Shawn
-> 
-> On Tue, Jun 05, 2018 at 10:43:26PM +0100, Suzuki K Poulose wrote:
->> Switch to the updated coresight bindings.
+Hi James,
 
-Looks good to me.
+On Tue, Jun 19, 2018 at 3:46 PM, James Morse <james.morse@arm.com> wrote:
+> Hi Yanjiang, Will,
+>
+> On 19/06/18 10:57, Jin, Yanjiang wrote:
+>>> -----Original Message-----
+>>> From: Will Deacon [mailto:will.deacon at arm.com]
+>>> Sent: 2018?6?19? 17:41
+>>> To: Jin, Yanjiang <yanjiang.jin@hxt-semitech.com>
+>>> Cc: James Morse <james.morse@arm.com>; Bhupesh Sharma
+>>> <bhsharma@redhat.com>; Mark Rutland <mark.rutland@arm.com>; Ard
+>>> Biesheuvel <ard.biesheuvel@linaro.org>; Catalin Marinas
+>>> <catalin.marinas@arm.com>; Kexec Mailing List <kexec@lists.infradead.org>;
+>>> AKASHI Takahiro <takahiro.akashi@linaro.org>; Bhupesh SHARMA
+>>> <bhupesh.linux@gmail.com>; linux-arm-kernel <linux-arm-
+>>> kernel at lists.infradead.org>
+>>> Subject: Re: [PATCH] arm64/mm: Introduce a variable to hold base address of
+>>> linear region
+>>>
+>>> On Tue, Jun 19, 2018 at 09:34:56AM +0000, Jin, Yanjiang wrote:
+>>>>> On Tue, Jun 19, 2018 at 03:02:15AM +0000, Jin, Yanjiang wrote:
+>>>>>>> You seem to be using this for user-space phys_to_virt() based on
+>>>>>>> values found in /proc/iomem. This should give you what you want,
+>>>>>>> and isolate your user-space from the kernel's unexpected naming of
+>>> variables.
+>>>>>>
+>>>>>> I don't know could I simplify this problem?
+>>>>>> Let's ignore what memstart_addr represents here, we just want to
+>>>>>> implement
+>>>>>> phys_to_virt() in an userspace applications(kexec-tools or others).
+>>>>>>
+>>>>>> ARM64 Kernel has a below definition:
+>>>>>>
+>>>>>> #define __phys_to_virt(x)       ((unsigned long)((x) - PHYS_OFFSET) |
+>>>>> PAGE_OFFSET)
+>>>>>>
+>>>>>> So userspace app must know PHYS_OFFSET(equal to memstart_addr now).
+>>>>>> Seems this is very simple, but memstart_addr has gone through
+>>>>>> several operations in arm64_memblock_init() depends on different
+>>>>>> Kernel configurations, so userspace app needs to know many
+>>>>>> additional definitions as
+>>>>> following:
+>>>>>>
+>>>>>> memblock_start_of_DRAM(),  (ifdef CONFIG_SPARSEMEM_VMEMMAP),
+>>>>>> ARM64_MEMSTART_SHIFT,  SECTION_SIZE_BITS,  PAGE_OFFSET,
+>>>>>> memblock_end_of_DRAM(), IS_ENABLED(CONFIG_RANDOMIZE_BASE),
+>>>>>> memstart_offset_seed.
+>>>>>>
+>>>>>> It is hard to know all above in kexec-tools now. Originally I
+>>>>>> planned to read memstart_addr's value from "/dev/mem", but someone
+>>>>>> thought not all Kernels enable "/dev/mem", we'd better find a more
+>>>>>> generic approach. So we want to get some suggestions from ARM kernel
+>>> community.
+>>>>>> Can we export this variable in Kernel side through sysconf() or
+>>>>>> other similar methods? Or someone can provide an effect way to get
+>>>>>> memstart_addr's value?
+>>>>>
+>>>>> I thought the suggestion from James was to expose this via an ELF
+>>>>> NOTE in kcore and vmcore (or in the header directly if that's possible, but I'm
+>>> not sure about it)?
+>>>>
+>>>> Thanks for your reply firstly. But same as DEVMEM, kcore is not a
+>>>> must-have, so we can't depend on it.
+>>>
+>>> Neither is KEXEC. We can select PROC_KCORE from KEXEC if it helps.
+>>>
+>>>> On the other hand, phys_to_virt() is called during generating vmcore
+>>>> in Kexec-tools, vmcore also can't help this issue.
+>>>
+>>> I don't understand this part. If you have the vmcore in your hand, why can't you
+>>> grok the pv offset from the note and use that in phys_to_virt()?
+>>
+>> It is a chicken-and-egg issue.
+>> phys_to virt() is for crashdump setup. To generate vmcore, we must call
+>> phys_to_virt(). At this point, no vmcore exists.
+>
+> Its needed for the parts of the ELF header that kexec-tools generates at kdump
+> load time?
+>
+> So adding this pv_offset to the key=value data crash_save_vmcoreinfo_init()
+> saves isn't available early enough?
 
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+Yes, one case where it is not actually available early enough for
+makedumpfile usage is if we are determining the PT_NOTE contents from
+the '/proc/kcore' on a 'live' system
 
---
-Stefan
+See <https://github.com/bhupesh-sharma/makedumpfile/blob/devel/elf_info.c#L375>
+for example:
 
+int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len)
+
+{
+
+<snip..>
+kvaddr = (ulong)vmcoreinfo_addr + PAGE_OFFSET;
+
+}
+
+Now the problem at hand is to determine the offset at which the
+pv_offset (key=value data pair) lies in the '/proc/kcore' (I assume
+that when you mentioned above and earlier about adding this pair to
+the elfnotes you meant both the vmcoreinfo and 'proc/kcore'), as we
+can have 'n' number of PT_LOAD segments.
+
+So, we have a chicken and egg situation in such case(s). Do you have
+any pointers on how we can fix such use-cases.
+
+Thanks,
+Bhupesh
+
+> If we select PROC_KCORE for KEXEC so you know you will have /proc/kcore if the
+> system supports kdump. We should probably provide the same information in the
+> PT_NOTE section of the /proc/kcore file.
+>
+>
+> (I thought the kdump kernel exported that crash_save_vmcoreinfo_init() data as
+> an elf-note itself, but digging deeper I see the kernel exposes the physical
+> address in /sys/kernel/vmcoreinfo. Presumably its passed back via the kdump
+> elfcorehdr.)
+>
+>
+>>>> Unfortunately, not all platforms support analyzing Kernel config in
+>>>> userspace application, so Kexec-tools can't know some key kernel options.
+>>>> If not so, we can simulate the whole arm64_memblock_init()  progress
+>>>> in kexec-tools.
+>>>
+>>> I don't understand what the kernel config has to do with kexec tools.
 >>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
->> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  arch/arm/boot/dts/imx7d.dtsi |  5 ++++-
->>  arch/arm/boot/dts/imx7s.dtsi | 41 ++++++++++++++++++++++++++++++-----------
->>  2 files changed, 34 insertions(+), 12 deletions(-)
+>> I mean that if we can know kernel .config in all circumstances, we can calculate memstart_addr  as below in Kexec-tools:
 >>
->> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
->> index 200714e..5faff17 100644
->> --- a/arch/arm/boot/dts/imx7d.dtsi
->> +++ b/arch/arm/boot/dts/imx7d.dtsi
->> @@ -87,7 +87,9 @@
 >>
->>  			port {
->>  				etm1_out_port: endpoint {
->> +					direction = <1>;
->>  					remote-endpoint = <&ca_funnel_in_port1>;
->> +					coresight,hwid = <0>;
->>  				};
->>  			};
->>  		};
->> @@ -174,8 +176,9 @@
->>  	port at 1 {
->>  		reg = <1>;
->>  		ca_funnel_in_port1: endpoint {
->> -			slave-mode;
->> +			direction = <0>;
->>  			remote-endpoint = <&etm1_out_port>;
->> +			coresight,hwid = <1>;
->>  		};
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
->> index 4d42335..8e90915 100644
->> --- a/arch/arm/boot/dts/imx7s.dtsi
->> +++ b/arch/arm/boot/dts/imx7s.dtsi
->> @@ -151,23 +151,28 @@
->>  			port at 0 {
->>  				reg = <0>;
->>  				replicator_out_port0: endpoint {
->> +					direction = <1>;
->>  					remote-endpoint = <&tpiu_in_port>;
->> +					coresight,hwid = <0>;
->>  				};
->>  			};
->>
->>  			port at 1 {
->>  				reg = <1>;
->>  				replicator_out_port1: endpoint {
->> +					direction = <1>;
->>  					remote-endpoint = <&etr_in_port>;
->> +					coresight,hwid = <1>;
->>  				};
->>  			};
->>
->>  			/* replicator input port */
->>  			port at 2 {
->> -				reg = <0>;
->> +				reg = <2>;
->>  				replicator_in_port0: endpoint {
->> -					slave-mode;
->> +					direction = <0>;
->>  					remote-endpoint = <&etf_out_port>;
->> +					coresight,hwid = <0>;
->>  				};
->>  			};
->>  		};
->> @@ -203,16 +208,19 @@
->>  				port at 0 {
->>  					reg = <0>;
->>  					ca_funnel_in_port0: endpoint {
->> -						slave-mode;
->> +						direction = <0>;
->>  						remote-endpoint = <&etm0_out_port>;
->> +						coresight,hwid = <0>;
->>  					};
->>  				};
->>
->>  				/* funnel output port */
->>  				port at 2 {
->> -					reg = <0>;
->> +					reg = <2>;
->>  					ca_funnel_out_port0: endpoint {
->> +						direction = <1>;
->>  						remote-endpoint = <&hugo_funnel_in_port0>;
->> +						coresight,hwid = <0>;
->>  					};
->>  				};
->>
->> @@ -229,7 +237,9 @@
->>
->>  			port {
->>  				etm0_out_port: endpoint {
->> +					direction = <1>;
->>  					remote-endpoint = <&ca_funnel_in_port0>;
->> +					coresight,hwid = <0>;
->>  				};
->>  			};
->>  		};
->> @@ -248,22 +258,26 @@
->>  				port at 0 {
->>  					reg = <0>;
->>  					hugo_funnel_in_port0: endpoint {
->> -						slave-mode;
->> +						direction = <0>;
->>  						remote-endpoint = <&ca_funnel_out_port0>;
->> +						coresight,hwid = <0>;
->>  					};
->>  				};
->>
->>  				port at 1 {
->>  					reg = <1>;
->>  					hugo_funnel_in_port1: endpoint {
->> -						slave-mode; /* M4 input */
->> +						direction = <0>; /* M4 input */
->> +						coresight,hwid = <1>;
->>  					};
->>  				};
->>
->>  				port at 2 {
->> -					reg = <0>;
->> +					reg = <2>;
->>  					hugo_funnel_out_port0: endpoint {
->> +						direction = <1>;
->>  						remote-endpoint = <&etf_in_port>;
->> +						coresight,hwid = <0>;
->>  					};
->>  				};
->>
->> @@ -284,15 +298,18 @@
->>  				port at 0 {
->>  					reg = <0>;
->>  					etf_in_port: endpoint {
->> -						slave-mode;
->> +						direction = <0>;
->>  						remote-endpoint = <&hugo_funnel_out_port0>;
->> +						coresight,hwid = <0>;
->>  					};
->>  				};
->>
->>  				port at 1 {
->> -					reg = <0>;
->> +					reg = <1>;
->>  					etf_out_port: endpoint {
->> +						direction = <1>;
->>  						remote-endpoint = <&replicator_in_port0>;
->> +						coresight,hwid = <0>;
->>  					};
->>  				};
->>  			};
->> @@ -306,8 +323,9 @@
->>
->>  			port {
->>  				etr_in_port: endpoint {
->> -					slave-mode;
->> +					direction = <0>;
->>  					remote-endpoint = <&replicator_out_port1>;
->> +					coresight,hwid = <0>;
->>  				};
->>  			};
->>  		};
->> @@ -320,8 +338,9 @@
->>
->>  			port {
->>  				tpiu_in_port: endpoint {
->> -					slave-mode;
->> +					direction = <0>;
->>  					remote-endpoint = <&replicator_out_port1>;
->> +					coresight,hwid = <0>;
->>  				};
->>  			};
->>  		};
->> --
->> 2.7.4
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>         memstart_addr = round_down(memblock_start_of_DRAM(),
+>>                                    ARM64_MEMSTART_ALIGN);
+>
+> This wouldn't work for KASLR. Having the kernel provide you with the offset
+> means you are insulated from the details of phys_to_virt() and what affects
+> these values. It should be possible to do this in the same way for all
+> architectures.
+>
+>
+> Thanks,
+>
+> James
