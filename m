@@ -1,175 +1,179 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 19 Jun 2018 09:52:02 -0600
-Subject: [PATCH 0/5] RFC: Mezzanine handling for 96boards
-In-Reply-To: <20180618074556.6944-1-linus.walleij@linaro.org>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
-Message-ID: <CAL_JsqK2DKPbaFvUPSU2E7oh1_pryrRXPMg8OASmK722jmznwA@mail.gmail.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Wed, 20 Jun 2018 01:06:34 +0900
+Subject: [PATCH -tip v6 05/27] ARM: kprobes: Remove jprobe arm implementation
+In-Reply-To: <152942424698.15209.15245996287444292393.stgit@devbox>
+References: <152942424698.15209.15245996287444292393.stgit@devbox>
+Message-ID: <152942439350.15209.11127640848082283736.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 1:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This is a proposal for how to handle the non-discoverable
-> 96boards plug-in expansion boards called "mezzanines" in the
-> Linux kernel. It is a working RFC series meant for discussion
-> at the moment.
->
-> The RFC was done on the brand new Ultra96 board from Xilinx
-> with a Secure96 mezzanine expansion board. The main part
-> is in patch 4, the rest is enabling and examples.
->
-> The code can be obtained from here:
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git/log/?h=ultra96
->
-> You can for example probably augment the DTS file for any
-> upstream-supported 96board and get the Secure96 going with
-> it with minor efforts.
->
-> TODO:
->
-> - Proper device tree bindings for the connector, for now
->   look at the example.
->
-> - Discuss whether to actually do this or just take it all and
->   flush it down the drain because the community doesn't like
->   it. I'm not one of those especially infatuated with my own code,
->   I always stay by the old programming project management mantra
->   to calculate to make one version and throw it away as stepping
->   stone to a good final design.
->
-> - Placement: putting this in drivers/bus is just an example.
->   drivers/platform/96boards-mezzanines is fine too, maybe better?
->
-> - I am especially curious about input from Andy and Mika from
->   the Intel/ACPI camp on what they have seen for non-discoverable
->   plug-in boards. Does this problem even exist in the Intel
->   world, or not...
->
-> Background:
->
-> - These boards connect on a custom connector on this family
->   of boards. The relationship is many-to-many with the connector
->   as nexus. The electronic standard for the connector is specified:
->   https://github.com/96boards/documentation/blob/master/Specifications/96Boards-CE-Specification.pdf
->   Example mezzanines:
->   https://www.96boards.org/documentation/mezzanine/
->
-> - These boards have siblings on other platforms, the problem
->   scope is similar with BeagleBone "capes":
->   https://beagleboard.org/capes
->   Raspberry Pi expansion boards:
->   https://www.abelectronics.co.uk/products/18/raspberry-pi-expansion-boards
->   Intel Edison, Galileo, Joule also have expansion boards.
->
-> Idea: add a driver for the connector itself and tie it in to
-> the device tree with a compatible string. Since the boards
-> are non-discoverable two mechanisms are provided to discover
-> them:
->
-> - Add a very simple device tree node with just a compatible
->   string for the board in the node. This will be simple to
->   add from e.g. a boot loader or as an overlay from userspace.
->
->   board {
->         compatible = "96boards,secure96";
->   };
->
->
-> - Echo 1 > boardname into a sysfs file to populate the
->   board and echo 0 > boardname to depopulate it. This
->   makes it easy to even switch out expansion boards at
->   runtime, if allowed by the electronics.
->
->   > cd /sys/devices/platform/connector
->   > echo 1 > secure96
->   lscon connector: called mezzanine_store on secure96
->   lscon connector: populate secure96
->   at24 1-0050: 2048 byte 24c128 EEPROM, writable, 128 bytes/write
->   atmel-ecc 1-0060: configuration zone is unlocked
->   tpm_tis_spi spi0.0: 2.0 TPM (device-id 0x1B, rev-id 16)
->   (...)
->
-> What this patch set does not do:
->
-> - It does not use device tree or ACPI DSDT or any other
->   hardware decription language to model the contents of the
->   board per se. Instead the boards buses are populated
->   directly with platform devices.
->
-> Predictable complaints about this design:
->
-> Q: This is not device tree overlays. Why is it not device
->    tree overlays?
->
-> A1: Right tool for the job, overlays are complex and the
->     plan to get it in place seems to be spanning years, this
->     is a few devices on simple busses and it works today.
->     Using this approach I can already work on shaping up
->     drivers for the mezzanine board devices as proved by:
->     https://marc.info/?l=linux-crypto-vger&m=152820660120590&w=2
->     https://marc.info/?l=linux-crypto-vger&m=152820662820595&w=2
->     (...)
->
->     I can work on drivers for the chips on the
->     Secure96 mezzanine board. It's just an example of
->     what the mezzanine community can do.
->     Now they are hacking around in userspace instead of
->     doing/reusing kernel drivers for their stuff:
->     https://github.com/jbech-linaro/secure96
->
->     This way we can bring developers for these components
->     into the kernel community instead of telling them to
->     wait for some big infrastructure that comes later
->     before they can contribute their stuff.
->
-> A2: Overlays does not solve the problem if the system runs
->     ACPI, and what about if the same connector[s] appear
->     on a server board, servers use ACPI. Also notice
->     that Intel have development boards with non-discoverable
->     expansion boards as well. They just will not use
->     device tree.
->
-> A3: Overlays is Big Upfront Design.
->     https://en.wikipedia.org/wiki/Big_Design_Up_Front
->     This way of designing things is associated with the
->     (pejorative term) "waterfall model" which is out of
->     fashion as a way of doing development. I think I am not
->     the only one slightly annoyed by the fact that device
->     tree overlays is now starting to look like a very
->     big very upfront design. It's just not possible to get
->     something up and running in small iterative steps with
->     device tree overlays. Instead huge efforts are
->     required and it involves major possible showstoppers
->     and uncertain outcome as indicated by Frank's TODO:
->     https://elinux.org/Frank's_Evolving_Overlay_Thoughts
+Remove arch dependent setjump/longjump functions
+and unused fields in kprobe_ctlblk for jprobes
+from arch/arm.
 
-I don't agree. This can be broken down into various smaller mostly
-independent problems. Overlay handling is mostly an orthogonal
-problem. The exception is that we need to ensure bindings allow a
-decoupling of upstream of the connector and downstream of the
-connector so the downstream part can be a reusable overlay. Defining
-anything while ignoring this known criteria would be a mistake.
+Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/include/asm/kprobes.h |    2 -
+ arch/arm/include/asm/probes.h  |    1 
+ arch/arm/probes/kprobes/core.c |  114 ----------------------------------------
+ 3 files changed, 117 deletions(-)
 
-The list is roughly like this:
-
-- Connector node binding and probing infrastructure
-- GPIO (already done w/ gpio-map binding)
-- I2C
-- SPI
-- Pinmux
-- clocks
-- OF graph (displays, cameras, etc.)
-- USB (re-use the USB connector binding for non-standard connectors)
-- Userspace interface
-
-We don't have to support every interface from the start. The bindings
-and corresponding kernel support can be designed 1-by-1 for the most
-part. Start with something simple like a GPIO LED on a mezzanine. Once
-the base is functionality is there, the other parts can be worked on
-incrementally. We can punt any overlay handling to the bootloader
-initially. That punts all the issues around overlays like designing a
-userspace interface, where overlays are located (filesystem, passed
-from bootloader, built into the kernel), when they are loaded, and how
-to specify which overlays to load. Most of Frank's list is related to
-these issues.
-
-Rob
+diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+index 59655459da59..82290f212d8e 100644
+--- a/arch/arm/include/asm/kprobes.h
++++ b/arch/arm/include/asm/kprobes.h
+@@ -44,8 +44,6 @@ struct prev_kprobe {
+ struct kprobe_ctlblk {
+ 	unsigned int kprobe_status;
+ 	struct prev_kprobe prev_kprobe;
+-	struct pt_regs jprobe_saved_regs;
+-	char jprobes_stack[MAX_STACK_SIZE];
+ };
+ 
+ void arch_remove_kprobe(struct kprobe *);
+diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+index 1e5b9bb92270..991c9127c650 100644
+--- a/arch/arm/include/asm/probes.h
++++ b/arch/arm/include/asm/probes.h
+@@ -51,7 +51,6 @@ struct arch_probes_insn {
+  * We assume one instruction can consume at most 64 bytes stack, which is
+  * 'push {r0-r15}'. Instructions consume more or unknown stack space like
+  * 'str r0, [sp, #-80]' and 'str r0, [sp, r1]' should be prohibit to probe.
+- * Both kprobe and jprobe use this macro.
+  */
+ #define MAX_STACK_SIZE			64
+ 
+diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
+index e90cc8a08186..23562111c511 100644
+--- a/arch/arm/probes/kprobes/core.c
++++ b/arch/arm/probes/kprobes/core.c
+@@ -47,9 +47,6 @@
+ 			   (unsigned long)(addr) +	\
+ 			   (size))
+ 
+-/* Used as a marker in ARM_pc to note when we're in a jprobe. */
+-#define JPROBE_MAGIC_ADDR		0xffffffff
+-
+ DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
+ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+ 
+@@ -521,117 +518,6 @@ void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+ 	regs->ARM_lr = (unsigned long)&kretprobe_trampoline;
+ }
+ 
+-int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+-{
+-	struct jprobe *jp = container_of(p, struct jprobe, kp);
+-	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+-	long sp_addr = regs->ARM_sp;
+-	long cpsr;
+-
+-	kcb->jprobe_saved_regs = *regs;
+-	memcpy(kcb->jprobes_stack, (void *)sp_addr, MIN_STACK_SIZE(sp_addr));
+-	regs->ARM_pc = (long)jp->entry;
+-
+-	cpsr = regs->ARM_cpsr | PSR_I_BIT;
+-#ifdef CONFIG_THUMB2_KERNEL
+-	/* Set correct Thumb state in cpsr */
+-	if (regs->ARM_pc & 1)
+-		cpsr |= PSR_T_BIT;
+-	else
+-		cpsr &= ~PSR_T_BIT;
+-#endif
+-	regs->ARM_cpsr = cpsr;
+-
+-	preempt_disable();
+-	return 1;
+-}
+-
+-void __kprobes jprobe_return(void)
+-{
+-	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+-
+-	__asm__ __volatile__ (
+-		/*
+-		 * Setup an empty pt_regs. Fill SP and PC fields as
+-		 * they're needed by longjmp_break_handler.
+-		 *
+-		 * We allocate some slack between the original SP and start of
+-		 * our fabricated regs. To be precise we want to have worst case
+-		 * covered which is STMFD with all 16 regs so we allocate 2 *
+-		 * sizeof(struct_pt_regs)).
+-		 *
+-		 * This is to prevent any simulated instruction from writing
+-		 * over the regs when they are accessing the stack.
+-		 */
+-#ifdef CONFIG_THUMB2_KERNEL
+-		"sub    r0, %0, %1		\n\t"
+-		"mov    sp, r0			\n\t"
+-#else
+-		"sub    sp, %0, %1		\n\t"
+-#endif
+-		"ldr    r0, ="__stringify(JPROBE_MAGIC_ADDR)"\n\t"
+-		"str    %0, [sp, %2]		\n\t"
+-		"str    r0, [sp, %3]		\n\t"
+-		"mov    r0, sp			\n\t"
+-		"bl     kprobe_handler		\n\t"
+-
+-		/*
+-		 * Return to the context saved by setjmp_pre_handler
+-		 * and restored by longjmp_break_handler.
+-		 */
+-#ifdef CONFIG_THUMB2_KERNEL
+-		"ldr	lr, [sp, %2]		\n\t" /* lr = saved sp */
+-		"ldrd	r0, r1, [sp, %5]	\n\t" /* r0,r1 = saved lr,pc */
+-		"ldr	r2, [sp, %4]		\n\t" /* r2 = saved psr */
+-		"stmdb	lr!, {r0, r1, r2}	\n\t" /* push saved lr and */
+-						      /* rfe context */
+-		"ldmia	sp, {r0 - r12}		\n\t"
+-		"mov	sp, lr			\n\t"
+-		"ldr	lr, [sp], #4		\n\t"
+-		"rfeia	sp!			\n\t"
+-#else
+-		"ldr	r0, [sp, %4]		\n\t"
+-		"msr	cpsr_cxsf, r0		\n\t"
+-		"ldmia	sp, {r0 - pc}		\n\t"
+-#endif
+-		:
+-		: "r" (kcb->jprobe_saved_regs.ARM_sp),
+-		  "I" (sizeof(struct pt_regs) * 2),
+-		  "J" (offsetof(struct pt_regs, ARM_sp)),
+-		  "J" (offsetof(struct pt_regs, ARM_pc)),
+-		  "J" (offsetof(struct pt_regs, ARM_cpsr)),
+-		  "J" (offsetof(struct pt_regs, ARM_lr))
+-		: "memory", "cc");
+-}
+-
+-int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+-{
+-	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+-	long stack_addr = kcb->jprobe_saved_regs.ARM_sp;
+-	long orig_sp = regs->ARM_sp;
+-	struct jprobe *jp = container_of(p, struct jprobe, kp);
+-
+-	if (regs->ARM_pc == JPROBE_MAGIC_ADDR) {
+-		if (orig_sp != stack_addr) {
+-			struct pt_regs *saved_regs =
+-				(struct pt_regs *)kcb->jprobe_saved_regs.ARM_sp;
+-			printk("current sp %lx does not match saved sp %lx\n",
+-			       orig_sp, stack_addr);
+-			printk("Saved registers for jprobe %p\n", jp);
+-			show_regs(saved_regs);
+-			printk("Current registers\n");
+-			show_regs(regs);
+-			BUG();
+-		}
+-		*regs = kcb->jprobe_saved_regs;
+-		memcpy((void *)stack_addr, kcb->jprobes_stack,
+-		       MIN_STACK_SIZE(stack_addr));
+-		preempt_enable_no_resched();
+-		return 1;
+-	}
+-	return 0;
+-}
+-
+ int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+ {
+ 	return 0;
