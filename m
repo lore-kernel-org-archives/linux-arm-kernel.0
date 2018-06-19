@@ -1,59 +1,51 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 20 Jun 2018 00:57:02 +0800
-Subject: [PATCH v5 5/7] dmaengine: imx-sdma: remove the maximum limitation for
- bd numbers
-In-Reply-To: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1529427424-12321-6-git-send-email-yibin.gong@nxp.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 19 Jun 2018 16:24:15 +0800
+Subject: [PATCH v6 13/29] drm/mediatek: add connection from RDMA0 to DPI0
+In-Reply-To: <1529393670-26862-14-git-send-email-stu.hsieh@mediatek.com>
+References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+ <1529393670-26862-14-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529396655.26480.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No this limitation now after virtual dma used since bd is allocated
-dynamically instead of static.
+On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
+> This patch add the connection from RDMA0 to DPI0
+> 
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- drivers/dma/imx-sdma.c | 14 --------------
- 1 file changed, 14 deletions(-)
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index d1d3494..9f1a462 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -285,7 +285,6 @@ struct sdma_context_data {
- 	u32  scratch7;
- } __attribute__ ((packed));
- 
--#define NUM_BD (int)(PAGE_SIZE / sizeof(struct sdma_buffer_descriptor))
- 
- struct sdma_engine;
- 
-@@ -1290,13 +1289,6 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 	if (ret)
- 		goto err_bd_out;
- 
--	if (sg_len > NUM_BD) {
--		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
--				channel, sg_len, NUM_BD);
--		ret = -EINVAL;
--		goto err_bd_out;
--	}
--
- 	desc->chn_count = 0;
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct sdma_buffer_descriptor *bd = &desc->bd[i];
-@@ -1406,12 +1398,6 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 	if (ret)
- 		goto err_bd_out;
- 
--	if (num_periods > NUM_BD) {
--		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
--				channel, num_periods, NUM_BD);
--		goto err_bd_out;
--	}
--
- 	if (period_len > 0xffff) {
- 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %zu > %d\n",
- 				channel, period_len, 0xffff);
--- 
-2.7.4
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 977df8facb79..3a3f37f523f2 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -29,6 +29,7 @@
+>  #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+>  #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
+>  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+> +#define DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN	0x0c4
+>  #define DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN	0x0c8
+>  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+>  
+> @@ -80,6 +81,7 @@
+>  #define COLOR0_SEL_IN_OVL0		0x1
+>  #define OVL1_MOUT_EN_COLOR1		0x1
+>  #define GAMMA_MOUT_EN_RDMA1		0x1
+> +#define RDMA0_SOUT_DPI0			0x2
+>  #define RDMA1_SOUT_DPI0			0x2
+>  #define DPI0_SEL_IN_RDMA1		0x1
+>  #define COLOR1_SEL_IN_OVL1		0x1
+> @@ -155,6 +157,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
+>  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+>  		value = OD1_MOUT_EN_RDMA1;
+> +	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
+> +		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
+> +		value = RDMA0_SOUT_DPI0;
+>  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
+>  		value = RDMA1_SOUT_DPI0;
