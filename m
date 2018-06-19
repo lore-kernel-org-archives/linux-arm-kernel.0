@@ -1,85 +1,175 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 19 Jun 2018 18:00:57 +0200
-Subject: [PATCH] arm64: mm: mark tramp_pg_dir read-only
-In-Reply-To: <20180619155512.GQ13984@arm.com>
-References: <20180530091457.GB2452@arm.com>
- <CAKv+Gu8Zc7eQbG-Ww51GXUCEmhe2J03vbq5vVdyaKra-s13KrA@mail.gmail.com>
- <20180619152035.GM13984@arm.com>
- <CAKv+Gu-Mad64U63jjuKGjhg=h2wdoEKm2vywzATBYr-t_UY_bQ@mail.gmail.com>
- <20180619152805.GN13984@arm.com>
- <CAKv+Gu81zgvcLd-N_MMENykxcm6ENvvfCuWOoMGsrfUf9Usy5g@mail.gmail.com>
- <20180619153754.GO13984@arm.com>
- <CAKv+Gu-x-e+M7_28m=zMeZ2=1p6DXWvu2L4K988jpfYjK+=JaA@mail.gmail.com>
- <20180619155001.GP13984@arm.com>
- <CAKv+Gu-fA61TbOWOfMbwffyJEzMDKrOSOOw0nbNbeO-xm8YbaA@mail.gmail.com>
- <20180619155512.GQ13984@arm.com>
-Message-ID: <CAKv+Gu-KA0Yog7mxfPkF7aNkJsTr=V6+R9+tbKLw0xMb4mSmWQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 19 Jun 2018 09:52:02 -0600
+Subject: [PATCH 0/5] RFC: Mezzanine handling for 96boards
+In-Reply-To: <20180618074556.6944-1-linus.walleij@linaro.org>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqK2DKPbaFvUPSU2E7oh1_pryrRXPMg8OASmK722jmznwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2018 at 17:55, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jun 19, 2018 at 05:51:46PM +0200, Ard Biesheuvel wrote:
->> On 19 June 2018 at 17:50, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Jun 19, 2018 at 05:40:26PM +0200, Ard Biesheuvel wrote:
->> >> On 19 June 2018 at 17:37, Will Deacon <will.deacon@arm.com> wrote:
->> >> > On Tue, Jun 19, 2018 at 05:29:03PM +0200, Ard Biesheuvel wrote:
->> >> >> On 19 June 2018 at 17:28, Will Deacon <will.deacon@arm.com> wrote:
->> >> >> > On Tue, Jun 19, 2018 at 05:23:41PM +0200, Ard Biesheuvel wrote:
->> >> >> >> On 19 June 2018 at 17:20, Will Deacon <will.deacon@arm.com> wrote:
->> >> >> >> > On Wed, May 30, 2018 at 11:53:20AM +0200, Ard Biesheuvel wrote:
->> >> >> >> >> On 30 May 2018 at 11:14, Will Deacon <will.deacon@arm.com> wrote:
->> >> >> >> >> > On Wed, May 30, 2018 at 12:48:06PM +0800, YaoJun wrote:
->> >> >> >> >> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> >> >> >> >> >> index 2dbb2c9f1ec1..ac4b22c7e435 100644
->> >> >> >> >> >> --- a/arch/arm64/mm/mmu.c
->> >> >> >> >> >> +++ b/arch/arm64/mm/mmu.c
->> >> >> >> >> >> @@ -551,6 +551,10 @@ static int __init map_entry_trampoline(void)
->> >> >> >> >> >>       __create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
->> >> >> >> >> >>                            prot, pgd_pgtable_alloc, 0);
->> >> >> >> >> >>
->> >> >> >> >> >> +     update_mapping_prot(__pa_symbol(tramp_pg_dir),
->> >> >> >> >> >> +                             (unsigned long)tramp_pg_dir,
->> >> >> >> >> >> +                             PGD_SIZE, PAGE_KERNEL_RO);
->> >> >> >> >> >
->> >> >> >> >> > Hmm, I like the idea but is there a risk that the page table has been mapped
->> >> >> >> >> > as part of a block entry, which we can't safely split at this point (i.e.
->> >> >> >> >> > we'll run into one of the BUG_ONs in the mapping code)?
->> >> >> >> >> >
->> >> >> >> >>
->> >> >> >> >> We'd need to create a separate segment for it initially so the mapping
->> >> >> >> >> is already at the right granularity.
->> >> >> >> >
->> >> >> >> > Why do you think that's the case? I can't see anything that guarantees this
->> >> >> >> > for the page table itself.
->> >> >> >> >
->> >> >> >>
->> >> >> >> We'd need to pass NO_BLOCK_MAPPINGS to map_kernel_segment(),
->> >> >> >> obviously, but that shouldn't hurt since that segment is relatively
->> >> >> >> tiny anyway.
->> >> >> >
->> >> >> > Ah right, with NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS, I agree that we're good.
->> >> >> > Ideally, we'd move {idmap,swapper,tramp}_pg_dir into .rodata...
->> >> >> >
->> >> >>
->> >> >> idmap and tramp yes, but swapper needs to be modifiable at runtime, no?
->> >> >
->> >> > Right, but couldn't we swizzle the permissions in e.g. set_pmd? We could
->> >> > even predicate that on a sanity check of the prot.
->> >> >
->> >>
->> >> Swizzle the permissions of the entire .rodata segment? That sounds
->> >> doable, but there is a whole class of data that belongs in this
->> >> category, and I think PaX/grsecurity had an API for that (but I don't
->> >> think anyone is upstreaming that yet). So let's not reinvent that
->> >> wheel for swapper_pg_dir only.
->> >
->> > I wasn't thinking of the whole .rodata segment -- just the page containing
->> > the entry being modified, but ok.
->>
->> That means we will need to map .rodata down to pages as well, or at
->> least avoid contiguous mappings.
+On Mon, Jun 18, 2018 at 1:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This is a proposal for how to handle the non-discoverable
+> 96boards plug-in expansion boards called "mezzanines" in the
+> Linux kernel. It is a working RFC series meant for discussion
+> at the moment.
 >
-> Doesn't it already avoid those?
+> The RFC was done on the brand new Ultra96 board from Xilinx
+> with a Secure96 mezzanine expansion board. The main part
+> is in patch 4, the rest is enabling and examples.
 >
+> The code can be obtained from here:
+> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git/log/?h=ultra96
+>
+> You can for example probably augment the DTS file for any
+> upstream-supported 96board and get the Secure96 going with
+> it with minor efforts.
+>
+> TODO:
+>
+> - Proper device tree bindings for the connector, for now
+>   look at the example.
+>
+> - Discuss whether to actually do this or just take it all and
+>   flush it down the drain because the community doesn't like
+>   it. I'm not one of those especially infatuated with my own code,
+>   I always stay by the old programming project management mantra
+>   to calculate to make one version and throw it away as stepping
+>   stone to a good final design.
+>
+> - Placement: putting this in drivers/bus is just an example.
+>   drivers/platform/96boards-mezzanines is fine too, maybe better?
+>
+> - I am especially curious about input from Andy and Mika from
+>   the Intel/ACPI camp on what they have seen for non-discoverable
+>   plug-in boards. Does this problem even exist in the Intel
+>   world, or not...
+>
+> Background:
+>
+> - These boards connect on a custom connector on this family
+>   of boards. The relationship is many-to-many with the connector
+>   as nexus. The electronic standard for the connector is specified:
+>   https://github.com/96boards/documentation/blob/master/Specifications/96Boards-CE-Specification.pdf
+>   Example mezzanines:
+>   https://www.96boards.org/documentation/mezzanine/
+>
+> - These boards have siblings on other platforms, the problem
+>   scope is similar with BeagleBone "capes":
+>   https://beagleboard.org/capes
+>   Raspberry Pi expansion boards:
+>   https://www.abelectronics.co.uk/products/18/raspberry-pi-expansion-boards
+>   Intel Edison, Galileo, Joule also have expansion boards.
+>
+> Idea: add a driver for the connector itself and tie it in to
+> the device tree with a compatible string. Since the boards
+> are non-discoverable two mechanisms are provided to discover
+> them:
+>
+> - Add a very simple device tree node with just a compatible
+>   string for the board in the node. This will be simple to
+>   add from e.g. a boot loader or as an overlay from userspace.
+>
+>   board {
+>         compatible = "96boards,secure96";
+>   };
+>
+>
+> - Echo 1 > boardname into a sysfs file to populate the
+>   board and echo 0 > boardname to depopulate it. This
+>   makes it easy to even switch out expansion boards at
+>   runtime, if allowed by the electronics.
+>
+>   > cd /sys/devices/platform/connector
+>   > echo 1 > secure96
+>   lscon connector: called mezzanine_store on secure96
+>   lscon connector: populate secure96
+>   at24 1-0050: 2048 byte 24c128 EEPROM, writable, 128 bytes/write
+>   atmel-ecc 1-0060: configuration zone is unlocked
+>   tpm_tis_spi spi0.0: 2.0 TPM (device-id 0x1B, rev-id 16)
+>   (...)
+>
+> What this patch set does not do:
+>
+> - It does not use device tree or ACPI DSDT or any other
+>   hardware decription language to model the contents of the
+>   board per se. Instead the boards buses are populated
+>   directly with platform devices.
+>
+> Predictable complaints about this design:
+>
+> Q: This is not device tree overlays. Why is it not device
+>    tree overlays?
+>
+> A1: Right tool for the job, overlays are complex and the
+>     plan to get it in place seems to be spanning years, this
+>     is a few devices on simple busses and it works today.
+>     Using this approach I can already work on shaping up
+>     drivers for the mezzanine board devices as proved by:
+>     https://marc.info/?l=linux-crypto-vger&m=152820660120590&w=2
+>     https://marc.info/?l=linux-crypto-vger&m=152820662820595&w=2
+>     (...)
+>
+>     I can work on drivers for the chips on the
+>     Secure96 mezzanine board. It's just an example of
+>     what the mezzanine community can do.
+>     Now they are hacking around in userspace instead of
+>     doing/reusing kernel drivers for their stuff:
+>     https://github.com/jbech-linaro/secure96
+>
+>     This way we can bring developers for these components
+>     into the kernel community instead of telling them to
+>     wait for some big infrastructure that comes later
+>     before they can contribute their stuff.
+>
+> A2: Overlays does not solve the problem if the system runs
+>     ACPI, and what about if the same connector[s] appear
+>     on a server board, servers use ACPI. Also notice
+>     that Intel have development boards with non-discoverable
+>     expansion boards as well. They just will not use
+>     device tree.
+>
+> A3: Overlays is Big Upfront Design.
+>     https://en.wikipedia.org/wiki/Big_Design_Up_Front
+>     This way of designing things is associated with the
+>     (pejorative term) "waterfall model" which is out of
+>     fashion as a way of doing development. I think I am not
+>     the only one slightly annoyed by the fact that device
+>     tree overlays is now starting to look like a very
+>     big very upfront design. It's just not possible to get
+>     something up and running in small iterative steps with
+>     device tree overlays. Instead huge efforts are
+>     required and it involves major possible showstoppers
+>     and uncertain outcome as indicated by Frank's TODO:
+>     https://elinux.org/Frank's_Evolving_Overlay_Thoughts
 
-You are right, it does.
+I don't agree. This can be broken down into various smaller mostly
+independent problems. Overlay handling is mostly an orthogonal
+problem. The exception is that we need to ensure bindings allow a
+decoupling of upstream of the connector and downstream of the
+connector so the downstream part can be a reusable overlay. Defining
+anything while ignoring this known criteria would be a mistake.
+
+The list is roughly like this:
+
+- Connector node binding and probing infrastructure
+- GPIO (already done w/ gpio-map binding)
+- I2C
+- SPI
+- Pinmux
+- clocks
+- OF graph (displays, cameras, etc.)
+- USB (re-use the USB connector binding for non-standard connectors)
+- Userspace interface
+
+We don't have to support every interface from the start. The bindings
+and corresponding kernel support can be designed 1-by-1 for the most
+part. Start with something simple like a GPIO LED on a mezzanine. Once
+the base is functionality is there, the other parts can be worked on
+incrementally. We can punt any overlay handling to the bootloader
+initially. That punts all the issues around overlays like designing a
+userspace interface, where overlays are located (filesystem, passed
+from bootloader, built into the kernel), when they are loaded, and how
+to specify which overlays to load. Most of Frank's list is related to
+these issues.
+
+Rob
