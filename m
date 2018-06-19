@@ -1,107 +1,62 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 19 Jun 2018 15:44:21 +0900
-Subject: [PATCH v2 1/4] arm64: export memblock_reserve()d regions via
- /proc/iomem
+Date: Tue, 19 Jun 2018 15:44:22 +0900
+Subject: [PATCH v2 2/4] efi/arm: map UEFI memory map even w/o runtime services
+ enabled
 In-Reply-To: <20180619064424.6642-1-takahiro.akashi@linaro.org>
 References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
-Message-ID: <20180619064424.6642-2-takahiro.akashi@linaro.org>
+Message-ID: <20180619064424.6642-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+Under the current implementation, UEFI memory map will be mapped and made
+available in virtual mappings only if runtime services are enabled.
+But in a later patch, we want to use UEFI memory map in acpi_os_ioremap()
+to create mappings of ACPI tables using memory attributes described in
+UEFI memory map.
 
-There has been some confusion around what is necessary to prevent kexec
-overwriting important memory regions. memblock: reserve, or nomap?
-Only memblock nomap regions are reported via /proc/iomem, kexec's
-user-space doesn't know about memblock_reserve()d regions.
+So, as a first step, arm_enter_runtime_services() will be modified
+so that UEFI memory map will be always accessible.
 
-Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
-as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
-and thus possible for kexec to overwrite with the new kernel or initrd.
-But this was always broken, as the UEFI memory map is also reserved
-and not marked as nomap.
+See a relevant commit:
+    arm64: acpi: fix alignment fault in accessing ACPI tables
 
-Exporting both nomap and reserved memblock types is a nuisance as
-they live in different memblock structures which we can't walk at
-the same time.
-
-Take a second walk over memblock.reserved and add new 'reserved'
-subnodes for the memblock_reserved() regions that aren't already
-described by the existing code. (e.g. Kernel Code)
-
-We use reserve_region_with_split() to find the gaps in existing named
-regions. This handles the gap between 'kernel code' and 'kernel data'
-which is memblock_reserve()d, but already partially described by
-request_standard_resources(). e.g.:
-| 80000000-dfffffff : System RAM
-|   80080000-80ffffff : Kernel code
-|   81000000-8158ffff : reserved
-|   81590000-8237efff : Kernel data
-|   a0000000-dfffffff : Crash kernel
-| e00f0000-f949ffff : System RAM
-
-reserve_region_with_split needs kzalloc() which isn't available when
-request_standard_resources() is called, use an initcall.
-
-Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
-Reported-by: Tyler Baicar <tbaicar@codeaurora.org>
-Suggested-by: Akashi Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: James Morse <james.morse@arm.com>
-Fixes: d28f6df1305a ("arm64/kexec: Add core kexec support")
-CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-CC: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/setup.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ drivers/firmware/efi/arm-runtime.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 30ad2f085d1f..5b4fac434c84 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -241,6 +241,44 @@ static void __init request_standard_resources(void)
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index 5889cbea60b8..30ac5c82051e 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -115,6 +115,13 @@ static int __init arm_enable_runtime_services(void)
+ 		return 0;
  	}
- }
  
-+static int __init reserve_memblock_reserved_regions(void)
-+{
-+	phys_addr_t start, end, roundup_end = 0;
-+	struct resource *mem, *res;
-+	u64 i;
++	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
 +
-+	for_each_reserved_mem_region(i, &start, &end) {
-+		if (end <= roundup_end)
-+			continue; /* done already */
-+
-+		start = __pfn_to_phys(PFN_DOWN(start));
-+		end = __pfn_to_phys(PFN_UP(end)) - 1;
-+		roundup_end = end;
-+
-+		res = kzalloc(sizeof(*res), GFP_ATOMIC);
-+		if (WARN_ON(!res))
-+			return -ENOMEM;
-+		res->start = start;
-+		res->end = end;
-+		res->name  = "reserved";
-+		res->flags = IORESOURCE_MEM;
-+
-+		mem = request_resource_conflict(&iomem_resource, res);
-+		/*
-+		 * We expected memblock_reserve() regions to conflict with
-+		 * memory created by request_standard_resources().
-+		 */
-+		if (WARN_ON_ONCE(!mem))
-+			continue;
-+		kfree(res);
-+
-+		reserve_region_with_split(mem, start, end, "reserved");
++	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
++		pr_err("Failed to remap EFI memory map\n");
++		return 0;
 +	}
 +
-+	return 0;
-+}
-+arch_initcall(reserve_memblock_reserved_regions);
-+
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+ 	if (efi_runtime_disabled()) {
+ 		pr_info("EFI runtime services will be disabled.\n");
+ 		return 0;
+@@ -127,13 +134,6 @@ static int __init arm_enable_runtime_services(void)
  
- void __init setup_arch(char **cmdline_p)
+ 	pr_info("Remapping and enabling EFI services.\n");
+ 
+-	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
+-
+-	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+-		pr_err("Failed to remap EFI memory map\n");
+-		return -ENOMEM;
+-	}
+-
+ 	if (!efi_virtmap_init()) {
+ 		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
+ 		return -ENOMEM;
 -- 
 2.17.0
