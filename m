@@ -1,57 +1,27 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 19 Jun 2018 11:40:00 -0700
-Subject: [PATCH 04/11] input: rohm_bu21023: switch to i2c_lock_segment
-In-Reply-To: <20180615101506.8012-5-peda@axentia.se>
-References: <20180615101506.8012-1-peda@axentia.se>
- <20180615101506.8012-5-peda@axentia.se>
-Message-ID: <20180619184000.GJ71788@dtor-ws>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 19 Jun 2018 21:26:31 +0200
+Subject: [PATCH 0/2] Make badr macro compatible with newer GAS versions
+Message-ID: <20180619192633.21846-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 12:14:59PM +0200, Peter Rosin wrote:
-> Locking the root adapter for __i2c_transfer will deadlock if the
-> device sits behind a mux-locked I2C mux. Switch to the finer-grained
-> i2c_lock_segment. If the device does not sit behind a mux-locked mux,
-> the two locking variants are equivalent.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+Work around the mindless and backward incompatible change in GAS that
+prevents us from using a simple addition to set the Thumb bit in local
+symbol references taken using 'adr' instructions (#2)
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+As a preparatory step, remove badr occurrences in ARM code sequences
+contained in Thumb2 kernels.
 
-I'm OK with it going through Wolfram's tree; I do not think I'd need an
-immutable branch for this even...
+Ard Biesheuvel (2):
+  ARM: avoid badr macro for switching to Thumb-2 mode
+  ARM: assembler: prevent ADR from setting the Thumb bit twice
 
-> ---
->  drivers/input/touchscreen/rohm_bu21023.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/touchscreen/rohm_bu21023.c b/drivers/input/touchscreen/rohm_bu21023.c
-> index bda0500c9b57..22d79db07234 100644
-> --- a/drivers/input/touchscreen/rohm_bu21023.c
-> +++ b/drivers/input/touchscreen/rohm_bu21023.c
-> @@ -304,7 +304,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
->  	msg[1].len = len;
->  	msg[1].buf = buf;
->  
-> -	i2c_lock_adapter(adap);
-> +	i2c_lock_segment(adap);
->  
->  	for (i = 0; i < 2; i++) {
->  		if (__i2c_transfer(adap, &msg[i], 1) < 0) {
-> @@ -313,7 +313,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
->  		}
->  	}
->  
-> -	i2c_unlock_adapter(adap);
-> +	i2c_unlock_segment(adap);
->  
->  	return ret;
->  }
-> -- 
-> 2.11.0
-> 
-
-Thanks.
+ arch/arm/common/mcpm_head.S      |  5 ++---
+ arch/arm/include/asm/assembler.h | 22 +++++++++++++++++++-
+ arch/arm/kernel/head-nommu.S     |  7 +++----
+ arch/arm/kernel/head.S           | 15 +++++++------
+ arch/arm/kernel/sleep.S          |  7 +++----
+ 5 files changed, 36 insertions(+), 20 deletions(-)
 
 -- 
-Dmitry
+2.17.1
