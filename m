@@ -1,164 +1,117 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 19 Jun 2018 13:18:17 +0100
-Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
-In-Reply-To: <20180618120310.39527-11-mark.rutland@arm.com>
+Date: Tue, 19 Jun 2018 13:19:19 +0100
+Subject: [PATCHv3 06/19] arm64: move sve_user_{enable, disable} to
+ <asm/fpsimd.h>
+In-Reply-To: <20180618120310.39527-7-mark.rutland@arm.com>
 References: <20180618120310.39527-1-mark.rutland@arm.com>
- <20180618120310.39527-11-mark.rutland@arm.com>
-Message-ID: <20180619121814.GR22983@e103592.cambridge.arm.com>
+ <20180618120310.39527-7-mark.rutland@arm.com>
+Message-ID: <20180619121918.GS22983@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 01:03:01PM +0100, Mark Rutland wrote:
-> Now that the syscall invocation logic is in C, we can migrate the rest
-> of the syscall entry logic over, so that the entry assembly needn't look
-> at the register values at all.
+On Mon, Jun 18, 2018 at 01:02:57PM +0100, Mark Rutland wrote:
+> In subsequent patches, we'll want to make use of sve_user_enable() and
+> sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
+> <asm/fpsimd.h> where we can make use of them.
 > 
-> The SVE reset across syscall logic now unconditionally clears TIF_SVE,
-> but sve_user_disable() will only write back to CPACR_EL1 when SVE is
-> actually enabled.
+> To avoid ifdeffery in sequences like:
+> 
+> if (system_supports_sve() && some_condition
+> 	sve_user_disable();
+> 
+> ... empty stubs are provided when support for SVE is not enabled. Note
+> that system_supports_sve() contains as IS_ENABLED(CONFIG_ARM64_SVE), so
+> the sve_user_disable() call should be optimized away entirely when
+> CONFIG_ARM64_SVE is not selected.
+> 
+> To ensure that this is the case, the stub definitions contain a
+> BUILD_BUG(), as we do for other stubs for which calls should always be
+> optimized away when the relevant config option is not selected.
+> 
+> At the same time, the include list of <asm/fpsimd.h> is sorted while
+> adding <asm/sysreg.h>.
 > 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
 > ---
->  arch/arm64/kernel/entry.S   | 42 ++++--------------------------------------
->  arch/arm64/kernel/syscall.c | 40 ++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 42 insertions(+), 40 deletions(-)
+>  arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
+>  arch/arm64/kernel/fpsimd.c      | 10 ----------
+>  2 files changed, 16 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 05b9f03f3e00..156c4e3fd1a4 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -720,14 +720,9 @@ el0_sync_compat:
->  	b.ge	el0_dbg
->  	b	el0_inv
->  el0_svc_compat:
-> -	/*
-> -	 * AArch32 syscall handling
-> -	 */
-> -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
-> -	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
-> -	mov	wscno, w7			// syscall number in w7 (r7)
-> -	mov     wsc_nr, #__NR_compat_syscalls
-> -	b	el0_svc_naked
-> +	mov	x0, sp
-> +	bl	el0_svc_compat_handler
-> +	b	ret_to_user
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index fa92747a49c8..dd1ad3950ef5 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -16,13 +16,15 @@
+>  #ifndef __ASM_FP_H
+>  #define __ASM_FP_H
 >  
->  	.align	6
->  el0_irq_compat:
-> @@ -925,37 +920,8 @@ ENDPROC(ret_to_user)
->   */
->  	.align	6
->  el0_svc:
-> -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
-> -	adrp	stbl, sys_call_table		// load syscall table pointer
-> -	mov	wscno, w8			// syscall number in w8
-> -	mov	wsc_nr, #__NR_syscalls
-> -
-> -#ifdef CONFIG_ARM64_SVE
-> -alternative_if_not ARM64_SVE
-> -	b	el0_svc_naked
-> -alternative_else_nop_endif
-> -	tbz	x16, #TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
-> -	bic	x16, x16, #_TIF_SVE		// discard SVE state
-> -	str	x16, [tsk, #TSK_TI_FLAGS]
-> -
-> -	/*
-> -	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-> -	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-> -	 * happens if a context switch or kernel_neon_begin() or context
-> -	 * modification (sigreturn, ptrace) intervenes.
-> -	 * So, ensure that CPACR_EL1 is already correct for the fast-path case:
-> -	 */
-> -	mrs	x9, cpacr_el1
-> -	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
-> -	msr	cpacr_el1, x9			// synchronised by eret to el0
-> -#endif
-> -
-> -el0_svc_naked:					// compat entry point
->  	mov	x0, sp
-> -	mov	w1, wscno
-> -	mov	w2, wsc_nr
-> -	mov	x3, stbl
-> -	bl	el0_svc_common
-> +	bl	el0_svc_handler
->  	b	ret_to_user
->  ENDPROC(el0_svc)
+> -#include <asm/ptrace.h>
+>  #include <asm/errno.h>
+> +#include <asm/ptrace.h>
+>  #include <asm/processor.h>
+>  #include <asm/sigcontext.h>
+> +#include <asm/sysreg.h>
 >  
-> diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-> index 2adf1a073398..6a31bb2a382b 100644
-> --- a/arch/arm64/kernel/syscall.c
-> +++ b/arch/arm64/kernel/syscall.c
-> @@ -6,7 +6,9 @@
->  #include <linux/ptrace.h>
+>  #ifndef __ASSEMBLY__
 >  
->  #include <asm/daifflags.h>
-> +#include <asm/fpsimd.h>
->  #include <asm/thread_info.h>
-> +#include <asm/unistd.h>
+> +#include <linux/build_bug.h>
+>  #include <linux/cache.h>
+>  #include <linux/init.h>
+>  #include <linux/stddef.h>
+> @@ -102,6 +104,16 @@ extern int sve_set_vector_length(struct task_struct *task,
+>  extern int sve_set_current_vl(unsigned long arg);
+>  extern int sve_get_current_vl(void);
 >  
->  long do_ni_syscall(struct pt_regs *regs);
->  
-> @@ -42,8 +44,8 @@ static inline bool has_syscall_work(unsigned long flags)
->  int syscall_trace_enter(struct pt_regs *regs);
->  void syscall_trace_exit(struct pt_regs *regs);
->  
-> -asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
-> -			       syscall_fn_t syscall_table[])
-> +static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
-> +			   syscall_fn_t syscall_table[])
->  {
->  	unsigned long flags = current_thread_info()->flags;
->  
-> @@ -80,3 +82,37 @@ asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
->  trace_exit:
->  	syscall_trace_exit(regs);
+> +static inline void sve_user_disable(void)
+> +{
+> +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+> +}
+> +
+> +static inline void sve_user_enable(void)
+> +{
+> +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+> +}
+> +
+>  /*
+>   * Probing and setup functions.
+>   * Calls to these functions must be serialised with one another.
+> @@ -128,6 +140,9 @@ static inline int sve_get_current_vl(void)
+>  	return -EINVAL;
 >  }
+>  
+> +static inline void sve_user_disable(void) { BUILD_BUG(); }
+> +static inline void sve_user_enable(void) { BUILD_BUG(); }
 > +
-> +static inline void sve_user_reset(void)
-> +{
-
-Can we call this "sve_user_discard" please?
-
-"Reset" is a reasonable name for the concept, but the "discard"
-terminology has been used elsewhere.
-
-> +	if (!system_supports_sve())
-> +		return;
-> +
-> +	/*
-> +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-> +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-> +	 * happens if a context switch or kernel_neon_begin() or context
-> +	 * modification (sigreturn, ptrace) intervenes.
-> +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
-> +	 */
-
-This comment should go after clear_thead_flag(), since it describes not
-the purpose of this function but the presence of sve_user_disable().
-
-> +	clear_thread_flag(TIF_SVE);
-> +	sve_user_disable();
-> +}
-> +
-> +extern syscall_fn_t sys_call_table[];
-> +
-> +asmlinkage void el0_svc_handler(struct pt_regs *regs)
-> +{
-> +	sve_user_reset();
-> +	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
-> +}
-> +
-> +#ifdef CONFIG_COMPAT
-> +extern syscall_fn_t compat_sys_call_table[];
-> +
-> +asmlinkage void el0_svc_compat_handler(struct pt_regs *regs)
-> +{
-> +	el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
-> +		       compat_sys_call_table);
-> +}
-> +#endif
+>  static inline void sve_init_vq_map(void) { }
+>  static inline void sve_update_vq_map(void) { }
+>  static inline int sve_verify_vq_map(void) { return 0; }
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index a98a7f96aff1..58c53bc96928 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -159,16 +159,6 @@ static void sve_free(struct task_struct *task)
+>  	__sve_free(task);
+>  }
+>  
+> -static void sve_user_disable(void)
+> -{
+> -	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+> -}
+> -
+> -static void sve_user_enable(void)
+> -{
+> -	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+> -}
+> -
+>  /*
+>   * TIF_SVE controls whether a task can use SVE without trapping while
+>   * in userspace, and also the way a task's FPSIMD/SVE state is stored
 > -- 
 > 2.11.0
 > 
