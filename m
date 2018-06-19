@@ -1,27 +1,54 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Jun 2018 10:14:24 -0700
-Subject: [RFC PATCH] ARM: Use logical or instead of addition for badr
- address calculation
-In-Reply-To: <20180619151235.GH17671@n2100.armlinux.org.uk>
-References: <1529384828-2452-1-git-send-email-linux@roeck-us.net>
- <CAKv+Gu8Byj7G3Awnq4Y90Wot=GJTx0gO5A7-960au9ZkBBL2=A@mail.gmail.com>
- <b8bff03d-91a7-0e53-a44e-d1924beb382d@roeck-us.net>
- <CAKv+Gu-T8Fx3Nry7pUdOoOeRU-Ns89w3oo4itmu1q4FzYF5Rag@mail.gmail.com>
- <20180619151235.GH17671@n2100.armlinux.org.uk>
-Message-ID: <20180619171424.GA16846@roeck-us.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 19 Jun 2018 19:20:49 +0200
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Stop compiling headsmp-apmu on !SMP
+Message-ID: <20180619172049.20089-1-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 04:12:35PM +0100, Russell King - ARM Linux wrote:
-> 
-> So, I'm going to continue sitting on the fence on this, and basically
-> take the attitude that it's better that people don't use the new
-> binutils until binutils people can provide us with an officially
-> sanctioned solution that's going to work for both older and future
-> assemblers.
-> 
-I would so much love if people were working together instead of against
-each other :-(. Never mind, I'll try a toolchain with binutils 2.28.1.
-At least that is still supported with buildroot.
+As of commit cad160ed0a94927e ("ARM: shmobile: Convert file to use
+cntvoff"), there's no non-SMP code left in headsmp-apmu.S.
 
-Guenter
+Hence build the file for SMP only, and drop the no longer needed check
+for CONFIG_SMP inside the file.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-shmobile/Makefile       | 2 +-
+ arch/arm/mach-shmobile/headsmp-apmu.S | 2 --
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 05ba728ed4f67cf2..b33dc59d8698d218 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -21,13 +21,13 @@ cpu-y				:= platsmp.o headsmp.o
+ # Shared SoC family objects
+ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= setup-rcar-gen2.o platsmp-apmu.o $(cpu-y)
+ CFLAGS_setup-rcar-gen2.o	+= -march=armv7-a
+-obj-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= regulator-quirk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= regulator-quirk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
+ 
+ # SMP objects
+ smp-y				:= $(cpu-y)
++smp-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+index a7b4bc7a087bdca1..fabe9cadd12ef0b1 100644
+--- a/arch/arm/mach-shmobile/headsmp-apmu.S
++++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+@@ -8,9 +8,7 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ 
+-#ifdef CONFIG_SMP
+ ENTRY(shmobile_boot_apmu)
+ 	bl	secure_cntvoff_init
+ 	b	secondary_startup
+ ENDPROC(shmobile_boot_apmu)
+-#endif
+-- 
+2.17.1
