@@ -1,68 +1,23 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Jun 2018 14:42:48 -0500
-Subject: [PATCH 0/5] arm64: Initial support Texas Instrument's AM654 Platform
-Message-ID: <20180619194253.27288-1-nm@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 19 Jun 2018 12:49:32 -0700
+Subject: [PATCH] dt-bindings: Fix unbalanced quotation marks
+In-Reply-To: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+References: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+Message-ID: <f5ffdbd1-d357-fa8d-9fdb-461cf2b9ad89@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-This is an update from RFC posted earlier:
-        https://marc.info/?l=linux-arm-kernel&m=152817866312732&w=2
+On 06/17/2018 07:31 AM, Jonathan Neusch?fer wrote:
+> Multiple binding documents have various forms of unbalanced quotation
+> marks. Fix them.
+> 
+> Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
+> ---
 
-The following series enables support for newest addition in TI's SoC
-portfolio - AM654 SoC.
+[snip]
 
-The series is based off v4.18-rc1, also available here:
-https://github.com/nmenon/linux-2.6-playground/tree/upstream/v4.18-rc1/k3-1-am6-base
+>  Documentation/devicetree/bindings/mips/brcm/soc.txt             | 2 +-
 
-Key changes since RFC are indicated in respective patches:
-* dt bindings updates (from review comments)
-* device tree is split up to incorporate ranges and bus segments
-* Cosmetic fixes including renaming the base dts to prevent confusion
-* UART has been split out
-
-Consolidated all patches (including all series) are available here:
-https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
-
-Full Boot log (integrated of all series) is available here:
-   https://pastebin.ubuntu.com/p/bBFmnzYtCd/
-
-NOTE: The uart series is seperated out and we get operational console only
-after that series is merged.
-
-The AM654 SoC is a lead device of the K3 Multicore SoC architecture
-platform, targeted for broad market and industrial control with aim to
-meet the complex processing needs of modern embedded products.
-
-The Linux development follows closely the 66AK2G SoC model in aarch64.
-
-See AM65x Technical Reference Manual (SPRUID7, April 2018)
-for further details: http://www.ti.com/lit/pdf/spruid7
-
-Nishanth Menon (5):
-  dt-bindings: arm: ti: Add bindings for AM654 SoC
-  arm64: Add support for TI's K3 Multicore SoC architecture
-  arm64: dts: ti: Add Support for AM654 SoC
-  soc: ti: Add Support for AM654 SoC config option
-  arm64: dts: ti: Add support for AM654 EVM base board
-
- Documentation/devicetree/bindings/arm/ti/k3.txt |  23 +++++
- MAINTAINERS                                     |   9 ++
- arch/arm64/Kconfig.platforms                    |   7 ++
- arch/arm64/boot/dts/Makefile                    |   1 +
- arch/arm64/boot/dts/ti/Makefile                 |   9 ++
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi        |  31 +++++++
- arch/arm64/boot/dts/ti/k3-am65.dtsi             |  87 ++++++++++++++++++
- arch/arm64/boot/dts/ti/k3-am654-base-board.dts  |  36 ++++++++
- arch/arm64/boot/dts/ti/k3-am654.dtsi            | 115 ++++++++++++++++++++++++
- drivers/soc/ti/Kconfig                          |  14 +++
- 10 files changed, 332 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
- create mode 100644 arch/arm64/boot/dts/ti/Makefile
- create mode 100644 arch/arm64/boot/dts/ti/k3-am65-main.dtsi
- create mode 100644 arch/arm64/boot/dts/ti/k3-am65.dtsi
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654.dtsi
-
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 -- 
-2.15.1
+Florian
