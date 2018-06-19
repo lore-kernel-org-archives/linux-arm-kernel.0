@@ -1,42 +1,68 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Jun 2018 14:42:50 -0500
-Subject: [PATCH 2/5] arm64: Add support for TI's K3 Multicore SoC architecture
-In-Reply-To: <20180619194253.27288-1-nm@ti.com>
-References: <20180619194253.27288-1-nm@ti.com>
-Message-ID: <20180619194253.27288-3-nm@ti.com>
+Date: Tue, 19 Jun 2018 14:42:48 -0500
+Subject: [PATCH 0/5] arm64: Initial support Texas Instrument's AM654 Platform
+Message-ID: <20180619194253.27288-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Texas Instrument's K3 Multicore SoC architecture
-processors.
+Hi,
+This is an update from RFC posted earlier:
+        https://marc.info/?l=linux-arm-kernel&m=152817866312732&w=2
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Changes since RFC:
- * None
+The following series enables support for newest addition in TI's SoC
+portfolio - AM654 SoC.
 
-RFC: https://patchwork.kernel.org/patch/10447633/
+The series is based off v4.18-rc1, also available here:
+https://github.com/nmenon/linux-2.6-playground/tree/upstream/v4.18-rc1/k3-1-am6-base
 
- arch/arm64/Kconfig.platforms | 7 +++++++
- 1 file changed, 7 insertions(+)
+Key changes since RFC are indicated in respective patches:
+* dt bindings updates (from review comments)
+* device tree is split up to incorporate ranges and bus segments
+* Cosmetic fixes including renaming the base dts to prevent confusion
+* UART has been split out
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index d5aeac351fc3..52df25bf4f8c 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -71,6 +71,13 @@ config ARCH_EXYNOS
- 	help
- 	  This enables support for ARMv8 based Samsung Exynos SoC family.
- 
-+config ARCH_K3
-+	bool "Texas Instruments Inc. K3 multicore SoC architecture"
-+	select PM_GENERIC_DOMAINS if PM
-+	help
-+	  This enables support for Texas Instruments' K3 multicore SoC
-+	  architecture.
-+
- config ARCH_LAYERSCAPE
- 	bool "ARMv8 based Freescale Layerscape SoC family"
- 	select EDAC_SUPPORT
+Consolidated all patches (including all series) are available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
+
+Full Boot log (integrated of all series) is available here:
+   https://pastebin.ubuntu.com/p/bBFmnzYtCd/
+
+NOTE: The uart series is seperated out and we get operational console only
+after that series is merged.
+
+The AM654 SoC is a lead device of the K3 Multicore SoC architecture
+platform, targeted for broad market and industrial control with aim to
+meet the complex processing needs of modern embedded products.
+
+The Linux development follows closely the 66AK2G SoC model in aarch64.
+
+See AM65x Technical Reference Manual (SPRUID7, April 2018)
+for further details: http://www.ti.com/lit/pdf/spruid7
+
+Nishanth Menon (5):
+  dt-bindings: arm: ti: Add bindings for AM654 SoC
+  arm64: Add support for TI's K3 Multicore SoC architecture
+  arm64: dts: ti: Add Support for AM654 SoC
+  soc: ti: Add Support for AM654 SoC config option
+  arm64: dts: ti: Add support for AM654 EVM base board
+
+ Documentation/devicetree/bindings/arm/ti/k3.txt |  23 +++++
+ MAINTAINERS                                     |   9 ++
+ arch/arm64/Kconfig.platforms                    |   7 ++
+ arch/arm64/boot/dts/Makefile                    |   1 +
+ arch/arm64/boot/dts/ti/Makefile                 |   9 ++
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi        |  31 +++++++
+ arch/arm64/boot/dts/ti/k3-am65.dtsi             |  87 ++++++++++++++++++
+ arch/arm64/boot/dts/ti/k3-am654-base-board.dts  |  36 ++++++++
+ arch/arm64/boot/dts/ti/k3-am654.dtsi            | 115 ++++++++++++++++++++++++
+ drivers/soc/ti/Kconfig                          |  14 +++
+ 10 files changed, 332 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
+ create mode 100644 arch/arm64/boot/dts/ti/Makefile
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am65.dtsi
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654.dtsi
+
 -- 
 2.15.1
