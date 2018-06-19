@@ -1,50 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Jun 2018 23:50:18 -0700
-Subject: [PATCH 01/10] ARM: OMAP1: ams-delta: drop GPIO lookup table for
- serio device
-In-Reply-To: <20180613044152.GB112168@atomide.com>
-References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
- <20180612222356.GD38773@dtor-ws> <69494657.T0PeNZxiFJ@z50>
- <20180613044152.GB112168@atomide.com>
-Message-ID: <20180619065018.GX112168@atomide.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 19 Jun 2018 16:26:25 +0930
+Subject: [PATCH v2 2/4] dt-bindings: misc: Aspeed coprocessor interrupt
+ controller
+In-Reply-To: <20180618045902.11453-3-benh@kernel.crashing.org>
+References: <20180618045902.11453-1-benh@kernel.crashing.org>
+ <20180618045902.11453-3-benh@kernel.crashing.org>
+Message-ID: <CACPK8XfCZA7m++KeJ1GyPAbBXPmyhebEkvb+R41Xy1iuGvkbLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180613 04:44]:
-> * Janusz Krzysztofik <jmkrzyszt@gmail.com> [180613 01:18]:
-> > On Wednesday, June 13, 2018 12:23:56 AM CEST Dmitry Torokhov wrote:
-> > > Hi Janusz,
-> > > 
-> > > On Sat, Jun 09, 2018 at 04:02:15PM +0200, Janusz Krzysztofik wrote:
-> > > > GPIO lookup table for ams-delta-serio device was introduced by commit
-> > > > 0486738928bf ("ARM: OMAP1: ams-delta: add GPIO lookup tables").
-> > > > Unfortunately, a follow up patch "Input: ams_delta_serio: use GPIO
-> > > > lookup table" was not accepted by subystem maintainer who requested
-> > > > conversion of the driver to a platform driver, replacepemnt of IRQ GPIO
-> > > > pin with IRQ resource, replacement of GPIO pin providing keyboard power
-> > > > with a regulator and removal of remaining GPIO pins from the driver as
-> > > > not handled by it.
-> > > > 
-> > > > Let's start with removal of no the longer needed GPIO lookup table from
-> > > > the board init file.
-> > > > 
-> > > > Series created and tested on top of next-20180608 tag from linux-next
-> > > > tree.
-> > > 
-> > > This all is really nice (modulo a couple of questions), thank you for
-> > > implementing this. How do you want to merge this? Through OMAP tree or
-> > > input?
-> > 
-> > Hi Dmitry,
-> > 
-> > If Tony doesn't mind, I would prefer it merged through OMAP tree as I still 
-> > have a few board patches built on top of it in my queue.
-> 
-> Works for me once Dmitry is happy with the patches.
+On 18 June 2018 at 14:29, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> Add the device-tree binding definition for the AST2400
+> and AST2500 coprocessor interrupt controller
+>
+> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ---
+>  .../devicetree/bindings/misc/aspeed,cvic.txt  | 35 +++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/aspeed,cvic.txt
+>
+> diff --git a/Documentation/devicetree/bindings/misc/aspeed,cvic.txt b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
+> new file mode 100644
+> index 000000000000..2562e2991e4d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
 
-And please repost the whole series with acks collected so
-I know what I need to apply :)
+Is there a reason you didn't put this in bindings/interrupt-controller?
 
-Regards,
+Aside from that this looks good.
 
-Tony
+> @@ -0,0 +1,35 @@
+> +* Aspeed AST2400 and AST2500 coprocessor interrupt controller
+> +
+> +This file describes the bindings for the interrupt controller present
+> +in the AST2400 and AST2500 BMC SoCs which provides interrupt to the
+> +ColdFire coprocessor.
+> +
+> +It is not a normal interrupt controller and it would be rather
+> +inconvenient to create an interrupt tree for it as it somewhat shares
+> +some of the same sources as the main ARM interrupt controller but with
+> +different numbers.
+> +
+> +The AST2500 supports a SW generated interrupt
+> +
+> +Required properties:
+> +- reg: address and length of the register for the device.
+> +- compatible: "aspeed,cvic" and one of:
+> +               "aspeed,ast2400-cvic"
+> +             or
+> +               "aspeed,ast2500-cvic"
+> +
+> +- valid-sources: One cell, bitmap of supported sources for the implementation
+> +
+> +Optional properties;
+> +- copro-sw-interrupts: List of interrupt numbers that can be used as
+> +                      SW interrupts from the ARM to the coprocessor.
+> +                      (AST2500 only)
+> +
+> +Example:
+> +
+> +       cvic: copro-interrupt-controller at 1e6c2000 {
+> +               compatible = "aspeed,ast2500-cvic";
+> +               valid-sources = <0xffffffff>;
+> +               copro-sw-interrupts = <1>;
+> +               reg = <0x1e6c2000 0x80>;
+> +       };
+> --
+> 2.17.1
+>
