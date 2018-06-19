@@ -1,29 +1,169 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 19 Jun 2018 14:07:14 +0200
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
-References: <5ed798a0-6c9c-086e-e5e8-906f593ca33e@huawei.com>
- <20180607122152.GP32433@dhcp22.suse.cz>
- <a880df29-b656-d98d-3037-b04761c7ed78@huawei.com>
- <20180611085237.GI13364@dhcp22.suse.cz>
- <16c4db2f-bc70-d0f2-fb38-341d9117ff66@huawei.com>
- <20180611134303.GC75679@bhelgaas-glaptop.roam.corp.google.com>
- <20180611145330.GO13364@dhcp22.suse.cz>
- <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
- <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
- <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
-Message-ID: <20180619120714.GE13685@dhcp22.suse.cz>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 19 Jun 2018 13:18:17 +0100
+Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
+In-Reply-To: <20180618120310.39527-11-mark.rutland@arm.com>
+References: <20180618120310.39527-1-mark.rutland@arm.com>
+ <20180618120310.39527-11-mark.rutland@arm.com>
+Message-ID: <20180619121814.GR22983@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 19-06-18 20:03:07, Xie XiuQi wrote:
-[...]
-> I tested on a arm board with 128 cores 4 numa nodes, but I set CONFIG_NR_CPUS=72.
-> Then node 3 is not be created, because node 3 has no memory, and no cpu.
-> But some pci device may related to node 3, which be set in ACPI table.
+On Mon, Jun 18, 2018 at 01:03:01PM +0100, Mark Rutland wrote:
+> Now that the syscall invocation logic is in C, we can migrate the rest
+> of the syscall entry logic over, so that the entry assembly needn't look
+> at the register values at all.
+> 
+> The SVE reset across syscall logic now unconditionally clears TIF_SVE,
+> but sve_user_disable() will only write back to CPACR_EL1 when SVE is
+> actually enabled.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/entry.S   | 42 ++++--------------------------------------
+>  arch/arm64/kernel/syscall.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 42 insertions(+), 40 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 05b9f03f3e00..156c4e3fd1a4 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -720,14 +720,9 @@ el0_sync_compat:
+>  	b.ge	el0_dbg
+>  	b	el0_inv
+>  el0_svc_compat:
+> -	/*
+> -	 * AArch32 syscall handling
+> -	 */
+> -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
+> -	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
+> -	mov	wscno, w7			// syscall number in w7 (r7)
+> -	mov     wsc_nr, #__NR_compat_syscalls
+> -	b	el0_svc_naked
+> +	mov	x0, sp
+> +	bl	el0_svc_compat_handler
+> +	b	ret_to_user
+>  
+>  	.align	6
+>  el0_irq_compat:
+> @@ -925,37 +920,8 @@ ENDPROC(ret_to_user)
+>   */
+>  	.align	6
+>  el0_svc:
+> -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
+> -	adrp	stbl, sys_call_table		// load syscall table pointer
+> -	mov	wscno, w8			// syscall number in w8
+> -	mov	wsc_nr, #__NR_syscalls
+> -
+> -#ifdef CONFIG_ARM64_SVE
+> -alternative_if_not ARM64_SVE
+> -	b	el0_svc_naked
+> -alternative_else_nop_endif
+> -	tbz	x16, #TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
+> -	bic	x16, x16, #_TIF_SVE		// discard SVE state
+> -	str	x16, [tsk, #TSK_TI_FLAGS]
+> -
+> -	/*
+> -	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
+> -	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
+> -	 * happens if a context switch or kernel_neon_begin() or context
+> -	 * modification (sigreturn, ptrace) intervenes.
+> -	 * So, ensure that CPACR_EL1 is already correct for the fast-path case:
+> -	 */
+> -	mrs	x9, cpacr_el1
+> -	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
+> -	msr	cpacr_el1, x9			// synchronised by eret to el0
+> -#endif
+> -
+> -el0_svc_naked:					// compat entry point
+>  	mov	x0, sp
+> -	mov	w1, wscno
+> -	mov	w2, wsc_nr
+> -	mov	x3, stbl
+> -	bl	el0_svc_common
+> +	bl	el0_svc_handler
+>  	b	ret_to_user
+>  ENDPROC(el0_svc)
+>  
+> diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
+> index 2adf1a073398..6a31bb2a382b 100644
+> --- a/arch/arm64/kernel/syscall.c
+> +++ b/arch/arm64/kernel/syscall.c
+> @@ -6,7 +6,9 @@
+>  #include <linux/ptrace.h>
+>  
+>  #include <asm/daifflags.h>
+> +#include <asm/fpsimd.h>
+>  #include <asm/thread_info.h>
+> +#include <asm/unistd.h>
+>  
+>  long do_ni_syscall(struct pt_regs *regs);
+>  
+> @@ -42,8 +44,8 @@ static inline bool has_syscall_work(unsigned long flags)
+>  int syscall_trace_enter(struct pt_regs *regs);
+>  void syscall_trace_exit(struct pt_regs *regs);
+>  
+> -asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+> -			       syscall_fn_t syscall_table[])
+> +static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+> +			   syscall_fn_t syscall_table[])
+>  {
+>  	unsigned long flags = current_thread_info()->flags;
+>  
+> @@ -80,3 +82,37 @@ asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+>  trace_exit:
+>  	syscall_trace_exit(regs);
+>  }
+> +
+> +static inline void sve_user_reset(void)
+> +{
 
-Could you double check that zonelists for node 3 are generated
-correctly?
--- 
-Michal Hocko
-SUSE Labs
+Can we call this "sve_user_discard" please?
+
+"Reset" is a reasonable name for the concept, but the "discard"
+terminology has been used elsewhere.
+
+> +	if (!system_supports_sve())
+> +		return;
+> +
+> +	/*
+> +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
+> +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
+> +	 * happens if a context switch or kernel_neon_begin() or context
+> +	 * modification (sigreturn, ptrace) intervenes.
+> +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
+> +	 */
+
+This comment should go after clear_thead_flag(), since it describes not
+the purpose of this function but the presence of sve_user_disable().
+
+> +	clear_thread_flag(TIF_SVE);
+> +	sve_user_disable();
+> +}
+> +
+> +extern syscall_fn_t sys_call_table[];
+> +
+> +asmlinkage void el0_svc_handler(struct pt_regs *regs)
+> +{
+> +	sve_user_reset();
+> +	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+> +}
+> +
+> +#ifdef CONFIG_COMPAT
+> +extern syscall_fn_t compat_sys_call_table[];
+> +
+> +asmlinkage void el0_svc_compat_handler(struct pt_regs *regs)
+> +{
+> +	el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
+> +		       compat_sys_call_table);
+> +}
+> +#endif
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
