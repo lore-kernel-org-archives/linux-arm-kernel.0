@@ -1,25 +1,57 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 19 Jun 2018 22:42:40 +0200
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <1281348164.12908.47.camel@localhost>
-References: <4C5F9B25.8080401@st.com> <20100809064957.GB16661@pengutronix.de>
- <4C5FA698.90904@st.com>
- <20100809090137.GP13165@mea-ext.zmailer.org>
- <1281348164.12908.47.camel@localhost>
-Message-ID: <20180619204240.GA32604@1wt.eu>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 20 Jun 2018 05:29:59 +0900
+Subject: [RFC PATCH v2] driver core: add a debugfs entry to show deferred
+ devices
+In-Reply-To: <CAHp75VdpHdanWJmcwLBRTSDoDkbpPxuAGwwVO0hosXSRn4PUoA@mail.gmail.com>
+References: <20180619183356.32106-1-javierm@redhat.com>
+ <CAHp75Vcn39N9rZ0UO3szGrODVLxek4X746uWs+RPXwy4i0s1Ug@mail.gmail.com>
+ <CAHp75VdpHdanWJmcwLBRTSDoDkbpPxuAGwwVO0hosXSRn4PUoA@mail.gmail.com>
+Message-ID: <20180619202959.GA19129@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 09, 2010 at 11:02:44AM +0100, David Woodhouse wrote:
-> If my corporate overloads told me I had to use my Exchange "messaging"
-> account for external email communication, they would get a quite clear
-> 'no' in response. My response may also contain suggestions that they use
-> certain other objects for purposes for which they were not designed.
+On Tue, Jun 19, 2018 at 10:55:20PM +0300, Andy Shevchenko wrote:
+> On Tue, Jun 19, 2018 at 10:53 PM, Andy Shevchenko
+> <andy.shevchenko@gmail.com> wrote:
+> > On Tue, Jun 19, 2018 at 9:33 PM, Javier Martinez Canillas
+> > <javierm@redhat.com> wrote:
+> >> For debugging purposes it may be useful to know what are the devices whose
+> >> probe function was deferred. Add a debugfs entry showing that information.
+> 
+> >> +static int deferred_devs_open(struct inode *inode, struct file *file)
+> >> +{
+> >> +       return single_open(file, deferred_devs_show, inode->i_private);
+> >> +}
+> >> +
+> >> +static const struct file_operations deferred_devs_fops = {
+> >> +       .owner = THIS_MODULE,
+> >> +       .open = deferred_devs_open,
+> >> +       .read = seq_read,
+> >> +       .llseek = seq_lseek,
+> >> +       .release = single_release,
+> >> +};
+> >
+> > Isn't this DEFINE_SHOW_ATTRIBUTE() ?
+> 
+> Besides that, you are summoning Greg's dark side :-)
+> See below.
+> 
+> >> +       if (IS_ENABLED(CONFIG_DEBUG_FS)) {
+> >> +               deferred_devices = debugfs_create_file("deferred_devices",
+> >> +                                                      0444, NULL, NULL,
+> >> +                                                      &deferred_devs_fops);
+> 
+> >> +               if (!deferred_devices)
+> >> +                       return -ENOMEM;
+> 
+> This must not prevent the execution. So, the check introduces actually
+> a regression.
 
-I'd say that if, after having been calmly explained the nature of the
-trouble caused, they don't care, it's a clear demonstration of total
-lack of respect of your work by deliberately breaking the tools you
-need to do it. Generally it's the signal that it's time to find a more
-respectful employer.
+Awe, you beat me to it :)
 
-Willy
+Also, I don't usually comment on RFC patches, as that shows the author
+really doesn't think that the code is ready to be reviewed/merged...
+
+thanks,
+
+greg k-h
