@@ -1,110 +1,55 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Tue, 19 Jun 2018 10:19:30 +0200
-Subject: [PATCH v3 9/9] ARM: dts: exynos5250-arndale: add DSI and panel nodes
+Date: Tue, 19 Jun 2018 10:19:29 +0200
+Subject: [PATCH v3 8/9] ARM: dts: exynos5250: add DSI node
 In-Reply-To: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
 References: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
- <CGME20180619082004eucas1p25ccebb3286e978645e3e09ebb8cb65f2@eucas1p2.samsung.com>
-Message-ID: <1529396370-18761-10-git-send-email-m.purski@samsung.com>
+ <CGME20180619082003eucas1p1ee69166282872a3c031caf08cb550269@eucas1p1.samsung.com>
+Message-ID: <1529396370-18761-9-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrzej Hajda <a.hajda@samsung.com>
 
-The patch adds bridge and panel nodes.
-It adds also DSI properties specific for arndale board and
-regulators required by the bridge.
+The patch adds common part of DSI node for Exynos5250 platforms
+and a required mipi-phy node.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250-arndale.dts | 61 ++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ arch/arm/boot/dts/exynos5250.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index 7a8a5c5..816d89d 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -71,6 +71,17 @@
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 2daf505..9965eca 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -733,6 +733,27 @@
+ 			#phy-cells = <0>;
  		};
- 	};
  
-+	panel: panel {
-+		compatible = "boe,hv070wsa-100";
-+		power-supply = <&vcc_3v3_reg>;
-+		enable-gpios = <&gpd1 3 GPIO_ACTIVE_HIGH>;
-+		port {
-+			panel_ep: endpoint {
-+				remote-endpoint = <&bridge_out_ep>;
-+			};
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -97,6 +108,30 @@
- 			reg = <2>;
- 			regulator-name = "hdmi-en";
- 		};
-+
-+		vcc_1v2_reg: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "VCC_1V2";
-+			regulator-min-microvolt = <1200000>;
-+			regulator-max-microvolt = <1200000>;
++		mipi_phy: video-phy at 10040710 {
++			compatible = "samsung,s5pv210-mipi-video-phy";
++			reg = <0x10040710 0x100>;
++			#phy-cells = <1>;
++			syscon = <&pmu_system_controller>;
 +		};
 +
-+		vcc_1v8_reg: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "VCC_1V8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
++		dsi_0: dsi at 14500000 {
++			compatible = "samsung,exynos4210-mipi-dsi";
++			reg = <0x14500000 0x10000>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			samsung,power-domain = <&pd_disp1>;
++			phys = <&mipi_phy 3>;
++			phy-names = "dsim";
++			clocks = <&clock CLK_DSIM0>, <&clock CLK_SCLK_MIPI1>;
++			clock-names = "bus_clk", "sclk_mipi";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +		};
 +
-+		vcc_3v3_reg: regulator at 5 {
-+			compatible = "regulator-fixed";
-+			reg = <5>;
-+			regulator-name = "VCC_3V3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
- 	};
- 
- 	fixed-rate-clocks {
-@@ -119,6 +154,32 @@
- 	cpu0-supply = <&buck2_reg>;
- };
- 
-+&dsi_0 {
-+	vddcore-supply = <&ldo8_reg>;
-+	vddio-supply = <&ldo10_reg>;
-+	samsung,pll-clock-frequency = <24000000>;
-+	samsung,burst-clock-frequency = <320000000>;
-+	samsung,esc-clock-frequency = <10000000>;
-+	status = "okay";
-+
-+	bridge at 0 {
-+		reg = <0>;
-+		compatible = "toshiba,tc358764";
-+		vddc-supply = <&vcc_1v2_reg>;
-+		vddio-supply = <&vcc_1v8_reg>;
-+		vddlvds-supply = <&vcc_3v3_reg>;
-+		reset-gpios = <&gpd1 6 GPIO_ACTIVE_LOW>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 1 {
-+			reg = <1>;
-+			bridge_out_ep: endpoint {
-+				remote-endpoint = <&panel_ep>;
-+			};
-+		};
-+	};
-+};
-+
- &dp {
- 	status = "okay";
- 	samsung,color-space = <0>;
+ 		adc: adc at 12d10000 {
+ 			compatible = "samsung,exynos-adc-v1";
+ 			reg = <0x12D10000 0x100>;
 -- 
 2.7.4
