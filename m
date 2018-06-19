@@ -1,102 +1,41 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 19 Jun 2018 17:13:59 -0500
-Subject: [PATCH] PCI: Do not enable PASID when End-to-End TLP is not
- supported
-In-Reply-To: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
-References: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180619221359.GG33049@bhelgaas-glaptop.roam.corp.google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 19 Jun 2018 18:14:55 -0400
+Subject: [PATCH] efi/fb: Convert PCI bus address to resource if translated
+ by the bridge
+In-Reply-To: <20180619215955.GF33049@bhelgaas-glaptop.roam.corp.google.com>
+References: <1526563343-28721-1-git-send-email-okaya@codeaurora.org>
+ <36cf3f12-bfe8-1c38-4d2c-b785fc64a3f6@arm.com>
+ <733101d0-9051-a5a6-ef64-162d8d1e10a1@codeaurora.org>
+ <20180619215955.GF33049@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <61384244-49f9-2020-04f0-6e188cf6a6b7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 12:52:49PM -0400, Sinan Kaya wrote:
-> A PCIe endpoint carries the process address space identifier (PASID) in
-> the TLP prefix as part of the memory read/write transaction. The address
-> information in the TLP is relevant only for a given PASID context.
-> 
-> A translation agent takes PASID value and the address information from the
-> TLP to look up the physical address in the system.
-> 
-> If a bridge drops the TLP prefix, the translation agent can resolve the
-> address to an incorrect location and cause data corruption. Prevent
-> this condition by requiring End-to-End TLP prefix to be supported on the
-> entire data path between the endpoint and the root port.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/ats.c             | 16 ++++++++++++++++
->  include/uapi/linux/pci_regs.h |  1 +
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-> index 89305b5..0bcded5 100644
-> --- a/drivers/pci/ats.c
-> +++ b/drivers/pci/ats.c
-> @@ -265,7 +265,9 @@ EXPORT_SYMBOL_GPL(pci_reset_pri);
->  int pci_enable_pasid(struct pci_dev *pdev, int features)
->  {
->  	u16 control, supported;
-> +	struct pci_dev *bridge;
->  	int pos;
-> +	u32 cap;
->  
->  	if (WARN_ON(pdev->pasid_enabled))
->  		return -EBUSY;
-> @@ -274,6 +276,20 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
->  	if (!pos)
->  		return -EINVAL;
->  
-> +	bridge = pci_upstream_bridge(pdev);
-> +	while (bridge) {
-> +		if (!pci_find_capability(bridge, PCI_CAP_ID_EXP))
-> +			return -EINVAL;
-> +
-> +		if (pcie_capability_read_dword(bridge, PCI_EXP_DEVCAP2, &cap))
-> +			return -EINVAL;
-> +
-> +		if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
-> +			return -EINVAL;
-> +
-> +		bridge = pci_upstream_bridge(bridge);
-> +	}
+Hi Bjorn,
 
-Hi Sinan,
-
-Would you consider implementing this in the style of c46fd358070f
-("PCI/ASPM: Enable Latency Tolerance Reporting when supported"), i.e.,
-add a bit in struct pci_dev so we don't have to search up the tree and
-re-lookup the PCIe capability several times for the endpoints of the
-hierarchy?
-
-This loop looks much like the one in pci_enable_atomic_ops_to_root()
-but doesn't use exactly the same iteration.
-
-Maybe we should someday collect up and combine all the places that
-read the capability registers so we don't have to read them multiple
-times?  Not sure if that would make readability better or worse -- it
-would add a second place to look at, while with this patch, everything
-is all in one place.
-
-> +
->  	pci_read_config_word(pdev, pos + PCI_PASID_CAP, &supported);
->  	supported &= PCI_PASID_CAP_EXEC | PCI_PASID_CAP_PRIV;
->  
-> diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
-> index 103ba79..d91dea5 100644
-> --- a/include/uapi/linux/pci_regs.h
-> +++ b/include/uapi/linux/pci_regs.h
-> @@ -634,6 +634,7 @@
->  #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
->  #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
->  #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
-> +#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
->  #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
->  #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
->  #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
-> -- 
-> 2.7.4
+On 6/19/2018 5:59 PM, Bjorn Helgaas wrote:
+> On Fri, May 18, 2018 at 10:20:29AM -0400, Sinan Kaya wrote:
+>> On 5/18/2018 6:42 AM, Robin Murphy wrote:
+>>>
+>>> FWIW, now that I've actually gone and looked, it appears you could simplify the whole function quite a bit by getting rid of these and just using the new local resource directly, especially since the only actual use of size is an open-coded resource_contains().
+>>
+>> Posted V2 a minute ago. I did the simplification on a prior patch in order not to
+>> mix the issues.
 > 
+> I don't see the V2 on linux-pci, but it sounds like Ard would merge this
+> anyway.  So I'll drop this and you can let me know if there's anything you
+> need from me.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+It is planned to go through fbdev tree for 4.19. 
+
+https://patchwork.kernel.org/patch/10410895/
+
+Feel free to review/ACK.
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
