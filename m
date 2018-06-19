@@ -1,100 +1,52 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Jun 2018 15:40:20 -0600
-Subject: [PATCH] ARM: at91: remove unnecessary of_platform_default_populate
- calls
-Message-ID: <20180619214020.18608-1-robh@kernel.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Jun 2018 16:43:46 -0500
+Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
+In-Reply-To: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT core will call of_platform_default_populate, so it is not
-necessary for machine specific code to call it unless there are custom
-match entries, auxdata or parent device. Neither of those apply here, so
-remove the call.
+On Thu, Apr 19, 2018 at 03:56:23PM -0400, Sinan Kaya wrote:
+> The infiniband adapter might be connected to a PCI hotplug slot. Performing
+> secondary bus reset on a hotplug slot causes PCI link up/down interrupts.
+> 
+> Hotplug driver removes the device from system when a link down interrupt
+> is observed and performs re-enumeration when link up interrupt is observed.
+> 
+> This conflicts with what this code is trying to do. Try secondary bus reset
+> only if pci_reset_slot() fails/unsupported.
 
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- arch/arm/mach-at91/at91rm9200.c | 5 -----
- arch/arm/mach-at91/at91sam9.c   | 5 -----
- arch/arm/mach-at91/sama5.c      | 5 -----
- 3 files changed, 15 deletions(-)
+Hi Sinan,
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 656ad409a253..42583261951e 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -8,17 +8,12 @@
-  * Licensed under GPLv2 or later.
-  */
- 
--#include <linux/of.h>
--#include <linux/of_platform.h>
--
- #include <asm/mach/arch.h>
- 
- #include "generic.h"
- 
- static void __init at91rm9200_dt_device_init(void)
- {
--	of_platform_default_populate(NULL, NULL, NULL);
--
- 	at91rm9200_pm_init();
- }
- 
-diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
-index 3dbdef4d3cbf..863a0e7ba00f 100644
---- a/arch/arm/mach-at91/at91sam9.c
-+++ b/arch/arm/mach-at91/at91sam9.c
-@@ -7,9 +7,6 @@
-  * Licensed under GPLv2 or later.
-  */
- 
--#include <linux/of.h>
--#include <linux/of_platform.h>
--
- #include <asm/mach/arch.h>
- #include <asm/system_misc.h>
- 
-@@ -17,8 +14,6 @@
- 
- static void __init at91sam9_init(void)
- {
--	of_platform_default_populate(NULL, NULL, NULL);
--
- 	at91sam9_pm_init();
- }
- 
-diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-index 3d0bf95a56ae..e3a84a59db76 100644
---- a/arch/arm/mach-at91/sama5.c
-+++ b/arch/arm/mach-at91/sama5.c
-@@ -7,9 +7,6 @@
-  * Licensed under GPLv2 or later.
-  */
- 
--#include <linux/of.h>
--#include <linux/of_platform.h>
--
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
-@@ -18,7 +15,6 @@
- 
- static void __init sama5_dt_device_init(void)
- {
--	of_platform_default_populate(NULL, NULL, NULL);
- 	sama5_pm_init();
- }
- 
-@@ -47,7 +43,6 @@ MACHINE_END
- 
- static void __init sama5d2_init(void)
- {
--	of_platform_default_populate(NULL, NULL, NULL);
- 	sama5d2_pm_init();
- }
- 
--- 
-2.17.1
+We had a bunch of discussion here but not sure we ever reached a
+consensus.  It did seem like we'd like to avoid putting hotplug
+knowledge in drivers, though.  What do you think the path forward is?
+
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/infiniband/hw/hfi1/pcie.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
+> index 83d66e8..75f49e3 100644
+> --- a/drivers/infiniband/hw/hfi1/pcie.c
+> +++ b/drivers/infiniband/hw/hfi1/pcie.c
+> @@ -908,7 +908,8 @@ static int trigger_sbr(struct hfi1_devdata *dd)
+>  	 * delay after a reset is required.  Per spec requirements,
+>  	 * the link is either working or not after that point.
+>  	 */
+> -	pci_reset_bridge_secondary_bus(dev->bus->self);
+> +	if (pci_reset_slot(dev->slot))
+> +		pci_reset_bridge_secondary_bus(dev->bus->self);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
