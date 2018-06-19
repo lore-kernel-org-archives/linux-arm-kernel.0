@@ -1,39 +1,75 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Jun 2018 18:14:55 -0400
-Subject: [PATCH] efi/fb: Convert PCI bus address to resource if translated
- by the bridge
-In-Reply-To: <20180619215955.GF33049@bhelgaas-glaptop.roam.corp.google.com>
-References: <1526563343-28721-1-git-send-email-okaya@codeaurora.org>
- <36cf3f12-bfe8-1c38-4d2c-b785fc64a3f6@arm.com>
- <733101d0-9051-a5a6-ef64-162d8d1e10a1@codeaurora.org>
- <20180619215955.GF33049@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <61384244-49f9-2020-04f0-6e188cf6a6b7@codeaurora.org>
+Date: Tue, 19 Jun 2018 18:21:43 -0400
+Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
+In-Reply-To: <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
+References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+ <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <2593baec-8a28-a3e7-7ebf-7c21addda0b8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On 6/19/2018 5:59 PM, Bjorn Helgaas wrote:
-> On Fri, May 18, 2018 at 10:20:29AM -0400, Sinan Kaya wrote:
->> On 5/18/2018 6:42 AM, Robin Murphy wrote:
->>>
->>> FWIW, now that I've actually gone and looked, it appears you could simplify the whole function quite a bit by getting rid of these and just using the new local resource directly, especially since the only actual use of size is an open-coded resource_contains().
+On 6/19/2018 5:43 PM, Bjorn Helgaas wrote:
+>> Hotplug driver removes the device from system when a link down interrupt
+>> is observed and performs re-enumeration when link up interrupt is observed.
 >>
->> Posted V2 a minute ago. I did the simplification on a prior patch in order not to
->> mix the issues.
+>> This conflicts with what this code is trying to do. Try secondary bus reset
+>> only if pci_reset_slot() fails/unsupported.
+> Hi Sinan,
 > 
-> I don't see the V2 on linux-pci, but it sounds like Ard would merge this
-> anyway.  So I'll drop this and you can let me know if there's anything you
-> need from me.
+> We had a bunch of discussion here but not sure we ever reached a
+> consensus.  It did seem like we'd like to avoid putting hotplug
+> knowledge in drivers, though.  What do you think the path forward is?
 > 
 
-It is planned to go through fbdev tree for 4.19. 
+There are multiple issues. 
 
-https://patchwork.kernel.org/patch/10410895/
+We discussed the need for a retrain API on this thread. However, retrain API may
+not be enough for this particular usage as the device might need a full link training
+sequence following firmware load including a hot reset message. I don't think we can
+remove the bus reset usage in this code.
 
-Feel free to review/ACK.
+I'd like to start with a small one to address your comment here.
 
-Sinan
+"I think my concern is that knowledge about this reset/link down/hotplug issue is
+leaking out and we'll end up with different reset interfaces that may
+or may not result in hotplug events.  This seems like a confusing API
+because it's hard to explain which interface a driver should use."
+
+I'm thinking of removing pci_reset_slot() and pci_try_reset_slot() functions
+as an exported API and fold them into pci_reset_bus() and  pci_try_reset_bus()
+API respectively.
+
+This is what happens when you insert a fatal error to a hotplug slot. See multiple
+link up/down messages.
+
+/_#_[__333.699731]_pcieport_0001:00:00.0:_AER:_Uncorrected_(Fatal)_error_received:_id=0000
+[  333.748116] pcieport 0001:00:00.0: PCIe Bus Error: severity=Uncorrected (Fatal), type=Transaction Layer, id
+[  333.816044] pcieport 0001:00:00.0:   device [17cb:0404] error status/mask=00040000/00400000
+[  333.871581] pcieport 0001:00:00.0:    [18] Malformed TLP          (First)
+[  333.914675] pcieport 0001:00:00.0:   TLP Header: 40000001 000000ff 00000000 00000000
+[  333.968397] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
+[  334.043234] iommu: Removing device 0001:01:00.4 from group 0
+[  334.095952] iommu: Removing device 0001:01:00.3 from group 0
+[  334.144644] iommu: Removing device 0001:01:00.2 from group 0
+[  334.194653] iommu: Removing device 0001:01:00.1 from group 0
+[  334.243564] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up
+[  334.282556] iommu: Removing device 0001:01:00.0 from group 0
+[  334.330994] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up event queued; currently getting powered off
+[  334.890587] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x13f1 (issued 282900 msec ago)
+[  335.070190] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
+[  335.106960] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down event queued; currently getting powered on
+[  335.191119] pcieport 0001:00:00.0: AER: Device recovery failed
+[  346.590153] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x17f1 (issued 10250 msec ago)
+
+As a suggestion:
+
+1. If the device belongs to a slot, do slot reset. 
+2. Otherwise, do bus reset.
+
+Since Oza's DPC/AER patch to refactor fatal error handling, both hotplug driver
+and AER/DPC driver will try removing devices and perform enumeration on link events/AER events.
+
+Perfect environment for race condition without a change.
 
 -- 
 Sinan Kaya
