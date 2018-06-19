@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 19 Jun 2018 16:31:02 -0700
-Subject: [GIT PULL 1/3] Broadcom devicetree fixes for 4.18
-Message-ID: <20180619233104.32173-1-f.fainelli@gmail.com>
+Date: Tue, 19 Jun 2018 16:31:03 -0700
+Subject: [GIT PULL 2/3] Broadcom devicetree-arm64 fixes for 4.18
+In-Reply-To: <20180619233104.32173-1-f.fainelli@gmail.com>
+References: <20180619233104.32173-1-f.fainelli@gmail.com>
+Message-ID: <20180619233104.32173-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +13,34 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the git repository at:
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/devicetree-fixes
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/devicetree-arm64-fixes
 
-for you to fetch changes up to 6cb1628ad3506b315cdddd7676db0ff2af378d28:
+for you to fetch changes up to 75af23c4736c5633894ea0baf9bca1cf6b248ca4:
 
-  ARM: dts: Cygnus: Fix PCIe controller interrupt type (2018-06-18 09:40:36 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs Device Tree fixes for
-4.18, please pull the following:
-
-- Ray fixes the I2C and PCIe interrupt types for the Cygnus SoC
-
-- Florian fixes the I2C and PCIe interrupts for the Northstar
-  (BCM5301x), Northstar Plus and Hurricane 2 SoCs
+  arm64: dts: Stingray: Fix I2C controller interrupt type (2018-06-18 09:47:36 -0700)
 
 ----------------------------------------------------------------
-Florian Fainelli (4):
-      ARM: dts: NSP: Fix i2c controller interrupt type
-      ARM: dts: NSP: Fix PCIe controllers interrupt types
-      ARM: dts: HR2: Fix interrupt types for i2c and PCIe
-      ARM: dts: BCM5301x: Fix i2c controller interrupt type
+This pull request contains Broadcom ARM64-based SoCs Device Tree fixes
+for 4.18, please pull the following:
 
-Ray Jui (2):
-      ARM: dts: Cygnus: Fix I2C controller interrupt type
-      ARM: dts: Cygnus: Fix PCIe controller interrupt type
+- Scott fixes both the bcm958742k and bcm958742t reference boards to
+  have the correct eMMC voltage specified
 
- arch/arm/boot/dts/bcm-cygnus.dtsi | 24 ++++++++++++------------
- arch/arm/boot/dts/bcm-hr2.dtsi    | 24 ++++++++++++------------
- arch/arm/boot/dts/bcm-nsp.dtsi    | 32 ++++++++++++++++----------------
- arch/arm/boot/dts/bcm5301x.dtsi   |  2 +-
- 4 files changed, 41 insertions(+), 41 deletions(-)
+- Ray fixes the I2C and PCIe Device Tree nodes interrupt specifiers for
+  Northstar 2 and Stingray SoCs.
+
+----------------------------------------------------------------
+Ray Jui (3):
+      arm64: dts: ns2: Fix I2C controller interrupt type
+      arm64: dts: ns2: Fix PCIe controller interrupt type
+      arm64: dts: Stingray: Fix I2C controller interrupt type
+
+Scott Branden (2):
+      arm64: dts: specify 1.8V EMMC capabilities for bcm958742k
+      arm64: dts: specify 1.8V EMMC capabilities for bcm958742t
+
+ arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi     | 8 ++++----
+ arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts | 4 ++++
+ arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts | 4 ++++
+ arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi  | 4 ++--
+ 4 files changed, 14 insertions(+), 6 deletions(-)
