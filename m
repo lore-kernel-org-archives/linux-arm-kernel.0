@@ -1,55 +1,108 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 19 Jun 2018 16:28:43 +0800
-Subject: [PATCH v6 16/29] drm/mediatek: add connection from RDMA1 to DPI1
-In-Reply-To: <1529393670-26862-17-git-send-email-stu.hsieh@mediatek.com>
-References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
- <1529393670-26862-17-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529396923.26480.12.camel@mtksdaap41>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Tue, 19 Jun 2018 14:04:44 +0530
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <20180615165232.GE2202@arm.com>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+ <20180615165232.GE2202@arm.com>
+Message-ID: <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
-> This patch add the connection from RDMA1 to DPI1
-> 
+Hi Will,
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 463ed7830d17..13e91903f493 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -85,7 +85,9 @@
->  #define RDMA0_SOUT_DSI2			0x4
->  #define RDMA0_SOUT_DSI3			0x5
->  #define RDMA1_SOUT_DPI0			0x2
-> +#define RDMA1_SOUT_DPI1			0x3
->  #define DPI0_SEL_IN_RDMA1		0x1
-> +#define DPI1_SEL_IN_RDMA1		(0x1 << 8)
->  #define COLOR1_SEL_IN_OVL1		0x1
->  
->  #define OVL_MOUT_EN_RDMA		0x1
-> @@ -171,6 +173,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
->  		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
->  		value = RDMA1_SOUT_DPI0;
-> +	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI1) {
-> +		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
-> +		value = RDMA1_SOUT_DPI1;
->  	} else {
->  		value = 0;
->  	}
-> @@ -190,6 +195,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
->  		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
->  		value = DPI0_SEL_IN_RDMA1;
-> +	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI1) {
-> +		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
-> +		value = DPI1_SEL_IN_RDMA1;
->  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
->  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
->  		value = COLOR1_SEL_IN_OVL1;
+On Fri, Jun 15, 2018 at 10:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Vivek,
+>
+> On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
+>> Qualcomm SoCs have an additional level of cache called as
+>> System cache or Last level cache[1]. This cache sits right
+>> before the DDR, and is tightly coupled with the memory
+>> controller.
+>> The cache is available to all the clients present in the
+>> SoC system. The clients request their slices from this system
+>> cache, make it active, and can then start using it. For these
+>> clients with smmu, to start using the system cache for
+>> dma buffers and related page tables [2], few of the memory
+>> attributes need to be set accordingly.
+>> This change makes the related memory Outer-Shareable, and
+>> updates the MAIR with necessary protection.
+>>
+>> The MAIR attribute requirements are:
+>>     Inner Cacheablity = 0
+>>     Outer Cacheablity = 1, Write-Back Write Allocate
+>>     Outer Shareablity = 1
+>
+> Hmm, so is this cache coherent with the CPU or not?
+
+Thanks for reviewing.
+Yes, this LLC is cache coherent with CPU, so we mark for Outer-cacheable.
+The different masters such as GPU as able to allocated and activate a slice
+in this Last Level Cache.
+
+> Why don't normal
+> non-cacheable mappings allocated in the LLC by default?
+
+Sorry, I couldn't fully understand your question here.
+Few of the masters on qcom socs are not io-coherent, so for them
+the IC has to be marked as 0.
+But they are able to use the LLC with OC marked as 1.
+
+Handling the IO-coherency is possibly a separate change to address?
+
+>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index f7a96bcf94a6..8058e7205034 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -249,6 +249,7 @@ struct arm_smmu_domain {
+>>       struct mutex                    init_mutex; /* Protects smmu pointer */
+>>       spinlock_t                      cb_lock; /* Serialises ATS1* ops and TLB syncs */
+>>       struct iommu_domain             domain;
+>> +     bool                            has_sys_cache;
+>>  };
+>>
+>>  struct arm_smmu_option_prop {
+>> @@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>>
+>>       if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+>>               pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+>> +     if (smmu_domain->has_sys_cache)
+>> +             pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
+>>
+>>       smmu_domain->smmu = smmu;
+>>       pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+>> @@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+>>       case DOMAIN_ATTR_NESTING:
+>>               *(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+>>               return 0;
+>> +     case DOMAIN_ATTR_USE_SYS_CACHE:
+>> +             *((int *)data) = smmu_domain->has_sys_cache;
+>> +             return 0;
+>
+> I really don't like exposing this to clients directly like this,
+> particularly as there aren't any in-tree users. I would prefer that we
+> provide a way for the io-pgtable code to have its MAIR values overridden
+> so that all non-coherent DMA ends up using the system cache.
+
+>From the way it looks from the users of LLC (as also pointed to by Jordan),
+the masters have to request and activate their slices in the cache, and then
+they can start using it. Before that the transaction don't go through LLC.
+
+But I will try to find out more on this.
+
+Thanks & Regards
+Vivek
+
+>
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
