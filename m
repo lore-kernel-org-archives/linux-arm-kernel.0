@@ -1,57 +1,52 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 13:15:36 +0800
-Subject: [PATCH 1/5] dt-bindings: mfd: axp20x: Add "self-working" mode for
- AXP806
-In-Reply-To: <20180620051540.25617-1-wens@csie.org>
-References: <20180620051540.25617-1-wens@csie.org>
-Message-ID: <20180620051540.25617-2-wens@csie.org>
+Date: Wed, 20 Jun 2018 13:15:35 +0800
+Subject: [PATCH 0/5] arm64: allwinner: h6: Enable AXP805 PMIC on Pine H64
+Message-ID: <20180620051540.25617-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP806 has three operation modes:
+Hi everyone,
 
-  - master mode: The PMIC is the first or only AXP PMIC in the system,
-		 but is not in charge of power management, i.e. only
-		 provides regulator functions.
+This series enables the AXP805 PMIC found on the Pine64 Pine H64 board.
+The AXP805 seems to be identical to the AXP806 when comparing datasheets.
+The Pine H64 uses the PMIC in stand-alone or "self-working" mode, using
+the I2C interface. Neither features are currently supported. This series
+adds support for them, and then adds the PMIC to the device tree.
 
-  - slave mode: The PMIC is the second AXP PMIC in the system, chained
-		to the first, or master, one.
+Patch 1 adds a new device tree property to describe the self-working mode
+for the AXP806.
 
-  - self-working mode: The PMIC is the only AXP PMIC in the system, and
-		       is in charge of power sequencing.
+Patch 2 adds support for the newly added property to the driver.
 
-The functional differences between these modes can be found in the
-"Control and Operation" chapter of the AXP806 (in Chinese) and AXP805
-(in English) datasheets. These include how the PMIC responds to external
-signals, whether it takes an external voltage reference or uses its own,
-and whether the EN/PWRON pin functions as an enable switch or power button.
+Patch 3 adds support for the using AXP806 with I2C.
 
-We already support both slave and master mode. This patch adds a property
-for describing the self-working mode, and reworks the description for
-the mode properties.
+Patch 4 converts raw clock/reset indices for the H6 R_CCU currently found
+in the device tree to macros defined as part of the device tree bindings.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/mfd/axp20x.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Patch 5 adds the PMIC and its regulators to the Pine H64 device tree.
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index d1762f3b30af..eaaf79c01e1e 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -45,8 +45,11 @@ Optional properties:
- 			  board is driving OTG VBus or not.
- 			  (axp221 / axp223 / axp803/ axp813 only)
- 
--- x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
--			wired for master mode. The default is slave mode.
-+- x-powers,self-working-mode and
-+  x-powers,master-mode: Boolean (axp806 only). Set either of these when the
-+			PMIC is wired for self-working mode or master mode.
-+			If neither is set then slave mode is assumed.
-+			This corresponds to how the MODESET pin is wired.
- 
- - <input>-supply: a phandle to the regulator supply node. May be omitted if
- 		  inputs are unregulated, such as using the IPSOUT output
+Please have a look.
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (4):
+  dt-bindings: mfd: axp20x: Add "self-working" mode for AXP806
+  mfd: axp20x: Add self-working mode support for AXP806
+  mfd: axp20x: Support AXP806 in I2C mode
+  arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset
+    indices
+
+Icenowy Zheng (1):
+  arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
+
+ .../devicetree/bindings/mfd/axp20x.txt        |   7 +-
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109 ++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  |   9 +-
+ drivers/mfd/axp20x-i2c.c                      |   2 +
+ drivers/mfd/axp20x.c                          |  30 ++++-
+ 5 files changed, 149 insertions(+), 8 deletions(-)
+
 -- 
 2.17.1
