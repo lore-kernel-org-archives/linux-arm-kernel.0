@@ -1,93 +1,97 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:18 +0200
-Subject: [PATCH v8 18/26] drivers: firmware: psci: Announce support for OS
- initiated suspend mode
+Date: Wed, 20 Jun 2018 19:22:08 +0200
+Subject: [PATCH v8 08/26] PM / Domains: Extend genpd CPU governor to cope with
+ QoS constraints
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-19-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-9-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI firmware v1.0+, supports two different modes for CPU_SUSPEND. The
-Platform Coordinated mode, which is the default and mandatory mode, while
-support for the OS initiated mode is optional.
+CPU devices and other regular devices may share the same PM domain and may
+also be hierarchically related via subdomains. In either case, all devices
+including CPUs, may be attached to a PM domain managed by genpd, that has
+an idle state with an enter/exit latency.
 
-This change introduces initial support for the OS initiated mode, in way
-that it adds the related PSCI bits from the spec and prints a message in
-the log to inform whether the mode is supported by the PSCI FW.
+Let's take these latencies into account in the state selection process by
+genpd's governor for CPUs. This means the governor, pm_domain_cpu_gov,
+becomes extended to satisfy both a state's residency and a potential dev PM
+QoS constraint.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci/psci.c | 21 ++++++++++++++++++++-
- include/uapi/linux/psci.h    |  5 +++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ drivers/base/power/domain_governor.c | 15 +++++++++++----
+ include/linux/pm_domain.h            |  1 +
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 38881007584e..e8f4f8444ff1 100644
---- a/drivers/firmware/psci/psci.c
-+++ b/drivers/firmware/psci/psci.c
-@@ -95,6 +95,11 @@ static inline bool psci_has_ext_power_state(void)
- 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
+index 1aad55719537..03d4e9454ce9 100644
+--- a/drivers/base/power/domain_governor.c
++++ b/drivers/base/power/domain_governor.c
+@@ -214,8 +214,10 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
+ 	struct generic_pm_domain *genpd = pd_to_genpd(pd);
+ 	struct gpd_link *link;
+ 
+-	if (!genpd->max_off_time_changed)
++	if (!genpd->max_off_time_changed) {
++		genpd->state_idx = genpd->cached_power_down_state_idx;
+ 		return genpd->cached_power_down_ok;
++	}
+ 
+ 	/*
+ 	 * We have to invalidate the cached results for the masters, so
+@@ -240,6 +242,7 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
+ 		genpd->state_idx--;
+ 	}
+ 
++	genpd->cached_power_down_state_idx = genpd->state_idx;
+ 	return genpd->cached_power_down_ok;
  }
  
-+static inline bool psci_has_osi_support(void)
-+{
-+	return psci_cpu_suspend_feature & PSCI_1_0_OS_INITIATED;
-+}
-+
- static inline bool psci_power_state_loses_context(u32 state)
- {
- 	const u32 mask = psci_has_ext_power_state() ?
-@@ -658,10 +663,24 @@ static int __init psci_0_1_init(struct device_node *np)
- 	return 0;
- }
+@@ -255,6 +258,10 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
+ 	s64 idle_duration_ns;
+ 	int cpu, i;
  
-+static int __init psci_1_0_init(struct device_node *np)
-+{
-+	int err;
++	/* Validate dev PM QoS constraints. */
++	if (!default_power_down_ok(pd))
++		return false;
 +
-+	err = psci_0_2_init(np);
-+	if (err)
-+		return err;
-+
-+	if (psci_has_osi_support())
-+		pr_info("OSI mode supported.\n");
-+
-+	return 0;
-+}
-+
- static const struct of_device_id psci_of_match[] __initconst = {
- 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
- 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
--	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
-+	{ .compatible = "arm,psci-1.0",	.data = psci_1_0_init},
- 	{},
+ 	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
+ 		return true;
+ 
+@@ -276,9 +283,9 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
+ 	/*
+ 	 * Find the deepest idle state that has its residency value satisfied
+ 	 * and by also taking into account the power off latency for the state.
+-	 * Start at the deepest supported state.
++	 * Start at the state picked by the dev PM QoS constraint validation.
+ 	 */
+-	i = genpd->state_count - 1;
++	i = genpd->state_idx;
+ 	do {
+ 		if (!genpd->states[i].residency_ns)
+ 			break;
+@@ -312,6 +319,6 @@ struct dev_power_governor pm_domain_always_on_gov = {
  };
  
-diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-index b3bcabe380da..581f72085c33 100644
---- a/include/uapi/linux/psci.h
-+++ b/include/uapi/linux/psci.h
-@@ -49,6 +49,7 @@
- 
- #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
- #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
-+#define PSCI_1_0_FN_SET_SUSPEND_MODE		PSCI_0_2_FN(15)
- 
- #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
- 
-@@ -97,6 +98,10 @@
- #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
- 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
- 
-+#define PSCI_1_0_OS_INITIATED			BIT(0)
-+#define PSCI_1_0_SUSPEND_MODE_PC		0
-+#define PSCI_1_0_SUSPEND_MODE_OSI		1
-+
- /* PSCI return values (inclusive of all PSCI versions) */
- #define PSCI_RET_SUCCESS			0
- #define PSCI_RET_NOT_SUPPORTED			-1
+ struct dev_power_governor pm_domain_cpu_gov = {
+-	.suspend_ok = NULL,
++	.suspend_ok = default_suspend_ok,
+ 	.power_down_ok = cpu_power_down_ok,
+ };
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 97901c833108..dbc69721cad8 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -81,6 +81,7 @@ struct generic_pm_domain {
+ 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
+ 	bool max_off_time_changed;
+ 	bool cached_power_down_ok;
++	bool cached_power_down_state_idx;
+ 	int (*attach_dev)(struct generic_pm_domain *domain,
+ 			  struct device *dev);
+ 	void (*detach_dev)(struct generic_pm_domain *domain,
 -- 
 2.17.1
