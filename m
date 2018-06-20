@@ -1,95 +1,116 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 10:14:26 +0800
-Subject: [GIT PULL] Allwinner clock changes for 4.18
-In-Reply-To: <CAGb2v66MkLLqL=Ei5kMb_CzpgUANpkNN3E52mSHKrZ0L7rXAog@mail.gmail.com>
-References: <20180521115947.wqrnv2hczate65lz@flea>
- <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
- <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
- <152879040155.16708.9862482085365718831@swboyd.mtv.corp.google.com>
- <CAGb2v66MkLLqL=Ei5kMb_CzpgUANpkNN3E52mSHKrZ0L7rXAog@mail.gmail.com>
-Message-ID: <CAGb2v67gL8m+XorkC78PwcaDA9cz69acsMkOrcLc9dgBY7m1eQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 19 Jun 2018 22:14:46 -0400
+Subject: [PATCH V2] PCI: Enable PASID when End-to-End TLP is supported by all
+ bridges
+Message-ID: <1529460886-23722-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+A PCIe endpoint carries the process address space identifier (PASID) in
+the TLP prefix as part of the memory read/write transaction. The address
+information in the TLP is relevant only for a given PASID context.
 
-On Tue, Jun 12, 2018 at 4:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Tue, Jun 12, 2018 at 4:00 PM, Stephen Boyd <sboyd@kernel.org> wrote:
->> Quoting Chen-Yu Tsai (2018-06-11 00:53:41)
->>> Hi,
->>>
->>> On Mon, Jun 11, 2018 at 10:00 AM, Masahiro Yamada
->>> <yamada.masahiro@socionext.com> wrote:
->>> > Hi Maxime,
->>> >
->>> >
->>> > 2018-05-21 20:59 GMT+09:00 Maxime Ripard <maxime.ripard@bootlin.com>:
->>> >> Hi Mike, Stephen,
->>> >>
->>> >> Please merge the following changes for the next merge window, thanks!
->>> >>
->>> >> Maxime
->>> >>
->>> >> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
->>> >>
->>> >>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
->>> >>
->>> >> are available in the Git repository at:
->>> >>
->>> >>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.18
->>> >>
->>> >> for you to fetch changes up to 17de4c857b1f74b90967f7e7fd5ff81be61dc044:
->>> >>
->>> >>   clk: sunxi-ng: r40: export a regmap to access the GMAC register (2018-05-17 14:02:07 +0800)
->>> >>
->>> >> ----------------------------------------------------------------
->>> >> Allwinner clock changes for 4.18
->>> >>
->>> >> Not a lot of changes for this release, but two quite important features
->>> >> were added: the H6 PRCM clock support, and the needed changes to the R40
->>> >> clock driver to allow for the EMAC to operate.
->>> >>
->>> >> ----------------------------------------------------------------
->>> >> Icenowy Zheng (3):
->>> >>       clk: sunxi-ng: add support for H6 PRCM CCU
->>> >>       clk: sunxi-ng: r40: rewrite init code to a platform driver
->>> >>       clk: sunxi-ng: r40: export a regmap to access the GMAC register
->>> >>
->>> >
->>> >
->>> >
->>> > Why was my patch "clk: sunxi-ng: replace lib-y with obj-y"
->>> > not included in the pull request?
->>> >
->>> >
->>> > You said "I've picked it up"
->>> > https://patchwork.kernel.org/patch/10348031/
->>>
->>> It looks like it was accidentally dropped after a rebase.
->>> Not quite sure what happened there. Maxime?
->>>
->>
->> I can directly pick and send as fix for clk-fixes targeting rc2.
+An IOMMU takes PASID value and the address information from the
+TLP to look up the physical address in the system.
 
-This is a friendly reminder to pick up this patch for -rc2.
+If a bridge drops the TLP prefix, the translation agent can resolve the
+address to an incorrect location and cause data corruption. Prevent
+this condition by requiring End-to-End TLP prefix to be supported on the
+entire data path between the endpoint and the root port.
 
-> The patch can still be found in the sunxi/for-next branch of the
-> sunxi repo on kernel.org:
->
-> https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/commit/?h=sunxi/for-next&id=d4a1496286b0c29fcace4e10c0047cca7cc79b25
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/ats.c             |  9 +++++++++
+ drivers/pci/probe.c           | 17 +++++++++++++++++
+ include/linux/pci.h           |  1 +
+ include/uapi/linux/pci_regs.h |  1 +
+ 4 files changed, 28 insertions(+)
 
-This is still available, but no longer referenced in any branch,
-as we've updated our sunxi/for-next branch for 4.19 stuff.
-
-> Or the original on patchwork:
->
-> https://patchwork.kernel.org/patch/10348027/
-
-And
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-if you pick directly from patchwork.
-
-Thanks
-ChenYu
+diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
+index 4923a2a..e1b2e6d 100644
+--- a/drivers/pci/ats.c
++++ b/drivers/pci/ats.c
+@@ -268,6 +268,7 @@ EXPORT_SYMBOL_GPL(pci_reset_pri);
+ int pci_enable_pasid(struct pci_dev *pdev, int features)
+ {
+ 	u16 control, supported;
++	struct pci_dev *bridge;
+ 	int pos;
+ 
+ 	if (WARN_ON(pdev->pasid_enabled))
+@@ -277,6 +278,14 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
+ 	if (!pos)
+ 		return -EINVAL;
+ 
++	bridge = pci_upstream_bridge(pdev);
++	while (bridge) {
++		if (!bridge->eetlp_prefix)
++			return -EINVAL;
++
++		bridge = pci_upstream_bridge(bridge);
++	}
++
+ 	pci_read_config_word(pdev, pos + PCI_PASID_CAP, &supported);
+ 	supported &= PCI_PASID_CAP_EXEC | PCI_PASID_CAP_PRIV;
+ 
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index ac876e3..a7f7ac1 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2042,6 +2042,22 @@ static void pci_configure_ltr(struct pci_dev *dev)
+ #endif
+ }
+ 
++static void pci_configure_eetlp_prefix(struct pci_dev *dev)
++{
++#ifdef CONFIG_PCI_PASID
++	u32 cap;
++
++	if (!pci_is_pcie(dev))
++		return;
++
++	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
++	if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
++		return;
++
++	dev->eetlp_prefix = 1;
++#endif
++}
++
+ static void pci_configure_device(struct pci_dev *dev)
+ {
+ 	struct hotplug_params hpp;
+@@ -2051,6 +2067,7 @@ static void pci_configure_device(struct pci_dev *dev)
+ 	pci_configure_extended_tags(dev, NULL);
+ 	pci_configure_relaxed_ordering(dev);
+ 	pci_configure_ltr(dev);
++	pci_configure_eetlp_prefix(dev);
+ 
+ 	memset(&hpp, 0, sizeof(hpp));
+ 	ret = pci_get_hp_params(dev, &hpp);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 340029b..cf88d47 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -350,6 +350,7 @@ struct pci_dev {
+ 	unsigned int	ltr_path:1;	/* Latency Tolerance Reporting
+ 					   supported from root to here */
+ #endif
++	unsigned int	eetlp_prefix:1;	/* End-to-End TLP Prefix */
+ 
+ 	pci_channel_state_t error_state;	/* Current connectivity state */
+ 	struct device	dev;			/* Generic device interface */
+diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
+index 4da87e2..a617ab2 100644
+--- a/include/uapi/linux/pci_regs.h
++++ b/include/uapi/linux/pci_regs.h
+@@ -636,6 +636,7 @@
+ #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
+ #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
+ #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
++#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
+ #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
+ #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
+ #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
+-- 
+2.7.4
