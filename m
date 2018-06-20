@@ -1,30 +1,22 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Jun 2018 15:02:00 +0200
-Subject: [PATCH/RFT v2 1/2] arm64: dts: r8a77995: Add SCIF-{0, 1, 3, 4, 5}
- device nodes
-In-Reply-To: <20180613151348.28697-1-horms+renesas@verge.net.au>
-References: <20180613151348.28697-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWJ24iCA=YQdoE99+1aVw8LNw3hRAGGbET6qAJNt4=QoQ@mail.gmail.com>
+Date: Wed, 20 Jun 2018 15:04:20 +0200
+Subject: [PATCH/RFT v2 2/2] arm64: dts: r8a77995: Add all HSCIF nodes
+In-Reply-To: <20180613150951.32322-1-horms+renesas@verge.net.au>
+References: <20180613150951.32322-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVZKqCriwJcXNL0koq1iZJOUrD_623yXLz1LEwCwbQZPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Wed, Jun 13, 2018 at 5:14 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+On Wed, Jun 13, 2018 at 5:10 PM Simon Horman <horms+renesas@verge.net.au> wrote:
 > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 >
-> This patch adds the device nodes for SCIF-{0,1,3,4,5} serial ports,
-> incl. clocks and power domain.
-
-While at it, perhaps you want to add DMA properties, too?
-The existing SCIF2 device node already has them.
-
+> This patch adds the device nodes all HSCIF serial ports
+> incl. clocks and power domain to the R8A77995 SoC.
+>
 > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 > [simon: updated internal clock from S3D1 to S3D1C to match documentation]
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Thanks for the update!
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
