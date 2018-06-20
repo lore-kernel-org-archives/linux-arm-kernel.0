@@ -1,41 +1,34 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Wed, 20 Jun 2018 16:19:13 +0800
-Subject: [PATCH v7 11/29] drm/mediatek: add connection from OD1 to RDMA1
+Date: Wed, 20 Jun 2018 16:19:03 +0800
+Subject: [PATCH v7 01/29] drm/mediatek: update dt-bindings for mt2712
 In-Reply-To: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529482771-2153-12-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529482771-2153-2-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the connection from OD1 to RDMA1 for ext path.
+Update device tree binding documentation for the display subsystem for
+Mediatek MT2712 SoCs.
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+Acked-by: CK Hu <ck.hu@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 58e44349e315..8bfc0debd2c2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -75,6 +75,7 @@
- 
- #define OVL0_MOUT_EN_COLOR0		0x1
- #define OD_MOUT_EN_RDMA0		0x1
-+#define OD1_MOUT_EN_RDMA1		BIT(16)
- #define UFOE_MOUT_EN_DSI0		0x1
- #define COLOR0_SEL_IN_OVL0		0x1
- #define OVL1_MOUT_EN_COLOR1		0x1
-@@ -151,6 +152,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_GAMMA && next == DDP_COMPONENT_RDMA1) {
- 		*addr = DISP_REG_CONFIG_DISP_GAMMA_MOUT_EN;
- 		value = GAMMA_MOUT_EN_RDMA1;
-+	} else if (cur == DDP_COMPONENT_OD1 && next == DDP_COMPONENT_RDMA1) {
-+		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
-+		value = OD1_MOUT_EN_RDMA1;
- 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
- 		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
- 		value = RDMA1_MOUT_DPI0;
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+index 383183a89164..8469de510001 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+@@ -40,7 +40,7 @@ Required properties (all function blocks):
+ 	"mediatek,<chip>-dpi"        - DPI controller, see mediatek,dpi.txt
+ 	"mediatek,<chip>-disp-mutex" - display mutex
+ 	"mediatek,<chip>-disp-od"    - overdrive
+-  the supported chips are mt2701 and mt8173.
++  the supported chips are mt2701, mt2712 and mt8173.
+ - reg: Physical base address and length of the function block register space
+ - interrupts: The interrupt signal from the function block (required, except for
+   merge and split function blocks).
 -- 
 2.12.5
