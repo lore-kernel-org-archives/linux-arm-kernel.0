@@ -1,76 +1,181 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Jun 2018 12:07:00 +0200 (CEST)
-Subject: [PATCH v5 2/6] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20180620094649.GA2766@piout.net>
-References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
- <20180619211929.22908-3-alexandre.belloni@bootlin.com>
- <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
- <20180620094649.GA2766@piout.net>
-Message-ID: <alpine.DEB.2.21.1806201156510.10546@nanos.tec.linutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 20 Jun 2018 12:09:49 +0200
+Subject: [PATCH 1/1] arm64/mm: move {idmap_pg_dir, tramp_pg_dir,
+ swapper_pg_dir} to .rodata section
+In-Reply-To: <20180620085755.20045-2-yaojun8558363@gmail.com>
+References: <20180620085755.20045-1-yaojun8558363@gmail.com>
+ <20180620085755.20045-2-yaojun8558363@gmail.com>
+Message-ID: <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jun 2018, Alexandre Belloni wrote:
-> On 20/06/2018 11:03:40+0200, Thomas Gleixner wrote:
-> > > +/*
-> > > + * Clocksource and clockevent using the same channel(s)
-> > > + */
-> > > +static u64 tc_get_cycles(struct clocksource *cs)
-> > > +{
-> > > +	u32 lower, upper;
-> > > +
-> > > +	do {
-> > > +		upper = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1]));
-> > > +		lower = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> > > +	} while (upper != readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1])));
-> > > +
-> > > +	return (upper << 16) | lower;
-> > > +}
-> > 
-> > For timekeeping the win of this is dubious. With a 5Mhz clock the 32bit
-> > part wraps around in ~859 seconds, which is plenty even for NOHZ.
-> > 
-> > So I really would avoid the double read/compare/eventually repeat magic and
-> > just use the lower 32bits for performance sake. I assume the same is true
-> > for sched_clock(), but I might be wrong.
-> > 
-> 
-> Agreed, this is why this is only used with the 16 bit counters (the
-> register is 32 bit wide but the counter only have 16 bits. For the 32
-> bit counters, tc_get_cycles32 is used and only use one counter.
+On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
+> Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
+> section. And update the swapper_pg_dir by fixmap.
+>
 
-Ah, sorry. I misread the code. Missed that it's the 16bit case. 
+I think we may be able to get away with not mapping idmap_pg_dir and
+tramp_pg_dir at all.
 
-> > > +static int tcb_clkevt_next_event(unsigned long delta,
-> > > +				 struct clock_event_device *d)
-> > > +{
-> > > +	u32 old, next, cur;
-> > > +
-> > > +	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> > > +	next = old + delta;
-> > > +	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
-> > > +	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> > > +
-> > > +	/* check whether the delta elapsed while setting the register */
-> > > +	if ((next < old && cur < old && cur > next) ||
-> > > +	    (next > old && (cur < old || cur > next))) {
-> > > +		/*
-> > > +		 * Clear the CPCS bit in the status register to avoid
-> > > +		 * generating a spurious interrupt next time a valid
-> > > +		 * timer event is configured.
-> > > +		 */
-> > > +		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
-> > > +		return -ETIME;
-> > > +	}
-> > 
-> > Aarg. Doesn;t that timer block have a simple count down and fire mode?
-> > These compare equal timers suck.
-> 
-> It only counts up...
+As for swapper_pg_dir, it would indeed be nice if we could keep those
+mappings read-only most of the time, but I'm not sure how useful this
+is if we apply it to the root level only.
 
-Have you tried to play with that waveform stuff?
+> Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
+> ---
+>  arch/arm64/include/asm/pgalloc.h | 19 +++++++++++++++++++
+>  arch/arm64/kernel/vmlinux.lds.S  | 32 ++++++++++++++++++--------------
+>  arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++----
+>  3 files changed, 56 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+> index 2e05bcd944c8..cc96a7e6957d 100644
+> --- a/arch/arm64/include/asm/pgalloc.h
+> +++ b/arch/arm64/include/asm/pgalloc.h
+> @@ -29,6 +29,10 @@
+>  #define PGALLOC_GFP    (GFP_KERNEL | __GFP_ZERO)
+>  #define PGD_SIZE       (PTRS_PER_PGD * sizeof(pgd_t))
+>
+> +#if CONFIG_STRICT_KERNEL_RWX
+> +extern spinlock_t pgdir_lock;
+> +#endif
+> +
+>  #if CONFIG_PGTABLE_LEVELS > 2
+>
+>  static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+> @@ -78,6 +82,21 @@ static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pudp, pgdval_t prot)
+>
+>  static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgdp, pud_t *pudp)
+>  {
+> +#if CONFIG_STRICT_KERNEL_RWX
+> +       if (mm == &init_mm) {
+> +               pgd_t *pgd;
+> +
+> +               spin_lock(&pgdir_lock);
+> +               pgd = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
+> +
+> +               pgd = (pgd_t *)((unsigned long)pgd + pgdp - swapper_pg_dir);
+> +               __pgd_populate(pgdp, __pa(pudp), PUD_TYPE_TABLE);
+> +
 
-Thanks,
+This only works for 4-level paging, but we support 2 and 3 level paging as well.
 
-	tglx
+> +               pgd_clear_fixmap();
+> +               spin_unlock(&pgdir_lock);
+> +               return;
+> +       }
+> +#endif
+>         __pgd_populate(pgdp, __pa(pudp), PUD_TYPE_TABLE);
+>  }
+>  #else
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 605d1b60469c..86532c57206a 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -216,21 +216,25 @@ SECTIONS
+>         BSS_SECTION(0, 0, 0)
+>
+>         . = ALIGN(PAGE_SIZE);
+> -       idmap_pg_dir = .;
+> -       . += IDMAP_DIR_SIZE;
+>
+> -#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> -       tramp_pg_dir = .;
+> -       . += PAGE_SIZE;
+> -#endif
+> -
+> -#ifdef CONFIG_ARM64_SW_TTBR0_PAN
+> -       reserved_ttbr0 = .;
+> -       . += RESERVED_TTBR0_SIZE;
+> -#endif
+> -       swapper_pg_dir = .;
+> -       . += SWAPPER_DIR_SIZE;
+> -       swapper_pg_end = .;
+> +       .rodata : {
+> +               . = ALIGN(PAGE_SIZE);
+> +               idmap_pg_dir = .;
+> +               . += IDMAP_DIR_SIZE;
+> +
+> +               #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+
+CPP directives should start in the first column
+
+> +               tramp_pg_dir = .;
+> +               . += PAGE_SIZE;
+> +               #endif
+> +
+> +               #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+> +               reserved_ttbr0 = .;
+> +               . += RESERVED_TTBR0_SIZE;
+> +               #endif
+> +               swapper_pg_dir = .;
+> +               . += SWAPPER_DIR_SIZE;
+> +               swapper_pg_end = .;
+> +       }
+>
+>         __pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+>         _end = .;
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 2dbb2c9f1ec1..c1aa85a6ada5 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -66,6 +66,10 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+>  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
+>  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+>
+> +#ifdef CONFIG_STRICT_KERNEL_RWX
+> +DEFINE_SPINLOCK(pgdir_lock);
+> +#endif
+> +
+>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>                               unsigned long size, pgprot_t vma_prot)
+>  {
+> @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
+>
+>  void __init mark_linear_text_alias_ro(void)
+>  {
+> +       unsigned long size;
+> +
+>         /*
+>          * Remove the write permissions from the linear alias of .text/.rodata
+> +        *
+> +        * We free some pages in .rodata at paging_init(), which generates a
+> +        * hole. And the hole splits .rodata into two pieces.
+>          */
+> +       size = (unsigned long)swapper_pg_dir + PAGE_SIZE - (unsigned long)_text;
+>         update_mapping_prot(__pa_symbol(_text), (unsigned long)lm_alias(_text),
+> -                           (unsigned long)__init_begin - (unsigned long)_text,
+> -                           PAGE_KERNEL_RO);
+> +                           size, PAGE_KERNEL_RO);
+> +
+> +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
+> +       update_mapping_prot(__pa_symbol(swapper_pg_end),
+> +                           (unsigned long)lm_alias(swapper_pg_end),
+> +                           size, PAGE_KERNEL_RO);
+
+I don't think this is necessary. Even if some pages are freed, it
+doesn't harm to keep a read-only alias of them here since the new
+owner won't access them via this mapping anyway. So we can keep
+.rodata as a single region.
+
+>  }
+>
+>  static void __init map_mem(pgd_t *pgdp)
+> @@ -587,8 +601,9 @@ static void __init map_kernel(pgd_t *pgdp)
+>          */
+>         map_kernel_segment(pgdp, _text, _etext, text_prot, &vmlinux_text, 0,
+>                            VM_NO_GUARD);
+> -       map_kernel_segment(pgdp, __start_rodata, __inittext_begin, PAGE_KERNEL,
+> -                          &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
+> +       map_kernel_segment(pgdp, __start_rodata, __inittext_begin,
+> +                          PAGE_KERNEL, &vmlinux_rodata,
+> +                          NO_CONT_MAPPINGS | NO_BLOCK_MAPPINGS, VM_NO_GUARD);
+
+Given the above, you should be able to drop this as well.
+
+>         map_kernel_segment(pgdp, __inittext_begin, __inittext_end, text_prot,
+>                            &vmlinux_inittext, 0, VM_NO_GUARD);
+>         map_kernel_segment(pgdp, __initdata_begin, __initdata_end, PAGE_KERNEL,
+> --
+> 2.17.1
+>
