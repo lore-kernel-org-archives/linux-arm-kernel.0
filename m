@@ -1,46 +1,57 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 12:45:03 +0800
-Subject: [PATCH v10 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <20180530091934.tbd6xbyr5s3ipn3v@paasikivi.fi.intel.com>
-References: <20180517090224.u3ygdzjr77im2mmp@flea>
- <20180529095757.qkz7jyuxza7movbc@flea.home>
- <20180530091934.tbd6xbyr5s3ipn3v@paasikivi.fi.intel.com>
-Message-ID: <CAGb2v67RP8bjObBJu_1JsREUo64hnEzptG_n-aYMn4Dcd_Zo-g@mail.gmail.com>
+Date: Wed, 20 Jun 2018 13:15:36 +0800
+Subject: [PATCH 1/5] dt-bindings: mfd: axp20x: Add "self-working" mode for
+ AXP806
+In-Reply-To: <20180620051540.25617-1-wens@csie.org>
+References: <20180620051540.25617-1-wens@csie.org>
+Message-ID: <20180620051540.25617-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2018 at 5:19 PM, Sakari Ailus
-<sakari.ailus@linux.intel.com> wrote:
-> On Tue, May 29, 2018 at 11:57:57AM +0200, Maxime Ripard wrote:
->> On Thu, May 17, 2018 at 11:02:24AM +0200, Maxime Ripard wrote:
->> > On Fri, May 04, 2018 at 02:44:08PM +0800, Yong Deng wrote:
->> > > This patchset add initial support for Allwinner V3s CSI.
->> > >
->> > > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
->> > > interface and CSI1 is used for parallel interface. This is not
->> > > documented in datasheet but by test and guess.
->> > >
->> > > This patchset implement a v4l2 framework driver and add a binding
->> > > documentation for it.
->> > >
->> > > Currently, the driver only support the parallel interface. And has been
->> > > tested with a BT1120 signal which generating from FPGA. The following
->> > > fetures are not support with this patchset:
->> > >   - ISP
->> > >   - MIPI-CSI2
->> > >   - Master clock for camera sensor
->> > >   - Power regulator for the front end IC
->> >
->> > I tested it on my H3 with a parallel camera, and it still works. Thanks!
->> >
->> > Hans, Sakari, any chance this might land in 4.18?
->>
->> Ping?
->
-> I'll try to look into this soonish but it seems to be too late for 4.18.
-> Sorry about that.
+The AXP806 has three operation modes:
 
-Can we get this into 4.19?
+  - master mode: The PMIC is the first or only AXP PMIC in the system,
+		 but is not in charge of power management, i.e. only
+		 provides regulator functions.
 
-Thanks
-ChenYu
+  - slave mode: The PMIC is the second AXP PMIC in the system, chained
+		to the first, or master, one.
+
+  - self-working mode: The PMIC is the only AXP PMIC in the system, and
+		       is in charge of power sequencing.
+
+The functional differences between these modes can be found in the
+"Control and Operation" chapter of the AXP806 (in Chinese) and AXP805
+(in English) datasheets. These include how the PMIC responds to external
+signals, whether it takes an external voltage reference or uses its own,
+and whether the EN/PWRON pin functions as an enable switch or power button.
+
+We already support both slave and master mode. This patch adds a property
+for describing the self-working mode, and reworks the description for
+the mode properties.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index d1762f3b30af..eaaf79c01e1e 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -45,8 +45,11 @@ Optional properties:
+ 			  board is driving OTG VBus or not.
+ 			  (axp221 / axp223 / axp803/ axp813 only)
+ 
+-- x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
+-			wired for master mode. The default is slave mode.
++- x-powers,self-working-mode and
++  x-powers,master-mode: Boolean (axp806 only). Set either of these when the
++			PMIC is wired for self-working mode or master mode.
++			If neither is set then slave mode is assumed.
++			This corresponds to how the MODESET pin is wired.
+ 
+ - <input>-supply: a phandle to the regulator supply node. May be omitted if
+ 		  inputs are unregulated, such as using the IPSOUT output
+-- 
+2.17.1
