@@ -1,59 +1,87 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Wed, 20 Jun 2018 16:19:25 +0800
-Subject: [PATCH v7 23/29] drm/mediatek: add connection from RDMA2 to DSI2
-In-Reply-To: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
-References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529482771-2153-24-git-send-email-stu.hsieh@mediatek.com>
+From: andrea.merello@gmail.com (Andrea Merello)
+Date: Wed, 20 Jun 2018 10:36:48 +0200
+Subject: [PATCH 1/6] dmaengine: xilinx_dma: fix splitting transfer causes
+ misalignments
+Message-ID: <20180620083653.17010-1-andrea.merello@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the connection from RDMA2 to DSI2
+Whenever a single or cyclic transaction is prepared, the driver
+could eventually split it over several SG descriptors in order
+to deal with the HW maximum transfer length.
 
-Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+This could end up in DMA operations starting from a misaligned
+address. This seems fatal for the HW.
+
+This patch eventually adjusts the transfer size in order to make sure
+all operations start from an aligned address.
+
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/dma/xilinx/xilinx_dma.c | 27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index db78fad785e3..e5db1ab51c9b 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -95,6 +95,7 @@
- #define RDMA2_SOUT_DPI0			0x2
- #define RDMA2_SOUT_DPI1			0x3
- #define RDMA2_SOUT_DSI1			0x1
-+#define RDMA2_SOUT_DSI2			0x4
- #define DPI0_SEL_IN_RDMA1		0x1
- #define DPI0_SEL_IN_RDMA2		0x3
- #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
-@@ -102,6 +103,7 @@
- #define DSI1_SEL_IN_RDMA1		0x1
- #define DSI1_SEL_IN_RDMA2		0x4
- #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
-+#define DSI2_SEL_IN_RDMA2		(0x4 << 16)
- #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
- #define COLOR1_SEL_IN_OVL1		0x1
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index 27b523530c4a..a516e7ffef21 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -376,6 +376,7 @@ struct xilinx_dma_chan {
+ 	void (*start_transfer)(struct xilinx_dma_chan *chan);
+ 	int (*stop_transfer)(struct xilinx_dma_chan *chan);
+ 	u16 tdest;
++	u32 copy_mask;
+ };
  
-@@ -209,6 +211,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
- 		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
- 		value = RDMA2_SOUT_DSI1;
-+	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
-+		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-+		value = RDMA2_SOUT_DSI2;
- 	} else {
- 		value = 0;
- 	}
-@@ -249,6 +254,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
- 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
- 		value = DSI1_SEL_IN_RDMA2;
-+	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
-+		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
-+		value = DSI2_SEL_IN_RDMA2;
- 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
- 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
- 		value = COLOR1_SEL_IN_OVL1;
+ /**
+@@ -1789,10 +1790,14 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+ 
+ 			/*
+ 			 * Calculate the maximum number of bytes to transfer,
+-			 * making sure it is less than the hw limit
++			 * making sure it is less than the hw limit and that
++			 * the next chuck start address is aligned
+ 			 */
+-			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
+-				     XILINX_DMA_MAX_TRANS_LEN);
++			copy = sg_dma_len(sg) - sg_used;
++			if (copy > XILINX_DMA_MAX_TRANS_LEN)
++				copy = XILINX_DMA_MAX_TRANS_LEN &
++					chan->copy_mask;
++
+ 			hw = &segment->hw;
+ 
+ 			/* Fill in the descriptor */
+@@ -1894,10 +1899,14 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+ 
+ 			/*
+ 			 * Calculate the maximum number of bytes to transfer,
+-			 * making sure it is less than the hw limit
++			 * making sure it is less than the hw limit and that
++			 * the next chuck start address is aligned
+ 			 */
+-			copy = min_t(size_t, period_len - sg_used,
+-				     XILINX_DMA_MAX_TRANS_LEN);
++			copy = period_len - sg_used;
++			if (copy > XILINX_DMA_MAX_TRANS_LEN)
++				copy = XILINX_DMA_MAX_TRANS_LEN &
++					chan->copy_mask;
++
+ 			hw = &segment->hw;
+ 			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
+ 					  period_len * i);
+@@ -2402,8 +2411,12 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 	if (width > 8)
+ 		has_dre = false;
+ 
+-	if (!has_dre)
++	if (has_dre) {
++		chan->copy_mask = ~0;
++	} else {
+ 		xdev->common.copy_align = fls(width - 1);
++		chan->copy_mask = ~(width - 1);
++	}
+ 
+ 	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel") ||
+ 	    of_device_is_compatible(node, "xlnx,axi-dma-mm2s-channel") ||
 -- 
-2.12.5
+2.17.1
