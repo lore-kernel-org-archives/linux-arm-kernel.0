@@ -1,77 +1,130 @@
-From: javierm@redhat.com (Javier Martinez Canillas)
-Date: Wed, 20 Jun 2018 11:04:38 +0200
-Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
-In-Reply-To: <CAHp75VcOd5K+T6bkxyz3qgqNr4-=K9GGRh+DQ_qgW7dGKdzO5A@mail.gmail.com>
-References: <20180619205914.21375-1-javierm@redhat.com>
- <20180619225145.GA23389@kroah.com>
- <CAHp75VcOd5K+T6bkxyz3qgqNr4-=K9GGRh+DQ_qgW7dGKdzO5A@mail.gmail.com>
-Message-ID: <c5ff2e6a-6bbf-deea-5250-7588b8046750@redhat.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Jun 2018 11:03:40 +0200 (CEST)
+Subject: [PATCH v5 2/6] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20180619211929.22908-3-alexandre.belloni@bootlin.com>
+References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+ <20180619211929.22908-3-alexandre.belloni@bootlin.com>
+Message-ID: <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On Tue, 19 Jun 2018, Alexandre Belloni wrote:
+> +
+> +static struct atmel_tcb_clksrc {
+> +	struct clocksource clksrc;
+> +	struct clock_event_device clkevt;
+> +	struct regmap *regmap;
+> +	void __iomem *base;
+> +	struct clk *clk[2];
+> +	char name[20];
+> +	int channels[2];
+> +	int bits;
+> +	int irq;
+> +	struct {
+> +		u32 cmr;
+> +		u32 imr;
+> +		u32 rc;
+> +		bool clken;
+> +	} cache[2];
+> +	u32 bmr_cache;
+> +	bool registered;
+> +} tc = {
+> +	.clksrc = {
+> +		.rating		= 200,
+> +		.mask		= CLOCKSOURCE_MASK(32),
+> +		.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+> +	},
+> +	.clkevt	= {
+> +		.features	= CLOCK_EVT_FEAT_ONESHOT,
+> +		/* Should be lower than at91rm9200's system timer */
+> +		.rating		= 125,
+> +	},
+> +};
+> +
+> +static struct tc_clkevt_device {
+> +	struct clock_event_device clkevt;
+> +	struct regmap *regmap;
+> +	void __iomem *base;
+> +	struct clk *slow_clk;
+> +	struct clk *clk;
+> +	char name[20];
+> +	int channel;
+> +	int irq;
+> +	struct {
+> +		u32 cmr;
+> +		u32 imr;
+> +		u32 rc;
+> +		bool clken;
+> +	} cache;
+> +	bool registered;
+> +	bool clk_enabled;
+> +} tce = {
+> +	.clkevt	= {
+> +		.features		= CLOCK_EVT_FEAT_PERIODIC |
+> +					  CLOCK_EVT_FEAT_ONESHOT,
+> +		/*
+> +		 * Should be lower than at91rm9200's system timer
+> +		 * but higher than tc.clkevt.rating
+> +		 */
+> +		.rating			= 140,
+> +	},
+> +};
 
-On 06/20/2018 01:43 AM, Andy Shevchenko wrote:
-> On Wed, Jun 20, 2018 at 1:51 AM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
->> On Tue, Jun 19, 2018 at 10:59:14PM +0200, Javier Martinez Canillas wrote:
->>> For debugging purposes it may be useful to know what are the devices whose
->>> probe function was deferred. Add a debugfs entry showing that information.
->>>
->>>   $ cat /sys/kernel/debug/deferred_devices
->>>   48070000.i2c:twl at 48:bci
->>>   musb-hdrc.0.auto
->>>   omapdrm.0
-> 
-> 
->> And what is the use of this file?  What can you do with this
->> information?  Who is going to use it?  Don't we have other deferred
->> probe debugging somewhere else?
-> 
-> Indeed.
-> 
-> Javier, have you tried to add 'initcall_debug' to a kernel command
-> line followed by 'dyndbg="file drivers/base/dd.c +p"'?
-> 
+To be honest: This stuff is horrible to read and the two structs are almost
+identical. There is really no good reason to have all this duplicated
+mess. I'm pretty sure you can consolidate stuff further when using _one_.
 
-I already mentioned this to Greg, but I'll elaborate a little bit. Using these
-kernel cmdline options will only tell us when a driver for a device was probed
-or deferred but it doesn't tell us what's left in the queue after all drivers
-have been registered.
+And please define the structs separate from the define and arrange the
+struct members in tabluar fashion.
 
-Yes, we could parse the kernel log and do some computation to figure out if a
-deferred driver finally got probed, but I don't understand why we can't just
-expose the deferred queue if the kernel already has that info and is useful?
+> +/*
+> + * Clocksource and clockevent using the same channel(s)
+> + */
+> +static u64 tc_get_cycles(struct clocksource *cs)
+> +{
+> +	u32 lower, upper;
+> +
+> +	do {
+> +		upper = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1]));
+> +		lower = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> +	} while (upper != readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1])));
+> +
+> +	return (upper << 16) | lower;
+> +}
 
-But even if we do that, the current debug printouts are only enabled until
-late_initcall time. So it won't print deferred probes for drivers registered
-by modules:
+For timekeeping the win of this is dubious. With a 5Mhz clock the 32bit
+part wraps around in ~859 seconds, which is plenty even for NOHZ.
 
-static void deferred_probe_work_func(struct work_struct *work)
-{
-...
-	if (initcall_debug && !initcalls_done)
-		deferred_probe_debug(dev);
-	else
-		bus_probe_device(dev);
-...
-}
+So I really would avoid the double read/compare/eventually repeat magic and
+just use the lower 32bits for performance sake. I assume the same is true
+for sched_clock(), but I might be wrong.
 
-static int deferred_probe_initcall(void)
-{
-...
-	initcalls_done = true;
-...
-}
-late_initcall(deferred_probe_initcall);
+> +static int tcb_clkevt_next_event(unsigned long delta,
+> +				 struct clock_event_device *d)
+> +{
+> +	u32 old, next, cur;
+> +
+> +	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> +	next = old + delta;
+> +	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
+> +	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> +
+> +	/* check whether the delta elapsed while setting the register */
+> +	if ((next < old && cur < old && cur > next) ||
+> +	    (next > old && (cur < old || cur > next))) {
+> +		/*
+> +		 * Clear the CPCS bit in the status register to avoid
+> +		 * generating a spurious interrupt next time a valid
+> +		 * timer event is configured.
+> +		 */
+> +		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
+> +		return -ETIME;
+> +	}
 
-Again, we could change that but in my opinion we should try to make debug more
-easier and this patch is quite trivial. The kernelci folks said that this will
-be useful for them and allows to detect regressions on drivers' probe as early
-as possible, which I think is very important.
+Aarg. Doesn;t that timer block have a simple count down and fire mode?
+These compare equal timers suck.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Software Engineer - Desktop Hardware Enablement
-Red Hat
+Thanks,
+
+	tglx
