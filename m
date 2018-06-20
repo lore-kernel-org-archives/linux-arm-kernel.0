@@ -1,57 +1,52 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Wed, 20 Jun 2018 16:19:02 +0800
-Subject: [PATCH v7 00/29] Add support for mediatek SOC MT2712
-Message-ID: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+Date: Wed, 20 Jun 2018 16:19:09 +0800
+Subject: [PATCH v7 07/29] drm/mediatek: add component DPI1
+In-Reply-To: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529482771-2153-8-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the Mediatek MT2712 DISP subsystem.
-MT2712 is base on MT8173, there are some difference as following:
-MT2712 support three disp output(two ovl and one rdma)
+This patch add the component DPI1
 
-Change in v6:
-- Update commit message for the patch
-  "drm/mediatek: Update the definition of connection from RDMA1 to DPI0"
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 ++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-Stu Hsieh (29):
-  drm/mediatek: update dt-bindings for mt2712
-  drm/mediatek: support maximum 64 mutex mod
-  drm/mediatek: add ddp component AAL1
-  drm/mediatek: add ddp component OD1
-  drm/mediatek: add ddp component PWM1
-  drm/mediatek: add ddp component PWM2
-  drm/mediatek: add component DPI1
-  drm/mediatek: add component DSI2
-  drm/mediatek: add component DSI3
-  drm/mediatek: add the DSI1 for component init condition
-  drm/mediatek: add connection from OD1 to RDMA1
-  drm/mediatek: Update the definition of connection from RDMA1 to DPI0
-  drm/mediatek: add connection from RDMA0 to DPI0
-  drm/mediatek: add connection from RDMA0 to DSI2
-  drm/mediatek: add connection from RDMA0 to DSI3
-  drm/mediatek: add connection from RDMA1 to DPI1
-  drm/mediatek: add connection from RDMA1 to DSI1
-  drm/mediatek: add connection from RDMA1 to DSI2
-  drm/mediatek: add connection from RDMA1 to DSI3
-  drm/mediatek: add connection from RDMA2 to DPI0
-  drm/mediatek: add connection from RDMA2 to DPI1
-  drm/mediatek: add connection from RDMA2 to DSI1
-  drm/mediatek: add connection from RDMA2 to DSI2
-  drm/mediatek: add connection from RDMA2 to DSI3
-  drm/mediatek: add DPI1 support for mutex
-  drm/mediatek: add DSI2 support for mutex
-  drm/mediatek: add DSI3 support for mutex
-  drm/mediatek: add third ddp path
-  drm/mediatek: Add support for mediatek SOC MT2712
-
- .../bindings/display/mediatek/mediatek,disp.txt    |   2 +-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   3 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 235 ++++++++++++++++++---
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  15 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |  10 +-
- drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  47 ++++-
- drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   5 +-
- 7 files changed, 274 insertions(+), 43 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 86e8c9e5df41..cc74b1a7278c 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -224,6 +224,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
+ 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+ 	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
++	[DDP_COMPONENT_DPI1]	= { MTK_DPI,		1, NULL },
+ 	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+ 	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+ 	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
+@@ -275,6 +276,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+ 
+ 	if (comp_id == DDP_COMPONENT_BLS ||
+ 	    comp_id == DDP_COMPONENT_DPI0 ||
++	    comp_id == DDP_COMPONENT_DPI1 ||
+ 	    comp_id == DDP_COMPONENT_DSI0 ||
+ 	    comp_id == DDP_COMPONENT_PWM0) {
+ 		comp->regs = NULL;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index e00c2e798abd..54c99c169093 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -47,6 +47,7 @@ enum mtk_ddp_comp_id {
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_COLOR1,
+ 	DDP_COMPONENT_DPI0,
++	DDP_COMPONENT_DPI1,
+ 	DDP_COMPONENT_DSI0,
+ 	DDP_COMPONENT_DSI1,
+ 	DDP_COMPONENT_GAMMA,
 -- 
 2.12.5
