@@ -1,23 +1,59 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 20 Jun 2018 22:26:11 +0200
-Subject: [PATCH] ARM: pxa: zylonite: use the new ac97 bus support
-In-Reply-To: <20180603201702.15919-1-robert.jarzmik@free.fr> (Robert Jarzmik's
- message of "Sun, 3 Jun 2018 22:17:02 +0200")
-References: <20180603201702.15919-1-robert.jarzmik@free.fr>
-Message-ID: <87zhzpnr18.fsf@belgarion.home>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 20 Jun 2018 13:28:05 -0700
+Subject: [PATCH v2 03/10] input: rohm_bu21023: switch to
+ i2c_lock_bus(..., I2C_LOCK_SEGMENT)
+In-Reply-To: <20180620051803.12206-4-peda@axentia.se>
+References: <20180620051803.12206-1-peda@axentia.se>
+ <20180620051803.12206-4-peda@axentia.se>
+Message-ID: <20180620202805.GB75925@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Wed, Jun 20, 2018 at 07:17:56AM +0200, Peter Rosin wrote:
+> Locking the root adapter for __i2c_transfer will deadlock if the
+> device sits behind a mux-locked I2C mux. Switch to the finer-grained
+> i2c_lock_bus with the I2C_LOCK_SEGMENT flag. If the device does not
+> sit behind a mux-locked mux, the two locking variants are equivalent.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 
-> Now the PXA is converted to new ac97 bus support, the wm9713 is
-> automatically detected and probed. Remove it from the platform bus.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Still
+
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Feel free to merge through I2C tree.
+
 > ---
->  arch/arm/mach-pxa/zylonite.c | 11 -----------
->  1 file changed, 11 deletions(-)
-Queued to pxa/for-next.
+>  drivers/input/touchscreen/rohm_bu21023.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/rohm_bu21023.c b/drivers/input/touchscreen/rohm_bu21023.c
+> index bda0500c9b57..714affdd742f 100644
+> --- a/drivers/input/touchscreen/rohm_bu21023.c
+> +++ b/drivers/input/touchscreen/rohm_bu21023.c
+> @@ -304,7 +304,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
+>  	msg[1].len = len;
+>  	msg[1].buf = buf;
+>  
+> -	i2c_lock_adapter(adap);
+> +	i2c_lock_bus(adap, I2C_LOCK_SEGMENT);
+>  
+>  	for (i = 0; i < 2; i++) {
+>  		if (__i2c_transfer(adap, &msg[i], 1) < 0) {
+> @@ -313,7 +313,7 @@ static int rohm_i2c_burst_read(struct i2c_client *client, u8 start, void *buf,
+>  		}
+>  	}
+>  
+> -	i2c_unlock_adapter(adap);
+> +	i2c_unlock_bus(adap, I2C_LOCK_SEGMENT);
+>  
+>  	return ret;
+>  }
+> -- 
+> 2.11.0
+> 
 
---
-Robert
+Thanks.
+
+-- 
+Dmitry
