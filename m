@@ -1,130 +1,52 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Jun 2018 11:03:40 +0200 (CEST)
-Subject: [PATCH v5 2/6] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20180619211929.22908-3-alexandre.belloni@bootlin.com>
-References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
- <20180619211929.22908-3-alexandre.belloni@bootlin.com>
-Message-ID: <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 20 Jun 2018 10:21:07 +0100
+Subject: [PATCHv3 10/19] arm64: convert native/compat syscall entry to C
+In-Reply-To: <20180619130932.ww53s5rnragcodha@lakrids.cambridge.arm.com>
+References: <20180618120310.39527-1-mark.rutland@arm.com>
+ <20180618120310.39527-11-mark.rutland@arm.com>
+ <20180619121814.GR22983@e103592.cambridge.arm.com>
+ <20180619130932.ww53s5rnragcodha@lakrids.cambridge.arm.com>
+Message-ID: <20180620092105.GT22983@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jun 2018, Alexandre Belloni wrote:
-> +
-> +static struct atmel_tcb_clksrc {
-> +	struct clocksource clksrc;
-> +	struct clock_event_device clkevt;
-> +	struct regmap *regmap;
-> +	void __iomem *base;
-> +	struct clk *clk[2];
-> +	char name[20];
-> +	int channels[2];
-> +	int bits;
-> +	int irq;
-> +	struct {
-> +		u32 cmr;
-> +		u32 imr;
-> +		u32 rc;
-> +		bool clken;
-> +	} cache[2];
-> +	u32 bmr_cache;
-> +	bool registered;
-> +} tc = {
-> +	.clksrc = {
-> +		.rating		= 200,
-> +		.mask		= CLOCKSOURCE_MASK(32),
-> +		.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> +	},
-> +	.clkevt	= {
-> +		.features	= CLOCK_EVT_FEAT_ONESHOT,
-> +		/* Should be lower than at91rm9200's system timer */
-> +		.rating		= 125,
-> +	},
-> +};
-> +
-> +static struct tc_clkevt_device {
-> +	struct clock_event_device clkevt;
-> +	struct regmap *regmap;
-> +	void __iomem *base;
-> +	struct clk *slow_clk;
-> +	struct clk *clk;
-> +	char name[20];
-> +	int channel;
-> +	int irq;
-> +	struct {
-> +		u32 cmr;
-> +		u32 imr;
-> +		u32 rc;
-> +		bool clken;
-> +	} cache;
-> +	bool registered;
-> +	bool clk_enabled;
-> +} tce = {
-> +	.clkevt	= {
-> +		.features		= CLOCK_EVT_FEAT_PERIODIC |
-> +					  CLOCK_EVT_FEAT_ONESHOT,
-> +		/*
-> +		 * Should be lower than at91rm9200's system timer
-> +		 * but higher than tc.clkevt.rating
-> +		 */
-> +		.rating			= 140,
-> +	},
-> +};
+On Tue, Jun 19, 2018 at 02:15:24PM +0100, Mark Rutland wrote:
+> On Tue, Jun 19, 2018 at 01:18:17PM +0100, Dave Martin wrote:
+> > On Mon, Jun 18, 2018 at 01:03:01PM +0100, Mark Rutland wrote:
+> > > +static inline void sve_user_reset(void)
+> > > +{
+> > 
+> > Can we call this "sve_user_discard" please?
+> > 
+> > "Reset" is a reasonable name for the concept, but the "discard"
+> > terminology has been used elsewhere.
+> 
+> Sure; done.
+> 
+> > > +	if (!system_supports_sve())
+> > > +		return;
+> > > +
+> > > +	/*
+> > > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
+> > > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
+> > > +	 * happens if a context switch or kernel_neon_begin() or context
+> > > +	 * modification (sigreturn, ptrace) intervenes.
+> > > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
+> > > +	 */
+> > 
+> > This comment should go after clear_thead_flag(), since it describes not
+> > the purpose of this function but the presence of sve_user_disable().
+> > 
+> > > +	clear_thread_flag(TIF_SVE);
+> > > +	sve_user_disable();
+> > > +}
+> 
+> Good point. I've moved the clear_thread_flag(TIF_SVE) above the comment
+> (with a blank line before the comment).
 
-To be honest: This stuff is horrible to read and the two structs are almost
-identical. There is really no good reason to have all this duplicated
-mess. I'm pretty sure you can consolidate stuff further when using _one_.
+Thanks -- with those changes:
 
-And please define the structs separate from the define and arrange the
-struct members in tabluar fashion.
+Reviewed-by: Dave Martin <Dave.Martin@arm.com> (for the SVE parts)
 
-> +/*
-> + * Clocksource and clockevent using the same channel(s)
-> + */
-> +static u64 tc_get_cycles(struct clocksource *cs)
-> +{
-> +	u32 lower, upper;
-> +
-> +	do {
-> +		upper = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1]));
-> +		lower = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> +	} while (upper != readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1])));
-> +
-> +	return (upper << 16) | lower;
-> +}
-
-For timekeeping the win of this is dubious. With a 5Mhz clock the 32bit
-part wraps around in ~859 seconds, which is plenty even for NOHZ.
-
-So I really would avoid the double read/compare/eventually repeat magic and
-just use the lower 32bits for performance sake. I assume the same is true
-for sched_clock(), but I might be wrong.
-
-> +static int tcb_clkevt_next_event(unsigned long delta,
-> +				 struct clock_event_device *d)
-> +{
-> +	u32 old, next, cur;
-> +
-> +	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> +	next = old + delta;
-> +	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
-> +	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> +
-> +	/* check whether the delta elapsed while setting the register */
-> +	if ((next < old && cur < old && cur > next) ||
-> +	    (next > old && (cur < old || cur > next))) {
-> +		/*
-> +		 * Clear the CPCS bit in the status register to avoid
-> +		 * generating a spurious interrupt next time a valid
-> +		 * timer event is configured.
-> +		 */
-> +		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
-> +		return -ETIME;
-> +	}
-
-Aarg. Doesn;t that timer block have a simple count down and fire mode?
-These compare equal timers suck.
-
-Thanks,
-
-	tglx
+Cheers
+---Dave
