@@ -1,74 +1,52 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:09 +0200
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle path
- for CPUs
+Date: Wed, 20 Jun 2018 19:22:16 +0200
+Subject: [PATCH v8 16/26] drivers: firmware: psci: Support hierarchical CPU
+ idle states
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-10-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-17-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow CPUs being power managed by PM domains, let's deploy support for
-runtime PM for the CPU's corresponding struct device.
+From: Lina Iyer <lina.iyer@linaro.org>
 
-More precisely, at the point when the CPU is about to enter an idle state,
-decrease the runtime PM usage count for its corresponding struct device,
-via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
-resumes from idle, let's increase the runtime PM usage count, via calling
-pm_runtime_get_sync().
+Currently CPU's idle states are represented in a flattened model, via the
+"cpu-idle-states" binding from within the CPU's device nodes.
+
+Support the hierarchical layout, simply by converting to calling the new OF
+helper, of_get_cpu_state_node().
 
 Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- kernel/cpu_pm.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/firmware/psci/psci.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-index 67b02e138a47..492d4a83dca0 100644
---- a/kernel/cpu_pm.c
-+++ b/kernel/cpu_pm.c
-@@ -16,9 +16,11 @@
-  */
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index 9788bfc1cf8b..256b4edbb20a 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -294,8 +294,7 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 	struct device_node *state_node;
  
- #include <linux/kernel.h>
-+#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/module.h>
- #include <linux/notifier.h>
-+#include <linux/pm_runtime.h>
- #include <linux/spinlock.h>
- #include <linux/syscore_ops.h>
+ 	/* Count idle states */
+-	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+-					      count))) {
++	while ((state_node = of_get_cpu_state_node(cpu_node, count))) {
+ 		count++;
+ 		of_node_put(state_node);
+ 	}
+@@ -308,7 +307,7 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 		return -ENOMEM;
  
-@@ -91,6 +93,7 @@ int cpu_pm_enter(void)
- {
- 	int nr_calls;
- 	int ret = 0;
-+	struct device *dev = get_cpu_device(smp_processor_id());
+ 	for (i = 0; i < count; i++) {
+-		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		state_node = of_get_cpu_state_node(cpu_node, i);
+ 		ret = psci_dt_parse_state_node(state_node, &psci_states[i]);
+ 		of_node_put(state_node);
  
- 	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
- 	if (ret)
-@@ -100,6 +103,9 @@ int cpu_pm_enter(void)
- 		 */
- 		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
- 
-+	if (!ret && dev && dev->pm_domain)
-+		pm_runtime_put_sync_suspend(dev);
-+
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(cpu_pm_enter);
-@@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
-  */
- int cpu_pm_exit(void)
- {
-+	struct device *dev = get_cpu_device(smp_processor_id());
-+
-+	if (dev && dev->pm_domain)
-+		pm_runtime_get_sync(dev);
-+
- 	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
- }
- EXPORT_SYMBOL_GPL(cpu_pm_exit);
 -- 
 2.17.1
