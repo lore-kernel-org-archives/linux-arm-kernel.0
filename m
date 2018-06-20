@@ -1,82 +1,29 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 21:46:40 +0800
-Subject: [PATCH 4/5] arm64: dts: allwinner: h6: Use macros for R_CCU clock
- and reset indices
-In-Reply-To: <f17d1d31905cd3276d257053b8ed632de941494c.camel@aosc.io>
-References: <20180620051540.25617-1-wens@csie.org>
- <20180620051540.25617-5-wens@csie.org>
- <f17d1d31905cd3276d257053b8ed632de941494c.camel@aosc.io>
-Message-ID: <CAGb2v65XQ-=oWbxOre2eT+G14T=q+E3+hKd=J1YrpoHFo47MsA@mail.gmail.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Wed, 20 Jun 2018 15:51:35 +0200
+Subject: [PATCH V3 0/3] add iwdg2 support for stm32mp157c
+Message-ID: <1529502698-13263-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 9:11 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> ? 2018-06-20?? 13:15 +0800?Chen-Yu Tsai???
->> Now that the device tree binding headers for the R_CCU have been
->> merged,
->> we can use the macros, instead of raw numbers.
->>
->> Switch to R_CCU macros for clock and reset indices.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 9 ++++++---
->>  1 file changed, 6 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> index c72da8cd9ef5..d85070f8c4a2 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> @@ -5,7 +5,9 @@
->>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include <dt-bindings/clock/sun50i-h6-ccu.h>
->> +#include <dt-bindings/clock/sun50i-h6-r-ccu.h>
->>  #include <dt-bindings/reset/sun50i-h6-ccu.h>
->> +#include <dt-bindings/reset/sun50i-h6-r-ccu.h>
->>
->>  / {
->>       interrupt-parent = <&gic>;
->> @@ -198,7 +200,7 @@
->>                       reg = <0x07022000 0x400>;
->>                       interrupts = <GIC_SPI 105
->> IRQ_TYPE_LEVEL_HIGH>,
->>                                    <GIC_SPI 111
->> IRQ_TYPE_LEVEL_HIGH>;
->> -                     clocks = <&r_ccu 2>, <&osc24M>, <&osc32k>;
->> +                     clocks = <&r_ccu CLK_R_APB1>, <&osc24M>,
->> <&osc32k>;
->>                       clock-names = "apb", "hosc", "losc";
->>                       gpio-controller;
->>                       #gpio-cells = <3>;
->> @@ -208,6 +210,7 @@
->>                       r_i2c_pins: r-i2c {
->>                               pins = "PL0", "PL1";
->>                               function = "s_i2c";
->> +                             bias-pull-up;
->
-> Should this be included in this patch?
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Oops. I'll remove it either in the next version, or if everything
-else checks out, when applying.
+This patch series updates stm32_iwdg driver to manage config
+by compatible. stm32mp1 config requires a pclk clock.
 
-Thanks!
-ChenYu
+v3:
+-remove stm32_iwdg_config structure, just assign the
+ boolean directly to .dat
 
->
->>                       };
->>               };
->>
->> @@ -215,8 +218,8 @@
->>                       compatible = "allwinner,sun6i-a31-i2c";
->>                       reg = <0x07081400 0x400>;
->>                       interrupts = <GIC_SPI 107
->> IRQ_TYPE_LEVEL_HIGH>;
->> -                     clocks = <&r_ccu 8>;
->> -                     resets = <&r_ccu 4>;
->> +                     clocks = <&r_ccu CLK_R_APB2_I2C>;
->> +                     resets = <&r_ccu RST_R_APB2_I2C>;
->>                       pinctrl-names = "default";
->>                       pinctrl-0 = <&r_i2c_pins>;
->>                       status = "disabled";
+Ludovic Barre (3):
+  watchdog: stm32: add pclk feature for stm32mp1
+  ARM: dts: stm32: add iwdg2 support for stm32mp157c
+  ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
+
+ .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  21 +++-
+ arch/arm/boot/dts/stm32mp157c-ed1.dts              |   5 +
+ arch/arm/boot/dts/stm32mp157c.dtsi                 |   8 ++
+ drivers/watchdog/stm32_iwdg.c                      | 116 +++++++++++++--------
+ 4 files changed, 104 insertions(+), 46 deletions(-)
+
+-- 
+2.7.4
