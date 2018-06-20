@@ -1,10 +1,10 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Wed, 20 Jun 2018 07:17:54 +0200
-Subject: [PATCH v2 01/10] tpm/tpm_i2c_infineon: switch to i2c_lock_bus(...,
+Date: Wed, 20 Jun 2018 07:17:57 +0200
+Subject: [PATCH v2 04/10] media: af9013: switch to i2c_lock_bus(...,
  I2C_LOCK_SEGMENT)
 In-Reply-To: <20180620051803.12206-1-peda@axentia.se>
 References: <20180620051803.12206-1-peda@axentia.se>
-Message-ID: <20180620051803.12206-2-peda@axentia.se>
+Message-ID: <20180620051803.12206-5-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,48 +15,38 @@ sit behind a mux-locked mux, the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/char/tpm/tpm_i2c_infineon.c | 8 ++++----
+ drivers/media/dvb-frontends/af9013.c | 8 ++++----
  1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/char/tpm/tpm_i2c_infineon.c b/drivers/char/tpm/tpm_i2c_infineon.c
-index 6116cd05e228..9086edc9066b 100644
---- a/drivers/char/tpm/tpm_i2c_infineon.c
-+++ b/drivers/char/tpm/tpm_i2c_infineon.c
-@@ -117,7 +117,7 @@ static int iic_tpm_read(u8 addr, u8 *buffer, size_t len)
- 	/* Lock the adapter for the duration of the whole sequence. */
- 	if (!tpm_dev.client->adapter->algo->master_xfer)
- 		return -EOPNOTSUPP;
--	i2c_lock_adapter(tpm_dev.client->adapter);
-+	i2c_lock_bus(tpm_dev.client->adapter, I2C_LOCK_SEGMENT);
+diff --git a/drivers/media/dvb-frontends/af9013.c b/drivers/media/dvb-frontends/af9013.c
+index 482bce49819a..99361c113bca 100644
+--- a/drivers/media/dvb-frontends/af9013.c
++++ b/drivers/media/dvb-frontends/af9013.c
+@@ -1312,10 +1312,10 @@ static int af9013_wregs(struct i2c_client *client, u8 cmd, u16 reg,
+ 	memcpy(&buf[3], val, len);
  
- 	if (tpm_dev.chip_type == SLB9645) {
- 		/* use a combined read for newer chips
-@@ -192,7 +192,7 @@ static int iic_tpm_read(u8 addr, u8 *buffer, size_t len)
- 	}
+ 	if (lock)
+-		i2c_lock_adapter(client->adapter);
++		i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	ret = __i2c_transfer(client->adapter, msg, 1);
+ 	if (lock)
+-		i2c_unlock_adapter(client->adapter);
++		i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	if (ret < 0) {
+ 		goto err;
+ 	} else if (ret != 1) {
+@@ -1353,10 +1353,10 @@ static int af9013_rregs(struct i2c_client *client, u8 cmd, u16 reg,
+ 	buf[2] = cmd;
  
- out:
--	i2c_unlock_adapter(tpm_dev.client->adapter);
-+	i2c_unlock_bus(tpm_dev.client->adapter, I2C_LOCK_SEGMENT);
- 	/* take care of 'guard time' */
- 	usleep_range(SLEEP_DURATION_LOW, SLEEP_DURATION_HI);
- 
-@@ -224,7 +224,7 @@ static int iic_tpm_write_generic(u8 addr, u8 *buffer, size_t len,
- 
- 	if (!tpm_dev.client->adapter->algo->master_xfer)
- 		return -EOPNOTSUPP;
--	i2c_lock_adapter(tpm_dev.client->adapter);
-+	i2c_lock_bus(tpm_dev.client->adapter, I2C_LOCK_SEGMENT);
- 
- 	/* prepend the 'register address' to the buffer */
- 	tpm_dev.buf[0] = addr;
-@@ -243,7 +243,7 @@ static int iic_tpm_write_generic(u8 addr, u8 *buffer, size_t len,
- 		usleep_range(sleep_low, sleep_hi);
- 	}
- 
--	i2c_unlock_adapter(tpm_dev.client->adapter);
-+	i2c_unlock_bus(tpm_dev.client->adapter, I2C_LOCK_SEGMENT);
- 	/* take care of 'guard time' */
- 	usleep_range(SLEEP_DURATION_LOW, SLEEP_DURATION_HI);
- 
+ 	if (lock)
+-		i2c_lock_adapter(client->adapter);
++		i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	ret = __i2c_transfer(client->adapter, msg, 2);
+ 	if (lock)
+-		i2c_unlock_adapter(client->adapter);
++		i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	if (ret < 0) {
+ 		goto err;
+ 	} else if (ret != 2) {
 -- 
 2.11.0
