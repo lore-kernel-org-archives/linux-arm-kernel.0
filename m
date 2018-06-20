@@ -1,59 +1,81 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:01 +0200
-Subject: [PATCH v8 01/26] PM / Domains: Don't treat zero found compatible idle
- states as an error
+Date: Wed, 20 Jun 2018 19:22:06 +0200
+Subject: [PATCH v8 06/26] timer: Export next wakeup time of a CPU
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-2-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-7-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of returning -EINVAL from of_genpd_parse_idle_states() in case none
-compatible states was found, let's return 0 to indicate success. Assign
-also the out-parameter *states to NULL and *n to 0, to indicate to the
-caller that zero states have been found/allocated.
+From: Lina Iyer <lina.iyer@linaro.org>
 
-This enables the caller of of_genpd_parse_idle_states() to easier act on
-the returned error code.
+Knowing the sleep duration of CPUs, is known to be needed while selecting
+the most energy efficient idle state for a CPU or a group of CPUs.
 
+However, to be able to compute the sleep duration, we need to know at what
+time the next expected wakeup is for the CPU. Therefore, let's export this
+information via a new function, tick_nohz_get_next_wakeup(). Following
+changes make use of it.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Lina Iyer <ilina@codeaurora.org>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Lina Iyer <ilina@codeaurora.org>
 ---
- drivers/base/power/domain.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ include/linux/tick.h     |  8 ++++++++
+ kernel/time/tick-sched.c | 10 ++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 4925af5c4cf0..62969c3d5d04 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2452,8 +2452,8 @@ static int genpd_iterate_idle_states(struct device_node *dn,
-  *
-  * Returns the device states parsed from the OF node. The memory for the states
-  * is allocated by this function and is the responsibility of the caller to
-- * free the memory after use. If no domain idle states is found it returns
-- * -EINVAL and in case of errors, a negative error code.
-+ * free the memory after use. If any or zero compatible domain idle states is
-+ * found it returns 0 and in case of errors, a negative error code is returned.
-  */
- int of_genpd_parse_idle_states(struct device_node *dn,
- 			struct genpd_power_state **states, int *n)
-@@ -2462,8 +2462,14 @@ int of_genpd_parse_idle_states(struct device_node *dn,
- 	int ret;
+diff --git a/include/linux/tick.h b/include/linux/tick.h
+index 55388ab45fd4..e48f6b26b425 100644
+--- a/include/linux/tick.h
++++ b/include/linux/tick.h
+@@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
+ extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
+ extern unsigned long tick_nohz_get_idle_calls(void);
+ extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
++extern ktime_t tick_nohz_get_next_wakeup(int cpu);
+ extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
+ extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
  
- 	ret = genpd_iterate_idle_states(dn, NULL);
--	if (ret <= 0)
--		return ret < 0 ? ret : -EINVAL;
-+	if (ret < 0)
-+		return ret;
+@@ -151,6 +152,13 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
+ 	*delta_next = TICK_NSEC;
+ 	return *delta_next;
+ }
 +
-+	if (!ret) {
-+		*states = NULL;
-+		*n = 0;
-+		return 0;
-+	}
++static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	/* Next wake up is the tick period, assume it starts now */
++	return ktime_add(ktime_get(), TICK_NSEC);
++}
++
+ static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+ static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
  
- 	st = kcalloc(ret, sizeof(*st), GFP_KERNEL);
- 	if (!st)
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index da9455a6b42b..f380bb4f0744 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -1089,6 +1089,16 @@ unsigned long tick_nohz_get_idle_calls(void)
+ 	return ts->idle_calls;
+ }
+ 
++/**
++ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
++ */
++ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	struct clock_event_device *dev = per_cpu(tick_cpu_device.evtdev, cpu);
++
++	return dev->next_event;
++}
++
+ static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+ {
+ #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 -- 
 2.17.1
