@@ -1,38 +1,37 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 20 Jun 2018 20:44:03 +0200
-Subject: [PATCH 07/15] arm: dts: exynos: Add missing cooling device
- properties for CPUs
-In-Reply-To: <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
-Message-ID: <20180620184403.u6tdqc2zvyslospe@kozik-lap>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 20 Jun 2018 20:44:49 +0200
+Subject: [PATCH v5 1/5] dt-bindings: clk: at91: add an I2S mux clock
+In-Reply-To: <20180620154759.GA4755@rob-hp-laptop>
+References: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
+ <20180618141239.10892-2-codrin.ciubotariu@microchip.com>
+ <20180620154759.GA4755@rob-hp-laptop>
+Message-ID: <20180620184449.GH7737@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 04:01:53PM +0530, Viresh Kumar wrote:
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
+On 20/06/2018 09:47:59-0600, Rob Herring wrote:
+> On Mon, Jun 18, 2018 at 05:12:35PM +0300, Codrin Ciubotariu wrote:
+> > The I2S mux clock can be used to select the I2S input clock. The
+> > available parents are the peripheral and the generated clocks.
+> > 
+> > Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> > ---
+> > 
+> > Changes in v5:
+> > 	- specified clock's parent;
+> > 	- added a newline before adding the clock's compatible string;
+> > 
+> >  .../devicetree/bindings/clock/at91-clock.txt  | 35 +++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
 > 
-> Add such missing properties.
+> Well, since Alexandre promises all this is going to get re-worked soon:
 > 
-> Fix other missing properties (clocks, OPP, clock latency) as well to
-> make it all work.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos3250.dtsi | 16 ++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi | 13 +++++++++++++
->  arch/arm/boot/dts/exynos4412.dtsi |  9 +++++++++
->  arch/arm/boot/dts/exynos5250.dtsi | 23 +++++++++++++++++++++++
->  4 files changed, 61 insertions(+)
-> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks, applied.
+Thanks, I'm planning to send a first version next week, it will be based
+on top of that series.
 
-Best regards,
-Krzysztof
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
