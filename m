@@ -1,36 +1,31 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 20 Jun 2018 03:45:01 +0300
-Subject: [PATCH 2/5] RFC: eeprom: at24: Allow passing gpiodesc from pdata
-In-Reply-To: <20180618074556.6944-3-linus.walleij@linaro.org>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
- <20180618074556.6944-3-linus.walleij@linaro.org>
-Message-ID: <CAHp75Vd8VeYh8KOvCW54u-ZnP3jM60aCD9AnWxKYsSBSX09Y4A@mail.gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed, 20 Jun 2018 10:59:59 +0900
+Subject: [PATCH] ASoC: add hp-det-gpio and mic-det-gpio to audio graph card
+ binding
+Message-ID: <20180620015959.10312-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 10:45 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> This makes it possible to pass an initialized GPIO descriptor
-> to the driver through platform data.
->
-> This is useful when we are dealing with EEPROMs on expansion
-> boards where the GPIO has to be looked up indirectly using a
-> connector abstraction (several systems using the same
-> connector) so the machine descriptor tables cannot be used
-> to associate the descriptor with the device and we then want
-> to pass this descriptor on to the EEPROM driver this way
-> instead.
+Add headphone and microphone detection GPIO support to audio graph
+card same as supported in simple card.
 
-How this descriptor is supposed to be created?
-Whenever we probe the device we might add properties to it (consider
-how MFD does instansiate them), I guess same way GPIO lookup tables
-work. No?
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ Documentation/devicetree/bindings/sound/audio-graph-card.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-P.S. I really would like to hear a _strong_ argument why it can't be
-done using other means like built-in device properties or GPIO lookup
-tables (which on my opinion have to work in the similar way at run
-time).
-
+diff --git a/Documentation/devicetree/bindings/sound/audio-graph-card.txt b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+index d04ea3b1a1dd..7e63e53a901c 100644
+--- a/Documentation/devicetree/bindings/sound/audio-graph-card.txt
++++ b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+@@ -18,6 +18,8 @@ Below are same as Simple-Card.
+ - bitclock-inversion
+ - frame-inversion
+ - mclk-fs
++- hp-det-gpio
++- mic-det-gpio
+ - dai-tdm-slot-num
+ - dai-tdm-slot-width
+ - clocks / system-clock-frequency
 -- 
-With Best Regards,
-Andy Shevchenko
+2.17.1
