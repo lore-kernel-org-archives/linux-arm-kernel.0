@@ -1,33 +1,95 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:14 +0200
-Subject: [PATCH v8 14/26] MAINTAINERS: Update files for PSCI
+Date: Wed, 20 Jun 2018 19:22:17 +0200
+Subject: [PATCH v8 17/26] drivers: firmware: psci: Simplify error path of
+ psci_dt_init()
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-15-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-18-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The files for the PSCI firmware driver were moved to a sub-directory,
-let's update MAINTAINERS to reflect that.
+Instead of having each psci init function taking care of the of_node_put(),
+let's deal with that from psci_dt_init(), as this enables a bit simpler
+error path for each psci init function.
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/firmware/psci/psci.c | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9d5eeff51b5f..3f28c21d0ad0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11389,7 +11389,7 @@ M:	Mark Rutland <mark.rutland@arm.com>
- M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
- L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
--F:	drivers/firmware/psci*.c
-+F:	drivers/firmware/psci/
- F:	include/linux/psci.h
- F:	include/uapi/linux/psci.h
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index 256b4edbb20a..38881007584e 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -608,9 +608,9 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	int err;
  
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
++
+ 	/*
+ 	 * Starting with v0.2, the PSCI specification introduced a call
+ 	 * (PSCI_VERSION) that allows probing the firmware version, so
+@@ -618,11 +618,7 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	 * can be carried out according to the specific version reported
+ 	 * by firmware
+ 	 */
+-	err = psci_probe();
+-
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return psci_probe();
+ }
+ 
+ /*
+@@ -634,9 +630,8 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	int err;
+ 
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
+ 
+ 	pr_info("Using PSCI v0.1 Function IDs from DT\n");
+ 
+@@ -660,9 +655,7 @@ static int __init psci_0_1_init(struct device_node *np)
+ 		psci_ops.migrate = psci_migrate;
+ 	}
+ 
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return 0;
+ }
+ 
+ static const struct of_device_id psci_of_match[] __initconst = {
+@@ -677,6 +670,7 @@ int __init psci_dt_init(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *matched_np;
+ 	psci_initcall_t init_fn;
++	int ret;
+ 
+ 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+ 
+@@ -684,7 +678,10 @@ int __init psci_dt_init(void)
+ 		return -ENODEV;
+ 
+ 	init_fn = (psci_initcall_t)matched_np->data;
+-	return init_fn(np);
++	ret = init_fn(np);
++
++	of_node_put(np);
++	return ret;
+ }
+ 
+ #ifdef CONFIG_ACPI
 -- 
 2.17.1
