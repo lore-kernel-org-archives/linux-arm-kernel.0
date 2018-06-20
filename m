@@ -1,136 +1,76 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Wed, 20 Jun 2018 11:37:27 +0000
-Subject: [PATCH 1/6] dmaengine: xilinx_dma: fix splitting transfer causes
- misalignments
-In-Reply-To: <20180620083653.17010-1-andrea.merello@gmail.com>
-References: <20180620083653.17010-1-andrea.merello@gmail.com>
-Message-ID: <DM6PR02MB4361458180616B591C6742E2C7770@DM6PR02MB4361.namprd02.prod.outlook.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 20 Jun 2018 12:51:22 +0100
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <814205eb-ae86-a519-bed0-f09b8e2d3a02@huawei.com> (Xie XiuQi's
+ message of "Wed, 20 Jun 2018 11:31:34 +0800")
+References: <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+ <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
+ <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+ <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+ <20180619151425.GH13685@dhcp22.suse.cz>
+ <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
+ <20180619163256.GA18952@e107981-ln.cambridge.arm.com>
+ <814205eb-ae86-a519-bed0-f09b8e2d3a02@huawei.com>
+Message-ID: <87602d3ccl.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
-> owner at vger.kernel.org] On Behalf Of Andrea Merello
-> Sent: Wednesday, June 20, 2018 2:07 PM
-> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
-> <michals@xilinx.com>; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>; dmaengine at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> Andrea Merello <andrea.merello@gmail.com>
-> Subject: [PATCH 1/6] dmaengine: xilinx_dma: fix splitting transfer causes
-> misalignments
+Xie XiuQi <xiexiuqi@huawei.com> writes:
 
-We should rephrase commit message to something like "In axidma
-slave_sg and dma_cylic mode align split descriptors" 
+> Hi Lorenzo, Punit,
+>
+>
+> On 2018/6/20 0:32, Lorenzo Pieralisi wrote:
+>> On Tue, Jun 19, 2018 at 04:35:40PM +0100, Punit Agrawal wrote:
+>>> Michal Hocko <mhocko@kernel.org> writes:
+>>>
+>>>> On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
+>>>> [...]
+>>>>> In terms of $SUBJECT, I wonder if it's worth taking the original patch
+>>>>> as a temporary fix (it'll also be easier to backport) while we work on
+>>>>> fixing these other issues and enabling memoryless nodes.
+>>>>
+>>>> Well, x86 already does that but copying this antipatern is not really
+>>>> nice. So it is good as a quick fix but it would be definitely much
+>>>> better to have a robust fix. Who knows how many other places might hit
+>>>> this. You certainly do not want to add a hack like this all over...
+>>>
+>>> Completely agree! I was only suggesting it as a temporary measure,
+>>> especially as it looked like a proper fix might be invasive.
+>>>
+>>> Another fix might be to change the node specific allocation to node
+>>> agnostic allocations. It isn't clear why the allocation is being
+>>> requested from a specific node. I think Lorenzo suggested this in one of
+>>> the threads.
+>> 
+>> I think that code was just copypasted but it is better to fix the
+>> underlying issue.
+>> 
+>>> I've started putting together a set fixing the issues identified in this
+>>> thread. It should give a better idea on the best course of action.
+>> 
+>> On ACPI ARM64, this diff should do if I read the code correctly, it
+>> should be (famous last words) just a matter of mapping PXMs to nodes for
+>> every SRAT GICC entry, feel free to pick it up if it works.
+>> 
+>> Yes, we can take the original patch just because it is safer for an -rc
+>> cycle even though if the patch below would do delaying the fix for a
+>> couple of -rc (to get it tested across ACPI ARM64 NUMA platforms) is
+>> not a disaster.
+>
+> I tested this patch on my arm board, it works.
 
-> 
-> Whenever a single or cyclic transaction is prepared, the driver
-> could eventually split it over several SG descriptors in order
-> to deal with the HW maximum transfer length.
-> 
-> This could end up in DMA operations starting from a misaligned
-> address. This seems fatal for the HW.
-This seems fatal for the HW if DRE is not enabled.
+I am assuming you tried the patch without enabling support for
+memory-less nodes.
 
-> 
-> This patch eventually adjusts the transfer size in order to make sure
-> all operations start from an aligned address.
-> 
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 27b523530c4a..a516e7ffef21 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -376,6 +376,7 @@ struct xilinx_dma_chan {
->  	void (*start_transfer)(struct xilinx_dma_chan *chan);
->  	int (*stop_transfer)(struct xilinx_dma_chan *chan);
->  	u16 tdest;
-> +	u32 copy_mask;
-We can reuse copy_align itself.  See below.
+The patch de-couples the onlining of numa nodes (as parsed from SRAT)
+from NR_CPUS restriction. When it comes to building zonelists, the node
+referenced by the PCI controller also has zonelists initialised.
 
->  };
-> 
->  /**
-> @@ -1789,10 +1790,14 @@ static struct dma_async_tx_descriptor
-> *xilinx_dma_prep_slave_sg(
-> 
->  			/*
->  			 * Calculate the maximum number of bytes to transfer,
-> -			 * making sure it is less than the hw limit
-> +			 * making sure it is less than the hw limit and that
-> +			 * the next chuck start address is aligned
-
-/s/chuck/chunk
->  			 */
-> -			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
-> -				     XILINX_DMA_MAX_TRANS_LEN);
-> +			copy = sg_dma_len(sg) - sg_used;
-> +			if (copy > XILINX_DMA_MAX_TRANS_LEN)
-> +				copy = XILINX_DMA_MAX_TRANS_LEN &
-> +					chan->copy_mask;
-> +
-
-
-In below implementation, we can reuse copy_align.
-Same for dma_cyclic.
-
-if ((copy + sg_used  < sg_dma_len(sg)) &&
-	chan->xdev->common.copy_align) {
-	/* If this is not the last descriptor, make sure
-	  * the next one will be properly aligned
-	 */
-	copy = rounddown(copy,
-               (1 << chan->xdev->common.copy_align));
-     }
-
->  			hw = &segment->hw;
-> 
->  			/* Fill in the descriptor */
-> @@ -1894,10 +1899,14 @@ static struct dma_async_tx_descriptor
-> *xilinx_dma_prep_dma_cyclic(
-> 
->  			/*
->  			 * Calculate the maximum number of bytes to transfer,
-> -			 * making sure it is less than the hw limit
-> +			 * making sure it is less than the hw limit and that
-> +			 * the next chuck start address is aligned
->  			 */
-> -			copy = min_t(size_t, period_len - sg_used,
-> -				     XILINX_DMA_MAX_TRANS_LEN);
-> +			copy = period_len - sg_used;
-> +			if (copy > XILINX_DMA_MAX_TRANS_LEN)
-> +				copy = XILINX_DMA_MAX_TRANS_LEN &
-> +					chan->copy_mask;
-> +
->  			hw = &segment->hw;
->  			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
->  					  period_len * i);
-> @@ -2402,8 +2411,12 @@ static int xilinx_dma_chan_probe(struct
-> xilinx_dma_device *xdev,
->  	if (width > 8)
->  		has_dre = false;
-> 
-> -	if (!has_dre)
-> +	if (has_dre) {
-> +		chan->copy_mask = ~0;
-> +	} else {
->  		xdev->common.copy_align = fls(width - 1);
-> +		chan->copy_mask = ~(width - 1);
-> +	}
-
-As mentioned above we don't need this additional field.
-
-> 
->  	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel") ||
->  	    of_device_is_compatible(node, "xlnx,axi-dma-mm2s-channel") ||
-> --
-> 2.17.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+So it looks like a fallback node is setup even if we don't have
+memory-less nodes enabled. I need to stare some more at the code to see
+why we need memory-less nodes at all then ...
