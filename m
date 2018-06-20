@@ -1,10 +1,10 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Wed, 20 Jun 2018 07:17:57 +0200
-Subject: [PATCH v2 04/10] media: af9013: switch to i2c_lock_bus(...,
+Date: Wed, 20 Jun 2018 07:17:58 +0200
+Subject: [PATCH v2 05/10] media: drxk_hard: switch to i2c_lock_bus(...,
  I2C_LOCK_SEGMENT)
 In-Reply-To: <20180620051803.12206-1-peda@axentia.se>
 References: <20180620051803.12206-1-peda@axentia.se>
-Message-ID: <20180620051803.12206-5-peda@axentia.se>
+Message-ID: <20180620051803.12206-6-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,38 +15,30 @@ sit behind a mux-locked mux, the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/media/dvb-frontends/af9013.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/media/dvb-frontends/drxk_hard.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/dvb-frontends/af9013.c b/drivers/media/dvb-frontends/af9013.c
-index 482bce49819a..99361c113bca 100644
---- a/drivers/media/dvb-frontends/af9013.c
-+++ b/drivers/media/dvb-frontends/af9013.c
-@@ -1312,10 +1312,10 @@ static int af9013_wregs(struct i2c_client *client, u8 cmd, u16 reg,
- 	memcpy(&buf[3], val, len);
+diff --git a/drivers/media/dvb-frontends/drxk_hard.c b/drivers/media/dvb-frontends/drxk_hard.c
+index 5a26ad93be10..29c36f95d624 100644
+--- a/drivers/media/dvb-frontends/drxk_hard.c
++++ b/drivers/media/dvb-frontends/drxk_hard.c
+@@ -213,7 +213,7 @@ static inline u32 log10times100(u32 value)
  
- 	if (lock)
--		i2c_lock_adapter(client->adapter);
-+		i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	ret = __i2c_transfer(client->adapter, msg, 1);
- 	if (lock)
--		i2c_unlock_adapter(client->adapter);
-+		i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	if (ret < 0) {
- 		goto err;
- 	} else if (ret != 1) {
-@@ -1353,10 +1353,10 @@ static int af9013_rregs(struct i2c_client *client, u8 cmd, u16 reg,
- 	buf[2] = cmd;
+ static int drxk_i2c_lock(struct drxk_state *state)
+ {
+-	i2c_lock_adapter(state->i2c);
++	i2c_lock_bus(state->i2c, I2C_LOCK_SEGMENT);
+ 	state->drxk_i2c_exclusive_lock = true;
  
- 	if (lock)
--		i2c_lock_adapter(client->adapter);
-+		i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	ret = __i2c_transfer(client->adapter, msg, 2);
- 	if (lock)
--		i2c_unlock_adapter(client->adapter);
-+		i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	if (ret < 0) {
- 		goto err;
- 	} else if (ret != 2) {
+ 	return 0;
+@@ -224,7 +224,7 @@ static void drxk_i2c_unlock(struct drxk_state *state)
+ 	if (!state->drxk_i2c_exclusive_lock)
+ 		return;
+ 
+-	i2c_unlock_adapter(state->i2c);
++	i2c_unlock_bus(state->i2c, I2C_LOCK_SEGMENT);
+ 	state->drxk_i2c_exclusive_lock = false;
+ }
+ 
 -- 
 2.11.0
