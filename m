@@ -1,111 +1,76 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Wed, 20 Jun 2018 10:36:49 +0200
-Subject: [PATCH 2/6] dmaengine: xilinx_dma: fix completion callback is not
- invoked for each DMA operation
-In-Reply-To: <20180620083653.17010-1-andrea.merello@gmail.com>
-References: <20180620083653.17010-1-andrea.merello@gmail.com>
-Message-ID: <20180620083653.17010-2-andrea.merello@gmail.com>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Wed, 20 Jun 2018 16:14:31 +0800
+Subject: [PATCH v6 12/29] drm/mediatek: Update the definition of
+ connection from RDMA1 to DPI0
+In-Reply-To: <1529396422.26480.8.camel@mtksdaap41>
+References: <1529393670-26862-1-git-send-email-stu.hsieh@mediatek.com>
+ <1529393670-26862-13-git-send-email-stu.hsieh@mediatek.com>
+ <1529396422.26480.8.camel@mtksdaap41>
+Message-ID: <1529482471.11190.46.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-API specification says: "On completion of each DMA operation, the next in
-queue is started and a tasklet triggered. The tasklet will then call the
-client driver completion callback routine for notification, if set."
+Hi, CK:
 
-Currently the driver keeps a "desc_pendingcount" counter of the total
-descriptor pending, and it uses as IRQ coalesce threshold, as result it
-only calls the CBs after ALL pending operations are completed, which is
-wrong.
+On Tue, 2018-06-19 at 16:20 +0800, CK Hu wrote:
+> Hi, Stu:
+> 
+> On Tue, 2018-06-19 at 15:34 +0800, Stu Hsieh wrote:
+> > This patch update the definition of connection from RDMA1 to DPI0.
+> > Change the term MOUT to SOUT.
+> > 
+> 
+> I would like commit message describe 'why' of this patch. Both you and
+> me know 'why' of this patch because we have discuss previously. But for
+> someone who just see this patch, he or she does not understand why you
+> change the name. So explain 'MOUT', 'SOUT' and describe 'why' change the
+> naming.
+> 
+> Regards,
+> CK
+> 
+OK
 
-This patch uses disable IRQ coalesce and checks for the completion flag
-for the descriptors (which is further divided in segments).
+Regards,
+Stu
 
-Possibly a better optimization could be using proper IRQ coalesce
-threshold to get an IRQ after all segments of the descriptors are done.
-But we don't do that yet..
-
-NOTE: for now we do this only for AXI DMA, other DMA flavors are
-untested/untouched.
-This is loosely based on
-commit 65df81a6dc74 ("xilinx_dma: IrqThreshold set incorrectly, unreliable.")
-in my linux-4.6-zynq tree
-
-From: Jeremy Trimble [original patch]
-Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
----
- drivers/dma/xilinx/xilinx_dma.c | 39 +++++++++++++++++++++------------
- 1 file changed, 25 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index a516e7ffef21..cf12f7147f07 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -164,6 +164,7 @@
- #define XILINX_DMA_CR_COALESCE_SHIFT	16
- #define XILINX_DMA_BD_SOP		BIT(27)
- #define XILINX_DMA_BD_EOP		BIT(26)
-+#define XILINX_DMA_BD_CMPLT		BIT(31)
- #define XILINX_DMA_COALESCE_MAX		255
- #define XILINX_DMA_NUM_DESCS		255
- #define XILINX_DMA_NUM_APP_WORDS	5
-@@ -1274,12 +1275,9 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
- 
--	if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
--		reg &= ~XILINX_DMA_CR_COALESCE_MAX;
--		reg |= chan->desc_pendingcount <<
--				  XILINX_DMA_CR_COALESCE_SHIFT;
--		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
--	}
-+	reg &= ~XILINX_DMA_CR_COALESCE_MAX;
-+	reg |= 1 << XILINX_DMA_CR_COALESCE_SHIFT;
-+	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
- 
- 	if (chan->has_sg && !chan->xdev->mcdma)
- 		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
-@@ -1378,6 +1376,20 @@ static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
- 		return;
- 
- 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
-+		if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
-+			/*
-+			 * Check whether the last segment in this descriptor
-+			 * has been completed.
-+			 */
-+			const struct xilinx_axidma_tx_segment *const tail_seg =
-+				list_last_entry(&desc->segments,
-+						struct xilinx_axidma_tx_segment,
-+						node);
-+
-+			/* we've processed all the completed descriptors */
-+			if (!(tail_seg->hw.status & XILINX_DMA_BD_CMPLT))
-+				break;
-+		}
- 		list_del(&desc->node);
- 		if (!desc->cyclic)
- 			dma_cookie_complete(&desc->async_tx);
-@@ -1826,14 +1838,13 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
- 				   struct xilinx_axidma_tx_segment, node);
- 	desc->async_tx.phys = segment->phys;
- 
--	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
--	if (chan->direction == DMA_MEM_TO_DEV) {
--		segment->hw.control |= XILINX_DMA_BD_SOP;
--		segment = list_last_entry(&desc->segments,
--					  struct xilinx_axidma_tx_segment,
--					  node);
--		segment->hw.control |= XILINX_DMA_BD_EOP;
--	}
-+	/* For the first transfer, set SOP */
-+	segment->hw.control |= XILINX_DMA_BD_SOP;
-+	/* For the last transfer, set EOP */
-+	segment = list_last_entry(&desc->segments,
-+				  struct xilinx_axidma_tx_segment,
-+				  node);
-+	segment->hw.control |= XILINX_DMA_BD_EOP;
- 
- 	return &desc->async_tx;
- 
--- 
-2.17.1
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > index 8bfc0debd2c2..977df8facb79 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > @@ -29,7 +29,7 @@
+> >  #define DISP_REG_CONFIG_DISP_COLOR0_SEL_IN	0x084
+> >  #define DISP_REG_CONFIG_DISP_COLOR1_SEL_IN	0x088
+> >  #define DISP_REG_CONFIG_DPI_SEL_IN		0x0ac
+> > -#define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
+> > +#define DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN	0x0c8
+> >  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+> >  
+> >  #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
+> > @@ -80,7 +80,7 @@
+> >  #define COLOR0_SEL_IN_OVL0		0x1
+> >  #define OVL1_MOUT_EN_COLOR1		0x1
+> >  #define GAMMA_MOUT_EN_RDMA1		0x1
+> > -#define RDMA1_MOUT_DPI0			0x2
+> > +#define RDMA1_SOUT_DPI0			0x2
+> >  #define DPI0_SEL_IN_RDMA1		0x1
+> >  #define COLOR1_SEL_IN_OVL1		0x1
+> >  
+> > @@ -156,8 +156,8 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+> >  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+> >  		value = OD1_MOUT_EN_RDMA1;
+> >  	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI0) {
+> > -		*addr = DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN;
+> > -		value = RDMA1_MOUT_DPI0;
+> > +		*addr = DISP_REG_CONFIG_DISP_RDMA1_SOUT_EN;
+> > +		value = RDMA1_SOUT_DPI0;
+> >  	} else {
+> >  		value = 0;
+> >  	}
+> 
+> 
