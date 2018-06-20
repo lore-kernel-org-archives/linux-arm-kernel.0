@@ -1,61 +1,46 @@
-From: ethan@ethantuttle.com (Ethan Tuttle)
-Date: Tue, 19 Jun 2018 21:31:08 -0700
-Subject: [PATCH] ARM: mvebu: declare asm symbols as character arrays in pmsu.c
-Message-ID: <20180620043109.1190-1-ethan@ethantuttle.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 20 Jun 2018 12:45:03 +0800
+Subject: [PATCH v10 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20180530091934.tbd6xbyr5s3ipn3v@paasikivi.fi.intel.com>
+References: <20180517090224.u3ygdzjr77im2mmp@flea>
+ <20180529095757.qkz7jyuxza7movbc@flea.home>
+ <20180530091934.tbd6xbyr5s3ipn3v@paasikivi.fi.intel.com>
+Message-ID: <CAGb2v67RP8bjObBJu_1JsREUo64hnEzptG_n-aYMn4Dcd_Zo-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_FORTIFY_SOURCE, memcpy uses the declared size of operands to
-detect buffer overflows.  If src or dest is declared as a char, attempts to
-copy more than byte will result in a fortify_panic().
+On Wed, May 30, 2018 at 5:19 PM, Sakari Ailus
+<sakari.ailus@linux.intel.com> wrote:
+> On Tue, May 29, 2018 at 11:57:57AM +0200, Maxime Ripard wrote:
+>> On Thu, May 17, 2018 at 11:02:24AM +0200, Maxime Ripard wrote:
+>> > On Fri, May 04, 2018 at 02:44:08PM +0800, Yong Deng wrote:
+>> > > This patchset add initial support for Allwinner V3s CSI.
+>> > >
+>> > > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+>> > > interface and CSI1 is used for parallel interface. This is not
+>> > > documented in datasheet but by test and guess.
+>> > >
+>> > > This patchset implement a v4l2 framework driver and add a binding
+>> > > documentation for it.
+>> > >
+>> > > Currently, the driver only support the parallel interface. And has been
+>> > > tested with a BT1120 signal which generating from FPGA. The following
+>> > > fetures are not support with this patchset:
+>> > >   - ISP
+>> > >   - MIPI-CSI2
+>> > >   - Master clock for camera sensor
+>> > >   - Power regulator for the front end IC
+>> >
+>> > I tested it on my H3 with a parallel camera, and it still works. Thanks!
+>> >
+>> > Hans, Sakari, any chance this might land in 4.18?
+>>
+>> Ping?
+>
+> I'll try to look into this soonish but it seems to be too late for 4.18.
+> Sorry about that.
 
-Address this problem in mvebu_setup_boot_addr_wa() by declaring
-mvebu_boot_wa_start and mvebu_boot_wa_end as character arrays.  Also remove
-a couple addressof operators to avoid "arithmetic on pointer to an
-incomplete type" compiler error.
+Can we get this into 4.19?
 
-See commit 54a7d50b9205 ("x86: mark kprobe templates as character arrays,
-not single characters") for a similar fix.
-
-Fixes "detected buffer overflow in memcpy" error during init on some mvebu
-systems (armada-370-xp, armada-375):
-
-(fortify_panic) from (mvebu_setup_boot_addr_wa+0xb0/0xb4)
-(mvebu_setup_boot_addr_wa) from (mvebu_v7_cpu_pm_init+0x154/0x204)
-(mvebu_v7_cpu_pm_init) from (do_one_initcall+0x7c/0x1a8)
-(do_one_initcall) from (kernel_init_freeable+0x1bc/0x254)
-(kernel_init_freeable) from (kernel_init+0x8/0x114)
-(kernel_init) from (ret_from_fork+0x14/0x2c)
-
-Signed-off-by: Ethan Tuttle <ethan@ethantuttle.com>
-Tested-by: Ethan Tuttle <ethan@ethantuttle.com>
----
- arch/arm/mach-mvebu/pmsu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 27a78c80e5b1..73d5d72dfc3e 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -116,8 +116,8 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
- 		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
- }
- 
--extern unsigned char mvebu_boot_wa_start;
--extern unsigned char mvebu_boot_wa_end;
-+extern unsigned char mvebu_boot_wa_start[];
-+extern unsigned char mvebu_boot_wa_end[];
- 
- /*
-  * This function sets up the boot address workaround needed for SMP
-@@ -130,7 +130,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
- 			     phys_addr_t resume_addr_reg)
- {
- 	void __iomem *sram_virt_base;
--	u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
-+	u32 code_len = mvebu_boot_wa_end - mvebu_boot_wa_start;
- 
- 	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
- 	mvebu_mbus_add_window_by_id(crypto_eng_target, crypto_eng_attribute,
--- 
-2.17.1
+Thanks
+ChenYu
