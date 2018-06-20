@@ -1,48 +1,82 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Jun 2018 10:50:09 +0200
-Subject: [PATCH v2 0/2] Add R8A77980/Condor PCIe support
-In-Reply-To: <cfa599bd-d244-0032-490b-553f7870d07c@cogentembedded.com>
-References: <b37d458c-071a-833a-2057-be8a07c880be@cogentembedded.com>
- <20180618093623.s33bkiptazxem463@verge.net.au>
- <cfa599bd-d244-0032-490b-553f7870d07c@cogentembedded.com>
-Message-ID: <20180620085009.xvd6todrfss6zazd@verge.net.au>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 20 Jun 2018 11:06:33 +0100
+Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
+ linear region
+In-Reply-To: <CACi5LpMXpSWUP97R2VWjf==LdxPBCKTcpKjQjCs4j3Kz9SzYGg@mail.gmail.com>
+References: <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
+ <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
+ <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
+ <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
+ <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
+ <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
+ <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619085541.GB13984@arm.com>
+ <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
+ <20180619094045.GD13984@arm.com>
+ <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
+ <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
+ <CACi5LpMoKP4eG5XhYe5hf5VC9MOY8KuHK=j0ujb8GFpyjAuAww@mail.gmail.com>
+ <b0d40351-8d78-fd69-cc87-d5ea5eaabd2a@arm.com>
+ <CACi5LpM2GV-vwcEGeCE20QW0PVmDcKnjz017sYBAwYRfZ24AzA@mail.gmail.com>
+ <51cf54d6a19f4837b74218b000cc23bc@HXTBJIDCEMVIW02.hxtcorp.net>
+ <CACi5LpMXpSWUP97R2VWjf==LdxPBCKTcpKjQjCs4j3Kz9SzYGg@mail.gmail.com>
+Message-ID: <aa9e1422-abbd-6d43-0a9f-eaf3476328a1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 07:16:47PM +0300, Sergei Shtylyov wrote:
-> On 06/18/2018 12:36 PM, Simon Horman wrote:
-> 
-> >> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-> >> 'renesas-devel-20180614v2-v4.17' tag. We're adding the R8A77980 PCIe related
-> >> device nodes and then enable PCIe on the Condor board. These patches depend
-> >> on the R8A77980 PCIe PHY driver support in order to work properly. Note that
-> >> in case the PCIe PHY driver is not enabled, the kernel will BUG() due to I/O
-> >> space page leak in the PCIe driver...
-> > 
-> > Is that problem specific to the presence of PCIe nodes for
-> > condor/r8a77980
-> 
->    The nodes are safe unless they are enabled, so the Condor patch may be
-> deferred untl I fix the PCI code.
+Hi guys,
 
-Understood. I would expect that given this is a but a fix
-would be backported to -stable in due course. But I agree its
-best to be cautious here.
+On 20/06/18 08:26, Bhupesh Sharma wrote:
+> On Wed, Jun 20, 2018 at 7:46 AM, Jin, Yanjiang
+> <yanjiang.jin@hxt-semitech.com> wrote:
+>> If /proc/kcore always exists in kexec/kdump, I think this issue can be fixed
+>> easily. But it requires  that Kexec/kdump have to rely on " CONFIG_PROC_KCORE=y".
+>> I am not sure if we can persuade Kexec-tools community to accept this.
 
-> > condor/r8a77980 or is it also true of other (R-Car) boards where
-> > PCIe is enabled?
+For the kernel this would be:
+--------------%<--------------
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 1aa59063f1fd..0ea2c7c0ac08 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -8,6 +8,7 @@ config CRASH_CORE
+
+ config KEXEC_CORE
+        select CRASH_CORE
++       select PROC_KCORE
+        bool
+
+ config HAVE_IMA_KEXEC
+--------------%<--------------
+
+With this kernel's that support kdump but don't have /proc/kcore wouldn't have
+the new PT_NOTEs anyway. Whatever you do today is all you can do.
+
+
+> Most distributions like Ubuntu and Fedora already enable
+> CONFIG_PROC_KCORE by default, to support user-space tools like
+> crash-utility and makedumpfile which can be used for 'live' debugging
+> of a primary kernel (without the requirement of being in the secondary
+> or crash kernel).
 > 
->    The leak happens every time the driver fails to probe later than
-> pci_remap_iospace() is called but the BUG_ON() is only triggered by rhe 2nd try
-> with EPROBE_DEFER returned previously.
+> For such cases. '/proc/kcore' and 'vmlinux' are the only available
+> sources for PT_NOTE/PT_LOAD segments and kernel symbols respectively.
 > 
-> > Regardless, it sounds like these patches expose a kernel bug.
-> > Is it being fixed?
-> 
->    I'm working on a fix (which embraces several PCI drivers)...
-> 
-> >> [1/2] arm64: dts: renesas: r8a77980: add PCIe support
-> >> [2/2] arm64: dts: renesas: condor: add PCIe support
-> 
-> WBR, Sergei
-> 
+> Since we need to support all such existing user-space utilities (which
+> work well with other archs like x86 and ppc64),
+
+x86 has kaslr too, I couldn't work out how your user-space:phys_to_virt() works
+there. Are we missing an alternative trick?
+
+
+> we need to have a
+> solution which works without modifying most of them - the rest (like
+> kexec-tools) can be easily modified to follow the same approach.
+
+(We're  also trying to solve this in a way that lets user-space shed
+arch-specific code.)
+
+
+Thanks,
+
+James
