@@ -1,133 +1,254 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 20 Jun 2018 15:20:37 +0300
-Subject: [PATCH v2 3/8] mailbox: Add transmit done by blocking option
+Date: Wed, 20 Jun 2018 15:20:38 +0300
+Subject: [PATCH v2 4/8] mailbox: tegra-hsp: Refactor in preparation of
+ mailboxes
 In-Reply-To: <20180620122042.10950-1-mperttunen@nvidia.com>
 References: <20180620122042.10950-1-mperttunen@nvidia.com>
-Message-ID: <20180620122042.10950-4-mperttunen@nvidia.com>
+Message-ID: <20180620122042.10950-5-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
-send_data function of the mailbox driver is expected to block until
-the message has been sent. The new option is used with the Tegra
-Combined UART driver to minimize unnecessary overhead when transmitting
-data.
+The HSP driver is currently in many places written with the assumption
+of only supporting doorbells. Prepare for the addition of shared
+mailbox support by removing these assumptions and cleaning up the code.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- drivers/mailbox/mailbox.c | 30 +++++++++++++++++++++---------
- drivers/mailbox/mailbox.h |  1 +
- 2 files changed, 22 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 674b35f402f5..5c76b70e673c 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -53,6 +53,8 @@ static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
- 	return idx;
+Notes:
+    v2:
+    - Moved fixes for some style and other issues from the next patch
+      here, where they belong.
+
+ drivers/mailbox/tegra-hsp.c | 123 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 81 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
+index 0cde356c11ab..5dc21a6d01bb 100644
+--- a/drivers/mailbox/tegra-hsp.c
++++ b/drivers/mailbox/tegra-hsp.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (c) 2016-2018, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -42,6 +42,7 @@ struct tegra_hsp_channel;
+ struct tegra_hsp;
+ 
+ struct tegra_hsp_channel {
++	unsigned int type;
+ 	struct tegra_hsp *hsp;
+ 	struct mbox_chan *chan;
+ 	void __iomem *regs;
+@@ -55,6 +56,12 @@ struct tegra_hsp_doorbell {
+ 	unsigned int index;
+ };
+ 
++static inline struct tegra_hsp_doorbell *
++channel_to_doorbell(struct tegra_hsp_channel *channel)
++{
++	return container_of(channel, struct tegra_hsp_doorbell, channel);
++}
++
+ struct tegra_hsp_db_map {
+ 	const char *name;
+ 	unsigned int master;
+@@ -69,7 +76,7 @@ struct tegra_hsp {
+ 	const struct tegra_hsp_soc *soc;
+ 	struct mbox_controller mbox;
+ 	void __iomem *regs;
+-	unsigned int irq;
++	unsigned int doorbell_irq;
+ 	unsigned int num_sm;
+ 	unsigned int num_as;
+ 	unsigned int num_ss;
+@@ -194,7 +201,7 @@ tegra_hsp_doorbell_create(struct tegra_hsp *hsp, const char *name,
+ 	if (!db)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	offset = (1 + (hsp->num_sm / 2) + hsp->num_ss + hsp->num_as) << 16;
++	offset = (1 + (hsp->num_sm / 2) + hsp->num_ss + hsp->num_as) * SZ_64K;
+ 	offset += index * 0x100;
+ 
+ 	db->channel.regs = hsp->regs + offset;
+@@ -218,18 +225,8 @@ static void __tegra_hsp_doorbell_destroy(struct tegra_hsp_doorbell *db)
+ 	kfree(db);
  }
  
-+static void tx_tick(struct mbox_chan *chan, int r, bool submit_next);
-+
- static void msg_submit(struct mbox_chan *chan)
+-static int tegra_hsp_doorbell_send_data(struct mbox_chan *chan, void *data)
+-{
+-	struct tegra_hsp_doorbell *db = chan->con_priv;
+-
+-	tegra_hsp_channel_writel(&db->channel, 1, HSP_DB_TRIGGER);
+-
+-	return 0;
+-}
+-
+-static int tegra_hsp_doorbell_startup(struct mbox_chan *chan)
++static int tegra_hsp_doorbell_startup(struct tegra_hsp_doorbell *db)
  {
- 	unsigned count, idx;
-@@ -60,10 +62,13 @@ static void msg_submit(struct mbox_chan *chan)
- 	void *data;
- 	int err = -EBUSY;
- 
-+next:
- 	spin_lock_irqsave(&chan->lock, flags);
- 
--	if (!chan->msg_count || chan->active_req)
--		goto exit;
-+	if (!chan->msg_count || chan->active_req) {
-+		spin_unlock_irqrestore(&chan->lock, flags);
-+		return;
-+	}
- 
- 	count = chan->msg_count;
- 	idx = chan->msg_free;
-@@ -82,15 +87,21 @@ static void msg_submit(struct mbox_chan *chan)
- 		chan->active_req = data;
- 		chan->msg_count--;
- 	}
--exit:
-+
- 	spin_unlock_irqrestore(&chan->lock, flags);
- 
- 	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
- 		/* kick start the timer immediately to avoid delays */
- 		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
-+
-+	if (chan->txdone_method & TXDONE_BY_BLOCK) {
-+		tx_tick(chan, err, false);
-+		if (!err)
-+			goto next;
-+	}
- }
- 
--static void tx_tick(struct mbox_chan *chan, int r)
-+static void tx_tick(struct mbox_chan *chan, int r, bool submit_next)
- {
+-	struct tegra_hsp_doorbell *db = chan->con_priv;
+ 	struct tegra_hsp *hsp = db->channel.hsp;
+ 	struct tegra_hsp_doorbell *ccplex;
  	unsigned long flags;
- 	void *mssg;
-@@ -101,7 +112,8 @@ static void tx_tick(struct mbox_chan *chan, int r)
- 	spin_unlock_irqrestore(&chan->lock, flags);
- 
- 	/* Submit next message */
--	msg_submit(chan);
-+	if (submit_next)
-+		msg_submit(chan);
- 
- 	if (!mssg)
- 		return;
-@@ -127,7 +139,7 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
- 		if (chan->active_req && chan->cl) {
- 			txdone = chan->mbox->ops->last_tx_done(chan);
- 			if (txdone)
--				tx_tick(chan, 0);
-+				tx_tick(chan, 0, true);
- 			else
- 				resched = true;
- 		}
-@@ -176,7 +188,7 @@ void mbox_chan_txdone(struct mbox_chan *chan, int r)
- 		return;
- 	}
- 
--	tx_tick(chan, r);
-+	tx_tick(chan, r, true);
+@@ -260,9 +257,8 @@ static int tegra_hsp_doorbell_startup(struct mbox_chan *chan)
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(mbox_chan_txdone);
  
-@@ -196,7 +208,7 @@ void mbox_client_txdone(struct mbox_chan *chan, int r)
- 		return;
- 	}
- 
--	tx_tick(chan, r);
-+	tx_tick(chan, r, true);
+-static void tegra_hsp_doorbell_shutdown(struct mbox_chan *chan)
++static void tegra_hsp_doorbell_shutdown(struct tegra_hsp_doorbell *db)
+ {
+-	struct tegra_hsp_doorbell *db = chan->con_priv;
+ 	struct tegra_hsp *hsp = db->channel.hsp;
+ 	struct tegra_hsp_doorbell *ccplex;
+ 	unsigned long flags;
+@@ -281,35 +277,60 @@ static void tegra_hsp_doorbell_shutdown(struct mbox_chan *chan)
+ 	spin_unlock_irqrestore(&hsp->lock, flags);
  }
- EXPORT_SYMBOL_GPL(mbox_client_txdone);
  
-@@ -275,7 +287,7 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
- 		ret = wait_for_completion_timeout(&chan->tx_complete, wait);
- 		if (ret == 0) {
- 			t = -ETIME;
--			tx_tick(chan, t);
-+			tx_tick(chan, t, true);
+-static const struct mbox_chan_ops tegra_hsp_doorbell_ops = {
+-	.send_data = tegra_hsp_doorbell_send_data,
+-	.startup = tegra_hsp_doorbell_startup,
+-	.shutdown = tegra_hsp_doorbell_shutdown,
++static int tegra_hsp_send_data(struct mbox_chan *chan, void *data)
++{
++	struct tegra_hsp_channel *channel = chan->con_priv;
++
++	switch (channel->type) {
++	case TEGRA_HSP_MBOX_TYPE_DB:
++		tegra_hsp_channel_writel(channel, 1, HSP_DB_TRIGGER);
++		return 0;
++	}
++
++	return -EINVAL;
++}
++
++static int tegra_hsp_startup(struct mbox_chan *chan)
++{
++	struct tegra_hsp_channel *channel = chan->con_priv;
++
++	switch (channel->type) {
++	case TEGRA_HSP_MBOX_TYPE_DB:
++		return tegra_hsp_doorbell_startup(channel_to_doorbell(channel));
++	}
++
++	return -EINVAL;
++}
++
++static void tegra_hsp_shutdown(struct mbox_chan *chan)
++{
++	struct tegra_hsp_channel *channel = chan->con_priv;
++
++	switch (channel->type) {
++	case TEGRA_HSP_MBOX_TYPE_DB:
++		tegra_hsp_doorbell_shutdown(channel_to_doorbell(channel));
++		break;
++	}
++}
++
++static const struct mbox_chan_ops tegra_hsp_ops = {
++	.send_data = tegra_hsp_send_data,
++	.startup = tegra_hsp_startup,
++	.shutdown = tegra_hsp_shutdown,
+ };
+ 
+-static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
+-					    const struct of_phandle_args *args)
++static struct mbox_chan *tegra_hsp_doorbell_xlate(struct tegra_hsp *hsp,
++						  unsigned int master)
+ {
+ 	struct tegra_hsp_channel *channel = ERR_PTR(-ENODEV);
+-	struct tegra_hsp *hsp = to_tegra_hsp(mbox);
+-	unsigned int type = args->args[0];
+-	unsigned int master = args->args[1];
+ 	struct tegra_hsp_doorbell *db;
+ 	struct mbox_chan *chan;
+ 	unsigned long flags;
+ 	unsigned int i;
+ 
+-	switch (type) {
+-	case TEGRA_HSP_MBOX_TYPE_DB:
+-		db = tegra_hsp_doorbell_get(hsp, master);
+-		if (db)
+-			channel = &db->channel;
+-
+-		break;
+-
+-	default:
+-		break;
+-	}
++	db = tegra_hsp_doorbell_get(hsp, master);
++	if (db)
++		channel = &db->channel;
+ 
+ 	if (IS_ERR(channel))
+ 		return ERR_CAST(channel);
+@@ -321,6 +342,7 @@ static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
+ 		if (!chan->con_priv) {
+ 			chan->con_priv = channel;
+ 			channel->chan = chan;
++			channel->type = TEGRA_HSP_MBOX_TYPE_DB;
+ 			break;
  		}
+ 
+@@ -332,6 +354,22 @@ static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
+ 	return chan ?: ERR_PTR(-EBUSY);
+ }
+ 
++static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
++					    const struct of_phandle_args *args)
++{
++	struct tegra_hsp *hsp = to_tegra_hsp(mbox);
++	unsigned int type = args->args[0];
++	unsigned int param = args->args[1];
++
++	switch (type) {
++	case TEGRA_HSP_MBOX_TYPE_DB:
++		return tegra_hsp_doorbell_xlate(hsp, param);
++
++	default:
++		return ERR_PTR(-EINVAL);
++	}
++}
++
+ static void tegra_hsp_remove_doorbells(struct tegra_hsp *hsp)
+ {
+ 	struct tegra_hsp_doorbell *db, *tmp;
+@@ -397,14 +435,14 @@ static int tegra_hsp_probe(struct platform_device *pdev)
+ 		return err;
  	}
  
-diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
-index 456ba68513bb..ec68e2e28cd6 100644
---- a/drivers/mailbox/mailbox.h
-+++ b/drivers/mailbox/mailbox.h
-@@ -10,5 +10,6 @@
- #define TXDONE_BY_IRQ	BIT(0) /* controller has remote RTR irq */
- #define TXDONE_BY_POLL	BIT(1) /* controller can read status of last TX */
- #define TXDONE_BY_ACK	BIT(2) /* S/W ACK recevied by Client ticks the TX */
-+#define TXDONE_BY_BLOCK	BIT(3) /* mailbox driver send_data blocks until done */
+-	hsp->irq = err;
++	hsp->doorbell_irq = err;
  
- #endif /* __MAILBOX_H */
+ 	hsp->mbox.of_xlate = of_tegra_hsp_xlate;
+ 	hsp->mbox.num_chans = 32;
+ 	hsp->mbox.dev = &pdev->dev;
+ 	hsp->mbox.txdone_irq = false;
+ 	hsp->mbox.txdone_poll = false;
+-	hsp->mbox.ops = &tegra_hsp_doorbell_ops;
++	hsp->mbox.ops = &tegra_hsp_ops;
+ 
+ 	hsp->mbox.chans = devm_kcalloc(&pdev->dev, hsp->mbox.num_chans,
+ 					sizeof(*hsp->mbox.chans),
+@@ -427,11 +465,12 @@ static int tegra_hsp_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	err = devm_request_irq(&pdev->dev, hsp->irq, tegra_hsp_doorbell_irq,
+-			       IRQF_NO_SUSPEND, dev_name(&pdev->dev), hsp);
++	err = devm_request_irq(&pdev->dev, hsp->doorbell_irq,
++			       tegra_hsp_doorbell_irq, IRQF_NO_SUSPEND,
++			       dev_name(&pdev->dev), hsp);
+ 	if (err < 0) {
+-		dev_err(&pdev->dev, "failed to request IRQ#%u: %d\n",
+-			hsp->irq, err);
++		dev_err(&pdev->dev, "failed to request doorbell IRQ#%u: %d\n",
++			hsp->doorbell_irq, err);
+ 		return err;
+ 	}
+ 
 -- 
 2.16.1
