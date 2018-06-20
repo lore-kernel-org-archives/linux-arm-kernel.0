@@ -1,135 +1,140 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 20 Jun 2018 15:28:27 +0300
-Subject: [PATCH 2/2] arm64: tegra: Add CPU nodes to Tegra194 device tree
-In-Reply-To: <20180620122827.14165-1-mperttunen@nvidia.com>
-References: <20180620122827.14165-1-mperttunen@nvidia.com>
-Message-ID: <20180620122827.14165-2-mperttunen@nvidia.com>
+From: radheys@xilinx.com (Radhey Shyam Pandey)
+Date: Wed, 20 Jun 2018 12:36:07 +0000
+Subject: [PATCH 2/6] dmaengine: xilinx_dma: fix completion callback is not
+ invoked for each DMA operation
+In-Reply-To: <20180620083653.17010-2-andrea.merello@gmail.com>
+References: <20180620083653.17010-1-andrea.merello@gmail.com>
+ <20180620083653.17010-2-andrea.merello@gmail.com>
+Message-ID: <DM6PR02MB43615ED0221189B6B8D9017EC7770@DM6PR02MB4361.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CPU and PSCI nodes to device tree. The Tegra194 SoC contains
-eight NVIDIA Carmel CPUs.
+> -----Original Message-----
+> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
+> owner at vger.kernel.org] On Behalf Of Andrea Merello
+> Sent: Wednesday, June 20, 2018 2:07 PM
+> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
+> <michals@xilinx.com>; Appana Durga Kedareswara Rao
+> <appanad@xilinx.com>; dmaengine at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> Andrea Merello <andrea.merello@gmail.com>
+> Subject: [PATCH 2/6] dmaengine: xilinx_dma: fix completion callback is not
+> invoked for each DMA operation
+> 
+> API specification says: "On completion of each DMA operation, the next in
+> queue is started and a tasklet triggered. The tasklet will then call the
+> client driver completion callback routine for notification, if set."
+> 
+> Currently the driver keeps a "desc_pendingcount" counter of the total
+> descriptor pending, and it uses as IRQ coalesce threshold, as result it
+> only calls the CBs after ALL pending operations are completed, which is
+> wrong.
+I think IRQ coalescing enable/disable should be configurable. 
+Performance related usecases will need this support.
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi | 40 +++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 53 ++++++++++++++++++++++++++
- 2 files changed, 93 insertions(+)
+> 
+> This patch uses disable IRQ coalesce and checks for the completion flag
+> for the descriptors (which is further divided in segments).
+> 
+> Possibly a better optimization could be using proper IRQ coalesce
+> threshold to get an IRQ after all segments of the descriptors are done.
+> But we don't do that yet..
+> 
+> NOTE: for now we do this only for AXI DMA, other DMA flavors are
+> untested/untouched.
+> This is loosely based on
+> commit 65df81a6dc74 ("xilinx_dma: IrqThreshold set incorrectly, unreliable.")
+> in my linux-4.6-zynq tree
+NOTE description doesn't help much.  
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-index ecb034177fc2..859ab5af17c1 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-@@ -229,6 +229,46 @@
- 		};
- 	};
- 
-+	cpus {
-+		cpu at 0 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 1 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 4 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 5 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 6 {
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 7 {
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		status = "okay";
-+		method = "smc";
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-index 6322ef265c2f..6d699815a84f 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-@@ -329,6 +329,59 @@
- 		};
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x10000>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x10001>;
-+		};
-+
-+		cpu at 2 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x100>;
-+		};
-+
-+		cpu at 3 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x101>;
-+		};
-+
-+		cpu at 4 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x200>;
-+		};
-+
-+		cpu at 5 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x201>;
-+		};
-+
-+		cpu at 6 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x10300>;
-+		};
-+
-+		cpu at 7 {
-+			compatible = "nvidia,tegra194-carmel", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x10301>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
--- 
-2.16.1
+> 
+> From: Jeremy Trimble [original patch]
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c | 39 +++++++++++++++++++++------------
+>  1 file changed, 25 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index a516e7ffef21..cf12f7147f07 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -164,6 +164,7 @@
+>  #define XILINX_DMA_CR_COALESCE_SHIFT	16
+>  #define XILINX_DMA_BD_SOP		BIT(27)
+>  #define XILINX_DMA_BD_EOP		BIT(26)
+> +#define XILINX_DMA_BD_CMPLT		BIT(31)
+>  #define XILINX_DMA_COALESCE_MAX		255
+>  #define XILINX_DMA_NUM_DESCS		255
+>  #define XILINX_DMA_NUM_APP_WORDS	5
+> @@ -1274,12 +1275,9 @@ static void xilinx_dma_start_transfer(struct
+> xilinx_dma_chan *chan)
+> 
+>  	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
+> 
+> -	if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
+> -		reg &= ~XILINX_DMA_CR_COALESCE_MAX;
+> -		reg |= chan->desc_pendingcount <<
+> -				  XILINX_DMA_CR_COALESCE_SHIFT;
+> -		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
+> -	}
+> +	reg &= ~XILINX_DMA_CR_COALESCE_MAX;
+> +	reg |= 1 << XILINX_DMA_CR_COALESCE_SHIFT;
+> +	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
+> 
+>  	if (chan->has_sg && !chan->xdev->mcdma)
+>  		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
+> @@ -1378,6 +1376,20 @@ static void xilinx_dma_complete_descriptor(struct
+> xilinx_dma_chan *chan)
+>  		return;
+> 
+>  	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
+> +		if (chan->xdev->dma_config->dmatype ==
+> XDMA_TYPE_AXIDMA) {
+> +			/*
+> +			 * Check whether the last segment in this descriptor
+> +			 * has been completed.
+> +			 */
+> +			const struct xilinx_axidma_tx_segment *const tail_seg
+> =
+> +				list_last_entry(&desc->segments,
+> +						struct
+> xilinx_axidma_tx_segment,
+> +						node);
+> +
+> +			/* we've processed all the completed descriptors */
+> +			if (!(tail_seg->hw.status & XILINX_DMA_BD_CMPLT))
+> +				break;
+> +		}
+>  		list_del(&desc->node);
+>  		if (!desc->cyclic)
+>  			dma_cookie_complete(&desc->async_tx);
+> @@ -1826,14 +1838,13 @@ static struct dma_async_tx_descriptor
+> *xilinx_dma_prep_slave_sg(
+>  				   struct xilinx_axidma_tx_segment, node);
+>  	desc->async_tx.phys = segment->phys;
+> 
+> -	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
+> -	if (chan->direction == DMA_MEM_TO_DEV) {
+> -		segment->hw.control |= XILINX_DMA_BD_SOP;
+> -		segment = list_last_entry(&desc->segments,
+> -					  struct xilinx_axidma_tx_segment,
+> -					  node);
+> -		segment->hw.control |= XILINX_DMA_BD_EOP;
+> -	}
+> +	/* For the first transfer, set SOP */
+> +	segment->hw.control |= XILINX_DMA_BD_SOP;
+> +	/* For the last transfer, set EOP */
+> +	segment = list_last_entry(&desc->segments,
+> +				  struct xilinx_axidma_tx_segment,
+> +				  node);
+> +	segment->hw.control |= XILINX_DMA_BD_EOP;
+> 
+>  	return &desc->async_tx;
+> 
+> --
+> 2.17.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
