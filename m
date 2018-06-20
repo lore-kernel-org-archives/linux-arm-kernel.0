@@ -1,288 +1,415 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 20 Jun 2018 19:40:02 +0200
-Subject: [PATCH v3 16/17] khwasan: update kasan documentation
+Date: Wed, 20 Jun 2018 19:39:49 +0200
+Subject: [PATCH v3 03/17] khwasan: add CONFIG_KASAN_GENERIC and CONFIG_KASAN_HW
 In-Reply-To: <cover.1529515183.git.andreyknvl@google.com>
 References: <cover.1529515183.git.andreyknvl@google.com>
-Message-ID: <ce878d72ed7d9c416d7fa5d67b8bc053afcdfb3b.1529515183.git.andreyknvl@google.com>
+Message-ID: <641ea2edfdc57d8ca30096699c47fd7360381287.1529515183.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates KASAN documentation to reflect the addition of KHWASAN.
+This commit splits the current CONFIG_KASAN config option into two:
+1. CONFIG_KASAN_GENERIC, that enables the generic software-only KASAN
+   version (the one that exists now);
+2. CONFIG_KASAN_HW, that enables KHWASAN.
+
+With CONFIG_KASAN_HW enabled, compiler options are changed to instrument
+kernel files wiht -fsantize=hwaddress (except the ones for which
+KASAN_SANITIZE := n is set).
+
+Both CONFIG_KASAN_GENERIC and CONFIG_KASAN_HW support both
+CONFIG_KASAN_INLINE and CONFIG_KASAN_OUTLINE instrumentation modes.
+
+This commit also adds empty placeholder (for now) implementation of
+KHWASAN specific hooks inserted by the compiler and adjusts common hooks
+implementation to compile correctly with each of the config options.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- Documentation/dev-tools/kasan.rst | 213 +++++++++++++++++-------------
- 1 file changed, 123 insertions(+), 90 deletions(-)
+ arch/arm64/Kconfig             |  1 +
+ include/linux/compiler-clang.h |  5 ++-
+ include/linux/compiler-gcc.h   |  4 ++
+ include/linux/compiler.h       |  3 +-
+ include/linux/kasan.h          | 16 +++++--
+ lib/Kconfig.kasan              | 76 ++++++++++++++++++++++++++--------
+ mm/kasan/Makefile              |  6 ++-
+ mm/kasan/khwasan.c             | 75 +++++++++++++++++++++++++++++++++
+ mm/slub.c                      |  2 +-
+ scripts/Makefile.kasan         | 27 +++++++++++-
+ 10 files changed, 187 insertions(+), 28 deletions(-)
+ create mode 100644 mm/kasan/khwasan.c
 
-diff --git a/Documentation/dev-tools/kasan.rst b/Documentation/dev-tools/kasan.rst
-index aabc8738b3d8..842d95af74d3 100644
---- a/Documentation/dev-tools/kasan.rst
-+++ b/Documentation/dev-tools/kasan.rst
-@@ -8,11 +8,19 @@ KernelAddressSANitizer (KASAN) is a dynamic memory error detector. It provides
- a fast and comprehensive solution for finding use-after-free and out-of-bounds
- bugs.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090cf0292..43d9de526d3a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -92,6 +92,7 @@ config ARM64
+ 	select HAVE_ARCH_HUGE_VMAP
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
++	select HAVE_ARCH_KASAN_HW if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+index 7087446c24c8..6ac1761ff102 100644
+--- a/include/linux/compiler-clang.h
++++ b/include/linux/compiler-clang.h
+@@ -21,13 +21,16 @@
+ #define KASAN_ABI_VERSION 5
  
--KASAN uses compile-time instrumentation for checking every memory access,
--therefore you will need a GCC version 4.9.2 or later. GCC 5.0 or later is
--required for detection of out-of-bounds accesses to stack or global variables.
-+KASAN has two modes: classic KASAN (a classic version, similar to user space
-+ASan) and KHWASAN (a version based on memory tagging, similar to user space
-+HWASan).
+ /* emulate gcc's __SANITIZE_ADDRESS__ flag */
+-#if __has_feature(address_sanitizer)
++#if __has_feature(address_sanitizer) || __has_feature(hwaddress_sanitizer)
+ #define __SANITIZE_ADDRESS__
+ #endif
  
--Currently KASAN is supported only for the x86_64 and arm64 architectures.
-+KASAN uses compile-time instrumentation to insert validity checks before every
-+memory access, and therefore requires a compiler version that supports that.
-+For classic KASAN you need GCC version 4.9.2 or later. GCC 5.0 or later is
-+required for detection of out-of-bounds accesses on stack and global variables.
-+KHWASAN in turns is only supported in clang and requires revision 330044 or
-+later.
+ #undef __no_sanitize_address
+ #define __no_sanitize_address __attribute__((no_sanitize("address")))
+ 
++#undef __no_sanitize_hwaddress
++#define __no_sanitize_hwaddress __attribute__((no_sanitize("hwaddress")))
 +
-+Currently classic KASAN is supported for the x86_64, arm64 and xtensa
-+architectures, and KHWASAN is supported only for arm64.
+ /* Clang doesn't have a way to turn it off per-function, yet. */
+ #ifdef __noretpoline
+ #undef __noretpoline
+diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
+index f1a7492a5cc8..24ca815de84b 100644
+--- a/include/linux/compiler-gcc.h
++++ b/include/linux/compiler-gcc.h
+@@ -338,6 +338,10 @@
+ #define __no_sanitize_address
+ #endif
  
- Usage
- -----
-@@ -21,12 +29,14 @@ To enable KASAN configure kernel with::
- 
- 	  CONFIG_KASAN = y
- 
--and choose between CONFIG_KASAN_OUTLINE and CONFIG_KASAN_INLINE. Outline and
--inline are compiler instrumentation types. The former produces smaller binary
--the latter is 1.1 - 2 times faster. Inline instrumentation requires a GCC
-+and choose between CONFIG_KASAN_GENERIC (to enable classic KASAN) and
-+CONFIG_KASAN_HW (to enabled KHWASAN). You also need to choose choose between
-+CONFIG_KASAN_OUTLINE and CONFIG_KASAN_INLINE. Outline and inline are compiler
-+instrumentation types. The former produces smaller binary while the latter is
-+1.1 - 2 times faster. For classic KASAN inline instrumentation requires GCC
- version 5.0 or later.
- 
--KASAN works with both SLUB and SLAB memory allocators.
-+Both KASAN modes work with both SLUB and SLAB memory allocators.
- For better bug detection and nicer reporting, enable CONFIG_STACKTRACE.
- 
- To disable instrumentation for specific files or directories, add a line
-@@ -43,85 +53,80 @@ similar to the following to the respective kernel Makefile:
- Error reports
- ~~~~~~~~~~~~~
- 
--A typical out of bounds access report looks like this::
-+A typical out-of-bounds access classic KASAN report looks like this::
- 
-     ==================================================================
--    BUG: AddressSanitizer: out of bounds access in kmalloc_oob_right+0x65/0x75 [test_kasan] at addr ffff8800693bc5d3
--    Write of size 1 by task modprobe/1689
--    =============================================================================
--    BUG kmalloc-128 (Not tainted): kasan error
--    -----------------------------------------------------------------------------
--
--    Disabling lock debugging due to kernel taint
--    INFO: Allocated in kmalloc_oob_right+0x3d/0x75 [test_kasan] age=0 cpu=0 pid=1689
--     __slab_alloc+0x4b4/0x4f0
--     kmem_cache_alloc_trace+0x10b/0x190
--     kmalloc_oob_right+0x3d/0x75 [test_kasan]
--     init_module+0x9/0x47 [test_kasan]
--     do_one_initcall+0x99/0x200
--     load_module+0x2cb3/0x3b20
--     SyS_finit_module+0x76/0x80
--     system_call_fastpath+0x12/0x17
--    INFO: Slab 0xffffea0001a4ef00 objects=17 used=7 fp=0xffff8800693bd728 flags=0x100000000004080
--    INFO: Object 0xffff8800693bc558 @offset=1368 fp=0xffff8800693bc720
--
--    Bytes b4 ffff8800693bc548: 00 00 00 00 00 00 00 00 5a 5a 5a 5a 5a 5a 5a 5a  ........ZZZZZZZZ
--    Object ffff8800693bc558: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc568: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc578: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc588: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc598: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc5a8: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc5b8: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b  kkkkkkkkkkkkkkkk
--    Object ffff8800693bc5c8: 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b 6b a5  kkkkkkkkkkkkkkk.
--    Redzone ffff8800693bc5d8: cc cc cc cc cc cc cc cc                          ........
--    Padding ffff8800693bc718: 5a 5a 5a 5a 5a 5a 5a 5a                          ZZZZZZZZ
--    CPU: 0 PID: 1689 Comm: modprobe Tainted: G    B          3.18.0-rc1-mm1+ #98
--    Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS rel-1.7.5-0-ge51488c-20140602_164612-nilsson.home.kraxel.org 04/01/2014
--     ffff8800693bc000 0000000000000000 ffff8800693bc558 ffff88006923bb78
--     ffffffff81cc68ae 00000000000000f3 ffff88006d407600 ffff88006923bba8
--     ffffffff811fd848 ffff88006d407600 ffffea0001a4ef00 ffff8800693bc558
-+    BUG: KASAN: slab-out-of-bounds in kmalloc_oob_right+0xa8/0xbc [test_kasan]
-+    Write of size 1 at addr ffff8800696f3d3b by task insmod/2734
-+    
-+    CPU: 0 PID: 2734 Comm: insmod Not tainted 4.15.0+ #98
-+    Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.10.2-1 04/01/2014
-     Call Trace:
--     [<ffffffff81cc68ae>] dump_stack+0x46/0x58
--     [<ffffffff811fd848>] print_trailer+0xf8/0x160
--     [<ffffffffa00026a7>] ? kmem_cache_oob+0xc3/0xc3 [test_kasan]
--     [<ffffffff811ff0f5>] object_err+0x35/0x40
--     [<ffffffffa0002065>] ? kmalloc_oob_right+0x65/0x75 [test_kasan]
--     [<ffffffff8120b9fa>] kasan_report_error+0x38a/0x3f0
--     [<ffffffff8120a79f>] ? kasan_poison_shadow+0x2f/0x40
--     [<ffffffff8120b344>] ? kasan_unpoison_shadow+0x14/0x40
--     [<ffffffff8120a79f>] ? kasan_poison_shadow+0x2f/0x40
--     [<ffffffffa00026a7>] ? kmem_cache_oob+0xc3/0xc3 [test_kasan]
--     [<ffffffff8120a995>] __asan_store1+0x75/0xb0
--     [<ffffffffa0002601>] ? kmem_cache_oob+0x1d/0xc3 [test_kasan]
--     [<ffffffffa0002065>] ? kmalloc_oob_right+0x65/0x75 [test_kasan]
--     [<ffffffffa0002065>] kmalloc_oob_right+0x65/0x75 [test_kasan]
--     [<ffffffffa00026b0>] init_module+0x9/0x47 [test_kasan]
--     [<ffffffff810002d9>] do_one_initcall+0x99/0x200
--     [<ffffffff811e4e5c>] ? __vunmap+0xec/0x160
--     [<ffffffff81114f63>] load_module+0x2cb3/0x3b20
--     [<ffffffff8110fd70>] ? m_show+0x240/0x240
--     [<ffffffff81115f06>] SyS_finit_module+0x76/0x80
--     [<ffffffff81cd3129>] system_call_fastpath+0x12/0x17
-+     __dump_stack lib/dump_stack.c:17
-+     dump_stack+0x83/0xbc lib/dump_stack.c:53
-+     print_address_description+0x73/0x280 mm/kasan/report.c:254
-+     kasan_report_error mm/kasan/report.c:352
-+     kasan_report+0x10e/0x220 mm/kasan/report.c:410
-+     __asan_report_store1_noabort+0x17/0x20 mm/kasan/report.c:505
-+     kmalloc_oob_right+0xa8/0xbc [test_kasan] lib/test_kasan.c:42
-+     kmalloc_tests_init+0x16/0x769 [test_kasan]
-+     do_one_initcall+0x9e/0x240 init/main.c:832
-+     do_init_module+0x1b6/0x542 kernel/module.c:3462
-+     load_module+0x6042/0x9030 kernel/module.c:3786
-+     SYSC_init_module+0x18f/0x1c0 kernel/module.c:3858
-+     SyS_init_module+0x9/0x10 kernel/module.c:3841
-+     do_syscall_64+0x198/0x480 arch/x86/entry/common.c:287
-+     entry_SYSCALL_64_after_hwframe+0x21/0x86 arch/x86/entry/entry_64.S:251
-+    RIP: 0033:0x7fdd79df99da
-+    RSP: 002b:00007fff2229bdf8 EFLAGS: 00000202 ORIG_RAX: 00000000000000af
-+    RAX: ffffffffffffffda RBX: 000055c408121190 RCX: 00007fdd79df99da
-+    RDX: 00007fdd7a0b8f88 RSI: 0000000000055670 RDI: 00007fdd7a47e000
-+    RBP: 000055c4081200b0 R08: 0000000000000003 R09: 0000000000000000
-+    R10: 00007fdd79df5d0a R11: 0000000000000202 R12: 00007fdd7a0b8f88
-+    R13: 000055c408120090 R14: 0000000000000000 R15: 0000000000000000
-+    
-+    Allocated by task 2734:
-+     save_stack+0x43/0xd0 mm/kasan/common.c:176
-+     set_track+0x20/0x30 mm/kasan/common.c:188
-+     kasan_kmalloc+0x9a/0xc0 mm/kasan/kasan.c:372
-+     kmem_cache_alloc_trace+0xcd/0x1a0 mm/slub.c:2761
-+     kmalloc ./include/linux/slab.h:512
-+     kmalloc_oob_right+0x56/0xbc [test_kasan] lib/test_kasan.c:36
-+     kmalloc_tests_init+0x16/0x769 [test_kasan]
-+     do_one_initcall+0x9e/0x240 init/main.c:832
-+     do_init_module+0x1b6/0x542 kernel/module.c:3462
-+     load_module+0x6042/0x9030 kernel/module.c:3786
-+     SYSC_init_module+0x18f/0x1c0 kernel/module.c:3858
-+     SyS_init_module+0x9/0x10 kernel/module.c:3841
-+     do_syscall_64+0x198/0x480 arch/x86/entry/common.c:287
-+     entry_SYSCALL_64_after_hwframe+0x21/0x86 arch/x86/entry/entry_64.S:251
-+    
-+    The buggy address belongs to the object at ffff8800696f3cc0
-+     which belongs to the cache kmalloc-128 of size 128
-+    The buggy address is located 123 bytes inside of
-+     128-byte region [ffff8800696f3cc0, ffff8800696f3d40)
-+    The buggy address belongs to the page:
-+    page:ffffea0001a5bcc0 count:1 mapcount:0 mapping:          (null) index:0x0
-+    flags: 0x100000000000100(slab)
-+    raw: 0100000000000100 0000000000000000 0000000000000000 0000000180150015
-+    raw: ffffea0001a8ce40 0000000300000003 ffff88006d001640 0000000000000000
-+    page dumped because: kasan: bad access detected
-+    
-     Memory state around the buggy address:
--     ffff8800693bc300: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
--     ffff8800693bc380: fc fc 00 00 00 00 00 00 00 00 00 00 00 00 00 fc
--     ffff8800693bc400: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
--     ffff8800693bc480: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
--     ffff8800693bc500: fc fc fc fc fc fc fc fc fc fc fc 00 00 00 00 00
--    >ffff8800693bc580: 00 00 00 00 00 00 00 00 00 00 03 fc fc fc fc fc
--                                                 ^
--     ffff8800693bc600: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
--     ffff8800693bc680: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
--     ffff8800693bc700: fc fc fc fc fb fb fb fb fb fb fb fb fb fb fb fb
--     ffff8800693bc780: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
--     ffff8800693bc800: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
-+     ffff8800696f3c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fc
-+     ffff8800696f3c80: fc fc fc fc fc fc fc fc 00 00 00 00 00 00 00 00
-+    >ffff8800696f3d00: 00 00 00 00 00 00 00 03 fc fc fc fc fc fc fc fc
-+                                            ^
-+     ffff8800696f3d80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fc fc
-+     ffff8800696f3e00: fc fc fc fc fc fc fc fc fb fb fb fb fb fb fb fb
-     ==================================================================
- 
--The header of the report discribe what kind of bug happened and what kind of
--access caused it. It's followed by the description of the accessed slub object
--(see 'SLUB Debug output' section in Documentation/vm/slub.rst for details) and
--the description of the accessed memory page.
-+The header of the report provides a short summary of what kind of bug happened
-+and what kind of access caused it. It's followed by a stack trace of the bad
-+access, a stack trace of where the accessed memory was allocated (in case bad
-+access happens on a slab object), and a stack trace of where the object was
-+freed (in case of a use-after-free bug report). Next comes a description of
-+the accessed slab object and information about the accessed memory page.
- 
- In the last section the report shows memory state around the accessed address.
- Reading this part requires some understanding of how KASAN works.
-@@ -138,18 +143,24 @@ inaccessible memory like redzones or freed memory (see mm/kasan/kasan.h).
- In the report above the arrows point to the shadow byte 03, which means that
- the accessed address is partially accessible.
- 
-+For KHWASAN this last report section shows the memory tags around the accessed
-+address (see Implementation details section).
++#if !defined(__no_sanitize_hwaddress)
++#define __no_sanitize_hwaddress	/* gcc doesn't support KHWASAN */
++#endif
 +
+ /*
+  * A trick to suppress uninitialized variable warning without generating any
+  * code
+diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+index 42506e4d1f53..6439fdd46b4e 100644
+--- a/include/linux/compiler.h
++++ b/include/linux/compiler.h
+@@ -195,7 +195,8 @@ void __read_once_size(const volatile void *p, void *res, int size)
+  * 	https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67368
+  * '__maybe_unused' allows us to avoid defined-but-not-used warnings.
+  */
+-# define __no_kasan_or_inline __no_sanitize_address __maybe_unused
++# define __no_kasan_or_inline __no_sanitize_address __no_sanitize_hwaddress \
++			      __maybe_unused
+ #else
+ # define __no_kasan_or_inline __always_inline
+ #endif
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index cbdc54543803..6608aa9b35ac 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -45,8 +45,6 @@ void kasan_free_pages(struct page *page, unsigned int order);
  
- Implementation details
- ----------------------
+ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
+ 			slab_flags_t *flags);
+-void kasan_cache_shrink(struct kmem_cache *cache);
+-void kasan_cache_shutdown(struct kmem_cache *cache);
  
-+Classic KASAN
-+~~~~~~~~~~~~~
+ void kasan_poison_slab(struct page *page);
+ void kasan_unpoison_object_data(struct kmem_cache *cache, void *object);
+@@ -94,8 +92,6 @@ static inline void kasan_free_pages(struct page *page, unsigned int order) {}
+ static inline void kasan_cache_create(struct kmem_cache *cache,
+ 				      unsigned int *size,
+ 				      slab_flags_t *flags) {}
+-static inline void kasan_cache_shrink(struct kmem_cache *cache) {}
+-static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
+ 
+ static inline void kasan_poison_slab(struct page *page) {}
+ static inline void kasan_unpoison_object_data(struct kmem_cache *cache,
+@@ -141,4 +137,16 @@ static inline size_t kasan_metadata_size(struct kmem_cache *cache) { return 0; }
+ 
+ #endif /* CONFIG_KASAN */
+ 
++#ifdef CONFIG_KASAN_GENERIC
 +
- From a high level, our approach to memory error detection is similar to that
- of kmemcheck: use shadow memory to record whether each byte of memory is safe
--to access, and use compile-time instrumentation to check shadow memory on each
--memory access.
-+to access, and use compile-time instrumentation to insert checks of shadow
-+memory on each memory access.
- 
--AddressSanitizer dedicates 1/8 of kernel memory to its shadow memory
--(e.g. 16TB to cover 128TB on x86_64) and uses direct mapping with a scale and
--offset to translate a memory address to its corresponding shadow address.
-+Classic KASAN dedicates 1/8th of kernel memory to its shadow memory (e.g. 16TB
-+to cover 128TB on x86_64) and uses direct mapping with a scale and offset to
-+translate a memory address to its corresponding shadow address.
- 
- Here is the function which translates an address to its corresponding shadow
- address::
-@@ -162,12 +173,34 @@ address::
- 
- where ``KASAN_SHADOW_SCALE_SHIFT = 3``.
- 
--Compile-time instrumentation used for checking memory accesses. Compiler inserts
--function calls (__asan_load*(addr), __asan_store*(addr)) before each memory
--access of size 1, 2, 4, 8 or 16. These functions check whether memory access is
--valid or not by checking corresponding shadow memory.
-+Compile-time instrumentation is used to insert memory access checks. Compiler
-+inserts function calls (__asan_load*(addr), __asan_store*(addr)) before each
-+memory access of size 1, 2, 4, 8 or 16. These functions check whether memory
-+access is valid or not by checking corresponding shadow memory.
- 
- GCC 5.0 has possibility to perform inline instrumentation. Instead of making
- function calls GCC directly inserts the code to check the shadow memory.
- This option significantly enlarges kernel but it gives x1.1-x2 performance
- boost over outline instrumented kernel.
++void kasan_cache_shrink(struct kmem_cache *cache);
++void kasan_cache_shutdown(struct kmem_cache *cache);
 +
-+KHWASAN
-+~~~~~~~
++#else /* CONFIG_KASAN_GENERIC */
 +
-+KHWASAN uses the Top Byte Ignore (TBI) feature of modern arm64 CPUs to store
-+a pointer tag in the top byte of kernel pointers. KHWASAN also uses shadow
-+memory to store memory tags associated with each 16-byte memory cell (therefore
-+it dedicates 1/16th of the kernel memory for shadow memory).
++static inline void kasan_cache_shrink(struct kmem_cache *cache) {}
++static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
 +
-+On each memory allocation KHWASAN generates a random tag, tags allocated memory
-+with this tag, and embeds this tag into the returned pointer. KHWASAN uses
-+compile-time instrumentation to insert checks before each memory access. These
-+checks make sure that tag of the memory that is being accessed is equal to tag
-+of the pointer that is used to access this memory. In case of a tag mismatch
-+KHWASAN prints a bug report.
++#endif /* CONFIG_KASAN_GENERIC */
 +
-+KHWASAN also has two instrumentation modes (outline, that emits callbacks to
-+check memory accesses; and inline, that performs the shadow memory checks
-+inline). With outline instrumentation mode, a bug report is simply printed
-+from the function that performs the access check. With inline instrumentation
-+a brk instruction is emitted by the compiler, and a dedicated brk handler is
-+used to print KHWASAN reports.
+ #endif /* LINUX_KASAN_H */
+diff --git a/lib/Kconfig.kasan b/lib/Kconfig.kasan
+index 3d35d062970d..baf2619b7ff4 100644
+--- a/lib/Kconfig.kasan
++++ b/lib/Kconfig.kasan
+@@ -1,33 +1,73 @@
+ config HAVE_ARCH_KASAN
+ 	bool
+ 
++config HAVE_ARCH_KASAN_HW
++	bool
++
+ if HAVE_ARCH_KASAN
+ 
+ config KASAN
+-	bool "KASan: runtime memory debugger"
++	bool "KASAN: runtime memory debugger"
++	help
++	  Enables KASAN (KernelAddressSANitizer) - runtime memory debugger,
++	  designed to find out-of-bounds accesses and use-after-free bugs.
++
++choice
++	prompt "KASAN mode"
++	depends on KASAN
++	default KASAN_GENERIC
++	help
++	  KASAN has two modes: KASAN (a classic version, similar to userspace
++	  ASan, enabled with CONFIG_KASAN_GENERIC) and KHWASAN (a version
++	  based on pointer tagging, only for arm64, similar to userspace
++	  HWASan, enabled with CONFIG_KASAN_HW).
++
++config KASAN_GENERIC
++	bool "KASAN: the generic mode"
+ 	depends on SLUB || (SLAB && !DEBUG_SLAB)
+ 	select CONSTRUCTORS
+ 	select STACKDEPOT
+ 	help
+-	  Enables kernel address sanitizer - runtime memory debugger,
+-	  designed to find out-of-bounds accesses and use-after-free bugs.
+-	  This is strictly a debugging feature and it requires a gcc version
+-	  of 4.9.2 or later. Detection of out of bounds accesses to stack or
+-	  global variables requires gcc 5.0 or later.
+-	  This feature consumes about 1/8 of available memory and brings about
+-	  ~x3 performance slowdown.
++	  Enables the generic mode of KASAN.
++	  This is strictly a debugging feature and it requires a GCC version
++	  of 4.9.2 or later. Detection of out-of-bounds accesses to stack or
++	  global variables requires GCC 5.0 or later.
++	  This mode consumes about 1/8 of available memory at kernel start
++	  and introduces an overhead of ~x1.5 for the rest of the allocations.
++	  The performance slowdown is ~x3.
++	  For better error detection enable CONFIG_STACKTRACE.
++	  Currently CONFIG_KASAN_GENERIC doesn't work with CONFIG_DEBUG_SLAB
++	  (the resulting kernel does not boot).
++
++if HAVE_ARCH_KASAN_HW
++
++config KASAN_HW
++	bool "KHWASAN: the hardware assisted mode"
++	depends on SLUB || (SLAB && !DEBUG_SLAB)
++	select CONSTRUCTORS
++	select STACKDEPOT
++	help
++	  Enabled KHWASAN (KASAN mode based on pointer tagging).
++	  This mode requires Top Byte Ignore support by the CPU and therefore
++	  only supported for arm64.
++	  This feature requires clang revision 330044 or later.
++	  This mode consumes about 1/16 of available memory at kernel start
++	  and introduces an overhead of ~20% for the rest of the allocations.
+ 	  For better error detection enable CONFIG_STACKTRACE.
+-	  Currently CONFIG_KASAN doesn't work with CONFIG_DEBUG_SLAB
++	  Currently CONFIG_KASAN_HW doesn't work with CONFIG_DEBUG_SLAB
+ 	  (the resulting kernel does not boot).
+ 
++endif
++
++endchoice
++
+ config KASAN_EXTRA
+-	bool "KAsan: extra checks"
+-	depends on KASAN && DEBUG_KERNEL && !COMPILE_TEST
++	bool "KASAN: extra checks"
++	depends on KASAN_GENERIC && DEBUG_KERNEL && !COMPILE_TEST
+ 	help
+-	  This enables further checks in the kernel address sanitizer, for now
+-	  it only includes the address-use-after-scope check that can lead
+-	  to excessive kernel stack usage, frame size warnings and longer
+-	  compile time.
++	  This enables further checks in KASAN, for now it only includes the
++	  address-use-after-scope check that can lead to excessive kernel
++	  stack usage, frame size warnings and longer compile time.
+ 	  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715 has more
+ 
+ 
+@@ -52,16 +92,16 @@ config KASAN_INLINE
+ 	  memory accesses. This is faster than outline (in some workloads
+ 	  it gives about x2 boost over outline instrumentation), but
+ 	  make kernel's .text size much bigger.
+-	  This requires a gcc version of 5.0 or later.
++	  For CONFIG_KASAN_GENERIC this requires GCC 5.0 or later.
+ 
+ endchoice
+ 
+ config TEST_KASAN
+-	tristate "Module for testing kasan for bug detection"
++	tristate "Module for testing KASAN for bug detection"
+ 	depends on m && KASAN
+ 	help
+ 	  This is a test module doing various nasty things like
+ 	  out of bounds accesses, use after free. It is useful for testing
+-	  kernel debugging features like kernel address sanitizer.
++	  kernel debugging features like KASAN.
+ 
+ endif
+diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
+index a6df14bffb6b..14955add96d3 100644
+--- a/mm/kasan/Makefile
++++ b/mm/kasan/Makefile
+@@ -2,6 +2,7 @@
+ KASAN_SANITIZE := n
+ UBSAN_SANITIZE_common.o := n
+ UBSAN_SANITIZE_kasan.o := n
++UBSAN_SANITIZE_khwasan.o := n
+ KCOV_INSTRUMENT := n
+ 
+ CFLAGS_REMOVE_kasan.o = -pg
+@@ -10,5 +11,8 @@ CFLAGS_REMOVE_kasan.o = -pg
+ 
+ CFLAGS_common.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+ CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
++CFLAGS_khwasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+ 
+-obj-y := common.o kasan.o report.o kasan_init.o quarantine.o
++obj-$(CONFIG_KASAN) := common.o kasan_init.o report.o
++obj-$(CONFIG_KASAN_GENERIC) += kasan.o quarantine.o
++obj-$(CONFIG_KASAN_HW) += khwasan.o
+diff --git a/mm/kasan/khwasan.c b/mm/kasan/khwasan.c
+new file mode 100644
+index 000000000000..e2c3a7f7fd1f
+--- /dev/null
++++ b/mm/kasan/khwasan.c
+@@ -0,0 +1,75 @@
++/*
++ * This file contains core KHWASAN code.
++ *
++ * Copyright (c) 2018 Google, Inc.
++ * Author: Andrey Konovalov <andreyknvl@google.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++#define DISABLE_BRANCH_PROFILING
++
++#include <linux/export.h>
++#include <linux/interrupt.h>
++#include <linux/init.h>
++#include <linux/kasan.h>
++#include <linux/kernel.h>
++#include <linux/kmemleak.h>
++#include <linux/linkage.h>
++#include <linux/memblock.h>
++#include <linux/memory.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/printk.h>
++#include <linux/random.h>
++#include <linux/sched.h>
++#include <linux/sched/task_stack.h>
++#include <linux/slab.h>
++#include <linux/stacktrace.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <linux/vmalloc.h>
++#include <linux/bug.h>
++
++#include "kasan.h"
++#include "../slab.h"
++
++void check_memory_region(unsigned long addr, size_t size, bool write,
++				unsigned long ret_ip)
++{
++}
++
++#define DEFINE_HWASAN_LOAD_STORE(size)					\
++	void __hwasan_load##size##_noabort(unsigned long addr)		\
++	{								\
++	}								\
++	EXPORT_SYMBOL(__hwasan_load##size##_noabort);			\
++	void __hwasan_store##size##_noabort(unsigned long addr)		\
++	{								\
++	}								\
++	EXPORT_SYMBOL(__hwasan_store##size##_noabort)
++
++DEFINE_HWASAN_LOAD_STORE(1);
++DEFINE_HWASAN_LOAD_STORE(2);
++DEFINE_HWASAN_LOAD_STORE(4);
++DEFINE_HWASAN_LOAD_STORE(8);
++DEFINE_HWASAN_LOAD_STORE(16);
++
++void __hwasan_loadN_noabort(unsigned long addr, unsigned long size)
++{
++}
++EXPORT_SYMBOL(__hwasan_loadN_noabort);
++
++void __hwasan_storeN_noabort(unsigned long addr, unsigned long size)
++{
++}
++EXPORT_SYMBOL(__hwasan_storeN_noabort);
++
++void __hwasan_tag_memory(unsigned long addr, u8 tag, unsigned long size)
++{
++}
++EXPORT_SYMBOL(__hwasan_tag_memory);
+diff --git a/mm/slub.c b/mm/slub.c
+index a60887938c19..5d1e1dee159b 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2956,7 +2956,7 @@ static __always_inline void slab_free(struct kmem_cache *s, struct page *page,
+ 		do_slab_free(s, page, head, tail, cnt, addr);
+ }
+ 
+-#ifdef CONFIG_KASAN
++#ifdef CONFIG_KASAN_GENERIC
+ void ___cache_free(struct kmem_cache *cache, void *x, unsigned long addr)
+ {
+ 	do_slab_free(cache, virt_to_head_page(x), x, NULL, 1, addr);
+diff --git a/scripts/Makefile.kasan b/scripts/Makefile.kasan
+index 69552a39951d..49c6e056c697 100644
+--- a/scripts/Makefile.kasan
++++ b/scripts/Makefile.kasan
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-ifdef CONFIG_KASAN
++ifdef CONFIG_KASAN_GENERIC
+ ifdef CONFIG_KASAN_INLINE
+ 	call_threshold := 10000
+ else
+@@ -42,6 +42,29 @@ ifdef CONFIG_KASAN_EXTRA
+ CFLAGS_KASAN += $(call cc-option, -fsanitize-address-use-after-scope)
+ endif
+ 
+-CFLAGS_KASAN_NOSANITIZE := -fno-builtin
++endif
++
++ifdef CONFIG_KASAN_HW
++
++ifdef CONFIG_KASAN_INLINE
++    instrumentation_flags := -mllvm -hwasan-mapping-offset=$(KASAN_SHADOW_OFFSET)
++else
++    instrumentation_flags := -mllvm -hwasan-instrument-with-calls=1
++endif
+ 
++CFLAGS_KASAN := -fsanitize=kernel-hwaddress \
++		-mllvm -hwasan-instrument-stack=0 \
++		$(instrumentation_flags)
++
++ifeq ($(call cc-option, $(CFLAGS_KASAN) -Werror),)
++    ifneq ($(CONFIG_COMPILE_TEST),y)
++        $(warning Cannot use CONFIG_KASAN_HW: \
++            -fsanitize=hwaddress is not supported by compiler)
++    endif
++endif
++
++endif
++
++ifdef CONFIG_KASAN
++CFLAGS_KASAN_NOSANITIZE := -fno-builtin
+ endif
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
