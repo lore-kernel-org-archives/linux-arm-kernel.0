@@ -1,39 +1,46 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 20 Jun 2018 15:54:02 +0300
-Subject: [PATCH 1/5] dt-bindings: tegra186-gpio: Add information for Tegra194
-Message-ID: <20180620125406.11906-1-mperttunen@nvidia.com>
+Date: Wed, 20 Jun 2018 15:54:04 +0300
+Subject: [PATCH 3/5] arm64: tegra: Add GPIO controller on Tegra194
+In-Reply-To: <20180620125406.11906-1-mperttunen@nvidia.com>
+References: <20180620125406.11906-1-mperttunen@nvidia.com>
+Message-ID: <20180620125406.11906-3-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra194 GPIO controller is similar to the one in Tegra186.
-Add relevant information to the device tree binding documentation.
+Add the device tree node for the GPIO controller on Tegra194.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra194.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt b/Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt
-index c82a2e221bc1..adff16c71d21 100644
---- a/Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt
-@@ -68,6 +68,8 @@ Required properties:
-     One of:
-     - "nvidia,tegra186-gpio".
-     - "nvidia,tegra186-gpio-aon".
-+    - "nvidia,tegra194-gpio".
-+    - "nvidia,tegra194-gpio-aon".
- - reg-names
-     Array of strings.
-     Contains a list of names for the register spaces described by the reg
-@@ -91,6 +93,8 @@ Required properties:
-     depending on compatible value:
-     - "nvidia,tegra186-gpio": 6 entries.
-     - "nvidia,tegra186-gpio-aon": 1 entry.
-+    - "nvidia,tegra194-gpio": 6 entries.
-+    - "nvidia,tegra194-gpio-aon": 1 entry.
- - gpio-controller
-     Boolean.
-     Marks the device node as a GPIO controller/provider.
+diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+index d7f780b06fe2..abe2d688eb65 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+@@ -18,6 +18,23 @@
+ 		#size-cells = <1>;
+ 		ranges = <0x0 0x0 0x0 0x40000000>;
+ 
++		gpio: gpio at 2200000 {
++			compatible = "nvidia,tegra194-gpio";
++			reg-names = "security", "gpio";
++			reg = <0x2200000 0x10000>,
++			      <0x2210000 0x10000>;
++			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 296 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			#gpio-cells = <2>;
++			gpio-controller;
++		};
++
+ 		uarta: serial at 3100000 {
+ 			compatible = "nvidia,tegra194-uart", "nvidia,tegra20-uart";
+ 			reg = <0x03100000 0x40>;
 -- 
 2.16.1
