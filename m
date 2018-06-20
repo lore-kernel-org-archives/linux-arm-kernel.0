@@ -1,59 +1,74 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Wed, 20 Jun 2018 16:19:26 +0800
-Subject: [PATCH v7 24/29] drm/mediatek: add connection from RDMA2 to DSI3
+Date: Wed, 20 Jun 2018 16:19:30 +0800
+Subject: [PATCH v7 28/29] drm/mediatek: add third ddp path
 In-Reply-To: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1529482771-2153-25-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1529482771-2153-29-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the connection from RDMA2 to DSI3
+This patch create third crtc by third ddp path
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 3 +++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 5 +++++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h  | 5 ++++-
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index e5db1ab51c9b..0a1b967cab1b 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -96,6 +96,7 @@
- #define RDMA2_SOUT_DPI1			0x3
- #define RDMA2_SOUT_DSI1			0x1
- #define RDMA2_SOUT_DSI2			0x4
-+#define RDMA2_SOUT_DSI3			0x5
- #define DPI0_SEL_IN_RDMA1		0x1
- #define DPI0_SEL_IN_RDMA2		0x3
- #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
-@@ -105,6 +106,7 @@
- #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
- #define DSI2_SEL_IN_RDMA2		(0x4 << 16)
- #define DSI3_SEL_IN_RDMA1		(0x1 << 16)
-+#define DSI3_SEL_IN_RDMA2		(0x4 << 16)
- #define COLOR1_SEL_IN_OVL1		0x1
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index 658b8dd45b83..2d6aa150a9ff 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -539,6 +539,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 	int ret;
+ 	int i;
  
- #define OVL_MOUT_EN_RDMA		0x1
-@@ -214,6 +216,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
- 		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
- 		value = RDMA2_SOUT_DSI2;
-+	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI3) {
-+		*addr = DISP_REG_CONFIG_DISP_RDMA2_SOUT;
-+		value = RDMA2_SOUT_DSI3;
- 	} else {
- 		value = 0;
- 	}
-@@ -257,6 +262,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
- 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
- 		value = DSI2_SEL_IN_RDMA2;
-+	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI3) {
-+		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
-+		value = DSI3_SEL_IN_RDMA2;
- 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
- 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
- 		value = COLOR1_SEL_IN_OVL1;
++	if (!path)
++		return 0;
++
+ 	for (i = 0; i < path_len; i++) {
+ 		enum mtk_ddp_comp_id comp_id = path[i];
+ 		struct device_node *node;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index 08d5d0b47bfe..3d279a299383 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -232,6 +232,11 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+ 	if (ret < 0)
+ 		goto err_component_unbind;
+ 
++	ret = mtk_drm_crtc_create(drm, private->data->third_path,
++				  private->data->third_len);
++	if (ret < 0)
++		goto err_component_unbind;
++
+ 	/* Use OVL device for all DMA memory allocations */
+ 	np = private->comp_node[private->data->main_path[0]] ?:
+ 	     private->comp_node[private->data->ext_path[0]];
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index c3378c452c0a..ecc00ca3221d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -17,7 +17,7 @@
+ #include <linux/io.h>
+ #include "mtk_drm_ddp_comp.h"
+ 
+-#define MAX_CRTC	2
++#define MAX_CRTC	3
+ #define MAX_CONNECTOR	2
+ 
+ struct device;
+@@ -33,6 +33,9 @@ struct mtk_mmsys_driver_data {
+ 	unsigned int main_len;
+ 	const enum mtk_ddp_comp_id *ext_path;
+ 	unsigned int ext_len;
++	const enum mtk_ddp_comp_id *third_path;
++	unsigned int third_len;
++
+ 	bool shadow_register;
+ };
+ 
 -- 
 2.12.5
