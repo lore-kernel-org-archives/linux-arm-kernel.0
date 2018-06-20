@@ -1,41 +1,27 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 20 Jun 2018 12:53:31 +0200
-Subject: [PATCH 18/20] dts: sama5d2: Update coresight bindings for
- hardware ports
-In-Reply-To: <abf65bac-0956-f1de-127e-38b0f41a6233@arm.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-19-git-send-email-suzuki.poulose@arm.com>
- <20180619212417.GB3128@piout.net>
- <abf65bac-0956-f1de-127e-38b0f41a6233@arm.com>
-Message-ID: <20180620105331.GD7737@piout.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Jun 2018 11:54:15 +0100
+Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
+In-Reply-To: <20180619225145.GA23389@kroah.com>
+References: <20180619205914.21375-1-javierm@redhat.com>
+ <20180619225145.GA23389@kroah.com>
+Message-ID: <20180620105415.GC6242@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/2018 10:44:29+0100, Suzuki K Poulose wrote:
-> On 19/06/18 22:24, Alexandre Belloni wrote:
-> > On 05/06/2018 22:43:29+0100, Suzuki K Poulose wrote:
-> > > Switch to the new coresight bindings for hardware ports
-> > > 
-> > > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > > ---
-> > >   arch/arm/boot/dts/sama5d2.dtsi | 5 ++++-
-> > >   1 file changed, 4 insertions(+), 1 deletion(-)
-> > > 
-> > Applied, thanks.
-> > 
-> 
-> Alexandre,
-> 
-> Please hold off applying this change, as we are yet to come to an
-> agreement on this. Sorry for the trouble. See [0]
-> 
+On Wed, Jun 20, 2018 at 07:51:45AM +0900, Greg Kroah-Hartman wrote:
 
-I've removed it.
+> And what is the use of this file?  What can you do with this
+> information?  Who is going to use it?  Don't we have other deferred
+> probe debugging somewhere else?
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Pretty much all we have right now is kernel log messages, and people
+keep trying to suppress those as they're quite noisy sometimes.  Ideally
+the device dependency stuff will reduce that problem but I'm not sure
+how that's getting on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180620/d8d6e36a/attachment.sig>
