@@ -1,97 +1,74 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:08 +0200
-Subject: [PATCH v8 08/26] PM / Domains: Extend genpd CPU governor to cope with
- QoS constraints
+Date: Wed, 20 Jun 2018 19:22:09 +0200
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle path
+ for CPUs
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-9-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-10-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU devices and other regular devices may share the same PM domain and may
-also be hierarchically related via subdomains. In either case, all devices
-including CPUs, may be attached to a PM domain managed by genpd, that has
-an idle state with an enter/exit latency.
+To allow CPUs being power managed by PM domains, let's deploy support for
+runtime PM for the CPU's corresponding struct device.
 
-Let's take these latencies into account in the state selection process by
-genpd's governor for CPUs. This means the governor, pm_domain_cpu_gov,
-becomes extended to satisfy both a state's residency and a potential dev PM
-QoS constraint.
+More precisely, at the point when the CPU is about to enter an idle state,
+decrease the runtime PM usage count for its corresponding struct device,
+via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
+resumes from idle, let's increase the runtime PM usage count, via calling
+pm_runtime_get_sync().
 
 Cc: Lina Iyer <ilina@codeaurora.org>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain_governor.c | 15 +++++++++++----
- include/linux/pm_domain.h            |  1 +
- 2 files changed, 12 insertions(+), 4 deletions(-)
+ kernel/cpu_pm.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-index 1aad55719537..03d4e9454ce9 100644
---- a/drivers/base/power/domain_governor.c
-+++ b/drivers/base/power/domain_governor.c
-@@ -214,8 +214,10 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 	struct generic_pm_domain *genpd = pd_to_genpd(pd);
- 	struct gpd_link *link;
+diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
+index 67b02e138a47..492d4a83dca0 100644
+--- a/kernel/cpu_pm.c
++++ b/kernel/cpu_pm.c
+@@ -16,9 +16,11 @@
+  */
  
--	if (!genpd->max_off_time_changed)
-+	if (!genpd->max_off_time_changed) {
-+		genpd->state_idx = genpd->cached_power_down_state_idx;
- 		return genpd->cached_power_down_ok;
-+	}
+ #include <linux/kernel.h>
++#include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/module.h>
+ #include <linux/notifier.h>
++#include <linux/pm_runtime.h>
+ #include <linux/spinlock.h>
+ #include <linux/syscore_ops.h>
  
- 	/*
- 	 * We have to invalidate the cached results for the masters, so
-@@ -240,6 +242,7 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 		genpd->state_idx--;
- 	}
+@@ -91,6 +93,7 @@ int cpu_pm_enter(void)
+ {
+ 	int nr_calls;
+ 	int ret = 0;
++	struct device *dev = get_cpu_device(smp_processor_id());
  
-+	genpd->cached_power_down_state_idx = genpd->state_idx;
- 	return genpd->cached_power_down_ok;
- }
+ 	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
+ 	if (ret)
+@@ -100,6 +103,9 @@ int cpu_pm_enter(void)
+ 		 */
+ 		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
  
-@@ -255,6 +258,10 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
- 	s64 idle_duration_ns;
- 	int cpu, i;
- 
-+	/* Validate dev PM QoS constraints. */
-+	if (!default_power_down_ok(pd))
-+		return false;
++	if (!ret && dev && dev->pm_domain)
++		pm_runtime_put_sync_suspend(dev);
 +
- 	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
- 		return true;
- 
-@@ -276,9 +283,9 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
- 	/*
- 	 * Find the deepest idle state that has its residency value satisfied
- 	 * and by also taking into account the power off latency for the state.
--	 * Start at the deepest supported state.
-+	 * Start at the state picked by the dev PM QoS constraint validation.
- 	 */
--	i = genpd->state_count - 1;
-+	i = genpd->state_idx;
- 	do {
- 		if (!genpd->states[i].residency_ns)
- 			break;
-@@ -312,6 +319,6 @@ struct dev_power_governor pm_domain_always_on_gov = {
- };
- 
- struct dev_power_governor pm_domain_cpu_gov = {
--	.suspend_ok = NULL,
-+	.suspend_ok = default_suspend_ok,
- 	.power_down_ok = cpu_power_down_ok,
- };
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 97901c833108..dbc69721cad8 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -81,6 +81,7 @@ struct generic_pm_domain {
- 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
- 	bool max_off_time_changed;
- 	bool cached_power_down_ok;
-+	bool cached_power_down_state_idx;
- 	int (*attach_dev)(struct generic_pm_domain *domain,
- 			  struct device *dev);
- 	void (*detach_dev)(struct generic_pm_domain *domain,
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(cpu_pm_enter);
+@@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
+  */
+ int cpu_pm_exit(void)
+ {
++	struct device *dev = get_cpu_device(smp_processor_id());
++
++	if (dev && dev->pm_domain)
++		pm_runtime_get_sync(dev);
++
+ 	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
+ }
+ EXPORT_SYMBOL_GPL(cpu_pm_exit);
 -- 
 2.17.1
