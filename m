@@ -1,34 +1,22 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 20 Jun 2018 02:43:14 +0300
-Subject: [PATCH] driver core: add a debugfs entry to show deferred devices
-In-Reply-To: <20180619225145.GA23389@kroah.com>
-References: <20180619205914.21375-1-javierm@redhat.com>
- <20180619225145.GA23389@kroah.com>
-Message-ID: <CAHp75VcOd5K+T6bkxyz3qgqNr4-=K9GGRh+DQ_qgW7dGKdzO5A@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 20 Jun 2018 08:42:23 +0800
+Subject: [PATCH v3 24/27] devicetree: fix a series of wrong file references
+In-Reply-To: <bce1b59268ac2d659fd7cb37f89285ef2acc8316.1528990947.git.mchehab+samsung@kernel.org>
+References: <cover.1528990947.git.mchehab+samsung@kernel.org>
+ <bce1b59268ac2d659fd7cb37f89285ef2acc8316.1528990947.git.mchehab+samsung@kernel.org>
+Message-ID: <CAGb2v67s29mYa+hcYFWCokmzLwi7aYyeBwDnQiTJQYxT0GxPNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 1:51 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Tue, Jun 19, 2018 at 10:59:14PM +0200, Javier Martinez Canillas wrote:
->> For debugging purposes it may be useful to know what are the devices whose
->> probe function was deferred. Add a debugfs entry showing that information.
->>
->>   $ cat /sys/kernel/debug/deferred_devices
->>   48070000.i2c:twl at 48:bci
->>   musb-hdrc.0.auto
->>   omapdrm.0
+On Fri, Jun 15, 2018 at 12:09 AM, Mauro Carvalho Chehab
+<mchehab+samsung@kernel.org> wrote:
+> As files got renamed, their references broke.
+>
+> Manually fix a series of broken refs at the DT bindings.
+>
+> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> ---
 
+>  Documentation/devicetree/bindings/mfd/sun6i-prcm.txt |  2 +-
 
-> And what is the use of this file?  What can you do with this
-> information?  Who is going to use it?  Don't we have other deferred
-> probe debugging somewhere else?
-
-Indeed.
-
-Javier, have you tried to add 'initcall_debug' to a kernel command
-line followed by 'dyndbg="file drivers/base/dd.c +p"'?
-
--- 
-With Best Regards,
-Andy Shevchenko
+Acked-by: Chen-Yu Tsai <wens@csie.org>
