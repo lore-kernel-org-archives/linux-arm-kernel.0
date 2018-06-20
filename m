@@ -1,144 +1,122 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:07 +0200
-Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
+Date: Wed, 20 Jun 2018 19:22:13 +0200
+Subject: [PATCH v8 13/26] drivers: firmware: psci: Move psci to separate
+ directory
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-8-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-14-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it's now perfectly possible that a PM domain managed by genpd contains
-devices belonging to CPUs, we should start to take into account the
-residency values for the idle states during the state selection process.
-The residency value specifies the minimum duration of time, the CPU or a
-group of CPUs, needs to spend in an idle state to not waste energy entering
-it.
+Some following changes extends the PSCI driver with some additional new
+files.  Let's avoid to continue cluttering the toplevel firmware directory
+and first move the PSCI files into a PSCI sub-directory.
 
-To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
-may be used for a PM domain that have CPU devices attached or if the CPUs
-are attached through subdomains.
-
-The new governor computes the minimum expected idle duration time for the
-online CPUs being attached to the PM domain and its subdomains. Then in the
-state selection process, trying the deepest state first, it verifies that
-the idle duration time satisfies the state's residency value.
-
-It should be noted that, when computing the minimum expected idle duration
-time, we use the information from tick_nohz_get_next_wakeup(), to find the
-next wakeup for the related CPUs. Future wise, this may deserve to be
-improved, as there are more reasons to why a CPU may be woken up from idle.
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Lina Iyer <ilina@codeaurora.org>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain_governor.c | 58 ++++++++++++++++++++++++++++
- include/linux/pm_domain.h            |  2 +
- 2 files changed, 60 insertions(+)
+ drivers/firmware/Kconfig                   | 15 +--------------
+ drivers/firmware/Makefile                  |  3 +--
+ drivers/firmware/psci/Kconfig              | 13 +++++++++++++
+ drivers/firmware/psci/Makefile             |  4 ++++
+ drivers/firmware/{ => psci}/psci.c         |  0
+ drivers/firmware/{ => psci}/psci_checker.c |  0
+ 6 files changed, 19 insertions(+), 16 deletions(-)
+ create mode 100644 drivers/firmware/psci/Kconfig
+ create mode 100644 drivers/firmware/psci/Makefile
+ rename drivers/firmware/{ => psci}/psci.c (100%)
+ rename drivers/firmware/{ => psci}/psci_checker.c (100%)
 
-diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-index 99896fbf18e4..1aad55719537 100644
---- a/drivers/base/power/domain_governor.c
-+++ b/drivers/base/power/domain_governor.c
-@@ -10,6 +10,9 @@
- #include <linux/pm_domain.h>
- #include <linux/pm_qos.h>
- #include <linux/hrtimer.h>
-+#include <linux/cpumask.h>
-+#include <linux/ktime.h>
-+#include <linux/tick.h>
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index 6e83880046d7..923c42d5a2e6 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -5,20 +5,6 @@
  
- static int dev_update_qos_constraint(struct device *dev, void *data)
- {
-@@ -245,6 +248,56 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
- 	return false;
- }
+ menu "Firmware Drivers"
  
-+static bool cpu_power_down_ok(struct dev_pm_domain *pd)
-+{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	ktime_t domain_wakeup, cpu_wakeup;
-+	s64 idle_duration_ns;
-+	int cpu, i;
-+
-+	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
-+		return true;
-+
-+	/*
-+	 * Find the next wakeup for any of the online CPUs within the PM domain
-+	 * and its subdomains. Note, we only need the genpd->cpus, as it already
-+	 * contains a mask of all CPUs from subdomains.
-+	 */
-+	domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
-+	for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
-+		cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
-+		if (ktime_before(cpu_wakeup, domain_wakeup))
-+			domain_wakeup = cpu_wakeup;
-+	}
-+
-+	/* The minimum idle duration is from now - until the next wakeup. */
-+	idle_duration_ns = ktime_to_ns(ktime_sub(domain_wakeup, ktime_get()));
-+
-+	/*
-+	 * Find the deepest idle state that has its residency value satisfied
-+	 * and by also taking into account the power off latency for the state.
-+	 * Start at the deepest supported state.
-+	 */
-+	i = genpd->state_count - 1;
-+	do {
-+		if (!genpd->states[i].residency_ns)
-+			break;
-+
-+		/* Check idle_duration_ns >= 0 to compare signed/unsigned. */
-+		if (idle_duration_ns >= 0 && idle_duration_ns >=
-+		    (genpd->states[i].residency_ns +
-+		     genpd->states[i].power_off_latency_ns))
-+			break;
-+		i--;
-+	} while (i >= 0);
-+
-+	if (i < 0)
-+		return false;
-+
-+	genpd->state_idx = i;
-+	return true;
-+}
-+
- struct dev_power_governor simple_qos_governor = {
- 	.suspend_ok = default_suspend_ok,
- 	.power_down_ok = default_power_down_ok,
-@@ -257,3 +310,8 @@ struct dev_power_governor pm_domain_always_on_gov = {
- 	.power_down_ok = always_on_power_down_ok,
- 	.suspend_ok = default_suspend_ok,
- };
-+
-+struct dev_power_governor pm_domain_cpu_gov = {
-+	.suspend_ok = NULL,
-+	.power_down_ok = cpu_power_down_ok,
-+};
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 2c09cf80b285..97901c833108 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -160,6 +160,7 @@ int dev_pm_genpd_set_performance_state(struct device *dev, unsigned int state);
+-config ARM_PSCI_FW
+-	bool
+-
+-config ARM_PSCI_CHECKER
+-	bool "ARM PSCI checker"
+-	depends on ARM_PSCI_FW && HOTPLUG_CPU && CPU_IDLE && !TORTURE_TEST
+-	help
+-	  Run the PSCI checker during startup. This checks that hotplug and
+-	  suspend operations work correctly when using PSCI.
+-
+-	  The torture tests may interfere with the PSCI checker by turning CPUs
+-	  on and off through hotplug, so for now torture tests and PSCI checker
+-	  are mutually exclusive.
+-
+ config ARM_SCMI_PROTOCOL
+ 	bool "ARM System Control and Management Interface (SCMI) Message Protocol"
+ 	depends on ARM || ARM64 || COMPILE_TEST
+@@ -286,6 +272,7 @@ config TI_SCI_PROTOCOL
+ config HAVE_ARM_SMCCC
+ 	bool
  
- extern struct dev_power_governor simple_qos_governor;
- extern struct dev_power_governor pm_domain_always_on_gov;
-+extern struct dev_power_governor pm_domain_cpu_gov;
- #else
++source "drivers/firmware/psci/Kconfig"
+ source "drivers/firmware/broadcom/Kconfig"
+ source "drivers/firmware/google/Kconfig"
+ source "drivers/firmware/efi/Kconfig"
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index e18a041cfc53..ea284e551dc8 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -2,8 +2,6 @@
+ #
+ # Makefile for the linux kernel.
+ #
+-obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
+-obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
+ obj-$(CONFIG_ARM_SCPI_PROTOCOL)	+= arm_scpi.o
+ obj-$(CONFIG_ARM_SCPI_POWER_DOMAIN) += scpi_pm_domain.o
+ obj-$(CONFIG_ARM_SDE_INTERFACE)	+= arm_sdei.o
+@@ -26,6 +24,7 @@ CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch armv7-a\n.arch_extension sec,-DREQU
+ obj-$(CONFIG_TI_SCI_PROTOCOL)	+= ti_sci.o
  
- static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
-@@ -203,6 +204,7 @@ static inline int dev_pm_genpd_set_performance_state(struct device *dev,
- 
- #define simple_qos_governor		(*(struct dev_power_governor *)(NULL))
- #define pm_domain_always_on_gov		(*(struct dev_power_governor *)(NULL))
-+#define pm_domain_cpu_gov		(*(struct dev_power_governor *)(NULL))
- #endif
- 
- #ifdef CONFIG_PM_GENERIC_DOMAINS_SLEEP
+ obj-$(CONFIG_ARM_SCMI_PROTOCOL)	+= arm_scmi/
++obj-y				+= psci/
+ obj-y				+= broadcom/
+ obj-y				+= meson/
+ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
+diff --git a/drivers/firmware/psci/Kconfig b/drivers/firmware/psci/Kconfig
+new file mode 100644
+index 000000000000..26a3b32bf7ab
+--- /dev/null
++++ b/drivers/firmware/psci/Kconfig
+@@ -0,0 +1,13 @@
++config ARM_PSCI_FW
++	bool
++
++config ARM_PSCI_CHECKER
++	bool "ARM PSCI checker"
++	depends on ARM_PSCI_FW && HOTPLUG_CPU && CPU_IDLE && !TORTURE_TEST
++	help
++	  Run the PSCI checker during startup. This checks that hotplug and
++	  suspend operations work correctly when using PSCI.
++
++	  The torture tests may interfere with the PSCI checker by turning CPUs
++	  on and off through hotplug, so for now torture tests and PSCI checker
++	  are mutually exclusive.
+diff --git a/drivers/firmware/psci/Makefile b/drivers/firmware/psci/Makefile
+new file mode 100644
+index 000000000000..1956b882470f
+--- /dev/null
++++ b/drivers/firmware/psci/Makefile
+@@ -0,0 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0
++#
++obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
++obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci/psci.c
+similarity index 100%
+rename from drivers/firmware/psci.c
+rename to drivers/firmware/psci/psci.c
+diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci/psci_checker.c
+similarity index 100%
+rename from drivers/firmware/psci_checker.c
+rename to drivers/firmware/psci/psci_checker.c
 -- 
 2.17.1
