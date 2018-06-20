@@ -1,25 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jun 2018 12:26:15 -0600
-Subject: [PATCH v3 6/9] dt-bindings: tc358754: add DT bindings
-In-Reply-To: <1529396370-18761-7-git-send-email-m.purski@samsung.com>
-References: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
- <CGME20180619082001eucas1p1df565ba7d1eaa320c2703e7dc019792b@eucas1p1.samsung.com>
- <1529396370-18761-7-git-send-email-m.purski@samsung.com>
-Message-ID: <20180620182615.GA15792@rob-hp-laptop>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 20 Jun 2018 20:44:03 +0200
+Subject: [PATCH 07/15] arm: dts: exynos: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <cfd8de4b2ad1cfd7b0f1a0706c0b6b918e1ebffc.1527244201.git.viresh.kumar@linaro.org>
+Message-ID: <20180620184403.u6tdqc2zvyslospe@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 10:19:27AM +0200, Maciej Purski wrote:
-> From: Andrzej Hajda <a.hajda@samsung.com>
+On Fri, May 25, 2018 at 04:01:53PM +0530, Viresh Kumar wrote:
+> The cooling device properties, like "#cooling-cells" and
+> "dynamic-power-coefficient", should either be present for all the CPUs
+> of a cluster or none. If these are present only for a subset of CPUs of
+> a cluster then things will start falling apart as soon as the CPUs are
+> brought online in a different order. For example, this will happen
+> because the operating system looks for such properties in the CPU node
+> it is trying to bring up, so that it can register a cooling device.
 > 
-> The patch adds bindings to Toshiba DSI/LVDS bridge TC358764.
-> Bindings describe power supplies, reset gpio and video interfaces.
+> Add such missing properties.
 > 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> Fix other missing properties (clocks, OPP, clock latency) as well to
+> make it all work.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  .../bindings/display/bridge/toshiba,tc358764.txt   | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/toshiba,tc358764.txt
+>  arch/arm/boot/dts/exynos3250.dtsi | 16 ++++++++++++++++
+>  arch/arm/boot/dts/exynos4210.dtsi | 13 +++++++++++++
+>  arch/arm/boot/dts/exynos4412.dtsi |  9 +++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi | 23 +++++++++++++++++++++++
+>  4 files changed, 61 insertions(+)
+> 
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks, applied.
+
+Best regards,
+Krzysztof
