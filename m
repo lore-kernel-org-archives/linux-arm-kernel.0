@@ -1,10 +1,10 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Wed, 20 Jun 2018 07:18:01 +0200
-Subject: [PATCH v2 08/10] media: tda18271: switch to i2c_lock_bus(...,
+Date: Wed, 20 Jun 2018 07:18:02 +0200
+Subject: [PATCH v2 09/10] mfd: 88pm860x-i2c: switch to i2c_lock_bus(...,
  I2C_LOCK_SEGMENT)
 In-Reply-To: <20180620051803.12206-1-peda@axentia.se>
 References: <20180620051803.12206-1-peda@axentia.se>
-Message-ID: <20180620051803.12206-9-peda@axentia.se>
+Message-ID: <20180620051803.12206-10-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,48 +15,46 @@ sit behind a mux-locked mux, the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/media/tuners/tda18271-common.c | 8 ++++----
+ drivers/mfd/88pm860x-i2c.c | 8 ++++----
  1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/media/tuners/tda18271-common.c b/drivers/media/tuners/tda18271-common.c
-index 7e81cd887c13..054b3b747dae 100644
---- a/drivers/media/tuners/tda18271-common.c
-+++ b/drivers/media/tuners/tda18271-common.c
-@@ -225,7 +225,7 @@ static int __tda18271_write_regs(struct dvb_frontend *fe, int idx, int len,
- 	 */
- 	if (lock_i2c) {
- 		tda18271_i2c_gate_ctrl(fe, 1);
--		i2c_lock_adapter(priv->i2c_props.adap);
-+		i2c_lock_bus(priv->i2c_props.adap, I2C_LOCK_SEGMENT);
- 	}
- 	while (len) {
- 		if (max > len)
-@@ -246,7 +246,7 @@ static int __tda18271_write_regs(struct dvb_frontend *fe, int idx, int len,
- 		len -= max;
- 	}
- 	if (lock_i2c) {
--		i2c_unlock_adapter(priv->i2c_props.adap);
-+		i2c_unlock_bus(priv->i2c_props.adap, I2C_LOCK_SEGMENT);
- 		tda18271_i2c_gate_ctrl(fe, 0);
- 	}
+diff --git a/drivers/mfd/88pm860x-i2c.c b/drivers/mfd/88pm860x-i2c.c
+index 84e313107233..7b9052ea7413 100644
+--- a/drivers/mfd/88pm860x-i2c.c
++++ b/drivers/mfd/88pm860x-i2c.c
+@@ -146,14 +146,14 @@ int pm860x_page_reg_write(struct i2c_client *i2c, int reg,
+ 	unsigned char zero;
+ 	int ret;
  
-@@ -300,7 +300,7 @@ int tda18271_init_regs(struct dvb_frontend *fe)
- 	 * as those could cause bad things
- 	 */
- 	tda18271_i2c_gate_ctrl(fe, 1);
--	i2c_lock_adapter(priv->i2c_props.adap);
-+	i2c_lock_bus(priv->i2c_props.adap, I2C_LOCK_SEGMENT);
+-	i2c_lock_adapter(i2c->adapter);
++	i2c_lock_bus(i2c->adapter, I2C_LOCK_SEGMENT);
+ 	read_device(i2c, 0xFA, 0, &zero);
+ 	read_device(i2c, 0xFB, 0, &zero);
+ 	read_device(i2c, 0xFF, 0, &zero);
+ 	ret = write_device(i2c, reg, 1, &data);
+ 	read_device(i2c, 0xFE, 0, &zero);
+ 	read_device(i2c, 0xFC, 0, &zero);
+-	i2c_unlock_adapter(i2c->adapter);
++	i2c_unlock_bus(i2c->adapter, I2C_LOCK_SEGMENT);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_reg_write);
+@@ -164,14 +164,14 @@ int pm860x_page_bulk_read(struct i2c_client *i2c, int reg,
+ 	unsigned char zero = 0;
+ 	int ret;
  
- 	/* initialize registers */
- 	switch (priv->id) {
-@@ -516,7 +516,7 @@ int tda18271_init_regs(struct dvb_frontend *fe)
- 	/* synchronize */
- 	__tda18271_write_regs(fe, R_EP1, 1, false);
- 
--	i2c_unlock_adapter(priv->i2c_props.adap);
-+	i2c_unlock_bus(priv->i2c_props.adap, I2C_LOCK_SEGMENT);
- 	tda18271_i2c_gate_ctrl(fe, 0);
- 
- 	return 0;
+-	i2c_lock_adapter(i2c->adapter);
++	i2c_lock_bus(i2c->adapter, I2C_LOCK_SEGMENT);
+ 	read_device(i2c, 0xfa, 0, &zero);
+ 	read_device(i2c, 0xfb, 0, &zero);
+ 	read_device(i2c, 0xff, 0, &zero);
+ 	ret = read_device(i2c, reg, count, buf);
+ 	read_device(i2c, 0xFE, 0, &zero);
+ 	read_device(i2c, 0xFC, 0, &zero);
+-	i2c_unlock_adapter(i2c->adapter);
++	i2c_unlock_bus(i2c->adapter, I2C_LOCK_SEGMENT);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_bulk_read);
 -- 
 2.11.0
