@@ -1,154 +1,316 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Wed, 20 Jun 2018 15:32:20 +0200
-Subject: [PATCH 2/6] dmaengine: xilinx_dma: fix completion callback is not
- invoked for each DMA operation
-In-Reply-To: <DM6PR02MB43615ED0221189B6B8D9017EC7770@DM6PR02MB4361.namprd02.prod.outlook.com>
-References: <20180620083653.17010-1-andrea.merello@gmail.com>
- <20180620083653.17010-2-andrea.merello@gmail.com>
- <DM6PR02MB43615ED0221189B6B8D9017EC7770@DM6PR02MB4361.namprd02.prod.outlook.com>
-Message-ID: <CAN8YU5O35du2RpTV78sJMx+MpGdOKf2LCQu8FqO1og6FO-JBOQ@mail.gmail.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Wed, 20 Jun 2018 15:35:02 +0200
+Subject: [PATCH V2 1/3] watchdog: stm32: add pclk feature for stm32mp1
+In-Reply-To: <d1d5e5f8-2e0f-7a73-ec43-6bb1f3d5f19c@roeck-us.net>
+References: <1529481238-15277-1-git-send-email-ludovic.Barre@st.com>
+ <1529481238-15277-2-git-send-email-ludovic.Barre@st.com>
+ <6162d701-2afd-5a22-d38f-7fb9e726cff7@roeck-us.net>
+ <e9babb86-7588-5de6-93ab-4cdd8982e773@st.com>
+ <d1d5e5f8-2e0f-7a73-ec43-6bb1f3d5f19c@roeck-us.net>
+Message-ID: <9e3edcdb-5bf5-2731-fb05-4baf0ab5822c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 2:36 PM, Radhey Shyam Pandey <radheys@xilinx.com> wrote:
->> -----Original Message-----
->> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
->> owner at vger.kernel.org] On Behalf Of Andrea Merello
->> Sent: Wednesday, June 20, 2018 2:07 PM
->> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
->> <michals@xilinx.com>; Appana Durga Kedareswara Rao
->> <appanad@xilinx.com>; dmaengine at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->> Andrea Merello <andrea.merello@gmail.com>
->> Subject: [PATCH 2/6] dmaengine: xilinx_dma: fix completion callback is not
->> invoked for each DMA operation
->>
->> API specification says: "On completion of each DMA operation, the next in
->> queue is started and a tasklet triggered. The tasklet will then call the
->> client driver completion callback routine for notification, if set."
->>
->> Currently the driver keeps a "desc_pendingcount" counter of the total
->> descriptor pending, and it uses as IRQ coalesce threshold, as result it
->> only calls the CBs after ALL pending operations are completed, which is
->> wrong.
-> I think IRQ coalescing enable/disable should be configurable.
-> Performance related usecases will need this support.
 
-I didn't intend this (only) wrt performances; my concern was mostly
-wrt correctness. If my point of view is wrong then I'll drop this
-patch from the series.
 
-(.. I might respin it again in future: I had a patch wrt an old driver
-version that allowed submitting new descriptors to the HW while the
-DMA is running, and in this case disabling coalesce is needed i.e. in
-order to submit a new empty buffer whenever the DMA finishes a
-transfer without waiting the DMA to stop).
+On 06/20/2018 03:29 PM, Guenter Roeck wrote:
+> On 06/20/2018 06:24 AM, Ludovic BARRE wrote:
+>>
+>>
+>> On 06/20/2018 11:19 AM, Guenter Roeck wrote:
+>>> On 06/20/2018 12:53 AM, Ludovic Barre wrote:
+>>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>>
+>>>> This patch adds config data to manage specific properties by
+>>>> compatible. Adds stm32mp1 config which requires pclk clock.
+>>>>
+>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>>> ---
+>>>> ? .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |? 21 +++-
+>>>> ? drivers/watchdog/stm32_iwdg.c????????????????????? | 132 
+>>>> ++++++++++++++-------
+>>>> ? 2 files changed, 104 insertions(+), 49 deletions(-)
+>>>>
+>>>> diff --git 
+>>>> a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt 
+>>>> b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+>>>> index cc13b10a..f07f6d89 100644
+>>>> --- a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+>>>> +++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+>>>> @@ -2,18 +2,31 @@ STM32 Independent WatchDoG (IWDG)
+>>>> ? ---------------------------------
+>>>> ? Required properties:
+>>>> -- compatible: "st,stm32-iwdg"
+>>>> -- reg: physical base address and length of the registers set for 
+>>>> the device
+>>>> -- clocks: must contain a single entry describing the clock input
+>>>> +- compatible: Should be either "st,stm32-iwdg" or "st,stm32mp1-iwdg"
+>>>> +- reg: Physical base address and length of the registers set for 
+>>>> the device
+>>>> +- clocks: Reference to the clock entry lsi. Additional pclk clock 
+>>>> entry
+>>>> +? is required only for st,stm32mp1-iwdg.
+>>>> +- clock-names: Name of the clocks used.
+>>>> +? "lsi" for st,stm32-iwdg
+>>>> +? "pclk", "lsi" for st,stm32mp1-iwdg
+>>>> ? Optional Properties:
+>>>> ? - timeout-sec: Watchdog timeout value in seconds.
+>>>> -Example:
+>>>> +Examples:
+>>>> ? iwdg: watchdog at 40003000 {
+>>>> ????? compatible = "st,stm32-iwdg";
+>>>> ????? reg = <0x40003000 0x400>;
+>>>> ????? clocks = <&clk_lsi>;
+>>>> +??? clock-names = "lsi";
+>>>> +??? timeout-sec = <32>;
+>>>> +};
+>>>> +
+>>>> +iwdg: iwdg at 5a002000 {
+>>>> +??? compatible = "st,stm32mp1-iwdg";
+>>>> +??? reg = <0x5a002000 0x400>;
+>>>> +??? clocks = <&rcc IWDG2>, <&clk_lsi>;
+>>>> +??? clock-names = "pclk", "lsi";
+>>>> ????? timeout-sec = <32>;
+>>>> ? };
+>>>> diff --git a/drivers/watchdog/stm32_iwdg.c 
+>>>> b/drivers/watchdog/stm32_iwdg.c
+>>>> index c97ad56..fc96670 100644
+>>>> --- a/drivers/watchdog/stm32_iwdg.c
+>>>> +++ b/drivers/watchdog/stm32_iwdg.c
+>>>> @@ -11,12 +11,13 @@
+>>>> ? #include <linux/clk.h>
+>>>> ? #include <linux/delay.h>
+>>>> -#include <linux/kernel.h>
+>>>> -#include <linux/module.h>
+>>>> ? #include <linux/interrupt.h>
+>>>> ? #include <linux/io.h>
+>>>> ? #include <linux/iopoll.h>
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/module.h>
+>>>> ? #include <linux/of.h>
+>>>> +#include <linux/of_device.h>
+>>>> ? #include <linux/platform_device.h>
+>>>> ? #include <linux/watchdog.h>
+>>>> @@ -54,11 +55,17 @@
+>>>> ? #define TIMEOUT_US??? 100000
+>>>> ? #define SLEEP_US??? 1000
+>>>> +struct stm32_iwdg_config {
+>>>> +??? bool has_pclk;
+>>>> +};
+>>>> +
+>>>
+>>> This data structure is unnecessary. Just assign the boolean directly 
+>>> to .data
+>>> and ...
+>>>
+>>
+>> Ok, I send a v3, with boolean directly to .data
+>> like:
+>>
+>> #define NO_PCLK??????? false
+>> #define HAS_PCLK??? true
+>> ...
+> 
+> Just use true/false directly. There is no need for those defines.
+> 
+> If you want the reader to understand what is defined, I would be ok with
+> 
+> #define HAS_PCLK??? true
+> 
+> static const struct of_device_id stm32_iwdg_of_match[] = {
+>  ???? { .compatible = "st,stm32-iwdg", .data = (void *) !HAS_PCLK },
+>  ???? { .compatible = "st,stm32mp1-iwdg", .data = (void *) HAS_PCLK },
+>  ???? { /* end node */ }
+> 
+> Guenter
 
-BTW, is there any dmaengine API suitable for setting interrupt coalesce?
+Ok, thanks
 
+> 
+>> static const struct of_device_id stm32_iwdg_of_match[] = {
+>> ?????{ .compatible = "st,stm32-iwdg", .data = (void *) NO_PCLK },
+>> ?????{ .compatible = "st,stm32mp1-iwdg", .data = (void *) HAS_PCLK },
+>> ?????{ /* end node */ }
+>> };
 >>
->> This patch uses disable IRQ coalesce and checks for the completion flag
->> for the descriptors (which is further divided in segments).
+>> Note:
+>> V3, because I sent my original version with V2
+>> (it's mistake)
 >>
->> Possibly a better optimization could be using proper IRQ coalesce
->> threshold to get an IRQ after all segments of the descriptors are done.
->> But we don't do that yet..
+>>>> ? struct stm32_iwdg {
+>>>> -??? struct watchdog_device??? wdd;
+>>>> -??? void __iomem??????? *regs;
+>>>> -??? struct clk??????? *clk;
+>>>> -??? unsigned int??????? rate;
+>>>> +??? struct watchdog_device??????? wdd;
+>>>> +??? void __iomem??????????? *regs;
+>>>> +??? struct stm32_iwdg_config??? *config;
+>>>
+>>> declare bool has_pclk here.
+>>>
+>>>> +??? struct clk??????????? *clk_lsi;
+>>>> +??? struct clk??????????? *clk_pclk;
+>>>> +??? unsigned int??????????? rate;
+>>>> ? };
+>>>> ? static inline u32 reg_read(void __iomem *base, u32 reg)
+>>>> @@ -133,6 +140,44 @@ static int stm32_iwdg_set_timeout(struct 
+>>>> watchdog_device *wdd,
+>>>> ????? return 0;
+>>>> ? }
+>>>> +static int stm32_iwdg_clk_init(struct platform_device *pdev,
+>>>> +?????????????????? struct stm32_iwdg *wdt)
+>>>> +{
+>>>> +??? u32 ret;
+>>>> +
+>>>> +??? wdt->clk_lsi = devm_clk_get(&pdev->dev, "lsi");
+>>>> +??? if (IS_ERR(wdt->clk_lsi)) {
+>>>> +??????? dev_err(&pdev->dev, "Unable to get lsi clock\n");
+>>>> +??????? return PTR_ERR(wdt->clk_lsi);
+>>>> +??? }
+>>>> +
+>>>> +??? /* optional peripheral clock */
+>>>> +??? if (wdt->config->has_pclk) {
+>>>> +??????? wdt->clk_pclk = devm_clk_get(&pdev->dev, "pclk");
+>>>> +??????? if (IS_ERR(wdt->clk_pclk)) {
+>>>> +??????????? dev_err(&pdev->dev, "Unable to get pclk clock\n");
+>>>> +??????????? return PTR_ERR(wdt->clk_pclk);
+>>>> +??????? }
+>>>> +
+>>>> +??????? ret = clk_prepare_enable(wdt->clk_pclk);
+>>>> +??????? if (ret) {
+>>>> +??????????? dev_err(&pdev->dev, "Unable to prepare pclk clock\n");
+>>>> +??????????? return ret;
+>>>> +??????? }
+>>>> +??? }
+>>>> +
+>>>> +??? ret = clk_prepare_enable(wdt->clk_lsi);
+>>>> +??? if (ret) {
+>>>> +??????? dev_err(&pdev->dev, "Unable to prepare lsi clock\n");
+>>>> +??????? clk_disable_unprepare(wdt->clk_pclk);
+>>>> +??????? return ret;
+>>>> +??? }
+>>>> +
+>>>> +??? wdt->rate = clk_get_rate(wdt->clk_lsi);
+>>>> +
+>>>> +??? return 0;
+>>>> +}
+>>>> +
+>>>> ? static const struct watchdog_info stm32_iwdg_info = {
+>>>> ????? .options??? = WDIOF_SETTIMEOUT |
+>>>> ??????????????? WDIOF_MAGICCLOSE |
+>>>> @@ -147,49 +192,50 @@ static const struct watchdog_ops 
+>>>> stm32_iwdg_ops = {
+>>>> ????? .set_timeout??? = stm32_iwdg_set_timeout,
+>>>> ? };
+>>>> +static const struct stm32_iwdg_config stm32_iwdg_cfg = {
+>>>> +??? .has_pclk = false,
+>>>> +};
+>>>> +
+>>>> +static const struct stm32_iwdg_config stm32mp1_iwdg_cfg = {
+>>>> +??? .has_pclk = true,
+>>>> +};
+>>>> +
+>>>> +static const struct of_device_id stm32_iwdg_of_match[] = {
+>>>> +??? { .compatible = "st,stm32-iwdg", .data = &stm32_iwdg_cfg },
+>>>> +??? { .compatible = "st,stm32mp1-iwdg", .data = &stm32mp1_iwdg_cfg },
+>>>> +??? { /* end node */ }
+>>>> +};
+>>>> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+>>>> +
+>>>> ? static int stm32_iwdg_probe(struct platform_device *pdev)
+>>>> ? {
+>>>> ????? struct watchdog_device *wdd;
+>>>> +??? const struct of_device_id *match;
+>>>> ????? struct stm32_iwdg *wdt;
+>>>> ????? struct resource *res;
+>>>> -??? void __iomem *regs;
+>>>> -??? struct clk *clk;
+>>>> ????? int ret;
+>>>> +??? match = of_match_device(stm32_iwdg_of_match, &pdev->dev);
+>>>> +??? if (!match || !match->data)
+>>>> +??????? return -ENODEV;
+>>>> +
+>>>> +??? wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>>>> +??? if (!wdt)
+>>>> +??????? return -ENOMEM;
+>>>> +
+>>>> +??? wdt->config = (struct stm32_iwdg_config *)match->data;
+>>>> +
+>>>> ????? /* This is the timer base. */
+>>>> ????? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>> -??? regs = devm_ioremap_resource(&pdev->dev, res);
+>>>> -??? if (IS_ERR(regs)) {
+>>>> +??? wdt->regs = devm_ioremap_resource(&pdev->dev, res);
+>>>> +??? if (IS_ERR(wdt->regs)) {
+>>>> ????????? dev_err(&pdev->dev, "Could not get resource\n");
+>>>> -??????? return PTR_ERR(regs);
+>>>> +??????? return PTR_ERR(wdt->regs);
+>>>> ????? }
+>>>> -??? clk = devm_clk_get(&pdev->dev, NULL);
+>>>> -??? if (IS_ERR(clk)) {
+>>>> -??????? dev_err(&pdev->dev, "Unable to get clock\n");
+>>>> -??????? return PTR_ERR(clk);
+>>>> -??? }
+>>>> -
+>>>> -??? ret = clk_prepare_enable(clk);
+>>>> -??? if (ret) {
+>>>> -??????? dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
+>>>> +??? ret = stm32_iwdg_clk_init(pdev, wdt);
+>>>> +??? if (ret)
+>>>> ????????? return ret;
+>>>> -??? }
+>>>> -
+>>>> -??? /*
+>>>> -???? * Allocate our watchdog driver data, which has the
+>>>> -???? * struct watchdog_device nested within it.
+>>>> -???? */
+>>>> -??? wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>>>> -??? if (!wdt) {
+>>>> -??????? ret = -ENOMEM;
+>>>> -??????? goto err;
+>>>> -??? }
+>>>> -
+>>>> -??? /* Initialize struct stm32_iwdg. */
+>>>> -??? wdt->regs = regs;
+>>>> -??? wdt->clk = clk;
+>>>> -??? wdt->rate = clk_get_rate(clk);
+>>>> ????? /* Initialize struct watchdog_device. */
+>>>> ????? wdd = &wdt->wdd;
+>>>> @@ -217,7 +263,8 @@ static int stm32_iwdg_probe(struct 
+>>>> platform_device *pdev)
+>>>> ????? return 0;
+>>>> ? err:
+>>>> -??? clk_disable_unprepare(clk);
+>>>> +??? clk_disable_unprepare(wdt->clk_lsi);
+>>>> +??? clk_disable_unprepare(wdt->clk_pclk);
+>>>> ????? return ret;
+>>>> ? }
+>>>> @@ -227,23 +274,18 @@ static int stm32_iwdg_remove(struct 
+>>>> platform_device *pdev)
+>>>> ????? struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
+>>>> ????? watchdog_unregister_device(&wdt->wdd);
+>>>> -??? clk_disable_unprepare(wdt->clk);
+>>>> +??? clk_disable_unprepare(wdt->clk_lsi);
+>>>> +??? clk_disable_unprepare(wdt->clk_pclk);
+>>>> ????? return 0;
+>>>> ? }
+>>>> -static const struct of_device_id stm32_iwdg_of_match[] = {
+>>>> -??? { .compatible = "st,stm32-iwdg" },
+>>>> -??? { /* end node */ }
+>>>> -};
+>>>> -MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+>>>> -
+>>>> ? static struct platform_driver stm32_iwdg_driver = {
+>>>> ????? .probe??????? = stm32_iwdg_probe,
+>>>> ????? .remove??????? = stm32_iwdg_remove,
+>>>> ????? .driver = {
+>>>> ????????? .name??? = "iwdg",
+>>>> -??????? .of_match_table = stm32_iwdg_of_match,
+>>>> +??????? .of_match_table = of_match_ptr(stm32_iwdg_of_match),
+>>>> ????? },
+>>>> ? };
+>>>> ? module_platform_driver(stm32_iwdg_driver);
+>>>>
+>>>
 >>
->> NOTE: for now we do this only for AXI DMA, other DMA flavors are
->> untested/untouched.
->> This is loosely based on
->> commit 65df81a6dc74 ("xilinx_dma: IrqThreshold set incorrectly, unreliable.")
->> in my linux-4.6-zynq tree
-> NOTE description doesn't help much.
->
->>
->> From: Jeremy Trimble [original patch]
->> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
->> ---
->>  drivers/dma/xilinx/xilinx_dma.c | 39 +++++++++++++++++++++------------
->>  1 file changed, 25 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
->> index a516e7ffef21..cf12f7147f07 100644
->> --- a/drivers/dma/xilinx/xilinx_dma.c
->> +++ b/drivers/dma/xilinx/xilinx_dma.c
->> @@ -164,6 +164,7 @@
->>  #define XILINX_DMA_CR_COALESCE_SHIFT 16
->>  #define XILINX_DMA_BD_SOP            BIT(27)
->>  #define XILINX_DMA_BD_EOP            BIT(26)
->> +#define XILINX_DMA_BD_CMPLT          BIT(31)
->>  #define XILINX_DMA_COALESCE_MAX              255
->>  #define XILINX_DMA_NUM_DESCS         255
->>  #define XILINX_DMA_NUM_APP_WORDS     5
->> @@ -1274,12 +1275,9 @@ static void xilinx_dma_start_transfer(struct
->> xilinx_dma_chan *chan)
->>
->>       reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
->>
->> -     if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
->> -             reg &= ~XILINX_DMA_CR_COALESCE_MAX;
->> -             reg |= chan->desc_pendingcount <<
->> -                               XILINX_DMA_CR_COALESCE_SHIFT;
->> -             dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
->> -     }
->> +     reg &= ~XILINX_DMA_CR_COALESCE_MAX;
->> +     reg |= 1 << XILINX_DMA_CR_COALESCE_SHIFT;
->> +     dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
->>
->>       if (chan->has_sg && !chan->xdev->mcdma)
->>               xilinx_write(chan, XILINX_DMA_REG_CURDESC,
->> @@ -1378,6 +1376,20 @@ static void xilinx_dma_complete_descriptor(struct
->> xilinx_dma_chan *chan)
->>               return;
->>
->>       list_for_each_entry_safe(desc, next, &chan->active_list, node) {
->> +             if (chan->xdev->dma_config->dmatype ==
->> XDMA_TYPE_AXIDMA) {
->> +                     /*
->> +                      * Check whether the last segment in this descriptor
->> +                      * has been completed.
->> +                      */
->> +                     const struct xilinx_axidma_tx_segment *const tail_seg
->> =
->> +                             list_last_entry(&desc->segments,
->> +                                             struct
->> xilinx_axidma_tx_segment,
->> +                                             node);
->> +
->> +                     /* we've processed all the completed descriptors */
->> +                     if (!(tail_seg->hw.status & XILINX_DMA_BD_CMPLT))
->> +                             break;
->> +             }
->>               list_del(&desc->node);
->>               if (!desc->cyclic)
->>                       dma_cookie_complete(&desc->async_tx);
->> @@ -1826,14 +1838,13 @@ static struct dma_async_tx_descriptor
->> *xilinx_dma_prep_slave_sg(
->>                                  struct xilinx_axidma_tx_segment, node);
->>       desc->async_tx.phys = segment->phys;
->>
->> -     /* For the last DMA_MEM_TO_DEV transfer, set EOP */
->> -     if (chan->direction == DMA_MEM_TO_DEV) {
->> -             segment->hw.control |= XILINX_DMA_BD_SOP;
->> -             segment = list_last_entry(&desc->segments,
->> -                                       struct xilinx_axidma_tx_segment,
->> -                                       node);
->> -             segment->hw.control |= XILINX_DMA_BD_EOP;
->> -     }
->> +     /* For the first transfer, set SOP */
->> +     segment->hw.control |= XILINX_DMA_BD_SOP;
->> +     /* For the last transfer, set EOP */
->> +     segment = list_last_entry(&desc->segments,
->> +                               struct xilinx_axidma_tx_segment,
->> +                               node);
->> +     segment->hw.control |= XILINX_DMA_BD_EOP;
->>
->>       return &desc->async_tx;
->>
->> --
->> 2.17.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
