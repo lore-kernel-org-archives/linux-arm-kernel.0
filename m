@@ -1,82 +1,76 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 20 Jun 2018 11:06:33 +0100
-Subject: [PATCH] arm64/mm: Introduce a variable to hold base address of
- linear region
-In-Reply-To: <CACi5LpMXpSWUP97R2VWjf==LdxPBCKTcpKjQjCs4j3Kz9SzYGg@mail.gmail.com>
-References: <CAKv+Gu8Hs+CArdkAWoBPbr_p-nq5+0oPwOPg0NsJDRMkE_bM9A@mail.gmail.com>
- <d801005a-5f7a-8fe4-a486-bc6443a406a3@arm.com>
- <CACi5LpOJ7Q7nbo9m_HGqr44+n_iEtreZt+Uxtf2PzcHSzTdKuA@mail.gmail.com>
- <3a05cd0e-466e-4fb6-a78a-4b363e21aaab@arm.com>
- <CACi5LpMJnFthKUJGfMWgDyMTM65oTtOvsRGCtMDjWP32qDptbQ@mail.gmail.com>
- <92ff5220-f863-4edc-bc9f-bd802d2efa9c@arm.com>
- <d5e01f4bedc649ff8a2ee17b17c1c33d@HXTBJIDCEMVIW02.hxtcorp.net>
- <20180619085541.GB13984@arm.com>
- <6860c284f1c74faa95edd6cf866ec80d@HXTBJIDCEMVIW02.hxtcorp.net>
- <20180619094045.GD13984@arm.com>
- <a720d91be20844cd9ed84728268300d9@HXTBJIDCEMVIW02.hxtcorp.net>
- <09260c7e-8b9d-bc3c-5bca-0fd75417f552@arm.com>
- <CACi5LpMoKP4eG5XhYe5hf5VC9MOY8KuHK=j0ujb8GFpyjAuAww@mail.gmail.com>
- <b0d40351-8d78-fd69-cc87-d5ea5eaabd2a@arm.com>
- <CACi5LpM2GV-vwcEGeCE20QW0PVmDcKnjz017sYBAwYRfZ24AzA@mail.gmail.com>
- <51cf54d6a19f4837b74218b000cc23bc@HXTBJIDCEMVIW02.hxtcorp.net>
- <CACi5LpMXpSWUP97R2VWjf==LdxPBCKTcpKjQjCs4j3Kz9SzYGg@mail.gmail.com>
-Message-ID: <aa9e1422-abbd-6d43-0a9f-eaf3476328a1@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Jun 2018 12:07:00 +0200 (CEST)
+Subject: [PATCH v5 2/6] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20180620094649.GA2766@piout.net>
+References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+ <20180619211929.22908-3-alexandre.belloni@bootlin.com>
+ <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
+ <20180620094649.GA2766@piout.net>
+Message-ID: <alpine.DEB.2.21.1806201156510.10546@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
-
-On 20/06/18 08:26, Bhupesh Sharma wrote:
-> On Wed, Jun 20, 2018 at 7:46 AM, Jin, Yanjiang
-> <yanjiang.jin@hxt-semitech.com> wrote:
->> If /proc/kcore always exists in kexec/kdump, I think this issue can be fixed
->> easily. But it requires  that Kexec/kdump have to rely on " CONFIG_PROC_KCORE=y".
->> I am not sure if we can persuade Kexec-tools community to accept this.
-
-For the kernel this would be:
---------------%<--------------
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 1aa59063f1fd..0ea2c7c0ac08 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -8,6 +8,7 @@ config CRASH_CORE
-
- config KEXEC_CORE
-        select CRASH_CORE
-+       select PROC_KCORE
-        bool
-
- config HAVE_IMA_KEXEC
---------------%<--------------
-
-With this kernel's that support kdump but don't have /proc/kcore wouldn't have
-the new PT_NOTEs anyway. Whatever you do today is all you can do.
-
-
-> Most distributions like Ubuntu and Fedora already enable
-> CONFIG_PROC_KCORE by default, to support user-space tools like
-> crash-utility and makedumpfile which can be used for 'live' debugging
-> of a primary kernel (without the requirement of being in the secondary
-> or crash kernel).
+On Wed, 20 Jun 2018, Alexandre Belloni wrote:
+> On 20/06/2018 11:03:40+0200, Thomas Gleixner wrote:
+> > > +/*
+> > > + * Clocksource and clockevent using the same channel(s)
+> > > + */
+> > > +static u64 tc_get_cycles(struct clocksource *cs)
+> > > +{
+> > > +	u32 lower, upper;
+> > > +
+> > > +	do {
+> > > +		upper = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1]));
+> > > +		lower = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> > > +	} while (upper != readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1])));
+> > > +
+> > > +	return (upper << 16) | lower;
+> > > +}
+> > 
+> > For timekeeping the win of this is dubious. With a 5Mhz clock the 32bit
+> > part wraps around in ~859 seconds, which is plenty even for NOHZ.
+> > 
+> > So I really would avoid the double read/compare/eventually repeat magic and
+> > just use the lower 32bits for performance sake. I assume the same is true
+> > for sched_clock(), but I might be wrong.
+> > 
 > 
-> For such cases. '/proc/kcore' and 'vmlinux' are the only available
-> sources for PT_NOTE/PT_LOAD segments and kernel symbols respectively.
+> Agreed, this is why this is only used with the 16 bit counters (the
+> register is 32 bit wide but the counter only have 16 bits. For the 32
+> bit counters, tc_get_cycles32 is used and only use one counter.
+
+Ah, sorry. I misread the code. Missed that it's the 16bit case. 
+
+> > > +static int tcb_clkevt_next_event(unsigned long delta,
+> > > +				 struct clock_event_device *d)
+> > > +{
+> > > +	u32 old, next, cur;
+> > > +
+> > > +	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> > > +	next = old + delta;
+> > > +	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
+> > > +	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> > > +
+> > > +	/* check whether the delta elapsed while setting the register */
+> > > +	if ((next < old && cur < old && cur > next) ||
+> > > +	    (next > old && (cur < old || cur > next))) {
+> > > +		/*
+> > > +		 * Clear the CPCS bit in the status register to avoid
+> > > +		 * generating a spurious interrupt next time a valid
+> > > +		 * timer event is configured.
+> > > +		 */
+> > > +		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
+> > > +		return -ETIME;
+> > > +	}
+> > 
+> > Aarg. Doesn;t that timer block have a simple count down and fire mode?
+> > These compare equal timers suck.
 > 
-> Since we need to support all such existing user-space utilities (which
-> work well with other archs like x86 and ppc64),
+> It only counts up...
 
-x86 has kaslr too, I couldn't work out how your user-space:phys_to_virt() works
-there. Are we missing an alternative trick?
-
-
-> we need to have a
-> solution which works without modifying most of them - the rest (like
-> kexec-tools) can be easily modified to follow the same approach.
-
-(We're  also trying to solve this in a way that lets user-space shed
-arch-specific code.)
-
+Have you tried to play with that waveform stuff?
 
 Thanks,
 
-James
+	tglx
