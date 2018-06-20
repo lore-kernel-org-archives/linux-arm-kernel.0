@@ -1,122 +1,93 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:13 +0200
-Subject: [PATCH v8 13/26] drivers: firmware: psci: Move psci to separate
- directory
+Date: Wed, 20 Jun 2018 19:22:18 +0200
+Subject: [PATCH v8 18/26] drivers: firmware: psci: Announce support for OS
+ initiated suspend mode
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-14-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-19-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some following changes extends the PSCI driver with some additional new
-files.  Let's avoid to continue cluttering the toplevel firmware directory
-and first move the PSCI files into a PSCI sub-directory.
+PSCI firmware v1.0+, supports two different modes for CPU_SUSPEND. The
+Platform Coordinated mode, which is the default and mandatory mode, while
+support for the OS initiated mode is optional.
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
+This change introduces initial support for the OS initiated mode, in way
+that it adds the related PSCI bits from the spec and prints a message in
+the log to inform whether the mode is supported by the PSCI FW.
+
+Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/Kconfig                   | 15 +--------------
- drivers/firmware/Makefile                  |  3 +--
- drivers/firmware/psci/Kconfig              | 13 +++++++++++++
- drivers/firmware/psci/Makefile             |  4 ++++
- drivers/firmware/{ => psci}/psci.c         |  0
- drivers/firmware/{ => psci}/psci_checker.c |  0
- 6 files changed, 19 insertions(+), 16 deletions(-)
- create mode 100644 drivers/firmware/psci/Kconfig
- create mode 100644 drivers/firmware/psci/Makefile
- rename drivers/firmware/{ => psci}/psci.c (100%)
- rename drivers/firmware/{ => psci}/psci_checker.c (100%)
+ drivers/firmware/psci/psci.c | 21 ++++++++++++++++++++-
+ include/uapi/linux/psci.h    |  5 +++++
+ 2 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6e83880046d7..923c42d5a2e6 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -5,20 +5,6 @@
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index 38881007584e..e8f4f8444ff1 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -95,6 +95,11 @@ static inline bool psci_has_ext_power_state(void)
+ 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+ }
  
- menu "Firmware Drivers"
- 
--config ARM_PSCI_FW
--	bool
--
--config ARM_PSCI_CHECKER
--	bool "ARM PSCI checker"
--	depends on ARM_PSCI_FW && HOTPLUG_CPU && CPU_IDLE && !TORTURE_TEST
--	help
--	  Run the PSCI checker during startup. This checks that hotplug and
--	  suspend operations work correctly when using PSCI.
--
--	  The torture tests may interfere with the PSCI checker by turning CPUs
--	  on and off through hotplug, so for now torture tests and PSCI checker
--	  are mutually exclusive.
--
- config ARM_SCMI_PROTOCOL
- 	bool "ARM System Control and Management Interface (SCMI) Message Protocol"
- 	depends on ARM || ARM64 || COMPILE_TEST
-@@ -286,6 +272,7 @@ config TI_SCI_PROTOCOL
- config HAVE_ARM_SMCCC
- 	bool
- 
-+source "drivers/firmware/psci/Kconfig"
- source "drivers/firmware/broadcom/Kconfig"
- source "drivers/firmware/google/Kconfig"
- source "drivers/firmware/efi/Kconfig"
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index e18a041cfc53..ea284e551dc8 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -2,8 +2,6 @@
- #
- # Makefile for the linux kernel.
- #
--obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
--obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
- obj-$(CONFIG_ARM_SCPI_PROTOCOL)	+= arm_scpi.o
- obj-$(CONFIG_ARM_SCPI_POWER_DOMAIN) += scpi_pm_domain.o
- obj-$(CONFIG_ARM_SDE_INTERFACE)	+= arm_sdei.o
-@@ -26,6 +24,7 @@ CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch armv7-a\n.arch_extension sec,-DREQU
- obj-$(CONFIG_TI_SCI_PROTOCOL)	+= ti_sci.o
- 
- obj-$(CONFIG_ARM_SCMI_PROTOCOL)	+= arm_scmi/
-+obj-y				+= psci/
- obj-y				+= broadcom/
- obj-y				+= meson/
- obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
-diff --git a/drivers/firmware/psci/Kconfig b/drivers/firmware/psci/Kconfig
-new file mode 100644
-index 000000000000..26a3b32bf7ab
---- /dev/null
-+++ b/drivers/firmware/psci/Kconfig
-@@ -0,0 +1,13 @@
-+config ARM_PSCI_FW
-+	bool
++static inline bool psci_has_osi_support(void)
++{
++	return psci_cpu_suspend_feature & PSCI_1_0_OS_INITIATED;
++}
 +
-+config ARM_PSCI_CHECKER
-+	bool "ARM PSCI checker"
-+	depends on ARM_PSCI_FW && HOTPLUG_CPU && CPU_IDLE && !TORTURE_TEST
-+	help
-+	  Run the PSCI checker during startup. This checks that hotplug and
-+	  suspend operations work correctly when using PSCI.
+ static inline bool psci_power_state_loses_context(u32 state)
+ {
+ 	const u32 mask = psci_has_ext_power_state() ?
+@@ -658,10 +663,24 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	return 0;
+ }
+ 
++static int __init psci_1_0_init(struct device_node *np)
++{
++	int err;
 +
-+	  The torture tests may interfere with the PSCI checker by turning CPUs
-+	  on and off through hotplug, so for now torture tests and PSCI checker
-+	  are mutually exclusive.
-diff --git a/drivers/firmware/psci/Makefile b/drivers/firmware/psci/Makefile
-new file mode 100644
-index 000000000000..1956b882470f
---- /dev/null
-+++ b/drivers/firmware/psci/Makefile
-@@ -0,0 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
-+#
-+obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
-+obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci/psci.c
-similarity index 100%
-rename from drivers/firmware/psci.c
-rename to drivers/firmware/psci/psci.c
-diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci/psci_checker.c
-similarity index 100%
-rename from drivers/firmware/psci_checker.c
-rename to drivers/firmware/psci/psci_checker.c
++	err = psci_0_2_init(np);
++	if (err)
++		return err;
++
++	if (psci_has_osi_support())
++		pr_info("OSI mode supported.\n");
++
++	return 0;
++}
++
+ static const struct of_device_id psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+-	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
++	{ .compatible = "arm,psci-1.0",	.data = psci_1_0_init},
+ 	{},
+ };
+ 
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index b3bcabe380da..581f72085c33 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -49,6 +49,7 @@
+ 
+ #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
++#define PSCI_1_0_FN_SET_SUSPEND_MODE		PSCI_0_2_FN(15)
+ 
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
+ 
+@@ -97,6 +98,10 @@
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+ 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+ 
++#define PSCI_1_0_OS_INITIATED			BIT(0)
++#define PSCI_1_0_SUSPEND_MODE_PC		0
++#define PSCI_1_0_SUSPEND_MODE_OSI		1
++
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
+ #define PSCI_RET_NOT_SUPPORTED			-1
 -- 
 2.17.1
