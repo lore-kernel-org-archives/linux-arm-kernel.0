@@ -1,113 +1,127 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 20 Jun 2018 19:39:51 +0200
-Subject: [PATCH v3 05/17] khwasan: initialize shadow to 0xff
+Date: Wed, 20 Jun 2018 19:39:54 +0200
+Subject: [PATCH v3 08/17] khwasan: add tag related helper functions
 In-Reply-To: <cover.1529515183.git.andreyknvl@google.com>
 References: <cover.1529515183.git.andreyknvl@google.com>
-Message-ID: <29bf9a5e71137411b8238fb2b8535811a91adbe8.1529515183.git.andreyknvl@google.com>
+Message-ID: <2fc356ecb74c2a0098dacf4b46f4c131ff1513af.1529515183.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A KHWASAN shadow memory cell contains a memory tag, that corresponds to
-the tag in the top byte of the pointer, that points to that memory. The
-native top byte value of kernel pointers is 0xff, so with KHWASAN we
-need to initialize shadow memory to 0xff. This commit does that.
+This commit adds a few helper functions, that are meant to be used to
+work with tags embedded in the top byte of kernel pointers: to set, to
+get or to reset (set to 0xff) the top byte.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/mm/kasan_init.c | 16 ++++++++++++++--
- include/linux/kasan.h      |  8 ++++++++
- mm/kasan/common.c          |  3 ++-
- 3 files changed, 24 insertions(+), 3 deletions(-)
+ arch/arm64/mm/kasan_init.c |  2 ++
+ include/linux/kasan.h      | 23 +++++++++++++++++++
+ mm/kasan/khwasan.c         | 47 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
 
 diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 12145874c02b..7a31e8ccbad2 100644
+index 7a31e8ccbad2..e7f37c0b7e14 100644
 --- a/arch/arm64/mm/kasan_init.c
 +++ b/arch/arm64/mm/kasan_init.c
-@@ -44,6 +44,15 @@ static phys_addr_t __init kasan_alloc_zeroed_page(int node)
- 	return __pa(p);
- }
- 
-+static phys_addr_t __init kasan_alloc_raw_page(int node)
-+{
-+	void *p = memblock_virt_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
-+						  __pa(MAX_DMA_ADDRESS),
-+						  MEMBLOCK_ALLOC_ACCESSIBLE,
-+						  node);
-+	return __pa(p);
-+}
-+
- static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
- 				      bool early)
- {
-@@ -89,7 +98,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
- 
- 	do {
- 		phys_addr_t page_phys = early ? __pa_symbol(kasan_zero_page)
--					      : kasan_alloc_zeroed_page(node);
-+					      : kasan_alloc_raw_page(node);
-+		if (!early)
-+			memset(__va(page_phys), KASAN_SHADOW_INIT, PAGE_SIZE);
- 		next = addr + PAGE_SIZE;
- 		set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
- 	} while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
-@@ -139,6 +150,7 @@ asmlinkage void __init kasan_early_init(void)
- 		KASAN_SHADOW_END - (1UL << (64 - KASAN_SHADOW_SCALE_SHIFT)));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
-+
- 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
- 			   true);
- }
-@@ -235,7 +247,7 @@ void __init kasan_init(void)
- 		set_pte(&kasan_zero_pte[i],
- 			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
- 
--	memset(kasan_zero_page, 0, PAGE_SIZE);
-+	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+@@ -250,6 +250,8 @@ void __init kasan_init(void)
+ 	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
  	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
  
++	khwasan_init();
++
  	/* At this point kasan is fully initialized. Enable error messages */
+ 	init_task.kasan_depth = 0;
+ 	pr_info("KernelAddressSanitizer initialized\n");
 diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 6608aa9b35ac..336385baf926 100644
+index 336385baf926..d7624b879d86 100644
 --- a/include/linux/kasan.h
 +++ b/include/linux/kasan.h
-@@ -139,6 +139,8 @@ static inline size_t kasan_metadata_size(struct kmem_cache *cache) { return 0; }
+@@ -155,6 +155,29 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
  
- #ifdef CONFIG_KASAN_GENERIC
+ #define KASAN_SHADOW_INIT 0xFF
  
-+#define KASAN_SHADOW_INIT 0
++void khwasan_init(void);
 +
- void kasan_cache_shrink(struct kmem_cache *cache);
- void kasan_cache_shutdown(struct kmem_cache *cache);
- 
-@@ -149,4 +151,10 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
- 
- #endif /* CONFIG_KASAN_GENERIC */
- 
-+#ifdef CONFIG_KASAN_HW
++void *khwasan_set_tag(const void *addr, u8 tag);
++u8 khwasan_get_tag(const void *addr);
++void *khwasan_reset_tag(const void *ptr);
 +
-+#define KASAN_SHADOW_INIT 0xFF
++#else /* CONFIG_KASAN_HW */
 +
-+#endif /* CONFIG_KASAN_HW */
++static inline void khwasan_init(void) { }
 +
++static inline void *khwasan_set_tag(const void *addr, u8 tag)
++{
++	return (void *)addr;
++}
++static inline u8 khwasan_get_tag(const void *addr)
++{
++	return 0xFF;
++}
++static inline void *khwasan_reset_tag(const void *ptr)
++{
++	return (void *)ptr;
++}
++
+ #endif /* CONFIG_KASAN_HW */
+ 
  #endif /* LINUX_KASAN_H */
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index e78ebeff1f4c..656baa8984c7 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -473,11 +473,12 @@ int kasan_module_alloc(void *addr, size_t size)
+diff --git a/mm/kasan/khwasan.c b/mm/kasan/khwasan.c
+index e2c3a7f7fd1f..d34679b8f8c7 100644
+--- a/mm/kasan/khwasan.c
++++ b/mm/kasan/khwasan.c
+@@ -38,6 +38,53 @@
+ #include "kasan.h"
+ #include "../slab.h"
  
- 	ret = __vmalloc_node_range(shadow_size, 1, shadow_start,
- 			shadow_start + shadow_size,
--			GFP_KERNEL | __GFP_ZERO,
-+			GFP_KERNEL,
- 			PAGE_KERNEL, VM_NO_GUARD, NUMA_NO_NODE,
- 			__builtin_return_address(0));
- 
- 	if (ret) {
-+		__memset(ret, KASAN_SHADOW_INIT, shadow_size);
- 		find_vm_area(addr)->flags |= VM_KASAN;
- 		kmemleak_ignore(ret);
- 		return 0;
++static DEFINE_PER_CPU(u32, prng_state);
++
++void khwasan_init(void)
++{
++	int cpu;
++
++	for_each_possible_cpu(cpu)
++		per_cpu(prng_state, cpu) = get_random_u32();
++}
++
++/*
++ * If a preemption happens between this_cpu_read and this_cpu_write, the only
++ * side effect is that we'll give a few allocated in different contexts objects
++ * the same tag. Since KHWASAN is meant to be used a probabilistic bug-detection
++ * debug feature, this doesn?t have significant negative impact.
++ *
++ * Ideally the tags use strong randomness to prevent any attempts to predict
++ * them during explicit exploit attempts. But strong randomness is expensive,
++ * and we did an intentional trade-off to use a PRNG. This non-atomic RMW
++ * sequence has in fact positive effect, since interrupts that randomly skew
++ * PRNG at unpredictable points do only good.
++ */
++u8 random_tag(void)
++{
++	u32 state = this_cpu_read(prng_state);
++
++	state = 1664525 * state + 1013904223;
++	this_cpu_write(prng_state, state);
++
++	return (u8)(state % (KHWASAN_TAG_MAX + 1));
++}
++
++void *khwasan_set_tag(const void *addr, u8 tag)
++{
++	return set_tag(addr, tag);
++}
++
++u8 khwasan_get_tag(const void *addr)
++{
++	return get_tag(addr);
++}
++
++void *khwasan_reset_tag(const void *addr)
++{
++	return reset_tag(addr);
++}
++
+ void check_memory_region(unsigned long addr, size_t size, bool write,
+ 				unsigned long ret_ip)
+ {
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
