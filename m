@@ -1,29 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jun 2018 13:08:28 -0600
-Subject: [PATCH v3 1/2] dt-bindings: mmc: broken clock stable indicator
- on arasan controllers
-In-Reply-To: <12953dbf9af1f1a71aaf3ef77782e56a2a7ad893.1529493667.git.h.grohne@intenta.de>
-References: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
- <cover.1529493667.git.h.grohne@intenta.de>
- <12953dbf9af1f1a71aaf3ef77782e56a2a7ad893.1529493667.git.h.grohne@intenta.de>
-Message-ID: <20180620190828.GA26510@rob-hp-laptop>
+From: nick@shmanahar.org (Nick Dyer)
+Date: Wed, 20 Jun 2018 21:20:45 +0100
+Subject: [PATCH v3] ARM: dts: imx51-zii-rdu1: fix touchscreen pinctrl
+In-Reply-To: <20180620194239.2730-1-nick@shmanahar.org>
+References: <20180620194239.2730-1-nick@shmanahar.org>
+Message-ID: <20180620202045.27965-1-nick@shmanahar.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 01:32:51PM +0200, Helmut Grohne wrote:
-> Some controllers immediately report that their internal clock is stable
-> after activating it even when the clock is not stable. When used in
-> conjunction with older/slower cards, this can result in:
-> 
->     mmc0: error -84 whilst initialising SD card
-> 
-> This flag allows documenting and thus working around such a hardware
-> defect.
-> 
-> Signed-off-by: Helmut Grohne <h.grohne@intenta.de>
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-> ---
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 2 ++
->  1 file changed, 2 insertions(+)
+The pinctrl settings were incorrect for the touchscreen interrupt line, causing
+an interrupt storm. This change has been tested with both the atmel_mxt_ts and
+RMI4 drivers on the RDU1 units.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+The value 0x4 comes from the value of register IOMUXC_SW_PAD_CTL_PAD_CSI1_D8
+from the old vendor kernel.
+
+Signed-off-by: Nick Dyer <nick@shmanahar.org>
+Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
+Cc: <stable@vger.kernel.org> # 4.15+
+---
+Changes in v3:
+- Update commit message to add source of 0x4 value, fixes tag and CC stable
+Changes in v2:
+- Use hex, only alter IRQ line config
+
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+index df9eca94d812..8a878687197b 100644
+--- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
++++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+@@ -770,7 +770,7 @@
+ 
+ 	pinctrl_ts: tsgrp {
+ 		fsl,pins = <
+-			MX51_PAD_CSI1_D8__GPIO3_12		0x85
++			MX51_PAD_CSI1_D8__GPIO3_12		0x04
+ 			MX51_PAD_CSI1_D9__GPIO3_13		0x85
+ 		>;
+ 	};
+-- 
+2.17.1
