@@ -1,62 +1,57 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 20 Jun 2018 07:17:59 +0200
-Subject: [PATCH v2 06/10] media: rtl2830: switch to i2c_lock_bus(...,
- I2C_LOCK_SEGMENT)
-In-Reply-To: <20180620051803.12206-1-peda@axentia.se>
-References: <20180620051803.12206-1-peda@axentia.se>
-Message-ID: <20180620051803.12206-7-peda@axentia.se>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Wed, 20 Jun 2018 07:59:34 +0200
+Subject: [PATCH 1/1] arm64: dts: rockchip: correct voltage selector
+ Firefly-RK3399
+In-Reply-To: <10782218.jfpm9omiT7@phil>
+References: <20180604171523.28454-1-xypron.glpk@gmx.de>
+ <19360053.2ABrQ075F2@phil> <10782218.jfpm9omiT7@phil>
+Message-ID: <459cb125-a3e2-8f1e-b960-011020d41b3c@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Locking the root adapter for __i2c_transfer will deadlock if the
-device sits behind a mux-locked I2C mux. Switch to the finer-grained
-i2c_lock_bus with the I2C_LOCK_SEGMENT flag. If the device does not
-sit behind a mux-locked mux, the two locking variants are equivalent.
+On 06/20/2018 01:21 AM, Heiko Stuebner wrote:
+> Hi Heinrich,
+> 
+> Am Donnerstag, 14. Juni 2018, 14:55:27 CEST schrieb Heiko Stuebner:
+>> Am Montag, 4. Juni 2018, 19:15:23 CEST schrieb Heinrich Schuchardt:
+>>> Without this patch the Firefly-RK3399 board boot process hangs after these
+>>> lines:
+>>>
+>>>    fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
+>>>    fan53555-reg: supplied by vcc_sys
+>>>    vcc1v8_s3: supplied by vcc_1v8
+>>>
+>>> Blacklisting driver fan53555 allows booting.
+>>>
+>>> The device tree uses a value of fcs,suspend-voltage-selector different to
+>>> any other board.
+>>>
+>>> Changing this setting to the usual value is sufficient to enable booting.
+>>>
+>>> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+>>
+>> applied for 4.19.
+> 
+> and dropped again.
+> 
+> Sadly it looks like the patch causes conflicts with at least one firefly
+> board in a kernelci lab. My own is currently not ready to use, so I cannot
+> look myself right now.
+> 
+> The issue kernelci people described sounded quite a lot like the one
+> in your commit message, so my current theory is that the
+> suspend-voltage-selector must in some form corespond to the
+> cpu_b_sleep_h gpio setting we're currently not handling at all, which
+> would therefore depend on how the bootloader sets this up.
+> 
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/media/dvb-frontends/rtl2830.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Hi Heiko,
 
-diff --git a/drivers/media/dvb-frontends/rtl2830.c b/drivers/media/dvb-frontends/rtl2830.c
-index 7bbfe11d11ed..91d12e6a03d5 100644
---- a/drivers/media/dvb-frontends/rtl2830.c
-+++ b/drivers/media/dvb-frontends/rtl2830.c
-@@ -24,9 +24,9 @@ static int rtl2830_bulk_write(struct i2c_client *client, unsigned int reg,
- 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
- 	int ret;
- 
--	i2c_lock_adapter(client->adapter);
-+	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	ret = regmap_bulk_write(dev->regmap, reg, val, val_count);
--	i2c_unlock_adapter(client->adapter);
-+	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	return ret;
- }
- 
-@@ -36,9 +36,9 @@ static int rtl2830_update_bits(struct i2c_client *client, unsigned int reg,
- 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
- 	int ret;
- 
--	i2c_lock_adapter(client->adapter);
-+	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	ret = regmap_update_bits(dev->regmap, reg, mask, val);
--	i2c_unlock_adapter(client->adapter);
-+	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	return ret;
- }
- 
-@@ -48,9 +48,9 @@ static int rtl2830_bulk_read(struct i2c_client *client, unsigned int reg,
- 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
- 	int ret;
- 
--	i2c_lock_adapter(client->adapter);
-+	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	ret = regmap_bulk_read(dev->regmap, reg, val, val_count);
--	i2c_unlock_adapter(client->adapter);
-+	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
- 	return ret;
- }
- 
--- 
-2.11.0
+please, provide a link to the log displaying the issue and the contact
+who can provide the exact setup.
+
+I have been testing with U-Boot as boot loader.
+
+Best regards
+
+Heinrich
