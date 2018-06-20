@@ -1,148 +1,141 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:26 +0200
-Subject: [PATCH v8 26/26] arm64: dts: Convert to the hierarchical CPU topology
- layout for MSM8916
+Date: Wed, 20 Jun 2018 19:22:05 +0200
+Subject: [PATCH v8 05/26] PM / Domains: Add helper functions to attach/detach
+ CPUs to/from genpd
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-27-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-6-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lina Iyer <lina.iyer@linaro.org>
+Introduce two new genpd helper functions, of_genpd_attach|detach_cpu(),
+which takes the CPU-number as an in-parameter.
 
-In the hierarchical layout, we are creating power domains around each CPU
-and describes the idle states for them inside the power domain provider
-node.  Note that, the CPU's idle states still needs to be compatible with
-"arm,idle-state".
+To attach a CPU to a genpd, of_genpd_attach_cpu() starts by fetching the
+struct device belonging to the CPU. Then it calls genpd_dev_pm_attach(),
+which via DT tries to hook up the CPU device to its corresponding PM
+domain. If it succeeds, of_genpd_attach_cpu() continues to prepare/enable
+runtime PM of the device.
 
-Furthermore, represent the CPU cluster as a separate master power domain,
-powering the CPU's power domains. The cluster node, contains the idle
-states for the cluster and each idle state needs to be compatible with the
-"domain-idle-state".
+To detach a CPU from its PM domain, of_genpd_attach_cpu() reverse the
+operations made from of_genpd_attach_cpu(). However, first it checks that
+the CPU device has a valid PM domain pointer assigned, as to make sure it
+belongs to genpd.
 
-If the running platform is using a PSCI FW that supports the OS initiated
-CPU suspend mode, which likely should be the case unless the PSCI FW is
-very old, this change makes the PSCI driver to enable it.
-
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
 Cc: Lina Iyer <ilina@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 53 +++++++++++++++++++++++++--
- 1 file changed, 49 insertions(+), 4 deletions(-)
+ drivers/base/power/domain.c | 69 +++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  9 +++++
+ 2 files changed, 78 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 650f356f69ca..d67c51090d0c 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -113,10 +113,10 @@
- 			reg = <0x0>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			#cooling-cells = <2>;
-+			power-domains = <&CPU_PD0>;
- 		};
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 6149ce0bfa7b..299fa2febbec 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2445,6 +2445,75 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
  
- 		CPU1: cpu at 1 {
-@@ -125,10 +125,10 @@
- 			reg = <0x1>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			#cooling-cells = <2>;
-+			power-domains = <&CPU_PD1>;
- 		};
++/*
++ * of_genpd_attach_cpu() - Attach a CPU to its PM domain
++ * @cpu: The CPU to be attached.
++ *
++ * Parses the OF node of the CPU's device, to find a PM domain specifier. If
++ * such is found, attaches the CPU's device to the retrieved pm_domain ops and
++ * enables runtime PM for it. This to allow the CPU to be power managed through
++ * its PM domain.
++ *
++ * Returns zero when successfully attached the CPU's device to its PM domain,
++ * else a negative error code.
++ */
++int of_genpd_attach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++	int ret;
++
++	if (!dev) {
++		pr_warn("genpd: no dev for cpu%d\n", cpu);
++		return -ENODEV;
++	}
++
++	ret = genpd_dev_pm_attach(dev);
++	if (ret != 1) {
++		dev_warn(dev, "genpd: attach cpu failed %d\n", ret);
++		return ret < 0 ? ret : -ENODEV;
++	}
++
++	pm_runtime_irq_safe(dev);
++	pm_runtime_get_noresume(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	dev_info(dev, "genpd: attached cpu\n");
++	return 0;
++}
++EXPORT_SYMBOL(of_genpd_attach_cpu);
++
++/**
++ * of_genpd_detach_cpu() - Detach a CPU from its PM domain
++ * @cpu: The CPU to be detached.
++ *
++ * Detach the CPU's device from its corresponding PM domain. If detaching is
++ * completed successfully, disable runtime PM and restore the runtime PM usage
++ * count for the CPU's device.
++ */
++void of_genpd_detach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++
++	if (!dev) {
++		pr_warn("genpd: no dev for cpu%d\n", cpu);
++		return;
++	}
++
++	/* Check that the device is attached to a genpd. */
++	if (!(dev->pm_domain && dev->pm_domain->detach == genpd_dev_pm_detach))
++		return;
++
++	genpd_dev_pm_detach(dev, true);
++
++	pm_runtime_disable(dev);
++	pm_runtime_put_noidle(dev);
++	pm_runtime_reinit(dev);
++
++	dev_info(dev, "genpd: detached cpu\n");
++}
++EXPORT_SYMBOL(of_genpd_detach_cpu);
++
+ static const struct of_device_id idle_state_match[] = {
+ 	{ .compatible = "domain-idle-state", },
+ 	{ }
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 3f67ff0c1c69..2c09cf80b285 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -243,6 +243,8 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
+ int genpd_dev_pm_attach(struct device *dev);
+ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 					 unsigned int index);
++int of_genpd_attach_cpu(int cpu);
++void of_genpd_detach_cpu(int cpu);
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+ static inline int of_genpd_add_provider_simple(struct device_node *np,
+ 					struct generic_pm_domain *genpd)
+@@ -294,6 +296,13 @@ static inline struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 	return NULL;
+ }
  
- 		CPU2: cpu at 2 {
-@@ -137,10 +137,10 @@
- 			reg = <0x2>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			#cooling-cells = <2>;
-+			power-domains = <&CPU_PD2>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -149,10 +149,10 @@
- 			reg = <0x3>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			#cooling-cells = <2>;
-+			power-domains = <&CPU_PD3>;
- 		};
- 
- 		L2_0: l2-cache {
-@@ -169,12 +169,57 @@
- 				min-residency-us = <2000>;
- 				local-timer-stop;
- 			};
++static inline int of_genpd_attach_cpu(int cpu)
++{
++	return -ENODEV;
++}
 +
-+			CLUSTER_RET: cluster-retention {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
++static inline void of_genpd_detach_cpu(int cpu) {}
 +
-+			CLUSTER_PWRDN: cluster-gdhs {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
- 		};
- 	};
- 
- 	psci {
- 		compatible = "arm,psci-1.0";
- 		method = "smc";
-+
-+		CPU_PD0: cpu-pd0 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CPU_PD1: cpu-pd1 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CPU_PD2: cpu-pd2 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CPU_PD3: cpu-pd3 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CLUSTER_PD: cluster-pd {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWRDN>;
-+		};
- 	};
- 
- 	pmu {
+ static inline
+ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+ {
 -- 
 2.17.1
