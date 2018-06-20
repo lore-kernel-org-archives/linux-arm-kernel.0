@@ -1,36 +1,40 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 20 Jun 2018 21:06:38 +0200
-Subject: Dynamic ftrace self test broken on ARM
-In-Reply-To: <20180620101311.0bcd73d3@gandalf.local.home>
-References: <65fb14b356bc0a414f1fe5cf5c6eb395@agner.ch>
- <20180618175437.3e6c85a1@gandalf.local.home>
- <b9f269ed2143688c38cdcbba7367b101@agner.ch>
- <20180619091735.7aec75d0@gandalf.local.home>
- <5e26cebbb2ebeb87fdc808509881736b@agner.ch>
- <20180620101311.0bcd73d3@gandalf.local.home>
-Message-ID: <7904ed3fe9f59a54526d64f366915b43@agner.ch>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 20 Jun 2018 21:34:07 +0200
+Subject: [PATCH 2/2] arm64: dts: exynos: Remove unneeded DSI and DECON
+ address/size cells in Exynos5433
+In-Reply-To: <CAJKOXPeCT3CkqqNowEZaeTw7goJd6=Nbd2S61QzTFW-nGr5AKg@mail.gmail.com>
+References: <20180618174216.24801-1-krzk@kernel.org>
+ <CGME20180618174316epcas1p397b66c8e4e8479fce8655941a4d4279f@epcas1p3.samsung.com>
+ <20180618174216.24801-2-krzk@kernel.org>
+ <20180619072652eucas1p1943deb1b158eda52980448e41f83e5e9~5fwX6lI2o2633926339eucas1p1Q@eucas1p1.samsung.com>
+ <CAJKOXPeCT3CkqqNowEZaeTw7goJd6=Nbd2S61QzTFW-nGr5AKg@mail.gmail.com>
+Message-ID: <20180620193407.gk5e5ecolo5bel3c@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.06.2018 16:13, Steven Rostedt wrote:
-> On Wed, 20 Jun 2018 15:51:55 +0200
-> Stefan Agner <stefan@agner.ch> wrote:
+On Tue, Jun 19, 2018 at 09:59:04AM +0200, Krzysztof Kozlowski wrote:
+> On 19 June 2018 at 09:26, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > Hi Krzysztof,
+> >
+> > On 2018-06-18 19:42, Krzysztof Kozlowski wrote:
+> >> The decon, decon_tv and dsi nodes have only one child port so
+> >> address/size mappings are not necessary.  This fixes DTC warnings like:
+> >>
+> >>      Warning (graph_child_address): /soc/decon at 13800000/ports:
+> >>          graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
+> >>
+> >> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> >
+> > Works fine with current Exynos DRM Decon/MIC/DSI drivers.
+> >
+> > Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > 
-> 
->> v4.9 seems to work, so I started bisecting. It turned out that commit
->> 6f05d0761af6 ("ARM: 8668/1: ftrace: Fix dynamic ftrace with DEBUG_RODATA
->> and !FRAME_POINTER") broke it, introduced during the v4.12 merge window.
-> 
-> That patch doesn't appear to be the cause. It could have been a failed
-> bisect. Does the commit before that commit work? Does that commit fail?
+> Thanks for review and testing!
 
-Pretty sure it is that one. Reverting it on top of v4.18-rc1 fixes it...
+I have second thoughs whether this patch is correct. AFAIU, the drivers
+get the remote endpoints by reg==0 (for example the
+of_graph_get_remote_node() in exynos_dsi_parse_dt()). If the port shall
+be ignored, then reg==-1 should be passed.
 
-> 
-> It may be due to some other RODATA change though. That is actually one
-> of my thoughts when looking at the bug.
-
-CONFIG_STRICT_KERNEL_RWX=y is set, will test without.
-
---
-Stefan
+Best regards,
+Krzysztof
