@@ -1,54 +1,83 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 20 Jun 2018 12:32:59 +0200
-Subject: [PATCH v5 2/6] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <alpine.DEB.2.21.1806201156510.10546@nanos.tec.linutronix.de>
-References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
- <20180619211929.22908-3-alexandre.belloni@bootlin.com>
- <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
- <20180620094649.GA2766@piout.net>
- <alpine.DEB.2.21.1806201156510.10546@nanos.tec.linutronix.de>
-Message-ID: <20180620103259.GA7737@piout.net>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 20 Jun 2018 13:41:16 +0300
+Subject: [PATCH] ARM: dts: imx7d-sdb: Restore pwm backlight support
+Message-ID: <c328d3e13702fa624febe08d7cd68df5b82b8c30.1529490998.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/2018 12:07:00+0200, Thomas Gleixner wrote:
-> > > > +static int tcb_clkevt_next_event(unsigned long delta,
-> > > > +				 struct clock_event_device *d)
-> > > > +{
-> > > > +	u32 old, next, cur;
-> > > > +
-> > > > +	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> > > > +	next = old + delta;
-> > > > +	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
-> > > > +	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
-> > > > +
-> > > > +	/* check whether the delta elapsed while setting the register */
-> > > > +	if ((next < old && cur < old && cur > next) ||
-> > > > +	    (next > old && (cur < old || cur > next))) {
-> > > > +		/*
-> > > > +		 * Clear the CPCS bit in the status register to avoid
-> > > > +		 * generating a spurious interrupt next time a valid
-> > > > +		 * timer event is configured.
-> > > > +		 */
-> > > > +		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
-> > > > +		return -ETIME;
-> > > > +	}
-> > > 
-> > > Aarg. Doesn;t that timer block have a simple count down and fire mode?
-> > > These compare equal timers suck.
-> > 
-> > It only counts up...
-> 
-> Have you tried to play with that waveform stuff?
-> 
+This was removed in commit 5eaeaccdaedb ("ARM: dts: imx7d-sdb: Pass
+'enable-gpios' and 'power-supply' properties") with a note claiming that
+GPIO1_IO01 is connected to a pin labeled as "PWREN" on the connector.
 
-There are only a count up and count up then down modes. As the counter
-value is in a read only register, the only configurable starting value
-is 0 so it will always start by counting up. I'm pretty sure the up/down
-mode will not help us.
+Despite that label this pin does actually work as a PWM controlling
+brightness. So restore pwm functionality.
 
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+This was tested with the suggested LCD8000-43T, maybe there are other
+display options which don't have PWM and require that pin to be always
+enabled?
+
+This same LCD is also supported on imx6ul-14x14-evk with a similar
+backlight.
+
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 940849163104..bf6f21b984ca 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -114,14 +114,21 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 		gpio = <&gpio2 14 GPIO_ACTIVE_LOW>;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm1 0 5000000 0>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++		status = "okay";
++	};
++
+ 	panel {
+ 		compatible = "innolux,at043tn24";
+-		pinctrl-0 = <&pinctrl_backlight>;
+-		enable-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
++		backlight = <&backlight>;
+ 		power-supply = <&reg_lcd_3v3>;
+ 
+ 		port {
+ 			panel_in: endpoint {
+ 				remote-endpoint = <&display_out>;
+@@ -710,18 +717,24 @@
+ 			>;
+ 		};
+ 	};
+ };
+ 
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
+ &iomuxc_lpsr {
+ 	pinctrl_wdog: wdoggrp {
+ 		fsl,pins = <
+ 			MX7D_PAD_LPSR_GPIO1_IO00__WDOG1_WDOG_B		0x74
+ 		>;
+ 	};
+ 
+-	pinctrl_backlight: backlightgrp {
++	pinctrl_pwm1: pwm1grp {
+ 		fsl,pins = <
+-			MX7D_PAD_LPSR_GPIO1_IO01__GPIO1_IO1		0x110b0
++			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x30
+ 		>;
+ 	};
+ };
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.17.1
