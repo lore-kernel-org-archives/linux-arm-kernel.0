@@ -1,42 +1,87 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 13:15:38 +0800
-Subject: [PATCH 3/5] mfd: axp20x: Support AXP806 in I2C mode
+Date: Wed, 20 Jun 2018 13:15:37 +0800
+Subject: [PATCH 2/5] mfd: axp20x: Add self-working mode support for AXP806
 In-Reply-To: <20180620051540.25617-1-wens@csie.org>
 References: <20180620051540.25617-1-wens@csie.org>
-Message-ID: <20180620051540.25617-4-wens@csie.org>
+Message-ID: <20180620051540.25617-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64 H64 board uses an AXP806 PMIC in I2C and self-working mode.
-The H64 SoC does not have the usual RSB controller.
+The AXP806 can operate in a standalone "self-working" mode, in which it
+is also responsible for power control of the overall system. This mode
+is similar to the master mode, but the EN/PWRON pin functions as a power
+button, instead of a level-triggered enable switch.
 
-This patch adds AXP806 to the list of devices supported in I2C mode.
-In theory, all RSB-based PMICs can also be used in I2C mode.
+This patch adds code checking for the new "x-powers,self-working-mode"
+property, and a separate mfd_cell list that includes the power button
+(PEK) sub-device.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mfd/axp20x-i2c.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mfd/axp20x.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
-index d35a5fe6c950..a7b7c5423ea5 100644
---- a/drivers/mfd/axp20x-i2c.c
-+++ b/drivers/mfd/axp20x-i2c.c
-@@ -65,6 +65,7 @@ static const struct of_device_id axp20x_i2c_of_match[] = {
- 	{ .compatible = "x-powers,axp202", .data = (void *)AXP202_ID },
- 	{ .compatible = "x-powers,axp209", .data = (void *)AXP209_ID },
- 	{ .compatible = "x-powers,axp221", .data = (void *)AXP221_ID },
-+	{ .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
- 	{ },
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 9a2ef3d9b8f8..1988881529a9 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -221,6 +221,11 @@ static const struct resource axp803_pek_resources[] = {
+ 	DEFINE_RES_IRQ_NAMED(AXP803_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
  };
- MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
-@@ -74,6 +75,7 @@ static const struct i2c_device_id axp20x_i2c_id[] = {
- 	{ "axp202", 0 },
- 	{ "axp209", 0 },
- 	{ "axp221", 0 },
-+	{ "axp806", 0 },
- 	{ },
+ 
++static const struct resource axp806_pek_resources[] = {
++	DEFINE_RES_IRQ_NAMED(AXP806_IRQ_POK_RISE, "PEK_DBR"),
++	DEFINE_RES_IRQ_NAMED(AXP806_IRQ_POK_FALL, "PEK_DBF"),
++};
++
+ static const struct resource axp809_pek_resources[] = {
+ 	DEFINE_RES_IRQ_NAMED(AXP809_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
+ 	DEFINE_RES_IRQ_NAMED(AXP809_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
+@@ -730,6 +735,17 @@ static const struct mfd_cell axp803_cells[] = {
+ 	{	.name			= "axp20x-regulator" },
  };
- MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
+ 
++static const struct mfd_cell axp806_self_working_cells[] = {
++	{
++		.name			= "axp221-pek",
++		.num_resources		= ARRAY_SIZE(axp806_pek_resources),
++		.resources		= axp806_pek_resources,
++	},
++	{
++		.name			= "axp20x-regulator",
++	},
++};
++
+ static const struct mfd_cell axp806_cells[] = {
+ 	{
+ 		.id			= 2,
+@@ -842,8 +858,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+ 		axp20x->regmap_irq_chip = &axp803_regmap_irq_chip;
+ 		break;
+ 	case AXP806_ID:
+-		axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
+-		axp20x->cells = axp806_cells;
++		if (of_property_read_bool(axp20x->dev->of_node,
++					  "x-powers,self-working-mode")) {
++			axp20x->nr_cells = ARRAY_SIZE(axp806_self_working_cells);
++			axp20x->cells = axp806_self_working_cells;
++		} else {
++			axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
++			axp20x->cells = axp806_cells;
++		}
+ 		axp20x->regmap_cfg = &axp806_regmap_config;
+ 		axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
+ 		break;
+@@ -901,7 +923,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+ 	 */
+ 	if (axp20x->variant == AXP806_ID) {
+ 		if (of_property_read_bool(axp20x->dev->of_node,
+-					  "x-powers,master-mode"))
++					  "x-powers,master-mode") ||
++		    of_property_read_bool(axp20x->dev->of_node,
++					  "x-powers,self-working-mode"))
+ 			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
+ 				     AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE);
+ 		else
 -- 
 2.17.1
