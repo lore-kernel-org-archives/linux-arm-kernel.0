@@ -1,68 +1,62 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 20 Jun 2018 15:20:36 +0300
-Subject: [PATCH v2 2/8] dt-bindings: serial: Add bindings for nvidia,
- tegra194-tcu
-In-Reply-To: <20180620122042.10950-1-mperttunen@nvidia.com>
-References: <20180620122042.10950-1-mperttunen@nvidia.com>
-Message-ID: <20180620122042.10950-3-mperttunen@nvidia.com>
+Date: Wed, 20 Jun 2018 15:20:34 +0300
+Subject: [PATCH v2 0/8] Tegra Combined UART driver
+Message-ID: <20180620122042.10950-1-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for the Tegra Combined UART device used to talk to the
-UART console on Tegra194 systems.
+Hi again - see individual patches for v2 changes.
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
+Thanks,
+Mikko
 
-Notes:
-    v2:
-    - Added Rob's Reviewed-by.
+Original message:
 
- .../bindings/serial/nvidia,tegra194-tcu.txt        | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Hi all,
+
+on Tegra194, the primary console UART is the "Tegra Combined UART",
+or TCU. This is a "virtual UART", where each consumer communicates
+with a central implementation over mailboxes. The central
+implementation then multiplexes the streams and arbitrates use of
+a hardware serial port. This driver implements the consumer portion
+to allow using the primary console.
+
+The series is split into the following parts:
+* patches 1 and 2 add the device tree bindings for mailbox and tcu
+  itself.
+* patch 3 adds a blocking transmission option to the mailbox
+  framework.
+* patches 4 and 5 add support for the "shared mailbox" primitive
+  to the Tegra HSP driver.
+* patch 6 adds the TCU driver itself
+* patches 7 and 8 do the necessary device tree changes.
+
+The series has been tested on the Tegra194 P2972 board.
+
+Mikko Perttunen (8):
+  dt-bindings: tegra186-hsp: Add shared interrupts
+  dt-bindings: serial: Add bindings for nvidia,tegra194-tcu
+  mailbox: Add transmit done by blocking option
+  mailbox: tegra-hsp: Refactor in preparation of mailboxes
+  mailbox: tegra-hsp: Add support for shared mailboxes
+  serial: Add Tegra Combined UART driver
+  arm64: tegra: Add nodes for tcu on Tegra194
+  arm64: tegra: Mark tcu as primary serial port on Tegra194 P2888
+
+ .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   3 +
+ .../bindings/serial/nvidia,tegra194-tcu.txt        |  35 +++
+ arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     |   2 +-
+ arch/arm64/boot/dts/nvidia/tegra194.dtsi           |  34 ++-
+ drivers/mailbox/mailbox.c                          |  30 +-
+ drivers/mailbox/mailbox.h                          |   1 +
+ drivers/mailbox/tegra-hsp.c                        | 319 +++++++++++++++++----
+ drivers/tty/serial/Kconfig                         |   9 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/tegra-tcu.c                     | 289 +++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 11 files changed, 658 insertions(+), 68 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+ create mode 100644 drivers/tty/serial/tegra-tcu.c
 
-diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-new file mode 100644
-index 000000000000..a8becf6efd2a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-@@ -0,0 +1,35 @@
-+NVIDIA Tegra Combined UART (TCU)
-+
-+The TCU is a system for sharing a hardware UART instance among multiple
-+systems within the Tegra SoC. It is implemented through a mailbox-
-+based protocol where each "virtual UART" has a pair of mailboxes, one
-+for transmitting and one for receiving, that is used to communicate
-+with the hardware implementing the TCU.
-+
-+Required properties:
-+- name : Should be tcu
-+- compatible
-+    Array of strings
-+    One of:
-+    - "nvidia,tegra194-tcu"
-+- mbox-names:
-+    "rx" - Mailbox for receiving data from hardware UART
-+    "tx" - Mailbox for transmitting data to hardware UART
-+- mboxes: Mailboxes corresponding to the mbox-names. 
-+
-+This node is a mailbox consumer. See the following files for details of
-+the mailbox subsystem, and the specifiers implemented by the relevant
-+provider(s):
-+
-+- .../mailbox/mailbox.txt
-+- .../mailbox/nvidia,tegra186-hsp.txt
-+
-+Example bindings:
-+-----------------
-+
-+tcu: tcu {
-+	compatible = "nvidia,tegra194-tcu";
-+	mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
-+	         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
-+	mbox-names = "rx", "tx";
-+};
 -- 
 2.16.1
