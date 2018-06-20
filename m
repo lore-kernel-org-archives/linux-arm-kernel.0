@@ -1,39 +1,75 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 20 Jun 2018 15:20:42 +0300
-Subject: [PATCH v2 8/8] arm64: tegra: Mark tcu as primary serial port on
- Tegra194 P2888
+Date: Wed, 20 Jun 2018 15:20:41 +0300
+Subject: [PATCH v2 7/8] arm64: tegra: Add nodes for tcu on Tegra194
 In-Reply-To: <20180620122042.10950-1-mperttunen@nvidia.com>
 References: <20180620122042.10950-1-mperttunen@nvidia.com>
-Message-ID: <20180620122042.10950-9-mperttunen@nvidia.com>
+Message-ID: <20180620122042.10950-8-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra Combined UART is the proper primary serial port on P2888,
-so use it.
+Add nodes required for communication through the Tegra Combined UART.
+This includes the AON HSP instance, addition of shared interrupts
+for the TOP0 HSP instance, and finally the TCU node itself. Also
+mark the HSP instances as compatible to tegra194-hsp, as the hardware
+is not identical but is compatible to tegra186-hsp.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
 ---
+ arch/arm64/boot/dts/nvidia/tegra194.dtsi | 34 +++++++++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 3 deletions(-)
 
-Notes:
-    v2:
-    - Added Jon's Acked-by.
-
- arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-index 859ab5af17c1..95e2433984f7 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-@@ -10,7 +10,7 @@
- 	aliases {
- 		sdhci0 = "/cbb/sdhci at 3460000";
- 		sdhci1 = "/cbb/sdhci at 3400000";
--		serial0 = &uartb;
-+		serial0 = &tcu;
- 		i2c0 = "/bpmp/i2c";
- 		i2c1 = "/cbb/i2c at 3160000";
- 		i2c2 = "/cbb/i2c at c240000";
+diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+index 6d699815a84f..d7f780b06fe2 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+@@ -217,10 +217,31 @@
+ 		};
+ 
+ 		hsp_top0: hsp at 3c00000 {
+-			compatible = "nvidia,tegra186-hsp";
++			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
+ 			reg = <0x03c00000 0xa0000>;
+-			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupt-names = "doorbell";
++			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "doorbell", "shared0", "shared1", "shared2",
++			                  "shared3", "shared4", "shared5", "shared6",
++			                  "shared7";
++			#mbox-cells = <2>;
++		};
++
++		hsp_aon: hsp at c150000 {
++			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
++			reg = <0x0c150000 0xa0000>;
++			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "shared0", "shared1", "shared2", "shared3";
+ 			#mbox-cells = <2>;
+ 		};
+ 
+@@ -382,6 +403,13 @@
+ 		};
+ 	};
+ 
++	tcu: tcu {
++		compatible = "nvidia,tegra194-tcu";
++		mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
++		         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
++		mbox-names = "rx", "tx";
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
 -- 
 2.16.1
