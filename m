@@ -1,21 +1,78 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Jun 2018 16:43:59 -0300
-Subject: [PATCH v3 17/17] kasan: add SPDX-License-Identifier mark to
- source files
-In-Reply-To: <CAAeHK+zJgSAxiHHfzhrm7N7iey7CbW42WfWvUN+FnZMPP3FXrA@mail.gmail.com>
-References: <cover.1529515183.git.andreyknvl@google.com>
- <f76d3070776e0038eda3cd76d471d1bfeae18480.1529515183.git.andreyknvl@google.com>
- <CAOMZO5BgPaMsmx_3AJvMTKCFjhusfH=kH26U_PQCSD5TcUDA+w@mail.gmail.com>
- <CAAeHK+zJgSAxiHHfzhrm7N7iey7CbW42WfWvUN+FnZMPP3FXrA@mail.gmail.com>
-Message-ID: <CAOMZO5APF=cYOia8dn7dHa3h-Tm6sFMsJZwie--T6N-1-X-TYg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jun 2018 13:49:37 -0600
+Subject: [PATCH v2 2/4] dt-bindings: misc: Aspeed coprocessor interrupt
+ controller
+In-Reply-To: <20180618045902.11453-3-benh@kernel.crashing.org>
+References: <20180618045902.11453-1-benh@kernel.crashing.org>
+ <20180618045902.11453-3-benh@kernel.crashing.org>
+Message-ID: <20180620194937.GA5088@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 4:41 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+On Mon, Jun 18, 2018 at 02:59:00PM +1000, Benjamin Herrenschmidt wrote:
+> Add the device-tree binding definition for the AST2400
+> and AST2500 coprocessor interrupt controller
+> 
+> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ---
+>  .../devicetree/bindings/misc/aspeed,cvic.txt  | 35 +++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/aspeed,cvic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/aspeed,cvic.txt b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
+> new file mode 100644
+> index 000000000000..2562e2991e4d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
+> @@ -0,0 +1,35 @@
+> +* Aspeed AST2400 and AST2500 coprocessor interrupt controller
+> +
+> +This file describes the bindings for the interrupt controller present
+> +in the AST2400 and AST2500 BMC SoCs which provides interrupt to the
+> +ColdFire coprocessor.
+> +
+> +It is not a normal interrupt controller and it would be rather
+> +inconvenient to create an interrupt tree for it as it somewhat shares
+> +some of the same sources as the main ARM interrupt controller but with
+> +different numbers.
+> +
+> +The AST2500 supports a SW generated interrupt
+> +
+> +Required properties:
+> +- reg: address and length of the register for the device.
+> +- compatible: "aspeed,cvic" and one of:
+> +		"aspeed,ast2400-cvic"
+> +	      or
+> +		"aspeed,ast2500-cvic"
+> +
+> +- valid-sources: One cell, bitmap of supported sources for the implementation
 
-> I used mm/slub.c as a reference, which uses //. Bu I can change it to
-> /* */ in the next version, no problem.
+aspeed,valid-sources
 
-C source files should use //. C header files should use /* */
+This could use a better description. I thought this was which bits to 
+use for s/w irq, but then I read the next property...
 
-This is documented at Documentation/process/license-rules.rst
+Alternatively, why can't this be implied by the compatible?
+
+> +
+> +Optional properties;
+> +- copro-sw-interrupts: List of interrupt numbers that can be used as
+> +		       SW interrupts from the ARM to the coprocessor.
+> +		       (AST2500 only)
+> +
+> +Example:
+> +
+> +	cvic: copro-interrupt-controller at 1e6c2000 {
+> +		compatible = "aspeed,ast2500-cvic";
+> +		valid-sources = <0xffffffff>;
+> +		copro-sw-interrupts = <1>;
+> +		reg = <0x1e6c2000 0x80>;
+> +	};
+> -- 
+> 2.17.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
