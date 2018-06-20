@@ -1,34 +1,74 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 20 Jun 2018 17:24:20 +0200
-Subject: [PATCH v4 1/7] arm64: add type casts to untagged_addr macro
-In-Reply-To: <cover.1529507994.git.andreyknvl@google.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
-Message-ID: <6d0ef0da936f76a215a5bae7784eba67ce1967e5.1529507994.git.andreyknvl@google.com>
+Date: Wed, 20 Jun 2018 17:24:19 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+Message-ID: <cover.1529507994.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the untagged_addr macro accept all kinds of address types
-(void *, unsigned long, etc.) and allows not to specify type casts in each
-place where it is used. This is done by using __typeof__.
+arm64 has a feature called Top Byte Ignore, which allows to embed pointer
+tags into the top byte of each pointer. Userspace programs (such as
+HWASan, a memory debugging tool [1]) might use this feature and pass
+tagged user pointers to the kernel through syscalls or other interfaces.
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- arch/arm64/include/asm/uaccess.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This patch makes a few of the kernel interfaces accept tagged user
+pointers. The kernel is already able to handle user faults with tagged
+pointers and has the untagged_addr macro, which this patchset reuses.
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index e66b0fca99c2..2d6451cbaa86 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -102,7 +102,8 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
-  * up with a tagged userland pointer. Clear the tag to get a sane pointer to
-  * pass on to access_ok(), for instance.
-  */
--#define untagged_addr(addr)		sign_extend64(addr, 55)
-+#define untagged_addr(addr)		\
-+	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
- 
- #define access_ok(type, addr, size)	__range_ok(addr, size)
- #define user_addr_max			get_fs
+We're not trying to cover all possible ways the kernel accepts user
+pointers in one patchset, so this one should be considered as a start.
+
+Thanks!
+
+[1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
+
+Changes in v4:
+- Added a selftest for checking that passing tagged pointers to the 
+  kernel succeeds.
+- Rebased onto 81e97f013 (4.18-rc1+).
+
+Changes in v3:
+- Rebased onto e5c51f30 (4.17-rc6+).
+- Added linux-arch@ to the list of recipients.
+
+Changes in v2:
+- Rebased onto 2d618bdf (4.17-rc3+).
+- Removed excessive untagging in gup.c.
+- Removed untagging pointers returned from __uaccess_mask_ptr.
+
+Changes in v1:
+- Rebased onto 4.17-rc1.
+
+Changes in RFC v2:
+- Added "#ifndef untagged_addr..." fallback in linux/uaccess.h instead of
+  defining it for each arch individually.
+- Updated Documentation/arm64/tagged-pointers.txt.
+- Dropped ?mm, arm64: untag user addresses in memory syscalls?.
+- Rebased onto 3eb2ce82 (4.16-rc7).
+
+Andrey Konovalov (7):
+  arm64: add type casts to untagged_addr macro
+  uaccess: add untagged_addr definition for other arches
+  arm64: untag user addresses in access_ok and __uaccess_mask_ptr
+  mm, arm64: untag user addresses in mm/gup.c
+  lib, arm64: untag addrs passed to strncpy_from_user and strnlen_user
+  arm64: update Documentation/arm64/tagged-pointers.txt
+  selftests, arm64: add a selftest for passing tagged pointers to kernel
+
+ Documentation/arm64/tagged-pointers.txt       |  5 +++--
+ arch/arm64/include/asm/uaccess.h              | 14 +++++++++-----
+ include/linux/uaccess.h                       |  4 ++++
+ lib/strncpy_from_user.c                       |  2 ++
+ lib/strnlen_user.c                            |  2 ++
+ mm/gup.c                                      |  4 ++++
+ tools/testing/selftests/arm64/.gitignore      |  1 +
+ tools/testing/selftests/arm64/Makefile        | 11 +++++++++++
+ .../testing/selftests/arm64/run_tags_test.sh  | 12 ++++++++++++
+ tools/testing/selftests/arm64/tags_test.c     | 19 +++++++++++++++++++
+ 10 files changed, 67 insertions(+), 7 deletions(-)
+ create mode 100644 tools/testing/selftests/arm64/.gitignore
+ create mode 100644 tools/testing/selftests/arm64/Makefile
+ create mode 100755 tools/testing/selftests/arm64/run_tags_test.sh
+ create mode 100644 tools/testing/selftests/arm64/tags_test.c
+
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
