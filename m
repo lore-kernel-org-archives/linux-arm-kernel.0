@@ -1,160 +1,93 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 20 Jun 2018 19:40:00 +0200
-Subject: [PATCH v3 14/17] khwasan,
- arm64: add brk handler for inline instrumentation
-In-Reply-To: <cover.1529515183.git.andreyknvl@google.com>
-References: <cover.1529515183.git.andreyknvl@google.com>
-Message-ID: <6660ebcd8b5c7b70b91731cb62dff85be5a94684.1529515183.git.andreyknvl@google.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Jun 2018 19:22:20 +0200
+Subject: [PATCH v8 20/26] drivers: firmware: psci: Share a few internal PSCI
+ functions
+In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-21-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KHWASAN inline instrumentation mode (which embeds checks of shadow memory
-into the generated code, instead of inserting a callback) generates a brk
-instruction when a tag mismatch is detected.
+Following changes needs to be able to call psci_get|set_domain_state() and
+psci_dt_parse_state_node(), but from a separate file. Let's make that
+possible by sharing them via a new internal PSCI header file.
 
-This commit add a KHWASAN brk handler, that decodes the immediate value
-passed to the brk instructions (to extract information about the memory
-access that triggered the mismatch), reads the register values (x0 contains
-the guilty address) and reports the bug.
-
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+Cc: Lina Iyer <ilina@codeaurora.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm64/include/asm/brk-imm.h |  2 +
- arch/arm64/kernel/traps.c        | 69 +++++++++++++++++++++++++++++++-
- 2 files changed, 69 insertions(+), 2 deletions(-)
+ drivers/firmware/psci/psci.c | 14 ++++++++------
+ drivers/firmware/psci/psci.h | 13 +++++++++++++
+ 2 files changed, 21 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/firmware/psci/psci.h
 
-diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
-index ed693c5bcec0..e4a7013321dc 100644
---- a/arch/arm64/include/asm/brk-imm.h
-+++ b/arch/arm64/include/asm/brk-imm.h
-@@ -16,10 +16,12 @@
-  * 0x400: for dynamic BRK instruction
-  * 0x401: for compile time BRK instruction
-  * 0x800: kernel-mode BUG() and WARN() traps
-+ * 0x9xx: KHWASAN trap (allowed values 0x900 - 0x9ff)
-  */
- #define FAULT_BRK_IMM			0x100
- #define KGDB_DYN_DBG_BRK_IMM		0x400
- #define KGDB_COMPILED_DBG_BRK_IMM	0x401
- #define BUG_BRK_IMM			0x800
-+#define KHWASAN_BRK_IMM			0x900
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index 40b2b8945018..463f78cda3be 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -34,6 +34,8 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
  
- #endif
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d399d459397b..95152a4fd202 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -35,6 +35,7 @@
- #include <linux/sizes.h>
- #include <linux/syscalls.h>
- #include <linux/mm_types.h>
-+#include <linux/kasan.h>
- 
- #include <asm/atomic.h>
- #include <asm/bug.h>
-@@ -269,10 +270,14 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
- 	}
- }
- 
--void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
-+void __arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
- {
- 	regs->pc += size;
-+}
- 
-+void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
-+{
-+	__arm64_skip_faulting_instruction(regs, size);
- 	/*
- 	 * If we were single stepping, we want to get the step exception after
- 	 * we return from the trap.
-@@ -791,7 +796,7 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
- 	}
- 
- 	/* If thread survives, skip over the BUG instruction and continue: */
--	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
-+	__arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
- 	return DBG_HOOK_HANDLED;
- }
- 
-@@ -801,6 +806,59 @@ static struct break_hook bug_break_hook = {
- 	.fn = bug_handler,
- };
- 
-+#ifdef CONFIG_KASAN_HW
-+
-+#define KHWASAN_ESR_RECOVER	0x20
-+#define KHWASAN_ESR_WRITE	0x10
-+#define KHWASAN_ESR_SIZE_MASK	0x0f
-+#define KHWASAN_ESR_SIZE(esr)	(1 << ((esr) & KHWASAN_ESR_SIZE_MASK))
-+
-+static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
-+{
-+	bool recover = esr & KHWASAN_ESR_RECOVER;
-+	bool write = esr & KHWASAN_ESR_WRITE;
-+	size_t size = KHWASAN_ESR_SIZE(esr);
-+	u64 addr = regs->regs[0];
-+	u64 pc = regs->pc;
-+
-+	if (user_mode(regs))
-+		return DBG_HOOK_ERROR;
-+
-+	kasan_report(addr, size, write, pc);
-+
-+	/*
-+	 * The instrumentation allows to control whether we can proceed after
-+	 * a crash was detected. This is done by passing the -recover flag to
-+	 * the compiler. Disabling recovery allows to generate more compact
-+	 * code.
-+	 *
-+	 * Unfortunately disabling recovery doesn't work for the kernel right
-+	 * now. KHWASAN reporting is disabled in some contexts (for example when
-+	 * the allocator accesses slab object metadata; same is true for KASAN;
-+	 * this is controlled by current->kasan_depth). All these accesses are
-+	 * detected by the tool, even though the reports for them are not
-+	 * printed.
-+	 *
-+	 * This is something that might be fixed at some point in the future.
-+	 */
-+	if (!recover)
-+		die("Oops - KHWASAN", regs, 0);
-+
-+	/* If thread survives, skip over the brk instruction and continue: */
-+	__arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
-+	return DBG_HOOK_HANDLED;
-+}
-+
-+#define KHWASAN_ESR_VAL (0xf2000000 | KHWASAN_BRK_IMM)
-+#define KHWASAN_ESR_MASK 0xffffff00
-+
-+static struct break_hook khwasan_break_hook = {
-+	.esr_val = KHWASAN_ESR_VAL,
-+	.esr_mask = KHWASAN_ESR_MASK,
-+	.fn = khwasan_handler,
-+};
-+#endif
++#include "psci.h"
 +
  /*
-  * Initial handler for AArch64 BRK exceptions
-  * This handler only used until debug_traps_init().
-@@ -808,6 +866,10 @@ static struct break_hook bug_break_hook = {
- int __init early_brk64(unsigned long addr, unsigned int esr,
- 		struct pt_regs *regs)
+  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+  * calls it is necessary to use SMC64 to pass or return 64-bit values.
+@@ -90,12 +92,12 @@ static u32 psci_function_id[PSCI_FN_MAX];
+ static DEFINE_PER_CPU(u32, domain_state);
+ static u32 psci_cpu_suspend_feature;
+ 
+-static inline u32 psci_get_domain_state(void)
++u32 psci_get_domain_state(void)
  {
-+#ifdef CONFIG_KASAN_HW
-+	if ((esr & KHWASAN_ESR_MASK) == KHWASAN_ESR_VAL)
-+		return khwasan_handler(regs, esr) != DBG_HOOK_HANDLED;
-+#endif
- 	return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
+ 	return this_cpu_read(domain_state);
  }
  
-@@ -815,4 +877,7 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
- void __init trap_init(void)
+-static inline void psci_set_domain_state(u32 state)
++void psci_set_domain_state(u32 state)
  {
- 	register_break_hook(&bug_break_hook);
-+#ifdef CONFIG_KASAN_HW
-+	register_break_hook(&khwasan_break_hook);
-+#endif
+ 	this_cpu_write(domain_state, state);
  }
+@@ -285,10 +287,7 @@ static int __init psci_features(u32 psci_func_id)
+ 			      psci_func_id, 0, 0);
+ }
+ 
+-#ifdef CONFIG_CPU_IDLE
+-static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+-
+-static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
++int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+ {
+ 	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
+ 
+@@ -305,6 +304,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_CPU_IDLE
++static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
++
+ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+ 	int i, ret = 0, count = 0;
+diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
+new file mode 100644
+index 000000000000..dc7b596daa2b
+--- /dev/null
++++ b/drivers/firmware/psci/psci.h
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __PSCI_H
++#define __PSCI_H
++
++struct device_node;
++
++u32 psci_get_domain_state(void);
++void psci_set_domain_state(u32 state);
++
++int psci_dt_parse_state_node(struct device_node *np, u32 *state);
++
++#endif /* __PSCI_H */
 -- 
-2.18.0.rc1.244.gcf134e6275-goog
+2.17.1
