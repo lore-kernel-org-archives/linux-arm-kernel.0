@@ -1,50 +1,71 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:24 +0200
-Subject: [PATCH v8 24/26] drivers: firmware: psci: Deal with CPU hotplug when
- using OSI mode
+Date: Wed, 20 Jun 2018 19:22:23 +0200
+Subject: [PATCH v8 23/26] drivers: firmware: psci: Try to attach CPU devices
+ to their PM domains
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-25-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-24-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To deal with CPU hotplug when OSI mode is used, the CPU device needs to be
-detached from its PM domain (genpd) when putting it offline, otherwise the
-CPU becomes considered as being in use from genpd and runtime PM point of
-view. Obviously, then we also need to re-attach the CPU device when bring
-the CPU back online, so let's do this.
+In case the OS initiated CPU suspend mode have been enabled, the PM domain
+topology for CPUs have earlier been created by PSCI. Let's use this
+information in psci_dt_cpu_init_idle() as a condition for when it makes
+sense to try to attach the CPU to its corresponding PM domain, via calling
+of_genpd_attach_cpu().
+
+If the CPU is attached successfully to its PM domain, idle management is
+now fully prepared to be controlled through runtime PM for the CPU.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci/psci.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/firmware/psci/psci.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 700e0e995871..e649673d71f0 100644
+index 80c286d83369..700e0e995871 100644
 --- a/drivers/firmware/psci/psci.c
 +++ b/drivers/firmware/psci/psci.c
-@@ -190,6 +190,10 @@ static int psci_cpu_off(u32 state)
- 	int err;
- 	u32 fn;
+@@ -20,6 +20,7 @@
+ #include <linux/linkage.h>
+ #include <linux/of.h>
+ #include <linux/pm.h>
++#include <linux/pm_domain.h>
+ #include <linux/printk.h>
+ #include <linux/psci.h>
+ #include <linux/reboot.h>
+@@ -91,6 +92,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
  
-+	/* If running OSI mode, detach the CPU device from its PM domain. */
-+	if (psci_osi_mode_enabled)
-+		of_genpd_detach_cpu(smp_processor_id());
-+
- 	fn = psci_function_id[PSCI_FN_CPU_OFF];
- 	err = invoke_psci_fn(fn, state, 0, 0);
- 	return psci_to_linux_errno(err);
-@@ -204,6 +208,10 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
- 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
- 	/* Clear the domain state to start fresh. */
- 	psci_set_domain_state(0);
-+
-+	if (!err && psci_osi_mode_enabled)
-+		of_genpd_attach_cpu(cpuid);
-+
- 	return psci_to_linux_errno(err);
- }
+ static DEFINE_PER_CPU(u32, domain_state);
+ static u32 psci_cpu_suspend_feature;
++static bool psci_osi_mode_enabled;
  
+ u32 psci_get_domain_state(void)
+ {
+@@ -339,6 +341,14 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 
+ 	/* Idle states parsed correctly, initialize per-cpu pointer */
+ 	per_cpu(psci_power_state, cpu) = psci_states;
++
++	/* If running OSI mode, attach the CPU device to its PM domain. */
++	if (psci_osi_mode_enabled) {
++		ret = of_genpd_attach_cpu(cpu);
++		if (ret)
++			goto free_mem;
++	}
++
+ 	return 0;
+ 
+ free_mem:
+@@ -753,6 +763,7 @@ int __init psci_dt_topology_init(void)
+ 		goto out;
+ 	}
+ 
++	psci_osi_mode_enabled = true;
+ 	pr_info("OSI mode enabled.\n");
+ out:
+ 	of_node_put(np);
 -- 
 2.17.1
