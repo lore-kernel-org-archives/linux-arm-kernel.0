@@ -1,23 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Jun 2018 07:50:53 -0300
-Subject: [PATCH] ARM: dts: imx7d-sdb: Restore pwm backlight support
-In-Reply-To: <c328d3e13702fa624febe08d7cd68df5b82b8c30.1529490998.git.leonard.crestez@nxp.com>
-References: <c328d3e13702fa624febe08d7cd68df5b82b8c30.1529490998.git.leonard.crestez@nxp.com>
-Message-ID: <CAOMZO5AJgSPqdLjnAiga-gExUeonkUD0jBsfb_L9n3KF8rbwTQ@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 20 Jun 2018 12:53:31 +0200
+Subject: [PATCH 18/20] dts: sama5d2: Update coresight bindings for
+ hardware ports
+In-Reply-To: <abf65bac-0956-f1de-127e-38b0f41a6233@arm.com>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+ <1528235011-30691-19-git-send-email-suzuki.poulose@arm.com>
+ <20180619212417.GB3128@piout.net>
+ <abf65bac-0956-f1de-127e-38b0f41a6233@arm.com>
+Message-ID: <20180620105331.GD7737@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 7:41 AM, Leonard Crestez
-<leonard.crestez@nxp.com> wrote:
-> This was removed in commit 5eaeaccdaedb ("ARM: dts: imx7d-sdb: Pass
-> 'enable-gpios' and 'power-supply' properties") with a note claiming that
-> GPIO1_IO01 is connected to a pin labeled as "PWREN" on the connector.
->
-> Despite that label this pin does actually work as a PWM controlling
-> brightness. So restore pwm functionality.
->
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+On 20/06/2018 10:44:29+0100, Suzuki K Poulose wrote:
+> On 19/06/18 22:24, Alexandre Belloni wrote:
+> > On 05/06/2018 22:43:29+0100, Suzuki K Poulose wrote:
+> > > Switch to the new coresight bindings for hardware ports
+> > > 
+> > > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > >   arch/arm/boot/dts/sama5d2.dtsi | 5 ++++-
+> > >   1 file changed, 4 insertions(+), 1 deletion(-)
+> > > 
+> > Applied, thanks.
+> > 
+> 
+> Alexandre,
+> 
+> Please hold off applying this change, as we are yet to come to an
+> agreement on this. Sorry for the trouble. See [0]
+> 
 
-Yes, it seems to me that the PWM functionality has been removed by mistake:
+I've removed it.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
