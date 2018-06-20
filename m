@@ -1,251 +1,118 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:21 +0200
-Subject: [PATCH v8 21/26] drivers: firmware: psci: Add support for PM domains
- using genpd
-In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-22-ulf.hansson@linaro.org>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 20 Jun 2018 10:39:16 -0700
+Subject: [PATCH v4 1/6] Documentation: DT: Consolidate SP805 binding docs
+In-Reply-To: <09c870cd-0a44-6634-58d8-f57f9fcd0cb5@broadcom.com>
+References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
+ <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
+ <20180605194124.GA26885@rob-hp-laptop>
+ <e91c75f3-f7a4-6f51-9911-7e22d5d05084@roeck-us.net>
+ <CABGGisxEvWDy16SKE2RG-vhUHBZHSCCHyfwJsPY16B1fQS-=cA@mail.gmail.com>
+ <09c870cd-0a44-6634-58d8-f57f9fcd0cb5@broadcom.com>
+Message-ID: <46ca340f-4347-94ca-6463-d38bece820e2@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the hierarchical layout is used in DT, as to describe the PM topology
-for the CPUs, which are managed by PSCI, we want to be able to initialize
-and setup the corresponding PM domain data structures.
+Hi Guenter/Rob,
 
-Let's make this possible via adding a new file, psci_pm_domains.c and
-implement the needed interface towards the generic PM domain (aka genpd).
-Share a helper function, psci_dt_init_pm_domains(), which the regular PSCI
-firmware driver may call when it needs to initialize the PM topology using
-genpd.
+Kindly let me know how you want to proceed with this?
 
-In principle, the implementation consists of allocating/initializing the
-genpd data structures, parsing the domain-idle states DT bindings via
-calling of_genpd_parse_idle_states() and to call pm_genpd_init() for the
-allocated genpds.
+Thanks,
 
-Finally, one genpd OF provider is added per genpd. Via DT, this enables
-devices, including CPU devices, to be attached to the created genpds.
+Ray
 
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/firmware/psci/Makefile         |   2 +-
- drivers/firmware/psci/psci.h           |   6 +
- drivers/firmware/psci/psci_pm_domain.c | 180 +++++++++++++++++++++++++
- 3 files changed, 187 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/psci/psci_pm_domain.c
-
-diff --git a/drivers/firmware/psci/Makefile b/drivers/firmware/psci/Makefile
-index 1956b882470f..ff300f1fec86 100644
---- a/drivers/firmware/psci/Makefile
-+++ b/drivers/firmware/psci/Makefile
-@@ -1,4 +1,4 @@
- # SPDX-License-Identifier: GPL-2.0
- #
--obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
-+obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o psci_pm_domain.o
- obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
-diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
-index dc7b596daa2b..a22684b24902 100644
---- a/drivers/firmware/psci/psci.h
-+++ b/drivers/firmware/psci/psci.h
-@@ -10,4 +10,10 @@ void psci_set_domain_state(u32 state);
- 
- int psci_dt_parse_state_node(struct device_node *np, u32 *state);
- 
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+int psci_dt_init_pm_domains(struct device_node *np);
-+#else
-+static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
-+#endif
-+
- #endif /* __PSCI_H */
-diff --git a/drivers/firmware/psci/psci_pm_domain.c b/drivers/firmware/psci/psci_pm_domain.c
-new file mode 100644
-index 000000000000..f54819e7e487
---- /dev/null
-+++ b/drivers/firmware/psci/psci_pm_domain.c
-@@ -0,0 +1,180 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * PM domains for CPUs via genpd - managed by PSCI.
-+ *
-+ * Copyright (C) 2018 Linaro Ltd.
-+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
-+ *
-+ */
-+
-+#define pr_fmt(fmt) "psci: " fmt
-+
-+#include <linux/device.h>
-+#include <linux/kernel.h>
-+#include <linux/pm_domain.h>
-+#include <linux/slab.h>
-+#include <linux/string.h>
-+
-+#include "psci.h"
-+
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+static int psci_pd_power_off(struct generic_pm_domain *pd)
-+{
-+	struct genpd_power_state *state = &pd->states[pd->state_idx];
-+	u32 *pd_state;
-+	u32 composite_pd_state;
-+
-+	if (!state->data)
-+		return 0;
-+
-+	pd_state = state->data;
-+	composite_pd_state = *pd_state | psci_get_domain_state();
-+	psci_set_domain_state(composite_pd_state);
-+
-+	return 0;
-+}
-+
-+static int psci_dt_parse_pd_states(struct genpd_power_state *states,
-+				   int state_count)
-+{
-+	int i, err;
-+	u32 *psci_states;
-+
-+	if (!state_count)
-+		return 0;
-+
-+	psci_states = kcalloc(state_count, sizeof(psci_states), GFP_KERNEL);
-+	if (!psci_states)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < state_count; i++) {
-+		err = psci_dt_parse_state_node(to_of_node(states[i].fwnode),
-+					       &psci_states[i]);
-+		if (err) {
-+			kfree(psci_states);
-+			return err;
-+		}
-+	}
-+
-+	for (i = 0; i < state_count; i++)
-+		states[i].data = &psci_states[i];
-+
-+	return 0;
-+}
-+
-+static int psci_dt_init_genpd(struct device_node *np,
-+			      struct genpd_power_state *states,
-+			      unsigned int state_count)
-+{
-+	struct generic_pm_domain *pd;
-+	struct dev_power_governor *pd_gov;
-+	int ret = -ENOMEM;
-+
-+	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-+	if (!pd)
-+		return -ENOMEM;
-+
-+	pd->name = kasprintf(GFP_KERNEL, "%pOF", np);
-+	if (!pd->name)
-+		goto free_pd;
-+
-+	pd->name = kbasename(pd->name);
-+	pd->power_off = psci_pd_power_off;
-+	pd->states = states;
-+	pd->state_count = state_count;
-+	pd->flags |= GENPD_FLAG_IRQ_SAFE | GENPD_FLAG_CPU_DOMAIN;
-+
-+	/* Use governor for CPU PM domains if it has some states to manage. */
-+	pd_gov = state_count > 0 ? &pm_domain_cpu_gov : NULL;
-+
-+	ret = pm_genpd_init(pd, pd_gov, false);
-+	if (ret)
-+		goto free_name;
-+
-+	ret = of_genpd_add_provider_simple(np, pd);
-+	if (ret)
-+		goto remove_pd;
-+
-+	pr_info("init PM domain %s\n", pd->name);
-+	return 0;
-+
-+remove_pd:
-+	pm_genpd_remove(pd);
-+free_name:
-+	kfree(pd->name);
-+free_pd:
-+	kfree(pd);
-+	pr_err("failed to init PM domain ret=%d %pOF\n", ret, np);
-+	return ret;
-+}
-+
-+static int psci_dt_set_genpd_topology(struct device_node *np)
-+{
-+	struct device_node *node;
-+	struct of_phandle_args child, parent;
-+	int ret;
-+
-+	for_each_child_of_node(np, node) {
-+		if (of_parse_phandle_with_args(node, "power-domains",
-+					       "#power-domain-cells", 0,
-+					       &parent))
-+			continue;
-+
-+		child.np = node;
-+		child.args_count = 0;
-+
-+		ret = of_genpd_add_subdomain(&parent, &child);
-+		of_node_put(parent.np);
-+		if (ret) {
-+			of_node_put(node);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+int psci_dt_init_pm_domains(struct device_node *np)
-+{
-+	struct device_node *node;
-+	struct genpd_power_state *states;
-+	int state_count;
-+	int pd_count = 0;
-+	int ret;
-+
-+	/* Parse child nodes for "#power-domain-cells". */
-+	for_each_child_of_node(np, node) {
-+		if (!of_find_property(node, "#power-domain-cells", NULL))
-+			continue;
-+
-+		ret = of_genpd_parse_idle_states(node, &states, &state_count);
-+		if (ret)
-+			goto err_put;
-+
-+		ret = psci_dt_parse_pd_states(states, state_count);
-+		if (ret)
-+			goto err_put;
-+
-+		ret = psci_dt_init_genpd(node, states, state_count);
-+		if (ret)
-+			goto err_put;
-+
-+		pd_count++;
-+	}
-+
-+	if (!pd_count)
-+		return 0;
-+
-+	ret = psci_dt_set_genpd_topology(np);
-+	if (ret)
-+		goto err_msg;
-+
-+	return pd_count;
-+
-+err_put:
-+	of_node_put(node);
-+err_msg:
-+	pr_err("failed to create PM domains ret=%d\n", ret);
-+	return ret;
-+}
-+#endif
--- 
-2.17.1
+On 6/6/2018 4:39 PM, Ray Jui wrote:
+> 
+> 
+> On 6/6/2018 9:33 AM, Rob Herring wrote:
+>> On Wed, Jun 6, 2018 at 11:19 AM, Guenter Roeck <linux@roeck-us.net> 
+>> wrote:
+>>> On 06/05/2018 12:41 PM, Rob Herring wrote:
+>>>>
+>>>> On Mon, May 28, 2018 at 11:01:32AM -0700, Ray Jui wrote:
+>>>>>
+>>>>> Consolidate two SP805 binding documents "arm,sp805.txt" and
+>>>>> "sp805-wdt.txt" into "arm,sp805.txt" that matches the naming of the
+>>>>> desired compatible string to be used
+>>>>>
+>>>>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>>>>> ---
+>>>>> ?? .../devicetree/bindings/watchdog/arm,sp805.txt???? | 27
+>>>>> ++++++++++++++-----
+>>>>> ?? .../devicetree/bindings/watchdog/sp805-wdt.txt???? | 31
+>>>>> ----------------------
+>>>>> ?? 2 files changed, 20 insertions(+), 38 deletions(-)
+>>>>> ?? delete mode 100644
+>>>>> Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>>>>
+>>>>
+>>>> Would be good to get a ACK from FSL/NXP person on this. It looks to me
+>>>> like the driver fetches the wrong clock as it gets the first one and 
+>>>> the
+>>>> driver really wants 'wdog_clk'. In any case, their dts files should be
+>>>> updated.
+>>>>
+>>>
+>>> This is really confusing, since he deleted file lists apb_pclk first.
+>>> Does the watchdog driver need apb_pclk or wdog_clk ? That isn't clear 
+>>> to me.
+>>> arch/arm64/boot/dts/hisilicon/hi3660.dtsi only provides apb_pclk, or at
+>>> least
+>>> it says so.
+>>
+>> Note that that clock source is 32KHz. That is obviously a mistake
+>> because no one clocks their bus/register interface at 32KHz. Someone
+>> just filled in something that happened to work.
+>>
+>>> The fsl dts files all have apb_pclk first.
+>>
+>> It's all kind of a mess, but fortunately one we should be able to 
+>> clean-up.
+>>
+> 
+> It is indeed a mess. Note the SP805 driver only derive one clock from 
+> DT, and that's not done based on name. As a result, the first clock 
+> defined in DT will be fetched and the rate calculation will be carried 
+> out based on that clock rate.
+> 
+> I assumed the clock entries and their names defined in the binding 
+> document are just placeholders, at least for the 2nd clock.
+> 
+> Based on how the current driver is, the first clock needs to be the 
+> WDOGCLK for things to work properly.
+> 
+> According to the SP805 TRM, APB clock is the PCLK, that drives the bus 
+> for register access.
+> 
+> The relationship between WDOGCLK and PCLK is defined as:
+> 
+> - the rising edges of WDOGCLK must be synchronous and
+> balanced with a rising edge of PCLK
+> 
+> - the WDOGCLK frequency cannot be greater than the PCLK
+> frequency
+> 
+>> The compatible string changes too, but AMBA bus devices don't actually
+>> use the compatible string as they use the ID registers to match. I
+>> suppose some other OS could do things differently. Worth the risk to
+>> clean-up IMO.
+>>
+>>>
+>>> Either case, why are two clocks asked for in the first place ? Are there
+>>> situations where the second clock is actually used/useful ?
+>>
+>> For clocks, the bus needs "apb_pclk" and the driver just gets the
+>> first clock. The driver is obviously going to want the functional
+>> clock that determines the counter rate. That should
+>>
+>> Primecell peripherals are about the only ones that have clear specs
+>> WRT clock inputs. Yet we've still managed to screw them up. There are
+>> 2 clocks in the spec, so the DT has (or should have) 2 clocks.
+>>
+>> Rob
+>>
+> 
+> Let me know how you guys want to proceed with this?
+> 
+> Thanks,
+> 
+> Ray
