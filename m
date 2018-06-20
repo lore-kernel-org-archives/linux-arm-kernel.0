@@ -1,37 +1,72 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 20 Jun 2018 10:44:29 +0100
-Subject: [PATCH 18/20] dts: sama5d2: Update coresight bindings for
- hardware ports
-In-Reply-To: <20180619212417.GB3128@piout.net>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-19-git-send-email-suzuki.poulose@arm.com>
- <20180619212417.GB3128@piout.net>
-Message-ID: <abf65bac-0956-f1de-127e-38b0f41a6233@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 20 Jun 2018 11:46:49 +0200
+Subject: [PATCH v5 2/6] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
+References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+ <20180619211929.22908-3-alexandre.belloni@bootlin.com>
+ <alpine.DEB.2.21.1806201037240.10546@nanos.tec.linutronix.de>
+Message-ID: <20180620094649.GA2766@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/18 22:24, Alexandre Belloni wrote:
-> On 05/06/2018 22:43:29+0100, Suzuki K Poulose wrote:
->> Switch to the new coresight bindings for hardware ports
->>
->> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
->> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm/boot/dts/sama5d2.dtsi | 5 ++++-
->>   1 file changed, 4 insertions(+), 1 deletion(-)
->>
-> Applied, thanks.
+On 20/06/2018 11:03:40+0200, Thomas Gleixner wrote:
+> > +/*
+> > + * Clocksource and clockevent using the same channel(s)
+> > + */
+> > +static u64 tc_get_cycles(struct clocksource *cs)
+> > +{
+> > +	u32 lower, upper;
+> > +
+> > +	do {
+> > +		upper = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1]));
+> > +		lower = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> > +	} while (upper != readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1])));
+> > +
+> > +	return (upper << 16) | lower;
+> > +}
+> 
+> For timekeeping the win of this is dubious. With a 5Mhz clock the 32bit
+> part wraps around in ~859 seconds, which is plenty even for NOHZ.
+> 
+> So I really would avoid the double read/compare/eventually repeat magic and
+> just use the lower 32bits for performance sake. I assume the same is true
+> for sched_clock(), but I might be wrong.
 > 
 
-Alexandre,
+Agreed, this is why this is only used with the 16 bit counters (the
+register is 32 bit wide but the counter only have 16 bits. For the 32
+bit counters, tc_get_cycles32 is used and only use one counter.
 
-Please hold off applying this change, as we are yet to come to an
-agreement on this. Sorry for the trouble. See [0]
+> > +static int tcb_clkevt_next_event(unsigned long delta,
+> > +				 struct clock_event_device *d)
+> > +{
+> > +	u32 old, next, cur;
+> > +
+> > +	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> > +	next = old + delta;
+> > +	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
+> > +	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
+> > +
+> > +	/* check whether the delta elapsed while setting the register */
+> > +	if ((next < old && cur < old && cur > next) ||
+> > +	    (next > old && (cur < old || cur > next))) {
+> > +		/*
+> > +		 * Clear the CPCS bit in the status register to avoid
+> > +		 * generating a spurious interrupt next time a valid
+> > +		 * timer event is configured.
+> > +		 */
+> > +		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
+> > +		return -ETIME;
+> > +	}
+> 
+> Aarg. Doesn;t that timer block have a simple count down and fire mode?
+> These compare equal timers suck.
+
+It only counts up...
 
 
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582269.html
-
-Kind regards
-Suzuki
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
