@@ -1,22 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 08:42:23 +0800
-Subject: [PATCH v3 24/27] devicetree: fix a series of wrong file references
-In-Reply-To: <bce1b59268ac2d659fd7cb37f89285ef2acc8316.1528990947.git.mchehab+samsung@kernel.org>
-References: <cover.1528990947.git.mchehab+samsung@kernel.org>
- <bce1b59268ac2d659fd7cb37f89285ef2acc8316.1528990947.git.mchehab+samsung@kernel.org>
-Message-ID: <CAGb2v67s29mYa+hcYFWCokmzLwi7aYyeBwDnQiTJQYxT0GxPNA@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 20 Jun 2018 03:45:01 +0300
+Subject: [PATCH 2/5] RFC: eeprom: at24: Allow passing gpiodesc from pdata
+In-Reply-To: <20180618074556.6944-3-linus.walleij@linaro.org>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+ <20180618074556.6944-3-linus.walleij@linaro.org>
+Message-ID: <CAHp75Vd8VeYh8KOvCW54u-ZnP3jM60aCD9AnWxKYsSBSX09Y4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 12:09 AM, Mauro Carvalho Chehab
-<mchehab+samsung@kernel.org> wrote:
-> As files got renamed, their references broke.
+On Mon, Jun 18, 2018 at 10:45 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> This makes it possible to pass an initialized GPIO descriptor
+> to the driver through platform data.
 >
-> Manually fix a series of broken refs at the DT bindings.
->
-> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-> ---
+> This is useful when we are dealing with EEPROMs on expansion
+> boards where the GPIO has to be looked up indirectly using a
+> connector abstraction (several systems using the same
+> connector) so the machine descriptor tables cannot be used
+> to associate the descriptor with the device and we then want
+> to pass this descriptor on to the EEPROM driver this way
+> instead.
 
->  Documentation/devicetree/bindings/mfd/sun6i-prcm.txt |  2 +-
+How this descriptor is supposed to be created?
+Whenever we probe the device we might add properties to it (consider
+how MFD does instansiate them), I guess same way GPIO lookup tables
+work. No?
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+P.S. I really would like to hear a _strong_ argument why it can't be
+done using other means like built-in device properties or GPIO lookup
+tables (which on my opinion have to work in the similar way at run
+time).
+
+-- 
+With Best Regards,
+Andy Shevchenko
