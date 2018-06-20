@@ -1,45 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Jun 2018 18:01:54 +0100
-Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache
- for kernel mappings
-In-Reply-To: <1529510537801.73315@nvidia.com>
-References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
- <1529412495-17525-4-git-send-email-will.deacon@arm.com>
- <1529510537801.73315@nvidia.com>
-Message-ID: <20180620170153.GF27776@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Jun 2018 19:22:02 +0200
+Subject: [PATCH v8 02/26] PM / Domains: Deal with multiple states but no
+ governor in genpd
+In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-3-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+A caller of pm_genpd_init() that provides some states for the genpd via the
+->states pointer in the struct generic_pm_domain, should also provide a
+governor. This because it's the job of the governor to pick a state that
+satisfies the constraints.
 
-On Wed, Jun 20, 2018 at 04:01:29PM +0000, Alexander Van Brunt wrote:
-> > When invalidating the instruction cache for a kernel mapping via
-> > flush_icache_range(), it is also necessary to flush the pipeline for
-> > other CPUs so that instructions fetched into the pipeline before the
-> > I-cache invalidation are discarded. For example, if module 'foo' is
-> > unloaded and then module 'bar' is loaded into the same area of memory,
-> > a CPU could end up executing instructions from 'foo' when branching into
-> > 'bar' if these instructions were fetched into the pipeline before 'foo'
-> > was unloaded.
-> 
-> I don't think this fixes the problem. If a CPU is executing 'foo', takes
-> an IPI, and returns to find itself executing in the middle of 'bar' there
-> is still a problem because the code changed. All this patch does is
-> synchronize when two CPUs see 'foo' change to 'bar'.
+Therefore, let's print a warning to inform the user about such bogus
+configuration and avoid to bail out, by instead picking the shallowest
+state before genpd invokes the ->power_off() callback.
 
-Right, but that would indicate a catastophic bug in the module code. There
-are two sides to this:
+Cc: Lina Iyer <ilina@codeaurora.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Lina Iyer <ilina@codeaurora.org>
+---
+ drivers/base/power/domain.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-1. Code that manages the lifetime of executable mappings. That should all be
-   present in the core code, to make sure that we don't e.g. unmap code that
-   is being executed.
-
-2. Ensuring that new instructions in an executable mapping are visible to
-   the CPU I-side when that CPU decides to branch into the mapping.
-
-This patch series is all about (2). *If* (1) was implemented exclusively
-using RCU, then we could probably avoid the IPI and instead ensure that an
-RCU grace period ensured all concurrent executors had gone through a context
-synchronization event, but unfortunately we can't rely on that.
-
-Will
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 62969c3d5d04..21d298e1820b 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -467,6 +467,10 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
+ 			return -EAGAIN;
+ 	}
+ 
++	/* Default to shallowest state. */
++	if (!genpd->gov)
++		genpd->state_idx = 0;
++
+ 	if (genpd->power_off) {
+ 		int ret;
+ 
+@@ -1687,6 +1691,8 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+ 		ret = genpd_set_default_power_state(genpd);
+ 		if (ret)
+ 			return ret;
++	} else if (!gov) {
++		pr_warn("%s : no governor for states\n", genpd->name);
+ 	}
+ 
+ 	device_initialize(&genpd->dev);
+-- 
+2.17.1
