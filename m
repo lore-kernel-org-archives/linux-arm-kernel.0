@@ -1,87 +1,64 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 20 Jun 2018 13:15:37 +0800
-Subject: [PATCH 2/5] mfd: axp20x: Add self-working mode support for AXP806
+Date: Wed, 20 Jun 2018 13:15:39 +0800
+Subject: [PATCH 4/5] arm64: dts: allwinner: h6: Use macros for R_CCU clock and
+ reset indices
 In-Reply-To: <20180620051540.25617-1-wens@csie.org>
 References: <20180620051540.25617-1-wens@csie.org>
-Message-ID: <20180620051540.25617-3-wens@csie.org>
+Message-ID: <20180620051540.25617-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP806 can operate in a standalone "self-working" mode, in which it
-is also responsible for power control of the overall system. This mode
-is similar to the master mode, but the EN/PWRON pin functions as a power
-button, instead of a level-triggered enable switch.
+Now that the device tree binding headers for the R_CCU have been merged,
+we can use the macros, instead of raw numbers.
 
-This patch adds code checking for the new "x-powers,self-working-mode"
-property, and a separate mfd_cell list that includes the power button
-(PEK) sub-device.
+Switch to R_CCU macros for clock and reset indices.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mfd/axp20x.c | 30 +++++++++++++++++++++++++++---
- 1 file changed, 27 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 9a2ef3d9b8f8..1988881529a9 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -221,6 +221,11 @@ static const struct resource axp803_pek_resources[] = {
- 	DEFINE_RES_IRQ_NAMED(AXP803_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index c72da8cd9ef5..d85070f8c4a2 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -5,7 +5,9 @@
  
-+static const struct resource axp806_pek_resources[] = {
-+	DEFINE_RES_IRQ_NAMED(AXP806_IRQ_POK_RISE, "PEK_DBR"),
-+	DEFINE_RES_IRQ_NAMED(AXP806_IRQ_POK_FALL, "PEK_DBF"),
-+};
-+
- static const struct resource axp809_pek_resources[] = {
- 	DEFINE_RES_IRQ_NAMED(AXP809_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
- 	DEFINE_RES_IRQ_NAMED(AXP809_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
-@@ -730,6 +735,17 @@ static const struct mfd_cell axp803_cells[] = {
- 	{	.name			= "axp20x-regulator" },
- };
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/sun50i-h6-ccu.h>
++#include <dt-bindings/clock/sun50i-h6-r-ccu.h>
+ #include <dt-bindings/reset/sun50i-h6-ccu.h>
++#include <dt-bindings/reset/sun50i-h6-r-ccu.h>
  
-+static const struct mfd_cell axp806_self_working_cells[] = {
-+	{
-+		.name			= "axp221-pek",
-+		.num_resources		= ARRAY_SIZE(axp806_pek_resources),
-+		.resources		= axp806_pek_resources,
-+	},
-+	{
-+		.name			= "axp20x-regulator",
-+	},
-+};
-+
- static const struct mfd_cell axp806_cells[] = {
- 	{
- 		.id			= 2,
-@@ -842,8 +858,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		axp20x->regmap_irq_chip = &axp803_regmap_irq_chip;
- 		break;
- 	case AXP806_ID:
--		axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
--		axp20x->cells = axp806_cells;
-+		if (of_property_read_bool(axp20x->dev->of_node,
-+					  "x-powers,self-working-mode")) {
-+			axp20x->nr_cells = ARRAY_SIZE(axp806_self_working_cells);
-+			axp20x->cells = axp806_self_working_cells;
-+		} else {
-+			axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
-+			axp20x->cells = axp806_cells;
-+		}
- 		axp20x->regmap_cfg = &axp806_regmap_config;
- 		axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
- 		break;
-@@ -901,7 +923,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
- 	 */
- 	if (axp20x->variant == AXP806_ID) {
- 		if (of_property_read_bool(axp20x->dev->of_node,
--					  "x-powers,master-mode"))
-+					  "x-powers,master-mode") ||
-+		    of_property_read_bool(axp20x->dev->of_node,
-+					  "x-powers,self-working-mode"))
- 			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
- 				     AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE);
- 		else
+ / {
+ 	interrupt-parent = <&gic>;
+@@ -198,7 +200,7 @@
+ 			reg = <0x07022000 0x400>;
+ 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 2>, <&osc24M>, <&osc32k>;
++			clocks = <&r_ccu CLK_R_APB1>, <&osc24M>, <&osc32k>;
+ 			clock-names = "apb", "hosc", "losc";
+ 			gpio-controller;
+ 			#gpio-cells = <3>;
+@@ -208,6 +210,7 @@
+ 			r_i2c_pins: r-i2c {
+ 				pins = "PL0", "PL1";
+ 				function = "s_i2c";
++				bias-pull-up;
+ 			};
+ 		};
+ 
+@@ -215,8 +218,8 @@
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07081400 0x400>;
+ 			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 8>;
+-			resets = <&r_ccu 4>;
++			clocks = <&r_ccu CLK_R_APB2_I2C>;
++			resets = <&r_ccu RST_R_APB2_I2C>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&r_i2c_pins>;
+ 			status = "disabled";
 -- 
 2.17.1
