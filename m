@@ -1,98 +1,76 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:19 +0200
-Subject: [PATCH v8 19/26] drivers: firmware: psci: Prepare to use OS initiated
- suspend mode
-In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-20-ulf.hansson@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jun 2018 13:14:09 -0600
+Subject: [PATCH V3 1/3] watchdog: stm32: add pclk feature for stm32mp1
+In-Reply-To: <1529502698-13263-2-git-send-email-ludovic.Barre@st.com>
+References: <1529502698-13263-1-git-send-email-ludovic.Barre@st.com>
+ <1529502698-13263-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <20180620191409.GA29934@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the OS initiated mode, the CPU topology needs to be described
-using the hierarchical model in DT. When used, the idle state bits for the
-CPU needs to be created by ORing the bits for CPU's selected idle state
-with the bits for CPU's PM domain (CPU's cluster) idle state.
+On Wed, Jun 20, 2018 at 03:51:36PM +0200, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+> 
+> This patch adds config data to manage specific properties by
+> compatible. Adds stm32mp1 config which requires pclk clock.
+> 
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> ---
+>  .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  21 +++-
 
-Let's prepare the PSCI driver to deal with this, via introducing a per CPU
-variable called domain_state and by adding internal helpers to read/write
-the value of variable.
+Please split bindings to separate patch.
 
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/firmware/psci/psci.c | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+>  drivers/watchdog/stm32_iwdg.c                      | 116 +++++++++++++--------
+>  2 files changed, 91 insertions(+), 46 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+> index cc13b10a..f07f6d89 100644
+> --- a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+> @@ -2,18 +2,31 @@ STM32 Independent WatchDoG (IWDG)
+>  ---------------------------------
+>  
+>  Required properties:
+> -- compatible: "st,stm32-iwdg"
+> -- reg: physical base address and length of the registers set for the device
+> -- clocks: must contain a single entry describing the clock input
+> +- compatible: Should be either "st,stm32-iwdg" or "st,stm32mp1-iwdg"
 
-diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index e8f4f8444ff1..40b2b8945018 100644
---- a/drivers/firmware/psci/psci.c
-+++ b/drivers/firmware/psci/psci.c
-@@ -87,8 +87,19 @@ static u32 psci_function_id[PSCI_FN_MAX];
- 				(PSCI_1_0_EXT_POWER_STATE_ID_MASK | \
- 				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
- 
-+static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
- 
-+static inline u32 psci_get_domain_state(void)
-+{
-+	return this_cpu_read(domain_state);
-+}
-+
-+static inline void psci_set_domain_state(u32 state)
-+{
-+	this_cpu_write(domain_state, state);
-+}
-+
- static inline bool psci_has_ext_power_state(void)
- {
- 	return psci_cpu_suspend_feature &
-@@ -187,6 +198,8 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
- 
- 	fn = psci_function_id[PSCI_FN_CPU_ON];
- 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-+	/* Clear the domain state to start fresh. */
-+	psci_set_domain_state(0);
- 	return psci_to_linux_errno(err);
- }
- 
-@@ -408,15 +421,17 @@ int psci_cpu_init_idle(unsigned int cpu)
- static int psci_suspend_finisher(unsigned long index)
- {
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 composite_state = state[index - 1] | psci_get_domain_state();
- 
--	return psci_ops.cpu_suspend(state[index - 1],
--				    __pa_symbol(cpu_resume));
-+	return psci_ops.cpu_suspend(composite_state, __pa_symbol(cpu_resume));
- }
- 
- int psci_cpu_suspend_enter(unsigned long index)
- {
- 	int ret;
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 composite_state = state[index - 1] | psci_get_domain_state();
-+
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-@@ -424,11 +439,14 @@ int psci_cpu_suspend_enter(unsigned long index)
- 	if (WARN_ON_ONCE(!index))
- 		return -EINVAL;
- 
--	if (!psci_power_state_loses_context(state[index - 1]))
--		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+	if (!psci_power_state_loses_context(composite_state))
-+		ret = psci_ops.cpu_suspend(composite_state, 0);
- 	else
- 		ret = cpu_suspend(index, psci_suspend_finisher);
- 
-+	/* Clear the domain state to start fresh when back from idle. */
-+	psci_set_domain_state(0);
-+
- 	return ret;
- }
- 
--- 
-2.17.1
+Please format one per line.
+
+> +- reg: Physical base address and length of the registers set for the device
+> +- clocks: Reference to the clock entry lsi. Additional pclk clock entry
+> +  is required only for st,stm32mp1-iwdg.
+> +- clock-names: Name of the clocks used.
+> +  "lsi" for st,stm32-iwdg
+> +  "pclk", "lsi" for st,stm32mp1-iwdg
+
+Put lsi 1st so it is always index 0.
+
+>  
+>  Optional Properties:
+>  - timeout-sec: Watchdog timeout value in seconds.
+>  
+> -Example:
+> +Examples:
+>  
+>  iwdg: watchdog at 40003000 {
+>  	compatible = "st,stm32-iwdg";
+>  	reg = <0x40003000 0x400>;
+>  	clocks = <&clk_lsi>;
+> +	clock-names = "lsi";
+> +	timeout-sec = <32>;
+> +};
+> +
+> +iwdg: iwdg at 5a002000 {
+
+watchdog at ...
+
+Do we really need 2 example just to show 2 clocks?
+
+> +	compatible = "st,stm32mp1-iwdg";
+> +	reg = <0x5a002000 0x400>;
+> +	clocks = <&rcc IWDG2>, <&clk_lsi>;
+> +	clock-names = "pclk", "lsi";
+>  	timeout-sec = <32>;
+>  };
