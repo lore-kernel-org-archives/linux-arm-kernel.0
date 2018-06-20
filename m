@@ -1,49 +1,29 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 20 Jun 2018 17:42:13 +0200
-Subject: [PATCH v4 15/19] dt-bindings: media: Document bindings for the
- Sunxi-Cedrus VPU driver
-In-Reply-To: <20180620154009.GA26099@rob-hp-laptop>
-References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
- <20180618145843.14631-16-paul.kocialkowski@bootlin.com>
- <20180620154009.GA26099@rob-hp-laptop>
-Message-ID: <a2f7b1841410b4a9cd8ac9b5dd323ab2b060acef.camel@bootlin.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 Jun 2018 16:44:26 +0100
+Subject: [PATCH] arm64: kpti: Use early_param for kpti= command-line option
+In-Reply-To: <20180620154032.kwhvuwibustjqmwz@armageddon.cambridge.arm.com>
+References: <1529508227-24331-1-git-send-email-will.deacon@arm.com>
+ <20180620154032.kwhvuwibustjqmwz@armageddon.cambridge.arm.com>
+Message-ID: <20180620154426.GC27776@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 2018-06-20 at 09:40 -0600, Rob Herring wrote:
-> On Mon, Jun 18, 2018 at 04:58:39PM +0200, Paul Kocialkowski wrote:
-> > This adds a device-tree binding document that specifies the properties
-> > used by the Sunxi-Cedurs VPU driver, as well as examples.
+On Wed, Jun 20, 2018 at 04:40:32PM +0100, Catalin Marinas wrote:
+> On Wed, Jun 20, 2018 at 04:23:47PM +0100, Will Deacon wrote:
+> > We inspect __kpti_forced early on as part of the cpufeature enable
+> > callback which remaps the swapper page table using non-global entries.
 > > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Ensure that __kpti_forced has been updated to reflect the kpti=
+> > command-line option before we start using it.
 > > 
-> >  create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > Reported-by: Wei Xu <xuwei5@hisilicon.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> You are missing a '---' line so this is going to end up in the commit 
-> msg.
+> Does it need a fixes tag?
+> 
+> Fixes: ea1e3de85e94 ("arm64: entry: Add fake CPU feature for unmapping the kernel at EL0")
 
-Yes, I can't really explain how this happened. It seems related to
-exporting patches with --summary.
+Perhaps, but really this is just a performance optimisation for the kpti=off
+case where we don't actually need to put the nG mappings down.
 
-> Please add acked/reviewed bys when posting new versions.
-
-Oh, sorry for forgetting that. The bindings are indeed exactly the same
-as the ones your reviewed and acked already.
-
-Cheers,
-
-Paul
-
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180620/8efc735c/attachment.sig>
+Will
