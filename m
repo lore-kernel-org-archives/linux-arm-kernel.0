@@ -1,37 +1,231 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 20 Jun 2018 19:39:56 +0200
-Subject: [PATCH v3 10/17] khwasan,
- mm: perform untagged pointers comparison in krealloc
+Date: Wed, 20 Jun 2018 19:40:01 +0200
+Subject: [PATCH v3 15/17] khwasan, mm,
+ arm64: tag non slab memory allocated via pagealloc
 In-Reply-To: <cover.1529515183.git.andreyknvl@google.com>
 References: <cover.1529515183.git.andreyknvl@google.com>
-Message-ID: <6ab2ac0b6a7d12d2a6616e847732305dde544a99.1529515183.git.andreyknvl@google.com>
+Message-ID: <05d48d96bcecdb74bc8b7977634a4c16feb7a465.1529515183.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The krealloc function checks where the same buffer was reused or a new one
-allocated by comparing kernel pointers. KHWASAN changes memory tag on the
-krealloc'ed chunk of memory and therefore also changes the pointer tag of
-the returned pointer. Therefore we need to perform comparison on untagged
-(with tags reset) pointers to check whether it's the same memory region or
-not.
+KWHASAN doesn't check memory accesses through pointers tagged with 0xff.
+When page_address is used to get pointer to memory that corresponds to
+some page, the tag of the resulting pointer gets set to 0xff, even though
+the allocated memory might have been tagged differently.
+
+For slab pages it's impossible to recover the correct tag to return from
+page_address, since the page might contain multiple slab objects tagged
+with different values, and we can't know in advance which one of them is
+going to get accessed. For non slab pages however, we can recover the tag
+in page_address, since the whole page was marked with the same tag.
+
+This patch adds tagging to non slab memory allocated with pagealloc. To
+set the tag of the pointer returned from page_address, the tag gets stored
+to page->flags when the memory gets allocated.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- mm/slab_common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/memory.h   | 10 ++++++++++
+ include/linux/mm.h                | 29 +++++++++++++++++++++++++++++
+ include/linux/page-flags-layout.h | 10 ++++++++++
+ mm/cma.c                          | 11 +++++++++++
+ mm/kasan/common.c                 | 15 +++++++++++++--
+ mm/page_alloc.c                   |  1 +
+ 6 files changed, 74 insertions(+), 2 deletions(-)
 
-diff --git a/mm/slab_common.c b/mm/slab_common.c
-index c279b52c7565..7746d2ef5d45 100644
---- a/mm/slab_common.c
-+++ b/mm/slab_common.c
-@@ -1509,7 +1509,7 @@ void *krealloc(const void *p, size_t new_size, gfp_t flags)
- 	}
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index e9e054dfb1fc..3352a65b8312 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -305,7 +305,17 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+ #define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
  
- 	ret = __do_krealloc(p, new_size, flags);
--	if (ret && p != ret)
-+	if (ret && khwasan_reset_tag(p) != khwasan_reset_tag(ret))
- 		kfree(p);
++#ifndef CONFIG_KASAN_HW
+ #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
++#else
++#define page_to_virt(page)	({					\
++	unsigned long __addr =						\
++		((__page_to_voff(page)) | PAGE_OFFSET);			\
++	__addr = KASAN_SET_TAG(__addr, page_kasan_tag(page));		\
++	((void *)__addr);						\
++})
++#endif
++
+ #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
  
- 	return ret;
+ #define _virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index a0fbb9ffe380..46afadf4f48c 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -784,6 +784,7 @@ int finish_mkwrite_fault(struct vm_fault *vmf);
+ #define NODES_PGOFF		(SECTIONS_PGOFF - NODES_WIDTH)
+ #define ZONES_PGOFF		(NODES_PGOFF - ZONES_WIDTH)
+ #define LAST_CPUPID_PGOFF	(ZONES_PGOFF - LAST_CPUPID_WIDTH)
++#define KASAN_TAG_PGOFF		(LAST_CPUPID_PGOFF - KASAN_TAG_WIDTH)
+ 
+ /*
+  * Define the bit shifts to access each section.  For non-existent
+@@ -794,6 +795,7 @@ int finish_mkwrite_fault(struct vm_fault *vmf);
+ #define NODES_PGSHIFT		(NODES_PGOFF * (NODES_WIDTH != 0))
+ #define ZONES_PGSHIFT		(ZONES_PGOFF * (ZONES_WIDTH != 0))
+ #define LAST_CPUPID_PGSHIFT	(LAST_CPUPID_PGOFF * (LAST_CPUPID_WIDTH != 0))
++#define KASAN_TAG_PGSHIFT	(KASAN_TAG_PGOFF * (KASAN_TAG_WIDTH != 0))
+ 
+ /* NODE:ZONE or SECTION:ZONE is used to ID a zone for the buddy allocator */
+ #ifdef NODE_NOT_IN_PAGE_FLAGS
+@@ -816,6 +818,7 @@ int finish_mkwrite_fault(struct vm_fault *vmf);
+ #define NODES_MASK		((1UL << NODES_WIDTH) - 1)
+ #define SECTIONS_MASK		((1UL << SECTIONS_WIDTH) - 1)
+ #define LAST_CPUPID_MASK	((1UL << LAST_CPUPID_SHIFT) - 1)
++#define KASAN_TAG_MASK		((1UL << KASAN_TAG_WIDTH) - 1)
+ #define ZONEID_MASK		((1UL << ZONEID_SHIFT) - 1)
+ 
+ static inline enum zone_type page_zonenum(const struct page *page)
+@@ -1070,6 +1073,32 @@ static inline bool cpupid_match_pid(struct task_struct *task, int cpupid)
+ }
+ #endif /* CONFIG_NUMA_BALANCING */
+ 
++#ifdef CONFIG_KASAN_HW
++static inline u8 page_kasan_tag(const struct page *page)
++{
++	return (page->flags >> KASAN_TAG_PGSHIFT) & KASAN_TAG_MASK;
++}
++
++static inline void page_kasan_tag_set(struct page *page, u8 tag)
++{
++	page->flags &= ~(KASAN_TAG_MASK << KASAN_TAG_PGSHIFT);
++	page->flags |= (tag & KASAN_TAG_MASK) << KASAN_TAG_PGSHIFT;
++}
++
++static inline void page_kasan_tag_reset(struct page *page)
++{
++	page_kasan_tag_set(page, 0xff);
++}
++#else
++static inline u8 page_kasan_tag(const struct page *page)
++{
++	return 0xff;
++}
++
++static inline void page_kasan_tag_set(struct page *page, u8 tag) { }
++static inline void page_kasan_tag_reset(struct page *page) { }
++#endif
++
+ static inline struct zone *page_zone(const struct page *page)
+ {
+ 	return &NODE_DATA(page_to_nid(page))->node_zones[page_zonenum(page)];
+diff --git a/include/linux/page-flags-layout.h b/include/linux/page-flags-layout.h
+index 7ec86bf31ce4..8dbad17664c2 100644
+--- a/include/linux/page-flags-layout.h
++++ b/include/linux/page-flags-layout.h
+@@ -82,6 +82,16 @@
+ #define LAST_CPUPID_WIDTH 0
+ #endif
+ 
++#ifdef CONFIG_KASAN_HW
++#define KASAN_TAG_WIDTH 8
++#if SECTIONS_WIDTH+NODES_WIDTH+ZONES_WIDTH+LAST_CPUPID_WIDTH+KASAN_TAG_WIDTH \
++	> BITS_PER_LONG - NR_PAGEFLAGS
++#error "KASAN: not enough bits in page flags for tag"
++#endif
++#else
++#define KASAN_TAG_WIDTH 0
++#endif
++
+ /*
+  * We are going to use the flags for the page to node mapping if its in
+  * there.  This includes the case where there is no node, so it is implicit.
+diff --git a/mm/cma.c b/mm/cma.c
+index 5809bbe360d7..fdad7ad0d9c4 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -407,6 +407,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+ 	unsigned long pfn = -1;
+ 	unsigned long start = 0;
+ 	unsigned long bitmap_maxno, bitmap_no, bitmap_count;
++	size_t i;
+ 	struct page *page = NULL;
+ 	int ret = -ENOMEM;
+ 
+@@ -466,6 +467,16 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+ 
+ 	trace_cma_alloc(pfn, page, count, align);
+ 
++	/*
++	 * CMA can allocate multiple page blocks, which results in different
++	 * blocks being marked with different tags. Reset the tags to ignore
++	 * those page blocks.
++	 */
++	if (page) {
++		for (i = 0; i < count; i++)
++			page_kasan_tag_reset(page + i);
++	}
++
+ 	if (ret && !(gfp_mask & __GFP_NOWARN)) {
+ 		pr_err("%s: alloc failed, req-size: %zu pages, ret: %d\n",
+ 			__func__, count, ret);
+diff --git a/mm/kasan/common.c b/mm/kasan/common.c
+index 1e96ca050c75..6cf7dec0b765 100644
+--- a/mm/kasan/common.c
++++ b/mm/kasan/common.c
+@@ -212,8 +212,15 @@ void kasan_unpoison_stack_above_sp_to(const void *watermark)
+ 
+ void kasan_alloc_pages(struct page *page, unsigned int order)
+ {
++	u8 tag;
++	unsigned long i;
++
+ 	if (unlikely(PageHighMem(page)))
+ 		return;
++
++	tag = random_tag();
++	for (i = 0; i < (1 << order); i++)
++		page_kasan_tag_set(page + i, tag);
+ 	kasan_unpoison_shadow(page_address(page), PAGE_SIZE << order);
+ }
+ 
+@@ -311,6 +318,10 @@ struct kasan_free_meta *get_free_info(struct kmem_cache *cache,
+ 
+ void kasan_poison_slab(struct page *page)
+ {
++	unsigned long i;
++
++	for (i = 0; i < (1 << compound_order(page)); i++)
++		page_kasan_tag_reset(page + i);
+ 	kasan_poison_shadow(page_address(page),
+ 			PAGE_SIZE << compound_order(page),
+ 			KASAN_KMALLOC_REDZONE);
+@@ -483,7 +494,7 @@ void kasan_poison_kfree(void *ptr, unsigned long ip)
+ 	page = virt_to_head_page(ptr);
+ 
+ 	if (unlikely(!PageSlab(page))) {
+-		if (reset_tag(ptr) != page_address(page)) {
++		if (ptr != page_address(page)) {
+ 			kasan_report_invalid_free(ptr, ip);
+ 			return;
+ 		}
+@@ -496,7 +507,7 @@ void kasan_poison_kfree(void *ptr, unsigned long ip)
+ 
+ void kasan_kfree_large(void *ptr, unsigned long ip)
+ {
+-	if (reset_tag(ptr) != page_address(virt_to_head_page(ptr)))
++	if (ptr != page_address(virt_to_head_page(ptr)))
+ 		kasan_report_invalid_free(ptr, ip);
+ 	/* The object will be poisoned by page_alloc. */
+ }
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 1521100f1e63..266e86323d73 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1176,6 +1176,7 @@ static void __meminit __init_single_page(struct page *page, unsigned long pfn,
+ 	init_page_count(page);
+ 	page_mapcount_reset(page);
+ 	page_cpupid_reset_last(page);
++	page_kasan_tag_reset(page);
+ 
+ 	INIT_LIST_HEAD(&page->lru);
+ #ifdef WANT_PAGE_VIRTUAL
 -- 
 2.18.0.rc1.244.gcf134e6275-goog
