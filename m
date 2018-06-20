@@ -1,25 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Jun 2018 10:56:19 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Stop compiling headsmp-apmu on
- !SMP
-In-Reply-To: <20180619172049.20089-1-geert+renesas@glider.be>
-References: <20180619172049.20089-1-geert+renesas@glider.be>
-Message-ID: <20180620085618.dy5vnlhxiajppryy@verge.net.au>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Wed, 20 Jun 2018 16:57:54 +0800
+Subject: [PATCH 0/1] Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir}
+Message-ID: <20180620085755.20045-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 07:20:49PM +0200, Geert Uytterhoeven wrote:
-> As of commit cad160ed0a94927e ("ARM: shmobile: Convert file to use
-> cntvoff"), there's no non-SMP code left in headsmp-apmu.S.
-> 
-> Hence build the file for SMP only, and drop the no longer needed check
-> for CONFIG_SMP inside the file.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch moves {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
+section, which makes KSMA more difficult. At the same time, it is more
+concise than the previous patches[1][2]. As James Morse suggested[2],
+this patch updates swapper_pg_dir through the fixmap entry.
 
-Thanks Geert,
+[1] http://www.openwall.com/lists/kernel-hardening/2018/05/31/1
+[2] https://patchwork.kernel.org/patch/10449589/
 
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
+Jun Yao (1):
+  arm64/mm: move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
+    section
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+ arch/arm64/include/asm/pgalloc.h | 19 +++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S  | 32 ++++++++++++++++++--------------
+ arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++----
+ 3 files changed, 56 insertions(+), 18 deletions(-)
+
+-- 
+2.17.1
