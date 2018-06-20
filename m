@@ -1,37 +1,39 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 20 Jun 2018 09:53:58 +0200
-Subject: [PATCH V2 3/3] ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
-In-Reply-To: <1529481238-15277-1-git-send-email-ludovic.Barre@st.com>
-References: <1529481238-15277-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1529481238-15277-4-git-send-email-ludovic.Barre@st.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 20 Jun 2018 10:05:10 +0200
+Subject: [PATCH v1] ARM: dts: imx51-zii-rdu1: fix touchscreen pinctrl
+In-Reply-To: <20180619220719.3200-1-nick@shmanahar.org>
+References: <20180619220719.3200-1-nick@shmanahar.org>
+Message-ID: <1529481910.7211.27.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hi Nick,
 
-This patch activates independent watchdog support for
-stm32mp157c board.
+Am Dienstag, den 19.06.2018, 23:07 +0100 schrieb Nick Dyer:
+> The pinctrl settings were incorrect for the touchscreen interrupt line, causing
+> an interrupt storm. This change has been tested with both the atmel_mxt_ts and
+> RMI4 drivers on the RDU1 units.
+> 
+> > Signed-off-by: Nick Dyer <nick@shmanahar.org>
+> ---
+> ?arch/arm/boot/dts/imx51-zii-rdu1.dts | 4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index df9eca94d812..4d12ba54ba15 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -770,8 +770,8 @@
+> ?
+> > ?	pinctrl_ts: tsgrp {
+> > ?		fsl,pins = <
+> > > -			MX51_PAD_CSI1_D8__GPIO3_12		0x85
+> > > -			MX51_PAD_CSI1_D9__GPIO3_13		0x85
+> > > +			MX51_PAD_CSI1_D8__GPIO3_12		4
+> +			MX51_PAD_CSI1_D9__GPIO3_13		(1<<16)
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- arch/arm/boot/dts/stm32mp157c-ed1.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Please don't move away from using hex notation for the padctrl
+settings.
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-index ae33653..8af263a 100644
---- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-@@ -68,6 +68,11 @@
- 	status = "okay";
- };
- 
-+&iwdg2 {
-+	timeout-sec = <32>;
-+	status = "okay";
-+};
-+
- &uart4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart4_pins_a>;
--- 
-2.7.4
+Thanks,
+Lucas
