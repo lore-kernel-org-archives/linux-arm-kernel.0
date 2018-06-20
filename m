@@ -1,106 +1,110 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Wed, 20 Jun 2018 10:40:25 -0700
-Subject: [PATCH v9 00/10] drivers: Introduce firmware dnd clock river for
- ZynqMP core
-Message-ID: <1529516435-7315-1-git-send-email-jollys@xilinx.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 20 Jun 2018 19:40:03 +0200
+Subject: [PATCH v3 17/17] kasan: add SPDX-License-Identifier mark to source
+ files
+In-Reply-To: <cover.1529515183.git.andreyknvl@google.com>
+References: <cover.1529515183.git.andreyknvl@google.com>
+Message-ID: <f76d3070776e0038eda3cd76d471d1bfeae18480.1529515183.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v9:
- - Fixed minor typo comments
+This patch adds a "SPDX-License-Identifier: GPL-2.0" mark to all source
+files under mm/kasan.
 
-v8:
- - Corrected typo in clk Kconfig
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ mm/kasan/common.c         | 1 +
+ mm/kasan/kasan.c          | 1 +
+ mm/kasan/kasan.h          | 2 +-
+ mm/kasan/kasan_init.c     | 1 +
+ mm/kasan/kasan_report.c   | 1 +
+ mm/kasan/khwasan.c        | 1 +
+ mm/kasan/khwasan_report.c | 1 +
+ mm/kasan/quarantine.c     | 1 +
+ mm/kasan/report.c         | 1 +
+ 9 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/mm/kasan/common.c b/mm/kasan/common.c
+index 6cf7dec0b765..955e0ebdc644 100644
+--- a/mm/kasan/common.c
++++ b/mm/kasan/common.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains common KASAN and KHWASAN code.
+  *
+diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+index 44ec228de0a2..128a865c9e05 100644
+--- a/mm/kasan/kasan.c
++++ b/mm/kasan/kasan.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains core KASAN code.
+  *
+diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
+index 6f4f2ebf5f57..3feacd889e24 100644
+--- a/mm/kasan/kasan.h
++++ b/mm/kasan/kasan.h
+@@ -1,4 +1,4 @@
+-/* SPDX-License-Identifier: GPL-2.0 */
++// SPDX-License-Identifier: GPL-2.0
+ #ifndef __MM_KASAN_KASAN_H
+ #define __MM_KASAN_KASAN_H
  
-v7:
- - Removed xilinx specific clock debugfs API support
- - Added reviewed-by tags for FW and clock bindings
- - Updated clock node name to clock-controller
-
-v6:
- - Broke patch series to have base FW driver and Clock driver user
- - Incorporated code review comments from last FW and Clock driver patch series. Discussed below:
-	https://patchwork.kernel.org/patch/10230759/
-	https://patchwork.kernel.org/patch/10250047/
-
-v5:
- - Added ATF version check support
- - Updated some functions to be static 
- - Minor function name corrections
-
-v4:
- - Changed clock setrate/getrate API prototype to support 64 bit rate
- - Defined macros for get_node_status return values
- - Moved DT node as a child of firmware
- - Changed debugfs APIs to return data to debugfs buffer instead of dumping to kernel log
- - Minor changes to incorporate other review comments from v3 patch series
-
-v3:
- - added some fixes to firmware-ggs.c
- - updated pinmux get/set function argument names to specify function id instead of node id
- - added new pinctrl query macros
- - incorporated review comments from v2 patch series
-
-v2:
- - change SPDX-License-Identifier license text style
- - split patch into multiple patches
- - Updated copyrights
- - Added ABI documentation
- - incorporated logical review comments from previuos patch. Discussed below:
-	https://patchwork.kernel.org/patch/10150665/
-
-Jolly Shah (1):
-  drivers: clk: Add ZynqMP clock driver
-
-Rajan Vaja (9):
-  dt-bindings: firmware: Add bindings for ZynqMP firmware
-  firmware: xilinx: Add Zynqmp firmware driver
-  firmware: xilinx: Add zynqmp IOCTL API for device control
-  firmware: xilinx: Add query data API
-  firmware: xilinx: Add clock APIs
-  firmware: xilinx: Add debugfs interface
-  firmware: xilinx: Add debugfs for IOCTL API
-  firmware: xilinx: Add debugfs for query data API
-  dt-bindings: clock: Add bindings for ZynqMP clock driver
-
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  82 +++
- arch/arm64/Kconfig.platforms                       |   1 +
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/zynqmp/Kconfig                         |  11 +
- drivers/clk/zynqmp/Makefile                        |   4 +
- drivers/clk/zynqmp/clk-gate-zynqmp.c               | 146 ++++
- drivers/clk/zynqmp/clk-mux-zynqmp.c                | 150 +++++
- drivers/clk/zynqmp/clk-zynqmp.h                    |  53 ++
- drivers/clk/zynqmp/clkc.c                          | 737 +++++++++++++++++++++
- drivers/clk/zynqmp/divider.c                       | 219 ++++++
- drivers/clk/zynqmp/pll.c                           | 345 ++++++++++
- drivers/firmware/Kconfig                           |   1 +
- drivers/firmware/Makefile                          |   1 +
- drivers/firmware/xilinx/Kconfig                    |  23 +
- drivers/firmware/xilinx/Makefile                   |   5 +
- drivers/firmware/xilinx/zynqmp-debug.c             | 249 +++++++
- drivers/firmware/xilinx/zynqmp-debug.h             |  22 +
- drivers/firmware/xilinx/zynqmp.c                   | 562 ++++++++++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
- include/linux/firmware/xlnx-zynqmp.h               | 115 ++++
- 21 files changed, 2844 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
- create mode 100644 drivers/clk/zynqmp/Kconfig
- create mode 100644 drivers/clk/zynqmp/Makefile
- create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
- create mode 100644 drivers/clk/zynqmp/clkc.c
- create mode 100644 drivers/clk/zynqmp/divider.c
- create mode 100644 drivers/clk/zynqmp/pll.c
- create mode 100644 drivers/firmware/xilinx/Kconfig
- create mode 100644 drivers/firmware/xilinx/Makefile
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
- create mode 100644 drivers/firmware/xilinx/zynqmp.c
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
- create mode 100644 include/linux/firmware/xlnx-zynqmp.h
-
+diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
+index f436246ccc79..2dfa730a9d43 100644
+--- a/mm/kasan/kasan_init.c
++++ b/mm/kasan/kasan_init.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains some kasan initialization code.
+  *
+diff --git a/mm/kasan/kasan_report.c b/mm/kasan/kasan_report.c
+index fdf2d77e3125..48da73f4ef7c 100644
+--- a/mm/kasan/kasan_report.c
++++ b/mm/kasan/kasan_report.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains KASAN specific error reporting code.
+  *
+diff --git a/mm/kasan/khwasan.c b/mm/kasan/khwasan.c
+index fd1725022794..f0d528a8c3f3 100644
+--- a/mm/kasan/khwasan.c
++++ b/mm/kasan/khwasan.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains core KHWASAN code.
+  *
+diff --git a/mm/kasan/khwasan_report.c b/mm/kasan/khwasan_report.c
+index 51238b404b08..4e193546d94e 100644
+--- a/mm/kasan/khwasan_report.c
++++ b/mm/kasan/khwasan_report.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains KHWASAN specific error reporting code.
+  *
+diff --git a/mm/kasan/quarantine.c b/mm/kasan/quarantine.c
+index 3a8ddf8baf7d..0e4dc1a22615 100644
+--- a/mm/kasan/quarantine.c
++++ b/mm/kasan/quarantine.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * KASAN quarantine.
+  *
+diff --git a/mm/kasan/report.c b/mm/kasan/report.c
+index e031c78f2e52..633b4b245798 100644
+--- a/mm/kasan/report.c
++++ b/mm/kasan/report.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * This file contains common KASAN and KHWASAN error reporting code.
+  *
 -- 
-2.7.4
+2.18.0.rc1.244.gcf134e6275-goog
