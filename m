@@ -1,78 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jun 2018 13:49:37 -0600
-Subject: [PATCH v2 2/4] dt-bindings: misc: Aspeed coprocessor interrupt
- controller
-In-Reply-To: <20180618045902.11453-3-benh@kernel.crashing.org>
-References: <20180618045902.11453-1-benh@kernel.crashing.org>
- <20180618045902.11453-3-benh@kernel.crashing.org>
-Message-ID: <20180620194937.GA5088@rob-hp-laptop>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Wed, 20 Jun 2018 21:57:41 +0200
+Subject: [PATCH 1/1] arm64: dts: rockchip: correct voltage selector
+ Firefly-RK3399
+In-Reply-To: <6592028.l3WmXB2ndK@diego>
+References: <20180604171523.28454-1-xypron.glpk@gmx.de>
+ <10782218.jfpm9omiT7@phil> <459cb125-a3e2-8f1e-b960-011020d41b3c@gmx.de>
+ <6592028.l3WmXB2ndK@diego>
+Message-ID: <cd7447bc-1c3d-29ca-9671-144b1f474711@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 02:59:00PM +1000, Benjamin Herrenschmidt wrote:
-> Add the device-tree binding definition for the AST2400
-> and AST2500 coprocessor interrupt controller
+On 06/20/2018 11:15 AM, Heiko St?bner wrote:
+> Hi Heinrich,
 > 
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> ---
->  .../devicetree/bindings/misc/aspeed,cvic.txt  | 35 +++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/aspeed,cvic.txt
+> Am Mittwoch, 20. Juni 2018, 07:59:34 CEST schrieb Heinrich Schuchardt:
+>> On 06/20/2018 01:21 AM, Heiko Stuebner wrote:
+>>> Am Donnerstag, 14. Juni 2018, 14:55:27 CEST schrieb Heiko Stuebner:
+>>>> Am Montag, 4. Juni 2018, 19:15:23 CEST schrieb Heinrich Schuchardt:
+>>>>> Without this patch the Firefly-RK3399 board boot process hangs after
+>>>>> these
+>>>>>
+>>>>> lines:
+>>>>>    fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
+>>>>>    fan53555-reg: supplied by vcc_sys
+>>>>>    vcc1v8_s3: supplied by vcc_1v8
+>>>>>
+>>>>> Blacklisting driver fan53555 allows booting.
+>>>>>
+>>>>> The device tree uses a value of fcs,suspend-voltage-selector different
+>>>>> to
+>>>>> any other board.
+>>>>>
+>>>>> Changing this setting to the usual value is sufficient to enable
+>>>>> booting.
+>>>>>
+>>>>> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+>>>>
+>>>> applied for 4.19.
+>>>
+>>> and dropped again.
+>>>
+>>> Sadly it looks like the patch causes conflicts with at least one firefly
+>>> board in a kernelci lab. My own is currently not ready to use, so I cannot
+>>> look myself right now.
+>>>
+>>> The issue kernelci people described sounded quite a lot like the one
+>>> in your commit message, so my current theory is that the
+>>> suspend-voltage-selector must in some form corespond to the
+>>> cpu_b_sleep_h gpio setting we're currently not handling at all, which
+>>> would therefore depend on how the bootloader sets this up.
+>>
+>> please, provide a link to the log displaying the issue and the contact
+>> who can provide the exact setup.
+>>
+>> I have been testing with U-Boot as boot loader.
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/aspeed,cvic.txt b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
-> new file mode 100644
-> index 000000000000..2562e2991e4d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/aspeed,cvic.txt
-> @@ -0,0 +1,35 @@
-> +* Aspeed AST2400 and AST2500 coprocessor interrupt controller
-> +
-> +This file describes the bindings for the interrupt controller present
-> +in the AST2400 and AST2500 BMC SoCs which provides interrupt to the
-> +ColdFire coprocessor.
-> +
-> +It is not a normal interrupt controller and it would be rather
-> +inconvenient to create an interrupt tree for it as it somewhat shares
-> +some of the same sources as the main ARM interrupt controller but with
-> +different numbers.
-> +
-> +The AST2500 supports a SW generated interrupt
-> +
-> +Required properties:
-> +- reg: address and length of the register for the device.
-> +- compatible: "aspeed,cvic" and one of:
-> +		"aspeed,ast2400-cvic"
-> +	      or
-> +		"aspeed,ast2500-cvic"
-> +
-> +- valid-sources: One cell, bitmap of supported sources for the implementation
-
-aspeed,valid-sources
-
-This could use a better description. I thought this was which bits to 
-use for s/w irq, but then I read the next property...
-
-Alternatively, why can't this be implied by the compatible?
-
-> +
-> +Optional properties;
-> +- copro-sw-interrupts: List of interrupt numbers that can be used as
-> +		       SW interrupts from the ARM to the coprocessor.
-> +		       (AST2500 only)
-> +
-> +Example:
-> +
-> +	cvic: copro-interrupt-controller at 1e6c2000 {
-> +		compatible = "aspeed,ast2500-cvic";
-> +		valid-sources = <0xffffffff>;
-> +		copro-sw-interrupts = <1>;
-> +		reg = <0x1e6c2000 0x80>;
-> +	};
-> -- 
-> 2.17.1
+> failing boot can be found on
+> https://kernelci.org/boot/id/5b2a053d59b514569079a872/
+> 
+> As this board is sitting in the "lab-baylibre-seattle", I guess
+> Kevin Hilman (Cc'ed now) is the one that can say a bit more about the
+> board setup.
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The more interesting question would be how to make sure we don't
+> die with possible different bootloader versions. As I don't really thing 
+> "upgrade your bootloader" is an always valid option.
+> 
+> 
+> Heiko
+> 
+
+Hi Kevin,
+
+the RK3399-Firefly was booted on lab-baylibre-seattle with
+U-Boot 2017.05-rc3-00131-gf79fd58d5f5c-dirty
+
+f79fd58d5f5c is not a commit in U-Boot master.
+The version number tells us it is 131 patches ahead of U-Boot 2017.05-rc3.
+Dirty means the source contained uncommitted changes.
+
+Unfortunately this is not a reproducible test environment.
+Could you, please, provide the build recipe to reproduce the U-Boot
+BayLibre is using?
+Would it be possible to use mainline U-Boot in kernelci for this board?
+
+Best regards
+
+Heinrich
