@@ -1,165 +1,289 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Wed, 20 Jun 2018 15:15:11 +0200
-Subject: [PATCH 1/6] dmaengine: xilinx_dma: fix splitting transfer causes
- misalignments
-In-Reply-To: <DM6PR02MB4361458180616B591C6742E2C7770@DM6PR02MB4361.namprd02.prod.outlook.com>
-References: <20180620083653.17010-1-andrea.merello@gmail.com>
- <DM6PR02MB4361458180616B591C6742E2C7770@DM6PR02MB4361.namprd02.prod.outlook.com>
-Message-ID: <CAN8YU5N8en1dtUShuK=0KCtLk3v4kVqm-TcM4J0=XBZo0=Sh-A@mail.gmail.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Wed, 20 Jun 2018 15:24:07 +0200
+Subject: [PATCH V2 1/3] watchdog: stm32: add pclk feature for stm32mp1
+In-Reply-To: <6162d701-2afd-5a22-d38f-7fb9e726cff7@roeck-us.net>
+References: <1529481238-15277-1-git-send-email-ludovic.Barre@st.com>
+ <1529481238-15277-2-git-send-email-ludovic.Barre@st.com>
+ <6162d701-2afd-5a22-d38f-7fb9e726cff7@roeck-us.net>
+Message-ID: <e9babb86-7588-5de6-93ab-4cdd8982e773@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 1:37 PM, Radhey Shyam Pandey <radheys@xilinx.com> wrote:
->> -----Original Message-----
->> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
->> owner at vger.kernel.org] On Behalf Of Andrea Merello
->> Sent: Wednesday, June 20, 2018 2:07 PM
->> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
->> <michals@xilinx.com>; Appana Durga Kedareswara Rao
->> <appanad@xilinx.com>; dmaengine at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->> Andrea Merello <andrea.merello@gmail.com>
->> Subject: [PATCH 1/6] dmaengine: xilinx_dma: fix splitting transfer causes
->> misalignments
->
-> We should rephrase commit message to something like "In axidma
-> slave_sg and dma_cylic mode align split descriptors"
 
-OK
 
+On 06/20/2018 11:19 AM, Guenter Roeck wrote:
+> On 06/20/2018 12:53 AM, Ludovic Barre wrote:
+>> From: Ludovic Barre <ludovic.barre@st.com>
 >>
->> Whenever a single or cyclic transaction is prepared, the driver
->> could eventually split it over several SG descriptors in order
->> to deal with the HW maximum transfer length.
+>> This patch adds config data to manage specific properties by
+>> compatible. Adds stm32mp1 config which requires pclk clock.
 >>
->> This could end up in DMA operations starting from a misaligned
->> address. This seems fatal for the HW.
-> This seems fatal for the HW if DRE is not enabled.
-
-OK
-
->>
->> This patch eventually adjusts the transfer size in order to make sure
->> all operations start from an aligned address.
->>
->> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 >> ---
->>  drivers/dma/xilinx/xilinx_dma.c | 27 ++++++++++++++++++++-------
->>  1 file changed, 20 insertions(+), 7 deletions(-)
+>> ? .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |? 21 +++-
+>> ? drivers/watchdog/stm32_iwdg.c????????????????????? | 132 
+>> ++++++++++++++-------
+>> ? 2 files changed, 104 insertions(+), 49 deletions(-)
 >>
->> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
->> index 27b523530c4a..a516e7ffef21 100644
->> --- a/drivers/dma/xilinx/xilinx_dma.c
->> +++ b/drivers/dma/xilinx/xilinx_dma.c
->> @@ -376,6 +376,7 @@ struct xilinx_dma_chan {
->>       void (*start_transfer)(struct xilinx_dma_chan *chan);
->>       int (*stop_transfer)(struct xilinx_dma_chan *chan);
->>       u16 tdest;
->> +     u32 copy_mask;
-> We can reuse copy_align itself.  See below.
-
-OK
-
->>  };
->>
->>  /**
->> @@ -1789,10 +1790,14 @@ static struct dma_async_tx_descriptor
->> *xilinx_dma_prep_slave_sg(
->>
->>                       /*
->>                        * Calculate the maximum number of bytes to transfer,
->> -                      * making sure it is less than the hw limit
->> +                      * making sure it is less than the hw limit and that
->> +                      * the next chuck start address is aligned
->
-> /s/chuck/chunk
-
-OK
-
->>                        */
->> -                     copy = min_t(size_t, sg_dma_len(sg) - sg_used,
->> -                                  XILINX_DMA_MAX_TRANS_LEN);
->> +                     copy = sg_dma_len(sg) - sg_used;
->> +                     if (copy > XILINX_DMA_MAX_TRANS_LEN)
->> +                             copy = XILINX_DMA_MAX_TRANS_LEN &
->> +                                     chan->copy_mask;
+>> diff --git 
+>> a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt 
+>> b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+>> index cc13b10a..f07f6d89 100644
+>> --- a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+>> +++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+>> @@ -2,18 +2,31 @@ STM32 Independent WatchDoG (IWDG)
+>> ? ---------------------------------
+>> ? Required properties:
+>> -- compatible: "st,stm32-iwdg"
+>> -- reg: physical base address and length of the registers set for the 
+>> device
+>> -- clocks: must contain a single entry describing the clock input
+>> +- compatible: Should be either "st,stm32-iwdg" or "st,stm32mp1-iwdg"
+>> +- reg: Physical base address and length of the registers set for the 
+>> device
+>> +- clocks: Reference to the clock entry lsi. Additional pclk clock entry
+>> +? is required only for st,stm32mp1-iwdg.
+>> +- clock-names: Name of the clocks used.
+>> +? "lsi" for st,stm32-iwdg
+>> +? "pclk", "lsi" for st,stm32mp1-iwdg
+>> ? Optional Properties:
+>> ? - timeout-sec: Watchdog timeout value in seconds.
+>> -Example:
+>> +Examples:
+>> ? iwdg: watchdog at 40003000 {
+>> ????? compatible = "st,stm32-iwdg";
+>> ????? reg = <0x40003000 0x400>;
+>> ????? clocks = <&clk_lsi>;
+>> +??? clock-names = "lsi";
+>> +??? timeout-sec = <32>;
+>> +};
 >> +
->
->
-> In below implementation, we can reuse copy_align.
-> Same for dma_cyclic.
->
-> if ((copy + sg_used  < sg_dma_len(sg)) &&
->         chan->xdev->common.copy_align) {
->         /* If this is not the last descriptor, make sure
->           * the next one will be properly aligned
->          */
->         copy = rounddown(copy,
->                (1 << chan->xdev->common.copy_align));
->      }
-
-OK for the general idea. But to me it seems a bit more complicated than needed:
-What's the point in setting 'copy' with min_t, performing also the
-subtraction sg_dma_len(sg) - sg_used, and then add sg_used again? What
-about something like:
-
-
--                       copy = min_t(size_t, sg_dma_len(sg) - sg_used,
--                                    XILINX_DMA_MAX_TRANS_LEN);
-+                       copy = sg_dma_len(sg) - sg_used;
-+                       if (copy > XILINX_DMA_MAX_TRANS_LEN &&
-+                           chan->xdev->common.copy_align)
-+                               copy = rounddown(XILINX_DMA_MAX_TRANS_LEN,
-+                                        (1 << chan->xdev->common.copy_align));
-+
-
-
->>                       hw = &segment->hw;
->>
->>                       /* Fill in the descriptor */
->> @@ -1894,10 +1899,14 @@ static struct dma_async_tx_descriptor
->> *xilinx_dma_prep_dma_cyclic(
->>
->>                       /*
->>                        * Calculate the maximum number of bytes to transfer,
->> -                      * making sure it is less than the hw limit
->> +                      * making sure it is less than the hw limit and that
->> +                      * the next chuck start address is aligned
->>                        */
->> -                     copy = min_t(size_t, period_len - sg_used,
->> -                                  XILINX_DMA_MAX_TRANS_LEN);
->> +                     copy = period_len - sg_used;
->> +                     if (copy > XILINX_DMA_MAX_TRANS_LEN)
->> +                             copy = XILINX_DMA_MAX_TRANS_LEN &
->> +                                     chan->copy_mask;
+>> +iwdg: iwdg at 5a002000 {
+>> +??? compatible = "st,stm32mp1-iwdg";
+>> +??? reg = <0x5a002000 0x400>;
+>> +??? clocks = <&rcc IWDG2>, <&clk_lsi>;
+>> +??? clock-names = "pclk", "lsi";
+>> ????? timeout-sec = <32>;
+>> ? };
+>> diff --git a/drivers/watchdog/stm32_iwdg.c 
+>> b/drivers/watchdog/stm32_iwdg.c
+>> index c97ad56..fc96670 100644
+>> --- a/drivers/watchdog/stm32_iwdg.c
+>> +++ b/drivers/watchdog/stm32_iwdg.c
+>> @@ -11,12 +11,13 @@
+>> ? #include <linux/clk.h>
+>> ? #include <linux/delay.h>
+>> -#include <linux/kernel.h>
+>> -#include <linux/module.h>
+>> ? #include <linux/interrupt.h>
+>> ? #include <linux/io.h>
+>> ? #include <linux/iopoll.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> ? #include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> ? #include <linux/platform_device.h>
+>> ? #include <linux/watchdog.h>
+>> @@ -54,11 +55,17 @@
+>> ? #define TIMEOUT_US??? 100000
+>> ? #define SLEEP_US??? 1000
+>> +struct stm32_iwdg_config {
+>> +??? bool has_pclk;
+>> +};
 >> +
->>                       hw = &segment->hw;
->>                       xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
->>                                         period_len * i);
->> @@ -2402,8 +2411,12 @@ static int xilinx_dma_chan_probe(struct
->> xilinx_dma_device *xdev,
->>       if (width > 8)
->>               has_dre = false;
->>
->> -     if (!has_dre)
->> +     if (has_dre) {
->> +             chan->copy_mask = ~0;
->> +     } else {
->>               xdev->common.copy_align = fls(width - 1);
->> +             chan->copy_mask = ~(width - 1);
->> +     }
->
-> As mentioned above we don't need this additional field.
+> 
+> This data structure is unnecessary. Just assign the boolean directly to 
+> .data
+> and ...
+> 
 
-OK
+Ok, I send a v3, with boolean directly to .data
+like:
 
+#define NO_PCLK		false
+#define HAS_PCLK	true
+...
+static const struct of_device_id stm32_iwdg_of_match[] = {
+	{ .compatible = "st,stm32-iwdg", .data = (void *) NO_PCLK },
+	{ .compatible = "st,stm32mp1-iwdg", .data = (void *) HAS_PCLK },
+	{ /* end node */ }
+};
+
+Note:
+V3, because I sent my original version with V2
+(it's mistake)
+
+>> ? struct stm32_iwdg {
+>> -??? struct watchdog_device??? wdd;
+>> -??? void __iomem??????? *regs;
+>> -??? struct clk??????? *clk;
+>> -??? unsigned int??????? rate;
+>> +??? struct watchdog_device??????? wdd;
+>> +??? void __iomem??????????? *regs;
+>> +??? struct stm32_iwdg_config??? *config;
+> 
+> declare bool has_pclk here.
+> 
+>> +??? struct clk??????????? *clk_lsi;
+>> +??? struct clk??????????? *clk_pclk;
+>> +??? unsigned int??????????? rate;
+>> ? };
+>> ? static inline u32 reg_read(void __iomem *base, u32 reg)
+>> @@ -133,6 +140,44 @@ static int stm32_iwdg_set_timeout(struct 
+>> watchdog_device *wdd,
+>> ????? return 0;
+>> ? }
+>> +static int stm32_iwdg_clk_init(struct platform_device *pdev,
+>> +?????????????????? struct stm32_iwdg *wdt)
+>> +{
+>> +??? u32 ret;
+>> +
+>> +??? wdt->clk_lsi = devm_clk_get(&pdev->dev, "lsi");
+>> +??? if (IS_ERR(wdt->clk_lsi)) {
+>> +??????? dev_err(&pdev->dev, "Unable to get lsi clock\n");
+>> +??????? return PTR_ERR(wdt->clk_lsi);
+>> +??? }
+>> +
+>> +??? /* optional peripheral clock */
+>> +??? if (wdt->config->has_pclk) {
+>> +??????? wdt->clk_pclk = devm_clk_get(&pdev->dev, "pclk");
+>> +??????? if (IS_ERR(wdt->clk_pclk)) {
+>> +??????????? dev_err(&pdev->dev, "Unable to get pclk clock\n");
+>> +??????????? return PTR_ERR(wdt->clk_pclk);
+>> +??????? }
+>> +
+>> +??????? ret = clk_prepare_enable(wdt->clk_pclk);
+>> +??????? if (ret) {
+>> +??????????? dev_err(&pdev->dev, "Unable to prepare pclk clock\n");
+>> +??????????? return ret;
+>> +??????? }
+>> +??? }
+>> +
+>> +??? ret = clk_prepare_enable(wdt->clk_lsi);
+>> +??? if (ret) {
+>> +??????? dev_err(&pdev->dev, "Unable to prepare lsi clock\n");
+>> +??????? clk_disable_unprepare(wdt->clk_pclk);
+>> +??????? return ret;
+>> +??? }
+>> +
+>> +??? wdt->rate = clk_get_rate(wdt->clk_lsi);
+>> +
+>> +??? return 0;
+>> +}
+>> +
+>> ? static const struct watchdog_info stm32_iwdg_info = {
+>> ????? .options??? = WDIOF_SETTIMEOUT |
+>> ??????????????? WDIOF_MAGICCLOSE |
+>> @@ -147,49 +192,50 @@ static const struct watchdog_ops stm32_iwdg_ops = {
+>> ????? .set_timeout??? = stm32_iwdg_set_timeout,
+>> ? };
+>> +static const struct stm32_iwdg_config stm32_iwdg_cfg = {
+>> +??? .has_pclk = false,
+>> +};
+>> +
+>> +static const struct stm32_iwdg_config stm32mp1_iwdg_cfg = {
+>> +??? .has_pclk = true,
+>> +};
+>> +
+>> +static const struct of_device_id stm32_iwdg_of_match[] = {
+>> +??? { .compatible = "st,stm32-iwdg", .data = &stm32_iwdg_cfg },
+>> +??? { .compatible = "st,stm32mp1-iwdg", .data = &stm32mp1_iwdg_cfg },
+>> +??? { /* end node */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+>> +
+>> ? static int stm32_iwdg_probe(struct platform_device *pdev)
+>> ? {
+>> ????? struct watchdog_device *wdd;
+>> +??? const struct of_device_id *match;
+>> ????? struct stm32_iwdg *wdt;
+>> ????? struct resource *res;
+>> -??? void __iomem *regs;
+>> -??? struct clk *clk;
+>> ????? int ret;
+>> +??? match = of_match_device(stm32_iwdg_of_match, &pdev->dev);
+>> +??? if (!match || !match->data)
+>> +??????? return -ENODEV;
+>> +
+>> +??? wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>> +??? if (!wdt)
+>> +??????? return -ENOMEM;
+>> +
+>> +??? wdt->config = (struct stm32_iwdg_config *)match->data;
+>> +
+>> ????? /* This is the timer base. */
+>> ????? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -??? regs = devm_ioremap_resource(&pdev->dev, res);
+>> -??? if (IS_ERR(regs)) {
+>> +??? wdt->regs = devm_ioremap_resource(&pdev->dev, res);
+>> +??? if (IS_ERR(wdt->regs)) {
+>> ????????? dev_err(&pdev->dev, "Could not get resource\n");
+>> -??????? return PTR_ERR(regs);
+>> +??????? return PTR_ERR(wdt->regs);
+>> ????? }
+>> -??? clk = devm_clk_get(&pdev->dev, NULL);
+>> -??? if (IS_ERR(clk)) {
+>> -??????? dev_err(&pdev->dev, "Unable to get clock\n");
+>> -??????? return PTR_ERR(clk);
+>> -??? }
+>> -
+>> -??? ret = clk_prepare_enable(clk);
+>> -??? if (ret) {
+>> -??????? dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
+>> +??? ret = stm32_iwdg_clk_init(pdev, wdt);
+>> +??? if (ret)
+>> ????????? return ret;
+>> -??? }
+>> -
+>> -??? /*
+>> -???? * Allocate our watchdog driver data, which has the
+>> -???? * struct watchdog_device nested within it.
+>> -???? */
+>> -??? wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>> -??? if (!wdt) {
+>> -??????? ret = -ENOMEM;
+>> -??????? goto err;
+>> -??? }
+>> -
+>> -??? /* Initialize struct stm32_iwdg. */
+>> -??? wdt->regs = regs;
+>> -??? wdt->clk = clk;
+>> -??? wdt->rate = clk_get_rate(clk);
+>> ????? /* Initialize struct watchdog_device. */
+>> ????? wdd = &wdt->wdd;
+>> @@ -217,7 +263,8 @@ static int stm32_iwdg_probe(struct platform_device 
+>> *pdev)
+>> ????? return 0;
+>> ? err:
+>> -??? clk_disable_unprepare(clk);
+>> +??? clk_disable_unprepare(wdt->clk_lsi);
+>> +??? clk_disable_unprepare(wdt->clk_pclk);
+>> ????? return ret;
+>> ? }
+>> @@ -227,23 +274,18 @@ static int stm32_iwdg_remove(struct 
+>> platform_device *pdev)
+>> ????? struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
+>> ????? watchdog_unregister_device(&wdt->wdd);
+>> -??? clk_disable_unprepare(wdt->clk);
+>> +??? clk_disable_unprepare(wdt->clk_lsi);
+>> +??? clk_disable_unprepare(wdt->clk_pclk);
+>> ????? return 0;
+>> ? }
+>> -static const struct of_device_id stm32_iwdg_of_match[] = {
+>> -??? { .compatible = "st,stm32-iwdg" },
+>> -??? { /* end node */ }
+>> -};
+>> -MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+>> -
+>> ? static struct platform_driver stm32_iwdg_driver = {
+>> ????? .probe??????? = stm32_iwdg_probe,
+>> ????? .remove??????? = stm32_iwdg_remove,
+>> ????? .driver = {
+>> ????????? .name??? = "iwdg",
+>> -??????? .of_match_table = stm32_iwdg_of_match,
+>> +??????? .of_match_table = of_match_ptr(stm32_iwdg_of_match),
+>> ????? },
+>> ? };
+>> ? module_platform_driver(stm32_iwdg_driver);
 >>
->>       if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel") ||
->>           of_device_is_compatible(node, "xlnx,axi-dma-mm2s-channel") ||
->> --
->> 2.17.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
