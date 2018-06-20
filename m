@@ -1,150 +1,106 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 20 Jun 2018 00:12:54 -0400
-Subject: [PATCH V2 1/5] PCI: handle error return from
- pci_reset_bridge_secondary_bus()
-Message-ID: <1529467995-28780-1-git-send-email-okaya@codeaurora.org>
+Date: Wed, 20 Jun 2018 00:12:58 -0400
+Subject: [PATCH V2 5/5] PCI: Unify slot and bus reset API
+In-Reply-To: <1529467995-28780-1-git-send-email-okaya@codeaurora.org>
+References: <1529467995-28780-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1529467995-28780-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 01fd61c0b9bd ("PCI: Add a return type for
-pci_reset_bridge_secondary_bus()") added a return value to the function to
-return if a device is accessible following a reset. Callers are not
-checking the value.
+Drivers are expected to call pci_reset_slot() or pci_reset_bus() by
+querying if a system supports hotplug or not. A survey showed that most
+drivers don't do this and we are leaking hotplug capability to the
+user.
 
-Pass error code up high in the stack if device is not accessible.
+Hide pci_slot_reset() from drivers and embed into pci_bus_reset().
+Change pci_reset_bus() parameter from struct pci_bus to struct pci_dev.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/hotplug/pciehp_hpc.c |  5 +++--
- drivers/pci/pci.c                | 12 ++++++------
- drivers/pci/pcie/aer.c           |  5 +++--
- drivers/pci/pcie/err.c           |  6 ++++--
- 4 files changed, 16 insertions(+), 12 deletions(-)
+ drivers/pci/pci.c   | 27 +++++++++++++++++++++++----
+ include/linux/pci.h |  3 +--
+ 2 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pci/hotplug/pciehp_hpc.c b/drivers/pci/hotplug/pciehp_hpc.c
-index 718b607..bbaa211 100644
---- a/drivers/pci/hotplug/pciehp_hpc.c
-+++ b/drivers/pci/hotplug/pciehp_hpc.c
-@@ -728,6 +728,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
- 	struct controller *ctrl = slot->ctrl;
- 	struct pci_dev *pdev = ctrl_dev(ctrl);
- 	u16 stat_mask = 0, ctrl_mask = 0;
-+	int rc;
- 
- 	if (probe)
- 		return 0;
-@@ -745,7 +746,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
- 	if (pciehp_poll_mode)
- 		del_timer_sync(&ctrl->poll_timer);
- 
--	pci_reset_bridge_secondary_bus(ctrl->pcie->port);
-+	rc = pci_reset_bridge_secondary_bus(ctrl->pcie->port);
- 
- 	pcie_capability_write_word(pdev, PCI_EXP_SLTSTA, stat_mask);
- 	pcie_write_cmd_nowait(ctrl, ctrl_mask, ctrl_mask);
-@@ -753,7 +754,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
- 		 pci_pcie_cap(ctrl->pcie->port) + PCI_EXP_SLTCTL, ctrl_mask);
- 	if (pciehp_poll_mode)
- 		int_poll_timeout(&ctrl->poll_timer);
--	return 0;
-+	return rc;
- }
- 
- int pcie_init_notification(struct controller *ctrl)
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 97acba7..98d1490 100644
+index 79a1566..a44b948 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -4253,9 +4253,7 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
- 	if (probe)
- 		return 0;
- 
--	pci_reset_bridge_secondary_bus(dev->bus->self);
--
--	return 0;
-+	return pci_reset_bridge_secondary_bus(dev->bus->self);
- }
- 
- static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
-@@ -4850,6 +4848,8 @@ EXPORT_SYMBOL_GPL(pci_try_reset_slot);
- 
- static int pci_bus_reset(struct pci_bus *bus, int probe)
- {
-+	int ret;
-+
- 	if (!bus->self || !pci_bus_resetable(bus))
- 		return -ENOTTY;
- 
-@@ -4860,11 +4860,11 @@ static int pci_bus_reset(struct pci_bus *bus, int probe)
- 
- 	might_sleep();
- 
--	pci_reset_bridge_secondary_bus(bus->self);
-+	ret = pci_reset_bridge_secondary_bus(bus->self);
- 
- 	pci_bus_unlock(bus);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -4924,7 +4924,7 @@ int pci_try_reset_bus(struct pci_bus *bus)
- 
- 	if (pci_bus_trylock(bus)) {
- 		might_sleep();
--		pci_reset_bridge_secondary_bus(bus->self);
-+		rc = pci_reset_bridge_secondary_bus(bus->self);
- 		pci_bus_unlock(bus);
- 	} else
- 		rc = -EAGAIN;
-diff --git a/drivers/pci/pcie/aer.c b/drivers/pci/pcie/aer.c
-index a2e8838..f1d0f3e 100644
---- a/drivers/pci/pcie/aer.c
-+++ b/drivers/pci/pcie/aer.c
-@@ -1305,6 +1305,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
- {
- 	u32 reg32;
- 	int pos;
-+	int rc;
- 
- 	pos = dev->aer_cap;
- 
-@@ -1313,7 +1314,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
- 	reg32 &= ~ROOT_PORT_INTR_ON_MESG_MASK;
- 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
- 
--	pci_reset_bridge_secondary_bus(dev);
-+	rc = pci_reset_bridge_secondary_bus(dev);
- 	pci_printk(KERN_DEBUG, dev, "Root Port link has been reset\n");
- 
- 	/* Clear Root Error Status */
-@@ -1325,7 +1326,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
- 	reg32 |= ROOT_PORT_INTR_ON_MESG_MASK;
- 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
- 
--	return PCI_ERS_RESULT_RECOVERED;
-+	return !rc ? PCI_ERS_RESULT_RECOVERED : PCI_ERS_RESULT_DISCONNECT;
- }
- 
- /**
-diff --git a/drivers/pci/pcie/err.c b/drivers/pci/pcie/err.c
-index f7ce0cb..3a62a2e 100644
---- a/drivers/pci/pcie/err.c
-+++ b/drivers/pci/pcie/err.c
-@@ -175,9 +175,11 @@ static int report_resume(struct pci_dev *dev, void *data)
+@@ -4798,7 +4798,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+  *
+  * Return 0 on success, non-zero on error.
   */
- static pci_ers_result_t default_reset_link(struct pci_dev *dev)
+-int pci_reset_slot(struct pci_slot *slot)
++static int __pci_reset_slot(struct pci_slot *slot)
  {
--	pci_reset_bridge_secondary_bus(dev);
-+	int rc;
-+
-+	rc = pci_reset_bridge_secondary_bus(dev);
- 	pci_printk(KERN_DEBUG, dev, "downstream link has been reset\n");
--	return PCI_ERS_RESULT_RECOVERED;
-+	return !rc ? PCI_ERS_RESULT_RECOVERED : PCI_ERS_RESULT_DISCONNECT;
- }
+ 	int rc;
  
- static pci_ers_result_t reset_link(struct pci_dev *dev, u32 service)
+@@ -4814,7 +4814,6 @@ int pci_reset_slot(struct pci_slot *slot)
+ 
+ 	return rc;
+ }
+-EXPORT_SYMBOL_GPL(pci_reset_slot);
+ 
+ /**
+  * __pci_try_reset_slot - Try to reset a PCI slot
+@@ -4878,7 +4877,7 @@ int pci_probe_reset_bus(struct pci_bus *bus)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
+ 
+ /**
+- * pci_reset_bus - reset a PCI bus
++ * __pci_reset_bus - reset a PCI bus
+  * @bus: top level PCI bus to reset
+  *
+  * Do a bus reset on the given bus and any subordinate buses, saving
+@@ -4886,7 +4885,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
+  *
+  * Return 0 on success, non-zero on error.
+  */
+-int pci_reset_bus(struct pci_bus *bus)
++static int __pci_reset_bus(struct pci_bus *bus)
+ {
+ 	int rc;
+ 
+@@ -4902,6 +4901,26 @@ int pci_reset_bus(struct pci_bus *bus)
+ 
+ 	return rc;
+ }
++
++/**
++ * pci_reset_bus - reset a PCI bus
++ * @pdev: top level PCI device to reset via slot/bus
++ *
++ * Do a slot/bus reset on the given bus and any subordinate buses, saving
++ * and restoring state of all devices.
++ *
++ * Return 0 on success, non-zero on error.
++ */
++int pci_reset_bus(struct pci_dev *pdev)
++{
++	bool slot = false;
++
++	if (!pci_probe_reset_slot(pdev->slot))
++		slot = true;
++
++	return slot ? __pci_reset_slot(pdev->slot) :
++			__pci_reset_bus(pdev->bus);
++}
+ EXPORT_SYMBOL_GPL(pci_reset_bus);
+ 
+ /**
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index f5c85b6..e68ca2e 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1095,9 +1095,8 @@ int pci_reset_function(struct pci_dev *dev);
+ int pci_reset_function_locked(struct pci_dev *dev);
+ int pci_try_reset_function(struct pci_dev *dev);
+ int pci_probe_reset_slot(struct pci_slot *slot);
+-int pci_reset_slot(struct pci_slot *slot);
+ int pci_probe_reset_bus(struct pci_bus *bus);
+-int pci_reset_bus(struct pci_bus *bus);
++int pci_reset_bus(struct pci_dev *dev);
+ int pci_try_reset_bus(struct pci_dev *dev);
+ void pci_reset_secondary_bus(struct pci_dev *dev);
+ void pcibios_reset_secondary_bus(struct pci_dev *dev);
 -- 
 2.7.4
