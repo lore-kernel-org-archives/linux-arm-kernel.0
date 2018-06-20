@@ -1,10 +1,10 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Wed, 20 Jun 2018 07:18:00 +0200
-Subject: [PATCH v2 07/10] media: tda1004x: switch to i2c_lock_bus(...,
+Date: Wed, 20 Jun 2018 07:17:59 +0200
+Subject: [PATCH v2 06/10] media: rtl2830: switch to i2c_lock_bus(...,
  I2C_LOCK_SEGMENT)
 In-Reply-To: <20180620051803.12206-1-peda@axentia.se>
 References: <20180620051803.12206-1-peda@axentia.se>
-Message-ID: <20180620051803.12206-8-peda@axentia.se>
+Message-ID: <20180620051803.12206-7-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,38 +15,48 @@ sit behind a mux-locked mux, the two locking variants are equivalent.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/media/dvb-frontends/tda1004x.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/media/dvb-frontends/rtl2830.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/media/dvb-frontends/tda1004x.c b/drivers/media/dvb-frontends/tda1004x.c
-index 7dcfb4a4b2d0..9d3261bf5090 100644
---- a/drivers/media/dvb-frontends/tda1004x.c
-+++ b/drivers/media/dvb-frontends/tda1004x.c
-@@ -329,7 +329,7 @@ static int tda1004x_do_upload(struct tda1004x_state *state,
- 	tda1004x_write_byteI(state, dspCodeCounterReg, 0);
- 	fw_msg.addr = state->config->demod_address;
+diff --git a/drivers/media/dvb-frontends/rtl2830.c b/drivers/media/dvb-frontends/rtl2830.c
+index 7bbfe11d11ed..91d12e6a03d5 100644
+--- a/drivers/media/dvb-frontends/rtl2830.c
++++ b/drivers/media/dvb-frontends/rtl2830.c
+@@ -24,9 +24,9 @@ static int rtl2830_bulk_write(struct i2c_client *client, unsigned int reg,
+ 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
+ 	int ret;
  
--	i2c_lock_adapter(state->i2c);
-+	i2c_lock_bus(state->i2c, I2C_LOCK_SEGMENT);
- 	buf[0] = dspCodeInReg;
- 	while (pos != len) {
- 		// work out how much to send this time
-@@ -342,14 +342,14 @@ static int tda1004x_do_upload(struct tda1004x_state *state,
- 		fw_msg.len = tx_size + 1;
- 		if (__i2c_transfer(state->i2c, &fw_msg, 1) != 1) {
- 			printk(KERN_ERR "tda1004x: Error during firmware upload\n");
--			i2c_unlock_adapter(state->i2c);
-+			i2c_unlock_bus(state->i2c, I2C_LOCK_SEGMENT);
- 			return -EIO;
- 		}
- 		pos += tx_size;
+-	i2c_lock_adapter(client->adapter);
++	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	ret = regmap_bulk_write(dev->regmap, reg, val, val_count);
+-	i2c_unlock_adapter(client->adapter);
++	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	return ret;
+ }
  
- 		dprintk("%s: fw_pos=0x%x\n", __func__, pos);
- 	}
--	i2c_unlock_adapter(state->i2c);
-+	i2c_unlock_bus(state->i2c, I2C_LOCK_SEGMENT);
+@@ -36,9 +36,9 @@ static int rtl2830_update_bits(struct i2c_client *client, unsigned int reg,
+ 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
+ 	int ret;
  
- 	/* give the DSP a chance to settle 03/10/05 Hac */
- 	msleep(100);
+-	i2c_lock_adapter(client->adapter);
++	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	ret = regmap_update_bits(dev->regmap, reg, mask, val);
+-	i2c_unlock_adapter(client->adapter);
++	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	return ret;
+ }
+ 
+@@ -48,9 +48,9 @@ static int rtl2830_bulk_read(struct i2c_client *client, unsigned int reg,
+ 	struct rtl2830_dev *dev = i2c_get_clientdata(client);
+ 	int ret;
+ 
+-	i2c_lock_adapter(client->adapter);
++	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	ret = regmap_bulk_read(dev->regmap, reg, val, val_count);
+-	i2c_unlock_adapter(client->adapter);
++	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 	return ret;
+ }
+ 
 -- 
 2.11.0
