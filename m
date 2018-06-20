@@ -1,38 +1,37 @@
-From: manu@freebsd.org (Emmanuel Vadot)
-Date: Wed, 20 Jun 2018 11:30:55 +0200
-Subject: [PATCH] arm64: allwinner: a64-sopine: Add cd-gpios to mmc0 node
-Message-ID: <20180620093055.10928-1-manu@freebsd.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 20 Jun 2018 10:44:29 +0100
+Subject: [PATCH 18/20] dts: sama5d2: Update coresight bindings for
+ hardware ports
+In-Reply-To: <20180619212417.GB3128@piout.net>
+References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
+ <1528235011-30691-19-git-send-email-suzuki.poulose@arm.com>
+ <20180619212417.GB3128@piout.net>
+Message-ID: <abf65bac-0956-f1de-127e-38b0f41a6233@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The card detect GPIO for Sopine and Pine64-LTS is PF6.
-Add this to the dts.
+On 19/06/18 22:24, Alexandre Belloni wrote:
+> On 05/06/2018 22:43:29+0100, Suzuki K Poulose wrote:
+>> Switch to the new coresight bindings for hardware ports
+>>
+>> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+>> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm/boot/dts/sama5d2.dtsi | 5 ++++-
+>>   1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+> Applied, thanks.
+> 
 
-Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+Alexandre,
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-index 43418bd881d8..3dfc0c55eb96 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-@@ -45,6 +45,8 @@
- 
- #include "sun50i-a64.dtsi"
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -52,6 +54,7 @@
- 	non-removable;
- 	disable-wp;
- 	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
- 	status = "okay";
- };
- 
--- 
-2.17.0
+Please hold off applying this change, as we are yet to come to an
+agreement on this. Sorry for the trouble. See [0]
+
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582269.html
+
+Kind regards
+Suzuki
