@@ -1,117 +1,89 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:11 +0200
-Subject: [PATCH v8 11/26] of: base: Add of_get_cpu_state_node() to get idle
- states for a CPU node
+Date: Wed, 20 Jun 2018 19:22:15 +0200
+Subject: [PATCH v8 15/26] drivers: firmware: psci: Split
+ psci_dt_cpu_init_idle()
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-12-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-16-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU's idle state nodes are currently parsed at the common cpuidle DT
-library, but also when initializing back-end data for the arch specific CPU
-operations, as in the PSCI driver case.
+Let's split psci_dt_cpu_init_idle() function into two functions, as to
+allow following changes to re-use some of the code.
 
-To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
-the device node for the CPU and the index to the requested idle state node,
-as in-parameters. In case a corresponding idle state node is found, it
-returns the node with the refcount incremented for it, else it returns
-NULL.
-
-Moreover, for ARM, there are two generic methods, to describe the CPU's
-idle states, either via the flattened description through the
-"cpu-idle-states" binding [1] or via the hierarchical layout, using the
-"power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
-take both options into account.
-
-[1]
-Documentation/devicetree/bindings/arm/idle-states.txt
-[2]
-Documentation/devicetree/bindings/arm/psci.txt
-
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
 Cc: Lina Iyer <ilina@codeaurora.org>
-Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/of.h |  8 ++++++++
- 2 files changed, 43 insertions(+)
+ drivers/firmware/psci/psci.c | 42 ++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 848f549164cd..97350cce1b8e 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -399,6 +399,41 @@ int of_cpu_node_to_id(struct device_node *cpu_node)
- }
- EXPORT_SYMBOL(of_cpu_node_to_id);
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index c80ec1d03274..9788bfc1cf8b 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -270,9 +270,26 @@ static int __init psci_features(u32 psci_func_id)
+ #ifdef CONFIG_CPU_IDLE
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
  
-+/**
-+ * of_get_cpu_state_node - Get CPU's idle state node at the given index
-+ *
-+ * @cpu_node: The device node for the CPU
-+ * @index: The index in the list of the idle states
-+ *
-+ * Two generic methods can be used to describe a CPU's idle states, either via
-+ * a flattened description through the "cpu-idle-states" binding or via the
-+ * hierarchical layout, using the "power-domains" and the "domain-idle-states"
-+ * bindings. This function check for both and returns the idle state node for
-+ * the requested index.
-+ *
-+ * In case and idle state node is found at index, the refcount incremented for
-+ * it, so call of_node_put() on it when done. Returns NULL if not found.
-+ */
-+struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-+					  int index)
++static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
 +{
-+	struct of_phandle_args args;
-+	int err;
++	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
 +
-+	err = of_parse_phandle_with_args(cpu_node, "power-domains",
-+					"#power-domain-cells", 0, &args);
-+	if (!err) {
-+		struct device_node *state_node =
-+			of_parse_phandle(args.np, "domain-idle-states", index);
-+
-+		of_node_put(args.np);
-+		return state_node;
++	if (err) {
++		pr_warn("%pOF missing arm,psci-suspend-param property\n", np);
++		return err;
 +	}
 +
-+	return of_parse_phandle(cpu_node, "cpu-idle-states", index);
-+}
-+EXPORT_SYMBOL(of_get_cpu_state_node);
++	if (!psci_power_state_is_valid(*state)) {
++		pr_warn("Invalid PSCI power state %#x\n", *state);
++		return -EINVAL;
++	}
 +
- /**
-  * __of_device_is_compatible() - Check if the node matches given constraints
-  * @device: pointer to node
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 4d25e4f952d9..15072b10ef4d 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -348,6 +348,8 @@ extern const void *of_get_property(const struct device_node *node,
- 				const char *name,
- 				int *lenp);
- extern struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
-+extern struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-+						 int index);
- #define for_each_property_of_node(dn, pp) \
- 	for (pp = dn->properties; pp != NULL; pp = pp->next)
- 
-@@ -733,6 +735,12 @@ static inline struct device_node *of_get_cpu_node(int cpu,
- 	return NULL;
- }
- 
-+static inline struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-+					int index)
-+{
-+	return NULL;
++	return 0;
 +}
 +
- static inline int of_n_addr_cells(struct device_node *np)
+ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
  {
+-	int i, ret, count = 0;
++	int i, ret = 0, count = 0;
+ 	u32 *psci_states;
+ 	struct device_node *state_node;
+ 
+@@ -291,29 +308,16 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 		return -ENOMEM;
+ 
+ 	for (i = 0; i < count; i++) {
+-		u32 state;
+-
+ 		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		ret = psci_dt_parse_state_node(state_node, &psci_states[i]);
++		of_node_put(state_node);
+ 
+-		ret = of_property_read_u32(state_node,
+-					   "arm,psci-suspend-param",
+-					   &state);
+-		if (ret) {
+-			pr_warn(" * %pOF missing arm,psci-suspend-param property\n",
+-				state_node);
+-			of_node_put(state_node);
++		if (ret)
+ 			goto free_mem;
+-		}
+ 
+-		of_node_put(state_node);
+-		pr_debug("psci-power-state %#x index %d\n", state, i);
+-		if (!psci_power_state_is_valid(state)) {
+-			pr_warn("Invalid PSCI power state %#x\n", state);
+-			ret = -EINVAL;
+-			goto free_mem;
+-		}
+-		psci_states[i] = state;
++		pr_debug("psci-power-state %#x index %d\n", psci_states[i], i);
+ 	}
++
+ 	/* Idle states parsed correctly, initialize per-cpu pointer */
+ 	per_cpu(psci_power_state, cpu) = psci_states;
  	return 0;
 -- 
 2.17.1
