@@ -1,52 +1,57 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed, 20 Jun 2018 10:40:35 +0800
-Subject: [PATCH v2] net: ethernet: stmmac: dwmac-rk: Add GMAC support for
- PX30
-In-Reply-To: <2582999.2hZx6CH9S6@diego>
-References: <1528956927-32440-1-git-send-email-david.wu@rock-chips.com>
- <1961033.25ax7s0Z5i@diego>
- <3aa2445f-ab2a-93b6-3a49-36be6c98d327@rock-chips.com>
- <2582999.2hZx6CH9S6@diego>
-Message-ID: <157ecfc9-d0e6-7782-1cbc-d0fb76c81edb@rock-chips.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 20 Jun 2018 02:53:35 +0000
+Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
+In-Reply-To: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
+References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Ping....
 
-? 2018?06?14? 16:30, Heiko St?bner ??:
-> Am Donnerstag, 14. Juni 2018, 10:14:31 CEST schrieb David Wu:
->> Hi Heiko,
->>
->> ? 2018?06?14? 15:54, Heiko St?bner ??:
->>> I don't see that new clock documented in the dt-binding.
->>> Also, which clock from the clock-controller does this connect to?
->>
->> The clock is the "SCLK_GMAC_RMII" at the clock-controller, which could
->> be set rate by the link speed.
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Friday, May 25, 2018 6:37 PM
+> To: linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
+> linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
 > 
-> Hmm, while these huge number of clocks are somewhat strange,
-> shouldn't it be named something with _rmii instead of _speed then?
-
-Okay, it is better to be named _speed.
-
+> This patch series is a continue of discussion from here,
+> https://patchwork.kernel.org/patch/9986293/
+> that some users may want to handle all available clocks from device tree
+> without need to know the detailed clock information likes clock numbers and
+> names. This is useful in writing some generic drivers to handle clock part.
 > 
-> Also, I don't see any clk_enable action for that new clock, so you could
-> end up with being off?
-
-The new speed is the parent of the clk_tx_rx, to enable/disable 
-clk_tx_rx, the new clock would be also enabled/disabled.
-
+> Note:
+> This patch series is tested on MX6Q SDB cpufreq driver with a minor change
+> to switch to use clk_bulk_get_all.
+> But patch 4 only test compiling. Hopefully someone could help test the
+> function.
 > 
-> And someone could convert the driver to use the new clk-bulk APIs [0],
-> so the large number of clk_prepare_enable calls would be a bit
-> trimmed down.
+> v2->v3:
+>  * address all comments from Stephen
+>  * fix build warnings on other architectures.
+> v1->v2:
+>  * add clk_bulk_{get|put}_all() which only supports DT platform currently
+>  * remove _all variants and the wrapper struct clk_bulk
+>  * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
+>    proves they need it because they don't have a struct device pointer.
 > 
+> Dong Aisheng (4):
+>   clk: bulk: add of_clk_bulk_get()
+>   clk: add new APIs to operate on all available clocks
+>   clk: add managed version of clk_bulk_get_all
+>   video: simplefb: switch to use clk_bulk API to simplify clock
+>     operations
 > 
-> Heiko
+>  drivers/clk/clk-bulk.c         | 80
+> ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/clk-devres.c       | 24 +++++++++++++
+>  drivers/video/fbdev/simplefb.c | 66 +++++++---------------------------
+>  include/linux/clk.h            | 65 +++++++++++++++++++++++++++++++++-
+>  4 files changed, 180 insertions(+), 55 deletions(-)
 > 
-> [0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/clk/clk-bulk.c
-> 
-> 
-> 
-> 
-> 
+> --
+> 2.7.4
