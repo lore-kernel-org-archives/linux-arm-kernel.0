@@ -1,93 +1,116 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jun 2018 19:22:20 +0200
-Subject: [PATCH v8 20/26] drivers: firmware: psci: Share a few internal PSCI
- functions
+Date: Wed, 20 Jun 2018 19:22:22 +0200
+Subject: [PATCH v8 22/26] drivers: firmware: psci: Introduce
+ psci_dt_topology_init()
 In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <20180620172226.15012-21-ulf.hansson@linaro.org>
+Message-ID: <20180620172226.15012-23-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following changes needs to be able to call psci_get|set_domain_state() and
-psci_dt_parse_state_node(), but from a separate file. Let's make that
-possible by sharing them via a new internal PSCI header file.
+In case the hierarchical layout is used in DT, we want to initialize the
+corresponding PM domain topology for the CPUs, by using the generic PM
+domain (aka genpd) infrastructure.
+
+At first glance, it may seem feasible to hook into the existing
+psci_dt_init() function, although because it's called quite early in the
+boot sequence, allocating the dynamic data structure for a genpd doesn't
+work.
+
+Therefore, let's export a new init function for PSCI,
+psci_dt_topology_init(), which the ARM machine code should call from a
+suitable initcall.
+
+Succeeding to initialize the PM domain topology, which means at least one
+instance of a genpd becomes created, allows us to continue to enable the
+PSCI OS initiated mode for the platform. If everything turns out fine,
+let's print a message in log to inform the user about the changed mode.
+
+In case of any failures, we stick to the default PSCI Platform Coordinated
+mode. Moreover, in case the kernel started from a kexec call, let's make
+sure to explicitly default to this mode during boot, in case the previous
+kernel changed the mode.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci/psci.c | 14 ++++++++------
- drivers/firmware/psci/psci.h | 13 +++++++++++++
- 2 files changed, 21 insertions(+), 6 deletions(-)
- create mode 100644 drivers/firmware/psci/psci.h
+ drivers/firmware/psci/psci.c | 38 +++++++++++++++++++++++++++++++++++-
+ include/linux/psci.h         |  2 ++
+ 2 files changed, 39 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 40b2b8945018..463f78cda3be 100644
+index 463f78cda3be..80c286d83369 100644
 --- a/drivers/firmware/psci/psci.c
 +++ b/drivers/firmware/psci/psci.c
-@@ -34,6 +34,8 @@
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
+@@ -691,9 +691,14 @@ static int __init psci_1_0_init(struct device_node *np)
+ 	if (err)
+ 		return err;
  
-+#include "psci.h"
+-	if (psci_has_osi_support())
++	if (psci_has_osi_support()) {
+ 		pr_info("OSI mode supported.\n");
+ 
++		/* Make sure we default to PC mode. */
++		invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
++			       PSCI_1_0_SUSPEND_MODE_PC, 0, 0);
++	}
 +
- /*
-  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-  * calls it is necessary to use SMC64 to pass or return 64-bit values.
-@@ -90,12 +92,12 @@ static u32 psci_function_id[PSCI_FN_MAX];
- static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
- 
--static inline u32 psci_get_domain_state(void)
-+u32 psci_get_domain_state(void)
- {
- 	return this_cpu_read(domain_state);
- }
- 
--static inline void psci_set_domain_state(u32 state)
-+void psci_set_domain_state(u32 state)
- {
- 	this_cpu_write(domain_state, state);
- }
-@@ -285,10 +287,7 @@ static int __init psci_features(u32 psci_func_id)
- 			      psci_func_id, 0, 0);
- }
- 
--#ifdef CONFIG_CPU_IDLE
--static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
--
--static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
-+int psci_dt_parse_state_node(struct device_node *np, u32 *state)
- {
- 	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
- 
-@@ -305,6 +304,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
  	return 0;
  }
  
-+#ifdef CONFIG_CPU_IDLE
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+@@ -723,6 +728,37 @@ int __init psci_dt_init(void)
+ 	return ret;
+ }
+ 
++int __init psci_dt_topology_init(void)
++{
++	struct device_node *np;
++	int ret;
 +
- static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- {
- 	int i, ret = 0, count = 0;
-diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
-new file mode 100644
-index 000000000000..dc7b596daa2b
---- /dev/null
-+++ b/drivers/firmware/psci/psci.h
-@@ -0,0 +1,13 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
++	if (!psci_has_osi_support())
++		return 0;
 +
-+#ifndef __PSCI_H
-+#define __PSCI_H
++	np = of_find_matching_node_and_match(NULL, psci_of_match, NULL);
++	if (!np)
++		return -ENODEV;
 +
-+struct device_node;
++	/* Initialize the CPU PM domains based on topology described in DT. */
++	ret = psci_dt_init_pm_domains(np);
++	if (ret <= 0)
++		goto out;
 +
-+u32 psci_get_domain_state(void);
-+void psci_set_domain_state(u32 state);
++	/* Enable OSI mode. */
++	ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
++			     PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
++	if (ret) {
++		pr_info("failed to enable OSI mode: %d\n", ret);
++		goto out;
++	}
 +
-+int psci_dt_parse_state_node(struct device_node *np, u32 *state);
++	pr_info("OSI mode enabled.\n");
++out:
++	of_node_put(np);
++	return ret;
++}
 +
-+#endif /* __PSCI_H */
+ #ifdef CONFIG_ACPI
+ /*
+  * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 8b1b3b5935ab..298a044407f0 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -53,8 +53,10 @@ extern struct psci_operations psci_ops;
+ 
+ #if defined(CONFIG_ARM_PSCI_FW)
+ int __init psci_dt_init(void);
++int __init psci_dt_topology_init(void);
+ #else
+ static inline int psci_dt_init(void) { return 0; }
++static inline int psci_dt_topology_init(void) { return 0; }
+ #endif
+ 
+ #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
 -- 
 2.17.1
