@@ -1,29 +1,26 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 20 Jun 2018 20:47:47 +0200
-Subject: [PATCH] dt-bindings: arm: Remove obsolete insignal-boards.txt
-In-Reply-To: <20180531165007.GA29098@rob-hp-laptop>
-References: <20180528185310.21971-1-krzk@kernel.org>
- <20180531165007.GA29098@rob-hp-laptop>
-Message-ID: <20180620184747.ermfvtqzllofwoub@kozik-lap>
+Date: Wed, 20 Jun 2018 20:59:53 +0200
+Subject: [PATCH] ARM: S3C24XX: fix typo in guard macro for s3c2412.h
+In-Reply-To: <20180617194617.15145-1-efremov@linux.com>
+References: <20180617194617.15145-1-efremov@linux.com>
+Message-ID: <20180620185953.cty5esnbfhawnbau@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2018 at 11:50:07AM -0500, Rob Herring wrote:
-> On Mon, May 28, 2018 at 08:53:10PM +0200, Krzysztof Kozlowski wrote:
-> > The compatibles mentioned in insignal-boards.txt are already documented
-> > under devicetree/bindings/arm/samsung/samsung-boards.txt.  Also the
-> > contents of insignal-boards.txt is not accurate, e.g. does not mention
-> > Arndale boards.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > ---
-> >  Documentation/devicetree/bindings/arm/insignal-boards.txt | 8 --------
-> >  1 file changed, 8 deletions(-)
-> >  delete mode 100644 Documentation/devicetree/bindings/arm/insignal-boards.txt
+On Sun, Jun 17, 2018 at 10:46:17PM +0300, efremov at linux.com wrote:
+> The guard macro __ARCH_ARM_REGS_S3C24XX_S3C2412_H in header s3c2412.h
+> doesn't match the #ifndef macro __ARCH_ARM_MACH_S3C24XX_S3C2412_H.
+> This patch defines the guard correctly.
 > 
-> Reviewd-by: Rob Herring <robh@kernel.org>
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Denis Efremov <efremov@linux.com>
+> ---
+>  arch/arm/mach-s3c24xx/include/mach/s3c2412.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
 
-Applied to samsung-soc (with fixed typo for Reviewed-by tag).
+Thanks, applied.
 
 Best regards,
 Krzysztof
