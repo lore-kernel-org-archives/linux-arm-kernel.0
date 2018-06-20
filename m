@@ -1,66 +1,230 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Wed, 20 Jun 2018 13:42:39 +0000
-Subject: [PATCH 3/6] dt-bindings: xilinx_dma: add required
- xlnx,lengthregwidth property
-In-Reply-To: <20180620083653.17010-3-andrea.merello@gmail.com>
-References: <20180620083653.17010-1-andrea.merello@gmail.com>
- <20180620083653.17010-3-andrea.merello@gmail.com>
-Message-ID: <DM6PR02MB43610E55E255E9DA5B9E4630C7770@DM6PR02MB4361.namprd02.prod.outlook.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 20 Jun 2018 16:46:02 +0300
+Subject: [PATCH V4] PCI: move early dump functionality from x86 arch into
+ the common code
+In-Reply-To: <1528164985-14099-1-git-send-email-okaya@codeaurora.org>
+References: <1528164985-14099-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75VekLHxB43b=7jCvuqhibz8ynfQGhwFXHkM+0orNCETjVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 5, 2018 at 5:16 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Move early dump functionality into common code so that it is available for
+> all archtiectures. No need to carry arch specific reads around as the read
+> hooks are already initialized by the time pci_setup_device() is getting
+> called during scan.
+>
 
-> -----Original Message-----
-> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
-> owner at vger.kernel.org] On Behalf Of Andrea Merello
-> Sent: Wednesday, June 20, 2018 2:07 PM
-> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
-> <michals@xilinx.com>; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>; dmaengine at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> Andrea Merello <andrea.merello@gmail.com>
-> Subject: [PATCH 3/6] dt-bindings: xilinx_dma: add required
-> xlnx,lengthregwidth property
+It didn't break my setup on x86 at least. Thus,
 
-dt-bindings: dmaengine: xilinx_dma
+Tested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-Please also include DT folks.
-> 
-> The width of the "length register" cannot be autodetected, and it is now
-> specified with a DT property. Add DOC for it.
-> 
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index a2b8bfaec43c..acecdc5d8d47 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -36,6 +36,8 @@ Required properties:
-> 
->  Required properties for VDMA:
->  - xlnx,num-fstores: Should be the number of framebuffers as configured in
-> h/w.
-> +Required properties for AXI DMA:
-> +- xlnx,lengthregwidth: Should be the width of the length register as
-> configured in h/w.
+>  Documentation/admin-guide/kernel-parameters.txt |  2 +-
+>  arch/x86/include/asm/pci-direct.h               |  4 ---
+>  arch/x86/kernel/setup.c                         |  5 ---
+>  arch/x86/pci/common.c                           |  4 ---
+>  arch/x86/pci/early.c                            | 44 -------------------------
+>  drivers/pci/pci.c                               |  5 +++
+>  drivers/pci/pci.h                               |  1 +
+>  drivers/pci/probe.c                             | 19 +++++++++++
+>  8 files changed, 26 insertions(+), 58 deletions(-)
+>
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index e490902..e64f1d8 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -2995,7 +2995,7 @@
+>                         See also Documentation/blockdev/paride.txt.
+>
+>         pci=option[,option...]  [PCI] various PCI subsystem options:
+> -               earlydump       [X86] dump PCI config space before the kernel
+> +               earlydump       dump PCI config space before the kernel
+>                                 changes anything
+>                 off             [X86] don't probe for the PCI bus
+>                 bios            [X86-32] force use of PCI BIOS, don't access
+> diff --git a/arch/x86/include/asm/pci-direct.h b/arch/x86/include/asm/pci-direct.h
+> index e1084f7..94597a3 100644
+> --- a/arch/x86/include/asm/pci-direct.h
+> +++ b/arch/x86/include/asm/pci-direct.h
+> @@ -15,8 +15,4 @@ extern void write_pci_config_byte(u8 bus, u8 slot, u8 func, u8 offset, u8 val);
+>  extern void write_pci_config_16(u8 bus, u8 slot, u8 func, u8 offset, u16 val);
+>
+>  extern int early_pci_allowed(void);
+> -
+> -extern unsigned int pci_early_dump_regs;
+> -extern void early_dump_pci_device(u8 bus, u8 slot, u8 func);
+> -extern void early_dump_pci_devices(void);
+>  #endif /* _ASM_X86_PCI_DIRECT_H */
+> diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+> index 2f86d88..480f250 100644
+> --- a/arch/x86/kernel/setup.c
+> +++ b/arch/x86/kernel/setup.c
+> @@ -991,11 +991,6 @@ void __init setup_arch(char **cmdline_p)
+>                 setup_clear_cpu_cap(X86_FEATURE_APIC);
+>         }
+>
+> -#ifdef CONFIG_PCI
+> -       if (pci_early_dump_regs)
+> -               early_dump_pci_devices();
+> -#endif
+> -
+>         e820__reserve_setup_data();
+>         e820__finish_early_params();
+>
+> diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+> index 563049c..d4ec117 100644
+> --- a/arch/x86/pci/common.c
+> +++ b/arch/x86/pci/common.c
+> @@ -22,7 +22,6 @@
+>  unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 |
+>                                 PCI_PROBE_MMCONF;
+>
+> -unsigned int pci_early_dump_regs;
+>  static int pci_bf_sort;
+>  int pci_routeirq;
+>  int noioapicquirk;
+> @@ -599,9 +598,6 @@ char *__init pcibios_setup(char *str)
+>                 pci_probe |= PCI_BIG_ROOT_WINDOW;
+>                 return NULL;
+>  #endif
+> -       } else if (!strcmp(str, "earlydump")) {
+> -               pci_early_dump_regs = 1;
+> -               return NULL;
+>         } else if (!strcmp(str, "routeirq")) {
+>                 pci_routeirq = 1;
+>                 return NULL;
+> diff --git a/arch/x86/pci/early.c b/arch/x86/pci/early.c
+> index e5f753c..f5fc953 100644
+> --- a/arch/x86/pci/early.c
+> +++ b/arch/x86/pci/early.c
+> @@ -57,47 +57,3 @@ int early_pci_allowed(void)
+>                         PCI_PROBE_CONF1;
+>  }
+>
+> -void early_dump_pci_device(u8 bus, u8 slot, u8 func)
+> -{
+> -       u32 value[256 / 4];
+> -       int i;
+> -
+> -       pr_info("pci 0000:%02x:%02x.%d config space:\n", bus, slot, func);
+> -
+> -       for (i = 0; i < 256; i += 4)
+> -               value[i / 4] = read_pci_config(bus, slot, func, i);
+> -
+> -       print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1, value, 256, false);
+> -}
+> -
+> -void early_dump_pci_devices(void)
+> -{
+> -       unsigned bus, slot, func;
+> -
+> -       if (!early_pci_allowed())
+> -               return;
+> -
+> -       for (bus = 0; bus < 256; bus++) {
+> -               for (slot = 0; slot < 32; slot++) {
+> -                       for (func = 0; func < 8; func++) {
+> -                               u32 class;
+> -                               u8 type;
+> -
+> -                               class = read_pci_config(bus, slot, func,
+> -                                                       PCI_CLASS_REVISION);
+> -                               if (class == 0xffffffff)
+> -                                       continue;
+> -
+> -                               early_dump_pci_device(bus, slot, func);
+> -
+> -                               if (func == 0) {
+> -                                       type = read_pci_config_byte(bus, slot,
+> -                                                                   func,
+> -                                                              PCI_HEADER_TYPE);
+> -                                       if (!(type & 0x80))
+> -                                               break;
+> -                               }
+> -                       }
+> -               }
+> -       }
+> -}
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 97acba7..04052dc 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -115,6 +115,9 @@ static bool pcie_ari_disabled;
+>  /* If set, the PCIe ATS capability will not be used. */
+>  static bool pcie_ats_disabled;
+>
+> +/* If set, the PCI config space of each device is printed during boot. */
+> +bool pci_early_dump;
+> +
+>  bool pci_ats_disabled(void)
+>  {
+>         return pcie_ats_disabled;
+> @@ -5805,6 +5808,8 @@ static int __init pci_setup(char *str)
+>                                 pcie_ats_disabled = true;
+>                         } else if (!strcmp(str, "noaer")) {
+>                                 pci_no_aer();
+> +                       } else if (!strcmp(str, "earlydump")) {
+> +                               pci_early_dump = true;
+>                         } else if (!strncmp(str, "realloc=", 8)) {
+>                                 pci_realloc_get_opt(str + 8);
+>                         } else if (!strncmp(str, "realloc", 7)) {
+> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+> index c358e7a0..c33265e 100644
+> --- a/drivers/pci/pci.h
+> +++ b/drivers/pci/pci.h
+> @@ -7,6 +7,7 @@
+>  #define PCI_VSEC_ID_INTEL_TBT  0x1234  /* Thunderbolt */
+>
+>  extern const unsigned char pcie_link_speed[];
+> +extern bool pci_early_dump;
+>
+>  bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
+>
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 56771f3..3678f0a 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1545,6 +1545,23 @@ static int pci_intx_mask_broken(struct pci_dev *dev)
+>         return 0;
+>  }
+>
+> +static void early_dump_pci_device(struct pci_dev *pdev)
+> +{
+> +       u32 value[256 / 4];
+> +       int i;
+> +
+> +       if (!pci_early_dump)
+> +               return;
+> +
+> +       pci_info(pdev, "config space:\n");
+> +
+> +       for (i = 0; i < 256; i += 4)
+> +               pci_read_config_dword(pdev, i, &value[i / 4]);
+> +
+> +       print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1, value,
+> +                      256, false);
+> +}
+> +
+>  /**
+>   * pci_setup_device - Fill in class and map information of a device
+>   * @dev: the device structure to fill
+> @@ -1594,6 +1611,8 @@ int pci_setup_device(struct pci_dev *dev)
+>         pci_printk(KERN_DEBUG, dev, "[%04x:%04x] type %02x class %#08x\n",
+>                    dev->vendor, dev->device, dev->hdr_type, dev->class);
+>
+> +       early_dump_pci_device(dev);
+> +
+>         /* Need to have dev->class ready */
+>         dev->cfg_size = pci_cfg_space_size(dev);
+>
+> --
+> 2.7.4
+>
 
-One suggestion to be inline with IP property naming we can rename 
-this prop to "xlnx,sg-length-width"? Please take a look at Xilinx tree
-we have this feature added in the master branch. It would be good
-to consolidate both implementations and upstream. Let me know 
-if there are any followup queries. 
- 
-> 
->  Optional properties:
->  - xlnx,include-sg: Tells configured for Scatter-mode in
-> --
-> 2.17.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
