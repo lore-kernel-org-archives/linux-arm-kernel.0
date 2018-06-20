@@ -1,32 +1,73 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Jun 2018 15:04:20 +0200
-Subject: [PATCH/RFT v2 2/2] arm64: dts: r8a77995: Add all HSCIF nodes
-In-Reply-To: <20180613150951.32322-1-horms+renesas@verge.net.au>
-References: <20180613150951.32322-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVZKqCriwJcXNL0koq1iZJOUrD_623yXLz1LEwCwbQZPA@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 20 Jun 2018 21:11:02 +0800
+Subject: [PATCH 4/5] arm64: dts: allwinner: h6: Use macros for R_CCU
+ clock and reset indices
+In-Reply-To: <20180620051540.25617-5-wens@csie.org>
+References: <20180620051540.25617-1-wens@csie.org>
+ <20180620051540.25617-5-wens@csie.org>
+Message-ID: <f17d1d31905cd3276d257053b8ed632de941494c.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 5:10 PM Simon Horman <horms+renesas@verge.net.au> wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->
-> This patch adds the device nodes all HSCIF serial ports
-> incl. clocks and power domain to the R8A77995 SoC.
->
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> [simon: updated internal clock from S3D1 to S3D1C to match documentation]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+? 2018-06-20?? 13:15 +0800?Chen-Yu Tsai???
+> Now that the device tree binding headers for the R_CCU have been
+> merged,
+> we can use the macros, instead of raw numbers.
+> 
+> Switch to R_CCU macros for clock and reset indices.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> index c72da8cd9ef5..d85070f8c4a2 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> @@ -5,7 +5,9 @@
+>  
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/clock/sun50i-h6-ccu.h>
+> +#include <dt-bindings/clock/sun50i-h6-r-ccu.h>
+>  #include <dt-bindings/reset/sun50i-h6-ccu.h>
+> +#include <dt-bindings/reset/sun50i-h6-r-ccu.h>
+>  
+>  / {
+>  	interrupt-parent = <&gic>;
+> @@ -198,7 +200,7 @@
+>  			reg = <0x07022000 0x400>;
+>  			interrupts = <GIC_SPI 105
+> IRQ_TYPE_LEVEL_HIGH>,
+>  				     <GIC_SPI 111
+> IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&r_ccu 2>, <&osc24M>, <&osc32k>;
+> +			clocks = <&r_ccu CLK_R_APB1>, <&osc24M>,
+> <&osc32k>;
+>  			clock-names = "apb", "hosc", "losc";
+>  			gpio-controller;
+>  			#gpio-cells = <3>;
+> @@ -208,6 +210,7 @@
+>  			r_i2c_pins: r-i2c {
+>  				pins = "PL0", "PL1";
+>  				function = "s_i2c";
+> +				bias-pull-up;
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Should this be included in this patch?
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  			};
+>  		};
+>  
+> @@ -215,8 +218,8 @@
+>  			compatible = "allwinner,sun6i-a31-i2c";
+>  			reg = <0x07081400 0x400>;
+>  			interrupts = <GIC_SPI 107
+> IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&r_ccu 8>;
+> -			resets = <&r_ccu 4>;
+> +			clocks = <&r_ccu CLK_R_APB2_I2C>;
+> +			resets = <&r_ccu RST_R_APB2_I2C>;
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&r_i2c_pins>;
+>  			status = "disabled";
