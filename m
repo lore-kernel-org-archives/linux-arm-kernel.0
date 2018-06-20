@@ -1,29 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Jun 2018 16:44:26 +0100
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 20 Jun 2018 16:46:00 +0100
 Subject: [PATCH] arm64: kpti: Use early_param for kpti= command-line option
-In-Reply-To: <20180620154032.kwhvuwibustjqmwz@armageddon.cambridge.arm.com>
+In-Reply-To: <1529508227-24331-1-git-send-email-will.deacon@arm.com>
 References: <1529508227-24331-1-git-send-email-will.deacon@arm.com>
- <20180620154032.kwhvuwibustjqmwz@armageddon.cambridge.arm.com>
-Message-ID: <20180620154426.GC27776@arm.com>
+Message-ID: <5B2A76B8.5020103@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 04:40:32PM +0100, Catalin Marinas wrote:
-> On Wed, Jun 20, 2018 at 04:23:47PM +0100, Will Deacon wrote:
-> > We inspect __kpti_forced early on as part of the cpufeature enable
-> > callback which remaps the swapper page table using non-global entries.
-> > 
-> > Ensure that __kpti_forced has been updated to reflect the kpti=
-> > command-line option before we start using it.
-> > 
-> > Reported-by: Wei Xu <xuwei5@hisilicon.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Does it need a fixes tag?
-> 
-> Fixes: ea1e3de85e94 ("arm64: entry: Add fake CPU feature for unmapping the kernel at EL0")
+Hi Will,
 
-Perhaps, but really this is just a performance optimisation for the kpti=off
-case where we don't actually need to put the nG mappings down.
+On 2018/6/20 16:23, Will Deacon wrote:
+> We inspect __kpti_forced early on as part of the cpufeature enable
+> callback which remaps the swapper page table using non-global entries.
+> 
+> Ensure that __kpti_forced has been updated to reflect the kpti=
+> command-line option before we start using it.
+> 
+> Reported-by: Wei Xu <xuwei5@hisilicon.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index d2856b129097..112b071e793f 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -937,7 +937,7 @@ static int __init parse_kpti(char *str)
+>  	__kpti_forced = enabled ? 1 : -1;
+>  	return 0;
+>  }
+> -__setup("kpti=", parse_kpti);
+> +early_param("kpti=", parse_kpti);
 
-Will
+%s/kpti=/kpti
+
+Thanks!
+
+Best Regards,
+Wei
+
+>  #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>  
+>  #ifdef CONFIG_ARM64_HW_AFDBM
+> 
