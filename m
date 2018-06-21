@@ -1,34 +1,120 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 21 Jun 2018 09:37:06 +0200
-Subject: [PATCH v7 4/4] ARM: davinci: dts: add a reset control to the dsp node
-In-Reply-To: <20180621073706.22812-1-brgl@bgdev.pl>
-References: <20180621073706.22812-1-brgl@bgdev.pl>
-Message-ID: <20180621073706.22812-5-brgl@bgdev.pl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 21 Jun 2018 09:37:28 +0200
+Subject: [PATCH V2 3/4] dt-bindings: arm: fsl: add scu binding doc
+In-Reply-To: <AM0PR04MB4211C2A376E6C74C7C4AC37880760@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
+ <1529239789-26849-4-git-send-email-aisheng.dong@nxp.com>
+ <20180620194438.GA3494@rob-hp-laptop>
+ <AM0PR04MB4211C2A376E6C74C7C4AC37880760@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180621073728.wmxb4jkn3ek4n2vt@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, Jun 21, 2018 at 03:38:30AM +0000, A.s. Dong wrote:
+> Hi Rob,
+> 
+> > -----Original Message-----
+> > From: Rob Herring [mailto:robh at kernel.org]
+> > Sent: Thursday, June 21, 2018 3:45 AM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
+> > kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
+> > <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; Mark
+> > Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org
+> > Subject: Re: [PATCH V2 3/4] dt-bindings: arm: fsl: add scu binding doc
+> > 
+> > On Sun, Jun 17, 2018 at 08:49:48PM +0800, Dong Aisheng wrote:
+> > > The System Controller Firmware (SCFW) is a low-level system function
+> > > which runs on a dedicated Cortex-M core to provide power, clock, and
+> > > resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
+> > > (QM, QP), and i.MX8QX (QXP, DX).
+> > >
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: devicetree at vger.kernel.org
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > > v1->v2:
+> > >  * remove status
+> > >  * changed to mu1
+> > > ---
+> > >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 38
+> > > ++++++++++++++++++++++
+> > >  1 file changed, 38 insertions(+)
+> > >  create mode 100644
+> > > Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > >
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > new file mode 100644
+> > > index 0000000..9b7c9fe
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > @@ -0,0 +1,38 @@
+> > > +NXP i.MX System Controller Firmware (SCFW)
+> > > +--------------------------------------------------------------------
+> > > +
+> > > +The System Controller Firmware (SCFW) is a low-level system function
+> > > +which runs on a dedicated Cortex-M core to provide power, clock, and
+> > > +resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
+> > > +(QM, QP), and i.MX8QX (QXP, DX).
+> > > +
+> > > +The AP communicates with the SC using a multi-ported MU module found
+> > > +in the LSIO subsystem. The current definition of this MU module
+> > > +provides
+> > > +5 remote AP connections to the SC to support up to 5 execution
+> > > +environments (TZ, HV, standard Linux, etc.). The SC side of this MU
+> > > +module interfaces with the LSIO DSC IP bus. The SC firmware will
+> > > +communicate with this MU using the MSI bus.
+> > > +
+> > > +System Controller Device Node:
+> > > +=============================
+> > > +
+> > > +Required properties:
+> > > +-------------------
+> > > +- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
+> > > +- fsl,mu: a phandle to the Message Unit used by SCU. Should be
+> > > +	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
+> > > +	  to make sure not use the one which is conflict with
+> > > +	  other execution environments. e.g. ATF.
+> > 
+> > Use the mailbox binding even if you don't use the mailbox subsystem.
+> > 
+> 
+> Looks reasonable. Will change it.
+> 
+> BTW as I said before, the current mailbox binding fixed #mbox-cells to be
+> at least 1 which is not suitable for i.MX SCU MU as it has only one physical
+> channel.
 
-The davinci-rproc driver will soon use the reset framework. Add the
-resets property to the dsp node in da850.dtsi.
+Why is that not suitable? If we use #mbox-cells = 1 we can encode the
+channel into the second cell. Furthermore, the SCU mode which uses all
+channels in a funny way could be another channel id the mu driver could
+use to distinguish the different channel/modes. i.e.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: David Lechner <david@lechnology.com>
----
- arch/arm/boot/dts/da850.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+#define MU_CHANNEL_0	0
+#define MU_CHANNEL_1    1
+#define MU_CHANNEL_2    2
+#define MU_CHANNEL_3    3
+#define MU_CHANNEL_SCU	4
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 1bc0e4bc0697..225e0cf4b7bc 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -118,6 +118,7 @@
- 		interrupt-parent = <&intc>;
- 		interrupts = <28>;
- 		clocks = <&psc0 15>;
-+		resets = <&psc0 15>;
- 		status = "disabled";
- 	};
- 	soc at 1c00000 {
+
+scu {
+       compatible = "fsl,imx8qxp-scu";
+       fsl,mu = <&lsio_mu1 MU_CHANNEL_SCU>;
+};
+
+This would also allow to the MU-SCU-mode driver to coexist with the
+regular MU driver for which Oleksij posted a driver.
+
+Sascha
+
 -- 
-2.17.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
