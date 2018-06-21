@@ -1,104 +1,123 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Jun 2018 11:29:52 +0200
-Subject: [PATCH 1/1] arm64/mm: move {idmap_pg_dir, tramp_pg_dir,
- swapper_pg_dir} to .rodata section
-In-Reply-To: <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
-References: <20180620085755.20045-1-yaojun8558363@gmail.com>
- <20180620085755.20045-2-yaojun8558363@gmail.com>
- <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
- <20180621025141.GB11276@toy>
- <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
- <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
-Message-ID: <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 21 Jun 2018 11:33:44 +0200
+Subject: [PATCH 4/9] media: cedrus: make engine type more generic
+In-Reply-To: <20180613140714.1686-5-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-5-maxime.ripard@bootlin.com>
+Message-ID: <4fcfed23bfae158699c23329f92d6f2e968dc062.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2018 at 10:59, James Morse <james.morse@arm.com> wrote:
-> Hi guys,
->
-> On 21/06/18 07:39, Ard Biesheuvel wrote:
->> On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
->>> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
->>>> On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
->>>>> Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
->>>>> section. And update the swapper_pg_dir by fixmap.
->>>>>
->>>>
->>>> I think we may be able to get away with not mapping idmap_pg_dir and
->>>> tramp_pg_dir at all.
->>>
->>> I think we need to move tramp_pg_dir to .rodata. The attacker can write
->>> a block-mapping(AP=01) to tramp_pg_dir and then he can access kernel
->>> memory.
->
->> Why does it need to be mapped at all? When do we ever access it from the code?
->
-> (We would want to make its fixmap entry read-only too)
->
+Hi,
 
-It already is.
+On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> The sunxi_cedrus_engine enum actually enumerates pretty much the codecs to
+> use (or we can easily infer the codec engine from the codec).
+> 
+> Since we will need the codec type as well in some later refactoring, make
+> that structure more useful by just enumerating the codec, and converting
+> the existing users.
 
->
->>>> As for swapper_pg_dir, it would indeed be nice if we could keep those
->>>> mappings read-only most of the time, but I'm not sure how useful this
->>>> is if we apply it to the root level only.
->>>
->>> The purpose of it is to make 'KSMA' harder, where an single arbitrary
->>> write is used to add a block mapping to the page-tables, giving the
->>> attacker full access to kernel memory. That's why we just apply it to
->>> the root level only. If the attacker can arbitrary write multiple times,
->>> I think it's hard to defend.
->>>
->>
->> So the assumption is that the root level is more easy to find?
->> Otherwise, I'm not sure I understand why being able to write a level 0
->> entry is so harmful, given that we don't have block mappings at that
->> level.
->
-> I think this thing assumes 3-level page tables with 39bit VA.
->
+With the comment below taken in account, this is:
 
-The attack, you mean? Because this code is unlikely to build with that
-configuration, given that __pgd_populate() BUILD_BUG()s in that case.
+Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
->
->>>>> @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
->>>>>
->>>>>  void __init mark_linear_text_alias_ro(void)
->>>>>  {
->
->>>>> +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
->>>>> +       update_mapping_prot(__pa_symbol(swapper_pg_end),
->>>>> +                           (unsigned long)lm_alias(swapper_pg_end),
->>>>> +                           size, PAGE_KERNEL_RO);
->>>>
->>>> I don't think this is necessary. Even if some pages are freed, it
->>>> doesn't harm to keep a read-only alias of them here since the new
->>>> owner won't access them via this mapping anyway. So we can keep
->>>> .rodata as a single region.
->>>
->>> To be honest, I didn't think of this issue at first. I later found a
->>> problem when testing the code on qemu:
->>
->> OK, you're right. I missed the fact that this operates on the linear
->> alias, not the kernel mapping itself.
->>
->> What I don't like is that we lose the ability to use block mappings
->> for the entire .rodata section this way. Isn't it possible to move
->> these pgdirs to the end of the .rodata segment, perhaps by using a
->> separate input section name and placing that explicitly? We could even
->> simply forget about freeing those pages, given that [on 4k pages] the
->> benefit of freeing 12 KB of space is likely to get lost in the
->> rounding noise anyway [segments are rounded up to 64 KB in size]
->
-> I assumed that to move swapper_pg_dir into the .rodata section we would need to
-> break it up. Today its ~3 levels, which we setup in head.S, then do a dance in
-> paging_init() so that swapper_pg_dir is always the top level.
->
-> We could generate all leves of the 'init_pg_dir' in the __initdata section, then
-> copy only the top level into swapper_pg_dir into the rodata section during
-> paging_init().
->
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h | 6 ++++++
+>  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c     | 6 +++---
+>  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h     | 6 +-----
+>  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c  | 2 +-
+>  4 files changed, 11 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> index b1ed1c8cb130..a5f83c452006 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> @@ -61,6 +61,12 @@ struct sunxi_cedrus_run {
+>  	};
+>  };
+>  
+> +enum sunxi_cedrus_codec {
 
-Is that complexity truly justified for a security sensitive piece of
-code? Can't we just drop the memblock_free() and be done with it?
+Feel free to rename to cedrus_codec when rebasing on top of the latest
+patchset introducing the driver.
+
+Cheers,
+
+Paul
+
+> +	SUNXI_CEDRUS_CODEC_MPEG2,
+> +
+> +	SUNXI_CEDRUS_CODEC_LAST,
+> +};
+> +
+>  struct sunxi_cedrus_ctx {
+>  	struct v4l2_fh fh;
+>  	struct sunxi_cedrus_dev	*dev;
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> index fc688a5c1ea3..bb46a01214e0 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> @@ -41,7 +41,7 @@
+>  #define SYSCON_SRAM_C1_MAP_VE	0x7fffffff
+>  
+>  int sunxi_cedrus_engine_enable(struct sunxi_cedrus_dev *dev,
+> -			       enum sunxi_cedrus_engine engine)
+> +			       enum sunxi_cedrus_codec codec)
+>  {
+>  	u32 reg = 0;
+>  
+> @@ -53,8 +53,8 @@ int sunxi_cedrus_engine_enable(struct sunxi_cedrus_dev *dev,
+>  
+>  	reg |= VE_CTRL_CACHE_BUS_BW_128;
+>  
+> -	switch (engine) {
+> -	case SUNXI_CEDRUS_ENGINE_MPEG:
+> +	switch (codec) {
+> +	case SUNXI_CEDRUS_CODEC_MPEG2:
+>  		reg |= VE_CTRL_DEC_MODE_MPEG;
+>  		break;
+>  
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
+> index 34f3fae462a8..3236c80bfcf4 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
+> @@ -23,12 +23,8 @@
+>  #ifndef _SUNXI_CEDRUS_HW_H_
+>  #define _SUNXI_CEDRUS_HW_H_
+>  
+> -enum sunxi_cedrus_engine {
+> -	SUNXI_CEDRUS_ENGINE_MPEG,
+> -};
+> -
+>  int sunxi_cedrus_engine_enable(struct sunxi_cedrus_dev *dev,
+> -			       enum sunxi_cedrus_engine engine);
+> +			       enum sunxi_cedrus_codec codec);
+>  void sunxi_cedrus_engine_disable(struct sunxi_cedrus_dev *dev);
+>  
+>  int sunxi_cedrus_hw_probe(struct sunxi_cedrus_dev *dev);
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> index 5be3e3b9ceef..85e6fc2fbdb2 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> @@ -83,7 +83,7 @@ void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+>  	}
+>  
+>  	/* Activate MPEG engine. */
+> -	sunxi_cedrus_engine_enable(dev, SUNXI_CEDRUS_ENGINE_MPEG);
+> +	sunxi_cedrus_engine_enable(dev, SUNXI_CEDRUS_CODEC_MPEG2);
+>  
+>  	/* Set quantization matrices. */
+>  	for (i = 0; i < 64; i++) {
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/8ee3cf01/attachment-0001.sig>
