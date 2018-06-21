@@ -1,104 +1,117 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 21 Jun 2018 10:20:42 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
-Message-ID: <5B2B6DEA.2090100@hisilicon.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 21 Jun 2018 14:52:33 +0530
+Subject: [PATCH RESEND 1/2] ti: wkup_m3_ipc: Add rtc_only with ddr in self
+ refresh mode support
+Message-ID: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Adds rtc_only support. This needs resume function to shutdown and
+reboot the m3.
 
-On 2018/6/21 9:38, James Morse wrote:
-> Hi Will, Wei,
-> 
-> On 20/06/18 17:25, Wei Xu wrote:
->> On 2018/6/20 23:54, James Morse wrote:
->> I have disabled CONFIG_ARM64_RAS_EXTN and reverted that commit.
->> But I still got the stack overflow issue sometimes.
->> Do you have more hint?
-> 
->> The log is as below:
->>     [    0.000000] Booting Linux on physical CPU 0x0000000000 [0x480fd010]
->>     [    0.000000] Linux version 4.17.0-45865-g2b31fe7-dirty
-> 
-> Could you reproduce this with v4.17? This says there are ~45,000 extra patches,
-> and un-committed changes. None of the hashes so far have been commits in
-> mainline, so we have no idea what this tree is.
-> 
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
 
-I have tried v4.17 and log is as below and also it can be found in the first mail
-of this thread.
+This is tested on am437x-gp-evm and target for 4.19
 
-	[ 0.000000] Linux version 4.17.0-45864-g29dcea8-dirty
-	(joyx at Turing-Arch-b) (gcc version 4.9.1 20140505 (prerelease) (crosstool-NG
-	linaro-1.13.1-4.9-2014.05 - Linaro GCC 4.9-2014.05)) #6 SMP PREEMPT Fri Jun
-	15 21:39:52 CST 2018
+ drivers/soc/ti/wkup_m3_ipc.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/wkup_m3_ipc.h  |  3 +++
+ 2 files changed, 44 insertions(+)
 
-I will try v4.17.2 and v4.18-rc1.
-
-> 
->> (joyx at Turing-Arch-b) (gcc version 4.9.1 20140505 (prerelease) (crosstool-NG
->> linaro-1.13.1-4.9-2014.05 - Linaro GCC 4.9-2014.05)) #10 SMP PREEMPT Wed Jun 20
->> 23:59:05 CST 2018
-> 
->>     [    0.000000] CPU0: using LPI pending table @0x000000007d860000
->>     [    0.000000] GIC: PPI11 is secure or misconfigured
->>     [    0.000000] arch_timer: WARNING: Invalid trigger for IRQ3, assuming level
->> low
->>     [    0.000000] arch_timer: WARNING: Please fix your firmware
->>     [    0.000000] arch_timer: cp15 timer(s) running at 100.00MHz (virt).
-> 
-> (No idea what these mean, but I doubt they are relevant)
-> 
-
-I will try with mainline qemu 2.12.0.
-
-Thanks!
-
-Best Regards,
-Wei
-
-> 
->>     [    0.042421] Insufficient stack space to handle exception!
->>     [    0.042423] ESR: 0x96000046 -- DABT (current EL)
->>     [    0.043730] FAR: 0xffff0000093a80e0
->>     [    0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
-> 
-> This was a level 2 translation fault on a write, to an address that is within
-> the stack....
-> 
-> 
->>     [    0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
->>     [    0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
->>     [    0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
->> 4.17.0-45865-g2b31fe7-dirty #10
->>     [    0.072201] Hardware name: linux,dummy-virt (DT)
-> 
->>     [    0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
->>     [    0.081727] pc : el1_sync+0x0/0xb0
-> 
-> ... from the vectors.
-> 
-> 
->>     [    0.085217] lr : kpti_install_ng_mappings+0x120/0x214
-> 
-> What I think is happening is: we come out of the kpti idmap with the stack
-> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
-> well when it tries to push the registers to the stack, and we keep going until
-> we overflow the stack.
-> 
-> I can't reproduce this with kvmtool or qemu in the model.
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> .
-> 
+diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+index 369aef5..b732c39 100644
+--- a/drivers/soc/ti/wkup_m3_ipc.c
++++ b/drivers/soc/ti/wkup_m3_ipc.c
+@@ -329,12 +329,24 @@ static int wkup_m3_finish_low_power(struct wkup_m3_ipc *m3_ipc)
+ 	return 0;
+ }
+ 
++/**
++ * wkup_m3_set_rtc_only - Set the rtc_only flag
++ * @wkup_m3_wakeup: struct wkup_m3_wakeup_src * gets assigned the
++ *                  wakeup src value
++ */
++static void wkup_m3_set_rtc_only(struct wkup_m3_ipc *m3_ipc)
++{
++	if (m3_ipc_state)
++		m3_ipc_state->is_rtc_only = true;
++}
++
+ static struct wkup_m3_ipc_ops ipc_ops = {
+ 	.set_mem_type = wkup_m3_set_mem_type,
+ 	.set_resume_address = wkup_m3_set_resume_address,
+ 	.prepare_low_power = wkup_m3_prepare_low_power,
+ 	.finish_low_power = wkup_m3_finish_low_power,
+ 	.request_pm_status = wkup_m3_request_pm_status,
++	.set_rtc_only = wkup_m3_set_rtc_only,
+ };
+ 
+ /**
+@@ -484,6 +496,32 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int wkup_m3_ipc_suspend(struct device *dev)
++{
++	/*
++	 * Nothing needs to be done on suspend even with rtc_only flag set
++	 */
++	return 0;
++}
++
++static int wkup_m3_ipc_resume(struct device *dev)
++{
++	if (m3_ipc_state->is_rtc_only) {
++		rproc_shutdown(m3_ipc_state->rproc);
++		rproc_boot(m3_ipc_state->rproc);
++	}
++
++	m3_ipc_state->is_rtc_only = false;
++
++	return 0;
++}
++
++static const struct dev_pm_ops wkup_m3_ipc_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(wkup_m3_ipc_suspend, wkup_m3_ipc_resume)
++};
++#endif
++
+ static const struct of_device_id wkup_m3_ipc_of_match[] = {
+ 	{ .compatible = "ti,am3352-wkup-m3-ipc", },
+ 	{ .compatible = "ti,am4372-wkup-m3-ipc", },
+@@ -497,6 +535,9 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+ 	.driver = {
+ 		.name = "wkup_m3_ipc",
+ 		.of_match_table = wkup_m3_ipc_of_match,
++#ifdef CONFIG_PM
++		.pm = &wkup_m3_ipc_pm_ops,
++#endif
+ 	},
+ };
+ 
+diff --git a/include/linux/wkup_m3_ipc.h b/include/linux/wkup_m3_ipc.h
+index d6ba7d3..d639df1 100644
+--- a/include/linux/wkup_m3_ipc.h
++++ b/include/linux/wkup_m3_ipc.h
+@@ -40,6 +40,7 @@ struct wkup_m3_ipc {
+ 	struct mbox_chan *mbox;
+ 
+ 	struct wkup_m3_ipc_ops *ops;
++	int is_rtc_only;
+ };
+ 
+ struct wkup_m3_ipc_ops {
+@@ -48,8 +49,10 @@ struct wkup_m3_ipc_ops {
+ 	int (*prepare_low_power)(struct wkup_m3_ipc *m3_ipc, int state);
+ 	int (*finish_low_power)(struct wkup_m3_ipc *m3_ipc);
+ 	int (*request_pm_status)(struct wkup_m3_ipc *m3_ipc);
++	void (*set_rtc_only)(struct wkup_m3_ipc *m3_ipc);
+ };
+ 
+ struct wkup_m3_ipc *wkup_m3_ipc_get(void);
+ void wkup_m3_ipc_put(struct wkup_m3_ipc *m3_ipc);
++void wkup_m3_set_rtc_only_mode(void);
+ #endif /* _LINUX_WKUP_M3_IPC_H */
+-- 
+1.9.1
