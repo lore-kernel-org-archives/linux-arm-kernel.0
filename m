@@ -1,96 +1,32 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 20 Jun 2018 21:29:06 -0400
-Subject: Dynamic ftrace self test broken on ARM
-In-Reply-To: <20180620230734.GO17671@n2100.armlinux.org.uk>
-References: <65fb14b356bc0a414f1fe5cf5c6eb395@agner.ch>
- <20180618175437.3e6c85a1@gandalf.local.home>
- <b9f269ed2143688c38cdcbba7367b101@agner.ch>
- <20180619091735.7aec75d0@gandalf.local.home>
- <5e26cebbb2ebeb87fdc808509881736b@agner.ch>
- <20180620101311.0bcd73d3@gandalf.local.home>
- <7904ed3fe9f59a54526d64f366915b43@agner.ch>
- <e4181ae694d44913a8eba4618477bd3b@agner.ch>
- <ac0178fb75658a8d7d7b1931691c7755@agner.ch>
- <20180620230734.GO17671@n2100.armlinux.org.uk>
-Message-ID: <20180620212906.24b7b66e@vmware.local.home>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Thu, 21 Jun 2018 11:43:46 +0900
+Subject: [PATCH] ASoC: uniphier: remove redundant check of PLL ID
+Message-ID: <20180621024346.13131-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jun 2018 00:07:34 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+This patch removes redudant check of PLL ID. struct uniphier_aio_pll
+enable member has already been checked at is_valid_pll().
 
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ sound/soc/uniphier/aio-cpu.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-> > Any input from ARM folks?  
-> 
-> The same issues must exist on other architectures as ARM is not the only
-> architecture to implement read-only kernel text and dynamic ftrace, so
-> surely this problem isn't unique to ARM.
-
-Probably because of the way set_kernel_text_ro() is implemented in
-other archs. For example, in x86, we have:
-
-void set_kernel_text_ro(void)
-{
-	unsigned long start = PFN_ALIGN(_text);
-	unsigned long end = PFN_ALIGN(__stop___ex_table);
-
-	if (!kernel_set_to_readonly)
-		return;
-
-	/*
-	 * Set the kernel identity mapping for text RO.
-	 */
-	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
-}
-
-and arm has:
-
-void set_kernel_text_ro(void)
-{
-	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
-				current->active_mm);
-}
-
-Where x86's set_kernel_text_ro() is a nop until the
-kernel_set_to_readonly is set.
-
-Perhaps this may fix things?
-
-[ Not even compiled tested ]
-
--- Steve
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index c186474422f3..0cc8e04295a4 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
- 	return 0;
- }
+diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
+index 2d9b7dde2ffa..cfe69ab44b63 100644
+--- a/sound/soc/uniphier/aio-cpu.c
++++ b/sound/soc/uniphier/aio-cpu.c
+@@ -224,10 +224,6 @@ static int uniphier_aio_set_pll(struct snd_soc_dai *dai, int pll_id,
  
-+static int kernel_set_to_readonly __read_mostly;
-+
- void mark_rodata_ro(void)
- {
-+	kernel_set_to_readonly = 1;
- 	stop_machine(__mark_rodata_ro, NULL, NULL);
- 	debug_checkwx();
- }
+ 	if (!is_valid_pll(aio->chip, pll_id))
+ 		return -EINVAL;
+-	if (!aio->chip->plls[pll_id].enable) {
+-		dev_err(dev, "PLL(%d) is not implemented\n", pll_id);
+-		return -ENOTSUPP;
+-	}
  
- void set_kernel_text_rw(void)
- {
-+	if (!kernel_set_to_readonly)
-+		return;
-+
- 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
- 				current->active_mm);
- }
- 
- void set_kernel_text_ro(void)
- {
-+	if (!kernel_set_to_readonly)
-+		return;
-+
- 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
- 				current->active_mm);
- }
+ 	ret = aio_chip_set_pll(aio->chip, pll_id, freq_out);
+ 	if (ret < 0)
+-- 
+2.17.1
