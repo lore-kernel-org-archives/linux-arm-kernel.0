@@ -1,49 +1,26 @@
-From: nick@shmanahar.org (Nick Dyer)
-Date: Thu, 21 Jun 2018 19:10:00 +0100
-Subject: [PATCH v5] ARM: dts: imx51-zii-rdu1: fix touchscreen pinctrl
-In-Reply-To: <CAFXsbZr-HJE54c0BC5=d1tStByA5ytGhSSZMirNKE03JzGCDXQ@mail.gmail.com>
-References: <CAFXsbZr-HJE54c0BC5=d1tStByA5ytGhSSZMirNKE03JzGCDXQ@mail.gmail.com>
-Message-ID: <20180621181000.12687-1-nick@shmanahar.org>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Thu, 21 Jun 2018 11:17:51 -0700
+Subject: Finish the GENERIC_IRQ_MULTI_HANDLER conversion
+Message-ID: <20180621181756.12493-1-palmer@sifive.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl settings were incorrect for the touchscreen interrupt line, causing
-an interrupt storm. This change has been tested with both the atmel_mxt_ts and
-RMI4 drivers on the RDU1 units.
+A while ago I sent a patch set that adds a GENERIC_IRQ_MULTI_HANDLER,
+which is an exact copy of the existing IRQ_MULTI_HANDLER support in the
+arm port, which is being used unconditionally by arm64 and openrisc.
+GENERIC_IRQ_MULTI_HANDLER is currently being used by the RISC-V port.  I
+managed to make a few mistakes in my original patch set and as a result
+my conversion of the other architectures of GENERIC_IRQ_MULTI_HANDLER
+was dropped.
 
-The value 0x4 comes from the value of register IOMUXC_SW_PAD_CTL_PAD_CSI1_D8
-from the old vendor kernel.
+This patch set finishes up my original patch set by converting arm,
+arm64, and openrisc over to the new GENERIC_IRQ_MULTI_HANDLER support
+and then removing MULTI_IRQ_HANDLER as it's obselete.
 
-Signed-off-by: Nick Dyer <nick@shmanahar.org>
-Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
-Cc: <stable@vger.kernel.org> # 4.15+
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Tested-by: Chris Healy <cphealy@gmail.com>
----
-Changes in v5:
-- Add tested by Chris Healy
-Changes in v4:
-- Add reviewed by Fabio
-Changes in v3:
-- Update commit message to add source of 0x4 value, fixes tag and CC stable
-Changes in v2:
-- Use hex, only alter IRQ line config
+At the time I wrote this I gave it fairly extensive build testing, but
+went I recently rebased it I just tested the full patch set on arm,
+arm64, and openrisc defconfigs.
 
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index df9eca94d812..8a878687197b 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -770,7 +770,7 @@
- 
- 	pinctrl_ts: tsgrp {
- 		fsl,pins = <
--			MX51_PAD_CSI1_D8__GPIO3_12		0x85
-+			MX51_PAD_CSI1_D8__GPIO3_12		0x04
- 			MX51_PAD_CSI1_D9__GPIO3_13		0x85
- 		>;
- 	};
--- 
-2.17.1
+Various flavors of this patch set have bounced around a few times
+before, but I'm calling this a whole new patch set as it builds on top
+of what was merged.
