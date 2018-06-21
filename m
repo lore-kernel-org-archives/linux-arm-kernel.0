@@ -1,28 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 21 Jun 2018 21:54:50 +0200
-Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
-In-Reply-To: <20171226041517.GD4210@X250>
-References: <20171213142406.5088-1-p.zabel@pengutronix.de>
- <20171226041517.GD4210@X250>
-Message-ID: <1529610890.4022.7.camel@pengutronix.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 21 Jun 2018 13:00:41 -0700
+Subject: [PATCH] drm/pl111: Support Nomadik LCDC variant
+In-Reply-To: <20180621184450.25377-1-linus.walleij@linaro.org>
+References: <20180621184450.25377-1-linus.walleij@linaro.org>
+Message-ID: <87lgb79afq.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-On Tue, 2017-12-26 at 12:15 +0800, Shawn Guo wrote:
-> On Wed, Dec 13, 2017 at 03:24:06PM +0100, Philipp Zabel wrote:
-> > Add the CodaHx4 VPU to the i.MX51 device tree.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> > This patch should only be applied once the patch to fix VPU register access on
-> > i.MX51 [1] is merged. The coda driver with patches [2] applied will start
-> > accessing VPU registers on i.MX51, which hangs the system without [1].
-> 
-> Ping me when it can be safely applied on IMX tree.
+> The Nomadik has a variant of the PL110 known as "Color LCD
+> Controller" LCDC. This variant has the same bit ordering as
+> the DRM subsystem (in difference from the other variants)
+> and adds a few bits for the control of 5551, 565 etc in the
+> control register. Notably it also adds a packed RGB888
+> 24BPP mode.
+>
+> We add support by detecting this variant and also adding a
+> small plug-in that will mux the LCDC out if the ASIC happens
+> to be muxed to the other graphics controller (they are
+> mutually exclusive).
 
-I forgot about this between the years, this patch is safe to be applied.
+This all looks reasonable to me.
 
-regards
-Philipp
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/3739e435/attachment.sig>
