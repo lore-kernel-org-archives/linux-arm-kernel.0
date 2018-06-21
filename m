@@ -1,78 +1,30 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 21 Jun 2018 09:38:53 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <5B2A7FE1.5040607@hisilicon.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
-Message-ID: <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 21 Jun 2018 10:50:03 +0200
+Subject: [PATCH v3 09/14] ASoC: pxa: remove the dmaengine compat need
+In-Reply-To: <1984a4a7-e33b-6349-31f3-6f85ff1582b8@zonque.org> (Daniel Mack's
+ message of "Sun, 17 Jun 2018 20:17:09 +0200")
+References: <20180617170217.24177-1-robert.jarzmik@free.fr>
+ <20180617170217.24177-10-robert.jarzmik@free.fr>
+ <1984a4a7-e33b-6349-31f3-6f85ff1582b8@zonque.org>
+Message-ID: <87muvoo75w.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Wei,
+Daniel Mack <daniel@zonque.org> writes:
 
-On 20/06/18 17:25, Wei Xu wrote:
-> On 2018/6/20 23:54, James Morse wrote:
-> I have disabled CONFIG_ARM64_RAS_EXTN and reverted that commit.
-> But I still got the stack overflow issue sometimes.
-> Do you have more hint?
+> Hi Mark,
+>
+> I prepared a series of patches for 4.18 that conflict with this one. Instead of
+> letting other people resolve this down the road, I'd prefer if this one went
+> through the ASoC tree, if you don't mind.
+>
+> I've talked to Robert off-list, and he's fine with this approach.
+That's right.
 
-> The log is as below:
-> ??? [??? 0.000000] Booting Linux on physical CPU 0x0000000000 [0x480fd010]
-> ??? [??? 0.000000] Linux version 4.17.0-45865-g2b31fe7-dirty
+I'll tentativaly queue this patch to my pxa/for-next tree. As soon as I hear
+that Mark queued it up in his tree, I'll drop it from mine.
 
-Could you reproduce this with v4.17? This says there are ~45,000 extra patches,
-and un-committed changes. None of the hashes so far have been commits in
-mainline, so we have no idea what this tree is.
+Cheers.
 
-
-> (joyx at Turing-Arch-b) (gcc version 4.9.1 20140505 (prerelease) (crosstool-NG
-> linaro-1.13.1-4.9-2014.05 - Linaro GCC 4.9-2014.05)) #10 SMP PREEMPT Wed Jun 20
-> 23:59:05 CST 2018
-
-> ??? [??? 0.000000] CPU0: using LPI pending table @0x000000007d860000
-> ??? [??? 0.000000] GIC: PPI11 is secure or misconfigured
-> ??? [??? 0.000000] arch_timer: WARNING: Invalid trigger for IRQ3, assuming level
-> low
-> ??? [??? 0.000000] arch_timer: WARNING: Please fix your firmware
-> ??? [??? 0.000000] arch_timer: cp15 timer(s) running at 100.00MHz (virt).
-
-(No idea what these mean, but I doubt they are relevant)
-
-
-> ??? [??? 0.042421] Insufficient stack space to handle exception!
-> ??? [??? 0.042423] ESR: 0x96000046 -- DABT (current EL)
-> ??? [??? 0.043730] FAR: 0xffff0000093a80e0
-> ??? [??? 0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
-
-This was a level 2 translation fault on a write, to an address that is within
-the stack....
-
-
-> ??? [??? 0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
-> ??? [??? 0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
-> ??? [??? 0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
-> 4.17.0-45865-g2b31fe7-dirty #10
-> ??? [??? 0.072201] Hardware name: linux,dummy-virt (DT)
-
-> ??? [??? 0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
-> ??? [??? 0.081727] pc : el1_sync+0x0/0xb0
-
-... from the vectors.
-
-
-> ??? [??? 0.085217] lr : kpti_install_ng_mappings+0x120/0x214
-
-What I think is happening is: we come out of the kpti idmap with the stack
-unmapped. Shortly after we access the stack, which faults. el1_sync faults as
-well when it tries to push the registers to the stack, and we keep going until
-we overflow the stack.
-
-I can't reproduce this with kvmtool or qemu in the model.
-
-
-Thanks,
-
-James
+--
+Robert
