@@ -1,432 +1,257 @@
-From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Thu, 21 Jun 2018 21:09:54 +0200
-Subject: [PATCH 2/7] ARM: dts: s5pv210: Add initial DTS for Samsung Aries
- based phones.
-In-Reply-To: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <1529608199-5583-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 21 Jun 2018 12:37:21 -0700
+Subject: [PATCH linux-next v6 00/13] PECI device driver introduction
+Message-ID: <20180621193721.20588-1-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This DTS file have initial support Samsung Aries based phones.
-Initial version have support for:
-- sdcard
-- internal memory (present only on non 4g variant)
-- max8998 pmic and rtc
-- max17040 fuel gauge
-- gpio keys
-- fimd (no panel driver yet)
-- usb (peripherial mode)
-- wifi
+Introduction of the Platform Environment Control Interface (PECI) bus
+device driver. PECI is a one-wire bus interface that provides a
+communication channel from Intel processors and chipset components to
+external monitoring or control devices. PECI is designed to support the
+following sideband functions:
 
-Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
----
- arch/arm/boot/dts/s5pv210-aries.dtsi | 397 +++++++++++++++++++++++++++++++++++
- 1 file changed, 397 insertions(+)
- create mode 100644 arch/arm/boot/dts/s5pv210-aries.dtsi
+* Processor and DRAM thermal management
+  - Processor fan speed control is managed by comparing Digital Thermal
+    Sensor (DTS) thermal readings acquired via PECI against the
+    processor-specific fan speed control reference point, or TCONTROL. Both
+    TCONTROL and DTS thermal readings are accessible via the processor PECI
+    client. These variables are referenced to a common temperature, the TCC
+    activation point, and are both defined as negative offsets from that
+    reference.
+  - PECI based access to the processor package configuration space provides
+    a means for Baseboard Management Controllers (BMC) or other platform
+    management devices to actively manage the processor and memory power
+    and thermal features.
 
-diff --git a/arch/arm/boot/dts/s5pv210-aries.dtsi b/arch/arm/boot/dts/s5pv210-aries.dtsi
-new file mode 100644
-index 000000000000..6e8ac3615765
---- /dev/null
-+++ b/arch/arm/boot/dts/s5pv210-aries.dtsi
-@@ -0,0 +1,397 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Samsung's S5PV210 based Galaxy Aries board device tree source
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include "s5pv210.dtsi"
-+
-+/ {
-+	compatible = "samsung,aries", "samsung,s5pv210";
-+
-+	aliases {
-+		i2c6 = &i2c_pmic;
-+		i2c9 = &i2c_fuel;
-+	};
-+
-+	memory at 30000000 {
-+		device_type = "memory";
-+		reg = <0x30000000 0x05000000
-+			0x40000000 0x10000000
-+			0x50000000 0x08000000>;
-+	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpg1 2 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wlan_gpio_rst>;
-+		post-power-on-delay-ms = <500>;
-+		power-off-delay-us = <500>;
-+	};
-+
-+	i2c_pmic: i2c-pmic {
-+		compatible = "i2c-gpio";
-+		sda-gpios = <&gpj4 0 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
-+		scl-gpios = <&gpj4 3 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
-+		i2c-gpio,delay-us = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pmic at 66 {
-+			compatible = "maxim,max8998";
-+			reg = <0x66>;
-+			interrupt-parent = <&gph0>;
-+			interrupts = <7 0>;
-+
-+			max8998,pmic-buck1-default-dvs-idx = <1>;
-+			max8998,pmic-buck1-dvs-gpios = <&gph0 3 GPIO_ACTIVE_HIGH>,
-+							<&gph0 4 GPIO_ACTIVE_HIGH>;
-+			max8998,pmic-buck1-dvs-voltage = <1275000>, <1200000>,
-+							<1050000>, <950000>;
-+
-+			max8998,pmic-buck2-default-dvs-idx = <0>;
-+			max8998,pmic-buck2-dvs-gpio = <&gph0 5 GPIO_ACTIVE_HIGH>;
-+			max8998,pmic-buck2-dvs-voltage = <1100000>, <1000000>;
-+
-+			regulators {
-+				ldo2_reg: LDO2 {
-+					regulator-name = "VALIVE_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
-+				};
-+
-+				ldo3_reg: LDO3 {
-+					regulator-name = "VUSB_1.1V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo4_reg: LDO4 {
-+					regulator-name = "VADC_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo5_reg: LDO5 {
-+					regulator-name = "VTF_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo7_reg: LDO7 {
-+					regulator-name = "VLCD_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					/* Till we get panel driver */
-+					regulator-always-on;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo8_reg: LDO8 {
-+					regulator-name = "VUSB_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo9_reg: LDO9 {
-+					regulator-name = "VCC_2.8V_PDA";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo11_reg: LDO11 {
-+					regulator-name = "CAM_AF_3.0V";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo12_reg: LDO12 {
-+					regulator-name = "CAM_SENSOR_CORE_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo13_reg: LDO13 {
-+					regulator-name = "VGA_VDDIO_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo14_reg: LDO14 {
-+					regulator-name = "VGA_DVDD_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo15_reg: LDO15 {
-+					regulator-name = "CAM_ISP_HOST_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo16_reg: LDO16 {
-+					regulator-name = "VGA_AVDD_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				ldo17_reg: LDO17 {
-+					regulator-name = "VCC_3.0V_LCD";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					/* Till we get panel driver */
-+					regulator-always-on;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				buck1_reg: BUCK1 {
-+					regulator-name = "vddarm";
-+					regulator-min-microvolt = <750000>;
-+					regulator-max-microvolt = <1500000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+						regulator-suspend-microvolt = <1250000>;
-+					};
-+				};
-+
-+				buck2_reg: BUCK2 {
-+					regulator-name = "vddint";
-+					regulator-min-microvolt = <750000>;
-+					regulator-max-microvolt = <1500000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+						regulator-suspend-microvolt = <1100000>;
-+					};
-+				};
-+
-+				buck3_reg: BUCK3 {
-+					regulator-name = "VCC_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				buck4_reg: BUCK4 {
-+					regulator-name = "CAM_ISP_CORE_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
-+				};
-+
-+				safe1_sreg: ESAFEOUT1 {
-+					regulator-name = "SAFEOUT1";
-+				};
-+			};
-+		};
-+	};
-+
-+	i2c_fuel: i2c-fuel {
-+		compatible = "i2c-gpio";
-+		sda-gpios = <&mp05 1 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
-+		scl-gpios = <&mp05 0 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
-+		i2c-gpio,delay-us = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		fuel at 36 {
-+			compatible = "maxim,max17040";
-+			interrupt-parent = <&vic0>;
-+			interrupts = <7>;
-+			reg = <0x36>;
-+		};
-+	};
-+};
-+
-+&xusbxti {
-+	clock-frequency = <24000000>;
-+};
-+
-+&pinctrl0 {
-+	wlan_bt_en: wlan-bt-en {
-+		samsung,pins = "gpb-5";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
-+		samsung,pin-val = <1>;
-+	};
-+
-+	wlan_gpio_rst: wlan-gpio-rst {
-+		samsung,pins = "gpg1-2";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
-+	};
-+
-+	wifi_host_wake: wifi-host-wake {
-+		samsung,pins = "gph2-4";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
-+		samsung,pin-pud = <S3C64XX_PIN_PULL_DOWN>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-+	};
-+
-+	tf_detect: tf-detect {
-+		samsung,pins = "gph3-4";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
-+		samsung,pin-pud = <S3C64XX_PIN_PULL_DOWN>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-+	};
-+
-+	wifi_wake: wifi-wake {
-+		samsung,pins = "gph3-5";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
-+	};
-+
-+	massmemory_en: massmemory-en {
-+		samsung,pins = "gpj2-7";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&sdhci1 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	bus-width = <4>;
-+	max-frequency = <38400000>;
-+	pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4 &wifi_wake &wifi_host_wake &wlan_bt_en>;
-+	pinctrl-names = "default";
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
-+
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&gph2>;
-+		interrupts = <4 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
-+&sdhci2 {
-+	bus-width = <4>;
-+	cd-gpios = <&gph3 4 GPIO_ACTIVE_LOW>;
-+	vmmc-supply = <&ldo5_reg>;
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &tf_detect>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-+
-+&hsotg {
-+	vusb_a-supply = <&ldo8_reg>;
-+	vusb_d-supply = <&ldo3_reg>;
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+	vbus-supply = <&safe1_sreg>;
-+};
-+
-+&fimd {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_clk &lcd_data24>;
-+	status = "okay";
-+
-+	samsung,invert-vden;
-+	samsung,invert-vclk;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	display-timings {
-+		native-mode = <&timing0>;
-+
-+		timing0: timing at 0 {
-+			/* 480x800 at 60Hz */
-+			clock-frequency = <25628040>;
-+			hactive = <480>;
-+			vactive = <800>;
-+			hfront-porch = <16>;
-+			hback-porch = <16>;
-+			hsync-len = <2>;
-+			vfront-porch = <28>;
-+			vback-porch = <1>;
-+			vsync-len = <2>;
-+		};
-+	};
-+};
+* Platform Manageability
+  - Platform manageability functions including thermal, power, and error
+    monitoring. Note that platform 'power' management includes monitoring
+    and control for both the processor and DRAM subsystem to assist with
+    data center power limiting.
+  - PECI allows read access to certain error registers in the processor MSR
+    space and status monitoring registers in the PCI configuration space
+    within the processor and downstream devices.
+  - PECI permits writes to certain registers in the processor PCI
+    configuration space.
+
+* Processor Interface Tuning and Diagnostics
+  - Processor interface tuning and diagnostics capabilities
+    (Intel Interconnect BIST). The processors Intel Interconnect Built In
+    Self Test (Intel IBIST) allows for infield diagnostic capabilities in
+    the Intel UPI and memory controller interfaces. PECI provides a port to
+    execute these diagnostics via its PCI Configuration read and write
+    capabilities.
+
+* Failure Analysis
+  - Output the state of the processor after a failure for analysis via
+    Crashdump.
+
+PECI uses a single wire for self-clocking and data transfer. The bus
+requires no additional control lines. The physical layer is a self-clocked
+one-wire bus that begins each bit with a driven, rising edge from an idle
+level near zero volts. The duration of the signal driven high depends on
+whether the bit value is a logic '0' or logic '1'. PECI also includes
+variable data transfer rate established with every message. In this way, it
+is highly flexible even though underlying logic is simple.
+
+The interface design was optimized for interfacing between an Intel
+processor and chipset components in both single processor and multiple
+processor environments. The single wire interface provides low board
+routing overhead for the multiple load connections in the congested routing
+area near the processor and chipset components. Bus speed, error checking,
+and low protocol overhead provides adequate link bandwidth and reliability
+to transfer critical device operating conditions and configuration
+information.
+
+This implementation provides the basic framework to add PECI extensions to
+the Linux bus and device models. A hardware specific 'Adapter' driver can
+be attached to the PECI bus to provide sideband functions described above.
+It is also possible to access all devices on an adapter from userspace
+through the /dev interface. A device specific 'Client' driver also can be
+attached to the PECI bus so each processor client's features can be
+supported by the 'Client' driver through an adapter connection in the bus.
+This patch set includes Aspeed 24xx/25xx PECI driver and PECI
+cputemp/dimmtemp drivers as the first implementation for both adapter and
+client drivers on the PECI bus framework.
+
+Please review.
+
+Thanks,
+
+-Jae
+
+Changes since v5:
+* Added more detailed descriptions for PECI client MFD documents.
+* Changed PECI client MFD souce file names.
+* Fixed DT example of PECI client MFD.
+* Removed unnecessary debug printings.
+* Moved the asm/intel-family.h inclusion place.
+
+Changes since v4:
+* Fixed an incorrect endianness handling in peci-aspeed.
+* Added a comment to explain about the asm/intel-family.h inclusion.
+* Added an MFD module to support multi-function PECI client devices.
+
+Changes since v3:
+* Made code more simple and compact.
+* Removed unused header file inclusion.
+* Fixed incorrect error return values and messages.
+* Removed DTS margin temperature from the peci-cputemp.
+* Made some magic numbers use defines.
+* Moved peci_get_cpu_id() into peci-core as a common function.
+* Replaced the cancel_delayed_work() call with a cancel_delayed_work_sync().
+* Replaced AST and Aspeed uses with ASPEED.
+* Simplified peci command timeout checking logic using
+  regmap_read_poll_timeout().
+* Simplified endian swap codes using endian handling macros.
+* Dropped regmap read/write error checking except for the first access.
+* Added a PECI reset setting in the device tree node.
+* Removed unnecessary sleep from the probe context.
+* Removed IRQF_SHARED flag from irq request code in the ASPEED PECI driver.
+* Fixed typos in documents.
+* Combined peci-bus.txt, peci-adapter.txt and peci-client.txt into peci.txt.
+* Fixed and swept documents to drop some incorrect or unnecessary
+  descriptions.
+* Fixed device tree to make unit-address format use reg contents.
+* Simplified bit manipulations using <linux/bitfield.h>.
+* Made client CPU model checking use <asm/intel-family.h> if available.
+* Modified adapter heap allocation method to use kobject reference count
+  based.
+* Added the low-level PECI xfer IOCTL again to support the Redfish
+  requirement.
+* Added PM domain attach/detach code.
+* Added logic for device instantiation through sysfs.
+* Fix a bug of interrupt status checking code in peci-aspeed driver.
+
+Changes since v2:
+* Divided peci-hwmon driver into two drivers, peci-cputemp and
+  peci-dimmtemp.
+* Added generic dt binding documents for PECI bus, adapter and client.
+* Removed in_atomic() call from the PECI core driver.
+* Improved PECI commands masking logic.
+* Added permission check logic for PECI ioctls.
+* Removed unnecessary type casts.
+* Fixed some invalid error return codes.
+* Added the mark_updated() function to improve update interval checking
+  logic.
+* Fixed a bug in populated DIMM checking function.
+* Fixed some typo, grammar and style issues in documents.
+* Rewrote hwmon drivers to use devm_hwmon_device_register_with_info API.
+* Made peci_match_id() function as a static.
+* Replaced a deprecated create_singlethread_workqueue() call with an
+  alloc_ordered_workqueue() call.
+* Reordered local variable definitions in reversed xmas tree notation.
+* Listed up client CPUs that can be supported by peci-cputemp and
+  peci-dimmtemp hwmon drivers.
+* Added CPU generation detection logic which checks CPUID signature through
+  PECI connection.
+* Improved interrupt handling logic in the Aspeed PECI adapter driver.
+* Fixed SPDX license identifier style in header files.
+* Changed some macros in peci.h to static inline functions.
+* Dropped sleepable context checking code in peci-core.
+* Adjusted rt_mutex protection scope in peci-core.
+* Moved adapter->xfer() checking code into peci_register_adapter().
+* Improved PECI command retry checking logic.
+* Changed ioctl base from 'P' to 0xb6 to avoid confiliction and updated
+  ioctl-number.txt to reflect the ioctl number of PECI subsystem.
+* Added a comment to describe PECI retry action.
+* Simplified return code handling of peci_ioctl_ping().
+* Changed type of peci_ioctl_fn[] to static const.
+* Fixed range checking code for valid PECI commands.
+* Fixed the error return code on invalid PECI commands.
+* Fixed incorrect definitions of PECI ioctl and its handling logic.
+
+Changes since v1:
+* Additionally implemented a core driver to support PECI linux bus driver
+  model.
+* Modified Aspeed PECI driver to make that to be an adapter driver in PECI
+  bus.
+* Modified PECI hwmon driver to make that to be a client driver in PECI
+  bus.
+* Simplified hwmon driver attribute labels and removed redundant strings.
+* Removed core_nums from device tree setting of hwmon driver and modified
+  core number detection logic to check the resolved_core register in client
+  CPU's local PCI configuration area.
+* Removed dimm_nums from device tree setting of hwmon driver and added
+  populated DIMM detection logic to support dynamic creation.
+* Removed indexing gap on core temperature and DIMM temperature attributes.
+* Improved hwmon registration and dynamic attribute creation logic.
+* Fixed structure definitions in PECI uapi header to make that use __u8,
+  __u16 and etc.
+* Modified wait_for_completion_interruptible_timeout error handling logic
+  in Aspeed PECI driver to deliver errors correctly.
+* Removed low-level xfer command from ioctl and kept only high-level PECI
+  command suite as ioctls.
+* Fixed I/O timeout logic in Aspeed PECI driver using ktime.
+* Added a function into hwmon driver to simplify update delay checking.
+* Added a function into hwmon driver to convert 10.6 to millidegree.
+* Dropped non-standard attributes in hwmon driver.
+* Fixed OF table for hwmon to make it indicate as a PECI client of Intel
+  CPU target.
+* Added a maintainer of PECI subsystem into MAINTAINERS document.
+
+Jae Hyun Yoo (13):
+  dt-bindings: Add a document of PECI subsystem
+  Documentation: ioctl: Add ioctl numbers for PECI subsystem
+  peci: Add support for PECI bus driver core
+  dt-bindings: Add a document of PECI adapter driver for ASPEED
+    AST24xx/25xx SoCs
+  ARM: dts: aspeed: peci: Add PECI node
+  peci: Add a PECI adapter driver for Aspeed AST24xx/AST25xx
+  dt-bindings: mfd: Add a document for PECI client MFD
+  mfd: intel-peci-client: Add PECI client MFD driver
+  dt-bindings: hwmon: Add documents for PECI hwmon client drivers
+  Documentation: hwmon: Add documents for PECI hwmon client drivers
+  hwmon: Add PECI cputemp driver
+  hwmon: Add PECI dimmtemp driver
+  Add maintainers for the PECI subsystem
+
+ .../bindings/hwmon/peci-cputemp.txt           |   11 +
+ .../bindings/hwmon/peci-dimmtemp.txt          |   12 +
+ .../bindings/mfd/intel-peci-client.txt        |   34 +
+ .../devicetree/bindings/peci/peci-aspeed.txt  |   57 +
+ .../devicetree/bindings/peci/peci.txt         |   60 +
+ Documentation/hwmon/peci-cputemp              |   78 +
+ Documentation/hwmon/peci-dimmtemp             |   50 +
+ Documentation/ioctl/ioctl-number.txt          |    2 +
+ MAINTAINERS                                   |   12 +
+ arch/arm/boot/dts/aspeed-g4.dtsi              |   26 +
+ arch/arm/boot/dts/aspeed-g5.dtsi              |   26 +
+ drivers/Kconfig                               |    2 +
+ drivers/Makefile                              |    1 +
+ drivers/hwmon/Kconfig                         |   28 +
+ drivers/hwmon/Makefile                        |    2 +
+ drivers/hwmon/peci-cputemp.c                  |  401 +++++
+ drivers/hwmon/peci-dimmtemp.c                 |  295 ++++
+ drivers/mfd/Kconfig                           |   14 +
+ drivers/mfd/Makefile                          |    1 +
+ drivers/mfd/intel-peci-client.c               |  182 +++
+ drivers/peci/Kconfig                          |   39 +
+ drivers/peci/Makefile                         |    9 +
+ drivers/peci/peci-aspeed.c                    |  498 ++++++
+ drivers/peci/peci-core.c                      | 1438 +++++++++++++++++
+ include/linux/mfd/intel-peci-client.h         |   81 +
+ include/linux/peci.h                          |  104 ++
+ include/uapi/linux/peci-ioctl.h               |  265 +++
+ 27 files changed, 3728 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/intel-peci-client.txt
+ create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
+ create mode 100644 Documentation/devicetree/bindings/peci/peci.txt
+ create mode 100644 Documentation/hwmon/peci-cputemp
+ create mode 100644 Documentation/hwmon/peci-dimmtemp
+ create mode 100644 drivers/hwmon/peci-cputemp.c
+ create mode 100644 drivers/hwmon/peci-dimmtemp.c
+ create mode 100644 drivers/mfd/intel-peci-client.c
+ create mode 100644 drivers/peci/Kconfig
+ create mode 100644 drivers/peci/Makefile
+ create mode 100644 drivers/peci/peci-aspeed.c
+ create mode 100644 drivers/peci/peci-core.c
+ create mode 100644 include/linux/mfd/intel-peci-client.h
+ create mode 100644 include/linux/peci.h
+ create mode 100644 include/uapi/linux/peci-ioctl.h
+
 -- 
-2.7.4
+2.17.1
