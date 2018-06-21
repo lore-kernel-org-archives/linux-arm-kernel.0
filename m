@@ -1,278 +1,107 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 21 Jun 2018 11:49:54 +0200
-Subject: [PATCH 6/9] media: cedrus: Add ops structure
-In-Reply-To: <20180613140714.1686-7-maxime.ripard@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-7-maxime.ripard@bootlin.com>
-Message-ID: <939381a854760b1d54984ae0f534ec03312ec8e0.camel@bootlin.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 21 Jun 2018 11:14:28 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <20180621091850.GA22505@arm.com>
+References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
+ <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <20180621091850.GA22505@arm.com>
+Message-ID: <5B2B7A84.8090309@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will,
 
-On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> In order to increase the number of codecs supported, we need to decouple
-> the MPEG2 only code that was there up until now and turn it into something
-> a bit more generic.
+On 2018/6/21 10:18, Will Deacon wrote:
+> On Thu, Jun 21, 2018 at 09:38:53AM +0100, James Morse wrote:
+>> On 20/06/18 17:25, Wei Xu wrote:
+>>>     [    0.042421] Insufficient stack space to handle exception!
+>>>     [    0.042423] ESR: 0x96000046 -- DABT (current EL)
+>>>     [    0.043730] FAR: 0xffff0000093a80e0
+>>>     [    0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
+>>
+>> This was a level 2 translation fault on a write, to an address that is within
+>> the stack....
+>>
+>>
+>>>     [    0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
+>>>     [    0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
+>>>     [    0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
+>>> 4.17.0-45865-g2b31fe7-dirty #10
+>>>     [    0.072201] Hardware name: linux,dummy-virt (DT)
+>>
+>>>     [    0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
+>>>     [    0.081727] pc : el1_sync+0x0/0xb0
+>>
+>> ... from the vectors.
+>>
+>>
+>>>     [    0.085217] lr : kpti_install_ng_mappings+0x120/0x214
+>>
+>> What I think is happening is: we come out of the kpti idmap with the stack
+>> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
+>> well when it tries to push the registers to the stack, and we keep going until
+>> we overflow the stack.
+>>
+>> I can't reproduce this with kvmtool or qemu in the model.
 > 
-> Do that by introducing an intermediate ops structure that would need to be
-> filled by each supported codec. Start by implementing in that structure the
-> setup and trigger hooks that are currently the only functions being
-> implemented by codecs support.
+> Hmm, one thing that occurs to me is that the kpti_install_ng_mappings()
+> code leaves the nG bit set in table entries, which is actually IGNORED in
+> the architecture.
 > 
-> To do so, we need to store the current codec in use, which we do at
-> start_streaming time.
+> Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
+> otherwise your kernel will take an age to boot.
 
-With the comments below taken in account, this is:
+Yes, amazing! This patch resolved the issue.
+I have tested 50 times and can not reproduce the issue any more.
+Could you please tell more why this patch works?
+Thanks!
 
-Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Best Regards,
+Wei
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  .../platform/sunxi/cedrus/sunxi_cedrus.c      |  2 ++
->  .../sunxi/cedrus/sunxi_cedrus_common.h        | 11 +++++++
->  .../platform/sunxi/cedrus/sunxi_cedrus_dec.c  | 10 +++---
->  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 11 +++++--
->  .../sunxi/cedrus/sunxi_cedrus_mpeg2.h         | 33 -------------------
->  .../sunxi/cedrus/sunxi_cedrus_video.c         | 17 +++++++++-
->  6 files changed, 42 insertions(+), 42 deletions(-)
->  delete mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
 > 
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
-> index ccd41d9a3e41..bc80480f5dfd 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
-> @@ -244,6 +244,8 @@ static int sunxi_cedrus_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	dev->dec_ops[SUNXI_CEDRUS_CODEC_MPEG2] = &sunxi_cedrus_dec_ops_mpeg2;
-> +
->  	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
->  	if (ret)
->  		goto unreg_media;
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> index a5f83c452006..c2e2c92d103b 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> @@ -75,6 +75,7 @@ struct sunxi_cedrus_ctx {
->  	struct v4l2_pix_format_mplane src_fmt;
->  	struct sunxi_cedrus_fmt *vpu_dst_fmt;
->  	struct v4l2_pix_format_mplane dst_fmt;
-> +	enum sunxi_cedrus_codec current_codec;
-
-Nit: for consistency with the way things are named, "codec_current"
-probably makes more sense.
-
-IMO using the natural English order is fine for temporary variables, but
- less so for variables used in common parts like structures. This allows
-seeing "_" as a logical hierarchical delimiter that automatically makes
-us end up with consistent prefixes that can easily be grepped for and
-derived.
-
-But that's just my 2 cents, it's really not a big deal, especially in
-this case!
-
->  	struct v4l2_ctrl_handler hdl;
->  	struct v4l2_ctrl *ctrls[SUNXI_CEDRUS_CTRL_MAX];
-> @@ -107,6 +108,14 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
->  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
->  }
->  
-> +struct sunxi_cedrus_dec_ops {
-> +	void (*setup)(struct sunxi_cedrus_ctx *ctx,
-> +		      struct sunxi_cedrus_run *run);
-> +	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
-
-By the way, are we sure that these functions won't ever fail?
-I think this is the case for MPEG2 (there is virtually nothing to check
-for errors) but perhaps it's different for H264.
-
-> +};
-> +
-> +extern struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2;
-> +
->  struct sunxi_cedrus_dev {
->  	struct v4l2_device v4l2_dev;
->  	struct video_device vfd;
-> @@ -130,6 +139,8 @@ struct sunxi_cedrus_dev {
->  	struct reset_control *rstc;
->  
->  	struct regmap *syscon;
-> +
-> +	struct sunxi_cedrus_dec_ops	*dec_ops[SUNXI_CEDRUS_CODEC_LAST];
->  };
->  
->  static inline void sunxi_cedrus_write(struct sunxi_cedrus_dev *dev,
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-> index f274408ab5a7..5e552fa05274 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-> @@ -28,7 +28,6 @@
->  #include <media/v4l2-mem2mem.h>
->  
->  #include "sunxi_cedrus_common.h"
-> -#include "sunxi_cedrus_mpeg2.h"
->  #include "sunxi_cedrus_dec.h"
->  #include "sunxi_cedrus_hw.h"
->  
-> @@ -77,6 +76,7 @@ void sunxi_cedrus_device_work(struct work_struct *work)
->  void sunxi_cedrus_device_run(void *priv)
->  {
->  	struct sunxi_cedrus_ctx *ctx = priv;
-> +	struct sunxi_cedrus_dev *dev = ctx->dev;
->  	struct sunxi_cedrus_run run = { 0 };
->  	struct media_request *src_req, *dst_req;
->  	unsigned long flags;
-> @@ -120,8 +120,6 @@ void sunxi_cedrus_device_run(void *priv)
->  	case V4L2_PIX_FMT_MPEG2_FRAME:
->  		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
->  		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
-> -		sunxi_cedrus_mpeg2_setup(ctx, &run);
-> -
->  		break;
->  
->  	default:
-> @@ -129,6 +127,9 @@ void sunxi_cedrus_device_run(void *priv)
->  	}
->  #undef CHECK_CONTROL
->  
-> +	if (!ctx->job_abort)
-> +		dev->dec_ops[ctx->current_codec]->setup(ctx, &run);
-> +
->  unlock_complete:
->  	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
->  
-> @@ -143,8 +144,7 @@ void sunxi_cedrus_device_run(void *priv)
->  	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
->  
->  	if (!ctx->job_abort) {
-> -		if (ctx->vpu_src_fmt->fourcc == V4L2_PIX_FMT_MPEG2_FRAME)
-> -			sunxi_cedrus_mpeg2_trigger(ctx);
-> +		dev->dec_ops[ctx->current_codec]->trigger(ctx);
->  	} else {
->  		v4l2_m2m_buf_done(run.src, VB2_BUF_STATE_ERROR);
->  		v4l2_m2m_buf_done(run.dst, VB2_BUF_STATE_ERROR);
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> index d1d7a3cfce0d..e25075bb5779 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> @@ -52,8 +52,8 @@ static const u8 mpeg_default_non_intra_quant[64] = {
->  
->  #define m_niq(i) ((i << 8) | mpeg_default_non_intra_quant[i])
->  
-> -void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
-> -			      struct sunxi_cedrus_run *run)
-> +static void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
-> +				     struct sunxi_cedrus_run *run)
->  {
->  	struct sunxi_cedrus_dev *dev = ctx->dev;
->  	const struct v4l2_ctrl_mpeg2_frame_hdr *frame_hdr = run->mpeg2.hdr;
-> @@ -148,9 +148,14 @@ void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
->  	sunxi_cedrus_write(dev, src_buf_addr + VBV_SIZE - 1, VE_MPEG_VLD_END);
->  }
->  
-> -void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
-> +static void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
->  {
->  	struct sunxi_cedrus_dev *dev = ctx->dev;
->  
->  	sunxi_cedrus_write(dev, VE_TRIG_MPEG2, VE_MPEG_TRIGGER);
->  }
-> +
-> +struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2 = {
-> +	.setup		= sunxi_cedrus_mpeg2_setup,
-> +	.trigger	= sunxi_cedrus_mpeg2_trigger,
-> +};
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
-> deleted file mode 100644
-> index 4c380becfa1a..000000000000
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
-> +++ /dev/null
-> @@ -1,33 +0,0 @@
-> -/*
-> - * Sunxi-Cedrus VPU driver
-> - *
-> - * Copyright (C) 2018 Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> - * Copyright (C) 2016 Florent Revest <florent.revest@free-electrons.com>
-> - *
-> - * Based on the vim2m driver, that is:
-> - *
-> - * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-> - * Pawel Osciak, <pawel@osciak.com>
-> - * Marek Szyprowski, <m.szyprowski@samsung.com>
-> - *
-> - * This software is licensed under the terms of the GNU General Public
-> - * License version 2, as published by the Free Software Foundation, and
-> - * may be copied, distributed, and modified under those terms.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - */
-> -
-> -#ifndef _SUNXI_CEDRUS_MPEG2_H_
-> -#define _SUNXI_CEDRUS_MPEG2_H_
-> -
-> -struct sunxi_cedrus_ctx;
-> -struct sunxi_cedrus_run;
-> -
-> -void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
-> -			      struct sunxi_cedrus_run *run);
-> -void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx);
-> -
-> -#endif
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
-> index 089abfe6bfeb..fb7b081a5bb7 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
-> @@ -28,7 +28,6 @@
->  #include <media/v4l2-mem2mem.h>
->  
->  #include "sunxi_cedrus_common.h"
-> -#include "sunxi_cedrus_mpeg2.h"
->  #include "sunxi_cedrus_dec.h"
->  #include "sunxi_cedrus_hw.h"
->  
-> @@ -414,6 +413,21 @@ static int sunxi_cedrus_buf_prepare(struct vb2_buffer *vb)
->  	return 0;
->  }
->  
-> +static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
-> +{
-> +	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
-> +
-> +	switch (ctx->vpu_src_fmt->fourcc) {
-> +	case V4L2_PIX_FMT_MPEG2_FRAME:
-> +		ctx->current_codec = SUNXI_CEDRUS_CODEC_MPEG2;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static void sunxi_cedrus_stop_streaming(struct vb2_queue *q)
->  {
->  	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
-> @@ -462,6 +476,7 @@ static struct vb2_ops sunxi_cedrus_qops = {
->  	.buf_cleanup		= sunxi_cedrus_buf_cleanup,
->  	.buf_queue		= sunxi_cedrus_buf_queue,
->  	.buf_request_complete	= sunxi_cedrus_buf_request_complete,
-> +	.start_streaming	= sunxi_cedrus_start_streaming,
->  	.stop_streaming		= sunxi_cedrus_stop_streaming,
->  	.wait_prepare		= vb2_ops_wait_prepare,
->  	.wait_finish		= vb2_ops_wait_finish,
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/d52423c9/attachment.sig>
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 5f9a73a4452c..70d9e98467ca 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -272,8 +272,8 @@ ENTRY(idmap_kpti_install_ng_mappings)
+>  	add	end_pgdp, cur_pgdp, #(PTRS_PER_PGD * 8)
+>  do_pgd:	__idmap_kpti_get_pgtable_ent	pgd
+>  	tbnz	pgd, #1, walk_puds
+> -next_pgd:
+>  	__idmap_kpti_put_pgtable_ent_ng	pgd
+> +next_pgd:
+>  skip_pgd:
+>  	add	cur_pgdp, cur_pgdp, #8
+>  	cmp	cur_pgdp, end_pgdp
+> @@ -302,8 +302,8 @@ walk_puds:
+>  	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
+>  do_pud:	__idmap_kpti_get_pgtable_ent	pud
+>  	tbnz	pud, #1, walk_pmds
+> -next_pud:
+>  	__idmap_kpti_put_pgtable_ent_ng	pud
+> +next_pud:
+>  skip_pud:
+>  	add	cur_pudp, cur_pudp, 8
+>  	cmp	cur_pudp, end_pudp
+> @@ -323,8 +323,8 @@ walk_pmds:
+>  	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
+>  do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
+>  	tbnz	pmd, #1, walk_ptes
+> -next_pmd:
+>  	__idmap_kpti_put_pgtable_ent_ng	pmd
+> +next_pmd:
+>  skip_pmd:
+>  	add	cur_pmdp, cur_pmdp, #8
+>  	cmp	cur_pmdp, end_pmdp
+> 
+> .
+> 
