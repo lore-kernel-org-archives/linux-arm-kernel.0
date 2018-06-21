@@ -1,50 +1,50 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 21 Jun 2018 19:54:10 +0200
-Subject: [PATCH] ARM: ftrace: Only set kernel memory back to read-only
- after boot
-In-Reply-To: <20180621125025.25b70bb9@gandalf.local.home>
-References: <20180621124710.453ee0ae@gandalf.local.home>
- <20180621125025.25b70bb9@gandalf.local.home>
-Message-ID: <704c501ac97ff4ca0d469183b293e0b5@agner.ch>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 21 Jun 2018 19:59:39 +0200
+Subject: [PATCH 1/2] rtc: armada38x: drop redundant initialization
+In-Reply-To: <00ffe926e6878724d8289dd0e289a1f16df55ef7.1529602823.git.baruch@tkos.co.il>
+References: <00ffe926e6878724d8289dd0e289a1f16df55ef7.1529602823.git.baruch@tkos.co.il>
+Message-ID: <20180621175939.GL7737@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.06.2018 18:50, Steven Rostedt wrote:
-> On Thu, 21 Jun 2018 12:47:10 -0400
-> Steven Rostedt <rostedt@goodmis.org> wrote:
-> 
->> From: Steven Rostedt (VMware) <rostedt@goodmis.org>
->>
->> Dynamic ftrace requires modifying the code segments that are usually
->> set to read-only. To do this, a per arch function is called both before
->> and after the ftrace modifications are performed. The "before" function
->> will set kernel code text to read-write to allow for ftrace to make the
->> modifications, and the "after" function will set the kernel code text
->> back to "read-only" to keep the kernel code text protected.
->>
->> The issue happens when dynamic ftrace is tested at boot up. The test is
->> done before the kernel code text has been set to read-only. But the
->> "before" and "after" calls are still performed. The "after" call will
->> change the kernel code text to read-only prematurely, and other boot
->> code that expects this code to be read-write will fail.
->>
->> The solution is to add a variable that is set when the kernel code text
->> is expected to be converted to read-only, and make the ftrace "before"
->> and "after" calls do nothing if that variable is not yet set. This is
->> similar to the x86 solution from commit 162396309745 ("ftrace, x86:
->> make kernel text writable only for conversions").
->>
->> Reported-by: Stefan Agner <stefan@agner.ch>
->> Tested-by: Stefan Agner <stefan@agner.ch>
->> Link: http://lkml.kernel.org/r/20180620212906.24b7b66e at vmware.local.home
->> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
->> ---
-> 
-> Perhaps I should have Cc'd stable too?
+On 21/06/2018 20:40:22+0300, Baruch Siach wrote:
+> The 'ret' variable in these functions is set unconditionally below.
 > 
 
-As it is self tests only which are broken probably not super important.
-But then, the fix is also rather clean and safe IMHO, so why not.
+Hum, what is the actual benefit of this patch?
 
---
-Stefan
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/rtc/rtc-armada38x.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+> index 1e4978c96ffd..4d62a54fd5d6 100644
+> --- a/drivers/rtc/rtc-armada38x.c
+> +++ b/drivers/rtc/rtc-armada38x.c
+> @@ -229,7 +229,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
+>  {
+>  	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+> -	int ret = 0;
+> +	int ret;
+>  	unsigned long time, flags;
+>  
+>  	ret = rtc_tm_to_time(tm, &time);
+> @@ -272,7 +272,7 @@ static int armada38x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  	u32 reg = ALARM_REG(RTC_ALARM1, rtc->data->alarm);
+>  	u32 reg_irq = ALARM_REG(RTC_IRQ1_CONF, rtc->data->alarm);
+>  	unsigned long time, flags;
+> -	int ret = 0;
+> +	int ret;
+>  
+>  	ret = rtc_tm_to_time(&alrm->time, &time);
+>  
+> -- 
+> 2.17.1
+> 
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
