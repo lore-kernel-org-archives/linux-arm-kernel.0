@@ -1,88 +1,34 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Thu, 21 Jun 2018 03:59:27 +0000
-Subject: [PATCH 0/7 v5] Support for fsl-mc bus and its devices in SMMU
-In-Reply-To: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
-References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <HE1PR0401MB24250CEFBC0B7CC919C4388AE6760@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+From: cphealy@gmail.com (Chris Healy)
+Date: Wed, 20 Jun 2018 21:22:20 -0700
+Subject: [PATCH v4] ARM: dts: imx51-zii-rdu1: fix touchscreen pinctrl
+In-Reply-To: <20180620203500.28309-1-nick@shmanahar.org>
+References: <CAOMZO5BTMRJmrjM7X3-7Qi1wuciOnLZhAUuWN27Dtoc0cZXVSA@mail.gmail.com>
+ <20180620203500.28309-1-nick@shmanahar.org>
+Message-ID: <CAFXsbZr-HJE54c0BC5=d1tStByA5ytGhSSZMirNKE03JzGCDXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin/Greg k-h,
-
-Will this patch-set be taken for the next kernel release (and via which tree)?
-
-Thanks,
-Nipun
-
-> -----Original Message-----
-> From: Nipun Gupta
-> Sent: Sunday, May 20, 2018 7:20 PM
-> To: robin.murphy at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
-> robh at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> gregkh at linuxfoundation.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>;
-> bhelgaas at google.com
-> Cc: hch at lst.de; joro at 8bytes.org; m.szyprowski at samsung.com;
-> shawnguo at kernel.org; frowand.list at gmail.com; iommu at lists.linux-
-> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
-> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
-> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>; Nipun Gupta
-> <nipun.gupta@nxp.com>
-> Subject: [PATCH 0/7 v5] Support for fsl-mc bus and its devices in SMMU
-> 
-> This patchset defines IOMMU DT binding for fsl-mc bus and adds
-> support in SMMU for fsl-mc bus.
-> 
-> The patch series is based on top of dma-mapping tree (for-next branch):
-> http://git.infradead.org/users/hch/dma-mapping.git
-> 
-> These patches
->   - Define property 'iommu-map' for fsl-mc bus (patch 1)
->   - Integrates the fsl-mc bus with the SMMU using this
->     IOMMU binding (patch 2,3,4)
->   - Adds the dma configuration support for fsl-mc bus (patch 5, 6)
->   - Updates the fsl-mc device node with iommu/dma related changes (patch 7)
-> 
-> Changes in v2:
->   - use iommu-map property for fsl-mc bus
->   - rebase over patchset https://patchwork.kernel.org/patch/10317337/
->     and make corresponding changes for dma configuration of devices on
->     fsl-mc bus
-> 
-> Changes in v3:
->   - move of_map_rid in drivers/of/address.c
-> 
+On Wed, Jun 20, 2018 at 1:35 PM, Nick Dyer <nick@shmanahar.org> wrote:
+> The pinctrl settings were incorrect for the touchscreen interrupt line, causing
+> an interrupt storm. This change has been tested with both the atmel_mxt_ts and
+> RMI4 drivers on the RDU1 units.
+>
+> The value 0x4 comes from the value of register IOMUXC_SW_PAD_CTL_PAD_CSI1_D8
+> from the old vendor kernel.
+>
+> Signed-off-by: Nick Dyer <nick@shmanahar.org>
+> Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
+> Cc: <stable@vger.kernel.org> # 4.15+
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
 > Changes in v4:
->   - move of_map_rid in drivers/of/base.c
-> 
-> Changes in v5:
->   - break patch 5 in two separate patches (now patch 5/7 and patch 6/7)
->   - add changelog text in patch 3/7 and patch 5/7
->   - typo fix
-> 
-> Nipun Gupta (7):
->   Docs: dt: add fsl-mc iommu-map device-tree binding
->   iommu: of: make of_pci_map_rid() available for other devices too
->   iommu: support iommu configuration for fsl-mc devices
->   iommu: arm-smmu: Add support for the fsl-mc bus
->   bus: fsl-mc: support dma configure for devices on fsl-mc bus
->   bus: fsl-mc: set coherent dma mask for devices on fsl-mc bus
->   arm64: dts: ls208xa: comply with the iommu map binding for fsl_mc
-> 
->  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  39 ++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   6 +-
->  drivers/bus/fsl-mc/fsl-mc-bus.c                    |  16 +++-
->  drivers/iommu/arm-smmu.c                           |   7 ++
->  drivers/iommu/iommu.c                              |  21 +++++
->  drivers/iommu/of_iommu.c                           |  25 ++++-
->  drivers/of/base.c                                  | 102 +++++++++++++++++++++
->  drivers/of/irq.c                                   |   5 +-
->  drivers/pci/of.c                                   | 101 --------------------
->  include/linux/fsl/mc.h                             |   8 ++
->  include/linux/iommu.h                              |   2 +
->  include/linux/of.h                                 |  11 +++
->  include/linux/of_pci.h                             |  10 --
->  13 files changed, 231 insertions(+), 122 deletions(-)
-> 
-> --
-> 1.9.1
+> - Add reviewed by Fabio
+> Changes in v3:
+> - Update commit message to add source of 0x4 value, fixes tag and CC stable
+> Changes in v2:
+> - Use hex, only alter IRQ line config
+
+Tested on an RDU1 with Synaptics touchscreen successfully.  No
+interrupt store any longer...
+
+Tested-by: Chris Healy <cphealy@gmail.com>
