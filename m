@@ -1,85 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 Jun 2018 11:54:05 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <5B2B7A84.8090309@hisilicon.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
-Message-ID: <20180621105404.GB22505@arm.com>
+From: bugalski.piotr@gmail.com (Piotr Bugalski)
+Date: Thu, 21 Jun 2018 12:56:50 +0200 (CEST)
+Subject: [RFC PATCH 2/2] dt-bindings: spi: QuadSPI driver for Atmel
+ SAMA5D2 documentation
+In-Reply-To: <20180620164741.2a8da424@bbrezillon>
+References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+ <20180618162124.21749-3-bugalski.piotr@gmail.com>
+ <20180620164741.2a8da424@bbrezillon>
+Message-ID: <alpine.DEB.2.20.1806211252390.28763@carbonite>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
 
-On Thu, Jun 21, 2018 at 11:14:28AM +0100, Wei Xu wrote:
-> On 2018/6/21 10:18, Will Deacon wrote:
-> > On Thu, Jun 21, 2018 at 09:38:53AM +0100, James Morse wrote:
-> >> On 20/06/18 17:25, Wei Xu wrote:
-> >>>     [    0.042421] Insufficient stack space to handle exception!
-> >>>     [    0.042423] ESR: 0x96000046 -- DABT (current EL)
-> >>>     [    0.043730] FAR: 0xffff0000093a80e0
-> >>>     [    0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
-> >>
-> >> This was a level 2 translation fault on a write, to an address that is within
-> >> the stack....
-> >>
-> >>
-> >>>     [    0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
-> >>>     [    0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
-> >>>     [    0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
-> >>> 4.17.0-45865-g2b31fe7-dirty #10
-> >>>     [    0.072201] Hardware name: linux,dummy-virt (DT)
-> >>
-> >>>     [    0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
-> >>>     [    0.081727] pc : el1_sync+0x0/0xb0
-> >>
-> >> ... from the vectors.
-> >>
-> >>
-> >>>     [    0.085217] lr : kpti_install_ng_mappings+0x120/0x214
-> >>
-> >> What I think is happening is: we come out of the kpti idmap with the stack
-> >> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
-> >> well when it tries to push the registers to the stack, and we keep going until
-> >> we overflow the stack.
-> >>
-> >> I can't reproduce this with kvmtool or qemu in the model.
-> > 
-> > Hmm, one thing that occurs to me is that the kpti_install_ng_mappings()
-> > code leaves the nG bit set in table entries, which is actually IGNORED in
-> > the architecture.
-> > 
-> > Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
-> > otherwise your kernel will take an age to boot.
-> 
-> Yes, amazing! This patch resolved the issue.
+Hi Boris,
 
-Great...
+On Wed, 20 Jun 2018, Boris Brezillon wrote:
 
-> I have tested 50 times and can not reproduce the issue any more.
-> Could you please tell more why this patch works?
+> Hi Piotr,
+>
+> On Mon, 18 Jun 2018 18:21:24 +0200
+> Piotr Bugalski <bugalski.piotr@gmail.com> wrote:
+>
+>> Documentation for DT-binding change.
+>>
+>> Suggested-by: Boris Brezillon <boris.brezillon@bootlin.com>
+>
+> I'm pretty sure I didn't make a single suggestion about the DT
+> bindings you use here ;-).
+>
 
-You might need to ask your CPU design team ;)
+Ok, I misunderstood a bit your idea, but I think from next release this
+field will be in good place. So it was just prepared for the future ;-)
 
-Without this patch, the code in idmap_kpti_install_ng_mappings() sets
-bit 11 in table descriptors so that we can keep track of which parts of
-the page table we've visited. With this patch, we don't bother tracking
-and potentially rewalk parts of the page table (which takes a very long
-time if KASAN is enabled).
+>> Signed-off-by: Piotr Bugalski <pbu@cryptera.com>
+>>
+>> ---
+>>  .../devicetree/bindings/spi/spi_atmel-qspi.txt     | 41 ++++++++++++++++++++++
+>>  1 file changed, 41 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
+>
+> I'll comment on this aspect in more details when replying to the cover
+> letter, but I think you should re-use the bindings defined in
+> Documentation/devicetree/bindings/mtd/atmel-quadspi.txt (IOW, move the
+> existing file to the Documentation/devicetree/bindings/spi directory).
+>
+> It's the same HW block, and just because you develop a new driver to
+> replace the old one doesn't mean you should have 2 different bindings in
+> parallel.
 
-The architecture documents I've looked at are clear that bit 11 is IGNORED
-by the CPU, which:
+I'll change it in next version.
 
-  "Indicates that the architecture guarantees that the bit or field is not
-   interpreted or modified by hardware."
+>
+>>
+>> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt b/Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
+>> new file mode 100644
+>> index 000000000000..d52b534c9c2b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
+>> @@ -0,0 +1,41 @@
+>> +* Atmel Quad Serial Peripheral Interface (QSPI)
+>> +
+>> +Required properties:
+>> +- compatible:     Should be "atmel,sama5d2-spi-qspi".
+>> +- reg:            Should contain the locations and lengths of the base registers
+>> +                  and the mapped memory.
+>> +- reg-names:      Should contain the resource reg names:
+>> +                  - qspi_base: configuration register address space
+>> +                  - qspi_mmap: memory mapped address space
+>> +- interrupts:     Should contain the interrupt for the device.
+>> +- clocks:         The phandle of the clock needed by the QSPI controller.
+>> +- #address-cells: Should be <1>.
+>> +- #size-cells:    Should be <0>.
+>> +
+>> +Example:
+>> +
+>> +qspi1: spi at f0024000 {
+>> +	compatible = "atmel,sama5d2-spi-qspi";
+>> +	reg = <0xf0024000 0x100>, <0xd8000000 0x08000000>;
+>> +	reg-names = "qspi_base", "qspi_mmap";
+>> +	interrupts = <53 IRQ_TYPE_LEVEL_HIGH 7>;
+>> +	clocks = <&qspi1_clk>;
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_qspi1_default>;
+>> +	status = "okay";
+>> +
+>> +	flash at 0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		compatible = "winbond,w25m02gv", "spi-nand";
+>
+> "winbond,w25m02gv" is undocumented and unnecessary since SPI NANDs are
+> automatically detected. Also, maybe you should declare a SPI NOR in the
+> example since SPI NAND support has not yet been merged.
+>
 
-Please can you double-check that your CPU is indeed ignoring bit 11 in
-non-leaf (table) descriptors?
+I was mainly focusing on NAND-flash with QSPI inteface so I took
+example from tested configuration. Next time I'll use NOR-flash.
+
+>> +		reg = <0>;
+>> +		spi-max-frequency = <83000000>;
+>> +		spi-rx-bus-width = <4>;
+>> +		spi-tx-bus-width = <4>;
+>> +
+>> +		...
+>> +	};
+>> +};
+>> +
+>
+> Regards,
+>
+> Boris
+>
 
 Thanks,
-
-Will
+Piotr
