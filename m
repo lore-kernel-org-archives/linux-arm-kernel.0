@@ -1,123 +1,54 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 21 Jun 2018 11:33:44 +0200
-Subject: [PATCH 4/9] media: cedrus: make engine type more generic
-In-Reply-To: <20180613140714.1686-5-maxime.ripard@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-5-maxime.ripard@bootlin.com>
-Message-ID: <4fcfed23bfae158699c23329f92d6f2e968dc062.camel@bootlin.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 21 Jun 2018 10:37:25 +0100
+Subject: [PATCH 3/6] coresight: Introduce support for Coresight Address
+ Translation Unit
+In-Reply-To: <20180620214157.GA20697@xps15>
+References: <1529319379-17895-1-git-send-email-suzuki.poulose@arm.com>
+ <1529319379-17895-4-git-send-email-suzuki.poulose@arm.com>
+ <20180620214157.GA20697@xps15>
+Message-ID: <76e0bc22-468c-6215-de54-3e4ead42e17c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mathieu,
 
-On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> The sunxi_cedrus_engine enum actually enumerates pretty much the codecs to
-> use (or we can easily infer the codec engine from the codec).
+On 20/06/1822:41, Mathieu Poirier wrote:
+> Hi Suzuki,
 > 
-> Since we will need the codec type as well in some later refactoring, make
-> that structure more useful by just enumerating the codec, and converting
-> the existing users.
-
-With the comment below taken in account, this is:
-
-Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h | 6 ++++++
->  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c     | 6 +++---
->  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h     | 6 +-----
->  drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c  | 2 +-
->  4 files changed, 11 insertions(+), 9 deletions(-)
+> On Mon, Jun 18, 2018 at 11:56:16AM +0100, Suzuki K Poulose wrote:
+>> Add the initial support for Coresight Address Translation Unit, which
+>> augments the TMC in Coresight SoC-600 by providing an improved Scatter
+>> Gather mechanism. CATU is always connected to a single TMC-ETR and
+>> converts the AXI address with a translated address (from a given SG
+>> table with specific format). The CATU should be programmed in pass
+>> through mode and enabled if the ETR doesn't translation by CATU.
 > 
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> index b1ed1c8cb130..a5f83c452006 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> @@ -61,6 +61,12 @@ struct sunxi_cedrus_run {
->  	};
->  };
->  
-> +enum sunxi_cedrus_codec {
+> To me this sentence look broken.
+> 
 
-Feel free to rename to cedrus_codec when rebasing on top of the latest
-patchset introducing the driver.
+Yes, it is broken. It should have been :
 
-Cheers,
+"The CATU should be programmed in pass through mode and enabled
+even if the ETR doesn't use the translation by CATU."
 
-Paul
 
-> +	SUNXI_CEDRUS_CODEC_MPEG2,
-> +
-> +	SUNXI_CEDRUS_CODEC_LAST,
-> +};
-> +
->  struct sunxi_cedrus_ctx {
->  	struct v4l2_fh fh;
->  	struct sunxi_cedrus_dev	*dev;
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> index fc688a5c1ea3..bb46a01214e0 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> @@ -41,7 +41,7 @@
->  #define SYSCON_SRAM_C1_MAP_VE	0x7fffffff
->  
->  int sunxi_cedrus_engine_enable(struct sunxi_cedrus_dev *dev,
-> -			       enum sunxi_cedrus_engine engine)
-> +			       enum sunxi_cedrus_codec codec)
->  {
->  	u32 reg = 0;
->  
-> @@ -53,8 +53,8 @@ int sunxi_cedrus_engine_enable(struct sunxi_cedrus_dev *dev,
->  
->  	reg |= VE_CTRL_CACHE_BUS_BW_128;
->  
-> -	switch (engine) {
-> -	case SUNXI_CEDRUS_ENGINE_MPEG:
-> +	switch (codec) {
-> +	case SUNXI_CEDRUS_CODEC_MPEG2:
->  		reg |= VE_CTRL_DEC_MODE_MPEG;
->  		break;
->  
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
-> index 34f3fae462a8..3236c80bfcf4 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
-> @@ -23,12 +23,8 @@
->  #ifndef _SUNXI_CEDRUS_HW_H_
->  #define _SUNXI_CEDRUS_HW_H_
->  
-> -enum sunxi_cedrus_engine {
-> -	SUNXI_CEDRUS_ENGINE_MPEG,
-> -};
-> -
->  int sunxi_cedrus_engine_enable(struct sunxi_cedrus_dev *dev,
-> -			       enum sunxi_cedrus_engine engine);
-> +			       enum sunxi_cedrus_codec codec);
->  void sunxi_cedrus_engine_disable(struct sunxi_cedrus_dev *dev);
->  
->  int sunxi_cedrus_hw_probe(struct sunxi_cedrus_dev *dev);
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> index 5be3e3b9ceef..85e6fc2fbdb2 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> @@ -83,7 +83,7 @@ void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
->  	}
->  
->  	/* Activate MPEG engine. */
-> -	sunxi_cedrus_engine_enable(dev, SUNXI_CEDRUS_ENGINE_MPEG);
-> +	sunxi_cedrus_engine_enable(dev, SUNXI_CEDRUS_CODEC_MPEG2);
->  
->  	/* Set quantization matrices. */
->  	for (i = 0; i < 64; i++) {
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/8ee3cf01/attachment-0001.sig>
+>> +static int catu_disable_hw(struct catu_drvdata *drvdata)
+>> +{
+>> +	int rc = 0;
+>> +
+>> +	if (catu_wait_for_ready(drvdata)) {
+>> +		dev_info(drvdata->dev, "Timeout while waiting for READY\n");
+>> +		rc = -EAGAIN;
+>> +	}
+>> +
+>> +	catu_write_control(drvdata, 0);
+> 
+> Is waiting for the ready bit before switching the component off comes from
+> experimentation with the HW (i.e FPGA)?  From what the reference manual
+> indicate, CONTROL.ENABLE should be set to 0 first, and then wait for
+> STATUS.READY.
+
+You're right. It should be in the reverse order. I will fix it in the next version.
+
+Thanks
+Suzuki
