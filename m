@@ -1,208 +1,111 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Thu, 21 Jun 2018 17:35:45 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
- for tcon-top gate
-In-Reply-To: <CAGb2v64iB8FP1Nf+vZM2wd6wzNLxWYrCP78D-rOUg881RPNpEA@mail.gmail.com>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <2581098.bNJirayF9O@jernej-laptop>
- <CAGb2v64iB8FP1Nf+vZM2wd6wzNLxWYrCP78D-rOUg881RPNpEA@mail.gmail.com>
-Message-ID: <2366311.u3CXHO0a4d@jernej-laptop>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 21 Jun 2018 17:38:23 +0200
+Subject: [PATCH 8/9] media: cedrus: Add start and stop decoder operations
+In-Reply-To: <20180613140714.1686-9-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-9-maxime.ripard@bootlin.com>
+Message-ID: <f37f23580c92728bbcd5bfe3fff506b5bb2bdfd0.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?etrtek, 21. junij 2018 ob 03:23:27 CEST je Chen-Yu Tsai napisal(a):
-> On Thu, Jun 21, 2018 at 3:37 AM, Jernej ?krabec <jernej.skrabec@siol.net> 
-wrote:
-> > Dne sobota, 16. junij 2018 ob 07:48:38 CEST je Chen-Yu Tsai napisal(a):
-> >> On Sat, Jun 16, 2018 at 1:33 AM, Jernej ?krabec <jernej.skrabec@siol.net>
-> > 
-> > wrote:
-> >> > Dne petek, 15. junij 2018 ob 19:13:17 CEST je Chen-Yu Tsai napisal(a):
-> >> >> On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
-> >> >> 
-> >> >> <jernej.skrabec@siol.net> wrote:
-> >> >> > Hi,
-> >> >> > 
-> >> >> > Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard 
-napisal(a):
-> >> >> >> Hi,
-> >> >> >> 
-> >> >> >> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
-> >> >> >> > TV TCONs connected to TCON TOP have to enable additional gate in
-> >> >> >> > order
-> >> >> >> > to work.
-> >> >> >> > 
-> >> >> >> > Add support for such TCONs.
-> >> >> >> > 
-> >> >> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> >> >> >> > ---
-> >> >> >> > 
-> >> >> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
-> >> >> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
-> >> >> >> >  2 files changed, 15 insertions(+)
-> >> >> >> > 
-> >> >> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> >> >> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index
-> >> >> >> > 08747fc3ee71..0afb5a94a414
-> >> >> >> > 100644
-> >> >> >> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> >> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> >> >> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct
-> >> >> >> > device
-> >> >> >> > *dev,
-> >> >> >> > 
-> >> >> >> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
-> >> >> >> >             return PTR_ERR(tcon->clk);
-> >> >> >> >     
-> >> >> >> >     }
-> >> >> >> > 
-> >> >> >> > +
-> >> >> >> > +   if (tcon->quirks->has_tcon_top_gate) {
-> >> >> >> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
-> >> >> >> > +           if (IS_ERR(tcon->top_clk)) {
-> >> >> >> > +                   dev_err(dev, "Couldn't get the TCON TOP bus
-> >> >> >> > clock\n");
-> >> >> >> > +                   return PTR_ERR(tcon->top_clk);
-> >> >> >> > +           }
-> >> >> >> > +           clk_prepare_enable(tcon->top_clk);
-> >> >> >> > +   }
-> >> >> >> > +
-> >> >> >> 
-> >> >> >> Is it required for the TCON itself to operate, or does the TCON
-> >> >> >> requires the TCON TOP, which in turn requires that clock to be
-> >> >> >> functional?
-> >> >> >> 
-> >> >> >> I find it quite odd to have a clock that isn't meant for a
-> >> >> >> particular
-> >> >> >> device to actually be wired to another device. I'm not saying this
-> >> >> >> isn't the case, but it would be a first.
-> >> >> > 
-> >> >> > Documentation doesn't say much about that gate. I did few tests and
-> >> >> > TCON
-> >> >> > registers can be read and written even if TCON TOP TV TCON gate is
-> >> >> > disabled. However, there is no image, as expected.
-> >> >> 
-> >> >> The R40 manual does include it in the diagram, on page 504. There's
-> >> >> also
-> >> >> a
-> >> >> mux to select whether the clock comes directly from the CCU or the TV
-> >> >> encoder (a feedback mode?). I assume this is the gate you are
-> >> >> referring
-> >> >> to
-> >> >> here, in which case it is not a bus clock, but rather the TCON module
-> >> >> or
-> >> >> channel clock, strangely routed.
-> >> >> 
-> >> >> > More interestingly, I enabled test pattern directly in TCON to
-> >> >> > eliminate
-> >> >> > influence of the mixer. As soon as I disabled that gate, test
-> >> >> > pattern
-> >> >> > on
-> >> >> > HDMI screen was gone, which suggest that this gate influences
-> >> >> > something
-> >> >> > inside TCON.
-> >> >> > 
-> >> >> > Another test I did was that I moved enable/disable gate code to
-> >> >> > sun4i_tcon_channel_set_status() and it worked just as well.
-> >> >> > 
-> >> >> > I'll ask AW engineer what that gate actually does, but from what I
-> >> >> > saw,
-> >> >> > I
-> >> >> > would say that most appropriate location to enable/disable TCON TOP
-> >> >> > TV
-> >> >> > TCON
-> >> >> > gate is TCON driver. Alternatively, TCON TOP driver could check if
-> >> >> > any
-> >> >> > TV
-> >> >> > TCON is in use and enable appropriate gate. However, that doesn't
-> >> >> > sound
-> >> >> > right to me for some reason.
-> >> >> 
-> >> >> If what I said above it true, then yes, the appropriate location to
-> >> >> enable
-> >> >> it is the TCON driver, but moreover, the representation of the clock
-> >> >> tree
-> >> >> should be fixed such that the TCON takes the clock from the TCON TOP
-> >> >> as
-> >> >> its
-> >> >> channel/ module clock instead. That way you don't need this patch, but
-> >> >> you'd add another for all the clock routing.
-> >> > 
-> >> > Can you be more specific? I not sure what you mean here.
-> >> 
-> >> For clock related properties in the device tree:
-> >> 
-> >> &tcon_top {
-> >> 
-> >>     clocks = <&ccu CLK_BUS_TCON_TOP>,
-> >>     
-> >>              <&ccu CLK_TCON_TV0>,
-> >>              <&tve0>,
-> >>              <&ccu CLK_TCON_TV1>,
-> >>              <&tve1>;
-> >>     
-> >>     clock-names = "bus", "tcon-tv0", "tve0", "tcon-tv1", "tve1";
-> >>     clock-output-names = "tcon-top-tv0", "tcon-top-tv1";
-> >> 
-> >> };
-> >> 
-> >> &tcon_tv0 {
-> >> 
-> >>     clocks = <&ccu CLK_BUS_TCON_TV0>, <&tcon_top 0>'
-> >>     clock-names = "ahb", "tcon-ch1";
-> >> 
-> >> };
-> >> 
-> >> A diagram would look like:
-> >>                    | This part is TCON TOP |
-> >>                    
-> >>                    v                       v
-> >> 
-> >> CCU CLK_TCON_TV0 --|----\                  |
-> >> 
-> >>                    |     mux ---- gate ----|-- TCON_TV0
-> >> 
-> >> TVE0 --------------|----/                  |
-> >> 
-> >> And the same goes for TCON_TV1 and TVE1.
-> >> 
-> >> The user manual is a bit lacking on how TVE outputs a clock though.
-> > 
-> > I didn't yet received any response on HW details from AW till now, but I
-> > would like to post new version of patches soon.
-> > 
-> > While chaining like you described could be implemented easily, I don't
-> > think it really represents HW as it is. Tests showed that these two
-> > clocks are independent, otherwise register writes/reads wouldn't be
-> > possible with tcon- top gate disabled. I chose tcon-top bus clock as a
-> > parent becase if it is not enabled, it simply won't work.
+Hi,
+
+On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> Some codec needs to perform some additional task when a decoding is started
+> and stopped, and not only at every frame.
 > 
-> AFAIK with the TCONs, even when the TCON channel clock (not the bus clock)
-> is disabled, register accesses still work.
-
-You're right, I just tested that.
-
-> I'm saying that the TCON TOP
-> gate is downstream from the TCON channel clock in the CCU. These are not
-> related to the TCON bus clock in the CCU, which affects register access.
+> For example, the H264 decoding support needs to allocate buffers that will
+> be used in the decoding process, but do not need to change over time, or at
+> each frame.
 > 
-> Did Allwinner provide any information regarding the hierarchy of the clocks?
-
-No reponse for now.
-
-> > However, if everyone feels chaining is the best way to implement it, I'll
-> > do it.
+> In order to allow that for codecs, introduce a start and stop hook that
+> will be called if present at start_streaming and stop_streaming time.
 > 
-> I would like to get it right and match actual hardware. My proposal is
-> based on my understanding from the diagrams in the user manual.
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  .../platform/sunxi/cedrus/sunxi_cedrus_common.h    |  2 ++
+>  .../platform/sunxi/cedrus/sunxi_cedrus_video.c     | 14 +++++++++++++-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> index a2a507eb9fc9..20c78ec1f037 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> @@ -120,6 +120,8 @@ struct sunxi_cedrus_dec_ops {
+>  	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+>  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+>  		      struct sunxi_cedrus_run *run);
+> +	int (*start)(struct sunxi_cedrus_ctx *ctx);
+> +	void (*stop)(struct sunxi_cedrus_ctx *ctx);
+>  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+>  };
+>  
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> index fb7b081a5bb7..d93461178857 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> @@ -416,6 +416,8 @@ static int sunxi_cedrus_buf_prepare(struct vb2_buffer *vb)
+>  static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+>  {
+>  	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
+> +	struct sunxi_cedrus_dev *dev = ctx->dev;
+> +	int ret = 0;
+>  
+>  	switch (ctx->vpu_src_fmt->fourcc) {
+>  	case V4L2_PIX_FMT_MPEG2_FRAME:
+> @@ -425,16 +427,26 @@ static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+>  		return -EINVAL;
+>  	}
+>  
+> -	return 0;
+> +	if (V4L2_TYPE_IS_OUTPUT(q->type) &&
 
-So for now, your explanation is the most reasonable. Should we go ahead and 
-implement your idea?
+I suppose this check was put in place to ensure that ->start is only
+called once, but what if start_streaming is called multiple times on
+output? Am I totally unsure about whether the API guarantees that we
+only get one start_streaming call per buffer queue, regardless of how
+many userspace issues.
 
-Please note that H6 has TCON-TOP too, but it has only one LCD TCON and one TV 
-TCON instead of two of each kind. That means we will have hole in indices 
-(tcon_lcd0 is 1, tcon_tv0 is 3, which is aligned with R40) and different TCON-
-TOP binding (no tcon_tv1 channel clock), but setup is exactly the same.
+If we don't have such a guarantee, we probably need an internal
+mechanism to avoid having ->start called more than once.
 
-Best regard,
-Jernej
+> +	    dev->dec_ops[ctx->current_codec]->start)
+> +		ret = dev->dec_ops[ctx->current_codec]->start(ctx);
+> +
+> +	return ret;
+>  }
+>  
+>  static void sunxi_cedrus_stop_streaming(struct vb2_queue *q)
+>  {
+>  	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
+> +	struct sunxi_cedrus_dev *dev = ctx->dev;
+>  	struct vb2_v4l2_buffer *vbuf;
+>  	unsigned long flags;
+>  
+>  	flush_scheduled_work();
+> +
+> +	if (V4L2_TYPE_IS_OUTPUT(q->type) &&
+
+Ditto.
+
+Cheers,
+
+Paul
+
+> +	    dev->dec_ops[ctx->current_codec]->stop)
+> +		dev->dec_ops[ctx->current_codec]->stop(ctx);
+> +
+>  	for (;;) {
+>  		spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+>  
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/ce39ae6b/attachment.sig>
