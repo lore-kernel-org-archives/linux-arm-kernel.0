@@ -1,101 +1,106 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Thu, 21 Jun 2018 13:16:14 +0000
-Subject: [PATCH v2 1/5] dmaengine: xilinx_dma: in axidma slave_sg and
- dma_cyclic mode align split descriptors
-In-Reply-To: <20180621115822.20058-1-andrea.merello@gmail.com>
-References: <20180621115822.20058-1-andrea.merello@gmail.com>
-Message-ID: <DM6PR02MB4361C0F0D4002B73B24D2F98C7760@DM6PR02MB4361.namprd02.prod.outlook.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 21 Jun 2018 16:16:24 +0300
+Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
+In-Reply-To: <5b66cafe-782e-43a9-c221-cf0a1528f382@gmail.com>
+References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
+ <20180618114920.654647c0@bbrezillon>
+ <8474a744-5552-932f-7ba8-85b7d95368ea@gmail.com>
+ <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
+ <5b66cafe-782e-43a9-c221-cf0a1528f382@gmail.com>
+Message-ID: <e0259cda-2334-946f-fc3f-25c64a4f721b@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
-> owner at vger.kernel.org] On Behalf Of Andrea Merello
-> Sent: Thursday, June 21, 2018 5:28 PM
-> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
-> <michals@xilinx.com>; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>; dmaengine at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> Andrea Merello <andrea.merello@gmail.com>
-> Subject: [PATCH v2 1/5] dmaengine: xilinx_dma: in axidma slave_sg and
-> dma_cyclic mode align split descriptors
-> 
-> Whenever a single or cyclic transaction is prepared, the driver
-> could eventually split it over several SG descriptors in order
-> to deal with the HW maximum transfer length.
-> 
-> This could end up in DMA operations starting from a misaligned
-> address. This seems fatal for the HW if DRE is not enabled.
-> 
-> This patch eventually adjusts the transfer size in order to make sure
-> all operations start from an aligned address.
-> 
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> ---
-> Changes in v2:
-> 	- don't introduce copy_mask field, rather rely on already-esistent
-> 	  copy_align field. Suggested by Radhey Shyam Pandey
-> 	- reword title
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 22 ++++++++++++++++------
->  1 file changed, 16 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 27b523530c4a..22d7a6b85e65 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -1789,10 +1789,15 @@ static struct dma_async_tx_descriptor
-> *xilinx_dma_prep_slave_sg(
-> 
->  			/*
->  			 * Calculate the maximum number of bytes to transfer,
-> -			 * making sure it is less than the hw limit
-> +			 * making sure it is less than the hw limit and that
-> +			 * the next chunck start address is aligned
-/s/chunck/chunk . Same for later occurrence.
->  			 */
-> -			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
-> -				     XILINX_DMA_MAX_TRANS_LEN);
-> +			copy = sg_dma_len(sg) - sg_used;
-> +			if (copy > XILINX_DMA_MAX_TRANS_LEN &&
-> +			    chan->xdev->common.copy_align)
-> +				copy =
-> rounddown(XILINX_DMA_MAX_TRANS_LEN,
-> +					 (1 << chan->xdev-
-> >common.copy_align));
-> +
-If DRE is not enabled (copy_align=0) we are copying entire sg_dma_len 
-which is not correct i.e more than XILINX_DMA_MAX_TRANS_LEN.
+Hi Marek,
 
->  			hw = &segment->hw;
+On 19.06.2018 04:28, Marek Vasut wrote:
+> On 06/18/2018 02:00 PM, Claudiu Beznea wrote:
+>>
+>>
+>> On 18.06.2018 12:53, Marek Vasut wrote:
+>>> On 06/18/2018 11:49 AM, Boris Brezillon wrote:
+>>>> Hi Claudiu,
+>>>>
+>>>> The subject prefix should be "mtd: spi-nor: atmel-quadspi: ". No need
+>>>> to send a new version just for that, I'll fix it when applying the
+>>>> patch.
+>>>>
+>> Hi Boris,
+>>
+>> Thank you!
+>>
+>>>> Looks good otherwise. Marek, any objection? If not, can you add your
+>>>> Acked-by?
+>>>
+>>> Will this work if you have ie. ubifs mounted on that QSPI NOR and you
+>>> suspect and resume during IO ? I think it would, but just curious if
+>>> there could be some problem.
+>>
+>> Hi Marek,
+>>
+>> I tested only with read/writes while suspending, simple scripts, but not
+>> having ubifs mounted on QSPI NOR. I will double check also with ubifs
+>> mounted on QSPI NOR and come back with the results.
 > 
->  			/* Fill in the descriptor */
-> @@ -1894,10 +1899,15 @@ static struct dma_async_tx_descriptor
-> *xilinx_dma_prep_dma_cyclic(
-> 
->  			/*
->  			 * Calculate the maximum number of bytes to transfer,
-> -			 * making sure it is less than the hw limit
-> +			 * making sure it is less than the hw limit and that
-> +			 * the next chunck start address is aligned
->  			 */
-> -			copy = min_t(size_t, period_len - sg_used,
-> -				     XILINX_DMA_MAX_TRANS_LEN);
-> +			copy = period_len - sg_used;
-> +			if (copy > XILINX_DMA_MAX_TRANS_LEN &&
-> +			    chan->xdev->common.copy_align)
-> +				copy =
-> rounddown(XILINX_DMA_MAX_TRANS_LEN,
-> +					 (1 << chan->xdev-
-> >common.copy_align));
-> +
->  			hw = &segment->hw;
->  			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
->  					  period_len * i);
-> --
-> 2.17.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks. I think it's gonna be OK, but let's just be sure.
+> Make sure to disable 4K sector support when fiddling with UBI/UBIFS on
+> QSPI NOR.
+
+I did the following to test this patch with ubifs:
+1. disabled CONFIG_MTD_SPI_NOR_USE_4K_SECTORS and build kernel
+
+2. create a ubifs image:
+mkfs.ubifs -r /mnt/ubifs-sama5d2-rootfs -m 1 -e 65408 -c 3739 \
+ -o /mnt/sama5d2-xplained-ubifs.img
+
+3. boot the board and check partitions:
+cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 00010000 00010000 "at91bootstrap"
+mtd1: 00010000 00010000 "bootloader env"
+mtd2: 00050000 00010000 "bootloader"
+mtd3: 00010000 00010000 "device tree"
+mtd4: 00380000 00010000 "kernel"
+mtd5: 01c00000 00010000 "rootfs"
+mtd6: 00400000 00010000 "spi32766.0"
+
+4. ubiformat /dev/mtd5
+5. ubiattach -p /dev/mtd5
+6. ubimkvol /dev/ubi0 -N test -s 28910336
+7. ubiupdatevol /dev/ubi0_0 /sama5d2-xplained-buildroot-ubifs.img
+8. mount -t ubifs ubi0:test /mnt
+9. cd /mnt/; ls /mnt/
+bin      lib      media    proc     sbin     usr
+dev      lib32    mnt      root     sys      var
+etc      linuxrc  opt      run      tmp
+
+10. Create a file with dd on ubifs partition:
+dd if=/dev/urandom of=test.bin bs=1024 count=8K
+
+11. compute md5sum on this file:
+md5sum test.bin > test.md5
+
+12. Measure how much will take to copy that file (to be sure the copy
+operation is not done before suspending):
+
+date; cp test.bin test-pm.bin; date
+Wed Jun 20 13:20:34 UTC 2018
+Wed Jun 20 13:21:14 UTC 2018
+
+13. Copy, sync, and switch to suspend-to-mem:
+
+cp test.bin test-pm.bin &
+sync &
+echo mem > /sys/power/state
+
+14. Check md5sum of test-pm.bin and compare it with md5sum of test.bin:
+md5sum test-pm.bin > test-pm.md5
+cat test.md5
+b5338647572b9665f24c61db98601522  test.bin
+cat test-pm.md5
+b5338647572b9665f24c61db98601522  test-pm.bin
+
+Please let me know if this is enough!
+
+Thank you,
+Claudiu Beznea
