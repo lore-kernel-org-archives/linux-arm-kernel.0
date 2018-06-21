@@ -1,32 +1,37 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Thu, 21 Jun 2018 21:09:52 +0200
-Subject: [PATCH 0/7] Initial support for Samsung Galaxy S and Galaxy S 4G
-Message-ID: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Date: Thu, 21 Jun 2018 21:09:53 +0200
+Subject: [PATCH 1/7] ARM: dts: s5pv210: Add missing interrupt-controller
+ property to gph2
+In-Reply-To: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1529608199-5583-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonathan Bakker (2):
-  ARM: dts: s5pv210: Add initial DTS config for SGH-T959P phone
-  dt-bindings: samsung: Document binding for SGH-T959P board
+Adds missing interrupt-controller property to gph2 block,
+to silence following warnings during build
+  /soc/pinctrl at e0200000/gph2: Missing interrupt-controller or interrupt-map property
 
-Pawe? Chmiel (5):
-  ARM: dts: s5pv210: Add missing interrupt-controller property to gph2
-  ARM: dts: s5pv210: Add initial DTS for Samsung Aries based phones.
-  ARM: dts: s5pv210: Add initial DTS for Samsung Galaxy S phone.
-  ARM: s5pv210_defconfig: Enable drivers for Samsung Aries based phones
-  dt-bindings: samsung: Document bindings for Samsung aries boards
+It's reguired by Samsung aries boards, an S5PV210 based
+Samsung Galaxy S (i9000) and Galaxy S 4G phones, which are added in next patches.
 
- .../bindings/arm/samsung/samsung-boards.txt        |   3 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/s5pv210-aries.dtsi               | 397 +++++++++++++++++++++
- arch/arm/boot/dts/s5pv210-fascinate4g.dts          |  40 +++
- arch/arm/boot/dts/s5pv210-galaxys.dts              |  72 ++++
- arch/arm/boot/dts/s5pv210-pinctrl.dtsi             |   2 +
- arch/arm/configs/s5pv210_defconfig                 |  49 ++-
- 7 files changed, 562 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/s5pv210-aries.dtsi
- create mode 100644 arch/arm/boot/dts/s5pv210-fascinate4g.dts
- create mode 100644 arch/arm/boot/dts/s5pv210-galaxys.dts
+Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+---
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+index 3a79feab11c3..7f0c9d447871 100644
+--- a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
++++ b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+@@ -258,6 +258,8 @@
+ 	gph2: gph2 {
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
+ 
 -- 
 2.7.4
