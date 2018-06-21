@@ -1,33 +1,27 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 21 Jun 2018 13:00:41 -0700
-Subject: [PATCH] drm/pl111: Support Nomadik LCDC variant
-In-Reply-To: <20180621184450.25377-1-linus.walleij@linaro.org>
-References: <20180621184450.25377-1-linus.walleij@linaro.org>
-Message-ID: <87lgb79afq.fsf@anholt.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 21 Jun 2018 17:01:11 -0300
+Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
+In-Reply-To: <1529610890.4022.7.camel@pengutronix.de>
+References: <20171213142406.5088-1-p.zabel@pengutronix.de>
+ <20171226041517.GD4210@X250>
+ <1529610890.4022.7.camel@pengutronix.de>
+Message-ID: <CAOMZO5Ahv2F-WeAPFgsBcpAeb2i==SAZ45QBLvnod7jYRG0fMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi Philipp,
 
-> The Nomadik has a variant of the PL110 known as "Color LCD
-> Controller" LCDC. This variant has the same bit ordering as
-> the DRM subsystem (in difference from the other variants)
-> and adds a few bits for the control of 5551, 565 etc in the
-> control register. Notably it also adds a packed RGB888
-> 24BPP mode.
->
-> We add support by detecting this variant and also adding a
-> small plug-in that will mux the LCDC out if the ASIC happens
-> to be muxed to the other graphics controller (they are
-> mutually exclusive).
+On Thu, Jun 21, 2018 at 4:54 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
-This all looks reasonable to me.
+> I forgot about this between the years, this patch is safe to be applied.
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/3739e435/attachment.sig>
+In order to get the internal RAM to be functional, I think we also
+need to pass the IRAM clock in the iram node:
+
+  iram: iram at 1ffe0000 {
+      compatible = "mmio-sram";
+      reg = <0x1ffe0000 0x20000>;
+  +  clocks = <&clks IMX5_CLK_OCRAM>;
+  };
+
+Thanks
