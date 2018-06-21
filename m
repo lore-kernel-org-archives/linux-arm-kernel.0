@@ -1,132 +1,110 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 21 Jun 2018 18:04:32 +0100
-Subject: [PATCH 1/1] arm64/mm: move
- {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata section
-In-Reply-To: <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
-References: <20180620085755.20045-1-yaojun8558363@gmail.com>
- <20180620085755.20045-2-yaojun8558363@gmail.com>
- <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
- <20180621025141.GB11276@toy>
- <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
- <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
- <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
-Message-ID: <67a238a8-e4db-6bf1-6da5-62ca9536191f@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 21 Jun 2018 17:11:33 +0000
+Subject: [PATCH V2 2/4] dt-bindings: arm: fsl: add mu binding doc
+In-Reply-To: <20180621074641.sqqvudxebt3hd43m@pengutronix.de>
+References: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
+ <1529239789-26849-3-git-send-email-aisheng.dong@nxp.com>
+ <20180620194310.GA28983@rob-hp-laptop>
+ <20180621074641.sqqvudxebt3hd43m@pengutronix.de>
+Message-ID: <AM0PR04MB4211B39D5AFAB95FC2A91F9980760@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Sascha,
 
-On 21/06/18 10:29, Ard Biesheuvel wrote:
-> On 21 June 2018 at 10:59, James Morse <james.morse@arm.com> wrote:
->> On 21/06/18 07:39, Ard Biesheuvel wrote:
->>> On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
->>>> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
->>>>> On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
->>>>>> Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
->>>>>> section. And update the swapper_pg_dir by fixmap.
->>>>>
->>>>> I think we may be able to get away with not mapping idmap_pg_dir and
->>>>> tramp_pg_dir at all.
->>>>
->>>> I think we need to move tramp_pg_dir to .rodata. The attacker can write
->>>> a block-mapping(AP=01) to tramp_pg_dir and then he can access kernel
->>>> memory.
->>
->>> Why does it need to be mapped at all? When do we ever access it from the code?
->>
->> (We would want to make its fixmap entry read-only too)
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Thursday, June 21, 2018 3:47 PM
+> To: Rob Herring <robh@kernel.org>
+> Cc: A.s. Dong <aisheng.dong@nxp.com>; linux-arm-
+> kernel at lists.infradead.org; dongas86 at gmail.com; kernel at pengutronix.de;
+> shawnguo at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-
+> imx <linux-imx@nxp.com>; Mark Rutland <mark.rutland@arm.com>;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH V2 2/4] dt-bindings: arm: fsl: add mu binding doc
 > 
-> It already is.
+> On Wed, Jun 20, 2018 at 01:43:10PM -0600, Rob Herring wrote:
+> > On Sun, Jun 17, 2018 at 08:49:47PM +0800, Dong Aisheng wrote:
+> > > The Messaging Unit module enables two processors within the SoC to
+> > > communicate and coordinate by passing messages (e.g. data, status
+> > > and control) through the MU interface.
+> > >
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: devicetree at vger.kernel.org
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > > v1->v2:
+> > >  * typo fixes
+> > >  * remove status property
+> > >  * remove imx6&7 compatible string which may be added later for
+> > >    the generic mailbox binding
+> > >
+> > > Note: Because MU used by SCU is not implemented as a mailbox driver,
+> > > Instead, they're provided in library calls to gain higher performance.
+> >
+> > Using a binding doesn't mean you have to use an OS's subsystem.
+> >
+> > What needs higher performance? What's the performance difference?
+> Why
+> > can't the mailbox framework be improved?
+> 
+> From what I see the performance is improved by polling the interrupt
+> registers rather than using interrupts.
+> I see no reason though why this can't be implemented with the mailbox
+> framework as is.
+> 
 
-Sorry, I missed that,
+I thought you've agreed to not write generic MU(mailbox) driver for SCU.
+https://www.spinics.net/lists/arm-kernel/msg650217.html
+But seems it's still not quite certain...
 
+I'd like to explain some more.
 
->>>>> As for swapper_pg_dir, it would indeed be nice if we could keep those
->>>>> mappings read-only most of the time, but I'm not sure how useful this
->>>>> is if we apply it to the root level only.
->>>>
->>>> The purpose of it is to make 'KSMA' harder, where an single arbitrary
->>>> write is used to add a block mapping to the page-tables, giving the
->>>> attacker full access to kernel memory. That's why we just apply it to
->>>> the root level only. If the attacker can arbitrary write multiple times,
->>>> I think it's hard to defend.
->>>
->>> So the assumption is that the root level is more easy to find?
->>> Otherwise, I'm not sure I understand why being able to write a level 0
->>> entry is so harmful, given that we don't have block mappings at that
->>> level.
->>
->> I think this thing assumes 3-level page tables with 39bit VA.
+1) the interrupt mechanism is not quite suitable for SCU firmware protocol
+as the transfer size would be more than 4 words and the response data size
+is also undetermined (it's set by SCU firmware side during a response).
+So polling mode may be the best way to handle this as MU message
+handling usually is quite fast in a few microseconds.
 
-> The attack, you mean? Because this code is unlikely to build with that
-> configuration, given that __pgd_populate() BUILD_BUG()s in that case.
+2) It's true that Mailbox framework is well designed and powerful.
+But it's not quite suitable for SCU MU as we don't need to use the most
+bits of it. Mailbox seems like to be more suitable for a generic MU
+mailbox driver used by various clients/servers.  But SCU MU are
+quite specific to SCU protocol and can't be used by other clients
+(MU 0~4 is fixed for SCU communication in MX8 HW design). 
+Even we write a MU Mailbox driver for SCU MU, it's still not a general
+one and can't be used by others (e.g. communication with M4).
+So I'd believe the current library way is still the best approach for SCU MU
+Using. But I'm also okay for another generic MU drivers for other common
+communications between A core and M4 side.
 
-Yes, the attack. (I struggle to think of it as an 'attack' because you already
-have arbitrary write...)
+3) We actually have tried the MU(Mailbox) internally, it increased a lot
+complexity comparing to the current library way and got a booting time
+regression issue due to extra delays introduced in handling SCU protocol
+in mailbox way.
 
+And finally a nature question to us is: 
+What the benefit we can get for SCU MU using a mailbox way?
 
->>>>> @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
->>>>>>
->>>>>>  void __init mark_linear_text_alias_ro(void)
->>>>>>  {
->>
->>>>>> +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
->>>>>> +       update_mapping_prot(__pa_symbol(swapper_pg_end),
->>>>>> +                           (unsigned long)lm_alias(swapper_pg_end),
->>>>>> +                           size, PAGE_KERNEL_RO);
->>>>>
->>>>> I don't think this is necessary. Even if some pages are freed, it
->>>>> doesn't harm to keep a read-only alias of them here since the new
->>>>> owner won't access them via this mapping anyway. So we can keep
->>>>> .rodata as a single region.
->>>>
->>>> To be honest, I didn't think of this issue at first. I later found a
->>>> problem when testing the code on qemu:
->>>
->>> OK, you're right. I missed the fact that this operates on the linear
->>> alias, not the kernel mapping itself.
->>>
->>> What I don't like is that we lose the ability to use block mappings
->>> for the entire .rodata section this way. Isn't it possible to move
->>> these pgdirs to the end of the .rodata segment, perhaps by using a
->>> separate input section name and placing that explicitly? We could even
->>> simply forget about freeing those pages, given that [on 4k pages] the
->>> benefit of freeing 12 KB of space is likely to get lost in the
->>> rounding noise anyway [segments are rounded up to 64 KB in size]
->>
->> I assumed that to move swapper_pg_dir into the .rodata section we would need to
->> break it up. Today its ~3 levels, which we setup in head.S, then do a dance in
->> paging_init() so that swapper_pg_dir is always the top level.
->>
->> We could generate all leves of the 'init_pg_dir' in the __initdata section, then
->> copy only the top level into swapper_pg_dir into the rodata section during
->> paging_init().
+If we can't find benefits but introduce more complexities then why
+we would do that way?
 
-> Is that complexity truly justified for a security sensitive piece of
-> code?
+Regards
+Dong Aisheng
 
-Wouldn't this be less complex? (I've probably explained it badly.)
-
-Today head.S builds the initial page tables in ~3 levels of swapper_pg_dir, then
-during paging_init() build new tables with a temporary top level.
-We switch to the temporary top level, then copy over the first level of
-swapper_pg_dir, then switch back to swapper_pg_dir. Finally we free the
-no-longer-used levels of swapper_pg_dir.
-
-This looks like re-inventing __initdata for the bits of page table we eventually
-free.
-
-What I tried to describe is building the head.S/initial-page-tables in a
-reserved area of the the __initdata section. We no longer need a temporary
-top-level, we can build the final page tables directly in swapper_pg_dir, which
-means one fewer rounds of cpu_replace_ttbr1().
-
-
-> Can't we just drop the memblock_free() and be done with it?
-
-That works, I assumed it would be at least frowned on!
-
-
-Thanks,
-
-James
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7C8ec
+> 827973f6e40d1fe1508d5d74b2471%7C686ea1d3bc2b4c6fa92cd99c5c301635%
+> 7C0%7C0%7C636651640089438560&sdata=oRARdjilF4Ve2%2FnsXVhG7fmjXip
+> H0HslgDMldbIGgY0%3D&reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
