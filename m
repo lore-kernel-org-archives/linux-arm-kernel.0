@@ -1,159 +1,208 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 21 Jun 2018 17:35:03 +0200
-Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
-In-Reply-To: <20180613140714.1686-8-maxime.ripard@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-8-maxime.ripard@bootlin.com>
-Message-ID: <a2e1e0a85e0cd650d27eb02dc58d438d6a750929.camel@bootlin.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 21 Jun 2018 17:35:45 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
+ for tcon-top gate
+In-Reply-To: <CAGb2v64iB8FP1Nf+vZM2wd6wzNLxWYrCP78D-rOUg881RPNpEA@mail.gmail.com>
+References: <20180612200036.21483-1-jernej.skrabec@siol.net>
+ <2581098.bNJirayF9O@jernej-laptop>
+ <CAGb2v64iB8FP1Nf+vZM2wd6wzNLxWYrCP78D-rOUg881RPNpEA@mail.gmail.com>
+Message-ID: <2366311.u3CXHO0a4d@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> The IRQ handler up until now was hardcoding the use of the MPEG engine to
-> read the interrupt status, clear it and disable the interrupts.
+Dne ?etrtek, 21. junij 2018 ob 03:23:27 CEST je Chen-Yu Tsai napisal(a):
+> On Thu, Jun 21, 2018 at 3:37 AM, Jernej ?krabec <jernej.skrabec@siol.net> 
+wrote:
+> > Dne sobota, 16. junij 2018 ob 07:48:38 CEST je Chen-Yu Tsai napisal(a):
+> >> On Sat, Jun 16, 2018 at 1:33 AM, Jernej ?krabec <jernej.skrabec@siol.net>
+> > 
+> > wrote:
+> >> > Dne petek, 15. junij 2018 ob 19:13:17 CEST je Chen-Yu Tsai napisal(a):
+> >> >> On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
+> >> >> 
+> >> >> <jernej.skrabec@siol.net> wrote:
+> >> >> > Hi,
+> >> >> > 
+> >> >> > Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard 
+napisal(a):
+> >> >> >> Hi,
+> >> >> >> 
+> >> >> >> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
+> >> >> >> > TV TCONs connected to TCON TOP have to enable additional gate in
+> >> >> >> > order
+> >> >> >> > to work.
+> >> >> >> > 
+> >> >> >> > Add support for such TCONs.
+> >> >> >> > 
+> >> >> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> >> >> >> > ---
+> >> >> >> > 
+> >> >> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
+> >> >> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
+> >> >> >> >  2 files changed, 15 insertions(+)
+> >> >> >> > 
+> >> >> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> >> >> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index
+> >> >> >> > 08747fc3ee71..0afb5a94a414
+> >> >> >> > 100644
+> >> >> >> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> >> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> >> >> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct
+> >> >> >> > device
+> >> >> >> > *dev,
+> >> >> >> > 
+> >> >> >> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
+> >> >> >> >             return PTR_ERR(tcon->clk);
+> >> >> >> >     
+> >> >> >> >     }
+> >> >> >> > 
+> >> >> >> > +
+> >> >> >> > +   if (tcon->quirks->has_tcon_top_gate) {
+> >> >> >> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
+> >> >> >> > +           if (IS_ERR(tcon->top_clk)) {
+> >> >> >> > +                   dev_err(dev, "Couldn't get the TCON TOP bus
+> >> >> >> > clock\n");
+> >> >> >> > +                   return PTR_ERR(tcon->top_clk);
+> >> >> >> > +           }
+> >> >> >> > +           clk_prepare_enable(tcon->top_clk);
+> >> >> >> > +   }
+> >> >> >> > +
+> >> >> >> 
+> >> >> >> Is it required for the TCON itself to operate, or does the TCON
+> >> >> >> requires the TCON TOP, which in turn requires that clock to be
+> >> >> >> functional?
+> >> >> >> 
+> >> >> >> I find it quite odd to have a clock that isn't meant for a
+> >> >> >> particular
+> >> >> >> device to actually be wired to another device. I'm not saying this
+> >> >> >> isn't the case, but it would be a first.
+> >> >> > 
+> >> >> > Documentation doesn't say much about that gate. I did few tests and
+> >> >> > TCON
+> >> >> > registers can be read and written even if TCON TOP TV TCON gate is
+> >> >> > disabled. However, there is no image, as expected.
+> >> >> 
+> >> >> The R40 manual does include it in the diagram, on page 504. There's
+> >> >> also
+> >> >> a
+> >> >> mux to select whether the clock comes directly from the CCU or the TV
+> >> >> encoder (a feedback mode?). I assume this is the gate you are
+> >> >> referring
+> >> >> to
+> >> >> here, in which case it is not a bus clock, but rather the TCON module
+> >> >> or
+> >> >> channel clock, strangely routed.
+> >> >> 
+> >> >> > More interestingly, I enabled test pattern directly in TCON to
+> >> >> > eliminate
+> >> >> > influence of the mixer. As soon as I disabled that gate, test
+> >> >> > pattern
+> >> >> > on
+> >> >> > HDMI screen was gone, which suggest that this gate influences
+> >> >> > something
+> >> >> > inside TCON.
+> >> >> > 
+> >> >> > Another test I did was that I moved enable/disable gate code to
+> >> >> > sun4i_tcon_channel_set_status() and it worked just as well.
+> >> >> > 
+> >> >> > I'll ask AW engineer what that gate actually does, but from what I
+> >> >> > saw,
+> >> >> > I
+> >> >> > would say that most appropriate location to enable/disable TCON TOP
+> >> >> > TV
+> >> >> > TCON
+> >> >> > gate is TCON driver. Alternatively, TCON TOP driver could check if
+> >> >> > any
+> >> >> > TV
+> >> >> > TCON is in use and enable appropriate gate. However, that doesn't
+> >> >> > sound
+> >> >> > right to me for some reason.
+> >> >> 
+> >> >> If what I said above it true, then yes, the appropriate location to
+> >> >> enable
+> >> >> it is the TCON driver, but moreover, the representation of the clock
+> >> >> tree
+> >> >> should be fixed such that the TCON takes the clock from the TCON TOP
+> >> >> as
+> >> >> its
+> >> >> channel/ module clock instead. That way you don't need this patch, but
+> >> >> you'd add another for all the clock routing.
+> >> > 
+> >> > Can you be more specific? I not sure what you mean here.
+> >> 
+> >> For clock related properties in the device tree:
+> >> 
+> >> &tcon_top {
+> >> 
+> >>     clocks = <&ccu CLK_BUS_TCON_TOP>,
+> >>     
+> >>              <&ccu CLK_TCON_TV0>,
+> >>              <&tve0>,
+> >>              <&ccu CLK_TCON_TV1>,
+> >>              <&tve1>;
+> >>     
+> >>     clock-names = "bus", "tcon-tv0", "tve0", "tcon-tv1", "tve1";
+> >>     clock-output-names = "tcon-top-tv0", "tcon-top-tv1";
+> >> 
+> >> };
+> >> 
+> >> &tcon_tv0 {
+> >> 
+> >>     clocks = <&ccu CLK_BUS_TCON_TV0>, <&tcon_top 0>'
+> >>     clock-names = "ahb", "tcon-ch1";
+> >> 
+> >> };
+> >> 
+> >> A diagram would look like:
+> >>                    | This part is TCON TOP |
+> >>                    
+> >>                    v                       v
+> >> 
+> >> CCU CLK_TCON_TV0 --|----\                  |
+> >> 
+> >>                    |     mux ---- gate ----|-- TCON_TV0
+> >> 
+> >> TVE0 --------------|----/                  |
+> >> 
+> >> And the same goes for TCON_TV1 and TVE1.
+> >> 
+> >> The user manual is a bit lacking on how TVE outputs a clock though.
+> > 
+> > I didn't yet received any response on HW details from AW till now, but I
+> > would like to post new version of patches soon.
+> > 
+> > While chaining like you described could be implemented easily, I don't
+> > think it really represents HW as it is. Tests showed that these two
+> > clocks are independent, otherwise register writes/reads wouldn't be
+> > possible with tcon- top gate disabled. I chose tcon-top bus clock as a
+> > parent becase if it is not enabled, it simply won't work.
 > 
-> Obviously, that won't work really well with the introduction of new codecs
-> that use a separate engine with a separate register set.
-> 
-> In order to make this more future proof, introduce new decodec operations
-> to deal with the interrupt management. The only one missing is the one to
-> enable the interrupts in the first place, but that's taken care of by the
-> trigger hook for now.
+> AFAIK with the TCONs, even when the TCON channel clock (not the bus clock)
+> is disabled, register accesses still work.
 
-Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+You're right, I just tested that.
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
->  .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
->  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
->  3 files changed, 53 insertions(+), 10 deletions(-)
+> I'm saying that the TCON TOP
+> gate is downstream from the TCON channel clock in the CCU. These are not
+> related to the TCON bus clock in the CCU, which affects register access.
 > 
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> index c2e2c92d103b..a2a507eb9fc9 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> @@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
->  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
->  }
->  
-> +enum sunxi_cedrus_irq_status {
-> +	SUNXI_CEDRUS_IRQ_NONE,
-> +	SUNXI_CEDRUS_IRQ_ERROR,
-> +	SUNXI_CEDRUS_IRQ_OK,
-> +};
-> +
->  struct sunxi_cedrus_dec_ops {
-> +	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
-> +	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
-> +	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
->  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
->  		      struct sunxi_cedrus_run *run);
->  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> index bb46a01214e0..6b97cbd2834e 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> @@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
->  	struct sunxi_cedrus_ctx *ctx;
->  	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
->  	struct vb2_v4l2_buffer *src_vb, *dst_vb;
-> +	enum sunxi_cedrus_irq_status status;
->  	unsigned long flags;
-> -	unsigned int value, status;
->  
->  	spin_lock_irqsave(&dev->irq_lock, flags);
->  
-> -	/* Disable MPEG interrupts and stop the MPEG engine */
-> -	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
-> -	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
-> -
-> -	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
-> -	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
-> -	sunxi_cedrus_engine_disable(dev);
-> -
->  	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
->  	if (!ctx) {
->  		pr_err("Instance released before the end of transaction\n");
->  		spin_unlock_irqrestore(&dev->irq_lock, flags);
->  
-> -		return IRQ_HANDLED;
-> +		return IRQ_NONE;
->  	}
->  
-> +	status = dev->dec_ops[ctx->current_codec]->irq_status(ctx);
-> +	if (status == SUNXI_CEDRUS_IRQ_NONE) {
-> +		spin_unlock_irqrestore(&dev->irq_lock, flags);
-> +		return IRQ_NONE;
-> +	}
-> +
-> +	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
-> +	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
-> +
->  	src_vb = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
->  	dst_vb = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
->  
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> index e25075bb5779..51fa0c0f9bf2 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
-> @@ -52,6 +52,36 @@ static const u8 mpeg_default_non_intra_quant[64] = {
->  
->  #define m_niq(i) ((i << 8) | mpeg_default_non_intra_quant[i])
->  
-> +static enum sunxi_cedrus_irq_status
-> +sunxi_cedrus_mpeg2_irq_status(struct sunxi_cedrus_ctx *ctx)
-> +{
-> +	struct sunxi_cedrus_dev *dev = ctx->dev;
-> +	u32 reg = sunxi_cedrus_read(dev, VE_MPEG_STATUS) & 0x7;
-> +
-> +	if (!reg)
-> +		return SUNXI_CEDRUS_IRQ_NONE;
-> +
-> +	if (reg & (BIT(1) | BIT(2)))
-> +		return SUNXI_CEDRUS_IRQ_ERROR;
-> +
-> +	return SUNXI_CEDRUS_IRQ_OK;
-> +}
-> +
-> +static void sunxi_cedrus_mpeg2_irq_clear(struct sunxi_cedrus_ctx *ctx)
-> +{
-> +	struct sunxi_cedrus_dev *dev = ctx->dev;
-> +
-> +	sunxi_cedrus_write(dev, GENMASK(2, 0), VE_MPEG_STATUS);
-> +}
-> +
-> +static void sunxi_cedrus_mpeg2_irq_disable(struct sunxi_cedrus_ctx *ctx)
-> +{
-> +	struct sunxi_cedrus_dev *dev = ctx->dev;
-> +	u32 reg = sunxi_cedrus_read(dev, VE_MPEG_CTRL) & ~BIT(3);
-> +
-> +	sunxi_cedrus_write(dev, reg, VE_MPEG_CTRL);
-> +}
-> +
->  static void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
->  				     struct sunxi_cedrus_run *run)
->  {
-> @@ -156,6 +186,9 @@ static void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
->  }
->  
->  struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2 = {
-> +	.irq_clear	= sunxi_cedrus_mpeg2_irq_clear,
-> +	.irq_disable	= sunxi_cedrus_mpeg2_irq_disable,
-> +	.irq_status	= sunxi_cedrus_mpeg2_irq_status,
->  	.setup		= sunxi_cedrus_mpeg2_setup,
->  	.trigger	= sunxi_cedrus_mpeg2_trigger,
->  };
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/6142c67d/attachment.sig>
+> Did Allwinner provide any information regarding the hierarchy of the clocks?
+
+No reponse for now.
+
+> > However, if everyone feels chaining is the best way to implement it, I'll
+> > do it.
+> 
+> I would like to get it right and match actual hardware. My proposal is
+> based on my understanding from the diagrams in the user manual.
+
+So for now, your explanation is the most reasonable. Should we go ahead and 
+implement your idea?
+
+Please note that H6 has TCON-TOP too, but it has only one LCD TCON and one TV 
+TCON instead of two of each kind. That means we will have hole in indices 
+(tcon_lcd0 is 1, tcon_tv0 is 3, which is aligned with R40) and different TCON-
+TOP binding (no tcon_tv1 channel clock), but setup is exactly the same.
+
+Best regard,
+Jernej
