@@ -1,112 +1,66 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 21 Jun 2018 09:25:48 +0200
-Subject: Dynamic ftrace self test broken on ARM
-In-Reply-To: <20180620212906.24b7b66e@vmware.local.home>
-References: <65fb14b356bc0a414f1fe5cf5c6eb395@agner.ch>
- <20180618175437.3e6c85a1@gandalf.local.home>
- <b9f269ed2143688c38cdcbba7367b101@agner.ch>
- <20180619091735.7aec75d0@gandalf.local.home>
- <5e26cebbb2ebeb87fdc808509881736b@agner.ch>
- <20180620101311.0bcd73d3@gandalf.local.home>
- <7904ed3fe9f59a54526d64f366915b43@agner.ch>
- <e4181ae694d44913a8eba4618477bd3b@agner.ch>
- <ac0178fb75658a8d7d7b1931691c7755@agner.ch>
- <20180620230734.GO17671@n2100.armlinux.org.uk>
- <20180620212906.24b7b66e@vmware.local.home>
-Message-ID: <daf9cea94b0baf23563c575fbab1a4da@agner.ch>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 21 Jun 2018 09:37:02 +0200
+Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using the
+ reset framework
+Message-ID: <20180621073706.22812-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.06.2018 03:29, Steven Rostedt wrote:
-> On Thu, 21 Jun 2018 00:07:34 +0100
-> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> 
-> 
->> > Any input from ARM folks?
->>
->> The same issues must exist on other architectures as ARM is not the only
->> architecture to implement read-only kernel text and dynamic ftrace, so
->> surely this problem isn't unique to ARM.
-> 
-> Probably because of the way set_kernel_text_ro() is implemented in
-> other archs. For example, in x86, we have:
-> 
-> void set_kernel_text_ro(void)
-> {
-> 	unsigned long start = PFN_ALIGN(_text);
-> 	unsigned long end = PFN_ALIGN(__stop___ex_table);
-> 
-> 	if (!kernel_set_to_readonly)
-> 		return;
-> 
-> 	/*
-> 	 * Set the kernel identity mapping for text RO.
-> 	 */
-> 	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
-> }
-> 
-> and arm has:
-> 
-> void set_kernel_text_ro(void)
-> {
-> 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
-> 				current->active_mm);
-> }
-> 
-> Where x86's set_kernel_text_ro() is a nop until the
-> kernel_set_to_readonly is set.
-> 
-> Perhaps this may fix things?
-> 
-> [ Not even compiled tested ]
-> 
-> -- Steve
-> 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index c186474422f3..0cc8e04295a4 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
->  	return 0;
->  }
->  
-> +static int kernel_set_to_readonly __read_mostly;
-> +
->  void mark_rodata_ro(void)
->  {
-> +	kernel_set_to_readonly = 1;
->  	stop_machine(__mark_rodata_ro, NULL, NULL);
->  	debug_checkwx();
->  }
->  
->  void set_kernel_text_rw(void)
->  {
-> +	if (!kernel_set_to_readonly)
-> +		return;
-> +
->  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
->  				current->active_mm);
->  }
->  
->  void set_kernel_text_ro(void)
->  {
-> +	if (!kernel_set_to_readonly)
-> +		return;
-> +
->  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
->  				current->active_mm);
->  }
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This aligns nicely with how this has been solved with commit
-162396309745 ("ftrace, x86: make kernel text writable only for
-conversions") a while ago.
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+These are the remaining patches that still need to be merged in order
+to complete the conversion of the davinci dsp driver to using the reset
+framework.
 
-Compiled and tested here, selftest as well as ftrace at runtime seems to
-work fine.
-Tested-by: Stefan Agner <stefan@agner.ch>
+They apply on top of v4.18-rc1 with David Lechner's remaining patches
+merged.
 
-Thanks Steven! Can you send a patch or should I do it?
+v1 -> v2:
+- fixed the device tree patches the descriptions of which were mixed up
+- return -EPROBE_DEFER from davinci-rproc's probe() if we can't get the
+  reset provider, since it's possible that the lookup table was not yet
+  registered
+- made the local variable naming consistent in the davinci-rproc driver
+- fixed a typo in PATCH 5/8
 
---
-Stefan
+v2 -> v3:
+- modify PATCH 1/8: drop the provider argument from the function adding
+  lookup entries and instead pass the provider name to the RESET_LOOKUP
+  macro, return -EPROBE_DEFER if we locate a correct lookup entry but
+  cannot get the corresponding reset controller
+- modify the reset lookup entry in psc-da850
+- don't manually return -EPROBE_DEFER from davinci-rproc, instead don't
+  emit an error message if devm_reset_control_get_exclusive() returns
+  this error code
+
+v3 -> v4:
+- make index the second parameter in RESET_LOOKUP() (right after the
+  provider name)
+
+v4 -> v5:
+- fix a bug where the dsp_reset object correctly stored in drproc struct
+
+v5 -> v6:
+- rebased on top of v4.17-rc1 and retested
+- dropped patches that were applied during 4.17 merge window
+- added relevant review and ack tags
+
+v6 -> v7:
+- rebased on top of v4.18-rc1 and dropped patches that were applied for
+  v4.17
+
+Bartosz Golaszewski (4):
+  remoteproc/davinci: use the reset framework
+  clk: davinci: kill davinci_clk_reset_assert/deassert()
+  ARM: davinci: dts: make psc0 a reset provider
+  ARM: davinci: dts: add a reset control to the dsp node
+
+ arch/arm/boot/dts/da850.dtsi               |  2 ++
+ arch/arm/mach-davinci/include/mach/clock.h | 21 -------------
+ drivers/clk/davinci/psc.c                  | 18 ------------
+ drivers/remoteproc/da8xx_remoteproc.c      | 34 ++++++++++++++++++----
+ 4 files changed, 31 insertions(+), 44 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+
+-- 
+2.17.1
