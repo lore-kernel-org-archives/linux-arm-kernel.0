@@ -1,113 +1,88 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 21 Jun 2018 03:38:30 +0000
-Subject: [PATCH V2 3/4] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <20180620194438.GA3494@rob-hp-laptop>
-References: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
- <1529239789-26849-4-git-send-email-aisheng.dong@nxp.com>
- <20180620194438.GA3494@rob-hp-laptop>
-Message-ID: <AM0PR04MB4211C2A376E6C74C7C4AC37880760@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Thu, 21 Jun 2018 03:59:27 +0000
+Subject: [PATCH 0/7 v5] Support for fsl-mc bus and its devices in SMMU
+In-Reply-To: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <HE1PR0401MB24250CEFBC0B7CC919C4388AE6760@HE1PR0401MB2425.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Robin/Greg k-h,
+
+Will this patch-set be taken for the next kernel release (and via which tree)?
+
+Thanks,
+Nipun
 
 > -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Thursday, June 21, 2018 3:45 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
-> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; Mark
-> Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org
-> Subject: Re: [PATCH V2 3/4] dt-bindings: arm: fsl: add scu binding doc
+> From: Nipun Gupta
+> Sent: Sunday, May 20, 2018 7:20 PM
+> To: robin.murphy at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> robh at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> gregkh at linuxfoundation.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>;
+> bhelgaas at google.com
+> Cc: hch at lst.de; joro at 8bytes.org; m.szyprowski at samsung.com;
+> shawnguo at kernel.org; frowand.list at gmail.com; iommu at lists.linux-
+> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
+> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>; Nipun Gupta
+> <nipun.gupta@nxp.com>
+> Subject: [PATCH 0/7 v5] Support for fsl-mc bus and its devices in SMMU
 > 
-> On Sun, Jun 17, 2018 at 08:49:48PM +0800, Dong Aisheng wrote:
-> > The System Controller Firmware (SCFW) is a low-level system function
-> > which runs on a dedicated Cortex-M core to provide power, clock, and
-> > resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> > (QM, QP), and i.MX8QX (QXP, DX).
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v1->v2:
-> >  * remove status
-> >  * changed to mu1
-> > ---
-> >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 38
-> > ++++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > new file mode 100644
-> > index 0000000..9b7c9fe
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > @@ -0,0 +1,38 @@
-> > +NXP i.MX System Controller Firmware (SCFW)
-> > +--------------------------------------------------------------------
-> > +
-> > +The System Controller Firmware (SCFW) is a low-level system function
-> > +which runs on a dedicated Cortex-M core to provide power, clock, and
-> > +resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> > +(QM, QP), and i.MX8QX (QXP, DX).
-> > +
-> > +The AP communicates with the SC using a multi-ported MU module found
-> > +in the LSIO subsystem. The current definition of this MU module
-> > +provides
-> > +5 remote AP connections to the SC to support up to 5 execution
-> > +environments (TZ, HV, standard Linux, etc.). The SC side of this MU
-> > +module interfaces with the LSIO DSC IP bus. The SC firmware will
-> > +communicate with this MU using the MSI bus.
-> > +
-> > +System Controller Device Node:
-> > +=============================
-> > +
-> > +Required properties:
-> > +-------------------
-> > +- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
-> > +- fsl,mu: a phandle to the Message Unit used by SCU. Should be
-> > +	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
-> > +	  to make sure not use the one which is conflict with
-> > +	  other execution environments. e.g. ATF.
+> This patchset defines IOMMU DT binding for fsl-mc bus and adds
+> support in SMMU for fsl-mc bus.
 > 
-> Use the mailbox binding even if you don't use the mailbox subsystem.
+> The patch series is based on top of dma-mapping tree (for-next branch):
+> http://git.infradead.org/users/hch/dma-mapping.git
 > 
-
-Looks reasonable. Will change it.
-
-BTW as I said before, the current mailbox binding fixed #mbox-cells to be
-at least 1 which is not suitable for i.MX SCU MU as it has only one physical
-channel.
-
-I will cook a patch to update it to allow #mbox-cells = <0>.
-
-If any issue please let me know.
-
-Regards
-Dong Aisheng
-
-> > +
-> > +Examples:
-> > +--------
-> > +lsio_mu1: mu at 5d1c0000 {
-> > +	compatible = "fsl,imx8qxp-mu";
-> > +	reg = <0x0 0x5d1c0000 0x0 0x10000>;
-> > +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>; };
-> > +
-> > +scu {
-> > +	compatible = "fsl,imx8qxp-scu";
-> > +	fsl,mu = <&lsio_mu1>;
-> > +};
-> > --
-> > 2.7.4
-> >
+> These patches
+>   - Define property 'iommu-map' for fsl-mc bus (patch 1)
+>   - Integrates the fsl-mc bus with the SMMU using this
+>     IOMMU binding (patch 2,3,4)
+>   - Adds the dma configuration support for fsl-mc bus (patch 5, 6)
+>   - Updates the fsl-mc device node with iommu/dma related changes (patch 7)
+> 
+> Changes in v2:
+>   - use iommu-map property for fsl-mc bus
+>   - rebase over patchset https://patchwork.kernel.org/patch/10317337/
+>     and make corresponding changes for dma configuration of devices on
+>     fsl-mc bus
+> 
+> Changes in v3:
+>   - move of_map_rid in drivers/of/address.c
+> 
+> Changes in v4:
+>   - move of_map_rid in drivers/of/base.c
+> 
+> Changes in v5:
+>   - break patch 5 in two separate patches (now patch 5/7 and patch 6/7)
+>   - add changelog text in patch 3/7 and patch 5/7
+>   - typo fix
+> 
+> Nipun Gupta (7):
+>   Docs: dt: add fsl-mc iommu-map device-tree binding
+>   iommu: of: make of_pci_map_rid() available for other devices too
+>   iommu: support iommu configuration for fsl-mc devices
+>   iommu: arm-smmu: Add support for the fsl-mc bus
+>   bus: fsl-mc: support dma configure for devices on fsl-mc bus
+>   bus: fsl-mc: set coherent dma mask for devices on fsl-mc bus
+>   arm64: dts: ls208xa: comply with the iommu map binding for fsl_mc
+> 
+>  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  39 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   6 +-
+>  drivers/bus/fsl-mc/fsl-mc-bus.c                    |  16 +++-
+>  drivers/iommu/arm-smmu.c                           |   7 ++
+>  drivers/iommu/iommu.c                              |  21 +++++
+>  drivers/iommu/of_iommu.c                           |  25 ++++-
+>  drivers/of/base.c                                  | 102 +++++++++++++++++++++
+>  drivers/of/irq.c                                   |   5 +-
+>  drivers/pci/of.c                                   | 101 --------------------
+>  include/linux/fsl/mc.h                             |   8 ++
+>  include/linux/iommu.h                              |   2 +
+>  include/linux/of.h                                 |  11 +++
+>  include/linux/of_pci.h                             |  10 --
+>  13 files changed, 231 insertions(+), 122 deletions(-)
+> 
+> --
+> 1.9.1
