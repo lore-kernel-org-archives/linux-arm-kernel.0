@@ -1,107 +1,78 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 21 Jun 2018 11:14:28 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <20180621091850.GA22505@arm.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <20180621091850.GA22505@arm.com>
-Message-ID: <5B2B7A84.8090309@hisilicon.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 21 Jun 2018 11:24:07 +0100
+Subject: [PATCH 3/3] arm64: IPI each CPU after invalidating the I-cache
+ for kernel mappings
+In-Reply-To: <20180619165019.GU13984@arm.com>
+References: <1529412495-17525-1-git-send-email-will.deacon@arm.com>
+ <1529412495-17525-4-git-send-email-will.deacon@arm.com>
+ <20180619135528.4rxgluvroybxgxem@lakrids.cambridge.arm.com>
+ <20180619165019.GU13984@arm.com>
+Message-ID: <280d8fd6-6767-121f-b432-83013184630b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Mark, Will
 
-On 2018/6/21 10:18, Will Deacon wrote:
-> On Thu, Jun 21, 2018 at 09:38:53AM +0100, James Morse wrote:
->> On 20/06/18 17:25, Wei Xu wrote:
->>>     [    0.042421] Insufficient stack space to handle exception!
->>>     [    0.042423] ESR: 0x96000046 -- DABT (current EL)
->>>     [    0.043730] FAR: 0xffff0000093a80e0
->>>     [    0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
+On 19/06/18 17:50, Will Deacon wrote:
+> On Tue, Jun 19, 2018 at 02:55:28PM +0100, Mark Rutland wrote:
+>> On Tue, Jun 19, 2018 at 01:48:15PM +0100, Will Deacon wrote:
+>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>>> index 816d03c4c913..4cc41864f277 100644
+>>> --- a/arch/arm64/kernel/insn.c
+>>> +++ b/arch/arm64/kernel/insn.c
+>>> @@ -249,7 +249,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>>>  	} else {
+>>>  		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
+>>>  			cpu_relax();
+>>> -		isb();
+>>>  	}
 >>
->> This was a level 2 translation fault on a write, to an address that is within
->> the stack....
+>> Something seems amiss here. 
 >>
+>> We call __apply_alternatives_multi_stop() via stop_machine(), and I
+>> thought that ensured that all CPUs had IRQs masked.
 >>
->>>     [    0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
->>>     [    0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
->>>     [    0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
->>> 4.17.0-45865-g2b31fe7-dirty #10
->>>     [    0.072201] Hardware name: linux,dummy-virt (DT)
+>> If so, the IPI from flush_icache_range() will deadlock.
 >>
->>>     [    0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
->>>     [    0.081727] pc : el1_sync+0x0/0xb0
->>
->> ... from the vectors.
->>
->>
->>>     [    0.085217] lr : kpti_install_ng_mappings+0x120/0x214
->>
->> What I think is happening is: we come out of the kpti idmap with the stack
->> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
->> well when it tries to push the registers to the stack, and we keep going until
->> we overflow the stack.
->>
->> I can't reproduce this with kvmtool or qemu in the model.
+>> If not, we can take IRQs, and execute potentially patched code.
 > 
-> Hmm, one thing that occurs to me is that the kpti_install_ng_mappings()
-> code leaves the nG bit set in table entries, which is actually IGNORED in
-> the architecture.
+> Yes, I think you're right, and I think this only applies to kprobes (since
+> it patches arbitrary instructions and requires the stop_machine()). However,
+> I think that highlights another issue, which is that the "nosync" patching
+> cases as used by things like jump_labels are still going to want this IPI,
+> so actually the fastpath stuff can all be ripped out. ftrace can probably
+> be left as-is, since I doubt it's critical that new CPUs immediately see
+> dynamic tracepoints.
+>
+> I'll cook a patch sorting this out and include it in v2.
 > 
-> Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
-> otherwise your kernel will take an age to boot.
+>> I think there's also an existing problem here. Even if with have IRQs
+>> masked, we could take SDEI events (or GICv3 psudeo-NMIs, once we have
+>> those). I don't know how we can manage those.
+> 
+> I guess there are just some places where we can't deal with an SDEI event.
+> That said, it's fine as long as the SDEI path is careful about what it runs
+> (and SDEI is masked until the worst of the patching is over during boot).
 
-Yes, amazing! This patch resolved the issue.
-I have tested 50 times and can not reproduce the issue any more.
-Could you please tell more why this patch works?
-Thanks!
+Yup, its setup as late as possible, so cpufeature stuff should be safe.
 
-Best Regards,
-Wei
+I think break-pointing code we expect to run in_nmi() is a disaster waiting to
+happen. e.g. taking an SDEI-event out of a guest, we run the handler before KVM
+does it's guest exit, so if you tread on a breakpoint KVM's el2_sync is going to
+bring the machine down.
 
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 5f9a73a4452c..70d9e98467ca 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -272,8 +272,8 @@ ENTRY(idmap_kpti_install_ng_mappings)
->  	add	end_pgdp, cur_pgdp, #(PTRS_PER_PGD * 8)
->  do_pgd:	__idmap_kpti_get_pgtable_ent	pgd
->  	tbnz	pgd, #1, walk_puds
-> -next_pgd:
->  	__idmap_kpti_put_pgtable_ent_ng	pgd
-> +next_pgd:
->  skip_pgd:
->  	add	cur_pgdp, cur_pgdp, #8
->  	cmp	cur_pgdp, end_pgdp
-> @@ -302,8 +302,8 @@ walk_puds:
->  	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
->  do_pud:	__idmap_kpti_get_pgtable_ent	pud
->  	tbnz	pud, #1, walk_pmds
-> -next_pud:
->  	__idmap_kpti_put_pgtable_ent_ng	pud
-> +next_pud:
->  skip_pud:
->  	add	cur_pudp, cur_pudp, 8
->  	cmp	cur_pudp, end_pudp
-> @@ -323,8 +323,8 @@ walk_pmds:
->  	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
->  do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
->  	tbnz	pmd, #1, walk_ptes
-> -next_pmd:
->  	__idmap_kpti_put_pgtable_ent_ng	pmd
-> +next_pmd:
->  skip_pmd:
->  	add	cur_pmdp, cur_pmdp, #8
->  	cmp	cur_pmdp, end_pmdp
-> 
-> .
-> 
+The SDEI stuff has __kprobes all over it, I probably need to add some more
+'notrace'.
+
+
+I think forbidding code-patch on NMI code-regions is the easiest thing to do.
+
+If this is something we needed to support, we could get stop_machine() to mask
+SDEI and GIC psuedo_NMIs as part of its work. We could mask SError and disable
+debug exceptions while we're at it.
+
+
+
+Thanks,
+
+James
