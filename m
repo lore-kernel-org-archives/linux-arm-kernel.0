@@ -1,34 +1,85 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 21 Jun 2018 16:22:24 +0530
-Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using the
- reset framework
-In-Reply-To: <20180621073706.22812-1-brgl@bgdev.pl>
-References: <20180621073706.22812-1-brgl@bgdev.pl>
-Message-ID: <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 21 Jun 2018 11:54:05 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <5B2B7A84.8090309@hisilicon.com>
+References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
+ <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
+Message-ID: <20180621105404.GB22505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Hi Wei,
 
-On Thursday 21 June 2018 01:07 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, Jun 21, 2018 at 11:14:28AM +0100, Wei Xu wrote:
+> On 2018/6/21 10:18, Will Deacon wrote:
+> > On Thu, Jun 21, 2018 at 09:38:53AM +0100, James Morse wrote:
+> >> On 20/06/18 17:25, Wei Xu wrote:
+> >>>     [    0.042421] Insufficient stack space to handle exception!
+> >>>     [    0.042423] ESR: 0x96000046 -- DABT (current EL)
+> >>>     [    0.043730] FAR: 0xffff0000093a80e0
+> >>>     [    0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
+> >>
+> >> This was a level 2 translation fault on a write, to an address that is within
+> >> the stack....
+> >>
+> >>
+> >>>     [    0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
+> >>>     [    0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
+> >>>     [    0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
+> >>> 4.17.0-45865-g2b31fe7-dirty #10
+> >>>     [    0.072201] Hardware name: linux,dummy-virt (DT)
+> >>
+> >>>     [    0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
+> >>>     [    0.081727] pc : el1_sync+0x0/0xb0
+> >>
+> >> ... from the vectors.
+> >>
+> >>
+> >>>     [    0.085217] lr : kpti_install_ng_mappings+0x120/0x214
+> >>
+> >> What I think is happening is: we come out of the kpti idmap with the stack
+> >> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
+> >> well when it tries to push the registers to the stack, and we keep going until
+> >> we overflow the stack.
+> >>
+> >> I can't reproduce this with kvmtool or qemu in the model.
+> > 
+> > Hmm, one thing that occurs to me is that the kpti_install_ng_mappings()
+> > code leaves the nG bit set in table entries, which is actually IGNORED in
+> > the architecture.
+> > 
+> > Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
+> > otherwise your kernel will take an age to boot.
 > 
-> These are the remaining patches that still need to be merged in order
-> to complete the conversion of the davinci dsp driver to using the reset
-> framework.
-> 
-> They apply on top of v4.18-rc1 with David Lechner's remaining patches
-> merged.
+> Yes, amazing! This patch resolved the issue.
 
-Series looks good to me.
+Great...
 
-To preserve bisect, shouldn't the order of applying be patch #3, #4, #1
-and #2 ?
+> I have tested 50 times and can not reproduce the issue any more.
+> Could you please tell more why this patch works?
 
-Given the dependencies and to preserve bisect its easiest if I take the
-series with acks from remoteproc and clock maintainers.
+You might need to ask your CPU design team ;)
 
-Open to other suggestions as well.
+Without this patch, the code in idmap_kpti_install_ng_mappings() sets
+bit 11 in table descriptors so that we can keep track of which parts of
+the page table we've visited. With this patch, we don't bother tracking
+and potentially rewalk parts of the page table (which takes a very long
+time if KASAN is enabled).
+
+The architecture documents I've looked at are clear that bit 11 is IGNORED
+by the CPU, which:
+
+  "Indicates that the architecture guarantees that the bit or field is not
+   interpreted or modified by hardware."
+
+Please can you double-check that your CPU is indeed ignoring bit 11 in
+non-leaf (table) descriptors?
 
 Thanks,
-Sekhar
+
+Will
