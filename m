@@ -1,99 +1,103 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 21 Jun 2018 10:17:56 -0500
-Subject: [PATCH 2/2] hwrng: msm: add ACPI support
-In-Reply-To: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
-References: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1529594276-12210-2-git-send-email-timur@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 21 Jun 2018 15:57:29 +0100
+Subject: [RFC PATCH 05/16] KVM: arm: Add arch init/uninit hooks
+In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1529593060-542-6-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for probing on ACPI systems, with ACPI HID QCOM8160.
+In preparation for adding support for SVE in guests on arm64, hooks
+for allocating and freeing additional per-vcpu memory are needed.
 
-On ACPI systems, clocks are always enabled, the PRNG should
-already be enabled, and the register region is read-only.
-The driver only verifies that the hardware is already
-enabled never tries to disable or configure it.
+kvm_arch_vcpu_setup() could be used for allocation, but this
+function is not clearly balanced by un "unsetup" function, making
+it unclear where memory allocated in this function should be freed.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
+To keep things simple, this patch defines backend hooks
+kvm_arm_arch_vcpu_{,un}unint(), and plumbs them in appropriately.
+The exusting kvm_arch_vcpu_init() function now calls
+kvm_arm_arch_vcpu_init(), while an explicit kvm_arch_vcpu_uninit()
+is added which current does nothing except to call
+kvm_arm_arch_vcpu_uninit().
+
+The backend functions are currently defined to do nothing.
+
+No functional change.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- drivers/char/hw_random/msm-rng.c | 40 ++++++++++++++++++++++++++++++++++------
- 1 file changed, 34 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  4 +++-
+ arch/arm64/include/asm/kvm_host.h |  4 +++-
+ virt/kvm/arm/arm.c                | 13 ++++++++++++-
+ 3 files changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/char/hw_random/msm-rng.c b/drivers/char/hw_random/msm-rng.c
-index 44580588b938..f34713d23d77 100644
---- a/drivers/char/hw_random/msm-rng.c
-+++ b/drivers/char/hw_random/msm-rng.c
-@@ -20,6 +20,7 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
-+#include <linux/acpi.h>
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 1f1fe410..9b902b8 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -284,10 +284,12 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+-static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+ static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
  
- /* Device specific register offsets */
- #define PRNG_DATA_OUT		0x0000
-@@ -186,16 +187,32 @@ static int msm_rng_probe(struct platform_device *pdev)
- 	if (IS_ERR(rng->base))
- 		return PTR_ERR(rng->base);
++static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
++static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
++
+ static inline void kvm_arm_init_debug(void) {}
+ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 92d6e88..9671ddd 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -425,10 +425,12 @@ static inline bool kvm_arch_check_sve_has_vhe(void)
  
--	rng->clk = devm_clk_get(&pdev->dev, "core");
--	if (IS_ERR(rng->clk))
--		return PTR_ERR(rng->clk);
--
- 	rng->hwrng.name = KBUILD_MODNAME;
--	rng->hwrng.init = msm_rng_init;
--	rng->hwrng.cleanup = msm_rng_cleanup;
- 	rng->hwrng.read = msm_rng_read;
- 	spin_lock_init(&rng->lock);
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+-static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+ static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
  
-+	/*
-+	 * ACPI systems have v2 hardware. The clocks are always enabled,
-+	 * the PRNG register space is read-only, and the PRNG should
-+	 * already be enabled.
-+	 */
-+	if (has_acpi_companion(&pdev->dev)) {
-+		u32 val;
++static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
++static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 +
-+		val = readl(rng->base + PRNG_CONFIG);
-+		if (!(val & PRNG_CONFIG_HW_ENABLE)) {
-+			dev_err(&pdev->dev, "device is not enabled\n");
-+			return -ENODEV;
-+		}
-+	} else {
-+		rng->clk = devm_clk_get(&pdev->dev, "core");
-+		if (IS_ERR(rng->clk))
-+			return PTR_ERR(rng->clk);
-+
-+		rng->hwrng.init = msm_rng_init;
-+		rng->hwrng.cleanup = msm_rng_cleanup;
-+	}
-+
- 	ret = devm_hwrng_register(&pdev->dev, &rng->hwrng);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register hwrng\n");
-@@ -211,11 +228,22 @@ static int msm_rng_probe(struct platform_device *pdev)
- };
- MODULE_DEVICE_TABLE(of, msm_rng_of_match);
+ void kvm_arm_init_debug(void);
+ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 04e554c..66f15cc 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -345,6 +345,8 @@ void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
  
-+#if IS_ENABLED(CONFIG_ACPI)
-+static const struct acpi_device_id msm_rng_acpi_match[] = {
-+	{
-+		.id = "QCOM8160",	/* v2 PRNG */
-+	},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, msm_rng_acpi_match);
-+#endif
+ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ {
++	int ret;
 +
- static struct platform_driver msm_rng_driver = {
- 	.probe = msm_rng_probe,
- 	.driver = {
- 		.name = KBUILD_MODNAME,
- 		.of_match_table = of_match_ptr(msm_rng_of_match),
-+		.acpi_match_table = ACPI_PTR(msm_rng_acpi_match),
- 	}
- };
- module_platform_driver(msm_rng_driver);
+ 	/* Force users to call KVM_ARM_VCPU_INIT */
+ 	vcpu->arch.target = -1;
+ 	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+@@ -354,7 +356,16 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ 
+ 	kvm_arm_reset_debug_ptr(vcpu);
+ 
+-	return kvm_vgic_vcpu_init(vcpu);
++	ret = kvm_vgic_vcpu_init(vcpu);
++	if (ret)
++		return ret;
++
++	return kvm_arm_arch_vcpu_init(vcpu);
++}
++
++void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
++{
++	kvm_arm_arch_vcpu_uninit(vcpu);
+ }
+ 
+ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.1.4
