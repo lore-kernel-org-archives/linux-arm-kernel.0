@@ -1,93 +1,91 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 21 Jun 2018 11:13:19 +0200
-Subject: [PATCH 3/9] media: cedrus: Add a macro to check for the
- validity of a control
-In-Reply-To: <20180613140714.1686-4-maxime.ripard@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-4-maxime.ripard@bootlin.com>
-Message-ID: <18ffd09bf91908886aebbad127e612775b7f0bf8.camel@bootlin.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 21 Jun 2018 10:18:51 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
+ <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+Message-ID: <20180621091850.GA22505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> During our frame decoding setup, we need to check a number of controls to
-> make sure that they are properly filled before trying to access them.
+On Thu, Jun 21, 2018 at 09:38:53AM +0100, James Morse wrote:
+> On 20/06/18 17:25, Wei Xu wrote:
+> > ??? [??? 0.042421] Insufficient stack space to handle exception!
+> > ??? [??? 0.042423] ESR: 0x96000046 -- DABT (current EL)
+> > ??? [??? 0.043730] FAR: 0xffff0000093a80e0
+> > ??? [??? 0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
 > 
-> It's not too bad with MPEG2 since there's just a single one, but with the
-> upcoming increase of codecs, and the integration of more complex codecs,
-> this logic will be duplicated a significant number of times. H264 for
-> example uses 4 different controls.
+> This was a level 2 translation fault on a write, to an address that is within
+> the stack....
 > 
-> Add a macro that expands to the proper check in order to reduce the
-> duplication.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  .../platform/sunxi/cedrus/sunxi_cedrus_dec.c     | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
+> > ??? [??? 0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
+> > ??? [??? 0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
+> > ??? [??? 0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
+> > 4.17.0-45865-g2b31fe7-dirty #10
+> > ??? [??? 0.072201] Hardware name: linux,dummy-virt (DT)
 > 
-> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-> index 8c92af34ebeb..c19acf9626c4 100644
-> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
-> @@ -110,15 +110,16 @@ void sunxi_cedrus_device_run(void *priv)
->  
->  	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
->  
-> +#define CHECK_CONTROL(ctx, ctrl)					\
-> +	if (!ctx->ctrls[(ctrl)]) {					\
+> > ??? [??? 0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
+> > ??? [??? 0.081727] pc : el1_sync+0x0/0xb0
+> 
+> ... from the vectors.
+> 
+> 
+> > ??? [??? 0.085217] lr : kpti_install_ng_mappings+0x120/0x214
+> 
+> What I think is happening is: we come out of the kpti idmap with the stack
+> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
+> well when it tries to push the registers to the stack, and we keep going until
+> we overflow the stack.
+> 
+> I can't reproduce this with kvmtool or qemu in the model.
 
-Although this was not introduced in this patch, I believe this approach
-won't work since ctx->ctrls[i] is a pointer returned from
-v4l2_ctrl_new_custom(hdl, &cfg, NULL), which will always be non-null
-after calling cedrus_init_ctrls.
+Hmm, one thing that occurs to me is that the kpti_install_ng_mappings()
+code leaves the nG bit set in table entries, which is actually IGNORED in
+the architecture.
 
-Perhaps checking ctx->ctrls[i].p_cur.p would be the right thing to
-check, but I'm unsure about that.
+Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
+otherwise your kernel will take an age to boot.
 
-> +		v4l2_err(&(ctx)->dev->v4l2_dev, "Invalid " #ctrl " control\n"); \
-> +		(ctx)->job_abort = 1;					\
-> +		goto unlock_complete;					\
-> +	}
-> +
->  	switch (ctx->vpu_src_fmt->fourcc) {
->  	case V4L2_PIX_FMT_MPEG2_FRAME:
-> -		if (!ctx->ctrls[SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR]) {
-> -			v4l2_err(&ctx->dev->v4l2_dev,
-> -				 "Invalid MPEG2 frame header control\n");
-> -			ctx->job_abort = 1;
-> -			goto unlock_complete;
-> -		}
-> -
-> +		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
->  		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
->  		sunxi_cedrus_mpeg2_setup(ctx, &run);
->  
-> @@ -128,6 +129,7 @@ void sunxi_cedrus_device_run(void *priv)
->  	default:
->  		ctx->job_abort = 1;
->  	}
+Will
 
-Maybe add a newline here?
+--->8
 
-Cheers,
-
-Paul
-
-> +#undef CHECK_CONTROL
->  
->  unlock_complete:
->  	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/b3b35974/attachment.sig>
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5f9a73a4452c..70d9e98467ca 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -272,8 +272,8 @@ ENTRY(idmap_kpti_install_ng_mappings)
+ 	add	end_pgdp, cur_pgdp, #(PTRS_PER_PGD * 8)
+ do_pgd:	__idmap_kpti_get_pgtable_ent	pgd
+ 	tbnz	pgd, #1, walk_puds
+-next_pgd:
+ 	__idmap_kpti_put_pgtable_ent_ng	pgd
++next_pgd:
+ skip_pgd:
+ 	add	cur_pgdp, cur_pgdp, #8
+ 	cmp	cur_pgdp, end_pgdp
+@@ -302,8 +302,8 @@ walk_puds:
+ 	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
+ do_pud:	__idmap_kpti_get_pgtable_ent	pud
+ 	tbnz	pud, #1, walk_pmds
+-next_pud:
+ 	__idmap_kpti_put_pgtable_ent_ng	pud
++next_pud:
+ skip_pud:
+ 	add	cur_pudp, cur_pudp, 8
+ 	cmp	cur_pudp, end_pudp
+@@ -323,8 +323,8 @@ walk_pmds:
+ 	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
+ do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
+ 	tbnz	pmd, #1, walk_ptes
+-next_pmd:
+ 	__idmap_kpti_put_pgtable_ent_ng	pmd
++next_pmd:
+ skip_pmd:
+ 	add	cur_pmdp, cur_pmdp, #8
+ 	cmp	cur_pmdp, end_pmdp
