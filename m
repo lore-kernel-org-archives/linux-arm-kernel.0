@@ -1,46 +1,134 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 21 Jun 2018 08:17:30 -0700
-Subject: [GIT PULL] Allwinner clock changes for 4.18
-In-Reply-To: <CAGb2v67gL8m+XorkC78PwcaDA9cz69acsMkOrcLc9dgBY7m1eQ@mail.gmail.com>
-References: <20180521115947.wqrnv2hczate65lz@flea>
- <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
- <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
- <152879040155.16708.9862482085365718831@swboyd.mtv.corp.google.com>
- <CAGb2v66MkLLqL=Ei5kMb_CzpgUANpkNN3E52mSHKrZ0L7rXAog@mail.gmail.com>
- <CAGb2v67gL8m+XorkC78PwcaDA9cz69acsMkOrcLc9dgBY7m1eQ@mail.gmail.com>
-Message-ID: <152959425090.16708.15302996362223342459@swboyd.mtv.corp.google.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 21 Jun 2018 10:17:55 -0500
+Subject: [PATCH 1/2] hwrng: msm: add a spinlock and support for blocking reads
+Message-ID: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chen-Yu Tsai (2018-06-19 19:14:26)
-> Hi Stephen,
-> 
-> On Tue, Jun 12, 2018 at 4:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > On Tue, Jun 12, 2018 at 4:00 PM, Stephen Boyd <sboyd@kernel.org> wrote:
-> >> Quoting Chen-Yu Tsai (2018-06-11 00:53:41)
-> >>>
-> >>
-> >> I can directly pick and send as fix for clk-fixes targeting rc2.
-> 
-> This is a friendly reminder to pick up this patch for -rc2.
-> 
-> > The patch can still be found in the sunxi/for-next branch of the
-> > sunxi repo on kernel.org:
-> >
-> > https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/commit/?h=sunxi/for-next&id=d4a1496286b0c29fcace4e10c0047cca7cc79b25
-> 
-> This is still available, but no longer referenced in any branch,
-> as we've updated our sunxi/for-next branch for 4.19 stuff.
-> 
-> > Or the original on patchwork:
-> >
-> > https://patchwork.kernel.org/patch/10348027/
-> 
-> And
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> if you pick directly from patchwork.
-> 
+The hwrng.read callback includes a boolean parameter called 'wait'
+which indicates whether the function should block and wait for
+more data.
 
-Got it from linux-next. Thanks!
+When 'wait' is true, the driver spins on the DATA_AVAIL bit or until
+a reasonable timeout.  The timeout can occur if there is a heavy load
+on reading the PRNG.
+
+The same code also needs a spinlock to protect against race conditions.
+
+If multiple cores hammer on the PRNG, it's possible for a race
+condition to occur between reading the status register and
+reading the data register.  Add a spinlock to protect against
+that.
+
+1. Core 1 reads status register, shows data is available.
+2. Core 2 also reads status register, same result
+3. Core 2 reads data register, depleting all entropy
+4. Core 1 reads data register, which returns 0
+
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/char/hw_random/msm-rng.c | 57 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 50 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/char/hw_random/msm-rng.c b/drivers/char/hw_random/msm-rng.c
+index 841fee845ec9..44580588b938 100644
+--- a/drivers/char/hw_random/msm-rng.c
++++ b/drivers/char/hw_random/msm-rng.c
+@@ -15,9 +15,11 @@
+ #include <linux/err.h>
+ #include <linux/hw_random.h>
+ #include <linux/io.h>
++#include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/spinlock.h>
+ 
+ /* Device specific register offsets */
+ #define PRNG_DATA_OUT		0x0000
+@@ -35,10 +37,22 @@
+ #define MAX_HW_FIFO_SIZE	(MAX_HW_FIFO_DEPTH * 4)
+ #define WORD_SZ			4
+ 
++/*
++ * Normally, this would be the maximum time it takes to refill the FIFO,
++ * after a read.  Under heavy load, tests show that this delay is either
++ * below 50us or above 2200us.  The higher value is probably what happens
++ * when entropy is completely depleted.
++ *
++ * Since we don't want to wait 2ms in a spinlock, set the timeout to the
++ * lower value.  Under extreme situations, that timeout can extend to 100us.
++ */
++#define TIMEOUT		50
++
+ struct msm_rng {
+ 	void __iomem *base;
+ 	struct clk *clk;
+ 	struct hwrng hwrng;
++	spinlock_t lock;
+ };
+ 
+ #define to_msm_rng(p)	container_of(p, struct msm_rng, hwrng)
+@@ -96,11 +110,39 @@ static int msm_rng_read(struct hwrng *hwrng, void *data, size_t max, bool wait)
+ 
+ 	/* read random data from hardware */
+ 	do {
+-		val = readl_relaxed(rng->base + PRNG_STATUS);
+-		if (!(val & PRNG_STATUS_DATA_AVAIL))
+-			break;
++		spin_lock(&rng->lock);
++
++		/*
++		 * First check the status bit.  If 'wait' is true, then wait
++		 * up to TIMEOUT microseconds for data to be available.
++		 */
++		if (wait) {
++			int ret;
++
++			ret = readl_poll_timeout_atomic(rng->base + PRNG_STATUS,
++				val, val & PRNG_STATUS_DATA_AVAIL, 0, TIMEOUT);
++			if (ret) {
++				/* Timed out */
++				spin_unlock(&rng->lock);
++				break;
++			}
++		} else {
++			val = readl_relaxed(rng->base + PRNG_STATUS);
++			if (!(val & PRNG_STATUS_DATA_AVAIL)) {
++				spin_unlock(&rng->lock);
++				break;
++			}
++		}
+ 
+ 		val = readl_relaxed(rng->base + PRNG_DATA_OUT);
++		spin_unlock(&rng->lock);
++
++		/*
++		 * Zero is technically a valid random number, but it's also
++		 * the value returned if the PRNG is not enabled properly.
++		 * To avoid accidentally returning all zeros, treat it as
++		 * invalid and just return what we've already read.
++		 */
+ 		if (!val)
+ 			break;
+ 
+@@ -148,10 +190,11 @@ static int msm_rng_probe(struct platform_device *pdev)
+ 	if (IS_ERR(rng->clk))
+ 		return PTR_ERR(rng->clk);
+ 
+-	rng->hwrng.name = KBUILD_MODNAME,
+-	rng->hwrng.init = msm_rng_init,
+-	rng->hwrng.cleanup = msm_rng_cleanup,
+-	rng->hwrng.read = msm_rng_read,
++	rng->hwrng.name = KBUILD_MODNAME;
++	rng->hwrng.init = msm_rng_init;
++	rng->hwrng.cleanup = msm_rng_cleanup;
++	rng->hwrng.read = msm_rng_read;
++	spin_lock_init(&rng->lock);
+ 
+ 	ret = devm_hwrng_register(&pdev->dev, &rng->hwrng);
+ 	if (ret) {
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
