@@ -1,331 +1,155 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 21 Jun 2018 11:13:37 -0600
-Subject: [PATCH 5/6] coresight: catu: Add support for scatter gather tables
-In-Reply-To: <1529319379-17895-6-git-send-email-suzuki.poulose@arm.com>
-References: <1529319379-17895-1-git-send-email-suzuki.poulose@arm.com>
- <1529319379-17895-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180621171337.GA10307@xps15>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 21 Jun 2018 19:27:01 +0200
+Subject: [PATCH 1/1] arm64/mm: move {idmap_pg_dir, tramp_pg_dir,
+ swapper_pg_dir} to .rodata section
+In-Reply-To: <67a238a8-e4db-6bf1-6da5-62ca9536191f@arm.com>
+References: <20180620085755.20045-1-yaojun8558363@gmail.com>
+ <20180620085755.20045-2-yaojun8558363@gmail.com>
+ <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
+ <20180621025141.GB11276@toy>
+ <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
+ <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
+ <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
+ <67a238a8-e4db-6bf1-6da5-62ca9536191f@arm.com>
+Message-ID: <CAKv+Gu8=jxY0qfMk53L8p5+x8HoE1DRy7W_p42ji9omGBc6QSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki,
+On 21 June 2018 at 19:04, James Morse <james.morse@arm.com> wrote:
+> Hi Ard,
+>
+> On 21/06/18 10:29, Ard Biesheuvel wrote:
+>> On 21 June 2018 at 10:59, James Morse <james.morse@arm.com> wrote:
+>>> On 21/06/18 07:39, Ard Biesheuvel wrote:
+>>>> On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
+>>>>> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
+>>>>>> On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
+>>>>>>> Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
+>>>>>>> section. And update the swapper_pg_dir by fixmap.
+>>>>>>
+>>>>>> I think we may be able to get away with not mapping idmap_pg_dir and
+>>>>>> tramp_pg_dir at all.
+>>>>>
+>>>>> I think we need to move tramp_pg_dir to .rodata. The attacker can write
+>>>>> a block-mapping(AP=01) to tramp_pg_dir and then he can access kernel
+>>>>> memory.
+>>>
+>>>> Why does it need to be mapped at all? When do we ever access it from the code?
+>>>
+>>> (We would want to make its fixmap entry read-only too)
+>>
+>> It already is.
+>
+> Sorry, I missed that,
+>
+>
+>>>>>> As for swapper_pg_dir, it would indeed be nice if we could keep those
+>>>>>> mappings read-only most of the time, but I'm not sure how useful this
+>>>>>> is if we apply it to the root level only.
+>>>>>
+>>>>> The purpose of it is to make 'KSMA' harder, where an single arbitrary
+>>>>> write is used to add a block mapping to the page-tables, giving the
+>>>>> attacker full access to kernel memory. That's why we just apply it to
+>>>>> the root level only. If the attacker can arbitrary write multiple times,
+>>>>> I think it's hard to defend.
+>>>>
+>>>> So the assumption is that the root level is more easy to find?
+>>>> Otherwise, I'm not sure I understand why being able to write a level 0
+>>>> entry is so harmful, given that we don't have block mappings at that
+>>>> level.
+>>>
+>>> I think this thing assumes 3-level page tables with 39bit VA.
+>
+>> The attack, you mean? Because this code is unlikely to build with that
+>> configuration, given that __pgd_populate() BUILD_BUG()s in that case.
+>
+> Yes, the attack. (I struggle to think of it as an 'attack' because you already
+> have arbitrary write...)
+>
 
-On Mon, Jun 18, 2018 at 11:56:18AM +0100, Suzuki K Poulose wrote:
-> This patch adds the support for setting up a SG table for use
-> by the CATU. We reuse the tmc_sg_table to represent the table/data
-> pages, even though the table format is different.
-> 
-> Similar to ETR SG table, CATU uses a 4KB page size for data buffers
-> as well as page tables. All table entries are 64bit wide and have
-> the following format:
-> 
->         63                      12      1  0
->         x-----------------------------------x
->         |        Address [63-12] | SBZ  | V |
->         x-----------------------------------x
-> 
-> 	Where [V] ->	 0 - Pointer is invalid
-> 			 1 - Pointer is Valid
-> 
-> CATU uses only first half of the page for data page pointers.
-> i.e, single table page will only have 256 page pointers, addressing
-> upto 1MB of data. The second half of a table page contains only two
-> pointers at the end of the page (i.e, pointers at index 510 and 511),
-> which are used as links to the "Previous" and "Next" page tables
-> respectively.
-> 
-> The first table page has an "Invalid" previous pointer and the
-> next pointer entry points to the second page table if there is one.
-> Similarly the last table page has an "Invalid" next pointer to
-> indicate the end of the table chain.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-catu.c | 249 +++++++++++++++++++++++++++
->  1 file changed, 249 insertions(+)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-catu.c b/drivers/hwtracing/coresight/coresight-catu.c
-> index 11c84cb..95064c3 100644
-> --- a/drivers/hwtracing/coresight/coresight-catu.c
-> +++ b/drivers/hwtracing/coresight/coresight-catu.c
-> @@ -16,10 +16,259 @@
->  
->  #include "coresight-catu.h"
->  #include "coresight-priv.h"
-> +#include "coresight-tmc.h"
->  
->  #define csdev_to_catu_drvdata(csdev)	\
->  	dev_get_drvdata(csdev->dev.parent)
->  
-> +/* Verbose output for CATU table contents */
-> +#ifdef CATU_DEBUG
-> +#define catu_dbg(x, ...) dev_dbg(x, __VA_ARGS__)
-> +#else
-> +#define catu_dbg(x, ...) do {} while (0)
-> +#endif
-> +
-> +/*
-> + * CATU uses a page size of 4KB for page tables as well as data pages.
-> + * Each 64bit entry in the table has the following format.
-> + *
-> + *	63			12	1  0
-> + *	------------------------------------
-> + *	|	 Address [63-12] | SBZ	| V|
-> + *	------------------------------------
-> + *
-> + * Where bit[0] V indicates if the address is valid or not.
-> + * Each 4K table pages have upto 256 data page pointers, taking upto 2K
-> + * size. There are two Link pointers, pointing to the previous and next
-> + * table pages respectively at the end of the 4K page. (i.e, entry 510
-> + * and 511).
-> + *  E.g, a table of two pages could look like :
-> + *
-> + *                 Table Page 0               Table Page 1
-> + * SLADDR ===> x------------------x  x--> x-----------------x
-> + * INADDR    ->|  Page 0      | V |  |    | Page 256    | V | <- INADDR+1M
-> + *             |------------------|  |    |-----------------|
-> + * INADDR+4K ->|  Page 1      | V |  |    |                 |
-> + *             |------------------|  |    |-----------------|
-> + *             |  Page 2      | V |  |    |                 |
-> + *             |------------------|  |    |-----------------|
-> + *             |   ...        | V |  |    |    ...          |
-> + *             |------------------|  |    |-----------------|
-> + * INADDR+1020K|  Page 255    | V |  |    |   Page 511  | V |
-> + * SLADDR+2K==>|------------------|  |    |-----------------|
-> + *             |  UNUSED      |   |  |    |                 |
-> + *             |------------------|  |    |                 |
-> + *             |  UNUSED      |   |  |    |                 |
-> + *             |------------------|  |    |                 |
-> + *             |    ...       |   |  |    |                 |
-> + *             |------------------|  |    |-----------------|
-> + *             |   IGNORED    | 0 |  |    | Table Page 0| 1 |
-> + *             |------------------|  |    |-----------------|
-> + *             |  Table Page 1| 1 |--x    | IGNORED     | 0 |
-> + *             x------------------x       x-----------------x
-> + * SLADDR+4K==>
-> + *
-> + * The base input address (used by the ETR, programmed in INADDR_{LO,HI})
-> + * must be aligned to 1MB (the size addressable by a single page table).
-> + * The CATU maps INADDR{LO:HI} to the first page in the table pointed
-> + * to by SLADDR{LO:HI} and so on.
-> + *
-> + */
-> +typedef u64 cate_t;
-> +
-> +#define CATU_PAGE_SHIFT		12
-> +#define CATU_PAGE_SIZE		(1UL << CATU_PAGE_SHIFT)
-> +#define CATU_PAGES_PER_SYSPAGE	(PAGE_SIZE / CATU_PAGE_SIZE)
-> +
-> +/* Page pointers are only allocated in the first 2K half */
-> +#define CATU_PTRS_PER_PAGE	((CATU_PAGE_SIZE >> 1) / sizeof(cate_t))
-> +#define CATU_PTRS_PER_SYSPAGE	(CATU_PAGES_PER_SYSPAGE * CATU_PTRS_PER_PAGE)
-> +#define CATU_LINK_PREV		((CATU_PAGE_SIZE / sizeof(cate_t)) - 2)
-> +#define CATU_LINK_NEXT		((CATU_PAGE_SIZE / sizeof(cate_t)) - 1)
-> +
-> +#define CATU_ADDR_SHIFT		12
-> +#define CATU_ADDR_MASK		~(((cate_t)1 << CATU_ADDR_SHIFT) - 1)
-> +#define CATU_ENTRY_VALID	((cate_t)0x1)
-> +#define CATU_VALID_ENTRY(addr) \
-> +	(((cate_t)(addr) & CATU_ADDR_MASK) | CATU_ENTRY_VALID)
-> +#define CATU_ENTRY_ADDR(entry)	((cate_t)(entry) & ~((cate_t)CATU_ENTRY_VALID))
-> +
-> +/*
-> + * catu_get_table : Retrieve the table pointers for the given @offset
-> + * within the buffer. The buffer is wrapped around to a valid offset.
-> + *
-> + * Returns : The CPU virtual address for the beginning of the table
-> + * containing the data page pointer for @offset. If @daddrp is not NULL,
-> + * @daddrp points the DMA address of the beginning of the table.
-> + */
-> +static inline cate_t *catu_get_table(struct tmc_sg_table *catu_table,
-> +				     unsigned long offset,
-> +				     dma_addr_t *daddrp)
-> +{
-> +	unsigned long buf_size = tmc_sg_table_buf_size(catu_table);
-> +	unsigned int table_nr, pg_idx, pg_offset;
-> +	struct tmc_pages *table_pages = &catu_table->table_pages;
-> +	void *ptr;
-> +
-> +	/* Make sure offset is within the range */
-> +	offset %= buf_size;
-> +
-> +	/*
-> +	 * Each table can address 1MB and a single kernel page can
-> +	 * contain "CATU_PAGES_PER_SYSPAGE" CATU tables.
-> +	 */
-> +	table_nr = offset >> 20;
-> +	/* Find the table page where the table_nr lies in */
-> +	pg_idx = table_nr / CATU_PAGES_PER_SYSPAGE;
-> +	pg_offset = (table_nr % CATU_PAGES_PER_SYSPAGE) * CATU_PAGE_SIZE;
-> +	if (daddrp)
-> +		*daddrp = table_pages->daddrs[pg_idx] + pg_offset;
-> +	ptr = page_address(table_pages->pages[pg_idx]);
-> +	return (cate_t *)((unsigned long)ptr + pg_offset);
-> +}
-> +
-> +#ifdef CATU_DEBUG
-> +static void catu_dump_table(struct tmc_sg_table *catu_table)
-> +{
-> +	int i;
-> +	cate_t *table;
-> +	unsigned long table_end, buf_size, offset = 0;
-> +
-> +	buf_size = tmc_sg_table_buf_size(catu_table);
-> +	dev_dbg(catu_table->dev,
-> +		"Dump table %p, tdaddr: %llx\n",
-> +		catu_table, catu_table->table_daddr);
-> +
-> +	while (offset < buf_size) {
-> +		table_end = offset + SZ_1M < buf_size ?
-> +			    offset + SZ_1M : buf_size;
-> +		table = catu_get_table(catu_table, offset, NULL);
-> +		for (i = 0; offset < table_end; i++, offset += CATU_PAGE_SIZE)
-> +			dev_dbg(catu_table->dev, "%d: %llx\n", i, table[i]);
-> +		dev_dbg(catu_table->dev, "Prev : %llx, Next: %llx\n",
-> +			table[CATU_LINK_PREV], table[CATU_LINK_NEXT]);
-> +		dev_dbg(catu_table->dev, "== End of sub-table ===");
-> +	}
-> +	dev_dbg(catu_table->dev, "== End of Table ===");
-> +}
-> +
-> +#else
-> +static inline void catu_dump_table(struct tmc_sg_table *catu_table)
-> +{
-> +}
-> +#endif
-> +
-> +static inline cate_t catu_make_entry(dma_addr_t addr)
-> +{
-> +	return addr ? CATU_VALID_ENTRY(addr) : 0;
-> +}
-> +
-> +/*
-> + * catu_populate_table : Populate the given CATU table.
-> + * The table is always populated as a circular table.
-> + * i.e, the "prev" link of the "first" table points to the "last"
-> + * table and the "next" link of the "last" table points to the
-> + * "first" table. The buffer should be made linear by calling
-> + * catu_set_table().
-> + */
-> +static void
-> +catu_populate_table(struct tmc_sg_table *catu_table)
-> +{
-> +	int i, dpidx, s_dpidx;
-> +	unsigned long offset, buf_size, last_offset;
-> +	dma_addr_t data_daddr;
-> +	dma_addr_t prev_taddr, next_taddr, cur_taddr;
-> +	cate_t *table_ptr, *next_table;
-> +
-> +	buf_size = tmc_sg_table_buf_size(catu_table);
-> +	dpidx = s_dpidx = 0;
+OK, so in that case, you can abuse your single arbitrary write to map
+an entire 1 GB block of memory with arbitrary permissions, allowing
+userland to take control of the contents, right? And if you know the
+virtual and physical addresses of swapper_pg_dir, you can make sure
+this block covers the entire kernel, allowing the attacker to
+manipulate all core kernel code and statically allocated data
+structures.
 
->From the reading the code below variable s_dpidx stands for "small" data page
-index, which isn't obvious from the get go and could easily be mistaken for
-"system" data page index.  Please add a comment to make your intentions clear.
+What I don't understand about this patch is how it is sufficient to
+only remap swapper_pg_dir r/w for updates on kernels that use 4 level
+paging.
 
-> +	offset = 0;
-> +
-> +	table_ptr = catu_get_table(catu_table, 0, &cur_taddr);
-> +	prev_taddr = 0;	/* Prev link for the first table */
-> +
-> +	while (offset < buf_size) {
-> +		/*
-> +		 * The @offset is always 1M aligned here and we have an
-> +		 * empty table @table_ptr to fill. Each table can address
-> +		 * upto 1MB data buffer. The last table may have fewer
-> +		 * entries if the buffer size is not aligned.
-> +		 */
-> +		last_offset = (offset + SZ_1M) < buf_size ?
-> +			      (offset + SZ_1M) : buf_size;
-> +		for (i = 0; offset < last_offset;
-> +		     i++, offset += CATU_PAGE_SIZE) {
+>
+>>>>>> @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
+>>>>>>>
+>>>>>>>  void __init mark_linear_text_alias_ro(void)
+>>>>>>>  {
+>>>
+>>>>>>> +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
+>>>>>>> +       update_mapping_prot(__pa_symbol(swapper_pg_end),
+>>>>>>> +                           (unsigned long)lm_alias(swapper_pg_end),
+>>>>>>> +                           size, PAGE_KERNEL_RO);
+>>>>>>
+>>>>>> I don't think this is necessary. Even if some pages are freed, it
+>>>>>> doesn't harm to keep a read-only alias of them here since the new
+>>>>>> owner won't access them via this mapping anyway. So we can keep
+>>>>>> .rodata as a single region.
+>>>>>
+>>>>> To be honest, I didn't think of this issue at first. I later found a
+>>>>> problem when testing the code on qemu:
+>>>>
+>>>> OK, you're right. I missed the fact that this operates on the linear
+>>>> alias, not the kernel mapping itself.
+>>>>
+>>>> What I don't like is that we lose the ability to use block mappings
+>>>> for the entire .rodata section this way. Isn't it possible to move
+>>>> these pgdirs to the end of the .rodata segment, perhaps by using a
+>>>> separate input section name and placing that explicitly? We could even
+>>>> simply forget about freeing those pages, given that [on 4k pages] the
+>>>> benefit of freeing 12 KB of space is likely to get lost in the
+>>>> rounding noise anyway [segments are rounded up to 64 KB in size]
+>>>
+>>> I assumed that to move swapper_pg_dir into the .rodata section we would need to
+>>> break it up. Today its ~3 levels, which we setup in head.S, then do a dance in
+>>> paging_init() so that swapper_pg_dir is always the top level.
+>>>
+>>> We could generate all leves of the 'init_pg_dir' in the __initdata section, then
+>>> copy only the top level into swapper_pg_dir into the rodata section during
+>>> paging_init().
+>
+>> Is that complexity truly justified for a security sensitive piece of
+>> code?
+>
+> Wouldn't this be less complex? (I've probably explained it badly.)
+>
+> Today head.S builds the initial page tables in ~3 levels of swapper_pg_dir, then
+> during paging_init() build new tables with a temporary top level.
+> We switch to the temporary top level, then copy over the first level of
+> swapper_pg_dir, then switch back to swapper_pg_dir. Finally we free the
+> no-longer-used levels of swapper_pg_dir.
+>
+> This looks like re-inventing __initdata for the bits of page table we eventually
+> free.
+>
+> What I tried to describe is building the head.S/initial-page-tables in a
+> reserved area of the the __initdata section. We no longer need a temporary
+> top-level, we can build the final page tables directly in swapper_pg_dir, which
+> means one fewer rounds of cpu_replace_ttbr1().
+>
 
-I really like the choice of "table_end" in function catu_dump_table().  I think
-using the same denomination here would make it easier to understand the code.
+Ah fair enough. So either the initial page tables are never referred
+to via swapper_pg_dir in the first place, or we copy the first level
+over from __initdata after setting it up (which is probably easier
+than teaching the asm code about non-consecutive page ranges).
 
-I wouldn't bother with such details if you weren't respinning this set.  But now
-that you are and these are extremely simple I think it's worth it, and it will
-help slowing the prolifiration of gray hair around my head when I look back at
-this a year or two down the road.
+So indeed, that would be an improvement in its own right.
 
-Thanks,
-Mathieu
+>
+>> Can't we just drop the memblock_free() and be done with it?
+>
+> That works, I assumed it would be at least frowned on!
+>
 
-> +
-> +			data_daddr = catu_table->data_pages.daddrs[dpidx] +
-> +				     s_dpidx * CATU_PAGE_SIZE;
-> +			catu_dbg(catu_table->dev,
-> +				"[table %5ld:%03d] 0x%llx\n",
-> +				(offset >> 20), i, data_daddr);
-> +			table_ptr[i] = catu_make_entry(data_daddr);
-> +			/* Move the pointers for data pages */
-> +			s_dpidx = (s_dpidx + 1) % CATU_PAGES_PER_SYSPAGE;
-> +			if (s_dpidx == 0)
-> +				dpidx++;
-> +		}
-> +
-> +		/*
-> +		 * If we have finished all the valid entries, fill the rest of
-> +		 * the table (i.e, last table page) with invalid entries,
-> +		 * to fail the lookups.
-> +		 */
-> +		if (offset == buf_size) {
-> +			memset(&table_ptr[i], 0,
-> +			       sizeof(cate_t) * (CATU_PTRS_PER_PAGE - i));
-> +			next_taddr = 0;
-> +		} else {
-> +			next_table = catu_get_table(catu_table,
-> +						    offset, &next_taddr);
-> +		}
-> +
-> +		table_ptr[CATU_LINK_PREV] = catu_make_entry(prev_taddr);
-> +		table_ptr[CATU_LINK_NEXT] = catu_make_entry(next_taddr);
-> +
-> +		catu_dbg(catu_table->dev,
-> +			"[table%5ld]: Cur: 0x%llx Prev: 0x%llx, Next: 0x%llx\n",
-> +			(offset >> 20) - 1,  cur_taddr, prev_taddr, next_taddr);
-> +
-> +		/* Update the prev/next addresses */
-> +		if (next_taddr) {
-> +			prev_taddr = cur_taddr;
-> +			cur_taddr = next_taddr;
-> +			table_ptr = next_table;
-> +		}
-> +	}
-> +
-> +	/* Sync the table for device */
-> +	tmc_sg_table_sync_table(catu_table);
-> +}
-> +
-> +static struct tmc_sg_table __maybe_unused *
-> +catu_init_sg_table(struct device *catu_dev, int node,
-> +		   ssize_t size, void **pages)
-> +{
-> +	int nr_tpages;
-> +	struct tmc_sg_table *catu_table;
-> +
-> +	/*
-> +	 * Each table can address upto 1MB and we can have
-> +	 * CATU_PAGES_PER_SYSPAGE tables in a system page.
-> +	 */
-> +	nr_tpages = DIV_ROUND_UP(size, SZ_1M) / CATU_PAGES_PER_SYSPAGE;
-> +	catu_table = tmc_alloc_sg_table(catu_dev, node, nr_tpages,
-> +					size >> PAGE_SHIFT, pages);
-> +	if (IS_ERR(catu_table))
-> +		return catu_table;
-> +
-> +	catu_populate_table(catu_table);
-> +	dev_dbg(catu_dev,
-> +		"Setup table %p, size %ldKB, %d table pages\n",
-> +		catu_table, (unsigned long)size >> 10,  nr_tpages);
-> +	catu_dump_table(catu_table);
-> +	return catu_table;
-> +}
-> +
->  coresight_simple_reg32(struct catu_drvdata, devid, CORESIGHT_DEVID);
->  coresight_simple_reg32(struct catu_drvdata, control, CATU_CONTROL);
->  coresight_simple_reg32(struct catu_drvdata, status, CATU_STATUS);
-> -- 
-> 2.7.4
-> 
+I think I prefer your suggestion above.
+
+But we do need to teach this code to deal with folded page table levels.
