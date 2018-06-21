@@ -1,64 +1,93 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 21 Jun 2018 14:43:08 +0530
-Subject: [PATCH] ARM: hwmod: RTC: Don't assume lock/unlock will be called with
- irq enabled
-Message-ID: <1529572388-21890-1-git-send-email-j-keerthy@ti.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 21 Jun 2018 11:13:19 +0200
+Subject: [PATCH 3/9] media: cedrus: Add a macro to check for the
+ validity of a control
+In-Reply-To: <20180613140714.1686-4-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-4-maxime.ripard@bootlin.com>
+Message-ID: <18ffd09bf91908886aebbad127e612775b7f0bf8.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Gerlach <d-gerlach@ti.com>
+Hi,
 
-When the RTC lock and unlock functions were introduced it was likely
-assumed that they would always be called from irq enabled context, hence
-the use of local_irq_disable/enable. This is no longer true as the
-RTC+DDR path makes a late call during the suspend path after irqs
-have been disabled to enable the RTC hwmod which calls both unlock and
-lock, leading to IRQs being reenabled through the local_irq_enable call
-in omap_hwmod_rtc_lock call.
+On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> During our frame decoding setup, we need to check a number of controls to
+> make sure that they are properly filled before trying to access them.
+> 
+> It's not too bad with MPEG2 since there's just a single one, but with the
+> upcoming increase of codecs, and the integration of more complex codecs,
+> this logic will be duplicated a significant number of times. H264 for
+> example uses 4 different controls.
+> 
+> Add a macro that expands to the proper check in order to reduce the
+> duplication.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  .../platform/sunxi/cedrus/sunxi_cedrus_dec.c     | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+> index 8c92af34ebeb..c19acf9626c4 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+> @@ -110,15 +110,16 @@ void sunxi_cedrus_device_run(void *priv)
+>  
+>  	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+>  
+> +#define CHECK_CONTROL(ctx, ctrl)					\
+> +	if (!ctx->ctrls[(ctrl)]) {					\
 
-To avoid this change the local_irq_disable/enable to
-local_irq_save/restore to ensure that from whatever context this is
-called the proper IRQ configuration is maintained.
+Although this was not introduced in this patch, I believe this approach
+won't work since ctx->ctrls[i] is a pointer returned from
+v4l2_ctrl_new_custom(hdl, &cfg, NULL), which will always be non-null
+after calling cedrus_init_ctrls.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_reset.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+Perhaps checking ctx->ctrls[i].p_cur.p would be the right thing to
+check, but I'm unsure about that.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
-index b68f9c0..d5ddba0 100644
---- a/arch/arm/mach-omap2/omap_hwmod_reset.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
-@@ -92,11 +92,13 @@ static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
-  */
- void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
- {
--	local_irq_disable();
-+	unsigned long flags;
-+
-+	local_irq_save(flags);
- 	omap_rtc_wait_not_busy(oh);
- 	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
- 	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
--	local_irq_enable();
-+	local_irq_restore(flags);
- }
- 
- /**
-@@ -110,9 +112,11 @@ void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
-  */
- void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
- {
--	local_irq_disable();
-+	unsigned long flags;
-+
-+	local_irq_save(flags);
- 	omap_rtc_wait_not_busy(oh);
- 	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
- 	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
--	local_irq_enable();
-+	local_irq_restore(flags);
- }
+> +		v4l2_err(&(ctx)->dev->v4l2_dev, "Invalid " #ctrl " control\n"); \
+> +		(ctx)->job_abort = 1;					\
+> +		goto unlock_complete;					\
+> +	}
+> +
+>  	switch (ctx->vpu_src_fmt->fourcc) {
+>  	case V4L2_PIX_FMT_MPEG2_FRAME:
+> -		if (!ctx->ctrls[SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR]) {
+> -			v4l2_err(&ctx->dev->v4l2_dev,
+> -				 "Invalid MPEG2 frame header control\n");
+> -			ctx->job_abort = 1;
+> -			goto unlock_complete;
+> -		}
+> -
+> +		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
+>  		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
+>  		sunxi_cedrus_mpeg2_setup(ctx, &run);
+>  
+> @@ -128,6 +129,7 @@ void sunxi_cedrus_device_run(void *priv)
+>  	default:
+>  		ctx->job_abort = 1;
+>  	}
+
+Maybe add a newline here?
+
+Cheers,
+
+Paul
+
+> +#undef CHECK_CONTROL
+>  
+>  unlock_complete:
+>  	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
 -- 
-1.9.1
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/b3b35974/attachment.sig>
