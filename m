@@ -1,90 +1,59 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 21 Jun 2018 12:58:53 +0800
-Subject: [PATCH V2 5/5] PCI: Unify slot and bus reset API
-In-Reply-To: <1529467995-28780-5-git-send-email-okaya@codeaurora.org>
-References: <1529467995-28780-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <201806211229.kMutzrVj%fengguang.wu@intel.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Thu, 21 Jun 2018 08:00:57 +0300
+Subject: [PATCH v2 0/5] crypto: ccree: cleanup, fixes and R-Car enabling
+In-Reply-To: <20180620085145.7bxfbu7bi45sftnk@verge.net.au>
+References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
+ <CAMuHMdVXrppnFEBmR3xhwNu3i0N3mVE1+FJRjEcWBYpHHbsAsw@mail.gmail.com>
+ <CAOtvUMc8D9DQFC6vZ+GnaVBg5uFVrQmOrnSQKz7ZPHGh4BCsZg@mail.gmail.com>
+ <20180620085145.7bxfbu7bi45sftnk@verge.net.au>
+Message-ID: <CAOtvUMfgUFT3+8kwVpACU6tXBX1TrzB-1uiHg7X=KXN-Utv0mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+On Wed, Jun 20, 2018 at 11:51 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Jun 19, 2018 at 04:57:15PM +0300, Gilad Ben-Yossef wrote:
+>> On Tue, Jun 19, 2018 at 3:58 PM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>> > Hi Gilad,
+>> >
+>> > On Thu, May 24, 2018 at 4:19 PM Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+>> >> The patch set enables the use of CryptoCell found in some Renesas R-Car
+>> >> Salvator-X boards and fixes some driver issues uncovered that prevented
+>> >> to work properly.
+>> >
+>> > With DEBUG enabled on R-Car H3, I see lots of
+>> >
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x00000098)
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000C0)
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000D0)
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000D8)
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000E0)
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000F0)
+>> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000F8)
+>> >
+>> > during boot. Is that expected?
+>>
+>> Yes. The condition itself it is reporting is not necessarily bad. It
+>> means that driver
+>> did not act on certain HW notification during interrupts and that's
+>> OK, we don't act on all of them
+>> depending on configuration - e.g. if you have CONFIG_FIPS enabled and
+>> an active TEE module or not.
+>>
+>> I can rate_limit the message if it bothers you but other than that it
+>> is a harmless debug print.
+>
+> Rate limiting sounds like an excellent idea to me.
 
-I love your patch! Perhaps something to improve:
+Will do.
 
-[auto build test WARNING on pci/next]
-[also build test WARNING on v4.18-rc1 next-20180620]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/PCI-handle-error-return-from-pci_reset_bridge_secondary_bus/20180620-121648
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+Thanks!
+Gilad
 
 
-sparse warnings: (new ones prefixed by >>)
 
->> drivers/infiniband/hw/hfi1/pcie.c:908:33: sparse: incorrect type in argument 1 (different base types) @@    expected struct pci_dev *dev @@    got struct pci_dev *dev @@
-   drivers/infiniband/hw/hfi1/pcie.c:908:33:    expected struct pci_dev *dev
-   drivers/infiniband/hw/hfi1/pcie.c:908:33:    got struct pci_bus *bus
-   drivers/infiniband/hw/hfi1/pcie.c: In function 'trigger_sbr':
-   drivers/infiniband/hw/hfi1/pcie.c:908:23: error: passing argument 1 of 'pci_reset_bus' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     return pci_reset_bus(dev->bus);
-                          ^~~
-   In file included from drivers/infiniband/hw/hfi1/pcie.c:48:0:
-   include/linux/pci.h:1099:5: note: expected 'struct pci_dev *' but argument is of type 'struct pci_bus *'
-    int pci_reset_bus(struct pci_dev *dev);
-        ^~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
 
-vim +908 drivers/infiniband/hw/hfi1/pcie.c
-
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  873  
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  874  /*
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  875   * Trigger a secondary bus reset (SBR) on ourselves using our parent.
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  876   *
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  877   * Based on pci_parent_bus_reset() which is not exported by the
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  878   * kernel core.
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  879   */
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  880  static int trigger_sbr(struct hfi1_devdata *dd)
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  881  {
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  882  	struct pci_dev *dev = dd->pcidev;
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  883  	struct pci_dev *pdev;
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  884  
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  885  	/* need a parent */
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  886  	if (!dev->bus->self) {
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  887  		dd_dev_err(dd, "%s: no parent device\n", __func__);
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  888  		return -ENOTTY;
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  889  	}
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  890  
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  891  	/* should not be anyone else on the bus */
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  892  	list_for_each_entry(pdev, &dev->bus->devices, bus_list)
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  893  		if (pdev != dev) {
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  894  			dd_dev_err(dd,
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  895  				   "%s: another device is on the same bus\n",
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  896  				   __func__);
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  897  			return -ENOTTY;
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  898  		}
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  899  
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  900  	/*
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  901  	 * A secondary bus reset (SBR) issues a hot reset to our device.
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  902  	 * The following routine does a 1s wait after the reset is dropped
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  903  	 * per PCI Trhfa (recovery time).  PCIe 3.0 section 6.6.1 -
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  904  	 * Conventional Reset, paragraph 3, line 35 also says that a 1s
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  905  	 * delay after a reset is required.  Per spec requirements,
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  906  	 * the link is either working or not after that point.
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  907  	 */
-f001109e drivers/infiniband/hw/hfi1/pcie.c Sinan Kaya       2018-06-20 @908  	return pci_reset_bus(dev->bus);
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  909  }
-77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  910  
-
-:::::: The code at line 908 was first introduced by commit
-:::::: f001109e94b74baebb3621ce1c7ba114a858adb3 IB/hfi1: use pci_reset_bus() for initiating pci secondary bus reset
-
-:::::: TO: Sinan Kaya <okaya@codeaurora.org>
-:::::: CC: 0day robot <lkp@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+values of ? will give rise to dom!
