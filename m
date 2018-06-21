@@ -1,204 +1,169 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 21 Jun 2018 15:27:24 +0200
-Subject: [PATCH] arm64: dts: rockchip: add 96boards RK3399 Ficus board
-In-Reply-To: <20180618220804.18468-1-ezequiel@collabora.com>
-References: <20180618220804.18468-1-ezequiel@collabora.com>
-Message-ID: <1621532.NjQG3041Bx@phil>
+From: ayaka@soulik.info (Randy Li)
+Date: Thu, 21 Jun 2018 21:32:10 +0800
+Subject: [PATCH v2] ARM64: dts: rockchip: add some pins to rk3399
+Message-ID: <20180621133210.9359-1-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Those pins would be used by many boards.
 
-Am Dienstag, 19. Juni 2018, 00:08:04 CEST schrieb Ezequiel Garcia:
-> The RK3399 Ficus board is an Enterprise Edition board
-> manufactured by Vamrs Ltd., based on the Rockchip RK3399 SoC.
-> 
-> The board exposes a bunch of nice peripherals, including
-> SATA, HDMI, MIPI CSI, Ethernet, WiFi, USB 2.0, USB 3.0
-> and PCIe.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
-> ---
-> I am not including USB support because I cannot seem
-> to make it work.
-> 
-> [    1.677293] dwc3 fe800000.dwc3: Failed to get clk 'ref': -2
-> [    1.677937] dwc3 fe800000.dwc3: Configuration mismatch. dr_mode forced to host
-> [    1.678602] dwc3 fe800000.dwc3: failed to initialize core
-> [    1.679409] dwc3 fe900000.dwc3: Failed to get clk 'ref': -2
-> [    1.679988] dwc3 fe900000.dwc3: failed to initialize core
-> 
-> I am under the impression it is related to:
-> 
-> commit fe8abf332b8f66868013cfcd6bfe727136a2ab5f
-> Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Date:   Wed May 16 11:41:07 2018 +0900
-> 
->     usb: dwc3: support clocks and resets for DWC3 core
-> 
-> Any ideas? Would like to sort out the USB issue before
-> merging.
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 87 +++++++++++++++++++++++++++-----
+ 1 file changed, 73 insertions(+), 14 deletions(-)
 
->From what I remember, we had an issue with usb ports not providing
-an extcon to the typc-c phys, making the dwc3 fail to probe.
-Enric did a nice patch adding support for extcon-less type-c phys in
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=ec1fcd7b7e6f50dd6e259ca76c6e41e2346b3afe
-
-So maybe the kernel you were working on was just to old?
-
-
-> Also, I should probably split the rk3399.dtsi change.
-
-correct :-D
-
-
->  arch/arm64/boot/dts/rockchip/Makefile         |   1 +
->  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 564 ++++++++++++++++++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi      |   9 +
->  3 files changed, 574 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-
-Please also add an entry to Documentation/devicetree/bindings/arm/rockchip.txt
-
-
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> new file mode 100644
-> index 000000000000..17471b4b7a14
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> @@ -0,0 +1,564 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Copyright (c) 2018 Collabora Ltd.
-> + * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3399.dtsi"
-> +#include "rk3399-opp.dtsi"
-> +
-> +/ {
-> +	model = "96boards RK3399 Ficus";
-> +	compatible = "vamrs,ficus", "rockchip,rk3399";
-> +
-> +	chosen {
-> +		stdout-path = "serial2:1500000n8";
-> +	};
-> +
-> +	clkin_gmac: external-gmac-clock {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <125000000>;
-> +		clock-output-names = "clkin_gmac";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	usb_typec_vbus: usb-typec-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "typec-vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	vcc1v8_s0: vcc1v8-s0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc1v8_s0";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	vcc_sys: vcc-sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_sys";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	vcc_phy: vcc-phy-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_phy";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-
-please try to double-check the regulator setup with the schematics.
-
-Like this completely unconnected vcc_phy regulator is normally copy-pasted
-from Rockchip's default board-dt and never matches the actual power-tree.
-
-Schematics seem to a at
-	https://www.96boards.org/documentation/consumer/rock960/hardware-docs/
-and there doesn't even seem to be network interface on the board?
-
-Also please use regulator names as defined in the schematics.
-
-
-This applies to all regulators defined here. I'd really like to see a real
-supply-tree with regulators connected to their supplies.
-
-See for example the rk3399-gru boards for an example :-)
-And you can also check $DEBUGFS/regulator/regulator_summary
-which should form a nice tree structure if everything is correct.
-
-
-> +&gmac {
-> +	assigned-clocks = <&cru SCLK_RMII_SRC>;
-> +	assigned-clock-parents = <&clkin_gmac>;
-> +	clock_in_out = "input";
-> +	phy-supply = <&vcc_phy>;
-> +	phy-mode = "rgmii";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&rgmii_pins>;
-> +	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
-> +	snps,reset-active-low;
-> +	snps,reset-delays-us = <0 10000 50000>;
-> +	tx_delay = <0x28>;
-> +	rx_delay = <0x11>;
-> +	status = "okay";
-> +};
-
-Looking at the 96boards page, there is no gmac on the board at all?
-
-
-> +	fusb0: fusb30x at 22 {
-
-node name should be generic ... typec at 22 or something like that
-
-
-
-> +		vbus-supply = <&usb_typec_vbus>;
-> +		compatible = "fairchild,fusb302";
-> +		reg = <0x22>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&fusb0_int>;
-> +		int-n-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> +		status = "okay";
-
-Please do
-- compatible
-- reg
-- interrupts
-[alphabetical]
-- status
-for properties.
-
-Again applies to everything.
-
-> +	};
-> +
-
-
-> +&pinctrl {
-> +	gmac {
-> +		rgmii_sleep_pins: rgmii-sleep-pins {
-> +			rockchip,pins =
-> +				<3 15 RK_FUNC_GPIO &pcfg_output_low>;
-> +		};
-> +	};
-
-again, no gmac that I can see ;-)
-
-
-Heiko
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index e0040b648f43..f32d1a049550 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1936,19 +1936,49 @@
+ 			drive-strength = <12>;
+ 		};
+ 
++		pcfg_pull_none_13ma: pcfg-pull-none-13ma {
++			bias-disable;
++			drive-strength = <13>;
++		};
++
++		pcfg_pull_none_18ma: pcfg-pull-none-18ma {
++			bias-disable;
++			drive-strength = <18>;
++		};
++
++		pcfg_pull_none_20ma: pcfg-pull-none-20ma {
++			bias-disable;
++			drive-strength = <20>;
++		};
++
++		pcfg_pull_up_2ma: pcfg-pull-up-2ma {
++			bias-pull-up;
++			drive-strength = <2>;
++		};
++
+ 		pcfg_pull_up_8ma: pcfg-pull-up-8ma {
+ 			bias-pull-up;
+ 			drive-strength = <8>;
+ 		};
+ 
++		pcfg_pull_up_18ma: pcfg-pull-up-18ma {
++			bias-pull-up;
++			drive-strength = <18>;
++		};
++
++		pcfg_pull_up_20ma: pcfg-pull-up-20ma {
++			bias-pull-up;
++			drive-strength = <20>;
++		};
++
+ 		pcfg_pull_down_4ma: pcfg-pull-down-4ma {
+ 			bias-pull-down;
+ 			drive-strength = <4>;
+ 		};
+ 
+-		pcfg_pull_up_2ma: pcfg-pull-up-2ma {
+-			bias-pull-up;
+-			drive-strength = <2>;
++		pcfg_pull_down_8ma: pcfg-pull-down-8ma {
++			bias-pull-down;
++			drive-strength = <8>;
+ 		};
+ 
+ 		pcfg_pull_down_12ma: pcfg-pull-down-12ma {
+@@ -1956,9 +1986,22 @@
+ 			drive-strength = <12>;
+ 		};
+ 
+-		pcfg_pull_none_13ma: pcfg-pull-none-13ma {
+-			bias-disable;
+-			drive-strength = <13>;
++		pcfg_pull_down_18ma: pcfg-pull-down-18ma {
++			bias-pull-down;
++			drive-strength = <18>;
++		};
++
++		pcfg_pull_down_20ma: pcfg-pull-down-20ma {
++			bias-pull-down;
++			drive-strength = <20>;
++		};
++
++		pcfg_output_high: pcfg-output-high {
++			output-high;
++		};
++
++		pcfg_output_low: pcfg-output-low {
++			output-low;
+ 		};
+ 
+ 		clock {
+@@ -2481,45 +2524,61 @@
+ 		pwm0 {
+ 			pwm0_pin: pwm0-pin {
+ 				rockchip,pins =
+-					<4 18 RK_FUNC_1 &pcfg_pull_none>;
++					<4 RK_PC2 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			pwm0_pin_pull_down: pwm0-pin-pull-down {
++				rockchip,pins =
++					<4 RK_PC2 RK_FUNC_1 &pcfg_pull_down>;
+ 			};
+ 
+ 			vop0_pwm_pin: vop0-pwm-pin {
+ 				rockchip,pins =
+-					<4 18 RK_FUNC_2 &pcfg_pull_none>;
++					<4 RK_PC2 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			vop1_pwm_pin: vop1-pwm-pin {
++				rockchip,pins =
++					<4 RK_PC2 RK_FUNC_3 &pcfg_pull_none>;
+ 			};
++
+ 		};
+ 
+ 		pwm1 {
+ 			pwm1_pin: pwm1-pin {
+ 				rockchip,pins =
+-					<4 22 RK_FUNC_1 &pcfg_pull_none>;
++					<4 RK_PC6 RK_FUNC_1 &pcfg_pull_none>;
+ 			};
+ 
+-			vop1_pwm_pin: vop1-pwm-pin {
++			pwm1_pin_pull_down: pwm1-pin-pull-down {
+ 				rockchip,pins =
+-					<4 18 RK_FUNC_3 &pcfg_pull_none>;
++					<4 RK_PC6 RK_FUNC_1 &pcfg_pull_down>;
+ 			};
+ 		};
+ 
+ 		pwm2 {
+ 			pwm2_pin: pwm2-pin {
+ 				rockchip,pins =
+-					<1 19 RK_FUNC_1 &pcfg_pull_none>;
++					<1 RK_PC3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			pwm2_pin_pull_down: pwm2-pin-pull-down {
++				rockchip,pins =
++					<1 RK_PC3 RK_FUNC_1 &pcfg_pull_down>;
+ 			};
+ 		};
+ 
+ 		pwm3a {
+ 			pwm3a_pin: pwm3a-pin {
+ 				rockchip,pins =
+-					<0 6 RK_FUNC_1 &pcfg_pull_none>;
++					<0 RK_PA6 RK_FUNC_1 &pcfg_pull_none>;
+ 			};
+ 		};
+ 
+ 		pwm3b {
+ 			pwm3b_pin: pwm3b-pin {
+ 				rockchip,pins =
+-					<1 14 RK_FUNC_1 &pcfg_pull_none>;
++					<1 RK_PB6 RK_FUNC_1 &pcfg_pull_none>;
+ 			};
+ 		};
+ 
+-- 
+2.14.4
