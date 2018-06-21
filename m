@@ -1,229 +1,132 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 21 Jun 2018 09:53:35 -0700
-Subject: [PATCH V4 2/4] watchdog: stm32: add pclk feature for stm32mp1
-In-Reply-To: <1529571737-3552-3-git-send-email-ludovic.Barre@st.com>
-References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
- <1529571737-3552-3-git-send-email-ludovic.Barre@st.com>
-Message-ID: <20180621165335.GA4563@roeck-us.net>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 21 Jun 2018 18:04:32 +0100
+Subject: [PATCH 1/1] arm64/mm: move
+ {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata section
+In-Reply-To: <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
+References: <20180620085755.20045-1-yaojun8558363@gmail.com>
+ <20180620085755.20045-2-yaojun8558363@gmail.com>
+ <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
+ <20180621025141.GB11276@toy>
+ <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
+ <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
+ <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
+Message-ID: <67a238a8-e4db-6bf1-6da5-62ca9536191f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 11:02:15AM +0200, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This patch adds compatible data to manage pclk clock by
-> compatible. Adds stm32mp1 support which requires pclk clock.
-> 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  drivers/watchdog/stm32_iwdg.c | 116 +++++++++++++++++++++++++++---------------
->  1 file changed, 74 insertions(+), 42 deletions(-)
-> 
-> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
-> index c97ad56..e00e3b3 100644
-> --- a/drivers/watchdog/stm32_iwdg.c
-> +++ b/drivers/watchdog/stm32_iwdg.c
-> @@ -11,12 +11,13 @@
->  
->  #include <linux/clk.h>
->  #include <linux/delay.h>
-> -#include <linux/kernel.h>
-> -#include <linux/module.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/iopoll.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/watchdog.h>
->  
-> @@ -54,11 +55,15 @@
->  #define TIMEOUT_US	100000
->  #define SLEEP_US	1000
->  
-> +#define HAS_PCLK	true
-> +
->  struct stm32_iwdg {
->  	struct watchdog_device	wdd;
->  	void __iomem		*regs;
-> -	struct clk		*clk;
-> +	struct clk		*clk_lsi;
-> +	struct clk		*clk_pclk;
->  	unsigned int		rate;
-> +	bool			has_pclk;
->  };
->  
->  static inline u32 reg_read(void __iomem *base, u32 reg)
-> @@ -133,6 +138,44 @@ static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
->  	return 0;
->  }
->  
-> +static int stm32_iwdg_clk_init(struct platform_device *pdev,
-> +			       struct stm32_iwdg *wdt)
-> +{
-> +	u32 ret;
-> +
-> +	wdt->clk_lsi = devm_clk_get(&pdev->dev, "lsi");
+Hi Ard,
 
-I just noticed a subtle difference: This used to be
-			devm_clk_get(&pdev->dev, NULL);
-which would always get the first clock, no matter how it is named.
-Can that cause problems with backward compatibility ?
+On 21/06/18 10:29, Ard Biesheuvel wrote:
+> On 21 June 2018 at 10:59, James Morse <james.morse@arm.com> wrote:
+>> On 21/06/18 07:39, Ard Biesheuvel wrote:
+>>> On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
+>>>> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
+>>>>> On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
+>>>>>> Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
+>>>>>> section. And update the swapper_pg_dir by fixmap.
+>>>>>
+>>>>> I think we may be able to get away with not mapping idmap_pg_dir and
+>>>>> tramp_pg_dir at all.
+>>>>
+>>>> I think we need to move tramp_pg_dir to .rodata. The attacker can write
+>>>> a block-mapping(AP=01) to tramp_pg_dir and then he can access kernel
+>>>> memory.
+>>
+>>> Why does it need to be mapped at all? When do we ever access it from the code?
+>>
+>> (We would want to make its fixmap entry read-only too)
+> 
+> It already is.
+
+Sorry, I missed that,
+
+
+>>>>> As for swapper_pg_dir, it would indeed be nice if we could keep those
+>>>>> mappings read-only most of the time, but I'm not sure how useful this
+>>>>> is if we apply it to the root level only.
+>>>>
+>>>> The purpose of it is to make 'KSMA' harder, where an single arbitrary
+>>>> write is used to add a block mapping to the page-tables, giving the
+>>>> attacker full access to kernel memory. That's why we just apply it to
+>>>> the root level only. If the attacker can arbitrary write multiple times,
+>>>> I think it's hard to defend.
+>>>
+>>> So the assumption is that the root level is more easy to find?
+>>> Otherwise, I'm not sure I understand why being able to write a level 0
+>>> entry is so harmful, given that we don't have block mappings at that
+>>> level.
+>>
+>> I think this thing assumes 3-level page tables with 39bit VA.
+
+> The attack, you mean? Because this code is unlikely to build with that
+> configuration, given that __pgd_populate() BUILD_BUG()s in that case.
+
+Yes, the attack. (I struggle to think of it as an 'attack' because you already
+have arbitrary write...)
+
+
+>>>>> @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
+>>>>>>
+>>>>>>  void __init mark_linear_text_alias_ro(void)
+>>>>>>  {
+>>
+>>>>>> +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
+>>>>>> +       update_mapping_prot(__pa_symbol(swapper_pg_end),
+>>>>>> +                           (unsigned long)lm_alias(swapper_pg_end),
+>>>>>> +                           size, PAGE_KERNEL_RO);
+>>>>>
+>>>>> I don't think this is necessary. Even if some pages are freed, it
+>>>>> doesn't harm to keep a read-only alias of them here since the new
+>>>>> owner won't access them via this mapping anyway. So we can keep
+>>>>> .rodata as a single region.
+>>>>
+>>>> To be honest, I didn't think of this issue at first. I later found a
+>>>> problem when testing the code on qemu:
+>>>
+>>> OK, you're right. I missed the fact that this operates on the linear
+>>> alias, not the kernel mapping itself.
+>>>
+>>> What I don't like is that we lose the ability to use block mappings
+>>> for the entire .rodata section this way. Isn't it possible to move
+>>> these pgdirs to the end of the .rodata segment, perhaps by using a
+>>> separate input section name and placing that explicitly? We could even
+>>> simply forget about freeing those pages, given that [on 4k pages] the
+>>> benefit of freeing 12 KB of space is likely to get lost in the
+>>> rounding noise anyway [segments are rounded up to 64 KB in size]
+>>
+>> I assumed that to move swapper_pg_dir into the .rodata section we would need to
+>> break it up. Today its ~3 levels, which we setup in head.S, then do a dance in
+>> paging_init() so that swapper_pg_dir is always the top level.
+>>
+>> We could generate all leves of the 'init_pg_dir' in the __initdata section, then
+>> copy only the top level into swapper_pg_dir into the rodata section during
+>> paging_init().
+
+> Is that complexity truly justified for a security sensitive piece of
+> code?
+
+Wouldn't this be less complex? (I've probably explained it badly.)
+
+Today head.S builds the initial page tables in ~3 levels of swapper_pg_dir, then
+during paging_init() build new tables with a temporary top level.
+We switch to the temporary top level, then copy over the first level of
+swapper_pg_dir, then switch back to swapper_pg_dir. Finally we free the
+no-longer-used levels of swapper_pg_dir.
+
+This looks like re-inventing __initdata for the bits of page table we eventually
+free.
+
+What I tried to describe is building the head.S/initial-page-tables in a
+reserved area of the the __initdata section. We no longer need a temporary
+top-level, we can build the final page tables directly in swapper_pg_dir, which
+means one fewer rounds of cpu_replace_ttbr1().
+
+
+> Can't we just drop the memblock_free() and be done with it?
+
+That works, I assumed it would be at least frowned on!
+
 
 Thanks,
-Guenter
 
-> +	if (IS_ERR(wdt->clk_lsi)) {
-> +		dev_err(&pdev->dev, "Unable to get lsi clock\n");
-> +		return PTR_ERR(wdt->clk_lsi);
-> +	}
-> +
-> +	/* optional peripheral clock */
-> +	if (wdt->has_pclk) {
-> +		wdt->clk_pclk = devm_clk_get(&pdev->dev, "pclk");
-> +		if (IS_ERR(wdt->clk_pclk)) {
-> +			dev_err(&pdev->dev, "Unable to get pclk clock\n");
-> +			return PTR_ERR(wdt->clk_pclk);
-> +		}
-> +
-> +		ret = clk_prepare_enable(wdt->clk_pclk);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "Unable to prepare pclk clock\n");
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	ret = clk_prepare_enable(wdt->clk_lsi);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to prepare lsi clock\n");
-> +		clk_disable_unprepare(wdt->clk_pclk);
-> +		return ret;
-> +	}
-> +
-> +	wdt->rate = clk_get_rate(wdt->clk_lsi);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct watchdog_info stm32_iwdg_info = {
->  	.options	= WDIOF_SETTIMEOUT |
->  			  WDIOF_MAGICCLOSE |
-> @@ -147,49 +190,42 @@ static const struct watchdog_ops stm32_iwdg_ops = {
->  	.set_timeout	= stm32_iwdg_set_timeout,
->  };
->  
-> +static const struct of_device_id stm32_iwdg_of_match[] = {
-> +	{ .compatible = "st,stm32-iwdg", .data = (void *)!HAS_PCLK },
-> +	{ .compatible = "st,stm32mp1-iwdg", .data = (void *)HAS_PCLK },
-> +	{ /* end node */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
-> +
->  static int stm32_iwdg_probe(struct platform_device *pdev)
->  {
->  	struct watchdog_device *wdd;
-> +	const struct of_device_id *match;
->  	struct stm32_iwdg *wdt;
->  	struct resource *res;
-> -	void __iomem *regs;
-> -	struct clk *clk;
->  	int ret;
->  
-> +	match = of_match_device(stm32_iwdg_of_match, &pdev->dev);
-> +	if (!match)
-> +		return -ENODEV;
-> +
-> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	wdt->has_pclk = match->data;
-> +
->  	/* This is the timer base. */
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	regs = devm_ioremap_resource(&pdev->dev, res);
-> -	if (IS_ERR(regs)) {
-> +	wdt->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(wdt->regs)) {
->  		dev_err(&pdev->dev, "Could not get resource\n");
-> -		return PTR_ERR(regs);
-> +		return PTR_ERR(wdt->regs);
->  	}
->  
-> -	clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(clk)) {
-> -		dev_err(&pdev->dev, "Unable to get clock\n");
-> -		return PTR_ERR(clk);
-> -	}
-> -
-> -	ret = clk_prepare_enable(clk);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
-> +	ret = stm32_iwdg_clk_init(pdev, wdt);
-> +	if (ret)
->  		return ret;
-> -	}
-> -
-> -	/*
-> -	 * Allocate our watchdog driver data, which has the
-> -	 * struct watchdog_device nested within it.
-> -	 */
-> -	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> -	if (!wdt) {
-> -		ret = -ENOMEM;
-> -		goto err;
-> -	}
-> -
-> -	/* Initialize struct stm32_iwdg. */
-> -	wdt->regs = regs;
-> -	wdt->clk = clk;
-> -	wdt->rate = clk_get_rate(clk);
->  
->  	/* Initialize struct watchdog_device. */
->  	wdd = &wdt->wdd;
-> @@ -217,7 +253,8 @@ static int stm32_iwdg_probe(struct platform_device *pdev)
->  
->  	return 0;
->  err:
-> -	clk_disable_unprepare(clk);
-> +	clk_disable_unprepare(wdt->clk_lsi);
-> +	clk_disable_unprepare(wdt->clk_pclk);
->  
->  	return ret;
->  }
-> @@ -227,23 +264,18 @@ static int stm32_iwdg_remove(struct platform_device *pdev)
->  	struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
->  
->  	watchdog_unregister_device(&wdt->wdd);
-> -	clk_disable_unprepare(wdt->clk);
-> +	clk_disable_unprepare(wdt->clk_lsi);
-> +	clk_disable_unprepare(wdt->clk_pclk);
->  
->  	return 0;
->  }
->  
-> -static const struct of_device_id stm32_iwdg_of_match[] = {
-> -	{ .compatible = "st,stm32-iwdg" },
-> -	{ /* end node */ }
-> -};
-> -MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
-> -
->  static struct platform_driver stm32_iwdg_driver = {
->  	.probe		= stm32_iwdg_probe,
->  	.remove		= stm32_iwdg_remove,
->  	.driver = {
->  		.name	= "iwdg",
-> -		.of_match_table = stm32_iwdg_of_match,
-> +		.of_match_table = of_match_ptr(stm32_iwdg_of_match),
->  	},
->  };
->  module_platform_driver(stm32_iwdg_driver);
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+James
