@@ -1,106 +1,204 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 21 Jun 2018 16:16:24 +0300
-Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
-In-Reply-To: <5b66cafe-782e-43a9-c221-cf0a1528f382@gmail.com>
-References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
- <20180618114920.654647c0@bbrezillon>
- <8474a744-5552-932f-7ba8-85b7d95368ea@gmail.com>
- <0be344a2-9878-2b92-9436-bc2f4d4fd6e0@microchip.com>
- <5b66cafe-782e-43a9-c221-cf0a1528f382@gmail.com>
-Message-ID: <e0259cda-2334-946f-fc3f-25c64a4f721b@microchip.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Jun 2018 15:27:24 +0200
+Subject: [PATCH] arm64: dts: rockchip: add 96boards RK3399 Ficus board
+In-Reply-To: <20180618220804.18468-1-ezequiel@collabora.com>
+References: <20180618220804.18468-1-ezequiel@collabora.com>
+Message-ID: <1621532.NjQG3041Bx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Ezequiel,
 
-On 19.06.2018 04:28, Marek Vasut wrote:
-> On 06/18/2018 02:00 PM, Claudiu Beznea wrote:
->>
->>
->> On 18.06.2018 12:53, Marek Vasut wrote:
->>> On 06/18/2018 11:49 AM, Boris Brezillon wrote:
->>>> Hi Claudiu,
->>>>
->>>> The subject prefix should be "mtd: spi-nor: atmel-quadspi: ". No need
->>>> to send a new version just for that, I'll fix it when applying the
->>>> patch.
->>>>
->> Hi Boris,
->>
->> Thank you!
->>
->>>> Looks good otherwise. Marek, any objection? If not, can you add your
->>>> Acked-by?
->>>
->>> Will this work if you have ie. ubifs mounted on that QSPI NOR and you
->>> suspect and resume during IO ? I think it would, but just curious if
->>> there could be some problem.
->>
->> Hi Marek,
->>
->> I tested only with read/writes while suspending, simple scripts, but not
->> having ubifs mounted on QSPI NOR. I will double check also with ubifs
->> mounted on QSPI NOR and come back with the results.
+Am Dienstag, 19. Juni 2018, 00:08:04 CEST schrieb Ezequiel Garcia:
+> The RK3399 Ficus board is an Enterprise Edition board
+> manufactured by Vamrs Ltd., based on the Rockchip RK3399 SoC.
 > 
-> Thanks. I think it's gonna be OK, but let's just be sure.
-> Make sure to disable 4K sector support when fiddling with UBI/UBIFS on
-> QSPI NOR.
+> The board exposes a bunch of nice peripherals, including
+> SATA, HDMI, MIPI CSI, Ethernet, WiFi, USB 2.0, USB 3.0
+> and PCIe.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+> ---
+> I am not including USB support because I cannot seem
+> to make it work.
+> 
+> [    1.677293] dwc3 fe800000.dwc3: Failed to get clk 'ref': -2
+> [    1.677937] dwc3 fe800000.dwc3: Configuration mismatch. dr_mode forced to host
+> [    1.678602] dwc3 fe800000.dwc3: failed to initialize core
+> [    1.679409] dwc3 fe900000.dwc3: Failed to get clk 'ref': -2
+> [    1.679988] dwc3 fe900000.dwc3: failed to initialize core
+> 
+> I am under the impression it is related to:
+> 
+> commit fe8abf332b8f66868013cfcd6bfe727136a2ab5f
+> Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Date:   Wed May 16 11:41:07 2018 +0900
+> 
+>     usb: dwc3: support clocks and resets for DWC3 core
+> 
+> Any ideas? Would like to sort out the USB issue before
+> merging.
 
-I did the following to test this patch with ubifs:
-1. disabled CONFIG_MTD_SPI_NOR_USE_4K_SECTORS and build kernel
+>From what I remember, we had an issue with usb ports not providing
+an extcon to the typc-c phys, making the dwc3 fail to probe.
+Enric did a nice patch adding support for extcon-less type-c phys in
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=ec1fcd7b7e6f50dd6e259ca76c6e41e2346b3afe
 
-2. create a ubifs image:
-mkfs.ubifs -r /mnt/ubifs-sama5d2-rootfs -m 1 -e 65408 -c 3739 \
- -o /mnt/sama5d2-xplained-ubifs.img
+So maybe the kernel you were working on was just to old?
 
-3. boot the board and check partitions:
-cat /proc/mtd
-dev:    size   erasesize  name
-mtd0: 00010000 00010000 "at91bootstrap"
-mtd1: 00010000 00010000 "bootloader env"
-mtd2: 00050000 00010000 "bootloader"
-mtd3: 00010000 00010000 "device tree"
-mtd4: 00380000 00010000 "kernel"
-mtd5: 01c00000 00010000 "rootfs"
-mtd6: 00400000 00010000 "spi32766.0"
 
-4. ubiformat /dev/mtd5
-5. ubiattach -p /dev/mtd5
-6. ubimkvol /dev/ubi0 -N test -s 28910336
-7. ubiupdatevol /dev/ubi0_0 /sama5d2-xplained-buildroot-ubifs.img
-8. mount -t ubifs ubi0:test /mnt
-9. cd /mnt/; ls /mnt/
-bin      lib      media    proc     sbin     usr
-dev      lib32    mnt      root     sys      var
-etc      linuxrc  opt      run      tmp
+> Also, I should probably split the rk3399.dtsi change.
 
-10. Create a file with dd on ubifs partition:
-dd if=/dev/urandom of=test.bin bs=1024 count=8K
+correct :-D
 
-11. compute md5sum on this file:
-md5sum test.bin > test.md5
 
-12. Measure how much will take to copy that file (to be sure the copy
-operation is not done before suspending):
+>  arch/arm64/boot/dts/rockchip/Makefile         |   1 +
+>  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 564 ++++++++++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi      |   9 +
+>  3 files changed, 574 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
 
-date; cp test.bin test-pm.bin; date
-Wed Jun 20 13:20:34 UTC 2018
-Wed Jun 20 13:21:14 UTC 2018
+Please also add an entry to Documentation/devicetree/bindings/arm/rockchip.txt
 
-13. Copy, sync, and switch to suspend-to-mem:
 
-cp test.bin test-pm.bin &
-sync &
-echo mem > /sys/power/state
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> new file mode 100644
+> index 000000000000..17471b4b7a14
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> @@ -0,0 +1,564 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright (c) 2018 Collabora Ltd.
+> + * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
+> + */
+> +
+> +/dts-v1/;
+> +#include "rk3399.dtsi"
+> +#include "rk3399-opp.dtsi"
+> +
+> +/ {
+> +	model = "96boards RK3399 Ficus";
+> +	compatible = "vamrs,ficus", "rockchip,rk3399";
+> +
+> +	chosen {
+> +		stdout-path = "serial2:1500000n8";
+> +	};
+> +
+> +	clkin_gmac: external-gmac-clock {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <125000000>;
+> +		clock-output-names = "clkin_gmac";
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	usb_typec_vbus: usb-typec-vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "typec-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	vcc1v8_s0: vcc1v8-s0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc1v8_s0";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	vcc_sys: vcc-sys {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_sys";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	vcc_phy: vcc-phy-regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_phy";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
 
-14. Check md5sum of test-pm.bin and compare it with md5sum of test.bin:
-md5sum test-pm.bin > test-pm.md5
-cat test.md5
-b5338647572b9665f24c61db98601522  test.bin
-cat test-pm.md5
-b5338647572b9665f24c61db98601522  test-pm.bin
+please try to double-check the regulator setup with the schematics.
 
-Please let me know if this is enough!
+Like this completely unconnected vcc_phy regulator is normally copy-pasted
+from Rockchip's default board-dt and never matches the actual power-tree.
 
-Thank you,
-Claudiu Beznea
+Schematics seem to a at
+	https://www.96boards.org/documentation/consumer/rock960/hardware-docs/
+and there doesn't even seem to be network interface on the board?
+
+Also please use regulator names as defined in the schematics.
+
+
+This applies to all regulators defined here. I'd really like to see a real
+supply-tree with regulators connected to their supplies.
+
+See for example the rk3399-gru boards for an example :-)
+And you can also check $DEBUGFS/regulator/regulator_summary
+which should form a nice tree structure if everything is correct.
+
+
+> +&gmac {
+> +	assigned-clocks = <&cru SCLK_RMII_SRC>;
+> +	assigned-clock-parents = <&clkin_gmac>;
+> +	clock_in_out = "input";
+> +	phy-supply = <&vcc_phy>;
+> +	phy-mode = "rgmii";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&rgmii_pins>;
+> +	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
+> +	snps,reset-active-low;
+> +	snps,reset-delays-us = <0 10000 50000>;
+> +	tx_delay = <0x28>;
+> +	rx_delay = <0x11>;
+> +	status = "okay";
+> +};
+
+Looking at the 96boards page, there is no gmac on the board at all?
+
+
+> +	fusb0: fusb30x at 22 {
+
+node name should be generic ... typec at 22 or something like that
+
+
+
+> +		vbus-supply = <&usb_typec_vbus>;
+> +		compatible = "fairchild,fusb302";
+> +		reg = <0x22>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&fusb0_int>;
+> +		int-n-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+> +		status = "okay";
+
+Please do
+- compatible
+- reg
+- interrupts
+[alphabetical]
+- status
+for properties.
+
+Again applies to everything.
+
+> +	};
+> +
+
+
+> +&pinctrl {
+> +	gmac {
+> +		rgmii_sleep_pins: rgmii-sleep-pins {
+> +			rockchip,pins =
+> +				<3 15 RK_FUNC_GPIO &pcfg_output_low>;
+> +		};
+> +	};
+
+again, no gmac that I can see ;-)
+
+
+Heiko
