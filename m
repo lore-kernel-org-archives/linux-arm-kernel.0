@@ -1,41 +1,45 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 21 Jun 2018 14:44:54 -0700
-Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
-In-Reply-To: <CAOMZO5B98O9XA8GhdWxJZ6DFgS=O+smHURm8v5jEirj31tuUhg@mail.gmail.com>
-References: <20180530173414.6121-1-andrew.smirnov@gmail.com>
- <CAOMZO5AyAegbvUtX42by99mU8yQfi91bmhJfd9iqu1Ak0dEHiw@mail.gmail.com>
- <CAOMZO5DJj=oQfsB-vNP=81HCiy-69j-5U+Km9P6LxGpnLx9xzg@mail.gmail.com>
- <CAHQ1cqHxq+RM1nNHECY75Cojd_kxu1ERLe6+MhMLUa5kb10r8w@mail.gmail.com>
- <CAOMZO5B98O9XA8GhdWxJZ6DFgS=O+smHURm8v5jEirj31tuUhg@mail.gmail.com>
-Message-ID: <CAHQ1cqELs4LaQkmPiPjXQuF17+7PBsEtbmSt8iveLqRv+4bgfQ@mail.gmail.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Thu, 21 Jun 2018 17:08:57 -0400
+Subject: [PATCH v7 09/10] dt-bindings: counter: Adjust dt-bindings for STM32
+ lptimer move
+In-Reply-To: <cover.1529607879.git.vilhelm.gray@gmail.com>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+Message-ID: <4bf9f5233a46e0dc195c27be19b76687448c17ff.1529607879.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 7:08 AM Fabio Estevam <festevam@gmail.com> wrote:
->
-> Hi Andrey,
->
-> On Thu, Jun 21, 2018 at 9:47 AM, Andrey Smirnov
-> <andrew.smirnov@gmail.com> wrote:
->
-> > I never assumed it was a regression and that USB worked on RDU1 board
-> > before, so I never tried to see if this was a regression. I can only
-> > tell you that it hangs as soon as any PORTSC registers are accessed.
->
-> I think we need to investigate this portsc register hang further.
->
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-I just finished experimenting with it on RDU1 and Babbage boards and I
-can't reproduce the hang that you describe against 4.18-rc1. At this
-point I wonder if it's the bootloader that is a variable that plays
-into this. I was booting both boards with 2018.06.0 version of barebox
-+ the custom patches that can be found here
-https://github.com/ndreys/barebox/commits/rdu1-netboot. Note that the
-last patch in that branch/stack was added as a part of this
-investigation, but even before it, I was able to boot Linux just fine,
-albeit without working USB.
+The STM32 LP Timer counter driver now resides under the Counter
+subsystem. This patch adjusts dt-bindings to account for the STM32
+lptimer driver move.
 
-Any chance you can try it on your end and see if that makes a difference?
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+---
+ .../devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt | 0
+ Documentation/devicetree/bindings/mfd/stm32-lptimer.txt         | 2 +-
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
 
-Thanks,
-Andrey Smirnov
+diff --git a/Documentation/devicetree/bindings/iio/counter/stm32-lptimer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-lptimer-cnt.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/iio/counter/stm32-lptimer-cnt.txt
+rename to Documentation/devicetree/bindings/counter/stm32-lptimer-cnt.txt
+diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+index 2a9ff29db9c9..fb54e4dad5b3 100644
+--- a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
++++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+@@ -16,7 +16,7 @@ Required properties:
+ 
+ Optional subnodes:
+ - pwm:			See ../pwm/pwm-stm32-lp.txt
+-- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
++- counter:		See ../counter/stm32-lptimer-cnt.txt
+ - trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
+ 
+ Example:
+-- 
+2.17.1
