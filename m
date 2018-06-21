@@ -1,46 +1,46 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 21 Jun 2018 15:57:27 +0100
-Subject: [RFC PATCH 03/16] KVM: arm64: Refactor kvm_arm_num_regs() for easier
- maintenance
-In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1529593060-542-4-git-send-email-Dave.Martin@arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 21 Jun 2018 08:17:30 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.18
+In-Reply-To: <CAGb2v67gL8m+XorkC78PwcaDA9cz69acsMkOrcLc9dgBY7m1eQ@mail.gmail.com>
+References: <20180521115947.wqrnv2hczate65lz@flea>
+ <CAK7LNASgetmPKKS8AhYXqSSEFCi+q0ASZ68M0SECJT5EbAU4XQ@mail.gmail.com>
+ <CAGb2v67DOgnW=gesPxgmxZJWieZkzjPJm5mt7eW15HgUP3_SZg@mail.gmail.com>
+ <152879040155.16708.9862482085365718831@swboyd.mtv.corp.google.com>
+ <CAGb2v66MkLLqL=Ei5kMb_CzpgUANpkNN3E52mSHKrZ0L7rXAog@mail.gmail.com>
+ <CAGb2v67gL8m+XorkC78PwcaDA9cz69acsMkOrcLc9dgBY7m1eQ@mail.gmail.com>
+Message-ID: <152959425090.16708.15302996362223342459@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_arm_num_regs() adds together various partial register counts in
-a freeform sum expression, which makes it harder than necessary to
-read diffs that add, modify or remove a single term in the sum
-(which is expected to the common case under maintenance).
+Quoting Chen-Yu Tsai (2018-06-19 19:14:26)
+> Hi Stephen,
+> 
+> On Tue, Jun 12, 2018 at 4:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > On Tue, Jun 12, 2018 at 4:00 PM, Stephen Boyd <sboyd@kernel.org> wrote:
+> >> Quoting Chen-Yu Tsai (2018-06-11 00:53:41)
+> >>>
+> >>
+> >> I can directly pick and send as fix for clk-fixes targeting rc2.
+> 
+> This is a friendly reminder to pick up this patch for -rc2.
+> 
+> > The patch can still be found in the sunxi/for-next branch of the
+> > sunxi repo on kernel.org:
+> >
+> > https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/commit/?h=sunxi/for-next&id=d4a1496286b0c29fcace4e10c0047cca7cc79b25
+> 
+> This is still available, but no longer referenced in any branch,
+> as we've updated our sunxi/for-next branch for 4.19 stuff.
+> 
+> > Or the original on patchwork:
+> >
+> > https://patchwork.kernel.org/patch/10348027/
+> 
+> And
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> if you pick directly from patchwork.
+> 
 
-This patch refactors the code to add the term one per line, for
-maximum readability.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kvm/guest.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 56a0260..4a9d77c 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -205,8 +205,14 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-  */
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
--	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
--		+ kvm_arm_get_fw_num_regs(vcpu)	+ NUM_TIMER_REGS;
-+	unsigned long res = 0;
-+
-+	res += num_core_regs();
-+	res += kvm_arm_num_sys_reg_descs(vcpu);
-+	res += kvm_arm_get_fw_num_regs(vcpu);
-+	res += NUM_TIMER_REGS;
-+
-+	return res;
- }
- 
- /**
--- 
-2.1.4
+Got it from linux-next. Thanks!
