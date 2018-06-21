@@ -1,85 +1,278 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 21 Jun 2018 10:48:33 +0100
-Subject: [PATCH v2 7/8] arm64: tegra: Add nodes for tcu on Tegra194
-In-Reply-To: <20180620122042.10950-8-mperttunen@nvidia.com>
-References: <20180620122042.10950-1-mperttunen@nvidia.com>
- <20180620122042.10950-8-mperttunen@nvidia.com>
-Message-ID: <eb514b19-001b-0783-def5-101a03ab5a6c@nvidia.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 21 Jun 2018 11:49:54 +0200
+Subject: [PATCH 6/9] media: cedrus: Add ops structure
+In-Reply-To: <20180613140714.1686-7-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-7-maxime.ripard@bootlin.com>
+Message-ID: <939381a854760b1d54984ae0f534ec03312ec8e0.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 20/06/18 13:20, Mikko Perttunen wrote:
-> Add nodes required for communication through the Tegra Combined UART.
-> This includes the AON HSP instance, addition of shared interrupts
-> for the TOP0 HSP instance, and finally the TCU node itself. Also
-> mark the HSP instances as compatible to tegra194-hsp, as the hardware
-> is not identical but is compatible to tegra186-hsp.
+On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> In order to increase the number of codecs supported, we need to decouple
+> the MPEG2 only code that was there up until now and turn it into something
+> a bit more generic.
 > 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> Do that by introducing an intermediate ops structure that would need to be
+> filled by each supported codec. Start by implementing in that structure the
+> setup and trigger hooks that are currently the only functions being
+> implemented by codecs support.
+> 
+> To do so, we need to store the current codec in use, which we do at
+> start_streaming time.
+
+With the comments below taken in account, this is:
+
+Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > ---
->  arch/arm64/boot/dts/nvidia/tegra194.dtsi | 34 +++++++++++++++++++++++++++++---
->  1 file changed, 31 insertions(+), 3 deletions(-)
+>  .../platform/sunxi/cedrus/sunxi_cedrus.c      |  2 ++
+>  .../sunxi/cedrus/sunxi_cedrus_common.h        | 11 +++++++
+>  .../platform/sunxi/cedrus/sunxi_cedrus_dec.c  | 10 +++---
+>  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 11 +++++--
+>  .../sunxi/cedrus/sunxi_cedrus_mpeg2.h         | 33 -------------------
+>  .../sunxi/cedrus/sunxi_cedrus_video.c         | 17 +++++++++-
+>  6 files changed, 42 insertions(+), 42 deletions(-)
+>  delete mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
 > 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-> index 6d699815a84f..d7f780b06fe2 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-> @@ -217,10 +217,31 @@
->  		};
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
+> index ccd41d9a3e41..bc80480f5dfd 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
+> @@ -244,6 +244,8 @@ static int sunxi_cedrus_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
 >  
->  		hsp_top0: hsp at 3c00000 {
-> -			compatible = "nvidia,tegra186-hsp";
-> +			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
->  			reg = <0x03c00000 0xa0000>;
-> -			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-> -			interrupt-names = "doorbell";
-> +			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "doorbell", "shared0", "shared1", "shared2",
-> +			                  "shared3", "shared4", "shared5", "shared6",
-> +			                  "shared7";
-> +			#mbox-cells = <2>;
-> +		};
+> +	dev->dec_ops[SUNXI_CEDRUS_CODEC_MPEG2] = &sunxi_cedrus_dec_ops_mpeg2;
 > +
-> +		hsp_aon: hsp at c150000 {
-> +			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
-> +			reg = <0x0c150000 0xa0000>;
-> +			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-> +			             <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "shared0", "shared1", "shared2", "shared3";
->  			#mbox-cells = <2>;
->  		};
+>  	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
+>  	if (ret)
+>  		goto unreg_media;
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> index a5f83c452006..c2e2c92d103b 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> @@ -75,6 +75,7 @@ struct sunxi_cedrus_ctx {
+>  	struct v4l2_pix_format_mplane src_fmt;
+>  	struct sunxi_cedrus_fmt *vpu_dst_fmt;
+>  	struct v4l2_pix_format_mplane dst_fmt;
+> +	enum sunxi_cedrus_codec current_codec;
+
+Nit: for consistency with the way things are named, "codec_current"
+probably makes more sense.
+
+IMO using the natural English order is fine for temporary variables, but
+ less so for variables used in common parts like structures. This allows
+seeing "_" as a logical hierarchical delimiter that automatically makes
+us end up with consistent prefixes that can easily be grepped for and
+derived.
+
+But that's just my 2 cents, it's really not a big deal, especially in
+this case!
+
+>  	struct v4l2_ctrl_handler hdl;
+>  	struct v4l2_ctrl *ctrls[SUNXI_CEDRUS_CTRL_MAX];
+> @@ -107,6 +108,14 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+>  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
+>  }
 >  
-> @@ -382,6 +403,13 @@
->  		};
->  	};
->  
-> +	tcu: tcu {
-> +		compatible = "nvidia,tegra194-tcu";
-> +		mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
-> +		         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
-> +		mbox-names = "rx", "tx";
-> +	};
+> +struct sunxi_cedrus_dec_ops {
+> +	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+> +		      struct sunxi_cedrus_run *run);
+> +	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+
+By the way, are we sure that these functions won't ever fail?
+I think this is the case for MPEG2 (there is virtually nothing to check
+for errors) but perhaps it's different for H264.
+
+> +};
 > +
->  	timer {
->  		compatible = "arm,armv8-timer";
->  		interrupts = <GIC_PPI 13
-> 
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
+> +extern struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2;
+> +
+>  struct sunxi_cedrus_dev {
+>  	struct v4l2_device v4l2_dev;
+>  	struct video_device vfd;
+> @@ -130,6 +139,8 @@ struct sunxi_cedrus_dev {
+>  	struct reset_control *rstc;
+>  
+>  	struct regmap *syscon;
+> +
+> +	struct sunxi_cedrus_dec_ops	*dec_ops[SUNXI_CEDRUS_CODEC_LAST];
+>  };
+>  
+>  static inline void sunxi_cedrus_write(struct sunxi_cedrus_dev *dev,
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+> index f274408ab5a7..5e552fa05274 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
+> @@ -28,7 +28,6 @@
+>  #include <media/v4l2-mem2mem.h>
+>  
+>  #include "sunxi_cedrus_common.h"
+> -#include "sunxi_cedrus_mpeg2.h"
+>  #include "sunxi_cedrus_dec.h"
+>  #include "sunxi_cedrus_hw.h"
+>  
+> @@ -77,6 +76,7 @@ void sunxi_cedrus_device_work(struct work_struct *work)
+>  void sunxi_cedrus_device_run(void *priv)
+>  {
+>  	struct sunxi_cedrus_ctx *ctx = priv;
+> +	struct sunxi_cedrus_dev *dev = ctx->dev;
+>  	struct sunxi_cedrus_run run = { 0 };
+>  	struct media_request *src_req, *dst_req;
+>  	unsigned long flags;
+> @@ -120,8 +120,6 @@ void sunxi_cedrus_device_run(void *priv)
+>  	case V4L2_PIX_FMT_MPEG2_FRAME:
+>  		CHECK_CONTROL(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
+>  		run.mpeg2.hdr = get_ctrl_ptr(ctx, SUNXI_CEDRUS_CTRL_DEC_MPEG2_FRAME_HDR);
+> -		sunxi_cedrus_mpeg2_setup(ctx, &run);
+> -
+>  		break;
+>  
+>  	default:
+> @@ -129,6 +127,9 @@ void sunxi_cedrus_device_run(void *priv)
+>  	}
+>  #undef CHECK_CONTROL
+>  
+> +	if (!ctx->job_abort)
+> +		dev->dec_ops[ctx->current_codec]->setup(ctx, &run);
+> +
+>  unlock_complete:
+>  	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
+>  
+> @@ -143,8 +144,7 @@ void sunxi_cedrus_device_run(void *priv)
+>  	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+>  
+>  	if (!ctx->job_abort) {
+> -		if (ctx->vpu_src_fmt->fourcc == V4L2_PIX_FMT_MPEG2_FRAME)
+> -			sunxi_cedrus_mpeg2_trigger(ctx);
+> +		dev->dec_ops[ctx->current_codec]->trigger(ctx);
+>  	} else {
+>  		v4l2_m2m_buf_done(run.src, VB2_BUF_STATE_ERROR);
+>  		v4l2_m2m_buf_done(run.dst, VB2_BUF_STATE_ERROR);
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> index d1d7a3cfce0d..e25075bb5779 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> @@ -52,8 +52,8 @@ static const u8 mpeg_default_non_intra_quant[64] = {
+>  
+>  #define m_niq(i) ((i << 8) | mpeg_default_non_intra_quant[i])
+>  
+> -void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+> -			      struct sunxi_cedrus_run *run)
+> +static void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+> +				     struct sunxi_cedrus_run *run)
+>  {
+>  	struct sunxi_cedrus_dev *dev = ctx->dev;
+>  	const struct v4l2_ctrl_mpeg2_frame_hdr *frame_hdr = run->mpeg2.hdr;
+> @@ -148,9 +148,14 @@ void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+>  	sunxi_cedrus_write(dev, src_buf_addr + VBV_SIZE - 1, VE_MPEG_VLD_END);
+>  }
+>  
+> -void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
+> +static void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
+>  {
+>  	struct sunxi_cedrus_dev *dev = ctx->dev;
+>  
+>  	sunxi_cedrus_write(dev, VE_TRIG_MPEG2, VE_MPEG_TRIGGER);
+>  }
+> +
+> +struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2 = {
+> +	.setup		= sunxi_cedrus_mpeg2_setup,
+> +	.trigger	= sunxi_cedrus_mpeg2_trigger,
+> +};
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
+> deleted file mode 100644
+> index 4c380becfa1a..000000000000
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
+> +++ /dev/null
+> @@ -1,33 +0,0 @@
+> -/*
+> - * Sunxi-Cedrus VPU driver
+> - *
+> - * Copyright (C) 2018 Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> - * Copyright (C) 2016 Florent Revest <florent.revest@free-electrons.com>
+> - *
+> - * Based on the vim2m driver, that is:
+> - *
+> - * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
+> - * Pawel Osciak, <pawel@osciak.com>
+> - * Marek Szyprowski, <m.szyprowski@samsung.com>
+> - *
+> - * This software is licensed under the terms of the GNU General Public
+> - * License version 2, as published by the Free Software Foundation, and
+> - * may be copied, distributed, and modified under those terms.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#ifndef _SUNXI_CEDRUS_MPEG2_H_
+> -#define _SUNXI_CEDRUS_MPEG2_H_
+> -
+> -struct sunxi_cedrus_ctx;
+> -struct sunxi_cedrus_run;
+> -
+> -void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+> -			      struct sunxi_cedrus_run *run);
+> -void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx);
+> -
+> -#endif
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> index 089abfe6bfeb..fb7b081a5bb7 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> @@ -28,7 +28,6 @@
+>  #include <media/v4l2-mem2mem.h>
+>  
+>  #include "sunxi_cedrus_common.h"
+> -#include "sunxi_cedrus_mpeg2.h"
+>  #include "sunxi_cedrus_dec.h"
+>  #include "sunxi_cedrus_hw.h"
+>  
+> @@ -414,6 +413,21 @@ static int sunxi_cedrus_buf_prepare(struct vb2_buffer *vb)
+>  	return 0;
+>  }
+>  
+> +static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+> +{
+> +	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
+> +
+> +	switch (ctx->vpu_src_fmt->fourcc) {
+> +	case V4L2_PIX_FMT_MPEG2_FRAME:
+> +		ctx->current_codec = SUNXI_CEDRUS_CODEC_MPEG2;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static void sunxi_cedrus_stop_streaming(struct vb2_queue *q)
+>  {
+>  	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
+> @@ -462,6 +476,7 @@ static struct vb2_ops sunxi_cedrus_qops = {
+>  	.buf_cleanup		= sunxi_cedrus_buf_cleanup,
+>  	.buf_queue		= sunxi_cedrus_buf_queue,
+>  	.buf_request_complete	= sunxi_cedrus_buf_request_complete,
+> +	.start_streaming	= sunxi_cedrus_start_streaming,
+>  	.stop_streaming		= sunxi_cedrus_stop_streaming,
+>  	.wait_prepare		= vb2_ops_wait_prepare,
+>  	.wait_finish		= vb2_ops_wait_finish,
 -- 
-nvpublic
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/d52423c9/attachment.sig>
