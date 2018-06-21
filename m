@@ -1,151 +1,246 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 21 Jun 2018 15:57:32 +0100
-Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable system
- registers
+Date: Thu, 21 Jun 2018 15:57:30 +0100
+Subject: [RFC PATCH 06/16] arm64/sve: Determine virtualisation-friendly vector
+ lengths
 In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
 References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1529593060-542-7-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some system registers may or may not logically exist for a vcpu
-depending on whether certain architectural features are enabled for
-the vcpu.
+Software at EL1 is permitted to assume that when programming
+ZCR_EL1.LEN, the effective vector length is nonetheless a vector
+length supported by the CPU.  Thus, software may rely on the
+effective vector length being different from that programmed via
+ZCR_EL1.LEN in some situations.
 
-In order to avoid spuriously emulating access to these registers
-when they should not exist, or allowing the registers to be
-spuriously enumerated or saved/restored through the ioctl
-interface, a means is needed to allow registers to be hidden
-depending on the vcpu configuration.
+However, KVM does not tightly bind vcpus to individual underlying
+physical CPUs.  As a result, vcpus can migrate from one CPU to
+another.  This means that in order to preserve the guarantee
+described in the previous paragraph, the set of supported vector
+lengths must appear to be the same for the vcpu at all times,
+irrespective of which physical CPU the vcpu is currently running
+on.
 
-In order to support this in a flexible way, this patch adds a
-check_present() method to struct sys_reg_desc, and updates the
-generic system register access and enumeration code to be aware of
-it:  if check_present() returns false, the code behaves as if the
-register did not exist.
+The Arm SVE architecture allows the maximum vector length visible
+to EL1 to be restricted by programming ZCR_EL2.LEN.  This provides
+a means to hide from guests any vector lengths that are not
+supported by every physical CPU in the system.  However, there is
+no way to hide a particular vector length while some greater vector
+length is exposed to EL1.
 
-For convenience, the complete check is wrapped up in a new helper
-sys_reg_present().
+This patch determines the maximum vector length
+(sve_max_virtualisable_vl) for which the set of supported vector
+lengths not exceeding it is identical for all CPUs.  When KVM is
+available, the set of vector lengths supported by each late
+secondary CPU is verified to be consistent with those of the early
+CPUs, in order to ensure that the value chosen for
+sve_max_virtualisable_vl remains globally valid, and ensure that
+all created vcpus continue to behave correctly.
 
-An attempt has been made to hook the new check into the generic
-accessors for trapped system registers.  This should reduce the
-potential for future surprises, although the redundant check will
-add a small cost.  No system register depends on this functionality
-yet, and some paths needing the check may also need attention.
-
-Naturally, this facility makes sense only for registers that are
-trapped.
+sve_secondary_vq_map is used as scratch space for these
+computations, rendering its name misleading.  This patch renames
+this bitmap to sve_tmp_vq_map in order to make its purpose clearer.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 20 +++++++++++++++-----
- arch/arm64/kvm/sys_regs.h | 11 +++++++++++
- 2 files changed, 26 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/fpsimd.h |  1 +
+ arch/arm64/kernel/cpufeature.c  |  2 +-
+ arch/arm64/kernel/fpsimd.c      | 86 ++++++++++++++++++++++++++++++++++-------
+ 3 files changed, 75 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index a436373..31a351a 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1840,7 +1840,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index fa92747..3ad4607 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -85,6 +85,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
+ extern u64 read_zcr_features(void);
  
- 	r = find_reg(params, table, num);
+ extern int __ro_after_init sve_max_vl;
++extern int __ro_after_init sve_max_virtualisable_vl;
  
--	if (r) {
-+	if (likely(r) && sys_reg_present(vcpu, r)) {
- 		perform_access(vcpu, params, r);
- 		return 0;
+ #ifdef CONFIG_ARM64_SVE
+ 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index d2856b1..f493a2f 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1511,7 +1511,7 @@ static void verify_sve_features(void)
+ 	unsigned int len = zcr & ZCR_ELx_LEN_MASK;
+ 
+ 	if (len < safe_len || sve_verify_vq_map()) {
+-		pr_crit("CPU%d: SVE: required vector length(s) missing\n",
++		pr_crit("CPU%d: SVE: vector length support mismatch\n",
+ 			smp_processor_id());
+ 		cpu_die_early();
  	}
-@@ -2016,7 +2016,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
- 	if (!r)
- 		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 6b1ddae..390afb4 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -18,6 +18,7 @@
+  */
  
--	if (likely(r)) {
-+	if (likely(r) && sys_reg_present(vcpu, r)) {
- 		perform_access(vcpu, params, r);
- 	} else {
- 		kvm_err("Unsupported guest sys_reg access at: %lx\n",
-@@ -2313,6 +2313,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
- 	if (!r)
- 		return get_invariant_sys_reg(reg->id, uaddr);
+ #include <linux/bitmap.h>
++#include <linux/bitops.h>
+ #include <linux/bottom_half.h>
+ #include <linux/bug.h>
+ #include <linux/cache.h>
+@@ -48,6 +49,7 @@
+ #include <asm/sigcontext.h>
+ #include <asm/sysreg.h>
+ #include <asm/traps.h>
++#include <asm/virt.h>
  
-+	if (!sys_reg_present(vcpu, r))
-+		return -ENOENT;
-+
- 	if (r->get_user)
- 		return (r->get_user)(vcpu, r, reg, uaddr);
+ #define FPEXC_IOF	(1 << 0)
+ #define FPEXC_DZF	(1 << 1)
+@@ -130,14 +132,18 @@ static int sve_default_vl = -1;
  
-@@ -2334,6 +2337,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
- 	if (!r)
- 		return set_invariant_sys_reg(reg->id, uaddr);
+ /* Maximum supported vector length across all CPUs (initially poisoned) */
+ int __ro_after_init sve_max_vl = SVE_VL_MIN;
++int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
+ /* Set of available vector lengths, as vq_to_bit(vq): */
+ static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
++/* Set of vector lengths present on@least one cpu: */
++static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
+ static void __percpu *efi_sve_state;
  
-+	if (!sys_reg_present(vcpu, r))
-+		return -ENOENT;
-+
- 	if (r->set_user)
- 		return (r->set_user)(vcpu, r, reg, uaddr);
+ #else /* ! CONFIG_ARM64_SVE */
  
-@@ -2390,7 +2396,8 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
- 	return true;
+ /* Dummy declaration for code that will be optimised out: */
+ extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
++extern __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
+ extern void __percpu *efi_sve_state;
+ 
+ #endif /* ! CONFIG_ARM64_SVE */
+@@ -642,11 +648,8 @@ int sve_get_current_vl(void)
+ 	return sve_prctl_status(0);
  }
  
--static int walk_one_sys_reg(const struct sys_reg_desc *rd,
-+static int walk_one_sys_reg(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_desc *rd,
- 			    u64 __user **uind,
- 			    unsigned int *total)
+-/*
+- * Bitmap for temporary storage of the per-CPU set of supported vector lengths
+- * during secondary boot.
+- */
+-static DECLARE_BITMAP(sve_secondary_vq_map, SVE_VQ_MAX);
++/* Bitmaps for temporary storage during manipulation of vector length sets */
++static DECLARE_BITMAP(sve_tmp_vq_map, SVE_VQ_MAX);
+ 
+ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
  {
-@@ -2401,6 +2408,9 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
- 	if (!(rd->reg || rd->get_user))
- 		return 0;
- 
-+	if (!sys_reg_present(vcpu, rd))
-+		return 0;
-+
- 	if (!copy_reg_to_user(rd, uind))
- 		return -EFAULT;
- 
-@@ -2429,9 +2439,9 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
- 		int cmp = cmp_sys_reg(i1, i2);
- 		/* target-specific overrides generic entry. */
- 		if (cmp <= 0)
--			err = walk_one_sys_reg(i1, &uind, &total);
-+			err = walk_one_sys_reg(vcpu, i1, &uind, &total);
- 		else
--			err = walk_one_sys_reg(i2, &uind, &total);
-+			err = walk_one_sys_reg(vcpu, i2, &uind, &total);
- 
- 		if (err)
- 			return err;
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index cd710f8..dfbb342 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -22,6 +22,9 @@
- #ifndef __ARM64_KVM_SYS_REGS_LOCAL_H__
- #define __ARM64_KVM_SYS_REGS_LOCAL_H__
- 
-+#include <linux/compiler.h>
-+#include <linux/types.h>
-+
- struct sys_reg_params {
- 	u8	Op0;
- 	u8	Op1;
-@@ -61,8 +64,16 @@ struct sys_reg_desc {
- 			const struct kvm_one_reg *reg, void __user *uaddr);
- 	int (*set_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 			const struct kvm_one_reg *reg, void __user *uaddr);
-+	bool (*check_present)(const struct kvm_vcpu *vpcu,
-+			      const struct sys_reg_desc *rd);
- };
- 
-+static inline bool sys_reg_present(const struct kvm_vcpu *vcpu,
-+				   const struct sys_reg_desc *rd)
-+{
-+	return likely(!rd->check_present) || rd->check_present(vcpu, rd);
-+}
-+
- static inline void print_sys_reg_instr(const struct sys_reg_params *p)
+@@ -669,6 +672,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
+ void __init sve_init_vq_map(void)
  {
- 	/* Look, we even formatted it for you to paste into the table! */
+ 	sve_probe_vqs(sve_vq_map);
++	bitmap_copy(sve_vq_partial_map, sve_vq_map, SVE_VQ_MAX);
+ }
+ 
+ /*
+@@ -677,24 +681,60 @@ void __init sve_init_vq_map(void)
+  */
+ void sve_update_vq_map(void)
+ {
+-	sve_probe_vqs(sve_secondary_vq_map);
+-	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
++	sve_probe_vqs(sve_tmp_vq_map);
++	bitmap_and(sve_vq_map, sve_vq_map, sve_tmp_vq_map,
++		   SVE_VQ_MAX);
++	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, sve_tmp_vq_map,
++		  SVE_VQ_MAX);
+ }
+ 
+ /* Check whether the current CPU supports all VQs in the committed set */
+ int sve_verify_vq_map(void)
+ {
+-	int ret = 0;
++	int ret = -EINVAL;
++	unsigned long b;
+ 
+-	sve_probe_vqs(sve_secondary_vq_map);
+-	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
+-		      SVE_VQ_MAX);
+-	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
++	sve_probe_vqs(sve_tmp_vq_map);
++
++	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
++	if (bitmap_intersects(sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX)) {
+ 		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
+ 			smp_processor_id());
+-		ret = -EINVAL;
++		goto error;
+ 	}
+ 
++	if (!IS_ENABLED(CONFIG_KVM) || !is_hyp_mode_available())
++		goto ok;
++
++	/*
++	 * For KVM, it is necessary to ensure that this CPU doesn't
++	 * support any vector length that guests may have probed as
++	 * unsupported.
++	 */
++
++	/* Recover the set of supported VQs: */
++	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
++	/* Find VQs supported that are not globally supported: */
++	bitmap_andnot(sve_tmp_vq_map, sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX);
++
++	/* Find the lowest such VQ, if any: */
++	b = find_last_bit(sve_tmp_vq_map, SVE_VQ_MAX);
++	if (b >= SVE_VQ_MAX)
++		goto ok; /* no mismatches */
++
++	/*
++	 * Mismatches above sve_max_virtualisable_vl are fine, since
++	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
++	 */
++	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
++		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
++			smp_processor_id());
++		goto error;
++	}
++
++ok:
++	ret = 0;
++error:
+ 	return ret;
+ }
+ 
+@@ -762,6 +802,7 @@ u64 read_zcr_features(void)
+ void __init sve_setup(void)
+ {
+ 	u64 zcr;
++	unsigned long b;
+ 
+ 	if (!system_supports_sve())
+ 		return;
+@@ -790,10 +831,29 @@ void __init sve_setup(void)
+ 	 */
+ 	sve_default_vl = find_supported_vector_length(64);
+ 
++	bitmap_andnot(sve_tmp_vq_map, sve_vq_partial_map, sve_vq_map,
++		      SVE_VQ_MAX);
++
++	b = find_last_bit(sve_tmp_vq_map, SVE_VQ_MAX);
++	if (b >= SVE_VQ_MAX)
++		/* No non-virtualisable VLs found */
++		sve_max_virtualisable_vl = SVE_VQ_MAX;
++	else if (WARN_ON(b == SVE_VQ_MAX - 1))
++		/* No virtualisable VLs?  This is architecturally forbidden. */
++		sve_max_virtualisable_vl = SVE_VQ_MIN;
++	else /* b + 1 < SVE_VQ_MAX */
++		sve_max_virtualisable_vl = sve_vl_from_vq(bit_to_vq(b + 1));
++
++	if (sve_max_virtualisable_vl > sve_max_vl)
++		sve_max_virtualisable_vl = sve_max_vl;
++
+ 	pr_info("SVE: maximum available vector length %u bytes per vector\n",
+ 		sve_max_vl);
+ 	pr_info("SVE: default vector length %u bytes per vector\n",
+ 		sve_default_vl);
++	if (sve_max_virtualisable_vl < sve_max_vl)
++		pr_info("SVE: vector lengths greater than %u bytes not virtualisable\n",
++			sve_max_virtualisable_vl);
+ 
+ 	sve_efi_setup();
+ }
 -- 
 2.1.4
