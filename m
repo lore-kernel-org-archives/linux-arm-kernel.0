@@ -1,105 +1,34 @@
-From: bugalski.piotr@gmail.com (Piotr Bugalski)
-Date: Thu, 21 Jun 2018 12:52:07 +0200 (CEST)
-Subject: [RFC PATCH 0/2] New QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180620165438.39608554@bbrezillon>
-References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
- <20180620165438.39608554@bbrezillon>
-Message-ID: <alpine.DEB.2.20.1806211239590.28763@carbonite>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 21 Jun 2018 16:22:24 +0530
+Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <20180621073706.22812-1-brgl@bgdev.pl>
+References: <20180621073706.22812-1-brgl@bgdev.pl>
+Message-ID: <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bartosz,
 
-Hi Boris,
+On Thursday 21 June 2018 01:07 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> These are the remaining patches that still need to be merged in order
+> to complete the conversion of the davinci dsp driver to using the reset
+> framework.
+> 
+> They apply on top of v4.18-rc1 with David Lechner's remaining patches
+> merged.
 
-Thank you very much for quick response.
+Series looks good to me.
 
-On Wed, 20 Jun 2018, Boris Brezillon wrote:
+To preserve bisect, shouldn't the order of applying be patch #3, #4, #1
+and #2 ?
 
-> Hi Piotr,
->
-> On Mon, 18 Jun 2018 18:21:22 +0200
-> Piotr Bugalski <bugalski.piotr@gmail.com> wrote:
->
->> Hello,
->>
->> Atmel SAMA5D2 is equipped with two QSPI interfaces. These interfaces can
->> work as in SPI-compatible mode or use two / four lines to improve
->> communication speed. At the moment there is QSPI driver strongly tied to
->> NOR-flash memory and MTD subsystem.
->> Intention of this change is to provide new driver which will not be tied
->> to MTD and allows using QSPI with NAND-flash memory or other peripherals
->> New spi-mem API provides abstraction layer which can disconnect QSPI
->> from MTD. This driver doesn't support regular SPI interface, it should
->> be used with spi-mem interface only.
->
-> Glad to see that people are starting to convert their SPI NOR
-> controller drivers to the SPI mem approach.
->
->> Unfortunately SAMA5D2 hardware by default supports only NOR-flash
->> memory. It allows 24- and 32-bit addressing while NAND-flash requires
->> 16-bit long. To workaround hardware limitation driver is a bit more
->> complicated.
->>
->> Request to spi-mem contains three fiels: opcode (command), address,
->> dummy bytes. SAMA5D2 QSPI hardware supports opcode, address, dummy and
->> option byte where address field can only be 24- or 32- bytes long.
->> Handling 8-bits long addresses is done using option field. For 16-bits
->> address behaviour depends of number of requested dummy bits. If there
->> are 8 or more dummy cycles, address is shifted and sent with first dummy
->> byte. Otherwise opcode is disabled and first byte of address contains
->> command opcode (works only if opcode and address use the same buswidth).
->> The limitation is when 16-bit address is used without enough dummy
->> cycles and opcode is using different buswidth than address. Other modes
->> are supported with described workaround.
->>
->> It looks like hardware has some limitation in performance. The same issue
->> exists in current QSPI driver (MTD/nor-flash) and soft-pack (bare-metal
->> library from Atmel). Without using DMA read speed is much worse than
->> maximum bandwidth (efficiency 30-40%). Any help with performance
->> improvement is highly welcome, especially for NAND-flash memories which
->> offers higher capacity than NOR-flash used with previous driver.
->>
->> Best Regards,
->> Piotr
->>
->> Piotr Bugalski (2):
->>   spi: Add QuadSPI driver for Atmel SAMA5D2
->>   dt-bindings: spi: QuadSPI driver for Atmel SAMA5D2 documentation
->>
->>  .../devicetree/bindings/spi/spi_atmel-qspi.txt     |  41 ++
->>  drivers/spi/Kconfig                                |   9 +
->>  drivers/spi/Makefile                               |   1 +
->>  drivers/spi/spi-atmel-qspi.c                       | 480 +++++++++++++++++++++
->
-> I'd like a solution where we remove the old driver. I definitely don't
-> want to have both in parallel. Did you test the new driver with a SPI
-> NOR to check if it still works correctly? If you did, then I'd suggest
-> that you add a patch updating defconfigs where the SPI_ATMEL_QUADSPI is
-> selected and another patch removing the old driver.
->
+Given the dependencies and to preserve bisect its easiest if I take the
+series with acks from remoteproc and clock maintainers.
 
-I misunderstood a bit your idea. My main concern was NAND-flash with
-QSPI interface and I expected original nor-flash driver to stay
-untouched - at least now. However idea of replacement older driver
-with spi-mem approach makes a lot of sense to me.
-I'll test nor-flash with new driver first, it should work but I prefer
-to be sure. In next version I'll follow your suggestion and replace
-old nor-flash driver.
+Open to other suggestions as well.
 
->>  4 files changed, 531 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel-qspi.txt
->
-> This should be a simple mv from
-> Documentation/devicetree/bindings/mtd/atmel-quadspi.txt to
-> Documentation/devicetree/bindings/spi/spi-atmel-qspi.txt
->
->>  create mode 100644 drivers/spi/spi-atmel-qspi.c
->>
->
-> Thanks,
->
-> Boris
->
-
-Thank you for comments,
-Piotr
+Thanks,
+Sekhar
