@@ -1,59 +1,56 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Thu, 21 Jun 2018 08:00:57 +0300
-Subject: [PATCH v2 0/5] crypto: ccree: cleanup, fixes and R-Car enabling
-In-Reply-To: <20180620085145.7bxfbu7bi45sftnk@verge.net.au>
-References: <1527171551-21979-1-git-send-email-gilad@benyossef.com>
- <CAMuHMdVXrppnFEBmR3xhwNu3i0N3mVE1+FJRjEcWBYpHHbsAsw@mail.gmail.com>
- <CAOtvUMc8D9DQFC6vZ+GnaVBg5uFVrQmOrnSQKz7ZPHGh4BCsZg@mail.gmail.com>
- <20180620085145.7bxfbu7bi45sftnk@verge.net.au>
-Message-ID: <CAOtvUMfgUFT3+8kwVpACU6tXBX1TrzB-1uiHg7X=KXN-Utv0mg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Jun 2018 22:37:54 -0700
+Subject: [PATCH 3/5] arm64: dts: ti: Add Support for AM654 SoC
+In-Reply-To: <20180619194253.27288-4-nm@ti.com>
+References: <20180619194253.27288-1-nm@ti.com>
+ <20180619194253.27288-4-nm@ti.com>
+Message-ID: <20180621053754.GD112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 11:51 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Jun 19, 2018 at 04:57:15PM +0300, Gilad Ben-Yossef wrote:
->> On Tue, Jun 19, 2018 at 3:58 PM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->> > Hi Gilad,
->> >
->> > On Thu, May 24, 2018 at 4:19 PM Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->> >> The patch set enables the use of CryptoCell found in some Renesas R-Car
->> >> Salvator-X boards and fixes some driver issues uncovered that prevented
->> >> to work properly.
->> >
->> > With DEBUG enabled on R-Car H3, I see lots of
->> >
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x00000098)
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000C0)
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000D0)
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000D8)
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000E0)
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000F0)
->> >     ccree e6601000.crypto: IRR includes unknown cause bits (0x000000F8)
->> >
->> > during boot. Is that expected?
->>
->> Yes. The condition itself it is reporting is not necessarily bad. It
->> means that driver
->> did not act on certain HW notification during interrupts and that's
->> OK, we don't act on all of them
->> depending on configuration - e.g. if you have CONFIG_FIPS enabled and
->> an active TEE module or not.
->>
->> I can rate_limit the message if it bothers you but other than that it
->> is a harmless debug print.
->
-> Rate limiting sounds like an excellent idea to me.
+* Nishanth Menon <nm@ti.com> [180619 19:46]:
+> +	cbass_main: cbass at 100000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0x00100000 0x00 0x00100000 0x00020000>, /* ctrl mmr */
+> +			 <0x00600000 0x00 0x00600000 0x00001100>, /* GPIO */
+> +			 <0x00900000 0x00 0x00900000 0x00012000>, /* serdes */
+> +			 <0x01000000 0x00 0x01000000 0x0af02400>, /* Most peripherals */
+> +			 <0x30800000 0x00 0x30800000 0x0bc00000>, /* MAIN NAVSS */
+> +			 /* MCUSS Range */
+> +			 <0x28380000 0x00 0x28380000 0x03880000>,
+> +			 <0x40200000 0x00 0x40200000 0x00900100>,
+> +			 <0x42040000 0x00 0x42040000 0x03ac2400>,
+> +			 <0x45100000 0x00 0x45100000 0x00c24000>,
+> +			 <0x46000000 0x00 0x46000000 0x00200000>,
+> +			 <0x47000000 0x00 0x47000000 0x00068400>;
+> +
+> +		cbass_mcu: cbass at 28380000 {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x28380000 0x28380000 0x03880000>, /* MCU NAVSS*/
+> +				 <0x40200000 0x40200000 0x00900100>, /* First peripheral window */
+> +				 <0x42040000 0x42040000 0x03ac2400>, /* WKUP */
+> +				 <0x45100000 0x45100000 0x00c24000>, /* MMRs, remaining NAVSS */
+> +				 <0x46000000 0x46000000 0x00200000>, /* CPSW */
+> +				 <0x47000000 0x47000000 0x00068400>; /* OSPI space 1 */
+> +
+> +			cbass_wakeup: cbass at 42040000 {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				/* WKUP  Basic peripherals */
+> +				ranges = <0x42040000 0x42040000 0x03ac2400>;
+> +			};
+> +		};
+> +	};
+> +};
 
-Will do.
+You should use cbass_main: interconnect at 1000000 and so on here.
+Other than that looks good to me, thanks for updating it.
 
-Thanks!
-Gilad
+Regards,
 
-
-
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-values of ? will give rise to dom!
+Tony
