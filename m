@@ -1,38 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Jun 2018 10:00:38 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
-Message-ID: <5fb40691-e887-a446-8e84-bfdfeaae2e78@arm.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Thu, 21 Jun 2018 11:02:16 +0200
+Subject: [PATCH V4 3/4] ARM: dts: stm32: add iwdg2 support for stm32mp157c
+In-Reply-To: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
+References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1529571737-3552-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/18 09:38, James Morse wrote:
+From: Ludovic Barre <ludovic.barre@st.com>
 
->> (joyx at Turing-Arch-b) (gcc version 4.9.1 20140505 (prerelease) (crosstool-NG
->> linaro-1.13.1-4.9-2014.05 - Linaro GCC 4.9-2014.05)) #10 SMP PREEMPT Wed Jun 20
->> 23:59:05 CST 2018
-> 
->> ??? [??? 0.000000] CPU0: using LPI pending table @0x000000007d860000
->> ??? [??? 0.000000] GIC: PPI11 is secure or misconfigured
->> ??? [??? 0.000000] arch_timer: WARNING: Invalid trigger for IRQ3, assuming level
->> low
->> ??? [??? 0.000000] arch_timer: WARNING: Please fix your firmware
->> ??? [??? 0.000000] arch_timer: cp15 timer(s) running at 100.00MHz (virt).
-> 
-> (No idea what these mean, but I doubt they are relevant)
+This patch adds independent watchdog support for stm32mp157c.
 
-Old (and buggy) QEMU. Nothing to worry about, the kernel (and the vgic)
-will do the right thing. A modern QEMU presents the guest with a fixed
-DT, removing the warning altogether.
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ arch/arm/boot/dts/stm32mp157c.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Nothing to do with the issue at hand anyway.
-
-	M.
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index 7d17538..95cc166 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -784,6 +784,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		iwdg2: watchdog at 5a002000 {
++			compatible = "st,stm32mp1-iwdg";
++			reg = <0x5a002000 0x400>;
++			clocks = <&rcc IWDG2>, <&rcc CK_LSI>;
++			clock-names = "pclk", "lsi";
++			status = "disabled";
++		};
++
+ 		usbphyc: usbphyc at 5a006000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
