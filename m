@@ -1,137 +1,43 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Fri, 22 Jun 2018 00:47:37 +0800
-Subject: [PATCH v3 2/2] drm/rockchip: Support 10 bits yuv format in vop
-In-Reply-To: <20180621164737.23611-1-ayaka@soulik.info>
-References: <20180621164737.23611-1-ayaka@soulik.info>
-Message-ID: <20180621164737.23611-3-ayaka@soulik.info>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 21 Jun 2018 12:50:25 -0400
+Subject: [PATCH] ARM: ftrace: Only set kernel memory back to read-only
+ after boot
+In-Reply-To: <20180621124710.453ee0ae@gandalf.local.home>
+References: <20180621124710.453ee0ae@gandalf.local.home>
+Message-ID: <20180621125025.25b70bb9@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rockchip use fully packed pixel format variants
-for YUV 10bits.
+On Thu, 21 Jun 2018 12:47:10 -0400
+Steven Rostedt <rostedt@goodmis.org> wrote:
 
-This patch only make the VOP accept this pixel format,
-but it doesn't add the converting data path for
-the color gamuts that the target display are supported.
+> From: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> 
+> Dynamic ftrace requires modifying the code segments that are usually
+> set to read-only. To do this, a per arch function is called both before
+> and after the ftrace modifications are performed. The "before" function
+> will set kernel code text to read-write to allow for ftrace to make the
+> modifications, and the "after" function will set the kernel code text
+> back to "read-only" to keep the kernel code text protected.
+> 
+> The issue happens when dynamic ftrace is tested at boot up. The test is
+> done before the kernel code text has been set to read-only. But the
+> "before" and "after" calls are still performed. The "after" call will
+> change the kernel code text to read-only prematurely, and other boot
+> code that expects this code to be read-write will fail.
+> 
+> The solution is to add a variable that is set when the kernel code text
+> is expected to be converted to read-only, and make the ftrace "before"
+> and "after" calls do nothing if that variable is not yet set. This is
+> similar to the x86 solution from commit 162396309745 ("ftrace, x86:
+> make kernel text writable only for conversions").
+> 
+> Reported-by: Stefan Agner <stefan@agner.ch>
+> Tested-by: Stefan Agner <stefan@agner.ch>
+> Link: http://lkml.kernel.org/r/20180620212906.24b7b66e at vmware.local.home
+> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> ---
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 27 +++++++++++++++++++++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  1 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c |  2 ++
- 3 files changed, 28 insertions(+), 2 deletions(-)
+Perhaps I should have Cc'd stable too?
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 2121345a61af..6a54b20501ac 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -232,6 +232,7 @@ static enum vop_data_format vop_convert_format(uint32_t format)
- 	case DRM_FORMAT_BGR565:
- 		return VOP_FMT_RGB565;
- 	case DRM_FORMAT_NV12:
-+	case DRM_FORMAT_NV12_10LE40:
- 		return VOP_FMT_YUV420SP;
- 	case DRM_FORMAT_NV16:
- 		return VOP_FMT_YUV422SP;
-@@ -249,6 +250,17 @@ static bool is_yuv_support(uint32_t format)
- 	case DRM_FORMAT_NV12:
- 	case DRM_FORMAT_NV16:
- 	case DRM_FORMAT_NV24:
-+	case DRM_FORMAT_NV12_10LE40:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static bool is_yuv_10bit(uint32_t format)
-+{
-+	switch (format) {
-+	case DRM_FORMAT_NV12_10LE40:
- 		return true;
- 	default:
- 		return false;
-@@ -711,6 +723,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
- 	dma_addr_t dma_addr;
- 	uint32_t val;
- 	bool rb_swap;
-+	bool is_10_bits = false;
- 	int win_index = VOP_WIN_TO_INDEX(vop_win);
- 	int format;
- 
-@@ -728,6 +741,8 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
- 		return;
- 	}
- 
-+	is_10_bits = is_yuv_10bit(fb->format->format);
-+
- 	obj = rockchip_fb_get_gem_obj(fb, 0);
- 	rk_obj = to_rockchip_obj(obj);
- 
-@@ -742,7 +757,11 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
- 	dsp_sty = dest->y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
- 	dsp_st = dsp_sty << 16 | (dsp_stx & 0xffff);
- 
--	offset = (src->x1 >> 16) * fb->format->cpp[0];
-+	if (is_10_bits)
-+		offset = (src->x1 >> 16) * (fb->format->cpp[0] * 5 / 4);
-+	else
-+		offset = (src->x1 >> 16) * fb->format->cpp[0];
-+
- 	offset += (src->y1 >> 16) * fb->pitches[0];
- 	dma_addr = rk_obj->dma_addr + offset + fb->offsets[0];
- 
-@@ -753,6 +772,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
- 	VOP_WIN_SET(vop, win, format, format);
- 	VOP_WIN_SET(vop, win, yrgb_vir, DIV_ROUND_UP(fb->pitches[0], 4));
- 	VOP_WIN_SET(vop, win, yrgb_mst, dma_addr);
-+	VOP_WIN_SET(vop, win, fmt_10, is_10_bits);
- 	if (is_yuv_support(fb->format->format)) {
- 		int hsub = drm_format_horz_chroma_subsampling(fb->format->format);
- 		int vsub = drm_format_vert_chroma_subsampling(fb->format->format);
-@@ -761,7 +781,10 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
- 		uv_obj = rockchip_fb_get_gem_obj(fb, 1);
- 		rk_uv_obj = to_rockchip_obj(uv_obj);
- 
--		offset = (src->x1 >> 16) * bpp / hsub;
-+		if (is_10_bits)
-+			offset = (src->x1 >> 16) * (bpp * 5 / 4) / hsub;
-+		else
-+			offset = (src->x1 >> 16) * bpp / hsub;
- 		offset += (src->y1 >> 16) * fb->pitches[1] / vsub;
- 
- 		dma_addr = rk_uv_obj->dma_addr + offset + fb->offsets[1];
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 084acdd0019a..d9ec993f420a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -131,6 +131,7 @@ struct vop_win_phy {
- 	struct vop_reg enable;
- 	struct vop_reg gate;
- 	struct vop_reg format;
-+	struct vop_reg fmt_10;
- 	struct vop_reg rb_swap;
- 	struct vop_reg act_info;
- 	struct vop_reg dsp_info;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 08023d3ecb76..5393886ddd95 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -50,6 +50,7 @@ static const uint32_t formats_win_full[] = {
- 	DRM_FORMAT_NV12,
- 	DRM_FORMAT_NV16,
- 	DRM_FORMAT_NV24,
-+	DRM_FORMAT_NV12_10LE40,
- };
- 
- static const uint32_t formats_win_lite[] = {
-@@ -215,6 +216,7 @@ static const struct vop_win_phy rk3288_win01_data = {
- 	.nformats = ARRAY_SIZE(formats_win_full),
- 	.enable = VOP_REG(RK3288_WIN0_CTRL0, 0x1, 0),
- 	.format = VOP_REG(RK3288_WIN0_CTRL0, 0x7, 1),
-+	.fmt_10 = VOP_REG(RK3288_WIN0_CTRL0, 0x1, 4),
- 	.rb_swap = VOP_REG(RK3288_WIN0_CTRL0, 0x1, 12),
- 	.act_info = VOP_REG(RK3288_WIN0_ACT_INFO, 0x1fff1fff, 0),
- 	.dsp_info = VOP_REG(RK3288_WIN0_DSP_INFO, 0x0fff0fff, 0),
--- 
-2.14.4
+-- Steve
