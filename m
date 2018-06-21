@@ -1,171 +1,96 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jun 2018 09:23:27 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 11/27] drm/sun4i: tcon: Add support
- for tcon-top gate
-In-Reply-To: <2581098.bNJirayF9O@jernej-laptop>
-References: <20180612200036.21483-1-jernej.skrabec@siol.net>
- <3871160.F3Km1rQkUz@jernej-laptop>
- <CAGb2v66Tv7876_heSve0zb+vWfz9kbwbrU8NjnpTwUHm6xOKJQ@mail.gmail.com>
- <2581098.bNJirayF9O@jernej-laptop>
-Message-ID: <CAGb2v64iB8FP1Nf+vZM2wd6wzNLxWYrCP78D-rOUg881RPNpEA@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 20 Jun 2018 21:29:06 -0400
+Subject: Dynamic ftrace self test broken on ARM
+In-Reply-To: <20180620230734.GO17671@n2100.armlinux.org.uk>
+References: <65fb14b356bc0a414f1fe5cf5c6eb395@agner.ch>
+ <20180618175437.3e6c85a1@gandalf.local.home>
+ <b9f269ed2143688c38cdcbba7367b101@agner.ch>
+ <20180619091735.7aec75d0@gandalf.local.home>
+ <5e26cebbb2ebeb87fdc808509881736b@agner.ch>
+ <20180620101311.0bcd73d3@gandalf.local.home>
+ <7904ed3fe9f59a54526d64f366915b43@agner.ch>
+ <e4181ae694d44913a8eba4618477bd3b@agner.ch>
+ <ac0178fb75658a8d7d7b1931691c7755@agner.ch>
+ <20180620230734.GO17671@n2100.armlinux.org.uk>
+Message-ID: <20180620212906.24b7b66e@vmware.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 3:37 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Dne sobota, 16. junij 2018 ob 07:48:38 CEST je Chen-Yu Tsai napisal(a):
->> On Sat, Jun 16, 2018 at 1:33 AM, Jernej ?krabec <jernej.skrabec@siol.net>
-> wrote:
->> > Dne petek, 15. junij 2018 ob 19:13:17 CEST je Chen-Yu Tsai napisal(a):
->> >> On Sat, Jun 16, 2018 at 12:41 AM, Jernej ?krabec
->> >>
->> >> <jernej.skrabec@siol.net> wrote:
->> >> > Hi,
->> >> >
->> >> > Dne petek, 15. junij 2018 ob 10:31:10 CEST je Maxime Ripard napisal(a):
->> >> >> Hi,
->> >> >>
->> >> >> On Tue, Jun 12, 2018 at 10:00:20PM +0200, Jernej Skrabec wrote:
->> >> >> > TV TCONs connected to TCON TOP have to enable additional gate in
->> >> >> > order
->> >> >> > to work.
->> >> >> >
->> >> >> > Add support for such TCONs.
->> >> >> >
->> >> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >> >> > ---
->> >> >> >
->> >> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 +++++++++++
->> >> >> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
->> >> >> >  2 files changed, 15 insertions(+)
->> >> >> >
->> >> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> >> > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index
->> >> >> > 08747fc3ee71..0afb5a94a414
->> >> >> > 100644
->> >> >> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> >> > @@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device
->> >> >> > *dev,
->> >> >> >
->> >> >> >             dev_err(dev, "Couldn't get the TCON bus clock\n");
->> >> >> >             return PTR_ERR(tcon->clk);
->> >> >> >
->> >> >> >     }
->> >> >> >
->> >> >> > +
->> >> >> > +   if (tcon->quirks->has_tcon_top_gate) {
->> >> >> > +           tcon->top_clk = devm_clk_get(dev, "tcon-top");
->> >> >> > +           if (IS_ERR(tcon->top_clk)) {
->> >> >> > +                   dev_err(dev, "Couldn't get the TCON TOP bus
->> >> >> > clock\n");
->> >> >> > +                   return PTR_ERR(tcon->top_clk);
->> >> >> > +           }
->> >> >> > +           clk_prepare_enable(tcon->top_clk);
->> >> >> > +   }
->> >> >> > +
->> >> >>
->> >> >> Is it required for the TCON itself to operate, or does the TCON
->> >> >> requires the TCON TOP, which in turn requires that clock to be
->> >> >> functional?
->> >> >>
->> >> >> I find it quite odd to have a clock that isn't meant for a particular
->> >> >> device to actually be wired to another device. I'm not saying this
->> >> >> isn't the case, but it would be a first.
->> >> >
->> >> > Documentation doesn't say much about that gate. I did few tests and
->> >> > TCON
->> >> > registers can be read and written even if TCON TOP TV TCON gate is
->> >> > disabled. However, there is no image, as expected.
->> >>
->> >> The R40 manual does include it in the diagram, on page 504. There's also
->> >> a
->> >> mux to select whether the clock comes directly from the CCU or the TV
->> >> encoder (a feedback mode?). I assume this is the gate you are referring
->> >> to
->> >> here, in which case it is not a bus clock, but rather the TCON module or
->> >> channel clock, strangely routed.
->> >>
->> >> > More interestingly, I enabled test pattern directly in TCON to
->> >> > eliminate
->> >> > influence of the mixer. As soon as I disabled that gate, test pattern
->> >> > on
->> >> > HDMI screen was gone, which suggest that this gate influences something
->> >> > inside TCON.
->> >> >
->> >> > Another test I did was that I moved enable/disable gate code to
->> >> > sun4i_tcon_channel_set_status() and it worked just as well.
->> >> >
->> >> > I'll ask AW engineer what that gate actually does, but from what I saw,
->> >> > I
->> >> > would say that most appropriate location to enable/disable TCON TOP TV
->> >> > TCON
->> >> > gate is TCON driver. Alternatively, TCON TOP driver could check if any
->> >> > TV
->> >> > TCON is in use and enable appropriate gate. However, that doesn't sound
->> >> > right to me for some reason.
->> >>
->> >> If what I said above it true, then yes, the appropriate location to
->> >> enable
->> >> it is the TCON driver, but moreover, the representation of the clock tree
->> >> should be fixed such that the TCON takes the clock from the TCON TOP as
->> >> its
->> >> channel/ module clock instead. That way you don't need this patch, but
->> >> you'd add another for all the clock routing.
->> >
->> > Can you be more specific? I not sure what you mean here.
->>
->> For clock related properties in the device tree:
->>
->> &tcon_top {
->>     clocks = <&ccu CLK_BUS_TCON_TOP>,
->>              <&ccu CLK_TCON_TV0>,
->>              <&tve0>,
->>              <&ccu CLK_TCON_TV1>,
->>              <&tve1>;
->>     clock-names = "bus", "tcon-tv0", "tve0", "tcon-tv1", "tve1";
->>     clock-output-names = "tcon-top-tv0", "tcon-top-tv1";
->> };
->>
->> &tcon_tv0 {
->>     clocks = <&ccu CLK_BUS_TCON_TV0>, <&tcon_top 0>'
->>     clock-names = "ahb", "tcon-ch1";
->> };
->>
->> A diagram would look like:
->>                    | This part is TCON TOP |
->>
->>                    v                       v
->> CCU CLK_TCON_TV0 --|----\                  |
->>
->>                    |     mux ---- gate ----|-- TCON_TV0
->>
->> TVE0 --------------|----/                  |
->>
->> And the same goes for TCON_TV1 and TVE1.
->>
->> The user manual is a bit lacking on how TVE outputs a clock though.
->
-> I didn't yet received any response on HW details from AW till now, but I would
-> like to post new version of patches soon.
->
-> While chaining like you described could be implemented easily, I don't think
-> it really represents HW as it is. Tests showed that these two clocks are
-> independent, otherwise register writes/reads wouldn't be possible with tcon-
-> top gate disabled. I chose tcon-top bus clock as a parent becase if it is not
-> enabled, it simply won't work.
+On Thu, 21 Jun 2018 00:07:34 +0100
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-AFAIK with the TCONs, even when the TCON channel clock (not the bus clock) is
-disabled, register accesses still work. I'm saying that the TCON TOP gate
-is downstream from the TCON channel clock in the CCU. These are not related
-to the TCON bus clock in the CCU, which affects register access.
 
-Did Allwinner provide any information regarding the hierarchy of the clocks?
+> > Any input from ARM folks?  
+> 
+> The same issues must exist on other architectures as ARM is not the only
+> architecture to implement read-only kernel text and dynamic ftrace, so
+> surely this problem isn't unique to ARM.
 
-> However, if everyone feels chaining is the best way to implement it, I'll do
-> it.
+Probably because of the way set_kernel_text_ro() is implemented in
+other archs. For example, in x86, we have:
 
-I would like to get it right and match actual hardware. My proposal is
-based on my understanding from the diagrams in the user manual.
+void set_kernel_text_ro(void)
+{
+	unsigned long start = PFN_ALIGN(_text);
+	unsigned long end = PFN_ALIGN(__stop___ex_table);
 
-Regards
-ChenYu
+	if (!kernel_set_to_readonly)
+		return;
+
+	/*
+	 * Set the kernel identity mapping for text RO.
+	 */
+	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
+}
+
+and arm has:
+
+void set_kernel_text_ro(void)
+{
+	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
+				current->active_mm);
+}
+
+Where x86's set_kernel_text_ro() is a nop until the
+kernel_set_to_readonly is set.
+
+Perhaps this may fix things?
+
+[ Not even compiled tested ]
+
+-- Steve
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index c186474422f3..0cc8e04295a4 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
+ 	return 0;
+ }
+ 
++static int kernel_set_to_readonly __read_mostly;
++
+ void mark_rodata_ro(void)
+ {
++	kernel_set_to_readonly = 1;
+ 	stop_machine(__mark_rodata_ro, NULL, NULL);
+ 	debug_checkwx();
+ }
+ 
+ void set_kernel_text_rw(void)
+ {
++	if (!kernel_set_to_readonly)
++		return;
++
+ 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
+ 				current->active_mm);
+ }
+ 
+ void set_kernel_text_ro(void)
+ {
++	if (!kernel_set_to_readonly)
++		return;
++
+ 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
+ 				current->active_mm);
+ }
