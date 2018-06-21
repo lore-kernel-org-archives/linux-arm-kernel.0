@@ -1,141 +1,159 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 21 Jun 2018 15:57:40 +0100
-Subject: [RFC PATCH 16/16] KVM: arm64/sve: Report and enable SVE API
- extensions for userspace
-In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1529593060-542-17-git-send-email-Dave.Martin@arm.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 21 Jun 2018 17:35:03 +0200
+Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
+In-Reply-To: <20180613140714.1686-8-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-8-maxime.ripard@bootlin.com>
+Message-ID: <a2e1e0a85e0cd650d27eb02dc58d438d6a750929.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reports the availability of KVM SVE support to userspace
-via a new vcpu feature flag KVM_ARM_VCPU_SVE.  This flag is
-reported via the KVM_ARM_PREFERRED_TARGET ioctl.
+Hi,
 
-Userspace can enable the feature by setting the flag for
-KVM_ARM_VCPU_INIT.  Without this flag set, SVE-related ioctls and
-register access extensions are hidden, and SVE remains disabled
-unconditionally for the guest.  This ensures that non-SVE-aware KVM
-userspace does not receive a vcpu that it does not understand how
-to snapshot or restore correctly.
+On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> The IRQ handler up until now was hardcoding the use of the MPEG engine to
+> read the interrupt status, clear it and disable the interrupts.
+> 
+> Obviously, that won't work really well with the introduction of new codecs
+> that use a separate engine with a separate register set.
+> 
+> In order to make this more future proof, introduce new decodec operations
+> to deal with the interrupt management. The only one missing is the one to
+> enable the interrupts in the first place, but that's taken care of by the
+> trigger hook for now.
 
-Storage is allocated for the SVE register state at vcpu init time,
-sufficient for the maximum vector length to be exposed to the vcpu.
-No attempt is made to allocate the storage lazily for now.  Also,
-no attempt is made to resize the storage dynamically, since the
-effective vector length of the vcpu can change at each EL0/EL1
-transition.  The storage is freed at the vcpu uninit hook.
+Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-No particular attempt is made to prevent userspace from creating a
-mix of vcpus some of which have SVE enabled and some of which have
-it disabled.  This may or may not be useful, but it reflects the
-underlying architectural behaviour.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/kvm_host.h |  6 +++---
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- arch/arm64/kvm/guest.c            | 19 +++++++++++++------
- arch/arm64/kvm/reset.c            | 14 ++++++++++++++
- 4 files changed, 31 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index d2084ae..d956cf2 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -44,7 +44,7 @@
- 
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
- 
--#define KVM_VCPU_MAX_FEATURES 4
-+#define KVM_VCPU_MAX_FEATURES 5
- 
- #define KVM_REQ_SLEEP \
- 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
-@@ -439,8 +439,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
- 
--static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
--static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-+int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu);
-+void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu);
- 
- void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index f54a9b0..6acf276 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -101,6 +101,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
- #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-+#define KVM_ARM_VCPU_SVE		4 /* Allow SVE for guest */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 5152362..fb7f6aa 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -58,6 +58,16 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
- 	return 0;
- }
- 
-+int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu)
-+{
-+	return 0;
-+}
-+
-+void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
-+{
-+	kfree(vcpu->arch.sve_state);
-+}
-+
- static u64 core_reg_offset_from_id(u64 id)
- {
- 	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-@@ -600,12 +610,9 @@ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
- 
- 	memset(init, 0, sizeof(*init));
- 
--	/*
--	 * For now, we don't return any features.
--	 * In future, we might use features to return target
--	 * specific features available for the preferred
--	 * target type.
--	 */
-+	/* KVM_ARM_VCPU_SVE understood by KVM_VCPU_INIT */
-+	init->features[0] = 1 << KVM_ARM_VCPU_SVE;
-+
- 	init->target = (__u32)target;
- 
- 	return 0;
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index a74311b..f63a791 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -110,6 +110,20 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 			cpu_reset = &default_regs_reset;
- 		}
- 
-+		if (system_supports_sve() &&
-+		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
-+			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
-+
-+			vcpu->arch.sve_max_vl = sve_max_virtualisable_vl;
-+
-+			vcpu->arch.sve_state = kzalloc(
-+				SVE_SIG_REGS_SIZE(
-+					sve_vq_from_vl(vcpu->arch.sve_max_vl)),
-+				GFP_KERNEL);
-+			if (!vcpu->arch.sve_state)
-+				return -ENOMEM;
-+		}
-+
- 		break;
- 	}
- 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
+>  .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
+>  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
+>  3 files changed, 53 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> index c2e2c92d103b..a2a507eb9fc9 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> @@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+>  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
+>  }
+>  
+> +enum sunxi_cedrus_irq_status {
+> +	SUNXI_CEDRUS_IRQ_NONE,
+> +	SUNXI_CEDRUS_IRQ_ERROR,
+> +	SUNXI_CEDRUS_IRQ_OK,
+> +};
+> +
+>  struct sunxi_cedrus_dec_ops {
+> +	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
+> +	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
+> +	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+>  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+>  		      struct sunxi_cedrus_run *run);
+>  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> index bb46a01214e0..6b97cbd2834e 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> @@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
+>  	struct sunxi_cedrus_ctx *ctx;
+>  	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
+>  	struct vb2_v4l2_buffer *src_vb, *dst_vb;
+> +	enum sunxi_cedrus_irq_status status;
+>  	unsigned long flags;
+> -	unsigned int value, status;
+>  
+>  	spin_lock_irqsave(&dev->irq_lock, flags);
+>  
+> -	/* Disable MPEG interrupts and stop the MPEG engine */
+> -	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
+> -	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
+> -
+> -	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
+> -	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
+> -	sunxi_cedrus_engine_disable(dev);
+> -
+>  	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
+>  	if (!ctx) {
+>  		pr_err("Instance released before the end of transaction\n");
+>  		spin_unlock_irqrestore(&dev->irq_lock, flags);
+>  
+> -		return IRQ_HANDLED;
+> +		return IRQ_NONE;
+>  	}
+>  
+> +	status = dev->dec_ops[ctx->current_codec]->irq_status(ctx);
+> +	if (status == SUNXI_CEDRUS_IRQ_NONE) {
+> +		spin_unlock_irqrestore(&dev->irq_lock, flags);
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
+> +	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
+> +
+>  	src_vb = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
+>  	dst_vb = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
+>  
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> index e25075bb5779..51fa0c0f9bf2 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
+> @@ -52,6 +52,36 @@ static const u8 mpeg_default_non_intra_quant[64] = {
+>  
+>  #define m_niq(i) ((i << 8) | mpeg_default_non_intra_quant[i])
+>  
+> +static enum sunxi_cedrus_irq_status
+> +sunxi_cedrus_mpeg2_irq_status(struct sunxi_cedrus_ctx *ctx)
+> +{
+> +	struct sunxi_cedrus_dev *dev = ctx->dev;
+> +	u32 reg = sunxi_cedrus_read(dev, VE_MPEG_STATUS) & 0x7;
+> +
+> +	if (!reg)
+> +		return SUNXI_CEDRUS_IRQ_NONE;
+> +
+> +	if (reg & (BIT(1) | BIT(2)))
+> +		return SUNXI_CEDRUS_IRQ_ERROR;
+> +
+> +	return SUNXI_CEDRUS_IRQ_OK;
+> +}
+> +
+> +static void sunxi_cedrus_mpeg2_irq_clear(struct sunxi_cedrus_ctx *ctx)
+> +{
+> +	struct sunxi_cedrus_dev *dev = ctx->dev;
+> +
+> +	sunxi_cedrus_write(dev, GENMASK(2, 0), VE_MPEG_STATUS);
+> +}
+> +
+> +static void sunxi_cedrus_mpeg2_irq_disable(struct sunxi_cedrus_ctx *ctx)
+> +{
+> +	struct sunxi_cedrus_dev *dev = ctx->dev;
+> +	u32 reg = sunxi_cedrus_read(dev, VE_MPEG_CTRL) & ~BIT(3);
+> +
+> +	sunxi_cedrus_write(dev, reg, VE_MPEG_CTRL);
+> +}
+> +
+>  static void sunxi_cedrus_mpeg2_setup(struct sunxi_cedrus_ctx *ctx,
+>  				     struct sunxi_cedrus_run *run)
+>  {
+> @@ -156,6 +186,9 @@ static void sunxi_cedrus_mpeg2_trigger(struct sunxi_cedrus_ctx *ctx)
+>  }
+>  
+>  struct sunxi_cedrus_dec_ops sunxi_cedrus_dec_ops_mpeg2 = {
+> +	.irq_clear	= sunxi_cedrus_mpeg2_irq_clear,
+> +	.irq_disable	= sunxi_cedrus_mpeg2_irq_disable,
+> +	.irq_status	= sunxi_cedrus_mpeg2_irq_status,
+>  	.setup		= sunxi_cedrus_mpeg2_setup,
+>  	.trigger	= sunxi_cedrus_mpeg2_trigger,
+>  };
 -- 
-2.1.4
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/6142c67d/attachment.sig>
