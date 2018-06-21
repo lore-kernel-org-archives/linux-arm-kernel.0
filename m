@@ -1,40 +1,38 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 21 Jun 2018 13:41:26 +0200
-Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using the
- reset framework
-In-Reply-To: <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
-References: <20180621073706.22812-1-brgl@bgdev.pl>
- <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
-Message-ID: <CAMRc=Me1JTuw40tMWaai2oKMxmc_ktN2OKBhF8tmGt0cQ6magg@mail.gmail.com>
+From: andrea.merello@gmail.com (Andrea Merello)
+Date: Thu, 21 Jun 2018 13:58:19 +0200
+Subject: [PATCH v2 2/5] dt-bindings: xilinx_dma: add optional xlnx,
+ sg-length-width property
+In-Reply-To: <20180621115822.20058-1-andrea.merello@gmail.com>
+References: <20180621115822.20058-1-andrea.merello@gmail.com>
+Message-ID: <20180621115822.20058-2-andrea.merello@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-21 12:52 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
-> Hi Bartosz,
->
-> On Thursday 21 June 2018 01:07 PM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> These are the remaining patches that still need to be merged in order
->> to complete the conversion of the davinci dsp driver to using the reset
->> framework.
->>
->> They apply on top of v4.18-rc1 with David Lechner's remaining patches
->> merged.
->
-> Series looks good to me.
->
-> To preserve bisect, shouldn't the order of applying be patch #3, #4, #1
-> and #2 ?
->
-> Given the dependencies and to preserve bisect its easiest if I take the
-> series with acks from remoteproc and clock maintainers.
->
-> Open to other suggestions as well.
->
-> Thanks,
-> Sekhar
+The width of the "length register" cannot be autodetected, and it is now
+specified with a DT property. Add DOC for it.
 
-Oops you're right about the order. Do you want me to resend?
+Cc: Rob Herring <robh+dt@kernel.org>
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+---
+Changes in v2:
+	- change property name
+	- property is now optional
+	- cc DT maintainer
+---
+ Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Bart
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+index a2b8bfaec43c..c894abe28baa 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -41,6 +41,7 @@ Optional properties:
+ - xlnx,include-sg: Tells configured for Scatter-mode in
+ 	the hardware.
+ Optional properties for AXI DMA:
++- xlnx,sg-length-width: Should be the width of the length register as configured in h/w.
+ - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
+ Optional properties for VDMA:
+ - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
+-- 
+2.17.1
