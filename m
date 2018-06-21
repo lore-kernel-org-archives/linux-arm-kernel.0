@@ -1,43 +1,65 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 21 Jun 2018 11:56:28 +0900
-Subject: [PATCH v2] ASoC: uniphier: remove redundant check of PLL ID
-Message-ID: <20180621025628.4046-1-suzuki.katsuhiro@socionext.com>
+Date: Thu, 21 Jun 2018 12:09:01 +0900
+Subject: [RESEND PATCH] media: helene: fix xtal frequency setting at power
+ on
+In-Reply-To: <20180529010920.20320-1-suzuki.katsuhiro@socionext.com>
+References: <20180529010920.20320-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <001f01d4090d$34a04310$9de0c930$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes redudant check of PLL ID. struct uniphier_aio_pll
-enable member has already been checked at is_valid_pll().
+Hello Mauro,
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Ping...
 
----
+If I got some mistake, please comment it...
 
-Changes from v1:
+Regards,
+--
+Katsuhiro Suzuki
 
-  - Remove unused variable 'dev'
----
- sound/soc/uniphier/aio-cpu.c | 5 -----
- 1 file changed, 5 deletions(-)
 
-diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
-index 2d9b7dde2ffa..ee90e6c3937c 100644
---- a/sound/soc/uniphier/aio-cpu.c
-+++ b/sound/soc/uniphier/aio-cpu.c
-@@ -219,15 +219,10 @@ static int uniphier_aio_set_pll(struct snd_soc_dai *dai, int pll_id,
- 				unsigned int freq_out)
- {
- 	struct uniphier_aio *aio = uniphier_priv(dai);
--	struct device *dev = &aio->chip->pdev->dev;
- 	int ret;
- 
- 	if (!is_valid_pll(aio->chip, pll_id))
- 		return -EINVAL;
--	if (!aio->chip->plls[pll_id].enable) {
--		dev_err(dev, "PLL(%d) is not implemented\n", pll_id);
--		return -ENOTSUPP;
--	}
- 
- 	ret = aio_chip_set_pll(aio->chip, pll_id, freq_out);
- 	if (ret < 0)
--- 
-2.17.1
+> -----Original Message-----
+> From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> Sent: Tuesday, May 29, 2018 10:09 AM
+> To: Abylay Ospan <aospan@netup.ru>; Mauro Carvalho Chehab
+> <mchehab+samsung@kernel.org>; linux-media at vger.kernel.org
+> Cc: Masami Hiramatsu <masami.hiramatsu@linaro.org>; Jassi Brar
+> <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Suzuki, Katsuhiro/?? ??
+> <suzuki.katsuhiro@socionext.com>
+> Subject: [RESEND PATCH] media: helene: fix xtal frequency setting at power on
+> 
+> This patch fixes crystal frequency setting when power on this device.
+> 
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> Acked-by: Abylay Ospan <aospan@netup.ru>
+> 
+> ---
+> 
+> Changes from before:
+>   - Add Abylay's Ack
+> 
+> ---
+>  drivers/media/dvb-frontends/helene.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/dvb-frontends/helene.c
+> b/drivers/media/dvb-frontends/helene.c
+> index 0a4f312c4368..8fcf7a00782a 100644
+> --- a/drivers/media/dvb-frontends/helene.c
+> +++ b/drivers/media/dvb-frontends/helene.c
+> @@ -924,7 +924,10 @@ static int helene_x_pon(struct helene_priv *priv)
+>  	helene_write_regs(priv, 0x99, cdata, sizeof(cdata));
+> 
+>  	/* 0x81 - 0x94 */
+> -	data[0] = 0x18; /* xtal 24 MHz */
+> +	if (priv->xtal == SONY_HELENE_XTAL_16000)
+> +		data[0] = 0x10; /* xtal 16 MHz */
+> +	else
+> +		data[0] = 0x18; /* xtal 24 MHz */
+>  	data[1] = (uint8_t)(0x80 | (0x04 & 0x1F)); /* 4 x 25 = 100uA */
+>  	data[2] = (uint8_t)(0x80 | (0x26 & 0x7F)); /* 38 x 0.25 = 9.5pF */
+>  	data[3] = 0x80; /* REFOUT signal output 500mVpp */
+> --
+> 2.17.0
