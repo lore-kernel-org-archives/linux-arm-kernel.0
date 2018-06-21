@@ -1,72 +1,169 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Fri, 22 Jun 2018 00:41:23 +0200
-Subject: [PATCH v2 05/10] ARM: OMAP1: ams-delta: Hog "keybrd_dataout" GPIO pin
+Date: Fri, 22 Jun 2018 00:41:21 +0200
+Subject: [PATCH v2 03/10] Input: ams_delta_serio: use private structure
 In-Reply-To: <20180621224128.17623-1-jmkrzyszt@gmail.com>
 References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
  <20180621224128.17623-1-jmkrzyszt@gmail.com>
-Message-ID: <20180621224128.17623-5-jmkrzyszt@gmail.com>
+Message-ID: <20180621224128.17623-3-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"keybrd_dataout" GPIO pin used to be initialized by ams-delta-serio
-driver to a state safe for ams-delta-serio device function and not
-changed thereafter.  As such, it may be assumed not under the driver
-control and responsibility for its initialization handed over to board
-init file.
-
-Introduce a GPIO hog table and take over control of the
-"keybrd_dataout" GPIO pin from the ams-delta-serio driver.
+Introduce a driver private structure and allocate it on device probe.
+For now, use it instead of a static variable for storing a pointer to
+serio structure.  Subsequent patches will populate it with more members
+as needed.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
 Changelog:
 v2: rebased on v4.18-rc1, no conflicts
 
- arch/arm/mach-omap1/board-ams-delta.c | 8 ++++++++
- drivers/input/serio/ams_delta_serio.c | 5 -----
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/input/serio/ams_delta_serio.c | 69 ++++++++++++++++++++++-------------
+ 1 file changed, 43 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 706eb2f9301d..2821284aa0c9 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -574,6 +574,12 @@ static struct gpiod_lookup_table *late_gpio_tables[] __initdata = {
- 	&ams_delta_nand_gpio_table,
- };
- 
-+static struct gpiod_hog ams_delta_gpio_hogs[] = {
-+	GPIO_HOG(LATCH2_LABEL, LATCH2_PIN_KEYBRD_DATAOUT, "keybrd_dataout",
-+		 GPIO_ACTIVE_HIGH, GPIOD_OUT_LOW),
-+	{},
-+};
-+
- static void __init ams_delta_init(void)
- {
- 	/* mux pins for uarts */
-@@ -594,6 +600,8 @@ static void __init ams_delta_init(void)
- 	omap_cfg_reg(J19_1610_CAM_D6);
- 	omap_cfg_reg(J18_1610_CAM_D7);
- 
-+	gpiod_add_hogs(ams_delta_gpio_hogs);
-+
- 	omap_serial_init();
- 	omap_register_i2c_bus(1, 100, NULL, 0);
- 
 diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-index 854d0d3ada52..b955c6a72e99 100644
+index a2a7fa19bf49..551a4fa73fe4 100644
 --- a/drivers/input/serio/ams_delta_serio.c
 +++ b/drivers/input/serio/ams_delta_serio.c
-@@ -121,11 +121,6 @@ static const struct gpio ams_delta_gpios[] __initconst_or_module = {
- 		.flags	= GPIOF_DIR_IN,
- 		.label	= "serio-clock",
- 	},
--	{
--		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "serio-dataout",
--	},
- };
+@@ -37,17 +37,17 @@ MODULE_AUTHOR("Matt Callow");
+ MODULE_DESCRIPTION("AMS Delta (E3) keyboard port driver");
+ MODULE_LICENSE("GPL");
+ 
+-static struct serio *ams_delta_serio;
++struct ams_delta_serio {
++	struct serio *serio;
++};
+ 
+-static int check_data(int data)
++static int check_data(struct serio *serio, int data)
+ {
+ 	int i, parity = 0;
+ 
+ 	/* check valid stop bit */
+ 	if (!(data & 0x400)) {
+-		dev_warn(&ams_delta_serio->dev,
+-				"invalid stop bit, data=0x%X\n",
+-				data);
++		dev_warn(&serio->dev, "invalid stop bit, data=0x%X\n", data);
+ 		return SERIO_FRAME;
+ 	}
+ 	/* calculate the parity */
+@@ -57,9 +57,9 @@ static int check_data(int data)
+ 	}
+ 	/* it should be odd */
+ 	if (!(parity & 0x01)) {
+-		dev_warn(&ams_delta_serio->dev,
+-				"parity check failed, data=0x%X parity=0x%X\n",
+-				data, parity);
++		dev_warn(&serio->dev,
++			 "parity check failed, data=0x%X parity=0x%X\n", data,
++			 parity);
+ 		return SERIO_PARITY;
+ 	}
+ 	return 0;
+@@ -67,6 +67,7 @@ static int check_data(int data)
+ 
+ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
+ {
++	struct ams_delta_serio *priv = dev_id;
+ 	int *circ_buff = &fiq_buffer[FIQ_CIRC_BUFF];
+ 	int data, dfl;
+ 	u8 scancode;
+@@ -84,9 +85,9 @@ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
+ 		if (fiq_buffer[FIQ_HEAD_OFFSET] == fiq_buffer[FIQ_BUF_LEN])
+ 			fiq_buffer[FIQ_HEAD_OFFSET] = 0;
+ 
+-		dfl = check_data(data);
++		dfl = check_data(priv->serio, data);
+ 		scancode = (u8) (data >> 1) & 0xFF;
+-		serio_interrupt(ams_delta_serio, scancode, dfl);
++		serio_interrupt(priv->serio, scancode, dfl);
+ 	}
+ 	return IRQ_HANDLED;
+ }
+@@ -130,21 +131,14 @@ static const struct gpio ams_delta_gpios[] __initconst_or_module = {
  
  static int ams_delta_serio_init(struct platform_device *pdev)
+ {
++	struct ams_delta_serio *priv;
++	struct serio *serio;
+ 	int err;
+ 
+-	ams_delta_serio = kzalloc(sizeof(struct serio), GFP_KERNEL);
+-	if (!ams_delta_serio)
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
+ 		return -ENOMEM;
+ 
+-	ams_delta_serio->id.type = SERIO_8042;
+-	ams_delta_serio->open = ams_delta_serio_open;
+-	ams_delta_serio->close = ams_delta_serio_close;
+-	strlcpy(ams_delta_serio->name, "AMS DELTA keyboard adapter",
+-			sizeof(ams_delta_serio->name));
+-	strlcpy(ams_delta_serio->phys, dev_name(&pdev->dev),
+-			sizeof(ams_delta_serio->phys));
+-	ams_delta_serio->dev.parent = &pdev->dev;
+-
+ 	err = gpio_request_array(ams_delta_gpios,
+ 				ARRAY_SIZE(ams_delta_gpios));
+ 	if (err) {
+@@ -154,7 +148,7 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ 
+ 	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+ 			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
+-			DRIVER_NAME, 0);
++			DRIVER_NAME, priv);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "IRQ request failed (%d)\n", err);
+ 		goto gpio;
+@@ -167,21 +161,44 @@ static int ams_delta_serio_init(struct platform_device *pdev)
+ 	irq_set_handler(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+ 			handle_simple_irq);
+ 
+-	serio_register_port(ams_delta_serio);
+-	dev_info(&ams_delta_serio->dev, "%s\n", ams_delta_serio->name);
++	serio = kzalloc(sizeof(*serio), GFP_KERNEL);
++	if (!serio) {
++		err = -ENOMEM;
++		goto irq;
++	}
++
++	priv->serio = serio;
++
++	serio->id.type = SERIO_8042;
++	serio->open = ams_delta_serio_open;
++	serio->close = ams_delta_serio_close;
++	strlcpy(serio->name, "AMS DELTA keyboard adapter", sizeof(serio->name));
++	strlcpy(serio->phys, dev_name(&pdev->dev), sizeof(serio->phys));
++	serio->dev.parent = &pdev->dev;
++	serio->port_data = priv;
++
++	serio_register_port(serio);
++
++	platform_set_drvdata(pdev, priv);
++
++	dev_info(&serio->dev, "%s\n", serio->name);
+ 
+ 	return 0;
++
++irq:
++	free_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), priv);
+ gpio:
+ 	gpio_free_array(ams_delta_gpios,
+ 			ARRAY_SIZE(ams_delta_gpios));
+ serio:
+-	kfree(ams_delta_serio);
+ 	return err;
+ }
+ 
+ static int ams_delta_serio_exit(struct platform_device *pdev)
+ {
+-	serio_unregister_port(ams_delta_serio);
++	struct ams_delta_serio *priv = platform_get_drvdata(pdev);
++
++	serio_unregister_port(priv->serio);
+ 	free_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
+ 	gpio_free_array(ams_delta_gpios,
+ 			ARRAY_SIZE(ams_delta_gpios));
 -- 
 2.16.4
