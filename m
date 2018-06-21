@@ -1,236 +1,90 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 21 Jun 2018 12:26:20 +0000
-Subject: [PATCH] clk: meson-axg: add clocks required by pcie driver
-Message-ID: <20180621122620.13195-1-yixun.lan@amlogic.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 21 Jun 2018 12:58:53 +0800
+Subject: [PATCH V2 5/5] PCI: Unify slot and bus reset API
+In-Reply-To: <1529467995-28780-5-git-send-email-okaya@codeaurora.org>
+References: <1529467995-28780-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <201806211229.kMutzrVj%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding clocks for pcie driver, due to the ASIC design,
-the pcie controller re-use part of the mipi clock logic,
-so the mipi clock is also required.
+Hi Sinan,
 
-Tested-by: Jianxin Qin <jianxin.qin@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+I love your patch! Perhaps something to improve:
+
+[auto build test WARNING on pci/next]
+[also build test WARNING on v4.18-rc1 next-20180620]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/PCI-handle-error-return-from-pci_reset_bridge_secondary_bus/20180620-121648
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
+
+
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/infiniband/hw/hfi1/pcie.c:908:33: sparse: incorrect type in argument 1 (different base types) @@    expected struct pci_dev *dev @@    got struct pci_dev *dev @@
+   drivers/infiniband/hw/hfi1/pcie.c:908:33:    expected struct pci_dev *dev
+   drivers/infiniband/hw/hfi1/pcie.c:908:33:    got struct pci_bus *bus
+   drivers/infiniband/hw/hfi1/pcie.c: In function 'trigger_sbr':
+   drivers/infiniband/hw/hfi1/pcie.c:908:23: error: passing argument 1 of 'pci_reset_bus' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     return pci_reset_bus(dev->bus);
+                          ^~~
+   In file included from drivers/infiniband/hw/hfi1/pcie.c:48:0:
+   include/linux/pci.h:1099:5: note: expected 'struct pci_dev *' but argument is of type 'struct pci_bus *'
+    int pci_reset_bus(struct pci_dev *dev);
+        ^~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +908 drivers/infiniband/hw/hfi1/pcie.c
+
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  873  
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  874  /*
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  875   * Trigger a secondary bus reset (SBR) on ourselves using our parent.
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  876   *
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  877   * Based on pci_parent_bus_reset() which is not exported by the
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  878   * kernel core.
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  879   */
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  880  static int trigger_sbr(struct hfi1_devdata *dd)
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  881  {
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  882  	struct pci_dev *dev = dd->pcidev;
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  883  	struct pci_dev *pdev;
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  884  
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  885  	/* need a parent */
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  886  	if (!dev->bus->self) {
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  887  		dd_dev_err(dd, "%s: no parent device\n", __func__);
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  888  		return -ENOTTY;
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  889  	}
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  890  
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  891  	/* should not be anyone else on the bus */
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  892  	list_for_each_entry(pdev, &dev->bus->devices, bus_list)
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  893  		if (pdev != dev) {
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  894  			dd_dev_err(dd,
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  895  				   "%s: another device is on the same bus\n",
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  896  				   __func__);
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  897  			return -ENOTTY;
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  898  		}
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  899  
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  900  	/*
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  901  	 * A secondary bus reset (SBR) issues a hot reset to our device.
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  902  	 * The following routine does a 1s wait after the reset is dropped
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  903  	 * per PCI Trhfa (recovery time).  PCIe 3.0 section 6.6.1 -
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  904  	 * Conventional Reset, paragraph 3, line 35 also says that a 1s
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  905  	 * delay after a reset is required.  Per spec requirements,
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  906  	 * the link is either working or not after that point.
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  907  	 */
+f001109e drivers/infiniband/hw/hfi1/pcie.c Sinan Kaya       2018-06-20 @908  	return pci_reset_bus(dev->bus);
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  909  }
+77241056 drivers/staging/rdma/hfi1/pcie.c  Mike Marciniszyn 2015-07-30  910  
+
+:::::: The code at line 908 was first introduced by commit
+:::::: f001109e94b74baebb3621ce1c7ba114a858adb3 IB/hfi1: use pci_reset_bus() for initiating pci secondary bus reset
+
+:::::: TO: Sinan Kaya <okaya@codeaurora.org>
+:::::: CC: 0day robot <lkp@intel.com>
+
 ---
- drivers/clk/meson/axg.c              | 145 +++++++++++++++++++++++++++
- drivers/clk/meson/axg.h              |   6 +-
- include/dt-bindings/clock/axg-clkc.h |   3 +
- 3 files changed, 153 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
-index bd4dbc696b88..f1dc5433b69d 100644
---- a/drivers/clk/meson/axg.c
-+++ b/drivers/clk/meson/axg.c
-@@ -626,6 +626,137 @@ static struct clk_regmap axg_mpll3 = {
- 	},
- };
- 
-+static const struct pll_rate_table axg_pcie_pll_rate_table[] = {
-+	{
-+		.rate	= 100000000,
-+		.m	= 200,
-+		.n	= 3,
-+		.od	= 1,
-+		.od2	= 3,
-+	},
-+	{ /* sentinel */ },
-+};
-+
-+static const struct reg_sequence axg_pcie_init_regs[] = {
-+	{ .reg = HHI_PCIE_PLL_CNTL,	.def = 0x400106c8 },
-+	{ .reg = HHI_PCIE_PLL_CNTL1,	.def = 0x0084a2aa },
-+	{ .reg = HHI_PCIE_PLL_CNTL2,	.def = 0xb75020be },
-+	{ .reg = HHI_PCIE_PLL_CNTL3,	.def = 0x0a47488e },
-+	{ .reg = HHI_PCIE_PLL_CNTL4,	.def = 0xc000004d },
-+	{ .reg = HHI_PCIE_PLL_CNTL5,	.def = 0x00078000 },
-+	{ .reg = HHI_PCIE_PLL_CNTL6,	.def = 0x002323c6 },
-+};
-+
-+static struct clk_regmap axg_pcie_pll = {
-+	.data = &(struct meson_clk_pll_data){
-+		.m = {
-+			.reg_off = HHI_PCIE_PLL_CNTL,
-+			.shift   = 0,
-+			.width   = 9,
-+		},
-+		.n = {
-+			.reg_off = HHI_PCIE_PLL_CNTL,
-+			.shift   = 9,
-+			.width   = 5,
-+		},
-+		.od = {
-+			.reg_off = HHI_PCIE_PLL_CNTL,
-+			.shift   = 16,
-+			.width   = 2,
-+		},
-+		.od2 = {
-+			.reg_off = HHI_PCIE_PLL_CNTL6,
-+			.shift   = 6,
-+			.width   = 2,
-+		},
-+		.frac = {
-+			.reg_off = HHI_PCIE_PLL_CNTL1,
-+			.shift   = 0,
-+			.width   = 12,
-+		},
-+		.l = {
-+			.reg_off = HHI_PCIE_PLL_CNTL,
-+			.shift   = 31,
-+			.width   = 1,
-+		},
-+		.rst = {
-+			.reg_off = HHI_PCIE_PLL_CNTL,
-+			.shift   = 29,
-+			.width   = 1,
-+		},
-+		.table = axg_pcie_pll_rate_table,
-+		.init_regs = axg_pcie_init_regs,
-+		.init_count = ARRAY_SIZE(axg_pcie_init_regs),
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pcie_pll",
-+		.ops = &meson_clk_pll_ops,
-+		.parent_names = (const char *[]){ "xtal" },
-+		.num_parents = 1,
-+	},
-+};
-+
-+static struct clk_regmap axg_pcie_mux = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_PCIE_PLL_CNTL6,
-+		.mask = 0x1,
-+		.shift = 2,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pcie_mux",
-+		.ops = &clk_regmap_mux_ops,
-+		.parent_names = (const char *[]){ "mpll3", "pcie_pll" },
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap axg_pcie_ref = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_PCIE_PLL_CNTL6,
-+		.mask = 0x1,
-+		.shift = 1,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pcie_ref",
-+		.ops = &clk_regmap_mux_ops,
-+		/* do not select the first partent, debug only */
-+		.parent_names = (const char *[]){ "",
-+			"pcie_mux" },
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap axg_pcie_cml_en0 = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_PCIE_PLL_CNTL6,
-+		.bit_idx = 4,
-+	},
-+	.hw.init = &(struct clk_init_data) {
-+		.name = "pcie_cml_en0",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "pcie_ref" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+
-+	},
-+};
-+
-+static struct clk_regmap axg_pcie_cml_en1 = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_PCIE_PLL_CNTL6,
-+		.bit_idx = 3,
-+	},
-+	.hw.init = &(struct clk_init_data) {
-+		.name = "pcie_cml_en1",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "pcie_ref" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
- static u32 mux_table_clk81[]	= { 0, 2, 3, 4, 5, 6, 7 };
- static const char * const clk81_parent_names[] = {
- 	"xtal", "fclk_div7", "mpll1", "mpll2", "fclk_div4",
-@@ -821,6 +952,7 @@ static MESON_GATE(axg_mmc_pclk, HHI_GCLK_MPEG2, 11);
- static MESON_GATE(axg_vpu_intr, HHI_GCLK_MPEG2, 25);
- static MESON_GATE(axg_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
- static MESON_GATE(axg_gic, HHI_GCLK_MPEG2, 30);
-+static MESON_GATE(axg_mipi_enable, HHI_MIPI_CNTL0, 29);
- 
- /* Always On (AO) domain gates */
- 
-@@ -910,6 +1042,13 @@ static struct clk_hw_onecell_data axg_hw_onecell_data = {
- 		[CLKID_FCLK_DIV4_DIV]		= &axg_fclk_div4_div.hw,
- 		[CLKID_FCLK_DIV5_DIV]		= &axg_fclk_div5_div.hw,
- 		[CLKID_FCLK_DIV7_DIV]		= &axg_fclk_div7_div.hw,
-+		[CLKID_PCIE_PLL]		= &axg_pcie_pll.hw,
-+		[CLKID_PCIE_MUX]		= &axg_pcie_mux.hw,
-+		[CLKID_PCIE_REF]		= &axg_pcie_ref.hw,
-+		[CLKID_PCIE_CML_EN0]		= &axg_pcie_cml_en0.hw,
-+		[CLKID_PCIE_CML_EN1]		= &axg_pcie_cml_en1.hw,
-+		[CLKID_MIPI_ENABLE]		= &axg_mipi_enable.hw,
-+
- 		[NR_CLKS]			= NULL,
- 	},
- 	.num = NR_CLKS,
-@@ -988,6 +1127,12 @@ static struct clk_regmap *const axg_clk_regmaps[] = {
- 	&axg_fclk_div4,
- 	&axg_fclk_div5,
- 	&axg_fclk_div7,
-+	&axg_pcie_pll,
-+	&axg_pcie_mux,
-+	&axg_pcie_ref,
-+	&axg_pcie_cml_en0,
-+	&axg_pcie_cml_en1,
-+	&axg_mipi_enable,
- };
- 
- static const struct of_device_id clkc_match_table[] = {
-diff --git a/drivers/clk/meson/axg.h b/drivers/clk/meson/axg.h
-index b421df6a7ea0..6e55ebd6c77d 100644
---- a/drivers/clk/meson/axg.h
-+++ b/drivers/clk/meson/axg.h
-@@ -16,6 +16,7 @@
-  * Register offsets from the data sheet must be multiplied by 4 before
-  * adding them to the base address to get the right value.
-  */
-+#define HHI_MIPI_CNTL0			0x00
- #define HHI_GP0_PLL_CNTL		0x40
- #define HHI_GP0_PLL_CNTL2		0x44
- #define HHI_GP0_PLL_CNTL3		0x48
-@@ -127,8 +128,11 @@
- #define CLKID_FCLK_DIV4_DIV			73
- #define CLKID_FCLK_DIV5_DIV			74
- #define CLKID_FCLK_DIV7_DIV			75
-+#define CLKID_PCIE_PLL				76
-+#define CLKID_PCIE_MUX				77
-+#define CLKID_PCIE_REF				78
- 
--#define NR_CLKS					76
-+#define NR_CLKS					82
- 
- /* include the CLKIDs that have been made part of the DT binding */
- #include <dt-bindings/clock/axg-clkc.h>
-diff --git a/include/dt-bindings/clock/axg-clkc.h b/include/dt-bindings/clock/axg-clkc.h
-index 555937a25504..70371228b7e0 100644
---- a/include/dt-bindings/clock/axg-clkc.h
-+++ b/include/dt-bindings/clock/axg-clkc.h
-@@ -68,5 +68,8 @@
- #define CLKID_SD_EMMC_B_CLK0			59
- #define CLKID_SD_EMMC_C_CLK0			60
- #define CLKID_HIFI_PLL				69
-+#define CLKID_PCIE_CML_EN0			79
-+#define CLKID_PCIE_CML_EN1			80
-+#define CLKID_MIPI_ENABLE			81
- 
- #endif /* __AXG_CLKC_H */
--- 
-2.17.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
