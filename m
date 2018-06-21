@@ -1,56 +1,122 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 21 Jun 2018 11:54:43 +0900
-Subject: [PATCH] ASoC: uniphier: remove redundant check of PLL ID
-In-Reply-To: <20180621024346.13131-1-suzuki.katsuhiro@socionext.com>
-References: <20180621024346.13131-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <001e01d4090b$34b3b5f0$9e1b21d0$@socionext.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Thu, 21 Jun 2018 10:55:00 +0800
+Subject: [PATCH v4] PCI: mediatek: Add system pm support for MT2712
+Message-ID: <1529549700-18742-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-I got mistake (forget to remove unused variable).
-I'll send v2. Sorry for confusing.
+The MTCMOS of PCIe Host for MT2712 will be off when system suspend, and all
+the internal control register will be reset after system resume. The PCIe
+link should be re-established and the related control register values
+should be re-set after system resume.
 
-Regards,
---
-Katsuhiro Suzuki
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+CC: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/pci/controller/pcie-mediatek.c | 60 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
+Change since v3:
+ - rebase to v4.18-rc1.
 
-> -----Original Message-----
-> From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> Sent: Thursday, June 21, 2018 11:44 AM
-> To: Mark Brown <broonie@kernel.org>; alsa-devel at alsa-project.org
-> Cc: Masami Hiramatsu <masami.hiramatsu@linaro.org>; Jassi Brar
-> <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; Suzuki, Katsuhiro/?? ??
-> <suzuki.katsuhiro@socionext.com>
-> Subject: [PATCH] ASoC: uniphier: remove redundant check of PLL ID
-> 
-> This patch removes redudant check of PLL ID. struct uniphier_aio_pll
-> enable member has already been checked at is_valid_pll().
-> 
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
->  sound/soc/uniphier/aio-cpu.c | 4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
-> index 2d9b7dde2ffa..cfe69ab44b63 100644
-> --- a/sound/soc/uniphier/aio-cpu.c
-> +++ b/sound/soc/uniphier/aio-cpu.c
-> @@ -224,10 +224,6 @@ static int uniphier_aio_set_pll(struct snd_soc_dai *dai,
-int
-> pll_id,
-> 
->  	if (!is_valid_pll(aio->chip, pll_id))
->  		return -EINVAL;
-> -	if (!aio->chip->plls[pll_id].enable) {
-> -		dev_err(dev, "PLL(%d) is not implemented\n", pll_id);
-> -		return -ENOTSUPP;
-> -	}
-> 
->  	ret = aio_chip_set_pll(aio->chip, pll_id, freq_out);
->  	if (ret < 0)
-> --
-> 2.17.1
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index 0baabe3..1ed2ef0 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -134,12 +134,14 @@ struct mtk_pcie_port;
+ /**
+  * struct mtk_pcie_soc - differentiate between host generations
+  * @need_fix_class_id: whether this host's class ID needed to be fixed or not
++ * @pm_support: whether the host's MTCMOS will be off when suspend
+  * @ops: pointer to configuration access functions
+  * @startup: pointer to controller setting functions
+  * @setup_irq: pointer to initialize IRQ functions
+  */
+ struct mtk_pcie_soc {
+ 	bool need_fix_class_id;
++	bool pm_support;
+ 	struct pci_ops *ops;
+ 	int (*startup)(struct mtk_pcie_port *port);
+ 	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+@@ -1181,12 +1183,69 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int mtk_pcie_suspend_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	const struct mtk_pcie_soc *soc = pcie->soc;
++	struct mtk_pcie_port *port;
++
++	if (!soc->pm_support)
++		return 0;
++
++	list_for_each_entry(port, &pcie->ports, list) {
++		clk_disable_unprepare(port->ahb_ck);
++		clk_disable_unprepare(port->sys_ck);
++		phy_power_off(port->phy);
++	}
++
++	return 0;
++}
++
++static int mtk_pcie_resume_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	const struct mtk_pcie_soc *soc = pcie->soc;
++	struct mtk_pcie_port *port;
++	int ret;
++
++	if (!soc->pm_support)
++		return 0;
++
++	list_for_each_entry(port, &pcie->ports, list) {
++		phy_power_on(port->phy);
++		clk_prepare_enable(port->sys_ck);
++		clk_prepare_enable(port->ahb_ck);
++
++		ret = soc->startup(port);
++		if (ret) {
++			dev_err(dev, "Port%d link down\n", port->slot);
++			phy_power_off(port->phy);
++			clk_disable_unprepare(port->sys_ck);
++			clk_disable_unprepare(port->ahb_ck);
++			return ret;
++		}
++
++		if (IS_ENABLED(CONFIG_PCI_MSI))
++			mtk_pcie_enable_msi(port);
++	}
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops mtk_pcie_pm_ops = {
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
++				      mtk_pcie_resume_noirq)
++};
++
+ static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+ 	.ops = &mtk_pcie_ops,
+ 	.startup = mtk_pcie_startup_port,
+ };
+ 
+ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
++	.pm_support = true,
+ 	.ops = &mtk_pcie_ops_v2,
+ 	.startup = mtk_pcie_startup_port_v2,
+ 	.setup_irq = mtk_pcie_setup_irq,
+@@ -1213,6 +1272,7 @@ static struct platform_driver mtk_pcie_driver = {
+ 		.name = "mtk-pcie",
+ 		.of_match_table = mtk_pcie_ids,
+ 		.suppress_bind_attrs = true,
++		.pm = &mtk_pcie_pm_ops,
+ 	},
+ };
+ builtin_platform_driver(mtk_pcie_driver);
+-- 
+2.6.4
