@@ -1,68 +1,35 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 21 Jun 2018 12:47:10 -0400
-Subject: [PATCH] ARM: ftrace: Only set kernel memory back to read-only after
- boot
-Message-ID: <20180621124710.453ee0ae@gandalf.local.home>
+From: ayaka@soulik.info (Randy Li)
+Date: Fri, 22 Jun 2018 00:47:35 +0800
+Subject: [PATCH v3 0/2] Add support for a YUV 10bits pixel format
+Message-ID: <20180621164737.23611-1-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steven Rostedt (VMware) <rostedt@goodmis.org>
+In the last time, I got some feedback and not a clear guide on what
+I should do. So just give more comment on describing this 10bits format.
+Whether I should add bpp instead cpp in drm_format_info and update a
+numbers of functions is up to you guys.
 
-Dynamic ftrace requires modifying the code segments that are usually
-set to read-only. To do this, a per arch function is called both before
-and after the ftrace modifications are performed. The "before" function
-will set kernel code text to read-write to allow for ftrace to make the
-modifications, and the "after" function will set the kernel code text
-back to "read-only" to keep the kernel code text protected.
+And I don't any other driver would request 10bits yuv format support,
+so I can't add the pixel format they don't use as I did a year ago.
+You would ignore those patches.
 
-The issue happens when dynamic ftrace is tested at boot up. The test is
-done before the kernel code text has been set to read-only. But the
-"before" and "after" calls are still performed. The "after" call will
-change the kernel code text to read-only prematurely, and other boot
-code that expects this code to be read-write will fail.
+v3:
+I put a code comment in a wrong commit in the previous commit,
+move it back.
+v2:
+add more comment to describe this pixel format
 
-The solution is to add a variable that is set when the kernel code text
-is expected to be converted to read-only, and make the ftrace "before"
-and "after" calls do nothing if that variable is not yet set. This is
-similar to the x86 solution from commit 162396309745 ("ftrace, x86:
-make kernel text writable only for conversions").
+Randy Li (2):
+  drm/fourcc: add a 10bits fully packed variant of NV12
+  drm/rockchip: Support 10 bits yuv format in vop
 
-Reported-by: Stefan Agner <stefan@agner.ch>
-Tested-by: Stefan Agner <stefan@agner.ch>
-Link: http://lkml.kernel.org/r/20180620212906.24b7b66e at vmware.local.home
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
----
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index c186474422f3..0cc8e04295a4 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
- 	return 0;
- }
- 
-+static int kernel_set_to_readonly __read_mostly;
-+
- void mark_rodata_ro(void)
- {
-+	kernel_set_to_readonly = 1;
- 	stop_machine(__mark_rodata_ro, NULL, NULL);
- 	debug_checkwx();
- }
- 
- void set_kernel_text_rw(void)
- {
-+	if (!kernel_set_to_readonly)
-+		return;
-+
- 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
- 				current->active_mm);
- }
- 
- void set_kernel_text_ro(void)
- {
-+	if (!kernel_set_to_readonly)
-+		return;
-+
- 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
- 				current->active_mm);
- }
+ drivers/gpu/drm/drm_fourcc.c                |  1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 27 +++++++++++++++++++++++++--
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  1 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c |  2 ++
+ include/uapi/drm/drm_fourcc.h               |  8 ++++++++
+ 5 files changed, 37 insertions(+), 2 deletions(-)
+
+-- 
+2.14.4
