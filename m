@@ -1,34 +1,41 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 21 Jun 2018 15:57:26 +0100
-Subject: [RFC PATCH 02/16] KVM: arm64: Delete orphaned declaration for
- __fpsimd_enabled()
+Date: Thu, 21 Jun 2018 15:57:34 +0100
+Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
+ visibility for the guest
 In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
 References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1529593060-542-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__fpsimd_enabled() no longer exists, but a dangling declaration has
-survived in kvm_hyp.h.
+Since SVE will be enabled or disabled on a per-vcpu basis, a flag
+is needed in order to track which vcpus have it enabled.
 
-This patch gets rid of it.
+This patch adds a suitable flag and a helper for checking it.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/kvm_hyp.h | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 384c343..9cbbd03 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -147,7 +147,6 @@ void __debug_switch_to_host(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 9671ddd..609d08b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
+ #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
+ #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
+ #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
++#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
++
++static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
++{
++	return system_supports_sve() &&
++		(vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE);
++
++}
  
- void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
- void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
--bool __fpsimd_enabled(void);
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
  
- void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
- void deactivate_traps_vhe_put(void);
 -- 
 2.1.4
