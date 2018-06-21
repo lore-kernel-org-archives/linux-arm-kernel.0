@@ -1,120 +1,104 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 21 Jun 2018 14:52:34 +0530
-Subject: [PATCH RESEND 2/2] soc: ti: wkup_m3_ipc: Add wkup_m3_request_wake_src
-In-Reply-To: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
-References: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1529572954-22244-2-git-send-email-j-keerthy@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 21 Jun 2018 11:29:52 +0200
+Subject: [PATCH 1/1] arm64/mm: move {idmap_pg_dir, tramp_pg_dir,
+ swapper_pg_dir} to .rodata section
+In-Reply-To: <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
+References: <20180620085755.20045-1-yaojun8558363@gmail.com>
+ <20180620085755.20045-2-yaojun8558363@gmail.com>
+ <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
+ <20180621025141.GB11276@toy>
+ <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
+ <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
+Message-ID: <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Gerlach <d-gerlach@ti.com>
+On 21 June 2018 at 10:59, James Morse <james.morse@arm.com> wrote:
+> Hi guys,
+>
+> On 21/06/18 07:39, Ard Biesheuvel wrote:
+>> On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
+>>> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
+>>>> On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
+>>>>> Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
+>>>>> section. And update the swapper_pg_dir by fixmap.
+>>>>>
+>>>>
+>>>> I think we may be able to get away with not mapping idmap_pg_dir and
+>>>> tramp_pg_dir at all.
+>>>
+>>> I think we need to move tramp_pg_dir to .rodata. The attacker can write
+>>> a block-mapping(AP=01) to tramp_pg_dir and then he can access kernel
+>>> memory.
+>
+>> Why does it need to be mapped at all? When do we ever access it from the code?
+>
+> (We would want to make its fixmap entry read-only too)
+>
 
-Add wkup_m3_request_wake_src to allow users to get the name of
-the wakeup source after a DeepSleep or Standby transition.
+It already is.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
+>
+>>>> As for swapper_pg_dir, it would indeed be nice if we could keep those
+>>>> mappings read-only most of the time, but I'm not sure how useful this
+>>>> is if we apply it to the root level only.
+>>>
+>>> The purpose of it is to make 'KSMA' harder, where an single arbitrary
+>>> write is used to add a block mapping to the page-tables, giving the
+>>> attacker full access to kernel memory. That's why we just apply it to
+>>> the root level only. If the attacker can arbitrary write multiple times,
+>>> I think it's hard to defend.
+>>>
+>>
+>> So the assumption is that the root level is more easy to find?
+>> Otherwise, I'm not sure I understand why being able to write a level 0
+>> entry is so harmful, given that we don't have block mappings at that
+>> level.
+>
+> I think this thing assumes 3-level page tables with 39bit VA.
+>
 
-This is tested on am437x-gp-evm and target for 4.19
+The attack, you mean? Because this code is unlikely to build with that
+configuration, given that __pgd_populate() BUILD_BUG()s in that case.
 
- drivers/soc/ti/wkup_m3_ipc.c | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/wkup_m3_ipc.h  |  6 ++++++
- 2 files changed, 45 insertions(+)
+>
+>>>>> @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
+>>>>>
+>>>>>  void __init mark_linear_text_alias_ro(void)
+>>>>>  {
+>
+>>>>> +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
+>>>>> +       update_mapping_prot(__pa_symbol(swapper_pg_end),
+>>>>> +                           (unsigned long)lm_alias(swapper_pg_end),
+>>>>> +                           size, PAGE_KERNEL_RO);
+>>>>
+>>>> I don't think this is necessary. Even if some pages are freed, it
+>>>> doesn't harm to keep a read-only alias of them here since the new
+>>>> owner won't access them via this mapping anyway. So we can keep
+>>>> .rodata as a single region.
+>>>
+>>> To be honest, I didn't think of this issue at first. I later found a
+>>> problem when testing the code on qemu:
+>>
+>> OK, you're right. I missed the fact that this operates on the linear
+>> alias, not the kernel mapping itself.
+>>
+>> What I don't like is that we lose the ability to use block mappings
+>> for the entire .rodata section this way. Isn't it possible to move
+>> these pgdirs to the end of the .rodata segment, perhaps by using a
+>> separate input section name and placing that explicitly? We could even
+>> simply forget about freeing those pages, given that [on 4k pages] the
+>> benefit of freeing 12 KB of space is likely to get lost in the
+>> rounding noise anyway [segments are rounded up to 64 KB in size]
+>
+> I assumed that to move swapper_pg_dir into the .rodata section we would need to
+> break it up. Today its ~3 levels, which we setup in head.S, then do a dance in
+> paging_init() so that swapper_pg_dir is always the top level.
+>
+> We could generate all leves of the 'init_pg_dir' in the __initdata section, then
+> copy only the top level into swapper_pg_dir into the rodata section during
+> paging_init().
+>
 
-diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-index b732c39..6840688 100644
---- a/drivers/soc/ti/wkup_m3_ipc.c
-+++ b/drivers/soc/ti/wkup_m3_ipc.c
-@@ -46,6 +46,7 @@
- #define M3_BASELINE_VERSION		0x191
- #define M3_STATUS_RESP_MASK		(0xffff << 16)
- #define M3_FW_VERSION_MASK		0xffff
-+#define M3_WAKE_SRC_MASK		0xff
- 
- #define M3_STATE_UNKNOWN		0
- #define M3_STATE_RESET			1
-@@ -55,6 +56,23 @@
- 
- static struct wkup_m3_ipc *m3_ipc_state;
- 
-+static const struct wkup_m3_wakeup_src wakeups[] = {
-+	{.irq_nr = 35,	.src = "USB0_PHY"},
-+	{.irq_nr = 36,	.src = "USB1_PHY"},
-+	{.irq_nr = 40,	.src = "I2C0"},
-+	{.irq_nr = 41,	.src = "RTC Timer"},
-+	{.irq_nr = 42,	.src = "RTC Alarm"},
-+	{.irq_nr = 43,	.src = "Timer0"},
-+	{.irq_nr = 44,	.src = "Timer1"},
-+	{.irq_nr = 45,	.src = "UART"},
-+	{.irq_nr = 46,	.src = "GPIO0"},
-+	{.irq_nr = 48,	.src = "MPU_WAKE"},
-+	{.irq_nr = 49,	.src = "WDT0"},
-+	{.irq_nr = 50,	.src = "WDT1"},
-+	{.irq_nr = 51,	.src = "ADC_TSC"},
-+	{.irq_nr = 0,	.src = "Unknown"},
-+};
-+
- static void am33xx_txev_eoi(struct wkup_m3_ipc *m3_ipc)
- {
- 	writel(AM33XX_M3_TXEV_ACK,
-@@ -330,6 +348,26 @@ static int wkup_m3_finish_low_power(struct wkup_m3_ipc *m3_ipc)
- }
- 
- /**
-+ * wkup_m3_request_wake_src - Get the wakeup source info passed from wkup_m3
-+ * @m3_ipc: Pointer to wkup_m3_ipc context
-+ */
-+static const char *wkup_m3_request_wake_src(struct wkup_m3_ipc *m3_ipc)
-+{
-+	unsigned int wakeup_src_idx;
-+	int j, val;
-+
-+	val = wkup_m3_ctrl_ipc_read(m3_ipc, 6);
-+
-+	wakeup_src_idx = val & M3_WAKE_SRC_MASK;
-+
-+	for (j = 0; j < ARRAY_SIZE(wakeups) - 1; j++) {
-+		if (wakeups[j].irq_nr == wakeup_src_idx)
-+			return wakeups[j].src;
-+	}
-+	return wakeups[j].src;
-+}
-+
-+/**
-  * wkup_m3_set_rtc_only - Set the rtc_only flag
-  * @wkup_m3_wakeup: struct wkup_m3_wakeup_src * gets assigned the
-  *                  wakeup src value
-@@ -346,6 +384,7 @@ static void wkup_m3_set_rtc_only(struct wkup_m3_ipc *m3_ipc)
- 	.prepare_low_power = wkup_m3_prepare_low_power,
- 	.finish_low_power = wkup_m3_finish_low_power,
- 	.request_pm_status = wkup_m3_request_pm_status,
-+	.request_wake_src = wkup_m3_request_wake_src,
- 	.set_rtc_only = wkup_m3_set_rtc_only,
- };
- 
-diff --git a/include/linux/wkup_m3_ipc.h b/include/linux/wkup_m3_ipc.h
-index d639df1..e497e62 100644
---- a/include/linux/wkup_m3_ipc.h
-+++ b/include/linux/wkup_m3_ipc.h
-@@ -43,12 +43,18 @@ struct wkup_m3_ipc {
- 	int is_rtc_only;
- };
- 
-+struct wkup_m3_wakeup_src {
-+	int irq_nr;
-+	char src[10];
-+};
-+
- struct wkup_m3_ipc_ops {
- 	void (*set_mem_type)(struct wkup_m3_ipc *m3_ipc, int mem_type);
- 	void (*set_resume_address)(struct wkup_m3_ipc *m3_ipc, void *addr);
- 	int (*prepare_low_power)(struct wkup_m3_ipc *m3_ipc, int state);
- 	int (*finish_low_power)(struct wkup_m3_ipc *m3_ipc);
- 	int (*request_pm_status)(struct wkup_m3_ipc *m3_ipc);
-+	const char *(*request_wake_src)(struct wkup_m3_ipc *m3_ipc);
- 	void (*set_rtc_only)(struct wkup_m3_ipc *m3_ipc);
- };
- 
--- 
-1.9.1
+Is that complexity truly justified for a security sensitive piece of
+code? Can't we just drop the memblock_free() and be done with it?
