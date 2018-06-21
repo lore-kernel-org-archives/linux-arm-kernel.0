@@ -1,54 +1,85 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 21 Jun 2018 10:37:25 +0100
-Subject: [PATCH 3/6] coresight: Introduce support for Coresight Address
- Translation Unit
-In-Reply-To: <20180620214157.GA20697@xps15>
-References: <1529319379-17895-1-git-send-email-suzuki.poulose@arm.com>
- <1529319379-17895-4-git-send-email-suzuki.poulose@arm.com>
- <20180620214157.GA20697@xps15>
-Message-ID: <76e0bc22-468c-6215-de54-3e4ead42e17c@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 21 Jun 2018 10:48:33 +0100
+Subject: [PATCH v2 7/8] arm64: tegra: Add nodes for tcu on Tegra194
+In-Reply-To: <20180620122042.10950-8-mperttunen@nvidia.com>
+References: <20180620122042.10950-1-mperttunen@nvidia.com>
+ <20180620122042.10950-8-mperttunen@nvidia.com>
+Message-ID: <eb514b19-001b-0783-def5-101a03ab5a6c@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
 
-On 20/06/1822:41, Mathieu Poirier wrote:
-> Hi Suzuki,
+On 20/06/18 13:20, Mikko Perttunen wrote:
+> Add nodes required for communication through the Tegra Combined UART.
+> This includes the AON HSP instance, addition of shared interrupts
+> for the TOP0 HSP instance, and finally the TCU node itself. Also
+> mark the HSP instances as compatible to tegra194-hsp, as the hardware
+> is not identical but is compatible to tegra186-hsp.
 > 
-> On Mon, Jun 18, 2018 at 11:56:16AM +0100, Suzuki K Poulose wrote:
->> Add the initial support for Coresight Address Translation Unit, which
->> augments the TMC in Coresight SoC-600 by providing an improved Scatter
->> Gather mechanism. CATU is always connected to a single TMC-ETR and
->> converts the AXI address with a translated address (from a given SG
->> table with specific format). The CATU should be programmed in pass
->> through mode and enabled if the ETR doesn't translation by CATU.
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra194.dtsi | 34 +++++++++++++++++++++++++++++---
+>  1 file changed, 31 insertions(+), 3 deletions(-)
 > 
-> To me this sentence look broken.
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+> index 6d699815a84f..d7f780b06fe2 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+> @@ -217,10 +217,31 @@
+>  		};
+>  
+>  		hsp_top0: hsp at 3c00000 {
+> -			compatible = "nvidia,tegra186-hsp";
+> +			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
+>  			reg = <0x03c00000 0xa0000>;
+> -			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+> -			interrupt-names = "doorbell";
+> +			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "doorbell", "shared0", "shared1", "shared2",
+> +			                  "shared3", "shared4", "shared5", "shared6",
+> +			                  "shared7";
+> +			#mbox-cells = <2>;
+> +		};
+> +
+> +		hsp_aon: hsp at c150000 {
+> +			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
+> +			reg = <0x0c150000 0xa0000>;
+> +			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
+> +			             <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "shared0", "shared1", "shared2", "shared3";
+>  			#mbox-cells = <2>;
+>  		};
+>  
+> @@ -382,6 +403,13 @@
+>  		};
+>  	};
+>  
+> +	tcu: tcu {
+> +		compatible = "nvidia,tegra194-tcu";
+> +		mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
+> +		         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
+> +		mbox-names = "rx", "tx";
+> +	};
+> +
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+>  		interrupts = <GIC_PPI 13
 > 
 
-Yes, it is broken. It should have been :
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
 
-"The CATU should be programmed in pass through mode and enabled
-even if the ETR doesn't use the translation by CATU."
+Cheers
+Jon
 
-
->> +static int catu_disable_hw(struct catu_drvdata *drvdata)
->> +{
->> +	int rc = 0;
->> +
->> +	if (catu_wait_for_ready(drvdata)) {
->> +		dev_info(drvdata->dev, "Timeout while waiting for READY\n");
->> +		rc = -EAGAIN;
->> +	}
->> +
->> +	catu_write_control(drvdata, 0);
-> 
-> Is waiting for the ready bit before switching the component off comes from
-> experimentation with the HW (i.e FPGA)?  From what the reference manual
-> indicate, CONTROL.ENABLE should be set to 0 first, and then wait for
-> STATUS.READY.
-
-You're right. It should be in the reverse order. I will fix it in the next version.
-
-Thanks
-Suzuki
+-- 
+nvpublic
