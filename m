@@ -1,51 +1,85 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 21 Jun 2018 11:02:14 +0200
-Subject: [PATCH V4 1/4] dt-bindings: watchdog: add stm32mp1 support
-In-Reply-To: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
-References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1529571737-3552-2-git-send-email-ludovic.Barre@st.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 21 Jun 2018 11:03:11 +0200
+Subject: [PATCH 2/9] media: cedrus: Add wrappers around container_of for
+ our buffers
+In-Reply-To: <20180613140714.1686-3-maxime.ripard@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-3-maxime.ripard@bootlin.com>
+Message-ID: <d19e2594f11963b218d7f09b4a50e9df36330dbe.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hi,
 
-This patch adds support of stm32mp1.
-stm32mp1 requires 2 clocks lsi and pclk.
+On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> The cedrus driver sub-classes the vb2_v4l2_buffer structure, but doesn't
+> provide any function to wrap around the proper container_of call that needs
+> to be duplicated in every calling site.
+> 
+> Add wrappers to make sure its opaque to the users and they don't have to
+> care anymore.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  .../platform/sunxi/cedrus/sunxi_cedrus_common.h      | 12 ++++++++++++
+>  .../media/platform/sunxi/cedrus/sunxi_cedrus_hw.c    |  4 ++--
+>  2 files changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> index ee6883ef9cb7..b1ed1c8cb130 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> @@ -89,6 +89,18 @@ struct sunxi_cedrus_buffer {
+>  	struct list_head list;
+>  };
+>  
+> +static inline
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- .../devicetree/bindings/watchdog/st,stm32-iwdg.txt          | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+I'm not a big fan of spreading the type qualifiers on two distinct lines
+instead of having a longer single line (reminds me of the GNU coding
+style a bit), but this is purely cosmetic.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
-index cc13b10a..d8f4430 100644
---- a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
-+++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
-@@ -2,9 +2,15 @@ STM32 Independent WatchDoG (IWDG)
- ---------------------------------
- 
- Required properties:
--- compatible: "st,stm32-iwdg"
--- reg: physical base address and length of the registers set for the device
--- clocks: must contain a single entry describing the clock input
-+- compatible: Should be either:
-+  - "st,stm32-iwdg"
-+  - "st,stm32mp1-iwdg"
-+- reg: Physical base address and length of the registers set for the device
-+- clocks: Reference to the clock entry lsi. Additional pclk clock entry
-+  is required only for st,stm32mp1-iwdg.
-+- clock-names: Name of the clocks used.
-+  "lsi" for st,stm32-iwdg
-+  "lsi", "pclk" for st,stm32mp1-iwdg
- 
- Optional Properties:
- - timeout-sec: Watchdog timeout value in seconds.
-@@ -15,5 +21,6 @@ iwdg: watchdog at 40003000 {
- 	compatible = "st,stm32-iwdg";
- 	reg = <0x40003000 0x400>;
- 	clocks = <&clk_lsi>;
-+	clock-names = "lsi";
- 	timeout-sec = <32>;
- };
+Cheers,
+
+Paul
+
+> +struct sunxi_cedrus_buffer *vb2_v4l2_to_cedrus_buffer(const struct vb2_v4l2_buffer *p)
+> +{
+> +	return container_of(p, struct sunxi_cedrus_buffer, vb);
+> +}
+> +
+> +static inline
+> +struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+> +{
+> +	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
+> +}
+> +
+>  struct sunxi_cedrus_dev {
+>  	struct v4l2_device v4l2_dev;
+>  	struct video_device vfd;
+> diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> index 5783bd985855..fc688a5c1ea3 100644
+> --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> @@ -108,8 +108,8 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
+>  		return IRQ_HANDLED;
+>  	}
+>  
+> -	src_buffer = container_of(src_vb, struct sunxi_cedrus_buffer, vb);
+> -	dst_buffer = container_of(dst_vb, struct sunxi_cedrus_buffer, vb);
+> +	src_buffer = vb2_v4l2_to_cedrus_buffer(src_vb);
+> +	dst_buffer = vb2_v4l2_to_cedrus_buffer(dst_vb);
+>  
+>  	/* First bit of MPEG_STATUS indicates success. */
+>  	if (ctx->job_abort || !(status & 0x01))
 -- 
-2.7.4
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/33933c40/attachment.sig>
