@@ -1,151 +1,101 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Jun 2018 08:39:08 +0200
-Subject: [PATCH 1/1] arm64/mm: move {idmap_pg_dir, tramp_pg_dir,
- swapper_pg_dir} to .rodata section
-In-Reply-To: <20180621025141.GB11276@toy>
-References: <20180620085755.20045-1-yaojun8558363@gmail.com>
- <20180620085755.20045-2-yaojun8558363@gmail.com>
- <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
- <20180621025141.GB11276@toy>
-Message-ID: <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Thu, 21 Jun 2018 08:55:36 +0200
+Subject: [PATCH] pci: fix I/O space page leak
+In-Reply-To: <1ca6adde-a91e-84d0-c7dc-fd01bfd9edcc@cogentembedded.com>
+References: <1ca6adde-a91e-84d0-c7dc-fd01bfd9edcc@cogentembedded.com>
+Message-ID: <20180621085536.1e19ef4e@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
-> Hi Ard,
->
-> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
->> On 20 June 2018 at 10:57, Jun Yao <yaojun8558363@gmail.com> wrote:
->> > Move {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata
->> > section. And update the swapper_pg_dir by fixmap.
->> >
->>
->> I think we may be able to get away with not mapping idmap_pg_dir and
->> tramp_pg_dir at all.
->
-> I think we need to move tramp_pg_dir to .rodata. The attacker can write
-> a block-mapping(AP=01) to tramp_pg_dir and then he can access kernel
-> memory.
->
+Hello,
 
-Why does it need to be mapped at all? When do we ever access it from the code?
+On Wed, 20 Jun 2018 20:51:37 +0300, Sergei Shtylyov wrote:
+> When testing the R-Car PCIe driver on the Condor board, I noticed that iff
+> I  left the PCIe PHY driver disabled, the kernel crashed  with this BUG:
+> 
+> [    1.225819] kernel BUG at lib/ioremap.c:72!
+> [    1.230007] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> [    1.235496] Modules linked in:
+> [    1.238561] CPU: 0 PID: 39 Comm: kworker/0:1 Not tainted 4.17.0-dirty #1092
+> [    1.245526] Hardware name: Renesas Condor board based on r8a77980 (DT)
+> [    1.252075] Workqueue: events deferred_probe_work_func
+> [    1.257220] pstate: 80000005 (Nzcv daif -PAN -UAO)
+> [    1.262024] pc : ioremap_page_range+0x370/0x3c8
+> [    1.266558] lr : ioremap_page_range+0x40/0x3c8
+> [    1.271002] sp : ffff000008da39e0
+> [    1.274317] x29: ffff000008da39e0 x28: 00e8000000000f07
+> [    1.279636] x27: ffff7dfffee00000 x26: 0140000000000000
+> [    1.284954] x25: ffff7dfffef00000 x24: 00000000000fe100
+> [    1.290272] x23: ffff80007b906000 x22: ffff000008ab8000
+> [    1.295590] x21: ffff000008bb1d58 x20: ffff7dfffef00000
+> [    1.300909] x19: ffff800009c30fb8 x18: 0000000000000001
+> [    1.306226] x17: 00000000000152d0 x16: 00000000014012d0
+> [    1.311544] x15: 0000000000000000 x14: 0720072007200720
+> [    1.316862] x13: 0720072007200720 x12: 0720072007200720
+> [    1.322180] x11: 0720072007300730 x10: 00000000000000ae
+> [    1.327498] x9 : 0000000000000000 x8 : ffff7dffff000000                      
+> [    1.332816] x7 : 0000000000000000 x6 : 0000000000000100
+> [    1.338134] x5 : 0000000000000000 x4 : 000000007b906000
+> [    1.343452] x3 : ffff80007c61a880 x2 : ffff7dfffeefffff
+> [    1.348770] x1 : 0000000040000000 x0 : 00e80000fe100f07
+> [    1.354090] Process kworker/0:1 (pid: 39, stack limit = 0x        (ptrval))  
+> [    1.361056] Call trace:
+> [    1.363504]  ioremap_page_range+0x370/0x3c8
+> [    1.367695]  pci_remap_iospace+0x7c/0xac
+> [    1.371624]  pci_parse_request_of_pci_ranges+0x13c/0x190
+> [    1.376945]  rcar_pcie_probe+0x4c/0xb04
+> [    1.380786]  platform_drv_probe+0x50/0xbc
+> [    1.384799]  driver_probe_device+0x21c/0x308
+> [    1.389072]  __device_attach_driver+0x98/0xc8
+> [    1.393431]  bus_for_each_drv+0x54/0x94
+> [    1.397269]  __device_attach+0xc4/0x12c
+> [    1.401107]  device_initial_probe+0x10/0x18
+> [    1.405292]  bus_probe_device+0x90/0x98
+> [    1.409130]  deferred_probe_work_func+0xb0/0x150
+> [    1.413756]  process_one_work+0x12c/0x29c
+> [    1.417768]  worker_thread+0x200/0x3fc
+> [    1.421522]  kthread+0x108/0x134
+> [    1.424755]  ret_from_fork+0x10/0x18
+> [    1.428334] Code: f9004ba2 54000080 aa0003fb 17ffff48 (d4210000)
+> 
+> It turned out that pci_remap_iospace() wasn't undone when the driver's
+> probe failed, and since devm_phy_optional_get() returned -EPROBE_DEFER,
+> the probe was retried,  finally causing the BUG due to trying to remap
+> already remapped pages.
+> 
+> The most feasible solution seems to introduce devm_pci_remap_iospace()
+> and call it instead of pci_remap_iospace(), so that the pages get unmapped
+> automagically on any probe failure.
+> 
+> And  while fixing pci_parse_request_of_pci_ranges(), aslo fix the other
+> drivers that have probably copied the bad example...
+> 
+> Fixes: 4e64dbe226e7 ("PCI: generic: Expose pci_host_common_probe() for use by other drivers")
+> Fixes: cbce7900598c ("PCI: designware: Make driver arch-agnostic")
+> Fixes: 8c39d710363c ("PCI: aardvark: Add Aardvark PCI host controller driver")
+> Fixes: d3c68e0a7e34 ("PCI: faraday: Add Faraday Technology FTPCI100 PCI Host Bridge driver")
+> Fixes: 68a15eb7bd0c ("PCI: v3-semi: Add V3 Semiconductor PCI host driver")
+> Fixes: b7e78170efd4 ("PCI: versatile: Add DT-based ARM Versatile PB PCIe host driver")
+> Fixes: 5f6b6ccdbe1c ("PCI: xgene: Add APM X-Gene PCIe driver")
+> Fixes: 637cfacae96f ("PCI: mediatek: Add MediaTek PCIe host controller support")
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Cc: stable at vger.kernel.org
+> 
+> ---
+> The patch is against the 'master' branch of Bjorn Helgaas' 'pci.git' repo...
+> It  has only been tested with the R-Car PCIe driver...
+> 
+>  drivers/pci/controller/dwc/pcie-designware-host.c |    3 +
+>  drivers/pci/controller/pci-aardvark.c             |    2 -
 
+For the Aardvark chunk:
 
->> As for swapper_pg_dir, it would indeed be nice if we could keep those
->> mappings read-only most of the time, but I'm not sure how useful this
->> is if we apply it to the root level only.
->
-> The purpose of it is to make 'KSMA' harder, where an single arbitrary
-> write is used to add a block mapping to the page-tables, giving the
-> attacker full access to kernel memory. That's why we just apply it to
-> the root level only. If the attacker can arbitrary write multiple times,
-> I think it's hard to defend.
->
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-So the assumption is that the root level is more easy to find?
-Otherwise, I'm not sure I understand why being able to write a level 0
-entry is so harmful, given that we don't have block mappings at that
-level.
+Thanks!
 
->> > @@ -417,12 +421,22 @@ static void __init __map_memblock(pgd_t *pgdp, phys_addr_t start,
->> >
->> >  void __init mark_linear_text_alias_ro(void)
->> >  {
->> > +       unsigned long size;
->> > +
->> >         /*
->> >          * Remove the write permissions from the linear alias of .text/.rodata
->> > +        *
->> > +        * We free some pages in .rodata at paging_init(), which generates a
->> > +        * hole. And the hole splits .rodata into two pieces.
->> >          */
->> > +       size = (unsigned long)swapper_pg_dir + PAGE_SIZE - (unsigned long)_text;
->> >         update_mapping_prot(__pa_symbol(_text), (unsigned long)lm_alias(_text),
->> > -                           (unsigned long)__init_begin - (unsigned long)_text,
->> > -                           PAGE_KERNEL_RO);
->> > +                           size, PAGE_KERNEL_RO);
->> > +
->> > +       size = (unsigned long)__init_begin - (unsigned long)swapper_pg_end;
->> > +       update_mapping_prot(__pa_symbol(swapper_pg_end),
->> > +                           (unsigned long)lm_alias(swapper_pg_end),
->> > +                           size, PAGE_KERNEL_RO);
->>
->> I don't think this is necessary. Even if some pages are freed, it
->> doesn't harm to keep a read-only alias of them here since the new
->> owner won't access them via this mapping anyway. So we can keep
->> .rodata as a single region.
->
-> To be honest, I didn't think of this issue at first. I later found a
-> problem when testing the code on qemu:
->
-
-OK, you're right. I missed the fact that this operates on the linear
-alias, not the kernel mapping itself.
-
-What I don't like is that we lose the ability to use block mappings
-for the entire .rodata section this way. Isn't it possible to move
-these pgdirs to the end of the .rodata segment, perhaps by using a
-separate input section name and placing that explicitly? We could even
-simply forget about freeing those pages, given that [on 4k pages] the
-benefit of freeing 12 KB of space is likely to get lost in the
-rounding noise anyway [segments are rounded up to 64 KB in size]
-
-
-> [    7.027935] Unable to handle kernel write to read-only memory at virtual address ffff800000f42c00
-> [    7.028388] Mem abort info:
-> [    7.028495]   ESR = 0x9600004f
-> [    7.028602]   Exception class = DABT (current EL), IL = 32 bits
-> [    7.028749]   SET = 0, FnV = 0
-> [    7.028837]   EA = 0, S1PTW = 0
-> [    7.028930] Data abort info:
-> [    7.029017]   ISV = 0, ISS = 0x0000004f
-> [    7.029120]   CM = 0, WnR = 1
-> [    7.029253] swapper pgtable: 4k pages, 48-bit VAs, pgdp =         (ptrval)
-> [    7.029418] [ffff800000f42c00] pgd=00000000beff6803, pud=00000000beff5803, pmd=00000000beff3803, pte=00e0000040f42f93
-> [    7.029807] Internal error: Oops: 9600004f [#1] PREEMPT SMP
-> [    7.030027] Modules linked in:
-> [    7.030256] CPU: 0 PID: 1321 Comm: jbd2/vda-8 Not tainted 4.17.0-rc4-02908-g0fe42512b2f0-dirty #71
-> [    7.030486] Hardware name: linux,dummy-virt (DT)
-> [    7.030708] pstate: 40400005 (nZcv daif +PAN -UAO)
-> [    7.030880] pc : __memset+0x16c/0x1c0
-> [    7.030993] lr : jbd2_journal_get_descriptor_buffer+0x7c/0xfc
-> [    7.031134] sp : ffff00000a8ebbe0
-> [    7.031264] x29: ffff00000a8ebbe0 x28: ffff80007c104800
-> [    7.031430] x27: ffff00000a8ebd98 x26: ffff80007c4410d0
-> [    7.031567] x25: ffff80007c441118 x24: 00000000ffffffff
-> [    7.031704] x23: ffff80007c41b000 x22: ffff0000090d9000
-> [    7.031838] x21: 0000000002000000 x20: ffff80007bcee800
-> [    7.031973] x19: ffff80007c4413a8 x18: 0000000000000727
-> [    7.032107] x17: 0000ffff89eba028 x16: ffff0000080e2c38
-> [    7.032286] x15: ffff7e0000000000 x14: 0000000000048018
-> [    7.032424] x13: 0000000048018c00 x12: ffff80007bc65788
-> [    7.032558] x11: ffff00000a8eba68 x10: 0000000000000040
-> [    7.032709] x9 : 0000000000000000 x8 : ffff800000f42c00
-> [    7.032849] x7 : 0000000000000000 x6 : 000000000000003f
-> [    7.032984] x5 : 0000000000000040 x4 : 0000000000000000
-> [    7.033119] x3 : 0000000000000004 x2 : 00000000000003c0
-> [    7.033254] x1 : 0000000000000000 x0 : ffff800000f42c00
-> [    7.033414] Process jbd2/vda-8 (pid: 1321, stack limit = 0x        (ptrval))
-> [    7.033633] Call trace:
-> [    7.033757]  __memset+0x16c/0x1c0
-> [    7.033858]  journal_submit_commit_record+0x60/0x174
-> [    7.033985]  jbd2_journal_commit_transaction+0xf38/0x1330
-> [    7.034115]  kjournald2+0xcc/0x250
-> [    7.034207]  kthread+0xfc/0x128
-> [    7.034295]  ret_from_fork+0x10/0x18
-> [    7.034718] Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428)
-> [    7.035104] ---[ end trace 26d65a14ae983167 ]---
->
-> /sys/kernel/debug/kernel_page_tables shows that:
->
-> ---[ Linear Mapping ]---
-> 0xffff800000000000-0xffff800000080000         512K PTE       RW NX SHD AF NG CON     UXN MEM/NORMAL
-> 0xffff800000080000-0xffff800000200000        1536K PTE       ro NX SHD AF NG         UXN MEM/NORMAL
-> 0xffff800000200000-0xffff800000e00000          12M PMD       RW NX SHD AF NG     BLK UXN MEM/NORMAL
-> 0xffff800000e00000-0xffff800000fb0000        1728K PTE       ro NX SHD AF NG         UXN MEM/NORMAL
->
-> So I split it into pieces.
->
-> Thanks,
->
-> Jun
+Thomas Petazzoni
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
