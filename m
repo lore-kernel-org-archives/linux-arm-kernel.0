@@ -1,139 +1,139 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 21 Jun 2018 15:57:31 +0100
-Subject: [RFC PATCH 07/16] arm64/sve: Enable SVE state tracking for non-task
- contexts
+Date: Thu, 21 Jun 2018 15:57:25 +0100
+Subject: [RFC PATCH 01/16] arm64: fpsimd: Always set TIF_FOREIGN_FPSTATE on
+ task state flush
 In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
 References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1529593060-542-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1529593060-542-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current FPSIMD/SVE context handling support for non-task (i.e.,
-KVM vcpu) contexts does not take SVE into account.  This means that
-only task contexts can safely use SVE at present.
+This patch updates fpsimd_flush_task_state() to mirror the new
+semantics of fpsimd_flush_cpu_state(): both functions now
+implicitly set TIF_FOREIGN_FPSTATE to indicate that the task's
+FPSIMD state is not loaded into the cpu.
 
-In preparation for enabling KVM guests to use SVE, it is necessary
-to keep track of SVE state for non-task contexts too.
+As a side-effect, fpsimd_flush_task_state() now sets
+TIF_FOREIGN_FPSTATE even for non-running tasks.  In the case of
+non-running tasks this is not useful but also harmless, because the
+flag is live only while the corresponding task is running.  This
+function is not called from fast paths, so special-casing this for
+the task == current case is not really worth it.
 
-This patch adds the necessary support, removing assumptions from
-the context switch code about the location of the SVE context
-storage.
+Compiler barriers previously present in restore_sve_fpsimd_context()
+are pulled into fpsimd_flush_task_state() so that it can be safely
+called with preemption enabled if necessary.
 
-When binding a vcpu context, its vector length is arbitrarily
-specified as sve_max_vl for now.  In any case, because TIF_SVE is
-presently cleared at vcpu context bind time, the specified vector
-length will not be used for anything yet.  In later patches TIF_SVE
-will be set here as appropriate, and the appropriate maximum vector
-length for the vcpu will be passed when binding.
+Explicit calls to set TIF_FOREIGN_FPSTATE that accompany
+fpsimd_flush_task_state() calls and are now redundant are removed
+as appropriate.
+
+fpsimd_flush_task_state() is used to get exclusive access to the
+representation of the task's state via task_struct, for the purpose
+of replacing the state.  Thus, the call to this function should
+happen before manipulating fpsimd_state or sve_state etc. in
+task_struct.  Anomalous cases are reordered appropriately in order
+to make the code more consistent, although there should be no
+functional difference since these cases are protected by
+local_bh_disable() anyway.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h |  3 ++-
- arch/arm64/kernel/fpsimd.c      | 20 +++++++++++++++-----
- arch/arm64/kvm/fpsimd.c         |  4 +++-
- 3 files changed, 20 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 25 +++++++++++++++++++------
+ arch/arm64/kernel/signal.c |  5 -----
+ 2 files changed, 19 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 3ad4607..d575e59 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -54,7 +54,8 @@ extern void fpsimd_restore_current_state(void);
- extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
- 
- extern void fpsimd_bind_task_to_cpu(void);
--extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state);
-+extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state,
-+				     void *sve_state, unsigned int sve_vl);
- 
- extern void fpsimd_flush_task_state(struct task_struct *target);
- extern void fpsimd_flush_cpu_state(void);
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 390afb4..8afc518 100644
+index 84c68b1..6b1ddae 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -121,6 +121,8 @@
-  */
- struct fpsimd_last_state_struct {
- 	struct user_fpsimd_state *st;
-+	void *sve_state;
-+	unsigned int sve_vl;
- };
+@@ -569,7 +569,6 @@ int sve_set_vector_length(struct task_struct *task,
+ 		local_bh_disable();
  
- static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
-@@ -260,14 +262,15 @@ static void task_fpsimd_load(void)
-  */
- void fpsimd_save(void)
- {
--	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
-+	struct fpsimd_last_state_struct const *last =
-+		this_cpu_ptr(&fpsimd_last_state);
- 	/* set by fpsimd_bind_task_to_cpu() or fpsimd_bind_state_to_cpu() */
- 
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
--			if (WARN_ON(sve_get_vl() != current->thread.sve_vl)) {
-+			if (WARN_ON(sve_get_vl() != last->sve_vl)) {
- 				/*
- 				 * Can't save the user regs, so current would
- 				 * re-enter user with corrupt state.
-@@ -277,9 +280,11 @@ void fpsimd_save(void)
- 				return;
- 			}
- 
--			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
-+			sve_save_state((char *)last->sve_state +
-+						sve_ffr_offset(last->sve_vl),
-+				       &last->st->fpsr);
- 		} else
--			fpsimd_save_state(st);
-+			fpsimd_save_state(last->st);
+ 		fpsimd_save();
+-		set_thread_flag(TIF_FOREIGN_FPSTATE);
  	}
- }
  
-@@ -1053,6 +1058,8 @@ void fpsimd_bind_task_to_cpu(void)
- 		this_cpu_ptr(&fpsimd_last_state);
+ 	fpsimd_flush_task_state(task);
+@@ -835,12 +834,11 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ 	local_bh_disable();
  
- 	last->st = &current->thread.uw.fpsimd_state;
-+	last->sve_state = current->thread.sve_state;
-+	last->sve_vl = current->thread.sve_vl;
- 	current->thread.fpsimd_cpu = smp_processor_id();
+ 	fpsimd_save();
+-	fpsimd_to_sve(current);
+ 
+ 	/* Force ret_to_user to reload the registers: */
+ 	fpsimd_flush_task_state(current);
+-	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 
++	fpsimd_to_sve(current);
+ 	if (test_and_set_thread_flag(TIF_SVE))
+ 		WARN_ON(1); /* SVE access shouldn't have trapped */
+ 
+@@ -917,9 +915,9 @@ void fpsimd_flush_thread(void)
+ 
+ 	local_bh_disable();
+ 
++	fpsimd_flush_task_state(current);
+ 	memset(&current->thread.uw.fpsimd_state, 0,
+ 	       sizeof(current->thread.uw.fpsimd_state));
+-	fpsimd_flush_task_state(current);
  
  	if (system_supports_sve()) {
-@@ -1066,7 +1073,8 @@ void fpsimd_bind_task_to_cpu(void)
+ 		clear_thread_flag(TIF_SVE);
+@@ -956,8 +954,6 @@ void fpsimd_flush_thread(void)
+ 			current->thread.sve_vl_onexec = 0;
  	}
+ 
+-	set_thread_flag(TIF_FOREIGN_FPSTATE);
+-
+ 	local_bh_enable();
  }
  
--void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
-+void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st, void *sve_state,
-+			      unsigned int sve_vl)
- {
- 	struct fpsimd_last_state_struct *last =
- 		this_cpu_ptr(&fpsimd_last_state);
-@@ -1074,6 +1082,8 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	last->st = st;
-+	last->sve_state = sve_state;
-+	last->sve_vl = sve_vl;
- }
+@@ -1066,12 +1062,29 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
  
  /*
-diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-index 4aaf78e..872008c 100644
---- a/arch/arm64/kvm/fpsimd.c
-+++ b/arch/arm64/kvm/fpsimd.c
-@@ -85,7 +85,9 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
- 	WARN_ON_ONCE(!irqs_disabled());
- 
- 	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
--		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs);
-+		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs,
-+					 NULL, sve_max_vl);
+  * Invalidate live CPU copies of task t's FPSIMD state
++ *
++ * This function may be called with preemption enabled.  The barrier()
++ * ensures that the assignment to fpsimd_cpu is visible to any
++ * preemption/softirq that could race with set_tsk_thread_flag(), so
++ * that TIF_FOREIGN_FPSTATE cannot be spuriously re-cleared.
++ *
++ * The final barrier ensures that TIF_FOREIGN_FPSTATE is seen set by any
++ * subsequent code.
+  */
+ void fpsimd_flush_task_state(struct task_struct *t)
+ {
+ 	t->thread.fpsimd_cpu = NR_CPUS;
 +
- 		clear_thread_flag(TIF_FOREIGN_FPSTATE);
- 		clear_thread_flag(TIF_SVE);
- 	}
++	barrier();
++	set_tsk_thread_flag(t, TIF_FOREIGN_FPSTATE);
++
++	barrier();
+ }
+ 
++/*
++ * Invalidate any task's FPSIMD state that is present on this cpu.
++ * This function must be called with softirqs disabled.
++ */
+ void fpsimd_flush_cpu_state(void)
+ {
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 511af13..7636965 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -296,11 +296,6 @@ static int restore_sve_fpsimd_context(struct user_ctxs *user)
+ 	 */
+ 
+ 	fpsimd_flush_task_state(current);
+-	barrier();
+-	/* From now, fpsimd_thread_switch() won't clear TIF_FOREIGN_FPSTATE */
+-
+-	set_thread_flag(TIF_FOREIGN_FPSTATE);
+-	barrier();
+ 	/* From now, fpsimd_thread_switch() won't touch thread.sve_state */
+ 
+ 	sve_alloc(current);
 -- 
 2.1.4
