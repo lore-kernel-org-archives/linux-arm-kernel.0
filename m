@@ -1,97 +1,121 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jun 2018 00:07:34 +0100
-Subject: Dynamic ftrace self test broken on ARM
-In-Reply-To: <ac0178fb75658a8d7d7b1931691c7755@agner.ch>
-References: <65fb14b356bc0a414f1fe5cf5c6eb395@agner.ch>
- <20180618175437.3e6c85a1@gandalf.local.home>
- <b9f269ed2143688c38cdcbba7367b101@agner.ch>
- <20180619091735.7aec75d0@gandalf.local.home>
- <5e26cebbb2ebeb87fdc808509881736b@agner.ch>
- <20180620101311.0bcd73d3@gandalf.local.home>
- <7904ed3fe9f59a54526d64f366915b43@agner.ch>
- <e4181ae694d44913a8eba4618477bd3b@agner.ch>
- <ac0178fb75658a8d7d7b1931691c7755@agner.ch>
-Message-ID: <20180620230734.GO17671@n2100.armlinux.org.uk>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Thu, 21 Jun 2018 02:57:02 +0200
+Subject: [PATCH 1/1] arm64: dts: rockchip: correct voltage selector
+ Firefly-RK3399
+In-Reply-To: <cd7447bc-1c3d-29ca-9671-144b1f474711@gmx.de>
+References: <20180604171523.28454-1-xypron.glpk@gmx.de>
+ <10782218.jfpm9omiT7@phil> <459cb125-a3e2-8f1e-b960-011020d41b3c@gmx.de>
+ <6592028.l3WmXB2ndK@diego> <cd7447bc-1c3d-29ca-9671-144b1f474711@gmx.de>
+Message-ID: <3b6e37c8-0ee2-1723-1aa8-499fcb30471c@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 12:45:04AM +0200, Stefan Agner wrote:
-> On 20.06.2018 23:32, Stefan Agner wrote:
-> > On 20.06.2018 21:06, Stefan Agner wrote:
-> >> On 20.06.2018 16:13, Steven Rostedt wrote:
-> >>> On Wed, 20 Jun 2018 15:51:55 +0200
-> >>> Stefan Agner <stefan@agner.ch> wrote:
-> >>>
-> >>>
-> >>>> v4.9 seems to work, so I started bisecting. It turned out that commit
-> >>>> 6f05d0761af6 ("ARM: 8668/1: ftrace: Fix dynamic ftrace with DEBUG_RODATA
-> >>>> and !FRAME_POINTER") broke it, introduced during the v4.12 merge window.
-> >>>
-> >>> That patch doesn't appear to be the cause. It could have been a failed
-> >>> bisect. Does the commit before that commit work? Does that commit fail?
-> >>
-> >> Pretty sure it is that one. Reverting it on top of v4.18-rc1 fixes it...
-> >>
-> >>>
-> >>> It may be due to some other RODATA change though. That is actually one
-> >>> of my thoughts when looking at the bug.
-> >>
-> >> CONFIG_STRICT_KERNEL_RWX=y is set, will test without.
-> > 
-> > Compiling without CONFIG_STRICT_KERNEL_RWX fixes the issue too. So seems
-> > to be a RODATA issue...
+On 06/20/2018 09:57 PM, Heinrich Schuchardt wrote:
+> On 06/20/2018 11:15 AM, Heiko St?bner wrote:
+>> Hi Heinrich,
+>>
+>> Am Mittwoch, 20. Juni 2018, 07:59:34 CEST schrieb Heinrich Schuchardt:
+>>> On 06/20/2018 01:21 AM, Heiko Stuebner wrote:
+>>>> Am Donnerstag, 14. Juni 2018, 14:55:27 CEST schrieb Heiko Stuebner:
+>>>>> Am Montag, 4. Juni 2018, 19:15:23 CEST schrieb Heinrich Schuchardt:
+>>>>>> Without this patch the Firefly-RK3399 board boot process hangs after
+>>>>>> these
+>>>>>>
+>>>>>> lines:
+>>>>>>    fan53555-regulator 0-0040: FAN53555 Option[8] Rev[1] Detected!
+>>>>>>    fan53555-reg: supplied by vcc_sys
+>>>>>>    vcc1v8_s3: supplied by vcc_1v8
+>>>>>>
+>>>>>> Blacklisting driver fan53555 allows booting.
+>>>>>>
+>>>>>> The device tree uses a value of fcs,suspend-voltage-selector different
+>>>>>> to
+>>>>>> any other board.
+>>>>>>
+>>>>>> Changing this setting to the usual value is sufficient to enable
+>>>>>> booting.
+>>>>>>
+>>>>>> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+>>>>>
+>>>>> applied for 4.19.
+>>>>
+>>>> and dropped again.
+>>>>
+>>>> Sadly it looks like the patch causes conflicts with at least one firefly
+>>>> board in a kernelci lab. My own is currently not ready to use, so I cannot
+>>>> look myself right now.
+>>>>
+>>>> The issue kernelci people described sounded quite a lot like the one
+>>>> in your commit message, so my current theory is that the
+>>>> suspend-voltage-selector must in some form corespond to the
+>>>> cpu_b_sleep_h gpio setting we're currently not handling at all, which
+>>>> would therefore depend on how the bootloader sets this up.
+>>>
+>>> please, provide a link to the log displaying the issue and the contact
+>>> who can provide the exact setup.
+>>>
+>>> I have been testing with U-Boot as boot loader.
+>>
+>> failing boot can be found on
+>> https://kernelci.org/boot/id/5b2a053d59b514569079a872/
+>>
+>> As this board is sitting in the "lab-baylibre-seattle", I guess
+>> Kevin Hilman (Cc'ed now) is the one that can say a bit more about the
+>> board setup.
+>>
+>>
+>> The more interesting question would be how to make sure we don't
+>> die with possible different bootloader versions. As I don't really thing 
+>> "upgrade your bootloader" is an always valid option.
+>>
+>>
+>> Heiko
+>>
 > 
-> Ok, I understand the issue now:
+> Hi Kevin,
 > 
-> In ARM ftrace we set kernel text to RW and back to RO in
-> arch_ftrace_update_code.
+> the RK3399-Firefly was booted on lab-baylibre-seattle with
+> U-Boot 2017.05-rc3-00131-gf79fd58d5f5c-dirty
 > 
-> ARM sets the kernel at free_initmem to RO. So using ftrace selftest sets
-> the kernel text to RO much earlier, which seems to cause issues.
+> f79fd58d5f5c is not a commit in U-Boot master.
+> The version number tells us it is 131 patches ahead of U-Boot 2017.05-rc3.
+> Dirty means the source contained uncommitted changes.
 > 
-> Reverting the above commit actually fixes selftests during boot, but it
-> breaks ftrace at runtime...
+> Unfortunately this is not a reproducible test environment.
+> Could you, please, provide the build recipe to reproduce the U-Boot
+> BayLibre is using?
+> Would it be possible to use mainline U-Boot in kernelci for this board?
 > 
-> This resolves the issue:
+> Best regards
 > 
-> +static int __ftrace_modify_code_boot(void *data)
-> +{
-> +       int *command = data;
-> +
-> +       ftrace_modify_all_code(*command);
-> +
-> +       return 0;
-> +}
-> +
->  void arch_ftrace_update_code(int command)
->  {
-> -       stop_machine(__ftrace_modify_code, &command, NULL);
-> +       if (system_state < SYSTEM_RUNNING)
-> +               stop_machine(__ftrace_modify_code_boot, &command, NULL);
-> +       else
-> +               stop_machine(__ftrace_modify_code, &command, NULL);
->  }
+> Heinrich
 > 
-> Using system_state to indicate whether fix_kernmem_perms has been called
-> is rather brittle...
-> 
-> Any input from ARM folks?
 
-The same issues must exist on other architectures as ARM is not the only
-architecture to implement read-only kernel text and dynamic ftrace, so
-surely this problem isn't unique to ARM.
+I have now built the last available release of U-Boot (v2018.05)
+according to the following recipe:
 
-It looks to me like x86 sets ARCH_HAS_STRICT_KERNEL_RWX, so surely the
-kernel text there is protected against modification of the kernel text.
-x86 seems to use probe_kernel_write() in the ftrace code, but I don't
-see how that would succeed with ARCH_HAS_STRICT_KERNEL_RWX.  Does
-dynamic ftrace work on x86, if so, how?
+git clone https://github.com/xypron/u-boot-build.git
+cd u-boot-build/
+git checkout firefly-rk3399-rkloader
+# commit 251b12fb4f0eabfff2d0552d0807d8ddc44ae2aa
+# tag firefly-rk3399-rkloader-v2018.05
+make
+make install DESTDIR=foo
+cd foo/usr/lib/u-boot/firefly-rk3399/
+# be careful to specify your SD card as device!
+./sd_fusing /dev/sdX
 
-It looks like powerpc also supports the combination, but again I don't
-see anything obvious that suggests how it gets around the kernel text
-read-only-ness.
+# in U-Boot 2018.05 (Jun 21 2018 - 02:33:12 +0200)
+load mmc 1:1 ${fdt_addr_r} 2018-06-20/rk3399-firefly.dtb
+load mmc 1:1 ${kernel_addr_r} 2018-06-20/Image
+booti ${kernel_addr_r} - ${fdt_addr_r}
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+The error observed in kernelci when initializing the FAN53555 driver
+does not occur.
+
+The console log is here:
+https://gist.github.com/xypron/34b6485deabfc8172f978b5a99705466
+
+Best regards
+
+Heinrich
