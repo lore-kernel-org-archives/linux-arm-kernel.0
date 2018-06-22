@@ -1,34 +1,44 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 22 Jun 2018 17:14:16 +0200
-Subject: [PATCH v3 01/17] platform-msi: allow creation of MSI domain without
- interrupt number
+Date: Fri, 22 Jun 2018 17:14:19 +0200
+Subject: [PATCH v3 04/17] irqchip/irq-mvebu-icu: fix wrong private data
+ retrieval
 In-Reply-To: <20180622151432.1566-1-miquel.raynal@bootlin.com>
 References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
-Message-ID: <20180622151432.1566-2-miquel.raynal@bootlin.com>
+Message-ID: <20180622151432.1566-5-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_msi_alloc_priv_data() checks that a number of interrupts is
-always given. This extra-check has no real impact and just prevents
-uselessly the user to create an MSI tree domain: remove it.
+The irq_domain structure has an host_data pointer that just stores
+private data. It is meant to not be touched by the IRQ core. However,
+when it comes to MSI, the MSI layer adds its own private data there
+with a structure that also has a host_data pointer.
+
+Because this IRQ domain is an MSI domain, to access private data we
+should do a d->host_data->host_data, also wrapped as
+'platform_msi_get_host_data()'.
+
+This bug was lying there silently because the 'icu' structure retrieved
+this way was just called by dev_err(), only producing a
+'(NULL device *):' output on the console.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- drivers/base/platform-msi.c | 2 +-
+ drivers/irqchip/irq-mvebu-icu.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 60d6cc618f1c..9f001f4ccc0f 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
- 	 * accordingly (which would impact the max number of MSI
- 	 * capable devices).
- 	 */
--	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
-+	if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
- 		return ERR_PTR(-EINVAL);
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index 13063339b416..a2a3acd74491 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -105,7 +105,7 @@ static int
+ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 			       unsigned long *hwirq, unsigned int *type)
+ {
+-	struct mvebu_icu *icu = d->host_data;
++	struct mvebu_icu *icu = platform_msi_get_host_data(d);
+ 	unsigned int icu_group;
  
- 	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
+ 	/* Check the count of the parameters in dt */
 -- 
 2.14.1
