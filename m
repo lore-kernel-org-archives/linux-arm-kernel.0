@@ -1,79 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Jun 2018 15:08:37 +0200
-Subject: [PATCH] [RFC] arm: Replace "multiple platforms" by "common
- platform"
-In-Reply-To: <20180621155906.12821-1-geert+renesas@glider.be>
-References: <20180621155906.12821-1-geert+renesas@glider.be>
-Message-ID: <20180622130830.xdglndk4xtr24yuv@verge.net.au>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 22 Jun 2018 15:08:25 +0200
+Subject: [Dev] [PATCH 0/5] RFC: Mezzanine handling for 96boards
+In-Reply-To: <CAMuUZTH8wXhoBSKwsCFBRBzAvvBBTUTnkmwKEpq=56=URo7kjQ@mail.gmail.com>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+ <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
+ <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
+ <CAMuUZTG0q4f2T=+HjEijUCLb7KNXok9RJHOXOKNs2iap5p7m5Q@mail.gmail.com>
+ <CAKv+Gu_Dq1uY0wHRyREmCmQdSRSJbNheF1ZsrNhibKOZowvf+g@mail.gmail.com>
+ <CAMuUZTHOuzQm3y-yF6cad9y1UgsK+6R2w7vSzz7MkkYCdYd3hA@mail.gmail.com>
+ <CAKv+Gu80zzaahJhoMScvZ9dS31QobMa0+JFjaOo-GxD+4XsuWQ@mail.gmail.com>
+ <CAMuUZTH8wXhoBSKwsCFBRBzAvvBBTUTnkmwKEpq=56=URo7kjQ@mail.gmail.com>
+Message-ID: <616e99d3-b43e-58ca-aa82-eaf41f618682@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 05:59:06PM +0200, Geert Uytterhoeven wrote:
-> "ARM multiplatform" has actually two meanings:
-> ? 1. It groups platforms that follow the "ARM multiplatform" software
->      framework,
-> ? 2. It allows to build a single kernel that can be booted on multiple
-> ? ? ?platforms.
+On 19.6.2018 17:32, Yang Zhang wrote:
+> On 19 June 2018 at 16:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 > 
-> Currently support for XIP and/or NOMMU cannot be enabled on platforms
-> that follow the "ARM multiplatform" framework, without duplicating their
-> machine selection logic under a new Kconfig symbol.  As (in theory) all
-> platforms can be used with XIP and/or NOMMU, this is not sustainable.
+>> On 19 June 2018 at 17:26, Yang Zhang <yang.zhang@96boards.org> wrote:
+>>> Yes.
+>>>
+>>> https://github.com/96boards/documentation/blob/master/
+>> mezzanine/files/mezzanine-design-guidelines.pdf
+>>>
+>>> Under Configuration data section
+>>>
+>>
+>> OK, fair enough. Do any such mezzanines exist yet? Should we offer
+>> more guidance on how exactly this discovery should be implemented?
+>>
+>>
+> I can't be sure, could look into it - I know there were couple of from
+> Arrow and ST were supporting this.
 > 
-> Hence clarify the meaning of ARCH_MULTIPLATFORM:
->   1. Replace "multiple platforms" by "common platform", as it allows to
->      select one or more platforms adhering to the common framework,
->   2. Note that a single kernel may not boot on all platforms if XIP or
->      NOMMU is enabled.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> References:
->   - "[PATCHv4 0/4] arm/versatile: no-MMU support"
->     (http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584555.html)
-> 
->   - "[PATCH 0/2] ARM: ARMv7 (with MMU) XIP without ARCH_MULTIPLATFORM"
->     (http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486835.html)
-> 
->  arch/arm/Kconfig | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 54eeb8d00bc62a9f..6b286c018cf748c7 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -329,7 +329,7 @@ choice
->  	default ARCH_MULTIPLATFORM if MMU
->  
->  config ARCH_MULTIPLATFORM
-> -	bool "Allow multiple platforms to be selected"
-> +	bool "Common platforms (\"multiplatform\")"
->  	depends on MMU
->  	select ARM_HAS_SG_CHAIN
->  	select ARM_PATCH_PHYS_VIRT
-> @@ -342,6 +342,13 @@ config ARCH_MULTIPLATFORM
->  	select PCI_DOMAINS if PCI
->  	select SPARSE_IRQ
->  	select USE_OF
-> +	help
-> +	  Support for systems implemented using the common "multiplatform"
-> +	  framework.
-> +
-> +	  Unless specialized options depending on intimate platform
-> +	  details, like XIP or NOMMU, are enabled, this allows to build a
-> +	  single kernel that boots on multiple platforms.
+> Yes, more details guidance of "How to" is always welcome :-).
 
-Hi Geert,
+Unfortunately this is not saying i2c address and also how to handle
+stacked solution.
 
-I wonder if this might be slightly clearer:
+I have told to Linus what Xilinx is using for FMC connector present on
+the most of xilinx development boards.
+These on board FMC eeproms contain information in FRU format.
+Also there incomplete support fmc support in the kernel in drivers/fmc
+which was added by Alessandro Rubini in 2013.
 
-	  Unless specialized options that depend on intimate platform
-	  details, such as XIP and NOMMU, are enabled, this allows building
-	  a single kernel that boots on multiple platforms.
+At least these eeprom could reuse FRU data format.
 
->  
->  config ARM_SINGLE_ARMV7M
->  	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
-> -- 
-> 2.17.1
-> 
+Thanks,
+Michal
