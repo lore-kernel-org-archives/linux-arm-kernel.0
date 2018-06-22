@@ -1,57 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jun 2018 19:38:38 +0100
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <TY1PR01MB1562C54E8DD3942F40F8CBBD8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-References: <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
- <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
- <20180622110145.GU17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
- <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
- <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
- <TY1PR01MB15624342267F973525BF45698A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
- <nycvar.YSQ.7.76.1806221244490.16670@knanqh.ubzr>
- <TY1PR01MB1562C54E8DD3942F40F8CBBD8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-Message-ID: <20180622183838.GZ17671@n2100.armlinux.org.uk>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 22 Jun 2018 13:55:11 -0500
+Subject: [PATCH 1/2] arm64: dts: stratix10: Fix SPI nodes for Stratix10
+In-Reply-To: <2e12b65a-c0bf-0628-ef38-ed931935ee41@linux.intel.com>
+References: <1527617612-2205-1-git-send-email-thor.thayer@linux.intel.com>
+ <2e12b65a-c0bf-0628-ef38-ed931935ee41@linux.intel.com>
+Message-ID: <4d02db71-c019-3517-8ba0-81b008cad2e2@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 05:23:09PM +0000, Chris Brandt wrote:
-> Then here's a question.
+
+
+On 06/21/2018 01:25 PM, Thor Thayer wrote:
+> Hi Dinh,
 > 
-> To be clear, the discussion is around
-> 
->   "Being able to build a kernel that will not boot"
-> 
-> So which one of these is more important: build or boot?
+> On 05/29/2018 01:13 PM, thor.thayer at linux.intel.com wrote:
+>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>
+>> Remove the unused bus-num node and change num-chipselect
+>> to num-cs to match SPI bindings.
+>>
+>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>> Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
+>> Cc: stable at vger.kernel.org
+>> ---
+>> ? arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 6 ++----
+>> ? 1 file changed, 2 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> index d8c94d5ff4b4..47fa4b450324 100644
+>> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> @@ -315,8 +315,7 @@
+>> ????????????? interrupts = <0 99 4>;
+>> ????????????? resets = <&rst SPIM0_RESET>;
+>> ????????????? reg-io-width = <4>;
+>> -??????????? num-chipselect = <4>;
+>> -??????????? bus-num = <0>;
+>> +??????????? num-cs = <4>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> ? @@ -328,8 +327,7 @@
+>> ????????????? interrupts = <0 100 4>;
+>> ????????????? resets = <&rst SPIM1_RESET>;
+>> ????????????? reg-io-width = <4>;
+>> -??????????? num-chipselect = <4>;
+>> -??????????? bus-num = <0>;
+>> +??????????? num-cs = <4>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> ?
+> Any update on this patch?
 
-We care about both.
+I've applied both patches.
 
-> Meaning what if you can select multiple platforms in kconfig, but then 
-> there is a .c file that does more sanity checking that then prevents the 
-> full build using a #error.
-
-... which is not acceptable.  We have a lot of automated build
-infrastructure to build almost every commit in the mainline kernel
-against almost every build configuration that is present in the
-kernel and every architecture that is present in the mainline kernel.
-We also have people that build random configurations and fix any
-build failures and warnings which result from that.
-
-I also build randconfigs here.
-
-> In that case you can never "build" a kernel that has no chance of 
-> booting on all the selected platforms.
-> 
-> There are configs options today that you can select, but unless some 
-> external criteria is  met during build time, the build will fail (like
-> with a "missing .h file" message or something)
-
-Such as?  I don't think that's found by the randconfig builders - I've
-never noticed any such failures on ARM.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Dinh
