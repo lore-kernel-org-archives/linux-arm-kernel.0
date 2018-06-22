@@ -1,66 +1,53 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 22 Jun 2018 12:07:48 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <6376822.ENUjdQ58sn@amdc3058>
- <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
- <CGME20180622100749eucas1p2a47cfba3b4d3d5004e9a0068917d5616@eucas1p2.samsung.com>
-Message-ID: <12969617.N13u7zUTf5@amdc3058>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Jun 2018 12:08:16 +0200
+Subject: [PATCH v4] MAINTAINERS: Add file patterns for mediatek device tree
+ bindings
+Message-ID: <20180622100816.29320-1-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 22, 2018 09:54:22 AM Ard Biesheuvel wrote:
-> On 13 June 2018 at 18:08, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> > On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
-> >> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
-> >> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
-> >> > _CRS windows.
-> >> >
-> >> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
-> >> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
-> >> >
-> >> > When a VGA device is behind such a host bridge and the resource is
-> >> > translated efifb driver is trying to do ioremap against bus address
-> >> > rather than the resource address and is failing to probe.
-> >> >
-> >> > efifb: probing for efifb
-> >> > efifb: cannot reserve video memory at 0x1e000000
-> >> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
-> >> > efifb: mode is 800x600x32, linelength=3200, pages=1
-> >> > efifb: scrolling: redraw
-> >> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-> >> >
-> >> > Use the host bridge offset information to convert bus address to
-> >> > resource address in the fixup.
-> >> >
-> >> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >>
-> >> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>
-> >> Bartlomiej, could you please take these via the fbdev tree for v4.19?
-> >
-> > Sure, I will queue it after the current merge window.
-> >
-> >> Peter already gave his ack but Sinan dropped it (presumably because of
-> >> the split in v2)
-> >
-> > Peter, can I (re)add your ACK to V2 patches?
-> >
-> 
-> Actually, it would be better if we could take this through the EFI
-> tree instead, with your ack. Would you mind?
+Submitters of device tree binding documentation may forget to CC
+the subsystem maintainer if this is missing.
 
-Fine with me.
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+v3:
+  - Update for next-20180622,
 
-> There are some other efifb changes coming up, some of which depend on
-> core EFI changes, and taking these through different trees is going to
-> be more trouble than it's worth.
+v2:
+  - Add Reviewed-by.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Impact on "scripts/get_maintainer.pl -f Documentation/devicetree/bindings/soc/mediatek/":
+
+-Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS,commit_signer:4/4=100%)
++Matthias Brugger <matthias.bgg@gmail.com> (maintainer:ARM/Mediatek SoC support)
++Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+ Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+-Matthias Brugger <matthias.bgg@gmail.com> (commit_signer:4/4=100%)
+-Sean Wang <sean.wang@mediatek.com> (commit_signer:3/4=75%,authored:3/4=75%)
+-Ulf Hansson <ulf.hansson@linaro.org> (commit_signer:2/4=50%)
+-Chen Zhong <chen.zhong@mediatek.com> (commit_signer:1/4=25%)
+-"weiyi.lu at mediatek.com" <weiyi.lu@mediatek.com> (authored:1/4=25%)
++linux-arm-kernel at lists.infradead.org (moderated list:ARM/Mediatek SoC support)
++linux-mediatek at lists.infradead.org (moderated list:ARM/Mediatek SoC support)
+ devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+ linux-kernel at vger.kernel.org (open list)
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3bb8ce891719ed21..baa4dc046daf9cdc 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1634,6 +1634,7 @@ M:	Matthias Brugger <matthias.bgg@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
++F:	Documentation/devicetree/bindings/soc/mediatek/
+ F:	arch/arm/boot/dts/mt6*
+ F:	arch/arm/boot/dts/mt7*
+ F:	arch/arm/boot/dts/mt8*
+-- 
+2.17.1
