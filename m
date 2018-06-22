@@ -1,65 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jun 2018 09:54:22 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <6376822.ENUjdQ58sn@amdc3058>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <CGME20180613154552epcas5p4877f53310b66cf9d3e17196b0d028e41@epcas5p4.samsung.com>
- <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
- <6376822.ENUjdQ58sn@amdc3058>
-Message-ID: <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 22 Jun 2018 09:56:41 +0200
+Subject: [PATCH 5/7] dt-bindings: samsung: Document bindings for Samsung
+ aries boards
+In-Reply-To: <1529608199-5583-6-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <1529608199-5583-6-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <CAJKOXPdV+UKKnntcrXQ15aOB5eCehyxqVEJfvZp5faTw434rPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2018 at 18:08, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
->> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
->> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
->> > _CRS windows.
->> >
->> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
->> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
->> >
->> > When a VGA device is behind such a host bridge and the resource is
->> > translated efifb driver is trying to do ioremap against bus address
->> > rather than the resource address and is failing to probe.
->> >
->> > efifb: probing for efifb
->> > efifb: cannot reserve video memory at 0x1e000000
->> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
->> > efifb: mode is 800x600x32, linelength=3200, pages=1
->> > efifb: scrolling: redraw
->> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
->> >
->> > Use the host bridge offset information to convert bus address to
->> > resource address in the fixup.
->> >
->> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>
->> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> Bartlomiej, could you please take these via the fbdev tree for v4.19?
+On 21 June 2018 at 21:09, Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com> wrote:
+> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 >
-> Sure, I will queue it after the current merge window.
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> index 14510b215480..edce6602de50 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> @@ -2,6 +2,8 @@
 >
->> Peter already gave his ack but Sinan dropped it (presumably because of
->> the split in v2)
+>  Required root node properties:
+>      - compatible = should be one or more of the following.
+> +       - "samsung,aries"       - for S5PV210-based Samsung Aries board.
+> +       - "samsung,galaxys"     - for S5PV210-based Samsung Galaxy S (i9000)  board.
+
+It is not strictly speaking Exynos-based board (as mentioned in the
+header at beginning of file) so maybe change it to "Samsung's Exynos
+and S5P SoC based boards"?
+
+Best regards,
+Krzysztof
+
+>         - "samsung,artik5"      - for Exynos3250-based Samsung ARTIK5 module.
+>         - "samsung,artik5-eval" - for Exynos3250-based Samsung ARTIK5 eval board.
+>         - "samsung,monk"        - for Exynos3250-based Samsung Simband board.
+> --
+> 2.7.4
 >
-> Peter, can I (re)add your ACK to V2 patches?
->
-
-Actually, it would be better if we could take this through the EFI
-tree instead, with your ack. Would you mind?
-
-There are some other efifb changes coming up, some of which depend on
-core EFI changes, and taking these through different trees is going to
-be more trouble than it's worth.
-
-https://marc.info/?l=linux-efi&m=152929425329015&w=2 from Hans, and the series
-
-[PATCH v2 0/2] efi: add support for cacheable efifb mappings
-
-that I just cc'ed you on a minute ago.
-
-Thanks.
