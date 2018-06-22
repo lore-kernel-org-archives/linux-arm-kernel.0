@@ -1,136 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 09:31:18 +0100
-Subject: [PATCH v2 4/4] arm64: insn: Don't fallback on nosync path for general
- insn patching
-In-Reply-To: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529656278-878-5-git-send-email-will.deacon@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 22 Jun 2018 09:33:04 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <20180621105404.GB22505@arm.com>
+References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
+ <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
+ <20180621105404.GB22505@arm.com>
+Message-ID: <5B2CB440.8040705@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patching kernel instructions at runtime requires other CPUs to undergo
-a context synchronisation event via an explicit ISB or an IPI in order
-to ensure that the new instructions are visible. This is required even
-for "hotpatch" instructions such as NOP and BL, so avoid optimising in
-this case and always go via stop_machine() when performing general
-patching.
+Hi Will,
 
-ftrace isn't quite as strict, so it can continue to call the nosync
-code directly.
+On 2018/6/21 11:54, Will Deacon wrote:
+> Hi Wei,
+> 
+> On Thu, Jun 21, 2018 at 11:14:28AM +0100, Wei Xu wrote:
+>> On 2018/6/21 10:18, Will Deacon wrote:
+>>> On Thu, Jun 21, 2018 at 09:38:53AM +0100, James Morse wrote:
+>>>> On 20/06/18 17:25, Wei Xu wrote:
+>>>>>     [    0.042421] Insufficient stack space to handle exception!
+>>>>>     [    0.042423] ESR: 0x96000046 -- DABT (current EL)
+>>>>>     [    0.043730] FAR: 0xffff0000093a80e0
+>>>>>     [    0.044714] Task stack: [0xffff0000093a8000..0xffff0000093ac000]
+>>>>
+>>>> This was a level 2 translation fault on a write, to an address that is within
+>>>> the stack....
+>>>>
+>>>>
+>>>>>     [    0.051113] IRQ stack: [0xffff000008000000..0xffff000008004000]
+>>>>>     [    0.057610] Overflow stack: [0xffff80003efce2f0..0xffff80003efcf2f0]
+>>>>>     [    0.064003] CPU: 0 PID: 12 Comm: migration/0 Not tainted
+>>>>> 4.17.0-45865-g2b31fe7-dirty #10
+>>>>>     [    0.072201] Hardware name: linux,dummy-virt (DT)
+>>>>
+>>>>>     [    0.076797] pstate: 604003c5 (nZCv DAIF +PAN -UAO)
+>>>>>     [    0.081727] pc : el1_sync+0x0/0xb0
+>>>>
+>>>> ... from the vectors.
+>>>>
+>>>>
+>>>>>     [    0.085217] lr : kpti_install_ng_mappings+0x120/0x214
+>>>>
+>>>> What I think is happening is: we come out of the kpti idmap with the stack
+>>>> unmapped. Shortly after we access the stack, which faults. el1_sync faults as
+>>>> well when it tries to push the registers to the stack, and we keep going until
+>>>> we overflow the stack.
+>>>>
+>>>> I can't reproduce this with kvmtool or qemu in the model.
+>>>
+>>> Hmm, one thing that occurs to me is that the kpti_install_ng_mappings()
+>>> code leaves the nG bit set in table entries, which is actually IGNORED in
+>>> the architecture.
+>>>
+>>> Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
+>>> otherwise your kernel will take an age to boot.
+>>
+>> Yes, amazing! This patch resolved the issue.
+> 
+> Great...
+> 
+>> I have tested 50 times and can not reproduce the issue any more.
+>> Could you please tell more why this patch works?
+> 
+> You might need to ask your CPU design team ;)
+> 
+> Without this patch, the code in idmap_kpti_install_ng_mappings() sets
+> bit 11 in table descriptors so that we can keep track of which parts of
+> the page table we've visited. With this patch, we don't bother tracking
+> and potentially rewalk parts of the page table (which takes a very long
+> time if KASAN is enabled).
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/insn.h |  2 --
- arch/arm64/kernel/insn.c      | 56 +------------------------------------------
- 2 files changed, 1 insertion(+), 57 deletions(-)
+Got it. Thanks!
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index f62c56b1793f..c6802dea6cab 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -446,8 +446,6 @@ u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
- s32 aarch64_get_branch_offset(u32 insn);
- u32 aarch64_set_branch_offset(u32 insn, s32 offset);
- 
--bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
--
- int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
- 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 0f6a2e0cfde0..2b3413549734 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -149,20 +149,6 @@ int __kprobes aarch64_insn_write(void *addr, u32 insn)
- 	return __aarch64_insn_write(addr, cpu_to_le32(insn));
- }
- 
--static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
--{
--	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
--		return false;
--
--	return	aarch64_insn_is_b(insn) ||
--		aarch64_insn_is_bl(insn) ||
--		aarch64_insn_is_svc(insn) ||
--		aarch64_insn_is_hvc(insn) ||
--		aarch64_insn_is_smc(insn) ||
--		aarch64_insn_is_brk(insn) ||
--		aarch64_insn_is_nop(insn);
--}
--
- bool __kprobes aarch64_insn_uses_literal(u32 insn)
- {
- 	/* ldr/ldrsw (literal), prfm */
-@@ -189,22 +175,6 @@ bool __kprobes aarch64_insn_is_branch(u32 insn)
- 		aarch64_insn_is_bcond(insn);
- }
- 
--/*
-- * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-- * Section B2.6.5 "Concurrent modification and execution of instructions":
-- * Concurrent modification and execution of instructions can lead to the
-- * resulting instruction performing any behavior that can be achieved by
-- * executing any sequence of instructions that can be executed from the
-- * same Exception level, except where the instruction before modification
-- * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
-- * or SMC instruction.
-- */
--bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
--{
--	return __aarch64_insn_hotpatch_safe(old_insn) &&
--	       __aarch64_insn_hotpatch_safe(new_insn);
--}
--
- int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
- {
- 	u32 *tp = addr;
-@@ -239,11 +209,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
- 		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
- 			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
- 							     pp->new_insns[i]);
--		/*
--		 * aarch64_insn_patch_text_nosync() calls flush_icache_range(),
--		 * which ends with "dsb; isb" pair guaranteeing global
--		 * visibility.
--		 */
- 		/* Notify other processors with an additional increment. */
- 		atomic_inc(&pp->cpu_count);
- 	} else {
-@@ -255,8 +220,7 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
- 	return ret;
- }
- 
--static
--int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
-+int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
- {
- 	struct aarch64_insn_patch patch = {
- 		.text_addrs = addrs,
-@@ -272,24 +236,6 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
- 				       cpu_online_mask);
- }
- 
--int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
--{
--	int ret;
--	u32 insn;
--
--	/* Unsafe to patch multiple instructions without synchronizaiton */
--	if (cnt == 1) {
--		ret = aarch64_insn_read(addrs[0], &insn);
--		if (ret)
--			return ret;
--
--		if (aarch64_insn_hotpatch_safe(insn, insns[0]))
--			return aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
--	}
--
--	return aarch64_insn_patch_text_sync(addrs, insns, cnt);
--}
--
- static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
- 						u32 *maskp, int *shiftp)
- {
--- 
-2.1.4
+> 
+> The architecture documents I've looked at are clear that bit 11 is IGNORED
+> by the CPU, which:
+> 
+>   "Indicates that the architecture guarantees that the bit or field is not
+>    interpreted or modified by hardware."
+> 
+> Please can you double-check that your CPU is indeed ignoring bit 11 in
+> non-leaf (table) descriptors?
+
+Do the non-leaf(table) descriptors mean the table descriptors
+of the section D4.3.1 "VMSAv8-64 translation table level 0, level 1, and level 2 descriptor formats"
+in the ARM Architecture Reference Manual ARMv8 for ARMv8-A(DDI0487C_a_armv8_arm.pdf)?
+
+If yes, our hardware does ignore it(not interpret or modify).
+
+Is there any other possible reason cause this?
+Thanks!
+
+Best Regards,
+Wei
+
+> 
+> Thanks,
+> 
+> Will
+> 
+> .
+> 
