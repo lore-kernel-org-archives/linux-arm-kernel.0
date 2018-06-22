@@ -1,41 +1,66 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 22 Jun 2018 11:43:06 +0200
-Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
-In-Reply-To: <CAOMZO5Ahv2F-WeAPFgsBcpAeb2i==SAZ45QBLvnod7jYRG0fMQ@mail.gmail.com>
-References: <20171213142406.5088-1-p.zabel@pengutronix.de>
- <20171226041517.GD4210@X250> <1529610890.4022.7.camel@pengutronix.de>
- <CAOMZO5Ahv2F-WeAPFgsBcpAeb2i==SAZ45QBLvnod7jYRG0fMQ@mail.gmail.com>
-Message-ID: <1529660586.2431.6.camel@pengutronix.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 22 Jun 2018 12:07:48 +0200
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <6376822.ENUjdQ58sn@amdc3058>
+ <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
+ <CGME20180622100749eucas1p2a47cfba3b4d3d5004e9a0068917d5616@eucas1p2.samsung.com>
+Message-ID: <12969617.N13u7zUTf5@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Thu, 2018-06-21 at 17:01 -0300, Fabio Estevam wrote:
-> Hi Philipp,
+On Friday, June 22, 2018 09:54:22 AM Ard Biesheuvel wrote:
+> On 13 June 2018 at 18:08, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> > On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
+> >> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
+> >> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
+> >> > _CRS windows.
+> >> >
+> >> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+> >> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+> >> >
+> >> > When a VGA device is behind such a host bridge and the resource is
+> >> > translated efifb driver is trying to do ioremap against bus address
+> >> > rather than the resource address and is failing to probe.
+> >> >
+> >> > efifb: probing for efifb
+> >> > efifb: cannot reserve video memory at 0x1e000000
+> >> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+> >> > efifb: mode is 800x600x32, linelength=3200, pages=1
+> >> > efifb: scrolling: redraw
+> >> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+> >> >
+> >> > Use the host bridge offset information to convert bus address to
+> >> > resource address in the fixup.
+> >> >
+> >> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >>
+> >> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>
+> >> Bartlomiej, could you please take these via the fbdev tree for v4.19?
+> >
+> > Sure, I will queue it after the current merge window.
+> >
+> >> Peter already gave his ack but Sinan dropped it (presumably because of
+> >> the split in v2)
+> >
+> > Peter, can I (re)add your ACK to V2 patches?
+> >
 > 
-> On Thu, Jun 21, 2018 at 4:54 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> 
-> > I forgot about this between the years, this patch is safe to be applied.
-> 
-> In order to get the internal RAM to be functional, I think we also
-> need to pass the IRAM clock in the iram node:
-> 
->   iram: iram at 1ffe0000 {
->       compatible = "mmio-sram";
->       reg = <0x1ffe0000 0x20000>;
->   +  clocks = <&clks IMX5_CLK_OCRAM>;
->   };
-> 
-> Thanks
+> Actually, it would be better if we could take this through the EFI
+> tree instead, with your ack. Would you mind?
 
-I think i.MX51 doesn't have that clock gate:
+Fine with me.
 
-????????clk[IMX5_CLK_OCRAM]?????????????= imx_clk_gate2("ocram", "ahb", MXC_CCM_CCGR6, 2);
+> There are some other efifb changes coming up, some of which depend on
+> core EFI changes, and taking these through different trees is going to
+> be more trouble than it's worth.
 
-is added for i.MX53 only. CCGR6 CG1 (bits 3:2) is documented as
-"no longer supported, should be cleared" in the i.MX51 reference
-manual. I can't find any mention of a gate for the SCC RAM.
-
-regards
-Philipp
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
