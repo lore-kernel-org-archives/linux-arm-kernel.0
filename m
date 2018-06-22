@@ -1,54 +1,42 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 22 Jun 2018 17:14:22 +0200
-Subject: [PATCH v3 07/17] irqchip/irq-mvebu-icu: make irq_domain local
-In-Reply-To: <20180622151432.1566-1-miquel.raynal@bootlin.com>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
-Message-ID: <20180622151432.1566-8-miquel.raynal@bootlin.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 22 Jun 2018 16:23:45 +0100
+Subject: [PATCH] arm64: mm: Ensure writes to swapper are ordered wrt
+ subsequent cache maintenance
+Message-ID: <1529681025-20850-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the current MSI irq_domain local to ease the split between ICU
-platform device code and NSR platform device code.
+When rewriting swapper using nG mappings, we must performance cache
+maintenance around each page table access in order to avoid coherency
+problems with the host's cacheable alias under KVM. To ensure correct
+ordering of the maintenance with respect to Device memory accesses made
+with the Stage-1 MMU disabled, DMBs need to be added between the
+maintenance and the corresponding memory access.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+This patch adds a missing DMB between writing a new page table entry and
+performing a clean+invalidate on the same line.
+
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/irqchip/irq-mvebu-icu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/mm/proc.S | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-index 3694c0d73c0d..607948870a14 100644
---- a/drivers/irqchip/irq-mvebu-icu.c
-+++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -41,7 +41,6 @@
- struct mvebu_icu {
- 	struct irq_chip irq_chip;
- 	struct regmap *regmap;
--	struct irq_domain *domain;
- 	struct device *dev;
- 	atomic_t initialized;
- };
-@@ -218,6 +217,7 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	struct mvebu_icu *icu;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct device_node *gicp_dn;
-+	struct irq_domain *irq_domain;
- 	struct resource *res;
- 	void __iomem *regs;
- 	int i;
-@@ -282,11 +282,11 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
- 	}
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5f9a73a4452c..03646e6a2ef4 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -217,8 +217,9 @@ ENDPROC(idmap_cpu_replace_ttbr1)
  
--	icu->domain =
-+	irq_domain =
- 		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
- 						  mvebu_icu_write_msg,
- 						  &mvebu_icu_domain_ops, icu);
--	if (!icu->domain) {
-+	if (!irq_domain) {
- 		dev_err(&pdev->dev, "Failed to create ICU domain\n");
- 		return -ENOMEM;
- 	}
+ 	.macro __idmap_kpti_put_pgtable_ent_ng, type
+ 	orr	\type, \type, #PTE_NG		// Same bit for blocks and pages
+-	str	\type, [cur_\()\type\()p]	// Update the entry and ensure it
+-	dc	civac, cur_\()\type\()p		// is visible to all CPUs.
++	str	\type, [cur_\()\type\()p]	// Update the entry and ensure
++	dmb	sy				// that it is visible to all
++	dc	civac, cur_\()\type\()p		// CPUs.
+ 	.endm
+ 
+ /*
 -- 
-2.14.1
+2.1.4
