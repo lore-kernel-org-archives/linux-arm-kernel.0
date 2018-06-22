@@ -1,37 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 22 Jun 2018 08:14:28 +0200
-Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
-In-Reply-To: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <20180622061428.7op5ndty4hqo5cnk@pengutronix.de>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Fri, 22 Jun 2018 14:16:38 +0800
+Subject: [RESEND PATCH] dt-bindings: input: Add common keyboard document
+ bindings
+Message-ID: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 12:56:57AM +0800, Robin Gong wrote:
-> Robin Gong (6):
->   tty: serial: imx: correct dma cookie status
->   dmaengine: imx-sdma: add virt-dma support
->   dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in 'struct
->     sdma_channel'
->   dmaengine: imx-sdma: remove the maximum limitation for bd numbers
->   dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
->   dmaengine: imx-sdma: alloclate bd memory from dma pool
-> 
-> Sascha Hauer (1):
->   dmaengine: imx-sdma: factor out a struct sdma_desc from struct
->     sdma_channel
+This patch adds the device tree binding documentation for common
+keyboard.
 
->From my side you can get my
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ Documentation/devicetree/bindings/input/keys.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/keys.txt
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-for this series, but of course it would be nice to get the feedback from
-Lucas.
-
-Sascha
-
+diff --git a/Documentation/devicetree/bindings/input/keys.txt b/Documentation/devicetree/bindings/input/keys.txt
+new file mode 100644
+index 0000000..a0ea7eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/keys.txt
+@@ -0,0 +1,8 @@
++General Keys Properties:
++
++Optional properties for Keys:
++- power-off-time-sec: Duration in seconds which the key should be kept
++ 	pressed for device to power off automatically. Device with key pressed
++ 	shutdown feature can specify this property.
++- linux,keycodes: Specifies the numeric keycode values to be used for
++	reporting key presses.
+\ No newline at end of file
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.1.dirty
