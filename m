@@ -1,60 +1,24 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 22 Jun 2018 12:11:11 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <12969617.N13u7zUTf5@amdc3058>
+Date: Fri, 22 Jun 2018 12:11:53 +0200
+Subject: [PATCH V2 1/2] efi/fb: Simplify fixup code to prefer struct
+ resource
+In-Reply-To: <CAKv+Gu-LkJBa+QKwROqWApfKHjZ8huDYPi9FanU2AhKECv=dog@mail.gmail.com>
 References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
- <12969617.N13u7zUTf5@amdc3058>
- <CGME20180622101111eucas1p119946679a7686911744b1296c2796b15@eucas1p1.samsung.com>
-Message-ID: <2887099.lOTkQMqGFA@amdc3058>
+ <CGME20180613154216epcas4p16e6cac42e19f870f761ee3e735bc4dc3@epcas4p1.samsung.com>
+ <CAKv+Gu-LkJBa+QKwROqWApfKHjZ8huDYPi9FanU2AhKECv=dog@mail.gmail.com>
+Message-ID: <1548378.AvPlWv1vxJ@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 22, 2018 12:07:48 PM Bartlomiej Zolnierkiewicz wrote:
-> On Friday, June 22, 2018 09:54:22 AM Ard Biesheuvel wrote:
-> > On 13 June 2018 at 18:08, Bartlomiej Zolnierkiewicz
-> > <b.zolnierkie@samsung.com> wrote:
-> > > On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
-> > >> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
-> > >> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
-> > >> > _CRS windows.
-> > >> >
-> > >> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
-> > >> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
-> > >> >
-> > >> > When a VGA device is behind such a host bridge and the resource is
-> > >> > translated efifb driver is trying to do ioremap against bus address
-> > >> > rather than the resource address and is failing to probe.
-> > >> >
-> > >> > efifb: probing for efifb
-> > >> > efifb: cannot reserve video memory at 0x1e000000
-> > >> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
-> > >> > efifb: mode is 800x600x32, linelength=3200, pages=1
-> > >> > efifb: scrolling: redraw
-> > >> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-> > >> >
-> > >> > Use the host bridge offset information to convert bus address to
-> > >> > resource address in the fixup.
-> > >> >
-> > >> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > >>
-> > >> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >>
-> > >> Bartlomiej, could you please take these via the fbdev tree for v4.19?
-> > >
-> > > Sure, I will queue it after the current merge window.
-> > >
-> > >> Peter already gave his ack but Sinan dropped it (presumably because of
-> > >> the split in v2)
-> > >
-> > > Peter, can I (re)add your ACK to V2 patches?
-> > >
-> > 
-> > Actually, it would be better if we could take this through the EFI
-> > tree instead, with your ack. Would you mind?
+On Wednesday, June 13, 2018 05:42:11 PM Ard Biesheuvel wrote:
+> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
+> > Get rid of base and size variables in favor of a struct resource.
+> > The conditional for checking window can be replaced with
+> > resource_contains().
+> >
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > 
-> Fine with me.
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
