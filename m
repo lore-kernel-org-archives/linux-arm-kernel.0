@@ -1,60 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jun 2018 13:49:50 +0100
-Subject: [PATCH 5/8] KVM: arm64: Avoid mistaken attempts to save SVE state for
- vcpus
+Date: Fri, 22 Jun 2018 13:49:52 +0100
+Subject: [PATCH 7/8] KVM: Enforce error in ioctl for compat tasks when
+ !KVM_COMPAT
 In-Reply-To: <20180622124953.12355-1-marc.zyngier@arm.com>
 References: <20180622124953.12355-1-marc.zyngier@arm.com>
-Message-ID: <20180622124953.12355-6-marc.zyngier@arm.com>
+Message-ID: <20180622124953.12355-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <Dave.Martin@arm.com>
+The current behaviour of the compat ioctls is a bit odd.
+We provide a compat_ioctl method when KVM_COMPAT is set, and NULL
+otherwise. But NULL means that the normal, non-compat ioctl should
+be used directly for compat tasks, and there is no way to actually
+prevent a compat task from issueing KVM ioctls.
 
-Commit e6b673b ("KVM: arm64: Optimise FPSIMD handling to reduce
-guest/host thrashing") uses fpsimd_save() to save the FPSIMD state
-for a vcpu when scheduling the vcpu out.  However, currently
-current's value of TIF_SVE is restored before calling fpsimd_save()
-which means that fpsimd_save() may erroneously attempt to save SVE
-state from the vcpu.  This enables current's vector state to be
-polluted with guest data.  current->thread.sve_state may be
-unallocated or not large enough, so this can also trigger a NULL
-dereference or buffer overrun.
+This patch changes this behaviour, by always registering a compat_ioctl
+method, even if KVM_COMPAT is not selected. In that case, the callback
+will always return -EINVAL.
 
-Instead of this, TIF_SVE should be configured properly for the
-guest when calling fpsimd_save() with the vcpu context loaded.
-
-This patch ensures this by delaying restoration of current's
-TIF_SVE until after the call to fpsimd_save().
-
-Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Fixes: de8e5d744051568c8aad ("KVM: Disable compat ioctl for s390")
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Christian Borntraeger <borntraeger@de.ibm.com>
+Acked-by: Radim Kr?m?? <rkrcmar@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/fpsimd.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ virt/kvm/kvm_main.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-index 98d19d1afa50..aac7808ce216 100644
---- a/arch/arm64/kvm/fpsimd.c
-+++ b/arch/arm64/kvm/fpsimd.c
-@@ -103,9 +103,6 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index ada21f47f22b..8b47507faab5 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -116,6 +116,11 @@ static long kvm_vcpu_ioctl(struct file *file, unsigned int ioctl,
+ #ifdef CONFIG_KVM_COMPAT
+ static long kvm_vcpu_compat_ioctl(struct file *file, unsigned int ioctl,
+ 				  unsigned long arg);
++#define KVM_COMPAT(c)	.compat_ioctl	= (c)
++#else
++static long kvm_no_compat_ioctl(struct file *file, unsigned int ioctl,
++				unsigned long arg) { return -EINVAL; }
++#define KVM_COMPAT(c)	.compat_ioctl	= kvm_no_compat_ioctl
+ #endif
+ static int hardware_enable_all(void);
+ static void hardware_disable_all(void);
+@@ -2396,11 +2401,9 @@ static int kvm_vcpu_release(struct inode *inode, struct file *filp)
+ static struct file_operations kvm_vcpu_fops = {
+ 	.release        = kvm_vcpu_release,
+ 	.unlocked_ioctl = kvm_vcpu_ioctl,
+-#ifdef CONFIG_KVM_COMPAT
+-	.compat_ioctl   = kvm_vcpu_compat_ioctl,
+-#endif
+ 	.mmap           = kvm_vcpu_mmap,
+ 	.llseek		= noop_llseek,
++	KVM_COMPAT(kvm_vcpu_compat_ioctl),
+ };
  
- 	local_irq_save(flags);
+ /*
+@@ -2824,10 +2827,8 @@ static int kvm_device_release(struct inode *inode, struct file *filp)
  
--	update_thread_flag(TIF_SVE,
--			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
--
- 	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
- 		/* Clean guest FP state to memory and invalidate cpu view */
- 		fpsimd_save();
-@@ -124,5 +121,8 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
- 			sysreg_clear_set(CPACR_EL1, CPACR_EL1_ZEN_EL0EN, 0);
- 	}
+ static const struct file_operations kvm_device_fops = {
+ 	.unlocked_ioctl = kvm_device_ioctl,
+-#ifdef CONFIG_KVM_COMPAT
+-	.compat_ioctl = kvm_device_ioctl,
+-#endif
+ 	.release = kvm_device_release,
++	KVM_COMPAT(kvm_device_ioctl),
+ };
  
-+	update_thread_flag(TIF_SVE,
-+			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
-+
- 	local_irq_restore(flags);
- }
+ struct kvm_device *kvm_device_from_filp(struct file *filp)
+@@ -3165,10 +3166,8 @@ static long kvm_vm_compat_ioctl(struct file *filp,
+ static struct file_operations kvm_vm_fops = {
+ 	.release        = kvm_vm_release,
+ 	.unlocked_ioctl = kvm_vm_ioctl,
+-#ifdef CONFIG_KVM_COMPAT
+-	.compat_ioctl   = kvm_vm_compat_ioctl,
+-#endif
+ 	.llseek		= noop_llseek,
++	KVM_COMPAT(kvm_vm_compat_ioctl),
+ };
+ 
+ static int kvm_dev_ioctl_create_vm(unsigned long type)
+@@ -3259,8 +3258,8 @@ static long kvm_dev_ioctl(struct file *filp,
+ 
+ static struct file_operations kvm_chardev_ops = {
+ 	.unlocked_ioctl = kvm_dev_ioctl,
+-	.compat_ioctl   = kvm_dev_ioctl,
+ 	.llseek		= noop_llseek,
++	KVM_COMPAT(kvm_dev_ioctl),
+ };
+ 
+ static struct miscdevice kvm_dev = {
 -- 
 2.17.1
