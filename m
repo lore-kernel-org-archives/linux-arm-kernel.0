@@ -1,460 +1,714 @@
-From: jonathan.cameron@huawei.com (Jonathan Cameron)
-Date: Fri, 22 Jun 2018 18:03:33 +0100
-Subject: [PATCH v7 06/10] counter: Add STM32 Timer quadrature encoder
-In-Reply-To: <3bcbc5d2c4dd644f81e3ab35a836c7648bfd0454.1529607879.git.vilhelm.gray@gmail.com>
-References: <cover.1529607879.git.vilhelm.gray@gmail.com>
- <3bcbc5d2c4dd644f81e3ab35a836c7648bfd0454.1529607879.git.vilhelm.gray@gmail.com>
-Message-ID: <20180622180333.00007ab8@huawei.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 22 Jun 2018 10:13:54 -0700
+Subject: [PATCH v8 2/2] drivers: soc: Add LLCC driver
+In-Reply-To: <1527122121-31452-3-git-send-email-rishabhb@codeaurora.org>
+References: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
+ <1527122121-31452-3-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <20180622171354.GI10336@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jun 2018 17:08:20 -0400
-William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
+On Wed 23 May 17:35 PDT 2018, Rishabh Bhatnagar wrote:
 
-> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+> LLCC (Last Level Cache Controller) provides additional cache memory
+> in the system. LLCC is partitioned into multiple slices and each
+> slice gets its own priority, size, ID and other config parameters.
+> LLCC driver programs these parameters for each slice. Clients that
+> are assigned to use LLCC need to get information such size & ID of the
+> slice they get and activate or deactivate the slice as needed. LLCC driver
+> provides API for the clients to perform these operations.
 > 
-> Implement counter part of the STM32 timer hardware block by using
-> counter API. Hardware only supports X2 and X4 quadrature modes. A
-> ceiling value can be set to define the maximum value reachable by the
-> counter.
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> Co-authored-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
-Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+> Reviewed-by: Evan Green <evgreen@chromium.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
 
 > ---
->  drivers/counter/Kconfig           |  10 +
->  drivers/counter/Makefile          |   1 +
->  drivers/counter/stm32-timer-cnt.c | 390 ++++++++++++++++++++++++++++++
->  3 files changed, 401 insertions(+)
->  create mode 100644 drivers/counter/stm32-timer-cnt.c
+>  drivers/soc/qcom/Kconfig           |  17 ++
+>  drivers/soc/qcom/Makefile          |   2 +
+>  drivers/soc/qcom/llcc-sdm845.c     |  94 +++++++++++
+>  drivers/soc/qcom/llcc-slice.c      | 335 +++++++++++++++++++++++++++++++++++++
+>  include/linux/soc/qcom/llcc-qcom.h | 180 ++++++++++++++++++++
+>  5 files changed, 628 insertions(+)
+>  create mode 100644 drivers/soc/qcom/llcc-sdm845.c
+>  create mode 100644 drivers/soc/qcom/llcc-slice.c
+>  create mode 100644 include/linux/soc/qcom/llcc-qcom.h
 > 
-> diff --git a/drivers/counter/Kconfig b/drivers/counter/Kconfig
-> index 7646f5df76f3..fcfbaa935122 100644
-> --- a/drivers/counter/Kconfig
-> +++ b/drivers/counter/Kconfig
-> @@ -36,4 +36,14 @@ config 104_QUAD_8
->  	  The base port addresses for the devices may be configured via the base
->  	  array module parameter.
+> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> index e050eb8..0b550f9 100644
+> --- a/drivers/soc/qcom/Kconfig
+> +++ b/drivers/soc/qcom/Kconfig
+> @@ -21,6 +21,23 @@ config QCOM_GSBI
+>            functions for connecting the underlying serial UART, SPI, and I2C
+>            devices to the output pins.
 >  
-> +config STM32_TIMER_CNT
-> +	tristate "STM32 Timer encoder counter driver"
-> +	depends on MFD_STM32_TIMERS || COMPILE_TEST
+> +config QCOM_LLCC
+> +	tristate "Qualcomm Technologies, Inc. LLCC driver"
+> +	depends on ARCH_QCOM
 > +	help
-> +	  Select this option to enable STM32 Timer quadrature encoder
-> +	  and counter driver.
+> +	  Qualcomm Technologies, Inc. platform specific
+> +	  Last Level Cache Controller(LLCC) driver. This provides interfaces
+> +	  to clients that use the LLCC. Say yes here to enable LLCC slice
+> +	  driver.
 > +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called stm32-timer-cnt.
+> +config QCOM_SDM845_LLCC
+> +	tristate "Qualcomm Technologies, Inc. SDM845 LLCC driver"
+> +	depends on QCOM_LLCC
+> +	help
+> +	  Say yes here to enable the LLCC driver for SDM845. This provides
+> +	  data required to configure LLCC so that clients can start using the
+> +	  LLCC slices.
 > +
->  endif # COUNTER
-> diff --git a/drivers/counter/Makefile b/drivers/counter/Makefile
-> index 23a4f6263e45..ff024259fb46 100644
-> --- a/drivers/counter/Makefile
-> +++ b/drivers/counter/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_COUNTER) += counter.o
->  counter-y := generic-counter.o
->  
->  obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
-> +obj-$(CONFIG_STM32_TIMER_CNT)	+= stm32-timer-cnt.o
-> diff --git a/drivers/counter/stm32-timer-cnt.c b/drivers/counter/stm32-timer-cnt.c
+>  config QCOM_MDT_LOADER
+>  	tristate
+>  	select QCOM_SCM
+> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+> index dcebf28..e16d6a2 100644
+> --- a/drivers/soc/qcom/Makefile
+> +++ b/drivers/soc/qcom/Makefile
+> @@ -12,3 +12,5 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+>  obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
+>  obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+>  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
+> +obj-$(CONFIG_QCOM_LLCC) += llcc-slice.o
+> +obj-$(CONFIG_QCOM_SDM845_LLCC) += llcc-sdm845.o
+> diff --git a/drivers/soc/qcom/llcc-sdm845.c b/drivers/soc/qcom/llcc-sdm845.c
 > new file mode 100644
-> index 000000000000..0b15e729798b
+> index 0000000..2e1e4f0
 > --- /dev/null
-> +++ b/drivers/counter/stm32-timer-cnt.c
-> @@ -0,0 +1,390 @@
+> +++ b/drivers/soc/qcom/llcc-sdm845.c
+> @@ -0,0 +1,94 @@
 > +// SPDX-License-Identifier: GPL-2.0
 > +/*
-> + * STM32 Timer Encoder and Counter driver
+> + * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
 > + *
-> + * Copyright (C) STMicroelectronics 2018
-> + *
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-> + *
-
-If I was being really really fussy - this blank line doesn't add
-anything ;)
-
 > + */
-> +#include <linux/counter.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/iio/types.h>
-> +#include <linux/mfd/stm32-timers.h>
+> +
+> +#include <linux/kernel.h>
 > +#include <linux/module.h>
-> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/soc/qcom/llcc-qcom.h>
 > +
-> +#define TIM_CCMR_CCXS	(BIT(8) | BIT(0))
-> +#define TIM_CCMR_MASK	(TIM_CCMR_CC1S | TIM_CCMR_CC2S | \
-> +			 TIM_CCMR_IC1F | TIM_CCMR_IC2F)
-> +#define TIM_CCER_MASK	(TIM_CCER_CC1P | TIM_CCER_CC1NP | \
-> +			 TIM_CCER_CC2P | TIM_CCER_CC2NP)
+> +/*
+> + * SCT(System Cache Table) entry contains of the following members:
+> + * usecase_id: Unique id for the client's use case
+> + * slice_id: llcc slice id for each client
+> + * max_cap: The maximum capacity of the cache slice provided in KB
+> + * priority: Priority of the client used to select victim line for replacement
+> + * fixed_size: Boolean indicating if the slice has a fixed capacity
+> + * bonus_ways: Bonus ways are additional ways to be used for any slice,
+> + *		if client ends up using more than reserved cache ways. Bonus
+> + *		ways are allocated only if they are not reserved for some
+> + *		other client.
+> + * res_ways: Reserved ways for the cache slice, the reserved ways cannot
+> + *		be used by any other client than the one its assigned to.
+> + * cache_mode: Each slice operates as a cache, this controls the mode of the
+> + *             slice: normal or TCM(Tightly Coupled Memory)
+> + * probe_target_ways: Determines what ways to probe for access hit. When
+> + *                    configured to 1 only bonus and reserved ways are probed.
+> + *                    When configured to 0 all ways in llcc are probed.
+> + * dis_cap_alloc: Disable capacity based allocation for a client
+> + * retain_on_pc: If this bit is set and client has maintained active vote
+> + *               then the ways assigned to this client are not flushed on power
+> + *               collapse.
+> + * activate_on_init: Activate the slice immediately after the SCT is programmed
+> + */
+> +#define SCT_ENTRY(uid, sid, mc, p, fs, bway, rway, cmod, ptw, dca, rp, a) \
+> +	{					\
+> +		.usecase_id = uid,		\
+> +		.slice_id = sid,		\
+> +		.max_cap = mc,			\
+> +		.priority = p,			\
+> +		.fixed_size = fs,		\
+> +		.bonus_ways = bway,		\
+> +		.res_ways = rway,		\
+> +		.cache_mode = cmod,		\
+> +		.probe_target_ways = ptw,	\
+> +		.dis_cap_alloc = dca,		\
+> +		.retain_on_pc = rp,		\
+> +		.activate_on_init = a,		\
+> +	}
 > +
-> +struct stm32_timer_cnt {
-> +	struct counter_device counter;
-> +	struct regmap *regmap;
-> +	struct clk *clk;
-> +	u32 ceiling;
+> +static struct llcc_slice_config sdm845_data[] =  {
+> +	SCT_ENTRY(LLCC_CPUSS,    1,  2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 1),
+> +	SCT_ENTRY(LLCC_VIDSC0,   2,  512,  2, 1, 0x0,   0x0f0, 0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_VIDSC1,   3,  512,  2, 1, 0x0,   0x0f0, 0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_ROTATOR,  4,  563,  2, 1, 0x0,   0x00e, 2, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_VOICE,    5,  2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_AUDIO,    6,  2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_MDMHPGRW, 7,  1024, 2, 0, 0xfc,  0xf00, 0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_MDM,      8,  2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_CMPT,     10, 2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_GPUHTW,   11, 512,  1, 1, 0xc,   0x0,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_GPU,      12, 2304, 1, 0, 0xff0, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_MMUHWT,   13, 256,  2, 0, 0x0,   0x1,   0, 0, 1, 0, 1),
+> +	SCT_ENTRY(LLCC_CMPTDMA,  15, 2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_DISP,     16, 2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_VIDFW,    17, 2816, 1, 0, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_MDMHPFX,  20, 1024, 2, 1, 0x0,   0xf00, 0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_MDMPNG,   21, 1024, 0, 1, 0x1e,  0x0,   0, 0, 1, 1, 0),
+> +	SCT_ENTRY(LLCC_AUDHW,    22, 1024, 1, 1, 0xffc, 0x2,   0, 0, 1, 1, 0),
+> +};
+> +
+> +static int sdm845_qcom_llcc_probe(struct platform_device *pdev)
+> +{
+> +	return qcom_llcc_probe(pdev, sdm845_data, ARRAY_SIZE(sdm845_data));
+> +}
+> +
+> +static const struct of_device_id sdm845_qcom_llcc_of_match[] = {
+> +	{ .compatible = "qcom,sdm845-llcc", },
+> +	{ }
+> +};
+> +
+> +static struct platform_driver sdm845_qcom_llcc_driver = {
+> +	.driver = {
+> +		.name = "sdm845-llcc",
+> +		.of_match_table = sdm845_qcom_llcc_of_match,
+> +	},
+> +	.probe = sdm845_qcom_llcc_probe,
+> +};
+> +module_platform_driver(sdm845_qcom_llcc_driver);
+> +
+> +MODULE_DESCRIPTION("QCOM sdm845 LLCC driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/soc/qcom/llcc-slice.c b/drivers/soc/qcom/llcc-slice.c
+> new file mode 100644
+> index 0000000..fcaad1a
+> --- /dev/null
+> +++ b/drivers/soc/qcom/llcc-slice.c
+> @@ -0,0 +1,335 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+> + *
+> + */
+> +
+> +#include <linux/bitmap.h>
+> +#include <linux/bitops.h>
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mutex.h>
+> +#include <linux/of_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/soc/qcom/llcc-qcom.h>
+> +
+> +#define ACTIVATE                      BIT(0)
+> +#define DEACTIVATE                    BIT(1)
+> +#define ACT_CTRL_OPCODE_ACTIVATE      BIT(0)
+> +#define ACT_CTRL_OPCODE_DEACTIVATE    BIT(1)
+> +#define ACT_CTRL_ACT_TRIG             BIT(0)
+> +#define ACT_CTRL_OPCODE_SHIFT         0x01
+> +#define ATTR1_PROBE_TARGET_WAYS_SHIFT 0x02
+> +#define ATTR1_FIXED_SIZE_SHIFT        0x03
+> +#define ATTR1_PRIORITY_SHIFT          0x04
+> +#define ATTR1_MAX_CAP_SHIFT           0x10
+> +#define ATTR0_RES_WAYS_MASK           GENMASK(11, 0)
+> +#define ATTR0_BONUS_WAYS_MASK         GENMASK(27, 16)
+> +#define ATTR0_BONUS_WAYS_SHIFT        0x10
+> +#define LLCC_STATUS_READ_DELAY        100
+> +
+> +#define CACHE_LINE_SIZE_SHIFT         6
+> +
+> +#define LLCC_COMMON_STATUS0           0x0003000c
+> +#define LLCC_LB_CNT_MASK              GENMASK(31, 28)
+> +#define LLCC_LB_CNT_SHIFT             28
+> +
+> +#define MAX_CAP_TO_BYTES(n)           (n * SZ_1K)
+> +#define LLCC_TRP_ACT_CTRLn(n)         (n * SZ_4K)
+> +#define LLCC_TRP_STATUSn(n)           (4 + n * SZ_4K)
+> +#define LLCC_TRP_ATTR0_CFGn(n)        (0x21000 + SZ_8 * n)
+> +#define LLCC_TRP_ATTR1_CFGn(n)        (0x21004 + SZ_8 * n)
+> +
+> +#define BANK_OFFSET_STRIDE	      0x80000
+> +
+> +static struct llcc_drv_data *drv_data;
+> +
+> +static const struct regmap_config llcc_regmap_config = {
+> +	.reg_bits = 32,
+> +	.reg_stride = 4,
+> +	.val_bits = 32,
+> +	.fast_io = true,
 > +};
 > +
 > +/**
-> + * stm32_count_function - enumerates stm32 timer counter encoder modes
-> + * @STM32_COUNT_SLAVE_MODE_DISABLED: counts on internal clock when CEN=1
-> + * @STM32_COUNT_ENCODER_MODE_1: counts TI1FP1 edges, depending on TI2FP2 level
-> + * @STM32_COUNT_ENCODER_MODE_2: counts TI2FP2 edges, depending on TI1FP1 level
-> + * @STM32_COUNT_ENCODER_MODE_3: counts on both TI1FP1 and TI2FP2 edges
+> + * llcc_slice_getd - get llcc slice descriptor
+> + * @uid: usecase_id for the client
+> + *
+> + * A pointer to llcc slice descriptor will be returned on success and
+> + * and error pointer is returned on failure
 > + */
-> +enum stm32_count_function {
-> +	STM32_COUNT_SLAVE_MODE_DISABLED = -1,
-> +	STM32_COUNT_ENCODER_MODE_1,
-> +	STM32_COUNT_ENCODER_MODE_2,
-> +	STM32_COUNT_ENCODER_MODE_3,
-> +};
-> +
-> +static enum count_function stm32_count_functions[] = {
-> +	[STM32_COUNT_ENCODER_MODE_1] = COUNT_FUNCTION_QUADRATURE_X2_A,
-> +	[STM32_COUNT_ENCODER_MODE_2] = COUNT_FUNCTION_QUADRATURE_X2_B,
-> +	[STM32_COUNT_ENCODER_MODE_3] = COUNT_FUNCTION_QUADRATURE_X4,
-> +};
-> +
-> +static int stm32_count_read(struct counter_device *counter,
-> +			    struct counter_count *count,
-> +			    struct count_read_value *val)
+> +struct llcc_slice_desc *llcc_slice_getd(u32 uid)
 > +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	u32 cnt;
+> +	const struct llcc_slice_config *cfg;
+> +	struct llcc_slice_desc *desc;
+> +	u32 sz, count;
 > +
-> +	regmap_read(priv->regmap, TIM_CNT, &cnt);
-> +	count_read_value_set(val, COUNT_POSITION, &cnt);
+> +	cfg = drv_data->cfg;
+> +	sz = drv_data->cfg_size;
 > +
-> +	return 0;
+> +	for (count = 0; cfg && count < sz; count++, cfg++)
+> +		if (cfg->usecase_id == uid)
+> +			break;
+> +
+> +	if (count == sz || !cfg)
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+> +	if (!desc)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	desc->slice_id = cfg->slice_id;
+> +	desc->slice_size = cfg->max_cap;
+> +
+> +	return desc;
 > +}
+> +EXPORT_SYMBOL_GPL(llcc_slice_getd);
 > +
-> +static int stm32_count_write(struct counter_device *counter,
-> +			     struct counter_count *count,
-> +			     struct count_write_value *val)
+> +/**
+> + * llcc_slice_putd - llcc slice descritpor
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +void llcc_slice_putd(struct llcc_slice_desc *desc)
 > +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	u32 cnt;
-> +	int err;
-> +
-> +	err = count_write_value_get(&cnt, COUNT_POSITION, val);
-> +	if (err)
-> +		return err;
-> +
-> +	if (cnt > priv->ceiling)
-> +		return -EINVAL;
-> +
-> +	return regmap_write(priv->regmap, TIM_CNT, cnt);
+> +	kfree(desc);
 > +}
+> +EXPORT_SYMBOL_GPL(llcc_slice_putd);
 > +
-> +static int stm32_count_function_get(struct counter_device *counter,
-> +				    struct counter_count *count,
-> +				    size_t *function)
+> +static int llcc_update_act_ctrl(u32 sid,
+> +				u32 act_ctrl_reg_val, u32 status)
 > +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	u32 smcr;
-> +
-> +	regmap_read(priv->regmap, TIM_SMCR, &smcr);
-> +
-> +	switch (smcr & TIM_SMCR_SMS) {
-> +	case 1:
-> +		*function = STM32_COUNT_ENCODER_MODE_1;
-> +		return 0;
-> +	case 2:
-> +		*function = STM32_COUNT_ENCODER_MODE_2;
-> +		return 0;
-> +	case 3:
-> +		*function = STM32_COUNT_ENCODER_MODE_3;
-> +		return 0;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static int stm32_count_function_set(struct counter_device *counter,
-> +				    struct counter_count *count,
-> +				    size_t function)
-> +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	u32 cr1, sms;
-> +
-> +	switch (function) {
-> +	case STM32_COUNT_ENCODER_MODE_1:
-> +		sms = 1;
-> +		break;
-> +	case STM32_COUNT_ENCODER_MODE_2:
-> +		sms = 2;
-> +		break;
-> +	case STM32_COUNT_ENCODER_MODE_3:
-> +		sms = 3;
-> +		break;
-> +	default:
-> +		sms = 0;
-> +		break;
-> +	}
-> +
-> +	/* Store enable status */
-> +	regmap_read(priv->regmap, TIM_CR1, &cr1);
-> +
-> +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
-> +
-> +	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
-> +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
-> +	regmap_write(priv->regmap, TIM_ARR, priv->ceiling);
-> +
-> +	regmap_update_bits(priv->regmap, TIM_SMCR, TIM_SMCR_SMS, sms);
-> +
-> +	/* Make sure that registers are updated */
-> +	regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
-> +
-> +	/* Restore the enable status */
-> +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, cr1);
-> +
-> +	return 0;
-> +}
-> +
-> +static ssize_t stm32_count_direction_read(struct counter_device *counter,
-> +				      struct counter_count *count,
-> +				      void *private, char *buf)
-> +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	const char *direction;
-> +	u32 cr1;
-> +
-> +	regmap_read(priv->regmap, TIM_CR1, &cr1);
-> +	direction = (cr1 & TIM_CR1_DIR) ? "backward" : "forward";
-> +
-> +	return scnprintf(buf, PAGE_SIZE, "%s\n", direction);
-> +}
-> +
-> +static ssize_t stm32_count_ceiling_read(struct counter_device *counter,
-> +					struct counter_count *count,
-> +					void *private, char *buf)
-> +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	u32 arr;
-> +
-> +	regmap_read(priv->regmap, TIM_ARR, &arr);
-> +
-> +	return snprintf(buf, PAGE_SIZE, "%u\n", arr);
-> +}
-> +
-> +static ssize_t stm32_count_ceiling_write(struct counter_device *counter,
-> +					 struct counter_count *count,
-> +					 void *private,
-> +					 const char *buf, size_t len)
-> +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	unsigned int ceiling;
+> +	u32 act_ctrl_reg;
+> +	u32 status_reg;
+> +	u32 slice_status;
 > +	int ret;
 > +
-> +	ret = kstrtouint(buf, 0, &ceiling);
+> +	act_ctrl_reg = drv_data->bcast_off + LLCC_TRP_ACT_CTRLn(sid);
+> +	status_reg = drv_data->bcast_off + LLCC_TRP_STATUSn(sid);
+> +
+> +	/* Set the ACTIVE trigger */
+> +	act_ctrl_reg_val |= ACT_CTRL_ACT_TRIG;
+> +	ret = regmap_write(drv_data->regmap, act_ctrl_reg, act_ctrl_reg_val);
 > +	if (ret)
 > +		return ret;
 > +
-> +	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
-> +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
-> +	regmap_write(priv->regmap, TIM_ARR, ceiling);
+> +	/* Clear the ACTIVE trigger */
+> +	act_ctrl_reg_val &= ~ACT_CTRL_ACT_TRIG;
+> +	ret = regmap_write(drv_data->regmap, act_ctrl_reg, act_ctrl_reg_val);
+> +	if (ret)
+> +		return ret;
 > +
-> +	priv->ceiling = ceiling;
-> +	return len;
+> +	ret = regmap_read_poll_timeout(drv_data->regmap, status_reg,
+> +				      slice_status, !(slice_status & status),
+> +				      0, LLCC_STATUS_READ_DELAY);
+> +	return ret;
 > +}
 > +
-> +static ssize_t stm32_count_enable_read(struct counter_device *counter,
-> +				       struct counter_count *count,
-> +				       void *private, char *buf)
+> +/**
+> + * llcc_slice_activate - Activate the llcc slice
+> + * @desc: Pointer to llcc slice descriptor
+> + *
+> + * A value of zero will be returned on success and a negative errno will
+> + * be returned in error cases
+> + */
+> +int llcc_slice_activate(struct llcc_slice_desc *desc)
 > +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	u32 cr1;
+> +	int ret;
+> +	u32 act_ctrl_val;
 > +
-> +	regmap_read(priv->regmap, TIM_CR1, &cr1);
-> +
-> +	return scnprintf(buf, PAGE_SIZE, "%d\n", (bool)(cr1 & TIM_CR1_CEN));
-> +}
-> +
-> +static ssize_t stm32_count_enable_write(struct counter_device *counter,
-> +					struct counter_count *count,
-> +					void *private,
-> +					const char *buf, size_t len)
-> +{
-> +	struct stm32_timer_cnt *const priv = counter->priv;
-> +	int err;
-> +	u32 cr1;
-> +	bool enable;
-> +
-> +	err = kstrtobool(buf, &enable);
-> +	if (err)
-> +		return err;
-> +
-> +	if (enable) {
-> +		regmap_read(priv->regmap, TIM_CR1, &cr1);
-> +			if (!(cr1 & TIM_CR1_CEN))
-> +				clk_enable(priv->clk);
-> +
-> +		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
-> +				   TIM_CR1_CEN);
-> +	} else {
-> +		regmap_read(priv->regmap, TIM_CR1, &cr1);
-> +		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
-> +		if (cr1 & TIM_CR1_CEN)
-> +			clk_disable(priv->clk);
-> +	}
-> +
-> +	return len;
-> +}
-> +
-> +static const struct counter_count_ext stm32_count_ext[] = {
-> +	{
-> +		.name = "direction",
-> +		.read = stm32_count_direction_read,
-> +	},
-> +	{
-> +		.name = "enable",
-> +		.read = stm32_count_enable_read,
-> +		.write = stm32_count_enable_write
-> +	},
-> +	{
-> +		.name = "ceiling",
-> +		.read = stm32_count_ceiling_read,
-> +		.write = stm32_count_ceiling_write
-> +	},
-> +};
-> +
-> +enum stm32_synapse_action {
-> +	STM32_SYNAPSE_ACTION_NONE,
-> +	STM32_SYNAPSE_ACTION_BOTH_EDGES
-> +};
-> +
-> +static enum synapse_action stm32_synapse_actions[] = {
-> +	[STM32_SYNAPSE_ACTION_NONE] = SYNAPSE_ACTION_NONE,
-> +	[STM32_SYNAPSE_ACTION_BOTH_EDGES] = SYNAPSE_ACTION_BOTH_EDGES
-> +};
-> +
-> +static int stm32_action_get(struct counter_device *counter,
-> +			    struct counter_count *count,
-> +			    struct counter_synapse *synapse,
-> +			    size_t *action)
-> +{
-> +	size_t function;
-> +	int err;
-> +
-> +	/* Default action mode (e.g. STM32_COUNT_SLAVE_MODE_DISABLED) */
-> +	*action = STM32_SYNAPSE_ACTION_NONE;
-> +
-> +	err = stm32_count_function_get(counter, count, &function);
-> +	if (err)
+> +	mutex_lock(&drv_data->lock);
+> +	if (test_bit(desc->slice_id, drv_data->bitmap)) {
+> +		mutex_unlock(&drv_data->lock);
 > +		return 0;
-> +
-> +	switch (function) {
-> +	case STM32_COUNT_ENCODER_MODE_1:
-> +		/* counts up/down on TI1FP1 edge depending on TI2FP2 level */
-> +		if (synapse->signal->id == count->synapses[0].signal->id)
-> +			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
-> +		break;
-> +	case STM32_COUNT_ENCODER_MODE_2:
-> +		/* counts up/down on TI2FP2 edge depending on TI1FP1 level */
-> +		if (synapse->signal->id == count->synapses[1].signal->id)
-> +			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
-> +		break;
-> +	case STM32_COUNT_ENCODER_MODE_3:
-> +		/* counts up/down on both TI1FP1 and TI2FP2 edges */
-> +		*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
-> +		break;
 > +	}
 > +
-> +	return 0;
+> +	act_ctrl_val = ACT_CTRL_OPCODE_ACTIVATE << ACT_CTRL_OPCODE_SHIFT;
+> +
+> +	ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
+> +				  DEACTIVATE);
+> +	if (ret) {
+> +		mutex_unlock(&drv_data->lock);
+> +		return ret;
+> +	}
+> +
+> +	__set_bit(desc->slice_id, drv_data->bitmap);
+> +	mutex_unlock(&drv_data->lock);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(llcc_slice_activate);
+> +
+> +/**
+> + * llcc_slice_deactivate - Deactivate the llcc slice
+> + * @desc: Pointer to llcc slice descriptor
+> + *
+> + * A value of zero will be returned on success and a negative errno will
+> + * be returned in error cases
+> + */
+> +int llcc_slice_deactivate(struct llcc_slice_desc *desc)
+> +{
+> +	u32 act_ctrl_val;
+> +	int ret;
+> +
+> +	mutex_lock(&drv_data->lock);
+> +	if (!test_bit(desc->slice_id, drv_data->bitmap)) {
+> +		mutex_unlock(&drv_data->lock);
+> +		return 0;
+> +	}
+> +	act_ctrl_val = ACT_CTRL_OPCODE_DEACTIVATE << ACT_CTRL_OPCODE_SHIFT;
+> +
+> +	ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
+> +				  ACTIVATE);
+> +	if (ret) {
+> +		mutex_unlock(&drv_data->lock);
+> +		return ret;
+> +	}
+> +
+> +	__clear_bit(desc->slice_id, drv_data->bitmap);
+> +	mutex_unlock(&drv_data->lock);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(llcc_slice_deactivate);
+> +
+> +/**
+> + * llcc_get_slice_id - return the slice id
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +int llcc_get_slice_id(struct llcc_slice_desc *desc)
+> +{
+> +	return desc->slice_id;
+> +}
+> +EXPORT_SYMBOL_GPL(llcc_get_slice_id);
+> +
+> +/**
+> + * llcc_get_slice_size - return the slice id
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +size_t llcc_get_slice_size(struct llcc_slice_desc *desc)
+> +{
+> +	return desc->slice_size;
+> +}
+> +EXPORT_SYMBOL_GPL(llcc_get_slice_size);
+> +
+> +static int qcom_llcc_cfg_program(struct platform_device *pdev)
+> +{
+> +	int i;
+> +	u32 attr1_cfg;
+> +	u32 attr0_cfg;
+> +	u32 attr1_val;
+> +	u32 attr0_val;
+> +	u32 max_cap_cacheline;
+> +	u32 sz;
+> +	int ret;
+> +	const struct llcc_slice_config *llcc_table;
+> +	struct llcc_slice_desc desc;
+> +	u32 bcast_off = drv_data->bcast_off;
+> +
+> +	sz = drv_data->cfg_size;
+> +	llcc_table = drv_data->cfg;
+> +
+> +	for (i = 0; i < sz; i++) {
+> +		attr1_cfg = bcast_off +
+> +				LLCC_TRP_ATTR1_CFGn(llcc_table[i].slice_id);
+> +		attr0_cfg = bcast_off +
+> +				LLCC_TRP_ATTR0_CFGn(llcc_table[i].slice_id);
+> +
+> +		attr1_val = llcc_table[i].cache_mode;
+> +		attr1_val |= llcc_table[i].probe_target_ways <<
+> +				ATTR1_PROBE_TARGET_WAYS_SHIFT;
+> +		attr1_val |= llcc_table[i].fixed_size <<
+> +				ATTR1_FIXED_SIZE_SHIFT;
+> +		attr1_val |= llcc_table[i].priority <<
+> +				ATTR1_PRIORITY_SHIFT;
+> +
+> +		max_cap_cacheline = MAX_CAP_TO_BYTES(llcc_table[i].max_cap);
+> +
+> +		/* LLCC instances can vary for each target.
+> +		 * The SW writes to broadcast register which gets propagated
+> +		 * to each llcc instace (llcc0,.. llccN).
+> +		 * Since the size of the memory is divided equally amongst the
+> +		 * llcc instances, we need to configure the max cap accordingly.
+> +		 */
+> +		max_cap_cacheline = max_cap_cacheline / drv_data->num_banks;
+> +		max_cap_cacheline >>= CACHE_LINE_SIZE_SHIFT;
+> +		attr1_val |= max_cap_cacheline << ATTR1_MAX_CAP_SHIFT;
+> +
+> +		attr0_val = llcc_table[i].res_ways & ATTR0_RES_WAYS_MASK;
+> +		attr0_val |= llcc_table[i].bonus_ways << ATTR0_BONUS_WAYS_SHIFT;
+> +
+> +		ret = regmap_write(drv_data->regmap, attr1_cfg, attr1_val);
+> +		if (ret)
+> +			return ret;
+> +		ret = regmap_write(drv_data->regmap, attr0_cfg, attr0_val);
+> +		if (ret)
+> +			return ret;
+> +		if (llcc_table[i].activate_on_init) {
+> +			desc.slice_id = llcc_table[i].slice_id;
+> +			ret = llcc_slice_activate(&desc);
+> +		}
+> +	}
+> +	return ret;
 > +}
 > +
-> +static const struct counter_ops stm32_timer_cnt_ops = {
-> +	.count_read = stm32_count_read,
-> +	.count_write = stm32_count_write,
-> +	.function_get = stm32_count_function_get,
-> +	.function_set = stm32_count_function_set,
-> +	.action_get = stm32_action_get,
-> +};
-> +
-> +static struct counter_signal stm32_signals[] = {
-> +	{
-> +		.id = 0,
-> +		.name = "Channel 1 Quadrature A"
-> +	},
-> +	{
-> +		.id = 1,
-> +		.name = "Channel 1 Quadrature B"
-> +	}
-> +};
-> +
-> +static struct counter_synapse stm32_count_synapses[] = {
-> +	{
-> +		.actions_list = stm32_synapse_actions,
-> +		.num_actions = ARRAY_SIZE(stm32_synapse_actions),
-> +		.signal = &stm32_signals[0]
-> +	},
-> +	{
-> +		.actions_list = stm32_synapse_actions,
-> +		.num_actions = ARRAY_SIZE(stm32_synapse_actions),
-> +		.signal = &stm32_signals[1]
-> +	}
-> +};
-> +
-> +static struct counter_count stm32_counts = {
-> +	.id = 0,
-> +	.name = "Channel 1 Count",
-> +	.functions_list = stm32_count_functions,
-> +	.num_functions = ARRAY_SIZE(stm32_count_functions),
-> +	.synapses = stm32_count_synapses,
-> +	.num_synapses = ARRAY_SIZE(stm32_count_synapses),
-> +	.ext = stm32_count_ext,
-> +	.num_ext = ARRAY_SIZE(stm32_count_ext)
-> +};
-> +
-> +static int stm32_timer_cnt_probe(struct platform_device *pdev)
+> +int qcom_llcc_probe(struct platform_device *pdev,
+> +		      const struct llcc_slice_config *llcc_cfg, u32 sz)
 > +{
-> +	struct stm32_timers *ddata = dev_get_drvdata(pdev->dev.parent);
+> +	u32 num_banks;
 > +	struct device *dev = &pdev->dev;
-> +	struct stm32_timer_cnt *priv;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	int ret, i;
 > +
-> +	if (IS_ERR_OR_NULL(ddata))
-> +		return -EINVAL;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
+> +	drv_data = devm_kzalloc(dev, sizeof(*drv_data), GFP_KERNEL);
+> +	if (!drv_data)
 > +		return -ENOMEM;
 > +
-> +	priv->regmap = ddata->regmap;
-> +	priv->clk = ddata->clk;
-> +	priv->ceiling = ddata->max_arr;
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
 > +
-> +	priv->counter.name = dev_name(dev);
-> +	priv->counter.parent = dev;
-> +	priv->counter.ops = &stm32_timer_cnt_ops;
-> +	priv->counter.counts = &stm32_counts;
-> +	priv->counter.num_counts = 1;
-> +	priv->counter.signals = stm32_signals;
-> +	priv->counter.num_signals = ARRAY_SIZE(stm32_signals);
-> +	priv->counter.priv = priv;
+> +	drv_data->regmap = devm_regmap_init_mmio(dev, base,
+> +					&llcc_regmap_config);
+> +	if (IS_ERR(drv_data->regmap))
+> +		return PTR_ERR(drv_data->regmap);
 > +
-> +	/* Register Counter device */
-> +	return devm_counter_register(dev, &priv->counter);
+> +	ret = regmap_read(drv_data->regmap, LLCC_COMMON_STATUS0,
+> +						&num_banks);
+> +	if (ret)
+> +		return ret;
+> +
+> +	num_banks &= LLCC_LB_CNT_MASK;
+> +	num_banks >>= LLCC_LB_CNT_SHIFT;
+> +	drv_data->num_banks = num_banks;
+> +
+> +	for (i = 0; i < sz; i++)
+> +		if (llcc_cfg[i].slice_id > drv_data->max_slices)
+> +			drv_data->max_slices = llcc_cfg[i].slice_id;
+> +
+> +	drv_data->offsets = devm_kcalloc(dev, num_banks, sizeof(u32),
+> +							GFP_KERNEL);
+> +	if (!drv_data->offsets)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < num_banks; i++)
+> +		drv_data->offsets[i] = i * BANK_OFFSET_STRIDE;
+> +
+> +	drv_data->bcast_off = num_banks * BANK_OFFSET_STRIDE;
+> +
+> +	drv_data->bitmap = devm_kcalloc(dev,
+> +	BITS_TO_LONGS(drv_data->max_slices), sizeof(unsigned long),
+> +						GFP_KERNEL);
+> +	if (!drv_data->bitmap)
+> +		return -ENOMEM;
+> +
+> +	drv_data->cfg = llcc_cfg;
+> +	drv_data->cfg_size = sz;
+> +	mutex_init(&drv_data->lock);
+> +	platform_set_drvdata(pdev, drv_data);
+> +
+> +	return qcom_llcc_cfg_program(pdev);
+> +}
+> +EXPORT_SYMBOL_GPL(qcom_llcc_probe);
+> diff --git a/include/linux/soc/qcom/llcc-qcom.h b/include/linux/soc/qcom/llcc-qcom.h
+> new file mode 100644
+> index 0000000..7e3b9c6
+> --- /dev/null
+> +++ b/include/linux/soc/qcom/llcc-qcom.h
+> @@ -0,0 +1,180 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#ifndef __LLCC_QCOM__
+> +#define __LLCC_QCOM__
+> +
+> +#define LLCC_CPUSS       1
+> +#define LLCC_VIDSC0      2
+> +#define LLCC_VIDSC1      3
+> +#define LLCC_ROTATOR     4
+> +#define LLCC_VOICE       5
+> +#define LLCC_AUDIO       6
+> +#define LLCC_MDMHPGRW    7
+> +#define LLCC_MDM         8
+> +#define LLCC_CMPT        10
+> +#define LLCC_GPUHTW      11
+> +#define LLCC_GPU         12
+> +#define LLCC_MMUHWT      13
+> +#define LLCC_CMPTDMA     15
+> +#define LLCC_DISP        16
+> +#define LLCC_VIDFW       17
+> +#define LLCC_MDMHPFX     20
+> +#define LLCC_MDMPNG      21
+> +#define LLCC_AUDHW       22
+> +
+> +/**
+> + * llcc_slice_desc - Cache slice descriptor
+> + * @slice_id: llcc slice id
+> + * @slice_size: Size allocated for the llcc slice
+> + */
+> +struct llcc_slice_desc {
+> +	u32 slice_id;
+> +	size_t slice_size;
+> +};
+> +
+> +/**
+> + * llcc_slice_config - Data associated with the llcc slice
+> + * @usecase_id: usecase id for which the llcc slice is used
+> + * @slice_id: llcc slice id assigned to each slice
+> + * @max_cap: maximum capacity of the llcc slice
+> + * @priority: priority of the llcc slice
+> + * @fixed_size: whether the llcc slice can grow beyond its size
+> + * @bonus_ways: bonus ways associated with llcc slice
+> + * @res_ways: reserved ways associated with llcc slice
+> + * @cache_mode: mode of the llcc slice
+> + * @probe_target_ways: Probe only reserved and bonus ways on a cache miss
+> + * @dis_cap_alloc: Disable capacity based allocation
+> + * @retain_on_pc: Retain through power collapse
+> + * @activate_on_init: activate the slice on init
+> + */
+> +struct llcc_slice_config {
+> +	u32 usecase_id;
+> +	u32 slice_id;
+> +	u32 max_cap;
+> +	u32 priority;
+> +	bool fixed_size;
+> +	u32 bonus_ways;
+> +	u32 res_ways;
+> +	u32 cache_mode;
+> +	u32 probe_target_ways;
+> +	bool dis_cap_alloc;
+> +	bool retain_on_pc;
+> +	bool activate_on_init;
+> +};
+> +
+> +/**
+> + * llcc_drv_data - Data associated with the llcc driver
+> + * @regmap: regmap associated with the llcc device
+> + * @cfg: pointer to the data structure for slice configuration
+> + * @lock: mutex associated with each slice
+> + * @cfg_size: size of the config data table
+> + * @max_slices: max slices as read from device tree
+> + * @bcast_off: Offset of the broadcast bank
+> + * @num_banks: Number of llcc banks
+> + * @bitmap: Bit map to track the active slice ids
+> + * @offsets: Pointer to the bank offsets array
+> + */
+> +struct llcc_drv_data {
+> +	struct regmap *regmap;
+> +	const struct llcc_slice_config *cfg;
+> +	struct mutex lock;
+> +	u32 cfg_size;
+> +	u32 max_slices;
+> +	u32 bcast_off;
+> +	u32 num_banks;
+> +	unsigned long *bitmap;
+> +	u32 *offsets;
+> +};
+> +
+> +#if IS_ENABLED(CONFIG_QCOM_LLCC)
+> +/**
+> + * llcc_slice_getd - get llcc slice descriptor
+> + * @uid: usecase_id of the client
+> + */
+> +struct llcc_slice_desc *llcc_slice_getd(u32 uid);
+> +
+> +/**
+> + * llcc_slice_putd - llcc slice descritpor
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +void llcc_slice_putd(struct llcc_slice_desc *desc);
+> +
+> +/**
+> + * llcc_get_slice_id - get slice id
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +int llcc_get_slice_id(struct llcc_slice_desc *desc);
+> +
+> +/**
+> + * llcc_get_slice_size - llcc slice size
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +size_t llcc_get_slice_size(struct llcc_slice_desc *desc);
+> +
+> +/**
+> + * llcc_slice_activate - Activate the llcc slice
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +int llcc_slice_activate(struct llcc_slice_desc *desc);
+> +
+> +/**
+> + * llcc_slice_deactivate - Deactivate the llcc slice
+> + * @desc: Pointer to llcc slice descriptor
+> + */
+> +int llcc_slice_deactivate(struct llcc_slice_desc *desc);
+> +
+> +/**
+> + * qcom_llcc_probe - program the sct table
+> + * @pdev: platform device pointer
+> + * @table: soc sct table
+> + * @sz: Size of the config table
+> + */
+> +int qcom_llcc_probe(struct platform_device *pdev,
+> +		      const struct llcc_slice_config *table, u32 sz);
+> +#else
+> +static inline struct llcc_slice_desc *llcc_slice_getd(u32 uid)
+> +{
+> +	return NULL;
 > +}
 > +
-> +static const struct of_device_id stm32_timer_cnt_of_match[] = {
-> +	{ .compatible = "st,stm32-timer-counter", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_timer_cnt_of_match);
+> +static inline void llcc_slice_putd(struct llcc_slice_desc *desc)
+> +{
 > +
-> +static struct platform_driver stm32_timer_cnt_driver = {
-> +	.probe = stm32_timer_cnt_probe,
-> +	.driver = {
-> +		.name = "stm32-timer-counter",
-> +		.of_match_table = stm32_timer_cnt_of_match,
-> +	},
 > +};
-> +module_platform_driver(stm32_timer_cnt_driver);
 > +
-> +MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
-> +MODULE_ALIAS("platform:stm32-timer-counter");
-> +MODULE_DESCRIPTION("STMicroelectronics STM32 TIMER counter driver");
-> +MODULE_LICENSE("GPL v2");
+> +static inline int llcc_get_slice_id(struct llcc_slice_desc *desc)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +static inline size_t llcc_get_slice_size(struct llcc_slice_desc *desc)
+> +{
+> +	return 0;
+> +}
+> +static inline int llcc_slice_activate(struct llcc_slice_desc *desc)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +static inline int llcc_slice_deactivate(struct llcc_slice_desc *desc)
+> +{
+> +	return -EINVAL;
+> +}
+> +static inline int qcom_llcc_probe(struct platform_device *pdev,
+> +		      const struct llcc_slice_config *table, u32 sz)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline int qcom_llcc_remove(struct platform_device *pdev)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+> +#endif
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
