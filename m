@@ -1,50 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 22 Jun 2018 13:05:25 -0400 (EDT)
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <TY1PR01MB15624342267F973525BF45698A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-References: <20180618141905.7789-1-gerg@linux-m68k.org>
- <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
- <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
- <20180622110145.GU17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
- <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
- <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
- <TY1PR01MB15624342267F973525BF45698A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-Message-ID: <nycvar.YSQ.7.76.1806221244490.16670@knanqh.ubzr>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 22 Jun 2018 10:04:02 -0700
+Subject: [PATCH v2 1/2] arm64: dts: sdm845: Add rpmh-rsc node
+In-Reply-To: <20180618215051.156270-1-dianders@chromium.org>
+References: <20180618215051.156270-1-dianders@chromium.org>
+Message-ID: <20180622170402.GE10336@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Jun 2018, Chris Brandt wrote:
+On Mon 18 Jun 14:50 PDT 2018, Douglas Anderson wrote:
 
-> On Friday, June 22, 2018 1, Nicolas Pitre wrote:
-> > All that is possible already. But config symbol mutual exclusion is not.
+> This adds the rpmh-rsc node to sdm845 based on the examples in the
+> bindings.
 > 
-> I still don't understand why we need some false sense of security for 
-> only selecting 1 platform.
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-Because that's the right thing to do. Small hacks are nice, but when 
-they accumulate (and they always do over time) then maintainability 
-suffers. This is why you may do whatever small hacks in your own copy of 
-the kernel code and that might be good enough, but the mainline source 
-tree should be held to higher standards.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-> There are probably plenty of kernel config options that you could enable
-> that would break any number of systems.
+Regards,
+Bjorn
 
-That's no excuse to add more of them. Many people are constantly working 
-to move things in the other direction.
-
-> So, why do we feel that XIP_KERNEL needs a warm safety blanket around 
-> it?
-
-Because we simply try not to create invalid kernel configurations. 
-XIP_KERNEL is not more special than other symbols in that respect.
-
-And if the kconfig language has to be extended for proper configurations 
-to be produced then that's what it is, and trying to cheat around that 
-fact won't produce any good.
-
-
-Nicolas
+> ---
+> 
+> Changes in v2:
+> - Fixed ordering of tcs-config as per Lina.
+> 
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index cd308b84bed7..43a182fb42c9 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -7,6 +7,7 @@
+>  
+>  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/soc/qcom,rpmh-rsc.h>
+>  
+>  / {
+>  	interrupt-parent = <&intc>;
+> @@ -984,6 +985,24 @@
+>  			#mbox-cells = <1>;
+>  		};
+>  
+> +		apps_rsc: rsc at 179c0000 {
+> +			label = "apps_rsc";
+> +			compatible = "qcom,rpmh-rsc";
+> +			reg = <0x179c0000 0x10000>,
+> +			      <0x179d0000 0x10000>,
+> +			      <0x179e0000 0x10000>;
+> +			reg-names = "drv-0", "drv-1", "drv-2";
+> +			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+> +			qcom,tcs-offset = <0xd00>;
+> +			qcom,drv-id = <2>;
+> +			qcom,tcs-config = <ACTIVE_TCS  2>,
+> +					  <SLEEP_TCS   3>,
+> +					  <WAKE_TCS    3>,
+> +					  <CONTROL_TCS 1>;
+> +		};
+> +
+>  		intc: interrupt-controller at 17a00000 {
+>  			compatible = "arm,gic-v3";
+>  			#address-cells = <1>;
+> -- 
+> 2.18.0.rc1.244.gcf134e6275-goog
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
