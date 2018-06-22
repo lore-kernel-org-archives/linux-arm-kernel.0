@@ -1,67 +1,61 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jun 2018 13:49:45 +0100
-Subject: [GIT PULL] KVM/arm updates for 4.18-rc2
-Message-ID: <20180622124953.12355-1-marc.zyngier@arm.com>
+Date: Fri, 22 Jun 2018 13:49:47 +0100
+Subject: [PATCH 2/8] arm64: Introduce sysreg_clear_set()
+In-Reply-To: <20180622124953.12355-1-marc.zyngier@arm.com>
+References: <20180622124953.12355-1-marc.zyngier@arm.com>
+Message-ID: <20180622124953.12355-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Radim, Paolo,
+From: Mark Rutland <mark.rutland@arm.com>
 
-This is the first batch of fixes for 4.18, mostly dealing with the
-fallout from Dave's lazy FPSIMD handling. We also have the disabling
-of the compat interface on arm64 (it never had it the first place),
-and a relaxation on the alignment of the GICv3 compatibility
-interface.
+Currently we have a couple of helpers to manipulate bits in particular
+sysregs:
 
-Please pull.
+ * config_sctlr_el1(u32 clear, u32 set)
 
-	M.
+ * change_cpacr(u64 val, u64 mask)
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+The parameters of these differ in naming convention, order, and size,
+which is unfortunate. They also differ slightly in behaviour, as
+change_cpacr() skips the sysreg write if the bits are unchanged, which
+is a useful optimization when sysreg writes are expensive.
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+Before we gain yet another sysreg manipulation function, let's
+unify these with a common helper, providing a consistent order for
+clear/set operands, and the write skipping behaviour from
+change_cpacr(). Code will be migrated to the new helper in subsequent
+patches.
 
-are available in the Git repository at:
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-fixes-for-4.18-1
-
-for you to fetch changes up to 37b65db85f9b2fc98267eee4a18d7506492e6e8c:
-
-  KVM: arm64: Prevent KVM_COMPAT from being selected (2018-06-21 17:17:50 +0100)
-
-----------------------------------------------------------------
-KVM/arm fixes for 4.18, take #1
-
-- Lazy FPSIMD switching fixes
-- Really disable compat ioctls on architectures that don't want it
-- Disable compat on arm64 (it was never implemented...)
-- Rely on architectural requirements for GICV on GICv3
-- Detect bad alignments in unmap_stage2_range
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      KVM: arm/arm64: Drop resource size check for GICV window
-
-Dave Martin (3):
-      KVM: arm64: Don't mask softirq with IRQs disabled in vcpu_put()
-      KVM: arm64/sve: Fix SVE trap restoration for non-current tasks
-      KVM: arm64: Avoid mistaken attempts to save SVE state for vcpus
-
-Jia He (1):
-      KVM: arm/arm64: add WARN_ON if size is not PAGE_SIZE aligned in unmap_stage2_range
-
-Marc Zyngier (2):
-      KVM: Enforce error in ioctl for compat tasks when !KVM_COMPAT
-      KVM: arm64: Prevent KVM_COMPAT from being selected
-
-Mark Rutland (1):
-      arm64: Introduce sysreg_clear_set()
-
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/include/asm/sysreg.h   | 11 +++++++++++
- arch/arm64/kvm/fpsimd.c           | 36 +++++++++++++++++++++++++++---------
- virt/kvm/Kconfig                  |  2 +-
- virt/kvm/arm/mmu.c                |  2 ++
- virt/kvm/arm/vgic/vgic-v3.c       |  5 -----
- virt/kvm/kvm_main.c               | 19 +++++++++----------
- 7 files changed, 51 insertions(+), 25 deletions(-)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 6171178075dc..a8f84812c6e8 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -728,6 +728,17 @@ asm(
+ 	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
+ } while (0)
+ 
++/*
++ * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
++ * set mask are set. Other bits are left as-is.
++ */
++#define sysreg_clear_set(sysreg, clear, set) do {			\
++	u64 __scs_val = read_sysreg(sysreg);				\
++	u64 __scs_new = (__scs_val & ~(u64)(clear)) | (set);		\
++	if (__scs_new != __scs_val)					\
++		write_sysreg(__scs_new, sysreg);			\
++} while (0)
++
+ static inline void config_sctlr_el1(u32 clear, u32 set)
+ {
+ 	u32 val;
+-- 
+2.17.1
