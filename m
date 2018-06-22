@@ -1,37 +1,46 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 22 Jun 2018 09:28:32 +0200
+Date: Fri, 22 Jun 2018 09:30:54 +0200
 Subject: [PATCH v2] net: ethernet: stmmac: dwmac-rk: Add GMAC support for
  PX30
-In-Reply-To: <7173b45f-17d3-2356-fede-28bdd5c658f2@rock-chips.com>
+In-Reply-To: <157ecfc9-d0e6-7782-1cbc-d0fb76c81edb@rock-chips.com>
 References: <1528956927-32440-1-git-send-email-david.wu@rock-chips.com>
  <2582999.2hZx6CH9S6@diego>
- <7173b45f-17d3-2356-fede-28bdd5c658f2@rock-chips.com>
-Message-ID: <19622369.ojvgxrHm8t@phil>
+ <157ecfc9-d0e6-7782-1cbc-d0fb76c81edb@rock-chips.com>
+Message-ID: <18221590.FEDROxemCD@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi David,
 
-Am Freitag, 22. Juni 2018, 09:22:35 CEST schrieb David Wu:
+Am Mittwoch, 20. Juni 2018, 04:40:35 CEST schrieb David Wu:
 > ? 2018?06?14? 16:30, Heiko St?bner ??:
-> > And someone could convert the driver to use the new clk-bulk APIs [0],
-> > so the large number of clk_prepare_enable calls would be a bit
-> > trimmed down.
+> > Am Donnerstag, 14. Juni 2018, 10:14:31 CEST schrieb David Wu:
+> >> Hi Heiko,
+> >>
+> >> ? 2018?06?14? 15:54, Heiko St?bner ??:
+> >>> I don't see that new clock documented in the dt-binding.
+> >>> Also, which clock from the clock-controller does this connect to?
+> >>
+> >> The clock is the "SCLK_GMAC_RMII" at the clock-controller, which could
+> >> be set rate by the link speed.
+> > 
+> > Hmm, while these huge number of clocks are somewhat strange,
+> > shouldn't it be named something with _rmii instead of _speed then?
 > 
-> Some clocks need special treatment at special cases, may not know which 
-> index is we need at clk_bulk_data struct.
-> 1. At rmii mode, need to use mac_ref, mac_refout; but at rgmii, they are 
-> not needed.
-> 2. At rgmii mode, rx is coming in from external source, there is no 
-> gate, and it is coming from mac_ref_clk at rmii mode, there is gate.
-> 3. clk_mac needs to be configured rate 50M or 125M.
-> 4. mac_clk_speed needs to be configured at PX30 Soc and next Socs.
+> Okay, it is better to be named _speed.
 > 
-> It looks like use the clk-bulk, will not be more flexible, and we still 
-> keep the present. What do you think?
+> > 
+> > Also, I don't see any clk_enable action for that new clock, so you could
+> > end up with being off?
+> 
+> The new speed is the parent of the clk_tx_rx, to enable/disable 
+> clk_tx_rx, the new clock would be also enabled/disabled.
 
-yeah, you're probably right. I just saw all these clk_prepare_enable calls
-and didn't think enough about the config side ;-) .
+Still it is nicer to really enable it, so that the clock-framework can keep
+track of usage counts.
+
+Because also no-one hinders the chip-designer from putting a gate in
+between in one of the next socs ;-)
 
 
 Heiko
