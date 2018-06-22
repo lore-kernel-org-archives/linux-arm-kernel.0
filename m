@@ -1,84 +1,59 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Fri, 22 Jun 2018 10:01:25 -0700
-Subject: [PATCH 4/5] openrisc: Use the new GENERIC_IRQ_MULTI_HANDLER
-In-Reply-To: <20180622170126.6308-1-palmer@sifive.com>
-References: <20180621181756.12493-1-palmer@sifive.com>
- <20180622170126.6308-1-palmer@sifive.com>
-Message-ID: <20180622170126.6308-5-palmer@sifive.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 22 Jun 2018 10:05:01 -0700
+Subject: [PATCH v2 2/2] arm64: dts: sdm845: Add rpmh-clk node
+In-Reply-To: <20180618215051.156270-2-dianders@chromium.org>
+References: <20180618215051.156270-1-dianders@chromium.org>
+ <20180618215051.156270-2-dianders@chromium.org>
+Message-ID: <20180622170501.GF10336@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that openrisc copied arm64's GENERIC_IRQ_MULTI_HANDLER code
-(which came from arm).  I wanted to make this generic so I could use it
-in the RISC-V port.  This patch converts the openrisc code to use the
-generic version.
+On Mon 18 Jun 14:50 PDT 2018, Douglas Anderson wrote:
 
-Acked-by: Stafford Horne <shorne@gmail.com>
-Signed-off-by: Palmer Dabbelt <palmer@sifive.com>
----
- arch/openrisc/Kconfig           | 5 +----
- arch/openrisc/include/asm/irq.h | 2 --
- arch/openrisc/kernel/irq.c      | 7 -------
- 3 files changed, 1 insertion(+), 13 deletions(-)
+> This adds the rpmh-clk node to sdm845 based on the examples in the
+> bindings.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-diff --git a/arch/openrisc/Kconfig b/arch/openrisc/Kconfig
-index 9ecad05bfc73..dfb6a79ba7ff 100644
---- a/arch/openrisc/Kconfig
-+++ b/arch/openrisc/Kconfig
-@@ -27,7 +27,6 @@ config OPENRISC
- 	select GENERIC_STRNLEN_USER
- 	select GENERIC_SMP_IDLE_THREAD
- 	select MODULES_USE_ELF_RELA
--	select MULTI_IRQ_HANDLER
- 	select HAVE_DEBUG_STACKOVERFLOW
- 	select OR1K_PIC
- 	select CPU_NO_EFFICIENT_FFS if !OPENRISC_HAVE_INST_FF1
-@@ -36,6 +35,7 @@ config OPENRISC
- 	select ARCH_USE_QUEUED_RWLOCKS
- 	select OMPIC if SMP
- 	select ARCH_WANT_FRAME_POINTERS
-+	select GENERIC_IRQ_MULTI_HANDLER
- 
- config CPU_BIG_ENDIAN
- 	def_bool y
-@@ -69,9 +69,6 @@ config STACKTRACE_SUPPORT
- config LOCKDEP_SUPPORT
- 	def_bool  y
- 
--config MULTI_IRQ_HANDLER
--	def_bool y
--
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/openrisc/include/asm/irq.h b/arch/openrisc/include/asm/irq.h
-index d9eee0a2b7b4..eb612b1865d2 100644
---- a/arch/openrisc/include/asm/irq.h
-+++ b/arch/openrisc/include/asm/irq.h
-@@ -24,6 +24,4 @@
- 
- #define NO_IRQ		(-1)
- 
--extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
--
- #endif /* __ASM_OPENRISC_IRQ_H__ */
-diff --git a/arch/openrisc/kernel/irq.c b/arch/openrisc/kernel/irq.c
-index 35e478a93116..5f9445effaf8 100644
---- a/arch/openrisc/kernel/irq.c
-+++ b/arch/openrisc/kernel/irq.c
-@@ -41,13 +41,6 @@ void __init init_IRQ(void)
- 	irqchip_init();
- }
- 
--static void (*handle_arch_irq)(struct pt_regs *);
--
--void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
--{
--	handle_arch_irq = handle_irq;
--}
--
- void __irq_entry do_IRQ(struct pt_regs *regs)
- {
- 	handle_arch_irq(regs);
--- 
-2.16.4
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> ---
+> NOTE: to apply this patch cleanly, apply it atop:
+>   arm64: dts: qcom: sdm845: Add I2C, SPI, and UART9 nodes
+>   https://patchwork.kernel.org/patch/10462691/
+> 
+> Changes in v2: None
+> 
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index 43a182fb42c9..00722b533a92 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -6,6 +6,7 @@
+>   */
+>  
+>  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+> +#include <dt-bindings/clock/qcom,rpmh.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+>  
+> @@ -1001,6 +1002,11 @@
+>  					  <SLEEP_TCS   3>,
+>  					  <WAKE_TCS    3>,
+>  					  <CONTROL_TCS 1>;
+> +
+> +			rpmhcc: clock-controller {
+> +				compatible = "qcom,sdm845-rpmh-clk";
+> +				#clock-cells = <1>;
+> +			};
+>  		};
+>  
+>  		intc: interrupt-controller at 17a00000 {
+> -- 
+> 2.18.0.rc1.244.gcf134e6275-goog
+> 
