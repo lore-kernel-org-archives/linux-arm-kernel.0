@@ -1,15 +1,16 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 22 Jun 2018 22:11:58 +0800
-Subject: [PATCH V3 3/5] dt-bindings: arm: fsl: add mu binding doc
+Date: Fri, 22 Jun 2018 22:11:59 +0800
+Subject: [PATCH V3 4/5] dt-bindings: arm: fsl: add scu binding doc
 In-Reply-To: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
 References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1529676720-7533-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1529676720-7533-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Messaging Unit module enables two processors within
-the SoC to communicate and coordinate by passing messages
-(e.g. data, status and control) through the MU interface.
+The System Controller Firmware (SCFW) is a low-level system function
+which runs on a dedicated Cortex-M core to provide power, clock, and
+resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
+(QM, QP), and i.MX8QX (QXP, DX).
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -20,58 +21,59 @@ Cc: devicetree at vger.kernel.org
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 v2->v3:
- * change to mailbox binding
-   Currently mbox-cells has to be 0 for SCU MU.
-   Generic MU Mailbox support binding could be extended later.
+ * update a bit to mailbox binding
 v1->v2:
- * typo fixes
- * remove status property
- * remove imx6&7 compatible string which may be added later for
-   the generic mailbox binding
+ * remove status
+ * changed to mu1
 ---
- .../devicetree/bindings/arm/freescale/fsl,mu.txt   | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,mu.txt
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,mu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,mu.txt
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
 new file mode 100644
-index 0000000..90e4905
+index 0000000..b51f9d1
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,mu.txt
-@@ -0,0 +1,34 @@
-+NXP i.MX Messaging Unit (MU)
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+@@ -0,0 +1,39 @@
++NXP i.MX System Controller Firmware (SCFW)
 +--------------------------------------------------------------------
 +
-+The Messaging Unit module enables two processors within the SoC to
-+communicate and coordinate by passing messages (e.g. data, status
-+and control) through the MU interface. The MU also provides the ability
-+for one processor to signal the other processor using interrupts.
++The System Controller Firmware (SCFW) is a low-level system function
++which runs on a dedicated Cortex-M core to provide power, clock, and
++resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
++(QM, QP), and i.MX8QX (QXP, DX).
 +
-+Because the MU manages the messaging between processors, the MU uses
-+different clocks (from each side of the different peripheral buses).
-+Therefore, the MU must synchronize the accesses from one side to the
-+other. The MU accomplishes synchronization using two sets of matching
-+registers (Processor A-facing, Processor B-facing).
++The AP communicates with the SC using a multi-ported MU module found
++in the LSIO subsystem. The current definition of this MU module provides
++5 remote AP connections to the SC to support up to 5 execution environments
++(TZ, HV, standard Linux, etc.). The SC side of this MU module interfaces
++with the LSIO DSC IP bus. The SC firmware will communicate with this MU
++using the MSI bus.
 +
-+Messaging Unit Device Node:
++System Controller Device Node:
 +=============================
 +
 +Required properties:
 +-------------------
-+- compatible :	should be "fsl,<chip>-mu", the supported chips include
-+		imx8qxp, imx8qm.
-+- reg :		Should contain the registers location and length
-+- interrupts :	Interrupt number. The interrupt specifier format depends
-+		on the interrupt controller parent.
-+- #mbox-cells:  Must be 0. Number of cells in a mailbox
++- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
++- fsl,mu: a phandle to the Message Unit used by SCU. Should be
++	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
++	  to make sure not use the one which is conflict with
++	  other execution environments. e.g. ATF.
 +
 +Examples:
 +--------
-+lsio_mu0: mailbox at 5d1b0000 {
++lsio_mu1: mailbox at 5d1c0000 {
 +	compatible = "fsl,imx8qxp-mu";
-+	reg = <0x0 0x5d1b0000 0x0 0x10000>;
++	reg = <0x0 0x5d1c0000 0x0 0x10000>;
 +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
 +	#mbox-cells = <0>;
++};
++
++scu {
++	compatible = "fsl,imx8qxp-scu";
++	fsl,mu = <&lsio_mu1>;
 +};
 -- 
 2.7.4
