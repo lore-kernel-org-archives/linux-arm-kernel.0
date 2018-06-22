@@ -1,19 +1,22 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 22 Jun 2018 10:05:01 -0700
-Subject: [PATCH v2 2/2] arm64: dts: sdm845: Add rpmh-clk node
-In-Reply-To: <20180618215051.156270-2-dianders@chromium.org>
-References: <20180618215051.156270-1-dianders@chromium.org>
- <20180618215051.156270-2-dianders@chromium.org>
-Message-ID: <20180622170501.GF10336@builder>
+Date: Fri, 22 Jun 2018 10:07:58 -0700
+Subject: [PATCH v8 1/2] dt-bindings: Documentation for qcom, llcc
+In-Reply-To: <1527122121-31452-2-git-send-email-rishabhb@codeaurora.org>
+References: <1527122121-31452-1-git-send-email-rishabhb@codeaurora.org>
+ <1527122121-31452-2-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <20180622170758.GH10336@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 18 Jun 14:50 PDT 2018, Douglas Anderson wrote:
+On Wed 23 May 17:35 PDT 2018, Rishabh Bhatnagar wrote:
 
-> This adds the rpmh-clk node to sdm845 based on the examples in the
-> bindings.
+> Documentation for last level cache controller device tree bindings,
+> client bindings usage examples.
 > 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+> Reviewed-by: Evan Green <evgreen@chromium.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
 Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
@@ -21,39 +24,43 @@ Regards,
 Bjorn
 
 > ---
-> NOTE: to apply this patch cleanly, apply it atop:
->   arm64: dts: qcom: sdm845: Add I2C, SPI, and UART9 nodes
->   https://patchwork.kernel.org/patch/10462691/
+>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
 > 
-> Changes in v2: None
-> 
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index 43a182fb42c9..00722b533a92 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -6,6 +6,7 @@
->   */
->  
->  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
-> +#include <dt-bindings/clock/qcom,rpmh.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
->  
-> @@ -1001,6 +1002,11 @@
->  					  <SLEEP_TCS   3>,
->  					  <WAKE_TCS    3>,
->  					  <CONTROL_TCS 1>;
+> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> new file mode 100644
+> index 0000000..5e85749
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> @@ -0,0 +1,26 @@
+> +== Introduction==
 > +
-> +			rpmhcc: clock-controller {
-> +				compatible = "qcom,sdm845-rpmh-clk";
-> +				#clock-cells = <1>;
-> +			};
->  		};
->  
->  		intc: interrupt-controller at 17a00000 {
+> +LLCC (Last Level Cache Controller) provides last level of cache memory in SOC,
+> +that can be shared by multiple clients. Clients here are different cores in the
+> +SOC, the idea is to minimize the local caches at the clients and migrate to
+> +common pool of memory. Cache memory is divided into partitions called slices
+> +which are assigned to clients. Clients can query the slice details, activate
+> +and deactivate them.
+> +
+> +Properties:
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be "qcom,sdm845-llcc"
+> +
+> +- reg:
+> +	Usage: required
+> +	Value Type: <prop-encoded-array>
+> +	Definition: Start address and the the size of the register region.
+> +
+> +Example:
+> +
+> +	cache-controller at 1100000 {
+> +		compatible = "qcom,sdm845-llcc";
+> +		reg = <0x1100000 0x250000>;
+> +	};
 > -- 
-> 2.18.0.rc1.244.gcf134e6275-goog
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 > 
