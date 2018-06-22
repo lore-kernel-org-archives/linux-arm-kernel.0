@@ -1,80 +1,59 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 22 Jun 2018 15:22:31 +0200
-Subject: [PATCH 5/5] RFC: ARM64: dts: Add Low-Speed Connector to ZCU100
-In-Reply-To: <20180618074556.6944-6-linus.walleij@linaro.org>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
- <20180618074556.6944-6-linus.walleij@linaro.org>
-Message-ID: <6c73bcf5-3847-adb2-ac71-5f2700fa72f8@xilinx.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 22 Jun 2018 13:26:40 +0000
+Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
+ machine for no-MMU
+In-Reply-To: <CAMuHMdXPiDGg+S3VQutSYSBwBbjW_wV+nTSBHuu7a3VNTghm1A@mail.gmail.com>
+References: <20180618141905.7789-1-gerg@linux-m68k.org>
+ <20180618141905.7789-5-gerg@linux-m68k.org>
+ <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
+ <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
+ <TY1PR01MB1562B232625397CCACD5931A8A760@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+ <CAMuHMdXPiDGg+S3VQutSYSBwBbjW_wV+nTSBHuu7a3VNTghm1A@mail.gmail.com>
+Message-ID: <TY1PR01MB1562AFD0C247CA1A30957B1D8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.6.2018 09:45, Linus Walleij wrote:
-> This adds the low-speed connector to the ZCU100 rev C device
-> tree (also known as the Ultra96 board).
+Hi Geert,
+
+On Friday, June 22, 2018, Geert Uytterhoeven wrote:
+> > 1) Modify kbuild to give the ability as stated above.
 > 
-> This is a proof-of-concept only, showing how it is possible
-> to populate a Secure96 board using the other patches in the
-> series.
-> 
-> If you comment out or delete the board {} node, you can
-> populate/depopulate the board from sysfs instead.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../boot/dts/xilinx/zynqmp-zcu100-revC.dts    | 27 +++++++++++++++++--
->  1 file changed, 25 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> index d62276e0e0a9..fc30497f248d 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> @@ -110,6 +110,28 @@
->  		compatible = "mmc-pwrseq-simple";
->  		reset-gpios = <&gpio 7 GPIO_ACTIVE_LOW>; /* WIFI_EN */
->  	};
-> +
-> +	lscon: connector {
-> +		compatible = "96boards,low-speed-connector";
-> +		i2c0 = <&i2csw_0>;
-> +		i2c1 = <&i2csw_1>;
-> +		spi = <&spi0>;
-> +		gpios = <&gpio 36 GPIO_ACTIVE_HIGH>, /* GPIO-A */
-> +		        <&gpio 37 GPIO_ACTIVE_HIGH>, /* GPIO-B */
-> +			<&gpio 39 GPIO_ACTIVE_HIGH>, /* GPIO-C */
-> +			<&gpio 40 GPIO_ACTIVE_HIGH>, /* GPIO-D */
-> +			<&gpio 44 GPIO_ACTIVE_HIGH>, /* GPIO-E */
-> +			<&gpio 45 GPIO_ACTIVE_HIGH>, /* GPIO-F */
-> +			<&gpio 78 GPIO_ACTIVE_HIGH>, /* GPIO-G */
-> +			<&gpio 79 GPIO_ACTIVE_HIGH>, /* GPIO-H */
-> +			<&gpio 80 GPIO_ACTIVE_HIGH>, /* GPIO-I */
-> +			<&gpio 81 GPIO_ACTIVE_HIGH>, /* GPIO-J */
-> +			<&gpio 82 GPIO_ACTIVE_HIGH>, /* GPIO-K */
-> +			<&gpio 83 GPIO_ACTIVE_HIGH>; /* GPIO-L */
+> Would that actually help, or would it only give you a false feeling of
+> safety?
+
+Yup!
+But I don't really care about safty. I just want to be able to build my images without having to hack Kconfig.
 
 
-This connector has also 2 uarts which you should have here too.
+> Conclusion: If you want NOMMU and/or XIP, you have to know what you're
+> doing,
+> and hand-holding at whatever level may not save you from making mistakes.
 
-Thanks,
-Michal
+I agree.
+And, you'll require your own kernel config in order to cut out all the 
+extra stuff that your system doesn't need.
 
 
-> +		board {
-> +			compatible = "96boards,secure96";
-> +		};
-> +	};
->  };
->  
->  &dcc {
-> @@ -134,8 +156,9 @@
->  			  "USB1_DIR", "USB1_DATA2", "USB1_NXT", "USB1_DATA0", "USB1_DATA1",
->  			  "USB1_STP", "USB1_DATA3", "USB1_DATA4", "USB1_DATA5", "USB1_DATA6",
->  			  "USB_DATA7", "WLAN_IRQ", "PMIC_IRQ", /* MIO end and EMIO start */
-> -			  "", "",
-> -			  "", "", "", "", "", "", "", "", "", "",
-> +			  "GPIO-G", "GPIO-H",
-> +			  "GPIO-I", "GPIO-J", "GPIO-K", "GPIO-L",
-> +			  "", "", "", "", "", "",
->  			  "", "", "", "", "", "", "", "", "", "",
->  			  "", "", "", "", "", "", "", "", "", "",
->  			  "", "", "", "", "", "", "", "", "", "",
+> > 2) Make XIP builds somehow be able to run at multiple physical address
+> > by modifying the binaries post-build (Arnd's suggestion).
 > 
+> That's actually an interesting one: no manual configuration (iff
+> parameters
+> would be extracted from the DTB), so nothing can go wrong ;-)
+> I guess it applies to NOMMU, too.
+
+For the hard coded memory address, it's only need at the very beginning 
+of boot in order to set up a temporary stack, but soon the DTB is read 
+and life is good. So in theory, the memory address could be passed in 
+with a register.
+
+For the hard coded ROM address, that needs to be available at run time 
+in order to do the virt_to_phys translation. But, the idea is to change 
+that from a #define to a global variable.
+
+It sounded like it might work...although I never got around to hacking 
+the code to see if it would or not because at the end of the day, it 
+didn't provide any real value to ab XIP Linux system.
+
+
+Chris
