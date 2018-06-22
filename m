@@ -1,30 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jun 2018 11:38:34 +0100
-Subject: Supporting more IRQs than NR_IRQS + 8196 on ARM64 server
-In-Reply-To: <5B2CB5C7.1020801@huawei.com>
-References: <5B2CB5C7.1020801@huawei.com>
-Message-ID: <d9fb69e1-6a25-a3a8-8073-c556f7ebcb92@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 22 Jun 2018 11:25:21 +0100
+Subject: [PATCH v2] arm64: kpti: Use early_param for kpti= command-line
+ option
+In-Reply-To: <1529659525-21340-1-git-send-email-will.deacon@arm.com>
+References: <1529659525-21340-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1ec38ecf-5cee-5223-2b6f-f63840169dad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yang,
 
-On 22/06/18 09:39, Yang Yingliang wrote:
-> Hi, Marc
-> Current system only supports (NR_IRQS + 8196) interrupts. It's not 
-> enough on ARM64 server, on D06 we have several pcie devices and each
-> device supports 256 VMs and each VM uses 64 interrupts. Can we set> NR_IRQS to a bigger value to support more interrupts ?
-You could, but it feels quite hackish, and not future proof at all. It
-would unnecessarily affect smaller systems that do not need the overhead.
 
-I'd rather we offer the architecture a way to buy into a more dynamic
-scheme which wouldn't be limited by a bitmap, or at least made the
-bitmap extensible.
+On 22/06/18 10:25, Will Deacon wrote:
+> We inspect __kpti_forced early on as part of the cpufeature enable
+> callback which remaps the swapper page table using non-global entries.
+> 
+> Ensure that __kpti_forced has been updated to reflect the kpti=
+> command-line option before we start using it.
+> 
 
-I'll have a think about it.
+This also fixes the case where SPE driver complains about missing
+kpti=off even when it's present as __setup parse kpti only after
+boot CPU detects and marks ARM64_UNMAP_KERNEL_AT_EL0 capability.
 
-Thanks,
+Tested-by: Sudeep Holla <sudeep.holla@arm.com>
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
