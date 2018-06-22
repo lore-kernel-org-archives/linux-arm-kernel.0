@@ -1,35 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jun 2018 13:49:53 +0100
-Subject: [PATCH 8/8] KVM: arm64: Prevent KVM_COMPAT from being selected
+Date: Fri, 22 Jun 2018 13:49:50 +0100
+Subject: [PATCH 5/8] KVM: arm64: Avoid mistaken attempts to save SVE state for
+ vcpus
 In-Reply-To: <20180622124953.12355-1-marc.zyngier@arm.com>
 References: <20180622124953.12355-1-marc.zyngier@arm.com>
-Message-ID: <20180622124953.12355-9-marc.zyngier@arm.com>
+Message-ID: <20180622124953.12355-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is very little point in trying to support the 32bit KVM/arm API
-on arm64, and this was never an anticipated use case.
+From: Dave Martin <Dave.Martin@arm.com>
 
-Let's make it clear by not selecting KVM_COMPAT.
+Commit e6b673b ("KVM: arm64: Optimise FPSIMD handling to reduce
+guest/host thrashing") uses fpsimd_save() to save the FPSIMD state
+for a vcpu when scheduling the vcpu out.  However, currently
+current's value of TIF_SVE is restored before calling fpsimd_save()
+which means that fpsimd_save() may erroneously attempt to save SVE
+state from the vcpu.  This enables current's vector state to be
+polluted with guest data.  current->thread.sve_state may be
+unallocated or not large enough, so this can also trigger a NULL
+dereference or buffer overrun.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Instead of this, TIF_SVE should be configured properly for the
+guest when calling fpsimd_save() with the vcpu context loaded.
+
+This patch ensures this by delaying restoration of current's
+TIF_SVE until after the call to fpsimd_save().
+
+Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kvm/fpsimd.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-index 72143cfaf6ec..ea434ddc8499 100644
---- a/virt/kvm/Kconfig
-+++ b/virt/kvm/Kconfig
-@@ -47,7 +47,7 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index 98d19d1afa50..aac7808ce216 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -103,9 +103,6 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
  
- config KVM_COMPAT
-        def_bool y
--       depends on KVM && COMPAT && !S390
-+       depends on KVM && COMPAT && !(S390 || ARM64)
+ 	local_irq_save(flags);
  
- config HAVE_KVM_IRQ_BYPASS
-        bool
+-	update_thread_flag(TIF_SVE,
+-			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
+-
+ 	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
+ 		/* Clean guest FP state to memory and invalidate cpu view */
+ 		fpsimd_save();
+@@ -124,5 +121,8 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+ 			sysreg_clear_set(CPACR_EL1, CPACR_EL1_ZEN_EL0EN, 0);
+ 	}
+ 
++	update_thread_flag(TIF_SVE,
++			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
++
+ 	local_irq_restore(flags);
+ }
 -- 
 2.17.1
