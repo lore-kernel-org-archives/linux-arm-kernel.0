@@ -1,115 +1,41 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 22 Jun 2018 17:14:23 +0200
-Subject: [PATCH v3 08/17] irqchip/irq-mvebu-icu: disociate ICU and NSR
+Date: Fri, 22 Jun 2018 17:14:20 +0200
+Subject: [PATCH v3 05/17] irqchip/irq-mvebu-icu: clarify the reset operation
+ of configured interrupts
 In-Reply-To: <20180622151432.1566-1-miquel.raynal@bootlin.com>
 References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
-Message-ID: <20180622151432.1566-9-miquel.raynal@bootlin.com>
+Message-ID: <20180622151432.1566-6-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NSR (non-secure interrupts) are handled in the ICU driver like if there
-was only this type of interrupt in the ICU. Change this behavior to
-prepare the introduction of SEI (System Error Interrupts) support by
-moving the NSR code in a separate function. This is done under the form
-of a 'probe' function to ease future migration to NSR/SEI being platform
-devices part of the ICU.
+Rewrite a small section to clarify the reset operation of interrupts
+already configured by ATF that we want to handle in the driver. This
+will simplify the introduction of System Error Interrupts support.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- drivers/irqchip/irq-mvebu-icu.c | 58 +++++++++++++++++++++++------------------
- 1 file changed, 33 insertions(+), 25 deletions(-)
+ drivers/irqchip/irq-mvebu-icu.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-index 607948870a14..24d45186eb6b 100644
+index a2a3acd74491..0f2655d7f19e 100644
 --- a/drivers/irqchip/irq-mvebu-icu.c
 +++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -205,6 +205,37 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
- 	.free      = mvebu_icu_irq_domain_free,
- };
- 
-+static int mvebu_icu_subset_probe(struct platform_device *pdev)
-+{
-+	struct device_node *msi_parent_dn;
-+	struct irq_domain *irq_domain;
-+	struct mvebu_icu *icu;
-+
-+	icu = dev_get_drvdata(&pdev->dev);
-+	if (!icu)
-+		return -ENODEV;
-+
-+	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, pdev->dev.of_node,
-+						 DOMAIN_BUS_PLATFORM_MSI);
-+	if (!pdev->dev.msi_domain)
-+		return -EPROBE_DEFER;
-+
-+	msi_parent_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
-+	if (!msi_parent_dn)
-+		return -ENODEV;
-+
-+	irq_domain = platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
-+						       mvebu_icu_write_msg,
-+						       &mvebu_icu_domain_ops,
-+						       icu);
-+	if (!irq_domain) {
-+		dev_err(&pdev->dev, "Failed to create ICU MSI domain\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
- static struct regmap_config mvebu_icu_regmap_config = {
- 	.reg_bits	= 32,
- 	.val_bits	= 32,
-@@ -215,9 +246,6 @@ static struct regmap_config mvebu_icu_regmap_config = {
- static int mvebu_icu_probe(struct platform_device *pdev)
- {
- 	struct mvebu_icu *icu;
--	struct device_node *node = pdev->dev.of_node;
--	struct device_node *gicp_dn;
--	struct irq_domain *irq_domain;
- 	struct resource *res;
- 	void __iomem *regs;
- 	int i;
-@@ -255,19 +283,6 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
- #endif
- 
--	/*
--	 * We're probed after MSI domains have been resolved, so force
--	 * resolution here.
--	 */
--	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
--						 DOMAIN_BUS_PLATFORM_MSI);
--	if (!pdev->dev.msi_domain)
--		return -EPROBE_DEFER;
--
--	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
--	if (!gicp_dn)
--		return -ENODEV;
--
- 	/*
- 	 * Clean all ICU interrupts with type SPI_NSR, required to
+@@ -258,8 +258,12 @@ static int mvebu_icu_probe(struct platform_device *pdev)
  	 * avoid unpredictable SPI assignments done by firmware.
-@@ -282,16 +297,9 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
+ 	 */
+ 	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
+-		u32 icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
+-		if ((icu_int >> ICU_GROUP_SHIFT) == ICU_GRP_NSR)
++		u32 icu_int, icu_grp;
++
++		icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
++		icu_grp = icu_int >> ICU_GROUP_SHIFT;
++
++		if (icu_grp == ICU_GRP_NSR)
+ 			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
  	}
  
--	irq_domain =
--		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
--						  mvebu_icu_write_msg,
--						  &mvebu_icu_domain_ops, icu);
--	if (!irq_domain) {
--		dev_err(&pdev->dev, "Failed to create ICU domain\n");
--		return -ENOMEM;
--	}
-+	platform_set_drvdata(pdev, icu);
- 
--	return 0;
-+	return mvebu_icu_subset_probe(pdev);
- }
- 
- static const struct of_device_id mvebu_icu_of_match[] = {
 -- 
 2.14.1
