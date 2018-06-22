@@ -1,31 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Jun 2018 00:20:05 -0700
-Subject: v4.18-rc1 on droid 4: very bad CPU performance
-In-Reply-To: <20180621121542.GA4836@amd>
-References: <20180621121542.GA4836@amd>
-Message-ID: <20180622072005.GF112168@atomide.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Fri, 22 Jun 2018 15:22:35 +0800
+Subject: [PATCH v2] net: ethernet: stmmac: dwmac-rk: Add GMAC support for
+ PX30
+In-Reply-To: <2582999.2hZx6CH9S6@diego>
+References: <1528956927-32440-1-git-send-email-david.wu@rock-chips.com>
+ <1961033.25ax7s0Z5i@diego>
+ <3aa2445f-ab2a-93b6-3a49-36be6c98d327@rock-chips.com>
+ <2582999.2hZx6CH9S6@diego>
+Message-ID: <7173b45f-17d3-2356-fede-28bdd5c658f2@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180621 12:18]:
-> Hi!
-> 
-> V4.18 is slower than it should be.
-> 
-> user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
-> | wc -c
-> 10044291
-> 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
-> user at devuan:~$ uname -a
-> Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
-> 19:26:37 CEST 2018 armv7l GNU/Linux
-> 
-> That bzip should take 12 seconds, not minute.
-> 
-> Any ideas? Do you see it, too?
+Hi Heiko,
 
-I've noticed firefox is super slow.. Git bisect time?
+? 2018?06?14? 16:30, Heiko St?bner ??:
+> And someone could convert the driver to use the new clk-bulk APIs [0],
+> so the large number of clk_prepare_enable calls would be a bit
+> trimmed down.
 
-Regards,
+Some clocks need special treatment at special cases, may not know which 
+index is we need at clk_bulk_data struct.
+1. At rmii mode, need to use mac_ref, mac_refout; but at rgmii, they are 
+not needed.
+2. At rgmii mode, rx is coming in from external source, there is no 
+gate, and it is coming from mac_ref_clk at rmii mode, there is gate.
+3. clk_mac needs to be configured rate 50M or 125M.
+4. mac_clk_speed needs to be configured at PX30 Soc and next Socs.
 
-Tony
+It looks like use the clk-bulk, will not be more flexible, and we still 
+keep the present. What do you think?
