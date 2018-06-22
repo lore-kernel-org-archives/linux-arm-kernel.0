@@ -1,45 +1,33 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 22 Jun 2018 12:04:02 -0400
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180622140125.GD108993@bhelgaas-glaptop.roam.corp.google.com>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
- <2593baec-8a28-a3e7-7ebf-7c21addda0b8@codeaurora.org>
- <20180622140125.GD108993@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <98c4531b-0b64-b9e1-ef95-562d1613d893@codeaurora.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 23 Jun 2018 00:06:30 +0800
+Subject: [PATCH 1/2] arm64: allwinner: a64: change TERES-I DLDO3's name to
+ start with "vdd"
+Message-ID: <20180622160631.8578-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/22/2018 10:01 AM, Bjorn Helgaas wrote:
->> Since Oza's DPC/AER patch to refactor fatal error handling, both
->> hotplug driver and AER/DPC driver will try removing devices and
->> perform enumeration on link events/AER events.
->>
->> Perfect environment for race condition without a change.
-> Yeah, this looks like a bit of a mess.  I guess we're getting two
-> interrupts (AER interrupt and hotplug interrupt) and we should
-> coordinate their handling somehow.  I don't have a proposal.  This
-> race could happen independent of the device reset paths, of course.
+Originally the name of the DLDO3 regulator on TERES-I is "eDP12", which
+is not consistent with other regulator names.
 
-I was hoping for pci_reset_slot() to avoid this but it turns out
-the root port does not have any slot pointers set on my system even though
-hotplug is enabled. 
+Change it to "vdd-edp", in order to make it more consistent.
 
-Slot pointer is only set for the child objects.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-https://patchwork.kernel.org/patch/10351515/
-
- * A PCI bus may host multiple slots, each slot may support a reset mechanism
- * independent of other slots.  For instance, some slots may support slot power
- * control.  In the case of a 1:1 bus to slot architecture, this function may
- * wrap the bus reset to avoid spurious slot related events such as hotplug.
- * Generally a slot reset should be attempted before a bus reset.  All of the
- * function of the slot and any subordinate buses behind the slot are reset
- * through this function.  PCI config space of all devices in the slot and
- * behind the slot is saved before and restored after reset.
-
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+index d9baab3dc96b..02fecc42440c 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+@@ -210,7 +210,7 @@
+ &reg_dldo3 {
+ 	regulator-min-microvolt = <1200000>;
+ 	regulator-max-microvolt = <1200000>;
+-	regulator-name = "eDP12";
++	regulator-name = "vdd-edp";
+ };
+ 
+ &reg_dldo4 {
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.17.1
