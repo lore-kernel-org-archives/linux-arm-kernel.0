@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 Jun 2018 15:50:25 +0100
-Subject: Applied "ASoC: add hp-det-gpio and mic-det-gpio to audio graph card
- binding" to the asoc tree
-In-Reply-To: <20180620015959.10312-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <E1fWNOL-0002cU-Oj@debutante>
+Date: Fri, 22 Jun 2018 15:50:32 +0100
+Subject: Applied "ASoC: uniphier: remove redundant check of PLL ID" to the
+ asoc tree
+In-Reply-To: <20180621025628.4046-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <E1fWNOS-0002fp-81@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: add hp-det-gpio and mic-det-gpio to audio graph card binding
+   ASoC: uniphier: remove redundant check of PLL ID
 
 has been applied to the asoc tree at
 
@@ -34,33 +34,39 @@ to this mail.
 Thanks,
 Mark
 
->From a12f671b4241f53e7cd9dec8770d51549682453b Mon Sep 17 00:00:00 2001
+>From 366f074d047b2538cc5d7e4a820bb6c117a3ccec Mon Sep 17 00:00:00 2001
 From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Wed, 20 Jun 2018 10:59:59 +0900
-Subject: [PATCH] ASoC: add hp-det-gpio and mic-det-gpio to audio graph card
- binding
+Date: Thu, 21 Jun 2018 11:56:28 +0900
+Subject: [PATCH] ASoC: uniphier: remove redundant check of PLL ID
 
-Add headphone and microphone detection GPIO support to audio graph
-card same as supported in simple card.
+This patch removes redudant check of PLL ID. struct uniphier_aio_pll
+enable member has already been checked at is_valid_pll().
 
 Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/audio-graph-card.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ sound/soc/uniphier/aio-cpu.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/audio-graph-card.txt b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
-index d04ea3b1a1dd..7e63e53a901c 100644
---- a/Documentation/devicetree/bindings/sound/audio-graph-card.txt
-+++ b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
-@@ -18,6 +18,8 @@ Below are same as Simple-Card.
- - bitclock-inversion
- - frame-inversion
- - mclk-fs
-+- hp-det-gpio
-+- mic-det-gpio
- - dai-tdm-slot-num
- - dai-tdm-slot-width
- - clocks / system-clock-frequency
+diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
+index 2d9b7dde2ffa..ee90e6c3937c 100644
+--- a/sound/soc/uniphier/aio-cpu.c
++++ b/sound/soc/uniphier/aio-cpu.c
+@@ -219,15 +219,10 @@ static int uniphier_aio_set_pll(struct snd_soc_dai *dai, int pll_id,
+ 				unsigned int freq_out)
+ {
+ 	struct uniphier_aio *aio = uniphier_priv(dai);
+-	struct device *dev = &aio->chip->pdev->dev;
+ 	int ret;
+ 
+ 	if (!is_valid_pll(aio->chip, pll_id))
+ 		return -EINVAL;
+-	if (!aio->chip->plls[pll_id].enable) {
+-		dev_err(dev, "PLL(%d) is not implemented\n", pll_id);
+-		return -ENOTSUPP;
+-	}
+ 
+ 	ret = aio_chip_set_pll(aio->chip, pll_id, freq_out);
+ 	if (ret < 0)
 -- 
 2.18.0.rc2
