@@ -1,55 +1,80 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 22 Jun 2018 13:32:48 +0800
-Subject: [PATCH] ARM: imx: enable bus auto clock gating function for i.mx6sll
-Message-ID: <1529645568-3786-1-git-send-email-Anson.Huang@nxp.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 22 Jun 2018 07:49:32 +0200
+Subject: [PATCH V2 2/4] dt-bindings: arm: fsl: add mu binding doc
+In-Reply-To: <AM0PR04MB4211B39D5AFAB95FC2A91F9980760@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
+ <1529239789-26849-3-git-send-email-aisheng.dong@nxp.com>
+ <20180620194310.GA28983@rob-hp-laptop>
+ <20180621074641.sqqvudxebt3hd43m@pengutronix.de>
+ <AM0PR04MB4211B39D5AFAB95FC2A91F9980760@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180622054932.ysqve7o7pvdnlp5k@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SLL has HW bus auto clock gating function, enable
-it by default to save VDD_SOC_IN power, about 5% ~ 20%
-saved depends on different use cases.
+On Thu, Jun 21, 2018 at 05:11:33PM +0000, A.s. Dong wrote:
+> Hi Sascha,
+> 
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Thursday, June 21, 2018 3:47 PM
+> > To: Rob Herring <robh@kernel.org>
+> > Cc: A.s. Dong <aisheng.dong@nxp.com>; linux-arm-
+> > kernel at lists.infradead.org; dongas86 at gmail.com; kernel at pengutronix.de;
+> > shawnguo at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-
+> > imx <linux-imx@nxp.com>; Mark Rutland <mark.rutland@arm.com>;
+> > devicetree at vger.kernel.org
+> > Subject: Re: [PATCH V2 2/4] dt-bindings: arm: fsl: add mu binding doc
+> > 
+> > On Wed, Jun 20, 2018 at 01:43:10PM -0600, Rob Herring wrote:
+> > > On Sun, Jun 17, 2018 at 08:49:47PM +0800, Dong Aisheng wrote:
+> > > > The Messaging Unit module enables two processors within the SoC to
+> > > > communicate and coordinate by passing messages (e.g. data, status
+> > > > and control) through the MU interface.
+> > > >
+> > > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > Cc: devicetree at vger.kernel.org
+> > > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > > ---
+> > > > v1->v2:
+> > > >  * typo fixes
+> > > >  * remove status property
+> > > >  * remove imx6&7 compatible string which may be added later for
+> > > >    the generic mailbox binding
+> > > >
+> > > > Note: Because MU used by SCU is not implemented as a mailbox driver,
+> > > > Instead, they're provided in library calls to gain higher performance.
+> > >
+> > > Using a binding doesn't mean you have to use an OS's subsystem.
+> > >
+> > > What needs higher performance? What's the performance difference?
+> > Why
+> > > can't the mailbox framework be improved?
+> > 
+> > From what I see the performance is improved by polling the interrupt
+> > registers rather than using interrupts.
+> > I see no reason though why this can't be implemented with the mailbox
+> > framework as is.
+> > 
+> 
+> I thought you've agreed to not write generic MU(mailbox) driver for SCU.
+> https://www.spinics.net/lists/arm-kernel/msg650217.html
+> But seems it's still not quite certain...
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/mach-imx/pm-imx6.c                 | 11 +++++++++--
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  3 +++
- 2 files changed, 12 insertions(+), 2 deletions(-)
+My suggestion was that we change the compatible of the MU unit to
+something that the SCU driver matches. But since we do not do that and
+instead use a fsl,imx8qxp-mu compatible for the MU we have to come up
+with a MU driver that handles both the SCU case and the regular usecase.
+Otherwise we'll end up with a generic driver attaching to the device you
+are using under the hoods.
 
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 791e1fd..b08e407 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -648,10 +648,17 @@ void __init imx6dl_pm_init(void)
- 
- void __init imx6sl_pm_init(void)
- {
--	if (cpu_is_imx6sl())
-+	struct regmap *gpr;
-+
-+	if (cpu_is_imx6sl()) {
- 		imx6_pm_common_init(&imx6sl_pm_data);
--	else
-+	} else {
- 		imx6_pm_common_init(&imx6sll_pm_data);
-+		gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-+		if (!IS_ERR(gpr))
-+			regmap_update_bits(gpr, IOMUXC_GPR5,
-+				IMX6SLL_GPR5_AFCG_X_BYPASS_MASK, 0);
-+	}
- }
- 
- void __init imx6sx_pm_init(void)
-diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-index e06f5f7..6c1ad16 100644
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -457,4 +457,7 @@
- #define MCLK_DIR(x) (x == 1 ? IMX6UL_GPR1_SAI1_MCLK_DIR : x == 2 ? \
- 		     IMX6UL_GPR1_SAI2_MCLK_DIR : IMX6UL_GPR1_SAI3_MCLK_DIR)
- 
-+/* For imx6sll iomux gpr register field define */
-+#define IMX6SLL_GPR5_AFCG_X_BYPASS_MASK		(0x1f << 11)
-+
- #endif /* __LINUX_IMX6Q_IOMUXC_GPR_H */
+Sascha
+
 -- 
-2.7.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
