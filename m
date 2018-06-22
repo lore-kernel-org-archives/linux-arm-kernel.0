@@ -1,51 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Jun 2018 16:25:37 +0100
-Subject: [PATCH] arm64: mm: Ensure writes to swapper are ordered wrt
- subsequent cache maintenance
-In-Reply-To: <1529681025-20850-1-git-send-email-will.deacon@arm.com>
-References: <1529681025-20850-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180622152537.6ctubjass2widjo3@lakrids.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 22 Jun 2018 11:25:57 -0400 (EDT)
+Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
+ machine for no-MMU
+In-Reply-To: <20180622110145.GU17671@n2100.armlinux.org.uk>
+References: <20180618141905.7789-1-gerg@linux-m68k.org>
+ <20180618141905.7789-5-gerg@linux-m68k.org>
+ <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
+ <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
+ <20180622110145.GU17671@n2100.armlinux.org.uk>
+Message-ID: <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 04:23:45PM +0100, Will Deacon wrote:
-> When rewriting swapper using nG mappings, we must performance cache
-> maintenance around each page table access in order to avoid coherency
-> problems with the host's cacheable alias under KVM. To ensure correct
-> ordering of the maintenance with respect to Device memory accesses made
-> with the Stage-1 MMU disabled, DMBs need to be added between the
-> maintenance and the corresponding memory access.
-> 
-> This patch adds a missing DMB between writing a new page table entry and
-> performing a clean+invalidate on the same line.
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/mm/proc.S | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> On Thu, Jun 21, 2018 at 12:24:04PM -0400, Nicolas Pitre wrote:
+> > [ adding linux-kbuild for their input ]
+> > 
+> > On Thu, 21 Jun 2018, Geert Uytterhoeven wrote:
+> > 
+> > > I've just sent a patch to do that.
+> > 
+> > Your patch isn't wrong per se.  But it is not enough. The issue here 
+> > would be easily fixed with some kconfig extension so that:
+> > 
+> > - If XIP or NOMMU is selected then only one target in the multiplatform 
+> >   set can be selected, basically turning it into a choice menu.
 > 
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 5f9a73a4452c..03646e6a2ef4 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -217,8 +217,9 @@ ENDPROC(idmap_cpu_replace_ttbr1)
->  
->  	.macro __idmap_kpti_put_pgtable_ent_ng, type
->  	orr	\type, \type, #PTE_NG		// Same bit for blocks and pages
-> -	str	\type, [cur_\()\type\()p]	// Update the entry and ensure it
-> -	dc	civac, cur_\()\type\()p		// is visible to all CPUs.
-> +	str	\type, [cur_\()\type\()p]	// Update the entry and ensure
-> +	dmb	sy				// that it is visible to all
-> +	dc	civac, cur_\()\type\()p		// CPUs.
->  	.endm
->  
->  /*
-> -- 
-> 2.1.4
+> I don't think that's how it should work.  Consider the V7M case, where
+> we have better standardisation of the physical address layout than
+> previous ARM devices.  We have three platforms which are V7M compliant:
 > 
+> - AT91
+> - iMX
+> - STM32
+> 
+> These have separate symbols:
+> 
+> menuconfig ARCH_AT91
+> 	bool "AT91/Microchip SoCs"
+> 	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+> 
+> menuconfig ARCH_MXC
+> 	bool "Freescale i.MX family"
+> 	depends on ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7 || ARM_SINGLE_ARMV7M
+> 
+> menuconfig ARCH_STM32
+> 	bool "STMicroelectronics STM32 family" if ARM_SINGLE_ARMV7M || ARCH_MULTI_V7
+> 
+> With your suggestion, you would become only build a kernel for one of
+> these, but that is not the case today: it's possible to build a single
+> kernel which supports all these platforms.
+
+That is still something that could be accommodated if the kconfig 
+language was more accommodating. The problem comes from the fact that 
+some options are mutually exclusive, like platforms with conflicting 
+memory maps and XIP.
+
+Leaving your example above aside for the moment, let's just pick the 
+ARCH_MULTIPLATFORM group which is always the problematic one in 
+practice. We need a way to limit platform selection within that set to 
+only one platform among them all if XIP_KERNEL is set. And that is 
+impossible to express with the kconfig language today.
+
+So, my assertion is that, unless someone volunteers a solution to the 
+kconfig language to express mutual exclusion between symbols, this issue 
+just can't be fixed properly.
+
+
+Nicolas
