@@ -1,47 +1,64 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Fri, 22 Jun 2018 17:23:09 +0000
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 22 Jun 2018 13:25:01 -0400 (EDT)
 Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
  machine for no-MMU
-In-Reply-To: <nycvar.YSQ.7.76.1806221244490.16670@knanqh.ubzr>
-References: <20180618141905.7789-1-gerg@linux-m68k.org>
- <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
+In-Reply-To: <20180622170951.GY17671@n2100.armlinux.org.uk>
+References: <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
  <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
  <20180622110145.GU17671@n2100.armlinux.org.uk>
  <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
  <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
  <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
- <TY1PR01MB15624342267F973525BF45698A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
- <nycvar.YSQ.7.76.1806221244490.16670@knanqh.ubzr>
-Message-ID: <TY1PR01MB1562C54E8DD3942F40F8CBBD8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+ <20180622161101.GW17671@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1806221218230.16670@knanqh.ubzr>
+ <20180622164012.GX17671@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1806221247210.16670@knanqh.ubzr>
+ <20180622170951.GY17671@n2100.armlinux.org.uk>
+Message-ID: <nycvar.YSQ.7.76.1806221322190.16670@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 22, 2018, Nicolas Pitre wrote:
-> > So, why do we feel that XIP_KERNEL needs a warm safety blanket around
-> > it?
+On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
+
+> On Fri, Jun 22, 2018 at 12:54:18PM -0400, Nicolas Pitre wrote:
+> > On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
+> > 
+> > > On Fri, Jun 22, 2018 at 12:21:33PM -0400, Nicolas Pitre wrote:
+> > > > On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
+> > > > > That is actually incorrect - you're too used to the dynamic fixup of
+> > > > > virt_to_phys() and friends now!
+> > > > > 
+> > > > > Given that XIP is typically used in environments where the kernel text
+> > > > > is very much unmodifyable, we disable CONFIG_ARM_PATCH_PHYS_VIRT.  When
+> > > > > disabled, we use a constant translation, based upon the build-time
+> > > > > CONFIG_PHYS_OFFSET and CONFIG_PAGE_OFFSET settings.
+> > > > > 
+> > > > > The early assembler relies upon these settings - which must be known
+> > > > > before we enable the MMU.  As such, DT parsing is not available to us
+> > > > > at that point (as we can't run any C code, because we won't be calling
+> > > > > it at the address it was linked for.)
+> > > > 
+> > > > I think you got me wrong.  I meant DT parsing at config or build time, 
+> > > > not at run time.
+> > > 
+> > > That seems backwards and complicated.  It seems this would end up
+> > > with:
+> > > 
+> > > - you configure the kernel
+> > > - build the dtb files
+> > > - reconfigure parsing a specific dtb file built in the previous step
+> > > - build the kernel proper
+> > 
+> > ... or just stick the right value manually when prompting for 
+> > XIP_PHYS_ADDR.  Really, depending on DT is a non issue that only pulls 
+> > the conversation away from the actual kconfig language limitation that 
+> > needs to be overcome.
 > 
-> Because we simply try not to create invalid kernel configurations.
-> XIP_KERNEL is not more special than other symbols in that respect.
+> Which is _exactly_ what we do today, so I don't see what point you're
+> making in this sub-thread.
 
-Then here's a question.
-
-To be clear, the discussion is around
-
-  "Being able to build a kernel that will not boot"
-
-So which one of these is more important: build or boot?
-
-Meaning what if you can select multiple platforms in kconfig, but then 
-there is a .c file that does more sanity checking that then prevents the 
-full build using a #error.
-
-In that case you can never "build" a kernel that has no chance of 
-booting on all the selected platforms.
-
-There are configs options today that you can select, but unless some 
-external criteria is  met during build time, the build will fail (like
-with a "missing .h file" message or something)
+I was merely trying to show Geert that DT dependencies are not an issue 
+after he brought that as an argument.
 
 
-Chris
+Nicolas
