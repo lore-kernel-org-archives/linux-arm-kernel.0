@@ -1,60 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 09:31:16 +0100
-Subject: [PATCH v2 2/4] arm64: Remove unnecessary ISBs from set_{pte,pmd,pud}
-In-Reply-To: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529656278-878-3-git-send-email-will.deacon@arm.com>
+Date: Fri, 22 Jun 2018 09:31:14 +0100
+Subject: [PATCH v2 0/4] I-side fixes
+Message-ID: <1529656278-878-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7f0b1bf04511 ("arm64: Fix barriers used for page table modifications")
-fixed a reported issue with fixmap page-table entries not being visible
-to the walker due to a missing DSB instruction. At the same time, it added
-ISB instructions to the arm64 set_{pte,pmd,pud} functions, which are not
-required by the architecture and make little sense in isolation.
+Hi all,
 
-Remove the redundant ISBs.
+Here's version two of the patches I previously posted here:
 
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Steve Capper <steve.capper@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584857.html
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 9f82d6b53851..1bdeca8918a6 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -224,10 +224,8 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
- 	 * Only if the new pte is valid and kernel, otherwise TLB maintenance
- 	 * or update_mmu_cache() have the necessary barriers.
- 	 */
--	if (pte_valid_not_user(pte)) {
-+	if (pte_valid_not_user(pte))
- 		dsb(ishst);
--		isb();
--	}
- }
- 
- extern void __sync_icache_dcache(pte_t pteval);
-@@ -434,7 +432,6 @@ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	WRITE_ONCE(*pmdp, pmd);
- 	dsb(ishst);
--	isb();
- }
- 
- static inline void pmd_clear(pmd_t *pmdp)
-@@ -485,7 +482,6 @@ static inline void set_pud(pud_t *pudp, pud_t pud)
- {
- 	WRITE_ONCE(*pudp, pud);
- 	dsb(ishst);
--	isb();
- }
- 
- static inline void pud_clear(pud_t *pudp)
+Changes since v1 include:
+
+  * Removal of "hotpatch" mechanism for certain classes of instructions
+  * Avoid attempting IPI when secondaries are in stop_machine()
+  * Leave ISBs intact in the stop_machine() callbacks
+
+Cheers,
+
+Will
+
+--->8
+
+Will Deacon (4):
+  arm64: Avoid flush_icache_range() in alternatives patching code
+  arm64: Remove unnecessary ISBs from set_{pte,pmd,pud}
+  arm64: IPI each CPU after invalidating the I-cache for kernel mappings
+  arm64: insn: Don't fallback on nosync path for general insn patching
+
+ arch/arm64/include/asm/alternative.h |  7 +++-
+ arch/arm64/include/asm/cacheflush.h  | 13 ++++++-
+ arch/arm64/include/asm/insn.h        |  2 --
+ arch/arm64/include/asm/pgtable.h     |  6 +---
+ arch/arm64/kernel/alternative.c      | 51 ++++++++++++++++++++++----
+ arch/arm64/kernel/cpu_errata.c       |  2 +-
+ arch/arm64/kernel/insn.c             | 70 ++----------------------------------
+ arch/arm64/kernel/module.c           |  5 ++-
+ arch/arm64/mm/cache.S                |  4 +--
+ 9 files changed, 71 insertions(+), 89 deletions(-)
+
 -- 
 2.1.4
