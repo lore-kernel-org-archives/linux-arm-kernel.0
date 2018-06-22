@@ -1,99 +1,92 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jun 2018 13:21:29 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Jun 2018 13:41:37 +0200
+Subject: [PATCH] [RFC] arm: Replace "multiple platforms" by "common
+ platform"
+In-Reply-To: <20180622092305.GS17671@n2100.armlinux.org.uk>
+References: <20180621155906.12821-1-geert+renesas@glider.be>
+ <20180622092305.GS17671@n2100.armlinux.org.uk>
+Message-ID: <CAMuHMdUqBhR4Ra=hF0TZKxgQHaE_KBUYh04ZTTmg1pRWtjveoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2018 at 00:29, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> Minor subject nit: From the caller's point of view, we must convert a bus
-> address to a resource *always* (the caller has no knowledge of "whether it
-> is translated by the host bridge").
->
-> On Fri, May 18, 2018 at 10:17:51AM -0400, Sinan Kaya wrote:
->> A host bridge is allowed to remap BAR addresses using _TRA attribute in
->> _CRS windows.
->
-> Also, _TRA/_CRS are ACPI-specific terms and non-ACPI host bridges can
-> also do the same sort of translation.  Another trivial nit.
->
->> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
->> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
->>
->> When a VGA device is behind such a host bridge and the resource is
->> translated efifb driver is trying to do ioremap against bus address
->> rather than the resource address and is failing to probe.
->>
->> efifb: probing for efifb
->> efifb: cannot reserve video memory at 0x1e000000
->> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
->> efifb: mode is 800x600x32, linelength=3200, pages=1
->> efifb: scrolling: redraw
->> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
->>
->> Use the host bridge offset information to convert bus address to
->> resource address in the fixup.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->
-> Reviewed-by: Bjorn Helgaas <bhelgaas@google.com>
->
-> Thanks a lot for fixing this!
->
+Hi Russell,
 
-Apologies for only bringing this up now, but I think this patch is
-wrong after all.
+Thanks for your comments!
 
-screen_info.lfb_base is supposed to be a CPU address, and so
-translating it like this is wrong. If you end up with a PCI address
-here, you have made a mistake in hacking support for PCI outbound
-translations into UEFI. Other users such as UEFI itself or GRUB will
-treat this as a CPU physical address as well, so the kernel should not
-treat it any differently.
-
-
->> ---
->>  drivers/video/fbdev/efifb.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
->> index 6daac8d..429cc85 100644
->> --- a/drivers/video/fbdev/efifb.c
->> +++ b/drivers/video/fbdev/efifb.c
->> @@ -431,6 +431,7 @@ static void efifb_fixup_resources(struct pci_dev *dev)
->>               .end = screen_info.lfb_base + screen_info.lfb_size - 1,
->>               .flags = IORESOURCE_MEM,
->>       };
->> +     struct pci_bus_region region;
->>       int i;
->>
->>       if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
->> @@ -442,6 +443,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
->>       if (!screen_res.start)
->>               return;
->>
->> +     region.start = screen_res.start;
->> +     region.end = screen_res.end;
->> +     pcibios_bus_to_resource(dev->bus, &screen_res, &region);
->> +
->>       for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
->>               struct resource *res = &dev->resource[i];
->>
->> --
->> 2.7.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Fri, Jun 22, 2018 at 11:23 AM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Jun 21, 2018 at 05:59:06PM +0200, Geert Uytterhoeven wrote:
+> > "ARM multiplatform" has actually two meanings:
+> >   1. It groups platforms that follow the "ARM multiplatform" software
+> >      framework,
+> >   2. It allows to build a single kernel that can be booted on multiple
+> >      platforms.
+> >
+> > Currently support for XIP and/or NOMMU cannot be enabled on platforms
+> > that follow the "ARM multiplatform" framework, without duplicating their
+> > machine selection logic under a new Kconfig symbol.  As (in theory) all
+> > platforms can be used with XIP and/or NOMMU, this is not sustainable.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The reason for that has nothing to do with the way this option is named,
+> and even after reading your commit message, I can't come up with any
+> reason for this change other than "personally don't like the existing
+> wording" which IMHO is not a good enough reason to randomly go around
+> rewording stuff in the kernel.
+>
+> The reason that XIP and NOMMU can't be enabled with a multi-platform
+> kernel is that there are often issues with different layouts of the
+> physical memory space which can not be taken into account.
+>
+> Multi-platform works around that by (a) using the MMU to abstract
+> away the differences on RAM, and (b) modifying the kernel text to
+> adjust the virtual to physical translations.  The latter is not
+> possible with XIP, and the former should not be used with NOMMU.
+> That means the kernel must be built to accomodate the physical
+> layout on the target platform, and so building a kernel supporting
+> multiple platforms with differing memory layouts makes no sense.
+>
+> This is exactly why I really don't like the idea of ARCH_MULTIPLATFORM
+> being hijacked for NOMMU/XIP support.
+
+That's multiplatform meaning #2.
+
+But as long as MMU=y and XIP_KERNEL=n, nothing would change.
+
+> We've worked around the issues with "multi-platform" XIP/NOMMU by
+> using things such as "ARM_SINGLE_V7M" to cover all V7M platforms
+> (which must, by definition) have compatible physical layouts.
+> Exactly the same approach should be adopted for other XIP/NOMMU
+> platforms, and _not_ reusing ARCH_MULTIPLATFORM, which will lead
+> to lots of non-bootable kernels.
+
+So we need ARM_SINGLE_ARMV7A, and let all subarchitectures depend on
+ARCH_MULTIPLATFORM || ARM_SINGLE_ARMV7M, to avoid duplicating
+their SoC entry?
+
+I had a quick look. So we have e.g. MACH_STM32F746 under ARM_SINGLE_ARMV7M,
+and MACH_STM32MP157 under ARCH_MULTI_V7.
+But according to stm32mp157c-ed1.dts and stm32746g-eval.dts both have
+memory at the same address, so it should be possible to run the same nommu
+kernel on the STM32MP157?
+
+MACH_STM32F469 is also under ARM_SINGLE_ARMV7M, but according to
+stm32f469-disco.dts, memory may be at a completely different address?
+Doesn't that lead to unbootable kernels, too?
+
+> Another problems for NOMMU is that the kernel has to be linked for
+> a specific _physical_ address.  When you have ARCH_MULTIPLATFORM
+> enabled, there is no facility to select that address.
+
+That can be easily solved with Kconfig symbols that depend on !MMU,
+can't it?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
