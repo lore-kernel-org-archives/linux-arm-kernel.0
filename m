@@ -1,82 +1,32 @@
-From: jonathan.cameron@huawei.com (Jonathan Cameron)
-Date: Fri, 22 Jun 2018 17:59:25 +0100
-Subject: [PATCH v7 05/10] counter: 104-quad-8: Documentation: Add
- Generic Counter sysfs documentation
-In-Reply-To: <891d9716ce95bd8568296ef53d5b8d266f7efe3e.1529607879.git.vilhelm.gray@gmail.com>
-References: <cover.1529607879.git.vilhelm.gray@gmail.com>
- <891d9716ce95bd8568296ef53d5b8d266f7efe3e.1529607879.git.vilhelm.gray@gmail.com>
-Message-ID: <20180622175925.00005cbc@huawei.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Fri, 22 Jun 2018 10:01:21 -0700
+Subject: Finish the GENERIC_IRQ_MULTI_HANDLER conversion
+In-Reply-To: <20180621181756.12493-1-palmer@sifive.com>
+References: <20180621181756.12493-1-palmer@sifive.com>
+Message-ID: <20180622170126.6308-1-palmer@sifive.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jun 2018 17:08:08 -0400
-William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
-
-> This patch adds standard documentation for the Generic Counter interface
-> userspace sysfs attributes of the 104-QUAD-8 driver.
+On Thu, Jun 21, 2018 at 11:17 AM, Palmer Dabbelt <palmer@sifive.com> wrote:
+> A while ago I sent a patch set that adds a GENERIC_IRQ_MULTI_HANDLER,
+> which is an exact copy of the existing IRQ_MULTI_HANDLER support in the
+> arm port, which is being used unconditionally by arm64 and openrisc.
+> GENERIC_IRQ_MULTI_HANDLER is currently being used by the RISC-V port.  I
+> managed to make a few mistakes in my original patch set and as a result
+> my conversion of the other architectures of GENERIC_IRQ_MULTI_HANDLER
+> was dropped.
 > 
-> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
-This stuff is very device specific obviously, but looks fine to me.
-
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-
-> ---
->  .../ABI/testing/sysfs-bus-counter-104-quad-8  | 36 +++++++++++++++++++
->  MAINTAINERS                                   |  1 +
->  2 files changed, 37 insertions(+)
->  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+> This patch set finishes up my original patch set by converting arm,
+> arm64, and openrisc over to the new GENERIC_IRQ_MULTI_HANDLER support
+> and then removing MULTI_IRQ_HANDLER as it's obselete.
 > 
-> diff --git a/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8 b/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
-> new file mode 100644
-> index 000000000000..062637df3c78
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
-> @@ -0,0 +1,36 @@
-> +What:		/sys/bus/counter/devices/counterX/signalY/index_polarity
-> +KernelVersion:	4.19
-> +Contact:	linux-iio at vger.kernel.org
-> +Description:
-> +		Active level of index input Signal Y; irrelevant in
-> +		non-synchronous load mode.
-> +
-> +What:		/sys/bus/counter/devices/counterX/signalY/index_polarity_available
-> +What:		/sys/bus/counter/devices/counterX/signalY/synchronous_mode_available
-> +KernelVersion:	4.19
-> +Contact:	linux-iio at vger.kernel.org
-> +Description:
-> +		Discrete set of available values for the respective Signal Y
-> +		configuration are listed in this file.
-> +
-> +What:		/sys/bus/counter/devices/counterX/signalY/synchronous_mode
-> +KernelVersion:	4.19
-> +Contact:	linux-iio at vger.kernel.org
-> +Description:
-> +		Configure the counter associated with Signal Y for
-> +		non-synchronous or synchronous load mode. Synchronous load mode
-> +		cannot be selected in non-quadrature (Pulse-Direction) clock
-> +		mode.
-> +
-> +		Non-synchronous:
-> +			A logic low level is the active level at this index
-> +			input. The index function (as enabled via preset_enable)
-> +			is performed directly on the active level of the index
-> +			input.
-> +
-> +		Synchronous:
-> +			Intended for interfacing with encoder Index output in
-> +			quadrature clock mode. The active level is configured
-> +			via index_polarity. The index function (as enabled via
-> +			preset_enable) is performed synchronously with the
-> +			quadrature clock on the active level of the index input.
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 4083523699f3..a06fd762f5d9 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -270,6 +270,7 @@ ACCES 104-QUAD-8 DRIVER
->  M:	William Breathitt Gray <vilhelm.gray@gmail.com>
->  L:	linux-iio at vger.kernel.org
->  S:	Maintained
-> +F:	Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
->  F:	Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
->  F:	drivers/counter/104-quad-8.c
->  
+> At the time I wrote this I gave it fairly extensive build testing, but
+> went I recently rebased it I just tested the full patch set on arm,
+> arm64, and openrisc defconfigs.
+> 
+> Various flavors of this patch set have bounced around a few times
+> before, but I'm calling this a whole new patch set as it builds on top
+> of what was merged.
+
+Looks like I managed to lose the patches.  They should be threaded under
+this message...
