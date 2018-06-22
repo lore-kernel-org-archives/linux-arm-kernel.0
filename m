@@ -1,136 +1,136 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 09:31:17 +0100
-Subject: [PATCH v2 3/4] arm64: IPI each CPU after invalidating the I-cache for
- kernel mappings
+Date: Fri, 22 Jun 2018 09:31:18 +0100
+Subject: [PATCH v2 4/4] arm64: insn: Don't fallback on nosync path for general
+ insn patching
 In-Reply-To: <1529656278-878-1-git-send-email-will.deacon@arm.com>
 References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529656278-878-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1529656278-878-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When invalidating the instruction cache for a kernel mapping via
-flush_icache_range(), it is also necessary to flush the pipeline for
-other CPUs so that instructions fetched into the pipeline before the
-I-cache invalidation are discarded. For example, if module 'foo' is
-unloaded and then module 'bar' is loaded into the same area of memory,
-a CPU could end up executing instructions from 'foo' when branching into
-'bar' if these instructions were fetched into the pipeline before 'foo'
-was unloaded.
+Patching kernel instructions at runtime requires other CPUs to undergo
+a context synchronisation event via an explicit ISB or an IPI in order
+to ensure that the new instructions are visible. This is required even
+for "hotpatch" instructions such as NOP and BL, so avoid optimising in
+this case and always go via stop_machine() when performing general
+patching.
 
-Whilst this is highly unlikely to occur in practice, particularly as
-any exception acts as a context-synchronizing operation, following the
-letter of the architecture requires us to execute an ISB on each CPU
-in order for the new instruction stream to be visible.
+ftrace isn't quite as strict, so it can continue to call the nosync
+code directly.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cacheflush.h | 13 ++++++++++++-
- arch/arm64/kernel/cpu_errata.c      |  2 +-
- arch/arm64/kernel/insn.c            | 18 ++++--------------
- arch/arm64/mm/cache.S               |  4 ++--
- 4 files changed, 19 insertions(+), 18 deletions(-)
+ arch/arm64/include/asm/insn.h |  2 --
+ arch/arm64/kernel/insn.c      | 56 +------------------------------------------
+ 2 files changed, 1 insertion(+), 57 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index d264a7274811..a0ec27066e6f 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -71,7 +71,7 @@
-  *		- kaddr  - page address
-  *		- size   - region size
-  */
--extern void flush_icache_range(unsigned long start, unsigned long end);
-+extern void __flush_icache_range(unsigned long start, unsigned long end);
- extern int  invalidate_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
- extern void __inval_dcache_area(void *addr, size_t len);
-@@ -81,6 +81,17 @@ extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- extern void sync_icache_aliases(void *kaddr, unsigned long len);
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index f62c56b1793f..c6802dea6cab 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -446,8 +446,6 @@ u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
+ s32 aarch64_get_branch_offset(u32 insn);
+ u32 aarch64_set_branch_offset(u32 insn, s32 offset);
  
-+static inline void flush_icache_range(unsigned long start, unsigned long end)
-+{
-+	__flush_icache_range(start, end);
-+
-+	/*
-+	 * IPI all online CPUs so that they undergo a context synchronization
-+	 * event and are forced to refetch the new instructions.
-+	 */
-+	kick_all_cpus_sync();
-+}
-+
- static inline void flush_cache_mm(struct mm_struct *mm)
- {
- }
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 1d2b6d768efe..0a338a1cd2d7 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -101,7 +101,7 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 	for (i = 0; i < SZ_2K; i += 0x80)
- 		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
+-bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+-
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
  
--	flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
-+	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
- }
- 
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
 diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 816d03c4c913..0f6a2e0cfde0 100644
+index 0f6a2e0cfde0..2b3413549734 100644
 --- a/arch/arm64/kernel/insn.c
 +++ b/arch/arm64/kernel/insn.c
-@@ -216,8 +216,8 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+@@ -149,20 +149,6 @@ int __kprobes aarch64_insn_write(void *addr, u32 insn)
+ 	return __aarch64_insn_write(addr, cpu_to_le32(insn));
+ }
  
- 	ret = aarch64_insn_write(tp, insn);
- 	if (ret == 0)
--		flush_icache_range((uintptr_t)tp,
--				   (uintptr_t)tp + AARCH64_INSN_SIZE);
-+		__flush_icache_range((uintptr_t)tp,
-+				     (uintptr_t)tp + AARCH64_INSN_SIZE);
+-static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+-{
+-	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
+-		return false;
+-
+-	return	aarch64_insn_is_b(insn) ||
+-		aarch64_insn_is_bl(insn) ||
+-		aarch64_insn_is_svc(insn) ||
+-		aarch64_insn_is_hvc(insn) ||
+-		aarch64_insn_is_smc(insn) ||
+-		aarch64_insn_is_brk(insn) ||
+-		aarch64_insn_is_nop(insn);
+-}
+-
+ bool __kprobes aarch64_insn_uses_literal(u32 insn)
+ {
+ 	/* ldr/ldrsw (literal), prfm */
+@@ -189,22 +175,6 @@ bool __kprobes aarch64_insn_is_branch(u32 insn)
+ 		aarch64_insn_is_bcond(insn);
+ }
  
+-/*
+- * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
+- * Section B2.6.5 "Concurrent modification and execution of instructions":
+- * Concurrent modification and execution of instructions can lead to the
+- * resulting instruction performing any behavior that can be achieved by
+- * executing any sequence of instructions that can be executed from the
+- * same Exception level, except where the instruction before modification
+- * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
+- * or SMC instruction.
+- */
+-bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+-{
+-	return __aarch64_insn_hotpatch_safe(old_insn) &&
+-	       __aarch64_insn_hotpatch_safe(new_insn);
+-}
+-
+ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ {
+ 	u32 *tp = addr;
+@@ -239,11 +209,6 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+ 		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+ 			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+ 							     pp->new_insns[i]);
+-		/*
+-		 * aarch64_insn_patch_text_nosync() calls flush_icache_range(),
+-		 * which ends with "dsb; isb" pair guaranteeing global
+-		 * visibility.
+-		 */
+ 		/* Notify other processors with an additional increment. */
+ 		atomic_inc(&pp->cpu_count);
+ 	} else {
+@@ -255,8 +220,7 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
  	return ret;
  }
-@@ -283,18 +283,8 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
- 		if (ret)
- 			return ret;
  
--		if (aarch64_insn_hotpatch_safe(insn, insns[0])) {
--			/*
--			 * ARMv8 architecture doesn't guarantee all CPUs see
--			 * the new instruction after returning from function
--			 * aarch64_insn_patch_text_nosync(). So send IPIs to
--			 * all other CPUs to achieve instruction
--			 * synchronization.
--			 */
--			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
--			kick_all_cpus_sync();
+-static
+-int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
++int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+ {
+ 	struct aarch64_insn_patch patch = {
+ 		.text_addrs = addrs,
+@@ -272,24 +236,6 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+ 				       cpu_online_mask);
+ }
+ 
+-int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+-{
+-	int ret;
+-	u32 insn;
+-
+-	/* Unsafe to patch multiple instructions without synchronizaiton */
+-	if (cnt == 1) {
+-		ret = aarch64_insn_read(addrs[0], &insn);
+-		if (ret)
 -			return ret;
--		}
-+		if (aarch64_insn_hotpatch_safe(insn, insns[0]))
-+			return aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
- 	}
- 
- 	return aarch64_insn_patch_text_sync(addrs, insns, cnt);
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 30334d81b021..0c22ede52f90 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -35,7 +35,7 @@
-  *	- start   - virtual start address of region
-  *	- end     - virtual end address of region
-  */
--ENTRY(flush_icache_range)
-+ENTRY(__flush_icache_range)
- 	/* FALLTHROUGH */
- 
- /*
-@@ -77,7 +77,7 @@ alternative_else_nop_endif
- 9:
- 	mov	x0, #-EFAULT
- 	b	1b
--ENDPROC(flush_icache_range)
-+ENDPROC(__flush_icache_range)
- ENDPROC(__flush_cache_user_range)
- 
- /*
+-
+-		if (aarch64_insn_hotpatch_safe(insn, insns[0]))
+-			return aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
+-	}
+-
+-	return aarch64_insn_patch_text_sync(addrs, insns, cnt);
+-}
+-
+ static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
+ 						u32 *maskp, int *shiftp)
+ {
 -- 
 2.1.4
