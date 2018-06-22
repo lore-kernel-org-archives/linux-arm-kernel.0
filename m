@@ -1,64 +1,184 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 22 Jun 2018 13:25:01 -0400 (EDT)
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <20180622170951.GY17671@n2100.armlinux.org.uk>
-References: <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
- <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
- <20180622110145.GU17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
- <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
- <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
- <20180622161101.GW17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221218230.16670@knanqh.ubzr>
- <20180622164012.GX17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221247210.16670@knanqh.ubzr>
- <20180622170951.GY17671@n2100.armlinux.org.uk>
-Message-ID: <nycvar.YSQ.7.76.1806221322190.16670@knanqh.ubzr>
+From: jonathan.cameron@huawei.com (Jonathan Cameron)
+Date: Fri, 22 Jun 2018 18:10:43 +0100
+Subject: [PATCH v7 00/10] Introduce the Counter subsystem
+In-Reply-To: <cover.1529607879.git.vilhelm.gray@gmail.com>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+Message-ID: <20180622181043.00003d56@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
+On Thu, 21 Jun 2018 17:06:46 -0400
+William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
 
-> On Fri, Jun 22, 2018 at 12:54:18PM -0400, Nicolas Pitre wrote:
-> > On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
-> > 
-> > > On Fri, Jun 22, 2018 at 12:21:33PM -0400, Nicolas Pitre wrote:
-> > > > On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
-> > > > > That is actually incorrect - you're too used to the dynamic fixup of
-> > > > > virt_to_phys() and friends now!
-> > > > > 
-> > > > > Given that XIP is typically used in environments where the kernel text
-> > > > > is very much unmodifyable, we disable CONFIG_ARM_PATCH_PHYS_VIRT.  When
-> > > > > disabled, we use a constant translation, based upon the build-time
-> > > > > CONFIG_PHYS_OFFSET and CONFIG_PAGE_OFFSET settings.
-> > > > > 
-> > > > > The early assembler relies upon these settings - which must be known
-> > > > > before we enable the MMU.  As such, DT parsing is not available to us
-> > > > > at that point (as we can't run any C code, because we won't be calling
-> > > > > it at the address it was linked for.)
-> > > > 
-> > > > I think you got me wrong.  I meant DT parsing at config or build time, 
-> > > > not at run time.
-> > > 
-> > > That seems backwards and complicated.  It seems this would end up
-> > > with:
-> > > 
-> > > - you configure the kernel
-> > > - build the dtb files
-> > > - reconfigure parsing a specific dtb file built in the previous step
-> > > - build the kernel proper
-> > 
-> > ... or just stick the right value manually when prompting for 
-> > XIP_PHYS_ADDR.  Really, depending on DT is a non issue that only pulls 
-> > the conversation away from the actual kconfig language limitation that 
-> > needs to be overcome.
+> Changes in v7:
+>  - Use git-format-patch "-M" switch option to format renames properly
+>    (apologies to Jonathan for reviewing delete/add pairs in past revs)
+>  - Remove superfluous license boilerplate in favor of SPDX lines
+>  - Rename functions to match <noun>_<action> naming convention; e.g.
+>    signal_read_value_set, count_read_value_set, etc.
+>  - Rename COUNT_POSITION_UNSIGNED to COUNT_POSITION, and remove
+>    COUNT_POSITION_SIGNED
+>  - Inline local variables that are only used once
+>  - Remove COUNT_FUNCTION_QUADRATURE_X2_RISING and
+>    COUNT_FUNCTION_QUADRATURE_X2_FALLING; these can be reintroduced when
+>    a practical use-case is determined
+>  - Explicitly free allocated attribute pointers on error in
+>    counter_device_groups_prepare
+>  - Remove pretty tab alignment for symbol declarations in counter.h
+>  - Fix kernel-doc syntax typos ("groups_list" and "groups" missing ':')
+>  - Clarify in kernel-doc comments the use of "val" parameter for the
+>    signal_read, count_read, and count_write callbacks
+>  - Cleanup Generic Counter attributes documentation (explain preset
+>    registers, remove superfluous text, etc.)
+>  - Cleanup Generic Counter driver API documentation (improve formatting
+>    by reorganizing options into intended sections, fix typos, etc.)
+>  - Utilize register defines to remove dependence on magic numbers in
+>    104-QUAD-8 counter driver
+>  - Update Kconfig description for the 104-QUAD-8 counter driver to
+>    describe its Generic Counter interface
+>  - Remove "mode" wording from STM32 Timer dt-bindings documentation;
+>    STM32 Timer features a proper quadrature encoder counter device
+>  - Fix typo in STM32 Timer documentation: IN1/IN2 pins are CH1/CH2 pins
 > 
-> Which is _exactly_ what we do today, so I don't see what point you're
-> making in this sub-thread.
+> Hi Greg,
+> 
+> This patchset is stabilizing so I hope you can take a look over it and
+> advise. This patchset introduces the Counter subsystem and the Generic
+> Counter driver API.
+> 
+> Last year, the STM32 LPTimer IIO driver authored by Fabrice Gasnier
+> opened up a discussion about the architecture of the IIO Counter
+> interface. The IIO Counter interface was developed to provide support
+> for the 104-QUAD-8 IIO driver -- several new IIO attributes were
+> implemented to support the functionality of the 104-QUAD-8 device. When
+> the STM32 LPTimer IIO driver was introduced, it too attempted to utilize
+> the IIO Counter interface to support the counter functionality of the
+> STM32 LPTimer device.
+> 
+> However, there were some difficulties with the IIO Counter interface.
+> For example, the 104-QUAD-8 device features a pulse-direction counter
+> and quadrature encoder counter (which can be toggled via the
+> quadrature_mode attribute), as well as three quadrature encoder modes
+> (x1, x2, and x4) which are set via the existing IIO scale attribute.
+> While this method works for the 104-QUAD-8, the STM32 LPTimer featured a
+> slightly different Quadrature x2 mode with different state machine
+> behavior -- as such there is ambiguity over what behavior "quadrature
+> x2" represents in the IIO Counter interface.
+> 
+> I decided to strip down these devices to arrive at the core essence of
+> what constitutes a "counter device" and therefore design a "generic
+> counter" abstraction to better represent these devices and prevent the
+> ambiguity we discovered with the existing IIO Counter interface. This
+> abstraction became the Generic Counter paradigm, which is explained in
+> detail within the Documentation/driver-api/generic-counter.rst file
+> introduced by this patchset.
+> 
+> Initially we attempted to further extend the IIO Counter interface in
+> order to integrate the Generic Counter API as part of the IIO subsystem,
+> but the outcome wasn't as clean as we desired. The results of our
+> efforts proved to grow increasingly complicated, sparsed with hacks, and
+> more often than not fought with the IIO subsystem rather than
+> complemented it. I decided to separate the Generic Counter API from the
+> IIO subsystem, and give it its own Counter subsystem in which to reside.
+> This allowed us to streamline development and avoid jeopardizing the
+> integrity of the IIO subsystem (we no longer have to bend the IIO API to
+> support our needs, but can instead implement the necessary
+> functionalities in the Counter subsystem as required).
+> 
+> The Counter subsystem has three consuming drivers thus far: two ported
+> from the IIO subsystem (104-QUAD-8 and STM32 LPTimer counter) and one
+> unique to the Counter subsystem (STM32 Timer counter). In userspace, the
+> Generic Counter interface is rather intuitive:
+> 
+>     * /sys/bus/counter/devices/
+>       - enumerated directories for counter devices
+>     * /sys/bus/counter/devices/counterX/
+>       - attributes for counterX where X is the enumeration ID
+>     * /sys/bus/counter/devices/counterX/signalY
+>       - attributes for signal Y where Y is the enumeration ID
+>     * /sys/bus/counter/devices/counterX/countY
+>       - attributes for count Y where Y is the enumeration ID
+> 
+> Although at this point the Counter subsystem is functionally separate
+> from the IIO subsystem, I believe it would be prudent to merge this
+> introduction patchset via the IIO tree due to the historical context of
+> these counter drivers and the development of this patchset. Are there
+> any additions or changes you believe I should make to this patchset
+> going forward?
+> 
 
-I was merely trying to show Geert that DT dependencies are not an issue 
-after he brought that as an argument.
+I'm fine with this approach if Greg doesn't mind.  I've explicitly
+given reviewed-by / acks where I normally would just sign off whilst
+applying to make it clear I'm happy if we do decide on a different
+route.  Has the side effect that I know which ones I liked last time
+on a slow brewing complex set like this one.
 
+Anyhow, we'll figure out the long term plan after these are in.
+I'm happy with continuing to route through the IIO tree as this isn't
+(I think) going to be a particularly busy as subsystems go.
 
-Nicolas
+Other options are fine with me as well!
+
+Well done on getting it to this state.
+
+Jonathan
+
+> Sincerely,
+> 
+> William Breathitt Gray
+> 
+> Benjamin Gaignard (2):
+>   counter: Add STM32 Timer quadrature encoder
+>   dt-bindings: counter: Document stm32 quadrature encoder
+> 
+> Fabrice Gasnier (2):
+>   counter: stm32-lptimer: add counter device
+>   dt-bindings: counter: Adjust dt-bindings for STM32 lptimer move
+> 
+> William Breathitt Gray (6):
+>   counter: Introduce the Generic Counter interface
+>   counter: Documentation: Add Generic Counter sysfs documentation
+>   docs: Add Generic Counter interface documentation
+>   counter: 104-quad-8: Add Generic Counter interface support
+>   counter: 104-quad-8: Documentation: Add Generic Counter sysfs
+>     documentation
+>   iio: counter: Add deprecation markings for IIO Counter attributes
+> 
+>  Documentation/ABI/testing/sysfs-bus-counter   |  230 +++
+>  .../ABI/testing/sysfs-bus-counter-104-quad-8  |   36 +
+>  Documentation/ABI/testing/sysfs-bus-iio       |    8 +
+>  .../testing/sysfs-bus-iio-counter-104-quad-8  |   16 +
+>  .../{iio => }/counter/stm32-lptimer-cnt.txt   |    0
+>  .../bindings/counter/stm32-timer-cnt.txt      |   31 +
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt |    2 +-
+>  .../devicetree/bindings/mfd/stm32-timers.txt  |    7 +
+>  Documentation/driver-api/generic-counter.rst  |  342 ++++
+>  Documentation/driver-api/index.rst            |    1 +
+>  MAINTAINERS                                   |   14 +-
+>  drivers/Kconfig                               |    2 +
+>  drivers/Makefile                              |    1 +
+>  drivers/{iio => }/counter/104-quad-8.c        |  782 ++++++++-
+>  drivers/counter/Kconfig                       |   59 +
+>  drivers/{iio => }/counter/Makefile            |    6 +-
+>  drivers/counter/generic-counter.c             | 1519 +++++++++++++++++
+>  drivers/{iio => }/counter/stm32-lptimer-cnt.c |  361 +++-
+>  drivers/counter/stm32-timer-cnt.c             |  390 +++++
+>  drivers/iio/Kconfig                           |    1 -
+>  drivers/iio/Makefile                          |    1 -
+>  drivers/iio/counter/Kconfig                   |   34 -
+>  include/linux/counter.h                       |  534 ++++++
+>  23 files changed, 4292 insertions(+), 85 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+>  rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>  create mode 100644 Documentation/driver-api/generic-counter.rst
+>  rename drivers/{iio => }/counter/104-quad-8.c (44%)
+>  create mode 100644 drivers/counter/Kconfig
+>  rename drivers/{iio => }/counter/Makefile (52%)
+>  create mode 100644 drivers/counter/generic-counter.c
+>  rename drivers/{iio => }/counter/stm32-lptimer-cnt.c (48%)
+>  create mode 100644 drivers/counter/stm32-timer-cnt.c
+>  delete mode 100644 drivers/iio/counter/Kconfig
+>  create mode 100644 include/linux/counter.h
+> 
