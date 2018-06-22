@@ -1,65 +1,116 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 22 Jun 2018 20:45:35 +0800
-Subject: [PATCH v2 2/7] dt-bindings: add binding for the Allwinner A64 DE2 bus
-Message-ID: <20180622124540.56203-1-icenowy@aosc.io>
+Date: Fri, 22 Jun 2018 20:45:36 +0800
+Subject: [PATCH v2 3/7] bus: add bus driver for accessing Allwinner A64 DE2
+In-Reply-To: <20180622124540.56203-1-icenowy@aosc.io>
+References: <20180622124540.56203-1-icenowy@aosc.io>
+Message-ID: <20180622124540.56203-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64 SoC to
-be claimed, otherwise the whole DE2 space is inaccessible.
+The "Display Engine 2.0" (usually called DE2) on the Allwinner A64 SoC
+is different from the ones on other Allwinner SoCs. It requires a SRAM
+region to be claimed, otherwise all DE2 subblocks won't be accessible.
 
-Add a device tree binding of the DE2 part as a sub-bus.
+Add a bus driver for the Allwinner A64 DE2 part which claims the SRAM
+region when probing.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 No changes since v1.
 
- .../bindings/bus/sun50i-de2-bus.txt           | 37 +++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+ drivers/bus/Kconfig      | 10 ++++++++
+ drivers/bus/Makefile     |  1 +
+ drivers/bus/sun50i-de2.c | 49 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 60 insertions(+)
+ create mode 100644 drivers/bus/sun50i-de2.c
 
-diff --git a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index d1c0b60e9326..1851112ccc29 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -103,6 +103,16 @@ config SIMPLE_PM_BUS
+ 	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
+ 	  "External Bus Interface") as found on several Renesas ARM SoCs.
+ 
++config SUN50I_DE2_BUS
++	bool "Allwinner A64 DE2 Bus Driver"
++	  default ARM64
++	  depends on ARCH_SUNXI
++	  select SUNXI_SRAM
++	  help
++	  Say y here to enable support for Allwinner A64 DE2 bus driver. It's
++	  mostly transparent, but a SRAM region needs to be claimed in the SRAM
++	  controller to make the all blocks in the DE2 part accessible.
++
+ config SUNXI_RSB
+ 	tristate "Allwinner sunXi Reduced Serial Bus Driver"
+ 	  default MACH_SUN8I || MACH_SUN9I || ARM64
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index b8f036cca7ff..ca300b1914ce 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -21,6 +21,7 @@ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+ 
+ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+ obj-$(CONFIG_QCOM_EBI2)		+= qcom-ebi2.o
++obj-$(CONFIG_SUN50I_DE2_BUS)	+= sun50i-de2.o
+ obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
+ obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+ obj-$(CONFIG_TEGRA_ACONNECT)	+= tegra-aconnect.o
+diff --git a/drivers/bus/sun50i-de2.c b/drivers/bus/sun50i-de2.c
 new file mode 100644
-index 000000000000..87dfb33fb3be
+index 000000000000..836828ef96d5
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
-@@ -0,0 +1,37 @@
-+Device tree bindings for Allwinner A64 DE2 bus
++++ b/drivers/bus/sun50i-de2.c
+@@ -0,0 +1,49 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Allwinner A64 Display Engine 2.0 Bus Driver
++ *
++ * Copyright (C) 2018 Icenowy Zheng <icenowy@aosc.io>
++ */
 +
-+The Allwinner A64 DE2 is on a special bus, which needs a SRAM region (SRAM C)
-+to be claimed for enabling the access.
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/soc/sunxi/sunxi_sram.h>
 +
-+Required properties:
++static int sun50i_de2_bus_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	int ret;
 +
-+ - compatible:		Should contain "allwinner,sun50i-a64-de2"
-+ - reg:			A resource specifier for the register space
-+ - #address-cells:	Must be set to 1
-+ - #size-cells:		Must be set to 1
-+ - ranges:		Must be set up to map the address space inside the
-+			DE2, for the sub-blocks of DE2.
-+ - allwinner,sram:	the SRAM that needs to be claimed
++	ret = sunxi_sram_claim(&pdev->dev);
++	if (ret) {
++		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
++		return ret;
++	}
 +
-+Example:
++	if (np)
++		of_platform_populate(np, NULL, NULL, &pdev->dev);
 +
-+	de2 at 1000000 {
-+		compatible = "allwinner,sun50i-a64-de2";
-+		reg = <0x1000000 0x400000>;
-+		allwinner,sram = <&de2_sram 1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x1000000 0x400000>;
++	return 0;
++}
 +
-+		display_clocks: clock at 0 {
-+			compatible = "allwinner,sun50i-a64-de2-clk";
-+			reg = <0x0 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+	};
++static int sun50i_de2_bus_remove(struct platform_device *pdev)
++{
++	sunxi_sram_release(&pdev->dev);
++	return 0;
++}
++
++static const struct of_device_id sun50i_de2_bus_of_match[] = {
++	{ .compatible = "allwinner,sun50i-a64-de2", },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver sun50i_de2_bus_driver = {
++	.probe = sun50i_de2_bus_probe,
++	.remove = sun50i_de2_bus_remove,
++	.driver = {
++		.name = "sun50i-de2-bus",
++		.of_match_table = sun50i_de2_bus_of_match,
++	},
++};
++
++builtin_platform_driver(sun50i_de2_bus_driver);
 -- 
 2.17.1
