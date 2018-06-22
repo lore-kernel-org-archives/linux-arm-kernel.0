@@ -1,45 +1,65 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 22 Jun 2018 13:47:17 +0100
-Subject: [PATCH v2] power: vexpress: fix corruption in notifier
- registration
-In-Reply-To: <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
-References: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
- <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <044c6de2-fc9d-37a7-90f4-8d77dc4961c3@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 22 Jun 2018 20:45:35 +0800
+Subject: [PATCH v2 2/7] dt-bindings: add binding for the Allwinner A64 DE2 bus
+Message-ID: <20180622124540.56203-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64 SoC to
+be claimed, otherwise the whole DE2 space is inaccessible.
 
-On 18/06/18 16:54, Sudeep Holla wrote:
-> Vexpress platforms provide two different restart handlers: SYS_REBOOT
-> that restart the entire system, while DB_RESET only restarts the
-> daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
-> if it exists.
-> 
-> notifier_chain_register used in register_restart_handler by design
-> relies on notifiers to be registered once only, however vexpress restart
-> notifier can get registered twice. When this happen it corrupts list
-> of notifiers, as result some notifiers can be not called on proper
-> event, traverse on list can be cycled forever, and second unregister
-> can access already freed memory.
-> 
-> So far, since this was the only restart handler in the system, no issue
-> was observed even if the same notifier was registered twice. However
-> commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
-> support for SP805 restart handlers and since the system under test
-> contains two vexpress restart and two SP805 watchdog instances, it was
-> observed that during the boot traversing the restart handler list looped
-> forever as there's a cycle in that list resulting in boot hang.
-> 
-> This patch fixes the issues by ensuring that the notifier is installed
-> only once.
-> 
+Add a device tree binding of the DE2 part as a sub-bus.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+No changes since v1.
 
-Can you pick this up ? Without this patch, my Vexpress TC2 hangs in the
-boot.
+ .../bindings/bus/sun50i-de2-bus.txt           | 37 +++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
 
+diff --git a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+new file mode 100644
+index 000000000000..87dfb33fb3be
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+@@ -0,0 +1,37 @@
++Device tree bindings for Allwinner A64 DE2 bus
++
++The Allwinner A64 DE2 is on a special bus, which needs a SRAM region (SRAM C)
++to be claimed for enabling the access.
++
++Required properties:
++
++ - compatible:		Should contain "allwinner,sun50i-a64-de2"
++ - reg:			A resource specifier for the register space
++ - #address-cells:	Must be set to 1
++ - #size-cells:		Must be set to 1
++ - ranges:		Must be set up to map the address space inside the
++			DE2, for the sub-blocks of DE2.
++ - allwinner,sram:	the SRAM that needs to be claimed
++
++Example:
++
++	de2 at 1000000 {
++		compatible = "allwinner,sun50i-a64-de2";
++		reg = <0x1000000 0x400000>;
++		allwinner,sram = <&de2_sram 1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1000000 0x400000>;
++
++		display_clocks: clock at 0 {
++			compatible = "allwinner,sun50i-a64-de2-clk";
++			reg = <0x0 0x100000>;
++			clocks = <&ccu CLK_DE>,
++				 <&ccu CLK_BUS_DE>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++	};
 -- 
-Regards,
-Sudeep
+2.17.1
