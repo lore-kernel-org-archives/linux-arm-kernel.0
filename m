@@ -1,80 +1,84 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 22 Jun 2018 10:01:24 +0100
-Subject: [PATCH 5/6] coresight: catu: Add support for scatter gather tables
-In-Reply-To: <20180621171337.GA10307@xps15>
-References: <1529319379-17895-1-git-send-email-suzuki.poulose@arm.com>
- <1529319379-17895-6-git-send-email-suzuki.poulose@arm.com>
- <20180621171337.GA10307@xps15>
-Message-ID: <d5bbff9b-2730-f708-8a4e-f16241f6f5ce@arm.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 22 Jun 2018 16:58:05 +0800
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <87602d3ccl.fsf@e105922-lin.cambridge.arm.com>
+References: <20180611145330.GO13364@dhcp22.suse.cz>
+ <87lgbk59gs.fsf@e105922-lin.cambridge.arm.com>
+ <87bmce60y3.fsf@e105922-lin.cambridge.arm.com>
+ <8b715082-14d4-f10b-d2d6-b23be7e4bf7e@huawei.com>
+ <20180619120714.GE13685@dhcp22.suse.cz>
+ <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
+ <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+ <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+ <20180619151425.GH13685@dhcp22.suse.cz>
+ <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
+ <20180619163256.GA18952@e107981-ln.cambridge.arm.com>
+ <814205eb-ae86-a519-bed0-f09b8e2d3a02@huawei.com>
+ <87602d3ccl.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <5c083c9c-473f-f504-848b-48506d0fd380@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
-
-On 21/06/18 18:13, Mathieu Poirier wrote:
-
->> +
->> +/*
->> + * catu_populate_table : Populate the given CATU table.
->> + * The table is always populated as a circular table.
->> + * i.e, the "prev" link of the "first" table points to the "last"
->> + * table and the "next" link of the "last" table points to the
->> + * "first" table. The buffer should be made linear by calling
->> + * catu_set_table().
->> + */
->> +static void
->> +catu_populate_table(struct tmc_sg_table *catu_table)
->> +{
->> +	int i, dpidx, s_dpidx;
->> +	unsigned long offset, buf_size, last_offset;
->> +	dma_addr_t data_daddr;
->> +	dma_addr_t prev_taddr, next_taddr, cur_taddr;
->> +	cate_t *table_ptr, *next_table;
->> +
->> +	buf_size = tmc_sg_table_buf_size(catu_table);
->> +	dpidx = s_dpidx = 0;
+On 2018/6/20 19:51, Punit Agrawal wrote:
+> Xie XiuQi <xiexiuqi@huawei.com> writes:
 > 
->  From the reading the code below variable s_dpidx stands for "small" data page
-> index, which isn't obvious from the get go and could easily be mistaken for
-> "system" data page index.  Please add a comment to make your intentions clear.
-
-Sure, I will add comments. They are supposed to mean :
-
-dpidx => Data page index
-s_dpidx => Sub-page index within the System page.
-
-May be I can rename the variables to =>
-
-sys_pidx and catu_pidx
-
-
+>> Hi Lorenzo, Punit,
+>>
+>>
+>> On 2018/6/20 0:32, Lorenzo Pieralisi wrote:
+>>> On Tue, Jun 19, 2018 at 04:35:40PM +0100, Punit Agrawal wrote:
+>>>> Michal Hocko <mhocko@kernel.org> writes:
+>>>>
+>>>>> On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
+>>>>> [...]
+>>>>>> In terms of $SUBJECT, I wonder if it's worth taking the original patch
+>>>>>> as a temporary fix (it'll also be easier to backport) while we work on
+>>>>>> fixing these other issues and enabling memoryless nodes.
+>>>>>
+>>>>> Well, x86 already does that but copying this antipatern is not really
+>>>>> nice. So it is good as a quick fix but it would be definitely much
+>>>>> better to have a robust fix. Who knows how many other places might hit
+>>>>> this. You certainly do not want to add a hack like this all over...
+>>>>
+>>>> Completely agree! I was only suggesting it as a temporary measure,
+>>>> especially as it looked like a proper fix might be invasive.
+>>>>
+>>>> Another fix might be to change the node specific allocation to node
+>>>> agnostic allocations. It isn't clear why the allocation is being
+>>>> requested from a specific node. I think Lorenzo suggested this in one of
+>>>> the threads.
+>>>
+>>> I think that code was just copypasted but it is better to fix the
+>>> underlying issue.
+>>>
+>>>> I've started putting together a set fixing the issues identified in this
+>>>> thread. It should give a better idea on the best course of action.
+>>>
+>>> On ACPI ARM64, this diff should do if I read the code correctly, it
+>>> should be (famous last words) just a matter of mapping PXMs to nodes for
+>>> every SRAT GICC entry, feel free to pick it up if it works.
+>>>
+>>> Yes, we can take the original patch just because it is safer for an -rc
+>>> cycle even though if the patch below would do delaying the fix for a
+>>> couple of -rc (to get it tested across ACPI ARM64 NUMA platforms) is
+>>> not a disaster.
+>>
+>> I tested this patch on my arm board, it works.
 > 
->> +	offset = 0;
->> +
->> +	table_ptr = catu_get_table(catu_table, 0, &cur_taddr);
->> +	prev_taddr = 0;	/* Prev link for the first table */
->> +
->> +	while (offset < buf_size) {
->> +		/*
->> +		 * The @offset is always 1M aligned here and we have an
->> +		 * empty table @table_ptr to fill. Each table can address
->> +		 * upto 1MB data buffer. The last table may have fewer
->> +		 * entries if the buffer size is not aligned.
->> +		 */
->> +		last_offset = (offset + SZ_1M) < buf_size ?
->> +			      (offset + SZ_1M) : buf_size;
->> +		for (i = 0; offset < last_offset;
->> +		     i++, offset += CATU_PAGE_SIZE) {
+> I am assuming you tried the patch without enabling support for
+> memory-less nodes.
 > 
-> I really like the choice of "table_end" in function catu_dump_table().  I think
-> using the same denomination here would make it easier to understand the code.
+> The patch de-couples the onlining of numa nodes (as parsed from SRAT)
+> from NR_CPUS restriction. When it comes to building zonelists, the node
+> referenced by the PCI controller also has zonelists initialised.
 > 
-> I wouldn't bother with such details if you weren't respinning this set.  But now
-> that you are and these are extremely simple I think it's worth it, and it will
-> help slowing the prolifiration of gray hair around my head when I look back at
-> this a year or two down the road.
+> So it looks like a fallback node is setup even if we don't have
+> memory-less nodes enabled. I need to stare some more at the code to see
+> why we need memory-less nodes at all then ...
 
-Sure, I can make those changes in the next revision. Thanks for the review.
+Yes, please. From my limited MM knowledge, zonelists should not be
+initialised if no CPU and no memory on this node, correct me if I'm
+wrong.
 
-Cheers
-Suzuki
+Thanks
+Hanjun
