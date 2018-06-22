@@ -1,34 +1,49 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 22 Jun 2018 11:46:44 +0100
-Subject: [PATCH v2 2/4] arm64: Remove unnecessary ISBs from
- set_{pte,pmd,pud}
-In-Reply-To: <1529656278-878-3-git-send-email-will.deacon@arm.com>
-References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
- <1529656278-878-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20180622104643.ohygdrln3ali3hqs@linaro.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 22 Jun 2018 18:47:37 +0800
+Subject: [PATCH v2] arm64: kpti: Use early_param for kpti= command-line
+ option
+In-Reply-To: <1529659525-21340-1-git-send-email-will.deacon@arm.com>
+References: <1529659525-21340-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5B2CD3C9.6040606@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Apologies for getting to this late]
-
 Hi Will,
 
-On Fri, Jun 22, 2018 at 09:31:16AM +0100, Will Deacon wrote:
-> Commit 7f0b1bf04511 ("arm64: Fix barriers used for page table modifications")
-> fixed a reported issue with fixmap page-table entries not being visible
-> to the walker due to a missing DSB instruction. At the same time, it added
-> ISB instructions to the arm64 set_{pte,pmd,pud} functions, which are not
-> required by the architecture and make little sense in isolation.
-> 
-> Remove the redundant ISBs.
-> 
+On 2018/6/22 17:25, Will Deacon wrote:
+> We inspect __kpti_forced early on as part of the cpufeature enable
+> callback which remaps the swapper page table using non-global entries.
+>
+> Ensure that __kpti_forced has been updated to reflect the kpti=
+> command-line option before we start using it.
+>
+> Reported-by: Wei Xu <xuwei5@hisilicon.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Thanks!
+Tested and works on a hisilicon platform.
 
-I agree, we don't want to update any cached local execution context
-information whilst setting page table entries and TLB maintenance is
-handled elsewhere; so the ISBs are redundant.
+Tested-by: Wei Xu <xuwei5@hisilicon.com>
 
-FWIW: Acked-by: Steve Capper <steve.capper@linaro.org>
+Best Regards,
+Wei
 
-Cheers,
--- 
-Steve
+> ---
+>
+> v1->v2: Fix typo (remove '=' from option)
+>
+>   arch/arm64/kernel/cpufeature.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index d2856b129097..f24892a40d2c 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -937,7 +937,7 @@ static int __init parse_kpti(char *str)
+>   	__kpti_forced = enabled ? 1 : -1;
+>   	return 0;
+>   }
+> -__setup("kpti=", parse_kpti);
+> +early_param("kpti", parse_kpti);
+>   #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>   
+>   #ifdef CONFIG_ARM64_HW_AFDBM
