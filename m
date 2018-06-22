@@ -1,387 +1,435 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 22 Jun 2018 09:39:05 +0200
-Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <alpine.DEB.2.20.1806220719190.21824@carbonite>
-References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
- <20180618162124.21749-2-bugalski.piotr@gmail.com>
- <20180621233321.0f25f572@bbrezillon>
- <alpine.DEB.2.20.1806220719190.21824@carbonite>
-Message-ID: <20180622093905.62a3b936@bbrezillon>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 22 Jun 2018 09:41:02 +0200
+Subject: [PATCH 2/7] ARM: dts: s5pv210: Add initial DTS for Samsung Aries
+ based phones.
+In-Reply-To: <1529608199-5583-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <1529608199-5583-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <CAJKOXPf9BVXP19Yt36uEKz=bzMh3cDd6_wdyxoRRX3itk9kuhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Piotr,
+On 21 June 2018 at 21:09, Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com> wrote:
+> This DTS file have initial support Samsung Aries based phones.
+> Initial version have support for:
+> - sdcard
+> - internal memory (present only on non 4g variant)
+> - max8998 pmic and rtc
+> - max17040 fuel gauge
+> - gpio keys
+> - fimd (no panel driver yet)
+> - usb (peripherial mode)
+> - wifi
+>
+> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
 
-On Fri, 22 Jun 2018 07:57:10 +0200 (CEST)
-Piotr Bugalski <bugalski.piotr@gmail.com> wrote:
+Hi Pawel,
 
-> Hi Boris,
-> 
-> I'm a bit allergic to personal preferences in coding style,
+Nice job in mainlining!
 
-I'm just pointing things that are common kernel coding style practices.
-You might not like coding style rules of a particular project, but when
-you contribute to this project you should do your best to follow those
-rules and keep the coding style consistent.
+Below you'll find some comments for improvement.
 
-> anyway
-> thank you for comments and some important findings.
-> 
+> ---
+>  arch/arm/boot/dts/s5pv210-aries.dtsi | 397 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 397 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/s5pv210-aries.dtsi
+>
+> diff --git a/arch/arm/boot/dts/s5pv210-aries.dtsi b/arch/arm/boot/dts/s5pv210-aries.dtsi
+> new file mode 100644
+> index 000000000000..6e8ac3615765
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/s5pv210-aries.dtsi
+> @@ -0,0 +1,397 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Samsung's S5PV210 based Galaxy Aries board device tree source
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/input/input.h>
 
-[...]
+Is the input header used here?
 
-> >> +/*
-> >> + * Atmel SAMA5D2 QuadSPI driver.
-> >> + *
-> >> + * Copyright (C) 2018 Cryptera A/S  
-> >
-> > A non-negligible portion of this code has been copied from the existing
-> > driver. Please keep the existing copyright (you can still add Cryptera's
-> > one).
-> >  
-> 
-> Technically this driver were written from scratch, with spi-fsl-qspi
-> as example of new interface. Hence the name and code structure.
-> But it's the same peripheral as Atmel's driver uses so code looks
-> similar. I can unify the code to make comparsion even simpler and
-> then update copyright.
+> +#include <dt-bindings/interrupt-controller/irq.h>
 
-Hm, ok. Some constructs really looked like they were copied
-from the old driver, hence my comment. I'll let Nicolas give his
-opinion on this aspect.
+Duplicated inclusion.
 
-> >> + */
-> >> +
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/module.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/of_device.h>
-> >> +#include <linux/clk.h>
-> >> +#include <linux/interrupt.h>
-> >> +#include <linux/io.h>
-> >> +#include <linux/spi/spi-mem.h>
-> >> +#include <linux/delay.h>
-> >> +
-> >> +#define QSPI_CR         0x0000
-> >> +#define QSPI_MR         0x0004
-> >> +#define QSPI_RDR        0x0008
-> >> +#define QSPI_TDR        0x000c
-> >> +#define QSPI_SR         0x0010
-> >> +#define QSPI_IER        0x0014
-> >> +#define QSPI_IDR        0x0018
-> >> +#define QSPI_IMR        0x001c
-> >> +#define QSPI_SCR        0x0020
-> >> +
-> >> +#define QSPI_IAR        0x0030
-> >> +#define QSPI_ICR        0x0034
-> >> +#define QSPI_IFR        0x0038
-> >> +
-> >> +#define QSPI_WPMR       0x00e4
-> >> +#define QSPI_WPSR       0x00e8
-> >> +
-> >> +/* Bitfields in QSPI_CR (Control Register) */  
-> >
-> > I personally prefer when reg offsets are declared next to the reg fields.  
-> 
-> I don't. But it may not be good place to discuss personal preferences.
-> I can change it.
+> +#include "s5pv210.dtsi"
+> +
+> +/ {
+> +       compatible = "samsung,aries", "samsung,s5pv210";
+> +
+> +       aliases {
+> +               i2c6 = &i2c_pmic;
+> +               i2c9 = &i2c_fuel;
+> +       };
+> +
+> +       memory at 30000000 {
+> +               device_type = "memory";
+> +               reg = <0x30000000 0x05000000
+> +                       0x40000000 0x10000000
+> +                       0x50000000 0x08000000>;
+> +       };
+> +
+> +       wifi_pwrseq: wifi-pwrseq {
+> +               compatible = "mmc-pwrseq-simple";
+> +               reset-gpios = <&gpg1 2 GPIO_ACTIVE_LOW>;
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&wlan_gpio_rst>;
+> +               post-power-on-delay-ms = <500>;
+> +               power-off-delay-us = <500>;
+> +       };
+> +
+> +       i2c_pmic: i2c-pmic {
 
-This one is actually not defined in the coding style rules, hence the
-"I personally prefer". The reasoning behind this approach is that it's
-easier for readers to identify the fields of a specific reg when they're
-defined next to each other.
+s/i2c-pmic/ to /i2c-gpio-0/
+to reflect generic class of this node. Change only the node name. The
+label can stay as is.
 
-> 
-> >  
-> >> +#define QSPI_CR_QSPIEN                  BIT(0)
-> >> +#define QSPI_CR_QSPIDIS                 BIT(1)
-> >> +#define QSPI_CR_SWRST                   BIT(7)
-> >> +#define QSPI_CR_LASTXFER                BIT(24)
-> >> +
-> >> +/* Bitfields in QSPI_ICR (Instruction Code Register) */
-> >> +#define QSPI_ICR_INST_MASK              GENMASK(7, 0)
-> >> +#define QSPI_ICR_INST(inst)             (((inst) << 0) & QSPI_ICR_INST_MASK)
-> >> +#define QSPI_ICR_OPT_MASK               GENMASK(23, 16)
-> >> +#define QSPI_ICR_OPT(opt)               (((opt) << 16) & QSPI_ICR_OPT_MASK)
-> >> +
-> >> +/* Bitfields in QSPI_MR (Mode Register) */
-> >> +#define QSPI_MR_SMM                     BIT(0)
-> >> +#define QSPI_MR_LLB                     BIT(1)
-> >> +#define QSPI_MR_WDRBT                   BIT(2)
-> >> +#define QSPI_MR_SMRM                    BIT(3)
-> >> +#define QSPI_MR_CSMODE_MASK             GENMASK(5, 4)
-> >> +#define QSPI_MR_CSMODE_NOT_RELOADED     (0 << 4)
-> >> +#define QSPI_MR_CSMODE_LASTXFER         (1 << 4)
-> >> +#define QSPI_MR_CSMODE_SYSTEMATICALLY   (2 << 4)
-> >> +#define QSPI_MR_NBBITS_MASK             GENMASK(11, 8)
-> >> +#define QSPI_MR_NBBITS(n)               ((((n) - 8) << 8) & QSPI_MR_NBBITS_MASK)
-> >> +#define QSPI_MR_DLYBCT_MASK             GENMASK(23, 16)
-> >> +#define QSPI_MR_DLYBCT(n)               (((n) << 16) & QSPI_MR_DLYBCT_MASK)
-> >> +#define QSPI_MR_DLYCS_MASK              GENMASK(31, 24)
-> >> +#define QSPI_MR_DLYCS(n)                (((n) << 24) & QSPI_MR_DLYCS_MASK)
-> >> +
-> >> +/* Bitfields in QSPI_IFR (Instruction Frame Register) */
-> >> +#define QSPI_IFR_WIDTH_MASK             GENMASK(2, 0)
-> >> +#define QSPI_IFR_WIDTH_SINGLE_BIT_SPI   (0 << 0)
-> >> +#define QSPI_IFR_WIDTH_DUAL_OUTPUT      (1 << 0)
-> >> +#define QSPI_IFR_WIDTH_QUAD_OUTPUT      (2 << 0)
-> >> +#define QSPI_IFR_WIDTH_DUAL_IO          (3 << 0)
-> >> +#define QSPI_IFR_WIDTH_QUAD_IO          (4 << 0)
-> >> +#define QSPI_IFR_WIDTH_DUAL_CMD         (5 << 0)
-> >> +#define QSPI_IFR_WIDTH_QUAD_CMD         (6 << 0)
-> >> +#define QSPI_IFR_INSTEN                 BIT(4)
-> >> +#define QSPI_IFR_ADDREN                 BIT(5)
-> >> +#define QSPI_IFR_OPTEN                  BIT(6)
-> >> +#define QSPI_IFR_DATAEN                 BIT(7)
-> >> +#define QSPI_IFR_OPTL_MASK              GENMASK(9, 8)
-> >> +#define QSPI_IFR_OPTL_1BIT              (0 << 8)
-> >> +#define QSPI_IFR_OPTL_2BIT              (1 << 8)
-> >> +#define QSPI_IFR_OPTL_4BIT              (2 << 8)
-> >> +#define QSPI_IFR_OPTL_8BIT              (3 << 8)
-> >> +#define QSPI_IFR_ADDRL                  BIT(10)
-> >> +#define QSPI_IFR_TFRTYP_MASK            GENMASK(13, 12)
-> >> +#define QSPI_IFR_TFRTYP_TRSFR_READ      (0 << 12)
-> >> +#define QSPI_IFR_TFRTYP_TRSFR_READ_MEM  (1 << 12)
-> >> +#define QSPI_IFR_TFRTYP_TRSFR_WRITE     (2 << 12)
-> >> +#define QSPI_IFR_TFRTYP_TRSFR_WRITE_MEM (3 << 13)
-> >> +#define QSPI_IFR_CRM                    BIT(14)
-> >> +#define QSPI_IFR_NBDUM_MASK             GENMASK(20, 16)
-> >> +#define QSPI_IFR_NBDUM(n)               (((n) << 16) & QSPI_IFR_NBDUM_MASK)
-> >> +
-> >> +/* Bitfields in QSPI_SR/QSPI_IER/QSPI_IDR/QSPI_IMR  */
-> >> +#define QSPI_SR_RDRF                    BIT(0)
-> >> +#define QSPI_SR_TDRE                    BIT(1)
-> >> +#define QSPI_SR_TXEMPTY                 BIT(2)
-> >> +#define QSPI_SR_OVRES                   BIT(3)
-> >> +#define QSPI_SR_CSR                     BIT(8)
-> >> +#define QSPI_SR_CSS                     BIT(9)
-> >> +#define QSPI_SR_INSTRE                  BIT(10)
-> >> +#define QSPI_SR_QSPIENS                 BIT(24)
-> >> +
-> >> +#define QSPI_SR_CMD_COMPLETED           (QSPI_SR_INSTRE | QSPI_SR_CSR)  
-> >
-> > Do you really to wait for both INSTRE and CSR to consider the command
-> > as complete?
-> >  
-> 
-> This part were really copied from Atmel driver. I wasn't sure so I
-> used tested solution.
+> +               compatible = "i2c-gpio";
+> +               sda-gpios = <&gpj4 0 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+> +               scl-gpios = <&gpj4 3 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
 
-Okay. I guess that's a question for Cyrille and/or Tudor then.
+Spaces around pipe |.
 
-> >> +
-> >> +static inline u32 qspi_readl(struct atmel_qspi *aq, u32 reg)
-> >> +{
-> >> +	return readl_relaxed(aq->iobase + reg);
-> >> +}
-> >> +
-> >> +static inline void qspi_writel(struct atmel_qspi *aq, u32 reg, u32 value)
-> >> +{
-> >> +	writel_relaxed(value, aq->iobase + reg);
-> >> +}  
-> >
-> > Please drop those wrappers and use readl/write_relaxed() directly.  
-> 
-> I like these wrappers, the same pattern were used in spi-fsl-qspi and
-> atmel-quadspi drivers. Functions are inlined so why to remove nice
-> looking code?
+> +               i2c-gpio,delay-us = <2>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               pmic at 66 {
+> +                       compatible = "maxim,max8998";
+> +                       reg = <0x66>;
+> +                       interrupt-parent = <&gph0>;
+> +                       interrupts = <7 0>;
 
-It's not really about code optimization (gcc is good at determining
-when to inline simple functions). Kernel devs like to know when
-_relaxed() versions of IO accessors are used, and by providing those
-wrappers you kind of hide that fact.
+If you really wanted 0 then IRQ_TYPE_NONE... but this should be a
+proper interrupt type.
 
-> 
-> >  
-> >> +
-> >> +static int atmel_qspi_init(struct atmel_qspi *aq)
-> >> +{
-> >> +	unsigned long rate;
-> >> +	u32 scbr;
-> >> +
-> >> +	qspi_writel(aq, QSPI_WPMR, QSPI_WPMR_WPKEY_PASSWD);
-> >> +
-> >> +	/* software reset */
-> >> +	qspi_writel(aq, QSPI_CR, QSPI_CR_SWRST);
-> >> +
-> >> +	/* set QSPI mode */
-> >> +	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);  
-> >
-> > It's already done in ->exec_op(), I think you can remove it here.
-> >  
-> 
-> I prefer initialize peripheral before first use. Single register write
-> is not big effort.
+> +
+> +                       max8998,pmic-buck1-default-dvs-idx = <1>;
+> +                       max8998,pmic-buck1-dvs-gpios = <&gph0 3 GPIO_ACTIVE_HIGH>,
+> +                                                       <&gph0 4 GPIO_ACTIVE_HIGH>;
+> +                       max8998,pmic-buck1-dvs-voltage = <1275000>, <1200000>,
+> +                                                       <1050000>, <950000>;
+> +
+> +                       max8998,pmic-buck2-default-dvs-idx = <0>;
+> +                       max8998,pmic-buck2-dvs-gpio = <&gph0 5 GPIO_ACTIVE_HIGH>;
+> +                       max8998,pmic-buck2-dvs-voltage = <1100000>, <1000000>;
+> +
+> +                       regulators {
+> +                               ldo2_reg: LDO2 {
+> +                                       regulator-name = "VALIVE_1.2V";
+> +                                       regulator-min-microvolt = <1200000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +                                       regulator-always-on;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-on-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo3_reg: LDO3 {
+> +                                       regulator-name = "VUSB_1.1V";
+> +                                       regulator-min-microvolt = <1100000>;
+> +                                       regulator-max-microvolt = <1100000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo4_reg: LDO4 {
+> +                                       regulator-name = "VADC_3.3V";
+> +                                       regulator-min-microvolt = <3300000>;
+> +                                       regulator-max-microvolt = <3300000>;
+> +                                       regulator-always-on;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo5_reg: LDO5 {
+> +                                       regulator-name = "VTF_2.8V";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
 
-I'm fine with that, but then, why should we initialize the IP in SMM
-mode? Can't you write 0 to this _MR reg?
+LDO6?
 
-> 
-> >> +
-> >> +	rate = clk_get_rate(aq->clk);
-> >> +	if (!rate)
-> >> +		return -EINVAL;
-> >> +
-> >> +	/* set baudrate */
-> >> +	scbr = DIV_ROUND_UP(rate, aq->clk_rate);
-> >> +	if (scbr > 0)
-> >> +		scbr--;  
-> >
-> > Add a blank line here.
-> >  
-> >> +	qspi_writel(aq, QSPI_SCR, QSPI_SCR_SCBR(scbr));  
-> >
-> > The baudrate setting should be done in an spi_controller->setup() hook,
-> > and the expected rate is available in spi_device->max_speed_hz.
-> >  
-> 
-> Ok, I'll change it.
-> 
-> >> +
-> >> +	/* enable qspi controller */
-> >> +	qspi_writel(aq, QSPI_CR, QSPI_CR_QSPIEN);
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static int atmel_qspi_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
-> >> +{
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static inline bool is_compatible(const struct spi_mem_op *op,
-> >> +				 const struct qspi_mode *mode)
-> >> +{
-> >> +	if (op->cmd.buswidth != mode->cmd_buswidth)
-> >> +		return false;  
-> >
-> > Add a blank line here  
-> 
-> Looks like personal preferences again... I hate too personalized code.
+All regulators should be defined in general. Most of the drivers would
+anyway register all of them and use driver-specific defaults for the
+ones which are missing in DT. I see that max8998 behaves differently
+and silently ignores missing regulators leaving them at bootloader
+settings. That's also not good because their initial settings might
+not be correct for current load and kernel cannot turn them off if
+needed. Also we want in general to have full description of HW in DT.
 
-It's mainly about being able to quickly identify different if() blocks.
-
-> Maybe I'll just merge these three if-s into one horrible large.
-> 
-> >  
-> >> +	if (op->addr.nbytes && op->addr.buswidth != mode->addr_buswidth)
-> >> +		return false;  
-> >
-> > here
-> >  
-> >> +	if (op->data.nbytes && op->data.buswidth != mode->data_buswidth)
-> >> +		return false;  
-> >
-> > and here.
-> >  
-> >> +	return true;
+The same applies to LDO10, clocks and ESAFEOUT2 later.
 
 
-> >> +
-> >> +static bool atmel_qspi_supports_op(struct spi_mem *mem,
-> >> +				   const struct spi_mem_op *op)
-> >> +{
-> >> +	if (find_mode(op) < 0)
-> >> +		return false;
-> >> +
-> >> +	// special case not supported by hardware  
-> >
-> > We try to avoid using C++ style comments in the kernel.
-> >  
-> 
-> Sure, my mistake.
-> 
-> >> +	if ((op->addr.nbytes == 2) && (op->cmd.buswidth != op->addr.buswidth) &&  
-> >
-> > You don't need those extra parenthesis around each test.
-> >  
-> 
-> It's just convention. Some people prefer to have extra bracket to make
-> code easier to read, while other think opposite.
+> +
+> +                               ldo7_reg: LDO7 {
+> +                                       regulator-name = "VLCD_1.8V";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       /* Till we get panel driver */
+> +                                       regulator-always-on;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo8_reg: LDO8 {
+> +                                       regulator-name = "VUSB_3.3V";
+> +                                       regulator-min-microvolt = <3300000>;
+> +                                       regulator-max-microvolt = <3300000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo9_reg: LDO9 {
+> +                                       regulator-name = "VCC_2.8V_PDA";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo11_reg: LDO11 {
+> +                                       regulator-name = "CAM_AF_3.0V";
+> +                                       regulator-min-microvolt = <3000000>;
+> +                                       regulator-max-microvolt = <3000000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo12_reg: LDO12 {
+> +                                       regulator-name = "CAM_SENSOR_CORE_1.2V";
+> +                                       regulator-min-microvolt = <1200000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo13_reg: LDO13 {
+> +                                       regulator-name = "VGA_VDDIO_2.8V";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo14_reg: LDO14 {
+> +                                       regulator-name = "VGA_DVDD_1.8V";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo15_reg: LDO15 {
+> +                                       regulator-name = "CAM_ISP_HOST_2.8V";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo16_reg: LDO16 {
+> +                                       regulator-name = "VGA_AVDD_2.8V";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               ldo17_reg: LDO17 {
+> +                                       regulator-name = "VCC_3.0V_LCD";
+> +                                       regulator-min-microvolt = <3000000>;
+> +                                       regulator-max-microvolt = <3000000>;
+> +                                       /* Till we get panel driver */
+> +                                       regulator-always-on;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               buck1_reg: BUCK1 {
+> +                                       regulator-name = "vddarm";
+> +                                       regulator-min-microvolt = <750000>;
+> +                                       regulator-max-microvolt = <1500000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                               regulator-suspend-microvolt = <1250000>;
+> +                                       };
+> +                               };
+> +
+> +                               buck2_reg: BUCK2 {
+> +                                       regulator-name = "vddint";
+> +                                       regulator-min-microvolt = <750000>;
+> +                                       regulator-max-microvolt = <1500000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                               regulator-suspend-microvolt = <1100000>;
+> +                                       };
+> +                               };
+> +
+> +                               buck3_reg: BUCK3 {
+> +                                       regulator-name = "VCC_1.8V";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               buck4_reg: BUCK4 {
+> +                                       regulator-name = "CAM_ISP_CORE_1.2V";
+> +                                       regulator-min-microvolt = <1200000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +
+> +                                       regulator-state-mem {
+> +                                               regulator-off-in-suspend;
+> +                                       };
+> +                               };
+> +
+> +                               safe1_sreg: ESAFEOUT1 {
+> +                                       regulator-name = "SAFEOUT1";
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       i2c_fuel: i2c-fuel {
 
-Except it's not even consistent in this file, see the
+s/i2c-fuel/ to /i2c-gpio-1/
 
-	if (op->addr.nbytes && op->addr.buswidth != mode->addr_buswidth)
 
-test above.
+> +               compatible = "i2c-gpio";
+> +               sda-gpios = <&mp05 1 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+> +               scl-gpios = <&mp05 0 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
 
-> I don't really know
-> which option is better.
+Spaces around | please.
 
-We try to avoid those parens when doing simple '2 operands' operations
+> +               i2c-gpio,delay-us = <2>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               fuel at 36 {
 
-	if (a == b && c == d)
+Name: fuelgauge
 
-but add them in case one of the operand results from another operation
+> +                       compatible = "maxim,max17040";
+> +                       interrupt-parent = <&vic0>;
+> +                       interrupts = <7>;
+> +                       reg = <0x36>;
+> +               };
+> +       };
+> +};
+> +
+> +&xusbxti {
+> +       clock-frequency = <24000000>;
+> +};
+> +
+> +&pinctrl0 {
 
-	if (a == (b * c) && c == d)
+Please order all labels alphabetically. It reduces conflicts later
+with multiple changes.
 
-> >> +
-> >> +	qspi_writel(aq, QSPI_IAR, addr);
-> >> +	qspi_writel(aq, QSPI_ICR, icr);
-> >> +	qspi_writel(aq, QSPI_IFR, ifr);  
-> >
-> > You should probably read the _SR register before starting a new operation
-> > to make sure all status flags have been cleared.
-> >  
-> 
-> I'm not sure about it, but there was SR read in Atmel's driver.
-> I can put it here.
+> +       wlan_bt_en: wlan-bt-en {
+> +               samsung,pins = "gpb-5";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
+> +               samsung,pin-val = <1>;
+> +       };
+> +
+> +       wlan_gpio_rst: wlan-gpio-rst {
+> +               samsung,pins = "gpg1-2";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
+> +       };
+> +
+> +       wifi_host_wake: wifi-host-wake {
+> +               samsung,pins = "gph2-4";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+> +               samsung,pin-pud = <S3C64XX_PIN_PULL_DOWN>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> +       };
+> +
+> +       tf_detect: tf-detect {
+> +               samsung,pins = "gph3-4";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+> +               samsung,pin-pud = <S3C64XX_PIN_PULL_DOWN>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> +       };
+> +
+> +       wifi_wake: wifi-wake {
+> +               samsung,pins = "gph3-5";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
+> +       };
+> +
+> +       massmemory_en: massmemory-en {
+> +               samsung,pins = "gpj2-7";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> +       };
+> +};
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> +
+> +&uart1 {
+> +       status = "okay";
+> +};
+> +
+> +&uart2 {
+> +       status = "okay";
+> +};
+> +
+> +&sdhci1 {
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +
+> +       bus-width = <4>;
+> +       max-frequency = <38400000>;
+> +       pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4 &wifi_wake &wifi_host_wake &wlan_bt_en>;
+> +       pinctrl-names = "default";
+> +       cap-sd-highspeed;
+> +       cap-mmc-highspeed;
+> +
+> +       mmc-pwrseq = <&wifi_pwrseq>;
+> +       non-removable;
+> +       status = "okay";
+> +
+> +       brcmf: bcrmf at 1 {
 
-It's probably safer, otherwise you might get status from previous
-operations.
+Name of node should describe generic class of the device so maybe
+"wlan" or "wlanbt"? Label is okay.
 
-> >> +static int atmel_qspi_probe(struct platform_device *pdev)
-> >> +{
-> >> +	struct spi_controller *ctrl;
-> >> +	struct atmel_qspi *aq;
-> >> +	struct device_node *np = pdev->dev.of_node;
-> >> +	struct device_node *child;
-> >> +	struct resource *res;
-> >> +	int irq, err = 0;
-> >> +
-> >> +	ctrl = spi_alloc_master(&pdev->dev, sizeof(*aq));
-> >> +	if (!ctrl)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	ctrl->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD | SPI_TX_DUAL | SPI_TX_QUAD;
-> >> +	ctrl->bus_num = -1;
-> >> +	ctrl->mem_ops = &atmel_qspi_mem_ops;
-> >> +	ctrl->num_chipselect = 1;
-> >> +	ctrl->dev.of_node = pdev->dev.of_node;
-> >> +	platform_set_drvdata(pdev, ctrl);
-> >> +
-> >> +	aq = spi_controller_get_devdata(ctrl);
-> >> +
-> >> +	if (of_get_child_count(np) != 1)
-> >> +		return -ENODEV;  
-> >
-> > Hm, I think the core already complains if there are more children than  
-> > ->num_chipselect, so I'd say this is useless. Also, you can have a  
-> > controller without any devices under, so, nchildren == 0 is a valid
-> > case.
-> >  
-> 
-> This trick were inspired by atmel-quadspi code. If clk frequency can
-> be taken from spi_device, all this of-child related ugliness can be
-> removed.
-
-Yep.
-
-> >> +static struct platform_driver atmel_qspi_driver = {
-> >> +	.driver = {
-> >> +		.name = "atmel_spi_qspi",  
-> >
-> > 			"atmel-qspi",
-> >  
-> 
-> I expected new driver to exists in parallel with atmel-qspi.
-> If it's replacement, then re-use name makes sense.
-
-I think the old driver name was "atmel_qspi", but I prefer dashes to
-underscores :-). Anyway, _spi_qspi seems redundant, since qspi already
-implies spi.
-
-Regards,
-
-Boris
+Best regards,
+Krzysztof
