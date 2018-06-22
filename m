@@ -1,47 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 08:49:20 +0100
-Subject: [PATCH] locking/qspinlock: Fix build for anonymous union in
- older gcc compilers
-In-Reply-To: <20180621203526.172ab5c4@vmware.local.home>
-References: <20180621203526.172ab5c4@vmware.local.home>
-Message-ID: <20180622074920.GA7601@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Jun 2018 00:49:36 -0700
+Subject: v4.18-rc1 on droid 4: very bad CPU performance
+In-Reply-To: <20180622072005.GF112168@atomide.com>
+References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
+Message-ID: <20180622074936.GG112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+* Tony Lindgren <tony@atomide.com> [180622 07:22]:
+> * Pavel Machek <pavel@ucw.cz> [180621 12:18]:
+> > Hi!
+> > 
+> > V4.18 is slower than it should be.
+> > 
+> > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
+> > | wc -c
+> > 10044291
+> > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
+> > user at devuan:~$ uname -a
+> > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
+> > 19:26:37 CEST 2018 armv7l GNU/Linux
+> > 
+> > That bzip should take 12 seconds, not minute.
+> > 
+> > Any ideas? Do you see it, too?
+> 
+> I've noticed firefox is super slow.. Git bisect time?
 
-On Thu, Jun 21, 2018 at 08:35:26PM -0400, Steven Rostedt wrote:
-> From: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> 
-> One of my tests compiles the kernel with gcc 4.5.3, and I hit the
-> following build error:
-> 
-> /work/git/linux-trace.git/include/linux/semaphore.h: In function 'sema_init':
-> /work/git/linux-trace.git/include/linux/semaphore.h:35:17: error: unknown field 'val' specified in initializer
-> /work/git/linux-trace.git/include/linux/semaphore.h:35:17: warning: missing braces around initializer
-> /work/git/linux-trace.git/include/linux/semaphore.h:35:17: warning: (near initialization for '(anonymous).raw_lock.<anonymous>.val')
-> In file included from /work/git/linux-trace.git/include/linux/sched/user.h:7:0,
->                  from /work/git/linux-trace.git/include/linux/cred.h:22,
->                  from /work/git/linux-trace.git/include/linux/seq_file.h:12,
->                  from /work/git/linux-trace.git/include/linux/cgroup.h:18,
->                  from /work/git/linux-trace.git/include/linux/memcontrol.h:22,
->                  from /work/git/linux-trace.git/include/linux/swap.h:9,
->                  from /work/git/linux-trace.git/include/linux/suspend.h:5,
->                  from /work/git/linux-trace.git/arch/x86/kernel/asm-offsets.c:13:
-> 
-> 
-> I bisected it down to the introduction of the commit that makes
-> qspinlock have an anonymous union, which makes initializing it special
-> for older compilers. By adding strategic brackets, it makes the build
-> happy again.
-> 
-> Fixes: 625e88be1f41 ("locking/qspinlock: Merge 'struct __qspinlock' into 'struct qspinlock'")
-> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> ---
+Hmm not happening for me at least on duovero and droid4,
+I'm getting about 20s for v4.17 and v4.18-rc1.
 
-Cheers for spotting this and fixing it up! I know it's already in -tip, but
-anyway:
+Regards,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Tony
