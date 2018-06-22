@@ -1,139 +1,152 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Fri, 22 Jun 2018 00:41:28 +0200
-Subject: [PATCH v2 10/10] Input: ams_delta_serio: Get FIQ buffer from
- platform_data
-In-Reply-To: <20180621224128.17623-1-jmkrzyszt@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 21 Jun 2018 17:05:02 -0700
+Subject: [PATCH v2 02/10] Input: ams_delta_serio: convert to platform
+ driver
+In-Reply-To: <20180621224128.17623-2-jmkrzyszt@gmail.com>
 References: <20180609140224.32606-1-jmkrzyszt@gmail.com>
  <20180621224128.17623-1-jmkrzyszt@gmail.com>
-Message-ID: <20180621224128.17623-10-jmkrzyszt@gmail.com>
+ <20180621224128.17623-2-jmkrzyszt@gmail.com>
+Message-ID: <20180622000502.GA79890@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of exporting the FIQ buffer symbol to be used in
-ams-delta-serio driver, pass it to the driver as platform_data.
+On Fri, Jun 22, 2018 at 12:41:20AM +0200, Janusz Krzysztofik wrote:
+> Convert the driver to an "ams-delta-serio" platform driver.  For it to
+> be used with Amstrad Delta, register an "ams-delta-serio" platform
+> device from the board init file.
+> 
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> ---
+> Changelog:
+> v2: rebased on v4.18-rc1, no conflicts
 
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
----
-Changelog:
-v2: rebased on v4.18-rc1, no conflicts
+Input bits look good to me.
 
- arch/arm/mach-omap1/ams-delta-fiq.c         |  6 +++---
- arch/arm/mach-omap1/board-ams-delta.c       |  8 ++++++++
- drivers/input/serio/ams_delta_serio.c       | 20 +++++++++++++-------
- include/linux/platform_data/ams-delta-fiq.h |  4 ----
- 4 files changed, 24 insertions(+), 14 deletions(-)
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
-index 82ca4246a5e4..b0dc7ddf5877 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq.c
-+++ b/arch/arm/mach-omap1/ams-delta-fiq.c
-@@ -40,8 +40,7 @@ static struct fiq_handler fh = {
-  * keystrokes received from the qwerty keyboard.  See
-  * <linux/platform_data/ams-delta-fiq.h> for details of offsets.
-  */
--unsigned int fiq_buffer[1024];
--EXPORT_SYMBOL(fiq_buffer);
-+static unsigned int fiq_buffer[1024];
- 
- static struct irq_chip *irq_chip;
- static struct irq_data *irq_data[16];
-@@ -203,9 +202,10 @@ void __init ams_delta_init_fiq(struct gpio_chip *chip,
- 	val = omap_readl(OMAP_IH1_BASE + offset) | 1;
- 	omap_writel(val, OMAP_IH1_BASE + offset);
- 
--	/* Initialize serio device IRQ resource */
-+	/* Initialize serio device IRQ resource and platform_data */
- 	serio->resource[0].start = gpiod_to_irq(clk);
- 	serio->resource[0].end = serio->resource[0].start;
-+	serio->dev.platform_data = fiq_buffer;
- 
- 	/*
- 	 * Since FIQ handler performs handling of GPIO registers for
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 84177ba3e39a..772892487827 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -520,6 +520,14 @@ static struct resource ams_delta_serio_resources[] = {
- static struct platform_device ams_delta_serio_device = {
- 	.name		= "ams-delta-serio",
- 	.id		= PLATFORM_DEVID_NONE,
-+	.dev		= {
-+		/*
-+		 * Initialize .platform_data explicitly with NULL to
-+		 * indicate it is going to be used.  It will be replaced
-+		 * with FIQ buffer address as soon as FIQ is initialized.
-+		 */
-+		.platform_data = NULL,
-+	},
- 	.num_resources	= ARRAY_SIZE(ams_delta_serio_resources),
- 	.resource	= ams_delta_serio_resources,
- };
-diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-index c1f8226f172e..f8663d7891f2 100644
---- a/drivers/input/serio/ams_delta_serio.c
-+++ b/drivers/input/serio/ams_delta_serio.c
-@@ -37,6 +37,7 @@ MODULE_LICENSE("GPL");
- struct ams_delta_serio {
- 	struct serio *serio;
- 	struct regulator *vcc;
-+	unsigned int *fiq_buffer;
- };
- 
- static int check_data(struct serio *serio, int data)
-@@ -66,22 +67,23 @@ static int check_data(struct serio *serio, int data)
- static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
- {
- 	struct ams_delta_serio *priv = dev_id;
--	int *circ_buff = &fiq_buffer[FIQ_CIRC_BUFF];
-+	int *circ_buff = &priv->fiq_buffer[FIQ_CIRC_BUFF];
- 	int data, dfl;
- 	u8 scancode;
- 
--	fiq_buffer[FIQ_IRQ_PEND] = 0;
-+	priv->fiq_buffer[FIQ_IRQ_PEND] = 0;
- 
- 	/*
- 	 * Read data from the circular buffer, check it
- 	 * and then pass it on the serio
- 	 */
--	while (fiq_buffer[FIQ_KEYS_CNT] > 0) {
-+	while (priv->fiq_buffer[FIQ_KEYS_CNT] > 0) {
- 
--		data = circ_buff[fiq_buffer[FIQ_HEAD_OFFSET]++];
--		fiq_buffer[FIQ_KEYS_CNT]--;
--		if (fiq_buffer[FIQ_HEAD_OFFSET] == fiq_buffer[FIQ_BUF_LEN])
--			fiq_buffer[FIQ_HEAD_OFFSET] = 0;
-+		data = circ_buff[priv->fiq_buffer[FIQ_HEAD_OFFSET]++];
-+		priv->fiq_buffer[FIQ_KEYS_CNT]--;
-+		if (priv->fiq_buffer[FIQ_HEAD_OFFSET] ==
-+		    priv->fiq_buffer[FIQ_BUF_LEN])
-+			priv->fiq_buffer[FIQ_HEAD_OFFSET] = 0;
- 
- 		dfl = check_data(priv->serio, data);
- 		scancode = (u8) (data >> 1) & 0xFF;
-@@ -116,6 +118,10 @@ static int ams_delta_serio_init(struct platform_device *pdev)
- 	if (!priv)
- 		return -ENOMEM;
- 
-+	priv->fiq_buffer = pdev->dev.platform_data;
-+	if (!priv->fiq_buffer)
-+		return -EINVAL;
-+
- 	priv->vcc = devm_regulator_get(&pdev->dev, "vcc");
- 	if (IS_ERR(priv->vcc)) {
- 		err = PTR_ERR(priv->vcc);
-diff --git a/include/linux/platform_data/ams-delta-fiq.h b/include/linux/platform_data/ams-delta-fiq.h
-index dc0f835ea918..cf4589ccb720 100644
---- a/include/linux/platform_data/ams-delta-fiq.h
-+++ b/include/linux/platform_data/ams-delta-fiq.h
-@@ -55,8 +55,4 @@
- 
- #define FIQ_CIRC_BUFF		30      /*Start of circular buffer */
- 
--#ifndef __ASSEMBLER__
--extern unsigned int fiq_buffer[];
--#endif
--
- #endif
+> 
+>  arch/arm/mach-omap1/board-ams-delta.c |  6 ++++++
+>  drivers/input/serio/ams_delta_serio.c | 34 +++++++++++++++++++++-------------
+>  2 files changed, 27 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+> index 18e0ff437b27..2119d2d3ba84 100644
+> --- a/arch/arm/mach-omap1/board-ams-delta.c
+> +++ b/arch/arm/mach-omap1/board-ams-delta.c
+> @@ -504,12 +504,18 @@ static struct platform_device cx20442_codec_device = {
+>  	.id     = -1,
+>  };
+>  
+> +static struct platform_device ams_delta_serio_device = {
+> +	.name		= "ams-delta-serio",
+> +	.id		= PLATFORM_DEVID_NONE,
+> +};
+> +
+>  static struct platform_device *ams_delta_devices[] __initdata = {
+>  	&latch1_gpio_device,
+>  	&latch2_gpio_device,
+>  	&ams_delta_kp_device,
+>  	&ams_delta_camera_device,
+>  	&ams_delta_audio_device,
+> +	&ams_delta_serio_device,
+>  };
+>  
+>  static struct platform_device *late_devices[] __initdata = {
+> diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+> index 3df501c3421b..a2a7fa19bf49 100644
+> --- a/drivers/input/serio/ams_delta_serio.c
+> +++ b/drivers/input/serio/ams_delta_serio.c
+> @@ -22,15 +22,17 @@
+>   */
+>  #include <linux/gpio.h>
+>  #include <linux/irq.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/serio.h>
+>  #include <linux/slab.h>
+>  #include <linux/module.h>
+>  
+> -#include <asm/mach-types.h>
+>  #include <mach/board-ams-delta.h>
+>  
+>  #include <mach/ams-delta-fiq.h>
+>  
+> +#define DRIVER_NAME	"ams-delta-serio"
+> +
+>  MODULE_AUTHOR("Matt Callow");
+>  MODULE_DESCRIPTION("AMS Delta (E3) keyboard port driver");
+>  MODULE_LICENSE("GPL");
+> @@ -126,13 +128,10 @@ static const struct gpio ams_delta_gpios[] __initconst_or_module = {
+>  	},
+>  };
+>  
+> -static int __init ams_delta_serio_init(void)
+> +static int ams_delta_serio_init(struct platform_device *pdev)
+>  {
+>  	int err;
+>  
+> -	if (!machine_is_ams_delta())
+> -		return -ENODEV;
+> -
+>  	ams_delta_serio = kzalloc(sizeof(struct serio), GFP_KERNEL);
+>  	if (!ams_delta_serio)
+>  		return -ENOMEM;
+> @@ -142,22 +141,22 @@ static int __init ams_delta_serio_init(void)
+>  	ams_delta_serio->close = ams_delta_serio_close;
+>  	strlcpy(ams_delta_serio->name, "AMS DELTA keyboard adapter",
+>  			sizeof(ams_delta_serio->name));
+> -	strlcpy(ams_delta_serio->phys, "GPIO/serio0",
+> +	strlcpy(ams_delta_serio->phys, dev_name(&pdev->dev),
+>  			sizeof(ams_delta_serio->phys));
+> +	ams_delta_serio->dev.parent = &pdev->dev;
+>  
+>  	err = gpio_request_array(ams_delta_gpios,
+>  				ARRAY_SIZE(ams_delta_gpios));
+>  	if (err) {
+> -		pr_err("ams_delta_serio: Couldn't request gpio pins\n");
+> +		dev_err(&pdev->dev, "Couldn't request gpio pins\n");
+>  		goto serio;
+>  	}
+>  
+>  	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+>  			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
+> -			"ams-delta-serio", 0);
+> +			DRIVER_NAME, 0);
+>  	if (err < 0) {
+> -		pr_err("ams_delta_serio: couldn't request gpio interrupt %d\n",
+> -				gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
+> +		dev_err(&pdev->dev, "IRQ request failed (%d)\n", err);
+>  		goto gpio;
+>  	}
+>  	/*
+> @@ -179,13 +178,22 @@ static int __init ams_delta_serio_init(void)
+>  	kfree(ams_delta_serio);
+>  	return err;
+>  }
+> -module_init(ams_delta_serio_init);
+>  
+> -static void __exit ams_delta_serio_exit(void)
+> +static int ams_delta_serio_exit(struct platform_device *pdev)
+>  {
+>  	serio_unregister_port(ams_delta_serio);
+>  	free_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
+>  	gpio_free_array(ams_delta_gpios,
+>  			ARRAY_SIZE(ams_delta_gpios));
+> +
+> +	return 0;
+>  }
+> -module_exit(ams_delta_serio_exit);
+> +
+> +static struct platform_driver ams_delta_serio_driver = {
+> +	.probe	= ams_delta_serio_init,
+> +	.remove	= ams_delta_serio_exit,
+> +	.driver	= {
+> +		.name	= DRIVER_NAME
+> +	},
+> +};
+> +module_platform_driver(ams_delta_serio_driver);
+> -- 
+> 2.16.4
+> 
+
 -- 
-2.16.4
+Dmitry
